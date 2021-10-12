@@ -1,0 +1,10 @@
+# ...
+# (compute PREFIX relative to file location)
+# ...
+set(CPOFG_INCLUDE_DIRS "@CMAKE_INSTALL_PREFIX@/@PKG_INSTALL_INCLUDEDIR@")
+set(CPOFG_BINDIR "@CMAKE_INSTALL_PREFIX@/@PKG_INSTALL_BINDIR@") 
+set(CPOFG_LIBRARIES @TARGET_LIBS_SPACESEP@)
+
+if(NOT TARGET cpofg)
+  include("${CMAKE_CURRENT_LIST_DIR}/cpofgTargets.cmake")
+endif()

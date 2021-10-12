@@ -1,0 +1,14 @@
+/// @copyright  
+#include "RatVersion.h"
+
+QString RatVersion::versionName(){
+    return QString("@PROJECT_VERSION@");
+}
+
+QString RatVersion::revisionName(){
+    return QString("@SVN_LAST_REVISION@");
+}
+
+QString RatVersion::combinedName(){
+    return QString("%1-%2").arg(versionName(), revisionName());
+}

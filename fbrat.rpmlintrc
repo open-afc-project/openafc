@@ -1,0 +1,21 @@
+# Nonstandard license term
+addFilter(r'.*: W: invalid-license Commercial')
+addFilter(r'.*: W: invalid-url URL: .*')
+addFilter(r'.*: W: invalid-url Source0: .*')
+
+# This is used for Doxygen files only
+addFilter(r'.*: W: rpm-buildroot-usage %build -DAPIDOC_INSTALL_PATH=%{buildroot}%{apidocdir} \\')
+
+# Allow unnecessary cmake-generated linking
+addFilter(r'.*: W: unused-direct-shlib-dependency .*')
+# dbus configuration is package-driven
+addFilter(r'.*: W: conffile-without-noreplace-flag /etc/dbus-1/system\.d/.*\.conf')
+# Libary debug info is special case
+addFilter(r'.*-debuginfo\..*: W: only-non-binary-in-usr-lib')
+
+# daemon users
+addFilter(r'fbrat\..*: W: non-standard-uid /var/lib/fbrat fbrat')
+addFilter(r'fbrat\..*: W: non-standard-gid /var/lib/fbrat fbrat')
+
+# The statically-linked library calls exit
+addFilter(r'fbrat\..*: W: shared-lib-calls-exit /usr/lib64/librkfcrashdump.so.0.0.0 .*')

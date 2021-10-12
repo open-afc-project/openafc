@@ -1,0 +1,3 @@
+/usr/bin/rat-manage-api -- gen_context(system_u:object_r:fbrat_exec_t)
+/usr/bin/afc-engine -- gen_context(system_u:object_r:fbrat_exec_t)
+/var/lib/fbrat(/.*)?  gen_context(system_u:object_r:fbrat_data_t)

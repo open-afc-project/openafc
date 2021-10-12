@@ -1,0 +1,109 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "build-rat",
+            "type": "shell",
+            "command": "sh ./build.sh",
+            "group": "build",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "dedicated",
+                "clear": true
+            },
+            "problemMatcher": [
+                "$gcc",
+                "$tsc"
+            ]
+        },
+        {
+            "label": "devel",
+            "type": "shell",
+            "command": "sh ./run.sh rat-manage-api --log-level=debug runserver",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "build"
+            },
+            "dependsOn": [
+                "build-rat"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "label": "clean",
+            "type": "shell",
+            "command": "sh ./clean.sh",
+            "presentation": {
+                "reveal": "silent",
+                "panel": "shared"
+            }
+        },
+        {
+            "label": "celery-worker",
+            "type": "shell",
+            "command": "sh ./run.sh celery worker -A ratapi.tasks.afc_worker -E --loglevel=debug",
+            "presentation": {
+                "reveal": "always",
+                "panel": "dedicated",
+                "group": "build"
+            },
+            "dependsOn": [
+                "build-rat"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": []
+        },
+        {
+            "type": "shell",
+            "label": "cpp build active file",
+            "command": "/usr/bin/cpp",
+            "args": [
+                "-g",
+                "${file}",
+                "-o",
+                "${fileDirname}/${fileBasenameNoExtension}"
+            ],
+            "options": {
+                "cwd": "/usr/bin"
+            }
+        },
+        {
+            "type": "npm",
+            "script": "build-dev",
+            "path": "src/web/",
+            "group": "build",
+            "problemMatcher": [],
+            "label": "npm: build-dev - src/web",
+            "detail": "webpack --config webpack.dev.js --display normal"
+        },
+        {
+            "type": "shell",
+            "label": "C/C++: gcc build active file",
+            "command": "/usr/bin/gcc",
+            "args": [
+                "-g",
+                "${file}",
+                "-o",
+                "${fileDirname}/${fileBasenameNoExtension}"
+            ],
+            "options": {
+                "cwd": "${workspaceFolder}"
+            },
+            "problemMatcher": [
+                "$gcc"
+            ],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        }
+    ],
+}

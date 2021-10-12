@@ -1,0 +1,5 @@
++ runcmd.py build.log -- ninja-build -v rpm-prep
+[0/2] cd /home/jenkins/slave/workspace/RAT-release-RPM/build && /usr/bin/cpack3 --config ./CPackSourceConfig.cmake /home/jenkins/slave/workspace/RAT-release-RPM/build/CPackSourceConfig.cmake
+CPack3: Create package using TBZ2
+CPack3: Install projects
+CPack3: - Install directory: /home/jenkins/slave/workspace/RAT-release-RPM

@@ -1,0 +1,185 @@
+/* Jenkinsfile to build a release RPM set.
+ *
+ * Build parameters are:
+ * SVN_TAG The trunk/branch/tag directory to build from.
+ * RPMBUILD_ARGS Additional arguments to "rpmbuild" command.
+ * REPO_ID The unique segment of the repository name to upload to.
+ *
+ * Environment variables required:
+ * HOME to mirror the builder host file paths.
+ * PATH to include all build tools.
+ */
+
+def buildtype = "RelWithDebInfo"
+def dockerHost = 'repo.rkf-engineering.com:5000'
+
+def getTrimmedShellOutput(command) {
+    return sh(label: "shell", returnStdout: true, script: command).trim()
+}
+
+
+node('linux-docker-host') {
+    cleanWs(disableDeferredWipeout: true, deleteDirs: true)
+    
+    def workingdir = "/app"
+    def cmake = "cmake3 " +
+        "-DCMAKE_INSTALL_PREFIX=${workingdir}/testroot " +
+        "-DCMAKE_PREFIX_PATH=${workingdir}/testroot " +
+        "-DCMAKE_BUILD_TYPE=${buildtype} " +
+        "-DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169 " +
+        "-G \"Ninja\""
+    def ninja = "ninja-build -v"
+    def rpmbuild = "rpmbuild --define \"_topdir \$PWD/dist\" ${RPMBUILD_ARGS} -ba"
+    def rpmlint = "rpmlint --file=${workingdir}/fbrat.rpmlintrc dist/SPECS dist/SRPMS dist/RPMS"
+    
+    // Artifactory tracking of packages
+    def artiserv = Artifactory.server 'repo.rkf-engineering.com'
+    def buildInfo = Artifactory.newBuildInfo()
+    buildInfo.name = "${buildInfo.name}(REPO_ID=${REPO_ID})".toString()
+
+    stage('checkout'){
+        // Get some code from a repository in fresh workspace
+        checkout scm
+
+        // Package publishing tools
+        checkout([
+            $class: 'SubversionSCM',
+            filterChangelog: false, 
+            ignoreDirPropChanges: false, 
+            locations: [
+                [
+                    credentialsId: '513c9078-ee91-4cdf-9447-d90724e45648',
+                    depthOption: 'infinity',
+                    ignoreExternalsOption: true,
+                    local: 'publish',
+                    remote: 'https://scm.rkf-engineering.com/svn/rpm_repos_tools/publish'
+                ],
+            ], 
+            workspaceUpdater: [$class: 'CheckoutUpdater']
+        ])
+    }
+
+    stage('bolt') {
+        sh "sh puppet/installpuppetfile.sh"
+    }
+
+    docker.withRegistry("https://${dockerHost}", '513c9078-ee91-4cdf-9447-d90724e45648') {
+        withEnv(['DOCKER_BUILDKIT=1']) {
+            def dockerImage = "fbrat/${env.SVN_TAG}/rpmbuild"
+            def dockerEnv
+
+            stage("build-image") {
+                sh "cp /etc/pki/tls/certs/ca-bundle.crt ."
+                sh "cp ${env.HOME}/bin/runcmd.py ."
+                
+                def username = getTrimmedShellOutput("id -un")
+                def uid = getTrimmedShellOutput("id -u")
+                def groupname = getTrimmedShellOutput("id -gn")
+                def gid = getTrimmedShellOutput("id -g")
+                writeFile(
+                    file: "Dockerfile",
+                    text: """\
+FROM centos:7.7.1908
+# Builder-independent state
+COPY ca-bundle.crt /etc/pki/tls/certs/ca-bundle.crt
+RUN yum-config-manager --add-repo https://repouser:pHp8k9Vg@repo.rkf-engineering.com/artifactory/list/rat-build/rat-build.repo
+RUN yum -y install puppet-agent sudo
+RUN update-alternatives --install /usr/bin/puppet puppet /opt/puppetlabs/puppet/bin/puppet 10
+RUN yum -y clean all
+RUN echo '%wheel ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/wheel-nopasswd
+COPY puppet/ /root/puppet
+RUN sh /root/puppet/docker-apply.sh --color=off
+COPY runcmd.py /usr/local/bin/runcmd.py
+RUN chmod 755 /usr/local/bin/*
+
+# Mirror user account from builder host
+# --no-log-init flag is required due to a bug in go https://github.com/golang/go/issues/13548
+RUN groupadd -g ${gid} '${groupname}' && \
+    useradd --no-log-init -u ${uid} -g ${gid} -G wheel '${username}'
+ENV HOME=${env.HOME}
+RUN chown -R ${uid}:${gid} \$HOME
+USER jenkins
+WORKDIR ${workingdir}
+LABEL version="fbrat-${BUILD_NUMBER}"
+"""
+                )
+                sh "docker pull ${dockerHost}/${dockerImage}:latest || true"
+                dockerEnv = docker.build("${dockerImage}:${env.BUILD_ID}", "--cache-from ${dockerHost}/${dockerImage}:latest --build-arg BUILDKIT_INLINE_CACHE=1 .")
+                dockerEnv.push("latest")
+            }
+    
+            stage('rpm build') {
+                dockerEnv.inside() {
+                    sh "mkdir -p build"
+                    dir('build'){
+                        sh "runcmd.py cmake.log -- ${cmake} .. "
+                        sh "runcmd.py build.log -- ${ninja} rpm-prep"
+                        sh "runcmd.py -a build.log -- ${rpmbuild} dist/SPECS/*.spec"
+                        sh "runcmd.py rpmlint.log -- ${rpmlint} || :"
+                    }
+                    // GPG sign the packages
+                    withCredentials([file(credentialsId: 'rkf-pkg-gpg-file', variable: 'SIGNKEY'), string(credentialsId: 'rkf-pkg-gpg-pass', variable: 'SIGNPASS')]) {
+                        withEnv(["PYTHONPATH=${workingdir}"]) {
+                            sh "echo -n '${env.SIGNPASS}' | python -m publish.rpmsign ${env.SIGNKEY} build/dist/SRPMS/*.rpm build/dist/RPMS/*/*.rpm"
+                        }
+                    }
+                }
+                
+                recordIssues(
+                    ignoreQualityGate: true,
+                    tools: [
+                        gcc4(pattern: 'build/build.log'),
+                        groovyScript(parserId: 'rpmlint', pattern: 'build/rpmlint.log'),
+                    ],
+                )
+            }
+        }
+    }
+    stage('publish'){
+        if(REPO_ID != '*none*'){
+            def PUB_TARGET = 'rat-build'
+            def ulSpec = """\
+{
+    "files": [
+        {
+            "pattern": "build/dist/SRPMS/(*.rpm)",
+            "target": "${PUB_TARGET}/SRPM/{1}",
+            "recursive": false,
+            "flat": false
+        },
+        {
+            "pattern": "build/dist/RPMS/(*)/(*.rpm)",
+            "target": "${PUB_TARGET}/{1}/{2}",
+            "recursive": false,
+            "flat": false
+        }
+    ]
+}"""
+            artiserv.upload(spec: ulSpec, buildInfo: buildInfo)
+            
+            Artifactory.addInteractivePromotion(
+                displayName: "Promote to release",
+                server: artiserv,
+                promotionConfig: [
+                    // Mandatory parameters
+                    'buildName': buildInfo.name,
+                    'buildNumber': buildInfo.number,
+                    'targetRepo': 'rat-release',
+    
+                    'status': 'Released',
+                    'sourceRepo': "${PUB_TARGET}".toString(),
+                    'copy': true,
+                    'failFast': true
+                ]
+            )
+        }
+        else {
+            archiveArtifacts('build/dist/SRPMS/*.rpm,build/dist/RPMS/*/*.rpm')
+        }
+
+        buildInfo.retention(maxBuilds: 5, deleteBuildArtifacts: true)
+        artiserv.publishBuildInfo(buildInfo)
+    }
+    
+    cleanWs()
+}
