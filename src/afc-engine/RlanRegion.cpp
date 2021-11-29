@@ -11,6 +11,7 @@
 /******************************************************************************************/
 RlanRegionClass::RlanRegionClass()
 {
+    configuredFlag = false;
 }
 /******************************************************************************************/
 
@@ -26,32 +27,17 @@ RlanRegionClass::~RlanRegionClass()
 /**** CONSTRUCTOR: EllipseRlanRegionClass::EllipseRlanRegionClass()                    ****/
 /******************************************************************************************/
 EllipseRlanRegionClass::EllipseRlanRegionClass(DoubleTriplet rlanLLA, DoubleTriplet rlanUncerts_m,
-    double rlanOrientationDeg, std::string rlanHeightType, TerrainClass *terrain)
+    double rlanOrientationDeg)
 {
     std::tie(centerLatitude, centerLongitude, centerHeightInput) = rlanLLA;
     std::tie(semiMinorAxis, semiMajorAxis, heightUncertainty) = rlanUncerts_m;
     orientationDeg = rlanOrientationDeg;
 
-    double bldgHeight;
-    MultibandRasterClass::HeightResult lidarHeightResult;
-    CConst::HeightSourceEnum rlanHeightSource;
-    terrain->getTerrainHeight(centerLongitude, centerLatitude, centerTerrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
-
-    // LOGGER_DEBUG(logger) << "rlanHeight: " << centerTerrainHeight << ", building height: " << bldgHeight << ", from: " << rlanHeightSource;
-
-    if (rlanHeightType == "AMSL") {
-        centerHeight = centerHeightInput;
-    } else if (rlanHeightType == "AGL") {
-        centerHeight = centerHeightInput + centerTerrainHeight;
-    } else {
-        throw std::runtime_error(ErrStream() << "ERROR: INVALID rlanHeightType = " << rlanHeightType);
-    }
-
     double rlanOrientationRad = rlanOrientationDeg*M_PI/180.0;
 
     centerPosn = EcefModel::geodeticToEcef(centerLatitude, centerLongitude, centerHeight / 1000.0);
 
-    upVec = centerPosn.normalized();
+    upVec = EcefModel::geodeticToEcef(centerLatitude, centerLongitude, 0.0).normalized();
     eastVec = (Vector3(-upVec.y(), upVec.x(), 0.0)).normalized();
     northVec = upVec.cross(eastVec);
 
@@ -86,6 +72,32 @@ EllipseRlanRegionClass::EllipseRlanRegionClass(DoubleTriplet rlanLLA, DoubleTrip
 /******************************************************************************************/
 EllipseRlanRegionClass::~EllipseRlanRegionClass()
 {
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** CONSTRUCTOR: EllipseRlanRegionClass::configure()                                 ****/
+/******************************************************************************************/
+void EllipseRlanRegionClass::configure(std::string rlanHeightType, TerrainClass *terrain)
+{
+    double bldgHeight;
+    MultibandRasterClass::HeightResult lidarHeightResult;
+    CConst::HeightSourceEnum rlanHeightSource;
+    terrain->getTerrainHeight(centerLongitude, centerLatitude, centerTerrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
+
+    // LOGGER_DEBUG(logger) << "rlanHeight: " << centerTerrainHeight << ", building height: " << bldgHeight << ", from: " << rlanHeightSource;
+
+    if (rlanHeightType == "AMSL") {
+        centerHeight = centerHeightInput;
+    } else if (rlanHeightType == "AGL") {
+        centerHeight = centerHeightInput + centerTerrainHeight;
+    } else {
+        throw std::runtime_error(ErrStream() << "ERROR: INVALID rlanHeightType = " << rlanHeightType);
+    }
+
+    centerPosn = EcefModel::geodeticToEcef(centerLatitude, centerLongitude, centerHeight / 1000.0);
+
+    configuredFlag = true;
 }
 /******************************************************************************************/
 
@@ -132,6 +144,10 @@ std::vector<GeodeticCoord> EllipseRlanRegionClass::getBoundary() const
     std::vector<GeodeticCoord> ptList;
     arma::vec P(2);
 
+    if (!configuredFlag) {
+        throw std::runtime_error(ErrStream() << "ERROR: EllipseRlanRegionClass::getBoundary() RlanRegion not configured");
+    }
+
     int ptIdx;
     int numRLANPoints = 32;
 
@@ -155,7 +171,33 @@ std::vector<GeodeticCoord> EllipseRlanRegionClass::getBoundary() const
 /******************************************************************************************/
 double EllipseRlanRegionClass::getMinHeightAGL() const
 {
+    if (!configuredFlag) {
+        throw std::runtime_error(ErrStream() << "ERROR: EllipseRlanRegionClass::getMinHeightAGL() RlanRegion not configured");
+    }
+
     return(centerHeight - heightUncertainty - centerTerrainHeight);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: EllipseRlanRegionClass::getMaxHeightAGL()                              ****/
+/******************************************************************************************/
+double EllipseRlanRegionClass::getMaxHeightAGL() const
+{
+    if (!configuredFlag) {
+        throw std::runtime_error(ErrStream() << "ERROR: EllipseRlanRegionClass::getMaxHeightAGL() RlanRegion not configured");
+    }
+
+    return(centerHeight + heightUncertainty - centerTerrainHeight);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: EllipseRlanRegionClass::getMaxDist()                                   ****/
+/******************************************************************************************/
+double EllipseRlanRegionClass::getMaxDist() const
+{
+    return(semiMajorAxis);
 }
 /******************************************************************************************/
 
@@ -163,30 +205,15 @@ double EllipseRlanRegionClass::getMinHeightAGL() const
 /**** CONSTRUCTOR: PolygonRlanRegionClass::PolygonRlanRegionClass()                    ****/
 /******************************************************************************************/
 PolygonRlanRegionClass::PolygonRlanRegionClass(DoubleTriplet rlanLLA, DoubleTriplet rlanUncerts_m,
-    const std::vector<std::pair<double, double>>& rlanPolygon, std::string rlanHeightType, TerrainClass *terrain, RLANBoundary polygonTypeVal) :
+    const std::vector<std::pair<double, double>>& rlanPolygon, RLANBoundary polygonTypeVal) :
 polygonType(polygonTypeVal)
 {
     std::tie(centerLatitude, centerLongitude, centerHeightInput) = rlanLLA;
     std::tie(std::ignore, std::ignore, heightUncertainty) = rlanUncerts_m;
 
-    double bldgHeight;
-    MultibandRasterClass::HeightResult lidarHeightResult;
-    CConst::HeightSourceEnum rlanHeightSource;
-    terrain->getTerrainHeight(centerLongitude, centerLatitude, centerTerrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
+    Vector3 centerPosnNoHeight = EcefModel::geodeticToEcef(centerLatitude, centerLongitude, 0.0);
 
-    // LOGGER_DEBUG(logger) << "rlanHeight: " << centerTerrainHeight << ", building height: " << bldgHeight << ", from: " << rlanHeightSource;
-
-    if (rlanHeightType == "AMSL") {
-        centerHeight = centerHeightInput;
-    } else if (rlanHeightType == "AGL") {
-        centerHeight = centerHeightInput + centerTerrainHeight;
-    } else {
-        throw std::runtime_error(ErrStream() << "ERROR: INVALID rlanHeightType = " << rlanHeightType);
-    }
-
-    centerPosn = EcefModel::geodeticToEcef(centerLatitude, centerLongitude, centerHeight / 1000.0);
-
-    upVec = centerPosn.normalized();
+    upVec = centerPosnNoHeight.normalized();
     eastVec = (Vector3(-upVec.y(), upVec.x(), 0.0)).normalized();
     northVec = upVec.cross(eastVec);
 
@@ -207,7 +234,7 @@ polygonType(polygonTypeVal)
             double angle = rlanPolygon[i].first;
             double length = rlanPolygon[i].second;
 
-            Vector3 position = centerPosn + (length/1000.0)*(northVec*cos(angle*M_PI/180.0) + eastVec*sin(angle*M_PI/180.0));
+            Vector3 position = centerPosnNoHeight + (length/1000.0)*(northVec*cos(angle*M_PI/180.0) + eastVec*sin(angle*M_PI/180.0));
             GeodeticCoord positionGeo = EcefModel::toGeodetic(position);
 
             longitude = positionGeo.longitudeDeg;
@@ -232,6 +259,32 @@ polygonType(polygonTypeVal)
 /******************************************************************************************/
 PolygonRlanRegionClass::~PolygonRlanRegionClass()
 {
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** CONSTRUCTOR: PolygonRlanRegionClass::configure()                                 ****/
+/******************************************************************************************/
+void PolygonRlanRegionClass::configure(std::string rlanHeightType, TerrainClass *terrain)
+{
+    double bldgHeight;
+    MultibandRasterClass::HeightResult lidarHeightResult;
+    CConst::HeightSourceEnum rlanHeightSource;
+    terrain->getTerrainHeight(centerLongitude, centerLatitude, centerTerrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
+
+    // LOGGER_DEBUG(logger) << "rlanHeight: " << centerTerrainHeight << ", building height: " << bldgHeight << ", from: " << rlanHeightSource;
+
+    if (rlanHeightType == "AMSL") {
+        centerHeight = centerHeightInput;
+    } else if (rlanHeightType == "AGL") {
+        centerHeight = centerHeightInput + centerTerrainHeight;
+    } else {
+        throw std::runtime_error(ErrStream() << "ERROR: INVALID rlanHeightType = " << rlanHeightType);
+    }
+
+    centerPosn = EcefModel::geodeticToEcef(centerLatitude, centerLongitude, centerHeight / 1000.0);
+
+    configuredFlag = true;
 }
 /******************************************************************************************/
 
@@ -281,6 +334,10 @@ std::vector<GeodeticCoord> PolygonRlanRegionClass::getBoundary() const
 {
     std::vector<GeodeticCoord> ptList;
 
+    if (!configuredFlag) {
+        throw std::runtime_error(ErrStream() << "ERROR: PolygonRlanRegionClass::getBoundary() RlanRegion not configured");
+    }
+
     int ptIdx;
     int numRLANPoints = polygon->num_bdy_pt[0];
 
@@ -302,6 +359,46 @@ std::vector<GeodeticCoord> PolygonRlanRegionClass::getBoundary() const
 /******************************************************************************************/
 double PolygonRlanRegionClass::getMinHeightAGL() const
 {
+    if (!configuredFlag) {
+        throw std::runtime_error(ErrStream() << "ERROR: PolygonRlanRegionClass::getMinHeightAGL() RlanRegion not configured");
+    }
+
     return(centerHeight - heightUncertainty - centerTerrainHeight);
 }
 /******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: PolygonRlanRegionClass::getMaxHeightAGL()                              ****/
+/******************************************************************************************/
+double PolygonRlanRegionClass::getMaxHeightAGL() const
+{
+    if (!configuredFlag) {
+        throw std::runtime_error(ErrStream() << "ERROR: PolygonRlanRegionClass::getMaxHeightAGL() RlanRegion not configured");
+    }
+
+    return(centerHeight + heightUncertainty - centerTerrainHeight);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: PolygonRlanRegionClass::getMaxDist()                                   ****/
+/******************************************************************************************/
+double PolygonRlanRegionClass::getMaxDist() const
+{
+    int ptIdx;
+    double dist;
+    double maxDist = 0.0;
+    int numRLANPoints = polygon->num_bdy_pt[0];
+
+    for(ptIdx=0; ptIdx<numRLANPoints; ptIdx++) {
+        int xval = polygon->bdy_pt_x[0][ptIdx];
+        int yval = polygon->bdy_pt_y[0][ptIdx];
+        dist = sqrt(((double) xval)*xval + ((double) yval)*yval)*(resolution*M_PI/180.0)*CConst::earthRadius;
+        if (dist > maxDist) {
+            maxDist = dist;
+        }
+    }
+    return(maxDist);
+}
+/******************************************************************************************/
+

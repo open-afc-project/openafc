@@ -2,7 +2,7 @@
   "name": "fbrat-web",
   "version": "0.0.0",
   "description": "FB AFC Tool Web GUI",
-  "license": "",
+  "license": "The use of this software shall be governed by the terms and conditions of the Professional Services Agreement Facebook, Inc. dated January 6, 2015.",
   "main": "index.js",
   "repository": "https://scm.rkf-engineering.com/svn/facebook_rlan_afc/",
   "private": true,

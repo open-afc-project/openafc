@@ -45,6 +45,8 @@ namespace UlsMeasurementAnalysis {
 
     double runPointToPoint(const TerrainClass *terrain, bool includeBldg, QPointF transLocLatLon, double transHt,       QPointF receiveLocLatLon,double receiveHt, double lineOfSightDistanceKm, double eps_dielect, double sgm_conductivity, double eno_ns_surfref, double frq_mhz, int radio_climate, int pol, double conf, double rel, int numpts, char *prefix,double **heightProfilePtr);
 
+    bool isLOS(const TerrainClass *terrain, QPointF transLocLatLon, double transHt, QPointF receiveLocLatLon,
+                           double receiveHt, double lineOfSightDistanceKm, int numpts, double **heightProfilePtr);
 
     double computeTerrainHeight(const double& latDeg, const double& lonDeg, const BuildingRasterModel *bldg, const WorldData *globeData, const GdalDataDir *dataDir);
 

@@ -4,6 +4,7 @@
 
 class ULSClass;
 class RLANClass;
+class RASClass;
 class ChannelPairClass;
 class LidarBlacklistEntryClass;
 class BBClass;
@@ -14,6 +15,7 @@ template class ListClass<double>;
 template class ListClass<DblDblClass>;
 template class ListClass<ULSClass *>;
 template class ListClass<RLANClass *>;
+template class ListClass<RASClass *>;
 template class ListClass<ChannelPairClass *>;
 template class ListClass<LidarBlacklistEntryClass *>;
 template class ListClass<Vector3>;

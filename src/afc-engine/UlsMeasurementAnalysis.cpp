@@ -428,11 +428,11 @@ namespace UlsMeasurementAnalysis {
                 // some dead spots exist in srtm1.  revert to wd when this is true
                 if (!srtm1->getHeight(height, pt.x(), pt.y())) {
                     numInvalidSRTM++;
-                    double height = wd->valueAtLatLon(pt.x(), pt.y());
-                    if (height == WorldData::NO_DATA) {
-                        height = 0.0;
+                    double heightVal = wd->valueAtLatLon(pt.x(), pt.y());
+                    if (heightVal == WorldData::NO_DATA) {
+                        heightVal = 0.0;
                     }
-                    *pos = height;
+                    *pos = heightVal;
                 }
                 else {
                     *pos = height;
@@ -994,11 +994,11 @@ namespace UlsMeasurementAnalysis {
 
                 // some dead spots exist in srtm1.  revert to wd when this is true
                 if (!srtm1->getHeight(height, pt.x(), pt.y())) {
-                    double height = wd->valueAtLatLon(pt.x(), pt.y());
-                    if (height == WorldData::NO_DATA) {
-                        height = 0.0;
+                    double heightVal = wd->valueAtLatLon(pt.x(), pt.y());
+                    if (heightVal == WorldData::NO_DATA) {
+                        heightVal = 0.0;
                     }
-                    hi[i] = height;
+                    hi[i] = heightVal;
                     numInvalidSRTM++;
                 } else {
                     hi[i] = height;
@@ -1164,7 +1164,6 @@ namespace UlsMeasurementAnalysis {
         char buf[256];
         int errnum;
 
-        
         point_to_point(*heightProfilePtr, transHt, receiveHt, eps_dielect, sgm_conductivity, eno_ns_surfref, frq_mhz, radio_climate, pol, conf, rel, rv, buf, errnum);
         //qDebug() << " point_to_point" << rv << buf << errnum;
 
@@ -1176,6 +1175,32 @@ namespace UlsMeasurementAnalysis {
         }
 
         return rv;
+    }
+
+    bool isLOS(const TerrainClass *terrain, QPointF transLocLatLon, double transHt, QPointF receiveLocLatLon,
+                           double receiveHt, double lineOfSightDistanceKm, int numpts, double **heightProfilePtr) {
+        if (!(*heightProfilePtr)) {
+            *heightProfilePtr = computeElevationVector(terrain, true, transLocLatLon, receiveLocLatLon, numpts);
+        }
+        (*heightProfilePtr)[1] = 1000 * lineOfSightDistanceKm / numpts;
+
+        double txHeightAMSL = (*heightProfilePtr)[2] + transHt;
+        double rxHeightAMSL = (*heightProfilePtr)[2+numpts-1] + receiveHt;
+
+        int ptIdx;
+        bool losFlag = true;
+        for(ptIdx = 0; (ptIdx < numpts)&&(losFlag); ++ptIdx){
+            double ptHeight = (*heightProfilePtr)[2 + ptIdx];
+            double signalHeight = ( txHeightAMSL*(numpts-1-ptIdx) + rxHeightAMSL*ptIdx ) / (numpts-1);
+
+            double clearance = signalHeight - ptHeight;
+
+            if (clearance < 0.0) {
+                losFlag = false;
+            }
+        }
+
+        return losFlag;
     }
 
     /******************************************************************************************/

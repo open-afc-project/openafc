@@ -37,7 +37,7 @@ class AppInfo extends React.Component<{}, { isModalOpen: boolean }> {
                 <AboutModal
                     isOpen={isModalOpen}
                     onClose={this.handleModalToggle}
-                    trademark=""
+                    trademark="The use of this software shall be governed by the terms and conditions of the Professional Services Agreement Facebook, Inc. dated January 6, 2015."
                     brandImageSrc=""
                     brandImageAlt="Logo"
                     productName="RLAN AFC Tool"

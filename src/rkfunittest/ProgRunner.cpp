@@ -22,8 +22,8 @@ namespace{
     LOGGER_DEFINE_GLOBAL(logger, "ProgRunner")
 }
 
-ProgRunner::ProgRunner(QObject *parent)
-  : QObject(parent){
+ProgRunner::ProgRunner(QObject *parentVal)
+  : QObject(parentVal){
     _goodExit = {0};
 
     _proc = new QProcess(this);

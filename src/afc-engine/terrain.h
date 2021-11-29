@@ -45,7 +45,9 @@ class TerrainClass
 {
 public:
     TerrainClass(QString lidarDir, std::string srtmDir, std::string depDir, QString globeDir,
-        double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon, int maxLidarRegionLoadVal);
+        double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon,
+        double terrainMinLatBldg, double terrainMinLonBldg, double terrainMaxLatBldg, double terrainMaxLonBldg,
+        int maxLidarRegionLoadVal);
     ~TerrainClass();
 
     void readLidarInfo(QDir lidarDir);

@@ -9,8 +9,8 @@ setuptools.setup(
     # Label compatible with PEP 440
     version='@PROJECT_VERSION@+@SVN_LAST_REVISION@'.lower(),
 
-    author='',
-    url='',
+    author='RKF Engineering Solutions, LLC',
+    url='http://www.rkf-eng.com/',
     license='Redistributable, no modification',
 
     description='Facebook RLAN AFC Tool',

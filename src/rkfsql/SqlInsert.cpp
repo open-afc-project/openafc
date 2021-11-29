@@ -12,12 +12,12 @@ namespace{
 const QChar comma(',');
 }
 
-SqlInsert & SqlInsert::cols(const QStringList &cols){
-    if(cols.toSet().count() != cols.count()){
+SqlInsert & SqlInsert::cols(const QStringList &colsVal){
+    if(colsVal.toSet().count() != colsVal.count()){
         throw SqlError("Duplicate column name");
     }
 
-    _cols = cols;
+    _cols = colsVal;
     return *this;
 }
 

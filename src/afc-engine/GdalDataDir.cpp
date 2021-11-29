@@ -125,6 +125,7 @@ bool GdalDataDir::getHeight(qint16& height, const double& lat, const double& lon
 	if (dataSet == _cachedData.constEnd()) 
 	{
 		// not found
+	        height = this->INVALID_HEIGHT;
 		return false;
 	}
 

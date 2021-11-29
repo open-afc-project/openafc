@@ -55,6 +55,10 @@ DEPDatasetClass::DEPDatasetClass(std::string directoryVal, int pointsPerDegreeVa
     fastFlag = fastFlagVal;
 
     switch(pointsPerDegree) {
+        case 3600:
+            str = "DEP 1 arcsec data";
+            size = 3612;
+            break;
         case 10800:
             str = "DEP 1/3 arcsec data";
             size = 10812;

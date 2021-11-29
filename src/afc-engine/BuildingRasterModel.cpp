@@ -124,10 +124,10 @@ std::pair<BuildingRasterModel::HeightResult, double> BuildingRasterModel::getHei
 
 std::vector<QRectF> BuildingRasterModel::getBounds() const
 {
-    std::vector<QRectF> bounds = std::vector<QRectF>();
+    std::vector<QRectF> boundsList = std::vector<QRectF>();
     for (RasterModel m : this->models)
     {
-        bounds.push_back(m.bounds);
+        boundsList.push_back(m.bounds);
     }
-    return bounds;
+    return boundsList;
 }

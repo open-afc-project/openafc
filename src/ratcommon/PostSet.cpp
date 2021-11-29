@@ -1,4 +1,3 @@
-//  
 
 #include "PostSet.h"
 #include "rkflogging/Logging.h"

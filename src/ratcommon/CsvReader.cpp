@@ -1,5 +1,3 @@
-//  
-
 #include <QFile>
 #include "CsvReader.h"
 
@@ -356,8 +354,8 @@ QStringList CsvReader::readRow(){
                     QString("End of file within quoted field")
                 );
             }
-            foreach(const QChar &chr, _lineEnding){
-                process.addChar(chr);
+            foreach(const QChar &chrVal, _lineEnding){
+                process.addChar(chrVal);
             }
             break;
 

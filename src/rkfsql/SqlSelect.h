@@ -54,8 +54,8 @@ public:
      * @param cols A list of column names.
      * @return The updated query object.
      */
-    SqlSelect & cols(const QStringList &cols){
-        _selCols = cols;
+    SqlSelect & cols(const QStringList &colsVal){
+        _selCols = colsVal;
         return *this;
     }
 
@@ -73,8 +73,8 @@ public:
      * @param cols A comma separated list of column names.
      * @return The updated query object.
      */
-    SqlSelect & group(const QString &cols){
-        _groupCols = cols;
+    SqlSelect & group(const QString &colsVal){
+        _groupCols = colsVal;
         return *this;
     }
     /** Overload to combine multiple column names.
@@ -98,8 +98,8 @@ public:
      * @param cols A comma separated list of column names.
      * @return The updated query object.
      */
-    SqlSelect & order(const QString &cols){
-        _orderCols = cols;
+    SqlSelect & order(const QString &colsVal){
+        _orderCols = colsVal;
         return *this;
     }
 
@@ -180,12 +180,12 @@ public:
      * @return The updated query object.
      */
     template<class Container>
-    SqlSelect & whereIn(const QString &col, const Container &values){
+    SqlSelect & whereIn(const QString &colVal, const Container &values){
         QVariantList parts;
         foreach(const typename Container::value_type &val, values){
             parts << val;
         }
-        return whereInList(col, parts);
+        return whereInList(colVal, parts);
     }
 
     /** Add a WHERE clause to the SELECT for a single column.

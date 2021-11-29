@@ -50,28 +50,28 @@ FileTestHelpers::TestDir::TestDir(const QString &testName)
     for(auto it = randStr.begin(); it != randStr.end(); ++it){
         *it = char(::rand() % 0x100);
     }
-    const QString dirName = absoluteFilePath(
+    const QString dirNameVal = absoluteFilePath(
         QString("unittest-%1-%2-%3")
             .arg(testName)
             .arg(QCoreApplication::applicationPid())
             .arg(QLatin1String(randStr.toHex()))
     );
-    QDir::mkdir(dirName);
+    QDir::mkdir(dirNameVal);
 #else
     QByteArray dformat = absoluteFilePath(QString("unittest-%1-XXXXXX").arg(testName)).toUtf8();
     if(::mkdtemp(dformat.data()) == NULL){
         throw RuntimeError(QString("Failed to make temporary directory %1").arg(QString(dformat)));
     }
-    const QString dirName(dformat);
+    const QString dirNameVal(dformat);
 #endif
 
     const auto env = QProcessEnvironment::systemEnvironment();
     if(!env.value("FILETESTHELPERS_TESTDIR_KEEP").isEmpty()){
         _keep = true;
-        LOGGER_INFO(logger) << "Saving temporary path \"" << dirName << "\"";
+        LOGGER_INFO(logger) << "Saving temporary path \"" << dirNameVal << "\"";
     }
-    if(!QDir::cd(dirName)){
-        throw RuntimeError(QString("Failed to enter directory %1").arg(dirName));
+    if(!QDir::cd(dirNameVal)){
+        throw RuntimeError(QString("Failed to enter directory %1").arg(dirNameVal));
     }
 }
 

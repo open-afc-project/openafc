@@ -36,7 +36,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 this.props.onChange({ kind: s, win2ProbLosThreshold: 10, win2Confidence: 50, itmConfidence: 50, p2108Confidence: 50, terrainSource: "SRTM (90m)" });
                 break;
             case "FCC 6GHz Report & Order":
-                this.props.onChange({ kind: s, win2Confidence: 50, itmConfidence: 50, p2108Confidence: 50, terrainSource: "SRTM (90m)" });
+                this.props.onChange({ kind: s, win2Confidence: 50, itmConfidence: 50, p2108Confidence: 50, buildingSource: "LiDAR", terrainSource: "3DEP (30m)"});
                 break;
             case "Ray Tracing":
                 break; // do nothing
@@ -63,6 +63,11 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
     }
 
     setBuildingSource = (s: string) => {
+        const model = this.props.data;
+        // Ensure that there is terrain source is set to default when there is building data
+        if(model.buildingSource === "None" && s !== "None") {
+            this.setTerrainSource("3DEP (30m)");
+        }
         this.props.onChange(Object.assign(this.props.data, { buildingSource: s }));
     }
 
@@ -95,16 +100,16 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         label="Building Data Source"
                         fieldId="propogation-model-data-source"
                     >
-                        <FormSelect
-                            value={model.buildingSource}
-                            onChange={this.setBuildingSource}
-                            id="propogation-model-data-source"
-                            name="propogation-model-data-source"
-                            style={{ textAlign: "right" }}
-                            isValid={model.buildingSource === "LiDAR" || model.buildingSource === "B-Design3D"}>
-                            <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
-                            <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
-                        </FormSelect>
+                    <FormSelect
+                        value={model.buildingSource}
+                        onChange={this.setBuildingSource}
+                        id="propogation-model-data-source"
+                        name="propogation-model-data-source"
+                        style={{ textAlign: "right" }}
+                        isValid={model.buildingSource === "LiDAR" || model.buildingSource === "B-Design3D"}>
+                        <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
+                        <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
+                    </FormSelect>
                     </FormGroup>
                 </>
             case "ITM with no building data":
@@ -171,9 +176,9 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             id="terrain-source"
                             name="terrain-source"
                             style={{ textAlign: "right" }}
-                            isValid={model.terrainSource === "SRTM (90m)" || model.terrainSource === "3DEP (10m)"}>
+                            isValid={model.terrainSource === "SRTM (90m)" || model.terrainSource === "3DEP (30m)"}>
                             <FormSelectOption key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
-                            <FormSelectOption key="3DEP (10m)" isDisabled={true} value="3DEP (10m)" label="3DEP (10m)" />
+                            <FormSelectOption key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
                         </FormSelect>
                     </FormGroup>
                 </>
@@ -219,6 +224,25 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
+                        label="Building Data Source"
+                        fieldId="propogation-model-data-source"
+                    >
+                        <FormSelect
+                            value={model.buildingSource}
+                            onChange={this.setBuildingSource}
+                            id="propogation-model-data-source"
+                            name="propogation-model-data-source"
+                            style={{ textAlign: "right" }}
+                            isValid={model.buildingSource === "LiDAR" || model.buildingSource === "B-Design3D" || model.buildingSource === "None"}>
+                            <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
+                            <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
+                            <FormSelectOption key="None" value="None" label="None" />
+                        </FormSelect>
+                        
+                    </FormGroup>
+                   
+                    {model.buildingSource === "None" ? 
+                     <FormGroup
                         label="Terrain Source"
                         fieldId="terrain-source"
                     >
@@ -228,11 +252,14 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             id="terrain-source"
                             name="terrain-source"
                             style={{ textAlign: "right" }}
-                            isValid={model.terrainSource === "SRTM (90m)" || model.terrainSource === "3DEP (10m)"}>
-                            <FormSelectOption key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
-                            <FormSelectOption key="3DEP (10m)" isDisabled={true} value="3DEP (10m)" label="3DEP (10m)" />
+                            isValid={model.terrainSource === "3DEP (30m)"}>
+                            <FormSelectOption key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
+                            <FormSelectOption isDisabled={true} key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
                         </FormSelect>
-                    </FormGroup>
+                        </FormGroup>
+                        :
+                        false}
+
                 </>
             case "Ray Tracing":
                 return <></>;
@@ -263,6 +290,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <li>- Distance &lt; 30m: FSPL</li>
                             <li>- 30m &le; Distance &lt; 1km: Combined Winner II Urban/Suburban/Rural</li>
                             <li>- Distance &gt;= 1km: ITM + [P.2108 Clutter (Urban/Suburban) or P.452 Clutter (Rural)]</li>
+                            <li>- For the terrain source, the highest resolution selected terrain source is used (1m LiDAR -&gt; 30m 3DEP -&gt; 90m SRTM -&gt; 1km Globe)</li>
                         </ul>
                     </>
                 }

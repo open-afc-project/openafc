@@ -13,6 +13,7 @@ export interface GuiConfig {
     history_url: string,
     afcconfig_defaults: string,
     lidar_bounds: string,
+    ras_bounds: string,
     google_apikey: string,
     rat_api_analysis: string,
     uls_convert_url: string,
@@ -39,6 +40,7 @@ export interface AFCConfigFile {
     propagationModel: PropagationModel,
     propagationEnv: "Population Density Map" | "Urban" | "Suburban" | "Rural",
     regionStr?: string,
+    rasDatabase?: string
 }
 
 export type PenetrationLossModel = P2109 | FixedValue;
@@ -94,7 +96,7 @@ export interface Win2ItmClutter {
     win2Confidence: number,
     itmConfidence: number,
     p2108Confidence: number,
-    terrainSource: "SRTM (90m)" |"3DEP (10m)"
+    terrainSource: "SRTM (90m)" |"3DEP (30m)"
 }
 export interface RayTrace {
     kind: "Ray Tracing"
@@ -104,7 +106,8 @@ export interface FCC6GHz {
     win2Confidence: number,
     itmConfidence: number,
     p2108Confidence: number,
-    terrainSource: "SRTM (90m)" |"3DEP (10m)"
+    buildingSource: "B-Design3D" | "LiDAR" | "None",
+    terrainSource: "SRTM (90m)" |"3DEP (30m)"
 }
 
 /**
@@ -118,7 +121,8 @@ export interface PAWSRequest {
     location: GeoLocation,
     owner?: DeviceOwner,
     antenna: AntennaCharacteristics,
-    capabilities: DeviceCapabilities
+    capabilities: DeviceCapabilities,
+    useAdjacentChannel?: boolean
 }
 
 /**

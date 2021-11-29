@@ -19,8 +19,8 @@ namespace{
     LOGGER_DEFINE_GLOBAL(logger, "PgsqlDaemonRunner")
 }
 
-PgsqlDaemonRunner::PgsqlDaemonRunner(const QDir &root, QObject *parent)
-  : ProgRunner(parent), _root(root){
+PgsqlDaemonRunner::PgsqlDaemonRunner(const QDir &root, QObject *parentVal)
+  : ProgRunner(parentVal), _root(root){
 
     if(!_root.mkdir("data")){
         throw std::runtime_error("failed to create data directory");

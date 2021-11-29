@@ -28,6 +28,9 @@ public:
     virtual LatLon closestPoint(LatLon latlon, bool& contains) const = 0;
     virtual std::vector<GeodeticCoord> getBoundary() const = 0;
     virtual double getMinHeightAGL()  const = 0;
+    virtual double getMaxHeightAGL()  const = 0;
+    virtual double getMaxDist() const = 0;
+    virtual void configure(std::string rlanHeightType, TerrainClass *terrain) = 0;
 
     double getCenterLongitude() const { return(centerLongitude); }
     double getCenterLatitude()  const { return(centerLatitude); }
@@ -47,6 +50,8 @@ protected:
     Vector3 upVec;
     Vector3 eastVec;
     Vector3 northVec;
+
+    bool configuredFlag;
 };
 /******************************************************************************************/
 
@@ -57,7 +62,7 @@ class EllipseRlanRegionClass : RlanRegionClass
 {
 public:
     EllipseRlanRegionClass(DoubleTriplet rlanLLA, DoubleTriplet rlanUncerts_m,
-        double rlanOrientationDeg, std::string rlanHeightType, TerrainClass *terrain);
+        double rlanOrientationDeg);
 
     ~EllipseRlanRegionClass();
 
@@ -65,6 +70,9 @@ public:
     LatLon closestPoint(LatLon latlon, bool& contains) const;
     std::vector<GeodeticCoord> getBoundary() const;
     double getMinHeightAGL() const;
+    double getMaxHeightAGL() const;
+    double getMaxDist() const;
+    void configure(std::string rlanHeightType, TerrainClass *terrain);
 
 private:
     double semiMinorAxis;
@@ -85,7 +93,7 @@ class PolygonRlanRegionClass : RlanRegionClass
 {
 public:
     PolygonRlanRegionClass(DoubleTriplet rlanLLA, DoubleTriplet rlanUncerts_m,
-        const std::vector<std::pair<double, double>>& rlanPolygon, std::string rlanHeightType, TerrainClass *terrain, RLANBoundary polygonTypeVal);
+        const std::vector<std::pair<double, double>>& rlanPolygon, RLANBoundary polygonTypeVal);
 
     ~PolygonRlanRegionClass();
 
@@ -93,6 +101,9 @@ public:
     LatLon closestPoint(LatLon latlon, bool& contains) const;
     std::vector<GeodeticCoord> getBoundary() const;
     double getMinHeightAGL() const;
+    double getMaxHeightAGL() const;
+    double getMaxDist() const;
+    void configure(std::string rlanHeightType, TerrainClass *terrain);
 
 private:
     double resolution, cosVal, oneOverCosVal;

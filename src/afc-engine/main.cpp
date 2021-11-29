@@ -117,10 +117,11 @@ int main(int argc, char **argv) { // Accepts input from command line
                 << " seconds";
         /**************************************************************************************/
     
-    #if DBG_COMPUTE
+    #if 0
         std::vector<psdFreqRangeClass> psdFreqRangeList;
         afcManager.computeInquiredFreqRangesPSD(psdFreqRangeList);
-    #else
+    #endif
+
         /**************************************************************************************/
         /* Write output files                                                                 */
         /**************************************************************************************/
@@ -129,7 +130,7 @@ int main(int argc, char **argv) { // Accepts input from command line
 
         LOGGER_DEBUG(logger) << "AFC Engine has exported the data for the GUI...";
         /**************************************************************************************/
-    #endif
+
         return 0;
     }
     catch(std::exception &e){

@@ -24,10 +24,10 @@ public:
      * @param y Y coordinate to set
      * @param z Z coordinate to set
      */
-	Vector3(double x = 0.0, double y = 0.0, double z = 0.0) {
-        data[0] = x;
-		data[1] = y;
-		data[2] = z;
+	Vector3(double xVal = 0.0, double yVal = 0.0, double zVal = 0.0) {
+        data[0] = xVal;
+		data[1] = yVal;
+		data[2] = zVal;
 	}
 
     /** 
