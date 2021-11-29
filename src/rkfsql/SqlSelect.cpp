@@ -28,65 +28,65 @@ SqlSelect & SqlSelect::col(const QString &name){
     return cols(QStringList(name));
 }
 
-SqlSelect & SqlSelect::group(const QStringList &cols){
-    return group(cols.join(","));
+SqlSelect & SqlSelect::group(const QStringList &colsVal){
+    return group(colsVal.join(","));
 }
 
-SqlSelect & SqlSelect::whereNull(const QString &col){
-    return where(QString("(%1 IS NULL)").arg(col));
+SqlSelect & SqlSelect::whereNull(const QString &colVal){
+    return where(QString("(%1 IS NULL)").arg(colVal));
 }
 
-SqlSelect & SqlSelect::whereEqualPlaceholder(const QString &col){
-    return where(QString("(%1 = ?)").arg(col));
+SqlSelect & SqlSelect::whereEqualPlaceholder(const QString &colVal){
+    return where(QString("(%1 = ?)").arg(colVal));
 }
 
-SqlSelect & SqlSelect::whereNonZero(const QString &col){
-    return where(QString("(%1 <> 0)").arg(col));
+SqlSelect & SqlSelect::whereNonZero(const QString &colVal){
+    return where(QString("(%1 <> 0)").arg(colVal));
 }
 
-SqlSelect & SqlSelect::whereEqual(const QString &col, const QVariant &value){
+SqlSelect & SqlSelect::whereEqual(const QString &colVal, const QVariant &value){
     const QString valEnc = SqlHelpers::quoted(_db.driver(), value);
     const QString op = (value.isNull() ? "IS" : "=");
-    return where(QString("(%1 %2 %3)").arg(col, op, valEnc));
+    return where(QString("(%1 %2 %3)").arg(colVal, op, valEnc));
 }
 
-SqlSelect & SqlSelect::whereCompare(const QString &col, const QString &op, const QVariant &value){
+SqlSelect & SqlSelect::whereCompare(const QString &colVal, const QString &op, const QVariant &value){
     const QString valEnc = SqlHelpers::quoted(_db.driver(), value);
-    return where(QString("(%1 %2 %3)").arg(col, op, valEnc));
+    return where(QString("(%1 %2 %3)").arg(colVal, op, valEnc));
 }
 
-SqlSelect & SqlSelect::whereComparePlaceholder(const QString &col, const QString &op){
-    return where(QString("(%1 %2 ?)").arg(col, op));
+SqlSelect & SqlSelect::whereComparePlaceholder(const QString &colVal, const QString &op){
+    return where(QString("(%1 %2 ?)").arg(colVal, op));
 }
 
-SqlSelect & SqlSelect::whereInExpr(const QString &col, const QString &expr){
-    _whereExprs << QString("(%1 IN (%2))").arg(col).arg(expr);
+SqlSelect & SqlSelect::whereInExpr(const QString &colVal, const QString &expr){
+    _whereExprs << QString("(%1 IN (%2))").arg(colVal).arg(expr);
     return *this;
 }
 
-SqlSelect & SqlSelect::whereInList(const QString &col, const QVariantList &values){
+SqlSelect & SqlSelect::whereInList(const QString &colVal, const QVariantList &values){
     const QSqlDriver *drv = _db.driver();
     QStringList parts;
     foreach(const QVariant &val, values){
         parts << SqlHelpers::quoted(drv, val);
     }
-    return whereInExpr(col, parts.join(","));
+    return whereInExpr(colVal, parts.join(","));
 }
 
-SqlSelect & SqlSelect::whereBetween(const QString &col, const QVariant &minInclusive, const QVariant &maxInclusive){
+SqlSelect & SqlSelect::whereBetween(const QString &colVal, const QVariant &minInclusive, const QVariant &maxInclusive){
     const QSqlDriver *drv = _db.driver();
-    _whereExprs << QString("((%1 >= %2) AND (%1 <= %3))").arg(col)
+    _whereExprs << QString("((%1 >= %2) AND (%1 <= %3))").arg(colVal)
         .arg(SqlHelpers::quoted(drv, minInclusive))
         .arg(SqlHelpers::quoted(drv, maxInclusive));
     return *this;
 }
 
 SqlSelect & SqlSelect::join(const QString &other, const QString &on, const QString &type){
-    Join join;
-    join.whatClause = other;
-    join.onClause = on;
-    join.typeClause = type;
-    _joins.append(join);
+    Join joinVal;
+    joinVal.whatClause = other;
+    joinVal.onClause = on;
+    joinVal.typeClause = type;
+    _joins.append(joinVal);
     return *this;
 }
 
@@ -110,9 +110,9 @@ QString SqlSelect::query() const{
     }
 
     // Optional JOINs list
-    foreach(const Join &join, _joins){
+    foreach(const Join &joinVal, _joins){
         queryStr += QString(" %1 JOIN %2 ON (%3)")
-            .arg(join.typeClause, join.whatClause, join.onClause);
+            .arg(joinVal.typeClause, joinVal.whatClause, joinVal.onClause);
     }
 
     // Add list of WHERE clauses

@@ -1,5 +1,3 @@
-//  
-
 #include "../ErrStream.h"
 #include "rkfunittest/GtestShim.h"
 #include <iomanip>

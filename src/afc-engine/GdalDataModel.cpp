@@ -99,18 +99,18 @@ std::map<int64_t,double> GdalDataModel::getBuildingsAtPoint(double lat, double l
     _ptrLayer->ResetReading();
 
     // Extract spatial reference datum from current layer
-    OGRSpatialReference* testSrcSpatialRef = new OGRSpatialReference();
-    testSrcSpatialRef->SetWellKnownGeogCS("WGS84");
+    OGRSpatialReference* tmpSrcSpatialRef = new OGRSpatialReference();
+    tmpSrcSpatialRef->SetWellKnownGeogCS("WGS84");
     // Create new spatial reference to transform current layer's coordinates into our preferred coordinate system
     // GDAL maintains ownership of returned pointer, so we should not manage its memory
-    OGRSpatialReference* testDestSpatialRef = _ptrLayer->GetSpatialRef();
+    OGRSpatialReference* tmpDestSpatialRef = _ptrLayer->GetSpatialRef();
 
     // Prepare for coordinate transform
-    OGRCoordinateTransformation *testCoordTransform = OGRCreateCoordinateTransformation(testSrcSpatialRef, testDestSpatialRef);
+    OGRCoordinateTransformation *tmpCoordTransform = OGRCreateCoordinateTransformation(tmpSrcSpatialRef, tmpDestSpatialRef);
 
     int transformSuccess;
     // Perform transform into WGS-84 lat/lon coordinate system
-    int allTransformSuccess = testCoordTransform->TransformEx(1, &lon, &lat, nullptr, &transformSuccess);
+    int allTransformSuccess = tmpCoordTransform->TransformEx(1, &lon, &lat, nullptr, &transformSuccess);
 
     // Store input point projected into data source's spatial reference
     GdalHelpers::GeomUniquePtr<OGRPoint> testPoint(GdalHelpers::createGeometry<OGRPoint>()); // Create OGRPoint on heap
@@ -139,8 +139,8 @@ std::map<int64_t,double> GdalDataModel::getBuildingsAtPoint(double lat, double l
     }
 
     // Memory de-allocation
-    delete testSrcSpatialRef;
-    OGRCoordinateTransformation::DestroyCT(testCoordTransform);
+    delete tmpSrcSpatialRef;
+    OGRCoordinateTransformation::DestroyCT(tmpCoordTransform);
 
     // Un-do effects of spatial filter
     // _ptrLayer = _ptrDataSource->GetLayer(0);
@@ -280,7 +280,6 @@ void GdalDataModel::printDebugInfo() const
                 double lon = pRing->getX(ptIdx);
                 double lat = pRing->getY(ptIdx);
 
-                int transformSuccess;
                 // Perform transform into WGS-84 lat/lon coordinate system
                 int allTransformSuccess = invCoordTransform->TransformEx(1, &lon, &lat, nullptr, &transformSuccess);
 

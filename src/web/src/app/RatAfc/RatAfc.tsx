@@ -50,13 +50,16 @@ import { Limit } from "../Lib/Admin";
   */
  const generateChannelData = (channelClasses: AvailableChannelInfo[], minEirp: number, maxEirp: number): ChannelData[] => {
     let channelData = clone(emptyChannels);
-    channelClasses.forEach(channelClass => 
-        channelData.forEach(channelGroup => channelGroup.channels.forEach(channel => {
+    channelClasses.forEach((channelClass) => 
+        channelData.forEach((channelGroup)=> channelGroup.channels.forEach((channel) => {
             channel.color = "grey";
             for (let i = 0; i < channelClass.channelCfi.length; i++) {
                 if (channel.name === String(channelClass.channelCfi[i])) {
                     channel.maxEIRP = channelClass.maxEirp[i];
-                    if (channel.maxEIRP >= maxEirp) {
+                    // RAS Exclusion will produce null channel EIRP
+                    if(channel.maxEIRP == null || channel.maxEIRP === undefined) {
+                        channel.color = "black"
+                    } else if (channel.maxEIRP >= maxEirp) {
                         channel.color = "green";
                     } else if (channel.maxEIRP >= minEirp) {
                         channel.color = "yellow";

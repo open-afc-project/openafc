@@ -55,7 +55,9 @@ enum ChannelColor
 {
     RED,
     YELLOW,
-    GREEN
+    GREEN,
+
+    BLACK  // In RAS protection zone
 };
 
 enum ChannelType

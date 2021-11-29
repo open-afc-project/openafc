@@ -11,8 +11,8 @@ QIODevice::OpenMode maskRw(QIODevice::OpenMode mode){
 }
 }
 
-GzipStream::GzipStream(QIODevice *dev, QObject *parent)
-  : QIODevice(parent), _dev(nullptr), _pos(0){
+GzipStream::GzipStream(QIODevice *dev, QObject *parentVal)
+  : QIODevice(parentVal), _dev(nullptr), _pos(0){
     setSourceDevice(dev);
 }
 
@@ -88,8 +88,8 @@ qint64 GzipStream::pos() const{
     return _pos - QIODevice::bytesAvailable() + QIODevice::bytesToWrite();
 }
 
-bool GzipStream::seek(qint64 pos){
-    Q_UNUSED(pos);
+bool GzipStream::seek(qint64 posVal){
+    Q_UNUSED(posVal);
     return false;
 }
 
@@ -273,8 +273,8 @@ qint64 GzipStream::writeOut(bool finish){
     return totalOut;
 }
 
-qint64 GzipStream::readSource(qint64 size){
-    QByteArray bufComp = _dev->read(size);
+qint64 GzipStream::readSource(qint64 sizeVal){
+    QByteArray bufComp = _dev->read(sizeVal);
     if(bufComp.isEmpty()){
         return 0;
     }

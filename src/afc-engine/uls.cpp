@@ -193,8 +193,6 @@ void ULSClass::setNumOutOfBandRLAN(int numOutOfBandRLANVal) { numOutOfBandRLAN =
 /******************************************************************************************/
 void ULSClass::clearData()
 {
-    int pathIdx;
-
     if (satellitePosnData) {
         delete satellitePosnData;
         satellitePosnData = (ListClass<Vector3> *) NULL;

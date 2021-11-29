@@ -27,6 +27,7 @@ export var guiConfig: GuiConfig = Object.freeze({
     admin_url: "",
     ap_admin_url: "",
     lidar_bounds: "",
+    ras_bounds: "",
     rat_afc: "",
     version: "API NOT LOADED"
 });
@@ -65,16 +66,18 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "threshold": -6, 
     "maxLinkDistance": 150, 
     "maxEIRP": 30, 
-    "minEIRP": 0, 
+    "minEIRP": 18, 
     "propagationModel": { 
         "kind": "FCC 6GHz Report & Order", 
         "win2Confidence": 50, 
         "itmConfidence": 50, 
         "p2108Confidence": 50, 
-        "terrainSource": "SRTM (90m)" }, 
+        "buildingSource": "LiDAR",
+        "terrainSource": "3DEP (30m)"}, 
     "propagationEnv": "Population Density Map", 
     "ulsDatabase": "CONUS_filtered_ULS_21Jan2020_6GHz_1.1.0_fixbps_sort_1record_unii5_7.sqlite3", 
     "regionStr" : "CONUS",
+    "rasDatabase": "RASdatabase.csv",
     "version": guiConfig.version 
 });
 

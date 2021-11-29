@@ -55,8 +55,7 @@ densityThrUrban(densityThrUrbanVal), densityThrSuburban(densityThrSuburbanVal), 
 /**** CONSTRUCTOR: PopGridClass::PopGridClass()                                        ****/
 /******************************************************************************************/
 PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<PolygonClass *> &regionPolygonList, double regionPolygonResolution,
-    double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal,
-    double minLat, double maxLat, double minLon, double maxLon
+    double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal
     ) : densityThrUrban(densityThrUrbanVal), densityThrSuburban(densityThrSuburbanVal), densityThrRural(densityThrRuralVal)
 {
     // NOTE: Each point in the PopGridClass is taken to be in the first region in which the point is contained.  So,
@@ -223,6 +222,8 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
         if ((regionIdx == 0) || (y0 < miny)) { miny = y0; }
         if ((regionIdx == 0) || (y1 > maxy)) { maxy = y1; }
     }
+
+#if 0
     if (minLon > minx*regionPolygonResolution) {
         minx = (int) floor(minLon / regionPolygonResolution);
     }
@@ -235,6 +236,7 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
     if (maxLat < maxx*regionPolygonResolution) {
         maxy = (int) floor(maxLat / regionPolygonResolution) + 1;
     }
+#endif
 
     minLonDeg = minx*regionPolygonResolution;
     minLatDeg = miny*regionPolygonResolution;

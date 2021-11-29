@@ -33,21 +33,25 @@ namespace {
 /**** FUNCTION: TerrainClass::TerrainClass()                                           ****/
 /******************************************************************************************/
 TerrainClass::TerrainClass(QString lidarDir, std::string srtmDir, std::string depDir, QString globeDir,
-        double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon, int maxLidarRegionLoadVal) :
+        double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon,
+        double terrainMinLatBldg, double terrainMinLonBldg, double terrainMaxLatBldg, double terrainMaxLonBldg,
+        int maxLidarRegionLoadVal) :
     maxLidarRegionLoad(maxLidarRegionLoadVal)
 {
     if (!lidarDir.isEmpty())
     {
         LOGGER_INFO(logger) << "Loading building+terrain data from " << lidarDir;
         readLidarInfo(lidarDir);
-        readLidarData(terrainMinLat, terrainMinLon, terrainMaxLat, terrainMaxLon);
+        readLidarData(terrainMinLatBldg, terrainMinLonBldg, terrainMaxLatBldg, terrainMaxLonBldg);
     }
 
     if (!depDir.empty())
     {
         LOGGER_INFO(logger) << "Loading DEP terrain data from " << depDir;
         time_t t1 = time(NULL);
-        depDataset = new DEPDatasetClass(depDir, 10800, false);
+        int pointsPerDegree = 3600;  // 1 arcsec => pointsPerDegree = 60*60
+        // int pointsPerDegree = 10800; // 1/3 arcsec => pointsPerDegree = 60*60*3
+        depDataset = new DEPDatasetClass(depDir, pointsPerDegree, false);
         depDataset->readRegion(terrainMinLat, terrainMinLon, terrainMaxLat, terrainMaxLon);
         time_t t2 = time(NULL);
         LOGGER_DEBUG(logger) << "Elapsed Time: " << (t2-t1);
@@ -172,6 +176,11 @@ void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, dou
     if (heightSource == CConst::unknownHeightSource) {
         qint16 ht;
         gdalDir->getHeight(ht,latitudeDeg, longitudeDeg);
+// printf("longitudeDeg = %.15e\n", longitudeDeg);
+// printf("latitudeDeg = %.15e\n", latitudeDeg);
+// printf("ht = %d\n", (int) ht);
+// printf("invalidHeight = %d\n", (int) gdalDir->getInvalidHeight());
+// fflush(stdout);
         if(ht == gdalDir->getInvalidHeight()){
             // Do nothing
         } else {
@@ -290,8 +299,10 @@ void TerrainClass::readLidarData(double terrainMinLat, double terrainMinLon, dou
         }
     }
 
+#if 0
     if (numRegionWithOverlap == 0)
         throw std::runtime_error("Building data was requested, but none was found within the analysis area.");
+#endif
     LOGGER_INFO(logger) << numRegionWithOverlap << " LiDAR tiles loaded";
 
     return;

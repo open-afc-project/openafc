@@ -141,8 +141,8 @@ std::unique_ptr<QIODevice> ZipWriter::openFile(const QString &intFileName, const
     return std::move(child);
 }
 
-ZipWriter::ContentFile::ContentFile(ZipWriter &parent)
-: _parent(&parent){
+ZipWriter::ContentFile::ContentFile(ZipWriter &parentVal)
+: _parent(&parentVal){
     _parent->_impl->openChild = this;
 }
 
@@ -183,8 +183,8 @@ void ZipWriter::ContentFile::close(){
     }
 }
 
-bool ZipWriter::ContentFile::seek(qint64 pos){
-    Q_UNUSED(pos);
+bool ZipWriter::ContentFile::seek(qint64 posVal){
+    Q_UNUSED(posVal);
     return false;
 }
 

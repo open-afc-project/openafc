@@ -95,7 +95,7 @@ export class AFCForm extends React.Component<
                 if (propModel.win2Confidence < 0 || propModel.win2Confidence > 100) return err();
                 if (propModel.win2ProbLosThreshold < 0 || propModel.win2ProbLosThreshold > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
-                if (propModel.terrainSource != "SRTM (90m)" && propModel.terrainSource != "3DEP (10m)") return err();
+                if (propModel.terrainSource != "SRTM (90m)" && propModel.terrainSource != "3DEP (30m)") return err();
                 break;
             case "ITM with building data":
                 if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
@@ -105,7 +105,8 @@ export class AFCForm extends React.Component<
                 if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
                 if (propModel.win2Confidence < 0 || propModel.win2Confidence > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
-                if (propModel.terrainSource != "SRTM (90m)" && propModel.terrainSource != "3DEP (10m)") return err();
+                if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
+                if (propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
                 break;
             case "FSPL":
                 break;

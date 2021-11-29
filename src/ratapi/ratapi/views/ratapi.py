@@ -91,6 +91,7 @@ class GuiConfig(MethodView):
             afcconfig_defaults=flask.url_for(
                 'ratapi-v1.AfcConfigFile', filename='afc_config.json'),
             lidar_bounds=flask.url_for('ratapi-v1.LiDAR_Bounds'),
+            ras_bounds=flask.url_for('ratapi-v1.RAS_Bounds'),
             google_apikey=flask.current_app.config['GOOGLE_APIKEY'],
             rat_api_analysis=flask.url_for('ratapi-v1.Phase1Analysis',
                                            request_type='p_request_type'),
@@ -325,7 +326,7 @@ class LiDAR_Bounds(MethodView):
     def get(self):
         ''' GET method for LiDAR_Bounds
         '''
-        LOGGER.debug('getting bounds')
+        LOGGER.debug('getting LiDAR bounds')
         user_id = auth(roles=['AP', 'Analysis'])
 
         import xdg.BaseDirectory
@@ -343,6 +344,50 @@ class LiDAR_Bounds(MethodView):
             return resp
         except StopIteration:
             raise werkzeug.exceptions.NotFound('Path not found to file')
+
+class RAS_Bounds(MethodView):
+    ''' Allow the web UI to manipulate configuration directly.
+    '''
+
+    def _open(self, abs_path, mode, user=None):
+        ''' Open a file.
+
+        :param abs_path: The specific config name to open.
+        :param mode: The file open mode.
+        :return: The opened file.
+        :rtype: file-like
+        '''
+
+        LOGGER.debug('Opening file "%s"', abs_path)
+        if not os.path.exists(abs_path) and mode != 'wb':
+            raise werkzeug.exceptions.NotFound()
+
+        handle = open(abs_path, mode)
+
+        return handle
+
+    def get(self):
+        ''' GET method for RAS_Bounds
+        '''
+        LOGGER.debug('getting RAS bounds')
+        user_id = auth(roles=['AP', 'Analysis'])
+
+        import xdg.BaseDirectory
+
+        try:
+            resp = flask.make_response()
+            datapath = next(xdg.BaseDirectory.load_data_paths('fbrat', 'rat_transfer', 'proc_lidar_2019'))
+            full_path = os.path.join(datapath, 'RAS_ExclusionZone.json')
+            if not os.path.exists(full_path):
+                raise werkzeug.exceptions.NotFound('RAS exclusion zone file not found')
+            with self._open(full_path, 'rb', user_id) as data_file:
+                resp.data = data_file.read()
+            resp.content_type = 'application/json'
+            #resp.content_encoding = 'gzip'
+            return resp
+        except StopIteration:
+            raise werkzeug.exceptions.NotFound('Path not found to file')
+
 
 class Phase1Analysis(MethodView):
     ''' Run analysis using AFC engine and display graphical results on map and graphs
@@ -617,6 +662,8 @@ module.add_url_rule('/afcconfig/<path:filename>',
                     view_func=AfcConfigFile.as_view('AfcConfigFile'))
 module.add_url_rule('/files/lidar_bounds',
                     view_func=LiDAR_Bounds.as_view('LiDAR_Bounds'))
+module.add_url_rule('/files/ras_bounds', 
+                    view_func=RAS_Bounds.as_view('RAS_Bounds'))
 module.add_url_rule('/analysis/p1/<request_type>',
                     view_func=Phase1Analysis.as_view('Phase1Analysis'))
 module.add_url_rule('/analysis/status/p1/<task_id>',

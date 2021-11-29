@@ -6,8 +6,8 @@
 #include "SignalWaiter.h"
 #include "ratcommon/PostSet.h"
 
-SignalWaiter::SignalWaiter(QObject *parent)
-  : QObject(parent), _received(false){
+SignalWaiter::SignalWaiter(QObject *parentVal)
+  : QObject(parentVal), _received(false){
     _loop = new QEventLoop(this);
     _timer = new QTimer(this);
     _timer->setSingleShot(true);

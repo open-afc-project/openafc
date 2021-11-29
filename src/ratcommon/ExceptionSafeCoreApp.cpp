@@ -11,23 +11,23 @@ LOGGER_DEFINE_GLOBAL(logger, "ExceptionSafeCoreApp")
 ExceptionSafeCoreApp::ExceptionSafeCoreApp(int &argc, char **argv)
   : QCoreApplication(argc, argv){}
 
-bool ExceptionSafeCoreApp::notify(QObject *obj, QEvent *event){
+bool ExceptionSafeCoreApp::notify(QObject *obj, QEvent *eventVal){
     // Cache the meta-object for error logging, in case the object is deleted
     const QMetaObject *const mObj = obj->metaObject();
     try{
-        return QCoreApplication::notify(obj, event);
+        return QCoreApplication::notify(obj, eventVal);
     }
     catch(std::exception &e){
-        logError(obj, mObj, event, e.what());
+        logError(obj, mObj, eventVal, e.what());
     }
     catch(...){
-        logError(obj, mObj, event, "Unknown exception");
+        logError(obj, mObj, eventVal, "Unknown exception");
     }
 
     return false;
 }
 
-void ExceptionSafeCoreApp::logError(const QObject *obj, const QMetaObject *mObj, const QEvent *event, const QString &msg) const{
+void ExceptionSafeCoreApp::logError(const QObject *obj, const QMetaObject *mObj, const QEvent *eventVal, const QString &msg) const{
     QString targetObj;
     if(obj){
         targetObj = QString("0x%1").arg(quint64(obj), 0, 16);
@@ -44,8 +44,8 @@ void ExceptionSafeCoreApp::logError(const QObject *obj, const QMetaObject *mObj,
     }
 
     QString eType;
-    if(event){
-        eType = QString::number(event->type());
+    if(eventVal){
+        eType = QString::number(eventVal->type());
     }
     else{
         eType = "UNKNOWN";

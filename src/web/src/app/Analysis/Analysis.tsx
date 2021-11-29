@@ -12,6 +12,7 @@ import { SpectrumDisplayPAWS } from "../Components/SpectrumDisplay";
 import DownloadContents from "../Components/DownloadContents";
 import { logger } from "../Lib/Logger";
 import LoadLidarBounds from "../Components/LoadLidarBounds";
+import LoadRasBounds from "../Components/LoadRasBounds";
 import { AnalysisProgress } from "../Components/AnalysisProgress";
 import { filterChannels, filterUNII } from "../MobileAP/PathProcessor";
 
@@ -78,7 +79,8 @@ class Analysis extends React.Component<{},
       percent: number,
       message: string
     },
-    filterUNII: boolean
+    filterUNII: boolean,
+    useAdjacent: boolean
   }> {
 
   private styles: Map<string, any>;
@@ -125,7 +127,8 @@ class Analysis extends React.Component<{},
         message: "",
         percent: 0
       },
-      filterUNII: false
+      filterUNII: false,
+      useAdjacent: true
     };
 
     this.handleJsonChange = (value) => {
@@ -148,15 +151,25 @@ class Analysis extends React.Component<{},
 
   componentDidMount() {
     const st = getCacheItem("analysisStateCache");
-    if (st !== undefined)
-      this.setState(st);
+    if (st !== undefined) {
+      if(st.mapState.val.features.length <= 646 ) {
+        this.setState(st);
+      } else {
+        this.setState({...st,  mapState: {
+          isModalOpen: false,
+          val: mapProps.geoJson,
+          text: "", valid: false,
+          dimensions: { width: 0, height: 0 },
+          versionId: 0
+        }, messageType: "Warn", messageTile: "Google Map API Error", messageValue: "Due to a limitation of the Google Maps API, map data could not be saved. Run again to see map data."});  
+      }
+    }
   }
 
   componentWillUnmount() {
     // before removing object, let's cache the state in case we want to come back
     const state: any = this.state;
     state.messageType = "None";
-
     // cancel running task
     this.cancelTask && this.cancelTask();
 
@@ -247,17 +260,14 @@ class Analysis extends React.Component<{},
     }
     this.setState({ canCancelTask: true });
     const filterUnii = this.state.filterUNII;
+    const useAdjacent = this.state.useAdjacent;
+    params = {...params, useAdjacentChannel: useAdjacent}
+
+    this.setState({results: undefined});
 
     // make api call
     await phase1Analysis(params, () => taskCanceled, (prog) => this.setState({ progress: prog }), (kml: Blob) => this.setState({ kml: kml })).then(res => {
       if (res.kind === "Success") {
-        this.setMapState({
-          isModalOpen: false,
-          val: mapProps.geoJson,
-          text: "", valid: false,
-          dimensions: { width: 0, height: 0 },
-          versionId: 0
-        });
         if (filterUnii) {
           res.result.spectrumData = filterUNII(res.result.spectrumData);
           res.result.channelData = filterChannels(res.result.channelData);
@@ -277,7 +287,7 @@ class Analysis extends React.Component<{},
               coordinates: [rasterizeEllipse(params.location.point, 32)]
             }
           });
-        logger.error("result", res.result, "state", {...this.state})
+
         this.setState({
           results: res.result,
           messageType: res.result.statusMessageList.length ? "Warn" : "None",
@@ -289,12 +299,28 @@ class Analysis extends React.Component<{},
           },
           canCancelTask: false
         });
-        this.setMapState({
-          val: res.result.geoJson,
-          text: JSON.stringify(res.result.geoJson, null, 2),
-          valid: false,
-          versionId: this.state.mapState.versionId + 1
-        });
+        if(this.state.mapState.val.features.length > 0) {
+          this.setState({mapState: {
+            isModalOpen: false,
+            val: mapProps.geoJson,
+            text: "", valid: false,
+            dimensions: { width: 0, height: 0 },
+            versionId: 0
+          }}, () =>  {
+            this.setMapState({
+            val: res.result.geoJson,
+            text: JSON.stringify(res.result.geoJson, null, 2),
+            valid: false,
+            versionId: this.state.mapState.versionId + 1
+          })});
+        } else {
+          this.setMapState({
+            val: res.result.geoJson,
+            text: JSON.stringify(res.result.geoJson, null, 2),
+            valid: false,
+            versionId: this.state.mapState.versionId + 1
+          });
+        }
       } else {
         // error in running analysis
         this.setState({
@@ -401,6 +427,14 @@ class Analysis extends React.Component<{},
                         name="horizontal-form-unii"
                         style={{ textAlign: "right" }}
                       />
+                      <Checkbox
+                        label="Adjacent Channel Interference"
+                        isChecked={this.state.useAdjacent}
+                        onChange={x => this.setState({ useAdjacent: x })}
+                        id="horizontal-form-unii-adj"
+                        name="horizontal-form-unii-adj"
+                        style={{ textAlign: "right" }}
+                      />
                 </GalleryItem>
               </Gallery>
               <PAWSForm parentName="analysisPage" onSubmit={x => this.runAnalysis(x)} onCopyPaste={(formData: PAWSRequest, updateCallback: (v: PAWSRequest) => void) => this.copyPaste(formData, updateCallback)} />
@@ -409,6 +443,7 @@ class Analysis extends React.Component<{},
               </>
               }
               {" "}<LoadLidarBounds currentGeoJson={this.state.mapState.val} onLoad={data => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })} />
+              <LoadRasBounds currentGeoJson={this.state.mapState.val} onLoad={data => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })} />
             </Expandable>
           </CardBody>
         </Card>

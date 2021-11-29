@@ -10,6 +10,7 @@ import { ExclusionZoneForm } from "./ExclusionZoneForm";
 import DownloadContents from "../Components/DownloadContents";
 import { logger } from "../Lib/Logger";
 import LoadLidarBounds from "../Components/LoadLidarBounds";
+import LoadRasBounds from "../Components/LoadRasBounds";
 import { AnalysisProgress } from "../Components/AnalysisProgress";
 
 /**
@@ -298,6 +299,7 @@ class ExclusionZone extends React.Component<{},
               </>
               }
               {" "}<LoadLidarBounds currentGeoJson={this.state.mapState.val} onLoad={data => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })} />
+                   <LoadRasBounds currentGeoJson={this.state.mapState.val} onLoad={data => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })} /> 
             </Expandable>
           </CardBody>
         </Card>

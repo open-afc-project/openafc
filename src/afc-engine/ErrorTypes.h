@@ -1,3 +1,6 @@
+/*
+ */
+
 #ifndef ERROR_TYPES_H
 #define ERROR_TYPES_H
 
@@ -28,8 +31,8 @@ class FatalError{
 public:
     /** Create a new error with title and message.
      */
-    FatalError(const QString &title, const QString &msg)
-      : _title(title), _msg(msg){}
+    FatalError(const QString &titleVal, const QString &msg)
+      : _title(titleVal), _msg(msg){}
 
     /// Same behavior as std::exception
     virtual ~FatalError() throw(){}

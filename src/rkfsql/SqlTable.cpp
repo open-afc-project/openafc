@@ -3,17 +3,17 @@
 #include "SqlTable.h"
 
 SqlTable::SqlTable(const QString &tableExpr){
-    Join join;
-    join.whatClause = tableExpr;
-    _joins.append(join);
+    Join joinVal;
+    joinVal.whatClause = tableExpr;
+    _joins.append(joinVal);
 }
 
 SqlTable & SqlTable::join(const QString &tableExpr, const QString &on, const QString &type){
-    Join join;
-    join.whatClause = tableExpr;
-    join.onClause = on;
-    join.typeClause = type;
-    _joins.append(join);
+    Join joinVal;
+    joinVal.whatClause = tableExpr;
+    joinVal.onClause = on;
+    joinVal.typeClause = type;
+    _joins.append(joinVal);
     return *this;
 }
 

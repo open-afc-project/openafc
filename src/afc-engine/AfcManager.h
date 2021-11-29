@@ -45,6 +45,7 @@
 #include "GdalDataDir.h"
 #include "GdalDataModel.h"
 #include "BuildingRasterModel.h"
+#include "ras.h"
 #include "str_type.h"
 #include "UlsDatabase.h"
 #include "uls.h"
@@ -85,6 +86,7 @@ class BuildingRasterModel;
 class WorldData;
 class PopGridClass;
 class AntennaClass;
+class RlanRegionClass;
 
 class AfcManager
 {
@@ -163,15 +165,18 @@ public:
 
     void clearData();
     void clearULSList();
+    void clearRASList();
     
-    void readPopulationGrid(const double& minLat, const double& maxLat, const double& minLon, const double& maxLon);  // Reads the population density for a given area
+    void readPopulationGrid();  // Reads the population density
     void readULSData(std::string filename, PopGridClass *popGrid, int linkDirection,
                      double minFreq, double maxFreq, bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
                      const double& minLat=-90, const double& maxLat=90, const double& minLon=-180, const double& maxLon=180); // Reads a database for FS stations information
     double getBandwidth(std::string emissionsDesignator);
     double getAngleFromDMS(std::string dmsStr);
     int findULSAntenna(std::string strval);
-    double computeSpectralOverlap(double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq) const;
+    double computeSpectralOverlap(double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq, bool aciFlag) const;
+
+    void readRASData(std::string filename);
 
     void computePathLoss(CConst::PropEnvEnum propEnv, double distKm, double frequency,
         double txLongitudeDeg, double txLatitudeDeg, double txHeightM,
@@ -198,9 +203,9 @@ public:
     double Winner2_D1rural_LOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double& pathLossCDF) const;
     double Winner2_D1rural_NLOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double& pathLossCDF) const;
 
-    double Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF) const;
-    double Winner2_C2urban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF) const;
-    double Winner2_D1rural(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF) const;
+    double Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, int losValue) const;
+    double Winner2_C2urban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, int losValue) const;
+    double Winner2_D1rural(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, int losValue) const;
 
     void computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &psdFreqRangeList); // Compute list of psdSegments for each inquired frequency range
 
@@ -281,6 +286,7 @@ private:
 
     std::string _ulsDataFile;               // File contining ULS data
     QString _inputULSDatabaseStr;           // ULS Database being used
+    std::string _rasDataFile;               // File contining RAS data
 
     std::string _pathLossModelStr;          // Path Loss Model to use
     QString _propagationEnviro;             // Propagation environment (e.g. Population Density Map)
@@ -338,7 +344,8 @@ private:
     double _closeInHgtLOS;                  // RLAN height above which prob of LOS = 100% for close in model",
     double _closeInDist;                    // Radius in which close in path loss model is used
     std::string _closeInPathLossModel;      // Close in path loss model is used
-    bool _pathLossClampFSPL;                // In set, when path loss < fspl, clamp to fspl value
+    bool _pathLossClampFSPL;                // If set, when path loss < fspl, clamp to fspl value
+    bool _winner2BldgLOSFlag;               // If set, use building data to determine if winner2 LOS or NLOS model is used
 
     double _wlanMinFreq;                    // Min Frequency for WiFi system
     double _wlanMaxFreq;                    // Max Frequency for WiFi system
@@ -396,6 +403,9 @@ private:
     std::vector<double> _rlanBWList;         // In this case four elements (20MHz, 40MHz, etc.) 
 
     ListClass<ULSClass *> *_ulsList;         // List of the FS stations that are being used in the analysis
+
+    ListClass<RASClass *> *_rasList;         // List of the RAS (Radio Astronomy Stations) that each have exclusion zone.
+
     std::vector<AntennaClass *> _ulsAntennaList;
 
     CConst::PathLossModelEnum _pathLossModel;
@@ -404,8 +414,10 @@ private:
     double _zclutter2108;
     double _zwinner2;
 
-    std::vector<int> _ulsIdxList;             // Stores the indices of the ULS stations we are analyzing
+    std::vector<int> _ulsIdxList;            // Stores the indices of the ULS stations we are analyzing
     DoubleTriplet _beamConeLatLons;          // Stores beam cone coordinates together to be loaded into geometries
+
+    RlanRegionClass *_rlanRegion;            // RLAN Uncertainty Region
     /**************************************************************************************/
 
     /**************************************************************************************/
@@ -415,10 +427,8 @@ private:
     std::vector<double> calculatedIoverN;
     std::vector<double> EIRPMask;              // Maximum EIRP for a given channel frequency
 
-    // ChannelStruct **_channelData;              // Matrix storing the channels of size [numChan,numBandwidths]
-    // int *_numChan;                             // Number of channels in each of the bandwidths in _rlanBWList
-
     std::vector<ChannelStruct> _channelList;    // List of channels, each channel identified by startFreq, stopFreq.  Computed results are availability and eirp_limit_dbm
+    bool _aciFlag;                              // If set, consider ACI in the overal interference calculation
 
     std::vector<LatLon> _exclusionZone;    // List of vertices of exclusion zone contour (Lon, Lat)
     double _exclusionZoneFSTerrainHeight;      // Terrain height at location of FS used in exclusion zone analysis
