@@ -1,6 +1,5 @@
 FROM centos:7.7.1908 as staging
 RUN mkdir -p /tmp/pkgs/
-COPY prereqs/entry.sh /wd/
 COPY prereqs/repo/*.rpm /tmp/pkgs/
 
 RUN curl -sL https://rpm.nodesource.com/setup_14.x | bash -
@@ -24,13 +23,11 @@ RUN cd /tmp/pkgs/ && \
     python2-flask_jsonrpc-0.3.1-1.el7.noarch.rpm python-flask-wtf-0.14.2-7.el7.noarch.rpm
 RUN yum -y clean all
 RUN rm -rf /tmp/* /var/tmp/*
+COPY prereqs/entry.sh /wd/
 
 FROM centos:7.7.1908
 COPY --from=staging / /
 
-ENV WORKING_DIR=/wd
-ENV FBRAT_WORKING_DIR=/wd/fbrat
-ENV APIDOCDIR=${FBRAT_WORKING_DIR}/build/testroot/share/doc/fbrat-api
 LABEL version="fbrat-build-env"
 WORKDIR /wd
 CMD ["sh", "-x", "entry.sh"]
