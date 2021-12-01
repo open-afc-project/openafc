@@ -1,5 +1,7 @@
 #!/bin/sh
 N_THREADS=$(nproc --all --ignore=2)
+FBRAT_WORKING_DIR=/wd/fbrat/${AFC_SUFX}
+APIDOCDIR=${FBRAT_WORKING_DIR}/build/testroot/share/doc/fbrat-api
 mkdir -p ${FBRAT_WORKING_DIR}/build
 cd ${FBRAT_WORKING_DIR}/build
 cmake3 -DCMAKE_INSTALL_PREFIX=${FBRAT_WORKING_DIR}/build/testroot \
