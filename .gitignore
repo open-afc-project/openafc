@@ -3,3 +3,4 @@
 *.cpp~
 *.un~
 *.swp
+build/*
