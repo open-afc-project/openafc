@@ -18,8 +18,9 @@ jobs:
       - name: Build the Docker image
         run: docker build . -t fbrat-build -f Dockerfile-for-build --tag oafc-build-image
       - run: echo "build done, status is ${{ job.status }}"
-      - name: Run Docker to build afc-engine
-        run: docker run --rm -v \`pwd\`:/wd/fbrat oafc-build-image
-      - name: List built liles
+      #- name: Run Docker to build afc-engine
+      #  run: docker run --rm -v \`pwd\`:/wd/fbrat oafc-build-image
+      - name: List built files
         run: |
-          ls -l ${{ github.workspace }}
+          ls -l ${{ github.workspace }} ; pwd
+
