@@ -1,0 +1,22 @@
+name: Docker Image CI
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "The job was automatically triggered by a ${{ github.event_name }} event."
+      - run: echo "This job is now running on a ${{ runner.os }} server hosted by GitHub!"
+      - run: echo "The name of your branch is ${{ github.ref }} and your repository is ${{ github.repository }}."
+      - name: Check out repository code
+        uses: actions/checkout@v2.4.0
+      - run: echo "The ${{ github.repository }} repository has been cloned to the runner."
+      - run: echo "The workflow is now ready to test your code on the runner."
+      - name: Build the Docker image
+        run: docker build . -t fbrat-build -f Dockerfile-for-build --tag oafc-build-image
+      - run: echo "build done, status is ${{ job.status }}"
+#      - name: Run Docker to build afc-engine
+#        run: docker run --rm -it -v \`pwd\`:/wd/fbrat oafc-build-image
