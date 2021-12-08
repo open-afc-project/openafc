@@ -18,5 +18,5 @@ jobs:
       - name: Build the Docker image
         run: docker build . -t fbrat-build -f Dockerfile-for-build --tag oafc-build-image
       - run: echo "build done, status is ${{ job.status }}"
-#      - name: Run Docker to build afc-engine
-#        run: docker run --rm -it -v \`pwd\`:/wd/fbrat oafc-build-image
+      - name: Run Docker to build afc-engine
+        run: docker run --rm -it -v \`pwd\`:/wd/fbrat oafc-build-image
