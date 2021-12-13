@@ -1,7 +1,6 @@
 // AfcDefinitions.h -- Reads in and writes JSON files, assigns values to
 // InputParameters structure for main.cpp and exports calculations from main.cpp
 // Authors: Andrew Winter, Vlad Martin, and Sam Smucny
-// RKF Engineering Solutions, LLC
 
 #ifndef INCLUDE_AFCDEFINITIONS_H
 #define INCLUDE_AFCDEFINITIONS_H

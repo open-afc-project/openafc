@@ -1,5 +1,3 @@
-// Copyright (C) 2017 RKF Engineering Solutions, LLC
-
 #include <QFile>
 #include "CsvReader.h"
 

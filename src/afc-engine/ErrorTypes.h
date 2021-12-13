@@ -1,16 +1,4 @@
 /*
- * All text, the source code, and the algorithms fixed in this document or otherwise
- * delivered to TerreStar Networks, Inc. are Copyright 2008 RKF Engineering Solutions, LLC ("RKF").
- * All Rights Reserved. No use of the same may be made without prior, written license from RKF.
- *
- * RKF hereby grants Terrestar Networks, Inc, the nonexclusive right and license to use this
- * protected property only for the purpose of upgrading and maintaining that certain software
- * installed on machines delivered to TerreStar pursuant to agreement between Terrestar and
- * RKF Engineering Solutions, LLC relating to RKF professional services in the establishment
- * of TerreStar's Global Resource Management ("GRM") project, .
- *
- * For further guidance on the use of RKF's protected properties related to the GRM project,
- * please contact RKF Engineering, LLC.
  */
 
 #ifndef ERROR_TYPES_H

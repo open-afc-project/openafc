@@ -1,4 +1,4 @@
-// Copyright (C) 2017 RKF Engineering Solutions, LLC
+// 
 
 #ifndef SQL_ERROR_H
 #define SQL_ERROR_H

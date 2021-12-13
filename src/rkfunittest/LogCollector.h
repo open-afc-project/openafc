@@ -1,4 +1,4 @@
-// Copyright (C) 2017 RKF Engineering Solutions, LLC
+// 
 
 #ifndef LOGCOLLECTOR_H_
 #define LOGCOLLECTOR_H_
