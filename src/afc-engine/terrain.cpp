@@ -43,6 +43,10 @@ TerrainClass::TerrainClass(QString lidarDir, std::string srtmDir, std::string de
         LOGGER_INFO(logger) << "Loading building+terrain data from " << lidarDir;
         readLidarInfo(lidarDir);
         readLidarData(terrainMinLatBldg, terrainMinLonBldg, terrainMaxLatBldg, terrainMaxLonBldg);
+        minLidarLongitude = terrainMinLonBldg;
+        maxLidarLongitude = terrainMaxLonBldg;
+        minLidarLatitude  = terrainMinLatBldg;
+        maxLidarLatitude  = terrainMaxLatBldg;
     }
 
     if (!depDir.empty())
@@ -129,7 +133,14 @@ LidarRegionStruct& TerrainClass::getLidarRegion(int lidarRegionIdx)
 void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, double& terrainHeight, double& bldgHeight,
     MultibandRasterClass::HeightResult& lidarHeightResult, CConst::HeightSourceEnum& heightSource) const
 {
-    int lidarRegionIdx = getLidarRegion(longitudeDeg, latitudeDeg);
+    int lidarRegionIdx = -1;
+
+    if (    (longitudeDeg >= minLidarLongitude) 
+         && (longitudeDeg <= maxLidarLongitude) 
+         && (latitudeDeg  >= minLidarLatitude) 
+         && (latitudeDeg  <= maxLidarLatitude) ) {
+        lidarRegionIdx = getLidarRegion(longitudeDeg, latitudeDeg);
+    }
 
     if (lidarRegionIdx != -1) {
         // loadLidarRegion(lidarRegionIdx);

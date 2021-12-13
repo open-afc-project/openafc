@@ -1,4 +1,4 @@
-//  
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef SRC_CPOTESTCOMMON_QUANTITYNEAR_H_
 #define SRC_CPOTESTCOMMON_QUANTITYNEAR_H_

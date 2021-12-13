@@ -1,3 +1,4 @@
+// Copyright (C) 2017-2018 RKF Engineering Solutions, LLC
 #include "UnitTestCoreApp.h"
 
 char UnitTestCoreApp::_arg0[] = "programName";

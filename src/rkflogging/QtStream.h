@@ -1,4 +1,4 @@
-//  
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef QTSTREAM_H_
 #define QTSTREAM_H_

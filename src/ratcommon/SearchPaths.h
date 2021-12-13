@@ -1,4 +1,4 @@
-//  
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef SEARCH_PATHS_H
 #define SEARCH_PATHS_H

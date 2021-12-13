@@ -1,4 +1,4 @@
-//  
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #include "SqlUpdate.h"
 #include "SqlHelpers.h"

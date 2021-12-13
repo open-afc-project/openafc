@@ -1,4 +1,4 @@
-//  
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 #ifndef SRC_KSCEGEOMETRY_GDALHELPERS_H_
 #define SRC_KSCEGEOMETRY_GDALHELPERS_H_
 

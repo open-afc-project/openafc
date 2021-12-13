@@ -1,4 +1,4 @@
-//  
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef OVERLOAD_CAST_H_
 #define OVERLOAD_CAST_H_

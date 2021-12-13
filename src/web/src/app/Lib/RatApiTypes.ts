@@ -17,6 +17,7 @@ export interface GuiConfig {
     google_apikey: string,
     rat_api_analysis: string,
     uls_convert_url: string,
+    uls_daily_url: string,
     login_url: string,
     user_url: string,
     admin_url: string,
@@ -32,16 +33,28 @@ export interface AFCConfigFile {
     ulsDatabase: string,
     buildingPenetrationLoss: PenetrationLossModel,
     polarizationMismatchLoss: PolarizationLossModel,
-    receiverFeederLoss: number,
+    receiverFeederLoss: FSReceiverFeederLoss,
     bodyLoss: BodyLossModel,
     threshold: number,
     maxLinkDistance: number,
     antennaPattern: AntennaPattern,
     propagationModel: PropagationModel,
-    propagationEnv: "Population Density Map" | "Urban" | "Suburban" | "Rural",
+    APUncertainty: APUncertainty, 
+    propagationEnv: "NLCD Point" | "Population Density Map" | "Urban" | "Suburban" | "Rural",
+    ITMParameters: ITMParameters, 
+    fsReceiverNoise: FSReceiverNoise,
+    clutterAtFS: boolean,
     regionStr?: string,
     rasDatabase?: string
 }
+
+export type FSReceiverFeederLoss = {
+    UNII5: Number,
+    UNII7: Number,
+    other: Number
+}
+
+export type FSReceiverNoise = FSReceiverFeederLoss;
 
 export type PenetrationLossModel = P2109 | FixedValue;
 
@@ -67,6 +80,22 @@ export type BodyLossModel = EU | {
     valueIndoor: number,
     valueOutdoor: number
 };
+
+export type APUncertainty = {
+    horizontal: number,
+    height: number 
+}
+
+export type ITMParameters = {
+    polarization: 'Vertical' | 'Horizontal',
+    ground: GroundType,
+    dielectricConst: Number,
+    conductivity: Number,
+    minSpacing: Number,
+    maxPoints: Number
+}
+
+export type GroundType = 'Average Ground' | 'Poor Ground' | 'Good Ground' | 'Fresh Water' | 'Sea Water';
 
 export type AntennaPattern = F1245 | UserUpload;
 

@@ -47,15 +47,17 @@ int main(int argc, char **argv) { // Accepts input from command line
                 ErrStream() << "Failed to parse command line arguments provided by GUI: " << err.what()
             );
         }
-    #   if DBG_COMPUTE
-        afcManager.setDBGInputs(tempDir); // Manually set inputs with this function
-    #   else
+
         /**************************************************************************************/
         /* Read in the input configuration and parameters                                     */
         /**************************************************************************************/
 
         // Set constant parameters
         afcManager.setConstInputs(tempDir);
+
+#       if DBG_COMPUTE
+        afcManager.setDBGInputs(tempDir); // Manually set inputs with this function
+#       else
 
         // Import user inputs from the GUI
         LOGGER_DEBUG(logger) << "AFC Engine is importing user inputs...";
@@ -84,9 +86,10 @@ int main(int argc, char **argv) { // Accepts input from command line
             throw std::invalid_argument(
                 ErrStream() << "MISSING_PARAM Failed to populate all required input parameters after import"); // Add err.what() after creating error handling in isNull()
         }
+#       endif
+
         /**************************************************************************************/
 
-    #endif
         // Prints user input files for debugging
         afcManager.printUserInputs();
         LOGGER_DEBUG(logger) << "User inputs written to userInputs.csv";

@@ -1,4 +1,4 @@
-//  
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef LOGGING_SEVERITY_LEVEL_H
 #define LOGGING_SEVERITY_LEVEL_H

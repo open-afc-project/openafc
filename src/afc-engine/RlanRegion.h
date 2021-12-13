@@ -26,16 +26,19 @@ public:
 
     virtual RLANBoundary getType() const = 0;
     virtual LatLon closestPoint(LatLon latlon, bool& contains) const = 0;
-    virtual std::vector<GeodeticCoord> getBoundary() const = 0;
-    virtual double getMinHeightAGL()  const = 0;
-    virtual double getMaxHeightAGL()  const = 0;
+    virtual std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const = 0;
+    virtual std::vector<LatLon> getScan(double scanResolutionM) const = 0;
     virtual double getMaxDist() const = 0;
     virtual void configure(std::string rlanHeightType, TerrainClass *terrain) = 0;
 
+    double getMinHeightAGL()  const;
+    double getMaxHeightAGL()  const;
     double getCenterLongitude() const { return(centerLongitude); }
     double getCenterLatitude()  const { return(centerLatitude); }
-    double getCenterHeight()    const { return(centerHeight); }
+    double getCenterHeightAMSL()    const { return(centerHeightAMSL); }
+    double getCenterTerrainHeight()    const { return(centerTerrainHeight); }
     double getHeightUncertainty()  const { return(heightUncertainty); }
+    bool   getFixedHeightAMSL()    const { return(fixedHeightAMSL); }
     
     Vector3 getCenterPosn()  const { return(centerPosn); }
 
@@ -43,14 +46,17 @@ protected:
     double centerLongitude;
     double centerLatitude;
     double centerHeightInput;
-    double centerHeight;
+    double centerHeightAMSL;
     double centerTerrainHeight;
+    double minTerrainHeight;
+    double maxTerrainHeight;
     double heightUncertainty;
     Vector3 centerPosn;
     Vector3 upVec;
     Vector3 eastVec;
     Vector3 northVec;
 
+    bool fixedHeightAMSL;
     bool configuredFlag;
 };
 /******************************************************************************************/
@@ -62,15 +68,14 @@ class EllipseRlanRegionClass : RlanRegionClass
 {
 public:
     EllipseRlanRegionClass(DoubleTriplet rlanLLA, DoubleTriplet rlanUncerts_m,
-        double rlanOrientationDeg);
+        double rlanOrientationDeg, bool fixedHeightAMSLVal);
 
     ~EllipseRlanRegionClass();
 
     RLANBoundary getType() const;
     LatLon closestPoint(LatLon latlon, bool& contains) const;
-    std::vector<GeodeticCoord> getBoundary() const;
-    double getMinHeightAGL() const;
-    double getMaxHeightAGL() const;
+    std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const;
+    std::vector<LatLon> getScan(double scanResolutionM) const;
     double getMaxDist() const;
     void configure(std::string rlanHeightType, TerrainClass *terrain);
 
@@ -83,6 +88,7 @@ private:
     Vector3 minorVec;
 
     arma::mat mxA;
+    arma::mat mxB;
 };
 /******************************************************************************************/
 
@@ -93,15 +99,14 @@ class PolygonRlanRegionClass : RlanRegionClass
 {
 public:
     PolygonRlanRegionClass(DoubleTriplet rlanLLA, DoubleTriplet rlanUncerts_m,
-        const std::vector<std::pair<double, double>>& rlanPolygon, RLANBoundary polygonTypeVal);
+        const std::vector<std::pair<double, double>>& rlanPolygon, RLANBoundary polygonTypeVal, bool fixedHeightAMSLVal);
 
     ~PolygonRlanRegionClass();
 
     RLANBoundary getType() const;
     LatLon closestPoint(LatLon latlon, bool& contains) const;
-    std::vector<GeodeticCoord> getBoundary() const;
-    double getMinHeightAGL() const;
-    double getMaxHeightAGL() const;
+    std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const;
+    std::vector<LatLon> getScan(double scanResolutionM) const;
     double getMaxDist() const;
     void configure(std::string rlanHeightType, TerrainClass *terrain);
 

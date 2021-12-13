@@ -1,4 +1,4 @@
-//  
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef SIGNAL_WAITER_H
 #define SIGNAL_WAITER_H

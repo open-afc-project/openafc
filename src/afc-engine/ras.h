@@ -87,7 +87,7 @@ public:
     int getNumRect() const { return rectList.size(); }
     std::tuple<double, double, double, double> getRect(int rectIdx) const { return rectList[rectIdx]; }
 
-    void addRect(double lonStart, double lonStop, double latStart, double latStop);
+    void addRect(double lon1, double lon2, double lat1, double lat2);
 
 private:
     std::vector<std::tuple<double, double, double, double> > rectList;

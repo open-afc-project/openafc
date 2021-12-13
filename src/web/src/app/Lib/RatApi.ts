@@ -22,6 +22,7 @@ export var guiConfig: GuiConfig = Object.freeze({
     google_apikey: "",
     rat_api_analysis: "",
     uls_convert_url: "",
+    uls_daily_url: "",
     login_url: "",
     user_url: "",
     admin_url: "",
@@ -47,39 +48,23 @@ const applicationCache: { [k: string]: any } = {};
  * if current user does not have a saved config.
  * @returns Default AFC config object
  */
-const defaultAfcConf: () => AFCConfigFile = () => ({ 
-    "antennaPattern": { 
-        "kind": "F.1245" 
-    }, 
-    "polarizationMismatchLoss": { 
-        "kind": "Fixed Value", 
-        "value": 3 }, 
-    "bodyLoss": { 
-        "kind": "Fixed Value", 
-        "valueIndoor": 4, 
-        "valueOutdoor": 4 }, 
-    "buildingPenetrationLoss": { 
-        "kind": "ITU-R Rec. P.2109", 
-        "buildingType": "Traditional", 
-        "confidence": 50 }, 
-    "receiverFeederLoss": 2, 
-    "threshold": -6, 
-    "maxLinkDistance": 150, 
-    "maxEIRP": 30, 
-    "minEIRP": 18, 
-    "propagationModel": { 
-        "kind": "FCC 6GHz Report & Order", 
-        "win2Confidence": 50, 
-        "itmConfidence": 50, 
-        "p2108Confidence": 50, 
-        "buildingSource": "LiDAR",
-        "terrainSource": "3DEP (30m)"}, 
-    "propagationEnv": "Population Density Map", 
-    "ulsDatabase": "CONUS_filtered_ULS_21Jan2020_6GHz_1.1.0_fixbps_sort_1record_unii5_7.sqlite3", 
-    "regionStr" : "CONUS",
-    "rasDatabase": "RASdatabase.csv",
-    "version": guiConfig.version 
-});
+const defaultAfcConf: () => AFCConfigFile = () => ({
+    "antennaPattern":{"kind":"F.1245"},
+    "polarizationMismatchLoss":{"kind":"Fixed Value","value":3},
+    "bodyLoss":{"kind":"Fixed Value","valueIndoor":0,"valueOutdoor":0},
+    "buildingPenetrationLoss":{"kind":"Fixed Value","value":20.5},
+    "receiverFeederLoss":{"UNII5":3,"UNII7":2.5,"other":2},
+    "fsReceiverNoise":{"UNII5":-110,"UNII7":-109.5,"other":-109},
+    "threshold":-6,"maxLinkDistance":50,"maxEIRP":36,"minEIRP":18,
+    "propagationModel":{"kind":"FCC 6GHz Report & Order","win2Confidence":50,"itmConfidence":50,"p2108Confidence":50,"buildingSource":"None","terrainSource":"3DEP (30m)"},
+    "propagationEnv":"NLCD Point",
+    "ulsDatabase":"CONUS_filtered_ULS_21Jan2020_6GHz_1.1.0_fixbps_sort_1record_unii5_7.sqlite3",
+    "regionStr":"CONUS",
+    "rasDatabase":"RASdatabase.csv",
+    "APUncertainty":{"horizontal":30,"height":5},
+    "ITMParameters":{"polarization":"Vertical","ground":"Good Ground","dielectricConst":25,"conductivity":0.02,"minSpacing":3,"maxPoints":2000},
+    "clutterAtFS":false,
+    "version": guiConfig.version});
 
 // API Calls
 
@@ -333,6 +318,131 @@ export const ulsFileConvert = (fileName: string): Promise<RatResponse<{ invalidR
             return error("Your request was unable to be processed", undefined, err);
         }
     )
+
+/**
+ * Continues a long running task by polling for status updates every 3 seconds.
+ * automatically handles cleanup of the task when completed barring any network interruption.
+ * optional parameters can be used to control the process while it is running.
+ * @param isCanceled If this callback function exists it will be polled before each status update. If it returns true then the task will be aborted
+ * @param status Callback function that is used to update the caller of the task progress until completion
+ * @returns On sucess: The result of the parse. On failure: error message
+ */
+function ulsParseContinuation(isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void) {
+    return async (startResponse: Response) => {
+        // use this to monitor and delete the task
+        const task = await startResponse.json() as any
+        const url: string = task.statusUrl;
+        // enter polling loop
+        while (true) {
+            await delay(3000); // wait 3 seconds before polling
+            if (isCanceled && isCanceled()) {
+                await analysisUpdate(url, "DELETE");
+
+                // exit and return
+                return error("Task canceled");
+            }
+            const res = await analysisUpdate(url, "GET");
+            if (res.status === 202) {
+                //still running
+                //todo : add progress tracking
+            } else if (res.status === 200) {
+                // get the result data
+                const data = (await res.json() as { entriesUpdated: number, entriesAdded: number, finishTime: string });
+                // exit and return
+                return success(data);
+            }
+            else {
+                logger.error(res);
+
+                // exit and return
+                return error(res.statusText, res.status);
+            }
+        }
+    }
+}
+
+
+/**
+ * Kick off a daily uls parse to create a new ULS database for that day. 
+ * @returns Success: number of ULSs updated and number of entries inserted. E
+ *          Error: information on why file could not be converted
+ */
+//(params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>> 
+ export const ulsDailyParse = (isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<{ entriesUpdated: number, entriesAdded: number, finishTime: string }>> =>
+    fetch(guiConfig.uls_daily_url, {
+        method: "POST",
+        headers: addAuth({})
+    }).then(ulsParseContinuation(isCanceled, status))
+    .catch(err => {
+        logger.error(err);
+        return error("Your request was unable to be processed", undefined, err);
+    });
+        // async res => {
+        //     if (res.ok) {
+        //         const data = (await res.json()) as { entriesUpdated: number, entriesAdded: number };
+        //         return success(data);
+        //     } else {
+        //         logger.error(res);
+        //         return error(res.statusText, res.status, (await res.json()) as any);
+        //     }
+        // }
+    
+    
+    
+    
+/**
+ * Gets the last successful run time of the daily parse. 
+ * @returns Success: An ISO string containing the last run time. 
+ *          Error: why it failed
+ */
+ export const ulsLastRuntime = (): Promise<RatResponse<{ lastSuccessfulRun: string }>> =>
+ fetch(guiConfig.uls_daily_url, {
+        method: "GET",
+        headers: addAuth({ "Content-Type": "application/json"})
+    }).then(
+        async res => {
+            if (res.ok) {
+                const data = (await res.json()) as { lastSuccessfulRun: string };
+                return success(data);
+            } else {
+                logger.error(res);
+                return error(res.statusText, res.status, (await res.json()) as any);
+            }
+        }
+    ).catch(
+        err => {
+            logger.error(err);
+            return error("Your request was unable to be processed", undefined, err);
+        }
+ )
+
+ /**
+ * Updates the backend celery task for daily parsing to the given time
+ * @returns Success: An ISO string containing the new time. 
+ *          Error: why it failed
+ */
+  export const setUlsParseTime = (hours: number, minutes: number): Promise<RatResponse<{ newTime: string }>> =>
+  fetch(guiConfig.uls_daily_url, {
+         method: "PUT",
+         headers: addAuth({}),
+         body: JSON.stringify({hours: hours, mins: minutes})
+     }).then(
+         async res => {
+             if (res.ok) {
+                 const data = (await res.json()) as { newTime: string };
+                 return success(data);
+             } else {
+                 logger.error(res);
+                 return error(res.statusText, res.status, (await res.json()) as any);
+             }
+         }
+     ).catch(
+         err => {
+             logger.error(err);
+             return error("Your request was unable to be processed", undefined, err);
+         }
+  )
+
 
 /**
  * Cache an item in the global application cache

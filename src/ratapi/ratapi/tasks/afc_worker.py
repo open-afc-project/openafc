@@ -1,3 +1,4 @@
+from inspect import cleandoc
 import logging
 import os
 import sys
@@ -5,7 +6,9 @@ import shutil
 import subprocess
 import datetime
 from celery import Celery
+from ..db.daily_uls_parse import daily_uls_parse
 from runcelery import init_config
+from celery.schedules import crontab
 from flask.config import Config
 from celery.utils.log import get_task_logger
 
@@ -22,7 +25,19 @@ client = Celery(
     backend=APP_CONFIG['CELERY_RESULT_BACKEND'],
     broker=APP_CONFIG['BROKER_URL'],
 )
+
 client.conf.update(APP_CONFIG)
+
+@client.on_after_configure.connect
+def setup_periodic_tasks(sender, **kwargs):
+    hours = APP_CONFIG["DAILY_ULS_HOURS"]
+    mins = APP_CONFIG["DAILY_ULS_MINS"]
+    # daily uls parse
+    sender.add_periodic_task(
+        crontab(hour=hours, minute=mins),
+        parseULS.apply_async(APP_CONFIG["STATE_ROOT_PATH"]),
+    )
+
 
 
 @client.task(bind=True)
@@ -154,3 +169,18 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type, re
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
         LOGGER.info('Worker resources cleaned up')
+
+
+# # Calls uls parse every day
+# @client.on_after_configure.connect
+# def setup_periodic_tasks(sender, **kwargs):
+#     secondsInDay = 86400
+#     sender.add_periodic_task(secondsInDay, parseULS.apply_async())
+
+
+@client.task(bind=True)
+def parseULS(self, state_path = "/var/lib/fbrat"):
+    self.update_state(state='PROGRESS')
+    result = daily_uls_parse(state_path)
+    self.update_state(state='DONE')
+    return result
