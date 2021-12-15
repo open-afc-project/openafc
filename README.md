@@ -161,10 +161,10 @@ Building and installing the fbrat with ninja-build is seamless - if you run the 
 &quot;-v /tmp/work/open-afc:/wd/fbrat&quot; means that contents of &quot;/tmp/work/open-afc&quot; folder will be available inside of container in /wd/fbrat/
 
 ```
- docker run --rm -it -v \`pwd\`:/wd/fbrat fbrat-build
+ docker run --rm -it -v `pwd`:/wd/fbrat fbrat-build
 ```
 If you want to build the rpm you will need to run it with Docker:
 
 ```
-docker run --rm -it -v \`pwd\`:/wd/fbrat fbrat-build /wd/fbrat/build-rpm.sh
+docker run --rm -it -v `pwd`:/wd/fbrat fbrat-build /wd/fbrat/build-rpm.sh
 ```
