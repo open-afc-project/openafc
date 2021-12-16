@@ -26,6 +26,8 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
     - [Pulling the Docker image from Docker registry](#pulling-the-docker-image-from-docker-registry)
   - [Building OpenAFC engine server](#building-openafc-engine-server)
 
+- [Databases info](/database_readme.md)
+- [Release Notes](/ReleaseNote.md)
 <br /><br />
 
 # **Introduction**
