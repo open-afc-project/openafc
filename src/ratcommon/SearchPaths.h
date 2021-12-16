@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SEARCH_PATHS_H
 #define SEARCH_PATHS_H

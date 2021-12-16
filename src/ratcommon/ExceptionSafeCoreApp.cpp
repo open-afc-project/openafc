@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "ExceptionSafeCoreApp.h"
 #include "rkflogging/Logging.h"

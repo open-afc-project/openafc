@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef PREPARED_QUERY_H
 #define PREPARED_QUERY_H

@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "rkfunittest/UnitTestHelpers.h"
 #include "../SqlConnectionDefinition.h"

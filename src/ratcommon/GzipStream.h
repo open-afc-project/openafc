@@ -1,4 +1,4 @@
-//  
+// 
 #ifndef GZIP_FILE_H
 #define GZIP_FILE_H
 

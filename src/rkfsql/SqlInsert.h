@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SQL_INSERT_H
 #define SQL_INSERT_H

@@ -1,4 +1,4 @@
-//  
+// 
 #include "GtestShim.h"
 #include <QDateTime>
 #include <QUrl>

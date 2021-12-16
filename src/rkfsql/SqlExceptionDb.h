@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SQL_EXCEPTION_DB_H
 #define SQL_EXCEPTION_DB_H

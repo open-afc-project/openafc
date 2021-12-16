@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "ZipWriter.h"
 #include "rkflogging/ErrStream.h"

@@ -76,6 +76,8 @@ private:
     std::vector<int> activeLidarRegionList;
     /**************************************************************************************/
 
+    double minLidarLongitude, maxLidarLongitude;
+    double minLidarLatitude,  maxLidarLatitude;
     int maxLidarRegionLoad;
 
     GdalDataDir *gdalDir;

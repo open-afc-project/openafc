@@ -62,8 +62,12 @@ RectRASClass::~RectRASClass()
 /******************************************************************************************/
 /**** FUNCTION: RectRASClass::RectRASClass()                                           ****/
 /******************************************************************************************/
-void RectRASClass::addRect(double lonStart, double lonStop, double latStart, double latStop)
+void RectRASClass::addRect(double lon1, double lon2, double lat1, double lat2)
 {
+    double lonStart = std::min(lon1, lon2);
+    double lonStop  = std::max(lon1, lon2);
+    double latStart = std::min(lat1, lat2);
+    double latStop  = std::max(lat1, lat2);
     rectList.push_back(std::make_tuple(lonStart, lonStop, latStart, latStop));
 }
 /******************************************************************************************/
@@ -93,14 +97,14 @@ bool RectRASClass::intersect(double longitude, double latitude, double maxDist, 
             intersectFlag = (dist <= maxDist);
         } else if (sy == 0) {
             double cosVal = cos(latitude * M_PI/180.0);
-            deltaLon = (sy == -1 ? rectLonStart - longitude : longitude - rectLonStop);
+            deltaLon = (sx == -1 ? rectLonStart - longitude : longitude - rectLonStop);
             dist = deltaLon*CConst::earthRadius*M_PI/180.0*cosVal;
             intersectFlag = (dist <= maxDist);
         } else {
             double cosVal = cos(latitude * M_PI/180.0);
             double cosSq = cosVal*cosVal;
             deltaLat = (sy == -1 ? rectLatStart - latitude : latitude - rectLatStop);
-            deltaLon = (sy == -1 ? rectLonStart - longitude : longitude - rectLonStop);
+            deltaLon = (sx == -1 ? rectLonStart - longitude : longitude - rectLonStop);
             dist = CConst::earthRadius*M_PI/180.0*sqrt(deltaLat*deltaLat + deltaLon*deltaLon*cosSq);
             intersectFlag = (dist <= maxDist);
         }

@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SQL_ERROR_H
 #define SQL_ERROR_H

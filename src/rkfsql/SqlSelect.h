@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SQL_SELECT_H
 #define SQL_SELECT_H

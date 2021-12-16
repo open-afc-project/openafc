@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "EnvironmentFlag.h"
 #include <QByteArray>

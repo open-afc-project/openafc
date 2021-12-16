@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef OVERLOAD_CAST_H_
 #define OVERLOAD_CAST_H_

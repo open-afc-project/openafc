@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SRC_RKFLOGGING_ERRSTREAM_H_
 #define SRC_RKFLOGGING_ERRSTREAM_H_

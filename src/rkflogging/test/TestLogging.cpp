@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "../Logging.h"
 #include "../LoggingConfig.h"

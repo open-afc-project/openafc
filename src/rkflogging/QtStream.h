@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef QTSTREAM_H_
 #define QTSTREAM_H_

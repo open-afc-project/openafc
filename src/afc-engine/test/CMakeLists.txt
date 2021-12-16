@@ -1,0 +1,18 @@
+# All source files to same target
+# file(GLOB ALL_CPP "*.cpp" "../AfcManager.cpp" "../cconst.cpp" "../list.cpp" "../uls.cpp" "../list_impl.cpp" "../terrain.cpp" "../str_type.cpp" "../RlanRegion.cpp" "../UlsMeasurementAnalysis.cpp")
+file(GLOB ALL_CPP "*.cpp" "../AfcManager.cpp" "../DEPDataset.cpp" "../GdalImageMap.cpp" "../list_impl.cpp" "../PopulationDatabase.cpp" "../terrain.cpp" "../antenna.cpp" "../EcefModel.cpp" "../GeodeticCoord.cpp" "../ras.cpp" "../uls.cpp" "../BuildingRasterModel.cpp" "../GdalDataDir.cpp" "../global_fn.cpp" "../MathConstants.cpp" "../readITUFiles.cpp" "../UlsDatabase.cpp" "../calcitu1245.cpp" "../GdalDataModel.cpp" "../ITMDLL.cpp" "../MathHelpers.cpp" "../rlan.cpp" "../UlsMeasurementAnalysis.cpp" "../calcitu1336_4.cpp" "../GdalHelpers.cpp" "../lidar_blacklist_entry.cpp" "../multiband_raster.cpp" "../RlanRegion.cpp" "../WorldData.cpp" "../cconst.cpp" "../GdalImageFile2.cpp" "../lininterp.cpp" "../polygon.cpp" "../spline.cpp" "../dbldbl.cpp" "../GdalImageFile.cpp" "../list.cpp" "../pop_grid.cpp" "../str_type.cpp")
+
+add_gtest_executable(${TGT_NAME}-test ${ALL_CPP} ${ALL_HEADER})
+# target_link_libraries(${TGT_NAME}-test PUBLIC ${TGT_NAME})
+target_link_libraries(${TGT_NAME}-test PUBLIC Qt5::Core)
+target_link_libraries(${TGT_NAME}-test PUBLIC Qt5::Concurrent)
+target_link_libraries(${TGT_NAME}-test PUBLIC Qt5::Gui)
+target_link_libraries(${TGT_NAME}-test PUBLIC Qt5::Widgets)
+target_link_libraries(${TGT_NAME}-test PUBLIC Qt5::Sql)
+target_link_libraries(${TGT_NAME}-test PUBLIC GDAL::GDAL)
+target_link_libraries(${TGT_NAME}-test PUBLIC iturp452)
+target_link_libraries(${TGT_NAME}-test PUBLIC ${ARMADILLO_LIBRARIES})
+target_link_libraries(${TGT_NAME}-test PUBLIC Boost::program_options)
+target_link_libraries(${TGT_NAME}-test PUBLIC rkfsql)
+target_link_libraries(${TGT_NAME}-test PUBLIC rkfunittest)
+target_link_libraries(${TGT_NAME}-test PUBLIC gtest_main)

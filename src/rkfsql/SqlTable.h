@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SQL_TABLE_H
 #define SQL_TABLE_H

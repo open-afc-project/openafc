@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SQL_HELPERS_H
 #define SQL_HELPERS_H

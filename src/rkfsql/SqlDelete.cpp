@@ -1,4 +1,4 @@
-//  
+// 
 
 #include <QVariantList>
 #include "SqlDelete.h"

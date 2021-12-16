@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SQL_DELETE_H
 #define SQL_DELETE_H

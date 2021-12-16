@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "QtStream.h"
 #include "Logging.h"

@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "TextHelpers.h"
 #include "rkflogging/ErrStream.h"

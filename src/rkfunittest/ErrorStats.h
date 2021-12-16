@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef ERROR_STATS_H
 #define ERROR_STATS_H

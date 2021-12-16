@@ -1,4 +1,4 @@
-//  
+// 
 
 #include <QSet>
 #include <QSqlField>

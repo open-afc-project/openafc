@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "../SearchPaths.h"
 #include "rkfunittest/UnitTestCoreApp.h"

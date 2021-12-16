@@ -1,4 +1,4 @@
-//  
+// 
 #ifndef SRC_RKFUNITTEST_GTESTSHIM_H_
 #define SRC_RKFUNITTEST_GTESTSHIM_H_
 

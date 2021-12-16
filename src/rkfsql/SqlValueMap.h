@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SQL_VALUE_MAP_H
 #define SQL_VALUE_MAP_H

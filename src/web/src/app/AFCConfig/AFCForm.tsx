@@ -1,11 +1,14 @@
 import * as React from "react";
-import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant } from "@patternfly/react-core";
+import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition  } from "@patternfly/react-core";
+import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import BuildlingPenetrationLossForm from "./BuildingPenetrationLossForm";
 import PolarizationMismatchLossForm from "./PolarizationMismatchLossForm";
+import { ITMParametersForm } from "./ITMParametersForm";
 import BodyLossForm from "./BodyLossForm";
 import AntennaPatternForm from "./AntennaPatternForm";
+import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
-import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPattern, RatResponse, PropagationModel } from "../Lib/RatApiTypes";
+import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise } from "../Lib/RatApiTypes";
 import { getDefaultAfcConf, guiConfig } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
@@ -43,17 +46,24 @@ export class AFCForm extends React.Component<
 
     private setMinEIRP = (n: number) => this.setState({ config: Object.assign(this.state.config, { minEIRP: n }) });
     private setMaxEIRP = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxEIRP: n }) });
-    private setFeederLoss = (n: number) => this.setState({ config: Object.assign(this.state.config, { receiverFeederLoss: n }) });
+    private setFeederLoss = (f: FSReceiverFeederLoss) => this.setState({ config: Object.assign(this.state.config, { receiverFeederLoss: f }) });
+    private setReceiverNoise = (f: FSReceiverNoise) => this.setState({ config: Object.assign(this.state.config, { fsReceiverNoise: f }) });
     private setThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { threshold: n }) });
     private setMaxLinkDistance = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxLinkDistance: n }) });
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => this.setState({ config: Object.assign(this.state.config, { regionStr: n , ulsDatabase: ""}) });
     private setPropogationEnv = (n: string) => this.setState({ config: Object.assign(this.state.config, { propagationEnv: n }) });
 
+
     private isValid = () => {
 
         const err = (s?: string) => ({ isError: true, message: s || "One or more inputs are invalid" });
         const model = this.state.config;
+
+        if(model.APUncertainty.horizontal <= 0 || model.APUncertainty.height <= 0) return err();
+        if(model.ITMParameters.minSpacing <1 || model.ITMParameters.minSpacing > 30) return err('Path Min Spacing must be between 1 and 30')        
+        if(model.ITMParameters.maxPoints <100 || model.ITMParameters.maxPoints > 10000) return err('Path Max Points must be between 100 and 10000')        
+
 
         if (!model.ulsDatabase) return err();
         if (!model.propagationEnv) return err();
@@ -193,6 +203,24 @@ export class AFCForm extends React.Component<
             this.setState({ config: conf });
         }
 
+        const setAPUncertainty = (x: APUncertainty) => {
+            const conf = this.state.config;
+            conf.APUncertainty = x;
+            this.setState({ config: conf });
+        }
+
+        const setITMParams = (x: ITMParameters) => {
+            const conf = this.state.config;
+            conf.ITMParameters = x;
+            this.setState({ config: conf });
+        }
+
+        const setUseClutter = (x: Boolean) => {
+            const conf = this.state.config;
+            conf.clutterAtFS = x;
+            this.setState({ config: conf });
+        }
+
         return (
             <Card>
                 <Modal
@@ -206,7 +234,7 @@ export class AFCForm extends React.Component<
                 <CardBody>
                     <Gallery gutter="sm">
                         <GalleryItem>
-                            <FormGroup label="ULS Region" fieldId="horizontal-form-uls-region">
+                            <FormGroup label="Country" fieldId="horizontal-form-uls-region">
                                 <FormSelect
                                     value={this.state.config.regionStr}
                                     onChange={x => this.setUlsRegion(x)}
@@ -215,7 +243,7 @@ export class AFCForm extends React.Component<
                                     isValid={!!this.state.config.regionStr}
                                     style={{ textAlign: "right" }}
                                 >
-                                    <FormSelectOption key={undefined} value={undefined} label="Select a ULS Region" />
+                                    <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
                                         <FormSelectOption key={"CONUS"} value={"CONUS"} label={"CONUS"} />
                                         <FormSelectOption key={"Canada"} value={"Canada"} label={"Canada"} />
                                     </FormSelect>
@@ -284,18 +312,163 @@ export class AFCForm extends React.Component<
                         </GalleryItem>
                         <GalleryItem>
                             <FormGroup label="FS Receiver Feeder Loss" fieldId="horizontal-form-receiver-feeder-loss">
+                                {" "}<Tooltip
+                                    position={TooltipPosition.top}
+                                    enableFlip={true}
+                                    className="fs-feeder-loss-tooltip"
+                                    maxWidth="40.0rem"
+                                    content={
+                                        <>
+                                            <p>UNII Range:</p>
+                                            <ul>
+                                                <li> UNII-5: 5,925-6,425 MHz</li>
+                                                <li> UNII-7: 6,525-6,875 MHz</li>
+                                            </ul>
+                                        </>
+                                    }
+                                >
+                                    <OutlinedQuestionCircleIcon />
+                                </Tooltip>
                                 <InputGroup>
                                     <TextInput
-                                        value={this.state.config.receiverFeederLoss}
-                                        onChange={x => this.setFeederLoss(Number(x))}
+                                        id="feeder-5-label"
+                                        name="feeder-5-label"
+                                        isReadOnly={true}
+                                        value="UNII-5"
+                                        style={{ textAlign: "left", minWidth: "35%" }}
+                                    /> 
+                                    <TextInput
+                                        value={this.state.config.receiverFeederLoss.UNII5}
+                                        onChange={x => this.setFeederLoss({...this.state.config.receiverFeederLoss, UNII5: Number(x)})}
                                         type="number"
                                         step="any"
-                                        id="horizontal-form-receiver-feeder-loss"
-                                        name="horizontal-form-receiver-feeder-loss"
-                                        isValid={this.hasValue(this.state.config.receiverFeederLoss)}
+                                        id="horizontal-form-receiver-feeder-loss-5"
+                                        name="horizontal-form-receiver-feeder-loss-5"
+                                        isValid={this.hasValue(this.state.config.receiverFeederLoss.UNII5)}
                                         style={{ textAlign: "right" }}
                                     />
                                     <InputGroupText>dB</InputGroupText>
+                                </InputGroup>
+                                <InputGroup>
+                                    <TextInput
+                                        id="feeder-7-label"
+                                        name="feeder-7-label"
+                                        isReadOnly={true}
+                                        value="UNII-7"
+                                        style={{ textAlign: "left", minWidth: "35%" }}
+                                    /> 
+                                    <TextInput
+                                        value={this.state.config.receiverFeederLoss.UNII7}
+                                        onChange={x => this.setFeederLoss({...this.state.config.receiverFeederLoss, UNII7: Number(x)})}
+                                        type="number"
+                                        step="any"
+                                        id="horizontal-form-receiver-feeder-loss-7"
+                                        name="horizontal-form-receiver-feeder-loss-7"
+                                        isValid={this.hasValue(this.state.config.receiverFeederLoss.UNII7)}
+                                        style={{ textAlign: "right" }}
+                                    />
+                                    <InputGroupText>dB</InputGroupText>
+                                </InputGroup>    
+                                <InputGroup>
+                                    <TextInput
+                                        id="feeder-o-label"
+                                        name="feeder-o-label"
+                                        isReadOnly={true}
+                                        value="Other"
+                                        style={{ textAlign: "left", minWidth: "35%" }}
+                                    /> 
+                                    <TextInput
+                                        value={this.state.config.receiverFeederLoss.other}
+                                        onChange={x => this.setFeederLoss({...this.state.config.receiverFeederLoss, other: Number(x)})}
+                                        type="number"
+                                        step="any"
+                                        id="horizontal-form-receiver-feeder-loss-o"
+                                        name="horizontal-form-receiver-feeder-loss-o"
+                                        isValid={this.hasValue(this.state.config.receiverFeederLoss.other)}
+                                        style={{ textAlign: "right" }}
+                                    />
+                                    <InputGroupText>dB</InputGroupText>
+                                </InputGroup>
+                            </FormGroup>
+                        </GalleryItem>
+                        <GalleryItem>
+                            <FormGroup label="FS Receiver Noise Floor" fieldId="horizontal-form-receiver-noise">
+                                {" "}<Tooltip
+                                    position={TooltipPosition.top}
+                                    enableFlip={true}
+                                    className="fs-feeder-loss-tooltip"
+                                    maxWidth="40.0rem"
+                                    content={
+                                        <>
+                                            <p>UNII Range:</p>
+                                            <ul>
+                                                <li> UNII-5: 5,925-6,425 MHz</li>
+                                                <li> UNII-7: 6,525-6,875 MHz</li>
+                                            </ul>
+                                        </>
+                                    }
+                                >
+                                    <OutlinedQuestionCircleIcon />
+                                </Tooltip>
+                                <InputGroup>
+                                    <TextInput
+                                        id="fs-noise-5-label"
+                                        name="fs-noise-5-label"
+                                        isReadOnly={true}
+                                        value="UNII-5"
+                                        style={{ textAlign: "left", minWidth: "35%" }}
+                                    /> 
+                                    <TextInput
+                                        value={this.state.config.fsReceiverNoise.UNII5}
+                                        onChange={x => this.setReceiverNoise({...this.state.config.fsReceiverNoise, UNII5: Number(x)})}
+                                        type="number"
+                                        step="any"
+                                        id="horizontal-form-noise-5"
+                                        name="horizontal-form-noise-5"
+                                        isValid={this.hasValue(this.state.config.fsReceiverNoise.UNII5)}
+                                        style={{ textAlign: "right" }}
+                                    />
+                                    <InputGroupText>dBm/MHz</InputGroupText>
+                                </InputGroup>
+                                <InputGroup>
+                                    <TextInput
+                                        id="fs-noise-7-label"
+                                        name="fs-noise-7-label"
+                                        isReadOnly={true}
+                                        value="UNII-7"
+                                        style={{ textAlign: "left", minWidth: "35%" }}
+                                    /> 
+                                    <TextInput
+                                        value={this.state.config.fsReceiverNoise.UNII7}
+                                        onChange={x => this.setReceiverNoise({...this.state.config.fsReceiverNoise, UNII7: Number(x)})}
+                                        type="number"
+                                        step="any"
+                                        id="horizontal-form-noise-7"
+                                        name="horizontal-form-noise-7"
+                                        isValid={this.hasValue(this.state.config.fsReceiverNoise.UNII7)}
+                                        style={{ textAlign: "right" }}
+                                    />
+                                    <InputGroupText>dBm/MHz</InputGroupText>
+                                </InputGroup>    
+                                <InputGroup>
+                                    <TextInput
+                                        id="fs-noise-o-label"
+                                        name="fs-noise-o-label"
+                                        isReadOnly={true}
+                                        value="Other"
+                                        style={{ textAlign: "left", minWidth: "35%" }}
+                                    /> 
+                                    <TextInput
+                                        value={this.state.config.fsReceiverNoise.other}
+                                        onChange={x => this.setReceiverNoise({...this.state.config.fsReceiverNoise, other: Number(x)})}
+                                        type="number"
+                                        step="any"
+                                        id="horizontal-form-receiver-feeder-loss-o"
+                                        name="horizontal-form-receiver-feeder-loss-o"
+                                        isValid={this.hasValue(this.state.config.fsReceiverNoise.other)}
+                                        style={{ textAlign: "right" }}
+                                    />
+                                    <InputGroupText>dBm/MHz</InputGroupText>
                                 </InputGroup>
                             </FormGroup>
                         </GalleryItem>
@@ -344,6 +517,11 @@ export class AFCForm extends React.Component<
                                 onChange={setAntennaPattern} />
                         </GalleryItem>
                         <GalleryItem>
+                            <APUncertaintyForm
+                                data={this.state.config.APUncertainty}
+                                onChange={setAPUncertainty} />
+                        </GalleryItem>
+                        <GalleryItem>
                             <PropogationModelForm
                                 data={this.state.config.propagationModel}
                                 onChange={setPropogationModel} />
@@ -351,15 +529,35 @@ export class AFCForm extends React.Component<
                         {(this.state.config.propagationModel.kind === "ITM with no building data" || this.state.config.propagationModel.kind == "FCC 6GHz Report & Order") &&
                             <GalleryItem>
                                 <FormGroup
-                                    label="AP/Client Propogation Environment"
+                                    label="AP/Client Propagation Environment"
                                     fieldId="propogation-env"
-                                ><FormSelect
+                                >
+                                    {" "}<Tooltip
+                                    position={TooltipPosition.top}
+                                    enableFlip={true}
+                                    //className="prop-env-tooltip"
+                                    maxWidth="40.0rem"
+                                    content={
+                                        <>
+                                            <p>AP/Client Propagation Environment:</p>
+                                            <ul>
+                                                <li>- "NLCD Point" assigns propagation environment based on single NLCD tile class the RLAN resides in: Urban if NLCD tile = 23 or 24, Suburban if NLCD tile = 22, Rural-D (Deciduous trees) if NLCD tile = 41, 43 or 90, Rural-C (Coniferous trees) if NLCD tile = 42, and Rural-V (Village Center) otherwise. The various Rural types correspond to the P.452 clutter category.</li>
+                                                <li>- If “NLCD Point” is not selected, Village center is assumed for the Rural clutter category.</li>
+                                            </ul>
+                                        </>
+                                    }
+                                    >
+                                       <OutlinedQuestionCircleIcon /> 
+                                    </Tooltip> 
+                                   
+                                    <FormSelect
                                     value={this.state.config.propagationEnv}
                                     onChange={(x) => this.setPropogationEnv(x)}
                                     id="propogation-env"
                                     name="propogation-env"
                                     style={{ textAlign: "right" }}
                                     isValid={this.props.config.propagationEnv !== undefined}>
+                                        <FormSelectOption key="NLCD Point" value="NLCD Point" label="NLCD Point" />
                                         <FormSelectOption key="Population Density Map" value="Population Density Map" label="Population Density Map" />
                                         <FormSelectOption key="Urban" value="Urban" label="Urban" />
                                         <FormSelectOption key="Suburban" value="Suburban" label="Suburban" />
@@ -367,6 +565,37 @@ export class AFCForm extends React.Component<
                                     </FormSelect>
                                 </FormGroup>
                             </GalleryItem>}
+                        {this.state.config.propagationModel.kind != "FSPL" ?  
+                            <GalleryItem>
+                                <ITMParametersForm data={this.state.config.ITMParameters} onChange={setITMParams}/>
+                            </GalleryItem>
+                        : false}
+                        <GalleryItem>
+                            <Tooltip
+                                position={TooltipPosition.top}
+                                enableFlip={true}
+                                //className="prop-env-tooltip"
+                                maxWidth="40.0rem"
+                                content={
+                                <p>When distance &gt; 1km, clutter loss is added at FS Receiver when FS Receiver AGL height &lt;10m. Clutter models are the same as those used for APs.​</p>
+                                    
+                                }
+                            >
+                                <InputGroup label=""> 
+                                    <Checkbox
+                                            label="Add Clutter at FS Receiver"
+                                            isChecked={this.state.config.clutterAtFS}
+                                            onChange={setUseClutter}
+                                            id="horizontal-form-clutter"
+                                            name="horizontal-form-clutter"
+                                            style={{ textAlign: "right" }}
+                                    /> 
+                                   
+                                    <OutlinedQuestionCircleIcon style={{marginLeft: "5px"}}/>
+                                    
+                                </InputGroup>
+                            </Tooltip>                       
+                        </GalleryItem>
                     </Gallery>
                     <br />
                     <>

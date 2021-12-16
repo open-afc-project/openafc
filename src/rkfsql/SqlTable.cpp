@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "SqlTable.h"
 

@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SRC_RATCOMMON_POSTSET_H_
 #define SRC_RATCOMMON_POSTSET_H_

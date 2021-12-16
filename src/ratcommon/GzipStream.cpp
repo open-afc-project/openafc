@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "GzipStream.h"
 

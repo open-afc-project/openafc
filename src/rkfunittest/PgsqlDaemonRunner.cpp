@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "PgsqlDaemonRunner.h"
 #include "rkflogging/Logging.h"

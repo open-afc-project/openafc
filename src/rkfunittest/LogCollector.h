@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef LOGCOLLECTOR_H_
 #define LOGCOLLECTOR_H_

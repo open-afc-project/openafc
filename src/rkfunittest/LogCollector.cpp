@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "LogCollector.h"
 #include <boost/log/core/core.hpp>

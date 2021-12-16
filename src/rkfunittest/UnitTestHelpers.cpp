@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "UnitTestHelpers.h"
 #include "rkflogging/LoggingConfig.h"

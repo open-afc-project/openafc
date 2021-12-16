@@ -29,13 +29,7 @@ namespace {
     // Logger for all instances of class
     LOGGER_DEFINE_GLOBAL(logger, "UlsMeasurementAnalysis")
 
-    const double fixedEpsDielect = 15;
-    const double fixedSgmConductivity = 0.005;
-    const double fixedEsNoSurfRef = 301;
-    const int fixedRadioClimate = 6;
-    const int fixedPolarization = 1;
-    const double fixedConfidence = 0.5;
-    const double fixedRelevance = 0.5;
+    static bool itmInitFlag = true;
 }; // end namespace
 
 namespace UlsMeasurementAnalysis {
@@ -1030,7 +1024,12 @@ namespace UlsMeasurementAnalysis {
 
         // Correct the distance for line of sight.
         heights[1] = 1000 * lineOfSightDistanceKm / numpts;
-        
+        if (itmInitFlag) {
+            LOGGER_INFO(logger) << "ITM Parameter: eps_dielect = " << eps_dielect;
+            LOGGER_INFO(logger) << "ITM Parameter: sgm_conductivity = " << sgm_conductivity;
+            LOGGER_INFO(logger) << "ITM Parameter: pol = " << pol;
+            itmInitFlag = false;
+        }
         point_to_point(heights, transHt, receiveHt, eps_dielect, sgm_conductivity, eno_ns_surfref, frq_mhz, radio_climate, pol, conf, rel, rv, buf, errnum);
         //qDebug() << " point_to_point" << rv << buf << errnum;
 
@@ -1070,6 +1069,12 @@ namespace UlsMeasurementAnalysis {
         char buf[256];
         int errnum;
 
+        if (itmInitFlag) {
+            LOGGER_INFO(logger) << "ITM Parameter: eps_dielect = " << eps_dielect;
+            LOGGER_INFO(logger) << "ITM Parameter: sgm_conductivity = " << sgm_conductivity;
+            LOGGER_INFO(logger) << "ITM Parameter: pol = " << pol;
+            itmInitFlag = false;
+        }
         point_to_point(*heightProfilePtr, transHt, receiveHt, eps_dielect, sgm_conductivity, eno_ns_surfref, frq_mhz, radio_climate, pol, conf, rel, rv, buf, errnum);
         //qDebug() << " point_to_point" << rv << buf << errnum;
 
@@ -1100,6 +1105,12 @@ namespace UlsMeasurementAnalysis {
         char buf[256];
         int errnum;
 
+        if (itmInitFlag) {
+            LOGGER_INFO(logger) << "ITM Parameter: eps_dielect = " << eps_dielect;
+            LOGGER_INFO(logger) << "ITM Parameter: sgm_conductivity = " << sgm_conductivity;
+            LOGGER_INFO(logger) << "ITM Parameter: pol = " << pol;
+            itmInitFlag = false;
+        }
         point_to_point(*heightProfilePtr, transHt, receiveHt, eps_dielect, sgm_conductivity, eno_ns_surfref, frq_mhz, radio_climate, pol, conf, rel, rv, buf, errnum);
         //qDebug() << " point_to_point" << rv << buf << errnum;
 
@@ -1164,6 +1175,12 @@ namespace UlsMeasurementAnalysis {
         char buf[256];
         int errnum;
 
+        if (itmInitFlag) {
+            LOGGER_INFO(logger) << "ITM Parameter: eps_dielect = " << eps_dielect;
+            LOGGER_INFO(logger) << "ITM Parameter: sgm_conductivity = " << sgm_conductivity;
+            LOGGER_INFO(logger) << "ITM Parameter: pol = " << pol;
+            itmInitFlag = false;
+        }
         point_to_point(*heightProfilePtr, transHt, receiveHt, eps_dielect, sgm_conductivity, eno_ns_surfref, frq_mhz, radio_climate, pol, conf, rel, rv, buf, errnum);
         //qDebug() << " point_to_point" << rv << buf << errnum;
 

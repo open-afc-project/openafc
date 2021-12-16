@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef SIGNAL_WAITER_H
 #define SIGNAL_WAITER_H

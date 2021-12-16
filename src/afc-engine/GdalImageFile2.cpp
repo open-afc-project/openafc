@@ -15,7 +15,7 @@ GdalImageFile2::GdalImageFile2(const QString &filen, int tileSizeXVal, int tileS
     const char *projRef = _dataset->GetProjectionRef();
     _spatialReferenceProjection = new OGRSpatialReference();
     char *projArr = (char *)calloc(strlen(projRef) + 1, sizeof(char));
-    projArr = strcpy(projArr, projRef);
+    strcpy(projArr, projRef);
     
     OGRErr errCode = _spatialReferenceProjection->importFromWkt(&projArr);
     if(errCode != OGRERR_NONE){
@@ -24,6 +24,7 @@ GdalImageFile2::GdalImageFile2(const QString &filen, int tileSizeXVal, int tileS
     }
 
     _geographicReference = new OGRSpatialReference();
+    // _geographicReference->SetAxisMappingStrategy(OAMS_TRADITIONAL_GIS_ORDER);
     errCode = _geographicReference->SetWellKnownGeogCS("WGS84");
 
     if(errCode != OGRERR_NONE){
@@ -73,12 +74,14 @@ GdalImageFile2::GdalImageFile2(const QString &filen, int tileSizeXVal, int tileS
         }
 
         OGRCoordinateTransformationH hTransform = NULL;
+        OGRCoordinateTransformationH hInvTransform = NULL;
         if(pszProjection != NULL && strlen(pszProjection) > 0){
             OGRSpatialReferenceH hLatLong = NULL;
             OGRSpatialReferenceH hProj = OSRNewSpatialReference(pszProjection);
             hLatLong = OSRNewSpatialReference(NULL);
             OSRSetWellKnownGeogCS(hLatLong, "WGS84");
             hTransform = OCTNewCoordinateTransformation(hProj, hLatLong);
+            hInvTransform = OCTNewCoordinateTransformation(hLatLong, hProj);
         }
 
         double minLat, maxLat, minLon, maxLon;
@@ -96,15 +99,29 @@ GdalImageFile2::GdalImageFile2(const QString &filen, int tileSizeXVal, int tileS
             geoY = _rawTransform[3] + _rawTransform[4] * x + _rawTransform[5] * y;
             qDebug() << x << y << "->" << geoX << geoY;
             double geoZ = 0.0;
+            double origX = geoX;
+            double origY = geoY;
             if(hTransform){
                 OCTTransform(hTransform, 1, &geoX, &geoY, &geoZ);
                 qDebug() << "    ->" << geoX << geoY;
             }
+            double lonDeg = geoX;
+            double latDeg = geoY;
 
-            if(c == 0 || geoY < minLat) minLat = geoY;
-            if(c == 0 || geoY > maxLat) maxLat = geoY;
-            if(c == 0 || geoX < minLon) minLon = geoX;
-            if(c == 0 || geoX > maxLon) maxLon = geoX;
+#if 0
+// For debug only
+            if(hInvTransform){
+                OCTTransform(hInvTransform, 1, &geoX, &geoY, &geoZ);
+                qDebug() << "    ->" << geoX << geoY;
+            }
+            double transformBackX = geoX;
+            double transformBackY = geoY;
+#endif
+
+            if(c == 0 || latDeg < minLat) minLat = latDeg;
+            if(c == 0 || latDeg > maxLat) maxLat = latDeg;
+            if(c == 0 || lonDeg < minLon) minLon = lonDeg;
+            if(c == 0 || lonDeg > maxLon) maxLon = lonDeg;
         }
 
         _topLeft = GeodeticCoord::fromLatLon(maxLat, minLon);
@@ -205,10 +222,15 @@ void GdalImageFile2::loadTile(int tileXIdxVal, int tileYIdxVal) {
 
 unsigned char GdalImageFile2::getValue(const GeodeticCoord &pt)
 {
-    if(!containsPoint(pt)) return NO_DATA;
+    // if(!containsPoint(pt)) return NO_DATA;
 
     int srcX, srcY;
     lonlatToXY(pt, srcX, srcY);
+
+    if (    (srcX < 0) || (srcX > _xsize-1)
+         || (srcY < 0) || (srcY > _ysize-1) ) {
+        return NO_DATA;
+    }
 
     unsigned char tf = getValue(srcX, srcY);
 

@@ -1,4 +1,4 @@
-//  
+// 
 
 #include "SqlScopedConnection.h"
 

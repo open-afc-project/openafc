@@ -44,8 +44,10 @@
 #include "GdalHelpers.h"
 #include "GdalDataDir.h"
 #include "GdalDataModel.h"
+#include "GdalImageFile2.h"
 #include "BuildingRasterModel.h"
 #include "ras.h"
+#include "readITUFiles.hpp"
 #include "str_type.h"
 #include "UlsDatabase.h"
 #include "uls.h"
@@ -92,17 +94,6 @@ class AfcManager
 {
 public:  
     AfcManager();
-    AfcManager(DoubleTriplet &rlanLLA, DoubleTriplet &rlanUncerts) : 
-                                        _rlanLLA(rlanLLA), _rlanUncerts_m(rlanUncerts), _minEIRP_dBm(-1.0), _maxEIRP_dBm(10.0),
-                                        _IoverN_threshold_dB(-6.0), _rlanOrientation_deg(0.0),
-                                        _buildingType(CConst::traditionalBuildingType) {}
-    AfcManager(DoubleTriplet &rlanLLA, DoubleTriplet &rlanUncerts,
-                    double &minEIRP, double &maxEIRP,
-                    double &IoverN, double &feederLoss, double &rlanOrient,
-                    CConst::BuildingTypeEnum &buildingType) : 
-                                        _rlanLLA(rlanLLA), _rlanUncerts_m(rlanUncerts), _minEIRP_dBm(minEIRP), _maxEIRP_dBm(maxEIRP),
-                                        _IoverN_threshold_dB(IoverN), _rlanOrientation_deg(rlanOrient),
-                                        _buildingType(buildingType) {}
     ~AfcManager();
 
     bool isNull() { // Checks if there are NaN values in any of the required inputs
@@ -163,6 +154,9 @@ public:
     
     void setConstInputs(const std::string& tempDir); // set inputs not specified by user
 
+    void setFixedBuildingLossFlag(bool fixedBuildingLossFlag) { _fixedBuildingLossFlag = fixedBuildingLossFlag; }
+    void setFixedBuildingLossValue(double fixedBuildingLossValue) { _fixedBuildingLossValue = fixedBuildingLossValue; }
+
     void clearData();
     void clearULSList();
     void clearRASList();
@@ -178,20 +172,21 @@ public:
 
     void readRASData(std::string filename);
 
-    void computePathLoss(CConst::PropEnvEnum propEnv, double distKm, double frequency,
-        double txLongitudeDeg, double txLatitudeDeg, double txHeightM,
-        double rxLongitudeDeg, double rxLatitudeDeg, double rxHeightM, double elevationAngleRad,
-        double& pathLoss, double& pathClutterDB, bool meanFlag,
+    void computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx, CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
+        double distKm, double frequency,
+        double txLongitudeDeg, double txLatitudeDeg, double txHeightM, double elevationAngleTxDeg,
+        double rxLongitudeDeg, double rxLatitudeDeg, double rxHeightM, double elevationAngleRxDeg,
+        double& pathLoss, double& pathClutterTxDB, double& pathClutterRxDB, bool meanFlag,
         std::string& pathLossModelStr, double& pathLossCDF,
-        std::string& pathClutterModelStr, double& pathClutterCDF,
-        const iturp452::ITURP452 *itu452, std::string *txClutterStrPtr, double **heightProfilePtr
+        std::string& pathClutterTxModelStr, double& pathClutterTxCDF, std::string& pathClutterRxModelStr, double& pathClutterRxCDF,
+        const iturp452::ITURP452 *itu452, std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **heightProfilePtr
 #if MM_DEBUG
                                  , std::vector<std::string> &ITMHeightType
 #endif
        ) const;
 
     double q(double Z) const;
-    double computeBuildingPenetration(CConst::BuildingTypeEnum buildingType, double elevationAngleRad, double frequency, std::string& buildingPenetrationModelStr, double& buildingPenetrationCDF, bool fixedProbFlag = false) const;
+    double computeBuildingPenetration(CConst::BuildingTypeEnum buildingType, double elevationAngleDeg, double frequency, std::string& buildingPenetrationModelStr, double& buildingPenetrationCDF, bool fixedProbFlag = false) const;
 
     double computeNearFieldLoss(double frequency, double maxGain, double distance) const;
 
@@ -238,7 +233,7 @@ private:
                                                                                         // Returns 1 is successful, 0 of cfi invalid
 
     void fixFSTerrain();
-    CConst::PropEnvEnum computeRlanPropEnv(double lonDeg, double latDeg, bool errorFlag = true) const;
+    CConst::PropEnvEnum computePropEnv(double lonDeg, double latDeg, CConst::NLCDLandCatEnum &nlcdLandCat, bool errorFlag = true) const;
     double computeIToNMargin(double d, double cc, double ss, ULSClass *uls, double chanCenterFreq, double bandwidth, double chanStartFreq, double chanStopFreq, double spectralOverlapLossDB, char ulsRxPropEnv, double& distKmM, std::string comment, CsvWriter *fexcthrwifi);
 
     /**************************************************************************************/
@@ -252,6 +247,7 @@ private:
     DoubleTriplet _rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, quietNaN); // minor uncertainity (NaN if not ellipse), major uncertainity (NaN if not ellipse), height uncertainty
     std::vector<LatLon> _rlanLinearPolygon = std::vector<LatLon>();
     std::vector<AngleRadius> _rlanRadialPolygon = std::vector<AngleRadius>();
+    double _scanres_xy, _scanres_ht;
 
     double _minEIRP_dBm = std::numeric_limits<double>::quiet_NaN();                    // minimum RLAN EIRP (in dBm)
     double _maxEIRP_dBm;                    // maximum RLAN EIRP (in dBm)
@@ -292,7 +288,19 @@ private:
     QString _propagationEnviro;             // Propagation environment (e.g. Population Density Map)
     QString _antennaPattern;                // User-inputted antenna pattern
 
-    double _receiverFeedLoss_dB;            // User-inputted ULS receiver feeder loss
+    double _rxFeederLossDBUNII5;            // User-inputted ULS receiver feeder loss for UNII-5
+    double _rxFeederLossDBUNII7;            // User-inputted ULS receiver feeder loss for UNII-7
+    double _rxFeederLossDBOther;            // User-inputted ULS receiver feeder loss for others (not UNII-5 or UNII-7)
+
+    double _ulsNoiseFigureDBUNII5;          // Noise Figure for ULS receiver in UNII-5 band;
+    double _ulsNoiseFigureDBUNII7;          // Noise Figure for ULS receiver in UNII-7 band;
+    double _ulsNoiseFigureDBOther;          // Noise Figure for ULS receiver in Other band;
+
+    double _itmEpsDielect;
+    double _itmSgmConductivity;
+    int _itmPolarization;
+    double _itmMinSpacing;                   // Min spacing, in meters, between points in ITM path profile
+    int _itmMaxNumPts;                       // Max number of points to use in ITM path profile
 
     QJsonObject _deviceDesc;                // parsed device description to be returned in response
 
@@ -319,6 +327,8 @@ private:
     QString _heatmapRLANOutdoorHeightType;   // Above Mean Sea Level (AMSL), Above Ground Level (AGL) for OutIndoor RLAN's
     double _heatmapRLANOutdoorHeight;       // RLAN Outdoor Height (m) to use for Heatmap Analysis
     double _heatmapRLANOutdoorHeightUncertainty; // RLAN Outdoor Height Uncertainty (m) to use for Heatmap Analysis
+
+    bool _applyClutterFSRxFlag;
     /**************************************************************************************/
 
     /**************************************************************************************/
@@ -333,7 +343,6 @@ private:
     bool _use3DEP = false;                  // flag to enable use of 3DEP 10m terrain data
 
     double _minRlanHeightAboveTerrain;      // Min height above terrain for RLAN
-    int _maxNumPointsITM;                   // Max number of points to use in ITM path profile
 
     double _maxRadius;                      // Max link distance to consider, links longer are ignored
     double _exclusionDist;                  // Min link distance to consider, links shorter are ignored
@@ -362,12 +371,14 @@ private:
     std::string _worldPopulationFile;       // GDAL file (tiff) containing population density data
     std::string _regionPolygonFileList;     // Comma separated list of KML files, one for each region in simulation
     double _regionPolygonResolution;   // Resolution to use for polygon vertices, 1.0e-5 corresp to 1.11m, should not have to change
+    std::string _nlcdFile;                  // GDAL file contining NLCD data
+    std::string _radioClimateFile;           // ITU radio climate data
+    std::string _surfRefracFile;             // ITU surface refractivity data
 
     double _densityThrUrban;                // Population density threshold above which region is considered URBAN
     double _densityThrSuburban;             // Population density above this thr and below urban thr is SUBURBAN
     double _densityThrRural;                // Population density above this thr and below suburban thr is RURAL
 
-    double _ulsNoiseFigureDB;               // Noise Figure for ULS receiver;
     bool _removeMobile;                     // If set to true, mobile entries are removed when reading ULS file
 
     bool _filterSimRegionOnly;              // Filter ULS file only for in/out of simulation region
@@ -375,8 +386,6 @@ private:
     std::string _ulsAntennaPatternFile;     // File containing ULS antenna patterns as a function of angle off boresight;
 
     // std::string _rlanBWStr;                 // Comma separated list of RLAN bandwidths (Hz), "b0,b1,b2"
-
-    bool _useFixedRxAntennaFeederLoss;      // If set, ignore RX antenna feeder loss values in ULS file and set to const value for all FS RX's
 
     double _visibilityThreshold;             // I/N threshold to determine whether or not an RLAN is visible to an FS
     std::string _excThrFile;                 // Generate file containing data for wifi devices where single entry I/N > visibility Threshold
@@ -406,6 +415,8 @@ private:
 
     ListClass<RASClass *> *_rasList;         // List of the RAS (Radio Astronomy Stations) that each have exclusion zone.
 
+    GdalImageFile2 *nlcdImageFile;
+
     std::vector<AntennaClass *> _ulsAntennaList;
 
     CConst::PathLossModelEnum _pathLossModel;
@@ -418,6 +429,8 @@ private:
     DoubleTriplet _beamConeLatLons;          // Stores beam cone coordinates together to be loaded into geometries
 
     RlanRegionClass *_rlanRegion;            // RLAN Uncertainty Region
+
+    ITUDataClass *_ituData;
     /**************************************************************************************/
 
     /**************************************************************************************/
@@ -446,6 +459,10 @@ private:
     /**************************************************************************************/
 
     //bool _configChange = false;
+
+#if MM_DEBUG
+    void runAnalyzeNLCD();
+#endif
 };
 
 #endif // INCLUDE_AFCMANAGER_H

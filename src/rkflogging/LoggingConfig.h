@@ -1,4 +1,4 @@
-//  
+// 
 
 #ifndef LOGGING_CONFIG_H_
 #define LOGGING_CONFIG_H_

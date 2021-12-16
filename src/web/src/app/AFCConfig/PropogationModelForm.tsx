@@ -14,7 +14,7 @@ import { PropagationModel } from "../Lib/RatApiTypes";
 const propogationModels = [
     "FSPL",
     "ITM with building data",
-    "ITM with no building data",
+    //"ITM with no building data",
     "FCC 6GHz Report & Order",
     "Ray Tracing"
 ]

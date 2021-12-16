@@ -1,3 +1,4 @@
+// 
 #include "UnitTestCoreApp.h"
 
 char UnitTestCoreApp::_arg0[] = "programName";
