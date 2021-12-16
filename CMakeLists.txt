@@ -4,6 +4,9 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS 3.10)
     cmake_policy(SET CMP0071 OLD)
 endif()
 
+set(CMAKE_BUILD_TYPE "Debug")
+# set(CMAKE_BUILD_TYPE "Release")
+
 # External version naming
 file(READ "${CMAKE_SOURCE_DIR}/version.txt" VERSIONFILE)
 string(STRIP ${VERSIONFILE} VERSIONFILE)
@@ -24,7 +27,6 @@ svnversion_info(
     SAVEFILE "${CMAKE_SOURCE_DIR}/svnrevision.txt"
 )
 message("${CMAKE_SOURCE_DIR} VERS ${SVN_LAST_REVISION}")
-
 
 # Compiler and linker config
 set(CMAKE_CXX_STANDARD 11)
@@ -56,9 +58,14 @@ endif(WIN32)
 
 # mmandell build flags
 if("mmandell" STREQUAL "$ENV{USER}")
+if (1)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDBG_COMPUTE=1 -DMM_DEBUG=1")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=format-extra-args")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=format")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=shadow")
     # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
     message(STATUS "Using build mode $ENV{USER}")
+endif()
 endif()
 
 # Coverage analysis
