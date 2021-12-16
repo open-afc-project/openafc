@@ -26,7 +26,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
     - [Pulling the Docker image from Docker registry](#pulling-the-docker-image-from-docker-registry)
   - [Building OpenAFC engine server](#building-openafc-engine-server)
 
-- [Databases info](/database_readme.md)
+- [Database info](/database_readme.md)
 - [Release Notes](/ReleaseNote.md)
 <br /><br />
 
@@ -174,6 +174,8 @@ docker run --rm -it -v `pwd`:/wd/fbrat fbrat-build /wd/fbrat/build-rpm.sh
 To run docker with your host's user you can use --user flag like:
 ```
 docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/fbrat fbrat-build
-
+```
+or for rpm build:
+```
 docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/fbrat fbrat-build /wd/fbrat/build-rpm.sh
 ```
