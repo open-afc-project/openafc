@@ -3,8 +3,12 @@
 ## **Version and Date**
 |Version|**v3.3.10**|
 | :- | :- |
-|**Date**|**12/17/2021**|
+|**Date**|**12/20/2021**|
 
+
+## **Issues Addressed**
+Jira OA-10: For FS links with passive receiver, FS Rx to point to the passive repeater
+Jira OA-11: Testing of ULS Script Parser
 
 ## **Feature Additions/Changes**
 
