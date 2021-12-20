@@ -17,10 +17,10 @@ dayMap = OrderedDict() # ordered dictionary so order is mainatined
 dayMap[6] = 'sun'
 dayMap[0] = 'mon'
 dayMap[1] = 'tue'
-dayMap[2] ='wed'
-dayMap[3] ='th'
-dayMap[4] ='fri'
-dayMap[5] ='sat'
+dayMap[2] = 'wed'
+dayMap[3] = 'thu'
+dayMap[4] = 'fri'
+dayMap[5] = 'sat'
 # map to reuse for converting month strings to ints
 monthMap = {
     'jan': 1,
@@ -72,8 +72,8 @@ def extractZips(logFile):
             zip_file.close() 
 
 # Returns the datetime object based on the counts file
-def verifyCountsFile(dirName, root):
-    os.chdir(root + '/temp/' + dirName)
+def verifyCountsFile(dirName, root, temp):
+    os.chdir(root + temp + "/" + dirName)
     # check weekly date 
     with open('counts', 'r') as countsFile: 
         line = countsFile.readline()
@@ -92,7 +92,7 @@ def verifyCountsFile(dirName, root):
         mins = timeData[1]
         sec = timeData[2]
         if(month != 'err'):
-            os.chdir(root + '/temp') # change back to temp directory
+            os.chdir(root + temp) # change back to temp directory
             fileCreationDate = datetime.datetime(year, month, day, hours, mins, sec)
             return fileCreationDate
         else: 
@@ -208,17 +208,17 @@ def readEntries(fileType):
     updateIndividualFile(fileType, recordBuffer)
 
 # Processes the daily files, replacing weekly entries when needed 
-def processDailyFiles(weeklyCreation, root, logFile):
+def processDailyFiles(weeklyCreation, root, logFile, temp):
     logFile.write('Processing daily files' + '\n')
     weeklyFormatFixed = False
     for key, day in dayMap.items():
         if (currentWeekday == 6):
             continue # this is LAST Sunday's files, so we skip this entry
         # ensure counts file is newer than weekly
-        fileCreationDate = verifyCountsFile(day, root)
+        fileCreationDate = verifyCountsFile(day, root, temp)
         timeDiff = fileCreationDate - weeklyCreation
         if(timeDiff.total_seconds() > 0):
-            os.chdir(root + '/temp/' + day) # change into the folder for the day, starting with sunday 
+            os.chdir(root + temp + '/' + day) # change into the folder for the day, starting with sunday 
             for dailyFile in os.listdir(os.getcwd()):
                 if (dailyFile in neededFiles.keys()):
                     logFile.write('Processing ' + dailyFile + ' for: ' + day + '\n')
@@ -227,7 +227,7 @@ def processDailyFiles(weeklyCreation, root, logFile):
             # Exit after processing yesterdays file
             if (key == currentWeekday - 1 or (currentWeekday == 0 and key == 6)):
                 break
-            os.chdir(root + '/temp/') # change back to temp
+            os.chdir(root + temp) # change back to temp
         else:
             logFile.write('INFO: Skipping ' + day + ' files because they are older than the weekly file' + '\n')
     # in this case there were no daily files processed so we need to fix weekly data 
@@ -239,36 +239,38 @@ def processDailyFiles(weeklyCreation, root, logFile):
             removeFromCombinedFile(file, []) 
 
 # Generates the combined text file that the coalition processor uses. 
-def generateUlsScriptInput(root, logFile):
+def generateUlsScriptInput(root, logFile, temp):
     logFile.write('Generating combined.txt for uls script' + '\n')
-    os.chdir(root + "/temp")
+    os.chdir(root + temp)
     with open('combined.txt', 'w') as combined:
         for weeklyFile in os.listdir('weekly'):
             if "withDaily" in weeklyFile:
                 logFile.write('Adding ' + weeklyFile + " to combined.txt" + '\n')
-                with open(root + '/temp/weekly/' + weeklyFile, 'r') as infile:
+                with open(root +  temp +'/weekly/' + weeklyFile, 'r') as infile:
                     for line in infile:
                         combined.write(line)
     os.chdir(root)
 
-def daily_uls_parse(state_root):
+def daily_uls_parse(state_root, isManual = False):
     startTime = datetime.datetime.now()
     root = state_root + "/daily_uls_parse"# root so path is consisent
+    temp = '/temp'
+    if isManual:
+        temp = '/temp_manual'
     # Ensure temp dir does not exist 
-    if (os.path.isdir(root + '/temp')):
+    if (os.path.isdir(root + temp)):
         try:
-            shutil.rmtree(root + '/temp') #delete temp folder
+            shutil.rmtree(root + temp) #delete temp folder
         except Exception as e: 
             # LOGGER.error('ERROR: Could not delete old temp directory:')
             raise e
     # create temp directory to download files to
-    os.mkdir(root + '/temp')
-    os.chdir(root + '/temp') #change to temp 
-    logname = root + "/temp/" + "dailyParse_" + startTime.isoformat() + ".log"
+    os.mkdir(root + temp)
+    os.chdir(root + temp) #change to temp 
+    logname = root + temp + "/dailyParse_" + startTime.isoformat() + ".log"
     logFile = open(logname, 'w')
     logFile.write('Starting update at: ' + startTime.isoformat() + '\n')
-    logFile.write('Creating temp directory' + '\n')
-    
+
 
     # download and unzip
     downloadFiles(logFile)
@@ -276,20 +278,20 @@ def daily_uls_parse(state_root):
 
 
     # get the time creation of weekly file from the counts file
-    weeklyCreation = verifyCountsFile('weekly', root)
+    weeklyCreation = verifyCountsFile('weekly', root, temp)
     # process the daily files day by day
-    processDailyFiles(weeklyCreation, root, logFile)
+    processDailyFiles(weeklyCreation, root, logFile, temp)
 
     os.chdir(root) # change back to root of this script
     # generate the combined csv/txt file for the coalition uls processor 
-    generateUlsScriptInput(root, logFile) 
+    generateUlsScriptInput(root, logFile, temp) 
 
     # run through the uls processor 
     logFile.write('Running through ULS processor' + '\n')
     nameTime =  datetime.datetime.now().isoformat().replace(":", '_')
-    coalitionScriptOutput = root + '/temp/' +'CONUS_ULS ' + nameTime + '.csv'
+    coalitionScriptOutput = root + temp +'/CONUS_ULS ' + nameTime + '.csv'
     try:
-        subprocess.call(['./uls-script', root + '/temp/combined.txt', coalitionScriptOutput]) 
+        subprocess.call(['./uls-script', root + temp + '/combined.txt', coalitionScriptOutput]) 
     except Exception as e: 
         logFile.write('ERROR: ULS processor error:')
         raise e

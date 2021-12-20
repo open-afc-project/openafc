@@ -350,6 +350,8 @@ function ulsParseContinuation(isCanceled?: () => boolean, status?: (progress: { 
                 const data = (await res.json() as { entriesUpdated: number, entriesAdded: number, finishTime: string });
                 // exit and return
                 return success(data);
+            } else if(res.status == 503) {
+                return error('Manual parse already in progress')
             }
             else {
                 logger.error(res);

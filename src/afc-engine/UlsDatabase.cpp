@@ -25,30 +25,34 @@ namespace
 } // end namespace
 
 QStringList columns = QStringList()
-            << "fsid"
-            << "callsign"
-            << "radio_service"
-            << "name"
-            << "rx_callsign"
-            << "rx_antenna_num"
-            << "freq_assigned_start_mhz"
-            << "freq_assigned_end_mhz"
-            << "emissions_des"
-            << "tx_lat_deg"
-            << "tx_long_deg"
-            << "tx_ground_elev_m"
-            << "tx_polarization"
-            << "tx_gain"
-            << "tx_eirp"
-            << "tx_height_to_center_raat_m"
-            << "rx_lat_deg"
-            << "rx_long_deg"
-            << "rx_ground_elev_m"
-            << "rx_height_to_center_raat_m"
-            << "rx_gain"
-            << "status"
-            << "mobile"
-            << "rx_ant_model";
+            << "fsid"                          // 0
+            << "callsign"                      // 1
+            << "radio_service"                 // 2
+            << "name"                          // 3
+            << "rx_callsign"                   // 4
+            << "rx_antenna_num"                // 5
+            << "freq_assigned_start_mhz"       // 6
+            << "freq_assigned_end_mhz"         // 7
+            << "emissions_des"                 // 8
+            << "tx_lat_deg"                    // 9
+            << "tx_long_deg"                   // 10
+            << "tx_ground_elev_m"              // 11
+            << "tx_polarization"               // 12
+            << "tx_gain"                       // 13
+            << "tx_eirp"                       // 14
+            << "tx_height_to_center_raat_m"    // 15
+            << "rx_lat_deg"                    // 16
+            << "rx_long_deg"                   // 17
+            << "rx_ground_elev_m"              // 18
+            << "rx_height_to_center_raat_m"    // 19
+            << "rx_gain"                       // 20
+            << "status"                        // 21
+            << "mobile"                        // 22
+            << "rx_ant_model"                  // 23
+            << "p_rx_indicator"                // 24
+            << "p_rp_lat_degs"                 // 25
+            << "p_rp_lon_degs"                 // 26
+            << "p_rp_height_to_center_raat_m"; // 27
 
 void verifyResult(const QSqlQuery& ulsQueryRes)
 {
@@ -197,6 +201,10 @@ void fillTarget(std::vector<UlsRecord>& target, QSqlQuery& q)
         target.at(r).status = q.value(21).toString().toStdString();
         target.at(r).mobile = q.value(22).toBool();
         target.at(r).rxAntennaModel = q.value(23).toString().toStdString();
+        target.at(r).hasPR = (q.value(24).toString().toStdString() == "Y" );
+        target.at(r).prLatitudeDeg  = q.value(25).isNull() ? nan : q.value(25).toDouble();
+        target.at(r).prLongitudeDeg = q.value(26).isNull() ? nan : q.value(26).toDouble();
+        target.at(r).prHeightAboveTerrain = q.value(27).isNull() ? nan : q.value(27).toDouble();
     }
     LOGGER_DEBUG(logger) << target.size() << " rows retreived";
 }

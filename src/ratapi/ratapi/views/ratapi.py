@@ -684,13 +684,13 @@ class UlsParse(MethodView):
                 description=err.message)
 
     def post(self):
-        ''' POST method for daily ULS Db parsing '''
+        ''' POST method for manual daily ULS Db parsing '''
 
         auth(roles=['Admin'])
 
         LOGGER.debug('Kicking off daily uls parse')
         try:
-            task = parseULS.apply_async(args=[flask.current_app.config["STATE_ROOT_PATH"]])
+            task = parseULS.apply_async(args=[flask.current_app.config["STATE_ROOT_PATH"], True])
             
             LOGGER.debug('uls parse started')
 
@@ -717,11 +717,18 @@ class UlsParse(MethodView):
         LOGGER.debug('Recieved arg %s', args)
         hours = args["hours"]
         mins =  args["mins"]
+        if hours == 0:
+            hours = "00"
+        if mins == 0:
+            mins = "00"
         timeStr = str(hours) + ":" + str(mins)
         LOGGER.debug('Updating automated ULS time to ' + timeStr + " UTC")
+        datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/nextRun.txt'
+        if not os.path.exists(datapath):
+            raise werkzeug.exceptions.NotFound('next run file not found')
+        with open(datapath, 'w') as data_file:
+            data_file.write(timeStr)
         try:
-            flask.current_app.config["DAILY_ULS_MINS"] = mins
-            flask.current_app.config["DAILY_ULS_HOUR"] = hours
             return flask.jsonify(
                 newTime=timeStr
             ), 200
@@ -735,6 +742,11 @@ class DailyULSStatus(MethodView):
 
     methods = ['GET', 'DELETE']
 
+    def resetManualParseFile(self):
+        ''' Overwrites the file for manual task id with a blank string '''
+        datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/currentManualId.txt'
+        with open(datapath, 'w') as data_file:
+            data_file.write("")
 
     def get(self, task_id):
         ''' GET method for uls parse Status '''
@@ -751,13 +763,19 @@ class DailyULSStatus(MethodView):
         if not task.ready():
             LOGGER.debug("Found Task pending")
             return flask.make_response(flask.json.dumps(dict(percent=0, message='Pending...')), 202)
+        if task.state == 'REVOKED':
+            LOGGER.debug("Found task already in progress")
+            #LOGGER.debug("task info %s", task.info)
+            raise werkzeug.exceptions.ServiceUnavailable()
 
-        if task.failed():
+        elif task.failed():
             LOGGER.debug("Found failed task")
+            self.resetManualParseFile()
             raise werkzeug.exceptions.InternalServerError(
                 'Task excecution failed')
 
         if task.successful():
+            self.resetManualParseFile()
             results = task.result
             return flask.jsonify(
                     entriesUpdated=results[0],
@@ -778,7 +796,6 @@ class DailyULSStatus(MethodView):
             LOGGER.debug('Terminating %s', task_id)
             task.revoke(terminate=True)
             return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
-
         if task.failed():
             task.forget()
             return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)

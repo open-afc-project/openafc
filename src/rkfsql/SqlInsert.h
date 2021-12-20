@@ -1,4 +1,4 @@
-// 
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef SQL_INSERT_H
 #define SQL_INSERT_H

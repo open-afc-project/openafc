@@ -222,7 +222,7 @@ void TerrainClass::loadLidarRegion(int lidarRegionIdx)
         return;
     }
 
-    if (activeLidarRegionList.size() == maxLidarRegionLoad) {
+    if (((int) activeLidarRegionList.size()) == maxLidarRegionLoad) {
         // Close Lidar region before opening new one.
         int deleteLidarRegionIdx = activeLidarRegionList.back();
         activeLidarRegionList.pop_back();
@@ -251,7 +251,7 @@ int TerrainClass::getLidarRegion(double lonDeg, double latDeg) const
     int lidarRegionIdx, retval;
     bool found = false;
 
-    for(lidarRegionIdx=0; (lidarRegionIdx<lidarRegionList.size())&&(!found); ++lidarRegionIdx) {
+    for(lidarRegionIdx=0; (lidarRegionIdx<((int) lidarRegionList.size()))&&(!found); ++lidarRegionIdx) {
         const LidarRegionStruct& lidarRegion = lidarRegionList[lidarRegionIdx];
 
         if (lidarRegion.multibandRaster) {
@@ -282,11 +282,11 @@ int TerrainClass::getLidarRegion(double lonDeg, double latDeg) const
 /******************************************************************************************/
 void TerrainClass::readLidarData(double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon)
 {
-    int lidarRegionIdx, retval;
+    int lidarRegionIdx;
     std::ostringstream errStr;
 
     int numRegionWithOverlap = 0;
-    for(lidarRegionIdx=0; (lidarRegionIdx<lidarRegionList.size()); ++lidarRegionIdx) {
+    for(lidarRegionIdx=0; (lidarRegionIdx<((int) lidarRegionList.size())); ++lidarRegionIdx) {
         const LidarRegionStruct& lidarRegion = lidarRegionList[lidarRegionIdx];
 
         if (!(    (terrainMaxLon < lidarRegion.minLonDeg) || (terrainMinLon > lidarRegion.maxLonDeg)
@@ -301,7 +301,7 @@ void TerrainClass::readLidarData(double terrainMinLat, double terrainMinLon, dou
         throw std::runtime_error(errStr.str());
     }
 
-    for(lidarRegionIdx=0; (lidarRegionIdx<lidarRegionList.size()); ++lidarRegionIdx) {
+    for(lidarRegionIdx=0; (lidarRegionIdx<((int) lidarRegionList.size())); ++lidarRegionIdx) {
         const LidarRegionStruct& lidarRegion = lidarRegionList[lidarRegionIdx];
 
         if (!(    (terrainMaxLon < lidarRegion.minLonDeg) || (terrainMinLon > lidarRegion.maxLonDeg)
@@ -356,7 +356,6 @@ void TerrainClass::readLidarInfo(QDir lidarDir)
         std::string str;
         std::string reasonIgnored;
         std::ostringstream errStr;
-        std::size_t strpos;
 
         int multibandFieldIdx           = -1;
         int minLonFieldIdx              = -1;
@@ -372,11 +371,6 @@ void TerrainClass::readLidarInfo(QDir lidarDir)
         fieldIdxList.push_back(&minLatFieldIdx);    fieldLabelList.push_back("MIN_LAT_DEG");
         fieldIdxList.push_back(&maxLatFieldIdx);    fieldLabelList.push_back("MAX_LAT_DEG");
         fieldIdxList.push_back(&formatFieldIdx);    fieldLabelList.push_back("FORMAT");
-
-        double minLonDeg;
-        double maxLonDeg;
-        double minLatDeg;
-        double maxLatDeg;
 
         int fieldIdx;
 

@@ -49,6 +49,5 @@ TASK_QUEUE = '/var/spool/fbrat'
 CELERY_RESULT_BACKEND = 'file:///var/celery/results'
 #: address of rabbitmq server
 BROKER_URL = 'amqp://celery:celery@localhost:5672/fbrat'
-#: Time for the automated ULS parse
-DAILY_ULS_MINS = 0
-DAILY_ULS_HOURS = 0
+#: Tracks if the daily uls parser ran today. Overwritten by the tasks that use it.
+DAILY_ULS_RAN_TODAY = False 

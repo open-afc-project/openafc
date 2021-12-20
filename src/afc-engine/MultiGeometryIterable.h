@@ -1,4 +1,4 @@
-// 
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 #ifndef MULTI_GEOMETRY_ITERABLE_H
 #define MULTI_GEOMETRY_ITERABLE_H
 

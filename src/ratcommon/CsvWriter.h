@@ -1,4 +1,4 @@
-// 
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef CSV_WRITER_H
 #define CSV_WRITER_H

@@ -1,4 +1,4 @@
-// 
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 #ifndef SRC_RKFUNITTEST_GTESTSHIM_H_
 #define SRC_RKFUNITTEST_GTESTSHIM_H_
 

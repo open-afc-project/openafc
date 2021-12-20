@@ -1,4 +1,4 @@
-// 
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef CPOTESTCOMMON_PROGRUNNER_H_
 #define CPOTESTCOMMON_PROGRUNNER_H_

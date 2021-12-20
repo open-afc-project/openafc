@@ -1,4 +1,4 @@
-// 
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef SQL_TABLE_H
 #define SQL_TABLE_H

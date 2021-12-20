@@ -1,4 +1,4 @@
-// 
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 
 #ifndef SQL_EXCEPTION_DB_H
 #define SQL_EXCEPTION_DB_H

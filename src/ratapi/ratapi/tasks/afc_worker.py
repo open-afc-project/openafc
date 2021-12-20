@@ -11,6 +11,7 @@ from runcelery import init_config
 from celery.schedules import crontab
 from flask.config import Config
 from celery.utils.log import get_task_logger
+from celery.exceptions import Ignore
 
 LOGGER = get_task_logger(__name__)
 
@@ -28,15 +29,20 @@ client = Celery(
 
 client.conf.update(APP_CONFIG)
 
+
 @client.on_after_configure.connect
 def setup_periodic_tasks(sender, **kwargs):
-    hours = APP_CONFIG["DAILY_ULS_HOURS"]
-    mins = APP_CONFIG["DAILY_ULS_MINS"]
-    # daily uls parse
+    # Check every minute if the daily parse time has passed
     sender.add_periodic_task(
-        crontab(hour=hours, minute=mins),
-        parseULS.apply_async(APP_CONFIG["STATE_ROOT_PATH"]),
+        crontab(),
+        checkParseTime.apply_async(args=[]),
     )
+    # reset daily flag every day at midnight
+    sender.add_periodic_task(
+        crontab(minute=0, hour=0),
+        resetDailyFlag.apply_async(args=[]),
+    )
+   
 
 
 
@@ -171,16 +177,62 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type, re
         LOGGER.info('Worker resources cleaned up')
 
 
-# # Calls uls parse every day
-# @client.on_after_configure.connect
-# def setup_periodic_tasks(sender, **kwargs):
-#     secondsInDay = 86400
-#     sender.add_periodic_task(secondsInDay, parseULS.apply_async())
-
+@client.task(bind=True)
+def parseULS(self, state_path = "/var/lib/fbrat", isManual = False):
+    task_id = str(self.request.id)
+    # only allow one manual at a time
+    if isManual:
+        datapath = state_path + '/daily_uls_parse/data_files/currentManualId.txt'
+        with open(datapath, 'r+') as data_file:
+            id_in_progress = data_file.read()
+            if(id_in_progress == "" or id_in_progress == None or id_in_progress == '\n'):
+                data_file.write(task_id)
+                LOGGER.debug('Setting manual parser to %s', str(task_id))
+            else:
+                LOGGER.error('Manual parse already in progress')
+                self.update_state(state = 'REVOKED')
+                raise Ignore('Manual parse already in progress')
+    self.update_state(state='PROGRESS')
+    result = daily_uls_parse(state_path, isManual)
+    self.update_state(state='DONE')
+    LOGGER.debug('Freeing up manual parse worker')
+    return result
 
 @client.task(bind=True)
-def parseULS(self, state_path = "/var/lib/fbrat"):
-    self.update_state(state='PROGRESS')
-    result = daily_uls_parse(state_path)
-    self.update_state(state='DONE')
-    return result
+def checkParseTime(self):
+    datapath = APP_CONFIG["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/nextRun.txt'
+    nextRun = ''
+    
+    with open(datapath, 'r') as data_file:
+        # string is stored as "<hours>:<mins>"
+        nextRun = data_file.read().split(':')
+    hours = int(nextRun[0])
+    mins = int(nextRun[1])
+    LOGGER.debug('Checking parse time for hours: ' + str(hours) + ' mins: ' + str(mins))
+    timeNow = datetime.datetime.utcnow()
+    LOGGER.debug('Current time: ' + timeNow.isoformat())
+    timeToParse = datetime.datetime.utcnow().replace(hour=hours, minute=mins)
+    timeDiff = timeNow - timeToParse
+    LOGGER.debug('Desired parse time: ' + timeToParse.isoformat())
+    # if the time now is past the time to parse, start a parse
+    if timeDiff.total_seconds() >= 0:
+        if client.conf["DAILY_ULS_RAN_TODAY"]:
+            LOGGER.debug('Parse already started/complete today')
+            return "ALREADY PARSED"
+        else:
+            # daily uls parse
+            client.conf["DAILY_ULS_RAN_TODAY"] = True
+            LOGGER.debug('Starting automated daily parse')
+            parseULS.apply_async(args=[APP_CONFIG["STATE_ROOT_PATH"]])
+            return "STARTED PARSE"
+
+    else:
+        LOGGER.debug("Time to parse not yet reached")
+        return "TOO SOON TO PARSE"
+
+        
+
+@client.task(bind=True)
+def resetDailyFlag(self):
+    LOGGER.debug('Setting parse flag to false')
+    client.conf["DAILY_ULS_RAN_TODAY"] = False
