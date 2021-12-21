@@ -1,4 +1,4 @@
-// Copyright (C) 2017 RKF Engineering Solutions, LLC
+// 
 
 #ifndef SQL_DELETE_H
 #define SQL_DELETE_H

@@ -1,4 +1,4 @@
-// Copyright (C) 2017 RKF Engineering Solutions, LLC
+// 
 
 #ifndef SQL_UPDATE_H
 #define SQL_UPDATE_H

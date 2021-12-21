@@ -1,4 +1,4 @@
-// Copyright (C) 2017 RKF Engineering Solutions, LLC
+// 
 
 #ifndef PREPARED_QUERY_H
 #define PREPARED_QUERY_H

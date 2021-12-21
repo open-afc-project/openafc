@@ -1,4 +1,4 @@
-// Copyright (C) 2017 RKF Engineering Solutions, LLC
+// 
 #include "GtestShim.h"
 #include <QDateTime>
 #include <QUrl>
