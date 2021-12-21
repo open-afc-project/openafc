@@ -34,6 +34,10 @@ struct UlsRecord
     std::string status;
     bool mobile;
     std::string rxAntennaModel;
+    bool hasPR;
+    double prLatitudeDeg;
+    double prLongitudeDeg;
+    double prHeightAboveTerrain;
 };
 
 class UlsDatabase

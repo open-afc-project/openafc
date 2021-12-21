@@ -114,7 +114,7 @@ double ITUDataClass::getSurfaceRefractivityValue(double latDeg, double lonDeg) {
     int lonIdx0 = (int) std::floor(lonIdxDbl);
 
     if (lonIdx0 == 240) {
-        lonIdx0 = 0;
+        lonIdx0 = 239;
     }
 
     int latIdx1 = latIdx0 + 1;

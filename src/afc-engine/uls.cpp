@@ -44,6 +44,7 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal) : dataSet(dataSetVal), id(
     txLidarRegion = -1;
     rxTerrainHeightFlag = false;
     txTerrainHeightFlag = false;
+    prTerrainHeightFlag = false;
     numOutOfBandRLAN = 0;
 
     ITMHeightProfile = (double *) NULL;
@@ -80,6 +81,7 @@ CConst::PathLossModelEnum ULSClass::pathLossModel = CConst::unknownPathLossModel
 int ULSClass::getID() const { return(id); }
 Vector3 ULSClass::getRxPosition() { return(rxPosition); }
 Vector3 ULSClass::getTxPosition() { return(txPosition); }
+Vector3 ULSClass::getPRPosition() { return(prPosition); }
 Vector3 ULSClass::getAntennaPointing() { return(antennaPointing); }
 CConst::ULSTypeEnum ULSClass::getType() { return(type); }
 ListClass<Vector3> *ULSClass::getSatellitePositionData() { return(satellitePosnData); }
@@ -88,6 +90,7 @@ double ULSClass::getStopAllocFreq() {return(stopAllocFreq); }
 double ULSClass::getStartUseFreq() {return(startUseFreq); }
 double ULSClass::getStopUseFreq() {return(stopUseFreq); }
 double ULSClass::getBandwidth() {return(bandwidth); }
+bool ULSClass::getHasPR() { return(hasPR); }
 std::string ULSClass::getRadioService() {return(radioService); }
 std::string ULSClass::getEntityName() {return(entityName); }
 std::string ULSClass::getCallsign() {return(callsign); }
@@ -108,6 +111,14 @@ double                   ULSClass::getTxTerrainHeight()       { return(txTerrain
 double                   ULSClass::getTxHeightAboveTerrain()  { return(txHeightAboveTerrain); }
 double                   ULSClass::getTxHeightAMSL()          { return(txHeightAMSL); }
 CConst::HeightSourceEnum ULSClass::getTxHeightSource()        { return(txHeightSource); }
+
+double ULSClass::getPRLongitudeDeg() {return(prLongitudeDeg); }
+double ULSClass::getPRLatitudeDeg() {return(prLatitudeDeg); }
+double                   ULSClass::getPRTerrainHeight()       { return(prTerrainHeight); }
+double                   ULSClass::getPRHeightAboveTerrain()  { return(prHeightAboveTerrain); }
+double                   ULSClass::getPRHeightAMSL()          { return(prHeightAMSL); }
+CConst::HeightSourceEnum ULSClass::getPRHeightSource()        { return(prHeightSource); }
+
 double ULSClass::getNoiseLevelDBW() {return(noiseLevelDBW); }
 double ULSClass::getRxGain()        { return(rxGain); }
 double ULSClass::getRxAntennaFeederLossDB() { return(rxAntennaFeederLossDB); }
@@ -128,13 +139,16 @@ double ULSClass::getPropLoss() { return(propLoss); }
 int ULSClass::getPairIdx() { return(pairIdx); }
 int ULSClass::getRxLidarRegion() { return(rxLidarRegion); }
 int ULSClass::getTxLidarRegion() { return(txLidarRegion); }
+int ULSClass::getPRLidarRegion() { return(prLidarRegion); }
 bool ULSClass::getRxTerrainHeightFlag() { return(rxTerrainHeightFlag); }
 bool ULSClass::getTxTerrainHeightFlag() { return(txTerrainHeightFlag); }
+bool ULSClass::getPRTerrainHeightFlag() { return(prTerrainHeightFlag); }
 int ULSClass::getNumOutOfBandRLAN() { return(numOutOfBandRLAN); }
 
 void ULSClass::setSatellitePositionData(ListClass<Vector3> *spd) { satellitePosnData = spd; return; }
 void ULSClass::setRxPosition(Vector3 p) { rxPosition = p; return; }
 void ULSClass::setTxPosition(Vector3 p) { txPosition = p; return; }
+void ULSClass::setPRPosition(Vector3 p) { prPosition = p; return; }
 void ULSClass::setAntennaPointing(Vector3 p) { antennaPointing = p; return; }
 void ULSClass::setType(CConst::ULSTypeEnum typeVal) { type = typeVal; return; }
 void ULSClass::setStartAllocFreq(double f) { startAllocFreq = f; return; }
@@ -142,6 +156,7 @@ void ULSClass::setStopAllocFreq(double f) { stopAllocFreq = f; return; }
 void ULSClass::setStartUseFreq(double f) { startUseFreq = f; return; }
 void ULSClass::setStopUseFreq(double f) { stopUseFreq = f; return; }
 void ULSClass::setBandwidth(double b) { bandwidth = b; return; }
+void ULSClass::setHasPR(bool hasPRVal) { hasPR = hasPRVal; return; }
 void ULSClass::setRadioService(std::string radioServiceVal) { radioService = radioServiceVal; return; }
 void ULSClass::setEntityName(std::string entityNameVal) { entityName = entityNameVal; return; }
 void ULSClass::setCallsign(std::string callsignVal) { callsign = callsignVal; return; }
@@ -162,6 +177,12 @@ void ULSClass::setTxTerrainHeight(double txTerrainHeightVal) { txTerrainHeight =
 void ULSClass::setTxHeightAboveTerrain(double txHeightAboveTerrainVal) { txHeightAboveTerrain = txHeightAboveTerrainVal; return; }
 void ULSClass::setTxHeightAMSL(double txHeightAMSLVal) { txHeightAMSL = txHeightAMSLVal; return; }
 void ULSClass::setTxHeightSource(CConst::HeightSourceEnum txHeightSourceVal) { txHeightSource = txHeightSourceVal; return; }
+void ULSClass::setPRLatitudeDeg(double prLatitudeDegVal) { prLatitudeDeg = prLatitudeDegVal; return; }
+void ULSClass::setPRLongitudeDeg(double prLongitudeDegVal) { prLongitudeDeg = prLongitudeDegVal; return; }
+void ULSClass::setPRTerrainHeight(double prTerrainHeightVal) { prTerrainHeight = prTerrainHeightVal; return; }
+void ULSClass::setPRHeightAboveTerrain(double prHeightAboveTerrainVal) { prHeightAboveTerrain = prHeightAboveTerrainVal; return; }
+void ULSClass::setPRHeightAMSL(double prHeightAMSLVal) { prHeightAMSL = prHeightAMSLVal; return; }
+void ULSClass::setPRHeightSource(CConst::HeightSourceEnum prHeightSourceVal) { prHeightSource = prHeightSourceVal; return; }
 void ULSClass::setNoiseLevelDBW(double noiseLevelDBWVal) { noiseLevelDBW = noiseLevelDBWVal; }
 void ULSClass::setRxGain(double rxGainVal) { rxGain = rxGainVal;  return; }
 void ULSClass::setRxAntennaFeederLossDB(double rxAntennaFeederLossDBVal) { rxAntennaFeederLossDB = rxAntennaFeederLossDBVal; return; }
@@ -183,8 +204,10 @@ void ULSClass::setPropLoss(double propLossVal) { propLoss = propLossVal; return;
 void ULSClass::setPairIdx(int pairIdxVal) { pairIdx = pairIdxVal; return; }
 void ULSClass::setRxLidarRegion(int lidarRegionVal) {rxLidarRegion = lidarRegionVal; return; }
 void ULSClass::setTxLidarRegion(int lidarRegionVal) {txLidarRegion = lidarRegionVal; return; }
+void ULSClass::setPRLidarRegion(int lidarRegionVal) {prLidarRegion = lidarRegionVal; return; }
 void ULSClass::setRxTerrainHeightFlag(bool terrainHeightFlagVal) {rxTerrainHeightFlag = terrainHeightFlagVal; return; }
 void ULSClass::setTxTerrainHeightFlag(bool terrainHeightFlagVal) {txTerrainHeightFlag = terrainHeightFlagVal; return; }
+void ULSClass::setPRTerrainHeightFlag(bool terrainHeightFlagVal) {prTerrainHeightFlag = terrainHeightFlagVal; return; }
 void ULSClass::setNumOutOfBandRLAN(int numOutOfBandRLANVal) { numOutOfBandRLAN = numOutOfBandRLANVal; return; }
 /******************************************************************************************/
 

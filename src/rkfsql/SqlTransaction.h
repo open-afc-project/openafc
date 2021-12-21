@@ -1,4 +1,4 @@
-// 
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 #ifndef CPOBG_SRC_CPOSQL_SQLTRANSACTION_H_
 #define CPOBG_SRC_CPOSQL_SQLTRANSACTION_H_
 

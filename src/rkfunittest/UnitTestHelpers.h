@@ -1,4 +1,4 @@
-// 
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 #ifndef UNIT_TEST_HELPERS_H
 #define UNIT_TEST_HELPERS_H
 

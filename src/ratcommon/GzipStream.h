@@ -1,4 +1,4 @@
-// 
+// Copyright (C) 2017 RKF Engineering Solutions, LLC
 #ifndef GZIP_FILE_H
 #define GZIP_FILE_H
 

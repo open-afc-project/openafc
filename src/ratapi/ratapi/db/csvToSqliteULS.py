@@ -300,7 +300,7 @@ def convertULS(data_file, state_root, logFile):
                         row.get("Passive Repeater Lat Coords")),
                     #: Passive Repeater Longitude Coords,
                     p_rp_lon_degs=_as_float(
-                        row.get("Passive Repeater Lat Coords")),
+                        row.get("Passive Repeater Long Coords")),
                     #: Passive Repeater Height to Center RAAT (m)
                     p_rp_height_to_center_raat_m=_as_float(
                         row.get("Passive Repeater Height to Center RAAT (m)")),
