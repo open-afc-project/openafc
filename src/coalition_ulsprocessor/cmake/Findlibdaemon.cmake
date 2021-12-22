@@ -1,0 +1,11 @@
+
+IF(UNIX)
+    find_package(PkgConfig)
+    pkg_search_module(LIBDAEMON REQUIRED libdaemon)
+    if(NOT ${LIBDAEMON_FOUND} EQUAL 1)
+        message(FATAL_ERROR "libdaemon is missing")
+    endif() 
+ENDIF(UNIX)
+IF(WIN32)
+    message(FATAL_ERROR "libdaemon not on Windows")
+ENDIF(WIN32)
