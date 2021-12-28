@@ -1,0 +1,33 @@
+graph Parsing
+    A[Parsing] -->|Follows https://www.fcc.gov/sites/default/files/public_access_database_definitions_v4.pdf| B[/Frequency/]
+    B --> C([Call Sign, Transmit Location Number, Transmit Antenna Number])
+    C -->|All Found| D[Microwave Path - PA]
+    C --> E[No Match]
+    D --> F([Call Sign, Location Number]) 
+	F -->|Matches| G[Transmitter Location - LO]
+	F --> H[No Match]
+	G --> I([Call Sign, Location Number, Antenna Number])
+	I -->|Matches| J[Transmitter Antenna - AN]
+	I --> K[No Match]
+	J --> L([Call Sign, Location Number])
+	L -->|Matches| M[Receiver Location - LO]
+	L --> N[No Match]
+	M --> O([Call Sign, Path Number, Segment Number == 1])
+	O -->|Matches|P[Receiver Antenna - AN ]
+	O --> Q[No Match]
+	P --> R([Call Sign, Path Number, Segment Number == 1])
+	R --> S[Microwave Segment - SG ]
+	S --> T([Location Number, Antenna Number, Frequency Number])
+	T -->|Matches| U[Emissions - EM]
+	T --> V[No Match]
+	U --> W([Call Sign])
+	W -->|Matches| Y[Application/License Header - HD]
+	W --> Z[No Match]
+	Y --> AA([Call Sign, Status == A])
+	AA -->|Matches| AB[Entity - EN]
+	AA --> AC[No Match]
+	AB --> AD([Call Sign])
+	AD --> AE[Control Point - CP]
+	AE --> AF[/Emission - EM/]
+	AF --> AG([low frequency < 7125, high frequency > 5925])
+	AG --> AH((Write to CSV))

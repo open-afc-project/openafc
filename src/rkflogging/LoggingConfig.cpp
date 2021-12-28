@@ -1,4 +1,4 @@
-// Copyright (C) 2017 RKF Engineering Solutions, LLC
+// 
 
 #include "LoggingConfig.h"
 #include <boost/log/core.hpp>

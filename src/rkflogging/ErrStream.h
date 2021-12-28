@@ -1,4 +1,4 @@
-// Copyright (C) 2017 RKF Engineering Solutions, LLC
+// 
 
 #ifndef SRC_RKFLOGGING_ERRSTREAM_H_
 #define SRC_RKFLOGGING_ERRSTREAM_H_

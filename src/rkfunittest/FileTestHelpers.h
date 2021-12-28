@@ -1,4 +1,4 @@
-// Copyright (C) 2017 RKF Engineering Solutions, LLC
+// 
 
 #ifndef FILE_TEST_HELPERS_H
 #define FILE_TEST_HELPERS_H
