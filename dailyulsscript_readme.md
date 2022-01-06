@@ -3,10 +3,10 @@
 ## **Assumptions**
 
 * The C++ uls-processor executable likely needs to be rebuilt on your system.
-** Source code can be found under /src/coalition_ulsprocessor
-** To build, simply run: sh build.sh
-** The resulting executable will be under /testroot/bin/uls-script
-** uls-script executable **MUST** be moved to /var/lib/fbrat/daily\_uls\_parse
+  * Source code can be found under /src/coalition_ulsprocessor
+  * To build, simply run: sh build.sh
+  * The resulting executable will be under /testroot/bin/uls-script
+* uls-script executable **MUST** be moved to /var/lib/fbrat/daily\_uls\_parse
 
 
 ## **Usage**
@@ -15,9 +15,16 @@
 * The scripts have been built into celery tasks are accessable via the API 
   * Celery Tasks can be found in /src/ratapi/ratapi/tasks/afc_worker
   * There are 3 new celery tasks to consider: 
-  * A cron job that runs every minute to see if the automated ULS update should start
-  * A cron job that runs every day at midnight (UTC) that resets the automated parse flag 
+  * checkParseTime, A cron job that runs every minute to see if the automated ULS update should start
+    * Currently it check a text file containing the next run time- this can be overwritten by an admin in the GUI- and a celery config flag to see if a parse was already done that day.
+  * resetDailyFlag, A cron job that runs every day at midnight (UTC) that resets the automated parse flag 
+    * This task at midnight will overwrite the config tag so that the next day it will be able to parse properly.
   * parseULS, which runs the scripts that download, parse, and produce the ULS DB
+  * The first two tasks are configured automatically when the application starts. You can find that function [here](https://github.com/Telecominfraproject/open-afc/blob/2cf091084f9bf96fd121222d5476b2ff37eadca9/src/ratapi/ratapi/tasks/afc_worker.py#L34)
+  * The third task (parseULS) is either run automatically by task 1 (checkParseTime) or it is run manually by a user in the admin tab.
+    * To use it programmatically, see [this example](https://github.com/Telecominfraproject/open-afc/blob/2cf091084f9bf96fd121222d5476b2ff37eadca9/src/ratapi/ratapi/views/ratapi.py#L693) for the manual parse in the API. It applies the asynchronous task which returns the task. This task's task_id allows us to interact with the worker after resolving this API call and cancel parse in progress. A future feature may be to add a progress bar similar to how the engine analysis works in the GUI.
+  * Note that for the cron job based tasks, if you want to interact or cancel the cron jobs programmatically then you'll need to keep track of the task ID that is associated with the tasks. [This documentation](https://docs.celeryproject.org/en/stable/userguide/periodic-tasks.html) on celery may prove useful.
+
 * The API updates include:
   * Adding the parser and DB scripts under /src/ratapi/ratapi/db
   * Support for manually starting a parse
