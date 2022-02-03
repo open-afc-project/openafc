@@ -1,0 +1,12 @@
+# Standard pythonpath
+WSGIDaemonProcess ratapi display-name=(wsgi:ratapi) processes=<%= @ratapi_worker_count %> threads=1 user=fbrat group=fbrat
+
+# Apache does not process auth'n/auth'z
+WSGIPassAuthorization on
+
+# Order of aliases matters
+# GLib uses PyGILState_* API and so does not support subinterpreter use
+WSGIScriptAlias <%= @ratapi_script_path %> /var/www/fbrat.wsgi process-group=ratapi application-group=%{GLOBAL}
+
+# Assume the application redirects a browser
+RedirectMatch ^/$ <%= @ratapi_script_path %>

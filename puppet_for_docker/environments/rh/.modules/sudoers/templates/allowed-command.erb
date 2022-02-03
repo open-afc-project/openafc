@@ -1,0 +1,10 @@
+<% if @comment -%>
+# <%= @comment %>
+<% end -%>
+<% @allowed_env_variables.each do |env_variable| -%>
+Defaults!<%= @command %> env_keep+=<%= env_variable %>
+<% end -%>
+<% if @no_tty -%>
+Defaults!<%= @command %> !requiretty
+<% end -%>
+<%= @user_spec %> <%= @host %>=(<%= @run_as %>)<%= @nopasswd %> <%= @command %>

@@ -1,0 +1,98 @@
+# VirtuozzoLinux 6 default repos
+---
+yum::os_default_repos:
+  - 'virtuozzolinux-base'
+  - 'virtuozzolinux-updates'
+  - 'virtuozzolinux-base-debuginfo'
+  - 'virtuozzolinux-updates-debuginfo'
+  - 'virtuozzo'
+  - 'virtuozzo-updates'
+  - 'virtuozzo-debuginfo'
+  - 'ez-templates'
+  - 'ez-templates-32'
+  - 'obsoleted-ez-templates'
+  - 'obsoleted-ez-templates-32'
+
+yum::repos:
+  virtuozzolinux-base:
+    descr: "VirtuozzoLinux - Base"
+    #mirrorlist: "http://repo.virtuozzolinux.com/virtuozzolinux/mirrorlists/virtuozzolinux-$releasever-$basearch-os.mirrorlist"
+    mirrorlist: "http://repo.virtuozzo.com/vzlinux/mirrorlist/mirrors-6-os"
+    #baseurl: "http://repo.virtuozzo.com/vzlinux/6/$basearch/os/"
+    enabled: true
+    gpgcheck: true
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/virtuozzolinux-base.repo"
+  virtuozzolinux-updates:
+    descr: "VirtuozzoLinux - Updates"
+    mirrorlist: "http://repo.virtuozzo.com/vzlinux/mirrorlist/mirrors-6-updates"
+    #baseurl: "http://repo.virtuozzo.com/vzlinux/6/$basearch/updates/"
+    enabled: true
+    gpgcheck: true
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/virtuozzolinux-updates.repo"
+  virtuozzolinux-base-debuginfo:
+    descr: "VirtuozzoLinux - Base Debug"
+    mirrorlist: "http://repo.virtuozzo.com/vzlinux/mirrorlist/mirrors-6-os-debug"
+    #baseurl: "http://repo.virtuozzo.com/vzlinux/6/$basearch/debug/"
+    enabled: false
+    gpgcheck: true
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/virtuozzolinux-base-debuginfo.repo"
+  virtuozzolinux-updates-debuginfo:
+    descr: "VirtuozzoLinux - Updates Debug"
+    mirrorlist: "http://repo.virtuozzo.com/vzlinux/mirrorlist/mirrors-6-updates-debug"
+    #baseurl: "http://repo.virtuozzo.com/vzlinux/6/$basearch/debug_updates/"
+    enabled: false
+    gpgcheck: true
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/virtuozzolinux-updates-debuginfo.repo"
+  virtuozzo:
+    descr: "Virtuozzo Base"
+    mirrorlist: "http://updates.virtuozzo.com/mirrors/cloudserver/6.0/base"
+    enabled: true
+    gpgcheck: true
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/virtuozzo.repo"
+  virtuozzo-updates:
+    descr: "Virtuozzo Updates"
+    mirrorlist: "http://updates.virtuozzo.com/mirrors/cloudserver/6.0/updates"
+    enabled: true
+    gpgcheck: true
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/virtuozzo-updates.repo"
+  virtuozzo-debuginfo:
+    descr: "Virtuozzo Debug and Devel packages"
+    mirrorlist: "http://updates.virtuozzo.com/mirrors/cloudserver/6.0/debug"
+    enabled: false
+    gpgcheck: true
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/virtuozzo-debuginfo.repo"
+  ez-templates:
+    descr: "Virtuozzo - EZ templates"
+    mirrorlist: "http://updates.virtuozzo.com/mirrors/templates-x86_64"
+    enabled: true
+    gpgcheck: false
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/ez-templates.repo"
+  ez-templates-32:
+    descr: "Virtuozzo - EZ templates (32 bits)"
+    mirrorlist: "http://updates.virtuozzo.com/mirrors/templates-i386"
+    enabled: true
+    gpgcheck: false
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/ez-templates-32.repo"
+  obsoleted-ez-templates:
+    descr: "Virtuozzo - obsoleted EZ templates"
+    mirrorlist: "http://updates.virtuozzo.com/mirrors/obsoleted-templates-x86_64"
+    enabled: false
+    gpgcheck: false
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/obsoleted-ez-templates.repo"
+  obsoleted-ez-templates-32:
+    descr: "Virtuozzo - obsoleted EZ templates (32 bits)"
+    mirrorlist: "http://updates.virtuozzo.com/mirrors/obsoleted-templates-i386"
+    enabled: false
+    gpgcheck: false
+    gpgkey: "file:///etc/pki/rpm-gpg/PARALLELS_GPG_KEY"
+    target: "/etc/yum.repos.d/obsoleted-ez-templates-32.repo"

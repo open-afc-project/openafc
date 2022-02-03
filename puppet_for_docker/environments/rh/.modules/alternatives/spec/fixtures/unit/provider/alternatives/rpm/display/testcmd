@@ -1,0 +1,5 @@
+testcmd - status is manual.
+ link currently points to /opt/testcmd1
+/opt/testcmd1 - priority 10
+/opt/testcmd2 - priority 20
+Current `best' version is /opt/testcmd2.
