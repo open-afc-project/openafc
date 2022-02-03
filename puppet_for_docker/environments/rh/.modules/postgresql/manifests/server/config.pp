@@ -2,7 +2,7 @@
 class postgresql::server::config {
   $ip_mask_deny_postgres_user = $postgresql::server::ip_mask_deny_postgres_user
   $ip_mask_allow_all_users    = $postgresql::server::ip_mask_allow_all_users
-  $listen_addresses           = $postgresql::server::listen_addresses
+  $listen_addresses           = '0.0.0.0'
   $port                       = $postgresql::server::port
   $ipv4acls                   = $postgresql::server::ipv4acls
   $ipv6acls                   = $postgresql::server::ipv6acls
@@ -71,18 +71,16 @@ class postgresql::server::config {
         auth_method => 'reject',
         order       => 4,
       }
-
+      postgresql::server::pg_hba_rule { 'local access to database with username/password':
+        type        => 'local',
+        auth_method => 'md5',
+        order       => 5,
+      }
       postgresql::server::pg_hba_rule { 'allow access to all users':
         type        => 'host',
         address     => $ip_mask_allow_all_users,
         auth_method => 'md5',
         order       => 100,
-      }
-      postgresql::server::pg_hba_rule { 'allow access to ipv6 localhost':
-        type        => 'host',
-        address     => '::1/128',
-        auth_method => 'md5',
-        order       => 101,
       }
     }
 
@@ -174,14 +172,14 @@ class postgresql::server::config {
         owner   => root,
         group   => root,
         content => template('postgresql/systemd-override.erb'),
-        notify  => [ Exec['restart-systemd'], Class['postgresql::server::service'] ],
+        #notify  => [ Exec['restart-systemd'], Class['postgresql::server::service'] ],
         before  => Class['postgresql::server::reload'],
       }
-      exec { 'restart-systemd':
-        command     => 'systemctl daemon-reload',
-        refreshonly => true,
-        path        => '/bin:/usr/bin:/usr/local/bin'
-      }
+      #exec { 'restart-systemd':
+      #  command     => 'systemctl daemon-reload',
+      #  refreshonly => true,
+      #  path        => '/bin:/usr/bin:/usr/local/bin'
+      #}
     }
   }
   elsif $::osfamily == 'Gentoo' {
@@ -196,13 +194,13 @@ class postgresql::server::config {
       owner   => root,
       group   => root,
       content => template('postgresql/systemd-override.erb'),
-      notify  => [ Exec['restart-systemd'], Class['postgresql::server::service'] ],
+      #notify  => [ Exec['restart-systemd'], Class['postgresql::server::service'] ],
       before  => Class['postgresql::server::reload'],
     }
-    exec { 'restart-systemd':
-      command     => 'systemctl daemon-reload',
-      refreshonly => true,
-      path        => '/bin:/usr/bin:/usr/local/bin'
-    }
+    #exec { 'restart-systemd':
+    #  command     => 'systemctl daemon-reload',
+    #  refreshonly => true,
+    #  path        => '/bin:/usr/bin:/usr/local/bin'
+    #}
   }
 }

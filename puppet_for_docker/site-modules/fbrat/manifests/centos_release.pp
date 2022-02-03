@@ -53,7 +53,6 @@ class fbrat::centos_release(
       group   => 'root',
       mode    => '0644',
     }
-  
     yumrepo { 'CentOS-Base-base':
       name       => 'base',
       mirrorlist => absent,
@@ -78,5 +77,12 @@ class fbrat::centos_release(
       name    => 'base-debuginfo',
       baseurl => 'http://debuginfo.centos.org/7/$basearch/',
     }
+  }
+  yumrepo { 'FBRAT-Repo':
+    name       => 'fbrat-repo',
+    mirrorlist => absent,
+    baseurl    => 'file:///repos/CentOS/7/7/Packages/',
+    gpgcheck   => '0',
+    enabled    => '1',
   }
 }

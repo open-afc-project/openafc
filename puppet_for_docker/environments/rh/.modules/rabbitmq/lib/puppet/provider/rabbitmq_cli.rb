@@ -25,7 +25,7 @@ class Puppet::Provider::RabbitmqCli < Puppet::Provider
 
   def self.home_tmp_command(name, path)
     has_command name, path do
-      environment HOME: '/tmp'
+      environment HOME: '/tmp', LC_ALL: 'en_US.UTF-8'
     end
   end
 
@@ -38,13 +38,15 @@ class Puppet::Provider::RabbitmqCli < Puppet::Provider
     return @rabbitmq_version if defined? @rabbitmq_version
 
     output = rabbitmqctl('-q', 'status')
-    version = output.match(%r{\{rabbit,"RabbitMQ","([\d\.]+)"\}})
+    version = output.match(%r{RabbitMQ.*?([\d\.]+)})
     @rabbitmq_version = version[1] if version
+    @rabbitmq_version
   end
 
   def self.rabbitmqctl_list(resource, *opts)
+    version = rabbitmq_version
     list_opts =
-      if Puppet::Util::Package.versioncmp(rabbitmq_version, '3.7.9') >= 0
+      if version && Puppet::Util::Package.versioncmp(version, '3.7.9') >= 0
         ['-q', '--no-table-headers']
       else
         ['-q']

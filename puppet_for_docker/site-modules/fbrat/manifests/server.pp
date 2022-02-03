@@ -23,7 +23,7 @@ class fbrat::server(
   Integer $http_timeout = 120,
   String $http_log_level = 'warn',
   String $pgsql_dbname = 'fbrat',
-  String $pgsql_username = 'fbrat',
+  String $pgsql_username = 'postgres',
   String $pgsql_password,
   Integer $ratapi_worker_count = 10,
   Boolean $ratapi_debug_mode = false,
@@ -31,13 +31,13 @@ class fbrat::server(
   Optional[String] $ratapi_history_dir = undef,
   String $flask_secret_key = '',
 ){
-  # Relational database
+/*   # Relational database
   class { 'postgresql::server': }
   postgresql::server::db { $pgsql_dbname:
     user     => $pgsql_username,
     password => postgresql_password($pgsql_username, $pgsql_password),
     require  => Class['postgresql::server'],
-  }
+  } */
 
   # email backend with local-only access
   class { 'postfix':
@@ -51,7 +51,7 @@ class fbrat::server(
 
   # Message queuing
   class { 'rabbitmq':
-    service_manage    => true,
+    service_manage    => false,
     port              => 5672,
     delete_guest_user => true,
     admin_enable      => false,
@@ -75,15 +75,25 @@ class fbrat::server(
     ensure => 'installed',
   }
   service { 'celery-fbrat':
-    ensure  => 'running',
-    enable  => true,
-    require => [Package['python2-celery'], Package['fbrat'], File['/etc/systemd/system/celery-fbrat.service'], File['/etc/default/celery-fbrat'], File['/var/spool/fbrat']],
+    ensure    => 'running',
+    enable    => false,
+    hasstatus => false,
+    require   => [Package['python2-celery'], Package['fbrat'], File['/etc/systemd/system/celery-fbrat.service'], File['/etc/default/celery-fbrat'], File['/var/spool/fbrat']],
+    start     => "/bin/sh -c \'/bin/celery multi start rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10 -A ratapi.tasks.afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=INFO\'",
+    stop      => "/bin/sh -c \'/bin/celery multi stopwait rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10 --pidfile=/var/run/celery/%n.pid\'",
+    restart   => "/bin/sh -c \'/bin/celery multi restart rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10 -A ratapi.tasks.afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=INFO\'",
   }
   file { '/etc/systemd/system/celery-fbrat.service':
     content => template('fbrat/etc/celery-fbrat.service.erb'),
     owner   => 'root',
     group   => 'root',
     mode    => '0644',
+  }
+  file {'/var/lib/fbrat':
+    ensure => 'directory',
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0755',
   }
   file { '/etc/default/celery-fbrat':
     content => template('fbrat/etc/celery-fbrat.erb'),
@@ -94,75 +104,81 @@ class fbrat::server(
   }
   file { '/var/log/celery':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0755',
   }
   file { '/var/run/celery':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0755',
   }
   file { '/var/celery/results':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0755',
   }
   file { '/var/celery':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0755',
   }
   file { '/var/spool/fbrat':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0755',
   }
   file { '/var/lib/fbrat/responses':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0755',
   }
   file { '/var/lib/fbrat/afc_config':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0750',
   }
   file { '/var/lib/fbrat/AntennaPatterns':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0750',
   }
   file { '/var/lib/fbrat/ULS_Database':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0750',
+  }
+  file { '/usr/share/fbrat':
+    ensure => 'directory',
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0755',
   }
   file { '/usr/share/fbrat/afc-engine':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0750',
   }
   file { '/usr/share/fbrat/afc-engine/ULS_Database':
     ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
+    owner  => 'root',
+    group  => 'root',
     mode   => '0750',
   }
   if $ratapi_history_dir {
     file { $ratapi_history_dir:
       ensure => 'directory',
-      owner  => 'fbrat',
-      group  => 'fbrat',
+      owner  => 'root',
+      group  => 'root',
       mode   => '0750',
     }
   }
@@ -176,37 +192,36 @@ class fbrat::server(
     keepalive      => 'On',
     timeout        => $http_timeout,
     log_level      => $http_log_level,
+    logroot        => '/',
+    error_log      => '/proc/self/fd/2',
   }
   # Non-TLS access for local troubleshooting
   apache::vhost { "${http_host}-notls":
-    servername => $http_host,
-    docroot    => '/var/www/html',
-    port       => 80,
-    ssl        => false,
-  }
-  if $http_allow_plaintext {
-    firewalld_service { 'Allow HTTP':
-      ensure  => 'present',
-      zone    => 'public',
-      service => 'http',
-    }
+    servername      => $http_host,
+    docroot         => '/var/www/html',
+    port            => 80,
+    ssl             => false,
+    logroot         => '/',
+    access_log_file => '/proc/self/fd/2',
+    error_log_file  => '/proc/self/fd/2',
+    error_log       => true,
   }
   # TLS access for normal use
   apache::vhost { "${http_host}-tls":
-    servername => $http_host,
-    docroot    => '/var/www/html',
-    port       => 443,
-    ssl        => true,
+    servername      => $http_host,
+    docroot         => '/var/www/html',
+    port            => 443,
+    ssl             => true,
     # Local host cert also contains its own CA chain
-    ssl_chain  => '/etc/pki/tls/certs/http.crt',
-    ssl_cert   => '/etc/pki/tls/certs/http.crt',
-    ssl_key    => '/etc/pki/tls/private/http.key',
-    ssl_cipher => 'DHE-RSA-AES256-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-GCM-SHA384',
-  }
-  firewalld_service { 'Allow HTTPS':
-    ensure  => 'present',
-    zone    => 'public',
-    service => 'https',
+    ssl_chain       => '/etc/pki/tls/certs/http.crt',
+    ssl_cert        => '/etc/pki/tls/certs/http.crt',
+    ssl_key         => '/etc/pki/tls/private/http.key',
+    ssl_cipher      => 'DHE-RSA-AES256-SHA256:DHE-RSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-SHA384:ECDHE-RSA-AES256-GCM-SHA384',
+
+    logroot         => '/',
+    access_log_file => '/proc/self/fd/2',
+    error_log_file  => '/proc/self/fd/2',
+    error_log       => true,
   }
 
   # basic user authentication
@@ -219,14 +234,14 @@ class fbrat::server(
 
   # For python WSGI 
   class { 'apache::mod::wsgi': }
-  selboolean { 'httpd_execmem':
-    value      => 'on',
-    persistent => true,
-  }
-  selboolean { 'httpd_tmp_exec':
-    value      => 'on',
-    persistent => true,
-  }
+#  selboolean { 'httpd_execmem':
+#    value      => 'on',
+#    persistent => true,
+#  }
+#  selboolean { 'httpd_tmp_exec':
+#    value      => 'on',
+#    persistent => true,
+#  }
 
   file { '/etc/pki/tls/private/http.key':
     ensure => 'present',
@@ -326,26 +341,26 @@ class fbrat::server(
     user     => 'fbrat',
   }
 
-  exec { 'rat-db-upgrade':
+/*   exec { 'rat-db-upgrade':
     path    => ['/usr/bin'],
     unless  => 'rat-manage-api db current 2>/dev/null | grep -E \' \(head\)$\'',
     command => 'rat-manage-api db upgrade head',
     require => [
-      Postgresql::Server::Db[$pgsql_dbname],
+      #Postgresql::Server::Db[$pgsql_dbname],
       Package['fbrat'],
       File['/etc/xdg/fbrat/ratapi.conf'],
     ],
   }
-
-  file { '/usr/share/fbrat/afc-engine.sha256':
-  ensure => file,
-  source => "puppet:///modules/fbrat/afc-engine.sha256",
-  }
-
-  exec  { 'check-data-hash':
-    path    =>['/usr/bin'],
-    command => 'sha256sum --check /usr/share/fbrat/afc-engine.sha256',
-    require =>[File['/usr/share/fbrat/afc-engine.sha256'],]
-  }
+ */
+#  file { '/usr/share/fbrat/afc-engine.sha256':
+#  ensure => file,
+#  source => "puppet:///modules/fbrat/afc-engine.sha256",
+#  }
+#
+#  exec  { 'check-data-hash':
+#    path    =>['/usr/bin'],
+#    command => 'sha256sum --check /usr/share/fbrat/afc-engine.sha256',
+#    require =>[File['/usr/share/fbrat/afc-engine.sha256'],]
+#  }
 
 }

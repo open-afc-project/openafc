@@ -39,17 +39,17 @@ class postfix::files {
   file { '/etc/aliases':
     ensure  => 'file',
     content => "# file managed by puppet\n",
-    notify  => Exec['newaliases'],
+    # notify  => Exec['newaliases'],
     replace => false,
     seltype => $postfix::params::aliasesseltype,
   }
 
   # Aliases
-  exec { 'newaliases':
-    command     => '/usr/bin/newaliases',
-    refreshonly => true,
-    subscribe   => File['/etc/aliases'],
-  }
+  # exec { 'newaliases':
+  #   command     => '/usr/bin/newaliases',
+  #   refreshonly => true,
+  #   subscribe   => File['/etc/aliases'],
+  # }
 
   # Config files
   if $mastercf_source {
@@ -103,7 +103,7 @@ class postfix::files {
   if $manage_root_alias {
     mailalias {'root':
       recipient => $root_mail_recipient,
-      notify    => Exec['newaliases'],
+      # notify    => Exec['newaliases'],
     }
   }
 

@@ -72,6 +72,10 @@
 #
 # @example Use RabbitMQ clustering facilities
 #   class { 'rabbitmq':
+#     cluster                  => {
+#       'name'      => 'test_cluster',
+#       'init_node' => 'hostname'
+#     },
 #     config_cluster           => true,
 #     cluster_nodes            => ['rabbit1', 'rabbit2'],
 #     cluster_node_type        => 'ram',
@@ -92,6 +96,7 @@
 #   An array specifying authorization/authentication backend to use. Single quotes should be placed around array entries,
 #   ex. `['{foo, baz}', 'baz']` Defaults to [rabbit_auth_backend_internal], and if using LDAP defaults to [rabbit_auth_backend_internal,
 #   rabbit_auth_backend_ldap].
+# @param cluster Join cluster and change name of cluster.
 # @param cluster_node_type
 #   Choose between disc and ram nodes.
 # @param cluster_nodes
@@ -140,6 +145,8 @@
 #   to 'False' and set 'erlang_cookie'.
 # @param file_limit
 #   Set rabbitmq file ulimit. Defaults to 16384. Only available on systems with `$::osfamily == 'Debian'` or `$::osfamily == 'RedHat'`.
+# @param oom_score_adj
+#   Set rabbitmq-server process OOM score. Defaults to 0.
 # @param heartbeat
 #   Set the heartbeat timeout interval, default is unset which uses the builtin server defaults of 60 seconds. Setting this
 # @param inetrc_config
@@ -157,7 +164,7 @@
 # @param ldap_auth
 #   Set to true to enable LDAP auth.
 # @param ldap_server
-#   LDAP server to use for auth.
+#   LDAP server or servers to use for auth.
 # @param ldap_user_dn_pattern
 #   User DN pattern for LDAP auth.
 # @param ldap_other_bind
@@ -264,8 +271,20 @@
 #   POODLE and BEAST attacks. Please see the
 #   [RabbitMQ SSL](https://www.rabbitmq.com/ssl.html) documentation for more information.
 # @param ssl_ciphers
-#   Support only a given list of SSL ciphers. Example: `['dhe_rsa,aes_256_cbc,sha','dhe_dss,aes_256_cbc,sha', 'ecdhe_rsa,aes_256_cbc,sha']`. Supported ciphers in your install can be listed with: rabbitmqctl eval 'ssl:cipher_suites().'
-#   Functionality can be tested with cipherscan or similar tool: https://github.com/jvehent/cipherscan.git
+#   Support only a given list of SSL ciphers, using either the Erlang or OpenSSL styles.
+#   Supported ciphers in your install can be listed with: `rabbitmqctl eval 'ssl:cipher_suites().'`
+#   Functionality can be tested with cipherscan or similar tool: https://github.com/mozilla/cipherscan
+#   * Erlang style: `['ecdhe_rsa,aes_256_cbc,sha', 'dhe_rsa,aes_256_cbc,sha']`
+#   * OpenSSL style: `['ECDHE-RSA-AES256-SHA', 'DHE-RSA-AES256-SHA']`
+# @param ssl_crl_check
+#   Perform CRL (Certificate Revocation List) verification
+#   Please see the [Erlang SSL](https://erlang.org/doc/man/ssl.html#type-crl_check) module documentation for more information.
+# @param ssl_crl_cache_hash_dir
+#   This setting makes use of a directory where CRLs are stored in files named by the hash of the issuer name.
+#   Please see the [Erlang SSL](https://erlang.org/doc/man/ssl.html#type-crl_cache_opts) module documentation for more information.
+# @param ssl_crl_cache_http_timeout
+#   This setting enables use of internal CRLs cache and sets HTTP timeout interval on fetching CRLs from distributino URLs defined inside certificate.
+#   Please see the [Erlang SSL](https://erlang.org/doc/man/ssl.html#type-crl_cache_opts) module documentation for more information.
 # @param stomp_port
 #   The port to use for Stomp.
 # @param stomp_ssl_only
@@ -295,11 +314,12 @@
 # @param loopback_users
 #   This option configures a list of users to allow access via the loopback interfaces
 #
-class rabbitmq(
+class rabbitmq (
   Boolean $admin_enable                                                                            = true,
   Boolean $management_enable                                                                       = false,
   Boolean $use_config_file_for_plugins                                                             = false,
-  Enum['ram', 'disk', 'disc'] $cluster_node_type                                                   = 'disc',
+  Hash $cluster                                                                                    = $rabbitmq::cluster,
+  Enum['ram', 'disc'] $cluster_node_type                                                           = 'disc',
   Array $cluster_nodes                                                                             = [],
   String $config                                                                                   = 'rabbitmq/rabbitmq.config.erb',
   Boolean $config_cluster                                                                          = false,
@@ -365,9 +385,12 @@ class rabbitmq(
   Boolean $ssl_honor_cipher_order                                                                  = true,
   Optional[Stdlib::Absolutepath] $ssl_dhfile                                                       = undef,
   Array $ssl_ciphers                                                                               = [],
+  Enum['true','false','peer','best_effort'] $ssl_crl_check                                         = 'false',
+  Optional[Stdlib::Absolutepath] $ssl_crl_cache_hash_dir                                                         = undef,
+  Optional[Integer] $ssl_crl_cache_http_timeout                                                    = undef,
   Boolean $stomp_ensure                                                                            = false,
   Boolean $ldap_auth                                                                               = false,
-  String $ldap_server                                                                              = 'ldap',
+  Variant[String[1],Array[String[1]]] $ldap_server                                                 = 'ldap',
   Optional[String] $ldap_user_dn_pattern                                                           = undef,
   String $ldap_other_bind                                                                          = 'anon',
   Boolean $ldap_use_ssl                                                                            = false,
@@ -379,6 +402,7 @@ class rabbitmq(
   Boolean $wipe_db_on_cookie_change                                                                = false,
   String $cluster_partition_handling                                                               = 'ignore',
   Variant[Integer[-1],Enum['unlimited'],Pattern[/^(infinity|\d+(:(infinity|\d+))?)$/]] $file_limit = 16384,
+  Integer[-1000, 1000] $oom_score_adj                                                              = 0,
   Hash $environment_variables                                                                      = { 'LC_ALL' => 'en_US.UTF-8' },
   Hash $config_variables                                                                           = {},
   Hash $config_kernel_variables                                                                    = {},
@@ -396,18 +420,41 @@ class rabbitmq(
   Array $loopback_users                                                                            = ['guest'],
   Boolean $service_restart                                                                         = true,
 ) {
-
   if $ssl_only and ! $ssl {
     fail('$ssl_only => true requires that $ssl => true')
   }
 
-  if $config_stomp and $stomp_ssl_only and ! $ssl_stomp_port  {
+  if $config_stomp and $stomp_ssl_only and ! $ssl_stomp_port {
     fail('$stomp_ssl_only requires that $ssl_stomp_port be set')
   }
 
   if $ssl_versions {
     unless $ssl {
       fail('$ssl_versions requires that $ssl => true')
+    }
+  }
+
+  if $ssl_crl_check != 'false' {
+    unless $ssl {
+      fail('$ssl_crl_check requires that $ssl => true')
+    }
+  }
+
+  if $ssl_crl_cache_hash_dir {
+    unless $ssl {
+      fail('$ssl_crl_cache_hash_dir requires that $ssl => true')
+    }
+    if $ssl_crl_check == 'false' {
+      fail('$ssl_crl_cache_http_timeout requires that $ssl_crl_check => true|peer|best_effort')
+    }
+  }
+
+  if $ssl_crl_cache_http_timeout {
+    unless $ssl {
+      fail('$ssl_crl_cache_http_timeout requires that $ssl => true')
+    }
+    if $ssl_crl_check == 'false' {
+      fail('$ssl_crl_cache_http_timeout requires that $ssl_crl_check => true|peer|best_effort')
     }
   }
 
@@ -484,6 +531,15 @@ class rabbitmq(
     Class['rabbitmq::install::rabbitmqadmin'] -> Rabbitmq_exchange<| |>
   }
 
+  if $config_cluster and $cluster['name'] and $cluster['init_node'] {
+    create_resources('rabbitmq_cluster', {
+        $cluster['name'] => {
+          'init_node'      => $cluster['init_node'],
+          'node_disc_type' => $cluster_node_type,
+        }
+    })
+  }
+
   if ($service_restart) {
     Class['rabbitmq::config'] ~> Class['rabbitmq::service']
   }
@@ -494,6 +550,5 @@ class rabbitmq(
   -> Class['rabbitmq::management']
 
   # Make sure the various providers have their requirements in place.
-  Class['rabbitmq::install'] -> Rabbitmq_plugin<| |>
-
+  Class['rabbitmq::install'] -> Rabbitmq_plugin<| |> -> Rabbitmq_cluster<| |>
 }

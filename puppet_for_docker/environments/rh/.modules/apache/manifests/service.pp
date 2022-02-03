@@ -18,8 +18,8 @@
 #
 class apache::service (
   $service_name   = $::apache::params::service_name,
-  $service_enable = true,
-  $service_ensure = 'running',
+  $service_enable = false,
+  $service_ensure = undef,
   $service_manage = true,
   $service_restart = undef
 ) {
@@ -43,11 +43,15 @@ class apache::service (
 
   if $service_manage {
     service { 'httpd':
+      provider   => 'base',
       ensure     => $_service_ensure,
       name       => $service_name,
       enable     => $service_enable,
       restart    => $service_restart,
-      hasrestart => $service_hasrestart,
+      hasrestart => false,
+      hasstatus  => false,
+      start      => "/usr/sbin/httpd \$OPTIONS -DBACKGROUND",
+      stop       => "/bin/kill -WINCH \${MAINPID}",
     }
   }
 }
