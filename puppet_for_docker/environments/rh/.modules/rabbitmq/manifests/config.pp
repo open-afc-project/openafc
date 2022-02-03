@@ -3,7 +3,6 @@
 #
 # @api private
 class rabbitmq::config {
-
   $admin_enable                        = $rabbitmq::admin_enable
   $management_enable                   = $rabbitmq::management_enable
   $use_config_file_for_plugins         = $rabbitmq::use_config_file_for_plugins
@@ -61,6 +60,9 @@ class rabbitmq::config {
   $ssl_dhfile                          = $rabbitmq::ssl_dhfile
   $ssl_versions                        = $rabbitmq::ssl_versions
   $ssl_ciphers                         = $rabbitmq::ssl_ciphers
+  $ssl_crl_check                       = $rabbitmq::ssl_crl_check
+  $ssl_crl_cache_hash_dir              = $rabbitmq::ssl_crl_cache_hash_dir
+  $ssl_crl_cache_http_timeout          = $rabbitmq::ssl_crl_cache_http_timeout
   $stomp_port                          = $rabbitmq::stomp_port
   $stomp_ssl_only                      = $rabbitmq::stomp_ssl_only
   $ldap_auth                           = $rabbitmq::ldap_auth
@@ -79,6 +81,7 @@ class rabbitmq::config {
   $auth_backends                       = $rabbitmq::auth_backends
   $cluster_partition_handling          = $rabbitmq::cluster_partition_handling
   $file_limit                          = $rabbitmq::file_limit
+  $oom_score_adj                       = $rabbitmq::oom_score_adj
   $collect_statistics_interval         = $rabbitmq::collect_statistics_interval
   $ipv6                                = $rabbitmq::ipv6
   $inetrc_config                       = $rabbitmq::inetrc_config
@@ -104,7 +107,7 @@ class rabbitmq::config {
     $management_ip_address = $rabbitmq::node_ip_address
   }
 
-  $inetrc_env = {'export ERL_INETRC' => $inetrc_config_path}
+  $inetrc_env = { 'export ERL_INETRC' => $inetrc_config_path }
 
   # Handle env variables.
   $_environment_variables = $default_ssl_env_variables + $inetrc_env + $rabbitmq::environment_variables
@@ -125,7 +128,7 @@ class rabbitmq::config {
       $proto_dist = 'inet6_tcp'
       $ssl_path = ''
     }
-    $ipv6_or_tls_env = ['SERVER', 'CTL'].reduce({}) |$memo, $item| {
+    $ipv6_or_tls_env = ['SERVER_ADDITIONAL', 'CTL'].reduce( {}) |$memo, $item| {
       $orig = $_environment_variables["RABBITMQ_${item}_ERL_ARGS"]
       $munged = $orig ? {
         # already quoted, keep quoting
@@ -136,7 +139,7 @@ class rabbitmq::config {
         default           => "\"${orig}${ssl_path} -proto_dist ${proto_dist}\"",
       }
 
-      merge($memo, {"RABBITMQ_${item}_ERL_ARGS" => $munged})
+      merge($memo, { "RABBITMQ_${item}_ERL_ARGS" => $munged })
     }
 
     $environment_variables = $_environment_variables + $ipv6_or_tls_env
@@ -146,23 +149,23 @@ class rabbitmq::config {
 
   file { '/etc/rabbitmq':
     ensure => directory,
-    owner  => '0',
-    group  => '0',
-    mode   => '0755',
+    owner  => $rabbitmq_user,
+    group  => $rabbitmq_group,
+    mode   => '2755',
   }
 
   file { '/etc/rabbitmq/ssl':
     ensure => directory,
-    owner  => '0',
-    group  => '0',
-    mode   => '0755',
+    owner  => $rabbitmq_user,
+    group  => $rabbitmq_group,
+    mode   => '2750',
   }
 
   file { 'rabbitmq.config':
     ensure  => file,
     path    => $config_path,
     content => template($config),
-    owner   => '0',
+    owner   => $rabbitmq_user,
     group   => $rabbitmq_group,
     mode    => '0640',
   }
@@ -171,7 +174,7 @@ class rabbitmq::config {
     ensure  => file,
     path    => $env_config_path,
     content => template($env_config),
-    owner   => '0',
+    owner   => $rabbitmq_user,
     group   => $rabbitmq_group,
     mode    => '0640',
   }
@@ -180,7 +183,7 @@ class rabbitmq::config {
     ensure  => file,
     path    => $inetrc_config_path,
     content => template($inetrc_config),
-    owner   => '0',
+    owner   => $rabbitmq_user,
     group   => $rabbitmq_group,
     mode    => '0640',
   }
@@ -190,7 +193,7 @@ class rabbitmq::config {
       ensure  => file,
       path    => '/etc/rabbitmq/enabled_plugins',
       content => template('rabbitmq/enabled_plugins.erb'),
-      owner   => '0',
+      owner   => $rabbitmq_user,
       group   => $rabbitmq_group,
       mode    => '0640',
       require => File['/etc/rabbitmq'],
@@ -202,7 +205,7 @@ class rabbitmq::config {
       ensure  => file,
       path    => '/etc/rabbitmq/rabbitmqadmin.conf',
       content => template('rabbitmq/rabbitmqadmin.conf.erb'),
-      owner   => '0',
+      owner   => $rabbitmq_user,
       group   => $rabbitmq_group,
       mode    => '0640',
       require => File['/etc/rabbitmq'],
@@ -227,14 +230,18 @@ class rabbitmq::config {
         mode    => '0644',
       }
     }
-    default: { }
+    default: {}
   }
 
   if $facts['systemd'] { # systemd fact provided by systemd module
     systemd::service_limits { "${service_name}.service":
-      limits          => {'LimitNOFILE' => $file_limit},
+      selinux_ignore_defaults => ($facts['os']['family'] == 'RedHat'),
+      limits                  => {
+        'LimitNOFILE'    => $file_limit,
+        'OOMScoreAdjust' => $oom_score_adj,
+      },
       # The service will be notified when config changes
-      restart_service => false,
+      restart_service         => false,
     }
   }
 

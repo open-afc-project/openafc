@@ -19,6 +19,18 @@ Type for managing rabbitmq parameters
          'expires' => '360000',
      },
    }
+   rabbitmq_parameter { 'documentumShovelNoMunging@/':
+     component_name => '',
+     value          => {
+         'src-uri'    => 'amqp://',
+         'src-exchange'  => 'my-exchange',
+         'src-exchange-key' => '6',
+         'src-queue'  => 'my-queue',
+         'dest-uri'   => 'amqp://remote-server',
+         'dest-exchange' => 'another-exchange',
+     },
+     autoconvert   => false,
+   }
 DESC
 
   ensurable do
@@ -50,6 +62,12 @@ DESC
     end
   end
 
+  newparam(:autoconvert) do
+    desc 'whether numeric strings from `value` should be converted to int automatically'
+    newvalues(:true, :false)
+    defaultto(:true)
+  end
+
   newproperty(:value) do
     desc 'A hash of values to use with the component name you are setting'
     validate do |value|
@@ -62,6 +80,12 @@ DESC
 
   autorequire(:rabbitmq_vhost) do
     [self[:name].split('@')[1]]
+  end
+
+  def set_parameters(hash) # rubocop:disable Style/AccessorMethodName
+    # Hack to ensure :autoconvert is initialized before :value
+    self[:autoconvert] = hash[:autoconvert] if hash.key?(:autoconvert)
+    super
   end
 
   def validate_component_name(value)
@@ -78,6 +102,7 @@ DESC
   end
 
   def munge_value(value)
+    return value if value(:autoconvert) == :false
     value.each do |k, v|
       value[k] = v.to_i if v =~ %r{\A[-+]?[0-9]+\z}
     end

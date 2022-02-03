@@ -76,7 +76,7 @@
 class postfix (
   String                          $alias_maps          = 'hash:/etc/aliases',
   String                          $inet_interfaces     = 'all',
-  String                          $inet_protocols      = 'all',
+  String                          $inet_protocols      = 'ipv4',
   Boolean                         $ldap                = false,
   Optional[String]                $ldap_base           = undef,
   Optional[String]                $ldap_host           = undef,

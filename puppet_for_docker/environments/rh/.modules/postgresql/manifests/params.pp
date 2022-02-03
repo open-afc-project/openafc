@@ -76,7 +76,7 @@ class postgresql::params inherits postgresql::globals {
       $psql_path           = pick($psql_path, "${bindir}/psql")
 
       $service_status      = $service_status
-      $service_reload      = "service ${service_name} reload"
+      $service_reload      = "/usr/local/bin/gosu postgres:postgres /usr/bin/pg_ctl reload -D \${PGDATA} -s"
       $perl_package_name   = pick($perl_package_name, 'perl-DBD-Pg')
       $python_package_name = pick($python_package_name, 'python-psycopg2')
 

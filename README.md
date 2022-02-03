@@ -25,6 +25,13 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
     - [Building Docker image from Dockerfile (can be omitted once we have Docker registry)](#building-docker-image-from-dockerfile-can-be-omitted-once-we-have-docker-registry)
     - [Pulling the Docker image from Docker registry](#pulling-the-docker-image-from-docker-registry)
   - [Building OpenAFC engine server](#building-openafc-engine-server)
+- [**OpenAFC Engine usage in Docker Environment**](#openafc-engine-usage-in-docker-environment)
+  - [AFC Engine build in docker](#afc-engine-build-in-docker)
+    - [Building Docker Container OpenAFC engine server](#building-docker-container-openafc-engine-server)
+    - [Prereqs](#prereqs)
+    - [docker-compose](#docker-compose)
+    - [PostgreSQL structure](#postgresql-structure)
+
 
 - [Database info](/database_readme.md)
 - [Release Notes](/ReleaseNote.md)
@@ -147,7 +154,7 @@ In this doc we assume to work in directory /tmp/work
 This can take some time
 
 ```
-docker build . -t fbrat-build -f Dockerfile-for-build
+docker build . -t afc-build -f Dockerfile-for-build
 ```
 
 ### Pulling the Docker image from Docker registry
@@ -156,26 +163,264 @@ Not available currently. Possibly will be added later.
 
 ## Building OpenAFC engine server
 
-Building and installing the fbrat with ninja-build is seamless - if you run the container without special command - it will execute the script from the CMD directive in Dockerfile.
+Building and installing the OpenAFC with ninja-build is seamless - if you run the container without special command - it will execute the script from the CMD directive in Dockerfile.
 
 **NB:** "-v" option maps the folder of the real machine into the insides of the docker container.
 
-&quot;-v /tmp/work/open-afc:/wd/fbrat&quot; means that contents of &quot;/tmp/work/open-afc&quot; folder will be available inside of container in /wd/fbrat/
+&quot;-v /tmp/work/open-afc:/wd/afc&quot; means that contents of &quot;/tmp/work/open-afc&quot; folder will be available inside of container in /wd/afc/
 
 ```
-docker run --rm -it -v `pwd`:/wd/fbrat fbrat-build
+docker run --rm -it -v `pwd`:/wd/afc afc-build
 ```
 If you want to build the rpm you will need to run it with Docker:
 
 ```
-docker run --rm -it -v `pwd`:/wd/fbrat fbrat-build /wd/fbrat/build-rpm.sh
+docker run --rm -it -v `pwd`:/wd/afc afc-build /wd/afc/build-rpm.sh
 ```
 
 To run docker with your host's user you can use --user flag like:
 ```
-docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/fbrat fbrat-build
+docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc afc-build
 ```
 or for rpm build:
 ```
-docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/fbrat fbrat-build /wd/fbrat/build-rpm.sh
+docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc afc-build /wd/afc/build-rpm.sh
 ```
+
+
+
+
+
+
+# **OpenAFC Engine usage in Docker Environment**
+# AFC Engine build in docker
+
+## Building Docker Container OpenAFC engine server
+
+Building the docker container with Monolitic OpenAFC is straitforward - in the root folder of the OpenAFC Project run default docker build command: 
+
+```
+docker build .
+```
+If you want to build image with some special tag just add the -t \<tag\> option
+
+```
+docker build . -t openafc
+```
+
+Once built, docker image is usable as usual docker image.
+
+## Prereqs
+Significant to know that the container needs several mappings to work properly:
+
+1) All databases in one folder - map to /usr/share/fbrat/rat_transfer
+      ```
+      /var/databases:/usr/share/fbrat/rat_transfer
+      ```
+      Those databases are:
+      - 3dep
+      - daily_uls_parse
+      - databases
+      - globe
+      - itudata
+      - nlcd
+      - population
+      - proc_gdal
+      - proc_lidar_2019
+      - RAS_Database
+      - srtm3arcsecondv003
+      - ULS_Database
+
+
+2) LiDAR Databases to /var/lib/fbrat/proc_lidar_2019
+      ```
+      /var/databases/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
+      ```
+3) RAS database to /var/lib/fbrat/RAS_Database
+      ```
+      /var/databases/RAS_Database:/var/lib/fbrat/RAS_Database
+      ```
+4) Actual ULS Databases to /var/lib/fbrat/ULS_Database
+      ```
+      /var/databases/ULS_Database:/var/lib/fbrat/ULS_Database
+      ```
+5) Same Actual ULS Databases to /usr/share/fbrat/afc-engine/ULS_Database (temporary requirement, to be removed in next versions)
+      ```
+      /var/databases/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
+      ```
+6) Folder with daily ULS Parse data /var/lib/fbrat/daily_uls_parse
+      ```
+      /var/databases/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
+      ```
+7) Folder with AFC Config data /var/lib/fbrat/afc_config
+      ```
+      /var/afc_config:/var/lib/fbrat/afc_config
+      ```
+
+It also needs access to the PostgreSQL 9 Database server with _fbrat_ database with special structure. (see separate )
+
+Default access to the database is described in the puppet files. However you can change it by overriding the default config (located in _/etc/xdg/fbrat/ratapi.conf_ or changing corresponding puppet variables).
+
+## docker-compose
+
+You would probably like to use docker-compose for setting up everything together - in this case feel free to use following docker-compose.yaml file as reference:
+
+```
+version: '3.2'
+
+services:
+  ratdb:
+    image: postgres:9
+    restart: always
+    volumes:
+      - /var/databases/pgdata:/var/lib/pgsql/data 
+    environment:
+      POSTGRES_PASSWORD: N3SF0LVKJx1RAhFGx4fcw
+      PGDATA: /var/lib/pgsql/data
+      POSTGRES_DB: fbrat
+  rat_server:
+    build:
+      context: .
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/databases:/usr/share/fbrat/rat_transfer
+      - /var/databases/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
+      - /var/databases/RAS_Database:/var/lib/fbrat/RAS_Database
+      - /var/databases/ULS_Database:/var/lib/fbrat/ULS_Database
+      - /var/databases/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
+      - /var/databases/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
+      - /var/afc_config:/var/lib/fbrat/afc_config
+    links:    
+      - ratdb
+```
+Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
+Just run in this folder following command and it is done:
+```
+docker-compose up -d
+```
+
+Keep in mind that on the first run it will build and pull all the needed containers and it can take some time (based on your machine power)
+
+## PostgreSQL structure
+
+If you start the server for the first time you need to create special DB structure 
+
+```
+# \dt
+              List of relations
+ Schema |       Name       | Type  |  Owner
+--------+------------------+-------+----------
+ public | aaa_role         | table | postgres
+ public | aaa_user         | table | postgres
+ public | aaa_user_role    | table | postgres
+ public | access_point     | table | postgres
+ public | alembic_version  | table | postgres
+ public | blacklist_tokens | table | postgres
+ public | limits           | table | postgres
+(7 rows)
+```
+
+aaa_role:
+```
+ Column |         Type          |                       Modifiers
+--------+-----------------------+-------------------------------------------------------
+ id     | integer               | not null default nextval('aaa_role_id_seq'::regclass)
+ name   | character varying(50) |
+Indexes:
+    "aaa_role_pkey" PRIMARY KEY, btree (id)
+    "aaa_role_name_key" UNIQUE CONSTRAINT, btree (name)
+Referenced by:
+    TABLE "aaa_user_role" CONSTRAINT "aaa_user_role_role_id_fkey" FOREIGN KEY (role_id) REFERENCES aaa_role(id) ON DELETE CASCADE
+```
+aaa_user:
+```
+       Column       |            Type             |                       Modifiers
+--------------------+-----------------------------+-------------------------------------------------------
+ id                 | integer                     | not null default nextval('aaa_user_id_seq'::regclass)
+ email              | character varying(255)      | not null
+ email_confirmed_at | timestamp without time zone |
+ password           | character varying(255)      | not null
+ active             | boolean                     |
+ first_name         | character varying(50)       |
+ last_name          | character varying(50)       |
+Indexes:
+    "aaa_user_pkey" PRIMARY KEY, btree (id)
+    "aaa_user_email_key" UNIQUE CONSTRAINT, btree (email)
+Referenced by:
+    TABLE "aaa_user_role" CONSTRAINT "aaa_user_role_user_id_fkey" FOREIGN KEY (user_id) REFERENCES aaa_user(id) ON DELETE CASCADE
+    TABLE "access_point" CONSTRAINT "access_point_user_id_fkey" FOREIGN KEY (user_id) REFERENCES aaa_user(id) ON DELETE CASCADE
+```
+aaa_user_role:
+```
+ Column  |  Type   |                         Modifiers
+---------+---------+------------------------------------------------------------
+ id      | integer | not null default nextval('aaa_user_role_id_seq'::regclass)
+ user_id | integer |
+ role_id | integer |
+Indexes:
+    "aaa_user_role_pkey" PRIMARY KEY, btree (id)
+    "aaa_user_role_user_id_role_id_key" UNIQUE CONSTRAINT, btree (user_id, role_id)
+Foreign-key constraints:
+    "aaa_user_role_role_id_fkey" FOREIGN KEY (role_id) REFERENCES aaa_role(id) ON DELETE CASCADE
+    "aaa_user_role_user_id_fkey" FOREIGN KEY (user_id) REFERENCES aaa_user(id) ON DELETE CASCADE
+```
+access_point:
+```
+      Column      |         Type          |                         Modifiers
+------------------+-----------------------+-----------------------------------------------------------
+ id               | integer               | not null default nextval('access_point_id_seq'::regclass)
+ serial_number    | character varying(64) | not null
+ model            | character varying(64) |
+ manufacturer     | character varying(64) |
+ certification_id | character varying(64) |
+ user_id          | integer               |
+Indexes:
+    "access_point_pkey" PRIMARY KEY, btree (id)
+    "access_point_serial_number_key" UNIQUE CONSTRAINT, btree (serial_number)
+    "ix_access_point_serial_number" btree (serial_number)
+Foreign-key constraints:
+    "access_point_user_id_fkey" FOREIGN KEY (user_id) REFERENCES aaa_user(id) ON DELETE CASCADE
+```
+alembic_version:
+```
+   Column    |         Type          | Modifiers
+-------------+-----------------------+-----------
+ version_num | character varying(32) | not null
+```
+blacklist_tokens:
+```
+     Column     |            Type             |                           Modifiers
+----------------+-----------------------------+---------------------------------------------------------------
+ id             | integer                     | not null default nextval('blacklist_tokens_id_seq'::regclass)
+ token          | character varying(500)      | not null
+ blacklisted_on | timestamp without time zone | not null
+Indexes:
+    "blacklist_tokens_pkey" PRIMARY KEY, btree (id)
+    "blacklist_tokens_token_key" UNIQUE CONSTRAINT, btree (token)
+```
+limits:
+```  Column  |     Type      | Modifiers
+----------+---------------+-----------
+ id       | integer       | not null
+ min_eirp | numeric(50,0) |
+ enforce  | boolean       |
+Indexes:
+    "limits_pkey" PRIMARY KEY, btree (id)
+```
+
+Also you need to perform following steps on newly created PostgreSQL database for stable work of OpenAFC server
+
+```
+\dt
+INSERT into aaa_role (id, name) VALUES ('2','Analysis');
+INSERT into aaa_role (id, name) VALUES ('3','AP'); 
+Check if previous added
+select * from aaa_role; 
+CREATE TABLE limits (id Integer PRIMARY KEY, min_eirp Numeric(50), enforce Boolean);
+\qt
+logout
+```
+
+Automatic default skeleton DB structure generation to be added in future.

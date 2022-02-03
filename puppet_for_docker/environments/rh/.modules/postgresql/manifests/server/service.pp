@@ -1,7 +1,7 @@
 # PRIVATE CLASS: do not call directly
 class postgresql::server::service {
   $service_ensure   = $postgresql::server::service_ensure
-  $service_enable   = $postgresql::server::service_enable
+  $service_enable   = false
   $service_manage   = $postgresql::server::service_manage
   $service_name     = $postgresql::server::service_name
   $service_provider = $postgresql::server::service_provider
@@ -21,8 +21,12 @@ class postgresql::server::service {
       enable    => $service_enable,
       name      => $service_name,
       provider  => $service_provider,
-      hasstatus => true,
+      hasstatus => false,
       status    => $service_status,
+      start     => "/usr/local/bin/gosu postgres:postgres /usr/bin/pg_ctl start -D \${PGDATA} -s -o \"-p \${PGPORT}\" -w -t 300",
+      stop      => "/usr/local/bin/gosu postgres:postgres /usr/bin/pg_ctl stop -D \${PGDATA} -s -m fast",
+      restart   => "/usr/local/bin/gosu postgres:postgres /usr/bin/pg_ctl reload -D \${PGDATA} -s",
+
     }
 
     if $service_ensure == 'running' {
