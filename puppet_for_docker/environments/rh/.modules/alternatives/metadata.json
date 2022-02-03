@@ -1,0 +1,56 @@
+{
+  "name": "puppet-alternatives",
+  "version": "3.0.0",
+  "author": "Vox Pupuli",
+  "summary": "Maintain symbolic links determining default commands",
+  "license": "Apache-2.0",
+  "source": "https://github.com/voxpupuli/puppet-alternatives",
+  "project_page": "https://github.com/voxpupuli/puppet-alternatives",
+  "issues_url": "https://github.com/voxpupuli/puppet-alternatives",
+  "dependencies": [
+  
+  ],
+  "data_provider": null,
+  "operatingsystem_support": [
+    {
+      "operatingsystem": "RedHat",
+      "operatingsystemrelease": [
+        "6",
+        "7"
+      ]
+    },
+    {
+      "operatingsystem": "CentOS",
+      "operatingsystemrelease": [
+        "6",
+        "7"
+      ]
+    },
+    {
+      "operatingsystem": "OracleLinux",
+      "operatingsystemrelease": [
+        "6",
+        "7"
+      ]
+    },
+    {
+      "operatingsystem": "Scientific",
+      "operatingsystemrelease": [
+        "6",
+        "7"
+      ]
+    },
+    {
+      "operatingsystem": "Ubuntu",
+      "operatingsystemrelease": [
+        "14.04"
+      ]
+    }
+  ],
+  "requirements": [
+    {
+      "name": "puppet",
+      "version_requirement": ">= 5.5.8 < 7.0.0"
+    }
+  ]
+}

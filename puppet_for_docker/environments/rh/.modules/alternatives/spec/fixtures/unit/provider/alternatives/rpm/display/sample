@@ -1,0 +1,5 @@
+sample - status is manual.
+ link currently points to /opt/sample2
+/opt/sample1 - priority 10
+/opt/sample2 - priority 20
+Current `best' version is /opt/sample2.

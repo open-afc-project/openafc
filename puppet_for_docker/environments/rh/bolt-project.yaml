@@ -1,0 +1,52 @@
+name: fbrat
+
+apply-settings:
+  show_diff: true
+
+color: false
+log:
+  bolt-debug.log: disable
+  console:
+    level: warn
+
+module-install:
+  forge:
+    baseurl: https://repo.rkf-engineering.com/artifactory/api/puppet/puppetforge
+
+modulepath:
+- '../../site-modules'
+
+# Pin dependency versions to keep them stable
+modules:
+  - name: 'puppet/yum'
+    version_requirement: '4.1.1'
+
+  - name: 'puppet-alternatives'
+    version_requirement: '3.0.0'
+  - name: 'puppet-archive'
+    version_requirement: '4.4.0'
+  - name: 'puppet-nodejs'
+    version_requirement: '7.0.1'
+  - name: 'puppet-selinux'
+    version_requirement: '1.6.1'
+  - name: 'puppet-rabbitmq'
+    version_requirement: '9.1.0'
+  - name: 'puppetlabs-apache'
+    version_requirement: '1.11.0'
+  - name: 'puppetlabs-concat'
+    version_requirement: '2.2.0'
+  - name: 'puppetlabs-mailalias_core'
+    version_requirement: '1.0.5'
+  - name: 'puppetlabs-postgresql'
+    version_requirement: '5.12.1'
+  - name: 'puppetlabs-stdlib'
+    version_requirement: '4.25.1'
+
+  - name: 'camptocamp-postfix'
+    version_requirement: '1.6.0'
+  - name: 'camptocamp-augeas'
+    version_requirement: '1.8.0'
+  - name: 'crayfishx-firewalld'
+    version_requirement: '3.4.0'
+  - name: 'phinze-sudoers'
+    version_requirement: '0.1.3'

@@ -1,0 +1,21 @@
+[Unit]
+Description=Celery Service
+After=network.target
+
+[Service]
+Type=forking
+User=fbrat
+Group=fbrat
+EnvironmentFile=/etc/default/celery-fbrat
+ExecStart=/bin/sh -c '${CELERY_BIN} multi start ${CELERY_FBRAT_NODES} \
+  -A ${CELERY_APP} --pidfile=${CELERY_FBRAT_PID_FILE} \
+  --logfile=${CELERY_FBRAT_LOG_FILE} --loglevel=${CELERY_FBRAT_LOG_LEVEL} ${CELERY_FBRAT_OPTS}'
+ExecStop=/bin/sh -c '${CELERY_BIN} multi stopwait ${CELERY_FBRAT_NODES} \
+  --pidfile=${CELERY_FBRAT_PID_FILE}'
+ExecReload=/bin/sh -c '${CELERY_BIN} multi restart ${CELERY_FBRAT_NODES} \
+  -A ${CELERY_APP} --pidfile=${CELERY_FBRAT_PID_FILE} \
+  --logfile=${CELERY_FBRAT_LOG_FILE} --loglevel=${CELERY_FBRAT_LOG_LEVEL} ${CELERY_FBRAT_OPTS}'
+
+[Install]
+WantedBy=multi-user.target
+    
