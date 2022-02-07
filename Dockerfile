@@ -1,6 +1,6 @@
 FROM centos:7.7.1908 as build_image
-RUN groupadd -g 1003 afc
-RUN useradd -u 1003 -g 1003 -m -b /var/lib -s /sbin/nologin afc
+RUN groupadd -g 1003 fbrat
+RUN useradd -u 1003 -g 1003 -m -b /var/lib -s /sbin/nologin fbrat
 RUN curl -sL https://rpm.nodesource.com/setup_14.x | bash -
 RUN curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo
 RUN rpm --import https://dl.yarnpkg.com/rpm/pubkey.gpg
@@ -30,8 +30,8 @@ RUN sh -x /wd/build-rpm.sh
 
 # Stage Install
 FROM centos:7.7.1908 as install_image
-RUN groupadd -g 1003 afc
-RUN useradd -u 1003 -g 1003 -m -b /var/lib -s /sbin/nologin afc
+RUN groupadd -g 1003 fbrat
+RUN useradd -u 1003 -g 1003 -m -b /var/lib -s /sbin/nologin fbrat
 COPY --from=build_image /wd/build/dist/RPMS/x86_64/fbrat* /root/rpmbuild/RPMS/noarch/python2-wtforms-2.2.1-6.el7.noarch.rpm /wd/pkgs/
 COPY prereqs /wd/prereqs/
 
@@ -70,8 +70,8 @@ RUN rabbitmq-server -detached ; \
 	rabbitmqctl stop
 
 RUN mkdir -p /var/lib/fbrat/daily_uls_parse
-RUN chown afc:afc /var/log/fbrat/history /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/lib/fbrat/daily_uls_parse
-RUN chown -R afc:afc /var/celery 
+RUN chown fbrat:fbrat /var/log/fbrat/history /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/lib/fbrat/daily_uls_parse
+RUN chown -R fbrat:fbrat /var/celery 
 RUN echo "DEFAULT_ULS_DIR = '/var/lib/fbrat/ULS_Database'" >> /etc/xdg/fbrat/ratapi.conf
 
 RUN yum -y autoremove rpmconf createrepo puppet5-release puppet-agent && yum -y autoremove
@@ -83,7 +83,7 @@ RUN chmod +x /docker-entrypoint.sh
 FROM centos:7.7.1908
 COPY --from=install_image / /
 
-LABEL version="afc-runtime"
+LABEL version="fbrat-runtime-env"
 WORKDIR /wd
 EXPOSE 80 443
 ENV PGPORT=5432

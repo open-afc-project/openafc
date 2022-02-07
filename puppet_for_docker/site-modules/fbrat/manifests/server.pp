@@ -22,6 +22,7 @@ class fbrat::server(
   Optional[String] $http_tls_certchain = undef,
   Integer $http_timeout = 120,
   String $http_log_level = 'warn',
+  String $pgsql_host = 'ratdb',
   String $pgsql_dbname = 'fbrat',
   String $pgsql_username = 'postgres',
   String $pgsql_password,
@@ -85,100 +86,100 @@ class fbrat::server(
   }
   file { '/etc/systemd/system/celery-fbrat.service':
     content => template('fbrat/etc/celery-fbrat.service.erb'),
-    owner   => 'root',
-    group   => 'root',
+    owner   => 'fbrat',
+    group   => 'fbrat',
     mode    => '0644',
   }
   file {'/var/lib/fbrat':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0755',
   }
   file { '/etc/default/celery-fbrat':
     content => template('fbrat/etc/celery-fbrat.erb'),
-    owner   => 'root',
-    group   => 'root',
+    owner   => 'fbrat',
+    group   => 'fbrat',
     mode    => '0644',
     require => [File['/var/log/celery'], File['/var/run/celery'], File['/var/celery/results'], File['/var/lib/fbrat/responses']],
   }
   file { '/var/log/celery':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0755',
   }
   file { '/var/run/celery':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0755',
   }
   file { '/var/celery/results':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0755',
   }
   file { '/var/celery':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0755',
   }
   file { '/var/spool/fbrat':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0755',
   }
   file { '/var/lib/fbrat/responses':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0755',
   }
   file { '/var/lib/fbrat/afc_config':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0750',
   }
   file { '/var/lib/fbrat/AntennaPatterns':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0750',
   }
   file { '/var/lib/fbrat/ULS_Database':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0750',
   }
   file { '/usr/share/fbrat':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0755',
   }
   file { '/usr/share/fbrat/afc-engine':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0750',
   }
   file { '/usr/share/fbrat/afc-engine/ULS_Database':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0750',
   }
   if $ratapi_history_dir {
     file { $ratapi_history_dir:
       ensure => 'directory',
-      owner  => 'root',
-      group  => 'root',
+      owner  => 'fbrat',
+      group  => 'fbrat',
       mode   => '0750',
     }
   }
@@ -227,7 +228,7 @@ class fbrat::server(
   # basic user authentication
   file { '/var/www/fbrat.htaccess':
     source => 'puppet:///modules/fbrat/fbrat.htaccess',
-    owner  => 'root',
+    owner  => 'fbrat',
     group  => 'apache',
     mode   => '0440',
   }
@@ -245,14 +246,14 @@ class fbrat::server(
 
   file { '/etc/pki/tls/private/http.key':
     ensure => 'present',
-    owner  => 'root',
+    owner  => 'fbrat',
     group  => 'apache',
     mode   => '0440',
     notify => Service['httpd'],
   }
   file { '/etc/pki/tls/certs/http.crt':
     ensure => 'present',
-    owner  => 'root',
+    owner  => 'fbrat',
     group  => 'apache',
     mode   => '0444',
     notify => Service['httpd'],
@@ -274,15 +275,15 @@ class fbrat::server(
   }
   file { '/etc/httpd/conf.d/fbrat.conf':
     content => template('fbrat/httpd/fbrat.conf.erb'),
-    owner   => 'root',
-    group   => 'root',
+    owner   => 'fbrat',
+    group   => 'fbrat',
     mode    => '0644',
     require => [Package['fbrat']],
     notify  => Service['httpd'],
   }
   file { '/var/www/fbrat.wsgi':
     content => template('fbrat/httpd/fbrat.wsgi.erb'),
-    owner   => 'root',
+    owner   => 'fbrat',
     group   => 'apache',
     mode    => '0644',
     require => [Package['fbrat']],
@@ -290,24 +291,24 @@ class fbrat::server(
   }
   file { '/etc/xdg/fbrat/ratapi.conf':
     content => template('fbrat/etc/ratapi.conf.erb'),
-    owner   => 'root',
-    group   => 'root',
+    owner   => 'fbrat',
+    group   => 'fbrat',
     mode    => '0644',
     require => [Package['fbrat']],
     notify  => [Service['httpd'], Service['celery-fbrat']],
   }
   file { '/etc/tmpfiles.d/celery.conf':
     content => template('fbrat/etc/celery-fbrat.tmp.erb'),
-    owner   => 'root',
-    group   => 'root',
+    owner   => 'fbrat',
+    group   => 'fbrat',
     mode    => '0644',
     require => [Package['fbrat']],
     notify  => [Service['celery-fbrat']],
   }
   file { '/var/log/fbrat':
     ensure => 'directory',
-    owner  => 'root',
-    group  => 'root',
+    owner  => 'fbrat',
+    group  => 'fbrat',
     mode   => '0666',
   }
   cron { 'clean-rat-history': # clean history twice a month

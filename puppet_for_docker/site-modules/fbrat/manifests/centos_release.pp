@@ -20,7 +20,6 @@ class fbrat::centos_release(
     file { '/etc/yum/vars/releasepinver':
       ensure => 'absent',
     }
-
     yumrepo { 'CentOS-Base-base':
       name       => 'base',
       mirrorlist => 'http://mirrorlist.centos.org/?release=$releasever&arch=$basearch&repo=os&infra=$infra',
