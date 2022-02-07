@@ -23,4 +23,5 @@ jobs:
       - name: List built files
         run: |
           ls -l ${{ github.workspace }} ; pwd
-
+      - name: Run afc-engine-test
+        run: docker run --rm -v `pwd`:/wd/afc oafc-build-image afc/build/src/afc-engine/test/afc-engine-test
