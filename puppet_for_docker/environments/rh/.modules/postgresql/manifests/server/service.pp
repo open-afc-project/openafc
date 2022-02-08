@@ -22,11 +22,7 @@ class postgresql::server::service {
       name      => $service_name,
       provider  => $service_provider,
       hasstatus => false,
-      status    => $service_status,
-      start     => "/usr/local/bin/gosu postgres:postgres /usr/bin/pg_ctl start -D \${PGDATA} -s -o \"-p \${PGPORT}\" -w -t 300",
-      stop      => "/usr/local/bin/gosu postgres:postgres /usr/bin/pg_ctl stop -D \${PGDATA} -s -m fast",
-      restart   => "/usr/local/bin/gosu postgres:postgres /usr/bin/pg_ctl reload -D \${PGDATA} -s",
-
+      status    => $service_status
     }
 
     if $service_ensure == 'running' {
