@@ -1,0 +1,32 @@
+FROM centos:7.7.1908 as staging
+RUN groupadd -g 1003 fbrat
+RUN useradd -u 1003 -g 1003 -m -b /var/lib -s /sbin/nologin fbrat
+RUN curl -sL https://rpm.nodesource.com/setup_14.x | bash -
+RUN curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo
+RUN rpm --import https://dl.yarnpkg.com/rpm/pubkey.gpg
+RUN yum -y install epel-release
+COPY prereqs /wd/prereqs/
+
+RUN cd /wd/prereqs/repo/ && \
+    yum -y install subversion rpm-build python2-devel redhat-rpm-config rpmlint cmake3 \
+	ninja-build gcc-c++ minizip-devel boost169-devel qt5-qtbase-devel python-nose checkpolicy \
+	selinux-policy-devel selinux-policy-targeted yarn \
+	iturp452-0.0.0-17626.el7.x86_64.rpm iturp452-devel-0.0.0-17626.el7.x86_64.rpm \
+	iturp452-debuginfo-0.0.0-17626.el7.x86_64.rpm
+RUN cd /wd/prereqs/repo/ && rpmbuild --rebuild python-wtforms-2.2.1-6.el7.src.rpm
+RUN cd /wd/prereqs/repo/ && \
+    yum -y install /root/rpmbuild/RPMS/noarch/python2-wtforms-2.2.1-6.el7.noarch.rpm \
+	python-flask-wtf-0.14.2-7.el7.noarch.rpm
+RUN yum -y install lcov
+
+RUN rm -rf /tmp/* /var/tmp/* /wd/prereqs
+RUN yum -y clean all
+COPY build-rpm.sh prereqs/entry.sh /wd/
+
+
+FROM centos:7.7.1908
+COPY --from=staging / /
+LABEL version="openafc-centos-build-image"
+
+WORKDIR /wd
+CMD ["sh", "-x", "entry.sh"]

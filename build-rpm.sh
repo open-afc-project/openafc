@@ -3,9 +3,10 @@
 # Any arguments to this script are passed along to each of the "rpmbuild" commands.
 set -e
 
+N_THREADS=$(nproc --all --ignore=2)
 ROOTDIR=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
 CMAKE="cmake3 -G Ninja"
-NINJA="ninja-build"
+NINJA="ninja-build -j$N_THREADS"
 RPMBUILD="rpmbuild -ba --without apidoc $@"
 RPMLINT="rpmlint"
 
@@ -24,5 +25,4 @@ ${NINJA} rpm-prep
 ${RPMBUILD} --define "_topdir ${PWD}/dist" dist/SPECS/*.spec
 
 popd
-
-${RPMLINT} --file fbrat.rpmlintrc build/dist/SRPMS build/dist/RPMS
+cd / && ${RPMLINT} --file fbrat.rpmlintrc build/dist/SRPMS build/dist/RPMS

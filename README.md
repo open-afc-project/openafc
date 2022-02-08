@@ -154,7 +154,7 @@ In this doc we assume to work in directory /tmp/work
 This can take some time
 
 ```
-docker build . -t afc-build -f Dockerfile-for-build
+docker build . -t afc-build -f dockerfiles/Dockerfile-for-build
 ```
 
 ### Pulling the Docker image from Docker registry
