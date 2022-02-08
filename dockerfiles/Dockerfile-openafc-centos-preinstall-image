@@ -1,0 +1,103 @@
+FROM centos:7.7.1908
+RUN groupadd -g 1003 fbrat
+RUN useradd -u 1003 -g 1003 -m -b /var/lib -s /sbin/nologin fbrat
+COPY prereqs /wd/prereqs/
+
+#this list is to be optimized in future
+RUN yum install -y https://yum.puppetlabs.com/puppet5-release-el-7.noarch.rpm epel-release && \
+    cd /wd/prereqs/repo/ && \
+    yum install -y \
+    rabbitmq-server \
+	postfix \
+	python2-flask-mail-0.9.1-2.el7.noarch.rpm \
+	python2-flask-user-1.0.1.5-1.el7.noarch.rpm \
+    python2-flask_jsonrpc-0.3.1-1.el7.noarch.rpm \
+	python2-jsmin-2.2.2-2.el7.noarch.rpm \
+	python-wsgidav-2.4.1-1.el7.noarch.rpm \
+	rpmconf \
+	boost169-thread \
+	createrepo \
+	puppet-agent \
+	httpd-2.4.6-97.el7.centos.1.x86_64 \
+	httpd-tools-2.4.6-97.el7.centos.1.x86_64 \
+	mod_ssl-2.4.6-97.el7.centos.1.x86_64 \
+	/wd/prereqs/repo/iturp452* \
+	mailx \
+	python2-celery \
+	python-psycopg2 \
+	awstats \
+	bc \
+    boost169 \
+    boost169-atomic \
+    boost169-chrono \
+    boost169-container \
+    boost169-context \
+    boost169-contract \
+    boost169-coroutine \
+    boost169-date-time \
+    boost169-devel \
+    boost169-fiber \
+    boost169-filesystem \
+    boost169-graph \
+    boost169-iostreams \
+    boost169-locale \
+    boost169-log \
+    boost169-math \
+    boost169-numpy2 \
+    boost169-numpy3 \
+    boost169-program-options \
+    boost169-python2 \
+    boost169-python3 \
+    boost169-random \
+    boost169-regex \
+    boost169-serialization \
+    boost169-stacktrace \
+    boost169-test \
+    boost169-timer \
+    boost169-type_erasure \
+    boost169-wave \
+    initscripts \
+    iproute \
+    iptables \
+    libicu-devel \
+    libmnl \
+    libnetfilter_conntrack \
+    libnfnetlink \
+    libselinux \
+    libselinux-utils \
+    minizip \
+    mod_wsgi \
+    numpy \
+    policycoreutils \
+    pyOpenSSL \
+    python-alembic \
+    python-beaker \
+    python-blinker \
+    python-cffi \
+    python-editor \
+    python-enum34 \
+    python-flask-script \
+    python-idna \
+    python-jwt \
+    python-mako \
+    python-nose \
+    python-paste \
+    python-ply \
+    python-prettytable \
+    python-pycparser \
+    python-six \
+    python-sqlalchemy \
+    python-tempita \
+    python2-bcrypt \
+    python2-cryptography \
+    python2-flask-migrate \
+    python2-flask-sqlalchemy \
+    python2-numpy \
+    python2-pyasn1 \
+    python2-pyxdg \
+    python2-six \
+    python36-numpy \
+    sysvinit-tools
+
+RUN cd /etc/pki/tls/certs && cp localhost.crt http.crt && cd /etc/pki/tls/private && cp localhost.key http.key
+RUN yum -y clean all
