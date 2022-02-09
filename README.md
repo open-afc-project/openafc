@@ -3,7 +3,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 <br />
 <br />
 
-## Table of Contents
+## Tabl- [**Introduction**](#introduction)
 - [**Introduction**](#introduction)
 - [**Contributing**](#contributing)
   - [How to contribute](#how-to-contribute)
@@ -26,11 +26,11 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
     - [Pulling the Docker image from Docker registry](#pulling-the-docker-image-from-docker-registry)
   - [Building OpenAFC engine server](#building-openafc-engine-server)
 - [**OpenAFC Engine usage in Docker Environment**](#openafc-engine-usage-in-docker-environment)
-  - [AFC Engine build in docker](#afc-engine-build-in-docker)
-    - [Building Docker Container OpenAFC engine server](#building-docker-container-openafc-engine-server)
-    - [Prereqs](#prereqs)
-    - [docker-compose](#docker-compose)
-    - [PostgreSQL structure](#postgresql-structure)
+- [AFC Engine build in docker](#afc-engine-build-in-docker)
+  - [Building Docker Container OpenAFC engine server](#building-docker-container-openafc-engine-server)
+  - [Prereqs](#prereqs)
+  - [docker-compose](#docker-compose)
+  - [PostgreSQL structure](#postgresql-structure)
 
 
 - [Database info](/database_readme.md)
@@ -197,7 +197,7 @@ docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --grou
 
 ## Building Docker Container OpenAFC engine server
 
-Building the docker container with Monolitic OpenAFC is straitforward - in the root folder of the OpenAFC Project run default docker build command: 
+Building the docker container with Monolitic OpenAFC is straitforward - in the root folder of the OpenAFC Project run default docker build command:
 
 ```
 docker build .
@@ -256,6 +256,7 @@ Significant to know that the container needs several mappings to work properly:
       ```
       /var/afc_config:/var/lib/fbrat/afc_config
       ```
+**Please post comment or open issue with request to get access to the openAFC database initial archive.**
 
 It also needs access to the PostgreSQL 9 Database server with _fbrat_ database with special structure. (see separate )
 
@@ -273,7 +274,7 @@ services:
     image: postgres:9
     restart: always
     volumes:
-      - /var/databases/pgdata:/var/lib/pgsql/data 
+      - /var/databases/pgdata:/var/lib/pgsql/data
     environment:
       POSTGRES_PASSWORD: N3SF0LVKJx1RAhFGx4fcw
       PGDATA: /var/lib/pgsql/data
@@ -292,7 +293,7 @@ services:
       - /var/databases/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
       - /var/databases/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
       - /var/afc_config:/var/lib/fbrat/afc_config
-    links:    
+    links:
       - ratdb
 ```
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
@@ -305,7 +306,7 @@ Keep in mind that on the first run it will build and pull all the needed contain
 
 ## PostgreSQL structure
 
-If you start the server for the first time you need to create special DB structure 
+If you start the server for the first time you need to create special DB structure
 
 ```
 # \dt
@@ -415,9 +416,9 @@ Also you need to perform following steps on newly created PostgreSQL database fo
 ```
 \dt
 INSERT into aaa_role (id, name) VALUES ('2','Analysis');
-INSERT into aaa_role (id, name) VALUES ('3','AP'); 
+INSERT into aaa_role (id, name) VALUES ('3','AP');
 Check if previous added
-select * from aaa_role; 
+select * from aaa_role;
 CREATE TABLE limits (id Integer PRIMARY KEY, min_eirp Numeric(50), enforce Boolean);
 \qt
 logout
