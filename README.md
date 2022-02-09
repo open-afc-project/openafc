@@ -3,7 +3,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 <br />
 <br />
 
-## Tabl- [**Introduction**](#introduction)
+## Table of Contents
 - [**Introduction**](#introduction)
 - [**Contributing**](#contributing)
   - [How to contribute](#how-to-contribute)
