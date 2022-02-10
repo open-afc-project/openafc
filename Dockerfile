@@ -1,4 +1,4 @@
-FROM openafc/centos-build-image:3.3.10.2 as build_image
+FROM openafc/centos-build-image:3.3.10.3 as build_image
 COPY CMakeLists.txt LICENSE.txt svnrevision.txt version.txt fbrat.rpmlintrc Doxyfile.in /wd/
 COPY cmake /wd/cmake/
 COPY pkg /wd/pkg/
@@ -19,6 +19,7 @@ RUN yum install -y /repos/CentOS/7/7/Packages/fbrat* \
 COPY puppet_for_docker /wd/puppet/
 
 RUN rabbitmq-server -detached ; \
+    yum -y check-update ; \
     /opt/puppetlabs/bin/puppet apply --modulepath /wd/puppet/site-modules:/wd/puppet/environments/rh/.modules /wd/puppet/example.pp ; \
     rabbitmqctl stop
 
