@@ -9,14 +9,14 @@ COPY prereqs /wd/prereqs/
 
 RUN cd /wd/prereqs/repo/ && \
     yum -y install subversion rpm-build python2-devel redhat-rpm-config rpmlint cmake3 \
-	ninja-build gcc-c++ minizip-devel boost169-devel qt5-qtbase-devel python-nose checkpolicy \
-	selinux-policy-devel selinux-policy-targeted yarn \
-	iturp452-0.0.0-17626.el7.x86_64.rpm iturp452-devel-0.0.0-17626.el7.x86_64.rpm \
-	iturp452-debuginfo-0.0.0-17626.el7.x86_64.rpm
+    ninja-build gcc-c++ minizip-devel boost169-devel qt5-qtbase-devel python-nose checkpolicy \
+    selinux-policy-devel selinux-policy-targeted yarn \
+    iturp452-0.0.0-17626.el7.x86_64.rpm iturp452-devel-0.0.0-17626.el7.x86_64.rpm \
+    iturp452-debuginfo-0.0.0-17626.el7.x86_64.rpm
 RUN cd /wd/prereqs/repo/ && rpmbuild --rebuild python-wtforms-2.2.1-6.el7.src.rpm
 RUN cd /wd/prereqs/repo/ && \
     yum -y install /root/rpmbuild/RPMS/noarch/python2-wtforms-2.2.1-6.el7.noarch.rpm \
-	python-flask-wtf-0.14.2-7.el7.noarch.rpm
+    python-flask-wtf-0.14.2-7.el7.noarch.rpm
 RUN yum -y install lcov
 
 RUN rm -rf /tmp/* /var/tmp/* /wd/prereqs

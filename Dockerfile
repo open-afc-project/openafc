@@ -19,8 +19,8 @@ RUN yum install -y /repos/CentOS/7/7/Packages/fbrat* \
 COPY puppet_for_docker /wd/puppet/
 
 RUN rabbitmq-server -detached ; \
-	/opt/puppetlabs/bin/puppet apply --modulepath /wd/puppet/site-modules:/wd/puppet/environments/rh/.modules /wd/puppet/example.pp ; \
-	rabbitmqctl stop
+    /opt/puppetlabs/bin/puppet apply --modulepath /wd/puppet/site-modules:/wd/puppet/environments/rh/.modules /wd/puppet/example.pp ; \
+    rabbitmqctl stop
 
 RUN mkdir -p /var/lib/fbrat/daily_uls_parse
 RUN chown fbrat:fbrat /var/log/fbrat/history /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/lib/fbrat/daily_uls_parse
