@@ -15,7 +15,7 @@ RUN createrepo /repos/CentOS/7/7/Packages/
 RUN echo -e "[fbrat-repo]\nname=FBRAT-Repo\nbaseurl=file:///repos/CentOS/7/7/Packages/\ngpgcheck=0\nenabled=1\n" >> /etc/yum.repos.d/fbrat-repo.repo
 RUN yum install -y /repos/CentOS/7/7/Packages/fbrat* \
     /repos/CentOS/7/7/Packages/python2-wtforms-2.2.1-6.el7.noarch.rpm \
-	/repos/CentOS/7/7/Packages/python-flask-wtf-0.14.2-7.el7.noarch.rpm
+    /repos/CentOS/7/7/Packages/python-flask-wtf-0.14.2-7.el7.noarch.rpm
 COPY puppet_for_docker /wd/puppet/
 
 RUN rabbitmq-server -detached ; \
