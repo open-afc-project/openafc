@@ -27,17 +27,16 @@ EXAMPLES
 """
 
 import argparse
-import logging
-import sys
-import os
-import requests
-import json
-import sqlite3
 import hashlib
 import inspect
+import json
+import logging
+import os
+import requests
+import sqlite3
+import sys
 
 
-AFC_INP_DB = 'afc_input.sqlite3'
 ADD_AFC_TEST_REQS = 'add_test_req.txt'
 AFC_URL_SUFFIX = '/fbrat/ap-afc/0.6/availableSpectrumInquiry'
 headers = {'content-type': 'application/json'}
@@ -48,15 +47,30 @@ TBL_RESPS_NAME = 'test_data_0_6'
 app_log = logging.getLogger(__name__)
 
 
-class AfcTester():
+class AfcTester:
     """Provide tester API"""
     def __init__(self):
         self.addr = ''
         self.port = 443
         self.url_path = 'https://'
         self.log_level = logging.INFO
+        self.db_filename = 'afc_input.sqlite3'
 
-    def set_cfg(self, params):
+    def run(self, opts):
+        """Main entry to find and execute commands"""
+        _call_opts = {
+            'cfg': self._set_cfg,
+            'db': self._set_db,
+            'test': self._run_test
+        }
+        for item in range(len(opts)):
+            if not _call_opts[list(opts)[item]](opts[list(opts)[item]]):
+                return False
+            app_log.debug('%s() Item %d done',
+                          inspect.stack()[0][3], item)
+        return True
+
+    def _set_cfg(self, params):
         """Execute configuration rapameters"""
         if not params:
             return True
@@ -70,7 +84,7 @@ class AfcTester():
         self.url_path += self.addr + ':' + str(self.port) + AFC_URL_SUFFIX
         return True
 
-    def set_db(self, params):
+    def _set_db(self, params):
         """Execute DB related rapameters"""
         if not params:
             return True
@@ -83,16 +97,16 @@ class AfcTester():
                 return False
         return True
 
-    def run_test(self, params):
+    def _run_test(self, params):
         """Execute test related rapameters"""
         if not params:
             return True
         set_run_opts = {
-            'r': _run_test,
-            'a': _run_acquisition
+            'r': start_test,
+            'a': start_acquisition
         }
         for k in params:
-            if not set_run_opts[k](self.url_path, params[k]):
+            if not set_run_opts[k](self, params[k]):
                 return False
         return True
 
@@ -161,15 +175,15 @@ def make_arg_parser():
     return args_parser
 
 
-def make_db():
+def make_db(filename):
     """Create DB file only with schema"""
     app_log.debug('%s()', inspect.stack()[0][3])
-    if os.path.isfile(AFC_INP_DB):
+    if os.path.isfile(filename):
         return True
 
     app_log.info('Create DB tables (%s, %s) from source files',
                  TBL_REQS_NAME, TBL_RESPS_NAME)
-    con = sqlite3.connect(AFC_INP_DB)
+    con = sqlite3.connect(filename)
     cur = con.cursor()
     cur.execute('CREATE TABLE ' + TBL_REQS_NAME + ' (data json)')
     cur.execute('CREATE TABLE ' + TBL_RESPS_NAME +
@@ -189,10 +203,10 @@ def add_reqs(self, opt):
         app_log.error('Missing raw test data file %s', filename)
         return False
 
-    if not make_db():
+    if not make_db(self.db_filename):
         return False
 
-    con = sqlite3.connect(AFC_INP_DB)
+    con = sqlite3.connect(self.db_filename)
     with open(filename, 'r') as fp_test:
         while True:
             dataline = fp_test.readline()
@@ -234,41 +248,41 @@ def dump_db(self, opt):
     """Ful dump from DB tables"""
     app_log.debug('%s() %s', inspect.stack()[0][3], opt)
 
-    if not os.path.isfile(AFC_INP_DB):
-        app_log.error('Missing DB file %s', AFC_INP_DB)
+    if not os.path.isfile(self.db_filename):
+        app_log.error('Missing DB file %s', self.db_filename)
         return False
 
-    con = sqlite3.connect(AFC_INP_DB)
+    con = sqlite3.connect(self.db_filename)
     cur = con.cursor()
     cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
     found_tables = cur.fetchall()
-    app_log.info('\nDump DB table - %s\n', found_tables[0][0])
+    app_log.info('\n\tDump DB table - %s\n', found_tables[0][0])
     cur.execute('SELECT * FROM ' + found_tables[0][0])
     found_data = cur.fetchall()
-    for row_idx in range(len(found_data)):
-        for in_idx in range(len(found_data[row_idx])):
-            app_log.info('%s', found_data[row_idx][in_idx])
-    app_log.info('\nDump DB table - %s\n', found_tables[1][0])
+    for val in enumerate(found_data):
+        for in_val in val:
+            app_log.info('%s', in_val)
+    app_log.info('\n\tDump DB table - %s\n', found_tables[1][0])
     cur.execute('SELECT * FROM ' + found_tables[1][0])
     found_data = cur.fetchall()
-    for row_idx in range(len(found_data)):
-        for in_idx in range(len(found_data[row_idx])):
-            app_log.info('%s', found_data[row_idx][in_idx])
+    for val in enumerate(found_data):
+        for in_val in val:
+            app_log.info('%s', in_val)
     con.close()
     return True
 
 
-def _run_acquisition(url_cfg, test_number):
+def start_acquisition(self, test_number):
     """
     Fetch test vectors from the DB, run tests and refill responses in the DB
     """
     app_log.debug('%s() %s', inspect.stack()[0][3], test_number)
 
-    if not os.path.isfile(AFC_INP_DB):
-        app_log.error('Missing DB file %s', AFC_INP_DB)
+    if not os.path.isfile(self.db_filename):
+        app_log.error('Missing DB file %s', self.db_filename)
         return False
 
-    con = sqlite3.connect(AFC_INP_DB)
+    con = sqlite3.connect(self.db_filename)
     cur = con.cursor()
     cur.execute('SELECT * FROM %s' % TBL_REQS_NAME)
     found_reqs = cur.fetchall()
@@ -282,7 +296,7 @@ def _run_acquisition(url_cfg, test_number):
 
     while row_idx < found_range:
         # Fetch test vector to create request
-        rawresp = requests.post(url_cfg,
+        rawresp = requests.post(self.url_path,
                                 data=json.dumps(eval(found_reqs[row_idx][1])),
                                 headers=headers, timeout=None, verify=False)
         resp = rawresp.json()
@@ -297,7 +311,7 @@ def _run_acquisition(url_cfg, test_number):
     return True
 
 
-def _run_test(url_cfg, test_number):
+def start_test(self, test_number):
     """Fetch test vectors from the DB and run tests"""
     app_log.debug('%s()', inspect.stack()[0][3])
     if test_number == 'True':
@@ -305,11 +319,11 @@ def _run_test(url_cfg, test_number):
     else:
         found_range = int(test_number)
 
-    if not os.path.isfile(AFC_INP_DB):
-        app_log.error('Missing DB file %s', AFC_INP_DB)
+    if not os.path.isfile(self.db_filename):
+        app_log.error('Missing DB file %s', self.db_filename)
         return False
 
-    con = sqlite3.connect(AFC_INP_DB)
+    con = sqlite3.connect(self.db_filename)
     cur = con.cursor()
     cur.execute('SELECT * FROM %s' % TBL_REQS_NAME)
     found_reqs = cur.fetchall()
@@ -329,7 +343,7 @@ def _run_test(url_cfg, test_number):
     while row_idx < found_range:
         # Fetch test vector to create request
         req_id = json_search('requestId', eval(found_reqs[row_idx][0]), None)
-        rawresp = requests.post(url_cfg,
+        rawresp = requests.post(self.url_path,
                                 data=json.dumps(eval(found_reqs[row_idx][0])),
                                 headers=headers, timeout=None, verify=False)
         resp = rawresp.json()
@@ -354,20 +368,19 @@ def main():
     app_log.addHandler(console_log)
     tester = AfcTester()
 
-    call_opts = {
-        'cfg': tester.set_cfg,
-        'db': tester.set_db,
-        'test': tester.run_test
-    }
     parser = make_arg_parser()
     prms = vars(parser.parse_args())
-    for item in range(len(prms)):
-        if not call_opts[list(prms)[item]](prms[list(prms)[item]]):
-            break
-        app_log.debug('%s() Item %d done',
-                      inspect.stack()[0][3], item)
+    tester.run(prms)
     sys.exit()
 
 
 if __name__ == '__main__':
     main()
+
+# Local Variables:
+# mode: Python
+# indent-tabs-mode: nil
+# python-indent: 4
+# End:
+#
+# vim: sw=4:et:tw=80:cc=+1
