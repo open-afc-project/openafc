@@ -31,6 +31,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Prereqs](#prereqs)
   - [docker-compose](#docker-compose)
   - [PostgreSQL structure](#postgresql-structure)
+  - [Initial Administrator account](#initial-administrator-account)
 
 
 - [Database info](/database_readme.md)
@@ -107,7 +108,7 @@ Make sure that all tests are passing before submitting a pull request.
 Push code to your remote feature branch.
 Below command will push your local branch along with the changes to OpenAFC GitHub.
 ```
-git push -u  origin my_change
+git push -u origin my_change
 ```
  > NOTE: The push can include several commits (not only one), but these commits should be related to the same logical change/issue fix/new feature originally described in the [Step 1](#step-1-file-an-issue).
 
@@ -256,9 +257,17 @@ Significant to know that the container needs several mappings to work properly:
       ```
       /var/afc_config:/var/lib/fbrat/afc_config
       ```
+**NB: All or almost all files and folders should be owned by user and group 1003 (currently - fbrat)**
+
+This can be applied via following command (mind the real location of these folders on your host system):
+
+```
+chown -R 1003:1003 /var/databases /var/afc_config
+```
+
 **Please post comment or open issue with request to get access to the openAFC database initial archive.**
 
-It also needs access to the PostgreSQL 9 Database server with _fbrat_ database with special structure. (see separate )
+It also needs access to the PostgreSQL 9 Database server with _fbrat_ database with special structure. (see [separate](#postgresql-structure) paragraph)
 
 Default access to the database is described in the puppet files. However you can change it by overriding the default config (located in _/etc/xdg/fbrat/ratapi.conf_ or changing corresponding puppet variables).
 
@@ -304,124 +313,63 @@ docker-compose up -d
 
 Keep in mind that on the first run it will build and pull all the needed containers and it can take some time (based on your machine power)
 
+After the initial start of the server we recommend to stop it and then start again using these commands:
+```
+docker-compose down
+docker-compose up -d
+```
+
+If you later need to rebuild the server with the changes - simply run this command:
+```
+docker-compose build
+```
+and then restart it.
+To force rebuild it completely use _--no-cache_ option:
+
+```
+docker-compose build --no-cache
+```
+
+**NB: the postgres:9 container requires the folder /var/lib/pgsql/data to be owned by it's internal user and group _postgres_, which both have id 999.**
+
+You can achieve it this way  (mind the real location of these folders on your host system):
+```
+chown 999:999 /var/databases/pgdata
+```
+
 ## PostgreSQL structure
 
-If you start the server for the first time you need to create special DB structure
+On the first start of the PostgreSQL server there are some initial steps to do. First to create the database. Its default name now is **fbrat**. If you are using compose script described above, everything will be done automatically.
+
+After that, once OpenAFC server is started, you need to create special DB structure. This can be done using a _rat-manage-api_ utility.
 
 ```
-# \dt
-              List of relations
- Schema |       Name       | Type  |  Owner
---------+------------------+-------+----------
- public | aaa_role         | table | postgres
- public | aaa_user         | table | postgres
- public | aaa_user_role    | table | postgres
- public | access_point     | table | postgres
- public | alembic_version  | table | postgres
- public | blacklist_tokens | table | postgres
- public | limits           | table | postgres
-(7 rows)
+rat-manage-api db-create
+```
+If you do it with the server which is run thru the docker-compose script described above, you can do it using this command:
+```
+docker-compose exec rat_server rat-manage-api db-create
 ```
 
-aaa_role:
-```
- Column |         Type          |                       Modifiers
---------+-----------------------+-------------------------------------------------------
- id     | integer               | not null default nextval('aaa_role_id_seq'::regclass)
- name   | character varying(50) |
-Indexes:
-    "aaa_role_pkey" PRIMARY KEY, btree (id)
-    "aaa_role_name_key" UNIQUE CONSTRAINT, btree (name)
-Referenced by:
-    TABLE "aaa_user_role" CONSTRAINT "aaa_user_role_role_id_fkey" FOREIGN KEY (role_id) REFERENCES aaa_role(id) ON DELETE CASCADE
-```
-aaa_user:
-```
-       Column       |            Type             |                       Modifiers
---------------------+-----------------------------+-------------------------------------------------------
- id                 | integer                     | not null default nextval('aaa_user_id_seq'::regclass)
- email              | character varying(255)      | not null
- email_confirmed_at | timestamp without time zone |
- password           | character varying(255)      | not null
- active             | boolean                     |
- first_name         | character varying(50)       |
- last_name          | character varying(50)       |
-Indexes:
-    "aaa_user_pkey" PRIMARY KEY, btree (id)
-    "aaa_user_email_key" UNIQUE CONSTRAINT, btree (email)
-Referenced by:
-    TABLE "aaa_user_role" CONSTRAINT "aaa_user_role_user_id_fkey" FOREIGN KEY (user_id) REFERENCES aaa_user(id) ON DELETE CASCADE
-    TABLE "access_point" CONSTRAINT "access_point_user_id_fkey" FOREIGN KEY (user_id) REFERENCES aaa_user(id) ON DELETE CASCADE
-```
-aaa_user_role:
-```
- Column  |  Type   |                         Modifiers
----------+---------+------------------------------------------------------------
- id      | integer | not null default nextval('aaa_user_role_id_seq'::regclass)
- user_id | integer |
- role_id | integer |
-Indexes:
-    "aaa_user_role_pkey" PRIMARY KEY, btree (id)
-    "aaa_user_role_user_id_role_id_key" UNIQUE CONSTRAINT, btree (user_id, role_id)
-Foreign-key constraints:
-    "aaa_user_role_role_id_fkey" FOREIGN KEY (role_id) REFERENCES aaa_role(id) ON DELETE CASCADE
-    "aaa_user_role_user_id_fkey" FOREIGN KEY (user_id) REFERENCES aaa_user(id) ON DELETE CASCADE
-```
-access_point:
-```
-      Column      |         Type          |                         Modifiers
-------------------+-----------------------+-----------------------------------------------------------
- id               | integer               | not null default nextval('access_point_id_seq'::regclass)
- serial_number    | character varying(64) | not null
- model            | character varying(64) |
- manufacturer     | character varying(64) |
- certification_id | character varying(64) |
- user_id          | integer               |
-Indexes:
-    "access_point_pkey" PRIMARY KEY, btree (id)
-    "access_point_serial_number_key" UNIQUE CONSTRAINT, btree (serial_number)
-    "ix_access_point_serial_number" btree (serial_number)
-Foreign-key constraints:
-    "access_point_user_id_fkey" FOREIGN KEY (user_id) REFERENCES aaa_user(id) ON DELETE CASCADE
-```
-alembic_version:
-```
-   Column    |         Type          | Modifiers
--------------+-----------------------+-----------
- version_num | character varying(32) | not null
-```
-blacklist_tokens:
-```
-     Column     |            Type             |                           Modifiers
-----------------+-----------------------------+---------------------------------------------------------------
- id             | integer                     | not null default nextval('blacklist_tokens_id_seq'::regclass)
- token          | character varying(500)      | not null
- blacklisted_on | timestamp without time zone | not null
-Indexes:
-    "blacklist_tokens_pkey" PRIMARY KEY, btree (id)
-    "blacklist_tokens_token_key" UNIQUE CONSTRAINT, btree (token)
-```
-limits:
-```  Column  |     Type      | Modifiers
-----------+---------------+-----------
- id       | integer       | not null
- min_eirp | numeric(50,0) |
- enforce  | boolean       |
-Indexes:
-    "limits_pkey" PRIMARY KEY, btree (id)
-```
+## Initial Administrator account
 
-Also you need to perform following steps on newly created PostgreSQL database for stable work of OpenAFC server
+Once done with database and starting the server, you need to create default administrative user to handle your server from WebUI. It is done from the server console using the _rat-manage-api_ utility.
+
+If you are running from the compose file described above, you first need to get the OpenAFC server console.
+```
+docker-compose exec rat_server bash
+```
+it will return something like this:
+```
+[root@149372a2ac05 wd]#
+```
+this means you are in. Type new password into quotes after _echo_ command and use the following command to create an administrator for your OpenAFC server.
 
 ```
-\dt
-INSERT into aaa_role (id, name) VALUES ('2','Analysis');
-INSERT into aaa_role (id, name) VALUES ('3','AP');
-Check if previous added
-select * from aaa_role;
-CREATE TABLE limits (id Integer PRIMARY KEY, min_eirp Numeric(50), enforce Boolean);
-\qt
-logout
+echo 'Enter Your Password Here' | rat-manage-api user create --role Admin --role AP --role Analysis admin /dev/stdin
 ```
 
-Automatic default skeleton DB structure generation to be added in future.
+Once done, you can authorize with this user and password in WebUI.
+To exit the console press Ctrl+D or type the 'exit' command.
+
+Happy usage!
