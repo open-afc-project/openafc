@@ -27,17 +27,16 @@ EXAMPLES
 """
 
 import argparse
-import logging
-import sys
-import os
-import requests
-import json
-import sqlite3
 import hashlib
 import inspect
+import json
+import logging
+import os
+import requests
+import sqlite3
+import sys
 
 
-AFC_INP_DB = 'afc_input.sqlite3'
 ADD_AFC_TEST_REQS = 'add_test_req.txt'
 AFC_URL_SUFFIX = '/fbrat/ap-afc/0.6/availableSpectrumInquiry'
 headers = {'content-type': 'application/json'}
@@ -48,15 +47,30 @@ TBL_RESPS_NAME = 'test_data_0_6'
 app_log = logging.getLogger(__name__)
 
 
-class AfcTester():
+class AfcTester:
     """Provide tester API"""
     def __init__(self):
         self.addr = ''
         self.port = 443
         self.url_path = 'https://'
         self.log_level = logging.INFO
+        self.db_filename = 'afc_input.sqlite3'
 
-    def set_cfg(self, params):
+    def run(self, opts):
+        """Main entry to find and execute commands"""
+        _call_opts = {
+            'cfg': self._set_cfg,
+            'db': self._set_db,
+            'test': self._run_test
+        }
+        for item in range(len(opts)):
+            if not _call_opts[list(opts)[item]](opts[list(opts)[item]]):
+                return False
+            app_log.debug('%s() Item %d done',
+                          inspect.stack()[0][3], item)
+        return True
+
+    def _set_cfg(self, params):
         """Execute configuration rapameters"""
         if not params:
             return True
@@ -70,7 +84,7 @@ class AfcTester():
         self.url_path += self.addr + ':' + str(self.port) + AFC_URL_SUFFIX
         return True
 
-    def set_db(self, params):
+    def _set_db(self, params):
         """Execute DB related rapameters"""
         if not params:
             return True
@@ -83,16 +97,16 @@ class AfcTester():
                 return False
         return True
 
-    def run_test(self, params):
+    def _run_test(self, params):
         """Execute test related rapameters"""
         if not params:
             return True
         set_run_opts = {
-            'r': _run_test,
-            'a': _run_acquisition
+            'r': start_test,
+            'a': start_acquisition
         }
         for k in params:
-            if not set_run_opts[k](self.url_path, params[k]):
+            if not set_run_opts[k](self, params[k]):
                 return False
         return True
 
@@ -112,30 +126,25 @@ class ParseDict(argparse.Action):
         setattr(namespace, self.dest, d)
 
 
-def json_search(json_keys, json_obj, val):
-    """Loookup for key in json and change it value if requireed"""
-    found = {}
-    if not isinstance(json_keys, list):
-        json_keys = [json_keys]
+def json_lookup(key, json_obj, val):
+    """Loookup for key in json and change it value if required"""
+    keepit = []
 
-    if isinstance(json_obj, dict):
-        for needle in json_keys:
-            if needle in json_obj.keys():
-                found[needle] = json_obj[needle]
-                if val:
-                    json_obj[needle] = val
-            elif len(json_obj.keys()) > 0:
-                for key in json_obj.keys():
-                    result = json_search(needle, json_obj[key], val)
-                    if result:
-                        for k, v in result.items():
-                            found[k] = v
-    elif isinstance(json_obj, list):
-        for node in json_obj:
-            result = json_search(json_keys, node, val)
-            if result:
-                for k, v in result.items():
-                    found[k] = v
+    def lookup(key, json_obj, val, keepit):
+        if isinstance(json_obj, dict):
+            for k, v in json_obj.items():
+                if isinstance(v, (dict, list)):
+                    lookup(key, v, val, keepit)
+                elif k == key:
+                    keepit.append(v)
+                    if val:
+                        json_obj[k] = val
+        elif isinstance(json_obj, list):
+            for node in json_obj:
+                lookup(key, node, val, keepit)
+        return keepit
+
+    found = lookup(key, json_obj, val, keepit)
     return found
 
 
@@ -161,15 +170,15 @@ def make_arg_parser():
     return args_parser
 
 
-def make_db():
+def make_db(filename):
     """Create DB file only with schema"""
     app_log.debug('%s()', inspect.stack()[0][3])
-    if os.path.isfile(AFC_INP_DB):
+    if os.path.isfile(filename):
         return True
 
     app_log.info('Create DB tables (%s, %s) from source files',
                  TBL_REQS_NAME, TBL_RESPS_NAME)
-    con = sqlite3.connect(AFC_INP_DB)
+    con = sqlite3.connect(filename)
     cur = con.cursor()
     cur.execute('CREATE TABLE ' + TBL_REQS_NAME + ' (data json)')
     cur.execute('CREATE TABLE ' + TBL_RESPS_NAME +
@@ -189,10 +198,10 @@ def add_reqs(self, opt):
         app_log.error('Missing raw test data file %s', filename)
         return False
 
-    if not make_db():
+    if not make_db(self.db_filename):
         return False
 
-    con = sqlite3.connect(AFC_INP_DB)
+    con = sqlite3.connect(self.db_filename)
     with open(filename, 'r') as fp_test:
         while True:
             dataline = fp_test.readline()
@@ -205,11 +214,11 @@ def add_reqs(self, opt):
                 headers=headers, timeout=None, verify=False)
 
             resp = rawresp.json()
-            resp_res = json_search('shortDescription', resp, None)
-            if resp_res['shortDescription'] != 'success':
+            resp_res = json_lookup('shortDescription', resp, None)
+            if resp_res[0] != 'success':
                 break
             app_log.info('Got response for the request')
-            json_search('availabilityExpireTime', resp, '0')
+            json_lookup('availabilityExpireTime', resp, '0')
 
             app_log.info('Insert new request in DB')
             cur = con.cursor()
@@ -224,51 +233,58 @@ def add_reqs(self, opt):
             cur.execute('INSERT INTO ' + TBL_RESPS_NAME + ' values ( ?, ?)',
                         [upd_data, hash_obj.hexdigest()])
             con.commit()
-    app_log.info('DB is closed 1')
     con.close()
-    app_log.info('DB is closed 2')
     return True
 
 
 def dump_db(self, opt):
     """Ful dump from DB tables"""
     app_log.debug('%s() %s', inspect.stack()[0][3], opt)
+    find_key = ''
+    if opt != 'True':
+        find_key = opt
 
-    if not os.path.isfile(AFC_INP_DB):
-        app_log.error('Missing DB file %s', AFC_INP_DB)
+    if not os.path.isfile(self.db_filename):
+        app_log.error('Missing DB file %s', self.db_filename)
         return False
 
-    con = sqlite3.connect(AFC_INP_DB)
+    con = sqlite3.connect(self.db_filename)
     cur = con.cursor()
     cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
     found_tables = cur.fetchall()
-    app_log.info('\nDump DB table - %s\n', found_tables[0][0])
+    app_log.info('\n\tDump DB table - %s\n', found_tables[0][0])
     cur.execute('SELECT * FROM ' + found_tables[0][0])
     found_data = cur.fetchall()
-    for row_idx in range(len(found_data)):
-        for in_idx in range(len(found_data[row_idx])):
-            app_log.info('%s', found_data[row_idx][in_idx])
-    app_log.info('\nDump DB table - %s\n', found_tables[1][0])
+    for val in enumerate(found_data):
+        for in_val in val:
+            if len(find_key) > 0:
+                if isinstance(in_val, tuple):
+                    new_json = json.loads(in_val[0].encode('utf-8'))
+                    found_vals = json_lookup(find_key, new_json, '111')
+                    app_log.info(found_vals[0])
+            else:
+                app_log.info('%s', in_val)
+    app_log.info('\n\tDump DB table - %s\n', found_tables[1][0])
     cur.execute('SELECT * FROM ' + found_tables[1][0])
     found_data = cur.fetchall()
-    for row_idx in range(len(found_data)):
-        for in_idx in range(len(found_data[row_idx])):
-            app_log.info('%s', found_data[row_idx][in_idx])
+    for val in enumerate(found_data):
+        for in_val in val:
+            app_log.info('%s', in_val)
     con.close()
     return True
 
 
-def _run_acquisition(url_cfg, test_number):
+def start_acquisition(self, test_number):
     """
     Fetch test vectors from the DB, run tests and refill responses in the DB
     """
     app_log.debug('%s() %s', inspect.stack()[0][3], test_number)
 
-    if not os.path.isfile(AFC_INP_DB):
-        app_log.error('Missing DB file %s', AFC_INP_DB)
+    if not os.path.isfile(self.db_filename):
+        app_log.error('Missing DB file %s', self.db_filename)
         return False
 
-    con = sqlite3.connect(AFC_INP_DB)
+    con = sqlite3.connect(self.db_filename)
     cur = con.cursor()
     cur.execute('SELECT * FROM %s' % TBL_REQS_NAME)
     found_reqs = cur.fetchall()
@@ -278,15 +294,18 @@ def _run_acquisition(url_cfg, test_number):
 
     row_idx = 0
     found_range = len(found_reqs)
+    if len(found_reqs) == 0:
+        app_log.error('Missing request records')
+        return False
     app_log.info('Acquisition to number of tests - %d', found_range - row_idx)
 
     while row_idx < found_range:
         # Fetch test vector to create request
-        rawresp = requests.post(url_cfg,
-                                data=json.dumps(eval(found_reqs[row_idx][1])),
+        rawresp = requests.post(self.url_path,
+                                data=json.dumps(eval(found_reqs[row_idx][0])),
                                 headers=headers, timeout=None, verify=False)
         resp = rawresp.json()
-        json_search('availabilityExpireTime', resp, '0')
+        json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
         hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
         cur.execute('INSERT INTO ' + TBL_RESPS_NAME + ' values ( ?, ?)',
@@ -297,7 +316,7 @@ def _run_acquisition(url_cfg, test_number):
     return True
 
 
-def _run_test(url_cfg, test_number):
+def start_test(self, test_number):
     """Fetch test vectors from the DB and run tests"""
     app_log.debug('%s()', inspect.stack()[0][3])
     if test_number == 'True':
@@ -305,11 +324,11 @@ def _run_test(url_cfg, test_number):
     else:
         found_range = int(test_number)
 
-    if not os.path.isfile(AFC_INP_DB):
-        app_log.error('Missing DB file %s', AFC_INP_DB)
+    if not os.path.isfile(self.db_filename):
+        app_log.error('Missing DB file %s', self.db_filename)
         return False
 
-    con = sqlite3.connect(AFC_INP_DB)
+    con = sqlite3.connect(self.db_filename)
     cur = con.cursor()
     cur.execute('SELECT * FROM %s' % TBL_REQS_NAME)
     found_reqs = cur.fetchall()
@@ -328,19 +347,19 @@ def _run_test(url_cfg, test_number):
 
     while row_idx < found_range:
         # Fetch test vector to create request
-        req_id = json_search('requestId', eval(found_reqs[row_idx][0]), None)
-        rawresp = requests.post(url_cfg,
+        req_id = json_lookup('requestId', eval(found_reqs[row_idx][0]), None)
+        rawresp = requests.post(self.url_path,
                                 data=json.dumps(eval(found_reqs[row_idx][0])),
                                 headers=headers, timeout=None, verify=False)
         resp = rawresp.json()
-        json_search('availabilityExpireTime', resp, '0')
+        json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
         hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
 
         if found_resps[row_idx][1] == hash_obj.hexdigest():
-            app_log.info('Test %s is Ok', req_id.get('requestId'))
+            app_log.info('Test %s is Ok', req_id[0])
         else:
-            app_log.error('Test %s is Fail', req_id.get('requestId'))
+            app_log.error('Test %s is Fail', req_id[0])
             app_log.error(upd_data)
             app_log.error(hash_obj.hexdigest())
         row_idx += 1
@@ -354,20 +373,19 @@ def main():
     app_log.addHandler(console_log)
     tester = AfcTester()
 
-    call_opts = {
-        'cfg': tester.set_cfg,
-        'db': tester.set_db,
-        'test': tester.run_test
-    }
     parser = make_arg_parser()
     prms = vars(parser.parse_args())
-    for item in range(len(prms)):
-        if not call_opts[list(prms)[item]](prms[list(prms)[item]]):
-            break
-        app_log.debug('%s() Item %d done',
-                      inspect.stack()[0][3], item)
+    tester.run(prms)
     sys.exit()
 
 
 if __name__ == '__main__':
     main()
+
+# Local Variables:
+# mode: Python
+# indent-tabs-mode: nil
+# python-indent: 4
+# End:
+#
+# vim: sw=4:et:tw=80:cc=+1
