@@ -1,0 +1,49 @@
+name: Regressions test CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+    - name: Public IP
+      id: ip
+      uses: haythem/public-ip@v1.2
+
+    - name: Print Public IP
+      run: |
+        echo ${{ steps.ip.outputs.ipv4 }}
+        echo ${{ steps.ip.outputs.ipv6 }}
+
+    - name: Allow Security group rule to connect Github Actions to OpenAFC servers
+      run: |
+        aws ec2 authorize-security-group-ingress --group-name ${{ secrets.AWS_AFC_DEV_SEC_GROUP_NAME }} --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port 443 --cidr ${{ steps.ip.outputs.ipv4 }}/24
+      env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
+        
+    - name: Checkout sources
+      uses: actions/checkout@v2
+      
+    - name: Build the regression tests docker image 
+      run: cd tests && docker build -t afc-regression-test .
+    - name: run regression test   
+      run: docker run --rm afc-regression-test --cfg addr=${{ secrets.AFC_DEV_SERVER }} --test r
+    
+    - name: remove Security group rule that was added for this test
+      if: ${{ always() }}
+      run: |
+        aws ec2 revoke-security-group-ingress --group-name ${{ secrets.AWS_AFC_DEV_SEC_GROUP_NAME }} --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port 443 --cidr ${{ steps.ip.outputs.ipv4 }}/24
+      env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: ${{ secrets.AWS_REGION }}
