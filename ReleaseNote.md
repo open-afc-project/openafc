@@ -8,17 +8,17 @@
 
 ## **Issues Addressed**
 Update of WFA interface specification to 1.1 (latest version) from 0.0.6
-Jira OA-7: Add rulsetId object
-Jira OA-8: Exclusion of frequencies/channels in the response where emission is prohibited
-Jira OA-16: Add "version" to request message
-Jira OA-17: Add globalOperatingClass in response message
-Jira OA-18: If AP sends an incorrect globalOperatingClass, the request will be rejected as invalid
-Jira OA-19: AFC to send a JSON response message in response to UN-successful requests
-Jira OA-25: Reject message if semi-major axis < semi-minor axis
+- Jira OA-7: Add rulsetId object
+- Jira OA-8: Exclusion of frequencies/channels in the response where emission is prohibited
+- Jira OA-16: Add "version" to request message
+- Jira OA-17: Add globalOperatingClass in response message
+- Jira OA-18: If AP sends an incorrect globalOperatingClass, the request will be rejected as invalid
+- Jira OA-19: AFC to send a JSON response message in response to UN-successful requests
+- Jira OA-25: Reject message if semi-major axis < semi-minor axis
 
 ULS-Parser enhancements:
-Jira OA-12: Convert .sqlite3 ULS to .csv so that it contains FS ID
-Jira OA-39: Improve ULS Processor Speed
+- Jira OA-12: Convert .sqlite3 ULS to .csv so that it contains FS ID
+- Jira OA-39: Improve ULS Processor Speed
 
 
 ## **Feature Additions/Changes**
