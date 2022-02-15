@@ -1,9 +1,12 @@
-import logging
+import logging, os
+import contextlib
+import shutil
 import flask
 import datetime
 from flask.views import MethodView
 from werkzeug import exceptions
 from sqlalchemy.exc import IntegrityError
+import werkzeug
 from ..models import aaa
 from .auth import auth
 from ..models.base import db
@@ -217,6 +220,73 @@ class Limits(MethodView):
         except IntegrityError:
             raise exceptions.BadRequest("DB Error")
 
+class AllowedFreqRanges(MethodView): 
+    ''' Allows an admin to update the JSON containing the allowed frequency bands and allow any user to view but not edit the file ''' 
+    methods = ['PUT', 'GET']
+    ACCEPTABLE_FILES = {
+        'allowed_frequencies.json': dict(
+            content_type='application/json',
+        )
+    }
+
+    def _open(self, rel_path, mode, user=None):
+        ''' Open a configuration file.
+
+        :param rel_path: The specific config name to open.
+        :param mode: The file open mode.
+        :return: The opened file.
+        :rtype: file-like
+        '''
+
+        config_path = os.path.join(flask.current_app.config['STATE_ROOT_PATH'], 'frequency_bands')
+        if not os.path.exists(config_path):
+            os.makedirs(config_path)
+
+        file_path = os.path.join(config_path, rel_path)
+        LOGGER.debug('Opening frequncy file "%s"', file_path)
+        if not os.path.exists(file_path) and mode != 'wb':
+            raise werkzeug.exceptions.NotFound()
+
+        handle = open(file_path, mode)
+
+        if mode == 'wb':
+            os.chmod(file_path, 0o666)
+
+        return handle
+
+    def get(self):
+        ''' GET method for allowed frequency bands
+        '''
+        LOGGER.debug('getting admin supplied frequncy bands')
+        filename="allowed_frequencies.json"
+        if filename not in self.ACCEPTABLE_FILES:
+            LOGGER.debug('Could not find allowed_frequencies.json')
+            raise werkzeug.exceptions.NotFound()
+        filedesc = self.ACCEPTABLE_FILES[filename]
+
+        resp = flask.make_response()
+        with self._open('allowed_frequencies.json', 'rb') as conf_file:
+            resp.data = conf_file.read()
+        resp.content_type = filedesc['content_type']
+        return resp
+
+    def put(self, filename="allowed_frequencies.json"):
+        ''' PUT method for afc config
+        '''
+        user_id = auth(roles=['Admin'])
+        LOGGER.debug("current user: %s", user_id)
+        if filename not in self.ACCEPTABLE_FILES:
+            raise werkzeug.exceptions.NotFound()
+        filedesc = self.ACCEPTABLE_FILES[filename]
+        if flask.request.content_type != filedesc['content_type']:
+            raise werkzeug.exceptions.UnsupportedMediaType()
+
+        with contextlib.closing(self._open(filename, 'wb', user_id)) as outfile:
+            shutil.copyfileobj(flask.request.stream, outfile)
+        return flask.make_response('Allowed frequency ranges updated', 204)
+
+
 module.add_url_rule('/user/<int:user_id>', view_func=User.as_view('User'))
 module.add_url_rule('/user/ap/<int:id>', view_func=AccessPoint.as_view('AccessPoint'))
 module.add_url_rule('/user/eirp_min', view_func=Limits.as_view('Eirp'))
+module.add_url_rule('/user/frequency_range', view_func=AllowedFreqRanges.as_view('Frequency'))

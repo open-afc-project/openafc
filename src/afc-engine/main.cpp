@@ -81,11 +81,13 @@ int main(int argc, char **argv) { // Accepts input from command line
             );
         }
 
+#if 0
         // Check if any required fields weren't populated by input file
         if (afcManager.isNull()) {
             throw std::invalid_argument(
                 ErrStream() << "MISSING_PARAM Failed to populate all required input parameters after import"); // Add err.what() after creating error handling in isNull()
         }
+#endif
 #       endif
 
         /**************************************************************************************/

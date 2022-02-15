@@ -1,9 +1,10 @@
 import * as React from "react";
 // import ReactTooltip from 'react-tooltip';
-import { Location, LinearPolygon, RadialPolygon, Ellipse } from "../Lib/RatAfcTypes";
+import { Location, LinearPolygon, RadialPolygon, Ellipse, Elevation } from "../Lib/RatAfcTypes";
 import { GalleryItem, FormGroup, InputGroup, FormSelect, FormSelectOption, TextInput, InputGroupText } from "@patternfly/react-core";
 import { ifNum } from "../Lib/Utils";
 import { PairList } from "./PairList";
+import { ElevationForm } from "./ElevationForm";
 
 /**
  * LocationForm.tsx: Form component for location object in AP-AFC request
@@ -17,12 +18,14 @@ export interface LocationFormParams {
     location: {
         ellipse?: Ellipse,
         linearPolygon?: LinearPolygon,
-        radialPolygon?: RadialPolygon
+        radialPolygon?: RadialPolygon,
+        elevation?: Elevation
     },
     onChange: (val: {
         ellipse?: Ellipse,
         linearPolygon?: LinearPolygon,
-        radialPolygon?: RadialPolygon
+        radialPolygon?: RadialPolygon,
+        elevation?: Elevation
     }) => void
 }
 
@@ -65,7 +68,8 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                     orientation: undefined
                 },
                 linearPolygon: undefined,
-                radialPolygon: undefined
+                radialPolygon: undefined,
+                elevation: this.props.location.elevation
             });
         } else if (dispType === "Linear Polygon") {
             this.props.onChange({
@@ -73,7 +77,8 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                 linearPolygon: {
                     outerBoundary: []
                 },
-                radialPolygon: undefined
+                radialPolygon: undefined,
+                elevation: this.props.location.elevation
             });
         } else if (dispType === "Radial Polygon") {
             this.props.onChange({
@@ -82,7 +87,8 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                 radialPolygon: {
                     center: { latitude: undefined, longitude: undefined },
                     outerBoundary: []
-                }
+                },
+                elevation: this.props.location.elevation
             });
         }
     }
@@ -91,7 +97,8 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
         let ellipseCopy: Ellipse = this.props.location.ellipse || {} as Ellipse;
         Object.assign(ellipseCopy, ellipse);
         this.props.onChange({
-            ellipse: ellipseCopy
+            ellipse: ellipseCopy,
+            elevation: this.props.location.elevation
         });
     }
 
@@ -99,7 +106,8 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
         let linearCopy: LinearPolygon = this.props.location.linearPolygon || {} as LinearPolygon;
         Object.assign(linearCopy, linearPoly);
         this.props.onChange({
-            linearPolygon: linearCopy
+            linearPolygon: linearCopy,
+            elevation: this.props.location.elevation
         });
     }
 
@@ -107,9 +115,23 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
         let radialCopy: RadialPolygon = this.props.location.radialPolygon || {} as RadialPolygon;
         Object.assign(radialCopy, radialPoly);
         this.props.onChange({
-            radialPolygon: radialCopy
+            radialPolygon: radialCopy,
+            elevation: this.props.location.elevation
         });
     }
+
+    private updateElevation(elevation: Partial<Elevation>) {
+        let elevationCopy = this.props.location.elevation || {} as Elevation;
+        Object.assign(elevationCopy, elevation);
+        this.props.onChange({
+            ellipse: this.props.location.ellipse,
+            linearPolygon: this.props.location.linearPolygon,
+            radialPolygon: this.props.location.radialPolygon,
+            elevation: elevationCopy,
+
+        });
+    }
+
 
     render() {
 
@@ -298,7 +320,12 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
                             sndValid={n => n > 0}
                             values={radialPolygon.outerBoundary.map(point => [point.angle, point.length])}
                             onChange={values => this.updateRadialPoly({ outerBoundary: values.map(p => ({ angle: p[0], length: p[1] }))})} />
-                    </GalleryItem></>)}
+                    </GalleryItem>
+                    </>)}
+                    <ElevationForm
+                        elevation={this.props.location.elevation}
+                        onChange={x => this.updateElevation(x)}
+                    />
           </>);
     }
 }

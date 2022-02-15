@@ -37,14 +37,24 @@ const double CConst::atmPressurehPa    = 1013;
 /**** Static StrTypeClass lists                                                        ****/
 /******************************************************************************************/
 const StrTypeClass CConst::strPathLossModelList[] = {
-    {               CConst::unknownPathLossModel, "UNKNOWN"           },
-    {               CConst::ITMBldgPathLossModel, "ITM_BLDG"          },
-    {         CConst::CoalitionOpt6PathLossModel, "COALITION_OPT_6"   },
-    { CConst::FCC6GHzReportAndOrderPathLossModel, "FCC_6GHZ_REPORT_AND_ORDER"   },
-    {                  CConst::FSPLPathLossModel, "FSPL"              },
+    {               CConst::unknownPathLossModel, "UNKNOWN"                   },
+    {                  CConst::FSPLPathLossModel, "FSPL"                      },
+    {               CConst::ITMBldgPathLossModel, "ITM with building data"    },
+    { CConst::FCC6GHzReportAndOrderPathLossModel, "FCC 6GHz Report & Order"   },
+    {         CConst::CoalitionOpt6PathLossModel, "ITM with no building data" },
 
-    {                                    -1,  (char *) 0         }
+    {                                    -1,  (char *) 0                      }
 };
+
+const StrTypeClass CConst::strWinner2LOSOptionList[] = {
+    {          CConst::UnknownWinner2LOSOption, "UNKNOWN"                   },
+    {         CConst::BldgDataWinner2LOSOption, "BLDG_DATA"                   },
+    {         CConst::ForceLOSWinner2LOSOption, "FORCE_LOS"                   },
+    {        CConst::ForceNLOSWinner2LOSOption, "FORCE_NLOS"                  },
+
+    {                                    -1,  (char *) 0                      }
+};
+
 
 const StrTypeClass CConst::strPropEnvList[] = {
     {                CConst::unknownPropEnv, "UNKNOWN"       },

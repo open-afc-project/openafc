@@ -1,7 +1,5 @@
 // mainUtilities.h -- Reads in and writes JSON files, assigns values to
 // InputParameters structure for main.cpp and exports calculations from main.cpp
-// Authors: Andrew Winter, Vlad Martin, and Sam Smucny
-
 #ifndef INCLUDE_AFCMANAGER_H
 #define INCLUDE_AFCMANAGER_H
 
@@ -39,6 +37,7 @@
 #include "calcitu1336_4.h"
 #include "cconst.h"
 #include "EcefModel.h"
+#include "freq_band.h"
 #include "global_fn.h"
 #include "WorldData.h"
 #include "GdalHelpers.h"
@@ -108,9 +107,13 @@ public:
                 (_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE && std::isnan(_rlanOrientation_deg)) ||
                 _ulsDataFile.empty() ||
                 std::isnan((int)_buildingType) || std::isnan(_confidenceBldg2109) ||
-                _pathLossModelStr.empty());// || 
+                _pathLossModel==CConst::unknownPathLossModel);// || 
                 //std::isnan(_confidenceClutter2108) || std::isnan(_confidenceWinner2) || std::isnan(_confidenceITM) || std::isnan(_winner2ProbLOSThr));
     }
+
+    void setAnalysisType(std::string analysisTypeVal) { _analysisType = analysisTypeVal; return; }
+    void setStateRoot(std::string stateRootVal) { _stateRoot = stateRootVal; return; }
+
     // Read all of the database information into the AfcManager
     void initializeDatabases();
 
@@ -205,8 +208,12 @@ public:
     void computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &psdFreqRangeList); // Compute list of psdSegments for each inquired frequency range
 
 private:
+
+    void importGUIjsonVersion1_0(const QJsonObject &jsonObj);
+    void importGUIjsonVersion1_1(const QJsonObject &jsonObj);
+
     void isValid() const { // Checks the inputs to ensure cooperation with terrain
-        if (!_rlanHeightType.compare("AMSL", Qt::CaseInsensitive)) {
+        if (_rlanHeightType == CConst::AMSLHeightType) {
             if (_terrainDataModel == NULL) {
                 throw std::runtime_error("isValid() called before terrain data has been initialized.");
             }
@@ -225,10 +232,12 @@ private:
     }
 
     void runPointAnalysis();
+    void runScanAnalysis();
     void runExclusionZoneAnalysis();
     void runHeatmapAnalysis();
     void writeKML();
     void createChannelList();
+    bool containsChannel(const std::vector<FreqBandClass>& freqBandList, int chanStartFreqMHz, int chanStopFreqMHz);
     int convertCFI(int cfi, int& bandwidthMHz, int& startFreqMHz, int& stopFreqMHz);    // Convert Center Frequency Index to bandwidth, startFreq, stopFreq of channel
                                                                                         // Returns 1 is successful, 0 of cfi invalid
 
@@ -257,9 +266,11 @@ private:
     double _polarizationLossDB;             // Polarization Loss (dB)
     double _rlanOrientation_deg;            // Orientation (deg) of ellipse clockwise from North in [-90, 90]
     RLANType _rlanType;
-    QString _rlanHeightType;                // Above Mean Sea Level (AMSL), Above Ground Level (AGL)
+    CConst::HeightTypeEnum _rlanHeightType; // Above Mean Sea Level (AMSL), Above Ground Level (AGL)
     QString _serialNumber;
     QString _requestId;
+    QString _rulesetId;
+    QString _guiJsonVersion;
 
     std::vector<std::pair<int, int>> _inquiredFrquencyRangesMHz = std::vector<std::pair<int, int>>(); // list of low-high frequencies in MHz
 
@@ -277,14 +288,24 @@ private:
     double _confidenceWinner2;              // Statistical confidence for Winner2 path loss model
     double _confidenceITM;                  // Statistical confidence for ITM path loss model
 
+    CConst::Winner2LOSOptionEnum _winner2LOSOption;  // Method used to determine LOS for Winner2
+                                                     // LOS Unknown, always use _winner2UnknownLOSMethod
+                                                     // BldgDataWinner2LOSOption : use building data 
+                                                     // ForceLOSWinner2LOSOption : Always use LOS
+                                                     // ForceNLOSWinner2LOSOption : Always use NLOS
+
+    CConst::Winner2UnknownLOSMethodEnum _winner2UnknownLOSMethod;  // Method used to compute Winner2 PL when LOS not known
+                                                                   // PLOSCombineWinner2UnknownLOSMethod : Compute probLOS, then combine
+                                                                   // PLOSThresholdWinner2UnknownLOSMethod : Compute probLOS, use LOS if exceeds _winner2ProbLOSThr
+
     double _winner2ProbLOSThr;              // Winner2 prob LOS threshold, if probLOS exceeds threshold, use LOS model, otherwise use NLOS
-    bool _winner2CombineFlag;               // Whether or not to combine LOS and NLOS path loss values in Winner2.
+    // bool _winner2CombineFlag;               // Whether or not to combine LOS and NLOS path loss values in Winner2.
+    // bool _winner2BldgLOSFlag;               // If set, use building data to determine if winner2 LOS or NLOS model is used
 
     std::string _ulsDataFile;               // File contining ULS data
     QString _inputULSDatabaseStr;           // ULS Database being used
     std::string _rasDataFile;               // File contining RAS data
 
-    std::string _pathLossModelStr;          // Path Loss Model to use
     QString _propagationEnviro;             // Propagation environment (e.g. Population Density Map)
     QString _antennaPattern;                // User-inputted antenna pattern
 
@@ -329,6 +350,9 @@ private:
     double _heatmapRLANOutdoorHeightUncertainty; // RLAN Outdoor Height Uncertainty (m) to use for Heatmap Analysis
 
     bool _applyClutterFSRxFlag;
+    bool _applyClutterRLANTxFlag;
+
+    std::vector<FreqBandClass> _allowableFreqBandList; // List of allowable freq bands.  For USA, correspond to UNII-5 and UNII-7
     /**************************************************************************************/
 
     /**************************************************************************************/
@@ -354,10 +378,11 @@ private:
     double _closeInDist;                    // Radius in which close in path loss model is used
     std::string _closeInPathLossModel;      // Close in path loss model is used
     bool _pathLossClampFSPL;                // If set, when path loss < fspl, clamp to fspl value
-    bool _winner2BldgLOSFlag;               // If set, use building data to determine if winner2 LOS or NLOS model is used
 
-    double _wlanMinFreq;                    // Min Frequency for WiFi system
-    double _wlanMaxFreq;                    // Max Frequency for WiFi system
+    int _wlanMinFreqMHz;                    // Min Frequency for WiFi system (integer in MHz)
+    int _wlanMaxFreqMHz;                    // Max Frequency for WiFi system (integer in MHz)
+    double _wlanMinFreq;                    // Min Frequency for WiFi system (double in Hz)
+    double _wlanMaxFreq;                    // Max Frequency for WiFi system (double in Hz)
 
     std::string _popDensityFile;            // File contining population density data
     double _popDensityResLon;               // Population density file resolution for longitude
@@ -456,6 +481,10 @@ private:
     double _heatmapIToNThresholdDB;            // I/N threshold value used to determine colors in heatmap graphical desplay
 
     std::vector<std::string> statusMessageList; // List of messages regarding run status to send to GUI
+    CConst::ResponseCodeEnum _responseCode;
+    QStringList _missingParams;
+    QStringList _invalidParams;
+    QStringList _unexpectedParams;
     /**************************************************************************************/
 
     //bool _configChange = false;

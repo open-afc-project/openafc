@@ -1,8 +1,9 @@
 import os, urllib, datetime, zipfile, shutil, subprocess, sys
 from collections import OrderedDict
 import ssl
-from ..db.csvToSqliteULS import convertULS
-from sort_callsigns_all import sortCallsigns
+from csvToSqliteULS import convertULS
+# from sort_callsigns_all import sortCallsigns
+from sort_callsigns_addfsid import sortCallsignsAddFSID
 from fix_bps import fixBPS
 
 ssl._create_default_https_context = ssl._create_unverified_context
@@ -224,12 +225,14 @@ def processDailyFiles(weeklyCreation, root, logFile, temp):
                     logFile.write('Processing ' + dailyFile + ' for: ' + day + '\n')
                     readEntries(dailyFile)
                     weeklyFormatFixed = True
-            # Exit after processing yesterdays file
-            if (key == currentWeekday - 1 or (currentWeekday == 0 and key == 6)):
-                break
-            os.chdir(root + temp) # change back to temp
         else:
             logFile.write('INFO: Skipping ' + day + ' files because they are older than the weekly file' + '\n')
+
+        # Exit after processing yesterdays file
+        if (key == currentWeekday - 1 or (currentWeekday == 0 and key == 6)):
+            break
+        os.chdir(root + temp) # change back to temp
+
     # in this case there were no daily files processed so we need to fix weekly data 
     # normally weekly data formatting is corrected when adding daily data 
     if (not weeklyFormatFixed):
@@ -268,7 +271,7 @@ def daily_uls_parse(state_root, isManual = False):
     os.mkdir(root + temp)
     os.chdir(root + temp) #change to temp 
     logname = root + temp + "/dailyParse_" + startTime.isoformat() + ".log"
-    logFile = open(logname, 'w')
+    logFile = open(logname, 'w', 1)
     logFile.write('Starting update at: ' + startTime.isoformat() + '\n')
 
 
@@ -303,8 +306,9 @@ def daily_uls_parse(state_root, isManual = False):
     
     # run sort callsign script
     sortedOutput = bpsScriptOutput.replace(".csv", "_sorted.csv")
-    logFile.write("Running through sort callsigns script" + '\n')
-    sortCallsigns(bpsScriptOutput, sortedOutput)
+    fsidTableFile =  root + '/data_files/fsid_table.csv'
+    logFile.write("Running through sort callsigns add FSID script" + '\n')
+    sortCallsignsAddFSID(bpsScriptOutput, fsidTableFile, sortedOutput)
     # convert uls csv to sqlite   
     updated, inserted = convertULS(sortedOutput, state_root, logFile)
     
@@ -373,3 +377,9 @@ def daily_uls_parse(state_root, isManual = False):
     logFile.write('Update took ' + str(timeDiff.total_seconds()) + ' seconds' + '\n')
     logFile.close()
     return updated, inserted, finishTime.isoformat()
+
+# for testing
+# daily_uls_parse("/tmp/fbrat", False)
+if __name__ == '__main__':
+    daily_uls_parse("/var/lib/fbrat", False)
+

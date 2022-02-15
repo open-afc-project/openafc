@@ -27,6 +27,7 @@ export interface GuiConfig {
 }
 
 export interface AFCConfigFile {
+    freqBands: FreqRange[]
     version: string,
     maxEIRP: number,
     minEIRP: number,
@@ -46,6 +47,12 @@ export interface AFCConfigFile {
     clutterAtFS: boolean,
     regionStr?: string,
     rasDatabase?: string
+}
+
+export type FreqRange = {
+    name: string,
+    startFreqMHz: number, 
+    stopFreqMHz: number
 }
 
 export type FSReceiverFeederLoss = {

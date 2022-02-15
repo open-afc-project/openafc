@@ -20,18 +20,18 @@ import { Limit } from "../Lib/Admin";
  * author: Sam Smucny
  */
 
- /**
-  * Properties for RatAfc
-  */
- interface RatAfcProps {
+/**
+ * Properties for RatAfc
+ */
+interface RatAfcProps {
     afcConfig: RatResponse<AFCConfigFile>
     limit: RatResponse<Limit>
- }
+}
 
- /**
-  * State for RatAfc
-  */
- interface RatAfcState {
+/**
+ * State for RatAfc
+ */
+interface RatAfcState {
     response?: AvailableSpectrumInquiryResponse,
     status?: "Success" | "Info" | "Error",
     err?: ResError,
@@ -40,45 +40,45 @@ import { Limit } from "../Lib/Admin";
     minEirp: number,
     maxEirp: number
     width: number
- }
+}
 
- /**
-  * generates channel data to be displayed from AP-AFC `AvailableChannelInfo` results
-  * @param channelClasses AP-AFC formatted channels
-  * @param minEirp min eirp to use for coloring
-  * @param maxEirp maz eirp to use for coloring
-  */
- const generateChannelData = (channelClasses: AvailableChannelInfo[], minEirp: number, maxEirp: number): ChannelData[] => {
+/**
+ * generates channel data to be displayed from AP-AFC `AvailableChannelInfo` results
+ * @param channelClasses AP-AFC formatted channels
+ * @param minEirp min eirp to use for coloring
+ * @param maxEirp maz eirp to use for coloring
+ */
+const generateChannelData = (channelClasses: AvailableChannelInfo[], minEirp: number, maxEirp: number): ChannelData[] => {
     let channelData = clone(emptyChannels);
-    channelClasses.forEach((channelClass) => 
-        channelData.forEach((channelGroup)=> channelGroup.channels.forEach((channel) => {
-            channel.color = "grey";
-            for (let i = 0; i < channelClass.channelCfi.length; i++) {
-                if (channel.name === String(channelClass.channelCfi[i])) {
-                    channel.maxEIRP = channelClass.maxEirp[i];
-                    // RAS Exclusion will produce null channel EIRP
-                    if(channel.maxEIRP == null || channel.maxEIRP === undefined) {
-                        channel.color = "black"
-                    } else if (channel.maxEIRP >= maxEirp) {
-                        channel.color = "green";
-                    } else if (channel.maxEIRP >= minEirp) {
-                        channel.color = "yellow";
-                    } else {
-                        channel.color = "red";
+    channelClasses.forEach((channelClass) =>
+        channelData.forEach((channelGroup) =>
+            channelGroup.channels.forEach((channel) => {
+                for (let i = 0; i < channelClass.channelCfi.length; i++) {
+                    if (channel.name === String(channelClass.channelCfi[i])) {
+                        channel.maxEIRP = channelClass.maxEirp[i];
+                        // RAS Exclusion will produce null channel EIRP
+                        if (channel.maxEIRP == null || channel.maxEIRP === undefined) {
+                            channel.color = "black"
+                        } else if (channel.maxEIRP >= maxEirp) {
+                            channel.color = "green";
+                        } else if (channel.maxEIRP >= minEirp) {
+                            channel.color = "yellow";
+                        } else {
+                            channel.color = "red";
+                        }
                     }
                 }
-            }
-        }))
+            }))
     );
 
     return channelData;
- }
+}
 
- /**
-  * RatAfc component class
-  */
- export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
-     
+/**
+ * RatAfc component class
+ */
+export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
+
     constructor(props: RatAfcProps) {
         super(props);
 
@@ -121,58 +121,59 @@ import { Limit } from "../Lib/Admin";
      */
     private sendRequest = (request: AvailableSpectrumInquiryRequest) => {
 
+        // Removed per RAT-285
         // check AGL settings and possibly truncate
-        if (request.location.height - request.location.verticalUncertainty < 1) {
-            // modify if height is not 1m above terrain height
-            const minHeight = 1;
-            const maxHeight = request.location.height + request.location.verticalUncertainty;
-            if (maxHeight < minHeight) {
-            this.setState({
-                err: error(`The height value must allow the AP to be at least 1m above the terrain. Currently the maximum height is ${maxHeight}m`),
-                status: "Error"
-            });
-            return;
-            }
-            const newHeight = (minHeight + maxHeight) / 2;
-            const newUncertainty = newHeight - minHeight;
-            request.location.height = newHeight;
-            request.location.verticalUncertainty = newUncertainty;
-            logger.warn("Height was not at least 1 m above terrain, so it was truncated to fit AFC requirement");
-            this.setState({ extraWarningTitle: "Truncated Height", extraWarning: `The AP height has been truncated so that its minimum height is 1m above the terrain. The new height is ${newHeight}+/-${newUncertainty}m`});
-        }
+        // if (request.location.elevation.height - request.location.elevation.verticalUncertainty < 1) {
+        //     // modify if height is not 1m above terrain height
+        //     const minHeight = 1;
+        //     const maxHeight = request.location.elevation.height + request.location.elevation.verticalUncertainty;
+        //     if (maxHeight < minHeight) {
+        //         this.setState({
+        //             err: error(`The height value must allow the AP to be at least 1m above the terrain. Currently the maximum height is ${maxHeight}m`),
+        //             status: "Error"
+        //         });
+        //         return;
+        //     }
+        //     const newHeight = (minHeight + maxHeight) / 2;
+        //     const newUncertainty = newHeight - minHeight;
+        //     request.location.elevation.height = newHeight;
+        //     request.location.elevation.verticalUncertainty = newUncertainty;
+        //     logger.warn("Height was not at least 1 m above terrain, so it was truncated to fit AFC requirement");
+        //     this.setState({ extraWarningTitle: "Truncated Height", extraWarning: `The AP height has been truncated so that its minimum height is 1m above the terrain. The new height is ${newHeight}+/-${newUncertainty}m` });
+        // }
 
         // make api call
         this.setState({ status: "Info" });
         return spectrumInquiryRequest(request)
-        .then(resp => {
-            if (resp.kind == "Success") {
-                const response = resp.result;
-                if (response.response.responseCode === 0) {
-                    const minEirp = request.minDesiredPower || this.state.minEirp;
-                    this.setState({
-                        status: "Success",
-                        response: resp.result,
-                        minEirp: minEirp,
-                     });
+            .then(resp => {
+                if (resp.kind == "Success") {
+                    const response = resp.result;
+                    if (response.response.responseCode === 0) {
+                        const minEirp = request.minDesiredPower || this.state.minEirp;
+                        this.setState({
+                            status: "Success",
+                            response: resp.result,
+                            minEirp: minEirp,
+                        });
+                    } else {
+                        this.setState({ status: "Error", err: error(response.response.shortDescription, response.response.responseCode, response) });
+                    }
                 } else {
-                    this.setState({ status: "Error", err: error(response.response.shortDescription, response.response.responseCode, response)});
+                    this.setState({ status: "Error", err: resp })
                 }
-            } else {
-                this.setState({ status: "Error", err: resp })
-            }
-        });
+            });
     }
 
     render() {
         return (
-        <PageSection id="ap-afc-page">
-            <Title size="lg">RAT AFC AP</Title>
-            <Card>
-                <CardBody>
-                    <RatAfcForm limit={this.props.limit.kind == "Success" ? this.props.limit.result : new Limit(false, 0)} config={this.props.afcConfig} onSubmit={req => this.sendRequest(req)}/>
-                </CardBody>
-            </Card>
-            <br />
+            <PageSection id="ap-afc-page">
+                <Title size="lg">RAT AFC AP</Title>
+                <Card>
+                    <CardBody>
+                        <RatAfcForm limit={this.props.limit.kind == "Success" ? this.props.limit.result : new Limit(false, 0)} config={this.props.afcConfig} onSubmit={req => this.sendRequest(req)} />
+                    </CardBody>
+                </Card>
+                <br />
                 {
                     this.state.status === "Success" &&
                     <Alert title={"Success"} variant="success">
@@ -196,10 +197,14 @@ import { Limit } from "../Lib/Admin";
                     this.state.status === "Error" &&
                     <Alert title={"Error: " + this.state.err?.errorCode} variant="danger">
                         <pre>{this.state.err?.description}</pre>
+                        {
+                            this.state.err?.body?.response?.supplementalInfo &&
+                            <pre>{JSON.stringify(this.state.err?.body?.response?.supplementalInfo)}</pre>
+                        }
                     </Alert>
                 }
 
-            <br/>
+                <br />
                 <Card isHoverable={true}><CardBody><Measure bounds={true}
                     onResize={contentRect => this.setState({ width: contentRect.bounds!.width })}>
                     {({ measureRef }) => <div ref={measureRef}>
@@ -210,10 +215,10 @@ import { Limit } from "../Lib/Admin";
                             channels={this.state.response?.availableChannelInfo ? generateChannelData(this.state.response.availableChannelInfo, this.state.minEirp, this.state.maxEirp) : emptyChannels} />
                     </div>}
                 </Measure></CardBody></Card>
-            <br />
-            {this.state.response?.availableSpectrumInfo && <SpectrumDisplayAFC spectrum={this.state.response} />}
-            <br />
-            <JsonRawDisp value={this.state.response} />
-        </PageSection>);
+                <br />
+                {this.state.response?.availableSpectrumInfo && <SpectrumDisplayAFC spectrum={this.state.response} />}
+                <br />
+                <JsonRawDisp value={this.state.response} />
+            </PageSection>);
     }
- }
+}

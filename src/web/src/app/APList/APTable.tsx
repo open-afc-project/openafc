@@ -27,8 +27,7 @@ export class APTable extends React.Component<APTableProps, {}> {
     private columns = [
         { title: "Serial Number", cellTransforms: [headerCol()] },
         { title: "Certification ID" },
-        { title: "Model" },
-        { title: "Manufacturer" }
+       
     ]
 
     constructor(props: APTableProps) {
@@ -49,15 +48,11 @@ export class APTable extends React.Component<APTableProps, {}> {
         cells: this.props.users ? [
             ap.serialNumber,
             ap.certificationId || "",
-            ap.model || "",
-            ap.manufacturer || "",
-            this.props.users.find(x => x.id === ap.ownerId)?.email || "NO USER"
+           this.props.users.find(x => x.id === ap.ownerId)?.email || "NO USER"
         ] : [
             ap.serialNumber,
             ap.certificationId || "",
-            ap.model || "",
-            ap.manufacturer || ""
-        ]
+       ]
     })
 
     actionResolver(data: any, extraData: any) {

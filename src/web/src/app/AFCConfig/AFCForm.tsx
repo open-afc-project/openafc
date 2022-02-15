@@ -8,10 +8,11 @@ import BodyLossForm from "./BodyLossForm";
 import AntennaPatternForm from "./AntennaPatternForm";
 import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
-import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise } from "../Lib/RatApiTypes";
+import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange } from "../Lib/RatApiTypes";
 import { getDefaultAfcConf, guiConfig } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
+import {AllowedRangesDisplay, defaultRanges}  from './AllowedRangesForm'
 
 /**
 * AFCForm.tsx: form for generating afc configuration files to be used to update server
@@ -24,6 +25,7 @@ import { Limit } from "../Lib/Admin";
 export class AFCForm extends React.Component<
     {
         limit: Limit,
+        frequencyBands:FreqRange[],
         config: AFCConfigFile,
         ulsFiles: string[],
         antennaPatterns: string[],
@@ -37,9 +39,16 @@ export class AFCForm extends React.Component<
     }
     > {
 
-    constructor(props: Readonly<{ limit: Limit, config: AFCConfigFile; ulsFiles: string[]; antennaPatterns: string[]; onSubmit: (x: AFCConfigFile) => Promise<RatResponse<string>>; }>) {
+    constructor(props: Readonly<{ limit: Limit; frequencyBands:FreqRange[]; config: AFCConfigFile; ulsFiles: string[]; antennaPatterns: string[]; onSubmit: (x: AFCConfigFile) => Promise<RatResponse<string>>; }>) {
         super(props);
-        this.state = { config: props.config as AFCConfigFile, messageError: undefined, messageSuccess: undefined, isModalOpen: false }
+        let config = props.config as AFCConfigFile
+        if (props.frequencyBands.length > 0 ) {
+            config.freqBands = props.frequencyBands; 
+        } else {
+            config.freqBands = defaultRanges;
+        }
+        
+        this.state = { config: config, messageError: undefined, messageSuccess: undefined, isModalOpen: false }
     }
 
     private hasValue = (val: any) => val !== undefined && val !== null;
@@ -153,7 +162,13 @@ export class AFCForm extends React.Component<
     }
 
     private reset = () => {
-        this.setState({ config: getDefaultAfcConf() });
+        let config = getDefaultAfcConf();
+        if (this.props.frequencyBands.length > 0 ) {
+            config.freqBands = props.frequencyBands; 
+        } else {
+            config.freqBands = defaultRanges;
+        }
+        this.setState({ config: config });
     }
 
     private setConfig = (newConf: string) => {
@@ -595,6 +610,9 @@ export class AFCForm extends React.Component<
                                     
                                 </InputGroup>
                             </Tooltip>                       
+                        </GalleryItem>
+                        <GalleryItem>
+                            <AllowedRangesDisplay data={this.props.frequencyBands}/>
                         </GalleryItem>
                     </Gallery>
                     <br />

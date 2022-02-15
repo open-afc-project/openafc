@@ -8,7 +8,7 @@ import { getAfcConfigFile } from "./Lib/RatApi";
 import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv } from "./Lib/FileApi";
 import AppLoginPage from "./AppLayout/AppLogin";
 import { UserAccountPage } from "./UserAccount/UserAccount";
-import { getUsers, getMinimumEIRP, Limit } from "./Lib/Admin";
+import { getUsers, getMinimumEIRP, Limit, getAllowedRanges } from "./Lib/Admin";
 import { ImportExport } from "./ImportExport/ImportExport";
 import { Replay } from "./Replay/Replay"
 
@@ -99,14 +99,15 @@ const afcConfigResolves = async () => ({
     conf: await getAfcConfigFile(),
     ulsFiles: await getUlsFiles(),
     antennaPatterns: await getAntennaPatterns(),
-    limit: await getMinimumEIRP()
+    limit: await getMinimumEIRP(),
+    frequencyBands: await getAllowedRanges()
 })
 const AFCConfig = () => {
   return (
     <DynamicImport load={getAfcConfigModuleAsync()} resolve={afcConfigResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
-          : <Component.AFCConfig limit={resolve.limit} ulsFiles={resolve.ulsFiles} afcConf={resolve.conf} antennaPatterns={resolve.antennaPatterns}  />
+          : <Component.AFCConfig limit={resolve.limit} ulsFiles={resolve.ulsFiles} afcConf={resolve.conf} antennaPatterns={resolve.antennaPatterns} frequencyBands={resolve.frequencyBands} />
       }}
     </DynamicImport>
   );
@@ -182,14 +183,15 @@ const getAdminModuleAsync = () => {
 }
 const adminResolves = async () => ({
   users: await getUsers(),
-  limit: await getMinimumEIRP()
+  limit: await getMinimumEIRP(),
+  frequencyBands: await getAllowedRanges()
 })
 const Admin = () => {
   return (
     <DynamicImport load={getAdminModuleAsync()} resolve={adminResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
-          : <Component.Admin users={resolve.users} limit={resolve.limit}/>
+          : <Component.Admin users={resolve.users} limit={resolve.limit} frequencyBands={resolve.frequencyBands}/>
       }}
     </DynamicImport>
   );

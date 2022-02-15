@@ -307,7 +307,8 @@ def convertULS(data_file, state_root, logFile):
                     # Path number 
                     path_number=row.get("Path Number")
                 )
-                to_save.append(uls)
+                s.add(uls)
+                # to_save.append(uls)
             except Exception as e:
                 logFile.write("ERROR: " + str(e) + '\n')
                 invalid_rows = invalid_rows + 1
@@ -317,28 +318,21 @@ def convertULS(data_file, state_root, logFile):
 
             if count % 10000 == 0:
                 logFile.write("CSV to sqlite Up to entry " + str(count) + '\n')
-                result = lookup_then_insert(s, to_save, highestFsId, state_root)
-                entriesUpdated += result[0]
-                entriesInserted += result[1]
-                highestFsId = result[2]
-                to_save = []
+                # result = lookup_then_insert(s, to_save, highestFsId, state_root)
+                # entriesUpdated += result[0]
+                # entriesInserted += result[1]
+                # highestFsId = result[2]
+                # to_save = []
 
-        if len(to_save) > 0:
-            result = lookup_then_insert(s, to_save, highestFsId, state_root)
-            entriesUpdated += result[0]
-            entriesInserted += result[1]
-            highestFsId = result[2]
-            to_save = []
+        # if len(to_save) > 0:
+        #     result = lookup_then_insert(s, to_save, highestFsId, state_root)
+        #     entriesUpdated += result[0]
+        #     entriesInserted += result[1]
+        #     highestFsId = result[2]
+        #     to_save = []
 
         if not (file_handle is None):
             file_handle.close()
-
-        if len(to_save) > 0:
-            result = lookup_then_insert(s, to_save, highestFsId, state_root)
-            entriesUpdated += result[0]
-            entriesInserted += result[1]
-            highestFsId = result[2]
-            to_save = []
 
         s.commit() # only commit after DB opertation are completed
 

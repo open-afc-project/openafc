@@ -1,4 +1,4 @@
-import { GuiConfig, AFCConfigFile, PAWSRequest, PAWSResponse, AnalysisResults, RatResponse, ResSuccess, ResError, success, error, AFCEngineException, ExclusionZoneRequest, HeatMapRequest, ExclusionZoneResult, HeatMapResult } from "./RatApiTypes";
+import { GuiConfig, AFCConfigFile, PAWSRequest, PAWSResponse, AnalysisResults, RatResponse, ResSuccess, ResError, success, error, AFCEngineException, ExclusionZoneRequest, HeatMapRequest, ExclusionZoneResult, HeatMapResult, FreqRange } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { delay } from "./Utils";
 import { addAuth } from "./User";
@@ -23,6 +23,7 @@ export var guiConfig: GuiConfig = Object.freeze({
     rat_api_analysis: "",
     uls_convert_url: "",
     uls_daily_url: "",
+    allowed_freq_url: "",
     login_url: "",
     user_url: "",
     admin_url: "",
@@ -49,6 +50,18 @@ const applicationCache: { [k: string]: any } = {};
  * @returns Default AFC config object
  */
 const defaultAfcConf: () => AFCConfigFile = () => ({
+    "freqBands": [           
+        {       
+            "name" : "UNII-5",
+            "startFreqMHz" : 5925,
+            "stopFreqMHz" : 6425
+        },      
+        {       
+            "name" : "UNII-7",
+            "startFreqMHz" : 6525,
+            "stopFreqMHz" : 6875
+        }               
+    ],
     "antennaPattern":{"kind":"F.1245"},
     "polarizationMismatchLoss":{"kind":"Fixed Value","value":3},
     "bodyLoss":{"kind":"Fixed Value","valueIndoor":0,"valueOutdoor":0},
@@ -444,7 +457,6 @@ function ulsParseContinuation(isCanceled?: () => boolean, status?: (progress: { 
              return error("Your request was unable to be processed", undefined, err);
          }
   )
-
 
 /**
  * Cache an item in the global application cache

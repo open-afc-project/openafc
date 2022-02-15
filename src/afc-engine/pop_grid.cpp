@@ -97,10 +97,10 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
         throw std::runtime_error(errStr.str());
     }
 
-    const char  *pszProjection = nullptr;
+    // const char  *pszProjection = nullptr;
     printf( "Origin = (%.6f,%.6f)\n", adfGeoTransform[0], adfGeoTransform[3] );
     printf( "Pixel Size = (%.6f,%.6f)\n", adfGeoTransform[1], adfGeoTransform[5] );
-    pszProjection = GDALGetProjectionRef(gdalDataset);
+    // pszProjection = GDALGetProjectionRef(gdalDataset);
 
     double pixelSize = adfGeoTransform[1];
     if ( fabs(pixelSize + adfGeoTransform[5]) > 1.0e-8 ) {
@@ -109,19 +109,19 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
 
     double ULX = adfGeoTransform[0] + adfGeoTransform[1] * 0      + adfGeoTransform[2] * 0;
     double ULY = adfGeoTransform[3] + adfGeoTransform[4] * 0      + adfGeoTransform[5] * 0;
-    double ULZ = 0.0;
+    // double ULZ = 0.0;
 
     double LLX = adfGeoTransform[0] + adfGeoTransform[1] * 0      + adfGeoTransform[2] * nYSize;
     double LLY = adfGeoTransform[3] + adfGeoTransform[4] * 0      + adfGeoTransform[5] * nYSize;
-    double LLZ = 0.0;
+    // double LLZ = 0.0;
 
     double URX = adfGeoTransform[0] + adfGeoTransform[1] * nXSize + adfGeoTransform[2] * 0;
     double URY = adfGeoTransform[3] + adfGeoTransform[4] * nXSize + adfGeoTransform[5] * 0;
-    double URZ = 0.0;
+    // double URZ = 0.0;
 
     double LRX = adfGeoTransform[0] + adfGeoTransform[1] * nXSize + adfGeoTransform[2] * nYSize;
     double LRY = adfGeoTransform[3] + adfGeoTransform[4] * nXSize + adfGeoTransform[5] * nYSize;
-    double LRZ = 0.0;
+    // double LRZ = 0.0;
 
     if ( (ULX != LLX) || (URX != LRX) || (LLY != LRY) || (ULY != URY) ) {
         errStr << "ERROR: Inconsistent bounding box in world population file: " << worldPopulationFile;
@@ -210,7 +210,7 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
 
     int minx, maxx, miny, maxy;
     int regionIdx;
-    for(regionIdx=0; regionIdx<regionPolygonList.size(); ++regionIdx) {
+    for(regionIdx=0; regionIdx< (int) regionPolygonList.size(); ++regionIdx) {
         PolygonClass *regionPolygon = regionPolygonList[regionIdx];
         regionNameList.push_back(regionPolygon->name);
 
@@ -361,7 +361,7 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
 // std::cout << longitudeDeg << " " << latitudeDeg << std::endl;
                 int polygonX = (int) floor( longitudeDeg / regionPolygonResolution + 0.5);
                 bool foundRegion = false;
-                for(regionIdx=0; (regionIdx<regionPolygonList.size())&&(!foundRegion); ++regionIdx) {
+                for(regionIdx=0; (regionIdx< (int) regionPolygonList.size())&&(!foundRegion); ++regionIdx) {
                     PolygonClass *regionPolygon = regionPolygonList[regionIdx];
                     if (regionPolygon->in_bdy_area(polygonX, polygonY)) {
                         foundRegion = true;
@@ -722,14 +722,14 @@ void PopGridClass::readData(std::string filename, const std::vector<std::string>
 
     double totalArea = 0.0;
     double totalPop = 0.0;
-    bool foundLabelLine = false;
-    bool hasRegion = false;
+    // bool foundLabelLine = false;
+    // bool hasRegion = false;
 
     std::vector<PopulationRecord> rows;
     PopulationDatabase::loadPopulationData(QString::fromStdString(filename), rows, minLatDeg, maxLatDeg, minLonDeg, maxLonDeg);    // add buffer *1.5
 
     // iterate through returned rows in population db and add them to members
-    for (int r = 0; r < rows.size(); r++)
+    for (int r = 0; r < (int) rows.size(); r++)
     {
 
                 // Grabs the longitude, latitude, and density from a row

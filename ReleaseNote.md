@@ -1,5 +1,59 @@
 # Release Note
 
+# **Version and Date**
+|Version|**v3.3.11**|
+| :- | :- |
+|**Date**|**02/14/2022**|
+
+
+## **Issues Addressed**
+Update of WFA interface specification to 1.1 (latest version) from 0.0.6
+Jira OA-7: Add rulsetId object
+Jira OA-8: Exclusion of frequencies/channels in the response where emission is prohibited
+Jira OA-16: Add "version" to request message
+Jira OA-17: Add globalOperatingClass in response message
+Jira OA-18: If AP sends an incorrect globalOperatingClass, the request will be rejected as invalid
+Jira OA-19: AFC to send a JSON response message in response to UN-successful requests
+Jira OA-25: Reject message if semi-major axis < semi-minor axis
+
+ULS-Parser enhancements:
+Jira OA-12: Convert .sqlite3 ULS to .csv so that it contains FS ID
+Jira OA-39: Improve ULS Processor Speed
+
+
+## **Feature Additions/Changes**
+
+### 1. Updated the WFA interface specification to 1.1
+**Reason for feature addition/change:** Compatible with the latest specification
+
+### 2. Enhanced ULS-Parser 
+**Reason for feature addition/change:** speed-up ULS-parser significantly (from hours to few min) and presence of FS-ID in the .csv file.
+
+
+## **Interface Changes**
+
+**WFA interface specification:** updated to latest version (1.1) from 0.0.6
+**ULS Parser:** No changes
+
+
+## **Bug Fixes**
+* None
+
+
+## **Testing Done**
+* End2End testing (tests 1 through 6) confirms the WFA interface specification and the RAS database change. 
+In addition, specific tests were done to trigger and confirm the expected Error code.
+
+* For RAS database change, the new antenna height is confirmed in the exc_thr file.
+
+* For the daily uls parser: speed was timed and the .csv was verified to have FS IDs.
+
+## **Known Issues**
+* Jira tickets pertaining to the ULS parser: automation and correction of passive repeater information
+
+## **Potential Improvements** 
+*
+
 ## **Version and Date**
 |Version|**v3.3.10**|
 | :- | :- |
