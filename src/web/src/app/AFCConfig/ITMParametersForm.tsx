@@ -15,7 +15,6 @@ export class ITMParametersForm extends React.PureComponent<{ data: ITMParameters
 
     constructor(props) {
         super(props)
-        console.log(props)
     }
 
     private lookUpConstants = (ground: GroundType) => {

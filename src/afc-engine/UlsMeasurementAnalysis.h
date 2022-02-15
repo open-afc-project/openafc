@@ -2,7 +2,7 @@
 #define ULS_MEASUREMENT_ANALYSIS_H
 
 #include <QString>
-#include <iturp452/ITURP452.h>
+// #include <iturp452/ITURP452.h>
 #include <ogr_spatialref.h>
 #include "WorldData.h"
 #include <QPointF>
@@ -33,10 +33,10 @@ namespace UlsMeasurementAnalysis {
 #endif
                               );
 
-    double runPointToPoint452(const WorldData *wd, const GdalDataDir *srtm1, QPointF transLocLatLon, double transHt, QPointF receiveLocLatLon,
-                           double receiveHt, double lineOfSightDistanceKm, 
-                           double frequencyGHz, iturp452::Polarization pol, double conf, int numpts, const iturp452::ITURP452 *itu,
-                           OGRCoordinateTransformation *clutterTrans, const float *pafScanline, double *clutterLossPtr, std::string *txClutterStrPtr);
+    // double runPointToPoint452(const WorldData *wd, const GdalDataDir *srtm1, QPointF transLocLatLon, double transHt, QPointF receiveLocLatLon,
+    //                        double receiveHt, double lineOfSightDistanceKm, 
+    //                        double frequencyGHz, iturp452::Polarization pol, double conf, int numpts, const iturp452::ITURP452 *itu,
+    //                        OGRCoordinateTransformation *clutterTrans, const float *pafScanline, double *clutterLossPtr, std::string *txClutterStrPtr);
 
     // double computeHeight(QPointF loc, const WorldData *globeData, const GdalDataDir *dataDir);
     double *computeElevationVector(const TerrainClass *terrain, bool includeBldg, const QPointF &from, const QPointF &to, int numpts);
@@ -50,8 +50,8 @@ namespace UlsMeasurementAnalysis {
 
     double computeTerrainHeight(const double& latDeg, const double& lonDeg, const BuildingRasterModel *bldg, const WorldData *globeData, const GdalDataDir *dataDir);
 
-    iturp452::ClutterCategory computeClutter(double lon, double lat, bool &waterFlag,
-        OGRCoordinateTransformation *clutterTrans, const float *pafScanline);
+//    iturp452::ClutterCategory computeClutter(double lon, double lat, bool &waterFlag,
+//        OGRCoordinateTransformation *clutterTrans, const float *pafScanline);
 
     extern long long numInvalidSRTM;
     extern long long numSRTM;

@@ -75,3 +75,31 @@ pre {
   background: #004bed;
   cursor: pointer;
 }
+
+#horizontal-form-certification-nra{
+  max-width: 20%;
+  display: inline;
+}
+
+#horizontal-form-certification-list{
+  max-width: 65%;
+  display: inline;
+}
+
+.nestedGallery {
+  border: 1px solid darkgray;
+}
+
+.inquiredChannelsSection{
+  margin-top: 20px;
+}
+
+.lowerInline, .upperInline{
+  max-width: 40%;
+  display:inline;
+}
+
+.btnInline{
+  max-width: 15%;
+  display: inline;
+}

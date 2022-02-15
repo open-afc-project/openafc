@@ -1,16 +1,18 @@
 import * as React from "react";
-import { Gallery, GalleryItem, PageSection, Card, CardHead, CardBody, CardHeader, Title, Modal, Button, FormGroup, FormSelect, FormSelectOption, Alert, Tooltip, AlertActionCloseButton, TooltipPosition} from "@patternfly/react-core";
+import { Gallery, GalleryItem, PageSection, Card, CardHead, CardBody, CardHeader, Title, Modal, InputGroupText, Button, FormGroup, FormSelect, FormSelectOption, Alert, Tooltip, AlertActionCloseButton, TooltipPosition, InputGroup, TextInput} from "@patternfly/react-core";
 import { UserTable } from "./UserList";
 import { Role } from "../Lib/User";
-import { getUsers, addUserRole, deleteUser, removeUserRole, setMinimumEIRP, Limit } from "../Lib/Admin";
+import { getUsers, addUserRole, deleteUser, removeUserRole, setMinimumEIRP, Limit, updateAllowedRanges, getAllowedRanges } from "../Lib/Admin";
 import {ulsDailyParse, ulsLastRuntime, setUlsParseTime} from "../Lib/RatApi"
 import { logger } from "../Lib/Logger";
 import { APList } from "../APList/APList";
 import { UserAccount } from "../UserAccount/UserAccount";
-import { UserModel, RatResponse } from "../Lib/RatApiTypes";
+import { UserModel, RatResponse, FreqRange } from "../Lib/RatApiTypes";
 import { element } from "prop-types";
 import { Timer } from "../Components/Timer";
-import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
+import { OutlinedQuestionCircleIcon , TimesCircleIcon} from "@patternfly/react-icons";
+import {Table, TableHeader, TableBody, TableVariant } from "@patternfly/react-table";
+import { FrequencyRangeInput } from "./FrequencyRangeInput";
 
 /**
  * Admin.tsx: Administration page for managing users
@@ -22,10 +24,18 @@ import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
  */
 const roles: Role[] = ["AP", "Analysis", "Admin"];
 
+const cols = ["Name", "Low Frequency (MHz)", "High Frequency (MHz)"]
+
+const freqBandToRow = (f: FreqRange, index) => ({
+  id: index,
+  cells: [ f.name, f.startFreqMHz, f.stopFreqMHz]
+})
+
+
 /**
  * Administrator tab for managing users
  */
-export class Admin extends React.Component<{ users: RatResponse<UserModel[]> }, 
+export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;}, 
 { 
   users: UserModel[],
   userId?: number
@@ -39,6 +49,9 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]> },
   limit: Limit,
   ulsLastSuccessRuntime: string,
   parseInProgress: boolean,
+  frequencyBands: FreqRange[],
+  editingFrequency: boolean,
+  frequencyEditIndex?: number
   messageSuccess?: string,
   messageError?: string,
   messageUlsSuccess?: string,
@@ -46,7 +59,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]> },
   messageUls?: string,
   userEnteredUpdateTime?: string
 }> {
-  constructor(props: Readonly<{ users: RatResponse<UserModel[]>; limit: RatResponse<Limit>;}>) {
+  constructor(props: Readonly<{ users: RatResponse<UserModel[]>; limit: RatResponse<Limit>; frequencyBands: RatResponse<FreqRange[]>;}>) {
     super(props);
     
     if (props.users.kind === "Error")
@@ -54,6 +67,8 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]> },
   
     const userList = props.users.kind === "Success" ? props.users.result : [];
     const apiLimit = props.limit.kind === "Success" ? props.limit.result : new Limit(false, 18);
+    const apiFreqBands = props.frequencyBands.kind === "Success" ? props.frequencyBands.result : []
+
 
     this.state = { 
       users: userList,
@@ -67,7 +82,10 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]> },
       ulsLastSuccessRuntime: '',
       messageSuccess: undefined,
       messageError: undefined,
-      userEnteredUpdateTime: "00:00"
+      userEnteredUpdateTime: "00:00",
+      editingFrequency: false,
+      frequencyEditIndex: undefined,
+      frequencyBands: apiFreqBands
     };
     this.init = this.init.bind(this);
     this.init()
@@ -187,6 +205,29 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]> },
         this.setState({messageError: "Unable to update limits.", messageSuccess: undefined});
       }
     })
+  } 
+
+  private removeFreqBand = (index : number) => {
+    const { frequencyBands } = this.state;
+    frequencyBands.splice(index, 1);
+    this.setState({frequencyBands: frequencyBands})
+  }
+
+  private addNewBand = () => {
+    const { frequencyBands } = this.state;
+    let newBand = {name: '',  startFreqMHz: 5925, stopFreqMHz: 6425} as FreqRange
+    frequencyBands.push(newBand)
+    this.setState({frequencyBands: frequencyBands})
+  }
+
+  private putFrequencyBands = () => {
+    updateAllowedRanges(this.state.frequencyBands).then((res) => {
+      if(res.kind == "Success") {
+        this.setState({messageSuccess: "Updated allowed frequency", messageError: undefined});
+      } else {
+        this.setState({messageError: "Unable to get current frequency ranges.", messageSuccess: undefined});
+      }
+    })
   }
   
   private manualDailyParse = async () => {
@@ -219,13 +260,43 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]> },
     })
   }
 
+  actionResolver(data: any, extraData: any) {
+
+    return [
+      {
+        title: "Edit Range",
+        onClick: (event: any, rowId: number, rowData: any, extra: any) => this.setState({ editingFrequency: true, frequencyEditIndex: rowId})
+      },
+        {
+            title: "Delete",
+            onClick: (event: any, rowId: any, rowData: any, extra: any) => this.removeFreqBand(rowId)
+        }
+    ];
+}
+
+  private updateTableEntry = (freq :FreqRange) => {
+    const {frequencyEditIndex, frequencyBands} = this.state;
+    frequencyBands[frequencyEditIndex] = freq;
+    this.setState({frequencyBands: frequencyBands})
+  }
+
+  private renderFrequencyTable = () => {
+    return (
+    <Table aria-label="freq-table" actionResolver={(a, b) => this.actionResolver(a, b)} variant={TableVariant.compact} cells={cols as any} rows={this.state.frequencyBands.map((band, index) => freqBandToRow(band, index))} >
+            <TableHeader/>
+            <TableBody/>
+            
+    </Table>)
+}
+
   render() {
     return (
       <PageSection>
         <Card>
           <CardHead><CardHeader>Limits</CardHeader></CardHead>
+            <CardBody>
             {this.state.limit.enforce ? 
-                <CardBody>
+                <>
                   <input id="limitEnabled" type="checkbox" checked={this.state.limit.enforce} onChange={(e) => this.setState({limit: {...this.state.limit, enforce: e.target.checked}})}/>
                   <label htmlFor="limitEnabled">Use Minimum EIRP value</label>
                   <br/>
@@ -233,15 +304,40 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]> },
                   <br/>
                   <input value={this.state.limit.limit} onChange={(event) => this.handleMinEIRP(Number(event.target.value))} id="min_EIRP" type="number"/>dBm
                   <Button style={{marginLeft: "10px"}} onClick={() => this.submitMinEIRP(this.state.limit.limit)}> Save</Button>
-              </CardBody> : 
+              </> : 
               
-              <CardBody>
+              <>
                 <input id="limitEnabled" type="checkbox" checked={this.state.limit.enforce} onChange={(e) => this.setState({limit: {...this.state.limit, enforce: e.target.checked}})}/>
                 <label htmlFor="limitEnabled">Use Minimum EIRP value</label>
                 <br/>
                 <Button onClick={() => this.submitMinEIRP(false)}> Save</Button>
-              </CardBody>
+              </>
             }
+          
+            </CardBody>
+           
+        </Card>
+        <br/>
+        <Card>
+        <CardHead><CardHeader>Allowed Frequency band(s)</CardHeader></CardHead>
+            <CardBody> 
+              <FormGroup  fieldId="allowedFreqGroup">
+                {this.state.frequencyBands ? this.renderFrequencyTable() : false}
+                  <InputGroup>
+                    <Button variant="secondary" onClick={this.addNewBand}>Add Another Range</Button>
+            
+                    <Button onClick={this.putFrequencyBands}>Submit Frequency Ranges</Button>
+                  </InputGroup>
+              </FormGroup>
+            
+            </CardBody>
+            <Modal
+              title="Edit Frequency Band"
+              isOpen={this.state.editingFrequency}
+              onClose={() => this.setState({editingFrequency: false, frequencyEditIndex: undefined})}
+            >
+                <FrequencyRangeInput frequencyRange={this.state.frequencyBands[this.state.frequencyEditIndex] } onSuccess={(freq :FreqRange) => this.updateTableEntry(freq)} />
+              </Modal>
         </Card>
         <br/>
             <>
@@ -367,7 +463,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]> },
           <CardHead><CardHeader>Daily ULS Parse</CardHeader></CardHead>
            
             <CardBody>  
-            <div class="pf-u-text-align-center">Last Successful Run Time: {" " + this.state.ulsLastSuccessRuntime}</div>
+            <div className="pf-u-text-align-center">Last Successful Run Time: {" " + this.state.ulsLastSuccessRuntime}</div>
             
             <br></br>
             <Gallery>
@@ -377,10 +473,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]> },
                   label="Manual ULS Parse"
                   fieldId="parse_setter">
                         
-                  
                     <Button onClick={() => this.manualDailyParse()} disabled={this.state.parseInProgress}> Start Manual Parse</Button> 
-                      
-                  
                   
                 </FormGroup>
               }

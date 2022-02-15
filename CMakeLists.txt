@@ -58,7 +58,7 @@ endif(WIN32)
 
 # mmandell build flags
 if("mmandell" STREQUAL "$ENV{USER}")
-if (1)
+if (0)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDBG_COMPUTE=1 -DMM_DEBUG=1")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=format-extra-args")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=format")

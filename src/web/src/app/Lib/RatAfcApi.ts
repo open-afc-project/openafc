@@ -16,7 +16,7 @@ export const spectrumInquiryRequest = (request: AvailableSpectrumInquiryRequest)
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ version: "0.6", availableSpectrumInquiryRequests: [request]})
+        body: JSON.stringify({ version: "1.1", availableSpectrumInquiryRequests: [request]})
     })
     .then(async resp => {
         if (resp.status == 200) {
@@ -39,7 +39,12 @@ export const sampleRequestObject: AvailableSpectrumInquiryRequest = {
     requestId: "0",
     deviceDescriptor: {
         serialNumber: "sample-ap",
-        certificationId: "1234567890",
+        certificationId: [
+            {
+                nra: "FCC",
+                id: "1234567890"
+            }
+        ],
         rulesetIds: ["47_CFR_PART_15_SUBPART_E"]
     },
     location: {
@@ -52,13 +57,17 @@ export const sampleRequestObject: AvailableSpectrumInquiryRequest = {
             minorAxis: 100,
             orientation: 90
         },
-        height: 15,
-        verticalUncertainty: 5,
+        elevation:{
+            height: 15,
+            verticalUncertainty: 5,
+            heightType: "AGL"
+        },
+        
         indoorDeployment: DeploymentEnum.indoorDeployment
     },
     minDesiredPower: 15,
     vendorExtensions: [{
-        extensionID: "RAT v0.6 AFC Config",
+        extensionID: "RAT v1.1AFC Config",
         parameters: getDefaultAfcConf()
     }],
     inquiredChannels: [

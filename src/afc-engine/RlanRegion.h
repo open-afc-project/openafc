@@ -29,7 +29,7 @@ public:
     virtual std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const = 0;
     virtual std::vector<LatLon> getScan(double scanResolutionM) const = 0;
     virtual double getMaxDist() const = 0;
-    virtual void configure(std::string rlanHeightType, TerrainClass *terrain) = 0;
+    virtual void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain) = 0;
 
     double getMinHeightAGL()  const;
     double getMaxHeightAGL()  const;
@@ -77,7 +77,7 @@ public:
     std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const;
     std::vector<LatLon> getScan(double scanResolutionM) const;
     double getMaxDist() const;
-    void configure(std::string rlanHeightType, TerrainClass *terrain);
+    void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
 
 private:
     double semiMinorAxis;
@@ -108,7 +108,7 @@ public:
     std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const;
     std::vector<LatLon> getScan(double scanResolutionM) const;
     double getMaxDist() const;
-    void configure(std::string rlanHeightType, TerrainClass *terrain);
+    void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
 
 private:
     double resolution, cosVal, oneOverCosVal;

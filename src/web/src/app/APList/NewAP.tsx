@@ -23,7 +23,8 @@ interface NewAPProps {
 
 interface NewAPState {
     serialNumber?: string,
-    certificationId?: string,
+    certificationIdNra?: string,
+    certificationIdId?: string,
     model?: string,
     manufacturer?: string,
     messageType?: "danger" | "success",
@@ -38,12 +39,13 @@ interface NewAPState {
 export class NewAP extends React.Component<NewAPProps, NewAPState> {
     constructor(props: NewAPProps) {
         super(props);
-        this.state = { 
+        this.state = {
             messageValue: "",
             serialNumber: "",
             model: undefined,
             manufacturer: undefined,
-            certificationId: undefined
+            certificationIdNra: undefined,
+            certificationIdId: undefined,
         };
     }
 
@@ -60,18 +62,18 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
         this.props.onAdd({
             id: 0,
             serialNumber: this.state.serialNumber,
-            certificationId: this.state.certificationId,
+            certificationId: this.state.certificationIdNra + " " + this.state.certificationIdId,
             model: this.state.model,
             manufacturer: this.state.manufacturer,
             ownerId: this.props.ownerId || this.state.userId // default is owner, but if admin then use the userId from the form
         })
-        .then(res => {
-            if (res.kind === "Success") {
-                this.setState((s: NewAPState) => ({ messageType: "success", messageValue: "Added " + s.serialNumber }));
-            } else {
-                this.setState({ messageType: "danger", messageValue: res.description });
-            }
-        })
+            .then(res => {
+                if (res.kind === "Success") {
+                    this.setState((s: NewAPState) => ({ messageType: "success", messageValue: "Added " + s.serialNumber }));
+                } else {
+                    this.setState({ messageType: "danger", messageValue: res.description });
+                }
+            })
     }
 
     private hideAlert = () => this.setState({ messageType: undefined });
@@ -79,111 +81,100 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
     render() {
 
         const serialNumberChange = (s?: string) => this.setState({ serialNumber: s });
-        const certificationIdChange = (s?: string) => this.setState({ certificationId: s });
+        const certificationIdNraChange = (s?: string) => this.setState({ certificationIdNra: s });
+        const certificationIdIdChange = (s?: string) => this.setState({ certificationIdId: s });
         const modelChange = (s?: string) => this.setState({ model: s });
         const manufacturerChange = (s?: string) => this.setState({ manufacturer: s });
         const setUserId = (s?: string) => s && this.setState({ userId: Number(s) })
 
         return (
             <>{
-                this.state.messageType && 
-                <Alert 
-                    variant={this.state.messageType} 
-                    title={this.state.messageValue} 
-                    action={<AlertActionCloseButton onClose={this.hideAlert} />} 
+                this.state.messageType &&
+                <Alert
+                    variant={this.state.messageType}
+                    title={this.state.messageValue}
+                    action={<AlertActionCloseButton onClose={this.hideAlert} />}
                 />
             }
-            <br/>
-            <Gallery gutter="sm">
-                <GalleryItem>
-                    <FormGroup
-                        label="Serial Number"
-                        isRequired={true}
-                        fieldId="serial-number-form"
-                    >
-                        <TextInput
-                            type="text"
-                            id="serial-number-form"
-                            name="serial-number-form"
-                            aria-describedby="serial-number-form-helper"
-                            value={this.state.serialNumber}
-                            onChange={serialNumberChange}
-                        />
-                    </FormGroup>
-                </GalleryItem>
-                <GalleryItem>
-                    <FormGroup
-                        label="Certification ID"
-                        fieldId="certification-id-form"
-                    >
-                        <TextInput
-                            type="text"
-                            id="certification-id-form"
-                            name="certification-id-form"
-                            aria-describedby="certification-id-form-helper"
-                            value={this.state.certificationId}
-                            onChange={certificationIdChange}
-                        />
-                    </FormGroup>
-                </GalleryItem>
-                <GalleryItem>
-                    <FormGroup
-                        label="Model"
-                        fieldId="model-form"
-                    >
-                        <TextInput
-                            type="text"
-                            id="model-form"
-                            name="model-form"
-                            aria-describedby="model-form-helper"
-                            value={this.state.model}
-                            onChange={modelChange}
-                        />
-                    </FormGroup>
-                </GalleryItem>
-                <GalleryItem>
-                    <FormGroup
-                        label="Manufacturer"
-                        fieldId="manufacturer-form"
-                    >
-                        <TextInput
-                            type="text"
-                            id="manufacturer-form"
-                            name="manufacturer-form"
-                            aria-describedby="manufacturer-form-helper"
-                            value={this.state.manufacturer}
-                            onChange={manufacturerChange}
-                        />
-                    </FormGroup>
-                </GalleryItem>
-                {this.props.ownerId === 0 && this.props.users &&
+                <br />
+                <Gallery gutter="sm">
                     <GalleryItem>
-                    <FormGroup
-                        label="Owner"
-                        fieldId="owner-form"
-                        isRequired={true}
-                    >
-                        <InputGroup>
-                        <FormSelect
-                            value={this.state.userId}
-                            onChange={setUserId}
-                            id="owner-form"
-                            name="owner-form"
-                            style={{ textAlign: "right" }}
+                        <FormGroup
+                            label="Serial Number"
+                            isRequired={true}
+                            fieldId="serial-number-form"
                         >
-                        <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select an owner" />
-                        {this.props.users.map((option: UserModel) => (
-                        <FormSelectOption key={option.id} value={option.id} label={option.email} />
-                        ))}
-                    </FormSelect>
-            </InputGroup>
-                    </FormGroup>
+                            <TextInput
+                                type="text"
+                                id="serial-number-form"
+                                name="serial-number-form"
+                                aria-describedby="serial-number-form-helper"
+                                value={this.state.serialNumber}
+                                onChange={serialNumberChange}
+                            />
+                        </FormGroup>
                     </GalleryItem>
-                }
-                <GalleryItem>
-                    <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()}>Add</Button>
-                </GalleryItem>
-            </Gallery></>
+                    <GalleryItem>
+                        <FormGroup
+                            label="Certification ID"
+                            fieldId="certification-id-form"
+                        >
+                            <div>
+                                <TextInput
+                                    label="NRA"
+                                    value={this.state.certificationIdNra}
+                                    onChange={certificationIdNraChange}
+                                    type="text"
+                                    step="any"
+                                    id="horizontal-form-certification-nra"
+                                    name="horizontal-form-certification-nra"
+                                    style={{ textAlign: "left" }}
+                                    placeholder="NRA"
+                                />
+
+                                <TextInput
+                                    label="Id"
+                                    value={this.state.certificationIdId}
+                                    onChange={certificationIdIdChange}
+                                    type="text"
+                                    step="any"
+                                    id="horizontal-form-certification-list"
+                                    name="horizontal-form-certification-list"
+                                    style={{ textAlign: "left" }}
+                                    placeholder="Id"
+                                />
+                            </div>
+                        </FormGroup>
+                    </GalleryItem>
+                  
+                    {this.props.ownerId === 0 && this.props.users &&
+                        <GalleryItem>
+                            <FormGroup
+                                label="Owner"
+                                fieldId="owner-form"
+                                isRequired={true}
+                            >
+                                <InputGroup>
+                                    <FormSelect
+                                        value={this.state.userId}
+                                        onChange={setUserId}
+                                        id="owner-form"
+                                        name="owner-form"
+                                        style={{ textAlign: "right" }}
+                                    >
+                                        <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select an owner" />
+                                        {this.props.users.map((option: UserModel) => (
+                                            <FormSelectOption key={option.id} value={option.id} label={option.email} />
+                                        ))}
+                                    </FormSelect>
+                                </InputGroup>
+                            </FormGroup>
+                        </GalleryItem>
+                    }
+                    <GalleryItem>
+                        <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()}>Add</Button>
+                    </GalleryItem>
+                </Gallery></>
         )
     }
 }

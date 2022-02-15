@@ -5,7 +5,7 @@ import {
     Alert,
 } from "@patternfly/react-core";
 import { AFCForm } from "./AFCForm";
-import { AFCConfigFile, RatResponse } from "../Lib/RatApiTypes";
+import { AFCConfigFile, FreqRange, RatResponse } from "../Lib/RatApiTypes";
 import { getDefaultAfcConf, putAfcConfigFile, guiConfig } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
@@ -37,12 +37,12 @@ class AFCConfig extends React.Component<{
     limit: RatResponse<Limit>,
     ulsFiles: RatResponse<string[]>,
     afcConf: RatResponse<AFCConfigFile>,
-    antennaPatterns: RatResponse<string[]>
+    antennaPatterns: RatResponse<string[]>,
+    frequencyBands: RatResponse<FreqRange[]>
 }, AFCState> {
 
-    constructor(props: Readonly<{ limit: RatResponse<Limit>, ulsFiles: RatResponse<string[]>; afcConf: RatResponse<AFCConfigFile>; antennaPatterns: RatResponse<string[]>; }>) {
+    constructor(props: Readonly<{ limit: RatResponse<Limit>; frequencyBands: RatResponse<FreqRange[]>; ulsFiles: RatResponse<string[]>; afcConf: RatResponse<AFCConfigFile>; antennaPatterns: RatResponse<string[]>; }>) {
         super(props);
-
         //@ts-ignore
         const state: AFCState = { config: getDefaultAfcConf() ,isModalOpen: false, messageValue: "", messageTitle: "" };
 
@@ -107,7 +107,7 @@ class AFCConfig extends React.Component<{
                         <pre>{this.state.messageValue}</pre>
                     </Alert>
                 }
-                <AFCForm limit={this.props.limit.kind == "Success" ? this.props.limit.result : new Limit(false, 0)} config={this.state.config} ulsFiles={this.state.ulsFiles} antennaPatterns={this.state.antennaPatterns} onSubmit={(x) => this.submit(x)} />
+                <AFCForm frequencyBands={this.props.frequencyBands.kind == "Success" ? this.props.frequencyBands.result : []} limit={this.props.limit.kind == "Success" ? this.props.limit.result : new Limit(false, 0)} config={this.state.config} ulsFiles={this.state.ulsFiles} antennaPatterns={this.state.antennaPatterns} onSubmit={(x) => this.submit(x)} />
             </PageSection>
         );
     }

@@ -70,6 +70,8 @@ def create_app(config_override=None):
             LOGGER.error('Failed creating state directory "%s"', state_path)
     if not os.path.exists(os.path.join(state_path, 'responses')):
         os.makedirs(os.path.join(state_path, 'responses'))
+    if not os.path.exists(os.path.join(state_path, 'frequency_bands')):
+        os.makedirs(os.path.join(state_path, 'frequency_bands'))
     if not os.path.exists(flaskapp.config['AFC_ENGINE']):
         LOGGER.error('Missing afc-engine executable "%s"',
                      flaskapp.config['AFC_ENGINE'])

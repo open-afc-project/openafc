@@ -125,20 +125,27 @@ namespace
 
 AfcManager::AfcManager()
 {
-	_terrainDataModel = (TerrainClass *) NULL;
+    _terrainDataModel = (TerrainClass *) NULL;
 
-	_ulsList = new ListClass<ULSClass *>(0);
+    _ulsList = new ListClass<ULSClass *>(0);
 
-	_rasList = new ListClass<RASClass *>(0);
+    _rasList = new ListClass<RASClass *>(0);
 
-	_popGrid = (PopGridClass *) NULL;
+    _popGrid = (PopGridClass *) NULL;
 
-        _rlanRegion = (RlanRegionClass *) NULL;
+    _rlanRegion = (RlanRegionClass *) NULL;
 
-	_heatmapIToNDB = (double **) NULL;
-	_heatmapIsIndoor = (bool **) NULL;
-	_heatmapNumPtsLon = 0;
-	_heatmapNumPtsLat = 0;
+    _heatmapIToNDB = (double **) NULL;
+    _heatmapIsIndoor = (bool **) NULL;
+    _heatmapNumPtsLon = 0;
+    _heatmapNumPtsLat = 0;
+
+    _pathLossModel = CConst::unknownPathLossModel;
+
+    _responseCode = CConst::successResponseCode;
+
+    _applyClutterFSRxFlag = false;
+    _applyClutterRLANTxFlag = true;
 }
 
 /******************************************************************************************/
@@ -146,9 +153,9 @@ AfcManager::AfcManager()
 /******************************************************************************************/
 AfcManager::~AfcManager()
 {
-	clearData();
-	delete _ulsList;
-	delete _rasList;
+    clearData();
+    delete _ulsList;
+    delete _rasList;
 }
 /******************************************************************************************/
 
@@ -163,59 +170,59 @@ bool sortFunction(std::pair<double, double> p0,std::pair<double, double> p1) { r
 /******************************************************************************************/
 void AfcManager::initializeDatabases()
 {
-	// Following lines are finding the minimum and maximum longitudes and latitudes with the 150km rlan range
+    if (_responseCode != CConst::successResponseCode) {
+        return;
+    }
 
-	double minLon, maxLon, minLat, maxLat;
-	double minLonBldg, maxLonBldg, minLatBldg, maxLatBldg;
+    // Following lines are finding the minimum and maximum longitudes and latitudes with the 150km rlan range
+    double minLon, maxLon, minLat, maxLat;
+    double minLonBldg, maxLonBldg, minLatBldg, maxLatBldg;
 
-        int chanIdx;
-        double maxBandwidth = 0.0;
-        for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
-            ChannelStruct *channel = &(_channelList[chanIdx]);
-            double chanStartFreq = channel->startFreqMHz * 1.0e6;
-            double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-            double bandwidth = chanStopFreq - chanStartFreq;
-            if (bandwidth > maxBandwidth) { maxBandwidth = bandwidth; }
-        }
+    createChannelList();
 
-        double ulsMinFreq = _wlanMinFreq - (_aciFlag ? maxBandwidth : 0.0);
-        double ulsMaxFreq = _wlanMaxFreq + (_aciFlag ? maxBandwidth : 0.0);
+    if (_responseCode != CConst::successResponseCode) {
+        return;
+    }
 
-	/**************************************************************************************/
-	/* Set Path Loss Model Parameters                                                     */
-	/**************************************************************************************/
-	if (_pathLossModelStr == "ITM_BLDG") {
-		// Building Polygons
+    int chanIdx;
+    double maxBandwidth = 0.0;
+    for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
+        ChannelStruct *channel = &(_channelList[chanIdx]);
+        double chanStartFreq = channel->startFreqMHz * 1.0e6;
+        double chanStopFreq = channel->stopFreqMHz * 1.0e6;
+        double bandwidth = chanStopFreq - chanStartFreq;
+        if (bandwidth > maxBandwidth) { maxBandwidth = bandwidth; }
+    }
 
-		// _gdalDataModel->printDebugInfo();
-		// exit(1);
-		_closeInDist = 0.0;              // Radius in which close in path loss model is used
-            if (_terrainDataModel->getNumLidarRegion() == 0) {
-                throw std::runtime_error(ErrStream() << "Path loss model set to ITM_BLDG, but no building data found within the analysis region.");
-            }
-	} else if (_pathLossModelStr == "COALITION_OPT_6") {
-		_closeInDist = 1.0e3;              // Radius in which close in path loss model is used
-	} else if (_pathLossModelStr == "FCC_6GHZ_REPORT_AND_ORDER") {
-		_closeInDist = 1.0e3;              // Radius in which close in path loss model is used
-	} else if (_pathLossModelStr == "FSPL") {
-		_closeInDist = 0.0;              // Radius in which close in path loss model is used
-	} else {
-		throw std::runtime_error(ErrStream() << "ERROR: Path Loss Model set to invalid value \"" + _pathLossModelStr + "\"");
-	}
+    double ulsMinFreq = _wlanMinFreq - (_aciFlag ? maxBandwidth : 0.0);
+    double ulsMaxFreq = _wlanMaxFreq + (_aciFlag ? maxBandwidth : 0.0);
 
-	// Set pathLossModel
-	int validFlag;
-	_pathLossModel = (CConst::PathLossModelEnum)CConst::strPathLossModelList->str_to_type(_pathLossModelStr, validFlag, 0);
-	ULSClass::pathLossModel = _pathLossModel;
+    /**************************************************************************************/
+    /* Set Path Loss Model Parameters                                                     */
+    /**************************************************************************************/
+    switch(_pathLossModel) {
+        case CConst::ITMBldgPathLossModel:
+            _closeInDist = 0.0;              // Radius in which close in path loss model is used
+            break;
+        case CConst::CoalitionOpt6PathLossModel:
+            _closeInDist = 1.0e3;              // Radius in which close in path loss model is used
+            break;
+        case CConst::FCC6GHzReportAndOrderPathLossModel:
+            _closeInDist = 1.0e3;              // Radius in which close in path loss model is used
+            break;
+        case CConst::FSPLPathLossModel:
+            _closeInDist = 0.0;              // Radius in which close in path loss model is used
+            break;
+        default:
+            throw std::runtime_error(ErrStream() << std::string("ERROR: Path Loss Model set to invalid value \"") + CConst::strPathLossModelList->type_to_str(_pathLossModel) + "\"");
+            break;
+    }
 
-	if (!validFlag)
-	{
-		throw std::runtime_error(ErrStream() << "ERROR: Path Loss Model set to invalid value \"" + _pathLossModelStr + "\"");
-	}
+    ULSClass::pathLossModel = _pathLossModel;
 
-	/**************************************************************************************/
+    /**************************************************************************************/
 
-	if (_analysisType == "PointAnalysis" || _analysisType == "APAnalysis" || _analysisType == "AP-AFC") {
+	if (_analysisType == "PointAnalysis" || _analysisType == "APAnalysis" || _analysisType == "AP-AFC" ||  _analysisType == "ScanAnalysis") {
                 bool fixedHeightAMSL;
                 if (_rlanType ==  RLANType::RLAN_INDOOR) {
                     fixedHeightAMSL = true;
@@ -319,6 +326,8 @@ void AfcManager::initializeDatabases()
                     minLonBldg = minLon;
                     maxLonBldg = maxLon;
                 }
+	} else {
+            throw std::runtime_error(QString("Invalid analysis type: %1").arg(QString::fromStdString(_analysisType)).toStdString());
 	}
 
 	/**************************************************************************************/
@@ -336,6 +345,8 @@ void AfcManager::initializeDatabases()
 	else if (_useLiDAR)
 	{
 		_lidarDir = SearchPaths::forReading("data", "fbrat/rat_transfer/proc_lidar_2019", true);
+
+		// _lidarDir = SearchPaths::forReading("data", "/mnt/s3/rat_transfer/proc_lidar_2019", true);
 	}
 	else
 	{
@@ -380,6 +391,11 @@ void AfcManager::initializeDatabases()
 				ErrStream() << "AfcManager::initializeDatabases(): User provided invalid input parameters: " << err.what()
 				);
 	}
+        if (_pathLossModel == CConst::ITMBldgPathLossModel) {
+            if (_terrainDataModel->getNumLidarRegion() == 0) {
+                throw std::runtime_error(ErrStream() << "Path loss model set to ITM_BLDG, but no building data found within the analysis region.");
+            }
+        }
 	/**************************************************************************************/
 
 	/**************************************************************************************/
@@ -425,11 +441,13 @@ void AfcManager::initializeDatabases()
 	/**************************************************************************************/
 	//_ulsDataFile = "/home/ssmucny/ULS_23Jan2019_perlink_fixedwithbas.sqlite3";
 
-	if (_analysisType == "PointAnalysis" || _analysisType == "APAnalysis" || _analysisType == "HeatmapAnalysis" || _analysisType == "AP-AFC") {
+	if (_analysisType == "PointAnalysis" || _analysisType == "APAnalysis" || _analysisType == "HeatmapAnalysis" || _analysisType == "AP-AFC" || _analysisType == "ScanAnalysis") {
 		readULSData(_ulsDataFile, _popGrid, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, minLat, maxLat, minLon, maxLon);
 		readRASData(_rasDataFile);
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		fixFSTerrain();
+	} else {
+            throw std::runtime_error(QString("Invalid analysis type: %1").arg(QString::fromStdString(_analysisType)).toStdString());
 	}
 	/**************************************************************************************/
 }
@@ -511,7 +529,9 @@ void AfcManager::clearRASList()
 }
 /******************************************************************************************/
 
-// Start assigning the values from json object into the vars in struct
+/******************************************************************************************/
+/**** FUNCTION: AfcManager::importGUIjson                                              ****/
+/******************************************************************************************/
 void AfcManager::importGUIjson(const std::string &inputJSONpath)
 {
 	// Read input parameters from GUI in JSON file
@@ -523,10 +543,8 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	{
 		jsonDoc = QJsonDocument::fromJson(inFile.readAll());
 		inFile.close();
-	}
-	else
-	{
-		throw std::runtime_error("AfcManager::importGUIjson(): Failed to open JSON file specifying user's input parameters.");
+	} else {
+            throw std::runtime_error("AfcManager::importGUIjson(): Failed to open JSON file specifying user's input parameters.");
 	}
 
 	// Print entirety of imported JSON file to debug log
@@ -540,15 +558,664 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	// Properly set _aciFlag from GUI.  When set to true, ACI is considered in interference calculations, when set to false, there is no ACI.
 	_aciFlag = true;
 
+        if (jsonObj.contains("version") && !jsonObj["version"].isUndefined()) {
+            _guiJsonVersion = jsonObj["version"].toString();
+        } else {
+            _guiJsonVersion = QString("1.0");
+        }
+
+        if (_guiJsonVersion == "1.1") {
+            importGUIjsonVersion1_1(jsonObj);
+        } else if (_guiJsonVersion == "1.0") {
+            importGUIjsonVersion1_0(jsonObj);
+        } else {
+            LOGGER_WARN(logger) <<
+                "VERSION NOT SUPPORTED: GUI JSON FILE \"" << inputJSONpath << "\": version: " << _guiJsonVersion;
+            _responseCode = CConst::versionNotSupportedResponseCode;
+            return;
+        }
+
+        return;
+}
+
+void AfcManager::importGUIjsonVersion1_1(const QJsonObject &jsonObj)
+{
+    QString errMsg;
+
+    if ( (_analysisType == "AP-AFC") || (_analysisType == "ScanAnalysis") ) {
+        QStringList requiredParams;
+        QStringList optionalParams;
+
+        /**********************************************************************/
+        /* AvailableSpectrumInquiryRequestMessage Object (Table 5)            */
+        /**********************************************************************/
+        requiredParams = QStringList() << "availableSpectrumInquiryRequests" << "version";
+        optionalParams = QStringList() << "vendorExtensions";
+        for(auto key : jsonObj.keys()) {
+            int rIdx = requiredParams.indexOf(key);
+            if (rIdx != -1) {
+                requiredParams.erase(requiredParams.begin()+rIdx);
+            } else {
+                int oIdx = optionalParams.indexOf(key);
+                if (oIdx != -1) {
+                    optionalParams.erase(optionalParams.begin()+oIdx);
+                } else {
+                    _unexpectedParams << key;
+                }
+            }
+        }
+        _missingParams << requiredParams;
+
+        QJsonObject requestObj;
+        if (!requiredParams.contains("availableSpectrumInquiryRequests")) {
+            QJsonArray requestArray = jsonObj["availableSpectrumInquiryRequests"].toArray();
+            if (requestArray.size() != 1) {
+                LOGGER_WARN(logger) << "GENERAL FAILURE: afc-engine only processes a single request, "
+                                    << requestArray.size() << " requests specified";
+                _responseCode = CConst::generalFailureResponseCode;
+                return;
+            }
+            requestObj = requestArray.at(0).toObject();
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* AvailableSpectrumInquiryRequest Object (Table 6)                   */
+        /**********************************************************************/
+        requiredParams = QStringList() << "requestId" << "deviceDescriptor" << "location";
+        optionalParams = QStringList() << "inquiredFrequencyRange" << "inquiredChannels" << "minDesiredPower" << "vendorExtensions";
+        for(auto key : requestObj.keys()) {
+            int rIdx = requiredParams.indexOf(key);
+            if (rIdx != -1) {
+                requiredParams.erase(requiredParams.begin()+rIdx);
+            } else {
+                int oIdx = optionalParams.indexOf(key);
+                if (oIdx != -1) {
+                    optionalParams.erase(optionalParams.begin()+oIdx);
+                } else {
+                    _unexpectedParams << key;
+                }
+            }
+        }
+        _missingParams << requiredParams;
+
+        QJsonObject deviceDescriptorObj;
+        if (!requiredParams.contains("deviceDescriptor")) {
+            deviceDescriptorObj = requestObj["deviceDescriptor"].toObject();
+        }
+
+        QJsonObject locationObj;
+        if (!requiredParams.contains("location")) {
+            locationObj = requestObj["location"].toObject();
+        }
+
+        QJsonArray inquiredFrequencyRangeArray;
+        if (!optionalParams.contains("inquiredFrequencyRange")) {
+            inquiredFrequencyRangeArray = requestObj["inquiredFrequencyRange"].toArray();
+        }
+
+        QJsonArray inquiredChannelsArray;
+        if (!optionalParams.contains("inquiredChannels")) {
+            inquiredChannelsArray = requestObj["inquiredChannels"].toArray();
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* DeviceDescriptor Object (Table 7)                                  */
+        /**********************************************************************/
+        requiredParams = QStringList() << "serialNumber" << "certificationId" << "rulesetIds";
+        optionalParams = QStringList();
+        for(auto key : deviceDescriptorObj.keys()) {
+            int rIdx = requiredParams.indexOf(key);
+            if (rIdx != -1) {
+                requiredParams.erase(requiredParams.begin()+rIdx);
+            } else {
+                int oIdx = optionalParams.indexOf(key);
+                if (oIdx != -1) {
+                    optionalParams.erase(optionalParams.begin()+oIdx);
+                } else {
+                    _unexpectedParams << key;
+                }
+            }
+        }
+        _missingParams << requiredParams;
+
+        QJsonArray certificationIdArray;
+        if (!requiredParams.contains("certificationId")) {
+            certificationIdArray = deviceDescriptorObj["certificationId"].toArray();
+        }
+
+        QJsonArray rulesetIdsArray;
+        if (!requiredParams.contains("rulesetIds")) {
+            rulesetIdsArray = deviceDescriptorObj["rulesetIds"].toArray();
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* CertificationID Object (Table 8)                                   */
+        /**********************************************************************/
+        for(auto certificationIDVal : certificationIdArray) {
+            auto certificationIDObj = certificationIDVal.toObject();
+            requiredParams = QStringList() << "nra" << "id";
+            optionalParams = QStringList();
+            for(auto key : certificationIDObj.keys()) {
+                int rIdx = requiredParams.indexOf(key);
+                if (rIdx != -1) {
+                    requiredParams.erase(requiredParams.begin()+rIdx);
+                } else {
+                    int oIdx = optionalParams.indexOf(key);
+                    if (oIdx != -1) {
+                        optionalParams.erase(optionalParams.begin()+oIdx);
+                    } else {
+                        _unexpectedParams << key;
+                    }
+                }
+            }
+            _missingParams << requiredParams;
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* Location Object (Table 9)                                          */
+        /**********************************************************************/
+        requiredParams = QStringList() << "elevation";
+        optionalParams = QStringList() << "ellipse" << "linearPolygon" << "radialPolygon" << "indoorDeployment";
+        for(auto key : locationObj.keys()) {
+            int rIdx = requiredParams.indexOf(key);
+            if (rIdx != -1) {
+                requiredParams.erase(requiredParams.begin()+rIdx);
+            } else {
+                int oIdx = optionalParams.indexOf(key);
+                if (oIdx != -1) {
+                    optionalParams.erase(optionalParams.begin()+oIdx);
+                } else {
+                    _unexpectedParams << key;
+                }
+            }
+        }
+        _missingParams << requiredParams;
+
+        int hasIndoorDeploymentFlag = (optionalParams.contains("indoorDeployment") ? 0 : 1);
+
+        int hasEllipseFlag       = (optionalParams.contains("ellipse")       ? 0 : 1);
+        int hasLinearPolygonFlag = (optionalParams.contains("linearPolygon") ? 0 : 1);
+        int hasRadialPolygonFlag = (optionalParams.contains("radialPolygon") ? 0 : 1);
+
+	int n = hasEllipseFlag + hasLinearPolygonFlag + hasRadialPolygonFlag;
+
+        if (n != 1) {
+            LOGGER_WARN(logger) << "GENERAL FAILURE: location object must contain exactly one instance of ellipse, linearPolygon, or radialPolygon, total of "
+                                << n << " instances found";
+            _responseCode = CConst::generalFailureResponseCode;
+            return;
+        }
+
+        QJsonObject ellipseObj;
+        if (hasEllipseFlag) {
+            ellipseObj = locationObj["ellipse"].toObject();
+        }
+
+        QJsonObject linearPolygonObj;
+        if (hasLinearPolygonFlag) {
+            linearPolygonObj = locationObj["linearPolygon"].toObject();
+        }
+
+        QJsonObject radialPolygonObj;
+        if (hasRadialPolygonFlag) {
+            radialPolygonObj = locationObj["radialPolygon"].toObject();
+        }
+
+        QJsonObject elevationObj;
+        if (!requiredParams.contains("elevation")) {
+            elevationObj = locationObj["elevation"].toObject();
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* Ellipse Object (Table 10)                                          */
+        /**********************************************************************/
+        bool hasCenterFlag = false;
+        QJsonObject centerObj;
+        if (hasEllipseFlag) {
+            requiredParams = QStringList() << "center" << "majorAxis" << "minorAxis" << "orientation";
+            optionalParams = QStringList();
+            for(auto key : ellipseObj.keys()) {
+                int rIdx = requiredParams.indexOf(key);
+                if (rIdx != -1) {
+                    requiredParams.erase(requiredParams.begin()+rIdx);
+                } else {
+                    int oIdx = optionalParams.indexOf(key);
+                    if (oIdx != -1) {
+                        optionalParams.erase(optionalParams.begin()+oIdx);
+                    } else {
+                        _unexpectedParams << key;
+                    }
+                }
+            }
+            _missingParams << requiredParams;
+
+            if (!requiredParams.contains("center")) {
+                centerObj = ellipseObj["center"].toObject();
+                hasCenterFlag = true;
+            }
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* LinearPolygon Object (Table 11)                                    */
+        /**********************************************************************/
+        bool hasOuterBoundaryPointArrayFlag = false;
+        QJsonArray outerBoundaryPointArray;
+        if (hasLinearPolygonFlag) {
+            requiredParams = QStringList() << "outerBoundary";
+            optionalParams = QStringList();
+            for(auto key : linearPolygonObj.keys()) {
+                int rIdx = requiredParams.indexOf(key);
+                if (rIdx != -1) {
+                    requiredParams.erase(requiredParams.begin()+rIdx);
+                } else {
+                    int oIdx = optionalParams.indexOf(key);
+                    if (oIdx != -1) {
+                        optionalParams.erase(optionalParams.begin()+oIdx);
+                    } else {
+                        _unexpectedParams << key;
+                    }
+                }
+            }
+            _missingParams << requiredParams;
+
+            if (!requiredParams.contains("outerBoundary")) {
+                outerBoundaryPointArray = linearPolygonObj["outerBoundary"].toArray();
+                hasOuterBoundaryPointArrayFlag = true;
+            }
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* RadialPolygon Object (Table 12)                                    */
+        /**********************************************************************/
+        bool hasOuterBoundaryVectorArrayFlag = false;
+        QJsonArray outerBoundaryVectorArray;
+        if (hasRadialPolygonFlag) {
+            requiredParams = QStringList() << "center" << "outerBoundary";
+            optionalParams = QStringList();
+            for(auto key : radialPolygonObj.keys()) {
+                int rIdx = requiredParams.indexOf(key);
+                if (rIdx != -1) {
+                    requiredParams.erase(requiredParams.begin()+rIdx);
+                } else {
+                    int oIdx = optionalParams.indexOf(key);
+                    if (oIdx != -1) {
+                        optionalParams.erase(optionalParams.begin()+oIdx);
+                    } else {
+                        _unexpectedParams << key;
+                    }
+                }
+            }
+            _missingParams << requiredParams;
+
+            if (!requiredParams.contains("center")) {
+                centerObj = radialPolygonObj["center"].toObject();
+                hasCenterFlag = true;
+            }
+
+            if (!requiredParams.contains("outerBoundary")) {
+                outerBoundaryVectorArray = radialPolygonObj["outerBoundary"].toArray();
+                hasOuterBoundaryVectorArrayFlag = true;
+            }
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* ElevationPolygon Object (Table 13)                                 */
+        /**********************************************************************/
+        requiredParams = QStringList() << "height" << "heightType" << "verticalUncertainty";
+        optionalParams = QStringList();
+        for(auto key : elevationObj.keys()) {
+            int rIdx = requiredParams.indexOf(key);
+            if (rIdx != -1) {
+                requiredParams.erase(requiredParams.begin()+rIdx);
+            } else {
+                int oIdx = optionalParams.indexOf(key);
+                if (oIdx != -1) {
+                    optionalParams.erase(optionalParams.begin()+oIdx);
+                } else {
+                    _unexpectedParams << key;
+                }
+            }
+        }
+        _missingParams << requiredParams;
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* Point Object (Table 14)                                            */
+        /**********************************************************************/
+        if (hasCenterFlag) {
+            requiredParams = QStringList() << "longitude" << "latitude";
+            optionalParams = QStringList();
+            for(auto key : centerObj.keys()) {
+                int rIdx = requiredParams.indexOf(key);
+                if (rIdx != -1) {
+                    requiredParams.erase(requiredParams.begin()+rIdx);
+                } else {
+                    int oIdx = optionalParams.indexOf(key);
+                    if (oIdx != -1) {
+                        optionalParams.erase(optionalParams.begin()+oIdx);
+                    } else {
+                        _unexpectedParams << key;
+                    }
+                }
+            }
+            _missingParams << requiredParams;
+        }
+
+        if (hasOuterBoundaryPointArrayFlag) {
+            for(auto outerBoundaryPointVal : outerBoundaryPointArray) {
+                auto outerBoundaryPointObj = outerBoundaryPointVal.toObject();
+                requiredParams = QStringList() << "longitude" << "latitude";
+                optionalParams = QStringList();
+                for(auto key : outerBoundaryPointObj.keys()) {
+                    int rIdx = requiredParams.indexOf(key);
+                    if (rIdx != -1) {
+                        requiredParams.erase(requiredParams.begin()+rIdx);
+                    } else {
+                        int oIdx = optionalParams.indexOf(key);
+                        if (oIdx != -1) {
+                            optionalParams.erase(optionalParams.begin()+oIdx);
+                        } else {
+                            _unexpectedParams << key;
+                        }
+                    }
+                }
+                _missingParams << requiredParams;
+            }
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* Vector Object (Table 15)                                           */
+        /**********************************************************************/
+        if (hasOuterBoundaryVectorArrayFlag) {
+            for(auto outerBoundaryVectorVal : outerBoundaryVectorArray) {
+                auto outerBoundaryVectorObj = outerBoundaryVectorVal.toObject();
+                requiredParams = QStringList() << "length" << "angle";
+                optionalParams = QStringList();
+                for(auto key : outerBoundaryVectorObj.keys()) {
+                    int rIdx = requiredParams.indexOf(key);
+                    if (rIdx != -1) {
+                        requiredParams.erase(requiredParams.begin()+rIdx);
+                    } else {
+                        int oIdx = optionalParams.indexOf(key);
+                        if (oIdx != -1) {
+                            optionalParams.erase(optionalParams.begin()+oIdx);
+                        } else {
+                            _unexpectedParams << key;
+                        }
+                    }
+                }
+                _missingParams << requiredParams;
+            }
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* FrequencyRange Object (Table 16)                                   */
+        /**********************************************************************/
+        for(auto inquiredFrequencyRangeVal : inquiredFrequencyRangeArray) {
+            auto inquiredFrequencyRangeObj = inquiredFrequencyRangeVal.toObject();
+            requiredParams = QStringList() << "lowFrequency" << "highFrequency";
+            optionalParams = QStringList();
+            for(auto key : inquiredFrequencyRangeObj.keys()) {
+                int rIdx = requiredParams.indexOf(key);
+                if (rIdx != -1) {
+                    requiredParams.erase(requiredParams.begin()+rIdx);
+                } else {
+                    int oIdx = optionalParams.indexOf(key);
+                    if (oIdx != -1) {
+                        optionalParams.erase(optionalParams.begin()+oIdx);
+                    } else {
+                        _unexpectedParams << key;
+                    }
+                }
+            }
+            _missingParams << requiredParams;
+        }
+        /**********************************************************************/
+
+        /**********************************************************************/
+        /* Channels Object (Table 17)                                         */
+        /**********************************************************************/
+        for(auto inquiredChannelsVal : inquiredChannelsArray) {
+            auto inquiredChannelsObj = inquiredChannelsVal.toObject();
+            requiredParams = QStringList() << "globalOperatingClass";
+            optionalParams = QStringList() << "channelCfi";
+            for(auto key : inquiredChannelsObj.keys()) {
+                int rIdx = requiredParams.indexOf(key);
+                if (rIdx != -1) {
+                    requiredParams.erase(requiredParams.begin()+rIdx);
+                } else {
+                    int oIdx = optionalParams.indexOf(key);
+                    if (oIdx != -1) {
+                        optionalParams.erase(optionalParams.begin()+oIdx);
+                    } else {
+                        _unexpectedParams << key;
+                    }
+                }
+            }
+            _missingParams << requiredParams;
+        }
+        /**********************************************************************/
+
+        if (_missingParams.size()) {
+            _responseCode = CConst::missingParamResponseCode;
+            return;
+        } else if (_unexpectedParams.size()) {
+            _responseCode = CConst::unexpectedParamResponseCode;
+            return;
+        }
+
+        /**********************************************************************/
+        /* Extract values                                                     */
+        /**********************************************************************/
+        _requestId = requestObj["requestId"].toString();
+        _serialNumber = deviceDescriptorObj["serialNumber"].toString();
+
+        if (rulesetIdsArray.size() == 0) {
+            _responseCode = CConst::invalidValueResponseCode;
+            _invalidParams << "rulesetIds";
+            return;
+        }
+        _rulesetId = rulesetIdsArray.at(0).toString();
+
+        if (hasIndoorDeploymentFlag) {
+            int indoorDeploymentVal = locationObj["indoorDeployment"].toInt();
+            switch(indoorDeploymentVal) {
+                case 0:
+                case 2:
+                    _rlanType = RLANType::RLAN_OUTDOOR;
+                    break;
+                case 1:
+                    _rlanType = RLANType::RLAN_INDOOR;
+                    break;
+                default:
+                    _invalidParams << "indoorDeployment";
+            }
+        } else {
+            _rlanType = RLANType::RLAN_OUTDOOR;
+        }
+
+        QString rlanHeightType = elevationObj["heightType"].toString();
+
+        if (rlanHeightType == "AMSL") {
+            _rlanHeightType = CConst::AMSLHeightType;
+        } else if (rlanHeightType == "AGL") {
+            _rlanHeightType = CConst::AGLHeightType;
+        } else {
+            _invalidParams << "heightType";
+        }
+
+        double verticalUncertainty = elevationObj["verticalUncertainty"].toDouble();
+        if (verticalUncertainty < 0.0) {
+            _invalidParams << "verticalUncertainty";
+        }
+        double centerHeight = elevationObj["height"].toDouble();
+
+        if (hasEllipseFlag) {
+            _rlanUncertaintyRegionType = RLANBoundary::ELLIPSE;
+            double centerLatitude = centerObj["latitude"].toDouble();
+            double centerLongitude = centerObj["longitude"].toDouble();
+
+            double minorAxis = ellipseObj["minorAxis"].toDouble();
+            double majorAxis = ellipseObj["majorAxis"].toDouble();
+
+            double orientation = ellipseObj["orientation"].toDouble();
+
+            if ( (centerLatitude < -90.0) || (centerLatitude > 90.0) ) {
+                _invalidParams << "latitude";
+            }
+            if ( (centerLongitude < -180.0) || (centerLongitude > 180.0) ) {
+                _invalidParams << "longitude";
+            }
+
+            if (majorAxis < minorAxis) {
+                _invalidParams << "minorAxis";
+                _invalidParams << "majorAxis";
+            } else {
+                if (minorAxis < 0.0) {
+                    _invalidParams << "minorAxis";
+                }
+                if (majorAxis < 0.0) {
+                    _invalidParams << "majorAxis";
+                }
+            }
+
+            if ( (orientation < 0.0) || (orientation > 180.0) ) {
+                _invalidParams << "orientation";
+            }
+
+            _rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
+            _rlanUncerts_m = std::make_tuple(minorAxis, majorAxis, verticalUncertainty);
+            _rlanOrientation_deg = orientation;
+        } else if (hasLinearPolygonFlag) {
+            _rlanUncertaintyRegionType = RLANBoundary::LINEAR_POLY;
+
+            if ((outerBoundaryPointArray.size() < 3) || (outerBoundaryPointArray.size() > 15)) {
+                _invalidParams << "outerBoundary";
+            }
+
+            for(auto outerBoundaryPointVal : outerBoundaryPointArray) {
+                auto outerBoundaryPointObj = outerBoundaryPointVal.toObject();
+                double latitude = outerBoundaryPointObj["latitude"].toDouble();
+                double longitude = outerBoundaryPointObj["longitude"].toDouble();
+
+                if ( (latitude < -90.0) || (latitude > 90.0) ) {
+                    _invalidParams << "latitude";
+                }
+                if ( (longitude < -180.0) || (longitude > 180.0) ) {
+                    _invalidParams << "longitude";
+                }
+
+                _rlanLinearPolygon.push_back(std::make_pair(latitude, longitude));
+            }
+
+            double centerLongitude;
+            double centerLatitude;
+
+            // Average LON/LAT of vertices
+            double sumLon = 0.0;
+            double sumLat = 0.0;
+            int i;
+            for(i=0; i< (int) _rlanLinearPolygon.size(); i++) {
+                sumLon += _rlanLinearPolygon[i].second;
+                sumLat += _rlanLinearPolygon[i].first;
+            }
+            centerLongitude = sumLon / _rlanLinearPolygon.size();
+            centerLatitude  = sumLat / _rlanLinearPolygon.size();
+
+            _rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
+            _rlanUncerts_m = std::make_tuple(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN(), verticalUncertainty);
+        } else if (hasRadialPolygonFlag) {
+            _rlanUncertaintyRegionType = RLANBoundary::RADIAL_POLY;
+
+            if ((outerBoundaryVectorArray.size() < 3) || (outerBoundaryVectorArray.size() > 15)) {
+                _invalidParams << "outerBoundary";
+            }
+
+            for(auto outerBoundaryVectorVal : outerBoundaryVectorArray) {
+                auto outerBoundaryVectorObj = outerBoundaryVectorVal.toObject();
+                double angle = outerBoundaryVectorObj["angle"].toDouble();
+                double length = outerBoundaryVectorObj["length"].toDouble();
+
+                if (length < 0.0) {
+                    _invalidParams << "length";
+                }
+                if ( (angle < 0.0) || (angle > 360.0) ) {
+                    _invalidParams << "angle";
+                }
+
+                _rlanRadialPolygon.push_back(std::make_pair(angle, length));
+            }
+
+            double centerLatitude = centerObj["latitude"].toDouble();
+            double centerLongitude = centerObj["longitude"].toDouble();
+
+            _rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
+            _rlanUncerts_m = std::make_tuple(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN(), verticalUncertainty);
+        }
+
+        for(auto inquiredChannelsVal : inquiredChannelsArray) {
+            auto inquiredChannelsObj = inquiredChannelsVal.toObject();
+            auto chanClass = std::make_pair<int, std::vector<int>>(inquiredChannelsObj["globalOperatingClass"].toInt(), std::vector<int>());
+            if (inquiredChannelsObj.contains("channelCfi")) {
+                for (const QJsonValue& chanIdx : inquiredChannelsObj["channelCfi"].toArray())
+                    chanClass.second.push_back(chanIdx.toInt());
+            }
+            LOGGER_INFO(logger) 
+            << (chanClass.second.empty() ? "ALL" : std::to_string(chanClass.second.size()))
+            << " channels requested in operating class " 
+            << chanClass.first;
+            // TODO: are we handling the case where they want all?
+
+            _inquiredChannels.push_back(chanClass);
+        }
+        LOGGER_INFO(logger) << inquiredChannelsArray.size() << " operating class(es) requested";
+
+        for(auto inquiredFrequencyRangeVal : inquiredFrequencyRangeArray) {
+            auto inquiredFrequencyRangeObj = inquiredFrequencyRangeVal.toObject();
+            _inquiredFrquencyRangesMHz.push_back(std::make_pair(
+                        inquiredFrequencyRangeObj["lowFrequency"].toInt(), 
+                        inquiredFrequencyRangeObj["highFrequency"].toInt()));
+        }
+        LOGGER_INFO(logger) << inquiredFrequencyRangeArray.size() << " frequency range(s) requested";
+
+        if (inquiredChannelsArray.size() + inquiredFrequencyRangeArray.size() == 0) {
+            LOGGER_WARN(logger) << "GENERAL FAILURE: must specify either inquiredChannels or inquiredFrequencies";
+            _responseCode = CConst::generalFailureResponseCode;
+            return;
+        }
+
+        if (_invalidParams.size()) {
+            _responseCode = CConst::invalidValueResponseCode;
+        }
+    } else {
+        throw std::runtime_error(QString("Invalid analysis type for version 1.1: %1").arg(QString::fromStdString(_analysisType)).toStdString());
+    }
+
+   return;
+}
+
+void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
+{
+
 	if (_analysisType == "AP-AFC")
 	{
-
+		if (jsonObj.contains("requestId") && !jsonObj["ellipse"].isUndefined())
 		_requestId = jsonObj["requestId"].toString();
 		_deviceDesc = jsonObj["deviceDescriptor"].toObject();
 		_serialNumber = _deviceDesc["serialNumber"].toString();
 
 		QJsonObject location = jsonObj["location"].toObject();
-		_rlanHeightType = "AGL";
+		_rlanHeightType = CConst::AGLHeightType;
 		if (location["indoorDeployment"].toInt() ==1){
 			_rlanType =  RLANType::RLAN_INDOOR;
 		}
@@ -556,7 +1223,7 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 			_rlanType = RLANType::RLAN_OUTDOOR;
 		}
 
-		if (location.contains("ellipse") && !jsonObj["ellipse"].isUndefined())
+		if (location.contains("ellipse") && !location["ellipse"].isUndefined())
 		{
 			_rlanUncertaintyRegionType = RLANBoundary::ELLIPSE;
 			QJsonObject ellipse = location["ellipse"].toObject();
@@ -569,7 +1236,7 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 				location["verticalUncertainty"].toDouble());
 			_rlanOrientation_deg = ellipse["orientation"].toDouble();
 		}
-		else if (location.contains("linearPolygon") && !jsonObj["linearPolygon"].isUndefined())
+		else if (location.contains("linearPolygon") && !location["linearPolygon"].isUndefined())
 		{
 			_rlanUncertaintyRegionType = RLANBoundary::LINEAR_POLY;
 			QJsonArray boundary = location["linearPolygon"].toObject()["outerBoundary"].toArray();
@@ -618,7 +1285,7 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 				std::numeric_limits<double>::quiet_NaN(),
 				location["verticalUncertainty"].toDouble());
 		}
-		else if (location.contains("radialPolygon") && !jsonObj["radialPolygon"].isUndefined())
+		else if (location.contains("radialPolygon") && !location["radialPolygon"].isUndefined())
 		{
 			_rlanUncertaintyRegionType = RLANBoundary::RADIAL_POLY;
 			QJsonArray boundary = location["radialPolygon"].toObject()["outerBoundary"].toArray();
@@ -688,9 +1355,6 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 		{
 			throw std::invalid_argument("must specify either inquiredChannels or inquiredFrequencies");
 		}
-
-		createChannelList();
-		
 	}
 	else if (_analysisType == "PointAnalysis" || _analysisType == "APAnalysis")
 	{
@@ -715,7 +1379,15 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 				ellipsePoint["semiMajorAxis"].toDouble(),
 				antenna["heightUncertainty"].toDouble());
 		_rlanOrientation_deg = ellipsePoint["orientation"].toDouble();
-		_rlanHeightType = antenna["heightType"].toString();
+
+		QString rlanHeightType = antenna["heightType"].toString();
+                if (rlanHeightType == "AMSL") {
+                    _rlanHeightType = CConst::AMSLHeightType;
+                } else if (rlanHeightType == "AGL") {
+                    _rlanHeightType = CConst::AGLHeightType;
+                } else {
+		    throw std::runtime_error(QString("Invalid height type: %1").arg(rlanHeightType).toStdString());
+                }
 
 		if (jsonObj["capabilities"].toObject()["indoorOutdoor"].toString() == "Outdoor")
 		{
@@ -758,7 +1430,16 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 		_exclusionZoneRLANChanIdx = 0;//round((centerFreq - _wlanMinFreq) / _exclusionZoneRLANBWHz - 0.5);
 		_exclusionZoneRLANEIRPDBm = jsonObj["EIRP"].toDouble();
 
-		_rlanHeightType = jsonObj["heightType"].toString();
+		QJsonObject antenna = jsonObj["antenna"].toObject();
+		QString rlanHeightType = antenna["heightType"].toString();
+                if (rlanHeightType == "AMSL") {
+                    _rlanHeightType = CConst::AMSLHeightType;
+                } else if (rlanHeightType == "AGL") {
+                    _rlanHeightType = CConst::AGLHeightType;
+                } else {
+		    throw std::runtime_error(QString("Invalid height type: %1").arg(rlanHeightType).toStdString());
+                }
+
 		_rlanLLA = std::make_tuple(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN(), jsonObj["height"].toDouble());
 		_rlanUncerts_m = std::make_tuple(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN(), jsonObj["heightUncertainty"].toDouble());
 		_rlanType = jsonObj["indoorOutdoor"].toString() == "Outdoor" ? RLANType::RLAN_OUTDOOR : RLANType::RLAN_INDOOR;
@@ -842,6 +1523,7 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 		throw std::runtime_error(QString("Invalid analysis type: %1").arg(QString::fromStdString(_analysisType)).toStdString());
 	}
 
+        return;
 }
 
 // Support command line interface with AFC Engine
@@ -937,210 +1619,246 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 
 void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
 {
-	// read json file in
-	QJsonDocument jsonDoc;
-	QFile inFile;
-	QString fName = QString(inputJSONpath.c_str());
-	inFile.setFileName(fName);
-	//inFile.open(inputJSONpath, std::ifstream::in);
-	if (inFile.open(QFile::ReadOnly | QFile::Text))
-	{
-		jsonDoc = QJsonDocument::fromJson(inFile.readAll());
-		inFile.close();
-	}
-	else
-	{
-		throw std::runtime_error("AfcManager::importConfigAFCjson(): Failed to open JSON file specifying configuration parameters.");
-	}
+    QString errMsg;
 
-	// Print raw contents of input JSON file
-	LOGGER_DEBUG(logger) << "Raw contents of input JSON file provided by the GUI: " << jsonDoc.toJson().toStdString();
+    if (_responseCode != CConst::successResponseCode) {
+        return;
+    }
 
-	// Read JSON from file
-	QJsonObject jsonObj = jsonDoc.object();
+    // read json file in
+    QJsonDocument jsonDoc;
+    QFile inFile;
+    QString fName = QString(inputJSONpath.c_str());
+    inFile.setFileName(fName);
+    //inFile.open(inputJSONpath, std::ifstream::in);
+    if (inFile.open(QFile::ReadOnly | QFile::Text)) {
+        jsonDoc = QJsonDocument::fromJson(inFile.readAll());
+        inFile.close();
+    } else {
+        throw std::runtime_error("AfcManager::importConfigAFCjson(): Failed to open JSON file specifying configuration parameters.");
+    }
 
-	// These are created for ease of copying
-	QJsonObject ellipsePoint = jsonObj["location"].toObject()["point"].toObject();
-	QJsonObject antenna = jsonObj["antenna"].toObject();
-	QJsonObject buildingLoss = jsonObj["buildingPenetrationLoss"].toObject();
-	QJsonObject propModel = jsonObj["propagationModel"].toObject();
+    // Print raw contents of input JSON file
+    LOGGER_DEBUG(logger) << "Raw contents of input JSON file provided by the GUI: " << jsonDoc.toJson().toStdString();
 
-	// Input parameters stored in the AfcManager object
-	_regionStr = jsonObj["regionStr"].toString().toStdString();
+    // Read JSON from file
+    QJsonObject jsonObj = jsonDoc.object();
 
-	if (_regionStr == "CONUS") {
-		_regionPolygonFileList = SearchPaths::forReading("data", "fbrat/rat_transfer/population/conus.kml", true).toStdString();
-	} else if (_regionStr == "Canada") {
-		_regionPolygonFileList = SearchPaths::forReading("data", "fbrat/rat_transfer/population/Canada.kml", true).toStdString();
-	} else {
-	throw std::runtime_error("AfcManager::importConfigAFCjson(): Invalid regionStr specified.");
-	}
+    /**********************************************************************/
+    /* Create _allowableFreqBandList                                      */
+    /**********************************************************************/
+    QJsonArray freqBandArray = jsonObj["freqBands"].toArray();
+    for (QJsonValue freqBandVal : freqBandArray) {
+        QJsonObject freqBandObj = freqBandVal.toObject();
+        std::string name = freqBandObj["name"].toString().toStdString();
+        int startFreqMHz = freqBandObj["startFreqMHz"].toInt();
+        int stopFreqMHz = freqBandObj["stopFreqMHz"].toInt();
 
-	// ITM Parameters
-	_itmEpsDielect =  jsonObj["ITMParameters"].toObject()["dielectricConst"].toDouble();
-	_itmSgmConductivity = jsonObj["ITMParameters"].toObject()["conductivity"].toDouble();
-	_itmPolarization = jsonObj["ITMParameters"].toObject()["polarization"].toString().toStdString() == "Vertical";
+        if (stopFreqMHz <= startFreqMHz) {
+            errMsg = QString("ERROR: Freq Band %1 Invalid, startFreqMHz = %2, stopFreqMHz = %3.  Require startFreqMHz < stopFreqMHz")
+                     .arg(QString::fromStdString(name)).arg(startFreqMHz).arg(stopFreqMHz);
+            throw std::runtime_error(errMsg.toStdString());
+        } else if ((stopFreqMHz <= _wlanMinFreqMHz) || (startFreqMHz >= _wlanMaxFreqMHz)) {
+            errMsg = QString("ERROR: Freq Band %1 Invalid, startFreqMHz = %2, stopFreqMHz = %3.  Has no overlap with band [%4,%5].")
+                     .arg(QString::fromStdString(name)).arg(startFreqMHz).arg(stopFreqMHz).arg(_wlanMinFreqMHz).arg(_wlanMaxFreqMHz);
+            throw std::runtime_error(errMsg.toStdString());
+        }
 
-	// ***********************************
-	// More ITM parameters 
-	// ***********************************
-	_itmMinSpacing = jsonObj["ITMParameters"].toObject()["minSpacing"].toDouble();
-	_itmMaxNumPts = jsonObj["ITMParameters"].toObject()["maxPoints"].toInt();
-	// ***********************************
+        _allowableFreqBandList.push_back(FreqBandClass(name, startFreqMHz, stopFreqMHz));
+    }
+    if (!_allowableFreqBandList.size()) {
+        throw std::runtime_error("AfcManager::importConfigAFCjson(): ERROR: no allowable frequency bands defined.");
+    }
+    /**********************************************************************/
 
-	// AP uncertainty scanning resolution
-	_scanres_xy = jsonObj["APUncertainty"].toObject()["horizontal"].toDouble();
-	_scanres_ht = jsonObj["APUncertainty"].toObject()["height"].toDouble();
-	_ulsDataFile = _stateRoot + "/ULS_Database/" + jsonObj["ulsDatabase"].toString().toStdString();
+    // These are created for ease of copying
+    QJsonObject antenna = jsonObj["antenna"].toObject();
+    QJsonObject buildingLoss = jsonObj["buildingPenetrationLoss"].toObject();
+    QJsonObject propModel = jsonObj["propagationModel"].toObject();
 
-	_inputULSDatabaseStr = jsonObj["ulsDatabase"].toString();
-	_rasDataFile = _stateRoot + "/RAS_Database/" + jsonObj["rasDatabase"].toString().toStdString();
-	
-	if (std::isnan(_minEIRP_dBm)) // only use config min eirp if not specified in request object
-		_minEIRP_dBm = jsonObj["minEIRP"].toDouble();
-	_maxEIRP_dBm = jsonObj["maxEIRP"].toDouble();
-	_IoverN_threshold_dB = jsonObj["threshold"].toDouble();
-	_maxRadius = jsonObj["maxLinkDistance"].toDouble() * 1000.0; // convert from km to m
-	_bodyLossIndoorDB = jsonObj["bodyLoss"].toObject()["valueIndoor"].toDouble();
-	_bodyLossOutdoorDB = jsonObj["bodyLoss"].toObject()["valueOutdoor"].toDouble();
-	_polarizationLossDB = jsonObj["polarizationMismatchLoss"].toObject()["value"].toDouble();
-	_buildingLossModel = (buildingLoss["kind"]).toString();
-	_propagationEnviro = jsonObj["propagationEnv"].toString();
+    // Input parameters stored in the AfcManager object
+    _regionStr = jsonObj["regionStr"].toString().toStdString();
 
-	// ***********************************
-	// Feeder loss parameters 
-	// ***********************************
-	_rxFeederLossDBUNII5 = jsonObj["receiverFeederLoss"].toObject()["UNII5"].toDouble();
-	_rxFeederLossDBUNII7 = jsonObj["receiverFeederLoss"].toObject()["UNII7"].toDouble();
-	_rxFeederLossDBOther = jsonObj["receiverFeederLoss"].toObject()["other"].toDouble();
-	// ***********************************
+    if (_regionStr == "CONUS") {
+        _regionPolygonFileList = SearchPaths::forReading("data", "fbrat/rat_transfer/population/conus.kml", true).toStdString();
+    } else if (_regionStr == "Canada") {
+        _regionPolygonFileList = SearchPaths::forReading("data", "fbrat/rat_transfer/population/Canada.kml", true).toStdString();
+    } else {
+        throw std::runtime_error("AfcManager::importConfigAFCjson(): Invalid regionStr specified.");
+    }
 
-	// ***********************************
-	// Noise Figure parameters 
-	// ***********************************
-	auto ulsRecieverNoise = jsonObj["fsReceiverNoise"].toObject();
+    // ITM Parameters
+    _itmEpsDielect =  jsonObj["ITMParameters"].toObject()["dielectricConst"].toDouble();
+    _itmSgmConductivity = jsonObj["ITMParameters"].toObject()["conductivity"].toDouble();
+    _itmPolarization = jsonObj["ITMParameters"].toObject()["polarization"].toString().toStdString() == "Vertical";
 
-	_ulsNoiseFigureDBUNII5 = noiseFloorToNoiseFigure(ulsRecieverNoise["UNII5"].toDouble());
-	_ulsNoiseFigureDBUNII7 = noiseFloorToNoiseFigure(ulsRecieverNoise["UNII7"].toDouble());
-	_ulsNoiseFigureDBOther = noiseFloorToNoiseFigure(ulsRecieverNoise["other"].toDouble());
-	// ***********************************
+    // ***********************************
+    // More ITM parameters 
+    // ***********************************
+    _itmMinSpacing = jsonObj["ITMParameters"].toObject()["minSpacing"].toDouble();
+    _itmMaxNumPts = jsonObj["ITMParameters"].toObject()["maxPoints"].toInt();
+    // ***********************************
 
-	// ***********************************
-	// apply clutter bool
-	// ***********************************
-	_applyClutterFSRxFlag = jsonObj["clutterAtFS"].toBool();
-	// ***********************************
+    // AP uncertainty scanning resolution
+    _scanres_xy = jsonObj["APUncertainty"].toObject()["horizontal"].toDouble();
+    _scanres_ht = jsonObj["APUncertainty"].toObject()["height"].toDouble();
+    _ulsDataFile = _stateRoot + "/ULS_Database/" + jsonObj["ulsDatabase"].toString().toStdString();
 
-	_antennaPattern = jsonObj["antennaPattern"].toObject()["kind"].toString();
+    _inputULSDatabaseStr = jsonObj["ulsDatabase"].toString();
+    _rasDataFile = _stateRoot + "/RAS_Database/" + jsonObj["rasDatabase"].toString().toStdString();
 
-	if (_antennaPattern == "User Upload") {
-		//_ulsAntennaPatternFile = SearchPaths::forReading("data", "fbrat/AntennaPatterns/" + jsonObj["antennaPattern"].toObject()["value"].toString(), true).toStdString();
-		_ulsAntennaPatternFile = QDir(QString::fromStdString(_stateRoot))
-			.absoluteFilePath(QString::fromStdString("/AntennaPatterns/") + jsonObj["antennaPattern"].toObject()["value"].toString())
-			.toStdString();
-		LOGGER_INFO(logger) << "Antenna pattern file set to: " << _ulsAntennaPatternFile;
-	} else {
-		_ulsAntennaPatternFile = "";
-	}
+    if (std::isnan(_minEIRP_dBm)) { // only use config min eirp if not specified in request object
+        _minEIRP_dBm = jsonObj["minEIRP"].toDouble();
+    }
+    _maxEIRP_dBm = jsonObj["maxEIRP"].toDouble();
+    _IoverN_threshold_dB = jsonObj["threshold"].toDouble();
+    _maxRadius = jsonObj["maxLinkDistance"].toDouble() * 1000.0; // convert from km to m
+    _bodyLossIndoorDB = jsonObj["bodyLoss"].toObject()["valueIndoor"].toDouble();
+    _bodyLossOutdoorDB = jsonObj["bodyLoss"].toObject()["valueOutdoor"].toDouble();
+    _polarizationLossDB = jsonObj["polarizationMismatchLoss"].toObject()["value"].toDouble();
+    _buildingLossModel = (buildingLoss["kind"]).toString();
+    _propagationEnviro = jsonObj["propagationEnv"].toString();
 
-	if (_rlanType == RLANType::RLAN_INDOOR) {
-		// Check what the building penetration type is (right ehre it is ITU-R P.2109)
-		if (buildingLoss["kind"].toString() == "ITU-R Rec. P.2109") {
-			_fixedBuildingLossFlag = false;
+    // ***********************************
+    // Feeder loss parameters 
+    // ***********************************
+    _rxFeederLossDBUNII5 = jsonObj["receiverFeederLoss"].toObject()["UNII5"].toDouble();
+    _rxFeederLossDBUNII7 = jsonObj["receiverFeederLoss"].toObject()["UNII7"].toDouble();
+    _rxFeederLossDBOther = jsonObj["receiverFeederLoss"].toObject()["other"].toDouble();
+    // ***********************************
 
-			if (buildingLoss["buildingType"].toString() == "Traditional") {
-				_buildingType = CConst::traditionalBuildingType;
-			} else if (buildingLoss["buildingType"].toString() == "Efficient") {
-				_buildingType = CConst::thermallyEfficientBuildingType;
-			}
-			_confidenceBldg2109 = buildingLoss["confidence"].toDouble() / 100.0;
+    // ***********************************
+    // Noise Figure parameters 
+    // ***********************************
+    auto ulsRecieverNoise = jsonObj["fsReceiverNoise"].toObject();
 
-			// User uses a fixed value for building loss
-		} else if (buildingLoss["kind"].toString() == "Fixed Value") {
-			_fixedBuildingLossFlag = true;
-			_fixedBuildingLossValue = buildingLoss["value"].toDouble();
-		} else {
-			throw std::runtime_error("ERROR: Invalid buildingLoss[\"kind\"]");
-		}
-		_bodyLossDB = _bodyLossIndoorDB;
-	} else {
-		_buildingType = CConst::noBuildingType;
-		_confidenceBldg2109 = 0.0;
-		_fixedBuildingLossFlag = false;
-		_fixedBuildingLossValue = 0.0;
-		_bodyLossDB = _bodyLossOutdoorDB;
-	}
+    _ulsNoiseFigureDBUNII5 = noiseFloorToNoiseFigure(ulsRecieverNoise["UNII5"].toDouble());
+    _ulsNoiseFigureDBUNII7 = noiseFloorToNoiseFigure(ulsRecieverNoise["UNII7"].toDouble());
+    _ulsNoiseFigureDBOther = noiseFloorToNoiseFigure(ulsRecieverNoise["other"].toDouble());
+    // ***********************************
 
-	// **** Determine which propagation model to use ****
-    _winner2CombineFlag = false;
+    // ***********************************
+    // apply clutter bool
+    // ***********************************
+    _applyClutterFSRxFlag = jsonObj["clutterAtFS"].toBool();
+
+    if (jsonObj.contains("clutterAtRLAN") && !jsonObj["clutterAtRLAN"].isUndefined()) {
+        _applyClutterRLANTxFlag= jsonObj["clutterAtRLAN"].toBool();
+    }
+    // ***********************************
+
+    _antennaPattern = jsonObj["antennaPattern"].toObject()["kind"].toString();
+
+    if (_antennaPattern == "User Upload") {
+        //_ulsAntennaPatternFile = SearchPaths::forReading("data", "fbrat/AntennaPatterns/" + jsonObj["antennaPattern"].toObject()["value"].toString(), true).toStdString();
+        _ulsAntennaPatternFile = QDir(QString::fromStdString(_stateRoot))
+            .absoluteFilePath(QString::fromStdString("/AntennaPatterns/") + jsonObj["antennaPattern"].toObject()["value"].toString())
+            .toStdString();
+        LOGGER_INFO(logger) << "Antenna pattern file set to: " << _ulsAntennaPatternFile;
+    } else {
+        _ulsAntennaPatternFile = "";
+    }
+
+    if (_rlanType == RLANType::RLAN_INDOOR) {
+        // Check what the building penetration type is (right ehre it is ITU-R P.2109)
+        if (buildingLoss["kind"].toString() == "ITU-R Rec. P.2109") {
+            _fixedBuildingLossFlag = false;
+
+            if (buildingLoss["buildingType"].toString() == "Traditional") {
+                _buildingType = CConst::traditionalBuildingType;
+            } else if (buildingLoss["buildingType"].toString() == "Efficient") {
+                _buildingType = CConst::thermallyEfficientBuildingType;
+            }
+            _confidenceBldg2109 = buildingLoss["confidence"].toDouble() / 100.0;
+
+            // User uses a fixed value for building loss
+        } else if (buildingLoss["kind"].toString() == "Fixed Value") {
+            _fixedBuildingLossFlag = true;
+            _fixedBuildingLossValue = buildingLoss["value"].toDouble();
+        } else {
+            throw std::runtime_error("ERROR: Invalid buildingLoss[\"kind\"]");
+        }
+        _bodyLossDB = _bodyLossIndoorDB;
+    } else {
+        _buildingType = CConst::noBuildingType;
+        _confidenceBldg2109 = 0.0;
+        _fixedBuildingLossFlag = false;
+        _fixedBuildingLossValue = 0.0;
+        _bodyLossDB = _bodyLossOutdoorDB;
+    }
+
+    /**************************************************************************************/
+    /* Path Loss Model Parmeters                                                       ****/
+    /**************************************************************************************/
     _pathLossClampFSPL = false;
 
-	// FSPL
-	if (propModel["kind"].toString() == "FSPL")
-	{
-		_pathLossModelStr = "FSPL";
-                _winner2BldgLOSFlag = false;
-	}
+    // Set pathLossModel
+    int validFlag;
+    _pathLossModel = (CConst::PathLossModelEnum)CConst::strPathLossModelList->str_to_type(propModel["kind"].toString().toStdString(), validFlag, 0);
+    if (!validFlag) {
+        throw std::runtime_error("ERROR: Invalid propagationModel[\"kind\"]");
+    }
 
-	// No buildings, Winner II, ITM, P.456 Clutter
-	else if (propModel["kind"].toString() == "ITM with no building data")
-	{
-		// GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
-		_winner2ProbLOSThr = propModel["win2ProbLosThreshold"].toDouble()/100.0;
-		_confidenceWinner2 = propModel["win2Confidence"].toDouble()/100.0;
-		_confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
-		_confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
-		
-		_use3DEP = propModel["terrainSource"].toString() == "3DEP (30m)";
+    switch(_pathLossModel) {
+        case CConst::unknownPathLossModel:
+            throw std::runtime_error("ERROR: Invalid propagationModel[\"kind\"]");
+            break;
+        case CConst::FSPLPathLossModel:
+            // FSPL
+            break;
+        case CConst::ITMBldgPathLossModel:
+	    // ITM model using Building data as terrain
+            // GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
+            _winner2ProbLOSThr = propModel["win2ProbLosThreshold"].toDouble()/100.0;
+            _confidenceWinner2 = propModel["win2Confidence"].toDouble()/100.0;
+            _confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
+            _confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
+            _useBDesignFlag = propModel["buildingSource"].toString() == "B-Design3D";
+            _useLiDAR = propModel["buildingSource"].toString() == "LiDAR";
+            _use3DEP = true;
+            _winner2LOSOption = CConst::UnknownWinner2LOSOption;
+            _winner2UnknownLOSMethod = CConst::PLOSThresholdWinner2UnknownLOSMethod;
+            break;
+        case CConst::CoalitionOpt6PathLossModel:
+            // No buildings, Winner II, ITM, P.456 Clutter
+            // GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
+            _winner2ProbLOSThr = propModel["win2ProbLosThreshold"].toDouble()/100.0;
+            _confidenceWinner2 = propModel["win2Confidence"].toDouble()/100.0;
+            _confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
+            _confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
 
-		_pathLossModelStr = "COALITION_OPT_6";
-                _winner2BldgLOSFlag = false;
-	}
+            _use3DEP = propModel["terrainSource"].toString() == "3DEP (30m)";
 
-	// FCC_6GHZ_REPORT_AND_ORDER path loss model
-	else if (propModel["kind"].toString() == "FCC 6GHz Report & Order")
-	{
-		// GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
-		_winner2ProbLOSThr = std::numeric_limits<double>::quiet_NaN();
-		_confidenceWinner2 = propModel["win2Confidence"].toDouble()/100.0;
-		_confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
-		_confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
+            _winner2LOSOption = CConst::UnknownWinner2LOSOption;
+            _winner2UnknownLOSMethod = CConst::PLOSThresholdWinner2UnknownLOSMethod;
+            break;
+        case CConst::FCC6GHzReportAndOrderPathLossModel:
+            // FCC_6GHZ_REPORT_AND_ORDER path loss model
+            // GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
+            _winner2ProbLOSThr = std::numeric_limits<double>::quiet_NaN();
+            _confidenceWinner2 = propModel["win2Confidence"].toDouble()/100.0;
+            _confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
+            _confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
 
-		_useBDesignFlag = propModel["buildingSource"].toString() == "B-Design3D";
-		_useLiDAR = propModel["buildingSource"].toString() == "LiDAR";
-		// for now, we always use 3DEP for FCC 6Ghz
-		_use3DEP = true;//propModel["terrainSource"].toString() == "3DEP (30m)";
+            _useBDesignFlag = propModel["buildingSource"].toString() == "B-Design3D";
+            _useLiDAR = propModel["buildingSource"].toString() == "LiDAR";
+            // for now, we always use 3DEP for FCC 6Ghz
+            _use3DEP = true;//propModel["terrainSource"].toString() == "3DEP (30m)";
 
-		_pathLossModelStr = "FCC_6GHZ_REPORT_AND_ORDER";
-        _winner2CombineFlag = true;
-        _pathLossClampFSPL = true;
-        _winner2BldgLOSFlag = (_useBDesignFlag || _useLiDAR);
-	}
+            _winner2LOSOption = ((_useBDesignFlag || _useLiDAR) ? CConst::BldgDataWinner2LOSOption : CConst::UnknownWinner2LOSOption);
+            _winner2UnknownLOSMethod = CConst::PLOSCombineWinner2UnknownLOSMethod;
 
-	// Buildings involved in analysis
-	else if (propModel["kind"].toString() == "ITM with building data")
-	{
-		// GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
-		_winner2ProbLOSThr = propModel["win2ProbLosThreshold"].toDouble()/100.0;
-		_confidenceWinner2 = propModel["win2Confidence"].toDouble()/100.0;
-		_confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
-		_confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
-		_useBDesignFlag = propModel["buildingSource"].toString() == "B-Design3D";
-		_useLiDAR = propModel["buildingSource"].toString() == "LiDAR";
-		_use3DEP = true;
-		_pathLossModelStr = "ITM_BLDG";
-                _winner2BldgLOSFlag = false;
-	}
+            _pathLossClampFSPL = true;
+            break;
+        default:
+            CORE_DUMP;
+            break;
+    }
 
-	// Ray tracing
-	else if (propModel["kind"].toString() == "Ray Tracing")
-	{
-		throw std::invalid_argument("AfcManager::importConfigAFCjson(): This propagation model (" + propModel["kind"].toString().toStdString() + ") is not supported");
-	}
-	else
-	{
-		throw std::invalid_argument("AfcManager::importConfigAFCjson(): This propagation model (" + propModel["kind"].toString().toStdString() + ") is not supported");
-	}
+    if (propModel.contains("winner2LOSOption") && !propModel["winner2LOSOption"].isUndefined()) {
+        _winner2LOSOption = (CConst::Winner2LOSOptionEnum)CConst::strWinner2LOSOptionList->str_to_type(propModel["winner2LOSOption"].toString().toStdString(), validFlag, 1);
+    }
+    
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -1154,7 +1872,7 @@ QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
 void AfcManager::addBuildingDatabaseTiles(OGRLayer *layer)
 {
 	// add building database raster boundary if loaded
-	if (_pathLossModelStr == "ITM_BLDG")
+	if (_pathLossModel == CConst::ITMBldgPathLossModel)
 	{
 		LOGGER_DEBUG(logger) << "adding raster bounds";
 		for (QRectF b : _terrainDataModel->getBounds())
@@ -1206,113 +1924,139 @@ void AfcManager::addBuildingDatabaseTiles(OGRLayer *layer)
 
 QJsonDocument AfcManager::generateRatAfcJson()
 {
-	std::vector<psdFreqRangeClass> psdFreqRangeList;
-	computeInquiredFreqRangesPSD(psdFreqRangeList);
+    std::vector<psdFreqRangeClass> psdFreqRangeList;
+    computeInquiredFreqRangesPSD(psdFreqRangeList);
 
-	// compute availableSpectrumInfo
-	QJsonArray spectrumInfos = QJsonArray();
-	for (auto freqRange : psdFreqRangeList)
-	{
-		for (int i = 0; i < (int) freqRange.psd_dBm_MHzList.size(); i++)
-		{
-			spectrumInfos.append(QJsonObject 
-			{
-				{ "frequencyRange", QJsonObject
-					{
-						{ "lowFrequency", freqRange.freqMHzList.at(i) },
-						{ "highFrequency", freqRange.freqMHzList.at(i+1) }
-					}
-				},
-				{ "maxPSD", freqRange.psd_dBm_MHzList.at(i) }
-			});
-		}
-	}
+    // compute availableSpectrumInfo
+    QJsonArray spectrumInfos = QJsonArray();
+    for (auto freqRange : psdFreqRangeList) {
+        for (int i = 0; i < (int) freqRange.psd_dBm_MHzList.size(); i++) {
+            if ( !std::isnan(freqRange.psd_dBm_MHzList.at(i)) ) {
+                spectrumInfos.append(QJsonObject 
+                {
+                    { "frequencyRange", QJsonObject
+                        {
+                            { "lowFrequency", freqRange.freqMHzList.at(i) },
+                            { "highFrequency", freqRange.freqMHzList.at(i+1) }
+                        }
+                    },
+                    { "maxPSD", freqRange.psd_dBm_MHzList.at(i) }
+                });
+            }
+        }
+    }
 
-	QJsonArray channelInfos = QJsonArray();
-	for (const auto &group : _inquiredChannels)
-	{
-		auto operatingClass = group.first;
-		auto indexArray = QJsonArray();
-		auto eirpArray = QJsonArray();
+    QJsonArray channelInfos = QJsonArray();
+    if (_responseCode == CConst::successResponseCode) {
+        for (const auto &group : _inquiredChannels) {
+            auto operatingClass = group.first;
+            auto indexArray = QJsonArray();
+            auto eirpArray = QJsonArray();
 
-		for (const auto &chan : _channelList)
-		{
-			if (chan.type == ChannelType::INQUIRED_CHANNEL && chan.operatingClass == operatingClass)
-			{
-				indexArray.append(chan.index);
-				eirpArray.append(chan.eirpLimit_dBm);
-			}
-		}
+            for (const auto &chan : _channelList) {
+                if (    (chan.type == ChannelType::INQUIRED_CHANNEL)
+                     && (chan.operatingClass == operatingClass)
+                     && (chan.availability != BLACK)
+                   ) {
+                    indexArray.append(chan.index);
+                    eirpArray.append(chan.eirpLimit_dBm);
+                }
+            }
 
-		auto channelGroup = QJsonObject
-		{
-			{ "globalOperatingClass", QJsonValue(operatingClass) },
-			{ "channelCfi", indexArray },
-			{ "maxEirp", eirpArray }
-		};
-		channelInfos.append(channelGroup);
-	}
-	
-	// for (auto chan : _channelList)
-	// {
-	// 	if (chan.type == ChannelType::INQUIRED_CHANNEL)
-	// 	{
-	// 		if (channelInfos.size() == 0)
-	// 		{
-	// 			channelInfos.push_back(QJsonObject
-	// 			{
-	// 				{ "globalOperatingClass", chan.operatingClass },
-	// 				{ "channelCfi", QJsonArray { chan.index } },
-	// 				{ "maxEirp", QJsonArray { chan.eirpLimit_dBm } }
-	// 			});
-	// 			continue;
-	// 		}
-	// 		for (int infoIdx = 0; infoIdx < channelInfos.size(); infoIdx++)
-	// 		{
-	// 			QJsonObject chanClass = channelInfos[infoIdx].toObject();
-	// 			if (chan.operatingClass == chanClass["globalOperatingClass"].toInt())
-	// 			{
-	// 				auto indexArray = chanClass["channelCfi"].toArray();
-	// 				auto eirpArray = chanClass["maxEirp"].toArray();
-	// 				indexArray.push_back(QJsonValue(chan.index));
-	// 				eirpArray.push_back(QJsonValue(chan.eirpLimit_dBm));
-	// 				chanClass["channelCfi"] = indexArray;
-	// 				chanClass["maxEirp"] = eirpArray;
-	// 				continue;
-	// 			}
-	// 			channelInfos.push_back(QJsonObject
-	// 			{
-	// 				{ "globalOperatingClass", chan.operatingClass },
-	// 				{ "channelCfi", QJsonArray { chan.index } },
-	// 				{ "maxEirp", QJsonArray { chan.eirpLimit_dBm } }
-	// 			});
-	// 		}
-	// 	}
-	// }
+            auto channelGroup = QJsonObject
+            {
+                { "globalOperatingClass", QJsonValue(operatingClass) },
+                { "channelCfi", indexArray },
+                { "maxEirp", eirpArray }
+            };
+            channelInfos.append(channelGroup);
+        }
+    }
 
-	QJsonObject responses { 
-		{ "version", "0.6" },
-		{ "availableSpectrumInquiryResponses", 
-			QJsonArray 
-			{
-				QJsonObject 
-				{
-					{ "requestId", _requestId },
-					{ "availableChannelInfo", channelInfos },
-					{ "availableSpectrumInfo", spectrumInfos }, 
-					{ "availabilityExpireTime", ISO8601TimeUTC(1) },
-					{ "response", QJsonObject
-						{
-							{ "responseCode", 0 },
-							{ "shortDescription", "success" }
-						} 
-					}
-				}
-			}
-		}
-	};
+    std::string shortDescription;
 
-	return QJsonDocument(responses);
+    switch(_responseCode) {
+        case      CConst::generalFailureResponseCode: shortDescription = "General Failure";       break;
+        case             CConst::successResponseCode: shortDescription = "Success";               break;
+        case CConst::versionNotSupportedResponseCode: shortDescription = "Version Not Supported"; break;
+        case    CConst::deviceDisallowedResponseCode: shortDescription = "Device Disallowed";     break;
+        case        CConst::missingParamResponseCode: shortDescription = "Missing Param";         break;
+        case        CConst::invalidValueResponseCode: shortDescription = "Invalid Value";         break;
+        case     CConst::unexpectedParamResponseCode: shortDescription = "Unexpected Param";      break;
+        case CConst::unsupportedSpectrumResponseCode: shortDescription = "Unsupported Spectrum";  break;
+
+        default: CORE_DUMP; break;
+    }
+
+    bool hasSupplementalInfoFlag = false;
+    if (_responseCode == CConst::missingParamResponseCode) {
+        hasSupplementalInfoFlag = true;
+    } else if (_responseCode == CConst::invalidValueResponseCode) {
+        hasSupplementalInfoFlag = true;
+    } else if (_responseCode == CConst::unexpectedParamResponseCode) {
+        hasSupplementalInfoFlag = true;
+    }
+
+    QJsonObject responseObj;
+    responseObj.insert("responseCode", _responseCode);
+    responseObj.insert("shortDescription", shortDescription.c_str());
+
+    if (hasSupplementalInfoFlag) {
+        QJsonObject paramObj;
+        QJsonArray paramsArray;
+
+        if (_missingParams.size()) {
+            paramsArray = QJsonArray();
+            for(auto param : _missingParams) {
+                paramsArray.append(param);
+            }
+            paramObj.insert("missingParams", paramsArray);
+        }
+
+        if (_invalidParams.size()) {
+            paramsArray = QJsonArray();
+            for(auto param : _invalidParams) {
+                paramsArray.append(param);
+            }
+            paramObj.insert("invalidParams", paramsArray);
+        }
+
+        if (_unexpectedParams.size()) {
+            paramsArray = QJsonArray();
+            for(auto param : _unexpectedParams) {
+                paramsArray.append(param);
+            }
+            paramObj.insert("unexpectedParams", paramsArray);
+        }
+
+        responseObj.insert("supplementalInfo", paramObj);
+    }
+
+    QJsonObject availableSpectrumInquiryResponse;
+    availableSpectrumInquiryResponse.insert("requestId", _requestId);
+    availableSpectrumInquiryResponse.insert("rulesetId", _rulesetId);
+    if (channelInfos.size()) {
+        availableSpectrumInquiryResponse.insert("availableChannelInfo", channelInfos);
+    }
+    if (spectrumInfos.size()) {
+        availableSpectrumInquiryResponse.insert("availableFrequencyInfo", spectrumInfos); 
+    }
+    if (_responseCode == CConst::successResponseCode) {
+        availableSpectrumInquiryResponse.insert("availabilityExpireTime", ISO8601TimeUTC(1));
+    }
+    availableSpectrumInquiryResponse.insert("response", responseObj);
+
+    QJsonObject responses { 
+        { "version", _guiJsonVersion },
+        { "availableSpectrumInquiryResponses", 
+            QJsonArray 
+	    {
+                availableSpectrumInquiryResponse
+            }
+        }
+    };
+
+    return QJsonDocument(responses);
 }
 
 QJsonDocument AfcManager::generateExclusionZoneJson()
@@ -1625,6 +2369,10 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath)
 	else if (_analysisType == "HeatmapAnalysis")
 	{
 		outputDocument = generateHeatmap();
+	}
+	else if (_analysisType == "ScanAnalysis")
+	{
+		outputDocument = QJsonDocument();
 	}
 	else
 	{
@@ -4227,7 +4975,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				{
 
                                     int winner2LOSValue = 0; // 1: Force LOS, 2: Force NLOS, 0: Compute probLOS, then select or combine.
-                                    if (_winner2BldgLOSFlag) {
+                                    if (_winner2LOSOption == CConst::BldgDataWinner2LOSOption) {
 			                double terrainHeight;
 			                double bldgHeight;
 			                MultibandRasterClass::HeightResult lidarHeightResult;
@@ -4243,6 +4991,10 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
                                                                                         distKm, numPts, heightProfilePtr);
                                             winner2LOSValue = (losFlag ? 1 : 2);
                                         }
+                                    } else if (_winner2LOSOption == CConst::ForceLOSWinner2LOSOption) {
+                                        winner2LOSValue = 1;
+                                    } else if (_winner2LOSOption == CConst::ForceNLOSWinner2LOSOption) {
+                                        winner2LOSValue = 2;
                                     }
 
 
@@ -4348,7 +5100,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				if (_closeInPathLossModel == "WINNER2")
 				{
                                     int winner2LOSValue = 0; // 1: Force LOS, 2: Force NLOS, 0: Compute probLOS, then select or combine.
-                                    if (_winner2BldgLOSFlag) {
+                                    if (_winner2LOSOption == CConst::BldgDataWinner2LOSOption) {
 			                double terrainHeight;
 			                double bldgHeight;
 			                MultibandRasterClass::HeightResult lidarHeightResult;
@@ -4364,6 +5116,10 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
                                                                                         distKm, numPts, heightProfilePtr);
                                             winner2LOSValue = (losFlag ? 1 : 2);
                                         }
+                                    } else if (_winner2LOSOption == CConst::ForceLOSWinner2LOSOption) {
+                                        winner2LOSValue = 1;
+                                    } else if (_winner2LOSOption == CConst::ForceNLOSWinner2LOSOption) {
+                                        winner2LOSValue = 2;
                                     }
 
                                         double sigma;
@@ -4481,7 +5237,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 		}
 		else
 		{
-			throw std::runtime_error(ErrStream() << "ERROR reading ULS data: propEnv = " << propEnv << " INVALID value");
+			throw std::runtime_error(ErrStream() << "ERROR: propEnv = " << propEnv << " INVALID value");
 		}
 #endif
 	}
@@ -4497,13 +5253,9 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
                 pathClutterTxDB = 0.0;
                 pathClutterTxModelStr = "NONE";
                 pathClutterTxCDF = 0.5;
-
-                pathClutterRxDB = 0.0;
-                pathClutterRxModelStr = "NONE";
-                pathClutterRxCDF = 0.5;
             } else if (distKm * 1000 < _closeInDist) {
                 int winner2LOSValue = 0; // 1: Force LOS, 2: Force NLOS, 0: Compute probLOS, then select or combine.
-                if (_winner2BldgLOSFlag) {
+                if (_winner2LOSOption == CConst::BldgDataWinner2LOSOption) {
                     double terrainHeight;
                     double bldgHeight;
                     MultibandRasterClass::HeightResult lidarHeightResult;
@@ -4519,6 +5271,10 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
                                                                      distKm, numPts, heightProfilePtr);
                         winner2LOSValue = (losFlag ? 1 : 2);
                     }
+                } else if (_winner2LOSOption == CConst::ForceLOSWinner2LOSOption) {
+                    winner2LOSValue = 1;
+                } else if (_winner2LOSOption == CConst::ForceNLOSWinner2LOSOption) {
+                    winner2LOSValue = 2;
                 }
 
                 double sigma;
@@ -4531,14 +5287,12 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
                 } else if ( (propEnv == CConst::ruralPropEnv) || (propEnv == CConst::barrenPropEnv) ) {
                     // Winner2 D1: rural
                     pathLoss = Winner2_D1rural(1000*distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, winner2LOSValue);
+		} else {
+                    throw std::runtime_error(ErrStream() << "ERROR: propEnv = " << propEnv << " INVALID value");
                 }
                 pathClutterTxModelStr = "NONE";
                 pathClutterTxDB = 0.0;
                 pathClutterTxCDF = 0.5;
-
-                pathClutterRxModelStr = "NONE";
-                pathClutterRxDB = 0.0;
-                pathClutterRxCDF = 0.5;
             } else if ((propEnv == CConst::urbanPropEnv) || (propEnv == CConst::suburbanPropEnv)) {
                 // Terrain propagation: SRTM + ITM
                 double frequencyMHz = 1.0e-6*frequency;
@@ -4558,25 +5312,28 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 		pathLossModelStr = "ITM";
 		pathLossCDF = _confidenceITM;
 
-		// ITU-R P.[CLUTTER] sec 3.2
-		double Ll = 23.5 + 9.6 * log(frequencyGHz) / log(10.0);
-		double Ls = 32.98 + 23.9 * log(distKm) / log(10.0) + 3.0 * log(frequencyGHz) / log(10.0);
+                if (_applyClutterRLANTxFlag) {
+		    // ITU-R P.[CLUTTER] sec 3.2
+		    double Ll = 23.5 + 9.6 * log(frequencyGHz) / log(10.0);
+		    double Ls = 32.98 + 23.9 * log(distKm) / log(10.0) + 3.0 * log(frequencyGHz) / log(10.0);
 
-		arma::vec gauss(1);
-		if (fixedProbFlag)
-		{
-			gauss[0] = _zclutter2108;
-		}
-		else
-		{
-			gauss = arma::randn(1);
-		}
+		    arma::vec gauss(1);
+		    if (fixedProbFlag) {
+                        gauss[0] = _zclutter2108;
+                    } else {
+                        gauss = arma::randn(1);
+		    }
 
-		double Lctt = -5.0 * log(exp(-0.2 * Ll * log(10.0)) + exp(-0.2 * Ls * log(10.0))) / log(10.0) + 6.0 * gauss[0];
+		    double Lctt = -5.0 * log(exp(-0.2 * Ll * log(10.0)) + exp(-0.2 * Ls * log(10.0))) / log(10.0) + 6.0 * gauss[0];
 
-		pathClutterTxDB = Lctt;
-		pathClutterTxModelStr = "P.2108";
-		pathClutterTxCDF = q(-gauss[0]);
+		    pathClutterTxDB = Lctt;
+		    pathClutterTxModelStr = "P.2108";
+		    pathClutterTxCDF = q(-gauss[0]);
+                } else {
+                    pathClutterTxModelStr = "NONE";
+                    pathClutterTxDB = 0.0;
+                    pathClutterTxCDF = 0.5;
+                }
 
             } else if ( (propEnv == CConst::ruralPropEnv) || (propEnv == CConst::barrenPropEnv) ) {
                 // Terrain propagation: SRTM + ITM
@@ -4598,46 +5355,52 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 		pathLossCDF = _confidenceITM;
 
 
-                double ha, dk;
-                switch(nlcdLandCatTx) {
-                    case CConst::deciduousTreesNLCDLandCat:
-                        ha = 15.0;
-                        dk = 0.05;
-	                if (txClutterStrPtr) { *txClutterStrPtr = "DECIDUOUS_TREES"; }
-                        break;
-                    case CConst::coniferousTreesNLCDLandCat:
-                        ha = 20.0;
-                        dk = 0.05;
-	                if (txClutterStrPtr) { *txClutterStrPtr = "CONIFEROUS_TREES"; }
-                        break;
-                    case CConst::villageCenterNLCDLandCat:
-                    case CConst::unknownNLCDLandCat:
-                        ha = 5.0;
-                        dk = 0.07;
-	                if (txClutterStrPtr) { *txClutterStrPtr = "VILLAGE_CENTER"; }
-                        break;
-                    default:
-                        CORE_DUMP;
-                        break;
-                }
+                if (_applyClutterRLANTxFlag) {
+                    double ha, dk;
+                    switch(nlcdLandCatTx) {
+                        case CConst::deciduousTreesNLCDLandCat:
+                            ha = 15.0;
+                            dk = 0.05;
+	                    if (txClutterStrPtr) { *txClutterStrPtr = "DECIDUOUS_TREES"; }
+                            break;
+                        case CConst::coniferousTreesNLCDLandCat:
+                            ha = 20.0;
+                            dk = 0.05;
+	                    if (txClutterStrPtr) { *txClutterStrPtr = "CONIFEROUS_TREES"; }
+                            break;
+                        case CConst::villageCenterNLCDLandCat:
+                        case CConst::unknownNLCDLandCat:
+                            ha = 5.0;
+                            dk = 0.07;
+	                    if (txClutterStrPtr) { *txClutterStrPtr = "VILLAGE_CENTER"; }
+                            break;
+                        default:
+                            CORE_DUMP;
+                            break;
+                    }
 
-                if (distKm < 10*dk) {
-                    pathClutterTxDB = 0.0;
-                } else {
-                    double elevationAngleThresholdDeg = std::atan((ha-txHeightM)/(dk*1000.0))*180.0/M_PI;
-                    if (elevationAngleTxDeg > elevationAngleThresholdDeg) {
+                    if (distKm < 10*dk) {
                         pathClutterTxDB = 0.0;
                     } else {
-                        const double Ffc = 0.25 + 0.375  * (1 + std::tanh(7.5 * (frequencyGHz - 0.5)));
-                        double result = 10.25 * Ffc * exp(-1 * dk);
-                        result *= 1 - std::tanh(6 * (txHeightM / ha - 0.625));
-                        result -= 0.33;
-                        pathClutterTxDB = result;
+                        double elevationAngleThresholdDeg = std::atan((ha-txHeightM)/(dk*1000.0))*180.0/M_PI;
+                        if (elevationAngleTxDeg > elevationAngleThresholdDeg) {
+                            pathClutterTxDB = 0.0;
+                        } else {
+                            const double Ffc = 0.25 + 0.375  * (1 + std::tanh(7.5 * (frequencyGHz - 0.5)));
+                            double result = 10.25 * Ffc * exp(-1 * dk);
+                            result *= 1 - std::tanh(6 * (txHeightM / ha - 0.625));
+                            result -= 0.33;
+                            pathClutterTxDB = result;
+                        }
                     }
-                }
 
-                pathClutterTxModelStr = "452_NLCD";
-                pathClutterTxCDF = 0.5;
+                    pathClutterTxModelStr = "452_NLCD";
+                    pathClutterTxCDF = 0.5;
+                } else {
+                    pathClutterTxModelStr = "NONE";
+                    pathClutterTxDB = 0.0;
+                    pathClutterTxCDF = 0.5;
+                }
             } else {
                 CORE_DUMP;
             }
@@ -4842,7 +5605,7 @@ double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, d
     if (losValue == 0) {
 	double probLOS = (((_closeInHgtFlag) && (hMS > _closeInHgtLOS)) ? 1.0 : exp(-distance / 200));
 
-        if (_winner2CombineFlag) {
+        if (_winner2UnknownLOSMethod == CConst::PLOSCombineWinner2UnknownLOSMethod) {
             double sigmaLOS, sigmaNLOS;
             double plLOS  = Winner2_C1suburban_LOS( distance, hBS, hMS, frequency, true, 0.0, sigmaLOS, pathLossCDF);
             double plNLOS = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, true, 0.0, sigmaNLOS, pathLossCDF);
@@ -4863,7 +5626,7 @@ double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, d
             pathLossCDF = q(-(gauss[0]));
 
             pathLossModelStr = "W2C1_SUBURBAN_COMB";
-        } else {
+        } else if (_winner2UnknownLOSMethod == CConst::PLOSThresholdWinner2UnknownLOSMethod) {
 	    if (probLOS > _winner2ProbLOSThr)
 	    {
 		    retval = Winner2_C1suburban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
@@ -4874,13 +5637,15 @@ double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, d
 		    retval = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
 		    pathLossModelStr = "W2C1_SUBURBAN_NLOS";
 	    }
+        } else {
+            CORE_DUMP;
 	}
     } else if (losValue == 1) {
 	    retval = Winner2_C1suburban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
-	    pathLossModelStr = "W2C1_SUBURBAN_LOSBLDG";
+	    pathLossModelStr = "W2C1_SUBURBAN_LOS";
     } else if (losValue == 2) {
 	    retval = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
-	    pathLossModelStr = "W2C1_SUBURBAN_NLOSBLDG";
+	    pathLossModelStr = "W2C1_SUBURBAN_NLOS";
     } else {
         CORE_DUMP;
     }
@@ -4993,7 +5758,7 @@ double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, doub
     	    probLOS = (distance > 18.0 ? 18.0 / distance : 1.0) * (1.0 - exp(-distance / 63.0)) + exp(-distance / 63.0);
         }
 
-        if (_winner2CombineFlag) {
+        if (_winner2UnknownLOSMethod == CConst::PLOSCombineWinner2UnknownLOSMethod) {
             double sigmaLOS, sigmaNLOS;
             double plLOS  = Winner2_C2urban_LOS( distance, hBS, hMS, frequency, true, 0.0, sigmaLOS, pathLossCDF);
             double plNLOS = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, true, 0.0, sigmaNLOS, pathLossCDF);
@@ -5012,7 +5777,7 @@ double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, doub
             pathLossCDF = q(-(gauss[0]));
 
             pathLossModelStr = "W2C2_URBAN_COMB";
-        } else {
+        } else if (_winner2UnknownLOSMethod == CConst::PLOSThresholdWinner2UnknownLOSMethod) {
 	    if (probLOS > _winner2ProbLOSThr)
 	    {
 		retval = Winner2_C2urban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
@@ -5023,13 +5788,15 @@ double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, doub
 		retval = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
 		pathLossModelStr = "W2C2_URBAN_NLOS";
 	    }
+        } else {
+            CORE_DUMP;
         }
     } else if (losValue == 1) {
 	retval = Winner2_C2urban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
-	pathLossModelStr = "W2C2_URBAN_LOSBLDG";
+	pathLossModelStr = "W2C2_URBAN_LOS";
     } else if (losValue == 2) {
 	retval = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
-	pathLossModelStr = "W2C2_URBAN_NLOSBLDG";
+	pathLossModelStr = "W2C2_URBAN_NLOS";
     } else {
         CORE_DUMP;
     }
@@ -5142,7 +5909,7 @@ double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, doub
 		probLOS = exp(-distance / 1000);
 	}
 
-        if (_winner2CombineFlag) {
+        if (_winner2UnknownLOSMethod == CConst::PLOSCombineWinner2UnknownLOSMethod) {
             double sigmaLOS, sigmaNLOS;
             double plLOS  = Winner2_D1rural_LOS( distance, hBS, hMS, frequency, true, 0.0, sigmaLOS, pathLossCDF);
             double plNLOS = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, true, 0.0, sigmaNLOS, pathLossCDF);
@@ -5161,7 +5928,7 @@ double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, doub
             pathLossCDF = q(-(gauss[0]));
 
             pathLossModelStr = "W2D1_RURAL_COMB";
-        } else {
+        } else if (_winner2UnknownLOSMethod == CConst::PLOSThresholdWinner2UnknownLOSMethod) {
 
 	    if (probLOS > _winner2ProbLOSThr)
 	    {
@@ -5173,13 +5940,15 @@ double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, doub
 		retval = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
 		pathLossModelStr = "W2D1_RURAL_NLOS";
 	    }
+        } else {
+            CORE_DUMP;
         }
     } else if (losValue == 1) {
 	retval = Winner2_D1rural_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
-	pathLossModelStr = "W2D1_RURAL_LOSBLDG";
+	pathLossModelStr = "W2D1_RURAL_LOS";
     } else if (losValue == 2) {
 	retval = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
-	pathLossModelStr = "W2D1_RURAL_NLOSBLDG";
+	pathLossModelStr = "W2D1_RURAL_NLOS";
     } else {
         CORE_DUMP;
     }
@@ -5193,6 +5962,10 @@ double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, doub
 /******************************************************************************************/
 void AfcManager::compute()
 {
+        if (_responseCode != CConst::successResponseCode) {
+            return;
+        }
+
 	// initialize all channels to max EIRP before computing
 	for (auto& channel : _channelList)
 		channel.eirpLimit_dBm = _maxEIRP_dBm;
@@ -5212,6 +5985,8 @@ void AfcManager::compute()
 		runPointAnalysis();
 	} else if (_analysisType == "AP-AFC") {
 		runPointAnalysis();
+	} else if (_analysisType == "ScanAnalysis") {
+		runScanAnalysis();
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		runExclusionZoneAnalysis();
 	} else if (_analysisType == "HeatmapAnalysis") {
@@ -5254,7 +6029,7 @@ void AfcManager::runPointAnalysis()
 
 	LOGGER_INFO(logger) << "Executing AfcManager::runPointAnalysis()";
 
-        _rlanRegion->configure(_rlanHeightType.toStdString(), _terrainDataModel);
+        _rlanRegion->configure(_rlanHeightType, _terrainDataModel);
 
         double heightUncertainty = _rlanRegion->getHeightUncertainty();
         int NHt = (int) floor(heightUncertainty / _scanres_ht);
@@ -5821,9 +6596,10 @@ void AfcManager::runPointAnalysis()
 				<< std::string("RLAN must be more than ") << _minRlanHeightAboveTerrain << " meters above terrain" << std::endl
 				);
 	}
-	char *tstr;
 
 #   if MM_DEBUG
+	char *tstr;
+
 	time_t tStartRAS = time(NULL);
 	tstr = strdup(ctime(&tStartRAS));
 	strtok(tstr, "\n");
@@ -5883,7 +6659,7 @@ void AfcManager::runPointAnalysis()
 
 #   endif
 
-#   if MM_DEBUG || 1
+#   if MM_DEBUG
 	time_t tStartULS = time(NULL);
 	tstr = strdup(ctime(&tStartULS));
 	strtok(tstr, "\n");
@@ -6475,7 +7251,7 @@ void AfcManager::runPointAnalysis()
 		statusMessageList.push_back(errStr.str());
 	}
 
-#   if MM_DEBUG || 1
+#   if MM_DEBUG
 	time_t tEndULS = time(NULL);
 	tstr = strdup(ctime(&tEndULS));
 	strtok(tstr, "\n");
@@ -6528,6 +7304,702 @@ void AfcManager::runPointAnalysis()
 
         free(eirpLimitList);
         free(ulsFlagList);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/* AfcManager::runScanAnalysis()                                                          */
+/******************************************************************************************/
+void AfcManager::runScanAnalysis()
+{
+    std::ostringstream errStr;
+
+    LOGGER_INFO(logger) << "Executing AfcManager::runScanAnalysis()";
+
+    const int numBW = 4;
+    auto bwList = std::vector<int> { 20, 40, 80, 160 };
+    int bwIdx;
+
+    FILE *fscan;
+    std::string scanFileName = _serialNumber.toStdString() + "_scan.csv";
+    if ( !(fscan = fopen(scanFileName.c_str(), "wb")) ) {
+        errStr << std::string("ERROR: Unable to open scanFile \"") + "/tmp/scan.csv" + std::string("\"\n");
+        throw std::runtime_error(errStr.str());
+    }
+    fprintf(fscan,  "SCAN_PT_IDX,HEIGHT_IDX,RLAN_LONGITUDE (deg)"
+                    ",RLAN_LATITUDE (deg)"
+                    ",RLAN_HEIGHT_ABOVE_TERRAIN (m)"
+                    ",RLAN_TERRAIN_HEIGHT (m)"
+                    ",RLAN_TERRAIN_SOURCE"
+                    ",RLAN_PROP_ENV");
+
+    for(bwIdx=0; bwIdx<numBW; ++bwIdx) {
+        int bw = bwList[bwIdx];
+        fprintf(fscan, ",NUM_CHAN_BLACK_%d_MHZ,NUM_CHAN_RED_%d_MHZ,NUM_CHAN_YELLOW_%d_MHZ,NUM_CHAN_GREEN_%d_MHZ", bw, bw, bw, bw);
+    }
+    fprintf(fscan, "\n");
+    fflush(fscan);
+
+    _rlanRegion->configure(_rlanHeightType, _terrainDataModel);
+
+    double heightUncertainty = _rlanRegion->getHeightUncertainty();
+    int NHt = (int) floor(heightUncertainty / _scanres_ht);
+    Vector3 rlanPosnList[2*NHt+1];
+    GeodeticCoord rlanCoordList[2*NHt+1];
+
+    int numBlack[numBW];
+    int numGreen[numBW];
+    int numYellow[numBW];
+    int numRed[numBW];
+
+    /**************************************************************************************/
+    /* Get Uncertainty Region Scan Points                                                 */
+    /**************************************************************************************/
+    std::vector<LatLon> scanPointList = _rlanRegion->getScan(_scanres_xy);
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /* Create KML file                                                                    */
+    /**************************************************************************************/
+    std::string kmzFileName = _serialNumber.toStdString() + "_scan.kmz";
+    ZXmlWriter *kml_writer = new ZXmlWriter(kmzFileName);
+    auto &fkml = kml_writer->xml_writer;
+
+    if (fkml) {
+        fkml->setAutoFormatting(true);
+        fkml->writeStartDocument();
+        fkml->writeStartElement("kml");
+        fkml->writeAttribute("xmlns", "http://www.opengis.net/kml/2.2");
+        fkml->writeStartElement("Document");
+        fkml->writeTextElement("name", "FB RLAN AFC");
+        fkml->writeTextElement("open", "1");
+        fkml->writeTextElement("description", "Display Point Analysis Results");
+
+        fkml->writeStartElement("Style");
+        fkml->writeAttribute("id", "transGrayPoly");
+        fkml->writeStartElement("LineStyle");
+        fkml->writeTextElement("width", "1.5");
+        fkml->writeEndElement(); // LineStyle
+        fkml->writeStartElement("PolyStyle");
+        fkml->writeTextElement("color", "7d7f7f7f");
+        fkml->writeEndElement(); // Polystyle
+        fkml->writeAttribute("id", "transBluePoly");
+        fkml->writeStartElement("LineStyle");
+        fkml->writeTextElement("width", "1.5");
+        fkml->writeEndElement(); // LineStyle
+        fkml->writeStartElement("PolyStyle");
+        fkml->writeTextElement("color", "7dff0000");
+        fkml->writeEndElement(); // PolyStyle
+        fkml->writeEndElement(); // Style
+
+        fkml->writeStartElement("Style");
+        fkml->writeAttribute("id", "redPoly");
+        fkml->writeStartElement("LineStyle");
+        fkml->writeTextElement("color", "ff0000ff");
+        fkml->writeTextElement("width", "1.5");
+        fkml->writeEndElement(); // LineStyle
+        fkml->writeStartElement("PolyStyle");
+        fkml->writeTextElement("color", "7d0000ff");
+        fkml->writeEndElement(); // Polystyle
+        fkml->writeEndElement(); // Style
+
+        fkml->writeStartElement("Style");
+        fkml->writeAttribute("id", "yellowPoly");
+        fkml->writeStartElement("LineStyle");
+        fkml->writeTextElement("color", "ff00ffff");
+        fkml->writeTextElement("width", "1.5");
+        fkml->writeEndElement(); // LineStyle
+        fkml->writeStartElement("PolyStyle");
+        fkml->writeTextElement("color", "7d00ffff");
+        fkml->writeEndElement(); // Polystyle
+        fkml->writeEndElement(); // Style
+
+        fkml->writeStartElement("Style");
+        fkml->writeAttribute("id", "greenPoly");
+        fkml->writeStartElement("LineStyle");
+        fkml->writeTextElement("color", "ff00ff00");
+        fkml->writeTextElement("width", "1.5");
+        fkml->writeEndElement(); // LineStyle
+        fkml->writeStartElement("PolyStyle");
+        fkml->writeTextElement("color", "7d00ff00");
+        fkml->writeEndElement(); // Polystyle
+        fkml->writeEndElement(); // Style
+
+        fkml->writeStartElement("Style");
+        fkml->writeAttribute("id", "blackPoly");
+        fkml->writeStartElement("LineStyle");
+        fkml->writeTextElement("color", "ff000000");
+        fkml->writeTextElement("width", "1.5");
+        fkml->writeEndElement(); // LineStyle
+        fkml->writeStartElement("PolyStyle");
+        fkml->writeTextElement("color", "7d000000");
+        fkml->writeEndElement(); // Polystyle
+        fkml->writeEndElement(); // Style
+
+        fkml->writeStartElement("Style");
+        fkml->writeAttribute("id", "dotStyle");
+        fkml->writeStartElement("IconStyle");
+        fkml->writeStartElement("Icon");
+        fkml->writeTextElement("href", "http://maps.google.com/mapfiles/kml/shapes/placemark_circle.png");
+        fkml->writeEndElement(); // Icon
+        fkml->writeEndElement(); // IconStyle
+        fkml->writeStartElement("LabelStyle");
+        fkml->writeTextElement("scale", "0");
+        fkml->writeEndElement(); // LabelStyle
+        fkml->writeEndElement(); // Style
+
+        fkml->writeStartElement("Style");
+        fkml->writeAttribute("id", "redPlacemark");
+        fkml->writeStartElement("IconStyle");
+        fkml->writeTextElement("color", "ff0000ff");
+        fkml->writeStartElement("Icon");
+        fkml->writeTextElement("href", "http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png");
+        fkml->writeEndElement(); // Icon
+        fkml->writeEndElement(); // IconStyle
+        fkml->writeEndElement(); // Style
+
+        fkml->writeStartElement("Style");
+        fkml->writeAttribute("id", "yellowPlacemark");
+        fkml->writeStartElement("IconStyle");
+        fkml->writeTextElement("color", "ff00ffff");
+        fkml->writeStartElement("Icon");
+        fkml->writeTextElement("href", "http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png");
+        fkml->writeEndElement(); // Icon
+        fkml->writeEndElement(); // IconStyle
+        fkml->writeEndElement(); // Style
+
+        fkml->writeStartElement("Style");
+        fkml->writeAttribute("id", "greenPlacemark");
+        fkml->writeStartElement("IconStyle");
+        fkml->writeTextElement("color", "ff00ff00");
+        fkml->writeStartElement("Icon");
+        fkml->writeTextElement("href", "http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png");
+        fkml->writeEndElement(); // Icon
+        fkml->writeEndElement(); // IconStyle
+        fkml->writeEndElement(); // Style
+
+        fkml->writeStartElement("Style");
+        fkml->writeAttribute("id", "blackPlacemark");
+        fkml->writeStartElement("IconStyle");
+        fkml->writeTextElement("color", "ff000000");
+        fkml->writeStartElement("Icon");
+        fkml->writeTextElement("href", "http://maps.google.com/mapfiles/kml/pushpin/ylw-pushpin.png");
+        fkml->writeEndElement(); // Icon
+        fkml->writeEndElement(); // IconStyle
+        fkml->writeEndElement(); // Style
+    }
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /* Draw uncertainty cylinder in KML                                                   */
+    /**************************************************************************************/
+    if (fkml) {
+        int ptIdx;
+        fkml->writeStartElement("Folder");
+        fkml->writeTextElement("name", "RLAN");
+
+        std::vector<GeodeticCoord> ptList = _rlanRegion->getBoundary(_terrainDataModel);
+
+        /**********************************************************************************/
+        /* CENTER                                                                         */
+        /**********************************************************************************/
+        GeodeticCoord rlanCenterPtGeo = EcefModel::toGeodetic(_rlanRegion->getCenterPosn());
+
+        fkml->writeStartElement("Placemark");
+        fkml->writeTextElement("name", "CENTER");
+        fkml->writeTextElement("visibility", "1");
+        fkml->writeTextElement("styleUrl", "#dotStyle");
+        fkml->writeStartElement("Point");
+        fkml->writeTextElement("altitudeMode", "absolute");
+        fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", rlanCenterPtGeo.longitudeDeg, rlanCenterPtGeo.latitudeDeg, rlanCenterPtGeo.heightKm * 1000.0));
+        fkml->writeEndElement(); // Point
+        fkml->writeEndElement(); // Placemark
+        /**********************************************************************************/
+
+        /**********************************************************************************/
+        /* TOP                                                                            */
+        /**********************************************************************************/
+        fkml->writeStartElement("Placemark");
+        fkml->writeTextElement("name", "TOP");
+        fkml->writeTextElement("visibility", "1");
+        fkml->writeTextElement("styleUrl", "#transGrayPoly");
+        fkml->writeStartElement("Polygon");
+        fkml->writeTextElement("extrude", "0");
+        fkml->writeTextElement("tessellate", "0");
+        fkml->writeTextElement("altitudeMode", "absolute");
+        fkml->writeStartElement("outerBoundaryIs");
+        fkml->writeStartElement("LinearRing");
+
+        QString top_coords = QString();
+        for(ptIdx=0; ptIdx<=(int) ptList.size(); ptIdx++) {
+            GeodeticCoord pt = ptList[ptIdx % ptList.size()];
+            top_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, pt.heightKm*1000.0 + _rlanRegion->getHeightUncertainty()));
+        }
+
+        fkml->writeTextElement("coordinates", top_coords);
+        fkml->writeEndElement(); // LinearRing
+        fkml->writeEndElement(); // outerBoundaryIs
+        fkml->writeEndElement(); // Polygon
+        fkml->writeEndElement(); // Placemark
+        /**********************************************************************************/
+
+        /**********************************************************************************/
+        /* BOTTOM                                                                         */
+        /**********************************************************************************/
+        fkml->writeStartElement("Placemark");
+        fkml->writeTextElement("name", "BOTTOM");
+        fkml->writeTextElement("visibility", "1");
+        fkml->writeTextElement("styleUrl", "#transGrayPoly");
+        fkml->writeStartElement("Polygon");
+        fkml->writeTextElement("extrude", "0");
+        fkml->writeTextElement("tessellate", "0");
+        fkml->writeTextElement("altitudeMode", "absolute");
+        fkml->writeStartElement("outerBoundaryIs");
+        fkml->writeStartElement("LinearRing");
+
+        QString bottom_coords = QString();
+        for(ptIdx=0; ptIdx<=(int) ptList.size(); ptIdx++) {
+            GeodeticCoord pt = ptList[ptIdx % ptList.size()];
+            bottom_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, pt.heightKm*1000.0 - _rlanRegion->getHeightUncertainty()));
+        }
+        fkml->writeTextElement("coordinates", bottom_coords);
+        fkml->writeEndElement(); // LinearRing
+        fkml->writeEndElement(); // outerBoundaryIs
+        fkml->writeEndElement(); // Polygon
+        fkml->writeEndElement(); // Placemark
+
+        /**********************************************************************************/
+
+        /**********************************************************************************/
+        /* SIDES                                                                          */
+        /**********************************************************************************/
+        for(ptIdx=0; ptIdx<(int) ptList.size(); ptIdx++) {
+            fkml->writeStartElement("Placemark");
+            fkml->writeTextElement("name", QString::asprintf("S_%d", ptIdx));
+            fkml->writeTextElement("visibility", "1");
+            fkml->writeTextElement("styleUrl", "#transGrayPoly");
+            fkml->writeStartElement("Polygon");
+            fkml->writeTextElement("extrude", "0");
+            fkml->writeTextElement("tessellate", "0");
+            fkml->writeTextElement("altitudeMode", "absolute");
+            fkml->writeStartElement("outerBoundaryIs");
+            fkml->writeStartElement("LinearRing");
+
+            GeodeticCoord pt1 = ptList[ptIdx];
+            GeodeticCoord pt2 = ptList[(ptIdx +1) % ptList.size()];
+            QString side_coords;
+            side_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt1.longitudeDeg, pt1.latitudeDeg, pt1.heightKm*1000.0 - _rlanRegion->getHeightUncertainty()));
+            side_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt1.longitudeDeg, pt1.latitudeDeg, pt1.heightKm*1000.0 + _rlanRegion->getHeightUncertainty()));
+            side_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt2.longitudeDeg, pt2.latitudeDeg, pt2.heightKm*1000.0 + _rlanRegion->getHeightUncertainty()));
+            side_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt2.longitudeDeg, pt2.latitudeDeg, pt2.heightKm*1000.0 - _rlanRegion->getHeightUncertainty()));
+            side_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt1.longitudeDeg, pt1.latitudeDeg, pt1.heightKm*1000.0 - _rlanRegion->getHeightUncertainty()));
+
+            fkml->writeTextElement("coordinates", side_coords);
+            fkml->writeEndElement(); // LinearRing
+            fkml->writeEndElement(); // outerBoundaryIs
+            fkml->writeEndElement(); // Polygon
+            fkml->writeEndElement(); // Placemark
+        }
+        /**********************************************************************************/
+
+        /**********************************************************************************/
+        /* Scan Points                                                                    */
+        /**********************************************************************************/
+        fkml->writeStartElement("Folder");
+        fkml->writeTextElement("name", "SCAN POINTS");
+
+        for(ptIdx=0; ptIdx<(int) scanPointList.size(); ptIdx++) {
+            LatLon scanPt = scanPointList[ptIdx];
+
+            double rlanTerrainHeight, bldgHeight;
+            MultibandRasterClass::HeightResult lidarHeightResult;
+            CConst::HeightSourceEnum rlanHeightSource;
+            _terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight,bldgHeight, lidarHeightResult, rlanHeightSource);
+
+            double height0;
+            if (_rlanRegion->getFixedHeightAMSL()) {
+                height0 = _rlanRegion->getCenterHeightAMSL();
+            } else {
+                height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
+            }
+
+            int htIdx;
+            for(htIdx=0; htIdx<=2*NHt; ++htIdx) {
+                double heightAMSL = height0 + (htIdx-NHt)*_scanres_ht;
+
+                fkml->writeStartElement("Placemark");
+                fkml->writeTextElement("name", QString::asprintf("SCAN_POINT_%d_%d", ptIdx, htIdx));
+                fkml->writeTextElement("visibility", "1");
+                fkml->writeTextElement("styleUrl", "#dotStyle");
+                fkml->writeStartElement("Point");
+                fkml->writeTextElement("altitudeMode", "absolute");
+                fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", scanPt.second, scanPt.first, heightAMSL));
+                fkml->writeEndElement(); // Point
+                fkml->writeEndElement(); // Placemark
+            }
+        }
+
+        fkml->writeEndElement(); // Scan Points
+        /**********************************************************************************/
+
+        fkml->writeEndElement(); // Folder
+
+        fkml->writeStartElement("Folder");
+        fkml->writeTextElement("name", "RAS");
+        int rasIdx;
+        for (rasIdx = 0; rasIdx < _rasList->getSize(); ++rasIdx) {
+            RASClass *ras = (*_rasList)[rasIdx];
+
+            fkml->writeStartElement("Folder");
+            fkml->writeTextElement("name", QString("RAS_") + QString::number(ras->getID()));
+
+            int numPtsCircle = 32;
+            int rectIdx, numRect;
+            double rectLonStart, rectLonStop, rectLatStart, rectLatStop;
+            double circleRadius, longitudeCenter, latitudeCenter;
+            double rasTerrainHeight, rasBldgHeight, rasHeightAGL;
+            Vector3 rasCenterPosn;
+            Vector3 rasUpVec;
+            Vector3 rasEastVec;
+            Vector3 rasNorthVec;
+            QString ras_coords;
+            MultibandRasterClass::HeightResult rasLidarHeightResult;
+            CConst::HeightSourceEnum rasHeightSource;
+            RASClass::RASExclusionZoneTypeEnum rasType = ras->type();
+            switch(rasType) {
+                case RASClass::rectRASExclusionZoneType:
+                case RASClass::rect2RASExclusionZoneType:
+                    numRect = ((RectRASClass *) ras)->getNumRect();
+                    for(rectIdx=0; rectIdx<numRect; rectIdx++) {
+                        std::tie(rectLonStart, rectLonStop, rectLatStart, rectLatStop) = ((RectRASClass *) ras)->getRect(rectIdx);
+
+                        fkml->writeStartElement("Placemark");
+                        fkml->writeTextElement("name", QString("RECT_") + QString::number(rectIdx));
+                        fkml->writeTextElement("visibility", "1");
+                        fkml->writeTextElement("styleUrl", "#transBluePoly");
+                        fkml->writeStartElement("Polygon");
+                        fkml->writeTextElement("extrude", "0");
+                        fkml->writeTextElement("tessellate", "0");
+                        fkml->writeTextElement("altitudeMode", "clampToGround");
+                        fkml->writeStartElement("outerBoundaryIs");
+                        fkml->writeStartElement("LinearRing");
+
+                        ras_coords = QString();
+                        ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStart, 0.0));
+                        ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStop,  rectLatStart, 0.0));
+                        ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStop,  rectLatStop,  0.0));
+                        ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStop,  0.0));
+                        ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStart, 0.0));
+
+                        fkml->writeTextElement("coordinates", ras_coords);
+                        fkml->writeEndElement(); // LinearRing
+                        fkml->writeEndElement(); // outerBoundaryIs
+                        fkml->writeEndElement(); // Polygon
+                        fkml->writeEndElement(); // Placemark
+                    }
+                    break;
+                case RASClass::circleRASExclusionZoneType:
+                case RASClass::horizonDistRASExclusionZoneType:
+                    circleRadius = ((CircleRASClass *) ras)->computeRadius(_rlanRegion->getMaxHeightAGL());
+                    longitudeCenter = ((CircleRASClass *) ras)->getLongitudeCenter();
+                    latitudeCenter = ((CircleRASClass *) ras)->getLatitudeCenter();
+                    rasHeightAGL = ras->getHeightAGL();
+                    _terrainDataModel->getTerrainHeight(longitudeCenter, latitudeCenter, rasTerrainHeight, rasBldgHeight, rasLidarHeightResult, rasHeightSource);
+
+                    rasCenterPosn = EcefModel::geodeticToEcef(latitudeCenter, longitudeCenter, (rasTerrainHeight + rasHeightAGL)/ 1000.0);
+                    rasUpVec = rasCenterPosn.normalized();
+                    rasEastVec = (Vector3(-rasUpVec.y(), rasUpVec.x(), 0.0)).normalized();
+                    rasNorthVec = rasUpVec.cross(rasEastVec);
+
+                    fkml->writeStartElement("Placemark");
+                    fkml->writeTextElement("name", QString("RECT_") + QString::number(rectIdx));
+                    fkml->writeTextElement("visibility", "1");
+                    fkml->writeTextElement("styleUrl", "#transBluePoly");
+                    fkml->writeStartElement("Polygon");
+                    fkml->writeTextElement("extrude", "0");
+                    fkml->writeTextElement("tessellate", "0");
+                    fkml->writeTextElement("altitudeMode", "clampToGround");
+                    fkml->writeStartElement("outerBoundaryIs");
+                    fkml->writeStartElement("LinearRing");
+
+                    ras_coords = QString();
+                    for(ptIdx=0; ptIdx<=numPtsCircle; ++ptIdx) {
+                        double phi = 2*M_PI*ptIdx / numPtsCircle;
+                        Vector3 circlePtPosn = rasCenterPosn + (circleRadius/1000)*(rasEastVec*cos(phi) + rasNorthVec*sin(phi));
+
+                        GeodeticCoord circlePtPosnGeodetic = EcefModel::ecefToGeodetic(circlePtPosn);
+
+                        ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", circlePtPosnGeodetic.longitudeDeg, circlePtPosnGeodetic.latitudeDeg, 0.0));
+                    }
+
+                    fkml->writeTextElement("coordinates", ras_coords);
+                    fkml->writeEndElement(); // LinearRing
+                    fkml->writeEndElement(); // outerBoundaryIs
+                    fkml->writeEndElement(); // Polygon
+                    fkml->writeEndElement(); // Placemark
+
+                    break;
+                default:
+                    CORE_DUMP;
+                    break;
+            }
+            fkml->writeEndElement(); // Folder
+        }
+        fkml->writeEndElement(); // Folder
+    }
+    /**************************************************************************************/
+
+    if (fkml) {
+        fkml->writeEndElement(); // Document
+        fkml->writeEndElement(); // kml
+        fkml->writeEndDocument();
+        delete kml_writer;
+    }
+
+
+    /**************************************************************************************/
+    /* Compute Channel Availability                                                       */
+    /**************************************************************************************/
+    _zbldg2109 = -qerfi(_confidenceBldg2109);
+    _zclutter2108 = -qerfi(_confidenceClutter2108);
+    _zwinner2 = -qerfi(_confidenceWinner2);
+
+    const double exclusionDistKmSquared = (_exclusionDist / 1000.0) * (_exclusionDist / 1000.0);
+    const double maxRadiusKmSquared = (_maxRadius / 1000.0) * (_maxRadius / 1000.0);
+
+    if (_rlanRegion->getMinHeightAGL() < _minRlanHeightAboveTerrain) {
+        throw std::runtime_error(ErrStream()
+                << std::string("ERROR: Point Analysis: Invalid RLAN parameter settings.") << std::endl
+                << std::string("RLAN Min Height above terrain = ") << _rlanRegion->getMinHeightAGL() << std::endl
+                << std::string("RLAN must be more than ") << _minRlanHeightAboveTerrain << " meters above terrain" << std::endl
+                );
+    }
+
+    int scanPtIdx;
+    for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
+        LatLon scanPt = scanPointList[scanPtIdx];
+
+        /**************************************************************************************/
+        /* Determine propagation environment of RLAN using scan point                         */
+        /**************************************************************************************/
+        CConst::NLCDLandCatEnum nlcdLandCatTx;
+        CConst::PropEnvEnum rlanPropEnv = computePropEnv(scanPt.second, scanPt.first, nlcdLandCatTx);
+        /**************************************************************************************/
+
+        double rlanTerrainHeight, bldgHeight;
+        MultibandRasterClass::HeightResult lidarHeightResult;
+        CConst::HeightSourceEnum rlanHeightSource;
+        _terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight,bldgHeight, lidarHeightResult, rlanHeightSource);
+
+        double height0;
+        if (_rlanRegion->getFixedHeightAMSL()) {
+            height0 = _rlanRegion->getCenterHeightAMSL();
+        } else {
+            height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
+        }
+
+        int rlanPosnIdx;
+        int htIdx;
+        for(htIdx=0; htIdx<=2*NHt; ++htIdx) {
+            rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, (height0 + (htIdx-NHt)*_scanres_ht)/1000.0);
+            rlanPosnList[htIdx] = EcefModel::fromGeodetic(rlanCoordList[htIdx]);
+        }
+
+        int numRlanPosn = 2*NHt + 1;
+
+        for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx) {
+            Vector3 rlanPosn = rlanPosnList[rlanPosnIdx];
+            GeodeticCoord rlanCoord = rlanCoordList[rlanPosnIdx];
+
+            /**************************************************************************************/
+            /* Initialize eirpLimit_dBm to _maxEIRP_dBm for all channels                          */
+            /**************************************************************************************/
+            for (auto& channel : _channelList) {
+                channel.eirpLimit_dBm = _maxEIRP_dBm;
+                channel.availability = GREEN;
+            }
+            /**************************************************************************************/
+
+            double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
+
+            int rasIdx;
+            double rlanRegionMaxDist = _rlanRegion->getMaxDist();
+            double rlanRegionMaxHeightAGL = _rlanRegion->getMaxHeightAGL();
+            for (rasIdx = 0; rasIdx < _rasList->getSize(); ++rasIdx) {
+                RASClass *ras = (*_rasList)[rasIdx];
+                if (ras->intersect(rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, 0.0, rlanHtAboveTerrain)) {
+                    for (auto& channel : _channelList) {
+                        if (channel.availability != BLACK) {
+                            double chanStartFreq = channel.startFreqMHz * 1.0e6;
+                            double chanStopFreq = channel.stopFreqMHz * 1.0e6;
+                            double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, ras->getStartFreq(), ras->getStopFreq(), false);
+                            if (spectralOverlap > 0.0) {
+                                channel.availability = BLACK;
+                                channel.eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+                            }
+                        }
+                    }
+                }
+            }
+
+	    int ulsIdx;
+            for (ulsIdx = 0; ulsIdx < _ulsList->getSize(); ++ulsIdx) {
+                ULSClass *uls = (*_ulsList)[ulsIdx];
+                const Vector3 ulsRxPos = uls->getRxPosition();
+                Vector3 lineOfSightVectorKm = ulsRxPos - rlanPosn;
+                double distKmSquared = (lineOfSightVectorKm).dot(lineOfSightVectorKm);
+                double distKm = lineOfSightVectorKm.len();
+                double dAP = rlanPosn.len();
+                double duls = ulsRxPos.len();
+                double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
+                double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
+
+                if ((distKmSquared < maxRadiusKmSquared) && (distKmSquared > exclusionDistKmSquared) && (uls->getLinkDistance() > 0.0)) {
+
+                    CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
+
+                    /**************************************************************************************/
+                    /* Determine propagation environment of FS, if needed.                                */
+                    /**************************************************************************************/
+                    char ulsRxPropEnv;
+                    CConst::NLCDLandCatEnum nlcdLandCatRx;
+                    CConst::PropEnvEnum fsPropEnv;
+                    if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= 10.0)) {
+                        fsPropEnv = computePropEnv(uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), nlcdLandCatRx);
+                        switch(fsPropEnv) {
+                            case CConst::urbanPropEnv:    ulsRxPropEnv = 'U'; break;
+                            case CConst::suburbanPropEnv: ulsRxPropEnv = 'S'; break;
+                            case CConst::ruralPropEnv:    ulsRxPropEnv = 'R'; break;
+                            case CConst::barrenPropEnv:   ulsRxPropEnv = 'B'; break;
+                            case CConst::unknownPropEnv:  ulsRxPropEnv = 'X'; break;
+                            default: CORE_DUMP;
+                        }
+                    } else {
+                        fsPropEnv = CConst::unknownPropEnv;
+                        ulsRxPropEnv = ' ';
+                    }
+                    /**************************************************************************************/
+
+                    for (auto& channel : _channelList) {
+                        if (channel.availability != BLACK) {
+                            double chanStartFreq = channel.startFreqMHz * 1.0e6;
+                            double chanStopFreq = channel.stopFreqMHz * 1.0e6;
+                                            // LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
+                            double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag);
+
+                            if (spectralOverlap > 0.0) {
+                                // double bandwidth = chanStopFreq - chanStartFreq;
+                                double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
+                                double spectralOverlapLossDB = -10.0 * log(spectralOverlap) / log(10.0);
+
+                                std::string buildingPenetrationModelStr;
+                                double buildingPenetrationCDF;
+                                double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
+
+                                std::string txClutterStr;
+                                std::string rxClutterStr;
+                                std::string pathLossModelStr;
+                                double pathLossCDF;
+                                double pathLoss;
+                                std::string pathClutterTxModelStr;
+                                double pathClutterTxCDF;
+                                double pathClutterTxDB;
+                                std::string pathClutterRxModelStr;
+                                double pathClutterRxCDF;
+                                double pathClutterRxDB;
+
+                                computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, chanCenterFreq,
+                                        rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
+                                        uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
+                                        pathLoss, pathClutterTxDB, pathClutterRxDB, true,
+                                        pathLossModelStr, pathLossCDF,
+                                        pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
+                                        (iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile)
+#if MM_DEBUG
+                                        , uls->ITMHeightType
+#endif
+                                           );
+    
+                                double rxGainDB;
+                                double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+                                if (ulsRxAntennaType == CConst::F1245AntennaType) {
+                                    rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, uls->getRxGain());
+                                } else if (ulsRxAntennaType == CConst::F1336OmniAntennaType) {
+                                    rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleRxDeg, uls->getRxGain(), chanCenterFreq);
+                                } else if (ulsRxAntennaType == CConst::OmniAntennaType) {
+                                    rxGainDB = 0.0;
+                                } else if (ulsRxAntennaType == CConst::LUTAntennaType) {
+                                    rxGainDB = uls->getRxAntenna()->gainDB(angleOffBoresightDeg * M_PI / 180.0) + uls->getRxGain();
+                                } else {
+                                    throw std::runtime_error(ErrStream() << "ERROR reading ULS data: ulsRxAntennaType = " << ulsRxAntennaType << " INVALID value");
+                                }
+
+                                double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+
+                                double I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
+
+                                double marginDB = _IoverN_threshold_dB - I2NDB;
+
+                                double eirpLimit_dBm = _maxEIRP_dBm + marginDB;
+
+                                if (eirpLimit_dBm < channel.eirpLimit_dBm) {
+                                    channel.eirpLimit_dBm = eirpLimit_dBm;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                if (uls->ITMHeightProfile) {
+                    free(uls->ITMHeightProfile);
+                    uls->ITMHeightProfile = (double *) NULL;
+                }
+            }
+
+            for(bwIdx=0; bwIdx<numBW; ++bwIdx) {
+                numBlack[bwIdx] = 0;
+                numGreen[bwIdx] = 0;
+                numYellow[bwIdx] = 0;
+                numRed[bwIdx] = 0;
+            }
+
+            for (auto& channel : _channelList) {
+                if (channel.type == ChannelType::INQUIRED_CHANNEL) {
+                    bwIdx = channel.operatingClass - 131;
+                    if (channel.availability == BLACK) {
+                        numBlack[bwIdx]++;
+                    } else if (channel.eirpLimit_dBm == _maxEIRP_dBm) {
+                        numGreen[bwIdx]++;
+	            }
+	            else if (channel.eirpLimit_dBm >= _minEIRP_dBm) {
+                        numYellow[bwIdx]++;
+	            } else {
+                        numRed[bwIdx]++;
+	            }
+	        }
+            }
+
+            fprintf(fscan, "%d,%d,%.6f,%.6f,%.1f,%.1f,%s,%s",
+                           scanPtIdx, rlanPosnIdx,
+                           rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, rlanTerrainHeight,
+                           _terrainDataModel->getSourceName(rlanHeightSource).c_str(),
+                           CConst::strPropEnvList->type_to_str(rlanPropEnv));
+
+            for(bwIdx=0; bwIdx<numBW; ++bwIdx) {
+                fprintf(fscan, ",%d,%d,%d,%d",
+                               numBlack[bwIdx], numRed[bwIdx], numYellow[bwIdx], numGreen[bwIdx]);
+            }
+            fprintf(fscan, "\n");
+            fflush(fscan);
+        }
+
+    }
+    fclose(fscan);
+
+
+    /**************************************************************************************/
+
+    _terrainDataModel->printStats();
 }
 /******************************************************************************************/
 
@@ -6880,9 +8352,9 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 	MultibandRasterClass::HeightResult lidarHeightResult;
 	CConst::HeightSourceEnum rlanHeightSource;
 	_terrainDataModel->getTerrainHeight(rlanLon,rlanLat, rlanTerrainHeight,bldgHeight, lidarHeightResult, rlanHeightSource);
-	if (_rlanHeightType == "AMSL") {
+	if (_rlanHeightType == CConst::AMSLHeightType) {
 		rlanHeight = rlanHeightInput;
-	} else if (_rlanHeightType == "AGL") {
+	} else if (_rlanHeightType == CConst::AGLHeightType) {
 		rlanHeight = rlanHeightInput + rlanTerrainHeight;
 	} else {
 		throw std::runtime_error(ErrStream() << "ERROR: INVALID_VALUE _rlanHeightType = " << _rlanHeightType);
@@ -7165,9 +8637,9 @@ void AfcManager::writeKML()
 		MultibandRasterClass::HeightResult lidarHeightResult;
 		CConst::HeightSourceEnum heightSource;
 		_terrainDataModel->getTerrainHeight(rlanLon,rlanLat, rlanTerrainHeight,bldgHeight, lidarHeightResult, heightSource);
-		if (_rlanHeightType == "AMSL") {
+		if (_rlanHeightType == CConst::AMSLHeightType) {
 			rlanHeight = rlanHeightInput;
-		} else if (_rlanHeightType == "AGL") {
+		} else if (_rlanHeightType == CConst::AGLHeightType) {
 			rlanHeight = rlanHeightInput + rlanTerrainHeight;
 		} else {
 			throw std::runtime_error(ErrStream() << "ERROR: INVALID _rlanHeightType = " << _rlanHeightType);
@@ -7315,8 +8787,9 @@ void AfcManager::runHeatmapAnalysis()
 	Vector3 rlanPosnList[3];
 	GeodeticCoord rlanCoordList[3];
 
-	char *tstr;
 #   if MM_DEBUG
+	char *tstr;
+
 	time_t tStartHeatmap = time(NULL);
 	tstr = strdup(ctime(&tStartHeatmap));
 	strtok(tstr, "\n");
@@ -7748,8 +9221,8 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "SEMI-MINOR_AXIS (M)", QString::number(minor, 'e', 20) } );
 		fUserInputs->writeRow({ "HEIGHT_UNCERTAINTY (M)", QString::number(height_uncert, 'e', 20) } );
 		fUserInputs->writeRow({ "ORIENTATION (DEG)", QString::number(_rlanOrientation_deg, 'e', 20) } );
-		fUserInputs->writeRow({ "HEIGHT_TYPE", QString(_rlanHeightType) } );
-		fUserInputs->writeRow({ "INDOOR/OUTDOOR", (_rlanType == RLAN_INDOOR ? "indoor" : _rlanType == RLAN_OUTDOOR ? "outdoo" : "error") } );
+		fUserInputs->writeRow({ "HEIGHT_TYPE", (_rlanHeightType == CConst::AMSLHeightType ? "AMSL" : _rlanHeightType == CConst::AGLHeightType ? "AGL" : "INVALID") } );
+		fUserInputs->writeRow({ "INDOOR/OUTDOOR", (_rlanType == RLAN_INDOOR ? "indoor" : _rlanType == RLAN_OUTDOOR ? "outdoor" : "error") } );
 
 		fUserInputs->writeRow({ "ULS_DATABASE", QString(_inputULSDatabaseStr) } );
 		fUserInputs->writeRow({ "AP/CLIENT_PROPAGATION_ENVIRO", QString(_propagationEnviro) } );
@@ -7767,20 +9240,18 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "FS_RECEIVER_ANTENNA_PATTERN", QString(_antennaPattern) } );
 
 
-		if (_pathLossModelStr == "COALITION_OPT_6") {
-			fUserInputs->writeRow({ "PROPAGATION_MODEL", QString("ITM_WITHNO_BUILDING_DATA (SRTM)") } );
+                fUserInputs->writeRow({ "PROPAGATION_MODEL", QString::fromStdString(CConst::strPathLossModelList->type_to_str(_pathLossModel)) } );
+		if (_pathLossModel == CConst::CoalitionOpt6PathLossModel) {
 			fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", QString::number(_winner2ProbLOSThr, 'e', 20) } );
 			fUserInputs->writeRow({ "WINNER_II_CONFIDENCE", QString::number(_confidenceWinner2, 'e', 20) } );
 			fUserInputs->writeRow({ "ITM_CONFIDENCE", QString::number(_confidenceITM, 'e', 20) } );
 			fUserInputs->writeRow({ "P.2108_CONFIDENCE", QString::number(_confidenceClutter2108, 'e', 20) } );
-		} else if (_pathLossModelStr == "ITM_BLDG") {
-			fUserInputs->writeRow({ "PROPAGATION_MODEL", QString::fromStdString(_pathLossModelStr) } );
+		} else if (_pathLossModel == CConst::ITMBldgPathLossModel) {
 			fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", "N/A" } );
 			fUserInputs->writeRow({ "WINNER_II_CONFIDENCE", "N/A" } );
 			fUserInputs->writeRow({ "ITM_CONFIDENCE", QString::number(_confidenceITM, 'e', 20) } );
 			fUserInputs->writeRow({ "P.2108_CONFIDENCE", "N/A" } );
 		} else {
-			fUserInputs->writeRow({ "PROPAGATION_MODEL", QString::fromStdString(_pathLossModelStr) } );
 			fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", "N/A" } );
 			fUserInputs->writeRow({ "WINNER_II_CONFIDENCE", "N/A" } );
 			fUserInputs->writeRow({ "ITM_CONFIDENCE", "N/A" } );
@@ -7944,10 +9415,11 @@ void AfcManager::setDBGInputs(const std::string& tempDir)
 
         _serialNumber = "0";
         _aciFlag = true;
-        _winner2BldgLOSFlag = true;
+        _winner2LOSOption = CConst::BldgDataWinner2LOSOption;
         _pathLossClampFSPL = true;
         _scanres_xy = 30.0;
         _scanres_ht = 5.0;
+	// _maxRadius = 30.0e3;
 
 	_propagationEnviro = QString::fromStdString("NLCD Point");
 
@@ -8035,7 +9507,7 @@ void AfcManager::setDBGInputs(const std::string& tempDir)
 
 		_winner2ProbLOSThr = 0.2;
 
-		_pathLossModelStr = "ITM_BLDG";
+		_pathLossModel = CConst::ITMBldgPathLossModel;
 
 		_minEIRP_dBm = 0.0;
 		_maxEIRP_dBm = 34.0; // Don't forget that units are dBm
@@ -8050,8 +9522,8 @@ void AfcManager::setDBGInputs(const std::string& tempDir)
 		_rlanLLA = std::make_tuple(0.0, 0.0, 20.0); // lat (deg), lon (deg), height (m) (this should be within a building in the NYC demo data)
 		_rlanUncerts_m = std::make_tuple(0.0, 0.0, 0.0);    // minor uncertainity, major uncertainity, height uncertainty;
 
-		_rlanHeightType = "AGL";
-		// _rlanHeightType = "AMSL";
+		_rlanHeightType = CConst::AGLHeightType;
+		// _rlanHeightType = CConst::AMSLHeightType;
 
 		_minEIRP_dBm = 0.0;
 		_maxEIRP_dBm = 34.0; // Don't forget that units are dBm
@@ -8074,14 +9546,14 @@ void AfcManager::setDBGInputs(const std::string& tempDir)
 
 		_winner2ProbLOSThr = 0.2;
 
-		_pathLossModelStr = "ITM_BLDG";
-		// _pathLossModelStr = "COALITION_OPT_6";
-		// _pathLossModelStr = "FSPL";
+		_pathLossModel = CConst::ITMBldgPathLossModel;
+		// _pathLossModel = CConst::CoalitionOpt6PathLossModel;
+		// _pathLossModel = CConst::FSPLPathLossModel;
 	} else {
                 // In Canada
 		// _rlanLLA = std::make_tuple(53.87, -103.83, 20.0); // lat (deg), lon (deg), height (m)
 
-		// _rlanLLA = std::make_tuple(40.76252, -73.95735, 20.0); // lat (deg), lon (deg), height (m) (this should be within a building in the NYC demo data)
+		_rlanLLA = std::make_tuple(40.76252, -73.95735, 20.0); // lat (deg), lon (deg), height (m) (this should be within a building in the NYC demo data)
 
 		// _rlanLLA = std::make_tuple(40.787960, -73.931108, 20.0); // lat (deg), lon (deg), height (m)
 
@@ -8089,7 +9561,7 @@ void AfcManager::setDBGInputs(const std::string& tempDir)
 
 		// _rlanLLA = std::make_tuple(38.51363, -80.57162, 20.0); // lat (deg), lon (deg), height (m)
 
-                _rlanLLA = std::make_tuple(38.72312660712634, -107.67923598048004, 1.5);
+                // _rlanLLA = std::make_tuple(38.72312660712634, -107.67923598048004, 1.5);
 
                 if (1) {
 		    _rlanUncerts_m = std::make_tuple(100.0, 60.0, 0.0);    // minor uncertainity, major uncertainity, height uncertainty;
@@ -8165,8 +9637,8 @@ void AfcManager::setDBGInputs(const std::string& tempDir)
 		    _rlanUncertaintyRegionType = RLANBoundary::ELLIPSE;
                 }
 
-		_rlanHeightType = "AGL";
-		// _rlanHeightType = "AMSL";
+		_rlanHeightType = CConst::AGLHeightType;
+		// _rlanHeightType = CConst::AMSLHeightType;
 
 		_minEIRP_dBm = 24.0;
 		_maxEIRP_dBm = 34.0; // Don't forget that units are dBm
@@ -8189,10 +9661,10 @@ void AfcManager::setDBGInputs(const std::string& tempDir)
 
 		_winner2ProbLOSThr = 0.2;
 
-		// _pathLossModelStr = "ITM_BLDG";
-                _pathLossModelStr = "FCC_6GHZ_REPORT_AND_ORDER";
-		// _pathLossModelStr = "COALITION_OPT_6";
-		// _pathLossModelStr = "FSPL";
+		// _pathLossModel = CConst::ITMBldgPathLossModel;
+                _pathLossModel = CConst::FCC6GHzReportAndOrderPathLossModel;
+		// _pathLossModel = CConst::CoalitionOpt6PathLossModel;
+		// _pathLossModel = CConst::FSPLPathLossModel;
 	}
 	/**************************************************************************************/
 
@@ -8241,8 +9713,11 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_closeInDist = 1.0e3;              // Radius in which close in path loss model is used
 	_closeInPathLossModel = "WINNER2"; // Close in path loss model is used
 
-	_wlanMinFreq = 5945.0e6;
-	_wlanMaxFreq = 7125.0e6;
+	_wlanMinFreqMHz = 5945;
+	_wlanMaxFreqMHz = 7125;
+
+	_wlanMinFreq = _wlanMinFreqMHz*1.0e6;
+	_wlanMaxFreq = _wlanMaxFreqMHz*1.0e6;
 
 	_srtmDir = SearchPaths::forReading("data", "fbrat/rat_transfer/srtm3arcsecondv003", true).toStdString();
 	
@@ -8311,17 +9786,17 @@ int AfcManager::convertCFI(int cfi, int& bandwidthMHz, int& startFreqMHz, int& s
     int posn = 0;
     int retval;
 
-    while(cfi & (1<<posn)) {
+    while((posn <= 4) && (cfi & (1<<posn))) {
         posn++;
     }
 
-    if ((posn == 0) || (posn > 4)) {
+    if ((posn == 0) || (posn > 4) || (cfi < 0)) {
         retval = 0;
     } else {
         bandwidthMHz = 20*(1<<(posn-1));
-        startFreqMHz = 5945 + (cfi - (1<<posn) + 1)*5;
+        startFreqMHz = _wlanMinFreqMHz + (cfi - (1<<posn) + 1)*5;
         stopFreqMHz = startFreqMHz + bandwidthMHz;
-        if (stopFreqMHz > 7125) {
+        if (stopFreqMHz > _wlanMaxFreqMHz) {
             retval = 0;
         } else {
             retval = 1;
@@ -8348,8 +9823,9 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
             bool initFlag = true;
             int nextFreqMHz = stopFreqMHz;
             double minPSD;
+            int minNextFreq = stopFreqMHz;
             for(auto channel : _channelList) {
-                if (channel.type == INQUIRED_FREQUENCY) {
+                if ( (channel.type == INQUIRED_FREQUENCY) && (channel.availability != BLACK) ) {
                     if ((channel.startFreqMHz <= prevFreqMHz) && (channel.stopFreqMHz > prevFreqMHz)) {
                         double psd = channel.eirpLimit_dBm - 10.0*log(channel.bandwidth())/log(10.0);
                         if ((initFlag) || (psd < minPSD)) {
@@ -8359,11 +9835,20 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
                             nextFreqMHz = channel.stopFreqMHz;
                         }
                         initFlag = false;
+                    } else if ((channel.startFreqMHz > prevFreqMHz) && (initFlag)) {
+                        if (channel.startFreqMHz < minNextFreq) {
+                            minNextFreq = channel.startFreqMHz;
+                        }
                     }
                  }
             }
             if (initFlag) {
-				throw std::runtime_error("Error computing PSD over inquired frequency range");
+                // throw std::runtime_error(std::string("Error computing PSD over inquired frequency range ")
+                //     + "[" + std::to_string(startFreqMHz) + "," + std::to_string(stopFreqMHz) + "]"
+                //     + ", problem at frequency " + std::to_string(prevFreqMHz)
+                // );
+                nextFreqMHz = minNextFreq;
+                minPSD = std::numeric_limits<double>::quiet_NaN(); 
             }
             psdFreqRange.freqMHzList.push_back(nextFreqMHz);
             psdFreqRange.psd_dBm_MHzList.push_back(minPSD);
@@ -8392,85 +9877,176 @@ void AfcManager::createChannelList()
 {
     // add channel plan to channel list
     auto bwList = std::vector<int> { 20, 40, 80, 160 };
-    int minFreqMHz = (int) floor(_wlanMinFreq*1.0e-6 + 0.5);
-    int maxFreqMHz = (int) floor(_wlanMaxFreq*1.0e-6 + 0.5);
 
     for(auto freqRange : _inquiredFrquencyRangesMHz) {
-        auto startFreqMHz = freqRange.first;
-        auto stopFreqMHz = freqRange.second;
+        auto inquiredStartFreqMHz = freqRange.first;
+        auto inquiredStopFreqMHz = freqRange.second;
 
-        if (   (stopFreqMHz > startFreqMHz) 
-			&& (stopFreqMHz <= maxFreqMHz) 
-			&& (startFreqMHz >= minFreqMHz)) {
+        if (inquiredStopFreqMHz <= inquiredStartFreqMHz) {
+	    LOGGER_DEBUG(logger) << "Inquired Freq Range INVALID: [" << inquiredStartFreqMHz << ", " << inquiredStopFreqMHz << "] stop freq must be > start freq" << std::endl;
+            _responseCode = CConst::unsupportedSpectrumResponseCode;
+            return;
+        }
 
+        if (containsChannel(_allowableFreqBandList, inquiredStartFreqMHz, inquiredStopFreqMHz)) {
+
+            auto startFreqMHz = inquiredStartFreqMHz;
+            auto stopFreqMHz = inquiredStopFreqMHz;
+
+            if (startFreqMHz < _wlanMinFreqMHz) {
+                startFreqMHz = _wlanMinFreqMHz;
+            }
+            if (stopFreqMHz > _wlanMaxFreqMHz) {
+                stopFreqMHz = _wlanMaxFreqMHz;
+            }
+
+            int numChan = 0;
             for(auto bwMHz : bwList) {
-                int startChanIdx = (startFreqMHz - minFreqMHz)/bwMHz;
-                int stopChanIdx = (stopFreqMHz - minFreqMHz - 1)/bwMHz;
+                int startChanIdx = (startFreqMHz - _wlanMinFreqMHz + bwMHz - 1)/bwMHz;
+                int stopChanIdx = (stopFreqMHz - _wlanMinFreqMHz)/bwMHz - 1;
                 for (int chanIdx = startChanIdx; chanIdx <= stopChanIdx; ++chanIdx) {
+                    int chanStartFreqMHz = _wlanMinFreqMHz + chanIdx*bwMHz;
+                    int chanStopFreqMHz = chanStartFreqMHz + bwMHz;
+
                     ChannelStruct channel;
-                    channel.startFreqMHz = minFreqMHz + chanIdx*bwMHz;
-                    channel.stopFreqMHz = channel.startFreqMHz + bwMHz;
+                    channel.startFreqMHz = chanStartFreqMHz;
+                    channel.stopFreqMHz = chanStopFreqMHz;
                     channel.availability = GREEN; // Everything initialized to GREEN
                     channel.type = INQUIRED_FREQUENCY;
                     channel.eirpLimit_dBm = 0;
                     _channelList.push_back(channel);
+
+                    numChan++;
                 }
             }
+
+            if (numChan == 0) {
+	        LOGGER_DEBUG(logger) << "Inquired Freq Range: [" << inquiredStartFreqMHz << ", " << inquiredStopFreqMHz << "] contains no channels" << std::endl;
+                _responseCode = CConst::invalidValueResponseCode;
+                _invalidParams << "lowFrequency" << "highFrequency";
+                return;
+            }
+        } else {
+            // the start/stop frequencies are not valid
+	    LOGGER_DEBUG(logger) << "Inquired Freq Range INVALID: [" << inquiredStartFreqMHz << ", " << inquiredStopFreqMHz << "]" << std::endl;
+            _responseCode = CConst::unsupportedSpectrumResponseCode;
+            return;
         }
-		else
-		{
-			// the start/stop frequencies are not valid
-			throw std::runtime_error("UNSUPPORTED_SPECTRUM: Invalid frequency range. Valid frequencies are in [5945 MHz, 7125 MHz].");
-		}
     }
 
     for(auto channelPair : _inquiredChannels) {
-		LOGGER_DEBUG(logger) << "creating channels for operating class " << channelPair.first; 
+        LOGGER_DEBUG(logger) << "creating channels for operating class " << channelPair.first; 
         auto cfiList = channelPair.second;
-		if (cfiList.size() == 0 && channelPair.first == 133) {
-			LOGGER_DEBUG(logger) << "creating ALL channels for operating class " << channelPair.first;
-			// include all channels in global operating class 133 which is our default
-			auto numChannels = std::vector<int> { 59, 29, 14, 7 };
-			auto startIndex = std::vector<int> { 1, 3, 7, 15 };
-			auto indexInc = std::vector<int> { 4, 8, 16, 32 };
-			int startFreq = 5945; // MHz
-			for(int bwIdx = 0; bwIdx < (int) bwList.size(); bwIdx++) 
-			{
-				for (int chanIdx = 0; chanIdx < numChannels.at(bwIdx); chanIdx++)
-				{
-					ChannelStruct channel;
-					channel.operatingClass = channelPair.first;
-					channel.index = startIndex.at(bwIdx) + chanIdx * indexInc.at(bwIdx);
-					channel.startFreqMHz = startFreq + chanIdx * bwList.at(bwIdx);
-					channel.stopFreqMHz = startFreq + (chanIdx + 1) * bwList.at(bwIdx);
-					channel.type = ChannelType::INQUIRED_CHANNEL;
-					channel.availability = GREEN; // Everything initialized to GREEN
-					channel.eirpLimit_dBm = 0;
-					_channelList.push_back(channel);
-				}
-			}
-			LOGGER_DEBUG(logger) << "added " << (59+29+14+7) << " channels";
-		} else if (cfiList.size() == 0) {
-			throw std::runtime_error("UNSUPPORTED_SPECTRUM Global operating class " + std::to_string(channelPair.first) + " not supported. 133 is currently the only supported class.");
-		}
-        for(auto cfi : cfiList) {
-			LOGGER_DEBUG(logger) << "creating cherry picked channels in operating class " << channelPair.first;
-            int bandwidthMHz, startFreqMHz, stopFreqMHz;
-            if (convertCFI(cfi, bandwidthMHz, startFreqMHz, stopFreqMHz)) {
-                ChannelStruct channel;
-                channel.startFreqMHz = startFreqMHz;
-                channel.stopFreqMHz = stopFreqMHz;
-				channel.index = cfi;
-				channel.operatingClass = channelPair.first;
-                channel.availability = GREEN; // Everything initialized to GREEN
-                channel.type = INQUIRED_CHANNEL;
-                channel.eirpLimit_dBm = 0;
-                _channelList.push_back(channel);
-            } else {
-				throw std::runtime_error("UNSUPPORTED_SPECTRUM Invalid channel with index " + std::to_string(cfi) + " found.");
+        int bwIdx = channelPair.first - 131;
+        if ((bwIdx < 0) || (bwIdx >= (int) bwList.size())) {
+            // throw std::runtime_error("UNSUPPORTED_SPECTRUM Global operating class " + std::to_string(channelPair.first) + " not supported. [131,13] are currently the only supported classes.");
+	    LOGGER_DEBUG(logger) << "Inquired Channel INVALID Operating Class: " << channelPair.first << std::endl;
+            _responseCode = CConst::unsupportedSpectrumResponseCode;
+            return;
+        }
+        int bwMHz = bwList[bwIdx];
+        if (cfiList.size() == 0) {
+            LOGGER_DEBUG(logger) << "creating ALL channels for operating class " << channelPair.first;
+            // include all channels in global operating class
+            auto numChannels = std::vector<int> { 59, 29, 14, 7 };
+            auto startIndex = std::vector<int> { 1, 3, 7, 15 };
+            auto indexInc = std::vector<int> { 4, 8, 16, 32 };
+            int numChannelAdded = 0;
+            for (int chanIdx = 0; chanIdx < numChannels.at(bwIdx); chanIdx++) {
+                int chanStartFreqMHz = _wlanMinFreqMHz + chanIdx*bwMHz;
+                int chanStopFreqMHz = chanStartFreqMHz + bwMHz;
+                if (containsChannel(_allowableFreqBandList, chanStartFreqMHz, chanStopFreqMHz)) {
+                    ChannelStruct channel;
+                    channel.operatingClass = channelPair.first;
+                    channel.index = startIndex.at(bwIdx) + chanIdx * indexInc.at(bwIdx);
+                    channel.startFreqMHz = chanStartFreqMHz;
+                    channel.stopFreqMHz = chanStopFreqMHz;
+                    channel.type = ChannelType::INQUIRED_CHANNEL;
+                    channel.availability = GREEN; // Everything initialized to GREEN
+                    channel.eirpLimit_dBm = 0;
+                    _channelList.push_back(channel);
+                    numChannelAdded++;
+                }
+            }
+            LOGGER_DEBUG(logger) << "added " << numChannelAdded << " channels";
+        } else {
+            for(auto cfi : cfiList) {
+                LOGGER_DEBUG(logger) << "creating cherry picked channels in operating class " << channelPair.first;
+                int bandwidthMHz, startFreqMHz, stopFreqMHz;
+                if (convertCFI(cfi, bandwidthMHz, startFreqMHz, stopFreqMHz)) {
+                    if (bandwidthMHz != bwMHz) {
+                        LOGGER_DEBUG(logger) << "ERROR: Channnel number " << cfi << " is not in operating class " << channelPair.first << std::endl;
+                        _responseCode = CConst::unsupportedSpectrumResponseCode;
+                        return;
+                    }
+                    if (containsChannel(_allowableFreqBandList, startFreqMHz, stopFreqMHz)) {
+                        ChannelStruct channel;
+                        channel.startFreqMHz = startFreqMHz;
+                        channel.stopFreqMHz = stopFreqMHz;
+                        channel.index = cfi;
+                        channel.operatingClass = channelPair.first;
+                        channel.availability = GREEN; // Everything initialized to GREEN
+                        channel.type = INQUIRED_CHANNEL;
+                        channel.eirpLimit_dBm = 0;
+                        _channelList.push_back(channel);
+                    } else {
+                        LOGGER_DEBUG(logger) << "ERROR: Channnel index " << cfi << " [" << startFreqMHz << ", " << stopFreqMHz << "] not in allowable freq range" << std::endl;
+                        _responseCode = CConst::unsupportedSpectrumResponseCode;
+                        return;
+                    }
+                } else {
+                    LOGGER_DEBUG(logger) << "ERROR: Channnel index " << cfi << " INVALID" << std::endl;
+                    _responseCode = CConst::unsupportedSpectrumResponseCode;
+                    return;
+                }
             }
         }
     }
+}
+/**************************************************************************************/
+
+/**************************************************************************************/
+/* AfcManager::containsChannel()                                                      */
+/**************************************************************************************/
+bool AfcManager::containsChannel(const std::vector<FreqBandClass>& freqBandList, int chanStartFreqMHz, int chanStopFreqMHz)
+{
+    auto segmentList = std::vector<std::pair<int,int>> { std::make_pair(chanStartFreqMHz, chanStopFreqMHz) };
+
+    for(auto freqBand : freqBandList) {
+        int bandStart = freqBand.getStartFreqMHz();
+        int bandStop  = freqBand.getStopFreqMHz();
+        int segIdx=0;
+        while(segIdx < (int) segmentList.size()) {
+            int segStart = segmentList[segIdx].first;
+            int segStop  = segmentList[segIdx].second;
+
+            if ((bandStop <= segStart) || (bandStart >= segStop)) {
+                // No overlap, do nothing
+                segIdx++;
+            } else if (    (bandStart <= segStart)
+                        && (bandStop  >= segStop ) ) {
+                // Remove segment
+                segmentList.erase(segmentList.begin() + segIdx);
+            } else if (bandStart <= segStart) {
+                // Clip bottom of segment
+                segmentList[segIdx] = std::make_pair(bandStop, segStop);
+                segIdx++;
+            } else if (bandStop >= segStop) {
+                // Clip top of segment
+                segmentList[segIdx] = std::make_pair(segStart, bandStart);
+                segIdx++;
+            } else {
+                // Split Segment
+                segmentList[segIdx] = std::make_pair(segStart, bandStart);
+                segmentList.insert(segmentList.begin()+segIdx+1, std::make_pair(bandStop, segStop));
+                segIdx+=2;
+            }
+        }
+    }
+
+    bool containsFlag = (segmentList.size() == 0);
+
+    return(containsFlag);
 }
 /**************************************************************************************/
 
