@@ -33,7 +33,7 @@ ULS-Parser enhancements:
 ## **Interface Changes**
 
 **WFA interface specification:** updated to latest version (1.1) from 0.0.6
-**For the new certificationId format (per 1.1 ICD), admin API that adds new APs (/admin/user/ap/<id>), it uses a single certificationId property that is nra+" "+certificationId. This matches the database schema. The Admin and Virtual AP GUI and the AP request JSON message were chagned to accomodate this change.
+**For the new certificationId format (per 1.1 ICD)**,the admin API that adds new APs (/admin/user/ap/<id>), still uses a single certificationId property that is nra+" "+certificationId. This matches the database schema. The Admin and Virtual AP GUI and the AP request JSON message were chagned to accomodate this change.
 **ULS Parser:** No changes
 
 
