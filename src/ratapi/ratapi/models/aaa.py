@@ -1,3 +1,12 @@
+#
+# This Python file uses the following encoding: utf-8
+#
+# Portions copyright © 2021 Broadcom.
+# All rights reserved. The term “Broadcom” refers solely
+# to the Broadcom Inc. corporate affiliate that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which
+# is included with this software program.
+#
 # pylint: disable=no-member
 ''' Authentication, authorization, and accounting classes.
 '''
@@ -146,7 +155,6 @@ class AccessPoint(db.Model):
         'aaa_user.id', ondelete='CASCADE'))
 
     def __init__(self, serial_number, model, manufacturer, certification_id, user_id=None):
-    #def __init__(self, serial_number, model, manufacturer, user_id=None):
         if not serial_number:
             raise RuntimeError("Serial number cannot be empty")
         self.serial_number = serial_number
@@ -174,3 +182,11 @@ class Limit(db.Model):
         self.id = 0
         self.min_eirp = min_eirp 
         self.enforce = True
+
+# Local Variables:
+# mode: Python
+# indent-tabs-mode: nil
+# python-indent: 4
+# End:
+#
+# vim: sw=4:et:tw=80:cc=+1
