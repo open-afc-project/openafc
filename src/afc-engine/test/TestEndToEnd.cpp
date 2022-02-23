@@ -476,7 +476,7 @@ void EndToEndTest::runTest()
     compareExcThr(runExcThrFile, expExcThrFile);
 }
 
-TEST_F(EndToEndTest, Test1) {
+TEST_F(EndToEndTest, DISABLED_Test1) {
     QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
     QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
     QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
