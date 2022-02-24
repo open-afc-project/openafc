@@ -17,20 +17,32 @@ export interface AvailableSpectrumInquiryRequest {
     vendorExtensions: VendorExtension[]
 }
 
+export interface CertificationId{
+    nra:string,
+    id:string
+}
+
+
 export interface DeviceDescriptor {
     serialNumber: string,
-    certificationId: string,
+    certificationId: CertificationId[],
     rulesetIds: ["47_CFR_PART_15_SUBPART_E"]
+}
+
+export interface Elevation {
+    height?: number,
+    verticalUncertainty?: number,
+    heightType?: string
 }
 
 export interface Location {
     ellipse?: Ellipse,
     linearPolygon?: LinearPolygon,
     radialPolygon?: RadialPolygon,
-    height: number,
-    verticalUncertainty: number,
+    elevation?: Elevation,
     indoorDeployment: DeploymentEnum
 }
+
 
 export interface Ellipse {
     center: Point,
@@ -94,7 +106,7 @@ export interface InquiryResponse {
 }
 
 export interface VendorExtension {
-    extensionID: "RAT v0.6 AFC Config"
+    extensionID: "RAT v1.1AFC Config"
     parameters: AFCConfigFile
 }
 
@@ -102,4 +114,13 @@ export enum DeploymentEnum {
     indoorDeployment = 1,
     outdoorDeployment = 2,
     unkown = 0
+}
+
+
+export enum OperatingClassIncludeType { None = "None", Some = "Some", All = "All" };
+
+export interface OperatingClass {
+    num: number,
+    include: OperatingClassIncludeType,
+    channels?: number[]
 }

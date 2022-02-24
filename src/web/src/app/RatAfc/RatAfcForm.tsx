@@ -1,13 +1,23 @@
 import * as React from "react";
-import { AvailableSpectrumInquiryRequest, LinearPolygon, RadialPolygon, Ellipse, DeploymentEnum } from "../Lib/RatAfcTypes";
+import { AvailableSpectrumInquiryRequest, LinearPolygon, RadialPolygon, Ellipse, DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange } from "../Lib/RatAfcTypes";
 import { logger } from "../Lib/Logger";
-import { Modal, Button, ClipboardCopy, ClipboardCopyVariant, Alert, Gallery, GalleryItem, FormGroup, TextInput, InputGroup, InputGroupText, FormSelect, FormSelectOption, Checkbox, ChipGroup, Chip } from "@patternfly/react-core";
+import {
+    Modal, Button, ClipboardCopy, ClipboardCopyVariant, Alert, Gallery, GalleryItem,
+    FormGroup, TextInput, InputGroup, InputGroupText, FormSelect, FormSelectOption, FormHelperText,
+    ChipGroup, Chip
+} from "@patternfly/react-core";
 import { Timer } from "../Components/Timer";
 import { getCacheItem, cacheItem, getAfcConfigFile } from "../Lib/RatApi";
 import { AFCConfigFile, RatResponse, IndoorOutdoorType } from "../Lib/RatApiTypes";
 import { ifNum } from "../Lib/Utils";
 import { LocationForm } from "./LocationForm";
 import { Limit } from "../Lib/Admin";
+import { ElevationForm } from "./ElevationForm";
+import ExclamationCircleIcon from '@patternfly/react-icons/dist/esm/icons/exclamation-circle-icon';
+import { OperatingClass, OperatingClassIncludeType } from "../Lib/RatAfcTypes";
+import { OperatingClassForm } from "./OperatingClassForm";
+import { InquiredFrequencyForm } from "./InquiredFrequencyForm";
+
 
 interface RatAfcFormParams {
     onSubmit: (a: AvailableSpectrumInquiryRequest) => Promise<void>,
@@ -24,25 +34,22 @@ interface RatAfcFormState {
     location: {
         ellipse?: Ellipse,
         linearPolygon?: LinearPolygon,
-        radialPolygon?: RadialPolygon
+        radialPolygon?: RadialPolygon,
+        elevation?: Elevation,
     },
+
     serialNumber?: string,
-    certificationId?: string,
-    // latitude?: number,
-    // longitude?: number,
-    // majorAxis?: number,
-    // minorAxis?: number,
-    // orientation?: number,
-    height?: number,
-    heightUncertainty?: number,
+    certificationId?: CertificationId[],
+    newCertificationId?: string,
+    newCertificationNra?: string,
     indoorDeployment?: DeploymentEnum,
     minDesiredPower?: number,
-    minFreqMHz?: number,
-    maxFreqMHz?: number,
-    globalOperatingClass?: number
-    channelIndicies: number[],
+    inquiredFrequencyRange: FrequencyRange[],
     newChannel?: number,
-    config?: AFCConfigFile
+
+    operatingClasses: OperatingClass[]
+
+
 }
 
 export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormState> {
@@ -55,30 +62,40 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
             status: props.config.kind === "Error" ? "Error" : undefined,
             message: props.config.kind === "Error" ? "AFC config file could not be loaded" : "",
             submitting: false,
-            location: {},
+            location: { elevation: {} },
             serialNumber: undefined,
-            certificationId: undefined,
-            // latitude: undefined,
-            // longitude: undefined,
-            // majorAxis: undefined,
-            // minorAxis: undefined,
-            // orientation: undefined,
-            height: undefined,
-            heightUncertainty: undefined,
+            certificationId: [],
             indoorDeployment: undefined,
             minDesiredPower: undefined,
-            minFreqMHz: undefined,
-            maxFreqMHz: undefined,
-            globalOperatingClass: 133,
-            channelIndicies: [],
-            config: props.config.kind === "Success" ? props.config.result : undefined
+            inquiredFrequencyRange: [],
+            operatingClasses: [
+                {
+                    num: 131,
+                    include: OperatingClassIncludeType.None
+                },
+
+                {
+                    num: 132,
+                    include: OperatingClassIncludeType.None
+                },
+
+                {
+                    num: 133,
+                    include: OperatingClassIncludeType.None
+                },
+
+                {
+                    num: 134,
+                    include: OperatingClassIncludeType.None
+                },
+            ]
         };
     }
 
     componentDidMount() {
         const st: RatAfcFormState = getCacheItem("ratAfcFormCache");
         if (st !== undefined) {
-            st.config = this.state.config;
+          
             this.setState(st);
         }
     }
@@ -91,50 +108,41 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
 
     private setConfig(value: string) {
         try {
-          const params = JSON.parse(value) as AvailableSpectrumInquiryRequest;
-          // set params
-          const location = params?.location;
-          const ellipse = location?.ellipse;
-          this.setState({
-            serialNumber: params?.deviceDescriptor?.serialNumber,
-            certificationId: params?.deviceDescriptor?.certificationId,
-            location: location,
-            // latitude: ellipse?.center?.latitude,
-            // longitude: ellipse?.center?.longitude,
-            // majorAxis: ellipse?.majorAxis,
-            // minorAxis: ellipse?.minorAxis,
-            // orientation: ellipse?.orientation,
-            height: location?.height,
-            heightUncertainty: location?.verticalUncertainty,
-            indoorDeployment: location?.indoorDeployment,
-            minDesiredPower: params?.minDesiredPower,
-            globalOperatingClass: params?.inquiredChannels && params.inquiredChannels[0].globalOperatingClass,
-            channelIndicies: (params?.inquiredChannels && params.inquiredChannels[0].channelCfi) || [],
-            minFreqMHz: params?.inquiredFrequencyRange && params.inquiredFrequencyRange[0].lowFrequency,
-            maxFreqMHz: params?.inquiredFrequencyRange && params.inquiredFrequencyRange[0].highFrequency,
-            config: params?.vendorExtensions && params.vendorExtensions[0]?.parameters
-          })
+            const params = JSON.parse(value) as AvailableSpectrumInquiryRequest;
+            // set params
+            const location = params?.location;
+            const ellipse = location?.ellipse;
+            const elevation = location?.elevation;
+            this.setState({
+                serialNumber: params?.deviceDescriptor?.serialNumber,
+                certificationId: params?.deviceDescriptor?.certificationId || [],
+                location: location,
+                indoorDeployment: location?.indoorDeployment,
+                minDesiredPower: params?.minDesiredPower,
+                operatingClasses: this.toOperatingClassArray(params?.inquiredChannels),
+                inquiredFrequencyRange: params.inquiredFrequencyRange,
+            })
         } catch (e) {
-          logger.error("Pasted value is not valid JSON");
+            logger.error("Pasted value is not valid JSON {" + value + "}");
         }
     }
 
-    private deleteChannel(channel: number) {
-      const copyOfChannels = this.state.channelIndicies;
-      const index = copyOfChannels.indexOf(channel as never);
-      if (index !== -1) {
-        copyOfChannels.splice(index, 1);
-        this.setState({ channelIndicies: copyOfChannels });
-      }
+
+    deleteCertifcationId(currentCid: string): void {
+        const copyOfcertificationId = this.state.certificationId.filter(x => x.id != currentCid);
+        this.setState({ certificationId: copyOfcertificationId });
+    }
+    addCertificationId(newCertificationId: CertificationId): void {
+        const copyOfcertificationId = this.state.certificationId.slice();
+        copyOfcertificationId.push({ id: newCertificationId.id, nra: newCertificationId.nra });
+        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationNra: '' });
     }
 
-    private addChannel(channel: number) {
-        const copyOfChannels = this.state.channelIndicies;
-        const existingChannel = copyOfChannels.indexOf(channel);
-        if (existingChannel === -1 && channel > 0 && Number.isInteger(channel)) {
-            copyOfChannels.push(channel);
-            this.setState({ channelIndicies: copyOfChannels, newChannel: undefined });
-        }
+
+    private updateOperatingClass(e: OperatingClass, i: number) {
+        var opClassesCopy = this.state.operatingClasses.slice();
+        opClassesCopy.splice(i, 1, e);
+        this.setState({ operatingClasses: opClassesCopy })
     }
 
     private getParamsJSON = () => ({
@@ -148,29 +156,127 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
             ellipse: this.state.location.ellipse!,
             linearPolygon: this.state.location.linearPolygon!,
             radialPolygon: this.state.location.radialPolygon!,
-            height: this.state.height!,
-            verticalUncertainty: this.state.heightUncertainty!,
+            elevation: this.state.location.elevation!,
             indoorDeployment: this.state.indoorDeployment!
         },
         minDesiredPower: this.state.minDesiredPower!,
-        vendorExtensions: [{
-            extensionID: "RAT v0.6 AFC Config",
-            parameters: this.state.config!
-        }],
-        inquiredChannels: ((this.state.channelIndicies.length > 0) ? [
-            {
-                globalOperatingClass: this.state.globalOperatingClass,
-                channelCfi: this.state.channelIndicies
-            }
-        ] : [
-            {
-                globalOperatingClass: this.state.globalOperatingClass,
-            }
-        ]),
-        inquiredFrequencyRange: ((this.state.minFreqMHz === undefined || this.state.maxFreqMHz === undefined) ? undefined : [
-            { lowFrequency: this.state.minFreqMHz, highFrequency: this.state.maxFreqMHz }
-        ])
+        vendorExtensions: [],
+        inquiredChannels:
+            this.state.operatingClasses.filter(x => x.include != OperatingClassIncludeType.None).map(x => this.fromOperatingClass(x)),
+
+        inquiredFrequencyRange:this.state.inquiredFrequencyRange && this.state.inquiredFrequencyRange.length > 0 ? this.state.inquiredFrequencyRange : []
     }) as AvailableSpectrumInquiryRequest;
+
+
+    private fromOperatingClass(oc: OperatingClass) {
+        switch (oc.include) {
+            case OperatingClassIncludeType.None:
+                return {};
+            case OperatingClassIncludeType.All:
+                return {
+                    globalOperatingClass: oc.num,
+                }
+            case OperatingClassIncludeType.Some:
+                return {
+                    globalOperatingClass: oc.num,
+                    channelCfi: oc.channels
+                }
+            default:
+                break;
+        }
+    }
+
+    private toOperatingClassArray(c: Channels[]) {
+        var empties = [
+            {
+                num: 131,
+                channels: [],
+                include: OperatingClassIncludeType.None
+            },
+            {
+                num: 132,
+                channels: [],
+                include: OperatingClassIncludeType.None
+            },
+            {
+                num: 133,
+                channels: [],
+                include: OperatingClassIncludeType.None
+            },
+            {
+                num: 134,
+                channels: [],
+                include: OperatingClassIncludeType.None
+            },
+        ];
+
+        if (!c)
+            return empties;
+
+        var converted = c.map(v => this.toOperatingClass(v));
+        var convertedClasses = converted.map(x => x.num);
+        var emptiesNeeded = empties.filter(x => !convertedClasses.includes(x.num))
+        var merge = converted.concat(emptiesNeeded).sort((a, b) => a.num - b.num);
+
+        return merge;
+    }
+
+    private toOperatingClass(c: Channels) {
+        var include = OperatingClassIncludeType.None
+        if (!c.channelCfi) {
+            include = OperatingClassIncludeType.All
+        } else if (c.channelCfi && c.channelCfi.length > 0) {
+            include = OperatingClassIncludeType.Some
+        }
+
+        var oc: OperatingClass = {
+            num: c.globalOperatingClass,
+            channels: c.channelCfi,
+            include: include
+        }
+        return oc;
+
+    }
+
+    private mapChannelsToOperatingClassArray(channels: number[]) {
+        var result = [
+            {
+                globalOperatingClass: 131,
+                channelCfi: []
+            },
+            {
+                globalOperatingClass: 132,
+                channelCfi: []
+            },
+            {
+                globalOperatingClass: 133,
+                channelCfi: []
+            },
+            {
+                globalOperatingClass: 134,
+                channelCfi: []
+            },
+        ];
+
+        channels.forEach(n => {
+            if (n % 4 == 1) {
+                result[0].channelCfi.push(n);
+            } else if (n % 8 == 3) {
+                result[1].channelCfi.push(n);
+            } else if (n % 16 == 7) {
+                result[2].channelCfi.push(n);
+            } else if (n % 32 == 15) {
+                result[3].channelCfi.push(n);
+            }
+        });
+
+        var filteredResult = result.filter(x => x.channelCfi.length > 0);
+
+
+        return filteredResult;
+    }
+
+
 
     private copyPasteClick() {
         this.setState({ isModalOpen: true });
@@ -180,18 +286,23 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
      * Validates form data
      */
     private validInputs() {
-        return !!this.state.serialNumber
-            && !!this.state.certificationId
-            && this.locationValid(this.state.location.ellipse, this.state.location.linearPolygon, this.state.location.radialPolygon)
-            && this.state.height >= 0
-            && this.state.indoorDeployment !== undefined
-            && this.state.heightUncertainty >= 0
-            && (this.state.minDesiredPower == undefined || this.state.minDesiredPower >= 0)
-            && ((this.state.globalOperatingClass >= 0 && Number.isInteger(this.state.globalOperatingClass))
-                || (this.state.minFreqMHz >= 0 && this.state.maxFreqMHz >= 0 && this.state.minFreqMHz <= this.state.maxFreqMHz)
-            ) && this.props.limit.enforce ? this.state.minDesiredPower === undefined || this.state.minDesiredPower >= this.props.limit.limit : this.state.minDesiredPower === undefined || this.state.minDesiredPower >= 0
+        return true;
+        // Per RAT-285, move all error checking to the engine
+
+
+        // return !!this.state.serialNumber
+        //     && this.state.certificationId && this.state.certificationId.length
+        //     && this.locationValid(this.state.location.ellipse, this.state.location.linearPolygon, this.state.location.radialPolygon)
+        //     && this.state.elevation.height >= 0
+        //     && this.state.indoorDeployment !== undefined
+        //     && this.state.elevation.verticalUncertainty >= 0
+        //     && (this.state.minDesiredPower == undefined || this.state.minDesiredPower >= 0)
+        //     && ((this.state.globalOperatingClass >= 0 && Number.isInteger(this.state.globalOperatingClass))
+        //         || (this.state.minFreqMHz >= 0 && this.state.maxFreqMHz >= 0 && this.state.minFreqMHz <= this.state.maxFreqMHz)
+        //     ) && (this.props.limit.enforce ? this.state.minDesiredPower === undefined || 
+        //             this.state.minDesiredPower >= this.props.limit.limit : this.state.minDesiredPower === undefined || this.state.minDesiredPower >= 0)
     }
-    
+
     /**
      * validates location form data. only one of the location types needs to be present and valid
      * @param ellipse ellipse form data
@@ -200,7 +311,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
      */
     private locationValid(ellipse?: Ellipse, linPoly?: LinearPolygon, radPoly?: RadialPolygon) {
         if (ellipse !== undefined) {
-            return ellipse.center 
+            return ellipse.center
                 && ellipse.center.latitude >= -90 && ellipse.center.latitude <= 90
                 && ellipse.center.longitude >= -180 && ellipse.center.longitude <= 180
                 && ellipse.majorAxis >= 0
@@ -223,29 +334,29 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
      * submit form data after validating it to make the api request
      */
     private submit() {
+        console.log('value for validInput' + this.validInputs())
         if (!this.validInputs()) {
-            this.setState({ status: "Error", message: "One or more inputs are invalid."});
-        } else if (!this.state.config) {
-            this.setState({ status: "Error", message: "The AFC config has not been loaded"});
-        } else {
+            this.setState({ status: "Error", message: "One or more inputs are invalid." });
+         } else {
             this.setState({ status: undefined, message: "" });
             const params = this.getParamsJSON();
             this.props.onSubmit(params)
-            .then(() => this.setState({ submitting: false }));
+                .then(() => this.setState({ submitting: false }));
         }
     }
 
     render() {
         return (
             <>
-            <Modal
-                title="Copy/Paste"
-                isLarge={true}
-                isOpen={this.state.isModalOpen}
-                onClose={() => this.setState({ isModalOpen: false })}
-                actions={[<Button key="update" variant="primary" onClick={() => this.setState({ isModalOpen: false })}>Close</Button>]}>
-                <ClipboardCopy variant={ClipboardCopyVariant.expansion} onChange={(v: string) => this.setConfig(v)} aria-label="text area">{JSON.stringify(this.getParamsJSON())}</ClipboardCopy>
-            </Modal>
+                <Modal
+                    title="Copy/Paste"
+                    isLarge={true}
+                    isOpen={this.state.isModalOpen}
+                    onClose={() => this.setState({ isModalOpen: false })}
+                    actions={[<Button key="update" variant="primary" onClick={() => this.setState({ isModalOpen: false })}>Close</Button>]}>
+                    <ClipboardCopy variant={ClipboardCopyVariant.expansion}
+                        onChange={(text: string | number) => this.setConfig(String(text))} aria-label="text area">{JSON.stringify(this.getParamsJSON())}</ClipboardCopy>
+                </Modal>
                 <Gallery gutter="sm">
                     <GalleryItem>
                         <FormGroup
@@ -269,58 +380,57 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                         <FormGroup
                             label="Certification Id"
                             fieldId="horizontal-form-certification-id"
+                            helperTextInvalid="Provide at least one Certification Id"
+                            // helperTextInvalidIcon={<ExclamationCircleIcon />} //This is not supported in our version of Patternfly
+                            validated={this.state.certificationId.length > 0 ? "success" : "error"}
                         >
-                            <TextInput
-                                value={this.state.certificationId}
-                                type="text"
-                                id="horizontal-form-certification-id"
-                                aria-describedby="horizontal-form-certification-id-helper"
-                                name="horizontal-form-manufacturer"
-                                onChange={x => this.setState({ certificationId: x })}
-                                isValid={!!this.state.certificationId}
-                                style={{ textAlign: "right" }}
-                            />
+                            <ChipGroup aria-orientation="vertical"
+                            >
+                                {this.state.certificationId.map(currentCid => (
+                                    <Chip width="100%" key={currentCid.id} onClick={() => this.deleteCertifcationId(currentCid.id)}>
+                                        {currentCid.nra + " " + currentCid.id}
+                                    </Chip>
+                                ))}
+                            </ChipGroup>
+                            <div>
+                                {" "}<Button key="add-certificationId" variant="tertiary"
+                                    onClick={() => this.addCertificationId({ id: this.state.newCertificationId, nra: this.state.newCertificationNra })}>
+                                    +
+                                </Button>
+                            </div>
+                            <div>
+                                <TextInput
+                                    label="NRA"
+                                    value={this.state.newCertificationNra}
+                                    onChange={x => this.setState({ newCertificationNra: x })}
+                                    type="text"
+                                    step="any"
+                                    id="horizontal-form-certification-nra"
+                                    name="horizontal-form-certification-nra"
+                                    style={{ textAlign: "left" }}
+                                    placeholder="NRA"
+                                />
+
+                                <TextInput
+                                    label="Id"
+                                    value={this.state.newCertificationId}
+                                    onChange={x => this.setState({ newCertificationId: x })}
+                                    type="text"
+                                    step="any"
+                                    id="horizontal-form-certification-list"
+                                    name="horizontal-form-certification-list"
+                                    style={{ textAlign: "left" }}
+                                    placeholder="Id"
+                                />
+                            </div>
                         </FormGroup>
                     </GalleryItem>
                     <LocationForm
                         location={this.state.location}
-                        onChange={x => this.setState({ location: x })} />
+                        onChange={x => this.setState({ location: x })}
+                    />
                     <GalleryItem>
-                        <FormGroup label="Height (Above Ground Level)" fieldId="horizontal-form-height">
-                            <InputGroup>
-                                <TextInput
-                                    value={this.state.height}
-                                    onChange={x => ifNum(x, n => this.setState({ height: n }))}
-                                    type="number"
-                                    step="any"
-                                    id="horizontal-form-height"
-                                    name="horizontal-form-height"
-                                    isValid={this.state.height >= 0}
-                                    style={{ textAlign: "right" }}
-                                />
-                                <InputGroupText>meters</InputGroupText>
-                            </InputGroup>
-                        </FormGroup>
-                    </GalleryItem>                    
-                    <GalleryItem>
-                        <FormGroup label="Height Uncertainty (+/-)" fieldId="horizontal-form-height-cert">
-                            <InputGroup>
-                                <TextInput
-                                    value={this.state.heightUncertainty}
-                                    onChange={x => ifNum(x, n => this.setState({ heightUncertainty: n }))}
-                                    type="number"
-                                    step="any"
-                                    id="horizontal-form-height-cert"
-                                    name="horizontal-form-height-cert"
-                                    isValid={this.state.heightUncertainty >= 0}
-                                    style={{ textAlign: "right" }}
-                                />
-                                <InputGroupText>meters</InputGroupText>
-                            </InputGroup>
-                        </FormGroup>
-                    </GalleryItem>
-                    <GalleryItem>
-                        <FormGroup label={this.props.limit.enforce ? "Minimum Desired EIRP (Min: " + this.props.limit.limit  + " dBm)": "Minimum Desired EIRP"} fieldId="horizontal-form-min-eirp">
+                        <FormGroup label={this.props.limit.enforce ? "Minimum Desired EIRP (Min: " + this.props.limit.limit + " dBm)" : "Minimum Desired EIRP"} fieldId="horizontal-form-min-eirp">
                             <InputGroup>
                                 <TextInput
                                     value={this.state.minDesiredPower}
@@ -338,23 +448,27 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                     </GalleryItem>
                     <GalleryItem>
                         <FormGroup label="Indoor Deployment" fieldId="horizontal-form-indoor-deployment">
-                            <InputGroup>                            
+                            <InputGroup>
                                 <FormSelect
                                     value={this.state.indoorDeployment}
-                                    onChange={(x:string)=> ((x!==undefined) && this.setState({indoorDeployment: Number.parseInt(x)}))}
-                                    isValid={this.state.indoorDeployment !==undefined} 
+                                    onChange={(x: string) => ((x !== undefined) && this.setState({ indoorDeployment: Number.parseInt(x) }))}
+                                    isValid={this.state.indoorDeployment !== undefined}
                                     id="horizontal-form-indoor-deployment"
                                     name="horizontal-form-indoor-deployment">
-                                    <FormSelectOption  key={undefined} value={undefined} label="Please select a value" isDisabled={true}/> 
-                                    <FormSelectOption  key={DeploymentEnum.indoorDeployment} value={DeploymentEnum.indoorDeployment} label="Indoor" />
-                                    <FormSelectOption  key={DeploymentEnum.outdoorDeployment} value={DeploymentEnum.outdoorDeployment} label="Outdoor" />
-                                    <FormSelectOption  key={DeploymentEnum.unkown} value={DeploymentEnum.unkown} label="Undefined" /> 
+                                    <FormSelectOption key={undefined} value={undefined} label="Please select a value" isDisabled={true} />
+                                    <FormSelectOption key={DeploymentEnum.indoorDeployment} value={DeploymentEnum.indoorDeployment} label="Indoor" />
+                                    <FormSelectOption key={DeploymentEnum.outdoorDeployment} value={DeploymentEnum.outdoorDeployment} label="Outdoor" />
+                                    <FormSelectOption key={DeploymentEnum.unkown} value={DeploymentEnum.unkown} label="Undefined" />
                                 </FormSelect>
                             </InputGroup>
                         </FormGroup>
                     </GalleryItem>
                     <GalleryItem>
-                        <FormGroup label="Minimum Frequency" fieldId="horizontal-form-min-freq">
+                        <InquiredFrequencyForm
+                            inquiredFrequencyRange={this.state.inquiredFrequencyRange}
+                            onChange={x => this.setState({ inquiredFrequencyRange: x.inquiredFrequencyRange })} >
+                        </InquiredFrequencyForm>
+                        {/* <FormGroup label="Minimum Frequency" fieldId="horizontal-form-min-freq">
                             <InputGroup>
                                 <TextInput
                                     value={this.state.minFreqMHz}
@@ -363,9 +477,6 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                                     step="any"
                                     id="horizontal-form-min-freq"
                                     name="horizontal-form-min-freq"
-                                    isValid={((this.state.globalOperatingClass >= 0 && Number.isInteger(this.state.globalOperatingClass))
-                                        || (this.state.minFreqMHz >= 0 && this.state.minFreqMHz <= this.state.maxFreqMHz)
-                                    )}
                                     style={{ textAlign: "right" }}
                                 />
                                 <InputGroupText>MHz</InputGroupText>
@@ -382,70 +493,40 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                                     step="any"
                                     id="horizontal-form-max-freq"
                                     name="horizontal-form-max-freq"
-                                    isValid={((this.state.globalOperatingClass >= 0 && Number.isInteger(this.state.globalOperatingClass))
-                                        || (this.state.maxFreqMHz >= 0 && this.state.minFreqMHz <= this.state.maxFreqMHz)
-                                    )}
                                     style={{ textAlign: "right" }}
                                 />
                                 <InputGroupText>MHz</InputGroupText>
                             </InputGroup>
-                        </FormGroup>
-                    </GalleryItem>
-                    {/* <GalleryItem>
-                        <FormGroup label="Global operating class" fieldId="horizontal-form-operating-class">
-                            <InputGroup>
-                                <TextInput
-                                    value={this.state.globalOperatingClass}
-                                    onChange={x => ifNum(x, n => this.setState({ globalOperatingClass: n === 0 ? undefined : n }))}
-                                    type="number"
-                                    step="any"
-                                    id="horizontal-form-operating-class"
-                                    name="horizontal-form-operating-class"
-                                    isValid={((this.state.globalOperatingClass >= 0 && Number.isInteger(this.state.globalOperatingClass))
-                                        || (this.state.minFreqMHz >= 0 && this.state.maxFreqMHz >= 0 && this.state.minFreqMHz <= this.state.maxFreqMHz)
-                                    )}
-                                    style={{ textAlign: "right" }}
-                                />
-                            </InputGroup>
-                        </FormGroup>
-                    </GalleryItem> */}
-                    <GalleryItem>
-                        <FormGroup label="Channel Indices" fieldId="horizontal-form-channel-list">
-                            <br/>
-                            <ChipGroup>
-                                {this.state.channelIndicies.map(currentChannel => (
-                                    <Chip key={currentChannel} onClick={() => this.deleteChannel(currentChannel)}>
-                                        {currentChannel}
-                                    </Chip>
-                                ))}
-                            </ChipGroup>
-                            {" "}<Button key="add-channel" variant="tertiary" onClick={() => this.addChannel(this.state.newChannel)}>+</Button>
-                            <TextInput
-                                    value={this.state.newChannel}
-                                    onChange={x => ifNum(x, n => this.setState({ newChannel: n === 0 ? undefined : n }))}
-                                    type="number"
-                                    step="any"
-                                    id="horizontal-form-channel-list"
-                                    name="horizontal-form-channel-list"
-                                    isValid={this.state.newChannel === undefined || (this.state.newChannel > 0 && Number.isInteger(this.state.newChannel))}
-                                    style={{ textAlign: "right" }}
-                                />
-                            
-                        </FormGroup>
+                        </FormGroup>*/}
                     </GalleryItem>
                 </Gallery>
-            <br />
+                <FormGroup label="Inquired Channel(s)" fieldId="horizontal-form-operating-class" className="inquiredChannelsSection">
+                    <Gallery className="nestedGallery" width={"1200px"} >
+                        {this.state.operatingClasses.map(
+                            (e, i) => (
+                                <OperatingClassForm key={i}
+                                    operatingClass={e}
+                                    onChange={x => this.updateOperatingClass(x, i)}
+                                ></OperatingClassForm>
+                            )
+                        )}
+                    </Gallery>
+                </FormGroup>
+
+
+                <br />
                 {
                     this.state.status === "Error" &&
                     <Alert title={"Error: "} variant="danger">
                         <pre>{this.state.message}</pre>
                     </Alert>
                 }
-            <br />
+                <br />
                 <>
                     <Button variant="primary" isDisabled={this.state.submitting} onClick={() => this.submit()}>Send Request</Button>{" "}
                     <Button key="open-modal" variant="secondary" onClick={() => this.copyPasteClick()}>Copy/Paste</Button>
                 </>
             </>)
     }
+
 }

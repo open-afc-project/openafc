@@ -131,7 +131,7 @@ EllipseRlanRegionClass::~EllipseRlanRegionClass()
 /******************************************************************************************/
 /**** CONSTRUCTOR: EllipseRlanRegionClass::configure()                                 ****/
 /******************************************************************************************/
-void EllipseRlanRegionClass::configure(std::string rlanHeightType, TerrainClass *terrain)
+void EllipseRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain)
 {
     double bldgHeight;
     MultibandRasterClass::HeightResult lidarHeightResult;
@@ -140,9 +140,9 @@ void EllipseRlanRegionClass::configure(std::string rlanHeightType, TerrainClass 
 
     // LOGGER_DEBUG(logger) << "rlanHeight: " << centerTerrainHeight << ", building height: " << bldgHeight << ", from: " << rlanHeightSource;
 
-    if (rlanHeightType == "AMSL") {
+    if (rlanHeightType == CConst::AMSLHeightType) {
         centerHeightAMSL = centerHeightInput;
-    } else if (rlanHeightType == "AGL") {
+    } else if (rlanHeightType == CConst::AGLHeightType) {
         centerHeightAMSL = centerHeightInput + centerTerrainHeight;
     } else {
         throw std::runtime_error(ErrStream() << "ERROR: INVALID rlanHeightType = " << rlanHeightType);
@@ -155,7 +155,7 @@ void EllipseRlanRegionClass::configure(std::string rlanHeightType, TerrainClass 
 
     int scanPtIdx;
     std::vector<LatLon> scanPtList = getScan(1.0);
-    for(scanPtIdx=0; scanPtIdx<scanPtList.size(); ++scanPtIdx) {
+    for(scanPtIdx=0; scanPtIdx<(int) scanPtList.size(); ++scanPtIdx) {
         LatLon scanPt = scanPtList[scanPtIdx];
         double terrainHeight;
         terrain->getTerrainHeight(scanPt.second, scanPt.first, terrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
@@ -261,7 +261,7 @@ std::vector<LatLon> EllipseRlanRegionClass::getScan(double scanResolutionM) cons
     double deltaLat = (scanResolutionM / CConst::earthRadius)*(180.0/M_PI);
     double deltaLon = deltaLat / cos(centerLatitude*M_PI/180.0);
 
-    int ix, iy, xs, ys;
+    int ix, iy;
     for(iy=-N; iy<=N; ++iy) {
         double latitude  = centerLatitude  + iy*deltaLat;
         for(ix=-N; ix<=N; ++ix) {
@@ -383,7 +383,7 @@ PolygonRlanRegionClass::~PolygonRlanRegionClass()
 /******************************************************************************************/
 /**** CONSTRUCTOR: PolygonRlanRegionClass::configure()                                 ****/
 /******************************************************************************************/
-void PolygonRlanRegionClass::configure(std::string rlanHeightType, TerrainClass *terrain)
+void PolygonRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain)
 {
     double bldgHeight;
     MultibandRasterClass::HeightResult lidarHeightResult;
@@ -392,9 +392,9 @@ void PolygonRlanRegionClass::configure(std::string rlanHeightType, TerrainClass 
 
     // LOGGER_DEBUG(logger) << "rlanHeight: " << centerTerrainHeight << ", building height: " << bldgHeight << ", from: " << rlanHeightSource;
 
-    if (rlanHeightType == "AMSL") {
+    if (rlanHeightType == CConst::AMSLHeightType) {
         centerHeightAMSL = centerHeightInput;
-    } else if (rlanHeightType == "AGL") {
+    } else if (rlanHeightType == CConst::AGLHeightType) {
         centerHeightAMSL = centerHeightInput + centerTerrainHeight;
     } else {
         throw std::runtime_error(ErrStream() << "ERROR: INVALID rlanHeightType = " << rlanHeightType);
@@ -407,7 +407,7 @@ void PolygonRlanRegionClass::configure(std::string rlanHeightType, TerrainClass 
 
     int scanPtIdx;
     std::vector<LatLon> scanPtList = getScan(1.0);
-    for(scanPtIdx=0; scanPtIdx<scanPtList.size(); ++scanPtIdx) {
+    for(scanPtIdx=0; scanPtIdx<(int) scanPtList.size(); ++scanPtIdx) {
         LatLon scanPt = scanPtList[scanPtIdx];
         double terrainHeight;
         terrain->getTerrainHeight(scanPt.second, scanPt.first, terrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
@@ -515,7 +515,7 @@ std::vector<LatLon> PolygonRlanRegionClass::getScan(double scanResolutionM) cons
     int minScanYIdx = (int) floor(miny*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM);
     int maxScanYIdx = (int) floor(maxy*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM)+1;
 
-    int ix, iy, xs, ys;
+    int ix, iy;
     bool isEdge;
     for(iy=minScanYIdx; iy<=maxScanYIdx; ++iy) {
         int yIdx = (int) floor(iy*scanResolutionM*(180.0/M_PI)/(CConst::earthRadius*resolution) + 0.5);

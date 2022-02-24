@@ -1,4 +1,4 @@
-
+/// @copyright 
 #include "RatVersion.h"
 
 QString RatVersion::versionName(){

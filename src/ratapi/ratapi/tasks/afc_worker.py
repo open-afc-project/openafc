@@ -173,6 +173,7 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type, re
             LOGGER.debug('afc-engine terminated')
 
         if os.path.exists(temp_dir):
+            LOGGER.debug('cleaning up')
             shutil.rmtree(temp_dir)
         LOGGER.info('Worker resources cleaned up')
 

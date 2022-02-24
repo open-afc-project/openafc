@@ -1,5 +1,5 @@
 import { guiConfig } from "./RatApi";
-import { UserModel, success, error, AccessPointModel } from "./RatApiTypes";
+import { UserModel, success, error, AccessPointModel, FreqRange } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { Role, addAuth } from "./User";
 
@@ -223,3 +223,50 @@ export const deleteAccessPoint = (id: number) =>
         }
     })
     .catch(err => error("An error was encountered", undefined, err));
+
+
+/**
+ * Gets the admin supplied allowed frequency ranges. 
+ * @returns Success: An array of FreqBand indicating the admin approved ranges.  
+ *          Error: why it failed
+ */
+ export const getAllowedRanges = () =>
+ fetch(guiConfig.admin_url.replace('-1', "frequency_range"), {
+        method: "GET",
+        headers: addAuth({ "Content-Type": "application/json"})
+    }).then(
+        async res => {
+            if (res.ok) {
+                const data = await(res.json() as Promise<FreqRange[]>);
+                return success(data);
+            } else {
+                logger.error(res);
+                return error(res.statusText, res.status, (await res.json()) as any);
+            }
+        }
+    ).catch(
+        err => {
+            logger.error(err);
+            return error("Your request was unable to be processed", undefined, err);
+        }
+ )
+
+ export const updateAllowedRanges = (conf: FreqRange[]) => (
+    fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
+        method: "PUT",
+        headers: addAuth({
+            "Content-Type": "application/json"
+        }),
+        body: JSON.stringify(conf)
+    }).then(res => {
+        if (res.status === 204) {
+            return success("Frequency Range(s) updated.");
+        }
+        else {
+            return error(res.statusText, res.status);
+        }
+    }).catch(err => {
+        logger.error(err);
+        return error("Unable to update frequency ranges.");
+    })
+);

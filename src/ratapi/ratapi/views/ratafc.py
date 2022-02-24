@@ -147,6 +147,9 @@ class RatAfc(MethodView):
     def _auth_ap(self, serial_number, certification_id, rulesets):
         ''' Authenticate an access point. If must match the serial_number and certification_id in the database to be valid
         '''
+        LOGGER.debug('Starting auth_ap,serial: %s; certId: %s; ruleset %s.',serial_number,certification_id,rulesets )
+
+
         if serial_number is None:
             raise MissingParamException(['serialNumber'])
 
@@ -171,25 +174,34 @@ class RatAfc(MethodView):
 
         # check request version
         ver = flask.request.json["version"]
-        if not (ver == "0.6"):
+        if not (ver == "1.1"):
             raise VersionNotSupportedException([ver])
 
         # start request
-        args = flask.request.json["availableSpectrumInquiryRequests"][0] # just take first request, ignore others
+        args = flask.request.json # Get the entire JSON to allow for multiple requests and match v1.1 expected format
+        firstRequest = flask.request.json["availableSpectrumInquiryRequests"][0] # as of now, there can be only one request
         LOGGER.debug("Running AFC analysis with params: %s", args)
         request_type = 'AP-AFC'
 
         try:
             config = None
-            extensions = args['vendorExtensions'] if 'vendorExtensions' in args else []
-            for ext in extensions:
-                if ext['extensionID'] == 'RAT v0.6 AFC Config':
-                    config = ext['parameters']
-                    del ext['parameters']
+            # disable the passing of configuration via vendorExtensions
+            # extensions = firstRequest['vendorExtensions'] if 'vendorExtensions' in args else []
+            # for ext in extensions:
+            #     if ext['extensionID'] == 'RAT v1.1 AFC Config':
+            #         config = ext['parameters']
+            #         del ext['parameters']
 
             # authenticate
-            device_desc = args['deviceDescriptor']
-            user_id = self._auth_ap(device_desc['serialNumber'], device_desc['certificationId'], device_desc['rulesetIds'])
+            device_desc = firstRequest.get('deviceDescriptor')
+ 
+            try:
+                firstCertId = device_desc['certificationId'][0]['nra'] + ' ' + device_desc['certificationId'][0]['id']
+            except:
+                firstCertId = None
+
+            user_id = self._auth_ap(device_desc.get('serialNumber'), firstCertId, device_desc.get('rulesetIds'))
+            
             user = User.query.filter_by(id=user_id).first()
             
             # process request
@@ -277,9 +289,9 @@ class RatAfc(MethodView):
         except AP_Exception as e:
             LOGGER.error('catching exception: %s', e.message)
             result = {
-                'version': '0.6',
+                'version': '1.1',
                 'availableSpectrumInquiryResponses': [{
-                'requestId': args['requestId'],
+                'requestId': firstRequest.get('requestId'),
                 'response': {
                     'responseCode': e.response_code,
                     'shortDescription': e.description,
@@ -294,5 +306,5 @@ class RatAfc(MethodView):
 
 
 
-module.add_url_rule('/0.6/availableSpectrumInquiry',
+module.add_url_rule('/1.1/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))

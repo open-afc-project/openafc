@@ -175,6 +175,7 @@ public:
                    WPer4KHzPSDDBUnit
     };
     /**************************************************************************************/
+
     /**************************************************************************************/
     /**** LidarFormatEnum                                                              ****/
     /**************************************************************************************/
@@ -184,6 +185,7 @@ public:
         fromRasterLidarFormat           // building data comes from raster data
     };
     /**************************************************************************************/
+
     /**************************************************************************************/
     /**** HeightSource                                                                 ****/
     /**************************************************************************************/
@@ -195,10 +197,55 @@ public:
                   lidarHeightSource
     };
     /**************************************************************************************/
+
+    /**************************************************************************************/
+    /**** HeightType                                                                   ****/
+    /**************************************************************************************/
+    enum HeightTypeEnum {
+                   AMSLHeightType,
+                    AGLHeightType
+    };
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /**** Winner2LOSOption                                                             ****/
+    /**************************************************************************************/
+    enum Winner2LOSOptionEnum {
+              UnknownWinner2LOSOption,
+             BldgDataWinner2LOSOption,
+             ForceLOSWinner2LOSOption,
+            ForceNLOSWinner2LOSOption
+    };
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /**** Winner2UnknownLOSMethod                                                      ****/
+    /**************************************************************************************/
+    enum Winner2UnknownLOSMethodEnum {
+          PLOSCombineWinner2UnknownLOSMethod,
+        PLOSThresholdWinner2UnknownLOSMethod
+    };
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /**** ResponseCode                                                                 ****/
+    /**************************************************************************************/
+    enum ResponseCodeEnum {
+             generalFailureResponseCode = -1,
+                    successResponseCode = 0,
+        versionNotSupportedResponseCode = 100,
+           deviceDisallowedResponseCode = 101,
+               missingParamResponseCode = 102,
+               invalidValueResponseCode = 103,
+            unexpectedParamResponseCode = 106,
+        unsupportedSpectrumResponseCode = 300
+    };
+    /**************************************************************************************/
     
     static const StrTypeClass strULSAntennaTypeList[];
     static const StrTypeClass strPropEnvList[];
     static const StrTypeClass strPathLossModelList[];
+    static const StrTypeClass strWinner2LOSOptionList[];
     static const StrTypeClass strHeightSourceList[];
 };
 

@@ -79,7 +79,7 @@ bool RectRASClass::intersect(double longitude, double latitude, double maxDist, 
 {
     int rectIdx, deltaLon, deltaLat, dist;
     bool intersectFlag = false;
-    for(rectIdx=0; (rectIdx<rectList.size())&&(!intersectFlag); ++rectIdx) {
+    for(rectIdx=0; (rectIdx<(int) rectList.size())&&(!intersectFlag); ++rectIdx) {
         double rectLonStart, rectLonStop, rectLatStart, rectLatStop;
         std::tie(rectLonStart, rectLonStop, rectLatStart, rectLatStop) = rectList[rectIdx];
 
