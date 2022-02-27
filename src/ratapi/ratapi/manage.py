@@ -390,8 +390,6 @@ class AccessPointCreate(Command):
     def __init__(self, flaskapp=None, serial_id=None,
                  cert_id=None, username=None):
         if flaskapp and serial_id and username:
-            LOGGER.debug('AccessPointCreate.__init__() %s %s %s',
-                          serial_id, cert_id, username)
             self._create_ap(flaskapp, str(serial_id), cert_id, username)
 
     def __call__(self, flaskapp, serial, cert_id, email, model, manuf):
@@ -580,25 +578,28 @@ class ConfigAdd(Command):
         LOGGER.debug('Open admin cfg src file - %s', filename)
         with open(filename, 'r') as fp_src:
             while True:
+                dataline = fp_src.readline()
+                if not dataline:
+                    break
+                # add user, APs and server configuration
+                new_rcrd = json.loads(dataline)
+                user_rcrd = json_lookup('userConfig', new_rcrd, None)
+                username = json_lookup('username', user_rcrd, None)
                 try:
-                    dataline = fp_src.readline()
-                    if not dataline:
-                        break
-                    # add user, APs and server configuration
-                    new_rcrd = json.loads(dataline)
-                    user_rcrd = json_lookup('userConfig', new_rcrd, None)
                     UserCreate(flaskapp, user_rcrd[0])
-
-                    username = json_lookup('username', user_rcrd, None)
                     f_str = "UserRemove(flaskapp, '" + username[0] + "')"
                     rollback.insert(0, f_str)
+                except RuntimeError:
+                    LOGGER.debug('User %s already exists', username[0])
 
+                try:
                     ap_rcrd = json_lookup('apConfig', new_rcrd, None)
                     serial_id = json_lookup('serialNumber', ap_rcrd, None)
                     cert_id = json_lookup('certificationId', ap_rcrd, None)
                     for i in range(len(serial_id)):
+                        cert_str = cert_id[i][0]['nra'] + ' ' + cert_id[i][0]['id']
                         AccessPointCreate(flaskapp, serial_id[i],
-                                          cert_id[i][0]['id'], username[0])
+                                          cert_str, username[0])
                         f_str = "AccessPointRemove(flaskapp, '" + serial_id[i] + "')"
                         rollback.insert(0, f_str)
 
@@ -613,13 +614,15 @@ class ConfigAdd(Command):
                         config_path = os.path.join(
                             flask.current_app.config['STATE_ROOT_PATH'],
                             'afc_config', str(user.id))
-                        os.makedirs(config_path)
+                        if not os.path.isdir(config_path):
+                            os.makedirs(config_path)
                         file_path = os.path.join(config_path, 'afc_config.json')
                         LOGGER.debug('Opening config file "%s"', file_path)
 
-                        with open(file_path, 'wb') as outfile:
-                            outfile.write(json.dumps(cfg_rcrd[0]))
-                        os.chmod(file_path, 0o666)
+                        if not os.path.isfile(file_path):
+                            with open(file_path, 'wb') as outfile:
+                                outfile.write(json.dumps(cfg_rcrd[0]))
+                            os.chmod(file_path, 0o666)
                 except Exception as e:
                     LOGGER.error(e)
                     LOGGER.error('Rolling back...')
@@ -649,34 +652,39 @@ class ConfigRemove(Command):
         LOGGER.debug('Open admin cfg src file - %s', filename)
         with open(filename, 'r') as fp_src:
             while True:
-                try:
-                    dataline = fp_src.readline()
-                    if not dataline:
-                        break
-                    new_rcrd = json.loads(dataline)
+                dataline = fp_src.readline()
+                if not dataline:
+                    break
+                new_rcrd = json.loads(dataline)
 
-                    ap_rcrd = json_lookup('apConfig', new_rcrd, None)
-                    serial_id = json_lookup('serialNumber', ap_rcrd, None)
-                    for i in range(len(serial_id)):
+                ap_rcrd = json_lookup('apConfig', new_rcrd, None)
+                serial_id = json_lookup('serialNumber', ap_rcrd, None)
+                for i in range(len(serial_id)):
+                    try:
                         AccessPointRemove(flaskapp, serial_id[i])
+                    except RuntimeError:
+                        LOGGER.debug('AP %s not found', serial_id[i])
 
-                    user_rcrd = json_lookup('userConfig', new_rcrd, None)
-                    username = json_lookup('username', user_rcrd, None)
-                    with flaskapp.app_context():
+                user_rcrd = json_lookup('userConfig', new_rcrd, None)
+                username = json_lookup('username', user_rcrd, None)
+                with flaskapp.app_context():
+                    try:
                         user = User.query.filter(User.email == username[0]).one()
                         LOGGER.debug('Found user id %d', user.id)
-                    UserRemove(flaskapp, username[0])
+                        UserRemove(flaskapp, username[0])
 
-                    with flaskapp.app_context():
-                        import flask
+                        with flaskapp.app_context():
+                            import flask
 
-                        config_path = os.path.join(
-                            flask.current_app.config['STATE_ROOT_PATH'],
-                            'afc_config', str(user.id))
-                        shutil.rmtree(config_path)
-                        LOGGER.debug('Delete config dir "%s"', config_path)
-                except Exception as e:
-                    LOGGER.error(e)
+                            config_path = os.path.join(
+                                flask.current_app.config['STATE_ROOT_PATH'],
+                                'afc_config', str(user.id))
+                            shutil.rmtree(config_path)
+                            LOGGER.debug('Delete config dir "%s"', config_path)
+                    except RuntimeError:
+                        LOGGER.debug('Delete missing user %s', username[0])
+                    except Exception as e:
+                        LOGGER.debug('Missing user %s in DB', username[0])
 
 
 class ConfigShow(Command):
