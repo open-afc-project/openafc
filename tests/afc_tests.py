@@ -38,10 +38,10 @@ import sys
 
 
 ADD_AFC_TEST_REQS = 'add_test_req.txt'
-AFC_URL_SUFFIX = '/fbrat/ap-afc/0.6/availableSpectrumInquiry'
+AFC_URL_SUFFIX = '/fbrat/ap-afc/1.1/availableSpectrumInquiry'
 headers = {'content-type': 'application/json'}
-TBL_REQS_NAME = 'test_vect_0_6'
-TBL_RESPS_NAME = 'test_data_0_6'
+TBL_REQS_NAME = 'test_vectors'
+TBL_RESPS_NAME = 'test_data'
 
 
 app_log = logging.getLogger(__name__)
@@ -288,7 +288,10 @@ def start_acquisition(self, test_number):
     cur = con.cursor()
     cur.execute('SELECT * FROM %s' % TBL_REQS_NAME)
     found_reqs = cur.fetchall()
-    cur.execute('DROP TABLE ' + TBL_RESPS_NAME)
+    try:
+        cur.execute('DROP TABLE ' + TBL_RESPS_NAME)
+    except Exception as OperationalError:
+        app_log.debug('Missing table %s', TBL_RESPS_NAME)
     cur.execute('CREATE TABLE ' + TBL_RESPS_NAME +
                 ' (data json, hash varchar(255))')
 
