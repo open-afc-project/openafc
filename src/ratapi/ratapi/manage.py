@@ -1,21 +1,54 @@
+#
+# This Python file uses the following encoding: utf-8
+#
+# Portions copyright © 2021 Broadcom.
+# All rights reserved. The term “Broadcom” refers solely
+# to the Broadcom Inc. corporate affiliate that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which
+# is included with this software program.
+#
 ''' External management of this application.
 '''
 
+import json
 import logging
-from flask_script import Manager, Command, Option, commands
-from . import cmd_utils
-import ratapi
 import os
-import time
+import ratapi
 import shutil
 import sqlalchemy
+import time
 from flask_migrate import MigrateCommand
 from . import create_app
 from .models.base import db
 from .db.generators import shp_to_spatialite, spatialite_to_raster
 from prettytable import PrettyTable
+from flask_script import Manager, Command, Option, commands
+from . import cmd_utils
 
 LOGGER = logging.getLogger(__name__)
+
+
+def json_lookup(key, json_obj, val):
+    """Loookup for key in json and change it value if required"""
+    keepit = []
+
+    def lookup(key, json_obj, val, keepit):
+        if isinstance(json_obj, dict):
+            for k, v in json_obj.items():
+                #LOGGER.debug('%s ... %s', k, type(v))
+                if k == key:
+                    keepit.append(v)
+                    if val:
+                        json_obj[k] = val
+                elif isinstance(v, (dict, list)):
+                    lookup(key, v, val, keepit)
+        elif isinstance(json_obj, list):
+            for node in json_obj:
+                lookup(key, node, val, keepit)
+        return keepit
+
+    found = lookup(key, json_obj, val, keepit)
+    return found
 
 
 def get_or_create(session, model, **kwargs):
@@ -176,26 +209,36 @@ class DbCreate(Command):
 
 
 class UserCreate(Command):
-    ''' Create a new user. '''
+    ''' Create a new user functionality. '''
 
     option_list = (
         Option('email', type=str,
-               help="user's email address"),
+               help='User name'),
         Option('password_in', type=str,
-               help="user's password as a readable pipe\nexample: echo 'pass' | rat-manage api user create email /dev/stdin"),
-        Option('--role', type=str, default=[], action='append', choices=['Admin', 'Analysis', 'AP'],
-               help="role to include with the new user"),
+               help='Users password as a readable pipe\n'
+                    'example: echo pass | rat-manage api'
+                    ' user create email /dev/stdin'),
+        Option('--role', type=str, default=[], action='append',
+               choices=['Admin', 'Analysis', 'AP'],
+               help='role to include with the new user'),
     )
 
-    def __call__(self, flaskapp, email, password_in, role):
+    def _create_user(self, flaskapp, email, password_in, role):
+        ''' Create user in database. '''
         from contextlib import closing
         import datetime
         from .models.aaa import User, Role
+        LOGGER.debug('UserCreate.__create_user() %s %s %s',
+                      email, password_in, role)
 
         try:
-            with closing(open(password_in)) as pwfile:
-                password = pwfile.read().strip()
-                passhash = flaskapp.user_manager.password_manager.hash_password(
+            if isinstance(password_in, (str, unicode)):
+                password = password_in.strip()
+            else:
+                with closing(open(password_in)) as pwfile:
+                    password = pwfile.read().strip()
+
+            passhash = flaskapp.user_manager.password_manager.hash_password(
                     password)
 
             with flaskapp.app_context():
@@ -217,7 +260,20 @@ class UserCreate(Command):
                 db.session.commit()  # pylint: disable=no-member
         except IOError:
             raise RuntimeError(
-                'Password received was not readable. Enter as a readable pipe.\ni.e. echo "pass" | rat-manage api user create email /dev/stdin')
+                'Password received was not readable.'
+                'Enter as a readable pipe.\n'
+                'i.e. echo "pass" | rat-manage api'
+                'user create email /dev/stdin')
+
+    def __init__(self, flaskapp=None, user_params=None):
+        if flaskapp and isinstance(user_params, dict):
+            self._create_user(flaskapp,
+                              user_params['username'],
+                              user_params['password'],
+                              user_params['rolename'])
+
+    def __call__(self, flaskapp, email, password_in, role):
+        self._create_user(flaskapp, email, password_in, role)
 
 
 class UserRemove(Command):
@@ -228,8 +284,9 @@ class UserRemove(Command):
                help="user's email address"),
     )
 
-    def __call__(self, flaskapp, email):
+    def _remove_user(self, flaskapp, email):
         from .models.aaa import User, Role
+        LOGGER.debug('UserRemove._remove_user() %s', email)
 
         with flaskapp.app_context():
             try:
@@ -241,11 +298,19 @@ class UserRemove(Command):
             db.session.delete(user)  # pylint: disable=no-member
             db.session.commit()  # pylint: disable=no-member
 
+    def __init__(self, flaskapp=None, email=None):
+        if flaskapp and email:
+            self._remove_user(flaskapp, email)
+
+    def __call__(self, flaskapp, email):
+        self._remove_user(flaskapp, email)
+
 
 class UserList(Command):
     '''Lists all users.'''
 
     def __call__(self, flaskapp):
+        LOGGER.debug('UserList.__call__()')
         table = PrettyTable()
         from .models.aaa import User, UserRole, Role
 
@@ -270,6 +335,7 @@ class User(Manager):
     ''' View and manage AAA state '''
 
     def __init__(self, *args, **kwargs):
+        LOGGER.debug('User.__init__()')
         Manager.__init__(self, *args, **kwargs)
         self.add_command('create', UserCreate())
         self.add_command('remove', UserRemove())
@@ -281,7 +347,9 @@ class AccessPointCreate(Command):
 
     option_list = (
         Option('serial', type=str,
-               help="access point's serial number"),
+               help='serial number of the ap'),
+        Option('cert_id', type=str,
+               help='certification id of the ap'),
         Option('--model', type=str, default=None,
                help="model number"),
         Option('--manuf', type=str, default=None,
@@ -290,10 +358,13 @@ class AccessPointCreate(Command):
                help="email of user assocated with this access point.")
     )
 
-    def __call__(self, flaskapp, serial, model, manuf, email):
+    def _create_ap(self, flaskapp, serial, cert_id, email,
+                   model=None, manuf=None):
         from contextlib import closing
         import datetime
         from .models.aaa import AccessPoint, User
+        LOGGER.debug('AccessPointCreate._create_ap() %s %s %s',
+                      serial, cert_id, email)
         with flaskapp.app_context():
             try:
                 # select * from aaa_user where email = ? limit 1
@@ -310,10 +381,19 @@ class AccessPointCreate(Command):
                 serial_number=serial,
                 model=model,
                 manufacturer=manuf,
+                certification_id=cert_id,
                 user_id=user.id
             )
             db.session.add(ap)  # pylint: disable=no-member
             db.session.commit()  # pylint: disable=no-member
+
+    def __init__(self, flaskapp=None, serial_id=None,
+                 cert_id=None, username=None):
+        if flaskapp and serial_id and username:
+            self._create_ap(flaskapp, str(serial_id), cert_id, username)
+
+    def __call__(self, flaskapp, serial, cert_id, email, model, manuf):
+        self._create_ap(flaskapp, serial, cert_id, email, model, manuf)
 
 
 class AccessPointRemove(Command):
@@ -321,11 +401,12 @@ class AccessPointRemove(Command):
 
     option_list = (
         Option('serial', type=str,
-               help="Access Point's serial number"),
+               help='Serial number of an Access Point'),
     )
 
-    def __call__(self, flaskapp, serial):
+    def _remove_ap(self, flaskapp, serial):
         from .models.aaa import AccessPoint, User
+        LOGGER.debug('AccessPointRemove._remove_ap() %s', serial)
         with flaskapp.app_context():
             try:
                 # select * from access_point as ap where ap.serial_number = ?
@@ -337,6 +418,13 @@ class AccessPointRemove(Command):
             db.session.delete(ap)  # pylint: disable=no-member
             db.session.commit()  # pylint: disable=no-member
 
+    def __init__(self, flaskapp=None, serial=None):
+        if flaskapp and serial:
+            self._remove_ap(flaskapp, serial)
+
+    def __call__(self, flaskapp, serial):
+        self._remove_ap(flaskapp, serial)
+
 
 class AccessPointList(Command):
     '''Lists all access points'''
@@ -345,11 +433,11 @@ class AccessPointList(Command):
         table = PrettyTable()
         from .models.aaa import AccessPoint, User
 
-        table.field_names = ["Serial Number", "Email"]
+        table.field_names = ["Serial Number", "Cert ID", "Email"]
         with flaskapp.app_context():
             # select email, serial_number from access_point as ap join aaa_user as au on ap.user_id = au.id;
             for ap, user in db.session.query(AccessPoint, User).filter(User.id == AccessPoint.user_id).all():  # pylint: disable=no-member
-                table.add_row([ap.serial_number, user.email])
+                table.add_row([ap.serial_number, ap.certification_id, user.email])
             print(table)
 
 
@@ -467,6 +555,187 @@ class Celery(Manager):
         self.add_command('test', TestCelery())
 
 
+class ConfigAdd(Command):
+    ''' Create a new admin configuration. '''
+    option_list = (
+        Option('src', type=str, help='configuration source file'),
+    )
+
+    def __init__(self, *args, **kwargs):
+        LOGGER.debug('ConfigAdd.__init__()')
+
+    def __call__(self, flaskapp, src):
+        LOGGER.debug('ConfigAdd.__call__() %s', src)
+        from .models.aaa import User
+
+        split_items = src.split('=', 1)
+        filename = split_items[1].strip()
+        if not os.path.exists(filename):
+            raise RuntimeError(
+                '"{}" source file does not exist'.format(filename))
+
+        rollback = []
+        LOGGER.debug('Open admin cfg src file - %s', filename)
+        with open(filename, 'r') as fp_src:
+            while True:
+                dataline = fp_src.readline()
+                if not dataline:
+                    break
+                # add user, APs and server configuration
+                new_rcrd = json.loads(dataline)
+                user_rcrd = json_lookup('userConfig', new_rcrd, None)
+                username = json_lookup('username', user_rcrd, None)
+                try:
+                    UserCreate(flaskapp, user_rcrd[0])
+                    f_str = "UserRemove(flaskapp, '" + username[0] + "')"
+                    rollback.insert(0, f_str)
+                except RuntimeError:
+                    LOGGER.debug('User %s already exists', username[0])
+
+                try:
+                    ap_rcrd = json_lookup('apConfig', new_rcrd, None)
+                    serial_id = json_lookup('serialNumber', ap_rcrd, None)
+                    cert_id = json_lookup('certificationId', ap_rcrd, None)
+                    for i in range(len(serial_id)):
+                        cert_str = cert_id[i][0]['nra'] + ' ' + cert_id[i][0]['id']
+                        AccessPointCreate(flaskapp, serial_id[i],
+                                          cert_str, username[0])
+                        f_str = "AccessPointRemove(flaskapp, '" + serial_id[i] + "')"
+                        rollback.insert(0, f_str)
+
+                    with flaskapp.app_context():
+                        user = User.query.filter(User.email == username[0]).one()
+                        LOGGER.debug('New user id %d', user.id)
+
+                    cfg_rcrd = json_lookup('afcConfig', new_rcrd, None)
+                    with flaskapp.app_context():
+                        import flask
+
+                        config_path = os.path.join(
+                            flask.current_app.config['STATE_ROOT_PATH'],
+                            'afc_config', str(user.id))
+                        if not os.path.isdir(config_path):
+                            os.makedirs(config_path)
+                        file_path = os.path.join(config_path, 'afc_config.json')
+                        LOGGER.debug('Opening config file "%s"', file_path)
+
+                        if not os.path.isfile(file_path):
+                            with open(file_path, 'wb') as outfile:
+                                outfile.write(json.dumps(cfg_rcrd[0]))
+                            os.chmod(file_path, 0o666)
+                except Exception as e:
+                    LOGGER.error(e)
+                    LOGGER.error('Rolling back...')
+                    for f in rollback:
+                       eval(f)
+
+
+class ConfigRemove(Command):
+    ''' Remove a user by email. '''
+    option_list = (
+        Option('src', type=str, help='configuration source file'),
+    )
+
+    def __init__(self, *args, **kwargs):
+        LOGGER.debug('ConfigRemove.__init__()')
+
+    def __call__(self, flaskapp, src):
+        LOGGER.debug('ConfigRemove.__call__() %s', src)
+        from .models.aaa import User
+
+        split_items = src.split('=', 1)
+        filename = split_items[1].strip()
+        if not os.path.exists(filename):
+            raise RuntimeError(
+                '"{}" source file does not exist'.format(filename))
+
+        LOGGER.debug('Open admin cfg src file - %s', filename)
+        with open(filename, 'r') as fp_src:
+            while True:
+                dataline = fp_src.readline()
+                if not dataline:
+                    break
+                new_rcrd = json.loads(dataline)
+
+                ap_rcrd = json_lookup('apConfig', new_rcrd, None)
+                serial_id = json_lookup('serialNumber', ap_rcrd, None)
+                for i in range(len(serial_id)):
+                    try:
+                        AccessPointRemove(flaskapp, serial_id[i])
+                    except RuntimeError:
+                        LOGGER.debug('AP %s not found', serial_id[i])
+
+                user_rcrd = json_lookup('userConfig', new_rcrd, None)
+                username = json_lookup('username', user_rcrd, None)
+                with flaskapp.app_context():
+                    try:
+                        user = User.query.filter(User.email == username[0]).one()
+                        LOGGER.debug('Found user id %d', user.id)
+                        UserRemove(flaskapp, username[0])
+
+                        with flaskapp.app_context():
+                            import flask
+
+                            config_path = os.path.join(
+                                flask.current_app.config['STATE_ROOT_PATH'],
+                                'afc_config', str(user.id))
+                            shutil.rmtree(config_path)
+                            LOGGER.debug('Delete config dir "%s"', config_path)
+                    except RuntimeError:
+                        LOGGER.debug('Delete missing user %s', username[0])
+                    except Exception as e:
+                        LOGGER.debug('Missing user %s in DB', username[0])
+
+
+class ConfigShow(Command):
+    '''Show all configurations.'''
+    option_list = (
+        Option('src', type=str, help="user's source file"),
+    )
+
+    def __init__(self, *args, **kwargs):
+        LOGGER.debug('ConfigShow.__init__()')
+
+    def __call__(self, flaskapp, src):
+        LOGGER.debug('ConfigShow.__call__()')
+        split_items = src.split('=', 1)
+        filename = split_items[1].strip()
+        if not os.path.exists(filename):
+            raise RuntimeError(
+                '"{}" source file does not exist'.format(filename))
+
+        LOGGER.debug('Open admin cfg src file - %s', filename)
+        with open(filename, 'r') as fp_src:
+            while True:
+                dataline = fp_src.readline()
+                if not dataline:
+                    break
+                new_rcrd = json.loads(dataline)
+                user_rcrd = json_lookup('userConfig', new_rcrd, None)
+                LOGGER.info('\nRecord ...\n\tuserConfig\n')
+                LOGGER.info(user_rcrd)
+
+                ap_rcrd = json_lookup('apConfig', new_rcrd, None)
+                LOGGER.info('\n\tapConfig\n')
+                for i in range(len(ap_rcrd[0])):
+                    LOGGER.info(ap_rcrd[0][i])
+
+                cfg_rcrd = json_lookup('afcConfig', new_rcrd, None)
+                LOGGER.info('\n\tafcConfig\n')
+                LOGGER.info(cfg_rcrd)
+
+
+class Config(Manager):
+    ''' View and manage configuration records '''
+
+    def __init__(self, *args, **kwargs):
+        LOGGER.debug('Config.__init__()')
+        Manager.__init__(self, *args, **kwargs)
+        self.add_command('add', ConfigAdd())
+        self.add_command('del', ConfigRemove())
+        self.add_command('list', ConfigShow())
+
+
 def main():
 
     def appfact(log_level):
@@ -498,6 +767,7 @@ def main():
     manager.add_command('data', Data())
     manager.add_command('celery', Celery())
     manager.add_command('ap', AccessPoints())
+    manager.add_command('cfg', Config())
 
     manager.run()
 
@@ -505,3 +775,11 @@ def main():
 if __name__ == '__main__':
     import sys
     sys.exit(main())
+
+# Local Variables:
+# mode: Python
+# indent-tabs-mode: nil
+# python-indent: 4
+# End:
+#
+# vim: sw=4:et:tw=80:cc=+1
