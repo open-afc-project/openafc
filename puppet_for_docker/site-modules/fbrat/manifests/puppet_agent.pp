@@ -5,8 +5,8 @@ class fbrat::puppet_agent {
   }
   package { 'puppet-release':
     ensure   => 'installed',
-    name     => 'puppet5-release',
-    source   => 'https://yum.puppetlabs.com/puppet5-release-el-7.noarch.rpm',
+    name     => 'puppet7-release',
+    source   => 'https://yum.puppetlabs.com/puppet7-release-el-7.noarch.rpm',
     provider => 'rpm',
   }
   package { 'puppet-agent':

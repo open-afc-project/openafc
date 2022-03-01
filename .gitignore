@@ -4,3 +4,5 @@
 *.un~
 *.swp
 build/*
+.vscode
+.vscode/*

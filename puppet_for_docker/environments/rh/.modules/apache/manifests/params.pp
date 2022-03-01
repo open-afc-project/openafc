@@ -37,7 +37,7 @@ class apache::params inherits ::apache::version {
   }
 
   # should we use systemd module?
-  $use_systemd = true
+  $use_systemd = false
 
   # Default mode for files
   $file_mode = '0644'
