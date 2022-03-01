@@ -185,18 +185,18 @@ def export_admin_cfg(self, opt):
     found_rcds = cur.fetchall()
     with open(filename, 'w') as fp_exp:
         for i in range(1, found_rcds[0][0] + 1):
-            query = 'SELECT * FROM '+TBL_USERS_NAME+' WHERE '\
-                    'user_id=\"'+str(i)+"\""
+            query = 'SELECT * FROM ' + TBL_USERS_NAME + ' WHERE '\
+                    'user_id=\"' + str(i) + "\""
             cur.execute(query)
             found_user = cur.fetchall()
 
-            query = 'SELECT * FROM '+TBL_AFC_CFG_NAME+' WHERE '\
-                    'user_id=\"'+str(i)+"\""
+            query = 'SELECT * FROM ' + TBL_AFC_CFG_NAME + ' WHERE '\
+                    'user_id=\"' + str(i) + "\""
             cur.execute(query)
             found_cfg = cur.fetchall()
 
-            query = 'SELECT * FROM '+TBL_AP_CFG_NAME+' WHERE '\
-                    'user_id=\"'+str(i)+"\""
+            query = 'SELECT * FROM ' + TBL_AP_CFG_NAME + ' WHERE '\
+                    'user_id=\"' + str(i) + "\""
             cur.execute(query)
             found_aps = cur.fetchall()
 
@@ -222,8 +222,9 @@ def make_db(filename):
                  TBL_REQS_NAME, TBL_RESPS_NAME)
     con = sqlite3.connect(filename)
     cur = con.cursor()
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    found_data = cur.fetchall()
+    cur.execute('CREATE TABLE ' + TBL_REQS_NAME + ' (data json)')
+    cur.execute('CREATE TABLE ' + TBL_RESPS_NAME +
+                ' (data json, hash varchar(255))')
     con.close()
     return True
 
