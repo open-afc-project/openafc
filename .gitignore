@@ -1,8 +1,11 @@
 
 *.bak
-*.cpp~
-*.un~
+*.*~
 *.swp
 build/*
 .vscode
-.vscode/*
+.vscode/*.git
+.github
+.github/*
+.DS_Store
+.dockerignore
