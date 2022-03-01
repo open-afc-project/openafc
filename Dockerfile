@@ -2,7 +2,6 @@ FROM openafc/centos-build-image:3.3.11.4 as build_image
 ARG BUILDREV=localbuild
 COPY CMakeLists.txt LICENSE.txt version.txt fbrat.rpmlintrc Doxyfile.in /wd/
 RUN echo $BUILDREV > /wd/svnrevision.txt
-RUN DEBUGFAIL
 COPY cmake /wd/cmake/
 COPY pkg /wd/pkg/
 COPY selinux /wd/selinux/
