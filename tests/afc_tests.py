@@ -43,6 +43,9 @@ headers = {'content-type': 'application/json'}
 TBL_REQS_NAME = 'test_vectors'
 TBL_RESPS_NAME = 'test_data'
 
+TBL_USERS_NAME = 'user_config'
+TBL_AFC_CFG_NAME = 'afc_config'
+TBL_AP_CFG_NAME = 'ap_config'
 
 app_log = logging.getLogger(__name__)
 
@@ -90,7 +93,8 @@ class AfcTester:
             return True
         set_db_opts = {
             'a': add_reqs,
-            'd': dump_db
+            'd': dump_db,
+            'e': export_admin_cfg
         }
         for k in params:
             if not set_db_opts[k](self, params[k]):
@@ -170,6 +174,44 @@ def make_arg_parser():
     return args_parser
 
 
+def export_admin_cfg(self, opt):
+    """Export admin server configuration"""
+    app_log.debug('%s() %s', inspect.stack()[0][3], opt)
+
+    filename = opt
+    con = sqlite3.connect(self.db_filename)
+    cur = con.cursor()
+    cur.execute('SELECT COUNT(*) FROM ' + TBL_USERS_NAME)
+    found_rcds = cur.fetchall()
+    with open(filename, 'w') as fp_exp:
+        for i in range(1, found_rcds[0][0] + 1):
+            query = 'SELECT * FROM '+TBL_USERS_NAME+' WHERE '\
+                    'user_id=\"'+str(i)+"\""
+            cur.execute(query)
+            found_user = cur.fetchall()
+
+            query = 'SELECT * FROM '+TBL_AFC_CFG_NAME+' WHERE '\
+                    'user_id=\"'+str(i)+"\""
+            cur.execute(query)
+            found_cfg = cur.fetchall()
+
+            query = 'SELECT * FROM '+TBL_AP_CFG_NAME+' WHERE '\
+                    'user_id=\"'+str(i)+"\""
+            cur.execute(query)
+            found_aps = cur.fetchall()
+
+            aps = ''
+            for val in enumerate(found_aps):
+                aps += ',' + val[1][1]
+            out_str = '{"afcAdminConfig":' + found_cfg[0][1] + ', '\
+                      '"userConfig":' + found_user[0][1] + ', '\
+                      '"apConfig":[' + aps + ']}'
+            fp_exp.write(out_str)
+    con.close()
+    app_log.info('Server admin config exported to %s', opt)
+    return True
+
+
 def make_db(filename):
     """Create DB file only with schema"""
     app_log.debug('%s()', inspect.stack()[0][3])
@@ -180,9 +222,8 @@ def make_db(filename):
                  TBL_REQS_NAME, TBL_RESPS_NAME)
     con = sqlite3.connect(filename)
     cur = con.cursor()
-    cur.execute('CREATE TABLE ' + TBL_REQS_NAME + ' (data json)')
-    cur.execute('CREATE TABLE ' + TBL_RESPS_NAME +
-                ' (data json, hash varchar(255))')
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+    found_data = cur.fetchall()
     con.close()
     return True
 
