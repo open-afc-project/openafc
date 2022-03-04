@@ -34,8 +34,8 @@
 ### 1. Engine end-to-end test:
 * Jira OA-9: Create an end-to-end regression test (for Engine)
 **Reason for feature addition/change:** to perform automated regression testing of the engine when making changes (for internal use). This was updated to the latest ULS structure (03/02/2022)
-**Please see attached JSONfiles_03March2022.zip that contains the json files for all tests as well as accompanying powerpoint and excel file that describes the configuration of each test.
-**For the description of parameters, please refer to WFA interface specification v1.1.
+* Please see attached JSONfiles_03March2022.zip that contains the json files for all tests as well as accompanying powerpoint and excel file that describes the configuration of each test.
+* For the description of parameters, please refer to WFA interface specification v1.1.
 
 ### 2. ULS Parser:
 * Added an interative mode for daily_uls_parse to facilitate degugging/development. 
