@@ -26,7 +26,7 @@ export interface CertificationId{
 export interface DeviceDescriptor {
     serialNumber: string,
     certificationId: CertificationId[],
-    rulesetIds: ["47_CFR_PART_15_SUBPART_E"]
+    rulesetIds: ["US_47_CFR_PART_15_SUBPART_E"]
 }
 
 export interface Elevation {

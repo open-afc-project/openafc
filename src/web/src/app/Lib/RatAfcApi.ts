@@ -45,7 +45,7 @@ export const sampleRequestObject: AvailableSpectrumInquiryRequest = {
                 id: "1234567890"
             }
         ],
-        rulesetIds: ["47_CFR_PART_15_SUBPART_E"]
+        rulesetIds: ["US_47_CFR_PART_15_SUBPART_E"]
     },
     location: {
         ellipse: {

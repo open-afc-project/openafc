@@ -32,7 +32,7 @@ class EndToEndTest : public ::testing::Test {
                     {
                         QJsonObject
                         {
-                            { "requestId", "12345678" },
+                            { "requestId", "0" },
                             { "deviceDescriptor",
                                 QJsonObject
                                 {
@@ -59,21 +59,21 @@ class EndToEndTest : public ::testing::Test {
                                             { "center",
                                                 QJsonObject
                                                 {
-                                                    { "longitude", "-122.984157" },
-                                                    { "latitude", "37.425056" }
+                                                    { "longitude", "-73.97434" },
+                                                    { "latitude", "40.75924" }
                                                 }
                                             },
                                             { "majorAxis", 100 },
                                             { "minorAxis", 50 },
-                                            { "orientation", 70 }
+                                            { "orientation", 45 }
                                         }
                                     },
                                     { "elevation",
                                         QJsonObject
                                         {
-                                            { "height", 3.0 },
+                                            { "height", 129 },
                                             { "heightType", "AGL" },
-                                            { "verticalUncertainty", 2 }
+                                            { "verticalUncertainty", 5 }
                                         }
                                     },
                                     { "indoorDeployment", 2 }
@@ -85,7 +85,7 @@ class EndToEndTest : public ::testing::Test {
                                     QJsonObject
                                     {
                                         { "lowFrequency", 5925 },
-                                        { "highFrequency", 6425 }
+                                        { "highFrequency", 6425 } //Note that these values are split over 5925-6425 and 6525-7125
                                     }
                                 }
                             },
@@ -98,7 +98,7 @@ class EndToEndTest : public ::testing::Test {
                                     },
                                 }
                             },
-                            { "minDesiredPower", 24 },
+                            { "minDesiredPower", 18 },
                         }
                     }
                 }
@@ -166,7 +166,7 @@ class EndToEndTest : public ::testing::Test {
                     }
                 },
                 { "threshold", -6 },
-                { "maxLinkDistance", 50 },
+                { "maxLinkDistance", 10 },
                 { "maxEIRP", 36 },
                 { "minEIRP", 18 },
                 { "propagationModel",
@@ -191,7 +191,7 @@ class EndToEndTest : public ::testing::Test {
                 { "threshold", -6 },
 
                 { "propagationEnv", "NLCD Point"},
-                { "ulsDatabase", "CONUS_filtered_ULS_21Jan2020_6GHz_1.1.0_fixbps_sort_1record_unii5_7.sqlite3"},
+                { "ulsDatabase", "CONUS_ULS_2022-03-02T03_34_41.097782_fixedBPS_sorted.sqlite3"},
                 { "regionStr", "CONUS"},
                 { "rasDatabase", "RASdatabase.csv"},
 
@@ -462,7 +462,7 @@ void EndToEndTest::runTest()
     createInputConfigJsonFile(runInputConfigJsonFile);
 
     _afc.setAnalysisType("AP-AFC");
-    _afc.setStateRoot("/var/lib/fbrat");
+    _afc.setStateRoot("/usr/share/fbrat/rat_transfer/");
     _afc.setConstInputs("");
     _afc.importGUIjson(runInputDeviceJsonFile);
     _afc.importConfigAFCjson(runInputConfigJsonFile);
@@ -476,12 +476,14 @@ void EndToEndTest::runTest()
     compareExcThr(runExcThrFile, expExcThrFile);
 }
 
-TEST_F(EndToEndTest, DISABLED_Test1) {
+//Test 1
+
+TEST_F(EndToEndTest, Test1) {
     QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
     QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
     QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
-    // QJsonArray  inquiredFrequencyRangeArr = availableSpectrumRequestObj["inquiredFrequencyRange"].toArray();
-    // QJsonObject inquiredFrequencyRangeObj = inquiredFrequencyRangeArr[0].toObject();
+    QJsonArray  inquiredFrequencyRangeArr = availableSpectrumRequestObj["inquiredFrequencyRange"].toArray();
+    QJsonObject inquiredFrequencyRangeObj = inquiredFrequencyRangeArr[0].toObject();
     QJsonObject ellipseObj = locationObj["ellipse"].toObject();
     QJsonObject elevationObj = locationObj["elevation"].toObject();
     QJsonObject centerObj = ellipseObj["center"].toObject();
@@ -503,16 +505,21 @@ TEST_F(EndToEndTest, DISABLED_Test1) {
     elevationObj["heightType"] = "AGL";
     elevationObj["verticalUncertainty"] = 5;
     locationObj["indoorDeployment"] = 2;
-    // inquiredFrequencyRangeObj["lowFrequency"] = 5945;
-    // inquiredFrequencyRangeObj["highFrequency"] = 7125;
+    inquiredFrequencyRangeObj["lowFrequency"] = 5925;
+    inquiredFrequencyRangeObj["highFrequency"] = 6425;
 
-    availableSpectrumRequestObj.remove("inquiredFrequencyRange");
+    QJsonObject inqFreqUnii7;
+    inqFreqUnii7["lowFrequency"] = 6525;
+    inqFreqUnii7["highFrequency"] = 6875;
+
+    // availableSpectrumRequestObj.remove("inquiredFrequencyRange");
 
     ellipseObj["center"] = centerObj;
     locationObj["ellipse"] = ellipseObj;
     locationObj["elevation"] = elevationObj;
-    // inquiredFrequencyRangeArr[0] = inquiredFrequencyRangeObj;
-    // availableSpectrumRequestObj["inquiredFrequencyRange"] = inquiredFrequencyRangeArr;
+    inquiredFrequencyRangeArr[0] = inquiredFrequencyRangeObj;
+    inquiredFrequencyRangeArr.push_back(inqFreqUnii7);
+    availableSpectrumRequestObj["inquiredFrequencyRange"] = inquiredFrequencyRangeArr;
     availableSpectrumRequestObj["inquiredChannels"] = inquiredChannelsArr;
     availableSpectrumRequestObj["location"] = locationObj;
     availableSpectrumRequestArr[0] = availableSpectrumRequestObj;
@@ -526,6 +533,389 @@ TEST_F(EndToEndTest, DISABLED_Test1) {
     expOutputJsonFile = testDir + "/" + "expected_output_test1.json";
     runExcThrFile = "exc_thr.csv.gz";
     expExcThrFile = testDir + "/" + "expected_exc_thr_test1.csv.gz";
+
+    runTest();
+}
+
+//Test 2
+
+TEST_F(EndToEndTest, Test2) {
+    QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
+    QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
+    QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
+    QJsonArray  inquiredFrequencyRangeArr = availableSpectrumRequestObj["inquiredFrequencyRange"].toArray();
+    QJsonObject inquiredFrequencyRangeObj = inquiredFrequencyRangeArr[0].toObject();
+    QJsonObject ellipseObj = locationObj["ellipse"].toObject();
+    QJsonObject elevationObj = locationObj["elevation"].toObject();
+    QJsonObject centerObj = ellipseObj["center"].toObject();
+
+    
+    
+    QJsonArray  inquiredChannelsArr;
+    int globalOperatingClass;
+    for(globalOperatingClass=131; globalOperatingClass<=134; ++globalOperatingClass) {
+        QJsonObject inquiredChannelObj;
+        inquiredChannelObj["globalOperatingClass"] = globalOperatingClass;
+                QJsonArray chanList;
+        if (globalOperatingClass == 131) {
+            chanList.push_back(5);
+        } else if (globalOperatingClass == 132) {
+            chanList.push_back(3);
+        } else if (globalOperatingClass == 133) {
+            chanList.push_back(7);
+        } else if (globalOperatingClass == 134) {
+            chanList.push_back(15);
+        }
+        inquiredChannelObj["channelCfi"] = chanList;
+
+        inquiredChannelsArr.append(inquiredChannelObj);
+    }
+
+    centerObj["latitude"] = 37.59735;
+    centerObj["longitude"] = -121.95034;
+    ellipseObj["majorAxis"] = 100;
+    ellipseObj["minorAxis"] = 60;
+    ellipseObj["orientation"] = 70;
+    elevationObj["height"] = 1.5;
+    elevationObj["heightType"] = "AGL";
+    elevationObj["verticalUncertainty"] = 0;
+    locationObj["indoorDeployment"] = 2;
+    inquiredFrequencyRangeObj["lowFrequency"] = 6745;
+    inquiredFrequencyRangeObj["highFrequency"] = 6825;
+
+    // availableSpectrumRequestObj.remove("inquiredFrequencyRange");
+
+    ellipseObj["center"] = centerObj;
+    locationObj["ellipse"] = ellipseObj;
+    locationObj["elevation"] = elevationObj;
+    inquiredFrequencyRangeArr[0] = inquiredFrequencyRangeObj;
+    //inquiredFrequencyRangeArr.push_back(inqFreqUnii7);
+    availableSpectrumRequestObj["inquiredFrequencyRange"] = inquiredFrequencyRangeArr;
+    availableSpectrumRequestObj["inquiredChannels"] = inquiredChannelsArr;
+    availableSpectrumRequestObj["location"] = locationObj;
+    availableSpectrumRequestArr[0] = availableSpectrumRequestObj;
+    inputJsonDeviceData["availableSpectrumInquiryRequests"] = availableSpectrumRequestArr;
+
+    inputJsonConfigData["maxLinkDistance"] = 10;
+    inputJsonConfigData["clutterAtFS"] = true;
+    
+    runInputDeviceJsonFile = "/tmp/test2_input_device.json";
+    runInputConfigJsonFile = "/tmp/test2_input_config.json";
+    runOutputJsonFile = "/tmp/test2_output.json.gz";
+    expOutputJsonFile = testDir + "/" + "expected_output_test2.json";
+    runExcThrFile = "exc_thr.csv.gz";
+    expExcThrFile = testDir + "/" + "expected_exc_thr_test2.csv.gz";
+
+    runTest();
+}
+
+//Test 3
+
+TEST_F(EndToEndTest, Test3) {
+    QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
+    QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
+    QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
+    QJsonArray  inquiredFrequencyRangeArr = availableSpectrumRequestObj["inquiredFrequencyRange"].toArray();
+    QJsonObject inquiredFrequencyRangeObj = inquiredFrequencyRangeArr[0].toObject();
+    QJsonObject elevationObj = locationObj["elevation"].toObject();
+    locationObj.remove("ellipse");
+    
+
+    QJsonArray  inquiredChannelsArr;
+    int globalOperatingClass;
+    for(globalOperatingClass=131; globalOperatingClass<=134; ++globalOperatingClass) {
+        QJsonObject inquiredChannelObj;
+        inquiredChannelObj["globalOperatingClass"] = globalOperatingClass;
+                QJsonArray chanList;
+        if (globalOperatingClass == 131) {
+            chanList.push_back(49);
+            chanList.push_back(53);
+            chanList.push_back(57);
+            chanList.push_back(61);
+            chanList.push_back(65);
+        } else if (globalOperatingClass == 132) {
+            chanList.push_back(3);
+            chanList.push_back(51);
+            chanList.push_back(67);
+        } else if (globalOperatingClass == 133) {
+            chanList.push_back(71);
+        } else if (globalOperatingClass == 134) {
+            chanList.push_back(47);
+        }
+        inquiredChannelObj["channelCfi"] = chanList;
+
+        inquiredChannelsArr.append(inquiredChannelObj);
+     }
+    QJsonObject centerObj;
+    centerObj["latitude"] = 29.7573483;
+    centerObj["longitude"] = -95.4308149;
+    QJsonArray OuterBoundaryArr;
+    QJsonObject vec;
+    vec["length"] = 64;
+    vec["angle"] = 0;
+    OuterBoundaryArr.push_back(vec);
+    vec["length"] = 104.6;
+    vec["angle"] = 45;
+    OuterBoundaryArr.push_back(vec);
+    vec["length"] = 104;
+    vec["angle"] = 90;
+    OuterBoundaryArr.push_back(vec);
+    vec["length"] = 72;
+    vec["angle"] = 135;
+    OuterBoundaryArr.push_back(vec);
+    vec["length"] = 75;
+    vec["angle"] = 180;
+    OuterBoundaryArr.push_back(vec);
+    vec["length"] = 95.3;
+    vec["angle"] = 225;
+    OuterBoundaryArr.push_back(vec);
+    vec["length"] = 103;
+    vec["angle"] = 270;
+    OuterBoundaryArr.push_back(vec);
+    vec["length"] = 68;
+    vec["angle"] = 315;
+    OuterBoundaryArr.push_back(vec);
+    QJsonObject radialPolygonObj;
+    radialPolygonObj["outerBoundary"] = OuterBoundaryArr;	 
+    elevationObj["heightType"] = "AGL";
+    elevationObj["height"] = 1.5;
+    elevationObj["verticalUncertainty"] = 0;
+    locationObj["indoorDeployment"] = 0;
+
+    availableSpectrumRequestObj.remove("inquiredFrequencyRange");
+    radialPolygonObj["center"] = centerObj;
+    locationObj["radialPolygon"] = radialPolygonObj;
+    locationObj["elevation"] = elevationObj;
+    //inquiredFrequencyRangeArr[0] = inquiredFrequencyRangeObj;
+    //inquiredFrequencyRangeArr.push_back(inqFreqUnii7);
+    // availableSpectrumRequestObj["inquiredFrequencyRange"] = inquiredFrequencyRangeArr;
+    availableSpectrumRequestObj["inquiredChannels"] = inquiredChannelsArr;
+    availableSpectrumRequestObj["location"] = locationObj;
+    availableSpectrumRequestArr[0] = availableSpectrumRequestObj;
+    inputJsonDeviceData["availableSpectrumInquiryRequests"] = availableSpectrumRequestArr;
+   
+    inputJsonConfigData["maxLinkDistance"] = 10;
+    
+    runInputDeviceJsonFile = "/tmp/test3_input_device.json";
+    runInputConfigJsonFile = "/tmp/test3_input_config.json";
+    runOutputJsonFile = "/tmp/test3_output.json.gz";
+    expOutputJsonFile = testDir + "/" + "expected_output_test3.json";
+    runExcThrFile = "exc_thr.csv.gz";
+    expExcThrFile = testDir + "/" + "expected_exc_thr_test3.csv.gz";
+    
+   runTest();
+}
+
+//Test 4 
+
+TEST_F(EndToEndTest, Test4) {
+    QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
+    QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
+    QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
+    QJsonArray  inquiredFrequencyRangeArr = availableSpectrumRequestObj["inquiredFrequencyRange"].toArray();
+    QJsonObject inquiredFrequencyRangeObj = inquiredFrequencyRangeArr[0].toObject();
+    QJsonObject elevationObj = locationObj["elevation"].toObject();
+    locationObj.remove("ellipse");
+    
+   // QJsonObject centerObj;
+   // centerObj["latitude"] = 29.7573483;
+   // centerObj["longitude"] = -95.4308149;
+    QJsonArray OuterBoundaryArr;
+    QJsonObject vec;
+    vec["latitude"] = 37.546067;
+    vec["longitude"] = -122.083744;
+    OuterBoundaryArr.push_back(vec);
+    vec["latitude"] = 37.546067;
+    vec["longitude"] = -122.083064;
+    OuterBoundaryArr.push_back(vec);   
+    vec["latitude"] = 37.546336;
+    vec["longitude"] = -122.082385;
+    OuterBoundaryArr.push_back(vec);
+    vec["latitude"] = 37.546875;
+    vec["longitude"] = -122.082045;
+    OuterBoundaryArr.push_back(vec);
+    vec["latitude"] = 37.547145;
+    vec["longitude"] = -122.083064;
+    OuterBoundaryArr.push_back(vec);   
+    vec["latitude"] = 37.546875;
+    vec["longitude"] = -122.083744;
+    OuterBoundaryArr.push_back(vec);
+    vec["latitude"] = 37.546606;
+    vec["longitude"] = -122.084084;
+    OuterBoundaryArr.push_back(vec);
+    QJsonObject linearPolygonObj;
+    linearPolygonObj["outerBoundary"] = OuterBoundaryArr;	 
+    elevationObj["heightType"] = "AGL";
+    elevationObj["height"] = 1.5;
+    elevationObj["verticalUncertainty"] = 0;
+    locationObj["indoorDeployment"] = 2;
+    inquiredFrequencyRangeObj["lowFrequency"] = 5925;
+    inquiredFrequencyRangeObj["highFrequency"] = 6425;
+    
+
+    QJsonObject inqFreqUnii7;
+    inqFreqUnii7["lowFrequency"] = 6525;
+    inqFreqUnii7["highFrequency"] = 6875;
+
+
+    // linearPolygonObj["center"] = centerObj;
+    locationObj["linearPolygon"] = linearPolygonObj;
+    locationObj["elevation"] = elevationObj;
+    inquiredFrequencyRangeArr[0] = inquiredFrequencyRangeObj;
+    inquiredFrequencyRangeArr.push_back(inqFreqUnii7);
+    availableSpectrumRequestObj["inquiredFrequencyRange"] = inquiredFrequencyRangeArr;
+    availableSpectrumRequestObj.remove("inquiredChannels");
+    availableSpectrumRequestObj["location"] = locationObj;
+    availableSpectrumRequestArr[0] = availableSpectrumRequestObj;
+    inputJsonDeviceData["availableSpectrumInquiryRequests"] = availableSpectrumRequestArr;
+   
+    inputJsonConfigData["maxLinkDistance"] = 10;
+    
+    runInputDeviceJsonFile = "/tmp/test4_input_device.json";
+    runInputConfigJsonFile = "/tmp/test4_input_config.json";
+    runOutputJsonFile = "/tmp/test4_output.json.gz";
+    expOutputJsonFile = testDir + "/" + "expected_output_test4.json";
+    runExcThrFile = "exc_thr.csv.gz";
+    expExcThrFile = testDir + "/" + "expected_exc_thr_test4.csv.gz";
+    
+   runTest();
+}
+
+//Test 5
+
+TEST_F(EndToEndTest, Test5) {
+    QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
+    QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
+    QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
+    QJsonArray  inquiredFrequencyRangeArr = availableSpectrumRequestObj["inquiredFrequencyRange"].toArray();
+    QJsonObject inquiredFrequencyRangeObj = inquiredFrequencyRangeArr[0].toObject();
+    QJsonObject ellipseObj = locationObj["ellipse"].toObject();
+    QJsonObject elevationObj = locationObj["elevation"].toObject();
+    QJsonObject centerObj = ellipseObj["center"].toObject();
+
+    QJsonArray  inquiredChannelsArr;
+    int globalOperatingClass;
+    for(globalOperatingClass=131; globalOperatingClass<=134; ++globalOperatingClass) {
+        if(globalOperatingClass!=132){
+            QJsonObject inquiredChannelObj;
+            inquiredChannelObj["globalOperatingClass"] = globalOperatingClass;
+                    QJsonArray chanList;
+#if 0
+            if (globalOperatingClass == 131) {
+                chanList.push_back(173);
+	    }else if (globalOperatingClass == 133) {
+                chanList.push_back(167);
+            } else if (globalOperatingClass == 134) {
+                chanList.push_back(175);
+            }
+            inquiredChannelObj["channelCfi"] = chanList;
+#endif
+    
+            inquiredChannelsArr.append(inquiredChannelObj);
+        
+        }
+    }
+    centerObj["latitude"] = 40.75940000579217;
+    centerObj["longitude"] = -73.97364799433059;
+    ellipseObj["majorAxis"] = 20;
+    ellipseObj["minorAxis"] = 8;
+    ellipseObj["orientation"] = 120;
+    elevationObj["height"] = 130;
+    elevationObj["heightType"] = "AGL";
+    elevationObj["verticalUncertainty"] = 0;
+    locationObj["indoorDeployment"] = 1;
+    inquiredFrequencyRangeObj["lowFrequency"] = 6525;
+    inquiredFrequencyRangeObj["highFrequency"] = 6585;
+
+    // availableSpectrumRequestObj.remove("inquiredFrequencyRange");
+
+    ellipseObj["center"] = centerObj;
+    locationObj["ellipse"] = ellipseObj;
+    locationObj["elevation"] = elevationObj;
+    inquiredFrequencyRangeArr[0] = inquiredFrequencyRangeObj;
+    //inquiredFrequencyRangeArr.push_back(inqFreqUnii7);
+    availableSpectrumRequestObj["inquiredFrequencyRange"] = inquiredFrequencyRangeArr;
+    availableSpectrumRequestObj["inquiredChannels"] = inquiredChannelsArr;
+    availableSpectrumRequestObj["location"] = locationObj;
+    availableSpectrumRequestArr[0] = availableSpectrumRequestObj;
+    inputJsonDeviceData["availableSpectrumInquiryRequests"] = availableSpectrumRequestArr;
+
+    inputJsonConfigData["maxLinkDistance"] = 10;
+
+    runInputDeviceJsonFile = "/tmp/test5_input_device.json";
+    runInputConfigJsonFile = "/tmp/test5_input_config.json";
+    runOutputJsonFile = "/tmp/test5_output.json.gz";
+    expOutputJsonFile = testDir + "/" + "expected_output_test5.json";
+    runExcThrFile = "exc_thr.csv.gz";
+    expExcThrFile = testDir + "/" + "expected_exc_thr_test5.csv.gz";
+
+    runTest();
+}
+
+//Test 6
+
+TEST_F(EndToEndTest, Test6) {
+    QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
+    QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
+    QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
+    QJsonArray  inquiredFrequencyRangeArr = availableSpectrumRequestObj["inquiredFrequencyRange"].toArray();
+    QJsonObject inquiredFrequencyRangeObj = inquiredFrequencyRangeArr[0].toObject();
+    QJsonObject ellipseObj = locationObj["ellipse"].toObject();
+    QJsonObject elevationObj = locationObj["elevation"].toObject();
+    QJsonObject centerObj = ellipseObj["center"].toObject();
+
+    QJsonArray  inquiredChannelsArr;
+    int globalOperatingClass;
+    for(globalOperatingClass=131; globalOperatingClass<=134; ++globalOperatingClass) {
+        QJsonObject inquiredChannelObj;
+        inquiredChannelObj["globalOperatingClass"] = globalOperatingClass;
+                QJsonArray chanList;
+        if (globalOperatingClass == 131) {
+            chanList.push_back(93);
+        } else if (globalOperatingClass == 132) {
+            chanList.push_back(91); 
+	}else if (globalOperatingClass == 133) {
+            chanList.push_back(87);
+        } else if (globalOperatingClass == 134) {
+            chanList.push_back(79);
+        }
+        inquiredChannelObj["channelCfi"] = chanList;
+
+        inquiredChannelsArr.append(inquiredChannelObj);
+    }
+    centerObj["latitude"] = 36.79947675671799;
+    centerObj["longitude"] = -118.89539271593094;
+    ellipseObj["majorAxis"] = 100;
+    ellipseObj["minorAxis"] = 60;
+    ellipseObj["orientation"] = 150;
+    elevationObj["height"] = 30;
+    elevationObj["heightType"] = "AGL";
+    elevationObj["verticalUncertainty"] = 3;
+    locationObj["indoorDeployment"] = 0;
+    inquiredFrequencyRangeObj["lowFrequency"] = 6525;
+    inquiredFrequencyRangeObj["highFrequency"] = 6875;
+
+    // availableSpectrumRequestObj.remove("inquiredFrequencyRange");
+
+    ellipseObj["center"] = centerObj;
+    locationObj["ellipse"] = ellipseObj;
+    locationObj["elevation"] = elevationObj;
+    inquiredFrequencyRangeArr[0] = inquiredFrequencyRangeObj;
+    //inquiredFrequencyRangeArr.push_back(inqFreqUnii7);
+    availableSpectrumRequestObj["inquiredFrequencyRange"] = inquiredFrequencyRangeArr;
+    availableSpectrumRequestObj["inquiredChannels"] = inquiredChannelsArr;
+    availableSpectrumRequestObj["location"] = locationObj;
+    availableSpectrumRequestArr[0] = availableSpectrumRequestObj;
+    inputJsonDeviceData["availableSpectrumInquiryRequests"] = availableSpectrumRequestArr;
+
+    inputJsonConfigData["maxLinkDistance"] = 50;
+
+    runInputDeviceJsonFile = "/tmp/test6_input_device.json";
+    runInputConfigJsonFile = "/tmp/test6_input_config.json";
+    runOutputJsonFile = "/tmp/test6_output.json.gz";
+    expOutputJsonFile = testDir + "/" + "expected_output_test6.json";
+    runExcThrFile = "exc_thr.csv.gz";
+    expExcThrFile = testDir + "/" + "expected_exc_thr_test6.csv.gz";
 
     runTest();
 }

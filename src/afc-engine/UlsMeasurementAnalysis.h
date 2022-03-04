@@ -28,7 +28,7 @@ namespace UlsMeasurementAnalysis {
     double runPointToPointBldg(const WorldData *wd, const GdalDataDir *srtm1, BuildingRasterModel *bldg, GdalDataModel *bldgPoly, QPointF transLocLatLon, double transHt, QPointF receiveLocLatLon,
                            double receiveHt, double losDistKm, double eps_dielect, double sgm_conductivity, double eno_ns_surfref,
                            double frq_mhz, int radio_climate, int pol, double conf, double rel, int numpts, char *prefix, double **heightProfilePtr
-#if MM_DEBUG
+#if DEBUG_AFC
                                            , std::vector<std::string> &ITMHeightType
 #endif
                               );

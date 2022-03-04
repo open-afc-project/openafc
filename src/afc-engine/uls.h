@@ -183,7 +183,7 @@ public:
     char *location;
     double *ITMHeightProfile;
 
-#if MM_DEBUG
+#if DEBUG_AFC
     std::vector<std::string> ITMHeightType;
 #endif
 

@@ -3,12 +3,8 @@
 #ifndef INCLUDE_AFCMANAGER_H
 #define INCLUDE_AFCMANAGER_H
 
-#ifndef DBG_COMPUTE
-#define DBG_COMPUTE 0
-#endif
-
-#ifndef MM_DEBUG
-#define MM_DEBUG 0
+#ifndef DEBUG_AFC
+#define DEBUG_AFC 0
 #endif
 
 #define USE_BUILDING_RASTER 1
@@ -153,8 +149,6 @@ public:
     // Support command line interface with AFC Engine
     void setCmdLineParams(std::string &inputFilePath, std::string &configFilePath, std::string &outputFilePath, std::string &tempDir, std::string &logLevel, int argc, char **argv);
 
-    void setDBGInputs(const std::string& tempDir); // Debug inputs
-    
     void setConstInputs(const std::string& tempDir); // set inputs not specified by user
 
     void setFixedBuildingLossFlag(bool fixedBuildingLossFlag) { _fixedBuildingLossFlag = fixedBuildingLossFlag; }
@@ -183,7 +177,7 @@ public:
         std::string& pathLossModelStr, double& pathLossCDF,
         std::string& pathClutterTxModelStr, double& pathClutterTxCDF, std::string& pathClutterRxModelStr, double& pathClutterRxCDF,
         const iturp452::ITURP452 *itu452, std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **heightProfilePtr
-#if MM_DEBUG
+#if DEBUG_AFC
                                  , std::vector<std::string> &ITMHeightType
 #endif
        ) const;
@@ -257,6 +251,12 @@ private:
     std::vector<LatLon> _rlanLinearPolygon = std::vector<LatLon>();
     std::vector<AngleRadius> _rlanRadialPolygon = std::vector<AngleRadius>();
     double _scanres_xy, _scanres_ht;
+    bool _indoorFixedHeightAMSL;
+
+    // Method used to treat RLAN uncertainty region scan points that have an AGL height less than _minRlanHeightAboveTerrain
+    // DiscardScanPointBelowGroundMethod : Discard these scan points
+    // TruncateScanPointBelowGroundMethod : Set the AGL height if these scan points to _minRlanHeightAboveTerrain
+    CConst::ScanPointBelowGroundMethodEnum _scanPointBelowGroundMethod;
 
     double _minEIRP_dBm = std::numeric_limits<double>::quiet_NaN();                    // minimum RLAN EIRP (in dBm)
     double _maxEIRP_dBm;                    // maximum RLAN EIRP (in dBm)
@@ -288,11 +288,11 @@ private:
     double _confidenceWinner2;              // Statistical confidence for Winner2 path loss model
     double _confidenceITM;                  // Statistical confidence for ITM path loss model
 
-    CConst::Winner2LOSOptionEnum _winner2LOSOption;  // Method used to determine LOS for Winner2
-                                                     // LOS Unknown, always use _winner2UnknownLOSMethod
-                                                     // BldgDataWinner2LOSOption : use building data 
-                                                     // ForceLOSWinner2LOSOption : Always use LOS
-                                                     // ForceNLOSWinner2LOSOption : Always use NLOS
+    CConst::LOSOptionEnum _winner2LOSOption;  // Method used to determine LOS for Winner2
+                                              // LOS Unknown, always use _winner2UnknownLOSMethod
+                                              // BldgDataWinner2LOSOption : use building data 
+                                              // ForceLOSWinner2LOSOption : Always use LOS
+                                              // ForceNLOSWinner2LOSOption : Always use NLOS
 
     CConst::Winner2UnknownLOSMethodEnum _winner2UnknownLOSMethod;  // Method used to compute Winner2 PL when LOS not known
                                                                    // PLOSCombineWinner2UnknownLOSMethod : Compute probLOS, then combine
@@ -350,7 +350,8 @@ private:
     double _heatmapRLANOutdoorHeightUncertainty; // RLAN Outdoor Height Uncertainty (m) to use for Heatmap Analysis
 
     bool _applyClutterFSRxFlag;
-    bool _applyClutterRLANTxFlag;
+
+    CConst::ITMClutterMethodEnum _rlanITMTxClutterMethod;
 
     std::vector<FreqBandClass> _allowableFreqBandList; // List of allowable freq bands.  For USA, correspond to UNII-5 and UNII-7
     /**************************************************************************************/
@@ -489,7 +490,7 @@ private:
 
     //bool _configChange = false;
 
-#if MM_DEBUG
+#if DEBUG_AFC
     void runAnalyzeNLCD();
 #endif
 };

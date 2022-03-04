@@ -150,7 +150,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
         deviceDescriptor: {
             serialNumber: this.state.serialNumber!,
             certificationId: this.state.certificationId!,
-            rulesetIds: ["47_CFR_PART_15_SUBPART_E"]
+            rulesetIds: ["US_47_CFR_PART_15_SUBPART_E"]
         },
         location: {
             ellipse: this.state.location.ellipse!,

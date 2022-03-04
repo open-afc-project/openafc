@@ -146,8 +146,8 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
         this.setState({ status: "Info" });
         return spectrumInquiryRequest(request)
             .then(resp => {
+                const response = resp.result;
                 if (resp.kind == "Success") {
-                    const response = resp.result;
                     if (response.response.responseCode === 0) {
                         const minEirp = request.minDesiredPower || this.state.minEirp;
                         this.setState({
@@ -155,12 +155,10 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             response: resp.result,
                             minEirp: minEirp,
                         });
-                    } else {
-                        this.setState({ status: "Error", err: error(response.response.shortDescription, response.response.responseCode, response) });
-                    }
-                } else {
-                    this.setState({ status: "Error", err: resp })
-                }
+                    } 
+                }else if(resp.kind == "Error" || !resp.kind) {
+                    this.setState({ status: "Error", err: error(resp.description, resp.errorCode, resp.body), response: resp.body });
+                }    
             });
     }
 
@@ -218,7 +216,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 <br />
                 {this.state.response?.availableSpectrumInfo && <SpectrumDisplayAFC spectrum={this.state.response} />}
                 <br />
-                <JsonRawDisp value={this.state.response} />
+                <JsonRawDisp value={this.state?.response ? this.state.response: this.state?.err?.body} />
             </PageSection>);
     }
 }

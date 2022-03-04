@@ -109,19 +109,15 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
 
     double ULX = adfGeoTransform[0] + adfGeoTransform[1] * 0      + adfGeoTransform[2] * 0;
     double ULY = adfGeoTransform[3] + adfGeoTransform[4] * 0      + adfGeoTransform[5] * 0;
-    // double ULZ = 0.0;
 
     double LLX = adfGeoTransform[0] + adfGeoTransform[1] * 0      + adfGeoTransform[2] * nYSize;
     double LLY = adfGeoTransform[3] + adfGeoTransform[4] * 0      + adfGeoTransform[5] * nYSize;
-    // double LLZ = 0.0;
 
     double URX = adfGeoTransform[0] + adfGeoTransform[1] * nXSize + adfGeoTransform[2] * 0;
     double URY = adfGeoTransform[3] + adfGeoTransform[4] * nXSize + adfGeoTransform[5] * 0;
-    // double URZ = 0.0;
 
     double LRX = adfGeoTransform[0] + adfGeoTransform[1] * nXSize + adfGeoTransform[2] * nYSize;
     double LRY = adfGeoTransform[3] + adfGeoTransform[4] * nXSize + adfGeoTransform[5] * nYSize;
-    // double LRZ = 0.0;
 
     if ( (ULX != LLX) || (URX != LRX) || (LLY != LRY) || (ULY != URY) ) {
         errStr << "ERROR: Inconsistent bounding box in world population file: " << worldPopulationFile;

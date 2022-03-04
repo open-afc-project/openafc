@@ -106,6 +106,7 @@ public:
              OmniAntennaType,
         F1336OmniAntennaType,
             F1245AntennaType,
+             F699AntennaType,
               LUTAntennaType
     };
     /**************************************************************************************/
@@ -208,13 +209,16 @@ public:
     /**************************************************************************************/
 
     /**************************************************************************************/
-    /**** Winner2LOSOption                                                             ****/
+    /**** LOSOption                                                                    ****/
     /**************************************************************************************/
-    enum Winner2LOSOptionEnum {
-              UnknownWinner2LOSOption,
-             BldgDataWinner2LOSOption,
-             ForceLOSWinner2LOSOption,
-            ForceNLOSWinner2LOSOption
+    enum LOSOptionEnum {
+              UnknownLOSOption,
+             BldgDataLOSOption,
+             BldgDataReqTxLOSOption,
+             BldgDataReqRxLOSOption,
+             BldgDataReqTxRxLOSOption,
+             ForceLOSLOSOption,
+            ForceNLOSLOSOption
     };
     /**************************************************************************************/
 
@@ -224,6 +228,16 @@ public:
     enum Winner2UnknownLOSMethodEnum {
           PLOSCombineWinner2UnknownLOSMethod,
         PLOSThresholdWinner2UnknownLOSMethod
+    };
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /**** ITMClutterMethod                                                             ****/
+    /**************************************************************************************/
+    enum ITMClutterMethodEnum {
+           ForceTrueITMClutterMethod,
+          ForceFalseITMClutterMethod,
+            BldgDataITMCLutterMethod
     };
     /**************************************************************************************/
 
@@ -242,10 +256,20 @@ public:
     };
     /**************************************************************************************/
     
+    /**************************************************************************************/
+    /**** ScanPointBelowGroundMethod                                                   ****/
+    /**************************************************************************************/
+    enum ScanPointBelowGroundMethodEnum {
+           DiscardScanPointBelowGroundMethod,
+          TruncateScanPointBelowGroundMethod
+    };
+    /**************************************************************************************/
+
     static const StrTypeClass strULSAntennaTypeList[];
     static const StrTypeClass strPropEnvList[];
     static const StrTypeClass strPathLossModelList[];
-    static const StrTypeClass strWinner2LOSOptionList[];
+    static const StrTypeClass strLOSOptionList[];
+    static const StrTypeClass strITMClutterMethodList[];
     static const StrTypeClass strHeightSourceList[];
 };
 
