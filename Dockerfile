@@ -1,4 +1,4 @@
-FROM openafc/centos-build-image:3.3.11.4 as build_image
+FROM openafc/centos-build-image:latest as build_image
 ARG BUILDREV=localbuild
 COPY CMakeLists.txt LICENSE.txt version.txt fbrat.rpmlintrc Doxyfile.in /wd/
 RUN echo $BUILDREV > /wd/svnrevision.txt
@@ -9,7 +9,7 @@ COPY src /wd/src/
 RUN sh -x /wd/build-rpm.sh
 
 # Stage Install
-FROM openafc/centos-preinstall-image:3.3.11.4 as install_image
+FROM openafc/centos-preinstall-image:latest as install_image
 RUN mkdir -p /repos/CentOS/7/7/Packages
 COPY --from=build_image \
     /wd/build/dist/RPMS/x86_64/fbrat* \
