@@ -203,7 +203,7 @@ def parseULS(self, state_path = "/var/lib/fbrat", isManual = False):
                 self.update_state(state = 'REVOKED')
                 raise Ignore('Manual parse already in progress')
     self.update_state(state='PROGRESS')
-    result = daily_uls_parse(state_path)
+    result = daily_uls_parse(state_path, False)
     self.update_state(state='DONE')
     LOGGER.debug('Freeing up manual parse worker')
     return result
