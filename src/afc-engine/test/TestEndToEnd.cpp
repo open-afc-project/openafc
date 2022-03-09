@@ -478,7 +478,7 @@ void EndToEndTest::runTest()
 
 //Test 1
 
-TEST_F(EndToEndTest, Test1) {
+TEST_F(EndToEndTest, DISABLED_Test1) {
     QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
     QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
     QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
@@ -539,7 +539,7 @@ TEST_F(EndToEndTest, Test1) {
 
 //Test 2
 
-TEST_F(EndToEndTest, Test2) {
+TEST_F(EndToEndTest, DISABLED_Test2) {
     QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
     QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
     QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
@@ -611,7 +611,7 @@ TEST_F(EndToEndTest, Test2) {
 
 //Test 3
 
-TEST_F(EndToEndTest, Test3) {
+TEST_F(EndToEndTest, DISABLED_Test3) {
     QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
     QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
     QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
@@ -708,7 +708,7 @@ TEST_F(EndToEndTest, Test3) {
 
 //Test 4 
 
-TEST_F(EndToEndTest, Test4) {
+TEST_F(EndToEndTest,  DISABLED_Test4) {
     QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
     QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
     QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
@@ -783,7 +783,7 @@ TEST_F(EndToEndTest, Test4) {
 
 //Test 5
 
-TEST_F(EndToEndTest, Test5) {
+TEST_F(EndToEndTest,  DISABLED_Test5) {
     QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
     QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
     QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
@@ -854,7 +854,7 @@ TEST_F(EndToEndTest, Test5) {
 
 //Test 6
 
-TEST_F(EndToEndTest, Test6) {
+TEST_F(EndToEndTest,  DISABLED_Test6) {
     QJsonArray availableSpectrumRequestArr = inputJsonDeviceData["availableSpectrumInquiryRequests"].toArray();
     QJsonObject availableSpectrumRequestObj = availableSpectrumRequestArr[0].toObject();
     QJsonObject locationObj = availableSpectrumRequestObj["location"].toObject();
