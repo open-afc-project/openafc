@@ -4,9 +4,9 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS 3.10)
     cmake_policy(SET CMP0071 OLD)
 endif()
 
-if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "Release")
-endif()
+#if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE "Debug")
+#endif()
 
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
