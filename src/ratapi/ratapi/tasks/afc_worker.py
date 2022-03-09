@@ -9,7 +9,7 @@ import datetime
 from celery import Celery
 from ..db.daily_uls_parse import daily_uls_parse
 from runcelery import init_config
-from celery.schedules import crontab,timedelta
+from celery.schedules import crontab
 from flask.config import Config
 from celery.utils.log import get_task_logger
 from celery.exceptions import Ignore
@@ -36,7 +36,7 @@ def setup_periodic_tasks(sender, **kwargs):
     # Check every minute if the daily parse time has passed
     sender.add_periodic_task(
         crontab(),
-        checkParseTime.apply_async(args=[],),
+        checkParseTime.apply_async(args=[]),
     )
     # reset daily flag every day at midnight
     sender.add_periodic_task(
