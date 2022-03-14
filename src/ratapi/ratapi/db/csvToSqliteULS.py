@@ -1,4 +1,5 @@
 import csv
+import os
 import sqlalchemy as sa
 from sqlalchemy import Column
 from sqlalchemy.sql.elements import and_, or_
@@ -19,6 +20,28 @@ class CoerceUTF8(TypeDecorator):
             value = value.decode('utf-8')
         return value
 
+class PR(Base):
+    ''' Passive Repeater table
+    '''
+
+    __tablename__ = 'pr'
+
+    id = Column(Integer, primary_key=True)
+
+    #: FSID
+    fsid = Column(Integer, nullable=False, index=True)
+
+    #: PR IDX
+    prSeq = Column(Integer)
+
+    pr_lat_deg = Column(Float)
+    pr_lon_deg = Column(Float)
+    pr_height_to_center_raat_m = Column(Float)
+    pr_reflector_height_m = Column(Float)
+    pr_reflector_width_m = Column(Float)
+    pr_back_to_back_gain_tx = Column(Float)
+    pr_back_to_back_gain_rx = Column(Float)
+
 class ULS(Base):
     ''' ULS Database table
     '''
@@ -27,8 +50,6 @@ class ULS(Base):
     __table_args__ = (
         sa.UniqueConstraint('fsid'),
     )
-
-    id = Column(Integer)
 
     #: FSID
     fsid = Column(Integer, nullable=False, index=True, primary_key=True)
@@ -92,10 +113,10 @@ class ULS(Base):
     tx_gain = Column(Float)
 
     #: Rx Lat Coords
-    rx_lat_deg = Column(Float, nullable=False)
+    rx_lat_deg = Column(Float, nullable=False, index=True)
 
     #: Rx Long Coords
-    rx_long_deg = Column(Float, nullable=False)
+    rx_long_deg = Column(Float, nullable=False, index=True)
 
     #: Rx Ground Elevation (m)
     rx_ground_elev_m = Column(Float)
@@ -109,17 +130,9 @@ class ULS(Base):
     #: Rx Gain (dBi)
     rx_gain = Column(Float)
 
-    p_rx_indicator = Column(String(1))
-
-    p_rp_lat_degs = Column(Float, index=True)
-
-    p_rp_lon_degs = Column(Float, index=True)
-
-    p_rp_height_to_center_raat_m = Column(Float)
+    p_rp_num = Column(Integer)
 
     path_number = Column(Integer, nullable=False)
-
-
 
 def _as_bool(s):
     if s == 'Y':
@@ -144,16 +157,6 @@ def truncate(num, n):
     integer = int(num * (10**n))/(10**n)
     return float(integer)
 
-
-def save_chunk(session, to_save):
-    ''' Chunked save operation. Falls back to saving individual enties if sqlalchemy is on old version '''
-    if hasattr(session, 'bulk_save_objects'):
-        session.bulk_save_objects(to_save)
-    else:
-        for entity in to_save:
-            session.add(entity)
-
-
 def load_csv_data(file_name, headers=None):
     ''' Loads csv file into python objects
 
@@ -176,73 +179,43 @@ def load_csv_data(file_name, headers=None):
                     },
                     delimiter=','), None)
 
-def lookup_then_insert(session, entries, highestFsId, state_root):
-    ''' Looks up the entries in yesterdays DB to retain FSID and inserts into the new DB
-
-        :param session: the sqlalchemy sessions to write to
-
-        :param entries: a list of the ULS entries to be added to the new DB
-
-        :param highestFsId: the largest know FSID to use as a starting point for new entries
-    '''
-    updateCount = 0
-    createCount = 0
-    path_to_db = state_root + '/daily_uls_parse/data_files/yesterdayDB.sqlite3'
-    # use yesterdays DB to retain FSID
-    yesterday_engine = sa.create_engine('sqlite:///' + path_to_db, convert_unicode=True)
-    yesterday_session = sessionmaker(bind=yesterday_engine)
-    s_yesterday = yesterday_session()
-    
-    for entry in entries:
-        # query yesterday DB for each entry
-        row = s_yesterday.query(ULS).filter(and_(ULS.callsign==entry.callsign, ULS.freq_assigned_start_mhz==entry.freq_assigned_start_mhz, ULS.freq_assigned_end_mhz==entry.freq_assigned_end_mhz, ULS.path_number==entry.path_number)).all()
-        # if we find an entry that matches, save the FSID but overwrite the entry
-        if(len(row) == 1):
-            persistentFSID = row[0].fsid
-            entry.fsid = persistentFSID 
-            updateCount += 1
-            session.add(entry)
-        elif(len(row) > 1):
-            raise Exception("ERROR: Multiple matches found for ULS:", "Callsign: " + str(entry.callsign), "Start Freq: " + str(entry.freq_assigned_start_mhz), "End Freq: " + str(entry.freq_assigned_end_mhz) ,"FSID: " + str(entry.fsid), "Path number: " + str(entry.path_number))
-        # otherwise increment fsid counter and store the entry with that FSID
-        else:
-            highestFsId += 1
-            entry.fsid = highestFsId
-            createCount += 1
-            session.add(entry)
-    return [updateCount, createCount, highestFsId]
-
-
 def convertULS(data_file, state_root, logFile):
     logFile.write('Converting ULS csv to sqlite' + '\n')
-    fileName = data_file.replace('.csv', '')
+    fileName = data_file.replace('.csv', '') + '.sqlite3'
+
+    if os.path.exists(fileName):
+        logFile.write("WARNING: sqlite file " + fileName + " already exists, deleting\n")
+        os.remove(fileName)
+        if os.path.exists(fileName):
+            logFile.write("ERROR: unable to delete file " + fileName + "\n")
+        else:
+            logFile.write("successfully deleted file " + fileName + "\n")
+
     # the new sqlite for the ULS
-    today_engine = sa.create_engine('sqlite:///' + fileName + '.sqlite3', convert_unicode=True)
+    today_engine = sa.create_engine('sqlite:///' + fileName, convert_unicode=True)
     today_session = sessionmaker(bind=today_engine)
     s = today_session()
 
-    highestFsId = None
-    entriesUpdated = 0
-    entriesInserted = 0
-    with open('data_files/lastFSID.txt', 'r') as fsidFile: 
-        highestFsId = int(fsidFile.read())
-    # create uls table
-    Base.metadata.create_all(today_engine, tables=[ULS.__table__])
+    # create uls and pr tables
+    Base.metadata.create_all(today_engine, tables=[ULS.__table__,PR.__table__])
     try:
         (data, file_handle) = load_csv_data(data_file)
 
         # generate queries in chunks to reduce memory footprint
         to_save = []
         invalid_rows = 0
+        prCount = 0;
         errors = []
         uls = None
+        pr = None
         
         for count, row in enumerate(data):
             try:
+                numPR = _as_int(row.get("Num Passive Repeater"))
+                fsidVal = int(row.get("FSID") or count + 2)
                 uls = ULS(
-                    id=count,
                     #: FSID
-                    fsid=int(row.get("FSID") or count + 2),
+                    fsid = fsidVal,
                     #: Callsign
                     callsign=str(row["Callsign"]),
                     #: Status
@@ -292,22 +265,29 @@ def convertULS(data_file, state_root, logFile):
                             row["Rx Height to Center RAAT (m)"]),
                     #: Rx Gain (dBi)
                     rx_gain=_as_float(row["Rx Gain (dBi)"]),
-                    #: Passive Receiver Indicator
-                    p_rx_indicator=(
-                        row.get("Passive Receiver Indicator") or "N"),
-                    #: Passive Repeater Latitude Coords,
-                    p_rp_lat_degs=_as_float(
-                        row.get("Passive Repeater Lat Coords")),
-                    #: Passive Repeater Longitude Coords,
-                    p_rp_lon_degs=_as_float(
-                        row.get("Passive Repeater Long Coords")),
-                    #: Passive Repeater Height to Center RAAT (m)
-                    p_rp_height_to_center_raat_m=_as_float(
-                        row.get("Passive Repeater Height to Center RAAT (m)")),
+                    #: Number of passive repeaters
+                    p_rp_num=numPR,
+
                     # Path number 
                     path_number=row.get("Path Number")
                 )
                 s.add(uls)
+                for idx in range(1, numPR+1):
+                    pr = PR(
+                        id = prCount,
+                        fsid = fsidVal,
+                        prSeq = idx,
+                        pr_lat_deg = _as_float(                 row.get("Passive Repeater " + str(idx) + " Lat Coords")),
+                        pr_lon_deg = _as_float(                 row.get("Passive Repeater " + str(idx) + " Long Coords")),
+                        pr_height_to_center_raat_m = _as_float( row.get("Passive Repeater " + str(idx) + " Height to Center RAAT (m)")),
+                        pr_reflector_height_m = _as_float(      row.get("Passive Repeater " + str(idx) + " Reflector Height (m)")),
+                        pr_reflector_width_m = _as_float(       row.get("Passive Repeater " + str(idx) + " Reflector Width (m)")),
+                        pr_back_to_back_gain_tx = _as_float(    row.get("Passive Repeater " + str(idx) + " Back-to-Back Gain Tx (dBi)")),
+                        pr_back_to_back_gain_rx = _as_float(    row.get("Passive Repeater " + str(idx) + " Back-to-Back Gain Rx (dBi)"))
+                    )
+                    prCount = prCount+1
+                    s.add(pr)
+                
                 # to_save.append(uls)
             except Exception as e:
                 logFile.write("ERROR: " + str(e) + '\n')
@@ -318,34 +298,17 @@ def convertULS(data_file, state_root, logFile):
 
             if count % 10000 == 0:
                 logFile.write("CSV to sqlite Up to entry " + str(count) + '\n')
-                # result = lookup_then_insert(s, to_save, highestFsId, state_root)
-                # entriesUpdated += result[0]
-                # entriesInserted += result[1]
-                # highestFsId = result[2]
-                # to_save = []
-
-        # if len(to_save) > 0:
-        #     result = lookup_then_insert(s, to_save, highestFsId, state_root)
-        #     entriesUpdated += result[0]
-        #     entriesInserted += result[1]
-        #     highestFsId = result[2]
-        #     to_save = []
 
         if not (file_handle is None):
             file_handle.close()
 
         s.commit() # only commit after DB opertation are completed
+        logFile.write("File " + str(fileName) + " created with " + str(count) + " entries and " + str(prCount) + " passive repeaters")
 
-        # update last assigned fsid file for future
-        with open('data_files/lastFSID.txt', 'w') as fsidFile: 
-            fsidFile.write(str(highestFsId))
-        logFile.write("Updated " + str(entriesUpdated) + ' entries.\nInserted ' + str(entriesInserted) + ' entries.' + '\n')
-        return entriesUpdated, entriesInserted
+        return
 
     except Exception as e:
         s.rollback()
         raise e
     finally:
         s.close()
-
-

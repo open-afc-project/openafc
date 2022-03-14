@@ -1,3 +1,4 @@
+from genericpath import exists
 from inspect import cleandoc
 import logging
 import os
@@ -43,8 +44,6 @@ def setup_periodic_tasks(sender, **kwargs):
         resetDailyFlag.apply_async(args=[]),
     )
    
-
-
 
 @client.task(bind=True)
 def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type, request_file_path, config_file_path, response_file_path, history_dir, debug):
@@ -117,7 +116,16 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type, re
             shutil.copy2(os.path.join(temp_dir, 'engine-error.txt'),
                          os.path.join(response_dir, self.request.id + ".error"))
 
-            # store error file in responses dir
+            LOGGER.debug("copied error file from "+os.path.join(temp_dir, 'engine-error.txt')+" to "+os.path.join(response_dir, self.request.id + ".error"))
+            # store error file in history dir so it can be seen via WebDav
+            if history_dir is not None:
+                LOGGER.debug("Moving temp files to history: %s",
+                            str(os.listdir(temp_dir)))
+                shutil.move(
+                    temp_dir,
+                    os.path.join(history_dir, username + '-' + str(datetime.datetime.now().isoformat())))
+                LOGGER.debug("Created history folder "+os.path.join(history_dir, username + '-' + str(datetime.datetime.now().isoformat())))
+                
             return {
                 'status': 'ERROR',
                 'user_id': user_id,
@@ -150,6 +158,7 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type, re
             shutil.move(
                 temp_dir,
                 os.path.join(history_dir, username + '-' + str(datetime.datetime.now().isoformat())))
+            LOGGER.debug("Created history folder "+os.path.join(history_dir, username + '-' + str(datetime.datetime.now().isoformat())))
 
         LOGGER.debug('task completed')
         result = {
@@ -194,16 +203,18 @@ def parseULS(self, state_path = "/var/lib/fbrat", isManual = False):
                 self.update_state(state = 'REVOKED')
                 raise Ignore('Manual parse already in progress')
     self.update_state(state='PROGRESS')
-    result = daily_uls_parse(state_path, isManual)
+    result = daily_uls_parse(state_path, False)
     self.update_state(state='DONE')
     LOGGER.debug('Freeing up manual parse worker')
     return result
 
 @client.task(bind=True)
 def checkParseTime(self):
+    print("Starting check parse time")
+    verifyUlsParseFolders(APP_CONFIG["STATE_ROOT_PATH"])
     datapath = APP_CONFIG["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/nextRun.txt'
     nextRun = ''
-    
+
     with open(datapath, 'r') as data_file:
         # string is stored as "<hours>:<mins>"
         nextRun = data_file.read().split(':')
@@ -237,3 +248,32 @@ def checkParseTime(self):
 def resetDailyFlag(self):
     LOGGER.debug('Setting parse flag to false')
     client.conf["DAILY_ULS_RAN_TODAY"] = False
+
+def verifyUlsParseFolders(rootDir):
+    # verify there is a daily_uls_parse directory
+    dailyParseDir= rootDir + '/daily_uls_parse'
+    dataFilesDir = dailyParseDir+'/data_files'
+    dataFileNames = {
+        dataFilesDir+'/currentManualId.txt':"",
+        dataFilesDir+'/fsid_table.csv':"",
+        dataFilesDir+'/lastFSID.txt':"1",
+        dataFilesDir+'/lastSuccessfulRun.txt':"",
+        dataFilesDir+'/nextRun.txt':"00:00"
+    }
+
+    LOGGER.debug('checking for next run file in '+dailyParseDir)
+
+    if(not os.path.exists(dailyParseDir)):
+        LOGGER.debug('adding '+dailyParseDir)
+        os.makedirs(dailyParseDir)
+
+    if(not os.path.exists(dataFilesDir)):
+        LOGGER.debug('adding '+dataFilesDir)
+        os.makedirs(dataFilesDir)
+
+    for fname in dataFileNames:
+        if not exists(fname):
+            LOGGER.debug('adding '+fname)
+            with open(fname, 'w+') as f:
+                f.write(dataFileNames[fname])
+

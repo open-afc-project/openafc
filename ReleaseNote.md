@@ -1,6 +1,77 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**v3.3.12**|
+| :- | :- |
+|**Date**|**03/04/2022**|
+
+
+
+## **Issues Addressed**
+* Bug fix in WFA interface specification (v1.1):
+ * Jira OA-89: Add "US" to rulesetId in AP request message (Virtual AP)
+
+* GUI enhancements:
+ * Jira OA-98: Error runs on Virtual AP to generate engine outputs under Debug folder
+
+* ULS-Parser bug fixes/changes:
+ * Jira OA-22: ULS script parsing coordinates incorrectly
+ * Jira OA-93: Include FS links marked as "Mobile" in ULS
+ * Jira OA-33: Some of the Passive Repeater data populated incorrectly
+ * Jira OA-20: ULS Parser to handle links with multiple passive repeaters
+ * Jira OA-94: How to handle FS links with FS Tx antenna pointing to different Rx: only partially fixed by using the path number in [AN] table; this is still open question to FCC (see Jira ticket for details)
+
+* Update of RAS Database:
+ * Jira OA-15: Update RAS Database (update of antenna AGL heights in RAS database to match WINNF-TS-1014-v0.0.0-r5.0 table 2). See attached updated file. Updated file needs to replace the existing one under /var/lib/fbrat.
+
+* Other:
+ * OA-87: RKF to remove the unneeded comments/debug lines from the source-code
+ * OA-81: Changes in assignment of AP height (partial - per comment in Jira only Engine portion has been implemented). 
+
+
+## **Feature Additions/Changes**
+
+### 1. Engine end-to-end test:
+* Jira OA-9: Create an end-to-end regression test (for Engine)
+**Reason for feature addition/change:** to perform automated regression testing of the engine when making changes (for internal use). This was updated to the latest ULS structure (03/02/2022)
+* Please see attached JSONfiles_03March2022.zip that contains the json files for all tests as well as accompanying powerpoint and excel file that describes the configuration of each test.
+* For the description of parameters, please refer to WFA interface specification v1.1.
+
+### 2. ULS Parser:
+* Added an interative mode for daily_uls_parse to facilitate degugging/development. 
+
+### 3. Height change
+* See attached tests
+
+
+## **Interface Changes**
+**ULS Database:** the Sqlite file has two tables: 
+* uls table: includes ALL FS links (but no information on their passive repeaters, except num of passive repeaters, for those that have)
+* pr table: includes information on all passive repeaters of the relevant FS. Each passive repeater of a given FS will be in a different row. This allows max flexibility and efficiency to handle any number of Passive Repeaters.
+* You need to put the CONUS_ULS_2022-03-02T03_34_41.097782_fixedBPS_sorted.sqlite3 in /var/lib/fbrat
+
+**VirtualAP**
+VirtualAP analysisResponse.json now has .gz extention consistently.
+
+
+## **Bug Fixes**
+* See **Issues Addressed**
+
+
+## **Testing Done**
+In addition to all tests done by the developer when making changes, the following additonal tests were done by another person.
+* End-to-end regression tests (tests 1 through 6) passed.
+* ULS Parser: specific issues (per Jira tickets) were confirmed against FCC online database and against Fedor's script.
+* Engine pointing to the last passive repeater: this was tested by checking the pointing direction of FS Rx (using results.kmz) against expected direction using ULS data in google-Earth. The test was done for 3 FS links with 1, 2 and 3 passive repeaters. See the json request and response message for each test in attached "EnginePointtoLastPR_220302.zip"
+* Handling AP height below ground (OA-81) is tested for the various cases (indoor, outdoor and desired error case as describe in the jira ticket). The tests' Readme, configuration and JSON files are in "APHeightBelowGroundTests.zip" attached.
+
+## **Known Issues**
+* As mentioned in Jira OA-21 comment and as agreed with the TIP Maintainer, automatic daily parsing of the ULS is currently not functional. Potential solutions are currently under discussion.
+
+
+## **Potential Improvements** 
+
+## **Version and Date**
 |Version|**v3.3.11**|
 | :- | :- |
 |**Date**|**02/14/2022**|

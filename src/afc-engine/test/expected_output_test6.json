@@ -1,0 +1,103 @@
+{
+    "availableSpectrumInquiryResponses": [
+        {
+            "availabilityExpireTime": "2022-03-04T20:46:47Z",
+            "availableChannelInfo": [
+                {
+                    "channelCfi": [
+                        93
+                    ],
+                    "globalOperatingClass": 131,
+                    "maxEirp": [
+                        36
+                    ]
+                },
+                {
+                    "channelCfi": [
+                        91
+                    ],
+                    "globalOperatingClass": 132,
+                    "maxEirp": [
+                        36
+                    ]
+                },
+                {
+                    "channelCfi": [
+                        87
+                    ],
+                    "globalOperatingClass": 133,
+                    "maxEirp": [
+                        36
+                    ]
+                },
+                {
+                    "channelCfi": [
+                        79
+                    ],
+                    "globalOperatingClass": 134,
+                    "maxEirp": [
+                        36
+                    ]
+                }
+            ],
+            "availableFrequencyInfo": [
+                {
+                    "frequencyRange": {
+                        "highFrequency": 6545,
+                        "lowFrequency": 6525
+                    },
+                    "maxPSD": 22.98970004336019
+                },
+                {
+                    "frequencyRange": {
+                        "highFrequency": 6625,
+                        "lowFrequency": 6545
+                    },
+                    "maxPSD": 19.97940008672038
+                },
+                {
+                    "frequencyRange": {
+                        "highFrequency": 6645,
+                        "lowFrequency": 6625
+                    },
+                    "maxPSD": 22.98970004336019
+                },
+                {
+                    "frequencyRange": {
+                        "highFrequency": 6705,
+                        "lowFrequency": 6685
+                    },
+                    "maxPSD": 22.98970004336019
+                },
+                {
+                    "frequencyRange": {
+                        "highFrequency": 6745,
+                        "lowFrequency": 6705
+                    },
+                    "maxPSD": 19.97940008672038
+                },
+                {
+                    "frequencyRange": {
+                        "highFrequency": 6825,
+                        "lowFrequency": 6745
+                    },
+                    "maxPSD": 16.969100130080566
+                },
+                {
+                    "frequencyRange": {
+                        "highFrequency": 6865,
+                        "lowFrequency": 6825
+                    },
+                    "maxPSD": 19.97940008672038
+                }
+            ],
+            "requestId": "0",
+            "response": {
+                "responseCode": 0,
+                "shortDescription": "Success"
+            },
+            "rulesetId": "US_47_CFR_PART_15_SUBPART_E"
+        }
+    ],
+    "version": "1.1"
+}

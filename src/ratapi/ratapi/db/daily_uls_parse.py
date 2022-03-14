@@ -1,4 +1,4 @@
-import os, urllib, datetime, zipfile, shutil, subprocess, sys
+import os, urllib, datetime, zipfile, shutil, subprocess, sys, glob
 from collections import OrderedDict
 import ssl
 from csvToSqliteULS import convertULS
@@ -254,132 +254,211 @@ def generateUlsScriptInput(root, logFile, temp):
                         combined.write(line)
     os.chdir(root)
 
-def daily_uls_parse(state_root, isManual = False):
+def daily_uls_parse(state_root, interactive):
     startTime = datetime.datetime.now()
     root = state_root + "/daily_uls_parse"# root so path is consisent
-    temp = '/temp'
-    if isManual:
-        temp = '/temp_manual'
-    # Ensure temp dir does not exist 
-    if (os.path.isdir(root + temp)):
-        try:
-            shutil.rmtree(root + temp) #delete temp folder
-        except Exception as e: 
-            # LOGGER.error('ERROR: Could not delete old temp directory:')
-            raise e
-    # create temp directory to download files to
-    os.mkdir(root + temp)
-    os.chdir(root + temp) #change to temp 
-    logname = root + temp + "/dailyParse_" + startTime.isoformat() + ".log"
-    logFile = open(logname, 'w', 1)
-    logFile.write('Starting update at: ' + startTime.isoformat() + '\n')
+    temp = "/temp"
 
+    if interactive:
+        print("Specify full path for root daily_uls_parse dir containing FCC files that have been downloaded")
+        value = raw_input("Enter Directory (" + root + "): ")
+        if (value != ""):
+            root = value
+        print("daily_uls_parse root directory set to " + root)
 
-    # download and unzip
-    downloadFiles(logFile)
-    extractZips(logFile)
+        global currentWeekday
+        print("Enter Current Weekday for FCC files: ")
+        for key, day in dayMap.items():
+            print(str(key) + ": " + day)
+        value = raw_input("Current Weekday (" + str(currentWeekday) + "): ")
+        if (value != ""):
+            currentWeekday = int(value)
+        if (currentWeekday < 0 or currentWeekday > 6):
+            print("ERROR: currentWeekday = " + str(currentWeekday) + " invalid, must be in [0,6]")
+            return
 
+        fullPathTempDir = root + temp
+        if (not os.path.isdir(fullPathTempDir)):
+            print("ERROR: " + fullPathTempDir + " does not exist")
+            return
 
-    # get the time creation of weekly file from the counts file
-    weeklyCreation = verifyCountsFile('weekly', root, temp)
-    # process the daily files day by day
-    processDailyFiles(weeklyCreation, root, logFile, temp)
+        logname = fullPathTempDir + "/dailyParse_" + startTime.isoformat() + ".log"
+        logFile = open(logname, 'w', 1)
+        logFile.write('Starting interactive mode update at: ' + startTime.isoformat() + '\n')
+    else:
 
-    os.chdir(root) # change back to root of this script
-    # generate the combined csv/txt file for the coalition uls processor 
-    generateUlsScriptInput(root, logFile, temp) 
+        fullPathTempDir = root + temp
+        # Ensure temp dir does not exist 
+        if (os.path.isdir(fullPathTempDir)):
+            try:
+                shutil.rmtree(fullPathTempDir) #delete temp folder
+            except Exception as e: 
+                # LOGGER.error('ERROR: Could not delete old temp directory:')
+                raise e
+        # create temp directory to download files to
+        os.mkdir(fullPathTempDir)
+        os.chdir(fullPathTempDir) #change to temp 
+        logname = fullPathTempDir + "/dailyParse_" + startTime.isoformat() + ".log"
+        logFile = open(logname, 'w', 1)
+        logFile.write('Starting update at: ' + startTime.isoformat() + '\n')
 
-    # run through the uls processor 
-    logFile.write('Running through ULS processor' + '\n')
+        # download and unzip
+        downloadFiles(logFile)
+        extractZips(logFile)
+
+    if interactive:
+        value = raw_input("Process FCC files and generate file combined.txt to use as input to uls-script? (y/n): ")
+        if value == "y":
+            processFCC = True
+        elif value == "n":
+            processFCC = False
+        else:
+            print("ERROR: Invalid input: " + value + ", must be y or n")
+    else:
+        processFCC = True
+
+    if processFCC:
+        # get the time creation of weekly file from the counts file
+        weeklyCreation = verifyCountsFile('weekly', root, temp)
+        # process the daily files day by day
+        processDailyFiles(weeklyCreation, root, logFile, temp)
+
+        os.chdir(root) # change back to root of this script
+        # generate the combined csv/txt file for the coalition uls processor 
+        generateUlsScriptInput(root, logFile, temp) 
+
     nameTime =  datetime.datetime.now().isoformat().replace(":", '_')
-    coalitionScriptOutput = root + temp +'/CONUS_ULS ' + nameTime + '.csv'
-    try:
-        subprocess.call(['./uls-script', root + temp + '/combined.txt', coalitionScriptOutput]) 
-    except Exception as e: 
-        logFile.write('ERROR: ULS processor error:')
-        raise e
+    coalitionScriptOutputFilename = 'CONUS_ULS_' + nameTime + '.csv'
+
+    if interactive:
+        value = raw_input("Run ULS Processor, uls-script? (y/n): ")
+        if value == "y":
+            runULSProcessor = True
+        elif value == "n":
+            runULSProcessor = False
+        else:
+            print("ERROR: Invalid input: " + value + ", must be y or n")
+
+        if runULSProcessor:
+            value = raw_input("Enter ULS Processor output filename to generate (" + coalitionScriptOutputFilename + "): ")
+        else:
+            flist = glob.glob(fullPathTempDir + "/CONUS_ULS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
+            if (len(flist)):
+                coalitionScriptOutputFilename = flist[-1]
+
+            value = raw_input("Enter Enter existing ULS Processor output filename to process (" + coalitionScriptOutputFilename + "): ")
+
+        if (value != ""):
+            coalitionScriptOutputFilename = value
+    else:
+        runULSProcessor = True
+
+    fullPathCoalitionScriptOutput = fullPathTempDir + "/" + coalitionScriptOutputFilename
+
+    if runULSProcessor:
+        # run through the uls processor 
+        logFile.write('Running through ULS processor' + '\n')
+        try:
+            subprocess.call(['./uls-script', root + temp + '/combined.txt', fullPathCoalitionScriptOutput]) 
+        except Exception as e: 
+            logFile.write('ERROR: ULS processor error:')
+            raise e
     
+    if interactive:
+        value = raw_input("Run fixBPS? (y/n): ")
+        if value == "y":
+            runFixBPS = True
+        elif value == "n":
+            runFixBPS = False
+        else:
+            print("ERROR: Invalid input: " + value + ", must be y or n")
+    else:
+        runFixBPS = True
+
     # run fixBPS script 
-    bpsScriptOutput = coalitionScriptOutput.replace('.csv', '_fixedBPS.csv')
-    logFile.write("Running through BPS script" + '\n')
-    fixBPS(coalitionScriptOutput, bpsScriptOutput)
-    
-    # run sort callsign script
+    bpsScriptOutput = fullPathCoalitionScriptOutput.replace('.csv', '_fixedBPS.csv')
+
+    if runFixBPS:
+        logFile.write("Running through BPS script, cwd = " + os.getcwd() + '\n')
+        fixBPS(fullPathCoalitionScriptOutput, bpsScriptOutput)
+
+    if interactive:
+        value = raw_input("Run sortCallsignsAddFSID? (y/n): ")
+        if value == "y":
+            runSrtCallsignsAddFSID = True
+        elif value == "n":
+            runSrtCallsignsAddFSID = False
+        else:
+            print("ERROR: Invalid input: " + value + ", must be y or n")
+    else:
+        runSrtCallsignsAddFSID = True
+
+    # run sort callsign and add FSID script
     sortedOutput = bpsScriptOutput.replace(".csv", "_sorted.csv")
     fsidTableFile =  root + '/data_files/fsid_table.csv'
-    logFile.write("Running through sort callsigns add FSID script" + '\n')
-    sortCallsignsAddFSID(bpsScriptOutput, fsidTableFile, sortedOutput)
+
+    if runSrtCallsignsAddFSID:
+        logFile.write("Running through sort callsigns add FSID script" + '\n')
+        sortCallsignsAddFSID(bpsScriptOutput, fsidTableFile, sortedOutput)
+
+    if interactive:
+        value = raw_input("Run conversion of CSV file to sqlite? (y/n): ")
+        if value == "y":
+            runConvertULS = True
+        elif value == "n":
+            runConvertULS = False
+        else:
+            print("ERROR: Invalid input: " + value + ", must be y or n")
+    else:
+        runConvertULS = True
+
     # convert uls csv to sqlite   
-    updated, inserted = convertULS(sortedOutput, state_root, logFile)
+    if runConvertULS:
+        convertULS(sortedOutput, state_root, logFile)
     
-
-    # Give sqlite file proper permissions
-    outputSQL = sortedOutput.replace('.csv', '.sqlite3')
-    # logFile.write("Updating permissions for sqlite file" ) 
-    # try:
-    #     subprocess.call(['chown', 'fbrat', outputSQL]) 
-    #     subprocess.call(['chgrp', 'fbrat', outputSQL]) 
-    #     subprocess.call(['chmod', '750', outputSQL]) 
-    # except Exception as e: 
-    #     logFile.write('ERROR: Could not set permissions for sqlite file')
-    #     raise e
-
-   
-    logFile.write("Creating and moving debug files")
-    # create debug zip containing final csv and anomalous uls and move it to where GUI can see
-    try:
-        dirName = str(nameTime + "_debug")
-        subprocess.call(['mkdir', dirName]) 
-        anomalousPath = root + '/' + 'anomalous_uls.csv'
-        subprocess.call(['mv', anomalousPath, dirName]) 
-        subprocess.call(['mv', sortedOutput, dirName]) 
-        shutil.make_archive( dirName , 'zip', dirName)
-        zipName = dirName + ".zip"
-        shutil.rmtree(dirName) #delete debug directory
-    except Exception as e: 
-        logFile.write('Error moving debug files:' + '\n')
-        raise e
-
-
-    logFile.write("Updating yesterdays DB" + '\n')
-    # replace the yesterday db file with the one generated today, for tomorrow
-    try:
-        subprocess.call(['rm', root + '/data_files/yesterdayDB.sqlite3']) 
-        subprocess.call(['cp', outputSQL, root + "/data_files/yesterdayDB.sqlite3"]) 
-        # subprocess.call(['chown', 'fbrat', zipName]) 
-        # subprocess.call(['chgrp', 'fbrat', zipName]) 
-        # subprocess.call(['chmod', '750', zipName]) 
-        subprocess.call(['mv', zipName,  state_root + '/ULS_Database/']) 
-    except Exception as e: 
-        logFile.write('Error moving debug files:' + '\n')
-        raise e
-    
-    # move sqlite to where GUI can see it
-    logFile.write("Moving sqlite file" + '\n')
-    try:
-        subprocess.call(['mv', outputSQL, state_root + '/ULS_Database/']) 
-    except Exception as e: 
-        logFile.write('Error moving ULS sqlite:' + '\n')
-        raise e
-    
-
-    # try:
-    #     shutil.rmtree(root + '/temp') #delete temp folder
-    # except Exception as e: 
-    #     logFile.write('Error deleting temp directory:', e)
-
-
     finishTime = datetime.datetime.now()
-    with open(root + '/data_files/lastSuccessfulRun.txt', 'w') as timeFile:
-        timeFile.write(finishTime.isoformat())
+
+    if not interactive:
+        outputSQL = sortedOutput.replace('.csv', '.sqlite3')
+   
+        logFile.write("Creating and moving debug files")
+        # create debug zip containing final csv and anomalous uls and move it to where GUI can see
+        try:
+            dirName = str(nameTime + "_debug")
+            subprocess.call(['mkdir', dirName]) 
+            anomalousPath = root + '/' + 'anomalous_uls.csv'
+            subprocess.call(['mv', anomalousPath, dirName]) 
+            subprocess.call(['cp', sortedOutput, dirName]) 
+            shutil.make_archive( dirName , 'zip', dirName)
+            zipName = dirName + ".zip"
+            shutil.rmtree(dirName) #delete debug directory
+            subprocess.call(['mv', zipName,  state_root + '/ULS_Database/']) 
+        except Exception as e: 
+            logFile.write('Error moving debug files:' + '\n')
+            raise e
+
+        # copy sqlite to where GUI can see it
+        logFile.write("Copying sqlite file" + '\n')
+        try:
+            subprocess.call(['cp', outputSQL, state_root + '/ULS_Database/']) 
+        except Exception as e: 
+            logFile.write('Error copying ULS sqlite:' + '\n')
+            raise e
+    
+        with open(root + '/data_files/lastSuccessfulRun.txt', 'w') as timeFile:
+            timeFile.write(finishTime.isoformat())
+
     logFile.write('Update finished at: ' + finishTime.isoformat() + '\n')
     timeDiff = finishTime - startTime
     logFile.write('Update took ' + str(timeDiff.total_seconds()) + ' seconds' + '\n')
     logFile.close()
-    return updated, inserted, finishTime.isoformat()
+    return finishTime.isoformat()
 
-# for testing
-# daily_uls_parse("/tmp/fbrat", False)
 if __name__ == '__main__':
-    daily_uls_parse("/var/lib/fbrat", False)
+    interactive = False
+    for arg in sys.argv[1:]:
+        if arg == "-i":
+            interactive = True
+    print("Interactive = " + str(interactive))
 
+    daily_uls_parse("/var/lib/fbrat", interactive)

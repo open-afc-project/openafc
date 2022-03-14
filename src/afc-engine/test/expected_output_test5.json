@@ -1,0 +1,161 @@
+{
+    "availableSpectrumInquiryResponses": [
+        {
+            "availabilityExpireTime": "2022-03-04T14:51:34Z",
+            "availableChannelInfo": [
+                {
+                    "channelCfi": [
+                        1,
+                        5,
+                        9,
+                        13,
+                        17,
+                        21,
+                        25,
+                        29,
+                        33,
+                        37,
+                        41,
+                        45,
+                        49,
+                        53,
+                        57,
+                        61,
+                        65,
+                        69,
+                        73,
+                        77,
+                        81,
+                        85,
+                        89,
+                        93,
+                        117,
+                        121,
+                        125,
+                        129,
+                        133,
+                        137,
+                        141,
+                        145,
+                        149,
+                        153,
+                        157,
+                        161,
+                        165,
+                        169,
+                        173,
+                        177,
+                        181
+                    ],
+                    "globalOperatingClass": 131,
+                    "maxEirp": [
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        34.37340325928787,
+                        36,
+                        36
+                    ]
+                },
+                {
+                    "channelCfi": [
+                        7,
+                        23,
+                        39,
+                        55,
+                        71,
+                        87,
+                        135,
+                        151,
+                        167
+                    ],
+                    "globalOperatingClass": 133,
+                    "maxEirp": [
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36,
+                        36
+                    ]
+                },
+                {
+                    "channelCfi": [
+                        15,
+                        47,
+                        79,
+                        143
+                    ],
+                    "globalOperatingClass": 134,
+                    "maxEirp": [
+                        36,
+                        36,
+                        36,
+                        36
+                    ]
+                }
+            ],
+            "availableFrequencyInfo": [
+                {
+                    "frequencyRange": {
+                        "highFrequency": 6545,
+                        "lowFrequency": 6525
+                    },
+                    "maxPSD": 22.98970004336019
+                },
+                {
+                    "frequencyRange": {
+                        "highFrequency": 6585,
+                        "lowFrequency": 6545
+                    },
+                    "maxPSD": 19.97940008672038
+                }
+            ],
+            "requestId": "0",
+            "response": {
+                "responseCode": 0,
+                "shortDescription": "Success"
+            },
+            "rulesetId": "US_47_CFR_PART_15_SUBPART_E"
+        }
+    ],
+    "version": "1.1"
+}

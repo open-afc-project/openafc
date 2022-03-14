@@ -553,7 +553,7 @@ namespace UlsMeasurementAnalysis {
     /**** Using Building Raster Data                                                       ****/
     /******************************************************************************************/
     double *computeElevationVectorWithBldg(const WorldData *wd, const GdalDataDir *srtm1, BuildingRasterModel *bldg, GdalDataModel *bldgPoly, const QPointF &from, const QPointF &to, int numpts, double lineOfSightDistanceKm
-#if MM_DEBUG
+#if DEBUG_AFC
                                            , std::vector<std::string> &ITMHeightType
 #endif
                                           ) {
@@ -576,7 +576,7 @@ namespace UlsMeasurementAnalysis {
 
 
 
-#if MM_DEBUG
+#if DEBUG_AFC
         std::string heightType;
         ITMHeightType.clear();
 #endif
@@ -591,7 +591,7 @@ namespace UlsMeasurementAnalysis {
             bool removeBldgFlag = ((pointIdx <= fromMaxIdx) || (pointIdx >= toMinIdx));
 
             height_res = bldg->getHeight(intLat, intLon);
-#if MM_DEBUG
+#if DEBUG_AFC
             if (pointIdx <= fromMaxIdx) {
                 heightType = "RLANBLDG";
             } else if (pointIdx >= toMinIdx) {
@@ -615,7 +615,7 @@ namespace UlsMeasurementAnalysis {
                     height_res.second = wd->valueAtLatLon(intLat, intLon);
                     if (height_res.second == WorldData::NO_DATA) {
                         height_res.second = 0.0;
-#if MM_DEBUG
+#if DEBUG_AFC
                         heightType += "_NODATA";
                     } else {
                         heightType += "_WD";
@@ -623,7 +623,7 @@ namespace UlsMeasurementAnalysis {
                     }
                 } else {
                     height_res.second = (double) srtmHeight;
-#if MM_DEBUG
+#if DEBUG_AFC
                     heightType += "_SRTM";
 #endif
                 }
@@ -631,7 +631,7 @@ namespace UlsMeasurementAnalysis {
                     height_res.second = wd->valueAtLatLon(intLat, intLon);
                 if (height_res.second == WorldData::NO_DATA) {
                     height_res.second = 0.0;
-#if MM_DEBUG
+#if DEBUG_AFC
                     heightType += "_NODATA";
                 } else {
                     heightType += "_WD";
@@ -640,7 +640,7 @@ namespace UlsMeasurementAnalysis {
             }
 
             *pos = height_res.second;
-#if MM_DEBUG
+#if DEBUG_AFC
             ITMHeightType.push_back(heightType);
 #endif
         }
@@ -1051,14 +1051,14 @@ namespace UlsMeasurementAnalysis {
     double runPointToPointBldg(const WorldData *wd, const GdalDataDir *srtm1, BuildingRasterModel *bldg, GdalDataModel *bldgPoly, QPointF transLocLatLon, double transHt, QPointF receiveLocLatLon,
                            double receiveHt, double lineOfSightDistanceKm, double eps_dielect, double sgm_conductivity, double eno_ns_surfref,
                            double frq_mhz, int radio_climate, int pol, double conf, double rel, int numpts, char *prefix, double **heightProfilePtr
-#if MM_DEBUG
+#if DEBUG_AFC
                                            , std::vector<std::string> &ITMHeightType
 #endif
                               ) {
 
         if (!(*heightProfilePtr)) {
             *heightProfilePtr = computeElevationVectorWithBldg(wd, srtm1, bldg, bldgPoly, transLocLatLon, receiveLocLatLon, numpts, lineOfSightDistanceKm
-#if MM_DEBUG
+#if DEBUG_AFC
                                                                , ITMHeightType
 #endif
                                                               );

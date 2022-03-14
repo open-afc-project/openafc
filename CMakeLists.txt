@@ -5,7 +5,8 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS 3.10)
 endif()
 
 set(CMAKE_BUILD_TYPE "Debug")
-# set(CMAKE_BUILD_TYPE "Release")
+
+message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
 # External version naming
 file(READ "${CMAKE_SOURCE_DIR}/version.txt" VERSIONFILE)
@@ -56,16 +57,14 @@ if(WIN32)
     add_definitions("-DCPL_DISABLE_DLL") # Workaround issue with "dllexport" in "cpl_port.h"
 endif(WIN32)
 
-# mmandell build flags
-if("mmandell" STREQUAL "$ENV{USER}")
-if (0)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDBG_COMPUTE=1 -DMM_DEBUG=1")
+# debug build flags
+if (DEBUG_AFC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDEBUG_AFC=1")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=format-extra-args")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=format")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=shadow")
     # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
-    message(STATUS "Using build mode $ENV{USER}")
-endif()
+    message(STATUS "Using DEBUG_AFC build mode")
 endif()
 
 # Coverage analysis

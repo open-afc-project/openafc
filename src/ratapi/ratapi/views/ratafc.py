@@ -221,7 +221,7 @@ class RatAfc(MethodView):
             request_file_path = os.path.join(temp_dir, 'analysisRequest.json')
 
             response_file_path = os.path.join(
-                temp_dir, 'analysisResponse.json')
+                temp_dir, 'analysisResponse.json.gz')
 
             config_file_path = None
             if config is None:

@@ -46,15 +46,25 @@ const StrTypeClass CConst::strPathLossModelList[] = {
     {                                    -1,  (char *) 0                      }
 };
 
-const StrTypeClass CConst::strWinner2LOSOptionList[] = {
-    {          CConst::UnknownWinner2LOSOption, "UNKNOWN"                   },
-    {         CConst::BldgDataWinner2LOSOption, "BLDG_DATA"                   },
-    {         CConst::ForceLOSWinner2LOSOption, "FORCE_LOS"                   },
-    {        CConst::ForceNLOSWinner2LOSOption, "FORCE_NLOS"                  },
+const StrTypeClass CConst::strLOSOptionList[] = {
+    {          CConst::UnknownLOSOption, "UNKNOWN"                    },
+    {         CConst::       BldgDataLOSOption, "BLDG_DATA"           },
+    {         CConst::  BldgDataReqTxLOSOption, "BLDG_DATA_REQ_TX"    },
+    {         CConst::  BldgDataReqRxLOSOption, "BLDG_DATA_REQ_RX"    },
+    {         CConst::BldgDataReqTxRxLOSOption, "BLDG_DATA_REQ_TX_RX" },
+    {         CConst::       ForceLOSLOSOption, "FORCE_LOS"           },
+    {         CConst::      ForceNLOSLOSOption, "FORCE_NLOS"          },
 
-    {                                    -1,  (char *) 0                      }
+    {                                    -1,  (char *) 0     }
 };
 
+const StrTypeClass CConst::strITMClutterMethodList[] = {
+    {     CConst::ForceTrueITMClutterMethod, "FORCE_TRUE"    },
+    {    CConst::ForceFalseITMClutterMethod, "FORCE_FALSE"   },
+    {      CConst::BldgDataITMCLutterMethod, "BLDG_DATA"     },
+
+    {                                    -1,  (char *) 0     }
+};
 
 const StrTypeClass CConst::strPropEnvList[] = {
     {                CConst::unknownPropEnv, "UNKNOWN"       },
@@ -68,6 +78,7 @@ const StrTypeClass CConst::strPropEnvList[] = {
 const StrTypeClass CConst::strULSAntennaTypeList[] = {
     {      CConst::F1336OmniAntennaType, "F.1336 Omni"  },
     {          CConst::F1245AntennaType, "F.1245"  },
+    {           CConst::F699AntennaType, "F.699"  },
     {                                -1,  (char *) 0       }
 };
 

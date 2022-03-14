@@ -55,10 +55,6 @@ int main(int argc, char **argv) { // Accepts input from command line
         // Set constant parameters
         afcManager.setConstInputs(tempDir);
 
-#       if DBG_COMPUTE
-        afcManager.setDBGInputs(tempDir); // Manually set inputs with this function
-#       else
-
         // Import user inputs from the GUI
         LOGGER_DEBUG(logger) << "AFC Engine is importing user inputs...";
         try {
@@ -80,15 +76,6 @@ int main(int argc, char **argv) { // Accepts input from command line
                 ErrStream() << "Failed to import configuration from GUI: " << err.what()
             );
         }
-
-#if 0
-        // Check if any required fields weren't populated by input file
-        if (afcManager.isNull()) {
-            throw std::invalid_argument(
-                ErrStream() << "MISSING_PARAM Failed to populate all required input parameters after import"); // Add err.what() after creating error handling in isNull()
-        }
-#endif
-#       endif
 
         /**************************************************************************************/
 

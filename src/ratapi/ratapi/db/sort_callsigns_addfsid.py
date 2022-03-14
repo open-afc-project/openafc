@@ -10,7 +10,7 @@ filterMaxEIRPFlag = False
 
 def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath):
     if not exists(fsidTableFile):
-        print "FSIDTable does NOT exist, creating Table at " + fsidTableFile + "\n"
+        print("FSIDTable does NOT exist, creating Table at " + fsidTableFile + "\n")
         with open(fsidTableFile, 'w') as fsidTable:
             fsidTable.write("FSID,Callsign,Path Number,Center Frequency (MHz),Emissions Designator\n")
 
@@ -62,7 +62,7 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath):
                 firstFSID = False
                 entriesRead += 1
 
-    print "Read " + str(entriesRead) + " entries from FSID table file: " + fsidTableFile + ", Max FSID = " + str(highestFSID) + "\n"
+    print("Read " + str(entriesRead) + " entries from FSID table file: " + fsidTableFile + ", Max FSID = " + str(highestFSID) + "\n")
 
     entriesAdded = 0
     with open(inputPath, 'r') as f:
@@ -119,14 +119,6 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath):
 
                         row.insert(0, "FSID")
                         csvwriter.writerow(row)
-
-                        # print ("Callsign IDX = ", callsignIdx)
-                        # print ("Path IDX = ", pathIdx)
-                        # print ("Freq IDX = ", freqIdx)
-                        # print ("Emdeg IDX = ", emdegIdx)
-                        # print ("Digital Mod Rate IDX = ", digitalModRateIdx)
-                        # print ("Tx EIRP (dBm) IDX = ", txEirpIdx)
-                        # print ("Tx Gain (dBi) IDX = ", txGainIdx)
                     else:
                         cs = row[callsignIdx]
                         path = int(row[pathIdx])
@@ -183,15 +175,6 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath):
                             else:
                                 highRateFlag = 0
     
-                        if keyv in fsidmap:
-                            fsid = fsidmap[keyv]
-                        else:
-                            fsid = nextFSID
-                            nextFSID += 1
-                            fsidTable.write(str(fsid) + "," + keyv[0] + "," + str(keyv[1]) + "," + keyv[2] + "," + keyv[3] + "\n")
-                            entriesAdded += 1
-                        r.insert(0, str(fsid))
-    
                         r.append(str(recordNum))
                         r.append(str(lowRateFlag))
                         r.append(str(highRateFlag))
@@ -209,8 +192,16 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath):
                                 printFlag = 0
     
                         if printFlag:
+                            if keyv in fsidmap:
+                                fsid = fsidmap[keyv]
+                            else:
+                                fsid = nextFSID
+                                nextFSID += 1
+                                fsidTable.write(str(fsid) + "," + keyv[0] + "," + str(keyv[1]) + "," + keyv[2] + "," + keyv[3] + "\n")
+                                entriesAdded += 1
+                            r.insert(0, str(fsid))
                             csvwriter.writerow(r)
     
                         recordNum = recordNum + 1
 
-    print "Added " + str(entriesAdded) + " entries to FSID table file: " + fsidTableFile + "\n"
+    print("Added " + str(entriesAdded) + " entries to FSID table file: " + fsidTableFile + "\n")
