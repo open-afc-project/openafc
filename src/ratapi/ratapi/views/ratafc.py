@@ -1,3 +1,12 @@
+#
+# This Python file uses the following encoding: utf-8
+#
+# Portions copyright © 2021 Broadcom.
+# All rights reserved. The term “Broadcom” refers solely
+# to the Broadcom Inc. corporate affiliate that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which
+# is included with this software program.
+#
 ''' API for AFC specification
 '''
 
@@ -308,3 +317,11 @@ class RatAfc(MethodView):
 
 module.add_url_rule('/1.1/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))
+
+# Local Variables:
+# mode: Python
+# indent-tabs-mode: nil
+# python-indent: 4
+# End:
+#
+# vim: sw=4:et:tw=80:cc=+1
