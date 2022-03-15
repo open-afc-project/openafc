@@ -260,7 +260,7 @@ def daily_uls_parse(state_root, interactive):
     temp = "/temp"
 
     if interactive:
-        print("Specify full path for root daily_uls_parse dir containing FCC files that have been downloaded")
+        print("Specify full path for root daily_uls_parse dir containing directory temp in which FCC files that have been downloaded")
         value = raw_input("Enter Directory (" + root + "): ")
         if (value != ""):
             root = value
@@ -282,9 +282,21 @@ def daily_uls_parse(state_root, interactive):
             print("ERROR: " + fullPathTempDir + " does not exist")
             return
 
+        os.chdir(fullPathTempDir) #change to temp 
         logname = fullPathTempDir + "/dailyParse_" + startTime.isoformat() + ".log"
         logFile = open(logname, 'w', 1)
         logFile.write('Starting interactive mode update at: ' + startTime.isoformat() + '\n')
+
+        value = raw_input("Extract FCC files from downloaded zip files? (y/n): ")
+        if value == "y":
+            extractZip = True
+        elif value == "n":
+            extractZip = False
+        else:
+            print("ERROR: Invalid input: " + value + ", must be y or n")
+
+        if extractZip:
+            extractZips(logFile)
     else:
 
         fullPathTempDir = root + temp

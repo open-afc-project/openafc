@@ -14,6 +14,7 @@
 #include "uls.h"
 #include "antenna.h"
 #include "calcitu1245.h"
+#include "calcitu699.h"
 #include "calcitu1336_4.h"
 #include "AfcManager.h"
 #include "global_defines.h"
@@ -33,7 +34,7 @@ namespace
 /******************************************************************************************/
 /**** FUNCTION: ULSClass::ULSClass()                                                   ****/
 /******************************************************************************************/
-ULSClass::ULSClass(AfcManager *dataSetVal, int idVal) : dataSet(dataSetVal), id(idVal)
+ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal) : dataSet(dataSetVal), id(idVal), dbIdx(dbIdxVal)
 {
     satellitePosnData = (ListClass<Vector3> *) NULL;
     type = CConst::ESULSType;
@@ -79,6 +80,7 @@ CConst::PathLossModelEnum ULSClass::pathLossModel = CConst::unknownPathLossModel
 /**** ULSClass:: SET/GET Functions                                                     ****/
 /******************************************************************************************/
 int ULSClass::getID() const { return(id); }
+int ULSClass::getDBIdx() const { return(dbIdx); }
 Vector3 ULSClass::getRxPosition() { return(rxPosition); }
 Vector3 ULSClass::getTxPosition() { return(txPosition); }
 Vector3 ULSClass::getPRPosition() { return(prPosition); }
@@ -281,6 +283,9 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
         case CConst::F1245AntennaType:
             rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, rxGain);
             break;
+        case CConst::F699AntennaType:
+            rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain);
+            break;
         case CConst::F1336OmniAntennaType:
             rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleDeg, rxGain, frequency);
             break;
@@ -313,6 +318,10 @@ double ULSClass::computeBeamWidth(double attnDB)
 
     //std::cout << "ULS: " << getID() << " GAIN (DB) = " << g0 << std::endl;
 
+    if (ulsRxAntennaType == CConst::F1336OmniAntennaType) {
+        throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeBeamWidth: ulsRxAntennaType = F1336OmniAntennaType not supported");
+    }
+
     double a1 = 0.0;
 
     double a2 = a1;
@@ -325,36 +334,18 @@ double ULSClass::computeBeamWidth(double attnDB)
         a2 += 2.0*exp(-g0*log(10.0)/20.0)*180.0/M_PI;
         if (a2 > 180.0) { a2 = 180.0; }
         double angleOffBoresightDeg = a2;
-        if (ulsRxAntennaType == CConst::F1245AntennaType) {
-            rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, getRxGain());
-        } else if (ulsRxAntennaType == CConst::F1336OmniAntennaType) {
-            // rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleRad*180.0/M_PI, getRxGain(), ap->getCenterFreq());
-            throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeBeamWidth: ulsRxAntennaType = F1336OmniAntennaType not supported");
-        } else if (ulsRxAntennaType == CConst::OmniAntennaType) {
-            rxGainDB = 0.0;
-        } else if (ulsRxAntennaType == CConst::LUTAntennaType) {
-            rxGainDB = getRxAntenna()->gainDB(angleOffBoresightDeg*M_PI/180.0) + getRxGain();
-        } else {
-            throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeRxGain: ulsRxAntennaType = " << ulsRxAntennaType << " INVALID value");
-        }
+
+        rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, -1.0);
+
         e2 = rxGainDB - g0 + attnDB;
     } while(e2 > 0.0);
 
     while (a2-a1 > 1.0e-8) {
         double a3 = (a1+a2)/2;
         double angleOffBoresightDeg = a3;
-        if (ulsRxAntennaType == CConst::F1245AntennaType) {
-            rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, getRxGain());
-        } else if (ulsRxAntennaType == CConst::F1336OmniAntennaType) {
-            // rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleRad*180.0/M_PI, getRxGain(), ap->getCenterFreq());
-            throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeBeamWidth: ulsRxAntennaType = F1336OmniAntennaType not supported");
-        } else if (ulsRxAntennaType == CConst::OmniAntennaType) {
-            rxGainDB = 0.0;
-        } else if (ulsRxAntennaType == CConst::LUTAntennaType) {
-            rxGainDB = getRxAntenna()->gainDB(angleOffBoresightDeg*M_PI/180.0) + getRxGain();
-        } else {
-            throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeRxGain: ulsRxAntennaType = " << ulsRxAntennaType << " INVALID value");
-        }
+
+        rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, -1.0);
+
         double e3 = rxGainDB - g0 + attnDB;
 
         if (e3 > 0.0) {

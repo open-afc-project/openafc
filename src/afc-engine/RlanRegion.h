@@ -8,6 +8,7 @@
 #define RLAN_REGION_H
 
 #include <string>
+#include "cconst.h"
 #include "AfcDefinitions.h"
 #include "Vector3.h"
 #include "GeodeticCoord.h"
@@ -27,7 +28,7 @@ public:
     virtual RLANBoundary getType() const = 0;
     virtual LatLon closestPoint(LatLon latlon, bool& contains) const = 0;
     virtual std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const = 0;
-    virtual std::vector<LatLon> getScan(double scanResolutionM) const = 0;
+    virtual std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const = 0;
     virtual double getMaxDist() const = 0;
     virtual void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain) = 0;
 
@@ -75,11 +76,14 @@ public:
     RLANBoundary getType() const;
     LatLon closestPoint(LatLon latlon, bool& contains) const;
     std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const;
-    std::vector<LatLon> getScan(double scanResolutionM) const;
+    std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const;
     double getMaxDist() const;
     void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
 
 private:
+    void calcHorizExtents(double latVal, double& lonA, double& lonB, bool& flag) const;
+    void calcVertExtents (double lonVal, double& latA, double& latB, bool& flag) const;
+
     double semiMinorAxis;
     double semiMajorAxis;
     double orientationDeg;
@@ -106,7 +110,7 @@ public:
     RLANBoundary getType() const;
     LatLon closestPoint(LatLon latlon, bool& contains) const;
     std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const;
-    std::vector<LatLon> getScan(double scanResolutionM) const;
+    std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const;
     double getMaxDist() const;
     void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
 

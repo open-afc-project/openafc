@@ -29,8 +29,6 @@
 #include <vector>
 // AFC Engine
 #include "antenna.h"
-#include "calcitu1245.h"
-#include "calcitu1336_4.h"
 #include "cconst.h"
 #include "EcefModel.h"
 #include "freq_band.h"
@@ -101,7 +99,7 @@ public:
                 std::isnan(_minEIRP_dBm) || std::isnan(_maxEIRP_dBm) || std::isnan(_IoverN_threshold_dB) ||
                 std::isnan(_bodyLossDB) || std::isnan(_polarizationLossDB) ||
                 (_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE && std::isnan(_rlanOrientation_deg)) ||
-                _ulsDataFile.empty() ||
+                (_ulsDatabaseList.size() == 0) ||
                 std::isnan((int)_buildingType) || std::isnan(_confidenceBldg2109) ||
                 _pathLossModel==CConst::unknownPathLossModel);// || 
                 //std::isnan(_confidenceClutter2108) || std::isnan(_confidenceWinner2) || std::isnan(_confidenceITM) || std::isnan(_winner2ProbLOSThr));
@@ -137,7 +135,7 @@ public:
     // Print the user inputs for testing and debugging
     void printUserInputs();
 
-    ULSClass *findULSID(int ulsID);
+    ULSClass *findULSID(int ulsID, int dbIdx);
 
     // ***** Perform AFC Engine computations *****
     void compute(); // Computes all the necessary losses and stores them into the output member variables below
@@ -159,7 +157,7 @@ public:
     void clearRASList();
     
     void readPopulationGrid();  // Reads the population density
-    void readULSData(std::string filename, PopGridClass *popGrid, int linkDirection,
+    void readULSData(const std::vector<std::tuple<std::string, std::string>>& ulsDatabaseList, PopGridClass *popGrid, int linkDirection,
                      double minFreq, double maxFreq, bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
                      const double& minLat=-90, const double& maxLat=90, const double& minLon=-180, const double& maxLon=180); // Reads a database for FS stations information
     double getBandwidth(std::string emissionsDesignator);
@@ -250,6 +248,10 @@ private:
     DoubleTriplet _rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, quietNaN); // minor uncertainity (NaN if not ellipse), major uncertainity (NaN if not ellipse), height uncertainty
     std::vector<LatLon> _rlanLinearPolygon = std::vector<LatLon>();
     std::vector<AngleRadius> _rlanRadialPolygon = std::vector<AngleRadius>();
+
+    CConst::ScanRegionMethodEnum _scanRegionMethod;
+
+    int _scanres_points_per_degree;
     double _scanres_xy, _scanres_ht;
     bool _indoorFixedHeightAMSL;
 
@@ -302,12 +304,13 @@ private:
     // bool _winner2CombineFlag;               // Whether or not to combine LOS and NLOS path loss values in Winner2.
     // bool _winner2BldgLOSFlag;               // If set, use building data to determine if winner2 LOS or NLOS model is used
 
-    std::string _ulsDataFile;               // File contining ULS data
+    std::vector<std::tuple<std::string, std::string>> _ulsDatabaseList;
+                                            // List of tuples where each tuple contains database name and database sqlite file name.
+
     QString _inputULSDatabaseStr;           // ULS Database being used
     std::string _rasDataFile;               // File contining RAS data
 
     QString _propagationEnviro;             // Propagation environment (e.g. Population Density Map)
-    QString _antennaPattern;                // User-inputted antenna pattern
 
     double _rxFeederLossDBUNII5;            // User-inputted ULS receiver feeder loss for UNII-5
     double _rxFeederLossDBUNII7;            // User-inputted ULS receiver feeder loss for UNII-7
@@ -410,6 +413,7 @@ private:
     bool _filterSimRegionOnly;              // Filter ULS file only for in/out of simulation region
 
     std::string _ulsAntennaPatternFile;     // File containing ULS antenna patterns as a function of angle off boresight;
+    CConst::ULSAntennaTypeEnum _ulsDefaultAntennaType; // Default ULS antenna type to use when antenna pattern is not otherwise specified.
 
     // std::string _rlanBWStr;                 // Comma separated list of RLAN bandwidths (Hz), "b0,b1,b2"
 

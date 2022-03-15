@@ -265,6 +265,16 @@ public:
     };
     /**************************************************************************************/
 
+    /**************************************************************************************/
+    /**** ScanRegionMethod                                                             ****/
+    /**************************************************************************************/
+    enum ScanRegionMethodEnum {
+          xyAlignRegionNorthEastScanRegionMethod,
+         xyAlignRegionMajorMinorScanRegionMethod,
+                 latLonAlignGridScanRegionMethod 
+    };
+    /**************************************************************************************/
+
     static const StrTypeClass strULSAntennaTypeList[];
     static const StrTypeClass strPropEnvList[];
     static const StrTypeClass strPathLossModelList[];
