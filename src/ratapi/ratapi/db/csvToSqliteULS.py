@@ -183,6 +183,10 @@ def convertULS(data_file, state_root, logFile):
     logFile.write('Converting ULS csv to sqlite' + '\n')
     fileName = data_file.replace('.csv', '') + '.sqlite3'
 
+    logFile.write("Converting CSV file to SQLITE\n")
+    logFile.write("CSV: " + data_file + "\n")
+    logFile.write("SQLITE: " + fileName + "\n")
+
     if os.path.exists(fileName):
         logFile.write("WARNING: sqlite file " + fileName + " already exists, deleting\n")
         os.remove(fileName)

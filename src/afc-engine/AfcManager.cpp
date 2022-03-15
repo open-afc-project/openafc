@@ -142,9 +142,6 @@ AfcManager::AfcManager()
     _pathLossModel = CConst::unknownPathLossModel;
 
     _responseCode = CConst::successResponseCode;
-
-    _applyClutterFSRxFlag = false;
-    _rlanITMTxClutterMethod = CConst::ForceTrueITMClutterMethod;
 }
 
 /******************************************************************************************/
@@ -283,7 +280,7 @@ void AfcManager::initializeDatabases()
                     maxLonBldg = maxLon;
                 }
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
-		readULSData(_ulsDataFile, (PopGridClass *) NULL, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, 0.0, 0.0, 0.0, 0.0);
+		readULSData(_ulsDatabaseList, (PopGridClass *) NULL, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, 0.0, 0.0, 0.0, 0.0);
 		readRASData(_rasDataFile);
 		if (_ulsList->getSize() == 0) {
 		} else if (_ulsList->getSize() > 1) {
@@ -448,7 +445,7 @@ void AfcManager::initializeDatabases()
 	//_ulsDataFile = "/home/ssmucny/ULS_23Jan2019_perlink_fixedwithbas.sqlite3";
 
 	if (_analysisType == "PointAnalysis" || _analysisType == "APAnalysis" || _analysisType == "HeatmapAnalysis" || _analysisType == "AP-AFC" || _analysisType == "ScanAnalysis") {
-		readULSData(_ulsDataFile, _popGrid, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, minLat, maxLat, minLon, maxLon);
+		readULSData(_ulsDatabaseList, _popGrid, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, minLat, maxLat, minLon, maxLon);
 		readRASData(_rasDataFile);
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		fixFSTerrain();
@@ -1731,12 +1728,66 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
     _itmMaxNumPts = jsonObj["ITMParameters"].toObject()["maxPoints"].toInt();
     // ***********************************
 
-    // AP uncertainty scanning resolution
-    _scanres_xy = jsonObj["APUncertainty"].toObject()["horizontal"].toDouble();
-    _scanres_ht = jsonObj["APUncertainty"].toObject()["height"].toDouble();
-    _ulsDataFile = _stateRoot + "/ULS_Database/" + jsonObj["ulsDatabase"].toString().toStdString();
+    QJsonObject uncertaintyObj = jsonObj["APUncertainty"].toObject();
 
-    _inputULSDatabaseStr = jsonObj["ulsDatabase"].toString();
+    if (uncertaintyObj.contains("scanMethod") && !uncertaintyObj["scanMethod"].isUndefined()) {
+        std::string scanMethodStr = uncertaintyObj["scanMethod"].toString().toStdString();
+        if (scanMethodStr == "xyAlignRegionNorthEast") {
+            _scanRegionMethod = CConst::xyAlignRegionNorthEastScanRegionMethod;
+        } else if (scanMethodStr == "xyAlignRegionMajorMinor") {
+            _scanRegionMethod = CConst::xyAlignRegionMajorMinorScanRegionMethod;
+        } else if (scanMethodStr == "latLonAlignGrid") {
+            _scanRegionMethod = CConst::latLonAlignGridScanRegionMethod;
+        } else {
+            throw std::runtime_error("AfcManager::importConfigAFCjson(): Invalid scanPointBelowGroundMethod specified.");
+        }
+    } else {
+        _scanRegionMethod = CConst::latLonAlignGridScanRegionMethod;
+    }
+
+    // AP uncertainty scanning resolution
+    _scanres_xy = -1.0;
+    _scanres_points_per_degree = -1;
+    switch(_scanRegionMethod) {
+        case CConst::xyAlignRegionNorthEastScanRegionMethod:
+        case CConst::xyAlignRegionMajorMinorScanRegionMethod:
+            if (uncertaintyObj.contains("horizontal") && !uncertaintyObj["horizontal"].isUndefined()) {
+                _scanres_xy = uncertaintyObj["horizontal"].toDouble();
+            } else {
+                _scanres_xy = 30.0;
+            }
+            break;
+        case CConst::latLonAlignGridScanRegionMethod:
+            if (uncertaintyObj.contains("points_per_degree") && !uncertaintyObj["points_per_degree"].isUndefined()) {
+                _scanres_points_per_degree = uncertaintyObj["points_per_degree"].toInt();
+            } else {
+                _scanres_points_per_degree = 3600;  // Defalut 1 arcsec
+            }
+            break;
+        default:
+            CORE_DUMP;
+            break;
+    }
+
+    if (uncertaintyObj.contains("height") && !uncertaintyObj["height"].isUndefined()) {
+        _scanres_ht = uncertaintyObj["height"].toDouble();
+    } else {
+        _scanres_ht = 5.0;
+    }
+
+    if (jsonObj.contains("ulsDatabaseList") && !jsonObj["ulsDatabaseList"].isUndefined()) {
+        QJsonArray ulsDatabaseArray = jsonObj["ulsDatabaseList"].toArray();
+        for (QJsonValue ulsDatabaseVal : ulsDatabaseArray) {
+            QJsonObject ulsDatabaseObj = ulsDatabaseVal.toObject();
+            std::string name = ulsDatabaseObj["name"].toString().toStdString();
+            std::string dbfile = _stateRoot + "/ULS_Database/" + ulsDatabaseObj["ulsDatabase"].toString().toStdString();
+            _ulsDatabaseList.push_back(std::make_tuple(name, dbfile));
+        }
+    } else {
+        std::string dbfile = _stateRoot + "/ULS_Database/" + jsonObj["ulsDatabase"].toString().toStdString();
+        _ulsDatabaseList.push_back(std::make_tuple("CONUS", dbfile));
+    }
+
     _rasDataFile = _stateRoot + "/RAS_Database/" + jsonObj["rasDatabase"].toString().toStdString();
 
     if (std::isnan(_minEIRP_dBm)) { // only use config min eirp if not specified in request object
@@ -1772,7 +1823,11 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
     // ***********************************
     // apply clutter bool
     // ***********************************
-    _applyClutterFSRxFlag = jsonObj["clutterAtFS"].toBool();
+    if (jsonObj.contains("clutterAtFS") && !jsonObj["clutterAtFS"].isUndefined()) {
+        _applyClutterFSRxFlag = jsonObj["clutterAtFS"].toBool();
+    } else {
+        _applyClutterFSRxFlag = false;
+    }
 
     int validFlag;
     if (jsonObj.contains("rlanITMTxClutterMethod") && !jsonObj["rlanITMTxClutterMethod"].isUndefined()) {
@@ -1780,12 +1835,14 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
         if (!validFlag) {
             throw std::runtime_error("ERROR: Invalid rlanITMTxClutterMethod");
         }
+    } else {
+        _rlanITMTxClutterMethod = CConst::ForceTrueITMClutterMethod;
     }
     // ***********************************
 
-    _antennaPattern = jsonObj["antennaPattern"].toObject()["kind"].toString();
+    QString antennaPattern = jsonObj["antennaPattern"].toObject()["kind"].toString();
 
-    if (_antennaPattern == "User Upload") {
+    if (antennaPattern == "User Upload") {
         //_ulsAntennaPatternFile = SearchPaths::forReading("data", "fbrat/AntennaPatterns/" + jsonObj["antennaPattern"].toObject()["value"].toString(), true).toStdString();
         _ulsAntennaPatternFile = QDir(QString::fromStdString(_stateRoot))
             .absoluteFilePath(QString::fromStdString("/AntennaPatterns/") + jsonObj["antennaPattern"].toObject()["value"].toString())
@@ -1793,6 +1850,15 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
         LOGGER_INFO(logger) << "Antenna pattern file set to: " << _ulsAntennaPatternFile;
     } else {
         _ulsAntennaPatternFile = "";
+    }
+
+    if (jsonObj.contains("ulsDefaultAntennaType") && !jsonObj["ulsDefaultAntennaType"].isUndefined()) {
+        _ulsDefaultAntennaType = (CConst::ULSAntennaTypeEnum) CConst::strULSAntennaTypeList->str_to_type(jsonObj["ulsDefaultAntennaType"].toString().toStdString(), validFlag, 0);
+        if (!validFlag) {
+            throw std::runtime_error("ERROR: Invalid ulsDefaultAntennaType");
+        }
+    } else {
+        _ulsDefaultAntennaType = CConst::F1245AntennaType;
     }
 
     // ***********************************
@@ -2184,7 +2250,7 @@ QJsonDocument AfcManager::generateExclusionZoneJson()
 	GdalHelpers::GeomUniquePtr<OGRPolygon> exZone(GdalHelpers::createGeometry<OGRPolygon>()); // Use GdalHelpers.h templates to have unique pointers create these on the heap
 	GdalHelpers::GeomUniquePtr<OGRLinearRing> exteriorOfZone(GdalHelpers::createGeometry<OGRLinearRing>());
 
-	ULSClass *uls = findULSID(_exclusionZoneFSID);
+	ULSClass *uls = findULSID(_exclusionZoneFSID, 0);
 	// Add properties to the geoJSON features
 	exclusionZoneFeature->SetField("FSID", _exclusionZoneFSID);
 	exclusionZoneFeature->SetField("kind", "ZONE");
@@ -2454,6 +2520,7 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath)
 		}
 
 		OGRFieldDefn objKind("kind", OFTString);
+		OGRFieldDefn dbNameField("DBNAME", OFTString);
 		OGRFieldDefn fsidField("FSID", OFTInteger);
 		OGRFieldDefn startFreq("startFreq", OFTReal);
 		OGRFieldDefn stopFreq("stopFreq", OFTReal);
@@ -2465,6 +2532,10 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath)
 		if (coneLayer->CreateField(&objKind) != OGRERR_NONE)
 		{
 			throw std::runtime_error("AfcManager::exportGUIjson(): Could not create 'kind' field in layer of the output data source");
+		}
+		if (coneLayer->CreateField(&dbNameField) != OGRERR_NONE)
+		{
+			throw std::runtime_error("AfcManager::exportGUIjson(): Could not create 'DBNAME' field in layer of the output data source");
 		}
 		if (coneLayer->CreateField(&fsidField) != OGRERR_NONE)
 		{
@@ -2481,17 +2552,20 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath)
 
 		// Calculate the cones in iterative loop
 		LatLon FSLatLonVal, posPointLatLon, negPointLatLon;
-		int FSID;
 		for (const auto &ulsIdx : _ulsIdxList)
 		{
+                        ULSClass *uls = (*_ulsList)[ulsIdx];
+
 			// Instantiate cone object
 			std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> coneFeature(OGRFeature::CreateFeature(coneLayer->GetLayerDefn()));
 
 			// Grab FSID for storing with coverage polygon
-			FSID = (*_ulsList)[ulsIdx]->getID();
+			int FSID = uls->getID();
+
+                        std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 
 			// Compute the beam coordinates and store into DoublePairs
-			std::tie(FSLatLonVal, posPointLatLon, negPointLatLon) = computeBeamConeLatLon((*_ulsList)[ulsIdx]);
+			std::tie(FSLatLonVal, posPointLatLon, negPointLatLon) = computeBeamConeLatLon(uls);
 
 			// Intantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
 			GdalHelpers::GeomUniquePtr<OGRPolygon> beamCone(GdalHelpers::createGeometry<OGRPolygon>()); // Use GdalHelpers.h templates to have unique pointers create these on the heap
@@ -2520,9 +2594,10 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath)
 
 			// Add properties to the geoJSON features
 			coneFeature->SetField("FSID", FSID);
+			coneFeature->SetField("DBNAME", dbName.c_str());
 			coneFeature->SetField("kind", "FS");
-			coneFeature->SetField("startFreq", (*_ulsList)[ulsIdx]->getStartAllocFreq() / 1.0e6);
-			coneFeature->SetField("stopFreq", (*_ulsList)[ulsIdx]->getStopAllocFreq() / 1.0e6);
+			coneFeature->SetField("startFreq", uls->getStartAllocFreq() / 1.0e6);
+			coneFeature->SetField("stopFreq", uls->getStopAllocFreq() / 1.0e6);
 			/* coneFeature->SetField("FS Lon", FSLatLonVal.second); coneFeature->SetField("FS lat", FSLatLonVal.first);*/
 
 			// Add geometry to feature
@@ -3008,52 +3083,55 @@ int AfcManager::findULSAntenna(std::string strval)
 /******************************************************************************************/
 /**** AfcManager::findULSID                                                            ****/
 /******************************************************************************************/
-ULSClass *AfcManager::findULSID(int ulsID)
+ULSClass *AfcManager::findULSID(int ulsID, int dbIdx)
 {
-	int ulsIdx, ulsIdxA, ulsIdxB;
-	int id, idA, idB;
-	ULSClass *uls = (ULSClass *) NULL;
+    int ulsIdx, ulsIdxA, ulsIdxB;
+    int id, db, idA, idB, dbIdxA, dbIdxB;
+    ULSClass *uls = (ULSClass *) NULL;
 
-	bool found = false;
+    bool found = false;
 
-	ulsIdxA = 0;
-	idA = (*_ulsList)[ulsIdxA]->getID();
-	if (idA == ulsID) {
-		found = true;
-		uls = (*_ulsList)[ulsIdxA];
-	} else if (ulsID < idA) {
-		throw std::runtime_error(ErrStream() << "ERROR: Invalid FSID = " << ulsID);
-	}
+    ulsIdxA = 0;
+    idA = (*_ulsList)[ulsIdxA]->getID();
+    dbIdxA = (*_ulsList)[ulsIdxA]->getDBIdx();
+    if ( (idA == ulsID) && (dbIdxA == dbIdx) ) {
+        found = true;
+        uls = (*_ulsList)[ulsIdxA];
+    } else if ((dbIdx < dbIdxA) || ((dbIdx == dbIdxA) && (ulsID < idA))) {
+        throw std::runtime_error(ErrStream() << "ERROR: Invalid DBIDX = " << dbIdx << " FSID = " << ulsID);
+    }
 
-	ulsIdxB = _ulsList->getSize()-1;;
-	idB = (*_ulsList)[ulsIdxB]->getID();
-	if (idB == ulsID) {
-		found = true;
-		uls = (*_ulsList)[ulsIdxB];
-	} else if (ulsID > idB) {
-		throw std::runtime_error(ErrStream() << "ERROR: Invalid FSID = " << ulsID);
-	}
+    ulsIdxB = _ulsList->getSize()-1;;
+    idB = (*_ulsList)[ulsIdxB]->getID();
+    dbIdxB = (*_ulsList)[ulsIdxB]->getDBIdx();
+    if ( (idB == ulsID) && (dbIdxB == dbIdx) ) {
+        found = true;
+        uls = (*_ulsList)[ulsIdxB];
+    } else if ( (dbIdx > dbIdxB) || ((dbIdx == dbIdxB) && (ulsID > idB)) ) {
+        throw std::runtime_error(ErrStream() << "ERROR: Invalid DBIDX = " << dbIdx << " FSID = " << ulsID);
+    }
 
-	while((ulsIdxA + 1 < ulsIdxB) && (!found)) {
-		ulsIdx = (ulsIdxA + ulsIdxB)/2;
-		id = (*_ulsList)[ulsIdx]->getID();
-		if (ulsID == id) {
-			found = true;
-			uls = (*_ulsList)[ulsIdx];
-		} else if (ulsID > id) {
-			ulsIdxA = ulsIdx;
-			idA = id;
-		} else {
-			ulsIdxB = ulsIdx;
-			idB = id;
-		}
-	}
+    while((ulsIdxA + 1 < ulsIdxB) && (!found)) {
+        ulsIdx = (ulsIdxA + ulsIdxB)/2;
+        id = (*_ulsList)[ulsIdx]->getID();
+        db = (*_ulsList)[ulsIdx]->getDBIdx();
+        if ( (ulsID == id) && (dbIdx == db) ) {
+            found = true;
+            uls = (*_ulsList)[ulsIdx];
+        } else if ( (dbIdx > db) || ((dbIdx == db) && (ulsID > id)) ) {
+            ulsIdxA = ulsIdx;
+            idA = id;
+        } else {
+            ulsIdxB = ulsIdx;
+            idB = id;
+        }
+    }
 
-	if (!found) {
-		throw std::runtime_error(ErrStream() << "ERROR: Invalid FSID = " << ulsID);
-	}
+    if (!found) {
+        throw std::runtime_error(ErrStream() << "ERROR: Invalid FSID = " << ulsID);
+    }
 
-	return(uls);
+    return(uls);
 }
 /******************************************************************************************/
 
@@ -3202,10 +3280,23 @@ double AfcManager::computeSpectralOverlap(double sigStartFreq, double sigStopFre
 /****                1: TX                                                             ****/
 /****                2: RX and TX                                                      ****/
 /******************************************************************************************/
-void AfcManager::readULSData(std::string filename, PopGridClass *popGridVal, int linkDirection, double minFreq, double maxFreq, bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
+void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::string>>& ulsDatabaseList, PopGridClass *popGridVal, int linkDirection, double minFreq, double maxFreq, bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
 		const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
-	LOGGER_INFO(logger) << "Reading ULS Data: " << filename;
+
+    auto fs_anom_writer = GzipCsvWriter(_fsAnomFile);
+    auto &fanom = fs_anom_writer.csv_writer;
+
+    if (fanom) {
+    	fanom->writeRow({"FSID,DBNAME,CALLSIGN,RX_LATITUDE,RX_LONGITUDE,ANOMALY_DESCRIPTION\n"});
+    }
+
+    int dbIdx;
+    for(dbIdx=0; dbIdx<(int) ulsDatabaseList.size(); ++dbIdx) {
+        std::string name = std::get<0>(ulsDatabaseList[dbIdx]);
+        std::string filename = std::get<1>(ulsDatabaseList[dbIdx]);
+
+	LOGGER_INFO(logger) << "Reading " << name << " ULS Database: " << filename;
 	int linenum;
 	//char *chptr;
 	std::string str;
@@ -3261,13 +3352,6 @@ void AfcManager::readULSData(std::string filename, PopGridClass *popGridVal, int
 	if (filename.empty())
 	{
 		throw std::runtime_error("ERROR: No ULS data file specified");
-	}
-
-	auto fs_anom_writer = GzipCsvWriter(_fsAnomFile);
-	auto &fanom = fs_anom_writer.csv_writer;
-
-	if (fanom) {
-		fanom->writeRow({"FSID,CALLSIGN,RX_LATITUDE,RX_LONGITUDE,ANOMALY_DESCRIPTION\n"});
 	}
 
 	int numUrbanULS = 0;
@@ -4112,7 +4196,7 @@ void AfcManager::readULSData(std::string filename, PopGridClass *popGridVal, int
 				/**************************************************************************/
 				if (!ignoreFlag) {
 					if ((_ulsAntennaList.size() == 0)||(row.rxAntennaModel.empty())) {
-						rxAntennaType = CConst::F1245AntennaType;
+						rxAntennaType = _ulsDefaultAntennaType;
 					} else {
 						std::string strval = row.rxAntennaModel;
 
@@ -4127,11 +4211,13 @@ void AfcManager::readULSData(std::string filename, PopGridClass *popGridVal, int
 							rxAntenna = (AntennaClass *) NULL;
 							if (!validFlag) {
 								std::ostringstream errStr;
-								errStr << "Invalid ULS data for FSID = " << fsid << ", Unknown Rx Antenna \"" << strval << "\" using F.1245";
+								errStr << "Invalid ULS data for FSID = " << fsid
+                                                                       << ", Unknown Rx Antenna \"" << strval
+                                                                       << "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
 								LOGGER_WARN(logger) << errStr.str();
 								statusMessageList.push_back(errStr.str());
 
-								rxAntennaType = CConst::F1245AntennaType;
+						                rxAntennaType = _ulsDefaultAntennaType;
 							}
 						}
 					}
@@ -4227,13 +4313,8 @@ void AfcManager::readULSData(std::string filename, PopGridClass *popGridVal, int
 				/**************************************************************************/
 				/* txAntenna                                                              */
 				/**************************************************************************/
-
-				// ULS db does not have txAntenna field so use these as defaults
-				txAntennaType = CConst::F1245AntennaType;
-				// phase 1 does not implement this because no antenna pattern file is specified
-				//int ulsAntIdx = findULSAntenna("F.1245");
-				//txAntenna = _ulsAntennaList[ulsAntIdx];
-
+				// ULS db does not have txAntenna field so use default
+				txAntennaType = _ulsDefaultAntennaType;
 				/**************************************************************************/
 			}
 		}
@@ -4310,7 +4391,7 @@ void AfcManager::readULSData(std::string filename, PopGridClass *popGridVal, int
                         noiseFigureDB = _ulsNoiseFigureDBOther;
                     }
 
-			uls = new ULSClass(this, fsid);
+			uls = new ULSClass(this, fsid, dbIdx);
 			_ulsList->append(uls);
 			uls->setCallsign(callsign);
 			uls->setRxCallsign(rxCallsign);
@@ -4471,10 +4552,10 @@ void AfcManager::readULSData(std::string filename, PopGridClass *popGridVal, int
 			double noiseLevelDBW = 10.0 * log(CConst::boltzmannConstant * CConst::T0 * bandwidth) / log(10.0) + noiseFigureDB;
 			uls->setNoiseLevelDBW(noiseLevelDBW);
 			if (fixedFlag) {
-				fanom->writeRow({QString::asprintf("%d,%s,%.15f,%.15f,%s\n", fsid, callsign.c_str(), rxLatitudeDeg, rxLongitudeDeg, fixedStr.c_str())});
+				fanom->writeRow({QString::asprintf("%d,%s,%s,%.15f,%.15f,%s\n", fsid, name.c_str(), callsign.c_str(), rxLatitudeDeg, rxLongitudeDeg, fixedStr.c_str())});
 			}
 		} else if (fanom) {
-			fanom->writeRow({QString::asprintf("%d,%s,%.15f,%.15f,%s\n", fsid, callsign.c_str(), rxLatitudeDeg, rxLongitudeDeg, reasonIgnored.c_str())});
+			fanom->writeRow({QString::asprintf("%d,%s,%s,%.15f,%.15f,%s\n", fsid, name.c_str(), callsign.c_str(), rxLatitudeDeg, rxLongitudeDeg, reasonIgnored.c_str())});
 		}
 
 	}
@@ -4500,8 +4581,9 @@ void AfcManager::readULSData(std::string filename, PopGridClass *popGridVal, int
 	}
 
         delete ulsDatabase;
+    }
 
-	return;
+    return;
 }
 /******************************************************************************************/
 
@@ -5087,16 +5169,11 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				/******************************************************************************************/
 				double u = _confidenceITM;
 
-				// for(int i=1; i<=99; i++) {
-				// u = ((double) i)/100.0;
 				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
 				true,
 				QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 				QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
 				distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL, heightProfilePtr);
-				//LOGGER_DEBUG(logger) << "Called runPointToPointBldg() successfully... u = " << u << ", pathLoss = " << -pathLoss;
-				// }
-				// exit(1);
 				pathLossModelStr = "ITM_BLDG";
 				pathLossCDF = _confidenceITM;
 			}
@@ -6118,7 +6195,7 @@ void AfcManager::runPointAnalysis()
 	/**************************************************************************************/
 	/* Get Uncertainty Region Scan Points                                                 */
 	/**************************************************************************************/
-        std::vector<LatLon> scanPointList = _rlanRegion->getScan(_scanres_xy);
+        std::vector<LatLon> scanPointList = _rlanRegion->getScan(_scanRegionMethod, _scanres_xy, _scanres_points_per_degree);
 	/**************************************************************************************/
 
 	/**************************************************************************************/
@@ -6128,7 +6205,7 @@ void AfcManager::runPointAnalysis()
 	auto &fexcthrwifi = excthr_writer.csv_writer;
 
 	if (fexcthrwifi) {
-		fexcthrwifi->writeRow({ "FS_ID",
+		fexcthrwifi->writeRow({ "FS_ID", "DBNAME",
 				"RLAN_POSN_IDX",
 				"CALLSIGN",
 				"FS_RX_LONGITUDE (deg)",
@@ -6799,9 +6876,8 @@ void AfcManager::runPointAnalysis()
                                     if (spectralOverlap > 0.0) {
 				        double eirpLimit_dBm = -std::numeric_limits<double>::infinity();
 
-				        if (eirpLimit_dBm < channel->eirpLimit_dBm) {
-					    channel->eirpLimit_dBm = eirpLimit_dBm;
-				        }
+                                        channel->availability = BLACK;
+                                        channel->eirpLimit_dBm = eirpLimit_dBm;
 
                                         if ( (!ulsFlagList[ulsIdx]) || (eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
                                             eirpLimitList[ulsIdx] = eirpLimit_dBm;
@@ -6934,28 +7010,8 @@ void AfcManager::runPointAnalysis()
 #endif
 						               );
 	
-					        double rxGainDB;
 					        double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-					        if (ulsRxAntennaType == CConst::F1245AntennaType)
-					        {
-                                                    rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, uls->getRxGain());
-					        }
-					        else if (ulsRxAntennaType == CConst::F1336OmniAntennaType)
-					        {
-					            rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleRxDeg, uls->getRxGain(), chanCenterFreq);
-					        }
-					        else if (ulsRxAntennaType == CConst::OmniAntennaType)
-					        {
-						    rxGainDB = 0.0;
-					        }
-					        else if (ulsRxAntennaType == CConst::LUTAntennaType)
-					        {
-						    rxGainDB = uls->getRxAntenna()->gainDB(angleOffBoresightDeg * M_PI / 180.0) + uls->getRxGain();
-					        }
-					        else
-					        {
-						    throw std::runtime_error(ErrStream() << "ERROR reading ULS data: ulsRxAntennaType = " << ulsRxAntennaType << " INVALID value");
-					        }
+					        double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
 
 					        double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
@@ -6996,34 +7052,21 @@ void AfcManager::runPointAnalysis()
 					            }
 
 					            std::string rxAntennaTypeStr;
-					            if (ulsRxAntennaType == CConst::F1245AntennaType)
-					            {
-					    	        rxAntennaTypeStr = "F.1245";
-					            }
-					            else if (ulsRxAntennaType == CConst::F1336OmniAntennaType)
-					            {
-					    	        rxAntennaTypeStr = "F.1336_OMNI";
-					            }
-					            else if (ulsRxAntennaType == CConst::OmniAntennaType)
-					            {
-					    	        rxAntennaTypeStr = "OMNI";
-					            }
-					            else if (ulsRxAntennaType == CConst::LUTAntennaType)
-					            {
+					            if (ulsRxAntennaType == CConst::LUTAntennaType) {
 					    	        rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
-					            }
-					            else
-					            {
-					    	        throw std::runtime_error(ErrStream() << "ERROR reading ULS data: ulsRxAntennaType = " << ulsRxAntennaType << " INVALID value");
-					            }
+					            } else {
+					    	        rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType));
+                                                    }
 
 					            std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
 					    		        _buildingType == CConst::noBuildingType ? "OUTDOOR" :
 					    		        _buildingType == CConst::traditionalBuildingType ?  "TRADITIONAL" :
 					    		        "THERMALLY_EFFICIENT");
 
+                                                    std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+
 					            QStringList msg;
-					            msg << QString::number(uls->getID()) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
+					            msg << QString::number(uls->getID()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
 					            msg << QString::number(uls->getRxLongitudeDeg(), 'f', 5) << QString::number(uls->getRxLatitudeDeg(), 'f', 5);
 					            msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2) << 
 					            QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource())) <<
@@ -7108,8 +7151,9 @@ void AfcManager::runPointAnalysis()
 
 					}
 				}
+                                std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 				ftrace->writeRow({
-						QString::asprintf("END_%d", uls->getID()),
+						QString::asprintf("END_%s_%d", dbName.c_str(), uls->getID()),
 						QString(),
 						QString(),
 						QString(),
@@ -7196,6 +7240,8 @@ void AfcManager::runPointAnalysis()
 		        ULSClass *uls = (*_ulsList)[ulsIdx];
 		        const Vector3 ulsRxPos = uls->getRxPosition();
 			if (fkml) {
+                                std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+
 				double beamWidthDeg = uls->computeBeamWidth(3.0);
 				double beamWidthRad = beamWidthDeg*(M_PI/180.0);
 
@@ -7211,7 +7257,7 @@ void AfcManager::runPointAnalysis()
 
 				int numCvgPoints = 32;
 				fkml->writeStartElement("Folder");
-				fkml->writeTextElement("name", QString::fromStdString(std::to_string(uls->getID())));	
+				fkml->writeTextElement("name", QString::fromStdString(dbName + "_" + std::to_string(uls->getID())));	
 				// fkml->writeTextElement("name", QString::fromStdString(uls->getCallsign()));	
 
 				std::vector<GeodeticCoord> ptList;
@@ -7227,7 +7273,7 @@ void AfcManager::runPointAnalysis()
 
                                 if (addPlacemarks) {
                                     fkml->writeStartElement("Placemark");
-                                    fkml->writeTextElement("name", QString::asprintf("RX %d", uls->getID()));
+                                    fkml->writeTextElement("name", QString::asprintf("RX %s_%d", dbName.c_str(), uls->getID()));
                                     fkml->writeTextElement("visibility", "1");
                                     fkml->writeTextElement("styleUrl", placemarkStyleStr.c_str());
                                     fkml->writeStartElement("Point");
@@ -7237,7 +7283,7 @@ void AfcManager::runPointAnalysis()
                                     fkml->writeEndElement(); // Placemark
 
                                     fkml->writeStartElement("Placemark");
-                                    fkml->writeTextElement("name", QString::asprintf("%s %d", (uls->getHasPR() ? "PR" : "TX"), uls->getID()));
+                                    fkml->writeTextElement("name", QString::asprintf("%s %s_%d", (uls->getHasPR() ? "PR" : "TX"), dbName.c_str(), uls->getID()));
                                     fkml->writeTextElement("visibility", "1");
                                     fkml->writeTextElement("styleUrl", placemarkStyleStr.c_str());
                                     fkml->writeStartElement("Point");
@@ -7404,7 +7450,7 @@ void AfcManager::runScanAnalysis()
     /**************************************************************************************/
     /* Get Uncertainty Region Scan Points                                                 */
     /**************************************************************************************/
-    std::vector<LatLon> scanPointList = _rlanRegion->getScan(_scanres_xy);
+    std::vector<LatLon> scanPointList = _rlanRegion->getScan(_scanRegionMethod, _scanres_xy, _scanres_points_per_degree);
     /**************************************************************************************/
 
     /**************************************************************************************/
@@ -7872,8 +7918,6 @@ void AfcManager::runScanAnalysis()
             double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
             int rasIdx;
-            double rlanRegionMaxDist = _rlanRegion->getMaxDist();
-            double rlanRegionMaxHeightAGL = _rlanRegion->getMaxHeightAGL();
             for (rasIdx = 0; rasIdx < _rasList->getSize(); ++rasIdx) {
                 RASClass *ras = (*_rasList)[rasIdx];
                 if (ras->intersect(rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, 0.0, rlanHtAboveTerrain)) {
@@ -7933,7 +7977,6 @@ void AfcManager::runScanAnalysis()
                         if (channel.availability != BLACK) {
                             double chanStartFreq = channel.startFreqMHz * 1.0e6;
                             double chanStopFreq = channel.stopFreqMHz * 1.0e6;
-                                            // LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
                             double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag);
 
                             if (spectralOverlap > 0.0) {
@@ -7969,19 +8012,9 @@ void AfcManager::runScanAnalysis()
 #endif
                                            );
     
-                                double rxGainDB;
                                 double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-                                if (ulsRxAntennaType == CConst::F1245AntennaType) {
-                                    rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, uls->getRxGain());
-                                } else if (ulsRxAntennaType == CConst::F1336OmniAntennaType) {
-                                    rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleRxDeg, uls->getRxGain(), chanCenterFreq);
-                                } else if (ulsRxAntennaType == CConst::OmniAntennaType) {
-                                    rxGainDB = 0.0;
-                                } else if (ulsRxAntennaType == CConst::LUTAntennaType) {
-                                    rxGainDB = uls->getRxAntenna()->gainDB(angleOffBoresightDeg * M_PI / 180.0) + uls->getRxGain();
-                                } else {
-                                    throw std::runtime_error(ErrStream() << "ERROR reading ULS data: ulsRxAntennaType = " << ulsRxAntennaType << " INVALID value");
-                                }
+
+                                double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
 
                                 double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
@@ -8096,7 +8129,8 @@ void AfcManager::runExclusionZoneAnalysis()
     /**************************************************************************************/
 #endif
 
-    ULSClass *uls = findULSID(_exclusionZoneFSID);
+    ULSClass *uls = findULSID(_exclusionZoneFSID, 0);
+    std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 
     ChannelStruct channel = _channelList[_exclusionZoneRLANChanIdx];
 
@@ -8273,7 +8307,7 @@ void AfcManager::runExclusionZoneAnalysis()
                 if (margin0 < 0.0) {
                     d0 *= 1.1;
                     cont = true;
-                    printf("FSID = %d, EXCL_PT_IDX = %d, dFSPL = %.1f DIST = %.1f margin = %.3f\n", uls->getID(), exclPtIdx, dFSPL, 1000*distKm0, margin0);
+                    printf("DBNAME = %s FSID = %d, EXCL_PT_IDX = %d, dFSPL = %.1f DIST = %.1f margin = %.3f\n", dbName.c_str(), uls->getID(), exclPtIdx, dFSPL, 1000*distKm0, margin0);
                 } else {
                     cont = false;
                 }
@@ -8506,19 +8540,9 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 #endif
 			       );
 
-		double rxGainDB;
 		double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-		if (ulsRxAntennaType == CConst::F1245AntennaType) {
-			rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, uls->getRxGain());
-		} else if (ulsRxAntennaType == CConst::F1336OmniAntennaType) {
-			rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleRxDeg, uls->getRxGain(), chanCenterFreq);
-		} else if (ulsRxAntennaType == CConst::OmniAntennaType) {
-			rxGainDB = 0.0;
-		} else if (ulsRxAntennaType == CConst::LUTAntennaType) {
-			rxGainDB = uls->getRxAntenna()->gainDB(angleOffBoresightDeg * M_PI / 180.0) + uls->getRxGain();
-		} else {
-			throw std::runtime_error(ErrStream() << "ERROR: INVALID ulsRxAntennaType: " << ulsRxAntennaType);
-		}
+
+                double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
 
 		double rxPowerDBW = (_exclusionZoneRLANEIRPDBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
@@ -8553,35 +8577,22 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 				pathDifference = -1.0;
 			}
 
-			std::string rxAntennaTypeStr;
-			if (ulsRxAntennaType == CConst::F1245AntennaType)
-			{
-				rxAntennaTypeStr = "F.1245";
-			}
-			else if (ulsRxAntennaType == CConst::F1336OmniAntennaType)
-			{
-				rxAntennaTypeStr = "F.1336_OMNI";
-			}
-			else if (ulsRxAntennaType == CConst::OmniAntennaType)
-			{
-				rxAntennaTypeStr = "OMNI";
-			}
-			else if (ulsRxAntennaType == CConst::LUTAntennaType)
-			{
-				rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
-			}
-			else
-			{
-				throw std::runtime_error(ErrStream() << "ERROR: INVALID ulsRxAntennaType = " << ulsRxAntennaType);
-			}
+                        std::string rxAntennaTypeStr;
+                        if (ulsRxAntennaType == CConst::LUTAntennaType) {
+                            rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
+                        } else {
+                            rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType));
+                        }
 
 			std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
 					_buildingType == CConst::noBuildingType ? "OUTDOOR" :
 					_buildingType == CConst::traditionalBuildingType ?  "TRADITIONAL" :
 					"THERMALLY_EFFICIENT");
 
+                        std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+
 			QStringList msg;
-			msg << QString::number(uls->getID()) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
+			msg << QString::number(uls->getID()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
 			msg << QString::number(uls->getRxLongitudeDeg(), 'f', 8) << QString::number(uls->getRxLatitudeDeg(), 'f', 8);
 			msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2) <<
 			QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
@@ -8631,7 +8642,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 void AfcManager::writeKML()
 {
 
-	ULSClass *uls = findULSID(_exclusionZoneFSID);
+	ULSClass *uls = findULSID(_exclusionZoneFSID, 0);
 	double rlanHeightInput = std::get<2>(_rlanLLA);
 
 	/**************************************************************************************/
@@ -8657,8 +8668,9 @@ void AfcManager::writeKML()
 	fkml->writeEndElement(); // PolyStyle
 	fkml->writeEndElement(); // Style
 
+        std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 	fkml->writeStartElement("Placemark");
-	fkml->writeTextElement("name", QString("FSID : %1").arg(uls->getID()));
+	fkml->writeTextElement("name", QString("FSID : %1_%s").arg(QString::fromStdString(dbName)).arg(uls->getID()));
 	fkml->writeTextElement("visibility", "0");
 	fkml->writeStartElement("Point");
 	fkml->writeTextElement("extrude", "1");
@@ -8764,6 +8776,7 @@ void AfcManager::runHeatmapAnalysis()
 	if (fexcthrwifi)
 	{
 		fexcthrwifi->writeRow({ "FS_ID",
+				"DBNAME",
 				"RLAN_POSN_IDX",
 				"CALLSIGN",
 				"FS_RX_LONGITUDE (deg)",
@@ -8950,7 +8963,8 @@ void AfcManager::runHeatmapAnalysis()
 #if 0
 				// For debugging, identifies anomalous ULS entries
 				if (uls->getLinkDistance() == -1) {
-					std::cout << uls->getID() << std::endl;
+                                        std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+					std::cout << dbName << "_" << uls->getID() << std::endl;
 				}
 #endif
 
@@ -9030,28 +9044,8 @@ void AfcManager::runHeatmapAnalysis()
 #endif
 								       );
 
-							double rxGainDB;
-							double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-							if (ulsRxAntennaType == CConst::F1245AntennaType)
-							{
-								rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, uls->getRxGain());
-							}
-							else if (ulsRxAntennaType == CConst::F1336OmniAntennaType)
-							{
-								rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleRxDeg, uls->getRxGain(), chanCenterFreq);
-							}
-							else if (ulsRxAntennaType == CConst::OmniAntennaType)
-							{
-								rxGainDB = 0.0;
-							}
-							else if (ulsRxAntennaType == CConst::LUTAntennaType)
-							{
-								rxGainDB = uls->getRxAntenna()->gainDB(angleOffBoresightDeg * M_PI / 180.0) + uls->getRxGain();
-							}
-							else
-							{
-								throw std::runtime_error(ErrStream() << "ERROR: INVALID ulsRxAntennaType = " << ulsRxAntennaType);
-							}
+                                                        double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+                                                        double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
 
 							double rxPowerDBW = (rlanEIRP - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
@@ -9085,35 +9079,22 @@ void AfcManager::runHeatmapAnalysis()
 									pathDifference = -1.0;
 								}
 
-								std::string rxAntennaTypeStr;
-								if (ulsRxAntennaType == CConst::F1245AntennaType)
-								{
-									rxAntennaTypeStr = "F.1245";
-								}
-								else if (ulsRxAntennaType == CConst::F1336OmniAntennaType)
-								{
-									rxAntennaTypeStr = "F.1336_OMNI";
-								}
-								else if (ulsRxAntennaType == CConst::OmniAntennaType)
-								{
-									rxAntennaTypeStr = "OMNI";
-								}
-								else if (ulsRxAntennaType == CConst::LUTAntennaType)
-								{
-									rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
-								}
-								else
-								{
-									throw std::runtime_error(ErrStream() << "ERROR: INVALID ulsRxAntennaType = " << ulsRxAntennaType);
-								}
+                                                                std::string rxAntennaTypeStr;
+                                                                if (ulsRxAntennaType == CConst::LUTAntennaType) {
+                                                                    rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
+                                                                } else {
+                                                                    rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType));
+                                                                }
 
 								std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
 										_buildingType == CConst::noBuildingType ? "OUTDOOR" :
 										_buildingType == CConst::traditionalBuildingType ?  "TRADITIONAL" :
 										"THERMALLY_EFFICIENT");
 
+                                                                std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+
 								QStringList msg;
-								msg << QString::number(uls->getID()) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
+								msg << QString::number(uls->getID()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
 								msg << QString::number(uls->getRxLongitudeDeg(), 'f', 5) << QString::number(uls->getRxLatitudeDeg(), 'f', 5);
 								msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2) <<
 								QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
@@ -9273,7 +9254,7 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "HEIGHT_TYPE", (_rlanHeightType == CConst::AMSLHeightType ? "AMSL" : _rlanHeightType == CConst::AGLHeightType ? "AGL" : "INVALID") } );
 		fUserInputs->writeRow({ "INDOOR/OUTDOOR", (_rlanType == RLAN_INDOOR ? "indoor" : _rlanType == RLAN_OUTDOOR ? "outdoor" : "error") } );
 
-		fUserInputs->writeRow({ "ULS_DATABASE", QString(_inputULSDatabaseStr) } );
+		// fUserInputs->writeRow({ "ULS_DATABASE", QString(_inputULSDatabaseStr) } );
 		fUserInputs->writeRow({ "AP/CLIENT_PROPAGATION_ENVIRO", QString(_propagationEnviro) } );
 		fUserInputs->writeRow({ "AP/CLIENT_MIN_EIRP (DBM)", QString::number(_minEIRP_dBm, 'e', 20) } );
 		fUserInputs->writeRow({ "AP/CLIENT_MAX_EIRP (DBM)", QString::number(_maxEIRP_dBm, 'e', 20) } );
@@ -9286,7 +9267,8 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "RLAN_BODY_LOSS_INDOOR (DB)", QString::number(_bodyLossIndoorDB, 'e', 20) } );
 		fUserInputs->writeRow({ "RLAN_BODY_LOSS_OUTDOOR (DB)", QString::number(_bodyLossOutdoorDB, 'e', 20) } );
 		fUserInputs->writeRow({ "I/N_THRESHOLD", QString::number(_IoverN_threshold_dB, 'e', 20) } );
-		fUserInputs->writeRow({ "FS_RECEIVER_ANTENNA_PATTERN", QString(_antennaPattern) } );
+		fUserInputs->writeRow({ "FS_RECEIVER_ANTENNA_PATTERN_FILE", QString::fromStdString(_ulsAntennaPatternFile) } );
+		fUserInputs->writeRow({ "FS_RECEIVER_DEFAULT_ANTENNA", QString::fromStdString(CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType )) } );
 
 
                 fUserInputs->writeRow({ "PROPAGATION_MODEL", QString::fromStdString(CConst::strPathLossModelList->type_to_str(_pathLossModel)) } );

@@ -607,3 +607,88 @@ std::tuple<double, double> PolygonClass::closestPoint(std::tuple<int, int> point
 }
 /******************************************************************************************/
 
+/******************************************************************************************/
+/**** FUNCTION: calcHorizExtents                                                       ****/
+/******************************************************************************************/
+void PolygonClass::calcHorizExtents(double yVal, double& xA, double& xB, bool& flag) const
+{
+    flag = false;
+    for (int segment_idx=0; segment_idx<=num_segment-1; segment_idx++) {
+        for (int bdy_pt_idx=0; bdy_pt_idx<=num_bdy_pt[segment_idx]-1; bdy_pt_idx++) {
+            int bdy_pt_idx2 = (bdy_pt_idx+1) % num_bdy_pt[segment_idx];
+            int x0 = bdy_pt_x[segment_idx][bdy_pt_idx];
+            int y0 = bdy_pt_y[segment_idx][bdy_pt_idx];
+            int x1 = bdy_pt_x[segment_idx][bdy_pt_idx2];
+            int y1 = bdy_pt_y[segment_idx][bdy_pt_idx2];
+
+            double xVal;
+            bool found = false;
+            if ((double) y0 == yVal) {
+                found = true;
+                xVal = (double) x0;
+            } else if (    (((double) y0 < yVal) && ((double) y1 >= yVal))
+                        || (((double) y0 > yVal) && ((double) y1 <= yVal)) ) {
+                found = true;
+                xVal = (x0*(y1-yVal) + x1*(yVal-y0))/(y1-y0);
+            }
+            if (found) {
+                if (!flag) {
+                    flag = true;
+                    xA = xVal;
+                    xB = xVal;
+                } else if (xVal < xA) {
+                    xA = xVal;
+                } else if (xVal > xB) {
+                    xB = xVal;
+                }
+            }
+        }
+    }
+
+    return;
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: calcHorizExtents                                                       ****/
+/******************************************************************************************/
+void PolygonClass::calcVertExtents (double xVal, double& yA, double& yB, bool& flag) const
+{
+    flag = false;
+    for (int segment_idx=0; segment_idx<=num_segment-1; segment_idx++) {
+        for (int bdy_pt_idx=0; bdy_pt_idx<=num_bdy_pt[segment_idx]-1; bdy_pt_idx++) {
+            int bdy_pt_idx2 = (bdy_pt_idx+1) % num_bdy_pt[segment_idx];
+            int x0 = bdy_pt_x[segment_idx][bdy_pt_idx];
+            int y0 = bdy_pt_y[segment_idx][bdy_pt_idx];
+            int x1 = bdy_pt_x[segment_idx][bdy_pt_idx2];
+            int y1 = bdy_pt_y[segment_idx][bdy_pt_idx2];
+
+            double yVal;
+            bool found = false;
+            if ((double) x0 == xVal) {
+                found = true;
+                yVal = (double) y0;
+            } else if (    (((double) x0 < xVal) && ((double) x1 >= xVal))
+                        || (((double) x0 > xVal) && ((double) x1 <= xVal)) ) {
+                found = true;
+                yVal = (y0*(x1-xVal) + y1*(xVal-x0))/(x1-x0);
+            }
+            if (found) {
+                if (!flag) {
+                    flag = true;
+                    yA = yVal;
+                    yB = yVal;
+                } else if (yVal < yA) {
+                    yA = yVal;
+                } else if (yVal > yB) {
+                    yB = yVal;
+                }
+            }
+        }
+    }
+
+    return;
+}
+/******************************************************************************************/
+
+

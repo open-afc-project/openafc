@@ -5,6 +5,7 @@
 #include "RlanRegion.h"
 #include "terrain.h"
 #include "EcefModel.h"
+#include "global_defines.h"
 
 /******************************************************************************************/
 /**** CONSTRUCTOR: RlanRegionClass::RlanRegionClass()                                  ****/
@@ -154,7 +155,7 @@ void EllipseRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, Te
     maxTerrainHeight = centerTerrainHeight;
 
     int scanPtIdx;
-    std::vector<LatLon> scanPtList = getScan(1.0);
+    std::vector<LatLon> scanPtList = getScan(CConst::xyAlignRegionNorthEastScanRegionMethod, 1.0, -1);
     for(scanPtIdx=0; scanPtIdx<(int) scanPtList.size(); ++scanPtIdx) {
         LatLon scanPt = scanPtList[scanPtIdx];
         double terrainHeight;
@@ -250,61 +251,168 @@ std::vector<GeodeticCoord> EllipseRlanRegionClass::getBoundary(TerrainClass *ter
 /******************************************************************************************/
 /**** FUNCTION: EllipseRlanRegionClass::getScan()                                      ****/
 /******************************************************************************************/
-std::vector<LatLon> EllipseRlanRegionClass::getScan(double scanResolutionM) const
+std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const
 {
     std::vector<LatLon> ptList;
 
-#if 1
-    // Scan points aligned with north/east
-    int N = floor(semiMajorAxis / scanResolutionM);
+    if (method == CConst::xyAlignRegionNorthEastScanRegionMethod) {
+        // Scan points aligned with north/east
+        int N = floor(semiMajorAxis / scanResolutionM);
 
-    double deltaLat = (scanResolutionM / CConst::earthRadius)*(180.0/M_PI);
-    double deltaLon = deltaLat / cos(centerLatitude*M_PI/180.0);
+        double deltaLat = (scanResolutionM / CConst::earthRadius)*(180.0/M_PI);
+        double deltaLon = deltaLat / cos(centerLatitude*M_PI/180.0);
 
-    int ix, iy;
-    for(iy=-N; iy<=N; ++iy) {
-        double latitude  = centerLatitude  + iy*deltaLat;
-        for(ix=-N; ix<=N; ++ix) {
-            double longitude  = centerLongitude  + ix*deltaLon;
-            bool contains;
-            closestPoint(std::pair<double, double>(latitude, longitude), contains);
-            if (contains) {
-                ptList.push_back(std::pair<double, double>(latitude, longitude));
-            }
-        }
-    }
-#else
-    // Scan points aligned with major/minor axis
-
-    double dx = scanResolutionM / semiMinorAxis;
-    double dy = scanResolutionM / semiMajorAxis;
-
-    arma::vec X0(2), X3(2);
-
-    int Ny = floor(1.0 / dy);
-
-    int ix, iy, xs, ys;
-    for(iy=0; iy<=Ny; ++iy) {
-        double yval = iy*dy;
-        int Nx = (int) floor(sqrt(1.0 - yval*yval) / dx);
-        for(ix=0; ix<=Nx; ++ix) {
-            double xval = ix*dx;
-            X0(0) = xval;
-            X0(1) = yval;
-            X3 = mxB*X0;
-
-            for(ys=0; ys<(iy==0?1:2); ++ys) {
-                for(xs=0; xs<(ix==0?1:2); ++xs) {
-                    double longitude = centerLongitude + (xs==0 ? 1 : -1) * X3(0);
-                    double latitude  = centerLatitude  + (ys==0 ? 1 : -1) * X3(1);
+        int ix, iy;
+        for(iy=-N; iy<=N; ++iy) {
+            double latitude  = centerLatitude  + iy*deltaLat;
+            for(ix=-N; ix<=N; ++ix) {
+                double longitude  = centerLongitude  + ix*deltaLon;
+                bool contains;
+                closestPoint(std::pair<double, double>(latitude, longitude), contains);
+                if (contains) {
                     ptList.push_back(std::pair<double, double>(latitude, longitude));
                 }
             }
         }
+    } else if (method == CConst::xyAlignRegionMajorMinorScanRegionMethod) {
+        // Scan points aligned with major/minor axis
+
+        double dx = scanResolutionM / semiMinorAxis;
+        double dy = scanResolutionM / semiMajorAxis;
+
+        arma::vec X0(2), X3(2);
+
+        int Ny = floor(1.0 / dy);
+
+        int ix, iy, xs, ys;
+        for(iy=0; iy<=Ny; ++iy) {
+            double yval = iy*dy;
+            int Nx = (int) floor(sqrt(1.0 - yval*yval) / dx);
+            for(ix=0; ix<=Nx; ++ix) {
+                double xval = ix*dx;
+                X0(0) = xval;
+                X0(1) = yval;
+                X3 = mxB*X0;
+
+                for(ys=0; ys<(iy==0?1:2); ++ys) {
+                    for(xs=0; xs<(ix==0?1:2); ++xs) {
+                        double longitude = centerLongitude + (xs==0 ? 1 : -1) * X3(0);
+                        double latitude  = centerLatitude  + (ys==0 ? 1 : -1) * X3(1);
+                        ptList.push_back(std::pair<double, double>(latitude, longitude));
+                    }
+                }
+            }
+        }
+    } else if (method == CConst::latLonAlignGridScanRegionMethod) {
+        // Scan points aligned with lat / lon grid
+        int N = floor( (semiMajorAxis / CConst::earthRadius)*(180.0/M_PI)*pointsPerDegree ) + 1;
+        int S[2*N+1][2*N+1];
+
+        int ix, iy;
+        for(ix=0; ix<=2*N; ++ix) {
+            for(iy=0; iy<=2*N; ++iy) {
+                S[ix][iy] = 0;
+            }
+        }
+        S[0][0] = 1;
+
+        int latN0 = (int) floor(centerLatitude*pointsPerDegree);
+        int lonN0 = (int) floor(centerLongitude*pointsPerDegree);
+
+        for(iy=-N+1; iy<=N; ++iy) {
+            double latVal = ((double) (latN0 + iy))/pointsPerDegree;
+            bool flag;
+            double lonA, lonB;
+            calcHorizExtents(latVal, lonA, lonB, flag);
+            if (flag) {
+                int iA = ((int) floor(lonA*pointsPerDegree)) - lonN0;
+                int iB = ((int) floor(lonB*pointsPerDegree)) - lonN0;
+                for(ix=iA; ix<=iB; ++ix) {
+                    S[N+ix][N+iy] = 1;
+                    S[N+ix][N+iy-1] = 1;
+                }
+            }
+        }
+
+        for(ix=-N+1; ix<=N; ++ix) {
+            double lonVal = ((double) (lonN0 + ix))/pointsPerDegree;
+            bool flag;
+            double latA, latB;
+            calcVertExtents(lonVal, latA, latB, flag);
+            if (flag) {
+                int iA = ((int) floor(latA*pointsPerDegree)) - latN0;
+                int iB = ((int) floor(latB*pointsPerDegree)) - latN0;
+                for(iy=iA; iy<=iB; ++iy) {
+                    S[N+ix][N+iy] = 1;
+                    S[N+ix-1][N+iy] = 1;
+                }
+            }
+        }
+
+        for(iy=2*N; iy>=0; --iy) {
+            for(ix=0; ix<=2*N; ++ix) {
+                if (S[ix][iy]) {
+                    double lonVal = (lonN0 + ix - N + 0.5)/pointsPerDegree; 
+                    double latVal = (latN0 + iy - N + 0.5)/pointsPerDegree; 
+                    ptList.push_back(std::pair<double, double>(latVal, lonVal));
+                }
+            }
+        }
+    } else {
+        CORE_DUMP;
     }
-#endif
 
     return(ptList);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: EllipseRlanRegionClass::calcHorizExtents()                             ****/
+/******************************************************************************************/
+void EllipseRlanRegionClass::calcHorizExtents(double latVal, double& lonA, double& lonB, bool& flag) const
+{
+    double yval = latVal - centerLatitude;
+
+    double B = (mxA(0,1) + mxA(1,0))*yval/mxA(0,0);
+    double C = (mxA(1,1)*yval*yval - 1.0)/mxA(0,0);
+
+    double D = B*B - 4*C;
+
+    if (D >= 0) {
+        flag = true;
+        double sqrtD = sqrt(D);
+        lonA = centerLongitude + (-B - sqrtD)/2;
+        lonB = centerLongitude + (-B + sqrtD)/2;
+    } else {
+        flag = false;
+    }
+
+    return;
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: EllipseRlanRegionClass::calcVertExtents()                              ****/
+/******************************************************************************************/
+void EllipseRlanRegionClass::calcVertExtents(double lonVal, double& latA, double& latB, bool& flag) const
+{
+    double xval = lonVal - centerLongitude;
+
+    double B = (mxA(0,1) + mxA(1,0))*xval/mxA(1,1);
+    double C = (mxA(0,0)*xval*xval - 1.0)/mxA(1,1);
+
+    double D = B*B - 4*C;
+
+    if (D >= 0) {
+        flag = true;
+        double sqrtD = sqrt(D);
+        latA = centerLatitude + (-B - sqrtD)/2;
+        latB = centerLatitude + (-B + sqrtD)/2;
+    } else {
+        flag = false;
+    }
+
+    return;
 }
 /******************************************************************************************/
 
@@ -406,7 +514,7 @@ void PolygonRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, Te
     maxTerrainHeight = centerTerrainHeight;
 
     int scanPtIdx;
-    std::vector<LatLon> scanPtList = getScan(1.0);
+    std::vector<LatLon> scanPtList = getScan(CConst::xyAlignRegionNorthEastScanRegionMethod, 1.0, -1);
     for(scanPtIdx=0; scanPtIdx<(int) scanPtList.size(); ++scanPtIdx) {
         LatLon scanPt = scanPtList[scanPtIdx];
         double terrainHeight;
@@ -503,31 +611,103 @@ std::vector<GeodeticCoord> PolygonRlanRegionClass::getBoundary(TerrainClass *ter
 /******************************************************************************************/
 /**** FUNCTION: PolygonRlanRegionClass::getScan()                                      ****/
 /******************************************************************************************/
-std::vector<LatLon> PolygonRlanRegionClass::getScan(double scanResolutionM) const
+std::vector<LatLon> PolygonRlanRegionClass::getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const
 {
     std::vector<LatLon> ptList;
 
     int minx, maxx, miny, maxy;
     polygon->comp_bdy_min_max(minx, maxx, miny, maxy);
 
-    int minScanXIdx = (int) floor(minx*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM);
-    int maxScanXIdx = (int) floor(maxx*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM)+1;
-    int minScanYIdx = (int) floor(miny*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM);
-    int maxScanYIdx = (int) floor(maxy*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM)+1;
+    if (    (method == CConst::xyAlignRegionNorthEastScanRegionMethod)
+         || (method == CConst::xyAlignRegionMajorMinorScanRegionMethod) ) {
+        int minScanXIdx = (int) floor(minx*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM);
+        int maxScanXIdx = (int) floor(maxx*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM)+1;
+        int minScanYIdx = (int) floor(miny*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM);
+        int maxScanYIdx = (int) floor(maxy*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM)+1;
 
-    int ix, iy;
-    bool isEdge;
-    for(iy=minScanYIdx; iy<=maxScanYIdx; ++iy) {
-        int yIdx = (int) floor(iy*scanResolutionM*(180.0/M_PI)/(CConst::earthRadius*resolution) + 0.5);
-        for(ix=minScanXIdx; ix<=maxScanXIdx; ++ix) {
-            int xIdx = (int) floor(ix*scanResolutionM*(180.0/M_PI)/(CConst::earthRadius*resolution) + 0.5);
-            bool inBdyArea = polygon->in_bdy_area(xIdx, yIdx, &isEdge);
-            if (inBdyArea || isEdge) {
-                double longitude = centerLongitude + xIdx*resolution*oneOverCosVal;
-                double latitude  = centerLatitude  + yIdx*resolution;
-                ptList.push_back(std::pair<double, double>(latitude, longitude));
+        int ix, iy;
+        bool isEdge;
+        for(iy=minScanYIdx; iy<=maxScanYIdx; ++iy) {
+            int yIdx = (int) floor(iy*scanResolutionM*(180.0/M_PI)/(CConst::earthRadius*resolution) + 0.5);
+            for(ix=minScanXIdx; ix<=maxScanXIdx; ++ix) {
+                int xIdx = (int) floor(ix*scanResolutionM*(180.0/M_PI)/(CConst::earthRadius*resolution) + 0.5);
+                bool inBdyArea = polygon->in_bdy_area(xIdx, yIdx, &isEdge);
+                if (inBdyArea || isEdge) {
+                    double longitude = centerLongitude + xIdx*resolution*oneOverCosVal;
+                    double latitude  = centerLatitude  + yIdx*resolution;
+                    ptList.push_back(std::pair<double, double>(latitude, longitude));
+                }
             }
         }
+    } else if (method == CConst::latLonAlignGridScanRegionMethod) {
+        // Scan points aligned with lat / lon grid
+        int NX = (int) floor( (maxx - minx)*resolution*oneOverCosVal*pointsPerDegree ) + 2;
+        int NY = (int) floor( (maxy - miny)*resolution*pointsPerDegree ) + 2;
+
+        int S[NX][NY];
+
+        // int xval = polygon->bdy_pt_x[0][ptIdx];
+        // int yval = polygon->bdy_pt_y[0][ptIdx];
+        // double longitude = centerLongitude + xval*resolution*oneOverCosVal;
+        // double latitude  = centerLatitude  + yval*resolution;
+
+        int ix, iy;
+        for(ix=0; ix<NX; ++ix) {
+            for(iy=0; iy<NY; ++iy) {
+                S[ix][iy] = 0;
+            }
+        }
+
+        int latN0 = (int) floor((centerLatitude + miny*resolution)*pointsPerDegree);
+        int lonN0 = (int) floor((centerLongitude + minx*resolution*oneOverCosVal)*pointsPerDegree);
+
+        for(iy=1; iy<NY; ++iy) {
+            double latVal = ((double) (latN0 + iy))/pointsPerDegree;
+            double yVal = (latVal - centerLatitude)/resolution;
+            bool flag;
+            double xA, xB;
+            polygon->calcHorizExtents(yVal, xA, xB, flag);
+            if (flag) {
+                double lonA = centerLongitude + xA*resolution*oneOverCosVal;
+                double lonB = centerLongitude + xB*resolution*oneOverCosVal;
+                int iA = ((int) floor(lonA*pointsPerDegree)) - lonN0;
+                int iB = ((int) floor(lonB*pointsPerDegree)) - lonN0;
+                for(ix=iA; ix<=iB; ++ix) {
+                    S[ix][iy] = 1;
+                    S[ix][iy-1] = 1;
+                }
+            }
+        }
+
+        for(ix=1; ix<NX; ++ix) {
+            double lonVal = ((double) (lonN0 + ix))/pointsPerDegree;
+            double xVal = (lonVal - centerLongitude)/resolution;
+            bool flag;
+            double yA, yB;
+            polygon->calcVertExtents(xVal, yA, yB, flag);
+            if (flag) {
+                double latA = centerLatitude + yA*resolution;
+                double latB = centerLatitude + yB*resolution;
+                int iA = ((int) floor(latA*pointsPerDegree)) - latN0;
+                int iB = ((int) floor(latB*pointsPerDegree)) - latN0;
+                for(iy=iA; iy<=iB; ++iy) {
+                    S[ix][iy] = 1;
+                    S[ix-1][iy] = 1;
+                }
+            }
+        }
+
+        for(iy=NY-1; iy>=0; --iy) {
+            for(ix=0; ix<NX; ++ix) {
+                if (S[ix][iy]) {
+                    double lonVal = (lonN0 + ix + 0.5)/pointsPerDegree; 
+                    double latVal = (latN0 + iy + 0.5)/pointsPerDegree; 
+                    ptList.push_back(std::pair<double, double>(latVal, lonVal));
+                }
+            }
+        }
+    } else {
+        CORE_DUMP;
     }
 
     return(ptList);
