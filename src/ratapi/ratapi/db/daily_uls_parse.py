@@ -335,10 +335,10 @@ def daily_uls_parse(state_root, interactive):
         # process the daily files day by day
         processDailyFiles(weeklyCreation, root, logFile, temp)
 
-        os.chdir(root) # change back to root of this script
         # generate the combined csv/txt file for the coalition uls processor 
         generateUlsScriptInput(root, logFile, temp) 
 
+    os.chdir(root) # change back to root of this script
     nameTime =  datetime.datetime.now().isoformat().replace(":", '_')
     coalitionScriptOutputFilename = 'CONUS_ULS_' + nameTime + '.csv'
 
@@ -411,7 +411,7 @@ def daily_uls_parse(state_root, interactive):
 
     if runSrtCallsignsAddFSID:
         logFile.write("Running through sort callsigns add FSID script" + '\n')
-        sortCallsignsAddFSID(bpsScriptOutput, fsidTableFile, sortedOutput)
+        sortCallsignsAddFSID(bpsScriptOutput, fsidTableFile, sortedOutput, logFile)
 
     if interactive:
         value = raw_input("Run conversion of CSV file to sqlite? (y/n): ")
@@ -434,12 +434,14 @@ def daily_uls_parse(state_root, interactive):
         outputSQL = sortedOutput.replace('.csv', '.sqlite3')
    
         logFile.write("Creating and moving debug files")
-        # create debug zip containing final csv and anomalous uls and move it to where GUI can see
+        # create debug zip containing final csv, anomalous_uls, and warning_uls and move it to where GUI can see
         try:
             dirName = str(nameTime + "_debug")
             subprocess.call(['mkdir', dirName]) 
             anomalousPath = root + '/' + 'anomalous_uls.csv'
+            warningPath = root + '/' + 'warning_uls.txt'
             subprocess.call(['mv', anomalousPath, dirName]) 
+            subprocess.call(['mv', warningPath, dirName]) 
             subprocess.call(['cp', sortedOutput, dirName]) 
             shutil.make_archive( dirName , 'zip', dirName)
             zipName = dirName + ".zip"
