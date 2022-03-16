@@ -40,6 +40,7 @@ export interface AFCConfigFile {
     maxLinkDistance: number,
     ulsDefaultAntennaType : DefaultAntennaType,
     antennaPattern: UserAntennaPattern,
+    scanPointBelowGroundMethod: ScanPointBelowGroundMethod
     propagationModel: PropagationModel,
     APUncertainty: APUncertainty, 
     propagationEnv: "NLCD Point" | "Population Density Map" | "Urban" | "Suburban" | "Rural",
@@ -152,6 +153,9 @@ export interface FCC6GHz {
     buildingSource: "B-Design3D" | "LiDAR" | "None",
     terrainSource: "SRTM (90m)" |"3DEP (30m)"
 }
+
+export type ScanPointBelowGroundMethod = "discard" | "truncate"
+
 
 /**
  * PAWS request format is specified in 

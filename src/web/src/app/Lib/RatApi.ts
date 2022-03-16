@@ -64,6 +64,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     ],
     "antennaPattern":{"kind":'None',"value":''},
     "ulsDefaultAntennaType": "F.699",
+    "scanPointBelowGroundMethod": "discard",
     "polarizationMismatchLoss":{"kind":"Fixed Value","value":3},
     "bodyLoss":{"kind":"Fixed Value","valueIndoor":0,"valueOutdoor":0},
     "buildingPenetrationLoss":{"kind":"Fixed Value","value":20.5},

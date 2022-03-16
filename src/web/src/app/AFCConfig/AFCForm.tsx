@@ -75,6 +75,20 @@ export class AFCForm extends React.Component<
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
     private setPropogationEnv = (n: string) => this.setState({ config: Object.assign(this.state.config, { propagationEnv: n }) });
+    private setScanBelowGround = (n: string) => {
+        const conf = this.state.config;
+        switch (n) {
+            case "truncate":
+                conf.scanPointBelowGroundMethod = "truncate";
+                break;
+            case "discard":
+                conf.scanPointBelowGroundMethod = "discard";
+                break;
+            default:
+                break;
+        };
+        this.setState({ config: conf });
+    }
 
 
     private isValid = () => {
@@ -240,6 +254,7 @@ export class AFCForm extends React.Component<
             conf.clutterAtFS = x;
             this.setState({ config: conf });
         }
+
 
         return (
             <Card>
@@ -618,6 +633,37 @@ export class AFCForm extends React.Component<
                         </GalleryItem>
                         <GalleryItem>
                             <AllowedRangesDisplay data={this.props.frequencyBands} />
+                        </GalleryItem>
+                        <GalleryItem>
+                            <FormGroup label="AP Height below Min Allowable AGL Height Behavior"
+                                fieldId="horizontal-form-uls-scanBelowGround">
+                                    {" "}<Tooltip
+                                        position={TooltipPosition.top}
+                                        enableFlip={true}
+                                        maxWidth="40.0rem"
+                                        content={
+                                            <>
+                                            <p>Min allowable AGL height = 1m</p>
+                                            <p>Note that this is meant to mainly prevent the portion of uncertainty region to be underground due to height uncertainty and terrain variation.</p>
+                                            <p>If the AGL height of all scan points is below ground (without height uncertainty), an error will be reported.</p>
+                                            </>
+                                        }
+                                    >
+                                        <OutlinedQuestionCircleIcon />
+                                </Tooltip>
+
+                                <FormSelect
+                                    value={this.state.config.scanPointBelowGroundMethod}
+                                    onChange={x => this.setScanBelowGround(x)}
+                                    id="horizontal-form-uls-scanBelowGround"
+                                    name="horizontal-form-uls-scanBelowGround"
+                                    isValid={!!this.state.config.scanPointBelowGroundMethod}
+                                    style={{ textAlign: "right" }}
+                                >
+                                    <FormSelectOption key={"truncate"} value={"truncate"} label={"Truncate AP height to min allowable AGL height"} />
+                                    <FormSelectOption key={"discard"} value={"discard"} label={"Discard scan point"} />
+                                </FormSelect>
+                            </FormGroup>
                         </GalleryItem>
                     </Gallery>
                     <br />
