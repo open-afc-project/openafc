@@ -8,9 +8,10 @@ fsidmap = {}
 remMissTxEIRPGFlag = False
 filterMaxEIRPFlag = False
 
-def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath):
+def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
+    logFile.write('Sorting callsigns and adding FSID' + '\n')
     if not exists(fsidTableFile):
-        print("FSIDTable does NOT exist, creating Table at " + fsidTableFile + "\n")
+        logFile.write("FSIDTable does NOT exist, creating Table at " + fsidTableFile + "\n")
         with open(fsidTableFile, 'w') as fsidTable:
             fsidTable.write("FSID,Callsign,Path Number,Center Frequency (MHz),Emissions Designator\n")
 
@@ -62,7 +63,7 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath):
                 firstFSID = False
                 entriesRead += 1
 
-    print("Read " + str(entriesRead) + " entries from FSID table file: " + fsidTableFile + ", Max FSID = " + str(highestFSID) + "\n")
+    logFile.write("Read " + str(entriesRead) + " entries from FSID table file: " + fsidTableFile + ", Max FSID = " + str(highestFSID) + "\n")
 
     entriesAdded = 0
     with open(inputPath, 'r') as f:
@@ -125,7 +126,7 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath):
                         freq = row[freqIdx]
                         emdeg = row[emdegIdx][0:4]
                         if remMissTxEIRPGFlag and (row[txEirpIdx].strip() == '' or row[txGainIdx].strip() == ''):
-                            print ("Removed entry missing Tx EIRP or Tx Gain")
+                            logFile.write("Removed entry missing Tx EIRP or Tx Gain")
                         else:
                             keyv = tuple([cs, path, freq, emdeg])
                             if keyv in csmap:
@@ -204,4 +205,4 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath):
     
                         recordNum = recordNum + 1
 
-    print("Added " + str(entriesAdded) + " entries to FSID table file: " + fsidTableFile + "\n")
+    logFile.write("Added " + str(entriesAdded) + " entries to FSID table file: " + fsidTableFile + "\n")
