@@ -1844,9 +1844,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
 
     if (antennaPattern == "User Upload") {
         //_ulsAntennaPatternFile = SearchPaths::forReading("data", "fbrat/AntennaPatterns/" + jsonObj["antennaPattern"].toObject()["value"].toString(), true).toStdString();
-        _ulsAntennaPatternFile = QDir(QString::fromStdString(_stateRoot))
-            .absoluteFilePath(QString::fromStdString("/AntennaPatterns/") + jsonObj["antennaPattern"].toObject()["value"].toString())
-            .toStdString();
+        _ulsAntennaPatternFile = _stateRoot + "/AntennaPatterns/" + jsonObj["antennaPattern"].toObject()["value"].toString().toStdString();
         LOGGER_INFO(logger) << "Antenna pattern file set to: " << _ulsAntennaPatternFile;
     } else {
         _ulsAntennaPatternFile = "";

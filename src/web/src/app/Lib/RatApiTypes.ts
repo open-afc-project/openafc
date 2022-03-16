@@ -38,7 +38,8 @@ export interface AFCConfigFile {
     bodyLoss: BodyLossModel,
     threshold: number,
     maxLinkDistance: number,
-    antennaPattern: AntennaPattern,
+    ulsDefaultAntennaType : DefaultAntennaType,
+    antennaPattern: UserAntennaPattern,
     propagationModel: PropagationModel,
     APUncertainty: APUncertainty, 
     propagationEnv: "NLCD Point" | "Population Density Map" | "Urban" | "Suburban" | "Rural",
@@ -104,14 +105,20 @@ export type ITMParameters = {
 
 export type GroundType = 'Average Ground' | 'Poor Ground' | 'Good Ground' | 'Fresh Water' | 'Sea Water';
 
-export type AntennaPattern = F1245 | UserUpload;
+export type AntennaPatternState = {
+    defaultAntennaPattern: DefaultAntennaType,
+    userUpload?: UserUpload
+}
 
-export interface F1245 {
-    kind: "F.1245"
+export type DefaultAntennaType = 'F.1245' | 'F.699'
+
+export type UserAntennaPattern = {
+    kind: string,
+    value: string
 }
 
 export interface UserUpload {
-    kind: "User Upload",
+    kind: "User Upload" | 'None',
     value: string
 }
 

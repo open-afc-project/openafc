@@ -62,7 +62,8 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
             "stopFreqMHz" : 6875
         }               
     ],
-    "antennaPattern":{"kind":"F.1245"},
+    "antennaPattern":{"kind":'None',"value":''},
+    "ulsDefaultAntennaType": "F.699",
     "polarizationMismatchLoss":{"kind":"Fixed Value","value":3},
     "bodyLoss":{"kind":"Fixed Value","valueIndoor":0,"valueOutdoor":0},
     "buildingPenetrationLoss":{"kind":"Fixed Value","value":20.5},
