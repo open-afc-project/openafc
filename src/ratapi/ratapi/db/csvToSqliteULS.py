@@ -130,6 +130,9 @@ class ULS(Base):
     #: Rx Gain (dBi)
     rx_gain = Column(Float)
 
+    #: Rx Ant Diameter (m)
+    rx_ant_diameter = Column(Float)
+
     p_rp_num = Column(Integer)
 
     path_number = Column(Integer, nullable=False)
@@ -269,6 +272,8 @@ def convertULS(data_file, state_root, logFile):
                             row["Rx Height to Center RAAT (m)"]),
                     #: Rx Gain (dBi)
                     rx_gain=_as_float(row["Rx Gain (dBi)"]),
+                    #: Rx Ant Diameter (m)
+                    rx_ant_diameter=_as_float(row["Rx Ant Diameter (m)"]),
                     #: Number of passive repeaters
                     p_rp_num=numPR,
 
