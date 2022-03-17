@@ -38,13 +38,13 @@ export interface AFCConfigFile {
     bodyLoss: BodyLossModel,
     threshold: number,
     maxLinkDistance: number,
-    ulsDefaultAntennaType : DefaultAntennaType,
+    ulsDefaultAntennaType: DefaultAntennaType,
     antennaPattern: UserAntennaPattern,
     scanPointBelowGroundMethod: ScanPointBelowGroundMethod
     propagationModel: PropagationModel,
-    APUncertainty: APUncertainty, 
+    APUncertainty: APUncertainty,
     propagationEnv: "NLCD Point" | "Population Density Map" | "Urban" | "Suburban" | "Rural",
-    ITMParameters: ITMParameters, 
+    ITMParameters: ITMParameters,
     fsReceiverNoise: FSReceiverNoise,
     clutterAtFS: boolean,
     regionStr?: string,
@@ -53,7 +53,7 @@ export interface AFCConfigFile {
 
 export type FreqRange = {
     name: string,
-    startFreqMHz: number, 
+    startFreqMHz: number,
     stopFreqMHz: number
 }
 
@@ -92,7 +92,7 @@ export type BodyLossModel = EU | {
 
 export type APUncertainty = {
     horizontal: number,
-    height: number 
+    height: number
 }
 
 export type ITMParameters = {
@@ -123,12 +123,12 @@ export interface UserUpload {
     value: string
 }
 
-export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FCC6GHz;
+export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FCC6GHz | CustomPropagation;
 
 export interface FSPL { kind: "FSPL" }
-export interface Win2ItmDb { 
-    kind: "ITM with building data", 
-    win2ProbLosThreshold: number, 
+export interface Win2ItmDb {
+    kind: "ITM with building data",
+    win2ProbLosThreshold: number,
     win2Confidence: number,
     itmConfidence: number,
     p2108Confidence: number,
@@ -136,11 +136,11 @@ export interface Win2ItmDb {
 }
 export interface Win2ItmClutter {
     kind: "ITM with no building data",
-    win2ProbLosThreshold: number, 
+    win2ProbLosThreshold: number,
     win2Confidence: number,
     itmConfidence: number,
     p2108Confidence: number,
-    terrainSource: "SRTM (90m)" |"3DEP (30m)"
+    terrainSource: "SRTM (90m)" | "3DEP (30m)"
 }
 export interface RayTrace {
     kind: "Ray Tracing"
@@ -151,8 +151,20 @@ export interface FCC6GHz {
     itmConfidence: number,
     p2108Confidence: number,
     buildingSource: "B-Design3D" | "LiDAR" | "None",
-    terrainSource: "SRTM (90m)" |"3DEP (30m)"
+    terrainSource: "SRTM (90m)" | "3DEP (30m)"
 }
+
+export interface CustomPropagation {
+    kind: "Custom",
+    winner2LosOption: 'UNKNOWN' | 'FORCE_LOS' | 'FORCE_NLOS' | 'BLDG_DATA',
+    win2Confidence: number,
+    itmConfidence: number,
+    p2108Confidence: number,
+    rlanITMTxClutterMethod: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
+    buildingSource: "B-Design3D" | "LiDAR" | "None",
+    terrainSource: "SRTM (90m)" | "3DEP (30m)" | "None"
+}
+
 
 export type ScanPointBelowGroundMethod = "discard" | "truncate"
 
@@ -288,7 +300,7 @@ export interface Bounds {
     east: number,
     west: number
 }
-  
+
 export interface HeatMapRequest {
     bounds: Bounds,
     bandwidth: number,
@@ -346,7 +358,7 @@ export interface GeoJson {
             /**
              * Buildings bounding box
              */
-            kind: "BLDB" 
+            kind: "BLDB"
         } | {
             kind: "RLAN",
             FSLonLat: [number, number],
@@ -396,31 +408,31 @@ export interface ColorEvent {
     colorA: string,
     colorB: string,
     require: {
-      type: "REQ_PEND",
-      requestIndex: number
+        type: "REQ_PEND",
+        requestIndex: number
     } | {
-      type: "NO_SERVICE"
+        type: "NO_SERVICE"
     }
-  }
-  
+}
+
 /**
  * Configuration object used for Mobile AP Demo
  * @see https://jira.rkf-engineering.com/jira/wiki/p/RAT/view/mobile-ap-demo/176
  */
 export interface MobileAPConfig {
     path: {
-      frame: number,
-      lon: number,
-      lat: number
+        frame: number,
+        lon: number,
+        lat: number
     }[],
-    requests: { 
-      request: PAWSRequest, 
-      sendRequestFrame: number
-      frameStart: number, 
-      frameEnd: number 
+    requests: {
+        request: PAWSRequest,
+        sendRequestFrame: number
+        frameStart: number,
+        frameEnd: number
     }[],
     colorEvents: ColorEvent[]
-  }
+}
 
 /**
  * User model modeled on database schema
@@ -462,7 +474,7 @@ export interface AFCEngineException {
  * but in principle the type can be used anywhere.
  * See the Haskell Either type for more details on the general type and examples of usage.
  */
-export type RatResponse<T> = ResError | ResSuccess<T> 
+export type RatResponse<T> = ResError | ResSuccess<T>
 
 /**
  * Constructs a pure RatResponse that is a success
