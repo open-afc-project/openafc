@@ -119,6 +119,7 @@ public:
                ITMBldgPathLossModel,
          CoalitionOpt6PathLossModel,
  FCC6GHzReportAndOrderPathLossModel,
+                CustomPathLossModel,
                   FSPLPathLossModel
 
     };
