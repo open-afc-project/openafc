@@ -20,11 +20,11 @@ const propogationModels = [
     "Custom"
 ]
 
+
 /**
  * Sub for for propogation model
  */
 export class PropogationModelForm extends React.PureComponent<{ data: PropagationModel, onChange: (x: PropagationModel) => void }> {
-
     private setKind = (s: string) => {
         switch (s) {
             case "FSPL":
@@ -44,7 +44,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
             case "Custom":
                 this.props.onChange({
                     kind: s, winner2LOSOption: "UNKNOWN", win2Confidence: 50, itmConfidence: 50,
-                    p2108Confidence: 50, rlanITMTxClutterMethod: "FORCE_TRUE", buildingSource: "None", terrainSource: "None"
+                    p2108Confidence: 50, rlanITMTxClutterMethod: "FORCE_TRUE", buildingSource: "None", terrainSource: "3DEP (30m)"
                 })
                 break;
         }
@@ -91,7 +91,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
             this.props.onChange(Object.assign(this.props.data, {
                 winner2LOSOption: s,
                 buildingSource: "None",
-                terrainSource: "None"
+                terrainSource: "3DEP (30m)"
             }));
         } else {
             this.props.onChange(Object.assign(this.props.data, { winner2LOSOption: s }));
@@ -104,7 +104,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
             this.props.onChange(Object.assign(this.props.data, {
                 rlanITMTxClutterMethod: s,
                 buildingSource: "None",
-                terrainSource: "None"
+                terrainSource: "3DEP (30m)"
             }));
         } else {
             this.props.onChange(Object.assign(this.props.data, { rlanITMTxClutterMethod: s }));
@@ -386,7 +386,6 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                                     name="terrain-source" style={{ textAlign: "right" }} >
                                     <FormSelectOption key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
                                     <FormSelectOption isDisabled={true} key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
-                                    <FormSelectOption key="None" value="None" label="None" />
 
                                 </FormSelect>
                             </FormGroup>

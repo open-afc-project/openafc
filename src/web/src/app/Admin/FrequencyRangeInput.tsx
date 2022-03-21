@@ -63,7 +63,7 @@ export class FrequencyRangeInput extends React.Component<FrequencyRangeProps, Fr
 
     render() {
         return (<Card><CardBody>
-            <FormGroup label="Update Frequency Range">
+            <FormGroup label="Update Frequency Range" fieldId="band-name-label" > 
                 <InputGroup>
                         <TextInput
                             id={"band-name-label"}

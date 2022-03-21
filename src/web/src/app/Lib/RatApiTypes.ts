@@ -46,6 +46,7 @@ export interface AFCConfigFile {
     propagationEnv: "NLCD Point" | "Population Density Map" | "Urban" | "Suburban" | "Rural",
     ITMParameters: ITMParameters,
     fsReceiverNoise: FSReceiverNoise,
+    rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
     clutterAtFS: boolean,
     regionStr?: string,
     rasDatabase?: string
@@ -160,9 +161,9 @@ export interface CustomPropagation {
     win2Confidence: number,
     itmConfidence: number,
     p2108Confidence: number,
-    rlanITMTxClutterMethod: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
     buildingSource: "B-Design3D" | "LiDAR" | "None",
-    terrainSource: "SRTM (90m)" | "3DEP (30m)" | "None"
+    terrainSource: "SRTM (90m)" | "3DEP (30m)"
+    rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
 }
 
 

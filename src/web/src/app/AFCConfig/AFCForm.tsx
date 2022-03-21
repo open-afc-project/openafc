@@ -8,7 +8,7 @@ import BodyLossForm from "./BodyLossForm";
 import AntennaPatternForm from "./AntennaPatternForm";
 import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
-import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange } from "../Lib/RatApiTypes";
+import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation } from "../Lib/RatApiTypes";
 import { getDefaultAfcConf, guiConfig } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
@@ -239,9 +239,27 @@ export class AFCForm extends React.Component<
         }
 
         const setPropogationModel = (x: PropagationModel) => {
-            const conf = this.state.config;
-            conf.propagationModel = x;
-            this.setState({ config: conf });
+            if (x.kind === "Custom") {
+                //rlanITMTxClutterMethod is set in the CustomPropagation but stored at the top level
+                // so move it up if present
+                const conf = {...this.state.config};
+                var model = x as CustomPropagation;
+                var itmTxClutterMethod = model.rlanITMTxClutterMethod;
+                delete model.rlanITMTxClutterMethod;
+                conf.propagationModel = model;
+                if(!!itmTxClutterMethod ){
+                    conf.rlanITMTxClutterMethod = itmTxClutterMethod;
+                }else{
+                    delete conf.rlanITMTxClutterMethod;
+                }
+                this.setState({ config: conf});
+
+
+            } else {
+                const conf = this.state.config;
+                conf.propagationModel = x;
+                this.setState({ config: conf });
+            }
         }
 
         const setAPUncertainty = (x: APUncertainty) => {
@@ -262,6 +280,19 @@ export class AFCForm extends React.Component<
             this.setState({ config: conf });
         }
 
+        const getPropagationModelForForm= () =>{
+            //rlanITMTxClutterMethod is stored at the top level but set in the form
+            // so move it down if present
+            if(this.state.config.propagationModel.kind !== "Custom"){
+                return { ...this.state.config.propagationModel };
+            }else{
+                const customModel =  { ...this.state.config.propagationModel } as CustomPropagation;
+                customModel.rlanITMTxClutterMethod = this.state.config.rlanITMTxClutterMethod;
+                return customModel;
+            }
+
+        }
+        
 
         return (
             <Card>
@@ -565,7 +596,7 @@ export class AFCForm extends React.Component<
                         </GalleryItem>
                         <GalleryItem>
                             <PropogationModelForm
-                                data={this.state.config.propagationModel}
+                                data={getPropagationModelForForm()}
                                 onChange={setPropogationModel} />
                         </GalleryItem>
                         {(this.state.config.propagationModel.kind === "ITM with no building data" || this.state.config.propagationModel.kind == "FCC 6GHz Report & Order") &&
@@ -644,19 +675,19 @@ export class AFCForm extends React.Component<
                         <GalleryItem>
                             <FormGroup label="AP Height below Min Allowable AGL Height Behavior"
                                 fieldId="horizontal-form-uls-scanBelowGround">
-                                    {" "}<Tooltip
-                                        position={TooltipPosition.top}
-                                        enableFlip={true}
-                                        maxWidth="40.0rem"
-                                        content={
-                                            <>
+                                {" "}<Tooltip
+                                    position={TooltipPosition.top}
+                                    enableFlip={true}
+                                    maxWidth="40.0rem"
+                                    content={
+                                        <>
                                             <p>Min allowable AGL height = 1m</p>
                                             <p>Note that this is meant to mainly prevent the portion of uncertainty region to be underground due to height uncertainty and terrain variation.</p>
                                             <p>If the AGL height of all scan points is below ground (without height uncertainty), an error will be reported.</p>
-                                            </>
-                                        }
-                                    >
-                                        <OutlinedQuestionCircleIcon />
+                                        </>
+                                    }
+                                >
+                                    <OutlinedQuestionCircleIcon />
                                 </Tooltip>
 
                                 <FormSelect
