@@ -14,6 +14,7 @@ RUN /usr/local/bin/python3 -m pip install --upgrade pip
 RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY afc_tests.py /usr/app/afc_tests.py
+COPY _version.py /usr/app/_version.py
 COPY afc_input.sqlite3 /usr/app/afc_input.sqlite3
 
 ENV PYTHONPATH=/usr/app
