@@ -156,7 +156,7 @@ export interface FCC6GHz {
 
 export interface CustomPropagation {
     kind: "Custom",
-    winner2LosOption: 'UNKNOWN' | 'FORCE_LOS' | 'FORCE_NLOS' | 'BLDG_DATA',
+    winner2LOSOption: 'UNKNOWN' | 'FORCE_LOS' | 'FORCE_NLOS' | 'BLDG_DATA',
     win2Confidence: number,
     itmConfidence: number,
     p2108Confidence: number,

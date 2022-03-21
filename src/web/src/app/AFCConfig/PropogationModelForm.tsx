@@ -43,7 +43,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 break; // do nothing
             case "Custom":
                 this.props.onChange({
-                    kind: s, winner2LosOption: "UNKNOWN", win2Confidence: 50, itmConfidence: 50,
+                    kind: s, winner2LOSOption: "UNKNOWN", win2Confidence: 50, itmConfidence: 50,
                     p2108Confidence: 50, rlanITMTxClutterMethod: "FORCE_TRUE", buildingSource: "None", terrainSource: "None"
                 })
                 break;
@@ -87,14 +87,14 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
     setLosOption = (s: string) => {
         const model = this.props.data as CustomPropagation;
 
-        if (model.winner2LosOption === "BLDG_DATA" && s !== "BLDG_DATA") {
+        if (model.winner2LOSOption === "BLDG_DATA" && s !== "BLDG_DATA") {
             this.props.onChange(Object.assign(this.props.data, {
-                winner2LosOption: s,
+                winner2LOSOption: s,
                 buildingSource: "None",
                 terrainSource: "None"
             }));
         } else {
-            this.props.onChange(Object.assign(this.props.data, { winner2LosOption: s }));
+            this.props.onChange(Object.assign(this.props.data, { winner2LOSOption: s }));
         }
     }
 
@@ -303,7 +303,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
             case "Custom":
                 return <>
                     <FormGroup label="WinnerII LoS Option" fieldId="propogation-model-win-los-option">
-                        <FormSelect value={model.winner2LosOption} onChange={this.setLosOption} id="propogation-model-win-los-option"
+                        <FormSelect value={model.winner2LOSOption} onChange={this.setLosOption} id="propogation-model-win-los-option"
                             name="propogation-model-win-los-option" style={{ textAlign: "right" }}
                         >
                             <FormSelectOption key="UNKNOWN" value="UNKNOWN" label="Combined LoS/NLoS" />
@@ -354,7 +354,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         </InputGroup>
                     </FormGroup>
 
-                    {model.rlanITMTxClutterMethod === "BLDG_DATA" || model.winner2LosOption === "BLDG_DATA" ?
+                    {model.rlanITMTxClutterMethod === "BLDG_DATA" || model.winner2LOSOption === "BLDG_DATA" ?
                         <>
                             <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
                                 <FormSelect value={model.buildingSource} onChange={this.setBuildingSource} id="propogation-model-data-source"
