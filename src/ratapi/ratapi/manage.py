@@ -200,6 +200,7 @@ class DbCreate(Command):
     ''' Create a full new database outside of alembic migrations. '''
 
     def __call__(self, flaskapp):
+        LOGGER.debug('DbCreate.__call__()')
         with flaskapp.app_context():
             from .models.aaa import User, Role
             db.create_all()
@@ -215,9 +216,9 @@ class UserCreate(Command):
         Option('email', type=str,
                help='User name'),
         Option('password_in', type=str,
-               help='Users password as a readable pipe\n'
-                    'example: echo pass | rat-manage api'
-                    ' user create email /dev/stdin'),
+               help='Users password\n'
+                    'example: rat-manage-api'
+                    ' user create email password'),
         Option('--role', type=str, default=[], action='append',
                choices=['Admin', 'Analysis', 'AP'],
                help='role to include with the new user'),

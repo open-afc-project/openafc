@@ -17,13 +17,13 @@ need to make acquisition and create new database as following.
 EXAMPLES
 
 1. Provide test file with new requests to add into DB
-    ./afc_tests.py --cfg addr="1.2.3.4" --db a=test_vector.txt
+    ./afc_tests.py --cfg addr=1.2.3.4 --db a=test_vector.txt
 
 2. Configure adrress and run all tests
-    ./afc_tests.py --cfg addr="1.2.3.4" --test r
+    ./afc_tests.py --cfg addr=1.2.3.4 --test r
 
 3. Configure adrress and log level, run test number 2
-    ./afc_tests.py --test r=2 --cfg addr="1.2.3.4"
+    ./afc_tests.py --test r=2 --cfg addr=1.2.3.4
 """
 
 import argparse
@@ -35,6 +35,7 @@ import os
 import requests
 import sqlite3
 import sys
+from _version import __version__
 
 
 ADD_AFC_TEST_REQS = 'add_test_req.txt'
@@ -43,6 +44,7 @@ headers = {'content-type': 'application/json'}
 TBL_REQS_NAME = 'test_vectors'
 TBL_RESPS_NAME = 'test_data'
 
+AFC_TEST_DB_FILENAME = 'afc_input.sqlite3'
 TBL_USERS_NAME = 'user_config'
 TBL_AFC_CFG_NAME = 'afc_config'
 TBL_AP_CFG_NAME = 'ap_config'
@@ -57,14 +59,15 @@ class AfcTester:
         self.port = 443
         self.url_path = 'https://'
         self.log_level = logging.INFO
-        self.db_filename = 'afc_input.sqlite3'
+        self.db_filename = AFC_TEST_DB_FILENAME
 
     def run(self, opts):
         """Main entry to find and execute commands"""
         _call_opts = {
             'cfg': self._set_cfg,
             'db': self._set_db,
-            'test': self._run_test
+            'test': self._run_test,
+            'ver': self._get_version
         }
         for item in range(len(opts)):
             if not _call_opts[list(opts)[item]](opts[list(opts)[item]]):
@@ -114,6 +117,12 @@ class AfcTester:
                 return False
         return True
 
+    def _get_version(self, params):
+        """Get AFC test utility version"""
+        app_log.info('AFC Test utility version %s', __version__)
+        app_log.info('AFC Test db hash %s', get_md5(AFC_TEST_DB_FILENAME))
+        return True
+
 
 class ParseDict(argparse.Action):
     """Parse command line options"""
@@ -152,6 +161,14 @@ def json_lookup(key, json_obj, val):
     return found
 
 
+def get_md5(fname):
+    hash_md5 = hashlib.md5()
+    with open(fname, "rb") as f:
+        for chunk in iter(lambda: f.read(4096), b""):
+            hash_md5.update(chunk)
+    return hash_md5.hexdigest()
+
+
 def make_arg_parser():
     """Define command line options"""
     args_parser = argparse.ArgumentParser(
@@ -171,6 +188,8 @@ def make_arg_parser():
                              help='<r=[number]>  - run number of tests '
                              '(0 - all cases)'
                              '<a>  - response aquisition for all tests')
+    args_parser.add_argument('-v', '--ver', action = 'store_true',
+                             help='get utility version')
     return args_parser
 
 
@@ -294,25 +313,21 @@ def dump_db(self, opt):
     cur = con.cursor()
     cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
     found_tables = cur.fetchall()
-    app_log.info('\n\tDump DB table - %s\n', found_tables[0][0])
-    cur.execute('SELECT * FROM ' + found_tables[0][0])
-    found_data = cur.fetchall()
-    for val in enumerate(found_data):
-        for in_val in val:
-            if len(find_key) > 0:
-                if isinstance(in_val, tuple):
-                    new_json = json.loads(in_val[0].encode('utf-8'))
-                    found_vals = json_lookup(find_key, new_json, '111')
-                    app_log.info(found_vals[0])
-            else:
-                app_log.info('%s', in_val)
-    app_log.info('\n\tDump DB table - %s\n', found_tables[1][0])
-    cur.execute('SELECT * FROM ' + found_tables[1][0])
-    found_data = cur.fetchall()
-    for val in enumerate(found_data):
-        for in_val in val:
-            app_log.info('%s', in_val)
+    for tbl in enumerate(found_tables):
+        app_log.info('\n\n\tDump DB table - %s', tbl[1][0])
+        cur.execute('SELECT * FROM ' + tbl[1][0])
+        found_data = cur.fetchall()
+        for val in enumerate(found_data):
+            for in_val in val:
+                if len(find_key) > 0:
+                    if isinstance(in_val, tuple):
+                        new_json = json.loads(in_val[0].encode('utf-8'))
+                        found_vals = json_lookup(find_key, new_json, '111')
+                        app_log.info(found_vals[0])
+                else:
+                    app_log.info('%s', in_val)
     con.close()
+    app_log.info('\n\n\tDump DB table - %s')
     return True
 
 
