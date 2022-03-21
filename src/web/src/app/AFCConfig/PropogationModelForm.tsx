@@ -356,7 +356,24 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
 
                     {model.rlanITMTxClutterMethod === "BLDG_DATA" || model.winner2LOSOption === "BLDG_DATA" ?
                         <>
+
                             <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
+                                {" "}<Tooltip
+                                    position={TooltipPosition.top}
+                                    enableFlip={true}
+                                    className="fs-feeder-loss-tooltip"
+                                    maxWidth="40.0rem"
+                                    content={
+                                        <>
+                                            <p>If Building Data Source is set to None, evaluate blockage based no terrain data alone.
+                                                For Building Data Source set to a Building database, outside of areas with building information,
+                                                FCC 6GHz Report &amp; Order probabilistic model is used. </p>
+                                        </>
+                                    }
+                                >
+                                    <OutlinedQuestionCircleIcon />
+                                </Tooltip>
+
                                 <FormSelect value={model.buildingSource} onChange={this.setBuildingSource} id="propogation-model-data-source"
                                     name="propogation-model-data-source" style={{ textAlign: "right" }} isValid={model.buildingSource === "LiDAR"
                                         || model.buildingSource === "B-Design3D" || model.buildingSource === "None"}>
