@@ -1,3 +1,9 @@
+#
+# Copyright © 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
 FROM openafc/centos-build-image:latest as build_image
 ARG BUILDREV=localbuild
 COPY CMakeLists.txt LICENSE.txt version.txt fbrat.rpmlintrc Doxyfile.in /wd/
@@ -10,6 +16,10 @@ RUN sh -x /wd/build-rpm.sh
 
 # Stage Install
 FROM openafc/centos-preinstall-image:latest as install_image
+COPY prereqs/devel.sh /wd/
+ARG AFC_DEVEL_ENV=production
+ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
+RUN /wd/devel.sh
 RUN mkdir -p /repos/CentOS/7/7/Packages
 COPY --from=build_image \
     /wd/build/dist/RPMS/x86_64/fbrat* \
