@@ -9,3 +9,4 @@ build/*
 .github/*
 .DS_Store
 .dockerignore
+src/web/node_modules/*

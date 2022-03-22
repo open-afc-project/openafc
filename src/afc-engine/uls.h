@@ -22,10 +22,11 @@ template<class T> class ListClass;
 class ULSClass
 {
 public:
-    ULSClass(AfcManager *dataSetVal, int idVal);
+    ULSClass(AfcManager *dataSetVal, int idVal, int dbIdx);
     ~ULSClass();
 
     int getID() const;
+    int getDBIdx() const;
     CConst::ULSTypeEnum getType();
     ListClass<Vector3> *getSatellitePositionData();
     double getStartAllocFreq();
@@ -191,6 +192,7 @@ private:
     AfcManager *dataSet;
 
     int id;
+    int dbIdx;
     double startAllocFreq;
     double stopAllocFreq;
     double startUseFreq;

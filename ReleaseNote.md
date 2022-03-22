@@ -1,5 +1,59 @@
 # Release Note
 
+
+## **Version and Date**
+|Version|**v3.3.13**|
+| :- | :- |
+|**Date**|**03/17/2022**|
+
+
+
+## **Issues Addressed**
+* Conformance with WFA interface specification (v1.1):
+    *  Jira OA-112: EIRP/PSD reporting for FS inside AP uncertainty region
+
+* Conformance with WFA test vectors:
+    * Jira OA-13: Add ability to use F.699 antenna pattern (instead of F.1245) for FS Rx
+    * Jira OA-110: Change RLAN Uncertainty Region Scan Points per WFA agreed methodology
+    * Jira OA-114: Ability to upload Canadian and Mexican FS database to AFC for US AP channel availability analysis [Note: this is only implemented in the engine; UI implementtation and add'l testing is on hold until the need for this feature is confirmed.]
+
+* ULS-Parser changes:
+   * Jira OA-94: How to handle FS links with FS Tx antenna pointing to different Rx
+
+* Other:
+   * Jira OA-81: Changes in assignment of AP height (this now includes the UI implementation)
+   * Jira OA-40: Add ability to select WinnerII LOS/NLOS only (instead of Combined) in AFC Config [Note: this is only implemented in the engine; UI implementation will be in next week.]
+
+
+## **Feature Additions/Changes**
+
+### 1. F.699 antenna pattern has been added to be used as default for FS receivers 
+### 2. Choose scan points within RLAN uncertainty region to align with 3DEP 1arcsec grid centers
+
+
+## **Interface Changes**
+
+
+## **Bug Fixes**
+ * Jira OA-112: EIRP/PSD reporting for FS inside AP uncertainty region
+
+
+## **Testing Done**
+In addition to all tests done by the developer making changes, the following additonal tests were done by another person.
+* EIRP for FS inside RLAN uncertainty region: tested the configuration in Point Analysis and those NULL EIRP channels were colored in black (instead of Red). In Virtual AP, the NULL EIRPs were not reported in the analysisResponse.JSON as desired. (see OA-112JSONfiles.docs attached to the Jira ticket.)
+* ULS Parser: confirmed in the updated ULS (CONUS_ULS_2022-03-10T16_47_26.958955_fixedBPS_sorted.sqlite3) that CallSigns WQMY782(path 2) and WRCJ254(path 2) are now included in the database.
+* F.699: Confirmed in "FS_ANT_TYPE" (in exc_thr) that only F.1245 or F.699 is used (per AFC-Config). Next, "FS_ANT_GAIN_TO_RLAN (dB)" vs. "FS_RX_ANGLE_OFF_BORESIGHT (deg)" is plotted from the exc_thr file and compared against ITU-R (F.1245 or F.699) formula implemented in excel. This is done for both F.1245 and F.699 to ensure both are used properly as selected by the user. Also, confirmed that channel availability results got worse when using F.699 as expected (I/Ns were 4 to 6.6 dB higher with F.699) . (see "F.699tests.zip" attached to Jira OA-13.) 
+* Scan points: this was tested by opening 3DEP tiles and the scan points (from results.kmz) in QGIS for the three uncertainty region types. (see ScanPointsImplementation3DEPgridCenter.gz attached to this Jira OA-110.)
+* Changes in AP height assignment: selections made in UI were confirmed in exc_thr file and results.kmz. Specifically when in AFC-Config "AP Height below Min Allowable AGL Height Behavior" is set to "Truncate AP height to min allowable AGL height," using a height-uncertainty that brings the height to 0m, exc_thr file's "RLAN_HEIGHT_ABOVE_TERRAIN (m)" confirms that 1m is used as minimum AP height. Next, when "AP Height below Min Allowable AGL Height Behavior" is set to "Discard scan point," exc_thr and results.kmz files confirm that the lower scan point has been removed from analysis (have only 2 heights at each AP location instead of 3) (see "APHeightBelowGroundTests_withUI.zip" attached to Jira OA-81). These were confirmed for Indoor AP as well but not included in the attachment.
+
+
+## **Known Issues**
+* As mentioned in Jira OA-21 comment and as agreed with the TIP Maintainer, automatic daily parsing of the ULS is currently not functional. Potential solutions are currently under discussion.
+* OA-40 to be implemented in the UI.
+
+## **Potential Improvements** 
+*
+
 ## **Version and Date**
 |Version|**v3.3.12**|
 | :- | :- |

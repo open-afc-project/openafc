@@ -1,5 +1,5 @@
 import * as React from "react";
-import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition  } from "@patternfly/react-core";
+import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import BuildlingPenetrationLossForm from "./BuildingPenetrationLossForm";
 import PolarizationMismatchLossForm from "./PolarizationMismatchLossForm";
@@ -8,11 +8,11 @@ import BodyLossForm from "./BodyLossForm";
 import AntennaPatternForm from "./AntennaPatternForm";
 import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
-import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange } from "../Lib/RatApiTypes";
+import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange } from "../Lib/RatApiTypes";
 import { getDefaultAfcConf, guiConfig } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
-import {AllowedRangesDisplay, defaultRanges}  from './AllowedRangesForm'
+import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
 
 /**
 * AFCForm.tsx: form for generating afc configuration files to be used to update server
@@ -25,7 +25,7 @@ import {AllowedRangesDisplay, defaultRanges}  from './AllowedRangesForm'
 export class AFCForm extends React.Component<
     {
         limit: Limit,
-        frequencyBands:FreqRange[],
+        frequencyBands: FreqRange[],
         config: AFCConfigFile,
         ulsFiles: string[],
         antennaPatterns: string[],
@@ -35,20 +35,33 @@ export class AFCForm extends React.Component<
         config: AFCConfigFile,
         isModalOpen: boolean,
         messageSuccess: string | undefined,
-        messageError: string | undefined
+        messageError: string | undefined,
+        antennaPatternData: AntennaPatternState
     }
-    > {
+> {
 
-    constructor(props: Readonly<{ limit: Limit; frequencyBands:FreqRange[]; config: AFCConfigFile; ulsFiles: string[]; antennaPatterns: string[]; onSubmit: (x: AFCConfigFile) => Promise<RatResponse<string>>; }>) {
+    constructor(props: Readonly<{ limit: Limit; frequencyBands: FreqRange[]; config: AFCConfigFile; ulsFiles: string[]; antennaPatterns: string[]; onSubmit: (x: AFCConfigFile) => Promise<RatResponse<string>>; }>) {
         super(props);
         let config = props.config as AFCConfigFile
-        if (props.frequencyBands.length > 0 ) {
-            config.freqBands = props.frequencyBands; 
+        if (props.frequencyBands.length > 0) {
+            config.freqBands = props.frequencyBands;
         } else {
             config.freqBands = defaultRanges;
         }
-        
-        this.state = { config: config, messageError: undefined, messageSuccess: undefined, isModalOpen: false }
+
+        this.state = {
+            config: config,
+            messageError: undefined,
+            messageSuccess: undefined,
+            isModalOpen: false,
+            antennaPatternData: {
+                defaultAntennaPattern: config.ulsDefaultAntennaType,
+                userUpload: {
+                    kind: config.antennaPattern?.kind == "User Upload" ? "User Upload" : "None",
+                    value: config.antennaPattern?.value
+                }
+            }
+        }
     }
 
     private hasValue = (val: any) => val !== undefined && val !== null;
@@ -60,8 +73,22 @@ export class AFCForm extends React.Component<
     private setThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { threshold: n }) });
     private setMaxLinkDistance = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxLinkDistance: n }) });
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
-    private setUlsRegion = (n: string) => this.setState({ config: Object.assign(this.state.config, { regionStr: n , ulsDatabase: ""}) });
+    private setUlsRegion = (n: string) => this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
     private setPropogationEnv = (n: string) => this.setState({ config: Object.assign(this.state.config, { propagationEnv: n }) });
+    private setScanBelowGround = (n: string) => {
+        const conf = this.state.config;
+        switch (n) {
+            case "truncate":
+                conf.scanPointBelowGroundMethod = "truncate";
+                break;
+            case "discard":
+                conf.scanPointBelowGroundMethod = "discard";
+                break;
+            default:
+                break;
+        };
+        this.setState({ config: conf });
+    }
 
 
     private isValid = () => {
@@ -69,9 +96,9 @@ export class AFCForm extends React.Component<
         const err = (s?: string) => ({ isError: true, message: s || "One or more inputs are invalid" });
         const model = this.state.config;
 
-        if(model.APUncertainty.horizontal <= 0 || model.APUncertainty.height <= 0) return err();
-        if(model.ITMParameters.minSpacing <1 || model.ITMParameters.minSpacing > 30) return err('Path Min Spacing must be between 1 and 30')        
-        if(model.ITMParameters.maxPoints <100 || model.ITMParameters.maxPoints > 10000) return err('Path Max Points must be between 100 and 10000')        
+        if (model.APUncertainty.horizontal <= 0 || model.APUncertainty.height <= 0) return err();
+        if (model.ITMParameters.minSpacing < 1 || model.ITMParameters.minSpacing > 30) return err('Path Min Spacing must be between 1 and 30')
+        if (model.ITMParameters.maxPoints < 100 || model.ITMParameters.maxPoints > 10000) return err('Path Max Points must be between 100 and 10000')
 
 
         if (!model.ulsDatabase) return err();
@@ -79,7 +106,7 @@ export class AFCForm extends React.Component<
 
         if (!(model.minEIRP <= model.maxEIRP)) return err();
 
-        if(this.props.limit.enforce && model.minEIRP < this.props.limit.limit || model.maxEIRP < this.props.limit.limit) {
+        if (this.props.limit.enforce && model.minEIRP < this.props.limit.limit || model.maxEIRP < this.props.limit.limit) {
             return err("EIRP value must be at least " + this.props.limit.limit + " dBm")
         }
 
@@ -97,15 +124,6 @@ export class AFCForm extends React.Component<
                 return err();
         }
 
-        switch (model.antennaPattern.kind) {
-            case "User Upload":
-                if (!model.antennaPattern.value) return err();
-                break;
-            case "F.1245":
-                break;
-            default:
-                return err();
-        }
 
         const propModel = model.propagationModel;
         switch (propModel.kind) {
@@ -163,8 +181,8 @@ export class AFCForm extends React.Component<
 
     private reset = () => {
         let config = getDefaultAfcConf();
-        if (this.props.frequencyBands.length > 0 ) {
-            config.freqBands = props.frequencyBands; 
+        if (this.props.frequencyBands.length > 0) {
+            config.freqBands = this.props.frequencyBands;
         } else {
             config.freqBands = defaultRanges;
         }
@@ -177,7 +195,7 @@ export class AFCForm extends React.Component<
             if (parsed.version == guiConfig.version) {
                 this.setState({ config: Object.assign(this.state.config, parsed) });
             } else {
-                this.setState({ messageError: "The imported configuration (version: " + parsed.version + ") is not compatible with the current version (" + guiConfig.version +")." })
+                this.setState({ messageError: "The imported configuration (version: " + parsed.version + ") is not compatible with the current version (" + guiConfig.version + ")." })
             }
         } catch (e) {
             logger.error("Pasted value was not valid JSON");
@@ -206,10 +224,11 @@ export class AFCForm extends React.Component<
             this.setState({ config: conf });
         }
 
-        const setAntennaPattern = (x: AntennaPattern) => {
+        const setAntennaPattern = (x: AntennaPatternState) => {
             const conf = this.state.config;
-            conf.antennaPattern = x;
-            this.setState({ config: conf });
+            conf.ulsDefaultAntennaType = x.defaultAntennaPattern;
+            conf.antennaPattern = x.userUpload?.kind == "User Upload" ? { kind: x.userUpload.kind, value: x.userUpload.value } : { kind: 'None', value: "" }
+            this.setState({ config: conf, antennaPatternData: x });
         }
 
         const setPropogationModel = (x: PropagationModel) => {
@@ -230,11 +249,12 @@ export class AFCForm extends React.Component<
             this.setState({ config: conf });
         }
 
-        const setUseClutter = (x: Boolean) => {
+        const setUseClutter = (x: boolean) => {
             const conf = this.state.config;
             conf.clutterAtFS = x;
             this.setState({ config: conf });
         }
+
 
         return (
             <Card>
@@ -259,9 +279,9 @@ export class AFCForm extends React.Component<
                                     style={{ textAlign: "right" }}
                                 >
                                     <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
-                                        <FormSelectOption key={"CONUS"} value={"CONUS"} label={"CONUS"} />
-                                        <FormSelectOption key={"Canada"} value={"Canada"} label={"Canada"} />
-                                    </FormSelect>
+                                    <FormSelectOption key={"CONUS"} value={"CONUS"} label={"CONUS"} />
+                                    <FormSelectOption key={"Canada"} value={"Canada"} label={"Canada"} />
+                                </FormSelect>
                             </FormGroup>
                         </GalleryItem>
                         <GalleryItem>
@@ -275,7 +295,7 @@ export class AFCForm extends React.Component<
                                     style={{ textAlign: "right" }}
                                 >
                                     <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select a ULS Database" />
-                                    {this.props.ulsFiles.filter((file : string) => file.includes(this.state.config.regionStr)).map((option: string) => (
+                                    {this.props.ulsFiles.filter((file: string) => file.includes(this.state.config.regionStr)).map((option: string) => (
                                         <FormSelectOption key={option} value={option} label={option} />
                                     ))}
                                 </FormSelect>
@@ -351,10 +371,10 @@ export class AFCForm extends React.Component<
                                         isReadOnly={true}
                                         value="UNII-5"
                                         style={{ textAlign: "left", minWidth: "35%" }}
-                                    /> 
+                                    />
                                     <TextInput
                                         value={this.state.config.receiverFeederLoss.UNII5}
-                                        onChange={x => this.setFeederLoss({...this.state.config.receiverFeederLoss, UNII5: Number(x)})}
+                                        onChange={x => this.setFeederLoss({ ...this.state.config.receiverFeederLoss, UNII5: Number(x) })}
                                         type="number"
                                         step="any"
                                         id="horizontal-form-receiver-feeder-loss-5"
@@ -371,10 +391,10 @@ export class AFCForm extends React.Component<
                                         isReadOnly={true}
                                         value="UNII-7"
                                         style={{ textAlign: "left", minWidth: "35%" }}
-                                    /> 
+                                    />
                                     <TextInput
                                         value={this.state.config.receiverFeederLoss.UNII7}
-                                        onChange={x => this.setFeederLoss({...this.state.config.receiverFeederLoss, UNII7: Number(x)})}
+                                        onChange={x => this.setFeederLoss({ ...this.state.config.receiverFeederLoss, UNII7: Number(x) })}
                                         type="number"
                                         step="any"
                                         id="horizontal-form-receiver-feeder-loss-7"
@@ -383,7 +403,7 @@ export class AFCForm extends React.Component<
                                         style={{ textAlign: "right" }}
                                     />
                                     <InputGroupText>dB</InputGroupText>
-                                </InputGroup>    
+                                </InputGroup>
                                 <InputGroup>
                                     <TextInput
                                         id="feeder-o-label"
@@ -391,10 +411,10 @@ export class AFCForm extends React.Component<
                                         isReadOnly={true}
                                         value="Other"
                                         style={{ textAlign: "left", minWidth: "35%" }}
-                                    /> 
+                                    />
                                     <TextInput
                                         value={this.state.config.receiverFeederLoss.other}
-                                        onChange={x => this.setFeederLoss({...this.state.config.receiverFeederLoss, other: Number(x)})}
+                                        onChange={x => this.setFeederLoss({ ...this.state.config.receiverFeederLoss, other: Number(x) })}
                                         type="number"
                                         step="any"
                                         id="horizontal-form-receiver-feeder-loss-o"
@@ -432,10 +452,10 @@ export class AFCForm extends React.Component<
                                         isReadOnly={true}
                                         value="UNII-5"
                                         style={{ textAlign: "left", minWidth: "35%" }}
-                                    /> 
+                                    />
                                     <TextInput
                                         value={this.state.config.fsReceiverNoise.UNII5}
-                                        onChange={x => this.setReceiverNoise({...this.state.config.fsReceiverNoise, UNII5: Number(x)})}
+                                        onChange={x => this.setReceiverNoise({ ...this.state.config.fsReceiverNoise, UNII5: Number(x) })}
                                         type="number"
                                         step="any"
                                         id="horizontal-form-noise-5"
@@ -452,10 +472,10 @@ export class AFCForm extends React.Component<
                                         isReadOnly={true}
                                         value="UNII-7"
                                         style={{ textAlign: "left", minWidth: "35%" }}
-                                    /> 
+                                    />
                                     <TextInput
                                         value={this.state.config.fsReceiverNoise.UNII7}
-                                        onChange={x => this.setReceiverNoise({...this.state.config.fsReceiverNoise, UNII7: Number(x)})}
+                                        onChange={x => this.setReceiverNoise({ ...this.state.config.fsReceiverNoise, UNII7: Number(x) })}
                                         type="number"
                                         step="any"
                                         id="horizontal-form-noise-7"
@@ -464,7 +484,7 @@ export class AFCForm extends React.Component<
                                         style={{ textAlign: "right" }}
                                     />
                                     <InputGroupText>dBm/MHz</InputGroupText>
-                                </InputGroup>    
+                                </InputGroup>
                                 <InputGroup>
                                     <TextInput
                                         id="fs-noise-o-label"
@@ -472,10 +492,10 @@ export class AFCForm extends React.Component<
                                         isReadOnly={true}
                                         value="Other"
                                         style={{ textAlign: "left", minWidth: "35%" }}
-                                    /> 
+                                    />
                                     <TextInput
                                         value={this.state.config.fsReceiverNoise.other}
-                                        onChange={x => this.setReceiverNoise({...this.state.config.fsReceiverNoise, other: Number(x)})}
+                                        onChange={x => this.setReceiverNoise({ ...this.state.config.fsReceiverNoise, other: Number(x) })}
                                         type="number"
                                         step="any"
                                         id="horizontal-form-receiver-feeder-loss-o"
@@ -511,8 +531,8 @@ export class AFCForm extends React.Component<
                         </GalleryItem>
                         <GalleryItem>
                             <FormGroup
-                            label="Max Link Distance to Consider"
-                            fieldId="propogation-model-max-link-distance"
+                                label="Max Link Distance to Consider"
+                                fieldId="propogation-model-max-link-distance"
                             >
                                 <InputGroup><TextInput
                                     value={this.state.config.maxLinkDistance}
@@ -527,7 +547,7 @@ export class AFCForm extends React.Component<
                         </GalleryItem>
                         <GalleryItem>
                             <AntennaPatternForm
-                                data={this.state.config.antennaPattern}
+                                data={this.state.antennaPatternData}
                                 antennaPatternFiles={this.props.antennaPatterns}
                                 onChange={setAntennaPattern} />
                         </GalleryItem>
@@ -548,30 +568,30 @@ export class AFCForm extends React.Component<
                                     fieldId="propogation-env"
                                 >
                                     {" "}<Tooltip
-                                    position={TooltipPosition.top}
-                                    enableFlip={true}
-                                    //className="prop-env-tooltip"
-                                    maxWidth="40.0rem"
-                                    content={
-                                        <>
-                                            <p>AP/Client Propagation Environment:</p>
-                                            <ul>
-                                                <li>- "NLCD Point" assigns propagation environment based on single NLCD tile class the RLAN resides in: Urban if NLCD tile = 23 or 24, Suburban if NLCD tile = 22, Rural-D (Deciduous trees) if NLCD tile = 41, 43 or 90, Rural-C (Coniferous trees) if NLCD tile = 42, and Rural-V (Village Center) otherwise. The various Rural types correspond to the P.452 clutter category.</li>
-                                                <li>- If “NLCD Point” is not selected, Village center is assumed for the Rural clutter category.</li>
-                                            </ul>
-                                        </>
-                                    }
+                                        position={TooltipPosition.top}
+                                        enableFlip={true}
+                                        //className="prop-env-tooltip"
+                                        maxWidth="40.0rem"
+                                        content={
+                                            <>
+                                                <p>AP/Client Propagation Environment:</p>
+                                                <ul>
+                                                    <li>- "NLCD Point" assigns propagation environment based on single NLCD tile class the RLAN resides in: Urban if NLCD tile = 23 or 24, Suburban if NLCD tile = 22, Rural-D (Deciduous trees) if NLCD tile = 41, 43 or 90, Rural-C (Coniferous trees) if NLCD tile = 42, and Rural-V (Village Center) otherwise. The various Rural types correspond to the P.452 clutter category.</li>
+                                                    <li>- If “NLCD Point” is not selected, Village center is assumed for the Rural clutter category.</li>
+                                                </ul>
+                                            </>
+                                        }
                                     >
-                                       <OutlinedQuestionCircleIcon /> 
-                                    </Tooltip> 
-                                   
+                                        <OutlinedQuestionCircleIcon />
+                                    </Tooltip>
+
                                     <FormSelect
-                                    value={this.state.config.propagationEnv}
-                                    onChange={(x) => this.setPropogationEnv(x)}
-                                    id="propogation-env"
-                                    name="propogation-env"
-                                    style={{ textAlign: "right" }}
-                                    isValid={this.props.config.propagationEnv !== undefined}>
+                                        value={this.state.config.propagationEnv}
+                                        onChange={(x) => this.setPropogationEnv(x)}
+                                        id="propogation-env"
+                                        name="propogation-env"
+                                        style={{ textAlign: "right" }}
+                                        isValid={this.props.config.propagationEnv !== undefined}>
                                         <FormSelectOption key="NLCD Point" value="NLCD Point" label="NLCD Point" />
                                         <FormSelectOption key="Population Density Map" value="Population Density Map" label="Population Density Map" />
                                         <FormSelectOption key="Urban" value="Urban" label="Urban" />
@@ -580,11 +600,11 @@ export class AFCForm extends React.Component<
                                     </FormSelect>
                                 </FormGroup>
                             </GalleryItem>}
-                        {this.state.config.propagationModel.kind != "FSPL" ?  
+                        {this.state.config.propagationModel.kind != "FSPL" ?
                             <GalleryItem>
-                                <ITMParametersForm data={this.state.config.ITMParameters} onChange={setITMParams}/>
+                                <ITMParametersForm data={this.state.config.ITMParameters} onChange={setITMParams} />
                             </GalleryItem>
-                        : false}
+                            : false}
                         <GalleryItem>
                             <Tooltip
                                 position={TooltipPosition.top}
@@ -592,27 +612,58 @@ export class AFCForm extends React.Component<
                                 //className="prop-env-tooltip"
                                 maxWidth="40.0rem"
                                 content={
-                                <p>When distance &gt; 1km, clutter loss is added at FS Receiver when FS Receiver AGL height &lt;10m. Clutter models are the same as those used for APs.​</p>
-                                    
+                                    <p>When distance &gt; 1km, clutter loss is added at FS Receiver when FS Receiver AGL height &lt;10m. Clutter models are the same as those used for APs.​</p>
+
                                 }
                             >
-                                <InputGroup label=""> 
+                                <InputGroup label="">
                                     <Checkbox
-                                            label="Add Clutter at FS Receiver"
-                                            isChecked={this.state.config.clutterAtFS}
-                                            onChange={setUseClutter}
-                                            id="horizontal-form-clutter"
-                                            name="horizontal-form-clutter"
-                                            style={{ textAlign: "right" }}
-                                    /> 
-                                   
-                                    <OutlinedQuestionCircleIcon style={{marginLeft: "5px"}}/>
-                                    
+                                        label="Add Clutter at FS Receiver"
+                                        isChecked={this.state.config.clutterAtFS}
+                                        onChange={setUseClutter}
+                                        id="horizontal-form-clutter"
+                                        name="horizontal-form-clutter"
+                                        style={{ textAlign: "right" }}
+                                    />
+
+                                    <OutlinedQuestionCircleIcon style={{ marginLeft: "5px" }} />
+
                                 </InputGroup>
-                            </Tooltip>                       
+                            </Tooltip>
                         </GalleryItem>
                         <GalleryItem>
-                            <AllowedRangesDisplay data={this.props.frequencyBands}/>
+                            <AllowedRangesDisplay data={this.props.frequencyBands} />
+                        </GalleryItem>
+                        <GalleryItem>
+                            <FormGroup label="AP Height below Min Allowable AGL Height Behavior"
+                                fieldId="horizontal-form-uls-scanBelowGround">
+                                    {" "}<Tooltip
+                                        position={TooltipPosition.top}
+                                        enableFlip={true}
+                                        maxWidth="40.0rem"
+                                        content={
+                                            <>
+                                            <p>Min allowable AGL height = 1m</p>
+                                            <p>Note that this is meant to mainly prevent the portion of uncertainty region to be underground due to height uncertainty and terrain variation.</p>
+                                            <p>If the AGL height of all scan points is below ground (without height uncertainty), an error will be reported.</p>
+                                            </>
+                                        }
+                                    >
+                                        <OutlinedQuestionCircleIcon />
+                                </Tooltip>
+
+                                <FormSelect
+                                    value={this.state.config.scanPointBelowGroundMethod}
+                                    onChange={x => this.setScanBelowGround(x)}
+                                    id="horizontal-form-uls-scanBelowGround"
+                                    name="horizontal-form-uls-scanBelowGround"
+                                    isValid={!!this.state.config.scanPointBelowGroundMethod}
+                                    style={{ textAlign: "right" }}
+                                >
+                                    <FormSelectOption key={"truncate"} value={"truncate"} label={"Truncate AP height to min allowable AGL height"} />
+                                    <FormSelectOption key={"discard"} value={"discard"} label={"Discard scan point"} />
+                                </FormSelect>
+                            </FormGroup>
                         </GalleryItem>
                     </Gallery>
                     <br />
