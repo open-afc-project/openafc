@@ -365,7 +365,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                                     maxWidth="40.0rem"
                                     content={
                                         <>
-                                            <p>If Building Data Source is set to None, evaluate blockage based no terrain data alone.
+                                            <p>If Building Data Source is set to None, blockage is evaluated based on terrain data alone.
                                                 For Building Data Source set to a Building database, outside of areas with building information,
                                                 FCC 6GHz Report &amp; Order probabilistic model is used. </p>
                                         </>
