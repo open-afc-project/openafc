@@ -63,6 +63,7 @@ class AfcTester:
 
     def run(self, opts):
         """Main entry to find and execute commands"""
+        app_log.debug('AfcTester.run()')
         _call_opts = {
             'cfg': self._set_cfg,
             'db': self._set_db,
@@ -70,10 +71,9 @@ class AfcTester:
             'ver': self._get_version
         }
         for item in range(len(opts)):
+            app_log.debug('AfcTester.run() Item %d , %s', item, list(opts)[item])
             if not _call_opts[list(opts)[item]](opts[list(opts)[item]]):
                 return False
-            app_log.debug('%s() Item %d done',
-                          inspect.stack()[0][3], item)
         return True
 
     def _set_cfg(self, params):
@@ -221,10 +221,14 @@ def export_admin_cfg(self, opt):
 
             aps = ''
             for val in enumerate(found_aps):
-                aps += ',' + val[1][1]
+                aps += val[1][1]
+                if val[1][0] != found_aps[-1][0]:
+                    aps += ','
             out_str = '{"afcAdminConfig":' + found_cfg[0][1] + ', '\
                       '"userConfig":' + found_user[0][1] + ', '\
                       '"apConfig":[' + aps + ']}'
+            if i != range(found_rcds[0][0]):
+                out_str += '\n'
             fp_exp.write(out_str)
     con.close()
     app_log.info('Server admin config exported to %s', opt)
