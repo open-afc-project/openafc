@@ -87,7 +87,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
     setLosOption = (s: string) => {
         const model = this.props.data as CustomPropagation;
 
-        if (model.winner2LOSOption === "BLDG_DATA" && s !== "BLDG_DATA") {
+        if (model.winner2LOSOption === "BLDG_DATA_REQ_TX" && s !== "BLDG_DATA_REQ_TX") {
             this.props.onChange(Object.assign(this.props.data, {
                 winner2LOSOption: s,
                 buildingSource: "None",
@@ -303,13 +303,29 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
             case "Custom":
                 return <>
                     <FormGroup label="WinnerII LoS Option" fieldId="propogation-model-win-los-option">
+                        {" "}<Tooltip
+                            position={TooltipPosition.top}
+                            enableFlip={true}
+                            className="propogation-model-win-los-option-tooltip"
+                            maxWidth="40.0rem"
+                            content={
+                                <>
+                                    <p>If <strong>LoS/NLoS per building data</strong> is selected, and if the RLAN is in a region where there is building database,
+                                        then terrain plus building database is used to determine whether the path is LoS or not.
+                                        Otherwise, the Combined LoS/NLoS model is used. By the same logic, if the <strong>Building Data Source</strong> is None,
+                                        the Combined LoS/NLoS model is always used. </p>
+                                </>
+                            }
+                        >
+                            <OutlinedQuestionCircleIcon />
+                        </Tooltip>
                         <FormSelect value={model.winner2LOSOption} onChange={this.setLosOption} id="propogation-model-win-los-option"
                             name="propogation-model-win-los-option" style={{ textAlign: "right" }}
                         >
                             <FormSelectOption key="UNKNOWN" value="UNKNOWN" label="Combined LoS/NLoS" />
                             <FormSelectOption key="FORCE_LOS" value="FORCE_LOS" label="LoS" />
                             <FormSelectOption key="FORCE_NLOS" value="FORCE_NLOS" label="NLoS" />
-                            <FormSelectOption key="BLDG_DATA" value="BLDG_DATA" label="Los/NLoS per building data" />
+                            <FormSelectOption key="BLDG_DATA_REQ_TX" value="BLDG_DATA_REQ_TX" label="Los/NLoS per building data" />
                         </FormSelect>
                     </FormGroup>
                     <FormGroup label="WinnerII Confidence" fieldId="propogation-model-win-confidence">
@@ -325,6 +341,20 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         </InputGroup>
                     </FormGroup>
                     <FormGroup label="ITM with Tx Clutter Method" fieldId="propogation-model-itm-tx-clutter">
+                        {" "}<Tooltip
+                            position={TooltipPosition.top}
+                            enableFlip={true}
+                            className="propogation-model-itm-tx-clutter-tooltip"
+                            maxWidth="40.0rem"
+                            content={
+                                <>
+                                    <p>If <strong>Clutter/No clutter per building</strong> is selected, the path is determined to be LoS or NLoS based on terrain and/or building database (if available). 
+                                        By the same logic, if the <strong>Building Data Source</strong> is None, blockage is determined based solely on terrain database.</p>
+                                </>
+                            }
+                        >
+                            <OutlinedQuestionCircleIcon />
+                        </Tooltip>
                         <FormSelect value={model.rlanITMTxClutterMethod} onChange={this.setItmClutterMethod} id="propogation-model-itm-tx-clutter"
                             name="propogation-model-itm-tx-clutter" style={{ textAlign: "right" }}
                         >
@@ -354,26 +384,10 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         </InputGroup>
                     </FormGroup>
 
-                    {model.rlanITMTxClutterMethod === "BLDG_DATA" || model.winner2LOSOption === "BLDG_DATA" ?
+                    {model.rlanITMTxClutterMethod === "BLDG_DATA" || model.winner2LOSOption === "BLDG_DATA_REQ_TX" ?
                         <>
 
                             <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
-                                {" "}<Tooltip
-                                    position={TooltipPosition.top}
-                                    enableFlip={true}
-                                    className="fs-feeder-loss-tooltip"
-                                    maxWidth="40.0rem"
-                                    content={
-                                        <>
-                                            <p>If Building Data Source is set to None, blockage is evaluated based on terrain data alone.
-                                                For Building Data Source set to a Building database, outside of areas with building information,
-                                                FCC 6GHz Report &amp; Order probabilistic model is used. </p>
-                                        </>
-                                    }
-                                >
-                                    <OutlinedQuestionCircleIcon />
-                                </Tooltip>
-
                                 <FormSelect value={model.buildingSource} onChange={this.setBuildingSource} id="propogation-model-data-source"
                                     name="propogation-model-data-source" style={{ textAlign: "right" }} isValid={model.buildingSource === "LiDAR"
                                         || model.buildingSource === "B-Design3D" || model.buildingSource === "None"}>
