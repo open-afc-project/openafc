@@ -276,7 +276,7 @@ def add_reqs(self, opt):
             new_req = json.dumps(new_req_json, sort_keys=True)
             rawresp = requests.post(
                 self.url_path, data=new_req,
-                headers=headers, timeout=None, verify=False)
+                headers=headers, timeout=None)
 
             resp = rawresp.json()
             resp_res = json_lookup('shortDescription', resp, None)
@@ -367,7 +367,7 @@ def start_acquisition(self, test_number):
         # Fetch test vector to create request
         rawresp = requests.post(self.url_path,
                                 data=json.dumps(eval(found_reqs[row_idx][0])),
-                                headers=headers, timeout=None, verify=False)
+                                headers=headers, timeout=None)
         resp = rawresp.json()
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
@@ -414,7 +414,7 @@ def start_test(self, test_number):
         req_id = json_lookup('requestId', eval(found_reqs[row_idx][0]), None)
         rawresp = requests.post(self.url_path,
                                 data=json.dumps(eval(found_reqs[row_idx][0])),
-                                headers=headers, timeout=None, verify=False)
+                                headers=headers, timeout=None)
         resp = rawresp.json()
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
