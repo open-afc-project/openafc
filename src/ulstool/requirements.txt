@@ -1,0 +1,2 @@
+sqlalchemy>=1.4
+openpyxl>=3.0
