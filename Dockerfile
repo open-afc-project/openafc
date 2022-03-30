@@ -4,10 +4,18 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-FROM openafc/centos-build-image:latest as build_image
+# default value of args
+ARG BLD_TAG=latest
+ARG PRINST_TAG=latest
+ARG BLD_NAME=openafc/centos-build-image
+ARG PRINST_NAME=openafc/centos-preinstall-image
 ARG BUILDREV=localbuild
+
+# Stage Build
+FROM ${BLD_NAME}:${BLD_TAG} as build_image
 COPY CMakeLists.txt LICENSE.txt version.txt fbrat.rpmlintrc Doxyfile.in /wd/
 RUN echo $BUILDREV > /wd/svnrevision.txt
+
 COPY cmake /wd/cmake/
 COPY pkg /wd/pkg/
 COPY selinux /wd/selinux/
@@ -15,7 +23,7 @@ COPY src /wd/src/
 RUN sh -x /wd/build-rpm.sh
 
 # Stage Install
-FROM openafc/centos-preinstall-image:latest as install_image
+FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 COPY prereqs/devel.sh /wd/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}

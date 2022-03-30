@@ -1,4 +1,4 @@
-name: Docker Image CI
+name: Docker Image for build and afc engine test CI
 on:
   push:
     branches: [ main ]
