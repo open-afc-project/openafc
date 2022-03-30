@@ -366,7 +366,7 @@ it will return something like this:
 this means you are in. Type new password into quotes after _echo_ command and use the following command to create an administrator for your OpenAFC server.
 
 ```
-echo 'Enter Your Password Here' | rat-manage-api user create --role Admin --role AP --role Analysis admin /dev/stdin
+rat-manage-api user create --role Admin --role AP --role Analysis admin "Enter Your Password Here"
 ```
 
 Once done, you can authorize with this user and password in WebUI.
