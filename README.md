@@ -90,6 +90,7 @@ As you develop code, commit your changes into your local feature branch.
 Please make sure to include the issue number you're addressing in your commit message.
 This helps us out by allowing us to track which issue/feature your commit relates to.
 Below command will commit your changes to the local branch.
+Note to use JIRA-ID at the beginning of commit message.
 ```
 git commit -a -m "<JIRA-ID>  desctiption of the change  ..."
 ```
