@@ -77,7 +77,12 @@ This will create your own copy of our repository.
 Create a temporary branch for making your changes.
 Keep a separate branch for each issue/feature you want to address.
 ```
-git checkout -b my_changes
+git checkout -b <JIRA-ID>-branch_name
+```
+
+Highly desirable to use branch name from Jira title, or use meaningful branch name reflecting the actual changes
+```
+eg. git checkout -b OA-146-update-readme-md-to-reflect-jira-and-branch-creation-procedure
 ```
 
 ### Step 4: Commit your changes
@@ -85,8 +90,9 @@ As you develop code, commit your changes into your local feature branch.
 Please make sure to include the issue number you're addressing in your commit message.
 This helps us out by allowing us to track which issue/feature your commit relates to.
 Below command will commit your changes to the local branch.
+Note to use JIRA-ID at the beginning of commit message.
 ```
-git commit -a -m "Issue:123  desctiption of the change  ..."
+git commit -a -m "<JIRA-ID>  desctiption of the change  ..."
 ```
 ### Step 5: Rebase
 
@@ -108,7 +114,7 @@ Make sure that all tests are passing before submitting a pull request.
 Push code to your remote feature branch.
 Below command will push your local branch along with the changes to OpenAFC GitHub.
 ```
-git push -u origin my_change
+git push -u origin <JIRA-ID>-branch_name
 ```
  > NOTE: The push can include several commits (not only one), but these commits should be related to the same logical change/issue fix/new feature originally described in the [Step 1](#step-1-file-an-issue).
 
