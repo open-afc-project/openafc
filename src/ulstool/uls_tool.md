@@ -1,7 +1,30 @@
 # ***uls_tool.py***
 # An instrument for working with AFC ULS data
 
-## Cheat sheet
+## Table of Contents
+- [Cheat Sheet](#cheat_sheet)
+- [Overview](#overview)
+    - [ULS Overview](#uls_overview)
+    - [*uls_tool.py* Overview](#uls_tool_py_overview)
+- [*uls_tool.py* Operation](#uls_tool_py_operation)
+    - [Prerequisites](#prerequisites)
+    - [Overview of Subcommands](#overview_of_subcommands)
+    - [Help](#help)
+    - [*latest* Subcommand](#latest_subcommand)
+    - [*download_afc* Subcommand](#download_afc_subcommand)
+    - [*download_uls* Subcommand](#download_uls_subcommand)
+    - [*uls_to_afc* Subcommand](#uls_to_afc_subcommand)
+    - [*gmap* Subcommand](#gmap_subcommand)
+    - [*compare* Subcommand](#compare_subcommand)
+    - [*csv* Subcommand](#csv_subcommand)
+    - [*xlsx* Subcommand](#xlsx_subcommand)
+- [Database Structures](#database_structures)
+    - [AFC Database Structure](#afc_database_structure)
+    - [ULS Database Structure](#uls_database_structure)
+- [*uls_tool.py* Structure](#uls_tool_py_structure)
+- [Version History](#version_history)
+
+## Cheat sheet <a name="cheat_sheet"/>
 In examples below file/directory names are in CAMEL_CASE, mandatory syntax is
 in lower case. Long commands are prolonged to next line using **\** sign.
 Command lines prepended with **$** sign (to distinguish them from output).
@@ -15,11 +38,11 @@ case):
 * Date of latest ULS data on FCC server. ETA ~2 minutes  
 `$ uls_tool.py latest`  
 sample printout:  
-`2022-01-25 08:11:03` # Time is FCC local (EST)
+`2022-01-25 08:11:03 EST`
 
 * Download latest raw ULS data files to given directory (e.g. for subsequent
 reuse)  
-`$ uls_tool.py latest --dir DIRECTORY`
+`$ uls_tool.py latest --to_dir DIRECTORY`
 
 * Download latest ULS data files and make AFC database from them. *fsid*s start
 from 1. ETA ~10 minutes  
@@ -29,8 +52,7 @@ from 1. ETA ~10 minutes
 `$ uls_tool.py download_afc --prev_afc PREV_AFC.sqlite3 DATABASE.sqlite3`
 
 * Make AFC database from previously downloaded raw ULS files  
-`$ uls_tool.py download_afc --dir DIRECTORY --skip_download
-DATABASE.sqlite3`
+`$ uls_tool.py download_afc --from_dir DIRECTORY DATABASE.sqlite3`
 
 * Compare two AFC databases (FIRST.sqlite3 and SECOND.sqlite3)  
 `$ uls_tool.py compare --removed IN_FIRST_ONLY.sqlite3 \ `  
@@ -40,18 +62,17 @@ Resulting statistics is printed, differences put to databases, specified with
 
 * Make KML file for displaying paths around San Jose on
 https://mymaps.google.com  
-'$ uls_tool.py gmap --lat 37 --lon -121 --distance 100 SAN_JOSE.kml `  
+'$ uls_tool.py gmap --lat 37 --lon -121 --distance 100 DATABASE.sqlite3 SAN_JOSE.kml`  
 KML file has limit of 2000 features (points and lines), so center and radius
 must be specified
 
-* Get data, related to callsign ZUZZEL25 from EM table of raw ULS files to
-.csv file  
-`$ uls_tool.py csv --table EM --callsign ZUZZEL25 --dir_directory \`  
-`--skip_download ZUZZEL.csv`
+* Get data, related to callsign ZUZZEL25 from raw ULS files to an eponymous
+* spreadsheet  
+`$ uls_tool.py xlsx --callsign ZUZZEL25 --from_dir DIRECTORY`  
 
-## Overview
+## Overview <a name="overview"/>
 
-### ULS overview
+### ULS Overview <a name="uls_overview"/>
 
 https://www.fcc.gov/wireless/universal-licensing-system is an FCC
 infrastructure that maintains information about various RF spectrum users - in
@@ -96,16 +117,11 @@ obvious duplications, omissions and inconsistencies that quite possible that
 FCC internally handles them as text files.
 
 AFC server engine uses SQLite file (referred to as **AFC database** in this
-document), created from raw ULS data by **AFC ULS download script**. This AFC
-database consists of a single table, each row defining a frequency range within
-single path (i.e. if path has several frequency ranges, it occupies several
-rows).
+document), created from raw ULS data by **AFC ULS download script**. Structure
+of database contained in this file described in
+*[AFC Database Structure](#afc_database_structure)* chapter.
 
-As of time of this writing AFC database does not support paths that have more
-than one repeater or repeaters with distinct RX and TX antennas (albeit such
-paths do exist in raw ULS data).
-
-### *uls_tool.py* overview
+### *uls_tool.py* Overview <a name="uls_tool_py_overview"/>
 
 *uls_tool.py* was originally created as ULS data analysis tool. Eventually it
 got an AFC ULS download capabilities too. Still most of its features are not
@@ -125,8 +141,9 @@ https://www.fcc.gov/sites/default/files/uls_code_definitions_20201222.txt
 https://www.fcc.gov/sites/default/files/public_access_database_definitions_sql_v3_4.txt
 * **AFC database**. SQLite database, used by AFC server. Built from raw ULS data
 by ULS downloader. Consists of a single table, each row contains information on
-a single frequency range of single path. See *AFC database structure* chapter
-for details on this table's structure.
+a single frequency range of single path. See
+*[AFC Database Structure](#afc_database_structure)* chapter for details on this
+table's structure.
 * **ULS database**. uls_tool.py may also works with its own SQLite database. This
 multitable database closely reflects the structure of ULS raw data: it consists
 of same tables (AN, EM, ...) that have same fields. Viewing this database in
@@ -145,8 +162,9 @@ into https://mymaps.google.com to display them against GoogleMaps backdrop
 Excel. uls_tool.py may put there an excerpt from some raw ULS table (*csv*
 subcommand)
 
-## *uls_tool.py* operation
-### Prerequisites
+## *uls_tool.py* Operation <a name="uls_tool_py_operation"/>
+
+### Prerequisites <a name="prerequisites"/>
 *uls_tool.py* is a Python script, it requires Python 3.7 or more recent. Its
 shebang line requests *python3*
 
@@ -162,7 +180,7 @@ Here is how to check SqlAlchemy version:
 *uls_tool.py* was tested on Linux and Windows - on both platforms it works
 fine. Probably it will work equally well on MacOS.
 
-### Overview of subcommands
+### Overview of Subcommands <a name="overview_of_subcommands"/>
 |Subcommand|What it does|
 |----------|------------|
 |help|Print list of subcommands or help on a particular subcommand|
@@ -172,9 +190,10 @@ fine. Probably it will work equally well on MacOS.
 |uls_to_afc|Create AFC database from ULS database|
 |gmap|Create KML file with paths for displaying it on Google Maps|
 |compare|Compare paths in two databases (ULS or AFC)|
-|csv|Extract data on given callsign from given table of raw ULS data in form of Excel-compatible .csv file|
+|csv|Extract data on given callsign(s) from given table of raw ULS data in form of Excel-compatible .csv file|
+|xlsx|Extract data on given callsign(s) from all tables of raw ULS data in form of .xlsx spreadsheet|
 
-### Help
+### Help <a name="help"/>
 General help (list of subcommands) might be printed in one of following ways:
 ```
 $ uls_tool.py
@@ -210,9 +229,10 @@ Help on individual command may be obtained using *help* subcommand (below is
 example with *download_afc* subcommand):
 ```
 $ uls_tool.py help download_afc
-usage: uls_tool.py download_afc [-h] [--extra] [--mobile] [--progress]
-                                [--quiet] [--dir DOWNLOAD_DIRECTORY]
-                                [--skip_download] [--retry]
+usage: uls_tool.py download_afc [-h] [--compatibility]
+                                [--prev_afc PREV_AFC_DATABASE] [--progress]
+                                [--quiet] [--to_dir DOWNLOAD_DIRECTORY]
+                                [--from_dir DOWNLOAD_DIRECTORY] [--retry]
                                 [--zip ZIP_FILE_NAME] [--report FILE_NAME]
                                 DST_DB
 
@@ -222,26 +242,29 @@ positional arguments:
 
 optional arguments:
   -h, --help            show this help message and exit
-  --extra               Generate extra fields (not in original AFC database)
-  --mobile              Allow mobile paths
+  --compatibility       Generate AFC database compatible with all AFC engine
+                        releases. Default is to generate database for latest
+                        AFC engine release
+  --prev_afc PREV_AFC_DATABASE
+                        Open AFC database 'fsid' field computed as sequential
+                        number counted from previous AFC database - specified
+                        by this switch. Default is to assign sequential
+                        numbers, starting from 1
   --progress            Print download progress information
-  --quiet               Do not print messages on nonfatal data
-                        inconsistencies
-  --dir DOWNLOAD_DIRECTORY
-                        Download FCC ULS files archives to given directory
-                        and retain them or (--skip_doownload specified) use
-                        FCC ULS files from given directory instead of
-                        downloading them. Default is to download to temporary
-                        directory and remove it afterwards. For development
-                        purposes
-  --skip_download       Don't download FCC ULS files, use already downloaded,
-                        located in directory, specified with --dir switch
-                        (that must present). For development purposes
+  --quiet               Do not print messages on nonfatal data inconsistencies
+  --to_dir DOWNLOAD_DIRECTORY
+                        Download raw FCC ULS files to given directory and
+                        retain them there. Default is to download to temporary
+                        directory and remove it afterwards
+  --from_dir DOWNLOAD_DIRECTORY
+                        Use raw FCC ULS files from given firectory (created
+                        from --to_dir in or some other way). Default is to
+                        download files from FCC server
   --retry               Retry download several times if it aborts. For use
                         e.g. on terminally overheated machines
   --zip ZIP_FILE_NAME   Take ULS tables from given single (presumably - full)
-                        .zip archive instead of downloading from FCC ULS
-                        site. For development purposes
+                        .zip archive instead of downloading from FCC ULS site.
+                        For development purposes
   --report FILE_NAME    Write ULS data inconsistency report to given file
 ```
 Also presence of *--help* in command line prints help on subcommand
@@ -250,9 +273,9 @@ independently of other switches. So this command:
 will cause same printout as above, which might be convenient when name of some
 switch is forgotten during typing the command.
 
-### *latest* subcommand
-Print FCC local date/time (EST) of latest or pre-downloaded raw ULS data. Takes
-around two minutes to complete.
+### *latest* Subcommand <a name="latest_subcommand"/>
+Print date/time of latest or pre-downloaded raw ULS data. Takes around two
+minutes to complete.
 
 Command line format:  
 `$ uls_tool.py latest some_switches_here`  
@@ -261,8 +284,8 @@ Command line switches:
 |Switch|Function|
 |------|--------|
 |--inc|Report date of latest daily incremental data (ignoring date of full data)|
-|--dir **raw_file_directory**|If *--skip_download* also specified - use raw ULS data from given directory. Otherwise - put downloaded raw ULS data to given directory|
-|--skip_download|Use raw ULS data from directory, specified with *--dir* (where to they were previously downloaded)|
+|--to_dir **directory**|Download raw ULS data files to given directory and retain them there (e.g. for subsequent use with *--from_dir*). By default raw ULS data files downloaded to temporary directory and removed after use|
+|--from_dir **directory|Use raw ULS data files from given directory (e.g. after they were previously downloaded there by means of *--to_dir*.  By default raw ULS data files are downloaded from FCC server|
 |--zip **zip_file**|Use raw ULS data from only given Zip archive (full raw ULS data consists of several such archives - full weekly archive and incremental daily archives)
 |--retry|Retry several times on unsuccessful download attempts|
 |--progress|Print fancy countups and time measurements|
@@ -270,10 +293,10 @@ Command line switches:
 
 Some examples:
 
-* Print EST date/time of latest ULS data on FCC server:  
+* Print date/time of latest ULS data on FCC server:  
 `$ uls_tool.py latest`  
 Sample printout:   
-`2022-01-25 08:11:03`
+`2022-01-25 08:11:03 EST`
 
 * Ditto, but with progress tracking:  
 `$ uls_tool.py latest --progress`  
@@ -282,9 +305,9 @@ Sample printout:
 `$ uls_tool.py latest --retry`  
 
 * Download raw ULS data to RAW_ULS_DIR directory (for subsequent reuse):  
-`$ uls_tool.py latest --dir RAW_ULS_DIR`
+`$ uls_tool.py latest --to_dir RAW_ULS_DIR`
 
-### *download_afc* subcommand
+### *download_afc* Subcommand <a name="download_afc_subcommand"/>
 Download raw ULS data and make AFC database from it. Or make AFC database from
 pre-downloaded raw ULS data.
 
@@ -295,12 +318,11 @@ Command line switches:
 |Switch|Function|
 |------|--------|
 |--prev_afc **previous_afc**.sqlite3|Continue path *fsid* assignment from given AFC database. Default is to assign *fsid* sequentially from 1|
-|--extra|Put some additional columns to generated database. These columns not used by AFC engine, but help in database troubleshooting (see *AFC database structure* chapter)|
-|--mobile|Add information on mobile (nonfixed) paths that somehow have fixed receiver antenna coordinates (these paths should not be in AFC database. This switch is for compatibility with existing ULS downloader script that puts mobile paths to AFC database)|
+|--extra|Put some additional columns to generated database. These columns not used by AFC engine, but help in database troubleshooting (see *[AFC Database Structure](#afc_database_structure)* chapter)|
 |--report **report_file**|Write to given file a report on encountered raw ULS data inconsistencies|
 ||Other switches same as in the *latest* subcommand:|
-|--dir **raw_file_directory**|If *--skip_download* also specified - use raw ULS data from given directory. Otherwise - put downloaded raw ULS data to given directory|
-|--skip_download|Use raw ULS data from directory, specified with *--dir* (where to they were previously downloaded)|
+|--to_dir **directory**|Download raw ULS data files to given directory and retain them there (e.g. for subsequent use with *--from_dir*). By default raw ULS data files downloaded to temporary directory and removed after use|
+|--from_dir **directory|Use raw ULS data files from given directory (e.g. after they were previously downloaded there by means of *--to_dir*.  By default raw ULS data files are downloaded from FCC server|
 |--zip **zip_file**|Use raw ULS data from only given Zip archive (full raw ULS data consists of several such archives - full weekly archive and incremental daily archives)|
 |--retry|Retry several times on unsuccessful download attempts|
 |--progress|Print fancy countups and time measurements|
@@ -326,10 +348,9 @@ with fancy progress tracking:
 `AFC_DATABASE.sqlite3`
 
 * Create AFC database from raw ULS data, previously downloaded to RAW_ULS_DIR:  
-`$ uls_tool.py download_afc --dir RAW_ULS_DIR --skip_download \`  
-`AFC_DATABASE.sqlite3`
+`$ uls_tool.py download_afc --from_dir RAW_ULS_DIR AFC_DATABASE.sqlite3`
 
-### *download_uls* subcommand
+### *download_uls* subcommand <a name="download_uls_subcommand"/>
 Download raw ULS data and make ULS database from it. Or make ULS database from
 pre-downloaded raw ULS data. Takes from 30 minutes to 3 hours, depending on
 *--data* switch.
@@ -345,8 +366,8 @@ Command line switches:
 |--overwrite|Overwrite target database if it exists. Default is to stop abnormally|
 |--skip_write|Skip database writing operations (to find out how slow SQLite is - quite a lot!)|
 ||Other switches same as in the *latest* subcommand|
-|--dir **raw_file_directory**|If *--skip_download* also specified - use raw ULS data from given directory. Otherwise - put downloaded raw ULS data to given directory|
-|--skip_download|Use raw ULS data from directory, specified with *--dir* (where to they were previously downloaded)|
+|--to_dir **directory**|Download raw ULS data files to given directory and retain them there (e.g. for subsequent use with *--from_dir*). By default raw ULS data files downloaded to temporary directory and removed after use|
+|--from_dir **directory|Use raw ULS data files from given directory (e.g. after they were previously downloaded there by means of *--to_dir*.  By default raw ULS data files are downloaded from FCC server|
 |--zip **zip_file**|Use raw ULS data from only given Zip archive (full raw ULS data consists of several such archives - full weekly archive and incremental daily archives)|
 |--retry|Retry several times on unsuccessful download attempts|
 |--progress|Print fancy countups and time measurements|
@@ -362,7 +383,7 @@ watching for errors:
 errors:  
 `$ uls_tool.py download_uls --progress --quiet --data all ULS_DATABASE.sqlite3`
 
-### *uls_to_afc* subcommand
+### *uls_to_afc* Subcommand <a name="uls_to_afc_subcommand"/>
 Creates AFC database from ULS database.
 
 Command line format:  
@@ -372,8 +393,7 @@ Command line switches:
 |Switch|Function|
 |------|--------|
 |--prev_afc **previous_afc**.sqlite3|Continue path *fsid* assignment from given database. Default is to assign *fsid* sequentially from 1|
-|--extra|Put some additional columns to generated database. These columns not used by AFC engine, but help in database troubleshooting (see *AFC database structure* chapter)|
-|--mobile|Add information on mobile (nonfixed) paths that somehow have fixed receiver antenna coordinates (these paths should not be in AFC database. This switch is for compatibility with existing ULS downloader script that puts mobile paths to AFC database)|
+|--extra|Put some additional columns to generated database. These columns not used by AFC engine, but help in database troubleshooting (see *[AFC Database Structure](#afc_database_structure)* chapter)|
 |--report **report_file**|Write to given file a report on encountered raw ULS data inconsistencies|
 |--progress|Print fancy countups and time measurements|
 |--quiet|Do not print nonfatal warnings|
@@ -384,13 +404,8 @@ Some examples:
 for errors, *fsid*s are sequential (starting from 1):  
 `$ uls_tool.py uls_to_afc --progress --quiet ULS_DATABASE.sqlite3 AFC_DATABASE.sqlite3`
 
-* Ditto, but include mobile paths (to be more compatible with current ULS
-downloader implementation):  
-`$ uls_tool.py uls_to_afc --progress --quiet --mobile \ `  
-`ULS_DATABASE.sqlite3 AFC_DATABASE.sqlite3`
 
-
-### *gmap* subcommand
+### *gmap* Subcommand <a name="gmap_subcommand"/>
 Create KML file to display paths on Google Maps.
 
 How to display KML file on Google Maps in browser described here:  
@@ -410,6 +425,7 @@ Command line switches:
 |--lat **latitude**|Latitude in degrees (north positive) of center point of the vicinity|
 |--lon **longitude**|Longitude in degrees (east positive) of center point of the vicinity|
 |--distance **miles**|Radius of vicinity|
+|--path **callsign[/num]**|Path or callsign to put on map. This switch may be specified several times|
 |--direction|Display direction arrows on map (every arrowhead counted as feature, thus decreasing the number of displayable paths)|
 |--progress|Print fancy countups and time measurements|
 |--quiet|Do not print nonfatal warnings|
@@ -426,7 +442,15 @@ Some examples:
 The following error message will be printed:  
 `uls_tool.py. WARNING: Number of KML features exceeds 2000. 1435 of 2143 paths written`
 
-### *compare* subcommand
+* Create KML file containing all paths of callsign ZUZZEL179:  
+`$ uls_tool.py gmap --path ZUZZEL179 ZUZZEL.kml`
+
+* Create KML file containing paths ZUZZEL179/18 and ZUZZEL57/1543:  
+`$ uls_tool.py gmap --path ZUZZEL179/18 ZUZZEL57/1543 ZUZZEL.kml`
+
+
+
+### *compare* Subcommand <a name="compare_subcommand"/>
 Compare paths from two databases (each may be AFC or ULS). Comparison is
 performed only by coordinates and frequency ranges.
 
@@ -442,6 +466,7 @@ Command line switches:
 |--common **db_for_common**|Database to put common paths to|
 |--unique|Print lists of unique path identifiers in each database|
 |--spatial **resolution**[;**top_n**]|Print *top_n* locations where the most changes encountered (if omitted - all places are printed). <br/>*resolution* specifies spatial resolution (size of places being compared) in degrees of latitude/longitude
+|--kml **kml_file**|Create a KML file (for displaying on Google Maps/Earth) with added (red) and removed (green) paths|
 |--progress|Print fancy countups and time measurements|
 |--quiet|Do not print nonfatal warnings|
 
@@ -491,12 +516,12 @@ Changes around 32.0N, 92.0W: 33
 `$ uls_tool.py compare --removed SPECIFIC_FOR_DB1.sqlite3 \`  
 `--added SPECIFIC_FOR_DB2.sqlite DB1.sqlite3 DB2.sqlite3`  
 
-### *csv* subcommand
+### *csv* Subcommand <a name="csv_subcommand"/>
 From given raw ULS data table (on FCC server or pre-downloaded) retrieve rows,
 pertinent to given callsign(s) and put them to Excel-compatible .csv file.
 
 Command line format:
-`$ uls_tool.py csv some_switches_here FILE.csv `  
+`$ uls_tool.py csv some_switches_here FILE.csv`  
 Command line switches:
 
 |Switch|Function|
@@ -505,8 +530,8 @@ Command line switches:
 |--table **table**|Two-letter table name (AN, EM...)|
 |--day {*full*\|*mon*\|*tue*\|...}|Specific dataset to retrieve from - full weekly or some daily update|
 ||Other switches same as in the *latest* subcommand|
-|--dir **raw_file_directory**|If *--skip_download* also specified - use raw ULS data from given directory. Otherwise - put downloaded raw ULS data to given directory|
-|--skip_download|Use raw ULS data from directory, specified with *--dir* (where to they were previously downloaded)|
+|--to_dir **directory**|Download raw ULS data files to given directory and retain them there (e.g. for subsequent use with *--from_dir*). By default raw ULS data files downloaded to temporary directory and removed after use|
+|--from_dir **directory|Use raw ULS data files from given directory (e.g. after they were previously downloaded there by means of *--to_dir*.  By default raw ULS data files are downloaded from FCC server|
 |--zip **zip_file**|Use raw ULS data from only given Zip archive (full raw ULS data consists of several such archives - full weekly archive and incremental daily archives)|
 |--retry|Retry several times on unsuccessful download attempts|
 |--progress|Print fancy countups and time measurements|
@@ -518,12 +543,44 @@ Some examples:
 `$ uls_tool.py csv --table EM --callsign ZUZZEL57 FILE.csv`
 
 * Ditto, but from pre-downloaded raw ULS files:  
-`$ uls_tool.py csv --table EM --dir RAW_ULS_DIR --skip_download --callsign ZUZZEL57 FILE.csv`
+`$ uls_tool.py csv --table EM --from_dir RAW_ULS_DIR --callsign ZUZZEL57 FILE.csv`
 
 * Ditto, but only Tuesday updates:  
 `$ uls_tool.py csv --table EM --day tue --callsign ZUZZEL57 FILE.csv`
 
-## Database structures
+### *xlsx* Subcommand <a name="xlsx_subcommand"/>
+From given raw ULS data table (on FCC server or pre-downloaded) retrieve rows,
+pertinent to given callsign(s) and put them to given .xlsx file (one page per
+raw ULS table):
+
+Command line format:
+`$ uls_tool.py xlsx some_switches_here [FILE.xlsx]` 
+If filename is not specified, it is derived from callsign name(s), specified
+with --callsign
+
+Command line switches:
+
+|Switch|Function|
+|------|--------|
+|--callsign **callsign**|Callsign to retrieve information about. Several may be specified|
+||Other switches same as in the *latest* subcommand|
+|--to_dir **directory**|Download raw ULS data files to given directory and retain them there (e.g. for subsequent use with *--from_dir*). By default raw ULS data files downloaded to temporary directory and removed after use|
+|--from_dir **directory|Use raw ULS data files from given directory (e.g. after they were previously downloaded there by means of *--to_dir*.  By default raw ULS data files are downloaded from FCC server|
+|--zip **zip_file**|Use raw ULS data from only given Zip archive (full raw ULS data consists of several such archives - full weekly archive and incremental daily archives)|
+|--retry|Retry several times on unsuccessful download attempts|
+|--progress|Print fancy countups and time measurements|
+|--quiet|Do not print nonfatal warnings|
+
+Some examples:
+
+* Get the latest data on callsigns ZUZZEL57 and put it to ZUZZEL57.xlsx:  
+`$ uls_tool.py xlsx --callsign ZUZZEL57 --callsign ZUZZEL179`
+
+* Get data on two callsigns from pre-downloaded raw ULS files and put them to
+FILE.xlsx:  
+`$ uls_tool.py csv --from_dir RAW_ULS_DIR --callsign ZUZZEL57 --callsign ZUZZEL179 FILE.xlsx`
+
+## Database Structures <a name="database_structures"/>
 
 Both AFC and ULS databases are SQLite 3 databases. Such database is just a
 file, containing a bunch of tables. Database may be viewed with SQlite viewer -
@@ -535,57 +592,73 @@ extension and default opener (associated with .sqlite3 files) - site contains
 an instruction on how to do it. It is not as comfortable as Excel, but quite
 sufficient for data analysis.
 
-### AFC database structure
+### AFC Database Structure  <a name="afc_database_structure"/>
+
+AFC database currently consists of two tables:
+* **uls**. Each row defines path attributes (except information about passive
+repeaters). Row contains information about single frequency range used by path,
+so if path uses several frequency ranges, it occupies correspondent number
+of rows.
+
+* **pr**. Contains information about passive repeater, used by certain row in
+**uls** table. I.e. if certain path has repeaters and uses several frequency
+ranges (hence occupise several rows), information about each repeater repeats
+corresponded number of times.
 
 Here is the structure of AFC database, generated by Open AFC ULS downloader.
-Columns used by AFC computation engine (as of time of this writing) shown in
-**bold**.
+Names of columns used by AFC computation engine (as known to author as of of
+time of this writing) shown in **bold**. Name of columns whose use is not known
+as of time of this writing shown in *italic*.
+
+**Structure of uls table**
 
 |Field|Description|
 |-----|-----------|
-|id|Line number in the table|
-|**fsid**|Path identifier. Assigned sequentially, continuing numbering from previous AFC database|
+|**fsid**|Path/frequency range identifier. Assigned sequentially, continuing numbering from previous AFC database. Used as primary key with respect to **pr** table|
 |**callsign**|Path callsign|
 |status|License status (*License Status* field from *HD* table of raw ULS data). Only paths with **A** and **L** (Active and Pending respectively) are admitted to AFC database| 
-|**radio_service**|*Radio Service Code* from *HD* table of raw ULS data - whatever is it|
+|**radio_service**|*Radio Service Code* from *HD* table of raw ULS data|
 |**name**|Licensee entity name (*Entity Name* from *EN* table of raw ULS data)|
-|common_carrier|*Common Carrier* field from *HD* table of raw ULS data. As of time of this writing NULL in all paths of AFC database|
-|mobile|*Mobile* field from *HD* table converted from string to boolean. As of time of this writing NULL in all paths. Real mobile/fixed distinguishers are *Path Type Code* from *PA* table and *Location Class Code* from *LO* table (as of time of this writing, these fields are in agreement, but latter is preferable, as it a documented enumeration, whereas former is a free-form text - albeit more conveniently located). As for time of this writing AFC database does contain a bunch of mobile paths, albeit it should not|
-|**rx_callsign**|Receiver callsign. May be different from path callsign|
+|common_carrier|*Common Carrier* field from *HD* table of raw ULS data, converted from string to boolean|
+|mobile|*Mobile* field from *HD* table converted from string to boolean|
+|**rx_callsign**|*Receiver Call Sign* field from PA table (*Call Sign* if it is NULL)|
 |**rx_antenna_num**|*Antenna number* from *AN* table. Utility is unknown, as it is only meaningful in pair with location number|
-|**freq_assigned_start_mhz**|Start of frequency range|
-|**freq_assigned_end_mhz**|End of frequency range|
-|**tx_eirp**|Transmitter EIRP power in dBm|
-|**emission_des**|Emission designator. See https://fccid.io/Emissions-Designator/ for structure|
-|**tx_lat_deg**|Transmitter WGS84 latitude in signed degrees (North is positive)|
-|**tx_long_deg**|Transmitter WGS84 longitude in signed degrees (East is positive)|
-|**tx_ground_elev_m**|Terrain elevation above WGS84 at transmitter location|
-|**tx_polarization**|Transmitter antenna polarization (*H*, *V* or number)|
-|**tx_height_to_center_raat_m**|Height of transmitter antenna center above ground in meters|
-|**tx_gain**|Transmitter antenna gain|
-|**rx_lat_deg**|Receiver WGS84 latitude in signed degrees (North is positive)|
-|**rx_long_deg**|Receiver WGS84 longitude in signed degrees (East is positive)|
-|**rx_ground_elev_m**|Terrain elevation above WGS84 at receiver location|
-|**rx_ant_model**|Receiver antenna model|
-|**rx_height_to_center_raat_m**|Height of receiver antenna center above ground in meters|
-|**rx_gain**|Receiver antenna gain|
-|**p_rx_indicator**|"Y" if path has repeaters ("N" or NULL otherwise)|
-|**p_rp_lat_degs**|Repeater WGS84 latitude in signed degrees (North is positive)|
-|**p_rp_long_degs**|Repeater WGS84 longitude in signed degrees (East is positive)|
-|**p_rp_height_to_center_raat_m**|Height of repeater antenna center (receiving? transmitting?) above ground in meters|
-|path_number|Path number. It's strange that AFC server does not use it (thus relying on ambiguous *fsid* in its diagnostics messages)|
+|**freq_assigned_start_mhz**|Start of frequency range in MHz. Computed from *Frequency Assigned* and *Frequency Upper Band* of *FR* table and *Emission Code* field of *EM* table|
+|**freq_assigned_end_mhz**|End of frequency range MHz. Computed from *Frequency Assigned* and *Frequency Upper Band* of *FR* table and *Emission Code* of *EM* table|
+|**tx_eirp**|Transmitter EIRP power in dBm. *EIRP* field of *FR* table|
+|**emission_des**|Emission designator. *Emission Code* field of *EM* table. See https://fccid.io/Emissions-Designator/ for structure|
+|**tx_lat_deg**|Transmitter WGS84 latitude in signed degrees (North is positive). Comprised of *\*Latitude* filds of *LO* table|
+|**tx_long_deg**|Transmitter WGS84 longitude in signed degrees (East is positive). Comprised of *\*Longitude* filds of *LO* table|
+|**tx_ground_elev_m**|Terrain elevation above WGS84 at transmitter location. *Ground Elevation* field of *LO* table|
+|**tx_polarization**|Transmitter antenna polarization (*H*, *V* or number). *Polarization Code* field of *AN* table|
+|**tx_height_to_center_raat_m**|Height of transmitter antenna center above ground in meters. *Height to Center RAAT* of *AN* table|
+|**tx_gain**|Transmitter antenna gain. *Gain* fild of *AN* table|
+|**rx_lat_deg**|Receiver WGS84 latitude in signed degrees (North is positive). Comprised of *\*Latitude* filds of *LO* table|
+|**rx_long_deg**|Receiver WGS84 longitude in signed degrees (East is positive). Comprised of *\*Longitude* filds of *LO* table|
+|**rx_ground_elev_m**|Terrain elevation above WGS84 at receiver location. *Ground Elevation* field of *LO* table|
+|**rx_ant_model**|Receiver antenna model. *Antenna Model* field of *AN* table|
+|**rx_height_to_center_raat_m**|Height of receiver antenna center above ground in meters. *Height to Center RAAT* of *AN* table|
+|**rx_gain**|Receiver antenna gain. *Gain* fild of *AN* table|
+|**p_rp_num**|Number of passive repeaters|
+|path_number|Path number. *Path Number / Link Number* field of *PA* table. It's strange that AFC server does not use it (thus relying on ambiguous *fsid* in its diagnostics messages)|
 
-Additional fields, added when *--extra* command line switch specified:  
+**Structure of PR table**
 
 |Field|Description|
 |-----|-----------|
-|seg_count|Number of segments (number of repeaters plus 1)|
-|grant_date|License grant date. *Grant Date* from *HD* table|
-|expired_date|License expiration date. Often not agree with *License Status* - i.e. path may be marked as "A" (having active license), but its license is many years since expired|
-|cancellation_date|License cancellation date (NULL for all 6 GHz paths so far)|
-|path_type_desc|*Path Type Code* from *PA* table. Distinguishes mobile and fixed paths|
+|id|Sequential record number|
+|**fsid**|Path/range identifier. Foreign key that references *fsid* field in "uls* table|
+|**prSeq**|1-based repeater sequential number inside the path|
+|**pr_lat_deg**|Repeater WGS84 latitude in signed degrees (North is positive). Comprised of *\*Latitude* filds of *LO* table|
+|**pr_long_deg**|Repeater WGS84 longitude in signed degrees (East is positive). Comprised of *\*Longitude* filds of *LO* table|
+|**pr_height_to_center_raat_m**|Height of repeater antenna center above ground in meters. *Height to Center RAAT* of *AN* table. *Terrain Elevation* is notably missing|
+|*pr_reflector_height_m*|Antenna reflector height in meters. *Reflector Height* field of *AN* table|
+|*pr_reflector_width_m*|Antenna reflector width in meters. *Reflector Width* field of *AN* table|
+|*pr_back_to_back_gain_tx*|*Back-to-Back Tx Dish Gain* field of *AN* table|
+|*pr_back_to_back_gain_rx*|*Back-to-Back Rx Dish Gain* field of *AN* table|
 
-### ULS database structure
+
+### ULS Database Structure <a name="uls_database_structure"/>
 
 ULS database consists of ULS raw data tables used by AFC (AN, CP, EM, EN,
 FR, HD, LO, PA, SG - see
@@ -601,7 +674,7 @@ raw ULS data named it differently in different tables)
 When *--data all* specified and *--strict* not specified ULS data loaded as is,
 including duplicates.
 
-## uls_tool.py structure
+## *uls_tool.py* Structure <a name="uls_tool_py_structure"/>
 
 This is brief overview of top-level objects in uls_tools.py:
 
@@ -634,3 +707,7 @@ This is brief overview of top-level objects in uls_tools.py:
 |class KmlWriter|Writes paths to KML file (for displaying in GoogleMaps)|
 |do_\*()|Executor of subcommands (e.g. *do_download()* executes *download* subcommand)|
 |main()|Parses command line parameters, sets up logging|
+
+## Version History <a name="version_history"/>
+1.0 - Original release
+2.0 - *xlsx* subcommand added, *--path* parameter added to *gmap* subcommand, time zone printed by *latest* subcommand

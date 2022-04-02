@@ -5,6 +5,7 @@
 
 import argparse
 from collections.abc import Iterator
+import copy
 import csv
 import datetime
 import enum
@@ -12,6 +13,10 @@ import inspect
 import locale
 import logging
 import math
+try:
+    import openpyxl
+except ImportError:
+    pass
 import operator
 import os
 import re
@@ -21,7 +26,6 @@ import sqlalchemy as sa
 import ssl
 import sys
 import tempfile
-import threading
 import time
 from typing import Any, Callable, Dict, List, Optional, Set, Tuple, Union
 import urllib.error
@@ -32,7 +36,7 @@ import xml.etree.ElementTree as etree
 import zipfile
 
 # Script version
-VERSION = "1.0"
+VERSION = "2.0"
 
 # Type for row data for exchange with database
 ROW_VALUE_TYPE = Optional[Union[str, int, float, bool, datetime.date]]
@@ -153,6 +157,16 @@ def error_if(cond: Any, msg: str) -> None:
         error(msg)
 
 
+def spreadsheet_col_name(col_num: int) -> str:
+    """ Returns spreadsheet column name for given 1-based column number) """
+    ret = ""
+    while col_num > 0:
+        col_num -= 1
+        ret = chr(ord("A") + (col_num % 26)) + ret
+        col_num //= 26
+    return ret
+
+
 class Progressor:
     """ Prints progress information (if enabled), erasing previous progress
     message """
@@ -231,6 +245,9 @@ class FreqRange:
     HIGH_6G_START_MHZ: int = 6525
     HIGH_6G_END_MHZ: int = 6875
 
+    # Rounding before equality comparison
+    ROUNDING = 5
+
     # Maps frequency scale letters to MHz multipliers
     SCALE_MHZ: Dict[str, float] = {"H": 0.000001, "K": 0.001, "M": 1.,
                                    "G": 1000., "T": 1000000.}
@@ -289,9 +306,18 @@ class FreqRange:
         """ True if frequency range is valid (has both bounds defined) """
         return (self.start_mhz is not None) and (self.end_mhz is not None)
 
+    def __eq__(self, other: Any) -> bool:
+        """ Equality comparison. Only ends are compared, emission descriptors
+        are ignored """
+        return isinstance(other, self.__class__) and \
+            all((round(self.__dict__[attr], self.ROUNDING) ==
+                 round(other.__dict__[attr], self.ROUNDING))
+                for attr in ("start_mhz", "end_mhz"))
+
     def __hash__(self) -> int:
         """ Hash, computed on significant parts of frequency bounds """
-        return hash(tuple([round(f, 6) for f in (self.start_mhz, self.end_mhz)
+        return hash(tuple([round(f, self.ROUNDING)
+                           for f in (self.start_mhz, self.end_mhz)
                            if f is not None]))
 
     @classmethod
@@ -509,7 +535,8 @@ class UlsTable:
                    AC("alternative_cgsa_method", sa.Unicode(1),
                       nullable=True)),
                  F("Path Number",
-                   AC("path_number", sa.Integer(), nullable=True)),
+                   AC("path_number", sa.Integer(), nullable=False),
+                   default="1"),
                  F("Line loss",
                    AC("line_loss", sa.Float(), nullable=True)),
                  F("Status Code",
@@ -521,9 +548,11 @@ class UlsTable:
                       nullable=True)),
                  F("Maximum ERP",
                    AC("maximum_erp", sa.Float(), nullable=True))],
-                id_fields=["call_sign", "location_number", "antenna_number"],
+                id_fields=["call_sign", "location_number", "antenna_number",
+                           "path_number"],
                 indices=[sa.Index("AN_ix", "call_sign", "location_number",
-                                  "antenna_number", unique=True)]),
+                                  "antenna_number", "path_number",
+                                  unique=True)]),
             cls("CP", 14,   # Control point
                 [F("Record Type",
                    AC("record_type", sa.Unicode(2), nullable=False)),
@@ -1419,6 +1448,25 @@ class ComplaintBadRxGain(Complainer.ComplaintBase):
                     f"{'. Path dropped' if drop else ''}"))
 
 
+class ComplaintInconsistentRepeater(Complainer.ComplaintBase):
+    """ Complaint on repeater with inconsistent parameters """
+    def __init__(self, callsign: str, path_num: int, repeater_idx: int) \
+            -> None:
+        """ Constructor
+
+        Arguments:
+        callsign     -- Callsign
+        path_num     -- Path number
+        repeater_idx -- 1-based repeater index
+        """
+        super().__init__(
+            category="Repeater has different RX and TX antenna parameters " +
+            "(not ULS error, but AFC database format limitation)",
+            sort_key=(callsign, path_num, repeater_idx),
+            rm=(f"Path {callsign}/{path_num}, repeater {repeater_idx} has "
+                f"different antenna parameters on RX and TX sides"))
+
+
 class GeoCalc:
     """ Simplified geodetic computations """
 
@@ -1550,7 +1598,6 @@ class PathInfo:
     radio_service     -- Radio service
     name              -- Entity name or None
     common_carrier    -- Common carrier - bool or None
-    path_type         -- Path Type (from PA)
     rx_callsign       -- RX callsign
     rx_antenna_num    -- RX antenna number or None
     freq_range        -- FreqRange object
@@ -1567,9 +1614,6 @@ class PathInfo:
     cancellation_date -- License cancellation date - date or None
     p_rx_indicator    -- Passive receiver indicator (from PA)
     fsid              -- 'fsid' field from AFC database or None
-
-    Private attributes:
-    _seg_count      -- None or explicitly specified segment count
     """
     class AntCoord:
         """ Full information about RX/TX/repeater antenna location
@@ -1629,12 +1673,6 @@ class PathInfo:
             self.height_to_center_raat_m = height_to_center_raat_m
             self.loc_type_code = loc_type_code
 
-        def is_mobile(self) -> bool:
-            """ True if location marked as mobile """
-            return \
-                (self.loc_type_code is not None) and \
-                (self.loc_type_code not in "FP")
-
         def __bool__(self) -> bool:
             """ True if coordinates and antenna center height above ground
             defined """
@@ -1651,42 +1689,129 @@ class PathInfo:
                     ret += hash(round(value, digits))
             return ret
 
+        def __eq__(self, other):
+            """ Equality comparison """
+            return isinstance(other, self.__class__) and \
+                all(getattr(self, attr) == getattr(other, attr)
+                    for attr in self.__dict__)
+
+        @classmethod
+        def combine(cls, v1: Optional["PathInfo.AntCoord"],
+                    v2: Optional["PathInfo.AntCoord"]) \
+                -> Tuple[bool, Optional["PathInfo.AntCoord"]]:
+            """ Combine two presumably equal values into one
+
+            Arguments:
+            v1 -- First value to combine (may be None)
+            v2 -- Second value to combine (may be None)
+            Returns (consistent, combination) value. 'consistent' is true if
+            values do not have different non-None atributes. 'combination' is
+            None if both components are None, otherwise value made of non-None
+            attributes of both values
+            """
+            if v1 is None:
+                return (True, v2)
+            if v2 is None:
+                return (True, v1)
+            if v1 == v2:
+                return (True, v1)
+            if v1 == v2:
+                return (True, v1)
+            consistent = True
+            ret = copy.copy(v1)
+            for attr in ret.__dict__:
+                a1 = getattr(v1, attr)
+                a2 = getattr(v2, attr)
+                if a1 is not None:
+                    if (a2 is not None) and (a2 != a1):
+                        consistent = False
+                elif a2 is not None:
+                    setattr(ret, attr, a2)
+            return (consistent, ret)
+
     class Repeater:
         """ Information about repeater
 
         Attributes:
-        rx -- Information about received antenna
-        tx -- Information about transmitter antenna
+        ant_coord            -- AntCoord or None
+        reflector_height     -- Reflector height or None
+        reflector_width      -- Reflector width or None
+        back_to_back_gain_tx -- Back to back gain TX or None
+        back_to_back_gain_rx -- Back to back gain RX or None
         """
-        def __init__(self, tx: Optional["PathInfo.AntCoord"],
-                     rx: Optional["PathInfo.AntCoord"]) -> None:
+        def __init__(self, ant_coord: Optional["PathInfo.AntCoord"],
+                     reflector_height: Optional[float],
+                     reflector_width: Optional[float],
+                     back_to_back_gain_tx: Optional[float],
+                     back_to_back_gain_rx: Optional[float]) -> None:
             """ Constructor
 
             Arguments:
-            rx -- Information about received antenna or None
-            tx -- Information about transmitter antenna or None
+            ant_coord            -- AntCoord or None
+            reflector_height     -- Reflector height or None
+            reflector_width      -- Reflector width or None
+            back_to_back_gain_tx -- Back to back gain TX or None
+            back_to_back_gain_rx -- Back to back gain RX or None
             """
-            if tx is None:
-                if rx is None:
-                    self.tx = self.rx = PathInfo.AntCoord()
-                else:
-                    self.tx = self.rx = rx
-            else:
-                if rx is None:
-                    self.tx = self.rx = tx
-                else:
-                    self.tx = tx
-                    self.rx = rx
+            self.ant_coord = ant_coord
+            self.reflector_height = reflector_height
+            self.reflector_width = reflector_width
+            self.back_to_back_gain_tx = back_to_back_gain_tx
+            self.back_to_back_gain_rx = back_to_back_gain_rx
 
         def __bool__(self) -> bool:
-            """ True if both receiver and transmitter antenna coordinates
-            defined """
-            return bool(self.tx and self.rx)
+            """ True if antenna coordinates defined """
+            return bool(self.ant_coord)
 
         def __hash__(self) -> int:
-            """ Hash over receiver and transmitter antenna coordinates """
-            # Not ^, as they might be the same
-            return hash(self.rx) + hash(self.tx)
+            """ Hash over antenna coordinates """
+            return hash(self.ant_coord)
+
+        def __eq__(self, other) -> bool:
+            """ Equality comparison """
+            return isinstance(other, self.__class__) and \
+                all((getattr(self, attr) == getattr(other, attr))
+                    for attr in self.__dict__)
+
+        @classmethod
+        def combine(cls, v1: Optional["PathInfo.Repeater"],
+                    v2: Optional["PathInfo.Repeater"]) \
+                -> Tuple[bool, Optional["PathInfo.Repeater"]]:
+            """ Combine two optional Repeater objects into one
+
+            Arguments:
+            v1 -- First combined objects
+            v2 -- Second combined object
+            Return (consistent, combination) tuple. 'consistent' is True if
+            combined objects do not have non-None attributes of different
+            values. 'combined' is object, combined of non-None attributes of
+            source objects
+            """
+            if v1 is None:
+                return (True, v2)
+            if v2 is None:
+                return (True, v1)
+            if v1 == v2:
+                return (True, v1)
+            ret = copy.deepcopy(v1)
+            consistent = True
+            for attr in ret.__dict__:
+                a1 = getattr(ret, attr)
+                a2 = getattr(v2, attr)
+                if (a1 != a2) and (a2 is not None):
+                    if a1 is None:
+                        setattr(ret, attr, a2)
+                    elif isinstance(a1, float):
+                        consistent = False
+                    elif isinstance(a1, PathInfo.AntCoord):
+                        c, v = PathInfo.AntCoord.combine(a1, a2)
+                        if c:
+                            setattr(ret, attr, v)
+                        else:
+                            consistent = False
+                    else:
+                        error("Internal error. Unsupported attribute type")
+            return (consistent, ret)
 
     def __init__(self, callsign: str, status: str, radio_service: str,
                  name: Optional[str],
@@ -1702,8 +1827,6 @@ class PathInfo:
                  grant_date: Optional[Union[str, datetime.date]] = None,
                  expired_date: Optional[Union[str, datetime.date]] = None,
                  cancellation_date: Optional[Union[str, datetime.date]] = None,
-                 seg_count: Optional[int] = None,
-                 path_type: Optional[str] = None,
                  fsid: Optional[int] = None) -> None:
         """ Constructor
 
@@ -1731,8 +1854,6 @@ class PathInfo:
         grant_date        -- License grant date or None
         expired_date      -- License expired date or None
         cancellation_date -- License expired date or None
-        seg_count         -- Explicitly specified segment count
-        path_type         -- Path Type (from PA)
         fsid              -- 'fsid' field from AFC database or None
         """
         self.callsign = callsign
@@ -1741,7 +1862,6 @@ class PathInfo:
         self.name = name
         self.common_carrier = self._yn_to_bool(common_carrier)
         self.mobile = self._yn_to_bool(mobile)
-        self.path_type = path_type
         self.rx_callsign = rx_callsign
         self.rx_antenna_num = rx_antenna_num
         self.freq_range = freq_range
@@ -1765,24 +1885,9 @@ class PathInfo:
         self.expired_date = make_optional_date(expired_date)
         self.cancellation_date = make_optional_date(cancellation_date)
 
-        self._seg_count = seg_count
-
-    @property
-    def seg_count(self):
-        """ Segment count (computed or explicitly specified) """
-        return self._seg_count if self._seg_count is not None \
-            else (len(self.repeaters) + 1)
-
     def is_afc(self) -> bool:
-        """ True if path fit for AFC database: is 6GHz, license active
-        nonmobile
-        """
-        return (self.status in "AL") and (not self.mobile) and \
-            self.freq_range.is_6ghz() and \
-            (not self.tx_ant.is_mobile()) and \
-            (not self.rx_ant.is_mobile()) and \
-            all((not r.tx.is_mobile()) and (not r.rx.is_mobile())
-                for r in self.repeaters)
+        """ True if path fit for AFC database: is 6GHz, license active """
+        return (self.status in "AL") and self.freq_range.is_6ghz()
 
     def is_expired(self) -> bool:
         """ True for expired active path """
@@ -1827,9 +1932,10 @@ class PathInfo:
                 p2_lat=ac2.lat, p2_lon=ac2.lon)
         ac = self.tx_ant
         for repeater in self.repeaters:
-            if within(ac, repeater.rx):
+            assert repeater.ant_coord is not None
+            if within(ac, repeater.ant_coord):
                 return True
-            ac = repeater.tx
+            ac = repeater.ant_coord
         return within(ac, self.rx_ant)
 
     def __bool__(self) -> bool:
@@ -1846,8 +1952,8 @@ class PathInfo:
 
 
 class PathFreqBucket:
-    """ Collection of variants of same path with different frequency ranges,
-    neither of which contains one another
+    """ Collection of variants of same path with different frequency ranges
+    reduces paths with same frequency range
 
     Private attributes:
     _paths -- List of PathInfo objects
@@ -1857,24 +1963,25 @@ class PathFreqBucket:
         self._paths: List[PathInfo] = []
 
     def try_add(self, path: PathInfo) -> bool:
-        """ Tries t add given path to collection
+        """ Tries to add given path to collection
 
         Arguments:
         path -- PathInfo object to add
         Returns False on failure (bucket already contains paths with other
-        callsign/path number """
+        callsign/path number) """
         if self._paths and \
                 ((self._paths[0].callsign != path.callsign) or
                  (self._paths[0].path_num != path.path_num)):
             return False
-        idx = 0
-        while idx < len(self._paths):
-            if path.freq_range.contains(self._paths[idx].freq_range):
-                self._paths.pop(idx)
-            elif self._paths[idx].freq_range.contains(path.freq_range):
-                return True
-            idx += 1
-        self._paths.append(path)
+        # idx = 0
+        # while idx < len(self._paths):
+        #     if path.freq_range.contains(self._paths[idx].freq_range):
+        #         self._paths.pop(idx)
+        #     elif self._paths[idx].freq_range.contains(path.freq_range):
+        #         return True
+        #     idx += 1
+        if not any((p.freq_range == path.freq_range) for p in self._paths):
+            self._paths.append(path)
         return True
 
     def __iter__(self) -> Iterator:
@@ -1895,25 +2002,22 @@ class PathValidator:
 
     Private attributes:
     _pass_all          -- True to allow all paths without checks
-    _allow_mobile      -- True to allow mobile paths
     _allow_low_antenna -- True to allow low antennas
     _allow_bad_gain    -- True to allow undefined or out of range RX gain
     _expired_callsigns -- Set of callsigns with reported expiration
     """
-    def __init__(self, pass_all: bool = False, allow_mobile: bool = False,
+    def __init__(self, pass_all: bool = False,
                  _allow_low_antenna: bool = False,
                  allow_bad_gain: bool = False) -> None:
         """ Constructor
 
         Arguments:
         pass_all          -- True to allow all paths without checks
-        allow_mobile      -- True to allow mobile paths
         allow_low_antenna -- True to allow low antennas
         allow_bad_gain    -- True to allow undefined or out of range RX gain
         expired_callsigns -- Set of callsigns with reported expiration
         """
         self._pass_all = pass_all
-        self._allow_mobile = allow_mobile
         self._allow_low_antenna = _allow_low_antenna
         self._allow_bad_gain = allow_bad_gain
         self._expired_callsigns: Set[str] = set()
@@ -1935,34 +2039,27 @@ class PathValidator:
             ComplaintWrongRepeaterMark(
                 callsign=path.callsign, path_num=mi(path.path_num),
                 has_repeaters=len(path.repeaters) > 0)
-        for ac_tx, ac_rx, role_prefix in \
-                ([(path.tx_ant, path.rx_ant, "")] +
-                 [(r.tx, r.rx, f"repeater {idx + 1} ")
-                  for idx, r in enumerate(path.repeaters)]):
-            for ac, role_suffix in [(ac_tx, "transmitter"),
-                                    (ac_rx, "receiver")]:
-                role = role_prefix + role_suffix
-                if (ac.lat is None) or (ac.lon is None):
-                    ComplaintMissingCoordinates(
-                        callsign=path.callsign, path_num=mi(path.path_num),
-                        role=role)
+        for ac, role in [(path.tx_ant, "transmitter"),
+                         (path.rx_ant, "receiver")] + \
+                [(r.ant_coord, f"repeater {idx + 1}")
+                 for idx, r in enumerate(path.repeaters)]:
+            if (ac.lat is None) or (ac.lon is None):
+                ComplaintMissingCoordinates(
+                    callsign=path.callsign, path_num=mi(path.path_num),
+                    role=role)
+                drop = True
+            if ac.height_to_center_raat_m is None:
+                ComplaintMissingAntennaHeight(
+                    callsign=path.callsign, path_num=mi(path.path_num),
+                    role=role)
+                drop = True
+            elif mf(ac.height_to_center_raat_m) < MIN_ANT_HEIGHT_M:
+                ComplaintLowAntennaHeight(
+                    callsign=path.callsign, path_num=mi(path.path_num),
+                    role=role, raat_height_m=ac.height_to_center_raat_m,
+                    drop=not self._allow_low_antenna)
+                if not self._allow_low_antenna:
                     drop = True
-                if ac.height_to_center_raat_m is None:
-                    ComplaintMissingAntennaHeight(
-                        callsign=path.callsign, path_num=mi(path.path_num),
-                        role=role)
-                    drop = True
-                elif mf(ac.height_to_center_raat_m) < MIN_ANT_HEIGHT_M:
-                    ComplaintLowAntennaHeight(
-                        callsign=path.callsign, path_num=mi(path.path_num),
-                        role=role, raat_height_m=ac.height_to_center_raat_m,
-                        drop=not self._allow_low_antenna)
-                    if not self._allow_low_antenna:
-                        drop = True
-                if ac.is_mobile() and (not self._allow_mobile):
-                    drop = True
-        if path.mobile and (not self._allow_mobile):
-            drop = True
         if (path.rx_gain is None) or \
                 (not (RX_GAIN_RANGE[0] <= mf(path.rx_gain) <=
                       RX_GAIN_RANGE[1])):
@@ -1979,6 +2076,267 @@ class PathValidator:
                 cancellation_date=path.cancellation_date)
             self._expired_callsigns.add(path.callsign)
         return not drop
+
+
+class AfcDb:
+    """ Information about AFC database """
+    class Format(enum.Enum):
+        """ AFC database format variations and their properties
+
+        Attributes:
+        has_path_num       -- Has path_number field
+        multirepeater      -- Supports more than one repeater
+        has_repeater_hwg   -- Has information about repeater antenna height,
+                              width, gain
+        separate_repeaters -- Repeaters in separate table
+        """
+        ORIGINAL: Dict[Any, Any] = {}
+        WITH_PATH_NUM = {"has_path_num": True}
+        MULTIREPEATER = {"has_path_num": True, "multirepeater": True}
+        SEP_REP = {"has_path_num": True, "multirepeater": True,
+                   "separate_repeaters": True}
+
+        def __init__(self, args: Dict[str, bool]) -> None:
+            """ Constructor
+
+            Arguments:
+            args -- Dictionary, assigned to enum value """
+            self.has_path_num: bool = args.get("has_path_num", False)
+            self.multirepeater: bool = args.get("multirepeater", False)
+            self.has_repeater_hwg: bool = args.get("multirepeater", False)
+            self.separate_repeaters: bool = \
+                args.get("separate_repeaters", False)
+
+        @classmethod
+        def latest(cls) -> "AfcDb.Format":
+            """ Returns latest table format """
+            return list(cls)[-1]
+
+    class ColInfo:
+        """ AFC database column descriptor
+
+        Attributes:
+        col_arg -- Arguments for sa.Column constructor
+        name    -- Database column name
+        formats -- None or list of formats to which column can be written
+        """
+        def __init__(self, col_arg: ArgContainer,
+                     formats: Optional[List["AfcDb.Format"]] = None) -> None:
+            """ Constructor
+
+            Arguments:
+            col_arg -- Arguments for sa.Column constructor
+            formats -- None or list of formats to which column can be written
+            """
+            self.col_arg = col_arg
+            self.formats: Optional[Set["AfcDb.Format"]] = \
+                set(formats) if formats else None
+            self.name: str = mst(col_arg[0])
+
+    # Path table name for AFC database
+    PATH_TABLE_NAME = "uls"
+
+    # Repeater table ame for AFC database
+    REP_TABLE_NAME = "pr"
+
+    # Maximum number of repeaters
+    MAX_REPEATERS = 3
+
+    # AFC database column descriptors
+    _COLUMNS: Dict[str, List["AfcDb.ColInfo"]] = {
+        PATH_TABLE_NAME: [
+            ColInfo(ArgContainer("id", sa.Integer(), nullable=False,
+                                 primary_key=True),
+                    formats=[Format.ORIGINAL, Format.WITH_PATH_NUM,
+                             Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("fsid", sa.Integer(), nullable=False,
+                                 index=True)),
+            ColInfo(ArgContainer("callsign", sa.Unicode(16), nullable=False)),
+            ColInfo(ArgContainer("status", sa.Unicode(1), nullable=False)),
+            ColInfo(ArgContainer("radio_service", sa.Unicode(4),
+                                 nullable=False)),
+            ColInfo(ArgContainer("name", sa.Unicode(256), nullable=False)),
+            ColInfo(ArgContainer("common_carrier", sa.Boolean(),
+                                 nullable=True)),
+            ColInfo(ArgContainer("mobile", sa.Boolean(), nullable=True)),
+            ColInfo(ArgContainer("rx_callsign", sa.Unicode(16),
+                                 nullable=False)),
+            ColInfo(ArgContainer("rx_antenna_num", sa.Integer(),
+                                 nullable=False)),
+            ColInfo(ArgContainer("freq_assigned_start_mhz", sa.Float(),
+                                 nullable=False)),
+            ColInfo(ArgContainer("freq_assigned_end_mhz", sa.Float(),
+                                 nullable=False)),
+            ColInfo(ArgContainer("tx_eirp", sa.Float(), nullable=True)),
+            ColInfo(ArgContainer("emissions_des", sa.Unicode(64),
+                                 nullable=False)),
+            ColInfo(ArgContainer("tx_lat_deg", sa.Float(), nullable=False,
+                                 index=True)),
+            ColInfo(ArgContainer("tx_long_deg", sa.Float(), nullable=False,
+                                 index=True)),
+            ColInfo(ArgContainer("tx_ground_elev_m", sa.Float(),
+                                 nullable=True)),
+            ColInfo(ArgContainer("tx_polarization", sa.Unicode(5),
+                                 nullable=True)),
+            ColInfo(ArgContainer("tx_height_to_center_raat_m", sa.Float(),
+                                 nullable=True)),
+            ColInfo(ArgContainer("tx_gain", sa.Float(), nullable=True)),
+            ColInfo(ArgContainer("rx_lat_deg", sa.Float(), nullable=False,
+                                 index=True)),
+            ColInfo(ArgContainer("rx_long_deg", sa.Float(), nullable=False,
+                                 index=True)),
+            ColInfo(ArgContainer("rx_ground_elev_m", sa.Float(),
+                                 nullable=True)),
+            ColInfo(ArgContainer("rx_ant_model", sa.Unicode(64),
+                                 nullable=True)),
+            ColInfo(ArgContainer("rx_height_to_center_raat_m", sa.Float(),
+                                 nullable=True)),
+            ColInfo(ArgContainer("rx_gain", sa.Float(), nullable=True)),
+            ColInfo(ArgContainer("p_rx_indicator", sa.Unicode(1),
+                                 nullable=True),
+                    formats=[Format.ORIGINAL, Format.WITH_PATH_NUM,
+                             Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_num", sa.Integer(), nullable=False),
+                    formats=[Format.MULTIREPEATER, Format.SEP_REP]),
+            ColInfo(ArgContainer("p_rp_lat_degs", sa.Float(), nullable=True,
+                                 index=True),
+                    formats=[Format.ORIGINAL, Format.WITH_PATH_NUM]),
+            ColInfo(ArgContainer("p_rp_lon_degs", sa.Float(), nullable=True,
+                                 index=True),
+                    formats=[Format.ORIGINAL, Format.WITH_PATH_NUM]),
+            ColInfo(ArgContainer("p_rp_height_to_center_raat_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.ORIGINAL, Format.WITH_PATH_NUM]),
+            ColInfo(ArgContainer("p_rp_1_lat_degs", sa.Float(), nullable=True,
+                                 index=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_1_lon_degs", sa.Float(), nullable=True,
+                                 index=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_1_height_to_center_raat_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_1_reflector_height_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_1_reflector_width_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_1_back_to_back_gain_tx", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_1_back_to_back_gain_rx", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_2_lat_degs", sa.Float(), nullable=True,
+                                 index=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_2_lon_degs", sa.Float(), nullable=True,
+                                 index=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_2_height_to_center_raat_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_2_reflector_height_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_2_reflector_width_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_2_back_to_back_gain_tx", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_2_back_to_back_gain_rx", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_3_lat_degs", sa.Float(), nullable=True,
+                                 index=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_3_lon_degs", sa.Float(), nullable=True,
+                                 index=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_3_height_to_center_raat_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_3_reflector_height_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_3_reflector_width_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_3_back_to_back_gain_tx", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("p_rp_3_back_to_back_gain_rx", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.MULTIREPEATER]),
+            ColInfo(ArgContainer("path_number", sa.Integer(), nullable=False),
+                    formats=[Format.WITH_PATH_NUM, Format.MULTIREPEATER,
+                             Format.SEP_REP])],
+        REP_TABLE_NAME: [
+            ColInfo(ArgContainer("id", sa.Integer(), primary_key=True,
+                                 nullable=False),
+                    formats=[Format.SEP_REP]),
+            ColInfo(ArgContainer("fsid", sa.Integer(), nullable=False,
+                                 index=True),
+                    formats=[Format.SEP_REP]),
+            ColInfo(ArgContainer("prSeq", sa.Integer(), nullable=False),
+                    formats=[Format.SEP_REP]),
+            ColInfo(ArgContainer("pr_lat_deg", sa.Float(), nullable=True,
+                                 index=True),
+                    formats=[Format.SEP_REP]),
+            ColInfo(ArgContainer("pr_lon_deg", sa.Float(), nullable=True,
+                                 index=True),
+                    formats=[Format.SEP_REP]),
+            ColInfo(ArgContainer("pr_height_to_center_raat_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.SEP_REP]),
+            ColInfo(ArgContainer("pr_reflector_height_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.SEP_REP]),
+            ColInfo(ArgContainer("pr_reflector_width_m", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.SEP_REP]),
+            ColInfo(ArgContainer("pr_back_to_back_gain_tx", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.SEP_REP]),
+            ColInfo(ArgContainer("pr_back_to_back_gain_rx", sa.Float(),
+                                 nullable=True),
+                    formats=[Format.SEP_REP])]}
+
+    @classmethod
+    def columns(cls, db_format: Optional["AfcDb.Format"], table_name: str) -> \
+            Iterator:
+        """ Generates sequence of columns
+
+        Arguments:
+        db_format  -- None or one of AfcDb.Format members (in this case only
+                      columns pertinent to this format should be included
+        table_name -- cls.PATH_TABLE_NAME or cls.REP_TABLE_NAME
+        Return Sequence of AfcDb.ColInfo
+        """
+        for column in cls._COLUMNS[table_name]:
+            if (db_format is not None) and (column.formats is not None) and \
+                    (db_format not in column.formats):
+                continue
+            yield column
+
+    @classmethod
+    def is_afc_db(cls, metadata: sa.MetaData) -> bool:
+        """ True if given metadata is of AFC database """
+        return cls.PATH_TABLE_NAME in metadata
+
+    @classmethod
+    def db_format(cls, metadata: sa.MetaData) -> "AfcDb.Format":
+        """ Format of AFC database of given metadata """
+        if cls.REP_TABLE_NAME in metadata:
+            return cls.Format.SEP_REP
+        table = metadata.tables[cls.PATH_TABLE_NAME]
+        if not hasattr(table.c, "path_number"):
+            return cls.Format.ORIGINAL
+        if not hasattr(table.c, "p_rp_1_lat_degs"):
+            return cls.Format.WITH_PATH_NUM
+        return cls.Format.MULTIREPEATER
 
 
 class DbPathIterator:
@@ -2003,12 +2361,10 @@ class DbPathIterator:
         self._metadata.reflect(bind=engine)
         self._conn = engine.connect()
 
-    def has_extra(self) -> bool:
-        """ Source table supports extra fields """
-        return (AfcWriter.AFC_TABLE_NAME not in self._metadata.tables) or \
-            any(hasattr(self._metadata.tables[AfcWriter.AFC_TABLE_NAME].c,
-                        c.name)
-                for c in AfcWriter.COLUMNS if c.extra)
+    def has_path_num(self) -> bool:
+        """ True if data source has path numbers """
+        return (not AfcDb.is_afc_db(self._metadata)) or \
+            AfcDb.db_format(self._metadata).has_path_num
 
     def __enter__(self) -> "DbPathIterator":
         """ Context manager entry. Returns self """
@@ -2020,70 +2376,129 @@ class DbPathIterator:
 
     def __iter__(self) -> Iterator:
         """ Iterate over paths in database """
-        return \
-            self._afc_paths() \
-            if AfcWriter.AFC_TABLE_NAME in self._metadata.tables \
+        return self._afc_paths() if AfcDb.is_afc_db(self._metadata) \
             else self._uls_paths()
 
     def _afc_paths(self) -> Iterator:
         """ Iterate over AFC database """
-        uls = self._metadata.tables[AfcWriter.AFC_TABLE_NAME]
-        extra_fields: List[Tuple[str, str]] = []
-        for afc_field, path_info_arg in \
-                [("seg_count", "seg_count"),
-                 ("grant_date", "grant_date"),
-                 ("expired_date", "expired_date"),
-                 ("cancellation_date", "cancellation_date"),
-                 ("path_number", "path_num"),
-                 ("path_type_desc", "path_type")]:
-            if hasattr(uls.c, afc_field):
-                extra_fields.append((afc_field, path_info_arg))
+        db_format = AfcDb.db_format(self._metadata)
+        repeaters_by_fsid: Dict[int, List[PathInfo.Repeater]] = {}
+        if db_format.separate_repeaters:
+            pr = self._metadata.tables[AfcDb.REP_TABLE_NAME]
+            s = sa.select([pr]).order_by(pr.c.fsid, pr.c.prSeq)
+            for r in self._conn.execute(s):
+                path_repeaters: List[PathInfo.Repeater] = \
+                    repeaters_by_fsid.setdefault(r.fsid, [])
+                repeater = \
+                    self._get_afc_repeater(
+                        record=r, prefix="pr", coordinate_suffix="",
+                        hwg=db_format.has_repeater_hwg)
+                error_if(repeater is None,
+                         (f"AFC database '{os.path.basename(self._filename)}' "
+                          f"is corrupted: path {r.fsid} has incomplete "
+                          f"information about repeater {r.prSeq}"))
+                assert repeater is not None
+                path_repeaters.append(repeater)
+                error_if(
+                    r.prSeq != len(path_repeaters),
+                    (f"AFC database '{os.path.basename(self._filename)}' is "
+                     f"corrupted: path {r.fsid} has out of sequence repeater "
+                     f"sequence number {r.prSeq}"))
+        uls = self._metadata.tables[AfcDb.PATH_TABLE_NAME]
         s = sa.select([uls])
         row_num = 0
         for r in self._conn.execute(s):
+            repeaters: List[PathInfo.Repeater] = []
+            if db_format.separate_repeaters:
+                repeaters = repeaters_by_fsid.get(r.fsid, [])
+                error_if(
+                    r.p_rp_num != len(repeaters),
+                    (f"Path {r.callsign}/{r.path_number} (FSID {r.fsid}) of "
+                     f"AFC database '{os.path.basename(self._filename)}' has "
+                     f"inconsistent information about repeaters: {r.p_rp_num} "
+                     f"repeaters according to {AfcDb.PATH_TABLE_NAME} but "
+                     f"{len(repeaters)} according to {AfcDb.REP_TABLE_NAME} "
+                     f"table"))
+            elif db_format.multirepeater:
+                for idx in range(1, AfcDb.MAX_REPEATERS + 1):
+                    repeater = \
+                        self._get_afc_repeater(
+                            record=r, prefix=f"p_rp_{idx}",
+                            coordinate_suffix="s",
+                            hwg=db_format.has_repeater_hwg)
+                    if not repeater:
+                        break
+                    repeaters.append(repeater)
+            else:
+                repeater = \
+                    self._get_afc_repeater(
+                        record=r, prefix="p_rp", coordinate_suffix="s",
+                        hwg=db_format.has_repeater_hwg)
+                if repeater:
+                    repeaters.append(repeater)
             path = \
                 PathInfo(
-                    callsign=r["callsign"], status=r["status"],
-                    radio_service=r["radio_service"], name=r["name"],
-                    common_carrier=r["common_carrier"],
-                    mobile=r["mobile"], rx_callsign=r["rx_callsign"],
-                    rx_antenna_num=r["rx_antenna_num"],
+                    callsign=r.callsign, status=r.status,
+                    radio_service=r.radio_service, name=r.name,
+                    common_carrier=r.common_carrier,
+                    mobile=r.mobile, rx_callsign=r.rx_callsign,
+                    rx_antenna_num=r.rx_antenna_num,
                     freq_range=FreqRange(
-                        emission_code=r["emissions_des"],
-                        start_mhz=r["freq_assigned_start_mhz"],
-                        end_mhz=r["freq_assigned_end_mhz"]),
-                    tx_eirp=r["tx_eirp"],
+                        emission_code=r.emissions_des,
+                        start_mhz=r.freq_assigned_start_mhz,
+                        end_mhz=r.freq_assigned_end_mhz),
+                    tx_eirp=r.tx_eirp,
                     tx_ant=PathInfo.AntCoord(
-                        lat=r["tx_lat_deg"], lon=r["tx_long_deg"],
-                        ground_elev_m=r["tx_ground_elev_m"],
-                        height_to_center_raat_m=r[
-                            "tx_height_to_center_raat_m"]),
-                    tx_polarization=r["tx_polarization"], tx_gain=r["tx_gain"],
+                        lat=r.tx_lat_deg, lon=r.tx_long_deg,
+                        ground_elev_m=r.tx_ground_elev_m,
+                        height_to_center_raat_m=r.tx_height_to_center_raat_m),
+                    tx_polarization=r.tx_polarization, tx_gain=r.tx_gain,
                     rx_ant=PathInfo.AntCoord(
-                        lat=r["rx_lat_deg"], lon=r["rx_long_deg"],
-                        ground_elev_m=r["rx_ground_elev_m"],
-                        height_to_center_raat_m=r[
-                            "rx_height_to_center_raat_m"]),
-                    rx_ant_model=r["rx_ant_model"], rx_gain=r["rx_gain"],
-                    repeaters=[PathInfo.Repeater(
-                        tx=PathInfo.AntCoord(
-                            lat=r["p_rp_lat_degs"], lon=r["p_rp_lon_degs"],
-                            height_to_center_raat_m=r[
-                                "p_rp_height_to_center_raat_m"]),
-                        rx=None)]
-                    if any(r[f] is not None for f in
-                           ["p_rp_lat_degs", "p_rp_lon_degs",
-                            "p_rp_height_to_center_raat_m"])
-                    else [],
-                    p_rx_indicator=r["p_rx_indicator"],
-                    **{path_info_arg: r[afc_field]
-                       for afc_field, path_info_arg in extra_fields},
-                    fsid=r["fsid"])
+                        lat=r.rx_lat_deg, lon=r.rx_long_deg,
+                        ground_elev_m=r.rx_ground_elev_m,
+                        height_to_center_raat_m=r.rx_height_to_center_raat_m),
+                    rx_ant_model=r.rx_ant_model, rx_gain=r.rx_gain,
+                    repeaters=repeaters,
+                    p_rx_indicator=('Y' if repeaters else 'N')
+                    if db_format.separate_repeaters
+                    else r.p_rx_indicator,
+                    fsid=r.fsid,
+                    path_num=r.path_number if db_format.has_path_num else None)
             row_num += 1
             if (row_num % 10000) == 0:
                 Progressor.print_progress(f"{row_num}")
             yield path
         Progressor.print_progress()
+
+    def _get_afc_repeater(self, record: Any, prefix: str,
+                          coordinate_suffix: str,
+                          hwg: bool) -> Optional[PathInfo.Repeater]:
+        """ Read repeater from record of AFC database
+
+        Arguments:
+        record            -- Record containing repeater data
+        prefix            -- Prefix of field names
+        coordinate_suffix -- Suffix of coordinate fields' names
+        hwg               -- True if information about repeater antenna heifht,
+                             width and gains present in the record
+        Return Repeater object if it is present else None """
+        lat = record[f"{prefix}_lat_deg{coordinate_suffix}"]
+        lon = record[f"{prefix}_lon_deg{coordinate_suffix}"]
+        raat = record[f"{prefix}_height_to_center_raat_m"]
+        if (lat is None) or (lon is None) or (raat is None):
+            return None
+        return \
+            PathInfo.Repeater(
+                ant_coord=PathInfo.AntCoord(
+                    lat=lat, lon=lon, height_to_center_raat_m=raat),
+                reflector_height=record[
+                    f"{prefix}_reflector_height_m"] if hwg else None,
+                reflector_width=record[
+                    f"{prefix}_reflector_width_m"] if hwg else None,
+                back_to_back_gain_tx=record[
+                    f"{prefix}_back_to_back_gain_tx"] if hwg else None,
+                back_to_back_gain_rx=record[
+                    f"{prefix}_back_to_back_gain_rx"] if hwg else None)
 
     def _uls_paths(self) -> Iterator:
         """ Iterate over ULS database """
@@ -2119,7 +2534,7 @@ class DbPathIterator:
         sg5 = sg1.alias("sg5")
         sg6 = sg1.alias("sg6")
         s = sa.select(
-            [pa.c.call_sign, pa.c.path_number, pa.c.path_type_desc,
+            [pa.c.call_sign, pa.c.path_number,
              hd.c.license_status, hd.c.radio_service_code, en.c.entity_name,
              hd.c.common_carrier, hd.c.mobile, hd.c.grant_date,
              hd.c.expired_date, hd.c.cancellation_date, pa.c.receiver_callsign,
@@ -2143,52 +2558,68 @@ class DbPathIterator:
              lo_r1rx.c.long_degrees, lo_r1rx.c.long_minutes,
              lo_r1rx.c.long_seconds, lo_r1rx.c.long_direction,
              lo_r1rx.c.ground_elevation, lo_r1rx.c.location_type_code,
-             an_r1rx.c.height_to_center_raat,
+             an_r1rx.c.height_to_center_raat, an_r1rx.c.reflector_height,
+             an_r1rx.c.reflector_width, an_r1rx.c.back_to_back_tx_dish_gain,
+             an_r1rx.c.back_to_back_rx_dish_gain,
              lo_r1tx.c.lat_degrees, lo_r1tx.c.lat_minutes,
              lo_r1tx.c.lat_seconds, lo_r1tx.c.lat_direction,
              lo_r1tx.c.long_degrees, lo_r1tx.c.long_minutes,
              lo_r1tx.c.long_seconds, lo_r1tx.c.long_direction,
              lo_r1tx.c.ground_elevation, lo_r1tx.c.location_type_code,
-             an_r1tx.c.height_to_center_raat,
+             an_r1tx.c.height_to_center_raat, an_r1tx.c.reflector_height,
+             an_r1tx.c.reflector_width, an_r1tx.c.back_to_back_tx_dish_gain,
+             an_r1tx.c.back_to_back_rx_dish_gain,
 
              lo_r2rx.c.lat_degrees, lo_r2rx.c.lat_minutes,
              lo_r2rx.c.lat_seconds, lo_r2rx.c.lat_direction,
              lo_r2rx.c.long_degrees, lo_r2rx.c.long_minutes,
              lo_r2rx.c.long_seconds, lo_r2rx.c.long_direction,
              lo_r2rx.c.ground_elevation, lo_r2rx.c.location_type_code,
-             an_r2rx.c.height_to_center_raat,
+             an_r2rx.c.height_to_center_raat, an_r2rx.c.reflector_height,
+             an_r2rx.c.reflector_width, an_r2rx.c.back_to_back_tx_dish_gain,
+             an_r2rx.c.back_to_back_rx_dish_gain,
              lo_r2tx.c.lat_degrees, lo_r2tx.c.lat_minutes,
              lo_r2tx.c.lat_seconds, lo_r2tx.c.lat_direction,
              lo_r2tx.c.long_degrees, lo_r2tx.c.long_minutes,
              lo_r2tx.c.long_seconds, lo_r2tx.c.long_direction,
              lo_r2tx.c.ground_elevation, lo_r2tx.c.location_type_code,
-             an_r2tx.c.height_to_center_raat,
+             an_r2tx.c.height_to_center_raat, an_r2tx.c.reflector_height,
+             an_r2tx.c.reflector_width, an_r2tx.c.back_to_back_tx_dish_gain,
+             an_r2tx.c.back_to_back_rx_dish_gain,
 
              lo_r3rx.c.lat_degrees, lo_r3rx.c.lat_minutes,
              lo_r3rx.c.lat_seconds, lo_r3rx.c.lat_direction,
              lo_r3rx.c.long_degrees, lo_r3rx.c.long_minutes,
              lo_r3rx.c.long_seconds, lo_r3rx.c.long_direction,
              lo_r3rx.c.ground_elevation, lo_r3rx.c.location_type_code,
-             an_r3rx.c.height_to_center_raat,
+             an_r3rx.c.height_to_center_raat, an_r3rx.c.reflector_height,
+             an_r3rx.c.reflector_width, an_r3rx.c.back_to_back_tx_dish_gain,
+             an_r3rx.c.back_to_back_rx_dish_gain,
              lo_r3tx.c.lat_degrees, lo_r3tx.c.lat_minutes,
              lo_r3tx.c.lat_seconds, lo_r3tx.c.lat_direction,
              lo_r3tx.c.long_degrees, lo_r3tx.c.long_minutes,
              lo_r3tx.c.long_seconds, lo_r3tx.c.long_direction,
              lo_r3tx.c.ground_elevation, lo_r3tx.c.location_type_code,
-             an_r3tx.c.height_to_center_raat,
+             an_r3tx.c.height_to_center_raat, an_r3tx.c.reflector_height,
+             an_r3tx.c.reflector_width, an_r3tx.c.back_to_back_tx_dish_gain,
+             an_r3tx.c.back_to_back_rx_dish_gain,
 
              lo_r4rx.c.lat_degrees, lo_r4rx.c.lat_minutes,
              lo_r4rx.c.lat_seconds, lo_r4rx.c.lat_direction,
              lo_r4rx.c.long_degrees, lo_r4rx.c.long_minutes,
              lo_r4rx.c.long_seconds, lo_r4rx.c.long_direction,
              lo_r4rx.c.ground_elevation, lo_r4rx.c.location_type_code,
-             an_r4rx.c.height_to_center_raat,
+             an_r4rx.c.height_to_center_raat, an_r4rx.c.reflector_height,
+             an_r4rx.c.reflector_width, an_r4rx.c.back_to_back_tx_dish_gain,
+             an_r4rx.c.back_to_back_rx_dish_gain,
              lo_r4tx.c.lat_degrees, lo_r4tx.c.lat_minutes,
              lo_r4tx.c.lat_seconds, lo_r4tx.c.lat_direction,
              lo_r4tx.c.long_degrees, lo_r4tx.c.long_minutes,
              lo_r4tx.c.long_seconds, lo_r4tx.c.long_direction,
              lo_r4tx.c.ground_elevation, lo_r4tx.c.location_type_code,
-             an_r4tx.c.height_to_center_raat,
+             an_r4tx.c.height_to_center_raat, an_r4tx.c.reflector_height,
+             an_r4tx.c.reflector_width, an_r4tx.c.back_to_back_tx_dish_gain,
+             an_r4tx.c.back_to_back_rx_dish_gain,
 
              sg6.c.call_sign]).select_from(
                 pa.join(
@@ -2209,9 +2640,11 @@ class DbPathIterator:
                      (lo_rx.c.location_number ==
                       pa.c.receiver_location_number)).
                 join(an, (an.c.call_sign == pa.c.call_sign) &
+                     (an.c.path_number == pa.c.path_number) &
                      (an.c.location_number == pa.c.transmit_location_number) &
                      (an.c.antenna_number == pa.c.transmit_antenna_number)).
                 join(an_rx, (an_rx.c.call_sign == pa.c.call_sign) &
+                     (an_rx.c.path_number == pa.c.path_number) &
                      (an_rx.c.location_number ==
                       pa.c.receiver_location_number) &
                      (an_rx.c.antenna_number == pa.c.receiver_antenna_number)).
@@ -2224,6 +2657,7 @@ class DbPathIterator:
                      (lo_r1rx.c.location_number == sg1.c.receiver_location),
                      isouter=True).
                 join(an_r1rx, (an_r1rx.c.call_sign == pa.c.call_sign) &
+                     (an_r1rx.c.path_number == pa.c.path_number) &
                      (an_r1rx.c.location_number == sg1.c.receiver_location) &
                      (an_r1rx.c.antenna_number == sg1.c.receiver_antenna),
                      isouter=True).
@@ -2234,6 +2668,7 @@ class DbPathIterator:
                      (lo_r1tx.c.location_number == sg2.c.transmit_location),
                      isouter=True).
                 join(an_r1tx, (an_r1tx.c.call_sign == pa.c.call_sign) &
+                     (an_r1tx.c.path_number == pa.c.path_number) &
                      (an_r1tx.c.location_number == sg2.c.transmit_location) &
                      (an_r1tx.c.antenna_number == sg2.c.transmit_antenna),
                      isouter=True).
@@ -2242,6 +2677,7 @@ class DbPathIterator:
                      (lo_r2rx.c.location_number == sg2.c.receiver_location),
                      isouter=True).
                 join(an_r2rx, (an_r2rx.c.call_sign == pa.c.call_sign) &
+                     (an_r2rx.c.path_number == pa.c.path_number) &
                      (an_r2rx.c.location_number == sg2.c.receiver_location) &
                      (an_r2rx.c.antenna_number == sg2.c.receiver_antenna),
                      isouter=True).
@@ -2252,6 +2688,7 @@ class DbPathIterator:
                      (lo_r2tx.c.location_number == sg3.c.transmit_location),
                      isouter=True).
                 join(an_r2tx, (an_r2tx.c.call_sign == pa.c.call_sign) &
+                     (an_r2tx.c.path_number == pa.c.path_number) &
                      (an_r2tx.c.location_number == sg3.c.transmit_location) &
                      (an_r2tx.c.antenna_number == sg3.c.transmit_antenna),
                      isouter=True).
@@ -2260,6 +2697,7 @@ class DbPathIterator:
                      (lo_r3rx.c.location_number == sg3.c.receiver_location),
                      isouter=True).
                 join(an_r3rx, (an_r3rx.c.call_sign == pa.c.call_sign) &
+                     (an_r3rx.c.path_number == pa.c.path_number) &
                      (an_r3rx.c.location_number == sg3.c.receiver_location) &
                      (an_r3rx.c.antenna_number == sg3.c.receiver_antenna),
                      isouter=True).
@@ -2270,6 +2708,7 @@ class DbPathIterator:
                      (lo_r3tx.c.location_number == sg4.c.transmit_location),
                      isouter=True).
                 join(an_r3tx, (an_r3tx.c.call_sign == pa.c.call_sign) &
+                     (an_r3tx.c.path_number == pa.c.path_number) &
                      (an_r3tx.c.location_number == sg4.c.transmit_location) &
                      (an_r3tx.c.antenna_number == sg4.c.transmit_antenna),
                      isouter=True).
@@ -2278,6 +2717,7 @@ class DbPathIterator:
                      (lo_r4rx.c.location_number == sg4.c.receiver_location),
                      isouter=True).
                 join(an_r4rx, (an_r4rx.c.call_sign == pa.c.call_sign) &
+                     (an_r4rx.c.path_number == pa.c.path_number) &
                      (an_r4rx.c.location_number == sg4.c.receiver_location) &
                      (an_r4rx.c.antenna_number == sg4.c.receiver_antenna),
                      isouter=True).
@@ -2288,6 +2728,7 @@ class DbPathIterator:
                      (lo_r4tx.c.location_number == sg5.c.transmit_location),
                      isouter=True).
                 join(an_r4tx, (an_r4tx.c.call_sign == pa.c.call_sign) &
+                     (an_r4tx.c.path_number == pa.c.path_number) &
                      (an_r4tx.c.location_number == sg5.c.transmit_location) &
                      (an_r4tx.c.antenna_number == sg5.c.transmit_antenna),
                      isouter=True).
@@ -2301,10 +2742,10 @@ class DbPathIterator:
             order_by(pa.c.call_sign, pa.c.path_number)
         path_freq_bucket = PathFreqBucket()
         row_num = 0
-        for callsign, path_num, path_type, status, radio_service, name, \
-                common_carrier, mobile, grant_date, expired_date, \
-                cancellation_date, rx_callsign, rx_antenna_num, \
-                freq_mhz, freq_upper_band_mhz, tx_eirp, emission_code, \
+        for callsign, path_num, status, radio_service, name,  common_carrier, \
+                mobile, grant_date, expired_date,  cancellation_date, \
+                rx_callsign, rx_antenna_num,  freq_mhz, freq_upper_band_mhz, \
+                tx_eirp, emission_code, \
                 tx_lat_deg, tx_lat_min, tx_lat_sec, tx_lat_dir, tx_lon_deg, \
                 tx_lon_min, tx_lon_sec, tx_lon_dir, tx_ground_elev_m, \
                 tx_loc_type_code, tx_polarization, \
@@ -2317,42 +2758,58 @@ class DbPathIterator:
                 r1rx_lat_dir, r1rx_lon_deg, r1rx_lon_min, \
                 r1rx_lon_sec, r1rx_lon_dir, \
                 r1rx_ground_elevation, r1rx_loc_type_code, \
-                r1rx_height_to_center_raat_m, \
+                r1rx_height_to_center_raat_m, r1rx_reflector_height, \
+                r1rx_reflector_width, r1rx_back_to_back_gain_tx, \
+                r1rx_back_to_back_gain_rx, \
                 r1tx_lat_deg, r1tx_lat_min, r1tx_lat_sec, \
                 r1tx_lat_dir, r1tx_lon_deg, r1tx_lon_min, \
                 r1tx_lon_sec, r1tx_lon_dir, \
                 r1tx_ground_elevation, r1tx_loc_type_code, \
-                r1tx_height_to_center_raat_m, \
+                r1tx_height_to_center_raat_m, r1tx_reflector_height, \
+                r1tx_reflector_width, r1tx_back_to_back_gain_tx, \
+                r1tx_back_to_back_gain_rx, \
                 r2rx_lat_deg, r2rx_lat_min, r2rx_lat_sec, \
                 r2rx_lat_dir, r2rx_lon_deg, r2rx_lon_min, \
                 r2rx_lon_sec, r2rx_lon_dir, \
                 r2rx_ground_elevation, r2rx_loc_type_code, \
-                r2rx_height_to_center_raat_m, \
+                r2rx_height_to_center_raat_m, r2rx_reflector_height, \
+                r2rx_reflector_width, r2rx_back_to_back_gain_tx, \
+                r2rx_back_to_back_gain_rx, \
                 r2tx_lat_deg, r2tx_lat_min, r2tx_lat_sec, \
                 r2tx_lat_dir, r2tx_lon_deg, r2tx_lon_min, \
                 r2tx_lon_sec, r2tx_lon_dir, \
                 r2tx_ground_elevation, r2tx_loc_type_code, \
-                r2tx_height_to_center_raat_m, \
+                r2tx_height_to_center_raat_m, r2tx_reflector_height, \
+                r2tx_reflector_width, r2tx_back_to_back_gain_tx, \
+                r2tx_back_to_back_gain_rx, \
                 r3rx_lat_deg, r3rx_lat_min, r3rx_lat_sec, \
                 r3rx_lat_dir, r3rx_lon_deg, r3rx_lon_min, \
                 r3rx_lon_sec, r3rx_lon_dir, \
                 r3rx_ground_elevation, r3rx_loc_type_code, \
-                r3rx_height_to_center_raat_m, \
+                r3rx_height_to_center_raat_m, r3rx_reflector_height, \
+                r3rx_reflector_width, r3rx_back_to_back_gain_tx, \
+                r3rx_back_to_back_gain_rx, \
                 r3tx_lat_deg, r3tx_lat_min, r3tx_lat_sec, \
                 r3tx_lat_dir, r3tx_lon_deg, r3tx_lon_min, \
                 r3tx_lon_sec, r3tx_lon_dir, \
                 r3tx_ground_elevation, r3tx_loc_type_code, \
-                r3tx_height_to_center_raat_m, \
+                r3tx_height_to_center_raat_m, r3tx_reflector_height, \
+                r3tx_reflector_width, r3tx_back_to_back_gain_tx, \
+                r3tx_back_to_back_gain_rx, \
                 r4rx_lat_deg, r4rx_lat_min, r4rx_lat_sec, \
                 r4rx_lat_dir, r4rx_lon_deg, r4rx_lon_min, \
                 r4rx_lon_sec, r4rx_lon_dir, \
                 r4rx_ground_elevation, r4rx_loc_type_code, \
-                r4rx_height_to_center_raat_m, \
+                r4rx_height_to_center_raat_m, r4rx_reflector_height, \
+                r4rx_reflector_width, r4rx_back_to_back_gain_tx, \
+                r4rx_back_to_back_gain_rx, \
                 r4tx_lat_deg, r4tx_lat_min, r4tx_lat_sec, \
                 r4tx_lat_dir, r4tx_lon_deg, r4tx_lon_min, \
                 r4tx_lon_sec, r4tx_lon_dir, \
                 r4tx_ground_elevation, r4tx_loc_type_code, \
-                r4tx_height_to_center_raat_m, \
+                r4tx_height_to_center_raat_m, r4tx_reflector_height, \
+                r4tx_reflector_width, r4tx_back_to_back_gain_tx, \
+                r4tx_back_to_back_gain_rx, \
                 sg6_callsign in self._conn.execute(s):
             error_if(sg6_callsign is not None, "6-segment path encountered")
             repeaters: List[PathInfo.Repeater] = []
@@ -2360,55 +2817,75 @@ class DbPathIterator:
                     rrx_lat_dir, rrx_lon_deg, rrx_lon_min, \
                     rrx_lon_sec, rrx_lon_dir, \
                     rrx_ground_elevation, rrx_loc_type_code, rrx_h2c_raat_m, \
+                    rrx_reflector_height, rrx_reflector_width, \
+                    rrx_back_to_back_gain_tx, rrx_back_to_back_gain_rx, \
                     rtx_lat_deg, rtx_lat_min, rtx_lat_sec, \
                     rtx_lat_dir, rtx_lon_deg, rtx_lon_min, \
                     rtx_lon_sec, rtx_lon_dir, \
-                    rtx_ground_elevation, rtx_loc_type_code, rtx_h2c_raat_m \
+                    rtx_ground_elevation, rtx_loc_type_code, rtx_h2c_raat_m, \
+                    rtx_reflector_height, rtx_reflector_width, \
+                    rtx_back_to_back_gain_tx, rtx_back_to_back_gain_rx \
                     in \
                     [(r1rx_lat_deg, r1rx_lat_min, r1rx_lat_sec,
                       r1rx_lat_dir, r1rx_lon_deg, r1rx_lon_min,
                       r1rx_lon_sec, r1rx_lon_dir,
                       r1rx_ground_elevation, r1rx_loc_type_code,
                       r1rx_height_to_center_raat_m,
+                      r1rx_reflector_height, r1rx_reflector_width,
+                      r1rx_back_to_back_gain_tx,  r1rx_back_to_back_gain_rx,
                       r1tx_lat_deg, r1tx_lat_min, r1tx_lat_sec,
                       r1tx_lat_dir, r1tx_lon_deg, r1tx_lon_min,
                       r1tx_lon_sec, r1tx_lon_dir,
                       r1tx_ground_elevation, r1tx_loc_type_code,
-                      r1tx_height_to_center_raat_m),
+                      r1tx_height_to_center_raat_m,
+                      r1tx_reflector_height, r1tx_reflector_width,
+                      r1tx_back_to_back_gain_tx, r1tx_back_to_back_gain_rx),
                      (r2rx_lat_deg, r2rx_lat_min, r2rx_lat_sec,
                       r2rx_lat_dir, r2rx_lon_deg, r2rx_lon_min,
                       r2rx_lon_sec, r2rx_lon_dir,
                       r2rx_ground_elevation, r2rx_loc_type_code,
                       r2rx_height_to_center_raat_m,
+                      r2rx_reflector_height, r2rx_reflector_width,
+                      r2rx_back_to_back_gain_tx, r2rx_back_to_back_gain_rx,
                       r2tx_lat_deg, r2tx_lat_min, r2tx_lat_sec,
                       r2tx_lat_dir, r2tx_lon_deg, r2tx_lon_min,
                       r2tx_lon_sec, r2tx_lon_dir,
                       r2tx_ground_elevation, r2tx_loc_type_code,
-                      r2tx_height_to_center_raat_m),
+                      r2tx_height_to_center_raat_m,
+                      r2tx_reflector_height, r2tx_reflector_width,
+                      r2tx_back_to_back_gain_tx, r2tx_back_to_back_gain_rx),
                      (r3rx_lat_deg, r3rx_lat_min, r3rx_lat_sec,
                       r3rx_lat_dir, r3rx_lon_deg, r3rx_lon_min,
                       r3rx_lon_sec, r3rx_lon_dir,
                       r3rx_ground_elevation, r3rx_loc_type_code,
                       r3rx_height_to_center_raat_m,
+                      r3rx_reflector_height, r3rx_reflector_width,
+                      r3rx_back_to_back_gain_tx, r3rx_back_to_back_gain_rx,
                       r3tx_lat_deg, r3tx_lat_min, r3tx_lat_sec,
                       r3tx_lat_dir, r3tx_lon_deg, r3tx_lon_min,
                       r3tx_lon_sec, r3tx_lon_dir,
                       r3tx_ground_elevation, r3tx_loc_type_code,
-                      r3tx_height_to_center_raat_m),
+                      r3tx_height_to_center_raat_m,
+                      r3tx_reflector_height, r3tx_reflector_width,
+                      r3tx_back_to_back_gain_tx, r3tx_back_to_back_gain_rx),
                      (r4rx_lat_deg, r4rx_lat_min, r4rx_lat_sec,
                       r4rx_lat_dir, r4rx_lon_deg, r4rx_lon_min,
                       r4rx_lon_sec, r4rx_lon_dir,
                       r4rx_ground_elevation, r4rx_loc_type_code,
                       r4rx_height_to_center_raat_m,
+                      r4rx_reflector_height, r4rx_reflector_width,
+                      r4rx_back_to_back_gain_tx, r4rx_back_to_back_gain_rx,
                       r4tx_lat_deg, r4tx_lat_min, r4tx_lat_sec,
                       r4tx_lat_dir, r4tx_lon_deg, r4tx_lon_min,
                       r4tx_lon_sec, r4tx_lon_dir,
                       r4tx_ground_elevation, r4tx_loc_type_code,
-                      r4tx_height_to_center_raat_m)]:
+                      r4tx_height_to_center_raat_m,
+                      r4tx_reflector_height, r4tx_reflector_width,
+                      r4tx_back_to_back_gain_tx, r4tx_back_to_back_gain_rx)]:
                 if rtx_lat_deg is not None:
-                    repeaters.append(
+                    rx = \
                         PathInfo.Repeater(
-                            rx=PathInfo.AntCoord(
+                            ant_coord=PathInfo.AntCoord(
                                 lat_deg=rrx_lat_deg, lat_min=rrx_lat_min,
                                 lat_sec=rrx_lat_sec, lat_dir=rrx_lat_dir,
                                 lon_deg=rrx_lon_deg, lon_min=rrx_lon_min,
@@ -2416,21 +2893,38 @@ class DbPathIterator:
                                 ground_elev_m=rrx_ground_elevation,
                                 height_to_center_raat_m=rrx_h2c_raat_m,
                                 loc_type_code=rrx_loc_type_code),
-                            tx=PathInfo.AntCoord(
+                            reflector_height=rrx_reflector_height,
+                            reflector_width=rrx_reflector_width,
+                            back_to_back_gain_tx=rrx_back_to_back_gain_tx,
+                            back_to_back_gain_rx=rrx_back_to_back_gain_rx)
+                    tx = \
+                        PathInfo.Repeater(
+                            ant_coord=PathInfo.AntCoord(
                                 lat_deg=rtx_lat_deg, lat_min=rtx_lat_min,
                                 lat_sec=rtx_lat_sec, lat_dir=rtx_lat_dir,
                                 lon_deg=rtx_lon_deg, lon_min=rtx_lon_min,
                                 lon_sec=rtx_lon_sec, lon_dir=rtx_lon_dir,
                                 ground_elev_m=rtx_ground_elevation,
                                 height_to_center_raat_m=rtx_h2c_raat_m,
-                                loc_type_code=rtx_loc_type_code)))
+                                loc_type_code=rtx_loc_type_code),
+                            reflector_height=rtx_reflector_height,
+                            reflector_width=rtx_reflector_width,
+                            back_to_back_gain_tx=rtx_back_to_back_gain_tx,
+                            back_to_back_gain_rx=rtx_back_to_back_gain_rx)
+                    consistent, repeater = PathInfo.Repeater.combine(rx, tx)
+                    if not consistent:
+                        ComplaintInconsistentRepeater(
+                            callsign=callsign, path_num=path_num,
+                            repeater_idx=len(repeaters) + 1)
+                    if not repeater:
+                        break
+                    repeaters.append(repeater)
             path = \
                 PathInfo(
                     callsign=callsign, status=status,
                     radio_service=radio_service, name=name,
                     common_carrier=common_carrier, mobile=mobile,
-                    path_type=path_type, rx_callsign=rx_callsign,
-                    rx_antenna_num=rx_antenna_num,
+                    rx_callsign=rx_callsign, rx_antenna_num=rx_antenna_num,
                     freq_range=FreqRange(emission_code=emission_code,
                                          center_mhz=freq_mhz)
                     if freq_upper_band_mhz is None
@@ -2532,123 +3026,64 @@ class AfcWriter:
     Must be used as context manager (with 'with' clause)
 
     Private attributes:
-    _metadata     -- Database metadata
-    _extra_fields -- True if extra (not present in Open AFC version) fields
-                     should be written to database
-    _no_bulk      -- True if no bulk write should be made (terminally slow, but
-                     works on SqlAlchemy 1.2)
-    _rows_data    -- List of row data dictionaries, prepared for bulk write
-    _table        -- sa.Table object
-    _validator    -- PathValidator to vet paths being written
-    _fsid_gen     -- FsidGenerator object for 'fsid' field generation
+    _metadata       -- Database metadata
+    _no_bulk        -- True if no bulk write should be made (terminally slow,
+                       but works on SqlAlchemy 1.2)
+    _path_rows_data -- List of path table row data dictionaries, prepared for
+                       bulk write
+    _rep_rows_data  -- List of repeater table row data dictionaries, prepared
+                       for bulk write
+    _path_table     -- Table object for paths
+    _rep_table      -- Table object for repeaters or None
+    _validator      -- PathValidator to vet paths being written
+    _fsid_gen       -- FsidGenerator object for 'fsid' field generation
+    _db_format      -- AfcDb.Format to write database in. None to write in
+                       universally compatible format
+    _path_col_names -- Column names in path database
+    _rep_col_names  -- Column names in repeater database
     """
     # Number of records to write to AFC database in a single transaction
     AFC_TRANSACTION_LENGTH = 500
 
-    # Table name for AFC database
-    AFC_TABLE_NAME = "uls"
-
-    class AfcCol:
-        """ AFC database column descriptor
-
-        Attributes:
-        col_arg -- Arguments for sa.Column constructor
-        extra   -- True for extra (not present in Open AFC version of database)
-                   column
-        name    -- Database column name
-        """
-        def __init__(self, col_arg: ArgContainer, extra: bool = False) -> None:
-            """ Constructor
-
-            Arguments:
-            col_arg -- Arguments for sa.Column constructor
-            extra   -- True for extra (not present in Open AFC version of
-                       database) column
-            """
-            self.col_arg = col_arg
-            self.extra = extra
-            self.name: str = mst(col_arg[0])
-
-    # AFC database column descriptors
-    COLUMNS: List["AfcWriter.AfcCol"] = [
-        AfcCol(ArgContainer("id", sa.Integer(), nullable=False,
-                            primary_key=True, index=True)),
-        AfcCol(ArgContainer("fsid", sa.Integer(), nullable=False, index=True)),
-        AfcCol(ArgContainer("callsign", sa.Unicode(16), nullable=False)),
-        AfcCol(ArgContainer("seg_count", sa.Integer(), nullable=True),
-               extra=True),
-        AfcCol(ArgContainer("grant_date", sa.Date(), nullable=True),
-               extra=True),
-        AfcCol(ArgContainer("expired_date", sa.Date(), nullable=True),
-               extra=True),
-        AfcCol(ArgContainer("cancellation_date", sa.Date(), nullable=True),
-               extra=True),
-        AfcCol(ArgContainer("path_type_desc", sa.Unicode(20), nullable=True),
-               extra=True),
-        AfcCol(ArgContainer("status", sa.Unicode(1), nullable=False)),
-        AfcCol(ArgContainer("radio_service", sa.Unicode(4), nullable=False)),
-        AfcCol(ArgContainer("name", sa.Unicode(256), nullable=False)),
-        AfcCol(ArgContainer("common_carrier", sa.Boolean(), nullable=True)),
-        AfcCol(ArgContainer("mobile", sa.Boolean(), nullable=True)),
-        AfcCol(ArgContainer("rx_callsign", sa.Unicode(16), nullable=False)),
-        AfcCol(ArgContainer("rx_antenna_num", sa.Integer(), nullable=False)),
-        AfcCol(ArgContainer("freq_assigned_start_mhz", sa.Float(),
-                            nullable=False)),
-        AfcCol(ArgContainer("freq_assigned_end_mhz", sa.Float(),
-                            nullable=False)),
-        AfcCol(ArgContainer("tx_eirp", sa.Float(), nullable=True)),
-        AfcCol(ArgContainer("emissions_des", sa.Unicode(64), nullable=False)),
-        AfcCol(ArgContainer("tx_lat_deg", sa.Float(), nullable=False,
-                            index=True)),
-        AfcCol(ArgContainer("tx_long_deg", sa.Float(), nullable=False,
-                            index=True)),
-        AfcCol(ArgContainer("tx_ground_elev_m", sa.Float(), nullable=True)),
-        AfcCol(ArgContainer("tx_polarization", sa.Unicode(5), nullable=True)),
-        AfcCol(ArgContainer("tx_height_to_center_raat_m", sa.Float(),
-                            nullable=True)),
-        AfcCol(ArgContainer("tx_gain", sa.Float(), nullable=True)),
-        AfcCol(ArgContainer("rx_lat_deg", sa.Float(), nullable=False,
-                            index=True)),
-        AfcCol(ArgContainer("rx_long_deg", sa.Float(), nullable=False,
-                            index=True)),
-        AfcCol(ArgContainer("rx_ground_elev_m", sa.Float(), nullable=True)),
-        AfcCol(ArgContainer("rx_ant_model", sa.Unicode(64), nullable=True)),
-        AfcCol(ArgContainer("rx_height_to_center_raat_m", sa.Float(),
-                            nullable=True)),
-        AfcCol(ArgContainer("rx_gain", sa.Float(), nullable=True)),
-        AfcCol(ArgContainer("p_rx_indicator", sa.Unicode(1), nullable=True)),
-        AfcCol(ArgContainer("p_rp_lat_degs", sa.Float(), nullable=True,
-                            index=True)),
-        AfcCol(ArgContainer("p_rp_lon_degs", sa.Float(), nullable=True,
-                            index=True)),
-        AfcCol(ArgContainer("p_rp_height_to_center_raat_m", sa.Float(),
-                            nullable=True)),
-        AfcCol(ArgContainer("path_number", sa.Integer(), nullable=False))]
-
     def __init__(self, db_filename: Optional[str], validator: PathValidator,
-                 extra_fields: bool, fsid_gen: FsidGenerator) -> None:
+                 fsid_gen: FsidGenerator, compatibility: bool) -> None:
         """ Constructor
 
         Arguments:
-        db_filename  -- Name of SQLite file to generate. None means creation of
-                        fake writer that explodes on attempt to write
-        validator    -- PathValidator to vet incoming paths
-        extra_fields -- True to write extra (not present in Open AFC version)
-                        fields to database
-        fsid_gen     -- FsidGenerator object for 'fsid' field generation
+        db_filename   -- Name of SQLite file to generate. None means creation
+                         of fake writer that explodes on attempt to write
+        validator     -- PathValidator to vet incoming paths
+        fsid_gen      -- FsidGenerator object for 'fsid' field generation
+        compatibility -- True to write database in universally-compatible
+                         format, False to write in latest known format
         """
         self._validator = validator
         self._metadata = sa.MetaData()
-        self._extra_fields = extra_fields
         self._fsid_gen = fsid_gen
         self._no_bulk = False
-        self._rows_data: List[ROW_DATA_TYPE] = []
+        self._path_rows_data: List[ROW_DATA_TYPE] = []
+        self._rep_rows_data: List[ROW_DATA_TYPE] = []
+        self._db_format = None if compatibility else AfcDb.Format.latest()
+        self._path_col_names: Set[str] = set()
+        self._rep_col_names: Set[str] = set()
 
-        sa_table_args: List[Any] = [self.AFC_TABLE_NAME, self._metadata]
-        for col in self.COLUMNS:
-            if self._extra_fields or (not col.extra):
-                sa_table_args.append(col.col_arg.apply(sa.Column))
-        self._table = sa.Table(*sa_table_args)
+        sa_path_table_args: List[Any] = [AfcDb.PATH_TABLE_NAME, self._metadata]
+        for col in AfcDb.columns(db_format=self._db_format,
+                                 table_name=AfcDb.PATH_TABLE_NAME):
+            sa_path_table_args.append(col.col_arg.apply(sa.Column))
+            self._path_col_names.add(col.name)
+        self._path_table = sa.Table(*sa_path_table_args)
+
+        self._rep_table: Optional[sa.Table] = None
+        if (self._db_format is None) or self._db_format.separate_repeaters:
+            sa_rep_table_args: List[Any] = [AfcDb.REP_TABLE_NAME,
+                                            self._metadata]
+            for col in AfcDb.columns(db_format=self._db_format,
+                                     table_name=AfcDb.REP_TABLE_NAME):
+                sa_rep_table_args.append(col.col_arg.apply(sa.Column))
+                self._rep_col_names.add(col.name)
+            self._rep_table = sa.Table(*sa_rep_table_args)
+
         if db_filename is not None:
             engine = sa.create_engine("sqlite:///" + db_filename)
             self._metadata.create_all(engine)
@@ -2672,10 +3107,7 @@ class AfcWriter:
         assert self._conn is not None
         if not self._validator.validate(path):
             return
-        repeater = \
-            path.repeaters[0] if path.repeaters \
-            else PathInfo.Repeater(rx=None, tx=None)
-        row_data: ROW_DATA_TYPE = \
+        path_row_data: ROW_DATA_TYPE = \
             {"fsid": self._fsid_gen.fsid(path),
              "callsign": path.callsign,
              "status": path.status,
@@ -2702,46 +3134,115 @@ class AfcWriter:
              "rx_height_to_center_raat_m": path.rx_ant.height_to_center_raat_m,
              "rx_gain": path.rx_gain,
              "p_rx_indicator": path.p_rx_indicator,
-             "p_rp_lat_degs": repeater.tx.lat,
-             "p_rp_lon_degs": repeater.tx.lon,
-             "p_rp_height_to_center_raat_m":
-             repeater.tx.height_to_center_raat_m,
              "path_number": path.path_num}
-        if self._extra_fields:
-            row_data["seg_count"] = path.seg_count
-            row_data["grant_date"] = path.grant_date
-            row_data["expired_date"] = path.expired_date
-            row_data["cancellation_date"] = path.cancellation_date
-            row_data["path_type_desc"] = path.path_type
-        self._write(row_data)
+        empty_repeater = \
+            PathInfo.Repeater(
+                ant_coord=PathInfo.AntCoord(), reflector_height=None,
+                reflector_width=None, back_to_back_gain_tx=None,
+                back_to_back_gain_rx=None)
 
-    def _write(self, row_data: Optional[ROW_DATA_TYPE] = None) -> None:
+        # Modern multirepeater format
+        path_row_data["p_rp_num"] = len(path.repeaters)
+        for idx in range(1, AfcDb.MAX_REPEATERS + 1):
+            r = path.repeaters[idx - 1] if idx <= len(path.repeaters) \
+                else empty_repeater
+            assert r is not None
+            assert r.ant_coord is not None
+            path_row_data[f"p_rp_{idx}_lat_degs"] = r.ant_coord.lat
+            path_row_data[f"p_rp_{idx}_lon_degs"] = r.ant_coord.lon
+            path_row_data[f"p_rp_{idx}_height_to_center_raat_m"] = \
+                r.ant_coord.height_to_center_raat_m
+            path_row_data[f"p_rp_{idx}_reflector_height_m"] = \
+                r.reflector_height
+            path_row_data[f"p_rp_{idx}_reflector_width_m"] = r.reflector_width
+            path_row_data[f"p_rp_{idx}_back_to_back_gain_tx"] = \
+                r.back_to_back_gain_tx
+            path_row_data[f"p_rp_{idx}_back_to_back_gain_rx"] = \
+                r.back_to_back_gain_rx
+
+        # Legacy single-repeater format
+        r = path.repeaters[-1] if path.repeaters else empty_repeater
+        assert r is not None
+        assert r.ant_coord is not None
+        path_row_data["p_rp_lat_degs"] = r.ant_coord.lat
+        path_row_data["p_rp_lon_degs"] = r.ant_coord.lon
+        path_row_data["p_rp_height_to_center_raat_m"] = \
+            r.ant_coord.height_to_center_raat_m
+
+        # Separate repeaters table
+        repeater_rows_data: List[ROW_DATA_TYPE] = []
+        if self._rep_col_names:
+            for idx, r in enumerate(path.repeaters):
+                assert r.ant_coord is not None
+                repeater_rows_data.append(
+                    {"fsid": path_row_data["fsid"],
+                     "prSeq": idx + 1,
+                     "pr_lat_deg": r.ant_coord.lat,
+                     "pr_lon_deg": r.ant_coord.lon,
+                     "pr_height_to_center_raat_m":
+                         r.ant_coord.height_to_center_raat_m,
+                     "pr_reflector_height_m": r.reflector_height,
+                     "pr_reflector_width_m": r.reflector_width,
+                     "pr_back_to_back_gain_tx": r.back_to_back_gain_tx,
+                     "pr_back_to_back_gain_rx": r.back_to_back_gain_rx})
+                self._filter_columns(row_data=repeater_rows_data[-1],
+                                     allowed_columns=self._rep_col_names)
+        self._filter_columns(row_data=path_row_data,
+                             allowed_columns=self._path_col_names)
+        self._write(path_row_data, repeater_rows_data)
+
+    def _write(self, path_row_data: Optional[ROW_DATA_TYPE] = None,
+               rep_rows_data: Optional[List[ROW_DATA_TYPE]] = None) -> None:
         """ Writes given row dictionary to database
 
         Arguments:
-        row_data -- Row dictionary or None - in latter case write of
-                    accumulated data to database is forced
-        """
-        if row_data is not None:
-            self._rows_data.append(row_data)
-        if not self._rows_data:
+        path_row_data -- Path row dictionary or None - in latter case write of
+                         accumulated data to database is forced """
+        if path_row_data is not None:
+            self._path_rows_data.append(path_row_data)
+        if rep_rows_data:
+            self._rep_rows_data += rep_rows_data
+        if not self._path_rows_data:
             return
-        if (row_data is None) or self._no_bulk or \
-                (len(self._rows_data) > self.AFC_TRANSACTION_LENGTH):
+        if (path_row_data is None) or self._no_bulk or \
+                (len(self._path_rows_data) > self.AFC_TRANSACTION_LENGTH):
             transaction = self._conn.begin()
-            ins = sa.insert(self._table).execution_options(autocommit=False)
+            ins = \
+                sa.insert(self._path_table).execution_options(autocommit=False)
             if self._no_bulk:
-                self._conn.execute(ins, self._rows_data)
+                self._conn.execute(ins, self._path_rows_data)
             else:
                 try:
-                    self._conn.execute(ins.values(self._rows_data))
-                except sa.exc.CompileError:
+                    self._conn.execute(ins.values(self._path_rows_data))
+                except sa.exc.CompileError as ex:
+                    logging.error(f"Database creation problem: {ex}")
+                    if self._no_bulk:
+                        raise
                     self._no_bulk = True
                     transaction.rollback()
                     transaction = self._conn.begin()
-                    self._conn.execute(ins, self._rows_data)
+                    self._conn.execute(ins, self._path_rows_data)
+            if self._rep_rows_data:
+                ins = sa.insert(self._rep_table).\
+                    execution_options(autocommit=False)
+                if self._no_bulk:
+                    for rep_row_data in self._rep_rows_data:
+                        self._conn.execute(ins, rep_row_data)
+                else:
+                    self._conn.execute(ins.values(self._rep_rows_data))
             transaction.commit()
-            self._rows_data = []
+            self._path_rows_data = []
+            self._rep_rows_data = []
+
+    def _filter_columns(self, row_data: ROW_DATA_TYPE,
+                        allowed_columns: Set[str]) -> None:
+        """ Remove columns except allowed
+
+        Arguments:
+        row_data        -- Name-value dictionary
+        allowed_columns -- Allowed column names """
+        for column in (row_data.keys() - allowed_columns):
+            del row_data[column]
 
 
 class Downloader:
@@ -2749,16 +3250,17 @@ class Downloader:
     Must be used as context manager (with 'with' clause)
 
     Public attributes
-    date     -- Upload datetime (without timezone set) or None
-    inc_date -- Upload datetime (without timezone set) of latest increment data
-                or None
+    date     -- (upload_datetime, timezone_name) or (None, None)
+    inc_date -- (upload_datetime, timezone_name) of latest increment data or
+                (None, None_
 
     Private attributes:
-    _directory   -- Download directory
-    _no_download -- Don't do download, just use already existing files
-    _retain      -- True to retain download directory, False to remove it after
-                    operation
-    _zip_file    -- None or .zip file to take all data from
+    _zip_dir      -- Directory with zip files or None
+    _unpacked_dir -- Directory with unpacked raw data
+    _no_download  -- Don't do download, just use already existing files
+    _retain       -- True to retain download directory, False to remove it
+                     after operation
+    _zip_file     -- None or .zip file to take all data from
     """
     # Weekly FCC ULS archive URL
     WEEKLY_URL = "https://data.fcc.gov/download/pub/uls/complete/l_micro.zip"
@@ -2779,34 +3281,30 @@ class Downloader:
     # Maximum download attempts
     MAX_DOWNLOAD_RETRIES = 10
 
-    def __init__(self, directory: Optional[str], no_download: bool,
+    def __init__(self, from_dir: Optional[str], to_dir: Optional[str],
                  retry: bool, zip_file: Optional[str]) -> None:
         """ Constructor
 
         Arguments:
-        directory   -- Explicitly specified download directory or None to use
-                       temporary directory
-        no_download -- True to use files already in download directory,
-                       bypassing download
+        from_dir    -- None or directory to read files from
+        to_dir      -- None or directory to download files to
         retry       -- True to retry download several times
         zip_file    -- None or name of ZIP archive to take all data from
         """
-        if no_download:
-            error_if(directory is None,
-                     "Download directory name must be specified for " +
-                     "download to be skipped")
-            assert directory is not None
-            error_if(not os.path.isdir(directory),
-                     f"Directory '{directory}' not found")
+        error_if(from_dir and (not os.path.isdir(from_dir)),
+                 f"Directory '{from_dir}' not found")
         error_if(zip_file and (not os.path.isfile(zip_file)),
-                 f"Archive '{zip}' not found")
-        self._directory = directory
-        self._no_download = no_download
+                 f"Archive '{zip_file}' not found")
+        self._zip_dir = from_dir or to_dir
+        self._unpacked_dir: Optional[str] = None
+        self._no_download = from_dir is not None
         self._retry = retry
-        self._retain = directory is not None
+        self._retain = self._zip_dir is not None
         self._zip_file = zip_file
-        self.date: Optional[datetime.date] = None
-        self.inc_date: Optional[datetime.date] = None
+        self.date: Tuple[Optional[datetime.datetime], Optional[str]] = \
+            (None, None)
+        self.inc_date: Tuple[Optional[datetime.datetime], Optional[str]] = \
+            (None, None)
 
     def __enter__(self) -> "Downloader":
         """ Context manager entry. Returns self """
@@ -2815,101 +3313,140 @@ class Downloader:
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         """ Context manager exit. Removes download directory if it is not to be
         retained """
-        if (not self._retain) and (self._directory is not None):
-            shutil.rmtree(self._directory)
+        if self._unpacked_dir is not None:
+            shutil.rmtree(self._unpacked_dir)
+        if (not self._retain) and (self._zip_dir is not None):
+            shutil.rmtree(self._zip_dir)
 
     @property
-    def directory(self):
-        """ Root download directory. Asserts if asked before download() """
-        assert self.date is not None
-        return self._directory
+    def unpacked_directory(self):
+        """ Root directory of unpacked files. Asserts if asked before
+        download() """
+        assert self.date[0] is not None
+        return self._unpacked_dir
 
     def download(self) -> Dict[Optional[datetime.datetime], str]:
         """ Perform the download
 
         Returns dictionary. Keys are: None for last full database, datetimes
-        for daily updates. Values are download directories for these keys """
-        dow_dir: Callable[[str], str] = \
-            lambda dow: os.path.join(mst(self._directory), dow)
+        for daily updates. Values are directories with unpacked raw ULS files
+        for these days """
         dow_url: Callable[[str], str] = \
             lambda dow: self.WEEKLY_URL if (dow == self.DOW_FULL) \
             else self.DAILY_URL.format(dow=dow)
-        if self._directory is None:
-            self._directory = \
+        # Creating zip directory (if needed) and unpacked files root directory
+        if self._zip_dir is None:
+            self._zip_dir = \
                 tempfile.mkdtemp(
                     prefix=os.path.splitext(os.path.basename(__file__))[0])
-        else:
-            os.makedirs(self._directory, exist_ok=True)
+        elif not self._zip_file:
+            os.makedirs(self._zip_dir, exist_ok=True)
+
+        self._unpacked_dir = \
+            tempfile.mkdtemp(
+                prefix=os.path.splitext(os.path.basename(__file__))[0])
+
+        # Daily/full directory names
         dows = [self.DOW_FULL] + self.DOWS
+        # Daily archives
+        zip_files: Dict[str, str] = {}
+
+        # Downloading/finding zip archives
         if self._zip_file:
-            dows = [self.DOW_FULL]
-            with Timing("Extracting files"), \
-                    zipfile.ZipFile(self._zip_file) as z:
-                z.extractall(dow_dir(self.DOW_FULL))
-        elif not self._no_download:
-            assert self._directory is not None
+            zip_files[self.DOW_FULL] = self._zip_file
+        elif self._no_download:
+            assert self._zip_dir is not None
+            for dow, synonyms in ([(self.DOW_FULL, ["weekly", "full"])] +
+                                  [(d, [d]) for d in self.DOWS]):
+                for fn in \
+                        [os.path.splitext(
+                            os.path.basename(
+                                urllib.parse.urlparse(
+                                    dow_url(dow)).path))[0]] + \
+                        synonyms:
+                    full_file_name = os.path.join(self._zip_dir, fn) + ".zip"
+                    if os.path.isfile(full_file_name):
+                        zip_files[dow] = full_file_name
+                        break
+        else:
             old_cdhc = ssl._create_default_https_context
             ssl._create_default_https_context = ssl._create_unverified_context
             try:
                 for dow in dows:
                     with Timing(f"Downloading '{dow_url(dow)}'"):
                         attempt = 0
-                        zip_file: Optional[str] = None
-                        while attempt < \
-                                (self.MAX_DOWNLOAD_RETRIES if self._retry
-                                 else 1):
+                        num_attempts = \
+                            self.MAX_DOWNLOAD_RETRIES if self._retry else 1
+                        while attempt < num_attempts:
                             if attempt:
                                 time.sleep(10)
                             attempt += 1
                             zip_file = self._download_file(dow_url(dow))
-                            if zip_file is None:
+                            if zip_file is not None:
+                                try:
+                                    with zipfile.ZipFile(zip_file) as z:
+                                        if z.testzip() is not None:
+                                            zip_file = None
+                                except zipfile.BadZipFile:
+                                    assert zip_file is not None
+                                    logging.warning(
+                                        (f"Broken "
+                                         f"'{os.path.basename(zip_file)}'"))
+                                    zip_file = None
+                            if zip_file is not None:
+                                zip_files[dow] = zip_file
+                                break
+                            if attempt < num_attempts:
+                                logging.warning("Retrying")
                                 continue
-                            try:
-                                with zipfile.ZipFile(zip_file) as z:
-                                    z.extractall(dow_dir(dow))
-                            except zipfile.BadZipFile:
-                                logging.info(
-                                    (f"Invalid content of downloaded "
-                                     f"{zip_file}. Possible reason is "
-                                     f"incomplete download (e.g. due to CPU "
-                                     f"overload)"))
-                                zip_file = None
-                                continue
+                            logging.warning(
+                                f"Failed to download {dow_url(dow)}")
                             break
-                        error_if(zip_file is None,
-                                 f"'{dow_url(dow)}' download failed")
             finally:
                 ssl._create_default_https_context = old_cdhc
+        error_if(self.DOW_FULL not in zip_files,
+                 (f"Full (nonincremental) ULS data not "
+                  f"{'found' if self._no_download else 'downloaded'}"))
         ret: Dict[Optional[datetime.datetime], str] = {}
         full_date: Optional[datetime.datetime] = None
-        self.date = None
-        self.inc_date = None
+        self.date = (None, None)
+        self.inc_date = (None, None)
+        # Unpacking archives and computing dates based on 'counts' files
         for dow in dows:
-            if (dow != self.DOW_FULL) and (not os.path.isdir(dow_dir(dow))):
+            if dow not in zip_files:
                 continue
-            counts_filename = os.path.join(dow_dir(dow), "counts")
+            unpacked_dow_dir = os.path.join(mst(self._unpacked_dir), dow)
+            try:
+                with zipfile.ZipFile(zip_files[dow]) as z:
+                    z.extractall(unpacked_dow_dir)
+            except zipfile.BadZipFile:
+                error(f"Broken '{os.path.basename(zip_files[dow])}'")
+            counts_filename = os.path.join(unpacked_dow_dir, "counts")
             error_if(not os.path.isfile(counts_filename),
-                     f"'counts' file not found in '{dow_url(dow)}'")
+                     f"'counts' file not found in "
+                     f"'{os.path.basename(zip_files[dow])}'")
             with open(counts_filename, mode="r", encoding="ascii") as f:
-                content_date = self._parse_counts_date(counts_content=f.read(),
-                                                       url=dow_url(dow))
-            if (self.date is None) or (content_date > self.date):
-                self.date = content_date
+                content_date, content_tz = \
+                    self._parse_counts_date(counts_content=f.read(),
+                                            url=dow_url(dow))
+            if (self.date[0] is None) or (content_date > self.date[0]):
+                self.date = (content_date, content_tz)
             if (dow == self.DOW_FULL):
                 full_date = content_date
-            elif (self.inc_date is None) or (content_date > self.inc_date):
-                self.inc_date = content_date
+            elif (self.inc_date[0] is None) or \
+                    (content_date > self.inc_date[0]):
+                self.inc_date = (content_date, content_tz)
             assert full_date is not None
             if (dow == self.DOW_FULL) or (content_date > full_date):
                 ret[None if (dow == self.DOW_FULL) else content_date] = \
-                    dow_dir(dow)
+                    unpacked_dow_dir
         return ret
 
     def _download_file(self, url: str) -> Optional[str]:
         """ Download file at given URL to download directory """
-        assert self._directory is not None
+        assert self._zip_dir is not None
         filename = \
-            os.path.join(self._directory,
+            os.path.join(self._zip_dir,
                          os.path.basename(urllib.parse.urlparse(url).path))
         download_started = False
         fail_reason = None
@@ -2934,32 +3471,33 @@ class Downloader:
             return filename
         logging.warning(
             (f"Download attempt for {url} failed"
-             f"{(' (' + fail_reason + ')') if fail_reason else ''}. "
-             f"Retrying"))
+             f"{(' (' + fail_reason + ')') if fail_reason else ''}"))
         return None
 
     def _parse_counts_date(self, counts_content: str, url: str) \
-            -> datetime.datetime:
-        """ Returns datetime, extracted from given contents of 'counts' file
-        """
+            -> Tuple[datetime.datetime, str]:
+        """ Returns datetime and time zone name, extracted from given contents
+        of 'counts' file """
         m = \
             re.match(
                 r"^File Creation Date: " +
-                r"\S{3}\s+(\S{3}\s+\d+\s+\d+:\d+:\d+\s+)\S+\s+(\d+)(\r|\n)",
+                r"\S{3}\s+(\S{3}\s+\d+\s+\d+:\d+:\d+)\s+(\S+)\s+(\d+)(\r|\n)",
                 counts_content)
         error_if(not m, f"Unrecognized date format in 'counts' of '{url}'")
         assert m is not None
-        with threading.Lock():
-            old_lc_time = locale.getlocale(locale.LC_TIME)
-            locale.setlocale(locale.LC_TIME, "C")
-            try:
-                return datetime.datetime.strptime(m.group(1) + m.group(2),
-                                                  "%b %d %H:%M:%S %Y")
-            except ValueError:
-                error(f"Unrecognized date format in 'counts' of '{url}'")
-                return datetime.datetime.now()  # Appeasing MyPy
-            finally:
-                locale.setlocale(locale.LC_TIME, old_lc_time)
+
+        old_lc_time = locale.getlocale(locale.LC_TIME)
+        locale.setlocale(locale.LC_TIME, "C")
+        try:
+            return \
+                (datetime.datetime.strptime(m.group(1) + " " + m.group(3),
+                                            "%b %d %H:%M:%S %Y"),
+                 m.group(2))
+        except ValueError:
+            error(f"Unrecognized date format in 'counts' of '{url}'")
+            return (datetime.datetime.now(), "")  # Appeasing MyPy
+        finally:
+            locale.setlocale(locale.LC_TIME, old_lc_time)
 
 
 class UlsFileReader:
@@ -3451,6 +3989,11 @@ class DownloadedPathIterator:
                           ((callsign, loc_num, ant_num) tuples
     _paths_by_callsign -- Dictionary of lists of _AfcPathInfo objects, indexed
                           by callsign
+    _locations         -- Dictionary of relevant excerpts from LO records,
+                          indexed by (callsign, location) tuples
+    _antennas          -- Dictionary of relevant excerpts from AN records,
+                          indexed by (callsign, path_number, location, antenna)
+                          tuples
     """
     class _AfcPathInfo:
         """ Bucket of data about path
@@ -3458,7 +4001,6 @@ class DownloadedPathIterator:
         Attributes:
         callsign              -- Path callsign
         path_num              -- Path number
-        path_type             -- Path Type from PA
         tx_loc_num            -- TX location number
         tx_ant_num            -- TX antenna number
         rx_loc_num            -- RX location number
@@ -3475,8 +4017,8 @@ class DownloadedPathIterator:
         expired_date          -- License expired date string (initially None)
         cancellation_date     -- License cancellation date string (initially
                                  None)
-        em_des_by_num_by_freq -- Nonempty widest emission descriptors by
-                                 frequency number then by frequency
+        em_des_by_num_by_freq -- Lists of emission descriptors, ordered by
+                                 frequency numbers, then by frequency
         freq_by_hash          -- FreqRange object, indexed by hash (initially
                                  empty)
         segments              -- List of Segment objects. Initially empty
@@ -3497,8 +4039,7 @@ class DownloadedPathIterator:
                 self.rx_loc_num = rx_loc_num
                 self.rx_ant_num = rx_ant_num
 
-        def __init__(self, callsign: str, path_num: int,
-                     path_type: Optional[str], tx_loc_num: int,
+        def __init__(self, callsign: str, path_num: int, tx_loc_num: int,
                      tx_ant_num: int, rx_loc_num: int, rx_ant_num: int,
                      rx_callsign: Optional[str],
                      p_rx_indicator: Optional[str]) -> None:
@@ -3507,7 +4048,6 @@ class DownloadedPathIterator:
             Arguments:
             callsign       -- Callsign
             path_num       -- Path number
-            path_type      -- Path Type from PA
             tx_loc_num     -- TX location number
             tx_ant_num     -- TX antenna number
             rx_loc_num     -- RX location number
@@ -3517,7 +4057,6 @@ class DownloadedPathIterator:
             """
             self.callsign = callsign
             self.path_num = path_num
-            self.path_type = path_type
             self.tx_loc_num = tx_loc_num
             self.tx_ant_num = tx_ant_num
             self.rx_loc_num = rx_loc_num
@@ -3533,7 +4072,7 @@ class DownloadedPathIterator:
             self.grant_date: Optional[str] = None
             self.expired_date: Optional[str] = None
             self.cancellation_date: Optional[str] = None
-            self.em_des_by_num_by_freq: Dict[int, Dict[float, str]] = {}
+            self.em_des_by_num_by_freq: Dict[int, Dict[float, List[str]]] = {}
             self.freq_by_hash: Dict[int, FreqRange] = {}
             self.segments: \
                 Dict[int, "DownloadedPathIterator._AfcPathInfo.Segment"] = {}
@@ -3564,20 +4103,44 @@ class DownloadedPathIterator:
         """ Antenna information
 
         Attributes:
-        ant_cord      -- Optional PathInfo.AntCoord object
-        model         -- Optional antenna model string
-        polarization  -- Optional antenna polarization string
-        gain          -- Optional antenna gain value
+        ant_cord             -- Optional PathInfo.AntCoord object
+        model                -- Optional antenna model string
+        polarization         -- Optional antenna polarization string
+        gain                 -- Optional antenna gain value
+        reflector_height     -- Optional reflector height
+        reflector_width      -- Optional reflector width
+        back_to_back_gain_tx -- Optional back-to-back TX gain
+        back_to_back_gain_rx -- Optional back-to-back RX gain
         """
         def __init__(
                 self, ant_coord: Optional[PathInfo.AntCoord] = None,
                 model: Optional[str] = None,
                 polarization: Optional[str] = None,
-                gain: Optional[float] = None) -> None:
+                gain: Optional[float] = None,
+                reflector_height: Optional[float] = None,
+                reflector_width: Optional[float] = None,
+                back_to_back_gain_tx: Optional[float] = None,
+                back_to_back_gain_rx: Optional[float] = None) -> None:
+            """ Constructor
+
+            Arguments:
+            ant_cord             -- Optional PathInfo.AntCoord object
+            model                -- Optional antenna model string
+            polarization         -- Optional antenna polarization string
+            gain                 -- Optional antenna gain value
+            reflector_height     -- Optional reflector height
+            reflector_width      -- Optional reflector width
+            back_to_back_gain_tx -- Optional back-to-back TX gain
+            back_to_back_gain_rx -- Optional back-to-back RX gain
+            """
             self.ant_coord = ant_coord
             self.model = model
             self.polarization = polarization
             self.gain = gain
+            self.reflector_height = reflector_height
+            self.reflector_width = reflector_width
+            self.back_to_back_gain_tx = back_to_back_gain_tx
+            self.back_to_back_gain_rx = back_to_back_gain_rx
 
     def __init__(self, day_dirs: Dict[Optional[datetime.datetime], str]) \
             -> None:
@@ -3596,7 +4159,7 @@ class DownloadedPathIterator:
         self._paths_by_callsign: \
             Dict[str, List["DownloadedPathIterator._AfcPathInfo"]] = {}
         self._locations: Dict[Tuple[str, int], ROW_DATA_TYPE] = {}
-        self._antennas: Dict[Tuple[str, int, int], ROW_DATA_TYPE] = {}
+        self._antennas: Dict[Tuple[str, int, int, int], ROW_DATA_TYPE] = {}
         self._process_pa()
         self._process_hd()
         self._process_em()
@@ -3623,7 +4186,6 @@ class DownloadedPathIterator:
                     self._AfcPathInfo(
                         callsign=row_data["call_sign"],
                         path_num=row_data["path_number"],
-                        path_type=row_data["path_type_desc"],
                         tx_loc_num=row_data["transmit_location_number"],
                         tx_ant_num=row_data["transmit_antenna_number"],
                         rx_loc_num=row_data["receiver_location_number"],
@@ -3650,8 +4212,7 @@ class DownloadedPathIterator:
                     ComplaintDataDuplication(
                         table="HD", line_num=line_num, row_data=row_data)
                     continue
-                if (row_data["license_status"] not in "AL") or \
-                        (row_data["mobile"] == "Y"):
+                if row_data["license_status"] not in "AL":
                     self._remove_afc_paths_by_callsign(row_data["call_sign"])
                 else:
                     for afc_path in afc_paths:
@@ -3685,18 +4246,10 @@ class DownloadedPathIterator:
                         line_num=line_num)
                     continue
                 for afc_path in self._paths_by_tx[key]:
-                    path_em_des = \
-                        afc_path.em_des_by_num_by_freq.\
-                        get(row_data["frequency_number"], {}).\
-                        get(row_data["frequency_assigned"])
-                    path_bw_mhz = FreqRange.emission_bw_mhz(path_em_des)
-                    assert (path_em_des is None) == (path_bw_mhz is None)
-                    assert em_bw_mhz is not None
-                    if (not path_em_des) or (mf(path_bw_mhz) < em_bw_mhz):
-                        afc_path.em_des_by_num_by_freq.setdefault(
-                            row_data["frequency_number"], {})[
-                            row_data["frequency_assigned"]] = \
-                            row_data["emission_code"]
+                    afc_path.em_des_by_num_by_freq.setdefault(
+                        row_data["frequency_number"], {}).\
+                        setdefault(row_data["frequency_assigned"], []).\
+                        append(row_data["emission_code"])
 
     def _process_fr(self):
         """ Obtains power (EIRP) information from FR table """
@@ -3709,52 +4262,49 @@ class DownloadedPathIterator:
                 if key not in self._paths_by_tx:
                     continue
                 for afc_path in self._paths_by_tx[key]:
-
-                    emission_code_by_num_freq: Optional[str] = None
-                    emission_code_by_num: Optional[str] = None
                     by_freq_dict = \
                         afc_path.em_des_by_num_by_freq.get(
-                            row_data["freq_seq_id"])
-                    if by_freq_dict:
-                        emission_code_by_num_freq = \
-                            by_freq_dict.get(row_data["frequency_assigned"])
-                        emission_code_by_num = list(by_freq_dict.values())[0]
-
-                    freq_range = None
+                            row_data["freq_seq_id"], {})
+                    emission_codes: List[str]
                     if row_data["frequency_upper_band"] is not None:
-                        if emission_code_by_num is None:
-                            ComplaintMissingEmission(
-                                callsign=row_data["call_sign"],
-                                loc_num=row_data["location_number"],
-                                ant_num=row_data["antenna_number"],
-                                freq_num=row_data["freq_seq_id"],
-                                line_num=line_num)
-                        else:
+                        # Frequency range specified. Emission codes(s)
+                        # retrieved by frequency number
+                        emission_codes = \
+                            sum(by_freq_dict.values(), [])
+                    else:
+                        # Center frequency specuified. Emission code(s)
+                        # retrieved by frequency number and center frequency
+                        emission_codes = \
+                            by_freq_dict.get(row_data["frequency_assigned"],
+                                             [])
+                    if not emission_codes:
+                        ComplaintMissingEmission(
+                            callsign=row_data["call_sign"],
+                            loc_num=row_data["location_number"],
+                            ant_num=row_data["antenna_number"],
+                            freq_num=row_data["freq_seq_id"],
+                            center_freq=None
+                            if row_data["frequency_upper_band"] is not None
+                            else row_data["frequency_assigned"],
+                            line_num=line_num)
+                    for emission_code in emission_codes:
+                        if row_data["frequency_upper_band"] is not None:
                             freq_range = \
                                 FreqRange(
-                                    emission_code=emission_code_by_num,
+                                    emission_code=emission_code,
                                     start_mhz=mf(
                                         row_data["frequency_assigned"]),
                                     end_mhz=mf(
                                         row_data["frequency_upper_band"]))
-                    elif FreqRange.emission_bw_mhz(emission_code_by_num_freq) \
-                            is not None:
-                        if emission_code_by_num_freq is None:
-                            ComplaintMissingEmission(
-                                callsign=row_data["call_sign"],
-                                loc_num=row_data["location_number"],
-                                ant_num=row_data["antenna_number"],
-                                freq_num=row_data["freq_seq_id"],
-                                center_freq=row_data["frequency_assigned"],
-                                line_num=line_num)
-                        else:
+                        elif FreqRange.emission_bw_mhz(emission_code) \
+                                is not None:
                             freq_range = \
                                 FreqRange(
-                                    emission_code=emission_code_by_num_freq,
+                                    emission_code=emission_code,
                                     center_mhz=row_data["frequency_assigned"])
-                    if freq_range and freq_range.is_6ghz():
-                        afc_path.freq_by_hash[hash(freq_range)] = freq_range
-
+                        if freq_range and freq_range.is_6ghz():
+                            afc_path.freq_by_hash[hash(freq_range)] = \
+                                freq_range
                     tx_eirp = row_data["eirp"]
                     if (tx_eirp is not None) and \
                             ((afc_path.tx_eirp is None) or
@@ -3764,7 +4314,7 @@ class DownloadedPathIterator:
     def _purge_nonafc(self):
         """ Purges paths not fit for AFC database (non-6GHz, not having license
         information, not having 6GHz emissions """
-        with Timing("Purging non-6GHz/enabled paths"):
+        with Timing("Pruning non-6GHz/enabled paths"):
             callsigns_to_remove: List[str] = []
             transmitters_to_remove: Dict[str, Set[Tuple[int, int]]] = {}
             for callsign, afc_paths in self._paths_by_callsign.items():
@@ -3851,7 +4401,7 @@ class DownloadedPathIterator:
     def _prepare_loc_ant(self):
         """ In _locations and _antennas builds collections of required
         locations and antennas """
-        with Timing("Finding required locations and antennas"):
+        with Timing("Pruning unrelated locations/antennas"):
             for afc_path in self._paths_by_path.values():
                 for tx_loc_num, tx_ant_num, rx_loc_num, rx_ant_num in \
                         [(afc_path.tx_loc_num, afc_path.tx_ant_num,
@@ -3862,7 +4412,8 @@ class DownloadedPathIterator:
                     for loc_num, ant_num in [(tx_loc_num, tx_ant_num),
                                              (rx_loc_num, rx_ant_num)]:
                         self._locations[(afc_path.callsign, loc_num)] = None
-                        self._antennas[(afc_path.callsign, loc_num,
+                        self._antennas[(afc_path.callsign,
+                                        afc_path.path_num, loc_num,
                                         ant_num)] = None
 
     def _process_lo(self) -> None:
@@ -3881,6 +4432,7 @@ class DownloadedPathIterator:
                 if self._locations[key]:
                     ComplaintDataDuplication(
                         table="LO", line_num=line_num, row_data=row_data)
+                    self._locations[key]["duplicate"] = True
                     continue
                 self._locations[key] = \
                     {field: row_data[field] for field in lo_fields}
@@ -3888,18 +4440,20 @@ class DownloadedPathIterator:
     def _process_an(self) -> None:
         """ Reads antenna data from AN table """
         an_fields = ("polarization_code", "height_to_center_raat", "gain",
-                     "antenna_model")
+                     "antenna_model", "reflector_height", "reflector_width",
+                     "back_to_back_tx_dish_gain", "back_to_back_rx_dish_gain")
         with Timing("Reading 'AN' data"):
             for _, line_num, row_data, _ in \
                     UlsTableReader(day_dirs=self._day_dirs,
                                    uls_table=UlsTable.by_name("AN")):
-                key = (row_data["call_sign"], row_data["location_number"],
-                       row_data["antenna_number"])
+                key = (row_data["call_sign"], row_data["path_number"],
+                       row_data["location_number"], row_data["antenna_number"])
                 if key not in self._antennas:
                     continue
                 if self._antennas[key]:
                     ComplaintDataDuplication(
                         table="AN", line_num=line_num, row_data=row_data)
+                    self._antennas[key]["duplicate"] = True
                     continue
                 self._antennas[key] = \
                     {field: row_data[field] for field in an_fields}
@@ -3911,11 +4465,14 @@ class DownloadedPathIterator:
             afc_paths = self._paths_by_callsign[callsign]
             for afc_path in sorted(afc_paths, key=lambda path: path.path_num):
                 repeaters: List[PathInfo.Repeater] = []
-                repeater_rx_ant: Optional[PathInfo.AntCoord] = None
+                repeater_rx_ai: Optional["DownloadedPathIterator._AntInfo"] = \
+                    None
                 drop = False
                 expected_idx = 1
+                # Populating repeater list
                 for seg_idx, segment in sorted(afc_path.segments.items()):
                     if seg_idx != expected_idx:
+                        # Segment index absent in SG
                         ComplaintMissingSegment(
                             callsign=callsign, path_num=afc_path.path_num,
                             seg_num=expected_idx)
@@ -3923,23 +4480,46 @@ class DownloadedPathIterator:
                         break
                     expected_idx += 1
                     if seg_idx > 1:
-                        assert repeater_rx_ant is not None
-                        repeater_tx_ant = \
+                        assert repeater_rx_ai is not None
+                        assert repeater_rx_ai.ant_coord is not None
+                        repeater_tx_ai = \
                             self._ant_info(
-                                callsign=callsign, loc_num=segment.tx_loc_num,
-                                ant_num=segment.tx_ant_num).ant_coord
-                        if not repeater_tx_ant:
+                                callsign=callsign, path_num=afc_path.path_num,
+                                loc_num=segment.tx_loc_num,
+                                ant_num=segment.tx_ant_num)
+                        if not repeater_tx_ai.ant_coord:
                             drop = True
                             break
-                        repeaters.append(
-                            PathInfo.Repeater(tx=repeater_tx_ant,
-                                              rx=repeater_rx_ant))
+                        # Repeater information from ingress and egress segments
+                        repeater_rx_tx: List[PathInfo.Repeater] = []
+                        for ai in (repeater_rx_ai, repeater_tx_ai):
+                            assert ai is not None
+                            repeater_rx_tx.append(
+                                PathInfo.Repeater(
+                                    ant_coord=ai.ant_coord,
+                                    reflector_height=ai.reflector_height,
+                                    reflector_width=ai.reflector_width,
+                                    back_to_back_gain_tx=ai.
+                                    back_to_back_gain_tx,
+                                    back_to_back_gain_rx=ai.
+                                    back_to_back_gain_rx))
+                        consistent, repeater = \
+                            PathInfo.Repeater.combine(repeater_rx_tx[0],
+                                                      repeater_rx_tx[1])
+                        if not consistent:
+                            # Ingress and egress repeater data mismatch
+                            ComplaintInconsistentRepeater(
+                                callsign=callsign, path_num=afc_path.path_num,
+                                repeater_idx=seg_idx - 1)
+                        assert repeater is not None
+                        repeaters.append(repeater)
                     if seg_idx < len(afc_path.segments):
-                        repeater_rx_ant = \
+                        repeater_rx_ai = \
                             self._ant_info(
-                                callsign=callsign, loc_num=segment.rx_loc_num,
-                                ant_num=segment.rx_ant_num).ant_coord
-                        if not repeater_rx_ant:
+                                callsign=callsign, path_num=afc_path.path_num,
+                                loc_num=segment.rx_loc_num,
+                                ant_num=segment.rx_ant_num)
+                        if not repeater_rx_ai.ant_coord:
                             drop = True
                             break
                 if drop:
@@ -3948,13 +4528,15 @@ class DownloadedPathIterator:
                 assert afc_path.radio_service is not None
                 tx_ant_info = \
                     self._ant_info(
-                        callsign=callsign, loc_num=afc_path.tx_loc_num,
+                        callsign=callsign, path_num=afc_path.path_num,
+                        loc_num=afc_path.tx_loc_num,
                         ant_num=afc_path.tx_ant_num)
                 if not tx_ant_info.ant_coord:
                     continue
                 rx_ant_info = \
                     self._ant_info(
-                        callsign=callsign, loc_num=afc_path.rx_loc_num,
+                        callsign=callsign, path_num=afc_path.path_num,
+                        loc_num=afc_path.rx_loc_num,
                         ant_num=afc_path.rx_ant_num)
                 if not rx_ant_info.ant_coord:
                     continue
@@ -3981,8 +4563,7 @@ class DownloadedPathIterator:
                             path_num=afc_path.path_num,
                             grant_date=afc_path.grant_date,
                             expired_date=afc_path.expired_date,
-                            cancellation_date=afc_path.cancellation_date,
-                            path_type=afc_path.path_type)
+                            cancellation_date=afc_path.cancellation_date)
                     path_freq_bucket.try_add(path)
                 for p in path_freq_bucket:
                     row_count += 1
@@ -3990,8 +4571,8 @@ class DownloadedPathIterator:
                         Progressor.print_progress(f"{row_count}")
                     yield p
 
-    def _ant_info(self, callsign: str, loc_num: int, ant_num: int) \
-            -> "DownloadedPathIterator._AntInfo":
+    def _ant_info(self, callsign: str, path_num: int, loc_num: int,
+                  ant_num: int) -> "DownloadedPathIterator._AntInfo":
         """ Builds _AntInfo for given antenna
 
         Arguments:
@@ -4002,7 +4583,7 @@ class DownloadedPathIterator:
         location: Optional[ROW_DATA_TYPE] = \
             self._locations.get((callsign, loc_num))
         antenna: Optional[ROW_DATA_TYPE] = \
-            self._antennas.get((callsign, loc_num, ant_num))
+            self._antennas.get((callsign, path_num, loc_num, ant_num))
         ret = \
             self._AntInfo(
                 ant_coord=PathInfo.AntCoord(
@@ -4025,6 +4606,14 @@ class DownloadedPathIterator:
                 model=ost(antenna["antenna_model"]) if antenna else None,
                 gain=of(antenna["gain"]) if antenna else None,
                 polarization=ost(antenna["polarization_code"])
+                if antenna else None,
+                reflector_height=of(antenna["reflector_height"])
+                if antenna else None,
+                reflector_width=of(antenna["reflector_width"])
+                if antenna else None,
+                back_to_back_gain_tx=of(antenna["back_to_back_tx_dish_gain"])
+                if antenna else None,
+                back_to_back_gain_rx=of(antenna["back_to_back_rx_dish_gain"])
                 if antenna else None)
         return ret
 
@@ -4034,7 +4623,7 @@ class KmlWriter:
     Intended to be used as context manager (with 'with' clause)
 
     Private attributes:
-    _filename    -- Name of .kml file to write to
+    _filename    -- Name of .kml file to write to. None to do nothing
     _comment     -- Map comment or None
     _map_points  -- Dictionary of MapPoint objects, indexed by
                     (latitude, longitude) tuples
@@ -4047,6 +4636,13 @@ class KmlWriter:
     """
     # Maximum feature count in KML file
     KML_MAX_FEATURES = 2000
+
+    # KML colors
+    C_RED = "0000ff"
+    C_BLUE = "ff0000"
+    C_BLACK = "000000"
+    C_YELLOW = "00ffff"
+    C_GREEN = "00ff00"
 
     class AntInfo:
         """ Information about single antenna
@@ -4147,6 +4743,7 @@ class KmlWriter:
         dst_raat  -- Minimum antenna height at destination point
         src_arrow -- Arrow should be drawn at source point
         dst_arrow -- Arrow should be drawn at destination point
+        color     -- 6-character hexadecimal KML color string ("bbggrr")
 
         Private attributes:
         _paths -- Dictionary of per-feature path names
@@ -4160,19 +4757,26 @@ class KmlWriter:
             self.dst_raat: Optional[float] = None
             self.src_arrow = False
             self.dst_arrow = False
+            self.color: Optional[str] = None
             self._paths: Dict["KmlWriter.MapSeg.Feature", Set[str]] = {}
 
         def add(self, path: PathInfo, src: PathInfo.AntCoord,
                 dst: PathInfo.AntCoord, src_arrow: bool,
-                dst_arrow: bool) -> None:
+                dst_arrow: bool, color: str,
+                color_priority: Optional[List[str]] = None) -> None:
             """ Add segment
 
             Arguments:
-            path      -- Path segment belongs to
-            src       -- Source point
-            dst       -- Destination point
-            src_arrow -- Arrow should be drawn at source point
-            dst_arrow -- Arrow should be drawn at destination point
+            path           -- Path segment belongs to
+            src            -- Source point
+            dst            -- Destination point
+            src_arrow      -- Arrow should be drawn at source point
+            dst_arrow      -- Arrow should be drawn at destination point
+            color          -- 6-character hexadecimal KML color string
+                              ("bbggrr")
+            color_priority -- None or list of color strings that specify
+                              resulting color (color with higher index beats
+                              one with lower). None means most recent wins
             """
             if (self.src_raat is None) or \
                     (self.src_raat > mf(src.height_to_center_raat_m)):
@@ -4188,8 +4792,13 @@ class KmlWriter:
             if dst_arrow:
                 self._paths.setdefault(self.Feature.Dst,
                                        set()).add(path.path_name())
+
             self.src_arrow |= src_arrow
             self.dst_arrow |= dst_arrow
+            if (self.color is None) or (color_priority is None) or \
+                    (color_priority.index(color) >
+                     color_priority.index(self.color)):
+                self.color = color
 
         def name(self, feature: "KmlWriter.MapSeg.Feature") -> str:
             """ Name for map of given feature """
@@ -4211,7 +4820,7 @@ class KmlWriter:
             return \
                 1 + (1 if self.src_arrow else 0) + (1 if self.dst_arrow else 0)
 
-    def __init__(self, filename: str, comment: Optional[str] = None,
+    def __init__(self, filename: Optional[str], comment: Optional[str] = None,
                  center_lat: Optional[float] = None,
                  center_lon: Optional[float] = None,
                  range_miles: Optional[float] = None, arrows: bool = False) \
@@ -4219,7 +4828,7 @@ class KmlWriter:
         """ Constructor
 
         Arguments:
-        filename    -- Name of KML file to write to
+        filename    -- Name of KML file to write to. None to do nothing
         comment     -- Map comment or None
         center_lat  -- Optional latitude of center of circle to draw
         center_lon  -- Optional longitude of center of circle to draw
@@ -4236,24 +4845,30 @@ class KmlWriter:
         self._range_miles = range_miles
         self._arrows = arrows
 
-    def add_path(self, path: PathInfo) -> None:
-        """ Add given path to map """
+    def add_path(self, path: PathInfo, color: str,
+                 color_priority: Optional[List[str]] = None) -> None:
+        """ Add given path to map
+
+        Arguments:
+        path           -- Path to add
+        color          -- 6-character hexadecimal KML color string ("bbggrr")
+        color_priority -- None or list of color strings that specify
+                          resulting color (color with higher index beats
+                          one with lower). None means most recent wins
+       """
         self._add_ant_coord(path=path, ant_coord=path.tx_ant, role="TX")
         loc = path.tx_ant
         for repeater in path.repeaters:
-            self._add_segment(path=path, src=loc, dst=repeater.rx)
-            if hash(repeater.tx) == hash(repeater.rx):
-                self._add_ant_coord(path=path, ant_coord=repeater.rx,
-                                    role="Rep RX/TX")
-            else:
-                self._add_ant_coord(path=path, ant_coord=repeater.rx,
-                                    role="Rep RX")
-                self._add_ant_coord(path=path, ant_coord=repeater.tx,
-                                    role="Rep TX")
-            loc = repeater.tx
+            assert repeater.ant_coord is not None
+            self._add_segment(path=path, src=loc, dst=repeater.ant_coord,
+                              color=color, color_priority=color_priority)
+            self._add_ant_coord(path=path, ant_coord=repeater.ant_coord,
+                                role="Repeater")
+            loc = repeater.ant_coord
         self._add_ant_coord(path=path, ant_coord=path.rx_ant, role="RX",
                             rx_callsign=path.rx_callsign)
-        self._add_segment(path=path, src=loc, dst=path.rx_ant)
+        self._add_segment(path=path, src=loc, dst=path.rx_ant,
+                          color=color, color_priority=color_priority)
 
     def num_features(self) -> int:
         """ Returns number of KML features already in collection """
@@ -4272,6 +4887,8 @@ class KmlWriter:
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         """ Context manager exit """
+        if self._filename is None:
+            return
         root = \
             etree.Element("kml",
                           attrib={"xmlns": "http://www.opengis.net/kml/2.2"})
@@ -4282,14 +4899,21 @@ class KmlWriter:
             circle_style = self._make_tag(document, "Style",
                                           attrs={"id": "CircleStyle"})
             line_style = self._make_tag(circle_style, "LineStyle")
-            self._make_tag(line_style, "color", text="200000ff")
+            self._make_tag(line_style, "color", text="20" + self.C_RED)
             self._make_tag(line_style, "width", text="2")
         if self._arrows:
             arrow_style = self._make_tag(document, "Style",
                                          attrs={"id": "ArrowStyle"})
             line_style = self._make_tag(arrow_style, "LineStyle")
-            self._make_tag(line_style, "color", text="ffff0000")
+            self._make_tag(line_style, "color", text="ff" + self.C_BLUE)
             self._make_tag(line_style, "width", text="3")
+        for line_color in sorted({s.color for s in self._map_segs.values()}):
+            seg_style = \
+                self._make_tag(document, "Style",
+                               attrs={"id": "SegmentStyle_" + line_color})
+            line_style = self._make_tag(seg_style, "LineStyle")
+            self._make_tag(line_style, "color", text="ff" + line_color)
+            self._make_tag(line_style, "width", text="1")
         if self._has_circle():
             placemark = self._make_tag(document, "Placemark")
             self._make_tag(placemark, "name", text="Range Boundary")
@@ -4320,6 +4944,8 @@ class KmlWriter:
                 placemark, "name", text=map_seg.name(self.MapSeg.Feature.Body))
             self._make_tag(placemark, "description",
                            text=map_seg.description(self.MapSeg.Feature.Body))
+            self._make_tag(placemark, "styleUrl",
+                           text="#SegmentStyle_" + map_seg.color)
             line = self._make_tag(placemark, "LineString")
             self._make_tag(line, "extrude", text="1")
             self._make_tag(line, "altitude_mode", text="relativeToGround")
@@ -4377,13 +5003,18 @@ class KmlWriter:
             (self._center_lon is not None) and (self._range_miles is not None)
 
     def _add_segment(self, path: PathInfo, src: PathInfo.AntCoord,
-                     dst: PathInfo.AntCoord) -> None:
+                     dst: PathInfo.AntCoord, color: str,
+                     color_priority: Optional[List[str]]) -> None:
         """ Adds map segment
 
         Arguments
-        path -- PathInfo segment belongs to
-        src  -- AntCoord of one end
-        dst  -- AntCoord of other end
+        path           -- PathInfo segment belongs to
+        src            -- AntCoord of one end
+        dst            -- AntCoord of other end
+        color          -- 6-character hexadecimal KML color string ("bbggrr")
+        color_priority -- None or list of color strings that specify
+                          resulting color (color with higher index beats
+                          one with lower). None means most recent wins
         """
         src_arrow = False
         dst_arrow = self._arrows
@@ -4392,7 +5023,8 @@ class KmlWriter:
         self._map_segs.setdefault(
             (mf(src.lat), mf(src.lon), mf(dst.lat), mf(dst.lon)),
             self.MapSeg()).add(path=path, src=src, dst=dst,
-                               src_arrow=src_arrow, dst_arrow=dst_arrow)
+                               src_arrow=src_arrow, dst_arrow=dst_arrow,
+                               color=color, color_priority=color_priority)
 
     def _make_tag(self, parent: etree.Element, name: str,
                   text: Optional[str] = None,
@@ -4413,10 +5045,11 @@ class KmlWriter:
 
 def check_download_switches(args: Any):
     """ Checks consistency off download-related switches """
-    error_if(args.skip_download and (args.dir is None),
-             "--skip_download switch requires --dir switch")
-    error_if(args.zip and args.dir,
-             "--zip and --dir switches can't be specified simultaneously")
+    error_if(
+        (int(args.from_dir is not None) + int(args.to_dir is not None) +
+         int(args.zip is not None)) > 1,
+        "--from_dir, --to_dir and --zip are mutually exclusive. No more " +
+        "than one of them can be specified")
 
 
 def do_latest(args: Any) -> None:
@@ -4427,12 +5060,12 @@ def do_latest(args: Any) -> None:
     check_download_switches(args)
     error_if(args.zip and args.inc,
              "--zip and --inc switches can't be specified simultaneously")
-    with Downloader(directory=args.dir, no_download=args.skip_download,
+    with Downloader(from_dir=args.from_dir, to_dir=args.to_dir,
                     retry=args.retry, zip_file=args.zip) as dl:
         dl.download()
-        date = dl.inc_date if args.inc else dl.date
+        date, tz = dl.inc_date if args.inc else dl.date
         assert date is not None
-        print(f"{date.strftime('%Y-%m-%d %H:%M:%S')}")
+        print(f"{date.strftime('%Y-%m-%d %H:%M:%S')} {tz}")
 
 
 def do_download_uls(args: Any) -> None:
@@ -4441,7 +5074,6 @@ def do_download_uls(args: Any) -> None:
     Arguments:
     args -- Argparsed command line arguments """
     check_download_switches(args)
-    assert (not args.skip_download) or (args.dir is not None)
     db_filename: str = args.DST_DB
     if os.path.isfile(db_filename):
         error_if(not args.overwrite, f"File {db_filename} already exists")
@@ -4453,7 +5085,7 @@ def do_download_uls(args: Any) -> None:
                  f"program"))
     with Timing(epilogue="Entire download"), \
             Complainer(filename=args.report), \
-            Downloader(directory=args.dir, no_download=args.skip_download,
+            Downloader(from_dir=args.from_dir, to_dir=args.to_dir,
                        retry=args.retry, zip_file=args.zip) as dl:
         day_dirs = dl.download()
         if args.skip_write:
@@ -4552,10 +5184,9 @@ def do_uls_to_afc(args: Any) -> None:
     with Timing("Generating AFC database"), \
             DbPathIterator(args.SRC_DB) as pi, \
             Complainer(filename=args.report), \
-            AfcWriter(
-                args.DST_DB,
-                validator=PathValidator(allow_mobile=args.mobile),
-                extra_fields=args.extra, fsid_gen=fsid_gen) as aw:
+            AfcWriter(args.DST_DB, validator=PathValidator(),
+                      fsid_gen=fsid_gen,
+                      compatibility=args.compatibility) as aw:
         for path in pi:
             aw.write_path(path)
 
@@ -4596,8 +5227,6 @@ def do_compare(args: Any) -> None:
     path_counts: List[int] = []
     # True if both database has path numbers
     has_path_num = True
-    # Presence of extra fields in firs and second database
-    has_extra: List[bool] = []
     # Paths in first and second database
     paths: List[Set[Tuple[str, Optional[int]]]] = []
     for f in (args.DB1, args.DB2):
@@ -4606,7 +5235,6 @@ def do_compare(args: Any) -> None:
         path_counts.append(0)
         paths.append(set())
         with Timing(f"Scanning {f}"), DbPathIterator(f) as pi:
-            has_extra.append(pi.has_extra())
             for path in pi:
                 if path.is_afc() and path.tx_ant and path.rx_ant:
                     path_counts[-1] += 1
@@ -4628,44 +5256,73 @@ def do_compare(args: Any) -> None:
         set(path_hashes[has_path_num][0].keys()) - \
         set(path_hashes[has_path_num][1].keys())
     spatial_bins: Dict[Tuple[float, float], int] = {}
-    for idx, hashes, src_db, dst_db in \
-            [(0, removed_hashes, args.DB1, args.removed),
-             (1, added_hashes, args.DB2, args.added)]:
-        if (not dst_db) and (not args.spatial):
-            continue
-        with Timing(f"Scanning {src_db}"), \
-                DbPathIterator(src_db) as pi, \
-                AfcWriter(dst_db, validator=PathValidator(pass_all=True),
-                          extra_fields=has_extra[idx],
-                          fsid_gen=FsidGenerator("")) as aw:
-            for path in pi:
-                if path.path_hash(with_path_num=has_path_num) in hashes:
-                    if dst_db:
-                        aw.write_path(path)
-                    if args.spatial:
-                        key = (round(path.tx_ant.lat / spatial_resolution) *
-                               spatial_resolution,
-                               round(path.tx_ant.lon / spatial_resolution) *
-                               spatial_resolution)
-                        spatial_bins.setdefault(key, 0)
-                        spatial_bins[key] += 1
+    with KmlWriter(
+            filename=args.kml,
+            comment=(f"Paths unique for "
+                     f"{os.path.splitext(os.path.basename(args.DB1))[0]} "
+                     f"(red) and for "
+                     f"{os.path.splitext(os.path.basename(args.DB2))[0]} "
+                     f"(green)"), arrows=False) as kw:
+        for hashes, src_db, dst_db, color in \
+                [(removed_hashes, args.DB1, args.removed, KmlWriter.C_RED),
+                 (added_hashes, args.DB2, args.added, KmlWriter.C_GREEN)]:
+            if (not dst_db) and (not args.spatial) and (not args.kml):
+                continue
+            with Timing(f"Scanning {src_db}"), \
+                    DbPathIterator(src_db) as pi, \
+                    AfcWriter(dst_db, validator=PathValidator(pass_all=True),
+                              fsid_gen=FsidGenerator(""),
+                              compatibility=True) as aw:
+                for path in pi:
+                    if path.path_hash(with_path_num=has_path_num) in hashes:
+                        if dst_db:
+                            aw.write_path(path)
+                        if args.spatial:
+                            key = (round(path.tx_ant.lat /
+                                         spatial_resolution) *
+                                   spatial_resolution,
+                                   round(path.tx_ant.lon /
+                                         spatial_resolution) *
+                                   spatial_resolution)
+                            spatial_bins.setdefault(key, 0)
+                            spatial_bins[key] += 1
+                        if args.kml:
+                            kw.add_path(path, color=color)
+        if args.kml:
+            if kw.num_features() > KmlWriter.KML_MAX_FEATURES:
+                logging.warning(
+                    (f"Number of KML features is {kw.num_features()} which "
+                     f"exceeds allowed maximum "
+                     f"({KmlWriter.KML_MAX_FEATURES})"))
+            else:
+                print(f"Number of features in KML file: {kw.num_features()}")
     if args.common:
         with Timing(f"Generating {args.common} from {args.DB1}"), \
                 DbPathIterator(args.DB1) as pi, \
                 AfcWriter(args.common, validator=PathValidator(pass_all=True),
-                          extra_fields=has_extra[0],
-                          fsid_gen=FsidGenerator("")) as aw:
+                          fsid_gen=FsidGenerator(""),
+                          compatibility=True) as aw:
             for path in pi:
                 if path.path_hash(with_path_num=has_path_num) not in \
                         removed_hashes:
                     aw.write_path(path)
     if args.unique:
         d = sorted(paths[0] - paths[1])
-        print(f"Unique paths in first database: "
+        print(f"{len(d)} unique paths in first database: "
               f"{', '.join(path_name(p[0], p[1]) for p in d)}")
         d = sorted(paths[1] - paths[0])
-        print(f"Unique paths in second database: "
+        print(f"{len(d)} unique paths in second database: "
               f"{', '.join(path_name(p[0], p[1]) for p in d)}")
+        # For each database - maps path names to sets of path hashes
+        hp: List[Dict[str, Set[int]]] = []
+        for ph in path_hashes[has_path_num]:
+            hp.append({})
+            for path_hash, path_name in ph.items():
+                hp[-1].setdefault(path_name, set()).add(path_hash)
+        miscalculated_paths: List[str] = \
+            [pn for pn, phs in hp[0].items() if phs != hp[1].get(pn, phs)]
+        print((f"{len(miscalculated_paths)} paths, computed differently: "
+               f"{', '.join(sorted(miscalculated_paths))}"))
     print(f"Paths added"
           f"{' ('+os.path.basename(args.added)+')' if args.added else ''}"
           f": {len(added_hashes)}")
@@ -4695,13 +5352,36 @@ def do_gmap(args: Any) -> None:
     error_if(
         not os.path.isfile(args.SRC_DB),
         f"Can't find source database file '{args.SRC_DB}'")
+    error_if(
+        ((args.lat is None) != (args.distance is None)) or
+        ((args.lon is None) != (args.distance is None)),
+        "--lat, --lon, --distance should be specified together or not at all")
+    error_if((not args.path) and (args.lat is None),
+             "Neither paths nor vicinity specified")
+    requested_path_names: Set[str] = set(args.path)
+    found_path_names: Set[str] = set()
     paths: List[PathInfo] = []
     with DbPathIterator(args.SRC_DB) as pi, Timing("Making path list"):
+        error_if(any(("/" in p) for p in requested_path_names) and
+                 (not pi.has_path_num()),
+                 "Source database does not have path numbers, so no path " +
+                 "numbers may be specified in --path")
         for path in pi:
-            if path and path.is_afc() and \
-                    path.within_range(center_lat=args.lat, center_lon=args.lon,
-                                      range_miles=args.distance):
+            if not path and path.is_afc():
+                continue
+            if (path.callsign in requested_path_names) or \
+                    (path.path_name() in requested_path_names) or \
+                    ((args.lat is not None) and
+                     path.within_range(center_lat=args.lat,
+                                       center_lon=args.lon,
+                                       range_miles=args.distance)):
                 paths.append(path)
+                found_path_names.add(path.callsign)
+                found_path_names.add(path.path_name())
+    paths_not_found = requested_path_names - found_path_names
+    error_if(paths_not_found,
+             (f"Following paths were not found: "
+              f"{', '.join(sorted(paths_not_found))}"))
     with KmlWriter(filename=args.KML_FILE,
                    comment=(f"Paths in {args.distance} miles around "
                             f"{abs(args.lat)}"
@@ -4720,7 +5400,7 @@ def do_gmap(args: Any) -> None:
                      f"{KmlWriter.KML_MAX_FEATURES}. {idx} of {len(paths)} "
                      f"paths written"))
                 break
-            kw.add_path(path)
+            kw.add_path(path, color=KmlWriter.C_BLACK)
 
 
 def do_download_afc(args: Any) -> None:
@@ -4742,13 +5422,13 @@ def do_download_afc(args: Any) -> None:
     fsid_gen = FsidGenerator(args.prev_afc)
     with Timing(epilogue="Entire download"), \
             Complainer(filename=args.report), \
-            Downloader(directory=args.dir, no_download=args.skip_download,
+            Downloader(from_dir=args.from_dir, to_dir=args.to_dir,
                        retry=args.retry, zip_file=args.zip) as dl:
         dpi = DownloadedPathIterator(day_dirs=dl.download())
         with Timing("Writing AFC database"), \
-                AfcWriter(args.DST_DB,
-                          validator=PathValidator(allow_mobile=args.mobile),
-                          extra_fields=args.extra, fsid_gen=fsid_gen) as aw:
+                AfcWriter(args.DST_DB, validator=PathValidator(),
+                          fsid_gen=fsid_gen,
+                          compatibility=args.compatibility) as aw:
             for path in dpi:
                 aw.write_path(path)
 
@@ -4769,7 +5449,7 @@ def do_csv(args: Any) -> None:
         if (not callsigns) or (callsign in callsigns):
             csv_writer.writerow(record.split("|"))
 
-    with Downloader(directory=args.dir, no_download=args.skip_download,
+    with Downloader(from_dir=args.from_dir, to_dir=args.to_dir,
                     retry=args.retry, zip_file=args.zip) as dl, \
             open(args.CSV_FILE, mode="w", encoding="ascii", newline="",
                  errors="backslashreplace") as f:
@@ -4777,7 +5457,7 @@ def do_csv(args: Any) -> None:
         csv_writer.writerow([field.dsc for field in uls_table.fields])
         day_dirs = dl.download()
         if args.day:
-            directory = os.path.join(dl.directory, args.day)
+            directory = os.path.join(dl.unpacked_directory, args.day)
             error_if(not os.path.isdir(directory),
                      f"Directory {directory} not found. Wrong --day parameter")
             with UlsFileReader(
@@ -4794,6 +5474,71 @@ def do_csv(args: Any) -> None:
                     UlsTableReader(uls_table=uls_table, day_dirs=day_dirs):
                 process_row(csv_writer=csv_writer,
                             callsign=row_data["call_sign"], record=record)
+
+
+def do_xlsx(args: Any) -> None:
+    """ Processes 'xlsx' subcommand
+
+    Arguments:
+    args -- Argparsed command line arguments """
+    check_download_switches(args)
+    error_if("openpyxl" not in sys.modules,
+             "Python 'openpyxl' module not installed. Please install it " +
+             "with 'pip install openpyxl' command")
+
+    callsigns: Set[str] = set(args.callsign)
+    filename = args.XLSX_FILE or ("_".join(args.callsign) + ".xlsx")
+    if os.path.isfile(filename):
+        try:
+            os.unlink(filename)
+        except OSError:
+            error(
+                (f"Can't delete '{filename}'. Maybe it is open in "
+                 f"another program"))
+    with Downloader(from_dir=args.from_dir, to_dir=args.to_dir,
+                    retry=args.retry, zip_file=args.zip) as dl, \
+            Timing(epilogue="Entire download"):
+        day_dirs = dl.download()
+        wb = openpyxl.Workbook()
+        for tab_idx, uls_table in enumerate(UlsTable.all()):
+            with Timing(f"Scanning {uls_table.name}"):
+                if tab_idx == 0:
+                    ws = wb.active
+                    ws.title = uls_table.name
+                else:
+                    ws = wb.create_sheet(uls_table.name)
+                for field_idx, field in enumerate(uls_table.fields):
+                    ws.cell(row=1, column=field_idx + 1, value=field.dsc)
+                    min_width = 0
+                    if isinstance(field.col_type, sa.Unicode):
+                        min_width = field.col_type.length
+                    elif isinstance(field.col_type, sa.DateTime):
+                        min_width = 10
+                    cn = spreadsheet_col_name(field_idx + 1)
+                    ws.column_dimensions[cn].width = \
+                        max(ws.column_dimensions[cn].width, min_width)
+                row_count = 1
+                for _, _, row_data, record in \
+                        UlsTableReader(uls_table=uls_table, day_dirs=day_dirs):
+                    if row_data["call_sign"] not in callsigns:
+                        continue
+                    for value_idx, value in enumerate(record.split("|")):
+                        field = uls_table.fields[value_idx]
+                        v: Optional[Union[int, float, str]] = value
+                        if not value:
+                            pass
+                        elif isinstance(field.col_type, sa.Integer):
+                            v = int(value)
+                        elif isinstance(field.col_type, sa.Float):
+                            v = float(value)
+                        ws.cell(row=row_count + 1, column=value_idx + 1,
+                                value=v)
+                    row_count += 1
+                if row_count == 1:
+                    logging.warning(
+                        (f"No data on callsign(s) {', '.join(args.callsign)} "
+                         f"found in table {uls_table.name}"))
+        wb.save(filename)
 
 
 def do_help(args: Any) -> None:
@@ -4836,17 +5581,15 @@ def main(argv: List[str]) -> None:
     switches_download = \
         argparse.ArgumentParser(add_help=False)
     switches_download.add_argument(
-        "--dir", metavar="DOWNLOAD_DIRECTORY",
-        help="Download FCC ULS files archives to given directory and retain " +
-        "them or (--skip_doownload specified) use FCC ULS files from given " +
-        "directory instead of downloading them. Default is to download to " +
-        "temporary directory and remove it afterwards. For development " +
-        "purposes")
+        "--to_dir", metavar="DOWNLOAD_DIRECTORY",
+        help="Download raw FCC ULS files to given directory and retain " +
+        "them there. Default is to download to temporary directory and " +
+        "remove it afterwards")
     switches_download.add_argument(
-        "--skip_download", action="store_true",
-        help="Don't download FCC ULS files, use already downloaded, located " +
-        "in directory, specified with --dir switch (that must present). For " +
-        "development purposes")
+        "--from_dir", metavar="DOWNLOAD_DIRECTORY",
+        help="Use raw FCC ULS files from given firectory (created from " +
+        "--to_dir in or some other way). Default is to download files from " +
+        "FCC server")
     switches_download.add_argument(
         "--retry", action="store_true",
         help="Retry download several times if it aborts. For use e.g. on " +
@@ -4861,11 +5604,10 @@ def main(argv: List[str]) -> None:
     switches_afc = \
         argparse.ArgumentParser(add_help=False)
     switches_afc.add_argument(
-        "--extra", action="store_true",
-        help="Generate extra fields (not in original AFC database)")
-    switches_afc.add_argument(
-        "--mobile", action="store_true",
-        help="Allow mobile paths")
+        "--compatibility", action="store_true",
+        help="Generate AFC database compatible with all AFC engine " +
+        "releases. Default is to generate database for latest AFC engine " +
+        "release")
     switches_afc.add_argument(
         "--prev_afc", metavar="PREV_AFC_DATABASE",
         help="Open AFC database 'fsid' field computed as sequential number " +
@@ -4948,15 +5690,17 @@ def main(argv: List[str]) -> None:
         "gmap", parents=[switches_common],
         help="Export KML to import to Google maps")
     parser_gmap.add_argument(
-        "--lat", metavar="CENTER_LATITUDE_DEGREES", required=True, type=float,
+        "--lat", metavar="CENTER_LATITUDE_DEGREES", type=float,
         help="Latitude of center point in degrees")
     parser_gmap.add_argument(
-        "--lon", metavar="CENTER_LONGITUDE_DEGREES", required=True,
-        type=float,
+        "--lon", metavar="CENTER_LONGITUDE_DEGREES", type=float,
         help="Latitude of center point in degrees")
     parser_gmap.add_argument(
-        "--distance", metavar="DISTANCE_IN_MILES", required=True, type=float,
+        "--distance", metavar="DISTANCE_IN_MILES", type=float,
         help="Maximum distance in miles from center point")
+    parser_gmap.add_argument(
+        "--path", metavar="CALLSIGN[/NUM]", action="append", default=[],
+        help="Path to put on map. This switch may be specified several times")
     parser_gmap.add_argument(
         "--direction", action="store_true",
         help="Show direction arrows on paths. Note that this adds clutter " +
@@ -4996,6 +5740,10 @@ def main(argv: List[str]) -> None:
         "latitude/longitude degrees, 'top' is the number of top spots to " +
         "print (default - print all)")
     parser_compare.add_argument(
+        "--kml", metavar="KML_FILE",
+        help="Create KML file (for displaying in Google maps) with added " +
+        "and removed paths")
+    parser_compare.add_argument(
         "DB1",
         help="First ULS or AFC database file to compare")
     parser_compare.add_argument(
@@ -5028,6 +5776,21 @@ def main(argv: List[str]) -> None:
         "CSV_FILE",
         help="Name of CSV file to generate")
     parser_csv.set_defaults(func=do_csv)
+
+    # Subparser for 'xlsx' command
+    parser_csv = subparsers.add_parser(
+        "xlsx", parents=[switches_download, switches_common],
+        help="Download and put to spreadsheet data on given callsign(s)")
+    parser_csv.add_argument(
+        "--callsign", metavar="CALLSIGN", action="append", default=[],
+        required=True,
+        help="Callsign to put to spreadsheet. This parameter is mandatory " +
+        "and may be specified several times")
+    parser_csv.add_argument(
+        "XLSX_FILE", nargs="?",
+        help="Name of XLSX file to generate. If omitted then callsign (or " +
+        "concatenation thereof) with .xlsx extension is used")
+    parser_csv.set_defaults(func=do_xlsx)
 
     # Subparser for 'help' command
     parser_help = subparsers.add_parser(
