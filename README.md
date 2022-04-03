@@ -36,6 +36,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 
 - [Database info](/database_readme.md)
 - [Release Notes](/ReleaseNote.md)
+- [Test info](/tests/README.md)
 <br /><br />
 
 # **Introduction**
