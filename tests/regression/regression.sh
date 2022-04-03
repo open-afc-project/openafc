@@ -130,6 +130,6 @@ build_dev_server() {
 }
 
 build_dev_server $1 $2
-
+build
 # Local Variables:
 # vim: sw=2:et:tw=80:cc=+1
