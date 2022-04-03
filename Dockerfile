@@ -9,10 +9,10 @@ ARG BLD_TAG=latest
 ARG PRINST_TAG=latest
 ARG BLD_NAME=openafc/centos-build-image
 ARG PRINST_NAME=openafc/centos-preinstall-image
-ARG BUILDREV=localbuild
 
 # Stage Build
 FROM ${BLD_NAME}:${BLD_TAG} as build_image
+ARG BUILDREV=localbuild
 COPY CMakeLists.txt LICENSE.txt version.txt fbrat.rpmlintrc Doxyfile.in /wd/
 RUN echo $BUILDREV > /wd/svnrevision.txt
 
