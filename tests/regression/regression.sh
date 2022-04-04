@@ -125,7 +125,8 @@ build_dev_server() {
   (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${rand} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${rand})
   EXT_ARGS="--build-arg BLD_TAG=${rand} --build-arg PRINST_TAG=${rand} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV}"
   docker_build_and_push ${wd}/Dockerfile ${SRV_DI}:${rand} "${EXT_ARGS}"
-  docker_build ${wd}/Dockerfile ${SRV_DI}:${rand} "--build-arg BLD_TAG=${rand} --build-arg PRINST_TAG=${rand} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV} --build-arg BUILDREV=`git rev-parse --short HEAD`"
+  BUILDREV=`git rev-parse --short HEAD`
+  docker_build ${wd}/Dockerfile ${SRV_DI}:${rand} "--build-arg BLD_TAG=${rand} --build-arg PRINST_TAG=${rand} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV} --build-arg BUILDREV=${BUILDREV}"
 }
 
 build_dev_server $1 $2
