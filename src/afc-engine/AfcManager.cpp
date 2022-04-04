@@ -1907,6 +1907,10 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
         throw std::runtime_error("ERROR: Invalid propagationModel[\"kind\"]");
     }
 
+    if (_pathLossModel == CConst::CustomPathLossModel) {
+        _pathLossModel = CConst::FCC6GHzReportAndOrderPathLossModel;
+    }
+
     switch(_pathLossModel) {
         case CConst::unknownPathLossModel:
             throw std::runtime_error("ERROR: Invalid propagationModel[\"kind\"]");

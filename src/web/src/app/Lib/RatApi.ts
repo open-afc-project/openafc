@@ -141,7 +141,7 @@ export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<strin
         headers: addAuth({
             "Content-Type": "application/json"
         }),
-        body: JSON.stringify(conf)
+        body: JSON.stringify(conf,undefined,3)
     }).then(res => {
         if (res.status === 204) {
             return success("AFC configuration updated");
