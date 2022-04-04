@@ -34,7 +34,7 @@ jobs:
 
     - name: generate rand
       run: |
-          echo RAND=`date +"D_%d_%m_%y_T_%H_%M_%S_TZ_%Z"` >> $GITHUB_ENV
+          echo RAND=`date +"D_%d_%m_%y_T_%H_%M_%S_TZ_%Z"`_hash_`git rev-parse --short HEAD` >> $GITHUB_ENV
 
     - name: generate  workdir
       run: |
@@ -58,7 +58,7 @@ jobs:
 # rsync sources{
     - name: rsync sources
       run: |
-          rsync -raz --delete ${{ github.workspace }}/* ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }}:/${{ env.WD }}
+          rsync -raz --delete ${{ github.workspace }}/ ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }}:/${{ env.WD }}
 # }rsync sources
 
 # build regr test images {
