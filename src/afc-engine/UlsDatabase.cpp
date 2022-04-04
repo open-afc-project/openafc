@@ -13,10 +13,10 @@
 #include <rkflogging/Logging.h>
 #include "rkflogging/ErrStream.h"
 
-namespace 
+namespace
 {
-	// Logger for all instances of class
-	LOGGER_DEFINE_GLOBAL(logger, "UlsDatabase")
+// Logger for all instances of class
+LOGGER_DEFINE_GLOBAL(logger, "UlsDatabase")
 
 } // end namespace
 
@@ -25,37 +25,68 @@ namespace
 /******************************************************************************************/
 UlsDatabase::UlsDatabase()
 {
-	columns << "fsid"; fieldIdxList.push_back(&fsidIdx);
+	columns << "fsid";
+	fieldIdxList.push_back(&fsidIdx);
 
-	columns << "callsign";                       fieldIdxList.push_back(&callsignIdx);
-	columns << "radio_service";                  fieldIdxList.push_back(&radio_serviceIdx);
-	columns << "name";                           fieldIdxList.push_back(&nameIdx);
-	columns << "rx_callsign";                    fieldIdxList.push_back(&rx_callsignIdx);
-	columns << "rx_antenna_num";                 fieldIdxList.push_back(&rx_antenna_numIdx);
-	columns << "freq_assigned_start_mhz";        fieldIdxList.push_back(&freq_assigned_start_mhzIdx);
-	columns << "freq_assigned_end_mhz";          fieldIdxList.push_back(&freq_assigned_end_mhzIdx);
-	columns << "emissions_des";                  fieldIdxList.push_back(&emissions_desIdx);
-	columns << "tx_lat_deg";                     fieldIdxList.push_back(&tx_lat_degIdx);
-	columns << "tx_long_deg";                    fieldIdxList.push_back(&tx_long_degIdx);
-	columns << "tx_ground_elev_m";               fieldIdxList.push_back(&tx_ground_elev_mIdx);
-	columns << "tx_polarization";                fieldIdxList.push_back(&tx_polarizationIdx);
-	columns << "tx_gain";                        fieldIdxList.push_back(&tx_gainIdx);
-	columns << "tx_eirp";                        fieldIdxList.push_back(&tx_eirpIdx);
-	columns << "tx_height_to_center_raat_m";     fieldIdxList.push_back(&tx_height_to_center_raat_mIdx);
-	columns << "rx_lat_deg";                     fieldIdxList.push_back(&rx_lat_degIdx);
-	columns << "rx_long_deg";                    fieldIdxList.push_back(&rx_long_degIdx);
-	columns << "rx_ground_elev_m";               fieldIdxList.push_back(&rx_ground_elev_mIdx);
-	columns << "rx_height_to_center_raat_m";     fieldIdxList.push_back(&rx_height_to_center_raat_mIdx);
-	columns << "rx_gain";                        fieldIdxList.push_back(&rx_gainIdx);
-	columns << "status";                         fieldIdxList.push_back(&statusIdx);
-	columns << "mobile";                         fieldIdxList.push_back(&mobileIdx);
-	columns << "rx_ant_model";                   fieldIdxList.push_back(&rx_ant_modelIdx);
-	columns << "p_rp_num";                       fieldIdxList.push_back(&p_rp_numIdx);
+	columns << "callsign";
+	fieldIdxList.push_back(&callsignIdx);
+	columns << "radio_service";
+	fieldIdxList.push_back(&radio_serviceIdx);
+	columns << "name";
+	fieldIdxList.push_back(&nameIdx);
+	columns << "rx_callsign";
+	fieldIdxList.push_back(&rx_callsignIdx);
+	columns << "rx_antenna_num";
+	fieldIdxList.push_back(&rx_antenna_numIdx);
+	columns << "freq_assigned_start_mhz";
+	fieldIdxList.push_back(&freq_assigned_start_mhzIdx);
+	columns << "freq_assigned_end_mhz";
+	fieldIdxList.push_back(&freq_assigned_end_mhzIdx);
+	columns << "emissions_des";
+	fieldIdxList.push_back(&emissions_desIdx);
+	columns << "tx_lat_deg";
+	fieldIdxList.push_back(&tx_lat_degIdx);
+	columns << "tx_long_deg";
+	fieldIdxList.push_back(&tx_long_degIdx);
+	columns << "tx_ground_elev_m";
+	fieldIdxList.push_back(&tx_ground_elev_mIdx);
+	columns << "tx_polarization";
+	fieldIdxList.push_back(&tx_polarizationIdx);
+	columns << "tx_gain";
+	fieldIdxList.push_back(&tx_gainIdx);
+	columns << "tx_eirp";
+	fieldIdxList.push_back(&tx_eirpIdx);
+	columns << "tx_height_to_center_raat_m";
+	fieldIdxList.push_back(&tx_height_to_center_raat_mIdx);
+	columns << "rx_lat_deg";
+	fieldIdxList.push_back(&rx_lat_degIdx);
+	columns << "rx_long_deg";
+	fieldIdxList.push_back(&rx_long_degIdx);
+	columns << "rx_ground_elev_m";
+	fieldIdxList.push_back(&rx_ground_elev_mIdx);
+	columns << "rx_height_to_center_raat_m";
+	fieldIdxList.push_back(&rx_height_to_center_raat_mIdx);
+	columns << "rx_gain";
+	fieldIdxList.push_back(&rx_gainIdx);
+	columns << "rx_ant_diameter";
+	fieldIdxList.push_back(&rx_antennaDiameterIdx);
+	columns << "status";
+	fieldIdxList.push_back(&statusIdx);
+	columns << "mobile";
+	fieldIdxList.push_back(&mobileIdx);
+	columns << "rx_ant_model";
+	fieldIdxList.push_back(&rx_ant_modelIdx);
+	columns << "p_rp_num";
+	fieldIdxList.push_back(&p_rp_numIdx);
 
-	prColumns << "prSeq";                        prFieldIdxList.push_back(&prSeqIdx);
-	prColumns << "pr_lat_deg";                   prFieldIdxList.push_back(&pr_lat_degIdx);
-	prColumns << "pr_lon_deg";                   prFieldIdxList.push_back(&pr_lon_degIdx);
-	prColumns << "pr_height_to_center_raat_m";   prFieldIdxList.push_back(&pr_height_to_center_raat_mIdx);
+	prColumns << "prSeq";
+	prFieldIdxList.push_back(&prSeqIdx);
+	prColumns << "pr_lat_deg";
+	prFieldIdxList.push_back(&pr_lat_degIdx);
+	prColumns << "pr_lon_deg";
+	prFieldIdxList.push_back(&pr_lon_degIdx);
+	prColumns << "pr_height_to_center_raat_m";
+	prFieldIdxList.push_back(&pr_height_to_center_raat_mIdx);
 
 	int fIdx;
 	for(fIdx=0; fIdx<(int) fieldIdxList.size(); ++fIdx) {
@@ -90,8 +121,8 @@ void verifyResult(const QSqlQuery& ulsQueryRes)
 
 
 // construct and run sql query and return result
-QSqlQuery runQueryWithBounds(const SqlScopedConnection<SqlExceptionDb>& db, 
-		const QStringList& columns, const double& minLat, const double& maxLat, const double& minLon, const double& maxLon);
+QSqlQuery runQueryWithBounds(const SqlScopedConnection<SqlExceptionDb>& db,
+                             const QStringList& columns, const double& minLat, const double& maxLat, const double& minLon, const double& maxLon);
 QSqlQuery runQueryById(const SqlScopedConnection<SqlExceptionDb>& db, const QStringList& columns, const int& fsid);
 
 void UlsDatabase::loadFSById(const QString& dbName, std::vector<UlsRecord>& target, const int& fsid)
@@ -117,7 +148,7 @@ void UlsDatabase::loadFSById(const QString& dbName, std::vector<UlsRecord>& targ
 }
 
 void UlsDatabase::loadUlsData(const QString& dbName, std::vector<UlsRecord>& target,
-		const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
+                              const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
 	LOGGER_DEBUG(logger) << "Bounds: " << minLat << ", " << maxLat << "; " << minLon << ", " << maxLon;
 
@@ -138,32 +169,32 @@ void UlsDatabase::loadUlsData(const QString& dbName, std::vector<UlsRecord>& tar
 	fillTarget(db, target, ulsQueryRes);
 }
 
-QSqlQuery runQueryWithBounds(const SqlScopedConnection<SqlExceptionDb>& db, 
-		const QStringList& columns, const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
+QSqlQuery runQueryWithBounds(const SqlScopedConnection<SqlExceptionDb>& db,
+                             const QStringList& columns, const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
 	return SqlSelect(*db, "uls")
-		.cols(columns)
-		.where(QString(
-					"(rx_lat_deg BETWEEN %1 AND %2)"
-					"AND"
-					"(rx_long_deg BETWEEN %3 AND %4)"
-					)
-				.arg(std::min(minLat, maxLat))
-				.arg(std::max(minLat, maxLat))
-				.arg(std::min(minLon, maxLon))
-				.arg(std::max(minLon, maxLon))
-			  )
-		.order("fsid")
-		.run();
+	       .cols(columns)
+	       .where(QString(
+	                  "(rx_lat_deg BETWEEN %1 AND %2)"
+	                  "AND"
+	                  "(rx_long_deg BETWEEN %3 AND %4)"
+	              )
+	              .arg(std::min(minLat, maxLat))
+	              .arg(std::max(minLat, maxLat))
+	              .arg(std::min(minLon, maxLon))
+	              .arg(std::max(minLon, maxLon))
+	             )
+	       .order("fsid")
+	       .run();
 }
 
 QSqlQuery runQueryById(const SqlScopedConnection<SqlExceptionDb>& db, const QStringList& columns, const int& fsid)
 {
 	return SqlSelect(*db, "uls")
-		.cols(columns)
-		.where(QString("fsid=%1").arg(fsid))
-		.topmost(1)
-		.run();
+	       .cols(columns)
+	       .where(QString("fsid=%1").arg(fsid))
+	       .topmost(1)
+	       .run();
 }
 
 void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vector<UlsRecord>& target, QSqlQuery& q)
@@ -218,6 +249,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		target.at(r).rxGroundElevation = q.value(rx_ground_elev_mIdx).isNull() ? nan : q.value(rx_ground_elev_mIdx).toDouble();
 		target.at(r).rxHeightAboveTerrain = q.value(rx_height_to_center_raat_mIdx).isNull() ? nan : q.value(rx_height_to_center_raat_mIdx).toDouble();
 		target.at(r).rxGain = q.value(rx_gainIdx).isNull() ? nan : q.value(rx_gainIdx).toDouble();
+		target.at(r).rxAntennaDiameter = q.value(rx_antennaDiameterIdx).isNull() ? nan : q.value(rx_antennaDiameterIdx).toDouble();
 		target.at(r).status = q.value(statusIdx).toString().toStdString();
 		target.at(r).mobile = q.value(mobileIdx).toBool();
 		target.at(r).rxAntennaModel = q.value(rx_ant_modelIdx).toString().toStdString();
@@ -229,9 +261,9 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 			target.at(r).prHeightAboveTerrain = std::vector<double>(numPR);
 
 			QSqlQuery prQueryRes = SqlSelect(*db, "pr")
-				.cols(prColumns)
-				.where(QString("fsid=%1").arg(fsid))
-				.run();
+			                       .cols(prColumns)
+			                       .where(QString("fsid=%1").arg(fsid))
+			                       .run();
 
 			int querySize;
 			// resize vector to fit result

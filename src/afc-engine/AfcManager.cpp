@@ -3386,7 +3386,7 @@ double AfcManager::computeSpectralOverlap(double sigStartFreq, double sigStopFre
 /****                2: RX and TX                                                      ****/
 /******************************************************************************************/
 void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::string>>& ulsDatabaseList, PopGridClass *popGridVal, int linkDirection, double minFreq, double maxFreq, bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
-		const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
+                             const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
 
 	auto fs_anom_writer = GzipCsvWriter(_fsAnomFile);
@@ -3436,6 +3436,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		std::string txPolarization;
 		double txHeightAboveTerrain;
 		double rxGain;
+		double rxAntennaDiameter;
 		double txGain;
 		double txEIRP;
 		CConst::ULSAntennaTypeEnum rxAntennaType;
@@ -4091,8 +4092,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/**************************************************************************/
 
 			/**************************************************************************/
-			/* Check txLatitude and txLongitude region defined by popGrid             */
-			/* (SIMULATION REGION)                                                    */
+			/* Check txLatitude and txLongitude region defined by popGrid (SIMULATION REGION)     */
 			/**************************************************************************/
 			if ((!ignoreFlag) && ((linkDirection == 1) || (linkDirection == 2)) && popGridVal)
 			{
@@ -4298,6 +4298,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					/**************************************************************************/
 
 					/**************************************************************************/
+					/* rxAntennaDiameter                                                      */
+					/**************************************************************************/
+					rxAntennaDiameter = row.rxAntennaDiameter;
+					/**************************************************************************/
+
+					/**************************************************************************/
 					/* rxAntenna                                                              */
 					/**************************************************************************/
 					if (!ignoreFlag) {
@@ -4318,8 +4324,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								if (!validFlag) {
 									std::ostringstream errStr;
 									errStr << "Invalid ULS data for FSID = " << fsid
-										<< ", Unknown Rx Antenna \"" << strval
-										<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
+									       << ", Unknown Rx Antenna \"" << strval
+									       << "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
 									LOGGER_WARN(logger) << errStr.str();
 									statusMessageList.push_back(errStr.str());
 
@@ -4496,6 +4502,9 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					rxAntennaFeederLossDB = _rxFeederLossDBOther;
 					noiseFigureDB = _ulsNoiseFigureDBOther;
 				}
+				double centerFreq = (startFreq + stopFreq)/2;
+				double lambda = CConst::c / centerFreq;
+				double rxDlambda = rxAntennaDiameter / lambda;
 
 				uls = new ULSClass(this, fsid, dbIdx);
 				_ulsList->append(uls);
@@ -4517,6 +4526,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setPRLatitudeDeg(prLatitudeDeg);
 				uls->setPRLongitudeDeg(prLongitudeDeg);
 				uls->setRxGain(rxGain);
+				uls->setRxDlambda(rxDlambda);
 				uls->setRxAntennaType(rxAntennaType);
 				uls->setTxAntennaType(txAntennaType);
 				uls->setRxAntenna(rxAntenna);
@@ -4692,7 +4702,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 	return;
 }
 /******************************************************************************************/
-
 /******************************************************************************************/
 /**** AfcManager::readRASData()                                                        ****/
 /******************************************************************************************/

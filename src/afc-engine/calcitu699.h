@@ -13,9 +13,9 @@ using namespace std;
 
 namespace calcItu699 {
 
-	double CalcITU699(const double &angleDeg, const double &maxGain);
+double CalcITU699(const double &angleDeg, const double &maxGain, const double &Dlambda);
 
-	double CalcITU699psiM(const double &maxGain);
+double CalcITU699psiM(const double &maxGain);
 }
 
 #endif // CALCITU699_H
