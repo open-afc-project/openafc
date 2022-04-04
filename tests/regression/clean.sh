@@ -9,4 +9,4 @@ set -x
 hostname
 wd=${1}
 rand=${2}
-# rm -fr ${wd}
+rm -fr ${wd}
