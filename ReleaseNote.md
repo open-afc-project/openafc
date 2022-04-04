@@ -1,5 +1,14 @@
 # Release Note
 
+## **Version and Date**
+|Version|**v3.3.14**|
+| :- | :- |
+|**Date**|**04/04/2022**|
+
+## **Issues Addressed**
+* Jira OA-40: Add ability to select WinnerII LOS/NLOS only (instead of Combined) in AFC Config
+    * GUI Updates to support selection that is more user configurable of Winner II (LoS/NLoS/Combined) and ITM (with or without P.2108/P.452).
+
 
 ## **Version and Date**
 |Version|**v3.3.13**|
