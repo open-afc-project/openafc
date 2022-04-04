@@ -58,7 +58,7 @@ jobs:
 # rsync sources{
     - name: rsync sources
       run: |
-          rsync -raz --delete ${{ github.workspace }}/* ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }}:/${{ env.WD }}
+          rsync -raz --delete ${{ github.workspace }}/ ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }}:/${{ env.WD }}
 # }rsync sources
 
 # build regr test images {
