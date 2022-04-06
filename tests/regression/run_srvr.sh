@@ -24,7 +24,7 @@ docker run --rm --user 1003:1003 -v `pwd`/pipe:/pipe afc-regression-test --db e=
 cp -a ~/template_regrtest/*  $wd/tests/regression
 docker tag dr942120/srv_di:${rand} srvr_di
 docker-compose down && docker-compose up -d && docker ps -a
-sleep 30
+sleep 5
 # set default srvr configuration
 docker-compose exec -T rat_server rat-manage-api db-create
 docker-compose exec -T -u 1003:1003 rat_server rat-manage-api cfg add src=/pipe/export_admin_cfg.json
