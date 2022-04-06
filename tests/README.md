@@ -7,12 +7,13 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 - [**Introduction**](#introduction)
 - [**Description**](#introduction)
 - [**Basic functionality**](#basic-functionality)
-  - [Testing](#testing)
+  - [Testing sequence](#testing-sequence)
   - [Set AFC Server configuration](#set-afc-server-configuration)
   - [Test database](#test-database)
 - [**Commands and procedures**](#commands-and-procedures)
-  - [Test execution](#test-execution)
+  - [Tests execution options](#tests-execution-options)
   - [Add new test vectors](#add-new-test-vectors)
+  - [Dry-run test vectors](#dry-run-test-vectors)
   - [Dump test database](#dump-test-database)
   - [Export AFC Server admin configuration](#export-afc-server-admin-configuration)
   - [Add AFC Server admin configuration](#add-afc-server-admin-configuration)
@@ -35,18 +36,20 @@ Please contact support@telecominfraproject.com in case you need access to the op
 # **Description**
 
 The system consists of a testing utility that communicates with the AFC server.
-The utility sends WFA standard AFC requests and gets AFC responses. It also provides analysis of the results.
-The utility also can be used to keep and export the AFC Server administration
-configuration used during validation. It consists of users, APs and server configurations.
+The utility sends WFA standard AFC requests and gets AFC responses. It also provides
+an analysis of the results. The utility also can be used to keep and export the AFC Server
+administration configuration used during validation. It consists of users, APs,
+and server configurations.
 
 <br /><br />
 
 
 # **Basic functionality**
-## Testing
+## Testing sequence
 
+The sequence executes all required tests and returns fail if even one test fails.
 The testing procedure begins by preparing a test database with test vectors and responses.
-Follows run of test utility with server and test options (for details see #test-execution).
+Follows run of test utility with server and test options (for details see #tests-execution-options).
 ```
 afc_tests.py --cfg <server cfg> --test <test cfg>
 ```
@@ -70,7 +73,7 @@ splitting JSON into fields which can be redesigned by request.
 
 
 # **Commands and procedures**
-## Test execution
+## Tests execution options
 
 Start sequential run of tests according to the data in the database
 ```
@@ -97,6 +100,12 @@ Provided file consists of any number of test vectors in the following format of 
 
 By default, a new test vector is sent to the AFC server in order to acquire it’s response and keep it in the database.
 
+## Dry-run test vectors
+
+This is an option to run a test vector from a file without further saving it or it's response to the database file.
+```
+afc_tests.py --cfg addr=1.2.3.4 --db r=add_test_vector.txt
+```
 ## Dump test database
 
 Show all entries from the database (requests and responses)
