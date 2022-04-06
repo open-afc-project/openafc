@@ -1,4 +1,4 @@
-#include "EnvironmentFlag.h"
+#include "../EnvironmentFlag.h"
 #include "rkfunittest/GtestShim.h"
 
 class TestEnvironmentFlag : public testing::Test {

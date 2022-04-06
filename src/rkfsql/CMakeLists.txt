@@ -11,4 +11,6 @@ target_link_libraries(${TGT_NAME} PUBLIC Qt5::Sql)
 
 target_link_libraries(${TGT_NAME} PUBLIC rkflogging)
 
-add_subdirectory(test)
+if (CMAKE_BUILD_TYPE STREQUAL "DebugWithTest")
+  add_subdirectory(test)
+endif()

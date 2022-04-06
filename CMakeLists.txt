@@ -4,8 +4,13 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS 3.10)
     cmake_policy(SET CMP0071 OLD)
 endif()
 
-
-    set(CMAKE_BUILD_TYPE "Debug")
+# Debug
+# Release
+# DebugWithTest
+set(default_build_type "Debug")
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE "${default_build_type}")
+endif()
 
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 
@@ -156,19 +161,21 @@ if(GDAL_FOUND AND NOT TARGET GDAL::GDAL)
   )
 endif()
 
-find_package(GTest 1.6 REQUIRED)
-
 set(Boost_USE_MULTITHREADED ON)
 set(Boost_USE_STATIC_RUNTIME OFF)
 find_package(Boost 1.54 REQUIRED COMPONENTS log program_options regex system thread)
 add_definitions("-DBOOST_ALL_DYN_LINK")
 
 
-# Run tests with CTest
-include(CTest)
-enable_testing()
-# Alias "check" target for verbose test run
-add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -C ${CMAKE_BUILD_TYPE} --verbose)
+if (CMAKE_BUILD_TYPE STREQUAL "DebugWithTest")
+  find_package(GTest 1.6 REQUIRED)
+  # Run tests with CTest
+  include(CTest)
+  enable_testing()
+  # Alias "check" target for verbose test run
+  add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -C ${CMAKE_BUILD_TYPE} --verbose)
+endif()
+
 
 # External library search options
 if(WIN32)

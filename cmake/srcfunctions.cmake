@@ -450,12 +450,13 @@ function(add_dist_yarnlibrary)
         message(FATAL_ERROR "add_dist_yarnlibrary missing SOURCES parameter")
     endif()
 
-    if ("${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
-        set(YARN_BUILD_TYPE "build")
-    else()
+    # TODO: only build working is build-dev
+    #if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug")
         set(YARN_BUILD_TYPE "build-dev")
         message(STATUS "will build yarn in DEV mode.")
-    endif()
+    #else()
+    #    set(YARN_BUILD_TYPE "build")
+    #endif()
 
     find_program(YARN "yarn")
     

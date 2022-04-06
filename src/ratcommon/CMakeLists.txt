@@ -16,4 +16,6 @@ target_link_libraries(${TGT_NAME} PUBLIC Qt5::Core)
 target_link_libraries(${TGT_NAME} PUBLIC Qt5::Network)
 target_link_libraries(${TGT_NAME} PUBLIC minizip)
 
-add_subdirectory(test)
+if (CMAKE_BUILD_TYPE STREQUAL "DebugWithTest")
+  add_subdirectory(test)
+endif()
