@@ -8,7 +8,7 @@ set -x
 hostname
 wd=${1}
 rand=${2}
-$wd/tests/regression
+cd $wd/tests/regression
 docker ps -a
 docker-compose down
 docker ps -a
