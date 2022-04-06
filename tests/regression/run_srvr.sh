@@ -16,7 +16,9 @@ docker build -t afc-regression-test .
 
 # export test dut configuration
 cd $wd/tests/regression
-docker run --rm -v `pwd`/pipe:/pipe afc-regression-test --db e=/pipe/export_admin_cfg.json
+mkdir pipe
+mkdir afc_config
+docker run --rm --user 1003:1003 -v `pwd`/pipe:/pipe afc-regression-test --db e=/pipe/export_admin_cfg.json
 
 # copy regr server config and run srvr
 cp -a ~/template_regrtest/*  $wd/tests/regression
@@ -25,4 +27,4 @@ docker-compose down && docker-compose up -d && docker ps -a
 sleep 20
 # set default srvr configuration
 docker-compose exec rat_server rat-manage-api db-create
-docker-compose exec rat_server rat-manage-api cfg add src=/pipe/export_admin_cfg.json
+docker-compose exec -u 1003:1003 rat_server rat-manage-api cfg add src=/pipe/export_admin_cfg.json
