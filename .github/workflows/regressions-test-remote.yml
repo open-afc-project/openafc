@@ -92,6 +92,7 @@ jobs:
 
 # stop dev srvr {
     - name: stop dev srvr
+      if: ${{ always() }}
       run: |
         ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "sh -x ${{ env.WD }}/${{ env.REGRD }}/stop_srvr.sh ${{ env.WD }} ${{ env.RAND }}"
 # }stop dev srvr
