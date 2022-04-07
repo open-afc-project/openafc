@@ -60,6 +60,7 @@ class AfcTester:
         self.url_path = 'https://'
         self.log_level = logging.INFO
         self.db_filename = AFC_TEST_DB_FILENAME
+        self.resp = ''
 
     def run(self, opts):
         """Main entry to find and execute commands"""
@@ -97,7 +98,8 @@ class AfcTester:
         set_db_opts = {
             'a': add_reqs,
             'd': dump_db,
-            'e': export_admin_cfg
+            'e': export_admin_cfg,
+            'r': run_reqs
         }
         for k in params:
             if not set_db_opts[k](self, params[k]):
@@ -122,6 +124,17 @@ class AfcTester:
         app_log.info('AFC Test utility version %s', __version__)
         app_log.info('AFC Test db hash %s', get_md5(AFC_TEST_DB_FILENAME))
         return True
+
+    def _send_recv(self, params):
+        """Run AFC test and wait for respons"""
+        new_req_json = json.loads(params.encode('utf-8'))
+        new_req = json.dumps(new_req_json, sort_keys=True)
+        app_log.debug(new_req)
+        rawresp = requests.post(
+            self.url_path, data=new_req,
+            headers=headers, timeout=None)
+        resp = rawresp.json()
+        return new_req, resp
 
 
 class ParseDict(argparse.Action):
@@ -180,10 +193,12 @@ def make_arg_parser():
                              help='<a=<ip address|hostname>>, [p=<port>], '
                              '[log=<info|debug|warn|error|critical>]')
     args_parser.add_argument('--db', metavar='KEY,KEY=VALUE',
-                             nargs='+', action=ParseDict, help='<a[=filename]>'
-                             ' - add new request record, '
-                             '<d> - dump all DB tables')
-    args_parser.add_argument('--test', metavar='KEY=VALUE',
+                             nargs='+', action=ParseDict,
+                             help='<a[=filename]> - add new request record,'
+                                  '<d> - dump all DB tables,'
+                                  '<e> - export admin config,'
+                                  '<r[=filename]> - run request from file')
+    args_parser.add_argument('--test', metavar='KEY,KEY=VALUE',
                              nargs='+', action=ParseDict,
                              help='<r=[number]>  - run number of tests '
                              '(0 - all cases)'
@@ -239,6 +254,8 @@ def make_db(filename):
     """Create DB file only with schema"""
     app_log.debug('%s()', inspect.stack()[0][3])
     if os.path.isfile(filename):
+        app_log.debug('%s() The db file is exists, no need to create new one.',
+                      inspect.stack()[0][3])
         return True
 
     app_log.info('Create DB tables (%s, %s) from source files',
@@ -272,15 +289,13 @@ def add_reqs(self, opt):
             dataline = fp_test.readline()
             if not dataline:
                 break
-            new_req_json = json.loads(dataline.encode('utf-8'))
-            new_req = json.dumps(new_req_json, sort_keys=True)
-            rawresp = requests.post(
-                self.url_path, data=new_req,
-                headers=headers, timeout=None)
 
-            resp = rawresp.json()
+            new_req, resp = self._send_recv(dataline)
+
             resp_res = json_lookup('shortDescription', resp, None)
-            if resp_res[0] != 'success':
+            if resp_res[0] != 'Success':
+                app_log.error('Failed in test response - %s', resp_res)
+                app_log.debug(resp)
                 break
             app_log.info('Got response for the request')
             json_lookup('availabilityExpireTime', resp, '0')
@@ -299,6 +314,38 @@ def add_reqs(self, opt):
                         [upd_data, hash_obj.hexdigest()])
             con.commit()
     con.close()
+    return True
+
+
+def run_reqs(self, opt):
+    """Run one or more requests from provided file"""
+    app_log.debug('%s()', inspect.stack()[0][3])
+    filename = ADD_AFC_TEST_REQS
+    if opt != 'True':
+        filename = opt
+
+    if not os.path.isfile(filename):
+        app_log.error('Missing raw test data file %s', filename)
+        return False
+
+    with open(filename, 'r') as fp_test:
+        while True:
+            dataline = fp_test.readline()
+            if not dataline:
+                break
+
+            new_req, resp = self._send_recv(dataline)
+
+            resp_res = json_lookup('shortDescription', resp, None)
+            if resp_res[0] != 'Success':
+                app_log.error('Failed in test response - %s', resp_res)
+                app_log.debug(resp)
+                break
+            app_log.info('Got response for the request')
+
+            json_lookup('availabilityExpireTime', resp, '0')
+            upd_data = json.dumps(resp, sort_keys=True)
+            hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
     return True
 
 
@@ -409,6 +456,7 @@ def start_test(self, test_number):
         app_log.info('Prepare to run number of tests - %d',
                      found_range - row_idx)
 
+    test_res = True
     while row_idx < found_range:
         # Fetch test vector to create request
         req_id = json_lookup('requestId', eval(found_reqs[row_idx][0]), None)
@@ -426,7 +474,9 @@ def start_test(self, test_number):
             app_log.error('Test %s is Fail', req_id[0])
             app_log.error(upd_data)
             app_log.error(hash_obj.hexdigest())
+            test_res = False
         row_idx += 1
+    return test_res
 
 
 def main():
@@ -439,8 +489,8 @@ def main():
 
     parser = make_arg_parser()
     prms = vars(parser.parse_args())
-    tester.run(prms)
-    sys.exit()
+    res = tester.run(prms)
+    sys.exit(res)
 
 
 if __name__ == '__main__':

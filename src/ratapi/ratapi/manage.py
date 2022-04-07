@@ -617,6 +617,7 @@ class ConfigAdd(Command):
                             'afc_config', str(user.id))
                         if not os.path.isdir(config_path):
                             os.makedirs(config_path)
+                            os.chown(config_path, 1003, 1003)
                         file_path = os.path.join(config_path, 'afc_config.json')
                         LOGGER.debug('Opening config file "%s"', file_path)
 
@@ -624,6 +625,7 @@ class ConfigAdd(Command):
                             with open(file_path, 'wb') as outfile:
                                 outfile.write(json.dumps(cfg_rcrd[0]))
                             os.chmod(file_path, 0o666)
+                            os.chown(file_path, 1003, 1003)
                 except Exception as e:
                     LOGGER.error(e)
                     LOGGER.error('Rolling back...')
