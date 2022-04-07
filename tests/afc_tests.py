@@ -49,6 +49,8 @@ TBL_USERS_NAME = 'user_config'
 TBL_AFC_CFG_NAME = 'afc_config'
 TBL_AP_CFG_NAME = 'ap_config'
 
+TEST_STATUS = { 'Ok':0, 'Error':1 }
+
 app_log = logging.getLogger(__name__)
 
 
@@ -456,7 +458,7 @@ def start_test(self, test_number):
         app_log.info('Prepare to run number of tests - %d',
                      found_range - row_idx)
 
-    test_res = True
+    test_res = TEST_STATUS['Ok']
     while row_idx < found_range:
         # Fetch test vector to create request
         req_id = json_lookup('requestId', eval(found_reqs[row_idx][0]), None)
@@ -474,7 +476,7 @@ def start_test(self, test_number):
             app_log.error('Test %s is Fail', req_id[0])
             app_log.error(upd_data)
             app_log.error(hash_obj.hexdigest())
-            test_res = False
+            test_res = TEST_STATUS['Error']
         row_idx += 1
     return test_res
 
