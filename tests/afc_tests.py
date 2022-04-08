@@ -49,10 +49,11 @@ TBL_USERS_NAME = 'user_config'
 TBL_AFC_CFG_NAME = 'afc_config'
 TBL_AP_CFG_NAME = 'ap_config'
 
-TEST_STATUS = { 'Ok':0, 'Error':1 }
+AFC_TEST_STATUS = { 'Ok':0, 'Error':1 }
+AFC_OK = AFC_TEST_STATUS['Ok']
+AFC_ERR = AFC_TEST_STATUS['Error']
 
 app_log = logging.getLogger(__name__)
-
 
 class AfcTester:
     """Provide tester API"""
@@ -63,40 +64,45 @@ class AfcTester:
         self.log_level = logging.INFO
         self.db_filename = AFC_TEST_DB_FILENAME
         self.resp = ''
+        self.post_verify = True
 
     def run(self, opts):
         """Main entry to find and execute commands"""
-        app_log.debug('AfcTester.run()')
+        app_log.debug('AfcTester.run()\n')
         _call_opts = {
             'cfg': self._set_cfg,
             'db': self._set_db,
             'test': self._run_test,
             'ver': self._get_version
         }
+        ret_res = AFC_OK
         for item in range(len(opts)):
             app_log.debug('AfcTester.run() Item %d , %s', item, list(opts)[item])
-            if not _call_opts[list(opts)[item]](opts[list(opts)[item]]):
-                return False
-        return True
+            ret_res = _call_opts[list(opts)[item]](opts[list(opts)[item]])
+            if (ret_res != AFC_OK):
+                break
+        return ret_res
 
     def _set_cfg(self, params):
         """Execute configuration rapameters"""
         if not params:
-            return True
+            return AFC_OK
         if 'log' in params:
-            self.log_level = params['log'].upper()
+            self.log_level = params['log'][0].upper()
             app_log.setLevel(self.log_level)
         if 'addr' in params:
-            self.addr = params['addr']
+            self.addr = params['addr'][0]
         if 'port' in params:
-            self.port = params['port']
+            self.port = params['port'][0]
+        if ('post' in params) and (params['post'][0] == 'n'):
+            self.post_verify = False
         self.url_path += self.addr + ':' + str(self.port) + AFC_URL_SUFFIX
-        return True
+        return AFC_OK
 
     def _set_db(self, params):
         """Execute DB related rapameters"""
         if not params:
-            return True
+            return AFC_OK
         set_db_opts = {
             'a': add_reqs,
             'd': dump_db,
@@ -104,28 +110,31 @@ class AfcTester:
             'r': run_reqs
         }
         for k in params:
-            if not set_db_opts[k](self, params[k]):
-                return False
-        return True
+            if not set_db_opts[k](self, params[k][0]):
+                return AFC_ERR
+        return AFC_OK
 
     def _run_test(self, params):
-        """Execute test related rapameters"""
+        """Execute tests with related parameters"""
         if not params:
-            return True
+            return AFC_OK
         set_run_opts = {
             'r': start_test,
             'a': start_acquisition
         }
+        ret_res = AFC_OK
         for k in params:
-            if not set_run_opts[k](self, params[k]):
-                return False
-        return True
+            for item in params[k]:
+                ret_res = set_run_opts[k](self, item)
+                if ret_res == AFC_ERR:
+                    break
+        return ret_res
 
     def _get_version(self, params):
         """Get AFC test utility version"""
         app_log.info('AFC Test utility version %s', __version__)
         app_log.info('AFC Test db hash %s', get_md5(AFC_TEST_DB_FILENAME))
-        return True
+        return AFC_OK
 
     def _send_recv(self, params):
         """Run AFC test and wait for respons"""
@@ -133,8 +142,8 @@ class AfcTester:
         new_req = json.dumps(new_req_json, sort_keys=True)
         app_log.debug(new_req)
         rawresp = requests.post(
-            self.url_path, data=new_req,
-            headers=headers, timeout=None)
+            self.url_path, data=new_req, headers=headers,
+            timeout=None, verify=self.post_verify)
         resp = rawresp.json()
         return new_req, resp
 
@@ -145,12 +154,23 @@ class ParseDict(argparse.Action):
         d = getattr(namespace, self.dest) or {}
         if values:
             for item in values:
-                split_items = item.split('=', 1)
-                key = split_items[0].strip()
-                try:
-                    d[key] = split_items[1]
-                except IndexError:
-                    d[key] = 'True'
+                key = ''
+                val = 'True'
+                if '=' in item:
+                    (key, val) = item.split('=', 1)
+                elif '>' in item:
+                    (key, val) = item.split('>', 1)
+                elif '<' in item:
+                    (key, val) = item.split('<', 1)
+                else:
+                    key = item.strip()
+
+                if ',' in val:
+                    d[key] = val.split(',')
+                elif key in d:
+                    d[key].append(val)
+                else:
+                    d[key] = [val]
         setattr(namespace, self.dest, d)
 
 
@@ -192,15 +212,17 @@ def make_arg_parser():
 
     args_parser.add_argument('--cfg', metavar='KEY=VALUE',
                              nargs='+', action=ParseDict,
-                             help='<a=<ip address|hostname>>, [p=<port>], '
-                             '[log=<info|debug|warn|error|critical>]')
+                             help='<addr=<ip address|hostname>>, '
+                                  '[port=<port>], '
+                                  '[post=n], '
+                                  '[log=<info|debug|warn|error|critical>]')
     args_parser.add_argument('--db', metavar='KEY,KEY=VALUE',
                              nargs='+', action=ParseDict,
                              help='<a[=filename]> - add new request record,'
                                   '<d> - dump all DB tables,'
                                   '<e> - export admin config,'
                                   '<r[=filename]> - run request from file')
-    args_parser.add_argument('--test', metavar='KEY,KEY=VALUE',
+    args_parser.add_argument('--test', metavar='KEY=VALUE',
                              nargs='+', action=ParseDict,
                              help='<r=[number]>  - run number of tests '
                              '(0 - all cases)'
@@ -416,7 +438,9 @@ def start_acquisition(self, test_number):
         # Fetch test vector to create request
         rawresp = requests.post(self.url_path,
                                 data=json.dumps(eval(found_reqs[row_idx][0])),
-                                headers=headers, timeout=None)
+                                headers=headers,
+                                timeout=None,
+                                verify=self.post_verify)
         resp = rawresp.json()
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
@@ -431,7 +455,7 @@ def start_acquisition(self, test_number):
 
 def start_test(self, test_number):
     """Fetch test vectors from the DB and run tests"""
-    app_log.debug('%s()', inspect.stack()[0][3])
+    app_log.debug('%s() %s', inspect.stack()[0][3], test_number)
     if test_number == 'True':
         found_range = 0
     else:
@@ -458,13 +482,15 @@ def start_test(self, test_number):
         app_log.info('Prepare to run number of tests - %d',
                      found_range - row_idx)
 
-    test_res = TEST_STATUS['Ok']
+    test_res = AFC_OK
     while row_idx < found_range:
         # Fetch test vector to create request
         req_id = json_lookup('requestId', eval(found_reqs[row_idx][0]), None)
         rawresp = requests.post(self.url_path,
                                 data=json.dumps(eval(found_reqs[row_idx][0])),
-                                headers=headers, timeout=None)
+                                headers=headers,
+                                timeout=None,
+                                verify=self.post_verify)
         resp = rawresp.json()
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
@@ -473,10 +499,10 @@ def start_test(self, test_number):
         if found_resps[row_idx][1] == hash_obj.hexdigest():
             app_log.info('Test %s is Ok', req_id[0])
         else:
-            app_log.error('Test %s is Fail', req_id[0])
+            app_log.error('Test %s (%s) is Fail', test_number, req_id[0])
             app_log.error(upd_data)
             app_log.error(hash_obj.hexdigest())
-            test_res = TEST_STATUS['Error']
+            test_res = AFC_ERR
         row_idx += 1
     return test_res
 
