@@ -10,5 +10,6 @@ wd=${1}
 rand=${2}
 cd $wd/tests/regression
 docker ps -a
+docker-compose logs
 docker-compose down
 docker ps -a
