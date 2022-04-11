@@ -17,8 +17,6 @@ class CConst
 		static const double T0;                // Room temperature for noise figure calculations
 		static const double atmPressurehPa;    // Atmospheric pressure value used in P.452
 
-
-
 		/**************************************************************************************/
 		/**** BuildingType                                                                 ****/
 		/**************************************************************************************/

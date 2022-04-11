@@ -3988,7 +3988,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/**************************************************************************/
 
 			/**************************************************************************/
-			/* Check txLatitude and txLongitude region defined by popGrid (SIMULATION REGION)     */
+			/* Check txLatitude and txLongitude region defined by popGrid             */
+			/* (SIMULATION REGION)                                                    */
 			/**************************************************************************/
 			if ((!ignoreFlag) && ((linkDirection == 1) || (linkDirection == 2)) && popGridVal)
 			{
@@ -5429,6 +5430,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 			pathClutterTxDB = 0.0;
 			pathClutterTxCDF = 0.5;
 		} else {
+<<<<<<< HEAD
 			bool rlanHasClutter;
 			switch(_rlanITMTxClutterMethod) {
 				case CConst::ForceTrueITMClutterMethod:
@@ -5447,6 +5449,249 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						rlanHasClutter = !losFlag;
 					}
 					break;
+=======
+                    throw std::runtime_error(ErrStream() << "ERROR: propEnv = " << propEnv << " INVALID value");
+                }
+                pathClutterTxModelStr = "NONE";
+                pathClutterTxDB = 0.0;
+                pathClutterTxCDF = 0.5;
+            } else {
+                bool rlanHasClutter;
+                switch(_rlanITMTxClutterMethod) {
+                    case CConst::ForceTrueITMClutterMethod:
+                        rlanHasClutter = true;
+                        break;
+                    case CConst::ForceFalseITMClutterMethod:
+                        rlanHasClutter = false;
+                        break;
+                    case CConst::BldgDataITMCLutterMethod:
+                        {
+			int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
+                        bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
+			                                                QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+			                                                QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+                                                                        distKm, numPts, heightProfilePtr);
+                        rlanHasClutter = !losFlag;
+                        }
+                        break;
+
+                }
+
+                if ((propEnv == CConst::urbanPropEnv) || (propEnv == CConst::suburbanPropEnv)) {
+                    // Terrain propagation: SRTM + ITM
+                    double frequencyMHz = 1.0e-6*frequency;
+		    int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
+	            int radioClimate    = _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
+	            int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
+                    if (radioClimateTmp < radioClimate) {
+                        radioClimate = radioClimateTmp;
+                    }
+	            double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
+		    double u = _confidenceITM;
+		    pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
+			false,
+			QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+			QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+			distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
+		    pathLossModelStr = "ITM";
+		    pathLossCDF = _confidenceITM;
+
+                    if (rlanHasClutter) {
+		        // ITU-R P.[CLUTTER] sec 3.2
+		        double Ll = 23.5 + 9.6 * log(frequencyGHz) / log(10.0);
+		        double Ls = 32.98 + 23.9 * log(distKm) / log(10.0) + 3.0 * log(frequencyGHz) / log(10.0);
+
+		        arma::vec gauss(1);
+		        if (fixedProbFlag) {
+                            gauss[0] = _zclutter2108;
+                        } else {
+                            gauss = arma::randn(1);
+		        }
+
+		        double Lctt = -5.0 * log(exp(-0.2 * Ll * log(10.0)) + exp(-0.2 * Ls * log(10.0))) / log(10.0) + 6.0 * gauss[0];
+
+		        pathClutterTxDB = Lctt;
+		        pathClutterTxModelStr = "P.2108";
+		        pathClutterTxCDF = q(-gauss[0]);
+                    } else {
+                        pathClutterTxModelStr = "NONE";
+                        pathClutterTxDB = 0.0;
+                        pathClutterTxCDF = 0.5;
+                    }
+
+                } else if ( (propEnv == CConst::ruralPropEnv) || (propEnv == CConst::barrenPropEnv) ) {
+                    // Terrain propagation: SRTM + ITM
+                    double frequencyMHz = 1.0e-6*frequency;
+		    double u = _confidenceITM;
+		    int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
+	            int radioClimate    = _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
+	            int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
+                    if (radioClimateTmp < radioClimate) {
+                        radioClimate = radioClimateTmp;
+                    }
+	            double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
+		    pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
+			false,
+			QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+			QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+			distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
+		    pathLossModelStr = "ITM";
+		    pathLossCDF = _confidenceITM;
+
+                    if ( (rlanHasClutter) && (nlcdLandCatTx == CConst::noClutterNLCDLandCat) ) {
+                        rlanHasClutter = false;
+                    }
+
+                    if (rlanHasClutter) {
+                        double ha, dk;
+                        switch(nlcdLandCatTx) {
+                            case CConst::deciduousTreesNLCDLandCat:
+                                ha = 15.0;
+                                dk = 0.05;
+	                        if (txClutterStrPtr) { *txClutterStrPtr = "DECIDUOUS_TREES"; }
+                                break;
+                            case CConst::coniferousTreesNLCDLandCat:
+                                ha = 20.0;
+                                dk = 0.05;
+	                        if (txClutterStrPtr) { *txClutterStrPtr = "CONIFEROUS_TREES"; }
+                                break;
+                            case CConst::highCropFieldsNLCDLandCat:
+                                ha = 4.0;
+                                dk = 0.1;
+	                        if (txClutterStrPtr) { *txClutterStrPtr = "HIGH_CROP_FIELDS"; }
+                                break;
+                            case CConst::villageCenterNLCDLandCat:
+                            case CConst::unknownNLCDLandCat:
+                                ha = 5.0;
+                                dk = 0.07;
+	                        if (txClutterStrPtr) { *txClutterStrPtr = "VILLAGE_CENTER"; }
+                                break;
+                            default:
+                                CORE_DUMP;
+                                break;
+                        }
+
+                        if (distKm < 10*dk) {
+                            pathClutterTxDB = 0.0;
+                        } else {
+                            double elevationAngleThresholdDeg = std::atan((ha-txHeightM)/(dk*1000.0))*180.0/M_PI;
+                            if (elevationAngleTxDeg > elevationAngleThresholdDeg) {
+                                pathClutterTxDB = 0.0;
+                            } else {
+                                const double Ffc = 0.25 + 0.375  * (1 + std::tanh(7.5 * (frequencyGHz - 0.5)));
+                                double result = 10.25 * Ffc * exp(-1 * dk);
+                                result *= 1 - std::tanh(6 * (txHeightM / ha - 0.625));
+                                result -= 0.33;
+                                pathClutterTxDB = result;
+                            }
+                        }
+
+                        pathClutterTxModelStr = "452_NLCD";
+                        pathClutterTxCDF = 0.5;
+                    } else {
+                        pathClutterTxModelStr = "NONE";
+                        pathClutterTxDB = 0.0;
+                        pathClutterTxCDF = 0.5;
+                    }
+                } else {
+                    CORE_DUMP;
+                }
+            }
+
+            if (_applyClutterFSRxFlag && (rxHeightM <= 10.0) && (distKm >= 1.0)) {
+                if (distKm * 1000 < _closeInDist) {
+                    pathClutterRxDB = 0.0;
+                    pathClutterRxModelStr = "NONE";
+                    pathClutterRxCDF = 0.5;
+                } else if ((propEnvRx == CConst::urbanPropEnv) || (propEnvRx == CConst::suburbanPropEnv)) {
+		    // ITU-R P.[CLUTTER] sec 3.2
+		    double Ll = 23.5 + 9.6 * log(frequencyGHz) / log(10.0);
+		    double Ls = 32.98 + 23.9 * log(distKm) / log(10.0) + 3.0 * log(frequencyGHz) / log(10.0);
+
+		    arma::vec gauss(1);
+		    if (fixedProbFlag)
+		    {
+			    gauss[0] = _zclutter2108;
+		    }
+		    else
+		    {
+			    gauss = arma::randn(1);
+		    }
+
+		    double Lctt = -5.0 * log(exp(-0.2 * Ll * log(10.0)) + exp(-0.2 * Ls * log(10.0))) / log(10.0) + 6.0 * gauss[0];
+
+		    pathClutterRxDB = Lctt;
+		    pathClutterRxModelStr = "P.2108";
+		    pathClutterRxCDF = q(-gauss[0]);
+                } else if ( (propEnvRx == CConst::ruralPropEnv) || (propEnvRx == CConst::barrenPropEnv) ) {
+                    bool clutterFlag = (nlcdLandCatRx == CConst::noClutterNLCDLandCat ? false : true);
+
+                    if (clutterFlag) {
+                        double ha, dk;
+                        switch(nlcdLandCatRx) {
+                            case CConst::deciduousTreesNLCDLandCat:
+                                ha = 15.0;
+                                dk = 0.05;
+	                        if (rxClutterStrPtr) { *rxClutterStrPtr = "DECIDUOUS_TREES"; }
+                                break;
+                            case CConst::coniferousTreesNLCDLandCat:
+                                ha = 20.0;
+                                dk = 0.05;
+	                        if (rxClutterStrPtr) { *rxClutterStrPtr = "CONIFEROUS_TREES"; }
+                                break;
+                            case CConst::highCropFieldsNLCDLandCat:
+                                ha = 4.0;
+                                dk = 0.1;
+	                        if (rxClutterStrPtr) { *rxClutterStrPtr = "HIGH_CROP_FIELDS"; }
+                                break;
+                            case CConst::villageCenterNLCDLandCat:
+                            case CConst::unknownNLCDLandCat:
+                                ha = 5.0;
+                                dk = 0.07;
+	                        if (rxClutterStrPtr) { *rxClutterStrPtr = "VILLAGE_CENTER"; }
+                                break;
+                            default:
+                                CORE_DUMP;
+                                break;
+                        }
+
+                        if (distKm < 10*dk) {
+                            pathClutterRxDB = 0.0;
+                        } else {
+                            double elevationAngleThresholdDeg = std::atan((ha-rxHeightM)/(dk*1000.0))*180.0/M_PI;
+                            if (elevationAngleRxDeg > elevationAngleThresholdDeg) {
+                                pathClutterRxDB = 0.0;
+                            } else {
+                                const double Ffc = 0.25 + 0.375  * (1 + std::tanh(7.5 * (frequencyGHz - 0.5)));
+                                double result = 10.25 * Ffc * exp(-1 * dk);
+                                result *= 1 - std::tanh(6 * (rxHeightM / ha - 0.625));
+                                result -= 0.33;
+                                pathClutterRxDB = result;
+                            }
+                        }
+
+                        pathClutterRxModelStr = "452_NLCD";
+                        pathClutterRxCDF = 0.5;
+                    } else {
+                        pathClutterRxDB = 0.0;
+                        pathClutterRxModelStr = "NONE";
+                        pathClutterRxCDF = 0.5;
+                    }
+                } else {
+		    throw std::runtime_error(ErrStream() << "ERROR: Invalid morphology for location " << rxLongitudeDeg << " " << rxLatitudeDeg);
+                }
+            } else {
+                pathClutterRxDB = 0.0;
+                pathClutterRxModelStr = "NONE";
+                pathClutterRxCDF = 0.5;
+            }
+        }
+	else if (_pathLossModel == CConst::FSPLPathLossModel)
+	{
+		pathLoss = 20.0 * log((4 * M_PI * frequency * distKm * 1000) / CConst::c) / log(10.0);
+		pathLossModelStr = "FSPL";
+		pathLossCDF = 0.5;
+>>>>>>> Modified calculations as described in Jira Ticket OA-133
 
 			}
 
@@ -9271,6 +9516,7 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "I/N_THRESHOLD", QString::number(_IoverN_threshold_dB, 'e', 20) } );
 		fUserInputs->writeRow({ "FS_RECEIVER_ANTENNA_PATTERN_FILE", QString::fromStdString(_ulsAntennaPatternFile) } );
 		fUserInputs->writeRow({ "FS_RECEIVER_DEFAULT_ANTENNA", QString::fromStdString(CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType )) } );
+		fUserInputs->writeRow({ "RLAN_ITM_TX_CLUTTER_METHOD", QString::fromStdString(CConst::strITMClutterMethodList->type_to_str(_rlanITMTxClutterMethod)) } );
 
 
 		fUserInputs->writeRow({ "PROPAGATION_MODEL", QString::fromStdString(CConst::strPathLossModelList->type_to_str(_pathLossModel)) } );
@@ -9336,6 +9582,7 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 	CConst::PropEnvEnum propEnv;
 	nlcdLandCat = CConst::unknownNLCDLandCat;
 	if (_propagationEnviro.toStdString() == "NLCD Point" || _propagationEnviro.isEmpty()) { //.isEmpty() == true in DEBUG mode
+<<<<<<< HEAD
 		unsigned int landcat = (unsigned int) nlcdImageFile->getValue(GeodeticCoord::fromLonLat(lonDeg, latDeg));
 
 		switch(landcat) {
@@ -9362,6 +9609,52 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 				propEnv = CConst::ruralPropEnv;
 				break;
 		}
+=======
+            unsigned int landcat = (unsigned int) nlcdImageFile->getValue(GeodeticCoord::fromLonLat(lonDeg, latDeg));
+
+            switch(landcat) {
+                 case 23:
+                 case 24:
+                    propEnv = CConst::urbanPropEnv;
+                    break;
+                 case 21:
+                 case 22:
+                    propEnv = CConst::suburbanPropEnv;
+                    break;
+                 case 41:
+                 case 43:
+                 case 90:
+                    nlcdLandCat = CConst::deciduousTreesNLCDLandCat;
+                    propEnv = CConst::ruralPropEnv;
+                    break;
+                 case 42:
+                    nlcdLandCat = CConst::coniferousTreesNLCDLandCat;
+                    propEnv = CConst::ruralPropEnv;
+                    break;
+                 case 52:
+                 case 82:
+                    nlcdLandCat = CConst::highCropFieldsNLCDLandCat;
+                    propEnv = CConst::ruralPropEnv;
+                    break;
+                 case 11:
+                 case 12:
+                 case 31:
+                 case 51:
+                 case 71:
+                 case 72:
+                 case 73:
+                 case 74:
+                 case 81:
+                 case 95:
+                    nlcdLandCat = CConst::noClutterNLCDLandCat;
+                    propEnv = CConst::ruralPropEnv;
+                    break;
+                 default:
+                    nlcdLandCat = CConst::villageCenterNLCDLandCat;
+                    propEnv = CConst::ruralPropEnv;
+                    break;
+            }
+>>>>>>> Modified calculations as described in Jira Ticket OA-133
 
 	} else if (_propagationEnviro.toStdString() == "Population Density Map") {
 		int regionIdx;
