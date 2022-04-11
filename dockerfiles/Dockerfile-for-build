@@ -32,4 +32,6 @@ COPY --from=staging / /
 LABEL version="openafc-centos-build-image"
 
 WORKDIR /wd
+ARG AFC_BUILD_TYPE=DebugWithTest
+ENV AFC_BUILD_TYPE ${AFC_BUILD_TYPE}
 CMD ["sh", "-x", "entry.sh"]
