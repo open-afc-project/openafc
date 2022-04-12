@@ -305,7 +305,8 @@ std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
         }
     } else if (method == CConst::latLonAlignGridScanRegionMethod) {
         // Scan points aligned with lat / lon grid
-        int N = floor( (semiMajorAxis / CConst::earthRadius)*(180.0/M_PI)*pointsPerDegree ) + 1;
+        double cosVal = cos(centerLatitude*M_PI/180.0);
+        int N = floor( (semiMajorAxis / CConst::earthRadius)*(180.0/M_PI)*pointsPerDegree/cosVal ) + 1;
         int S[2*N+1][2*N+1];
 
         int ix, iy;
