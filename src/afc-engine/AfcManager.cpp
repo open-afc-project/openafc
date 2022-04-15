@@ -1480,6 +1480,7 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 			{
 				ChannelStruct channel;
 				channel.operatingClass = opClass.opClass;
+				channel.index = cfi;
 				channel.startFreqMHz = opClass.startFreq + cfi * opClass.bandWidth;
 				channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 				channel.availability = GREEN; // Everything initialized to GREEN
@@ -9820,11 +9821,12 @@ void AfcManager::createChannelList()
 				if (includeClannel) {
 					ChannelStruct channel;
 					channel.operatingClass = opClass.opClass;
+					channel.index = cfi;
 					channel.startFreqMHz = opClass.startFreq + cfi * opClass.bandWidth;
 					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 					channel.availability = GREEN; // Everything initialized to GREEN
 					channel.eirpLimit_dBm = 0;
-					channel.type = INQUIRED_CHANNEL;
+					channel.type = ChannelType::INQUIRED_CHANNEL;
 					_channelList.push_back(channel);
 					numChan++;
 					LOGGER_DEBUG(logger) << "added " << numChan << " channels";
