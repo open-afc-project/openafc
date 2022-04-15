@@ -8,50 +8,50 @@
 #include <armadillo>
 
 class GdalImageFile2 {
-public:
-    static constexpr unsigned char NO_DATA = 0;
-    
-    GdalImageFile2(const QString &filename, int tileSizeXVal, int tileSizeYVal);
-    ~GdalImageFile2();
+	public:
+		static constexpr unsigned char NO_DATA = 0;
 
-    void loadTile(int tileXIdxVal, int tileYIdxVal);
-    unsigned char getValue(const GeodeticCoord &pt);
-    unsigned char getValue(int xIdx, int yIdx);
-    bool containsPoint(const GeodeticCoord &ptr) const;
-    
-    GeodeticCoord topRight() const;
-    GeodeticCoord bottomLeft() const;
-    GeodeticCoord topLeft() const;
-    GeodeticCoord bottomRight() const;
+		GdalImageFile2(const QString &filename, int tileSizeXVal, int tileSizeYVal);
+		~GdalImageFile2();
 
-    void xyIdxtoLonLat(const int& xIdx, const int& yIdx, GeodeticCoord &pt);
-    void lonlatToXY(const GeodeticCoord &pt, int& xIdx, int& yIdx);
-    int getNumTileX() const;
-    int getNumTileY() const;
-    int getSizeX() const;
-    int getSizeY() const;
+		void loadTile(int tileXIdxVal, int tileYIdxVal);
+		unsigned char getValue(const GeodeticCoord &pt);
+		unsigned char getValue(int xIdx, int yIdx);
+		bool containsPoint(const GeodeticCoord &ptr) const;
 
-private:
-    GDALDataset *_dataset;
-    OGRSpatialReference *_spatialReferenceProjection;
-    OGRSpatialReference *_geographicReference;
-    OGRCoordinateTransformation *_transform;
-    OGRCoordinateTransformation *_invTransform;
-    GDALRasterBand *_rasterBand;
+		GeodeticCoord topRight() const;
+		GeodeticCoord bottomLeft() const;
+		GeodeticCoord topLeft() const;
+		GeodeticCoord bottomRight() const;
 
-    QString _filename;
-    double *_rawTransform;
-    double _extentXMax, _extentXMin, _extentYMax, _extentYMin;
-    double _invTransform1, _invTransform5;
+		void xyIdxtoLonLat(const int& xIdx, const int& yIdx, GeodeticCoord &pt);
+		void lonlatToXY(const GeodeticCoord &pt, int& xIdx, int& yIdx);
+		int getNumTileX() const;
+		int getNumTileY() const;
+		int getSizeX() const;
+		int getSizeY() const;
 
-    GeodeticCoord _topRight, _bottomRight, _topLeft, _bottomLeft;
-    unsigned char *_rawData;
-    int _xsize, _ysize, _stride;
-    bool _loadedData;
+	private:
+		GDALDataset *_dataset;
+		OGRSpatialReference *_spatialReferenceProjection;
+		OGRSpatialReference *_geographicReference;
+		OGRCoordinateTransformation *_transform;
+		OGRCoordinateTransformation *_invTransform;
+		GDALRasterBand *_rasterBand;
 
-    int tileSizeX, tileSizeY;
-    int numTileX, numTileY;
-    int tileXIdx, tileYIdx;
+		QString _filename;
+		double *_rawTransform;
+		double _extentXMax, _extentXMin, _extentYMax, _extentYMin;
+		double _invTransform1, _invTransform5;
+
+		GeodeticCoord _topRight, _bottomRight, _topLeft, _bottomLeft;
+		unsigned char *_rawData;
+		int _xsize, _ysize, _stride;
+		bool _loadedData;
+
+		int tileSizeX, tileSizeY;
+		int numTileX, numTileY;
+		int tileXIdx, tileYIdx;
 };
 
 #endif

@@ -19,29 +19,29 @@
 
 class GdalDataModel
 {
-public:
-    GdalDataModel(const std::string &dataSourcePath, const std::string &heightFieldName);
-    ~GdalDataModel();
+	public:
+		GdalDataModel(const std::string &dataSourcePath, const std::string &heightFieldName);
+		~GdalDataModel();
 
-    // The return object is owned by this instance of the class
-    OGRDataSource *getDataSource() { return _ptrDataSource; }
-    // The return object is owned by this instance of the class
-    OGRLayer *getLayer() { return _ptrLayer; }
+		// The return object is owned by this instance of the class
+		OGRDataSource *getDataSource() { return _ptrDataSource; }
+		// The return object is owned by this instance of the class
+		OGRLayer *getLayer() { return _ptrLayer; }
 
-    OGRSpatialReference* testSrcSpatialRef;
-    OGRSpatialReference* testDestSpatialRef;
-    OGRCoordinateTransformation *testCoordTransform;
-    OGRCoordinateTransformation *invCoordTransform;
+		OGRSpatialReference* testSrcSpatialRef;
+		OGRSpatialReference* testDestSpatialRef;
+		OGRCoordinateTransformation *testCoordTransform;
+		OGRCoordinateTransformation *invCoordTransform;
 
-    double getMaxBuildingHeightAtPoint(double latDeg, double lonDeg) const;
-    std::map<int64_t,double> getBuildingsAtPoint(double lat, double lon) const;
+		double getMaxBuildingHeightAtPoint(double latDeg, double lonDeg) const;
+		std::map<int64_t,double> getBuildingsAtPoint(double lat, double lon) const;
 
-    void printDebugInfo() const;
+		void printDebugInfo() const;
 
-    int heightFieldIdx;
-private:
-    OGRDataSource *_ptrDataSource;
-    OGRLayer *_ptrLayer;
+		int heightFieldIdx;
+	private:
+		OGRDataSource *_ptrDataSource;
+		OGRLayer *_ptrLayer;
 };
 
 #endif // INCLUDE_GDALDATAMODEL_H

@@ -6,30 +6,30 @@
 //  Note: Altitude here is a true altitude, i.e. a height. Given an altitude (in km), this returns a value in an ECEF coordinate
 //      frame in km.
 Vector3 EcefModel::geodeticToEcef(double lat, double lon, double alt){
-    const double a = MathConstants::WGS84EarthSemiMajorAxis; // 6378.137; // Radius of the earth in km.
-    const double esq = MathConstants::WGS84EarthFirstEccentricitySquared; // 6.694379901e-3; // First eccentricity squared.
+	const double a = MathConstants::WGS84EarthSemiMajorAxis; // 6378.137; // Radius of the earth in km.
+	const double esq = MathConstants::WGS84EarthFirstEccentricitySquared; // 6.694379901e-3; // First eccentricity squared.
 
 	//  Convert lat/lon to radians.
 	const double latr = lat * M_PI / 180.0;
 	const double lonr = lon * M_PI / 180.0;
 
-    double cosLon, sinLon;
-    ::sincos(lonr, &sinLon, &cosLon);
-    double cosLat, sinLat;
-    ::sincos(latr, &sinLat, &cosLat);
+	double cosLon, sinLon;
+	::sincos(lonr, &sinLon, &cosLon);
+	double cosLat, sinLat;
+	::sincos(latr, &sinLat, &cosLat);
 
 	//  Compute 'chi', which adjusts for vertical eccentricity.
 	const double chi = sqrt(1.0 - esq * sinLat * sinLat);
 
 	return Vector3((a / chi + alt) * cosLat * cosLon,
-				   (a / chi + alt) * cosLat * sinLon,
-				   (a * (1 - esq) / chi + alt) * sinLat);
+			(a / chi + alt) * cosLat * sinLon,
+			(a * (1 - esq) / chi + alt) * sinLat);
 }
 
 //  Converts from ecef to geodetic coordinates. This algorithm is from Wikipedia, and
 //      all constants are from WGS '84.
 GeodeticCoord EcefModel::ecefToGeodetic(const Vector3 &ecef){
-    const double a = MathConstants::WGS84EarthSemiMajorAxis; // 6378.137;
+	const double a = MathConstants::WGS84EarthSemiMajorAxis; // 6378.137;
 	const double b = MathConstants::WGS84EarthSemiMinorAxis; // 6356.7523142;
 	// double e = sqrt(MathConstants::WGS84EarthFirstEccentricitySquared);
 	const double eprime = sqrt(MathConstants::WGS84EarthSecondEccentricitySquared);
@@ -60,20 +60,20 @@ GeodeticCoord EcefModel::ecefToGeodetic(const Vector3 &ecef){
 }
 
 Vector3 EcefModel::fromGeodetic(const GeodeticCoord &in){
-    return geodeticToEcef(in.latitudeDeg, in.longitudeDeg, in.heightKm);
+	return geodeticToEcef(in.latitudeDeg, in.longitudeDeg, in.heightKm);
 }
 
 GeodeticCoord EcefModel::toGeodetic(const Vector3 &in){
-    return ecefToGeodetic(in);
+	return ecefToGeodetic(in);
 }
 
 Vector3 EcefModel::localVertical(const GeodeticCoord &in){
-    double cosLon, sinLon;
-    ::sincos(M_PI/180.0 * in.longitudeDeg, &sinLon, &cosLon);
-    double cosLat, sinLat;
-    ::sincos(M_PI/180.0 * in.latitudeDeg, &sinLat, &cosLat);
+	double cosLon, sinLon;
+	::sincos(M_PI/180.0 * in.longitudeDeg, &sinLon, &cosLon);
+	double cosLat, sinLat;
+	::sincos(M_PI/180.0 * in.latitudeDeg, &sinLat, &cosLat);
 
 	return Vector3(cosLat * cosLon,
-				   cosLat * sinLon,
-				   sinLat);
+			cosLat * sinLon,
+			sinLat);
 }

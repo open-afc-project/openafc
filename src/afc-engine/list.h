@@ -13,32 +13,32 @@
 template<class T>
 class ListClass
 {
-    public:
-        ListClass(int n, int incr = 10);
-        ~ListClass();
-        T& operator[] (int index) const;
-        int operator==(ListClass<T> &val);
-        int getSize() const;
-        void append(T val);
-        void reset();
-        void resize(int n = 0);
-        void reverse();
-        void del_elem(T val, const int err = 1);
-        void del_elem_idx(int index, const int err = 1);
-        void toggle_elem(T val);
-        T pop();  // push not needed because append does the same thing.
+	public:
+		ListClass(int n, int incr = 10);
+		~ListClass();
+		T& operator[] (int index) const;
+		int operator==(ListClass<T> &val);
+		int getSize() const;
+		void append(T val);
+		void reset();
+		void resize(int n = 0);
+		void reverse();
+		void del_elem(T val, const int err = 1);
+		void del_elem_idx(int index, const int err = 1);
+		void toggle_elem(T val);
+		T pop();  // push not needed because append does the same thing.
 
-        int ins_elem(T val, const int err = 1, int *insFlagPtr = (int *) 0);
-        int get_index(T val, const int err = 1) const;
-        int contains(T val) const;
+		int ins_elem(T val, const int err = 1, int *insFlagPtr = (int *) 0);
+		int get_index(T val, const int err = 1) const;
+		int contains(T val) const;
 
-        void printlist(int n = 100, const char *elemSep = (const char *) 0, const char *grpSep = (const char *) 0, const char *endStr = (const char *) 0);
+		void printlist(int n = 100, const char *elemSep = (const char *) 0, const char *grpSep = (const char *) 0, const char *endStr = (const char *) 0);
 
-    private:
-        T *a;
-        int size;
-        int allocation_size;
-        int allocation_increment;
+	private:
+		T *a;
+		int size;
+		int allocation_size;
+		int allocation_increment;
 };
 /******************************************************************************************/
 
