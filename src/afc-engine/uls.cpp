@@ -27,8 +27,8 @@
 
 namespace
 {
-    // Logger for all instances of class
-    LOGGER_DEFINE_GLOBAL(logger, "ULSClass")
+	// Logger for all instances of class
+	LOGGER_DEFINE_GLOBAL(logger, "ULSClass")
 }
 
 /******************************************************************************************/
@@ -36,19 +36,19 @@ namespace
 /******************************************************************************************/
 ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal) : dataSet(dataSetVal), id(idVal), dbIdx(dbIdxVal)
 {
-    satellitePosnData = (ListClass<Vector3> *) NULL;
-    type = CConst::ESULSType;
-    location = (char *) NULL;
-    mobilePopGrid = (PopGridClass *) NULL;
-    pairIdx = -1;
-    rxLidarRegion = -1;
-    txLidarRegion = -1;
-    rxTerrainHeightFlag = false;
-    txTerrainHeightFlag = false;
-    prTerrainHeightFlag = false;
-    numOutOfBandRLAN = 0;
+	satellitePosnData = (ListClass<Vector3> *) NULL;
+	type = CConst::ESULSType;
+	location = (char *) NULL;
+	mobilePopGrid = (PopGridClass *) NULL;
+	pairIdx = -1;
+	rxLidarRegion = -1;
+	txLidarRegion = -1;
+	rxTerrainHeightFlag = false;
+	txTerrainHeightFlag = false;
+	prTerrainHeightFlag = false;
+	numOutOfBandRLAN = 0;
 
-    ITMHeightProfile = (double *) NULL;
+	ITMHeightProfile = (double *) NULL;
 }
 /******************************************************************************************/
 
@@ -57,7 +57,7 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal) : dataSet(da
 /******************************************************************************************/
 ULSClass::~ULSClass()
 {
-    clearData();
+	clearData();
 }
 /******************************************************************************************/
 
@@ -218,15 +218,15 @@ void ULSClass::setNumOutOfBandRLAN(int numOutOfBandRLANVal) { numOutOfBandRLAN =
 /******************************************************************************************/
 void ULSClass::clearData()
 {
-    if (satellitePosnData) {
-        delete satellitePosnData;
-        satellitePosnData = (ListClass<Vector3> *) NULL;
-    }
+	if (satellitePosnData) {
+		delete satellitePosnData;
+		satellitePosnData = (ListClass<Vector3> *) NULL;
+	}
 
-    if (location) {
-        free(location);
-        location = (char *) NULL;
-    }
+	if (location) {
+		free(location);
+		location = (char *) NULL;
+	}
 }
 /******************************************************************************************/
 
@@ -235,40 +235,40 @@ void ULSClass::clearData()
 /******************************************************************************************/
 void ULSClass::setUseFrequency()
 {
-    std::ostringstream errStr;
+	std::ostringstream errStr;
 
-    if (fabs(stopAllocFreq - startAllocFreq - bandwidth) < 1.0e-3) {
-        startUseFreq = startAllocFreq;
-        stopUseFreq = stopAllocFreq;
-    } else if (stopAllocFreq - startAllocFreq > bandwidth) {
-        if (1) {
-            // std::cout << "ALLOC_BW_GT_BW: ID = " << getID() << " radioService = " << getRadioService()
-            //           << " startAllocFreq = " << startAllocFreq << " stopAllocFreq = " << stopAllocFreq << " bandwidth = " << bandwidth << std::endl;
+	if (fabs(stopAllocFreq - startAllocFreq - bandwidth) < 1.0e-3) {
+		startUseFreq = startAllocFreq;
+		stopUseFreq = stopAllocFreq;
+	} else if (stopAllocFreq - startAllocFreq > bandwidth) {
+		if (1) {
+			// std::cout << "ALLOC_BW_GT_BW: ID = " << getID() << " radioService = " << getRadioService()
+			//           << " startAllocFreq = " << startAllocFreq << " stopAllocFreq = " << stopAllocFreq << " bandwidth = " << bandwidth << std::endl;
 
-            // Randomly select channel
-            int N = (int) floor((stopAllocFreq - startAllocFreq)/bandwidth);
-            double r = ((double) rand() / (RAND_MAX+1.0));
-            int k = (int) floor(r*N);
-            startUseFreq = startAllocFreq + k*bandwidth;
-            stopUseFreq = startUseFreq + bandwidth;
-        } else if (0) {
-            // Most conservative, aggregate interference over entire alloc band, consider noise only in bandwidth
-            startUseFreq = startAllocFreq;
-            stopUseFreq = stopAllocFreq;
-        } else {
-            // Aggregate interference over entire alloc band, consider noise over entire alloc band
-            startUseFreq = startAllocFreq;
-            stopUseFreq = stopAllocFreq;
-            bandwidth = stopAllocFreq - startAllocFreq;
-        }
-    } else {
-        errStr << "ERROR: Invalid frequency specification for Radio Service = " << radioService
-               << " startAllocFreq = " << startAllocFreq*1.0e-6 
-               << " stopAllocFreq = "  << stopAllocFreq*1.0e-6 
-               << " bandwidth = "      << bandwidth*1.0e-6 
-               << std::endl;
-        throw std::runtime_error(errStr.str());
-    }
+			// Randomly select channel
+			int N = (int) floor((stopAllocFreq - startAllocFreq)/bandwidth);
+			double r = ((double) rand() / (RAND_MAX+1.0));
+			int k = (int) floor(r*N);
+			startUseFreq = startAllocFreq + k*bandwidth;
+			stopUseFreq = startUseFreq + bandwidth;
+		} else if (0) {
+			// Most conservative, aggregate interference over entire alloc band, consider noise only in bandwidth
+			startUseFreq = startAllocFreq;
+			stopUseFreq = stopAllocFreq;
+		} else {
+			// Aggregate interference over entire alloc band, consider noise over entire alloc band
+			startUseFreq = startAllocFreq;
+			stopUseFreq = stopAllocFreq;
+			bandwidth = stopAllocFreq - startAllocFreq;
+		}
+	} else {
+		errStr << "ERROR: Invalid frequency specification for Radio Service = " << radioService
+			<< " startAllocFreq = " << startAllocFreq*1.0e-6 
+			<< " stopAllocFreq = "  << stopAllocFreq*1.0e-6 
+			<< " bandwidth = "      << bandwidth*1.0e-6 
+			<< std::endl;
+		throw std::runtime_error(errStr.str());
+	}
 }
 /******************************************************************************************/
 
@@ -277,30 +277,30 @@ void ULSClass::setUseFrequency()
 /******************************************************************************************/
 double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency)
 {
-    double rxGainDB;
+	double rxGainDB;
 
-    switch(rxAntennaType) {
-        case CConst::F1245AntennaType:
-            rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, rxGain);
-            break;
-        case CConst::F699AntennaType:
-            rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain);
-            break;
-        case CConst::F1336OmniAntennaType:
-            rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleDeg, rxGain, frequency);
-            break;
-        case CConst::OmniAntennaType:
-            rxGainDB = 0.0;
-            break;
-        case CConst::LUTAntennaType:
-            rxGainDB = rxAntenna->gainDB(angleOffBoresightDeg*M_PI/180.0) + rxGain;
-            break;
-        default:
-            throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeRxGain: rxAntennaType = " << rxAntennaType << " INVALID value");
-            break;
-    }
+	switch(rxAntennaType) {
+		case CConst::F1245AntennaType:
+			rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, rxGain);
+			break;
+		case CConst::F699AntennaType:
+			rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain);
+			break;
+		case CConst::F1336OmniAntennaType:
+			rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleDeg, rxGain, frequency);
+			break;
+		case CConst::OmniAntennaType:
+			rxGainDB = 0.0;
+			break;
+		case CConst::LUTAntennaType:
+			rxGainDB = rxAntenna->gainDB(angleOffBoresightDeg*M_PI/180.0) + rxGain;
+			break;
+		default:
+			throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeRxGain: rxAntennaType = " << rxAntennaType << " INVALID value");
+			break;
+	}
 
-    return(rxGainDB);
+	return(rxGainDB);
 }
 /******************************************************************************************/
 
@@ -309,57 +309,57 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 /******************************************************************************************/
 double ULSClass::computeBeamWidth(double attnDB)
 {
-    double rxGainDB;
-    std::ostringstream errStr;
+	double rxGainDB;
+	std::ostringstream errStr;
 
-    CConst::ULSAntennaTypeEnum ulsRxAntennaType = getRxAntennaType();
+	CConst::ULSAntennaTypeEnum ulsRxAntennaType = getRxAntennaType();
 
-    double g0 = getRxGain();
+	double g0 = getRxGain();
 
-    //std::cout << "ULS: " << getID() << " GAIN (DB) = " << g0 << std::endl;
+	//std::cout << "ULS: " << getID() << " GAIN (DB) = " << g0 << std::endl;
 
-    if (ulsRxAntennaType == CConst::F1336OmniAntennaType) {
-        throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeBeamWidth: ulsRxAntennaType = F1336OmniAntennaType not supported");
-    }
+	if (ulsRxAntennaType == CConst::F1336OmniAntennaType) {
+		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeBeamWidth: ulsRxAntennaType = F1336OmniAntennaType not supported");
+	}
 
-    double a1 = 0.0;
+	double a1 = 0.0;
 
-    double a2 = a1;
-    double e2;
-    do {
-        if (a2 == 180.0) {
-            errStr << "ERROR: Unable to compute " << attnDB << " dB beamwidth with GAIN (DB) = " << g0 << std::endl;
-            throw std::runtime_error(errStr.str());
-        }
-        a2 += 2.0*exp(-g0*log(10.0)/20.0)*180.0/M_PI;
-        if (a2 > 180.0) { a2 = 180.0; }
-        double angleOffBoresightDeg = a2;
+	double a2 = a1;
+	double e2;
+	do {
+		if (a2 == 180.0) {
+			errStr << "ERROR: Unable to compute " << attnDB << " dB beamwidth with GAIN (DB) = " << g0 << std::endl;
+			throw std::runtime_error(errStr.str());
+		}
+		a2 += 2.0*exp(-g0*log(10.0)/20.0)*180.0/M_PI;
+		if (a2 > 180.0) { a2 = 180.0; }
+		double angleOffBoresightDeg = a2;
 
-        rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, -1.0);
+		rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, -1.0);
 
-        e2 = rxGainDB - g0 + attnDB;
-    } while(e2 > 0.0);
+		e2 = rxGainDB - g0 + attnDB;
+	} while(e2 > 0.0);
 
-    while (a2-a1 > 1.0e-8) {
-        double a3 = (a1+a2)/2;
-        double angleOffBoresightDeg = a3;
+	while (a2-a1 > 1.0e-8) {
+		double a3 = (a1+a2)/2;
+		double angleOffBoresightDeg = a3;
 
-        rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, -1.0);
+		rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, -1.0);
 
-        double e3 = rxGainDB - g0 + attnDB;
+		double e3 = rxGainDB - g0 + attnDB;
 
-        if (e3 > 0.0) {
-            a1 = a3;
-        } else {
-            a2 = a3;
-            e2 = e3;
-        }
-    }
+		if (e3 > 0.0) {
+			a1 = a3;
+		} else {
+			a2 = a3;
+			e2 = e3;
+		}
+	}
 
-    double beamWidthDeg = a1;
-    //std::cout << "ULS: " << getID() << " BEAMWIDTH (deg) = " << beamWidthDeg << std::endl;
+	double beamWidthDeg = a1;
+	//std::cout << "ULS: " << getID() << " BEAMWIDTH (deg) = " << beamWidthDeg << std::endl;
 
-    return(beamWidthDeg);
+	return(beamWidthDeg);
 }
 /******************************************************************************************/
 

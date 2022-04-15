@@ -30,10 +30,10 @@ std::vector<std::tuple<QString, int, int>> getFileNames(const QDir& dataDir, con
 		for (int lon = static_cast<int>(floor(bounds.top())); lon < static_cast<int>(ceil(bounds.bottom())); lon++)
 		{
 			QString entry = QString("%1%2%3%4.hgt")
-			.arg(lat >= 0 ? "N" : "S")
-			.arg(abs(lat), 2, 10, QChar('0')) // .arg(value, fillwidth, base, fillchar)
-			.arg(lon >= 0 ? "E" : "W")
-			.arg(abs(lon), 3, 10, QChar('0'));
+				.arg(lat >= 0 ? "N" : "S")
+				.arg(abs(lat), 2, 10, QChar('0')) // .arg(value, fillwidth, base, fillchar)
+				.arg(lon >= 0 ? "E" : "W")
+				.arg(abs(lon), 3, 10, QChar('0'));
 
 			if (dataDir.exists(entry))
 			{
@@ -59,9 +59,9 @@ GdalDataDir::GdalDataDir(QString dataDirectory, double minlat, double minlon, do
 	GDALAllRegister();
 
 	// only read in srtm files that match the regex, and lon/lat params
-    int numRead = 0;
+	int numRead = 0;
 	this->_cachedData  = QHash<int, GDALDataset*>(); 
-    QRectF rf(QPointF(minlat, minlon), QPointF(maxlat, maxlon));
+	QRectF rf(QPointF(minlat, minlon), QPointF(maxlat, maxlon));
 	LOGGER_INFO(logger) << "Loading srtm files in lat:" << minlat << " - " << maxlat << ", lon:" << minlon << " - " << maxlon;
 	// Check for .hgt file with the following filename structure:
 	// (N|S)	check for 'N' or 'S'
@@ -82,7 +82,7 @@ GdalDataDir::GdalDataDir(QString dataDirectory, double minlat, double minlon, do
 
 		/// Read the tile.
 		// generate file hash and store GDAL object handle
-		
+
 		int key = latLonToHashDirect(lat, lon);
 		GDALDataset* buffer = static_cast<GDALDataset*>(GDALOpen(dataDir.filePath(file).toStdString().c_str(), GA_ReadOnly));
 		LOGGER_DEBUG(logger) << lat << " " << lon << " assigned key " << key;
@@ -103,8 +103,8 @@ GdalDataDir::GdalDataDir(QString dataDirectory, double minlat, double minlon, do
 
 		numRead++;
 	}
-	
-    LOGGER_DEBUG(logger) << "Finished reading srtm files"; 
+
+	LOGGER_DEBUG(logger) << "Finished reading srtm files"; 
 }
 
 bool GdalDataDir::getHeight(qint16& height, const double& lat, const double& lon) const{
@@ -112,12 +112,12 @@ bool GdalDataDir::getHeight(qint16& height, const double& lat, const double& lon
 	// Critical Section
 	const int floorLat = static_cast<int>(floor(lat));
 	const int floorLon = static_cast<int>(floor(lon));
-    const int shiftFloorLat = floorLat * this->INV_STEP_INT;
-    const int shiftFloorLon = floorLon * this->INV_STEP_INT;
-    const int shiftLat = lat * this->INV_STEP;
-    const int shiftLon = lon * this->INV_STEP;
-    const int latIndex = this->SIZE - 1 - (shiftLat - shiftFloorLat);
-    const int lonIndex = (shiftLon - shiftFloorLon);
+	const int shiftFloorLat = floorLat * this->INV_STEP_INT;
+	const int shiftFloorLon = floorLon * this->INV_STEP_INT;
+	const int shiftLat = lat * this->INV_STEP;
+	const int shiftLon = lon * this->INV_STEP;
+	const int latIndex = this->SIZE - 1 - (shiftLat - shiftFloorLat);
+	const int lonIndex = (shiftLon - shiftFloorLon);
 
 	int key = latLonToHashDirect(floorLat, floorLon);
 
@@ -125,7 +125,7 @@ bool GdalDataDir::getHeight(qint16& height, const double& lat, const double& lon
 	if (dataSet == _cachedData.constEnd()) 
 	{
 		// not found
-	        height = this->INVALID_HEIGHT;
+		height = this->INVALID_HEIGHT;
 		return false;
 	}
 
@@ -133,7 +133,7 @@ bool GdalDataDir::getHeight(qint16& height, const double& lat, const double& lon
 	if (readError != CPLErr::CE_None) 
 	{
 		throw std::runtime_error(QString("GdalDataDir::readFile(): Failed to read raster data from %1, throwing CPLErr = %2")
-			.arg(key).arg(readError).toStdString());
+				.arg(key).arg(readError).toStdString());
 	}
 	else if (height == this->INVALID_HEIGHT)
 	{

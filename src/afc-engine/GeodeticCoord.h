@@ -15,72 +15,72 @@
  * separate from each other.
  */
 struct GeodeticCoord {
-    /// Convenience definition for NaN value
-    static const qreal nan;
+	/// Convenience definition for NaN value
+	static const qreal nan;
 
 
-    /// Static helper function for lat/lon coordinate order.
-    static inline GeodeticCoord fromLatLon(qreal latDeg, qreal lonDeg, qreal htKm = 0){
-        return GeodeticCoord(lonDeg, latDeg, htKm);
-    }
+	/// Static helper function for lat/lon coordinate order.
+	static inline GeodeticCoord fromLatLon(qreal latDeg, qreal lonDeg, qreal htKm = 0){
+		return GeodeticCoord(lonDeg, latDeg, htKm);
+	}
 
-    /// Static helper function for lon/lat coordinate order.
-    static inline GeodeticCoord fromLonLat(qreal lonDeg, qreal latDeg, qreal htKm = 0){
-        return GeodeticCoord(lonDeg, latDeg, htKm);
-    }
-    
-    /** Default constructor has NaN horizontal values to distinguish an
-     * invalid coordinate, but zero height value.
-     */
-    GeodeticCoord()
-      : longitudeDeg(nan), latitudeDeg(nan), heightKm(0) {}
+	/// Static helper function for lon/lat coordinate order.
+	static inline GeodeticCoord fromLonLat(qreal lonDeg, qreal latDeg, qreal htKm = 0){
+		return GeodeticCoord(lonDeg, latDeg, htKm);
+	}
 
-    /** Construct a new geodetic coordinate, the height is optional.
-     */
-    GeodeticCoord(qreal inLongitudeDeg, qreal inLatitudeDeg, qreal inHeightKm = 0)
-      : longitudeDeg(inLongitudeDeg), latitudeDeg(inLatitudeDeg),
-        heightKm(inHeightKm) {}
+	/** Default constructor has NaN horizontal values to distinguish an
+	 * invalid coordinate, but zero height value.
+	 */
+	GeodeticCoord()
+		: longitudeDeg(nan), latitudeDeg(nan), heightKm(0) {}
 
-    /** Implicit conversion to QVariant.
-     * @return The variant containing this GeodeticCoord value.
-     */
-    operator QVariant () const{
-        return QVariant::fromValue(*this);
-    }
+	/** Construct a new geodetic coordinate, the height is optional.
+	*/
+	GeodeticCoord(qreal inLongitudeDeg, qreal inLatitudeDeg, qreal inHeightKm = 0)
+		: longitudeDeg(inLongitudeDeg), latitudeDeg(inLatitudeDeg),
+		heightKm(inHeightKm) {}
 
-    /** Determine if this location is the default NaN-valued.
-     * @return True if any coordinate is NaN.
-     */
-    bool isNull() const;
+	/** Implicit conversion to QVariant.
+	 * @return The variant containing this GeodeticCoord value.
+	 */
+	operator QVariant () const{
+		return QVariant::fromValue(*this);
+	}
 
-    /** Normalize the coordinates in-place.
-     * Longitude is limited to the range [-180, +180) by wrapping.
-     * Latitude is limited to the range [-90, +90] by clamping.
-     */
-    void normalize();
+	/** Determine if this location is the default NaN-valued.
+	 * @return True if any coordinate is NaN.
+	 */
+	bool isNull() const;
 
-    /** Get a normalized copy of the coordinates.
-     * @return A copy of these coordinates after normalize() is called on it.
-     */
-    GeodeticCoord normalized() const{
-        GeodeticCoord oth(*this);
-        oth.normalize();
-        return oth;
-    }
+	/** Normalize the coordinates in-place.
+	 * Longitude is limited to the range [-180, +180) by wrapping.
+	 * Latitude is limited to the range [-90, +90] by clamping.
+	 */
+	void normalize();
 
-    /** Compare two points to some required accuracy of sameness.
-     * @param other The point to compare against.
-     * @param accuracy This applies to difference between each of the
-     * longitudes and latitude independently.
-     */
-    bool isIdenticalTo(const GeodeticCoord &other, qreal accuracy) const;
+	/** Get a normalized copy of the coordinates.
+	 * @return A copy of these coordinates after normalize() is called on it.
+	 */
+	GeodeticCoord normalized() const{
+		GeodeticCoord oth(*this);
+		oth.normalize();
+		return oth;
+	}
 
-    /// Longitude referenced to WGS84 zero meridian; units of degrees.
-    qreal longitudeDeg;
-    /// Latitude referenced to WGS84 equator; units of degrees.
-    qreal latitudeDeg;
-    /// Height referenced to WGS84 ellipsoid; units of kilometers.
-    qreal heightKm;
+	/** Compare two points to some required accuracy of sameness.
+	 * @param other The point to compare against.
+	 * @param accuracy This applies to difference between each of the
+	 * longitudes and latitude independently.
+	 */
+	bool isIdenticalTo(const GeodeticCoord &other, qreal accuracy) const;
+
+	/// Longitude referenced to WGS84 zero meridian; units of degrees.
+	qreal longitudeDeg;
+	/// Latitude referenced to WGS84 equator; units of degrees.
+	qreal latitudeDeg;
+	/// Height referenced to WGS84 ellipsoid; units of kilometers.
+	qreal heightKm;
 };
 Q_DECLARE_METATYPE(GeodeticCoord);
 
