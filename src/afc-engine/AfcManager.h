@@ -83,6 +83,18 @@ class PopGridClass;
 class AntennaClass;
 class RlanRegionClass;
 
+namespace OpClass
+{
+	class OpClass
+	{
+		public:
+			const int opClass;
+			const int bandWidth;
+			const int startFreq;
+			const std::vector<int> channels;
+	};
+}
+
 class AfcManager
 {
 	public:  
@@ -387,6 +399,7 @@ class AfcManager
 		int _wlanMaxFreqMHz;                    // Max Frequency for WiFi system (integer in MHz)
 		double _wlanMinFreq;                    // Min Frequency for WiFi system (double in Hz)
 		double _wlanMaxFreq;                    // Max Frequency for WiFi system (double in Hz)
+		std::vector <OpClass::OpClass> _opClass;
 
 		std::string _popDensityFile;            // File contining population density data
 		double _popDensityResLon;               // Population density file resolution for longitude
