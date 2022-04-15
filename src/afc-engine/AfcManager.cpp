@@ -54,12 +54,12 @@ namespace
 	// Logger for all instances of class
 	LOGGER_DEFINE_GLOBAL(logger, "AfcManager")
 
-		// const double fixedEpsDielect = 15;
-		// const double fixedSgmConductivity = 0.005;
-		// const double fixedEsNoSurfRef = 301;
-		// const int fixedRadioClimate = 6;
-		// const int fixedPolarization = 1;
-		const double fixedConfidence = 0.5;
+	// const double fixedEpsDielect = 15;
+	// const double fixedSgmConductivity = 0.005;
+	// const double fixedEsNoSurfRef = 301;
+	// const int fixedRadioClimate = 6;
+	// const int fixedPolarization = 1;
+	const double fixedConfidence = 0.5;
 	const double fixedRelevance = 0.5;
 	/**
 	 * Encapsulates a CSV writer to a file gzip'd
@@ -121,6 +121,78 @@ namespace
 		zip_writer.reset();	
 	}
 }; // end namespace
+
+namespace OpClass
+{
+	OpClass  GlobalOpClass_131 =
+	{
+		131, 20, 5950,
+		{
+			  1,   5,   9,  13,  17,  21,  25,  29,
+			 33,  37,  41,  45,  49,  53,  57,  61,
+			 65,  69,  73,  77,  81,  85,  89,  93,
+			 97, 101, 105, 109, 113, 117, 121, 125,
+			129, 133, 137, 141, 145, 149, 153, 157,
+			161, 165, 169, 173, 177, 181, 185, 189,
+			193, 197, 201, 205, 209, 213, 217, 221,
+			225, 229, 233
+		}
+	};
+
+	const OpClass GlobalOpClass_132 =
+	{
+		132, 40, 5950,
+		{
+			  3,  11,  19,  27,  35,  43,  51, 59,
+			 67,  75,  83,  91,  99, 107, 115, 123,
+			131, 139, 147, 155, 163, 171, 179, 187,
+			195, 203, 211, 219, 227
+		}
+	};
+
+	const OpClass GlobalOpClass_133 =
+	{
+		133, 80, 5950,
+		{
+			7,   23,   39,  55,  71,  87, 103, 119,
+			135, 151, 167, 183, 199, 215
+		}
+	};
+
+	const OpClass GlobalOpClass_134 =
+	{
+		134, 160, 5950,
+		{
+			15,  47,  79, 111, 143, 175, 207
+		}
+	};
+
+	const OpClass GlobalOpClass_135 =
+	{
+		135, 80, 5950,
+		{
+			7,   23,   39,  55,  71,  87, 103, 119,
+			135, 151, 167, 183, 199, 215
+		}
+	};
+
+	const OpClass GlobalOpClass_136 =
+	{
+		136, 20, 5925,
+		{ 2 }
+	};
+
+	const std::vector<OpClass> USOpClass =
+	{
+		GlobalOpClass_131,
+		GlobalOpClass_132,
+		GlobalOpClass_133,
+		GlobalOpClass_134,
+		// GlobalOpClass_135,
+		GlobalOpClass_136
+	};
+
+}
 
 AfcManager::AfcManager()
 {
@@ -1401,16 +1473,15 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 			_rlanType = RLANType::RLAN_INDOOR;
 		}
 
-		auto numChannels = std::vector<int> { 59, 29, 14, 7 };
-		auto bwList = std::vector<int> { 20, 40, 80, 160 };
-		int startFreq = 5945; // MHz
-		for(int bwIdx = 0; bwIdx < (int) bwList.size(); bwIdx++) 
+		// Add all channels from all supported operating classes
+		for (auto &opClass: _opClass)
 		{
-			for (int chanIdx = 0; chanIdx < numChannels.at(bwIdx); chanIdx++)
+			for (auto &cfi: opClass.channels)
 			{
 				ChannelStruct channel;
-				channel.startFreqMHz = startFreq + chanIdx * bwList.at(bwIdx);
-				channel.stopFreqMHz = startFreq + (chanIdx + 1) * bwList.at(bwIdx);
+				channel.operatingClass = opClass.opClass;
+				channel.startFreqMHz = opClass.startFreq + cfi * opClass.bandWidth;
+				channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 				channel.availability = GREEN; // Everything initialized to GREEN
 				channel.eirpLimit_dBm = 0;
 				channel.type = ChannelType::INQUIRED_CHANNEL;
@@ -9467,8 +9538,14 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_closeInDist = 1.0e3;              // Radius in which close in path loss model is used
 	_closeInPathLossModel = "WINNER2"; // Close in path loss model is used
 
-	_wlanMinFreqMHz = 5945;
+	_wlanMinFreqMHz = 5925;
 	_wlanMaxFreqMHz = 7125;
+
+	// Hardcode to US for now.
+	// When multiple countries are supported this need to come from AFC Configuration
+	for (auto opClass: OpClass::USOpClass) {
+		_opClass.push_back(opClass);
+	}
 
 	_wlanMinFreq = _wlanMinFreqMHz*1.0e6;
 	_wlanMaxFreq = _wlanMaxFreqMHz*1.0e6;
@@ -9627,34 +9704,27 @@ void AfcManager::createChannelList()
 		}
 
 		if (containsChannel(_allowableFreqBandList, inquiredStartFreqMHz, inquiredStopFreqMHz)) {
+			int numChan;
 
-			auto startFreqMHz = inquiredStartFreqMHz;
-			auto stopFreqMHz = inquiredStopFreqMHz;
+			numChan = 0;
 
-			if (startFreqMHz < _wlanMinFreqMHz) {
-				startFreqMHz = _wlanMinFreqMHz;
-			}
-			if (stopFreqMHz > _wlanMaxFreqMHz) {
-				stopFreqMHz = _wlanMaxFreqMHz;
-			}
-
-			int numChan = 0;
-			for(auto bwMHz : bwList) {
-				int startChanIdx = (startFreqMHz - _wlanMinFreqMHz + bwMHz - 1)/bwMHz;
-				int stopChanIdx = (stopFreqMHz - _wlanMinFreqMHz)/bwMHz - 1;
-				for (int chanIdx = startChanIdx; chanIdx <= stopChanIdx; ++chanIdx) {
-					int chanStartFreqMHz = _wlanMinFreqMHz + chanIdx*bwMHz;
-					int chanStopFreqMHz = chanStartFreqMHz + bwMHz;
-
+			// Iterate each operating classes and add all channels within the given frequency range
+			for (auto &opClass: _opClass)
+			{
+				for (auto &cfi: opClass.channels)
+				{
 					ChannelStruct channel;
-					channel.startFreqMHz = chanStartFreqMHz;
-					channel.stopFreqMHz = chanStopFreqMHz;
-					channel.availability = GREEN; // Everything initialized to GREEN
-					channel.type = INQUIRED_FREQUENCY;
-					channel.eirpLimit_dBm = 0;
-					_channelList.push_back(channel);
+					channel.startFreqMHz = opClass.startFreq + cfi * opClass.bandWidth;
+					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 
-					numChan++;
+					if (channel.startFreqMHz >= inquiredStartFreqMHz &&
+						channel.stopFreqMHz <= inquiredStopFreqMHz) {
+						channel.availability = GREEN; // Everything initialized to GREEN
+						channel.eirpLimit_dBm = 0;
+						channel.type = INQUIRED_FREQUENCY;
+						_channelList.push_back(channel);
+						numChan++;
+					}
 				}
 			}
 
@@ -9674,70 +9744,57 @@ void AfcManager::createChannelList()
 
 	for(auto channelPair : _inquiredChannels) {
 		LOGGER_DEBUG(logger) << "creating channels for operating class " << channelPair.first; 
-		auto cfiList = channelPair.second;
-		int bwIdx = channelPair.first - 131;
-		if ((bwIdx < 0) || (bwIdx >= (int) bwList.size())) {
-			// throw std::runtime_error("UNSUPPORTED_SPECTRUM Global operating class " + std::to_string(channelPair.first) + " not supported. [131,13] are currently the only supported classes.");
+
+		int numChan;
+		numChan = 0;
+
+		// Iterate each operating classes and add all channels within the given frequency range
+		for (auto &opClass: _opClass)
+		{
+			// Skip of classes of not in inquired channel list
+			if (opClass.opClass != channelPair.first) {
+				continue;
+			}
+
+			for (auto &cfi: opClass.channels)
+			{
+				bool includeClannel;
+
+				includeClannel = false;
+
+				// If channel indexes are provided check for channel validity
+				// If channel indexes are not provided then include all channels of
+				// givern operating class.
+				if (channelPair.second.size() != 0) {
+					for(auto inquired_cfi : channelPair.second) {
+						if (inquired_cfi == cfi) {
+							includeClannel = true;
+							break;
+						}
+					}
+				} else {
+					includeClannel = true;
+				}
+
+				if (includeClannel) {
+					ChannelStruct channel;
+					channel.operatingClass = opClass.opClass;
+					channel.startFreqMHz = opClass.startFreq + cfi * opClass.bandWidth;
+					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
+					channel.availability = GREEN; // Everything initialized to GREEN
+					channel.eirpLimit_dBm = 0;
+					channel.type = INQUIRED_CHANNEL;
+					_channelList.push_back(channel);
+					numChan++;
+					LOGGER_DEBUG(logger) << "added " << numChan << " channels";
+				}
+			}
+		}
+
+		if (numChan == 0) {
 			LOGGER_DEBUG(logger) << "Inquired Channel INVALID Operating Class: " << channelPair.first << std::endl;
 			_responseCode = CConst::unsupportedSpectrumResponseCode;
 			return;
-		}
-		int bwMHz = bwList[bwIdx];
-		if (cfiList.size() == 0) {
-			LOGGER_DEBUG(logger) << "creating ALL channels for operating class " << channelPair.first;
-			// include all channels in global operating class
-			auto numChannels = std::vector<int> { 59, 29, 14, 7 };
-			auto startIndex = std::vector<int> { 1, 3, 7, 15 };
-			auto indexInc = std::vector<int> { 4, 8, 16, 32 };
-			int numChannelAdded = 0;
-			for (int chanIdx = 0; chanIdx < numChannels.at(bwIdx); chanIdx++) {
-				int chanStartFreqMHz = _wlanMinFreqMHz + chanIdx*bwMHz;
-				int chanStopFreqMHz = chanStartFreqMHz + bwMHz;
-				if (containsChannel(_allowableFreqBandList, chanStartFreqMHz, chanStopFreqMHz)) {
-					ChannelStruct channel;
-					channel.operatingClass = channelPair.first;
-					channel.index = startIndex.at(bwIdx) + chanIdx * indexInc.at(bwIdx);
-					channel.startFreqMHz = chanStartFreqMHz;
-					channel.stopFreqMHz = chanStopFreqMHz;
-					channel.type = ChannelType::INQUIRED_CHANNEL;
-					channel.availability = GREEN; // Everything initialized to GREEN
-					channel.eirpLimit_dBm = 0;
-					_channelList.push_back(channel);
-					numChannelAdded++;
-				}
-			}
-			LOGGER_DEBUG(logger) << "added " << numChannelAdded << " channels";
-		} else {
-			for(auto cfi : cfiList) {
-				LOGGER_DEBUG(logger) << "creating cherry picked channels in operating class " << channelPair.first;
-				int bandwidthMHz, startFreqMHz, stopFreqMHz;
-				if (convertCFI(cfi, bandwidthMHz, startFreqMHz, stopFreqMHz)) {
-					if (bandwidthMHz != bwMHz) {
-						LOGGER_DEBUG(logger) << "ERROR: Channnel number " << cfi << " is not in operating class " << channelPair.first << std::endl;
-						_responseCode = CConst::unsupportedSpectrumResponseCode;
-						return;
-					}
-					if (containsChannel(_allowableFreqBandList, startFreqMHz, stopFreqMHz)) {
-						ChannelStruct channel;
-						channel.startFreqMHz = startFreqMHz;
-						channel.stopFreqMHz = stopFreqMHz;
-						channel.index = cfi;
-						channel.operatingClass = channelPair.first;
-						channel.availability = GREEN; // Everything initialized to GREEN
-						channel.type = INQUIRED_CHANNEL;
-						channel.eirpLimit_dBm = 0;
-						_channelList.push_back(channel);
-					} else {
-						LOGGER_DEBUG(logger) << "ERROR: Channnel index " << cfi << " [" << startFreqMHz << ", " << stopFreqMHz << "] not in allowable freq range" << std::endl;
-						_responseCode = CConst::unsupportedSpectrumResponseCode;
-						return;
-					}
-				} else {
-					LOGGER_DEBUG(logger) << "ERROR: Channnel index " << cfi << " INVALID" << std::endl;
-					_responseCode = CConst::unsupportedSpectrumResponseCode;
-					return;
-				}
-			}
 		}
 	}
 }
