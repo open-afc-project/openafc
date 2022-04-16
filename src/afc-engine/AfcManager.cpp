@@ -1481,7 +1481,7 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 				ChannelStruct channel;
 				channel.operatingClass = opClass.opClass;
 				channel.index = cfi;
-				channel.startFreqMHz = opClass.startFreq + cfi * opClass.bandWidth;
+				channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
 				channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 				channel.availability = GREEN; // Everything initialized to GREEN
 				channel.eirpLimit_dBm = 0;
@@ -9715,7 +9715,7 @@ void AfcManager::createChannelList()
 				for (auto &cfi: opClass.channels)
 				{
 					ChannelStruct channel;
-					channel.startFreqMHz = opClass.startFreq + cfi * opClass.bandWidth;
+					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
 					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 
 					if (channel.startFreqMHz >= inquiredStartFreqMHz &&
@@ -9749,7 +9749,7 @@ void AfcManager::createChannelList()
 		int numChan;
 		numChan = 0;
 
-		// Iterate each operating classes and add all channels within the given frequency range
+		// Iterate each operating classes and add all channels of given operating class
 		for (auto &opClass: _opClass)
 		{
 			// Skip of classes of not in inquired channel list
@@ -9759,29 +9759,29 @@ void AfcManager::createChannelList()
 
 			for (auto &cfi: opClass.channels)
 			{
-				bool includeClannel;
+				bool includeChannel;
 
-				includeClannel = false;
+				includeChannel = false;
 
-				// If channel indexes are provided check for channel validity
+				// If channel indexes are provided check for channel validity.
 				// If channel indexes are not provided then include all channels of
-				// givern operating class.
+				// given operating class.
 				if (channelPair.second.size() != 0) {
 					for(auto inquired_cfi : channelPair.second) {
 						if (inquired_cfi == cfi) {
-							includeClannel = true;
+							includeChannel = true;
 							break;
 						}
 					}
 				} else {
-					includeClannel = true;
+					includeChannel = true;
 				}
 
-				if (includeClannel) {
+				if (includeChannel) {
 					ChannelStruct channel;
 					channel.operatingClass = opClass.opClass;
 					channel.index = cfi;
-					channel.startFreqMHz = opClass.startFreq + cfi * opClass.bandWidth;
+					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
 					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 					channel.availability = GREEN; // Everything initialized to GREEN
 					channel.eirpLimit_dBm = 0;
