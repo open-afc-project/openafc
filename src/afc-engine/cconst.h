@@ -5,281 +5,306 @@ class StrTypeClass;
 
 class CConst
 {
-	public:
-		static const double c;                 // speed of light in m/s
-		static const double u0;                // Permeability of free space H/m
-		static const double e0;                // Permittivity of free space F/m
-		static const double logTable[];        // logTable[i] = LOG10(1+i)   i = [0,8]
+public:
+	static const double c;	// speed of light in m/s
+	static const double u0;	// Permeability of free space H/m
+	static const double e0;	// Permittivity of free space F/m
+	static const double logTable[];	// logTable[i] = LOG10(1+i)   i = [0,8]
 
-		static const double earthRadius;       // Radius of earth in m
-		static const double geoRadius;         // Radius of geosynchronous orbit
-		static const double boltzmannConstant; // Boltzman's constant
-		static const double T0;                // Room temperature for noise figure calculations
-		static const double atmPressurehPa;    // Atmospheric pressure value used in P.452
+	static const double earthRadius;	// Radius of earth in m
+	static const double geoRadius;	// Radius of geosynchronous orbit
+	static const double boltzmannConstant;	// Boltzman's constant
+	static const double T0;	// Room temperature for noise figure calculations
+	static const double atmPressurehPa;	// Atmospheric pressure value used in P.452
 
-		/**************************************************************************************/
-		/**** BuildingType                                                                 ****/
-		/**************************************************************************************/
-		enum BuildingTypeEnum {
-			noBuildingType,  // outdoor
-			traditionalBuildingType,
-			thermallyEfficientBuildingType
-		};
-		/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** PropEnv                                                                      ****/
-		/**************************************************************************************/
-		enum PropEnvEnum {
-			unknownPropEnv,  // 'X'
-			urbanPropEnv,  // 'U'
-			suburbanPropEnv,  // 'S'
-			ruralPropEnv,  // 'R'
-			barrenPropEnv   // 'B'
-		};
-		/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** NLCDLandCat                                                                  ****/
-		/**************************************************************************************/
-		enum NLCDLandCatEnum {
-			deciduousTreesNLCDLandCat,
-			coniferousTreesNLCDLandCat,
-			villageCenterNLCDLandCat,
+	/**************************************************************************************/
+	/**** BuildingType                                                                 ****/
+	/**************************************************************************************/
+	enum BuildingTypeEnum
+	{
+		noBuildingType,		// outdoor
+		traditionalBuildingType,
+		thermallyEfficientBuildingType
+	};
+	/**************************************************************************************/
 
-			unknownNLCDLandCat
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** PropEnv                                                                      ****/
+	/**************************************************************************************/
+	enum PropEnvEnum
+	{
+		unknownPropEnv,		// 'X'
+		urbanPropEnv,		// 'U'
+		suburbanPropEnv,		// 'S'
+		ruralPropEnv,		// 'R'
+		barrenPropEnv		// 'B'
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** UserType                                                                     ****/
-		/**************************************************************************************/
-		enum UserTypeEnum {
-			unknownUserType,
-			corporateUserType,
-			publicUserType,
-			homeUserType
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** NLCDLandCat                                                                  ****/
+	/**************************************************************************************/
+	enum NLCDLandCatEnum
+	{
+		deciduousTreesNLCDLandCat,
+		coniferousTreesNLCDLandCat,
+		highCropFieldsNLCDLandCat,
+		noClutterNLCDLandCat,
+		villageCenterNLCDLandCat,
 
-		/**************************************************************************************/
-		/**** AntennaModel                                                                 ****/
-		/**************************************************************************************/
-		enum AntennaModelEnum {
-			idealOmniAntennaModel,
+		unknownNLCDLandCat
+	};
+	/**************************************************************************************/
 
-			indoorUTAverageAntennaModel,
-			outdoorClientAntennaModel,
-			outdoorDirPtToPtAntennaModel,
-			outdoorOmniPtToMptAntennaModel,
-			outdoorOmniRLANAntennaModel
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** UserType                                                                     ****/
+	/**************************************************************************************/
+	enum UserTypeEnum
+	{
+		unknownUserType,
+		corporateUserType,
+		publicUserType,
+		homeUserType
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** AntennaType                                                                  ****/
-		/**************************************************************************************/
-		enum AntennaTypeEnum {
-			antennaOmni,
-			antennaLUT_H,
-			antennaLUT_V,
-			antennaLUT_Boresight,
-			antennaLUT
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** AntennaModel                                                                 ****/
+	/**************************************************************************************/
+	enum AntennaModelEnum
+	{
+		idealOmniAntennaModel,
 
-		/**************************************************************************************/
-		/**** ULSType                                                             ****/
-		/**************************************************************************************/
-		enum ULSTypeEnum {
-			ESULSType,
-			AMTULSType
-		};
-		/**************************************************************************************/
+		indoorUTAverageAntennaModel,
+		outdoorClientAntennaModel,
+		outdoorDirPtToPtAntennaModel,
+		outdoorOmniPtToMptAntennaModel,
+		outdoorOmniRLANAntennaModel
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** ULSAntennaType                                                               ****/
-		/**************************************************************************************/
-		enum ULSAntennaTypeEnum {
-			OmniAntennaType,
-			F1336OmniAntennaType,
-			F1245AntennaType,
-			F699AntennaType,
-			LUTAntennaType
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** AntennaType                                                                  ****/
+	/**************************************************************************************/
+	enum AntennaTypeEnum
+	{
+		antennaOmni,
+		antennaLUT_H,
+		antennaLUT_V,
+		antennaLUT_Boresight,
+		antennaLUT
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** PathLossModel                                                                ****/
-		/**************************************************************************************/
-		enum PathLossModelEnum {
-			unknownPathLossModel,
-			ITMBldgPathLossModel,
-			CoalitionOpt6PathLossModel,
-			FCC6GHzReportAndOrderPathLossModel,
-			CustomPathLossModel,
-			FSPLPathLossModel
+	/**************************************************************************************/
+	/**** ULSType                                                             ****/
+	/**************************************************************************************/
+	enum ULSTypeEnum
+	{
+		ESULSType,
+		AMTULSType
+	};
+	/**************************************************************************************/
 
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** ULSAntennaType                                                               ****/
+	/**************************************************************************************/
+	enum ULSAntennaTypeEnum
+	{
+		OmniAntennaType,
+		F1336OmniAntennaType,
+		F1245AntennaType,
+		F699AntennaType,
+		LUTAntennaType
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** Global Parameters                                                            ****/
-		/**************************************************************************************/
-		enum GParam {
-			antenna_num_interp_pts = 361
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** PathLossModel                                                                ****/
+	/**************************************************************************************/
+	enum PathLossModelEnum
+	{
+		unknownPathLossModel,
+		ITMBldgPathLossModel,
+		CoalitionOpt6PathLossModel,
+		FCC6GHzReportAndOrderPathLossModel,
+		CustomPathLossModel,
+		FSPLPathLossModel
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** SimulationEnum                                                               ****/
-		/**************************************************************************************/
-		enum SimulationEnum {
-			FixedSimulation,
-			MobileSimulation,
-			RLANSensingSimulation,
-			showFSPwrAtRLANSimulation,
-			FSToFSSimulation
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** Global Parameters                                                            ****/
+	/**************************************************************************************/
+	enum GParam
+	{
+		antenna_num_interp_pts = 361
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** LengthUnit                                                                   ****/
-		/**************************************************************************************/
-		enum LengthUnitEnum {
-			mmLengthUnit,
-			cmLengthUnit,
-			mLengthUnit,
-			KmLengthUnit,
-			milLengthUnit,
-			inLengthUnit,
-			ftLengthUnit
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** SimulationEnum                                                               ****/
+	/**************************************************************************************/
+	enum SimulationEnum
+	{
+		FixedSimulation,
+		MobileSimulation,
+		RLANSensingSimulation,
+		showFSPwrAtRLANSimulation,
+		FSToFSSimulation
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** AngleUnit                                                                    ****/
-		/**************************************************************************************/
-		enum AngleUnitEnum {
-			radianAngleUnit = 0,
-			degreeAngleUnit
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** LengthUnit                                                                   ****/
+	/**************************************************************************************/
+	enum LengthUnitEnum
+	{
+		mmLengthUnit,
+		cmLengthUnit,
+		mLengthUnit,
+		KmLengthUnit,
+		milLengthUnit,
+		inLengthUnit,
+		ftLengthUnit
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** PSDDBUnit                                                                    ****/
-		/**************************************************************************************/
-		enum PSDDBUnitEnum {
-			WPerHzPSDDBUnit = 0,
-			WPerMHzPSDDBUnit,
-			WPer4KHzPSDDBUnit
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** AngleUnit                                                                    ****/
+	/**************************************************************************************/
+	enum AngleUnitEnum
+	{
+		radianAngleUnit = 0,
+		degreeAngleUnit
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** LidarFormatEnum                                                              ****/
-		/**************************************************************************************/
-		enum LidarFormatEnum
-		{
-			fromVectorLidarFormat,          // building data comes from vector data
-			fromRasterLidarFormat           // building data comes from raster data
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** PSDDBUnit                                                                    ****/
+	/**************************************************************************************/
+	enum PSDDBUnitEnum
+	{
+		WPerHzPSDDBUnit = 0,
+		WPerMHzPSDDBUnit,
+		WPer4KHzPSDDBUnit
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** HeightSource                                                                 ****/
-		/**************************************************************************************/
-		enum HeightSourceEnum {
-			unknownHeightSource,
-			globalHeightSource,
-			depHeightSource,
-			srtmHeightSource,
-			lidarHeightSource
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** LidarFormatEnum                                                              ****/
+	/**************************************************************************************/
+	enum LidarFormatEnum
+	{
+		fromVectorLidarFormat,	// building data comes from vector data
+		fromRasterLidarFormat	// building data comes from raster data
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** HeightType                                                                   ****/
-		/**************************************************************************************/
-		enum HeightTypeEnum {
-			AMSLHeightType,
-			AGLHeightType
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** HeightSource                                                                 ****/
+	/**************************************************************************************/
+	enum HeightSourceEnum
+	{
+		unknownHeightSource,
+		globalHeightSource,
+		depHeightSource,
+		srtmHeightSource,
+		lidarHeightSource
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** LOSOption                                                                    ****/
-		/**************************************************************************************/
-		enum LOSOptionEnum {
-			UnknownLOSOption,
-			BldgDataLOSOption,
-			BldgDataReqTxLOSOption,
-			BldgDataReqRxLOSOption,
-			BldgDataReqTxRxLOSOption,
-			ForceLOSLOSOption,
-			ForceNLOSLOSOption
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** HeightType                                                                   ****/
+	/**************************************************************************************/
+	enum HeightTypeEnum
+	{
+		AMSLHeightType,
+		AGLHeightType
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** Winner2UnknownLOSMethod                                                      ****/
-		/**************************************************************************************/
-		enum Winner2UnknownLOSMethodEnum {
-			PLOSCombineWinner2UnknownLOSMethod,
-			PLOSThresholdWinner2UnknownLOSMethod
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** LOSOption                                                                    ****/
+	/**************************************************************************************/
+	enum LOSOptionEnum
+	{
+		UnknownLOSOption,
+		BldgDataLOSOption,
+		BldgDataReqTxLOSOption,
+		BldgDataReqRxLOSOption,
+		BldgDataReqTxRxLOSOption,
+		ForceLOSLOSOption,
+		ForceNLOSLOSOption
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** ITMClutterMethod                                                             ****/
-		/**************************************************************************************/
-		enum ITMClutterMethodEnum {
-			ForceTrueITMClutterMethod,
-			ForceFalseITMClutterMethod,
-			BldgDataITMCLutterMethod
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** Winner2UnknownLOSMethod                                                      ****/
+	/**************************************************************************************/
+	enum Winner2UnknownLOSMethodEnum
+	{
+		PLOSCombineWinner2UnknownLOSMethod,
+		PLOSThresholdWinner2UnknownLOSMethod
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** ResponseCode                                                                 ****/
-		/**************************************************************************************/
-		enum ResponseCodeEnum {
-			generalFailureResponseCode = -1,
-			successResponseCode = 0,
-			versionNotSupportedResponseCode = 100,
-			deviceDisallowedResponseCode = 101,
-			missingParamResponseCode = 102,
-			invalidValueResponseCode = 103,
-			unexpectedParamResponseCode = 106,
-			unsupportedSpectrumResponseCode = 300
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** ITMClutterMethod                                                             ****/
+	/**************************************************************************************/
+	enum ITMClutterMethodEnum
+	{
+		ForceTrueITMClutterMethod,
+		ForceFalseITMClutterMethod,
+		BldgDataITMCLutterMethod
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** ScanPointBelowGroundMethod                                                   ****/
-		/**************************************************************************************/
-		enum ScanPointBelowGroundMethodEnum {
-			DiscardScanPointBelowGroundMethod,
-			TruncateScanPointBelowGroundMethod
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** ResponseCode                                                                 ****/
+	/**************************************************************************************/
+	enum ResponseCodeEnum
+	{
+		generalFailureResponseCode = -1,
+		successResponseCode = 0,
+		versionNotSupportedResponseCode = 100,
+		deviceDisallowedResponseCode = 101,
+		missingParamResponseCode = 102,
+		invalidValueResponseCode = 103,
+		unexpectedParamResponseCode = 106,
+		unsupportedSpectrumResponseCode = 300
+	};
+	/**************************************************************************************/
 
-		/**************************************************************************************/
-		/**** ScanRegionMethod                                                             ****/
-		/**************************************************************************************/
-		enum ScanRegionMethodEnum {
-			xyAlignRegionNorthEastScanRegionMethod,
-			xyAlignRegionMajorMinorScanRegionMethod,
-			latLonAlignGridScanRegionMethod 
-		};
-		/**************************************************************************************/
+	/**************************************************************************************/
+	/**** ScanPointBelowGroundMethod                                                   ****/
+	/**************************************************************************************/
+	enum ScanPointBelowGroundMethodEnum
+	{
+		DiscardScanPointBelowGroundMethod,
+		TruncateScanPointBelowGroundMethod
+	};
+	/**************************************************************************************/
 
-		static const StrTypeClass strULSAntennaTypeList[];
-		static const StrTypeClass strPropEnvList[];
-		static const StrTypeClass strPathLossModelList[];
-		static const StrTypeClass strLOSOptionList[];
-		static const StrTypeClass strITMClutterMethodList[];
-		static const StrTypeClass strHeightSourceList[];
+	/**************************************************************************************/
+	/**** ScanRegionMethod                                                             ****/
+	/**************************************************************************************/
+	enum ScanRegionMethodEnum
+	{
+		xyAlignRegionNorthEastScanRegionMethod,
+		xyAlignRegionMajorMinorScanRegionMethod,
+		latLonAlignGridScanRegionMethod
+	};
+	/**************************************************************************************/
+
+	static const StrTypeClass strULSAntennaTypeList[];
+	static const StrTypeClass strPropEnvList[];
+	static const StrTypeClass strPathLossModelList[];
+	static const StrTypeClass strLOSOptionList[];
+	static const StrTypeClass strITMClutterMethodList[];
+	static const StrTypeClass strHeightSourceList[];
 };
 
 #endif
