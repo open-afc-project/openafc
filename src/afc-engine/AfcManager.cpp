@@ -1479,14 +1479,16 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 			for (auto &cfi: opClass.channels)
 			{
 				ChannelStruct channel;
-				channel.operatingClass = opClass.opClass;
-				channel.index = cfi;
 				channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
 				channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
-				channel.availability = GREEN; // Everything initialized to GREEN
-				channel.eirpLimit_dBm = 0;
-				channel.type = ChannelType::INQUIRED_CHANNEL;
-				_channelList.push_back(channel);
+				if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
+					channel.operatingClass = opClass.opClass;
+					channel.index = cfi;
+					channel.availability = GREEN; // Everything initialized to GREEN
+					channel.eirpLimit_dBm = 0;
+					channel.type = ChannelType::INQUIRED_CHANNEL;
+					_channelList.push_back(channel);
+				}
 			}
 		}
 	}
@@ -1500,7 +1502,9 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 		channel.eirpLimit_dBm = 0;
 		channel.startFreqMHz = jsonObj["centerFrequency"].toInt() - jsonObj["bandwidth"].toInt()/2;
 		channel.stopFreqMHz = jsonObj["centerFrequency"].toInt() + jsonObj["bandwidth"].toInt()/2;
-		_channelList.push_back(channel);
+		if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
+			_channelList.push_back(channel);
+		}
 
 		_exclusionZoneRLANChanIdx = 0;//round((centerFreq - _wlanMinFreq) / _exclusionZoneRLANBWHz - 0.5);
 		_exclusionZoneRLANEIRPDBm = jsonObj["EIRP"].toDouble();
@@ -1547,7 +1551,9 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 		channel.eirpLimit_dBm = 0;
 		channel.startFreqMHz = jsonObj["centerFrequency"].toInt() - jsonObj["bandwidth"].toInt()/2;
 		channel.stopFreqMHz = jsonObj["centerFrequency"].toInt() + jsonObj["bandwidth"].toInt()/2;
-		_channelList.push_back(channel);
+		if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
+			_channelList.push_back(channel);
+		}
 
 		QJsonObject inOutdoor = jsonObj["indoorOutdoor"].toObject();
 		if (inOutdoor["kind"].toString() == "Selected per Building Data")
@@ -7485,8 +7491,7 @@ void AfcManager::runScanAnalysis()
 
 	LOGGER_INFO(logger) << "Executing AfcManager::runScanAnalysis()";
 
-	const int numBW = 4;
-	auto bwList = std::vector<int> { 20, 40, 80, 160 };
+	auto bwList = std::vector<int> { 20, 40, 80, 160, 80, 20 };
 	int bwIdx;
 
 	FILE *fscan;
@@ -7502,6 +7507,7 @@ void AfcManager::runScanAnalysis()
 			",RLAN_TERRAIN_SOURCE"
 			",RLAN_PROP_ENV");
 
+	const int numBW = bwList.size();
 	for(bwIdx=0; bwIdx<numBW; ++bwIdx) {
 		int bw = bwList[bwIdx];
 		fprintf(fscan, ",NUM_CHAN_BLACK_%d_MHZ,NUM_CHAN_RED_%d_MHZ,NUM_CHAN_YELLOW_%d_MHZ,NUM_CHAN_GREEN_%d_MHZ", bw, bw, bw, bw);
@@ -9692,7 +9698,6 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 void AfcManager::createChannelList()
 {
 	// add channel plan to channel list
-	auto bwList = std::vector<int> { 20, 40, 80, 160 };
 
 	for(auto freqRange : _inquiredFrquencyRangesMHz) {
 		auto inquiredStartFreqMHz = freqRange.first;
@@ -9779,16 +9784,21 @@ void AfcManager::createChannelList()
 
 				if (includeChannel) {
 					ChannelStruct channel;
-					channel.operatingClass = opClass.opClass;
-					channel.index = cfi;
 					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
 					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
-					channel.availability = GREEN; // Everything initialized to GREEN
-					channel.eirpLimit_dBm = 0;
-					channel.type = ChannelType::INQUIRED_CHANNEL;
-					_channelList.push_back(channel);
-					numChan++;
-					LOGGER_DEBUG(logger) << "added " << numChan << " channels";
+
+					// Include channel if it is within the frequency bands in AFC config
+					if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
+						channel.operatingClass = opClass.opClass;
+						channel.index = cfi;
+
+						channel.availability = GREEN; // Everything initialized to GREEN
+						channel.eirpLimit_dBm = 0;
+						channel.type = ChannelType::INQUIRED_CHANNEL;
+						_channelList.push_back(channel);
+						numChan++;
+						LOGGER_DEBUG(logger) << "added " << numChan << " channels";
+					}
 				}
 			}
 		}
