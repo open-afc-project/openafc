@@ -78,6 +78,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "rasDatabase":"RASdatabase.csv",
     "APUncertainty":{"horizontal":30,"height":5},
     "ITMParameters":{"polarization":"Vertical","ground":"Good Ground","dielectricConst":25,"conductivity":0.02,"minSpacing":3,"maxPoints":2000},
+    "rlanITMTxClutterMethod": 'FORCE_TRUE' ,
     "clutterAtFS":false,
     "version": guiConfig.version});
 
