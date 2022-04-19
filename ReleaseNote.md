@@ -1,6 +1,27 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-181**|
+| :- | :- |
+|**Date**|**04/19/2022**|
+
+## **Issues Addressed**
+ * Jira OA-181: Set the new parameter "rlanITMTxClutterMethod" in AFC Config correctly
+ 
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Set AFC-Config to default, and other propagation models and confirm that the "rlanITMTxClutterMethod" is set correctly in afc_config.json and the propagation model is chosen correctly in exc_thr file.
+ * See the test results attached to this ticket. 
+ * Confirmed that "rlanITMTxClutterMethod": "FORCE_TRUE" (in afc_config.json) when default, FSPL and FCC 6GHz Report & Order are selected for the propagation model..
+ * Confirmed that "rlanITMTxClutterMethod": "BLDG_DATA" when "ITM with buildign data" is selected for the propagation model.
+ * Confirmed that "rlanITMTxClutterMethod": "BLDG_DATA" when "Custom" propagation model with LoS/NLoS based on building data is selected.
+ * COnfirmed that "rlanITMTxClutterMethod": "FORCE_FALSE" when "Custom" propagation model with WinnerII LoS and Never add Clutter for > 1km is selected.
+## **Open Issues**
+
+
+## **Version and Date**
 |Version|**v3.3.14**|
 | :- | :- |
 |**Date**|**04/04/2022**|
