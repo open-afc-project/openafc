@@ -124,9 +124,17 @@ namespace
 
 namespace OpClass
 {
+	// Note: Per 11ax D 8.0, section 27.3..23.2
+	// Channel's start frequency is calculated using formula
+	// Channel center frequency = Channel starting frequency + 5 × nch
+	// where nch = 1, 2, ...233, is the channel index
+	// For channel 1, center frequency is (5950 + 5 * 1) = 5955
+	// and start frequency = (center frequency - BW/2) = (5955 - 20/2) = 5945
 	OpClass  GlobalOpClass_131 =
 	{
-		131, 20, 5950,
+		131,		// Operating class
+		20,		// Bandwidth
+		5950,		// Start frequency.
 		{
 			  1,   5,   9,  13,  17,  21,  25,  29,
 			 33,  37,  41,  45,  49,  53,  57,  61,
@@ -141,7 +149,9 @@ namespace OpClass
 
 	const OpClass GlobalOpClass_132 =
 	{
-		132, 40, 5950,
+		132,
+		40,
+		5950,
 		{
 			  3,  11,  19,  27,  35,  43,  51, 59,
 			 67,  75,  83,  91,  99, 107, 115, 123,
@@ -152,7 +162,9 @@ namespace OpClass
 
 	const OpClass GlobalOpClass_133 =
 	{
-		133, 80, 5950,
+		133,
+		80,
+		5950,
 		{
 			7,   23,   39,  55,  71,  87, 103, 119,
 			135, 151, 167, 183, 199, 215
@@ -161,7 +173,9 @@ namespace OpClass
 
 	const OpClass GlobalOpClass_134 =
 	{
-		134, 160, 5950,
+		134,
+		160,
+		5950,
 		{
 			15,  47,  79, 111, 143, 175, 207
 		}
@@ -169,7 +183,9 @@ namespace OpClass
 
 	const OpClass GlobalOpClass_135 =
 	{
-		135, 80, 5950,
+		135,
+		80,
+		5950,
 		{
 			7,   23,   39,  55,  71,  87, 103, 119,
 			135, 151, 167, 183, 199, 215
@@ -178,7 +194,9 @@ namespace OpClass
 
 	const OpClass GlobalOpClass_136 =
 	{
-		136, 20, 5925,
+		136,
+		20,
+		5925,
 		{ 2 }
 	};
 
@@ -188,6 +206,7 @@ namespace OpClass
 		GlobalOpClass_132,
 		GlobalOpClass_133,
 		GlobalOpClass_134,
+		// Opclass 135 is a non contiguous 80+80 channels.
 		// GlobalOpClass_135,
 		GlobalOpClass_136
 	};
@@ -7491,8 +7510,7 @@ void AfcManager::runScanAnalysis()
 
 	LOGGER_INFO(logger) << "Executing AfcManager::runScanAnalysis()";
 
-	auto bwList = std::vector<int> { 20, 40, 80, 160, 80, 20 };
-	int bwIdx;
+	std::map<int, int> bw_count_map;
 
 	FILE *fscan;
 	std::string scanFileName = _serialNumber.toStdString() + "_scan.csv";
@@ -7507,10 +7525,19 @@ void AfcManager::runScanAnalysis()
 			",RLAN_TERRAIN_SOURCE"
 			",RLAN_PROP_ENV");
 
-	const int numBW = bwList.size();
-	for(bwIdx=0; bwIdx<numBW; ++bwIdx) {
-		int bw = bwList[bwIdx];
+
+	// List all bandwidths covered by op-classes, merge duplicates
+	for (auto &opClass: _opClass) {
+		int bw = opClass.bandWidth;
+		bw_count_map[opClass.bandWidth] = 0;
+	}
+
+	int numBW = 0;
+	for (auto &map: bw_count_map) {
+		int bw = map.first;
 		fprintf(fscan, ",NUM_CHAN_BLACK_%d_MHZ,NUM_CHAN_RED_%d_MHZ,NUM_CHAN_YELLOW_%d_MHZ,NUM_CHAN_GREEN_%d_MHZ", bw, bw, bw, bw);
+		// Note down the index of bandwidth in the map
+		map.second = numBW++;
 	}
 	fprintf(fscan, "\n");
 	fflush(fscan);
@@ -7522,6 +7549,7 @@ void AfcManager::runScanAnalysis()
 	Vector3 rlanPosnList[2*NHt+1];
 	GeodeticCoord rlanCoordList[2*NHt+1];
 
+	int bwIdx;
 	int numBlack[numBW];
 	int numGreen[numBW];
 	int numYellow[numBW];
@@ -8127,7 +8155,7 @@ void AfcManager::runScanAnalysis()
 
 			for (auto& channel : _channelList) {
 				if (channel.type == ChannelType::INQUIRED_CHANNEL) {
-					bwIdx = channel.operatingClass - 131;
+					bwIdx = bw_count_map[channel.bandwidth()];
 					if (channel.availability == BLACK) {
 						numBlack[bwIdx]++;
 					} else if (channel.eirpLimit_dBm == _maxEIRP_dBm) {
@@ -9601,35 +9629,6 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 /**************************************************************************************/
 
 /**************************************************************************************/
-/* AfcManager::convertCFI()                                                           */
-/**************************************************************************************/
-int AfcManager::convertCFI(int cfi, int& bandwidthMHz, int& startFreqMHz, int& stopFreqMHz)
-{
-	int posn = 0;
-	int retval;
-
-	while((posn <= 4) && (cfi & (1<<posn))) {
-		posn++;
-	}
-
-	if ((posn == 0) || (posn > 4) || (cfi < 0)) {
-		retval = 0;
-	} else {
-		bandwidthMHz = 20*(1<<(posn-1));
-		startFreqMHz = _wlanMinFreqMHz + (cfi - (1<<posn) + 1)*5;
-		stopFreqMHz = startFreqMHz + bandwidthMHz;
-		if (stopFreqMHz > _wlanMaxFreqMHz) {
-			retval = 0;
-		} else {
-			retval = 1;
-		}
-	}
-
-	return(retval);
-}
-/**************************************************************************************/
-
-/**************************************************************************************/
 /* AfcManager::computeInquiredFreqRangesPSD()                                         */
 /**************************************************************************************/
 void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &psdFreqRangeList)
@@ -9723,8 +9722,20 @@ void AfcManager::createChannelList()
 					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
 					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 
-					if (channel.startFreqMHz >= inquiredStartFreqMHz &&
-						channel.stopFreqMHz <= inquiredStopFreqMHz) {
+					// Include enquired frequencies if they are within the supported opclass frequencies or
+					// if the channel in an opclass is within the inquired frequency range
+					if ((inquiredStartFreqMHz >= channel.startFreqMHz &&
+						inquiredStopFreqMHz <= channel.stopFreqMHz) ||
+						(channel.startFreqMHz >= inquiredStartFreqMHz &&
+						channel.stopFreqMHz <= inquiredStopFreqMHz)) {
+						// Limit frequencies within the inquired frequency range
+						if (inquiredStartFreqMHz > channel.startFreqMHz) {
+							channel.startFreqMHz = inquiredStartFreqMHz;
+						}
+						if (inquiredStopFreqMHz < channel.stopFreqMHz) {
+							channel.stopFreqMHz = inquiredStopFreqMHz;
+						}
+
 						channel.availability = GREEN; // Everything initialized to GREEN
 						channel.eirpLimit_dBm = 0;
 						channel.type = INQUIRED_FREQUENCY;
