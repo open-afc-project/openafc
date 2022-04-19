@@ -39,12 +39,12 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
     }
 
     readonly humanNames = {
-        131: "20 MHz Channel(s)",
-        132: "40 MHz Channel(s)",
-        133: "80 MHz Channel(s)",
-        134: "160 MHz Channel(s)"
+        131: "Operating Class 131 (20 MHz)",
+        132: "Operating Class 132 (40 MHz)",
+        133: "Operating Class 133 (80 MHz)",
+        134: "Operating Class 134 (160 MHz)",
+        136: "Operating Class 136 (20 MHz)"
     }
-
 
     private setInclude(n: OperatingClassIncludeType) {
         this.props.onChange({
@@ -55,16 +55,12 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
         );
     }
 
-
-
-
     private setChannels(n: number[]) {
         this.props.onChange({
             include: this.props.operatingClass.include,
             channels: n,
             num: this.props.operatingClass.num
         })
-
     }
 
     private AddIdToString(s: string) {
@@ -95,6 +91,11 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
                 start = 15;
                 interval = 32;
                 count = 7
+                break;
+            case 136:
+                start = 2;
+                interval = 4;
+                count = 1;
                 break;
             default:
                 return [];
