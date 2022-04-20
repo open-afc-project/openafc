@@ -146,8 +146,8 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
         this.setState({ status: "Info" });
         return spectrumInquiryRequest(request)
             .then(resp => {
-                const response = resp.result;
                 if (resp.kind == "Success") {
+                    const response = resp.result;
                     if (response.response.responseCode === 0) {
                         const minEirp = request.minDesiredPower || this.state.minEirp;
                         this.setState({
@@ -155,10 +155,10 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             response: resp.result,
                             minEirp: minEirp,
                         });
-                    } 
-                }else if(resp.kind == "Error" || !resp.kind) {
+                    }
+                } else if (!resp.kind || resp.kind == "Error") {
                     this.setState({ status: "Error", err: error(resp.description, resp.errorCode, resp.body), response: resp.body });
-                }    
+                }
             });
     }
 
@@ -214,9 +214,9 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                     </div>}
                 </Measure></CardBody></Card>
                 <br />
-                {this.state.response?.availableSpectrumInfo && <SpectrumDisplayAFC spectrum={this.state.response} />}
+                {this.state.response?.availableFrequencyInfo && <SpectrumDisplayAFC spectrum={this.state.response} />}
                 <br />
-                <JsonRawDisp value={this.state?.response ? this.state.response: this.state?.err?.body} />
+                <JsonRawDisp value={this.state?.response ? this.state.response : this.state?.err?.body} />
             </PageSection>);
     }
 }
