@@ -7533,7 +7533,7 @@ void AfcManager::runScanAnalysis()
 
 	LOGGER_INFO(logger) << "Executing AfcManager::runScanAnalysis()";
 
-	std::map<int, int> bw_count_map;
+	std::map<int, int> bw_index_map;
 
 	FILE *fscan;
 	std::string scanFileName = _serialNumber.toStdString() + "_scan.csv";
@@ -7552,11 +7552,11 @@ void AfcManager::runScanAnalysis()
 	// List all bandwidths covered by op-classes, merge duplicates
 	for (auto &opClass: _opClass) {
 		int bw = opClass.bandWidth;
-		bw_count_map[opClass.bandWidth] = 0;
+		bw_index_map[opClass.bandWidth] = 0;
 	}
 
 	int numBW = 0;
-	for (auto &map: bw_count_map) {
+	for (auto &map: bw_index_map) {
 		int bw = map.first;
 		fprintf(fscan, ",NUM_CHAN_BLACK_%d_MHZ,NUM_CHAN_RED_%d_MHZ,NUM_CHAN_YELLOW_%d_MHZ,NUM_CHAN_GREEN_%d_MHZ", bw, bw, bw, bw);
 		// Note down the index of bandwidth in the map
@@ -8178,7 +8178,7 @@ void AfcManager::runScanAnalysis()
 
 			for (auto& channel : _channelList) {
 				if (channel.type == ChannelType::INQUIRED_CHANNEL) {
-					bwIdx = bw_count_map[channel.bandwidth()];
+					bwIdx = bw_index_map[channel.bandwidth()];
 					if (channel.availability == BLACK) {
 						numBlack[bwIdx]++;
 					} else if (channel.eirpLimit_dBm == _maxEIRP_dBm) {
@@ -9738,6 +9738,7 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 void AfcManager::createChannelList()
 {
 	// add channel plan to channel list
+	int totalNunChan = 0;
 
 	for(auto freqRange : _inquiredFrquencyRangesMHz) {
 		auto inquiredStartFreqMHz = freqRange.first;
@@ -9763,7 +9764,7 @@ void AfcManager::createChannelList()
 					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
 					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 
-					// Include enquired frequencies if they are within the supported opclass frequencies or
+					// Include inquired frequencies if they are within the supported opclass frequencies or
 					// if the channel in an opclass is within the inquired frequency range
 					if ((inquiredStartFreqMHz >= channel.startFreqMHz &&
 						inquiredStopFreqMHz <= channel.stopFreqMHz) ||
@@ -9782,6 +9783,7 @@ void AfcManager::createChannelList()
 						channel.type = INQUIRED_FREQUENCY;
 						_channelList.push_back(channel);
 						numChan++;
+						totalNunChan++;
 					}
 				}
 			}
@@ -9849,15 +9851,21 @@ void AfcManager::createChannelList()
 						channel.type = ChannelType::INQUIRED_CHANNEL;
 						_channelList.push_back(channel);
 						numChan++;
+						totalNunChan++;
 						LOGGER_DEBUG(logger) << "added " << numChan << " channels";
 					}
 				}
 			}
+			if (numChan == 0) {
+				LOGGER_DEBUG(logger) << "Inquired Channel INVALID Operating Class: " << channelPair.first << std::endl;
+				_responseCode = CConst::unsupportedSpectrumResponseCode;
+				return;
+			}
 		}
 
-		if (numChan == 0) {
-			LOGGER_DEBUG(logger) << "Inquired Channel INVALID Operating Class: " << channelPair.first << std::endl;
-			_responseCode = CConst::unsupportedSpectrumResponseCode;
+		if (totalNunChan == 0) {
+			LOGGER_DEBUG(logger) << "Missing valid Inquired channel and frequency " << std::endl;
+			_responseCode = CConst::missingParamResponseCode;
 			return;
 		}
 	}
