@@ -364,7 +364,8 @@ def run_reqs(self, opt):
             dataline = fp_test.readline()
             if not dataline:
                 break
-
+            app_log.info('Request:')
+            app_log.info(dataline)
             new_req, resp = self._send_recv(dataline)
 
             resp_res = json_lookup('shortDescription', resp, None)
@@ -373,7 +374,9 @@ def run_reqs(self, opt):
                 app_log.debug(resp)
                 break
             app_log.info('Got response for the request')
-
+            app_log.info('Resp:')
+            app_log.info(resp)
+            app_log.info('\n\n')
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)
             hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
@@ -418,7 +421,7 @@ def import_tests(self, opt):
     app_log.debug('%s() %s\n', inspect.stack()[0][3], opt)
     filename = "AFC System (SUT) Test Vectors r5.xlsx"
     test_ident = 'all'
-     
+
     if (opt != 'True'):
         if (AFC_TEST_IDENT.get(opt.lower()) is None):
             app_log.error('Unsupported test identifier (%s)', opt)
@@ -446,7 +449,7 @@ def import_tests(self, opt):
         if (test_ident != 'True') and (cell.value.lower() != test_ident):
             continue
 
-        res_str = REQ_HEADER + REQ_INQUIRY_HEADER + REQ_INQ_CHA_HEADER 
+        res_str = REQ_HEADER + REQ_INQUIRY_HEADER + REQ_INQ_CHA_HEADER
         cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_90)
         res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
         cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_92)
@@ -493,7 +496,7 @@ def import_tests(self, opt):
             app_log.debug(e)
 
         res_str += REQ_INQ_FREQ_RANG_FOOTER
-    
+
         cell = sheet.cell(row = i, column = MINDESIREDPOWER)
         if (cell.value):
             res_str += REQ_MIN_DESIRD_PWR + str(cell.value) + ', '
