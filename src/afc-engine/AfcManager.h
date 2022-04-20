@@ -242,7 +242,6 @@ class AfcManager
 		void writeKML();
 		void createChannelList();
 		bool containsChannel(const std::vector<FreqBandClass>& freqBandList, int chanStartFreqMHz, int chanStopFreqMHz);
-		int convertCFI(int cfi, int& bandwidthMHz, int& startFreqMHz, int& stopFreqMHz);    // Convert Center Frequency Index to bandwidth, startFreq, stopFreq of channel
 		// Returns 1 is successful, 0 of cfi invalid
 
 		void fixFSTerrain();
