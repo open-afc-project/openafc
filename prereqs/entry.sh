@@ -11,4 +11,3 @@ cmake3 -DCMAKE_INSTALL_PREFIX=${FBRAT_WORKING_DIR}/build/testroot \
 cd ${FBRAT_WORKING_DIR}/build
 ninja-build -j$N_THREADS
 ninja-build install -j$N_THREADS
-bash
