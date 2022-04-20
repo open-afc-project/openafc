@@ -455,6 +455,8 @@ def import_tests(self, opt):
         res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
         cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_96)
         res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}'
+        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_98)
+        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}'
         res_str += REQ_INQ_CHA_FOOTER + ' '
 
         cell = sheet.cell(row = i, column = PURPOSE_CLM)
