@@ -258,6 +258,11 @@ export class AFCForm extends React.Component<
             } else {
                 const conf = this.state.config;
                 conf.propagationModel = x;
+                if(x.kind === "ITM with building data"){
+                    conf.rlanITMTxClutterMethod = "BLDG_DATA"
+                }else{
+                    conf.rlanITMTxClutterMethod="FORCE_TRUE"
+                }
                 this.setState({ config: conf });
             }
         }
