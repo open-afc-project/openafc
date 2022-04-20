@@ -9697,7 +9697,7 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 void AfcManager::createChannelList()
 {
 	// add channel plan to channel list
-	int totalNunChan = 0;
+	int totalNumChan = 0;
 
 	for(auto freqRange : _inquiredFrquencyRangesMHz) {
 		auto inquiredStartFreqMHz = freqRange.first;
@@ -9742,7 +9742,7 @@ void AfcManager::createChannelList()
 						channel.type = INQUIRED_FREQUENCY;
 						_channelList.push_back(channel);
 						numChan++;
-						totalNunChan++;
+						totalNumChan++;
 					}
 				}
 			}
@@ -9810,7 +9810,7 @@ void AfcManager::createChannelList()
 						channel.type = ChannelType::INQUIRED_CHANNEL;
 						_channelList.push_back(channel);
 						numChan++;
-						totalNunChan++;
+						totalNumChan++;
 						LOGGER_DEBUG(logger) << "added " << numChan << " channels";
 					}
 				}
@@ -9822,7 +9822,7 @@ void AfcManager::createChannelList()
 			}
 		}
 
-		if (totalNunChan == 0) {
+		if (totalNumChan == 0) {
 			LOGGER_DEBUG(logger) << "Missing valid Inquired channel and frequency " << std::endl;
 			_responseCode = CConst::missingParamResponseCode;
 			return;
