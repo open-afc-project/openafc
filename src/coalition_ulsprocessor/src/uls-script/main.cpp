@@ -8,6 +8,8 @@
 
 #define VERSION "1.3.0"
 
+bool removeMobile = false;
+
 namespace {
 QString makeNumber(const double &d) {
   if (std::isnan(d))
@@ -43,13 +45,12 @@ double emissionDesignatorToBandwidth(const QString &emDesig) {
     multi = 1e9;
     unitS = "G";
   } else {
-    printf("WARNING: Emission designator contains no order of magnitude.\n");
     return -1;
   }
 
   QString num = frqPart.replace(unitS, ".");
 
-  double number = num.toFloat() * multi;
+  double number = num.toDouble() * multi;
 
   return number / 1e6; // Convert to MHz
 }
@@ -57,7 +58,7 @@ double emissionDesignatorToBandwidth(const QString &emDesig) {
 
 // Ensures that all the necessary fields are available to determine if this goes in the regular ULS or anomalous file
 // returns a blank string if valid, otherwise a string indicating what failed. 
-QString hasNecessaryFields(const UlsEmission &e, UlsPath path, UlsLocation rxLoc, UlsLocation txLoc, UlsAntenna rxAnt, UlsAntenna txAnt, UlsHeader txHeader, UlsLocation prLoc, UlsAntenna prAnt) {
+QString hasNecessaryFields(const UlsEmission &e, UlsPath path, UlsLocation rxLoc, UlsLocation txLoc, UlsAntenna rxAnt, UlsAntenna txAnt, UlsHeader txHeader, QList<UlsLocation> prLocList, QList<UlsAntenna> prAntList) {
   QString failReason = "";
   // check lat/lon degree for rx
   if (isnan(rxLoc.latitudeDeg) || isnan(rxLoc.longitudeDeg)) {
@@ -108,17 +109,20 @@ QString hasNecessaryFields(const UlsEmission &e, UlsPath path, UlsLocation rxLoc
   }
   
   // mobile 
-  if(txHeader.mobile == 'Y') {
+  if ( removeMobile && (txHeader.mobile == 'Y') ) {
     failReason.append("Mobile is Y, ");
   }
 
   // radio service code 
-  if(strcmp(txHeader.radioServiceCode, "TP") == 0) {
+  if ( removeMobile &&(strcmp(txHeader.radioServiceCode, "TP") == 0) ) {
     failReason.append("Radio service value of TP, ");
   }
-  
-  // check passive repeater
-  if(path.passiveReceiver == 'Y') {
+
+  int prIdx;
+  for(prIdx=0; prIdx<std::min(prLocList.size(),prAntList.size()); ++prIdx) {
+      const UlsLocation &prLoc = prLocList[prIdx];
+      const UlsAntenna &prAnt = prAntList[prIdx];
+
     // check lat/lon degree for pr
     if (isnan(prLoc.latitudeDeg) || isnan(prLoc.longitudeDeg)) {
       failReason.append( "Invalid passive repeater lat degree or long degree, "); 
@@ -142,13 +146,20 @@ QString hasNecessaryFields(const UlsEmission &e, UlsPath path, UlsLocation rxLoc
   return failReason; 
 }
 
+bool SegmentCompare(const UlsSegment& segA, const UlsSegment& segB)
+{
+    return segA.segmentNumber < segB.segmentNumber;
+}
+
 }; // namespace
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
   setvbuf(stdout, NULL, _IONBF, 0);
 
   if (strcmp(argv[1], "--version") == 0) {
     printf("Coalition ULS Processing Tool Version %s\n", VERSION);
+    printf("Copyright 2019 (C) RKF Engineering Solutions\n");
     printf("Compatible with ULS Database Version 4\n");
     printf("Spec: "
            "https://www.fcc.gov/sites/default/files/"
@@ -156,12 +167,119 @@ int main(int argc, char **argv) {
     return 0;
   }
   printf("Coalition ULS Processing Tool Version %s\n", VERSION);
+  printf("Copyright 2019 (C) RKF Engineering Solutions\n");
   if (argc < 3 || argc > 3) {
     fprintf(stderr, "Syntax: %s [ULS file.csv] [Output File.csv]\n", argv[0]);
     return -1;
   }
 
+    char *tstr;
+
+    time_t t1 = time(NULL);
+    tstr = strdup(ctime(&t1));
+    strtok(tstr, "\n");
+    std::cout << tstr << " : Begin processing." << std::endl;
+    free(tstr);
+
   UlsFileReader r(argv[1]);
+
+    int maxNumSegment = 0;
+    std::string maxNumSegmentCallsign = "";
+
+#if 1
+    foreach (const UlsFrequency &freq, r.frequencies()) {
+
+        UlsPath path;
+        bool pathFound = false;
+
+        foreach (const UlsPath &p, r.pathsMap(freq.callsign)) {
+            if (strcmp(p.callsign, freq.callsign) == 0) {
+                if (freq.locationNumber == p.txLocationNumber &&
+                    freq.antennaNumber == p.txAntennaNumber) {
+                    path = p;
+                    pathFound = true;
+                    break;
+                }
+            }
+        }
+
+        if (pathFound == false) {
+            continue;
+        }
+
+        /// Find the emissions information.
+        UlsEmission txEm;
+        bool txEmFound = false;
+        bool hasMultipleTxEm = false;
+        QList<UlsEmission> allTxEm;
+        foreach (const UlsEmission &e, r.emissionsMap(freq.callsign)) {
+            if (strcmp(e.callsign, freq.callsign) == 0 &&
+                e.locationId == freq.locationNumber &&
+                e.antennaId == freq.antennaNumber &&
+                e.frequencyId == freq.frequencyNumber) {
+                allTxEm << e;
+            }
+        }
+
+        /// Find the header.
+        UlsHeader txHeader;
+        bool txHeaderFound = false;
+        foreach (const UlsHeader &h, r.headersMap(path.callsign)) {
+            if (strcmp(h.callsign, path.callsign) == 0) {
+                txHeader = h;
+                txHeaderFound = true;
+                break;
+            }
+        }
+
+        if (!txHeaderFound) {
+            continue;
+        } else if (txHeader.licenseStatus != 'A' && txHeader.licenseStatus != 'L') {
+            continue;
+        }
+
+        // std::cout << freq.callsign << ": " << allTxEm.size() << " emissions" << std::endl;
+        foreach (const UlsEmission &e, allTxEm) {
+            bool invalidFlag = false;
+            double bwMhz = std::numeric_limits<double>::quiet_NaN();
+            double lowFreq, highFreq;
+            bwMhz = emissionDesignatorToBandwidth(e.desig);
+            if (bwMhz == -1) {
+                invalidFlag = true;
+            }
+            if (bwMhz == 0) {
+                invalidFlag = true;
+            }
+
+            if (!invalidFlag) {
+                if (freq.frequencyUpperBand > freq.frequencyAssigned) {
+                    lowFreq  = freq.frequencyAssigned;  // Lower Band (MHz)
+                    highFreq = freq.frequencyUpperBand; // Upper Band (MHz)
+                    // Here Frequency Assigned should be low + high / 2
+                } else {
+                    lowFreq  = freq.frequencyAssigned - bwMhz / 2.0; // Lower Band (MHz)
+                    highFreq = freq.frequencyAssigned + bwMhz / 2.0; // Upper Band (MHz)
+                }
+                // skip if no overlap UNII5 and 7
+                if (lowFreq >= 6875 || highFreq <= 5925) {
+                    invalidFlag = true;
+                } else if (lowFreq >= 6425 && highFreq <= 6525) {
+                    invalidFlag = true;
+                }
+            } 
+            if (!invalidFlag) {
+                foreach (const UlsSegment &segment, r.segmentsMap(freq.callsign)) {
+                    int segmentNumber = segment.segmentNumber;
+                    if (segmentNumber > maxNumSegment) {
+                        maxNumSegment = segmentNumber;
+                        maxNumSegmentCallsign = std::string(segment.callsign);
+                    }
+                }
+            }
+        }
+    }
+#endif
+    int maxNumPassiveRepeater = maxNumSegment - 1;
 
   qDebug() << "DATA statistics:";
   qDebug() << "paths" << r.paths().count();
@@ -174,6 +292,9 @@ int main(int argc, char **argv) {
   qDebug() << "entities" << r.entities().count();
   qDebug() << "control points" << r.controlPoints().count();
   qDebug() << "segments" << r.segments().count();
+  qDebug() << "maxNumPassiveRepeater" << maxNumPassiveRepeater << " callsign: " << QString::fromStdString(maxNumSegmentCallsign);
+
+  int prIdx;
 
   CsvWriter wt(argv[2]);
   {
@@ -205,7 +326,6 @@ int main(int argc, char **argv) {
     header << "Rx Location Number";
     header << "Rx Antenna Number";
     header << "Frequency Number";
-    header << "Passive Receiver Indicator";
     header << "1st Segment Length (km)";
     header << "Center Frequency (MHz)";
     header << "Bandwidth (MHz)";
@@ -243,17 +363,24 @@ int main(int argc, char **argv) {
     header << "Rx Gain (dBi)";
     header << "Rx Diversity Height (m)";
     header << "Rx Diversity Gain (dBi)";
-    header << "Passive Repeater Location Name";
-    header << "Passive Repeater Lat Coords";
-    header << "Passive Repeater Long Coords";
-    header << "Passive Repeater Ground Elevation (m)";
-    header << "Passive Repeater Polarization";
-    header << "Passive Repeater Azimuth Angle (deg)";
-    header << "Passive Repeater Elevation Angle (deg)";
-    header << "Passive Repeater Height to Center RAAT (m)";
-    header << "Passive Repeater Beamwidth";
-    header << "Passive Repeater Back-to-Back Gain Tx (dBi)";
-    header << "Passive Repeater Back-to-Back Gain Rx (dBi)";
+    header << "Num Passive Repeater";
+    for(prIdx=1; prIdx<=maxNumPassiveRepeater; ++prIdx) {
+        header << "Passive Repeater " + QString::number(prIdx) + " Location Name";
+        header << "Passive Repeater " + QString::number(prIdx) + " Lat Coords";
+        header << "Passive Repeater " + QString::number(prIdx) + " Long Coords";
+        header << "Passive Repeater " + QString::number(prIdx) + " Ground Elevation (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Polarization";
+        header << "Passive Repeater " + QString::number(prIdx) + " Azimuth Angle (deg)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Elevation Angle (deg)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Height (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Width (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Line Loss (dB)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Beamwidth";
+        header << "Passive Repeater " + QString::number(prIdx) + " Back-to-Back Gain Tx (dBi)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Back-to-Back Gain Rx (dBi)";
+        header << "Segment " + QString::number(prIdx+1) + " Length (Km)";
+    }
     wt.writeRow(header);
   }
 
@@ -287,7 +414,6 @@ int main(int argc, char **argv) {
     header << "Rx Location Number";
     header << "Rx Antenna Number";
     header << "Frequency Number";
-    header << "Passive Receiver Indicator";
     header << "1st Segment Length (km)";
     header << "Center Frequency (MHz)";
     header << "Bandwidth (MHz)";
@@ -325,259 +451,330 @@ int main(int argc, char **argv) {
     header << "Rx Gain (dBi)";
     header << "Rx Diversity Height (m)";
     header << "Rx Diversity Gain (dBi)";
-    header << "Passive Repeater Location Name";
-    header << "Passive Repeater Lat Coords";
-    header << "Passive Repeater Long Coords";
-    header << "Passive Repeater Ground Elevation (m)";
-    header << "Passive Repeater Polarization";
-    header << "Passive Repeater Azimuth Angle (deg)";
-    header << "Passive Repeater Elevation Angle (deg)";
-    header << "Passive Repeater Height to Center RAAT (m)";
-    header << "Passive Repeater Beamwidth";
-    header << "Passive Repeater Back-to-Back Gain Tx (dBi)";
-    header << "Passive Repeater Back-to-Back Gain Rx (dBi)";
+    header << "Num Passive Repeater";
+    for(prIdx=1; prIdx<=maxNumPassiveRepeater; ++prIdx) {
+        header << "Passive Repeater " + QString::number(prIdx) + " Location Name";
+        header << "Passive Repeater " + QString::number(prIdx) + " Lat Coords";
+        header << "Passive Repeater " + QString::number(prIdx) + " Long Coords";
+        header << "Passive Repeater " + QString::number(prIdx) + " Ground Elevation (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Polarization";
+        header << "Passive Repeater " + QString::number(prIdx) + " Azimuth Angle (deg)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Elevation Angle (deg)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Height (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Width (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Line Loss (dB)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Beamwidth";
+        header << "Passive Repeater " + QString::number(prIdx) + " Back-to-Back Gain Tx (dBi)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Back-to-Back Gain Rx (dBi)";
+        header << "Segment " + QString::number(prIdx+1) + " Length (Km)";
+    }
     header << "Anomalous Reason";
     anomalous.writeRow(header);
   }
 
-  qDebug() << "--- Beginning path processing";
+    FILE *fwarn;
+    std::string warningFile = "warning_uls.txt";
+    if ( !(fwarn = fopen(warningFile.c_str(), "wb")) ) {
+        std::cout << std::string("WARNING: Unable to open warningFile \"") + warningFile + std::string("\"\n");
+    }
 
-  int cnt = 0;
-  int numRecs = 0;
+    qDebug() << "--- Beginning path processing";
 
+    int cnt = 0;
+    int numRecs = 0;
 
   foreach (const UlsFrequency &freq, r.frequencies()) {
     // qDebug() << "processing frequency " << cnt << "/" << r.frequencies().count()
             //  << " callsign " << freq.callsign;
-    UlsPath path;
     bool pathFound = false;
     bool hasRepeater = false;
     QString anomalousReason = ""; 
 
+    QList<UlsPath> pathList;
+
     foreach (const UlsPath &p, r.pathsMap(freq.callsign)) {
-      if (strcmp(p.callsign, freq.callsign) == 0) {
-        if (freq.locationNumber == p.txLocationNumber &&
-            freq.antennaNumber == p.txAntennaNumber) {
-          if (p.passiveReceiver == 'Y') {
+        if (strcmp(p.callsign, freq.callsign) == 0) {
+            if (    (freq.locationNumber == p.txLocationNumber)
+                 && (freq.antennaNumber == p.txAntennaNumber) ) {
+                pathList << p;
+            }
+        }
+    }
+
+    if ((pathList.size() == 0) && (fwarn)) {
+        fprintf(fwarn, "CALLSIGN: %s, Unable to find path matching TX_LOCATION_NUM = %d TX_ANTENNA_NUM = %d\n",
+            freq.callsign, freq.locationNumber, freq.antennaNumber);
+    }
+
+    foreach (const UlsPath &path, pathList) {
+        if (path.passiveReceiver == 'Y') {
             hasRepeater = true;
-          }
-          path = p;
-          pathFound = true;
-          break;
         }
-      }
-    }
-    cnt++;
 
-    if (pathFound == false) {
-      // qDebug() << "no matching path found";
-      continue;
-    }
+        cnt++;
 
-    /// Find the associated transmit location.
-    UlsLocation txLoc;
-    bool locFound = false;
-    foreach (const UlsLocation &loc, r.locationsMap(path.callsign)) {
-      if (strcmp(loc.callsign, path.callsign) == 0) {
-        if (path.txLocationNumber == loc.locationNumber) {
-          txLoc = loc;
-          locFound = true;
-          break;
+        /// Find the associated transmit location.
+        UlsLocation txLoc;
+        bool locFound = false;
+        foreach (const UlsLocation &loc, r.locationsMap(path.callsign)) {
+            if (strcmp(loc.callsign, path.callsign) == 0) {
+                if (path.txLocationNumber == loc.locationNumber) {
+                    txLoc = loc;
+                    locFound = true;
+                    break;
+                }
+            }
         }
-      }
-    }
 
-    if (locFound == false) {
-      // qDebug() << "Unable to find TX location for path" << path.callsign
-      //          << "path ID" << path.pathNumber;
-      continue;
-    }
-
-    /// Find the associated transmit antenna.
-    UlsAntenna txAnt;
-    bool txAntFound = false;
-    foreach (const UlsAntenna &ant, r.antennasMap(path.callsign)) {
-      if (strcmp(ant.callsign, path.callsign) == 0) {
-        // Implicitly matches with an Antenna record with locationClass 'T'
-        if (ant.locationNumber == txLoc.locationNumber) {
-          if (ant.antennaNumber == path.txAntennaNumber) {
-            txAnt = ant;
-            txAntFound = true;
-            break;
-          }
-        }
-      }
-    }
-
-    if (txAntFound == false) {
-      // qDebug() << "Unable to locate TX antenna data for callsign"
-      //          << path.callsign << "path" << path.pathNumber;
-      continue;
-    }
-
-    /// Find the associated frequency.
-    const UlsFrequency &txFreq = freq;
-
-    /// Find the RX location.
-    UlsLocation rxLoc;
-    bool rxLocFound = false;
-    foreach (const UlsLocation &loc, r.locationsMap(path.callsign)) {
-      if (strcmp(loc.callsign, path.callsign) == 0) {
-        if (loc.locationNumber == path.rxLocationNumber) {
-          rxLoc = loc;
-          rxLocFound = true;
-          break;
-        }
-      }
-    }
-
-    if (rxLocFound == false) {
-      // qDebug() << "Unable to locate RX location data for callsign"
-      //          << path.callsign << "path" << path.pathNumber;
-      continue;
-    }
-
-    /// Find the RX antenna.
-    UlsAntenna rxAnt;
-    bool rxAntFound = false;
-    foreach (const UlsAntenna &ant, r.antennasMap(path.callsign)) {
-      if (strcmp(ant.callsign, path.callsign) == 0) {
-        // Implicitly matches with an Antenna record with locationClass 'R'
-        if (ant.locationNumber == rxLoc.locationNumber) {
-          if (ant.antennaNumber == path.rxAntennaNumber) {
-            rxAnt = ant;
-            rxAntFound = true;
-            break;
-          }
-        }
-      }
-    }
-    if (rxAntFound == false) {
-      // qDebug() << "Unable to locate RX antenna data for callsign"
-      //          << path.callsign << "path" << path.pathNumber;
-      continue;
-    }
-
-    // Only assigned if hasRepeater is True
-    UlsLocation prLoc;
-    UlsAntenna prAnt;
-
-    if (hasRepeater) {
-      /// Find the Passive Repeater Location
-      foreach (const UlsLocation &loc, r.locationsMap(path.callsign)) {
-        if (strcmp(loc.callsign, path.callsign) == 0) {
-          if (loc.locationClass == 'P') {
-            prLoc = loc;
-            break;
-          }
-        }
-      }
-
-      /// Find the Passive Repeater Transmit Antenna
-      foreach (const UlsAntenna &ant, r.antennasMap(path.callsign)) {
-        if (strcmp(ant.callsign, path.callsign) == 0) {
-          if (ant.antennaType == 'P' &&
-              ant.locationNumber == prLoc.locationNumber) {
-            prAnt = ant;
-            break;
-          }
-        }
-      }
-    }
-
-    /// Find the first segment.
-    UlsSegment txSeg;
-    bool txSegFound = false;
-    foreach (const UlsSegment &s, r.segmentsMap(path.callsign)) {
-      if (strcmp(s.callsign, path.callsign) == 0) {
-        if (s.pathNumber == path.pathNumber) {
-          if (s.segmentNumber < 2) {
-            txSeg = s;
-            txSegFound = true;
-            break;
-          }
-        }
-      }
-    }
-
-    /// Find the emissions information.
-    UlsEmission txEm;
-    bool txEmFound = false;
-    bool hasMultipleTxEm = false;
-    QList<UlsEmission> allTxEm;
-    foreach (const UlsEmission &e, r.emissionsMap(path.callsign)) {
-      if (strcmp(e.callsign, path.callsign) == 0) {
-        if (e.locationId == txLoc.locationNumber &&
-            e.antennaId == txAnt.antennaNumber &&
-            e.frequencyId == txFreq.frequencyNumber) {
-          if (txEmFound) {
-            hasMultipleTxEm = true;
-            allTxEm << e;
+        if (locFound == false) {
+            if (fwarn) {
+                fprintf(fwarn, "CALLSIGN: %s, Unable to find txLoc matching LOCATION_NUM = %d\n",
+                    freq.callsign, path.txLocationNumber);
+            }
             continue;
-          } else {
-            allTxEm << e;
-            txEm = e;
-            txEmFound = true;
-          }
-          // break;
         }
-      }
-    }
-    if (!txEmFound)
-      allTxEm << txEm; // Make sure at least one emission.
 
-    // if (hasMultipleTxEm) {
-    //   qDebug() << "callsign " << path.callsign
-    //            << " has multiple emission designators.";
-    // }
+        /// Find the associated transmit antenna.
+        UlsAntenna txAnt;
+        bool txAntFound = false;
+        foreach (const UlsAntenna &ant, r.antennasMap(path.callsign)) {
+            if (strcmp(ant.callsign, path.callsign) == 0) {
+                // Implicitly matches with an Antenna record with locationClass 'T'
+                if (    (ant.locationNumber == txLoc.locationNumber)
+                     && (ant.antennaNumber == path.txAntennaNumber)
+                     && (ant.pathNumber == path.pathNumber)
+                   ) {
+                    txAnt = ant;
+                    txAntFound = true;
+                    break;
+                }
+            }
+        }
 
-    /// Find the header.
-    UlsHeader txHeader;
-    bool txHeaderFound = false;
-    foreach (const UlsHeader &h, r.headersMap(path.callsign)) {
-      if (strcmp(h.callsign, path.callsign) == 0) {
-        txHeader = h;
-        txHeaderFound = true;
-        break;
-      }
-    }
+        if (txAntFound == false) {
+            if (fwarn) {
+                fprintf(fwarn, "CALLSIGN: %s, Unable to find txAnt matching LOCATION_NUM = %d ANTENNA_NUM = %d PATH_NUM = %d\n",
+                    freq.callsign, txLoc.locationNumber, path.txAntennaNumber, path.pathNumber);
+            }
+            continue;
+        }
 
-    if (!txHeaderFound) {
-      // qDebug() << "Unable to locate header data for" << path.callsign << "path"
-              //  << path.pathNumber;
-      continue;
-    } else if (txHeader.licenseStatus != 'A' && txHeader.licenseStatus != 'L') {
-      // qDebug() << "Skipping non-Active tx for" << path.callsign << "path" << path.pathNumber;
-      continue;
-    }
+        /// Find the associated frequency.
+        const UlsFrequency &txFreq = freq;
 
-    /// Find the entity
-    UlsEntity txEntity;
-    bool txEntityFound = false;
-    foreach (const UlsEntity &e, r.entitiesMap(path.callsign)) {
-      if (strcmp(e.callsign, path.callsign) == 0) {
-        txEntity = e;
-        txEntityFound = true;
-        break;
-      }
-    }
+        /// Find the RX location.
+        UlsLocation rxLoc;
+        bool rxLocFound = false;
+        foreach (const UlsLocation &loc, r.locationsMap(path.callsign)) {
+            if (strcmp(loc.callsign, path.callsign) == 0) {
+                if (loc.locationNumber == path.rxLocationNumber) {
+                    rxLoc = loc;
+                    rxLocFound = true;
+                    break;
+                }
+            }
+        }
 
-    if (!txEntityFound) {
-      // qDebug() << "Unable to locate entity data for" << path.callsign << "path"
-      //          << path.pathNumber;
-      continue;
-    }
+        if (rxLocFound == false) {
+            if (fwarn) {
+                fprintf(fwarn, "CALLSIGN: %s, Unable to find rxLoc matching LOCATION_NUM = %d\n",
+                    freq.callsign, path.rxLocationNumber);
+            }
+            continue;
+        }
 
-    /// Find the control point.
-    UlsControlPoint txControlPoint;
-    bool txControlPointFound = false;
-    foreach (const UlsControlPoint &ucp, r.controlPointsMap(path.callsign)) {
-      if (strcmp(ucp.callsign, path.callsign) == 0) {
-        txControlPoint = ucp;
-        txControlPointFound = true;
-        break;
-      }
-    }
+        /// Find the RX antenna.
+        UlsAntenna rxAnt;
+        bool rxAntFound = false;
+        foreach (const UlsAntenna &ant, r.antennasMap(path.callsign)) {
+            if (strcmp(ant.callsign, path.callsign) == 0) {
+                // Implicitly matches with an Antenna record with locationClass 'R'
+                if (    (ant.locationNumber == rxLoc.locationNumber)
+                     && (ant.antennaNumber == path.rxAntennaNumber)
+                     && (ant.pathNumber == path.pathNumber)
+                   ) {
+                    rxAnt = ant;
+                    rxAntFound = true;
+                    break;
+                }
+            }
+        }
+
+        if (rxAntFound == false) {
+            if (fwarn) {
+                fprintf(fwarn, "CALLSIGN: %s, Unable to find rxAnt matching LOCATION_NUM = %d ANTENNA_NUM = %d PATH_NUM = %d\n",
+                    freq.callsign, rxLoc.locationNumber, path.rxAntennaNumber, path.pathNumber);
+            }
+            continue;
+        }
+
+        // Only assigned if hasRepeater is True
+        QList<UlsLocation> prLocList;
+        QList<UlsAntenna> prAntList;
+
+        /// Create list of segments in link.
+        QList<UlsSegment> segList;
+        foreach (const UlsSegment &s, r.segmentsMap(path.callsign)) {
+            if (s.pathNumber == path.pathNumber) {
+                segList << s;
+            }
+        }
+        qSort(segList.begin(), segList.end(), SegmentCompare);
+
+        int prevSegRxLocationId = -1;
+        for(int segIdx=0; segIdx<segList.size(); ++segIdx) {
+            const UlsSegment &s = segList[segIdx];
+            if (s.segmentNumber != segIdx+1) {
+                anomalousReason.append("Segments missing, ");
+                qDebug() << "callsign " << path.callsign << " path " << path.pathNumber << " has missing segments.";
+                break;
+            }
+            if (segIdx == 0) {
+                if (s.txLocationId != txLoc.locationNumber) {
+                    anomalousReason.append("First segment not at TX, ");
+                    qDebug() << "callsign " << path.callsign << " path " << path.pathNumber << " first segment not at TX.";
+                    break;
+                }
+            }
+            if (segIdx == segList.size()-1) {
+                if (s.rxLocationId != rxLoc.locationNumber) {
+                    anomalousReason.append("Last segment not at RX, ");
+                    qDebug() << "callsign " << path.callsign << " path " << path.pathNumber << " last segment not at RX.";
+                    break;
+                }
+            }
+            if (segIdx) {
+                if (s.txLocationId != prevSegRxLocationId) {
+                    anomalousReason.append("Segments do not form a path, ");
+                    qDebug() << "callsign " << path.callsign << " path " << path.pathNumber << " segments do not form a path.";
+                    break;
+                }
+                bool found;
+                found = false;
+                foreach (const UlsLocation &loc, r.locationsMap(path.callsign)) {
+                    if (loc.locationNumber == s.txLocationId) {
+                        prLocList << loc;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    anomalousReason.append("Segment location not found, ");
+                    qDebug() << "callsign " << path.callsign << " path " << path.pathNumber << " segment location not found.";
+                    break;
+                }
+                found = false;
+                foreach (const UlsAntenna &ant, r.antennasMap(path.callsign)) {
+                    if (    (ant.antennaType == 'P')
+                         && (ant.locationNumber == prLocList.last().locationNumber)
+                         && (ant.pathNumber == path.pathNumber) ) {
+                        prAntList << ant;
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    anomalousReason.append("Segment antenna not found, ");
+                    qDebug() << "callsign " << path.callsign << " path " << path.pathNumber << " segment antenna not found.";
+                    break;
+                }
+            }
+            prevSegRxLocationId = s.rxLocationId;
+        }
+
+        UlsSegment txSeg;
+        bool txSegFound = false;
+        foreach (const UlsSegment &s, r.segmentsMap(path.callsign)) {
+            if (strcmp(s.callsign, path.callsign) == 0) {
+                if (s.pathNumber == path.pathNumber) {
+                    if (s.segmentNumber < 2) {
+                        txSeg = s;
+                        txSegFound = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        /// Find the emissions information.
+        UlsEmission txEm;
+        bool txEmFound = false;
+        bool hasMultipleTxEm = false;
+        QList<UlsEmission> allTxEm;
+        foreach (const UlsEmission &e, r.emissionsMap(path.callsign)) {
+            if (strcmp(e.callsign, path.callsign) == 0) {
+                if (e.locationId == txLoc.locationNumber &&
+                    e.antennaId == txAnt.antennaNumber &&
+                    e.frequencyId == txFreq.frequencyNumber) {
+                if (txEmFound) {
+                    hasMultipleTxEm = true;
+                    allTxEm << e;
+                    continue;
+                } else {
+                    allTxEm << e;
+                    txEm = e;
+                    txEmFound = true;
+                }
+                // break;
+                }
+            }
+        }
+        if (!txEmFound)
+          allTxEm << txEm; // Make sure at least one emission.
+
+        // if (hasMultipleTxEm) {
+        //   qDebug() << "callsign " << path.callsign
+        //            << " has multiple emission designators.";
+        // }
+
+        /// Find the header.
+        UlsHeader txHeader;
+        bool txHeaderFound = false;
+        foreach (const UlsHeader &h, r.headersMap(path.callsign)) {
+            if (strcmp(h.callsign, path.callsign) == 0) {
+                txHeader = h;
+                txHeaderFound = true;
+                break;
+            }
+        }
+
+        if (!txHeaderFound) {
+            // qDebug() << "Unable to locate header data for" << path.callsign << "path"
+            //  << path.pathNumber;
+            continue;
+        } else if (txHeader.licenseStatus != 'A' && txHeader.licenseStatus != 'L') {
+            // qDebug() << "Skipping non-Active tx for" << path.callsign << "path" << path.pathNumber;
+            continue;
+        }
+
+        /// Find the entity
+        UlsEntity txEntity;
+        bool txEntityFound = false;
+        foreach (const UlsEntity &e, r.entitiesMap(path.callsign)) {
+            if (strcmp(e.callsign, path.callsign) == 0) {
+                txEntity = e;
+                txEntityFound = true;
+                break;
+            }
+        }
+
+        if (!txEntityFound) {
+            // qDebug() << "Unable to locate entity data for" << path.callsign << "path"
+            //          << path.pathNumber;
+            continue;
+        }
+
+        /// Find the control point.
+        UlsControlPoint txControlPoint;
+        bool txControlPointFound = false;
+        foreach (const UlsControlPoint &ucp, r.controlPointsMap(path.callsign)) {
+            if (strcmp(ucp.callsign, path.callsign) == 0) {
+                txControlPoint = ucp;
+                txControlPointFound = true;
+                break;
+            }
+        }
 
     /// Build the actual output.
     foreach (const UlsEmission &e, allTxEm) {
@@ -625,9 +822,7 @@ int main(int argc, char **argv) {
       
 
       // now that we have everything, ensure that inputs have what we need
-      anomalousReason.append(hasNecessaryFields(e, path, rxLoc, txLoc, rxAnt, txAnt, txHeader, prLoc, prAnt));
-
-
+      anomalousReason.append(hasNecessaryFields(e, path, rxLoc, txLoc, rxAnt, txAnt, txHeader, prLocList, prAntList));
 
       QStringList row;
       row << path.callsign;                   // Callsign
@@ -664,7 +859,6 @@ int main(int argc, char **argv) {
       row << makeNumber(path.rxLocationNumber);   // Rx Location Number
       row << makeNumber(path.rxAntennaNumber);    // Rx Antenna Number
       row << makeNumber(txFreq.frequencyNumber);  // Frequency Number
-      row << charString(path.passiveReceiver);    // Passive Receiver Indicator
       if (txSegFound) {
         row << makeNumber(txSeg.segmentLength); // 1st Segment Length (km)
       } else {
@@ -747,34 +941,52 @@ int main(int argc, char **argv) {
       row << makeNumber(rxAnt.gain);            // Rx Gain (dBi)
       row << makeNumber(rxAnt.diversityHeight); // Rx Diveristy Height (m)
       row << makeNumber(rxAnt.diversityGain);   // Rx Diversity Gain (dBi)
-      if (hasRepeater) {
-        row << prLoc.locationName;          // Passive Repeater Location Name
-        row << makeNumber(prLoc.latitude);  // Passive Repeater Lat Coords
-        row << makeNumber(prLoc.longitude); // Passive Repeater Lon Coords
-        row << makeNumber(
-            prLoc.groundElevation);       // Passive Repeater Ground Elevation
-        row << prAnt.polarizationCode;    // Passive Repeater Polarization
-        row << makeNumber(prAnt.azimuth); // Passive Repeater Azimuth Angle
-        row << makeNumber(prAnt.tilt);    // Passive Repeater Elevation Angle
-        row << makeNumber(
-            prAnt.heightToCenterRAAT); // Passive Repeater Height to Center RAAT
-        row << makeNumber(prAnt.beamwidth); // Passive Repeater Beamwidth
-        row << makeNumber(
-            prAnt.backtobackTxGain); // Passive Repeater Back-To-Back Tx Gain
-        row << makeNumber(
-            prAnt.backtobackRxGain); // Passive Repeater Back-To-Back Rx Gain
-      } else {
-        row << "";
-        row << "";
-        row << "";
-        row << "";
-        row << "";
-        row << "";
-        row << "";
-        row << "";
-        row << "";
-        row << "";
-        row << "";
+
+      row << QString::number(prLocList.size());
+      for(prIdx=1; prIdx<=maxNumPassiveRepeater; ++prIdx) {
+
+          if (    (prIdx <= prLocList.size())
+               && (prIdx <= prAntList.size()) ) {
+              UlsLocation &prLoc = prLocList[prIdx-1];
+              UlsAntenna &prAnt = prAntList[prIdx-1];
+              UlsSegment &segment = segList[prIdx];
+
+              row << prLoc.locationName;          // Passive Repeater Location Name
+              row << makeNumber(prLoc.latitude);  // Passive Repeater Lat Coords
+              row << makeNumber(prLoc.longitude); // Passive Repeater Lon Coords
+              row << makeNumber(
+                  prLoc.groundElevation);       // Passive Repeater Ground Elevation
+              row << prAnt.polarizationCode;    // Passive Repeater Polarization
+              row << makeNumber(prAnt.azimuth); // Passive Repeater Azimuth Angle
+              row << makeNumber(prAnt.tilt);    // Passive Repeater Elevation Angle
+              row << makeNumber(prAnt.reflectorHeight); // Passive Repeater Reflector Height
+              row << makeNumber(prAnt.reflectorWidth);  // Passive Repeater Reflector Width
+              row << makeNumber(prAnt.lineLoss);        // Passive Repeater Line Loss
+              row << makeNumber(
+                  prAnt.heightToCenterRAAT); // Passive Repeater Height to Center RAAT
+              row << makeNumber(prAnt.beamwidth); // Passive Repeater Beamwidth
+              row << makeNumber(
+                  prAnt.backtobackTxGain); // Passive Repeater Back-To-Back Tx Gain
+              row << makeNumber(
+                  prAnt.backtobackRxGain); // Passive Repeater Back-To-Back Rx Gain
+              row << makeNumber(segment.segmentLength); // Segment Length (km)
+          } else {
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+          }
       }
       if(anomalousReason.length() > 0) {
         row << anomalousReason; 
@@ -786,11 +998,42 @@ int main(int argc, char **argv) {
       }
       
     }
+    }
   }
-  qDebug() << "Processed" << r.frequencies().count()
-           << "frequency records and output to file; a total of " << numRecs
-           << "output";
-  std::cout<<"Processed " << r.frequencies().count()
-           << " frequency records and output to file; a total of " << numRecs
-           << " output"<<'\n';
+
+    if (fwarn) {
+        fclose(fwarn);
+    }
+
+    std::cout<<"Processed " << r.frequencies().count()
+             << " frequency records and output to file; a total of " << numRecs
+             << " output"<<'\n';
+
+    time_t t2 = time(NULL);
+    tstr = strdup(ctime(&t2));
+    strtok(tstr, "\n");
+    std::cout << tstr << " : Completed processing." << std::endl;
+    free(tstr);
+
+    int elapsedTime = (int) (t2-t1);
+
+    int et = elapsedTime;
+    int elapsedTimeSec = et % 60;
+    et = et / 60;
+    int elapsedTimeMin = et % 60;
+    et = et / 60;
+    int elapsedTimeHour = et % 24;
+    et = et / 24;
+    int elapsedTimeDay = et;
+
+    std::cout << "Elapsed time = " << (t2-t1) << " sec = ";
+    if (elapsedTimeDay) {
+        std::cout << elapsedTimeDay  << " days ";
+    }
+    if (elapsedTimeDay || elapsedTimeHour) {
+        std::cout << elapsedTimeHour << " hours ";
+    }
+    std::cout << elapsedTimeMin  << " min ";
+    std::cout << elapsedTimeSec  << " sec";
+    std::cout << std::endl;
 }
