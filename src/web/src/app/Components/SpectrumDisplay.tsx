@@ -135,13 +135,13 @@ export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableS
             domain={["dataMin", "auto"]}
             type="number"
             dataKey="dbm"
-            name="EIRP Density (dBm/MHz)"
-            label={{ value: "EIRP Density (dBm/MHz)", angle: -90, position: "insideLeft" }}
+            name="PSD (dBm/MHz)"
+            label={{ value: "PSD (dBm/MHz)", angle: -90, position: "insideLeft" }}
           />
           <Tooltip cursor={true} />
           <Scatter
             key={1}
-            name={"EIRP Density"}
+            name={"PSD"}
             data={makeSteps(props.spectrum.availableFrequencyInfo)}
             fill={colors[0]}
             line={true} />
