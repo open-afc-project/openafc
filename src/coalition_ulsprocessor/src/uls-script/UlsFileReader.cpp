@@ -5,10 +5,15 @@
 
 namespace {
 double emptyAtof(const char *str) {
-  if (strlen(str) == 0)
-    return std::numeric_limits<double>::quiet_NaN();
-  else
-    return atof(str);
+    char *endptr;
+    double z = strtod(str, &endptr);
+
+    if (endptr == str) {
+        // No conversion performed, str empty or not numeric
+        z = std::numeric_limits<double>::quiet_NaN();
+    }
+
+    return z;
 }
 
 

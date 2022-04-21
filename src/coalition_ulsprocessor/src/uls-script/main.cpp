@@ -10,6 +10,12 @@
 
 bool removeMobile = false;
 
+const double speedOfLight = 2.99792458e8;
+const double unii5StartFreqMHz = 5925.0;
+const double unii5StopFreqMHz  = 6425.0;
+const double unii7StartFreqMHz = 6525.0;
+const double unii7StopFreqMHz  = 6875.0;
+
 namespace {
 QString makeNumber(const double &d) {
   if (std::isnan(d))
@@ -151,6 +157,116 @@ bool SegmentCompare(const UlsSegment& segA, const UlsSegment& segB)
     return segA.segmentNumber < segB.segmentNumber;
 }
 
+QStringList getCSVHeader(int numPR)
+{
+    QStringList header;
+    header << "Callsign";
+    header << "Status";
+    header << "Radio Service";
+    header << "Entity Name";
+    header << "Grant";
+    header << "Expiration";
+    header << "Effective";
+    header << "Address";
+    header << "City";
+    header << "County";
+    header << "State";
+    header << "Common Carrier";
+    header << "Non Common Carrier";
+    header << "Private Comm";
+    header << "Fixed";
+    header << "Mobile";
+    header << "Radiolocation";
+    header << "Satellite";
+    header << "Developmental or STA or Demo";
+    header << "Interconnected";
+    header << "Path Number";
+    header << "Tx Location Number";
+    header << "Tx Antenna Number";
+    header << "Rx Callsign";
+    header << "Rx Location Number";
+    header << "Rx Antenna Number";
+    header << "Frequency Number";
+    header << "1st Segment Length (km)";
+    header << "Center Frequency (MHz)";
+    header << "Bandwidth (MHz)";
+    header << "Lower Band (MHz)";
+    header << "Upper Band (MHz)";
+    header << "Tolerance (%)";
+    header << "Tx EIRP (dBm)";
+    header << "Auto Tx Pwr Control";
+    header << "Emissions Designator";
+    header << "Digital Mod Rate";
+    header << "Digital Mod Type";
+    header << "Tx Manufacturer";
+    header << "Tx Model";
+    header << "Tx Location Name";
+    header << "Tx Lat Coords";
+    header << "Tx Long Coords";
+    header << "Tx Ground Elevation (m)";
+    header << "Tx Polarization";
+    header << "Tx Azimuth Angle (deg)";
+    header << "Tx Elevation Angle (deg)";
+    header << "Tx Ant Manufacturer";
+    header << "Tx Ant Model";
+    header << "Tx Height to Center RAAT (m)";
+    header << "Tx Beamwidth";
+    header << "Tx Gain (dBi)";
+    header << "Rx Location Name";
+    header << "Rx Lat Coords";
+    header << "Rx Long Coords";
+    header << "Rx Ground Elevation (m)";
+    header << "Rx Manufacturer";
+    header << "Rx Model";
+    header << "Rx Ant Manufacturer";
+    header << "Rx Ant Model";
+    header << "Rx Height to Center RAAT (m)";
+    header << "Rx Gain (dBi)";
+    header << "Rx Ant Diameter (m)";
+    header << "Rx Diversity Height (m)";
+    header << "Rx Diversity Gain (dBi)";
+    header << "Num Passive Repeater";
+    for(int prIdx=1; prIdx<=numPR; ++prIdx) {
+        header << "Passive Repeater " + QString::number(prIdx) + " Location Name";
+        header << "Passive Repeater " + QString::number(prIdx) + " Lat Coords";
+        header << "Passive Repeater " + QString::number(prIdx) + " Long Coords";
+        header << "Passive Repeater " + QString::number(prIdx) + " Ground Elevation (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Polarization";
+        header << "Passive Repeater " + QString::number(prIdx) + " Azimuth Angle (deg)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Elevation Angle (deg)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Height (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Width (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Line Loss (dB)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Beamwidth";
+        header << "Passive Repeater " + QString::number(prIdx) + " Back-to-Back Gain Tx (dBi)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Back-to-Back Gain Rx (dBi)";
+        header << "Segment " + QString::number(prIdx+1) + " Length (Km)";
+    }
+
+    return header;
+}
+
+/******************************************************************************************/
+/**** computeSpectralOverlap                                                           ****/
+/******************************************************************************************/
+double computeSpectralOverlap(double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq)
+{
+    double overlap;
+
+    if ((sigStopFreq <= rxStartFreq) || (sigStartFreq >= rxStopFreq)) {
+        overlap = 0.0;
+    } else {
+        double f1 = (sigStartFreq < rxStartFreq ? rxStartFreq : sigStartFreq);
+        double f2 = (sigStopFreq  > rxStopFreq ? rxStopFreq : sigStopFreq);
+        overlap = (f2-f1)/(sigStopFreq - sigStartFreq);
+    }
+
+    return(overlap);
+}
+/******************************************************************************************/
+
+
 }; // namespace
 
 int main(int argc, char **argv)
@@ -186,7 +302,6 @@ int main(int argc, char **argv)
     int maxNumSegment = 0;
     std::string maxNumSegmentCallsign = "";
 
-#if 1
     foreach (const UlsFrequency &freq, r.frequencies()) {
 
         UlsPath path;
@@ -278,7 +393,7 @@ int main(int argc, char **argv)
             }
         }
     }
-#endif
+
     int maxNumPassiveRepeater = maxNumSegment - 1;
 
   qDebug() << "DATA statistics:";
@@ -296,182 +411,19 @@ int main(int argc, char **argv)
 
   int prIdx;
 
-  CsvWriter wt(argv[2]);
-  {
-    QStringList header;
-    header << "Callsign";
-    header << "Status";
-    header << "Radio Service";
-    header << "Entity Name";
-    header << "Grant";
-    header << "Expiration";
-    header << "Effective";
-    header << "Address";
-    header << "City";
-    header << "County";
-    header << "State";
-    header << "Common Carrier";
-    header << "Non Common Carrier";
-    header << "Private Comm";
-    header << "Fixed";
-    header << "Mobile";
-    header << "Radiolocation";
-    header << "Satellite";
-    header << "Developmental or STA or Demo";
-    header << "Interconnected";
-    header << "Path Number";
-    header << "Tx Location Number";
-    header << "Tx Antenna Number";
-    header << "Rx Callsign";
-    header << "Rx Location Number";
-    header << "Rx Antenna Number";
-    header << "Frequency Number";
-    header << "1st Segment Length (km)";
-    header << "Center Frequency (MHz)";
-    header << "Bandwidth (MHz)";
-    header << "Lower Band (MHz)";
-    header << "Upper Band (MHz)";
-    header << "Tolerance (%)";
-    header << "Tx EIRP (dBm)";
-    header << "Auto Tx Pwr Control";
-    header << "Emissions Designator";
-    header << "Digital Mod Rate";
-    header << "Digital Mod Type";
-    header << "Tx Manufacturer";
-    header << "Tx Model";
-    header << "Tx Location Name";
-    header << "Tx Lat Coords";
-    header << "Tx Long Coords";
-    header << "Tx Ground Elevation (m)";
-    header << "Tx Polarization";
-    header << "Tx Azimuth Angle (deg)";
-    header << "Tx Elevation Angle (deg)";
-    header << "Tx Ant Manufacturer";
-    header << "Tx Ant Model";
-    header << "Tx Height to Center RAAT (m)";
-    header << "Tx Beamwidth";
-    header << "Tx Gain (dBi)";
-    header << "Rx Location Name";
-    header << "Rx Lat Coords";
-    header << "Rx Long Coords";
-    header << "Rx Ground Elevation (m)";
-    header << "Rx Manufacturer";
-    header << "Rx Model";
-    header << "Rx Ant Manufacturer";
-    header << "Rx Ant Model";
-    header << "Rx Height to Center RAAT (m)";
-    header << "Rx Gain (dBi)";
-    header << "Rx Diversity Height (m)";
-    header << "Rx Diversity Gain (dBi)";
-    header << "Num Passive Repeater";
-    for(prIdx=1; prIdx<=maxNumPassiveRepeater; ++prIdx) {
-        header << "Passive Repeater " + QString::number(prIdx) + " Location Name";
-        header << "Passive Repeater " + QString::number(prIdx) + " Lat Coords";
-        header << "Passive Repeater " + QString::number(prIdx) + " Long Coords";
-        header << "Passive Repeater " + QString::number(prIdx) + " Ground Elevation (m)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Polarization";
-        header << "Passive Repeater " + QString::number(prIdx) + " Azimuth Angle (deg)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Elevation Angle (deg)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Height (m)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Width (m)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Line Loss (dB)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT (m)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Beamwidth";
-        header << "Passive Repeater " + QString::number(prIdx) + " Back-to-Back Gain Tx (dBi)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Back-to-Back Gain Rx (dBi)";
-        header << "Segment " + QString::number(prIdx+1) + " Length (Km)";
+    CsvWriter wt(argv[2]);
+    {
+        QStringList header = getCSVHeader(maxNumPassiveRepeater);
+        wt.writeRow(header);
     }
-    wt.writeRow(header);
-  }
 
-  CsvWriter anomalous("anomalous_uls.csv");
-  {
-    QStringList header;
-    header << "Callsign";
-    header << "Status";
-    header << "Radio Service";
-    header << "Entity Name";
-    header << "Grant";
-    header << "Expiration";
-    header << "Effective";
-    header << "Address";
-    header << "City";
-    header << "County";
-    header << "State";
-    header << "Common Carrier";
-    header << "Non Common Carrier";
-    header << "Private Comm";
-    header << "Fixed";
-    header << "Mobile";
-    header << "Radiolocation";
-    header << "Satellite";
-    header << "Developmental or STA or Demo";
-    header << "Interconnected";
-    header << "Path Number";
-    header << "Tx Location Number";
-    header << "Tx Antenna Number";
-    header << "Rx Callsign";
-    header << "Rx Location Number";
-    header << "Rx Antenna Number";
-    header << "Frequency Number";
-    header << "1st Segment Length (km)";
-    header << "Center Frequency (MHz)";
-    header << "Bandwidth (MHz)";
-    header << "Lower Band (MHz)";
-    header << "Upper Band (MHz)";
-    header << "Tolerance (%)";
-    header << "Tx EIRP (dBm)";
-    header << "Auto Tx Pwr Control";
-    header << "Emissions Designator";
-    header << "Digital Mod Rate";
-    header << "Digital Mod Type";
-    header << "Tx Manufacturer";
-    header << "Tx Model";
-    header << "Tx Location Name";
-    header << "Tx Lat Coords";
-    header << "Tx Long Coords";
-    header << "Tx Ground Elevation (m)";
-    header << "Tx Polarization";
-    header << "Tx Azimuth Angle (deg)";
-    header << "Tx Elevation Angle (deg)";
-    header << "Tx Ant Manufacturer";
-    header << "Tx Ant Model";
-    header << "Tx Height to Center RAAT (m)";
-    header << "Tx Beamwidth";
-    header << "Tx Gain (dBi)";
-    header << "Rx Location Name";
-    header << "Rx Lat Coords";
-    header << "Rx Long Coords";
-    header << "Rx Ground Elevation (m)";
-    header << "Rx Manufacturer";
-    header << "Rx Model";
-    header << "Rx Ant Manufacturer";
-    header << "Rx Ant Model";
-    header << "Rx Height to Center RAAT (m)";
-    header << "Rx Gain (dBi)";
-    header << "Rx Diversity Height (m)";
-    header << "Rx Diversity Gain (dBi)";
-    header << "Num Passive Repeater";
-    for(prIdx=1; prIdx<=maxNumPassiveRepeater; ++prIdx) {
-        header << "Passive Repeater " + QString::number(prIdx) + " Location Name";
-        header << "Passive Repeater " + QString::number(prIdx) + " Lat Coords";
-        header << "Passive Repeater " + QString::number(prIdx) + " Long Coords";
-        header << "Passive Repeater " + QString::number(prIdx) + " Ground Elevation (m)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Polarization";
-        header << "Passive Repeater " + QString::number(prIdx) + " Azimuth Angle (deg)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Elevation Angle (deg)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Height (m)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Width (m)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Line Loss (dB)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT (m)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Beamwidth";
-        header << "Passive Repeater " + QString::number(prIdx) + " Back-to-Back Gain Tx (dBi)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Back-to-Back Gain Rx (dBi)";
-        header << "Segment " + QString::number(prIdx+1) + " Length (Km)";
+    CsvWriter anomalous("anomalous_uls.csv");
+    {
+        QStringList header = getCSVHeader(maxNumPassiveRepeater);
+        header << "Fixed";
+        header << "Anomalous Reason";
+        anomalous.writeRow(header);
     }
-    header << "Anomalous Reason";
-    anomalous.writeRow(header);
-  }
 
     FILE *fwarn;
     std::string warningFile = "warning_uls.txt";
@@ -490,6 +442,7 @@ int main(int argc, char **argv)
     bool pathFound = false;
     bool hasRepeater = false;
     QString anomalousReason = ""; 
+    QString fixedReason = ""; 
 
     QList<UlsPath> pathList;
 
@@ -799,27 +752,58 @@ int main(int argc, char **argv)
         highFreq = txFreq.frequencyAssigned +
                           bwMhz / 2.0; // Upper Band (MHz)
       }
-      // skip if no overlap UNII5 and 7
-      if (lowFreq >= 6875 || highFreq <= 5925) {
-        continue;
-      } 
-      // skip if in restricted range 
-      else if(lowFreq >= 6425 && highFreq <= 6525) {
-        continue;
+
+      double rxAntennaDiameter = 0.0;
+      if(isnan(lowFreq) || isnan(highFreq)) {
+          anomalousReason.append("NaN frequency value, ");
+      } else {
+          double overlapUnii5 = computeSpectralOverlap(lowFreq, highFreq, unii5StartFreqMHz, unii5StopFreqMHz);
+          double overlapUnii7 = computeSpectralOverlap(lowFreq, highFreq, unii7StartFreqMHz, unii7StopFreqMHz);
+
+          if ((overlapUnii5 == 0.0) && (overlapUnii7 == 0.0)) {
+              continue;
+          } else if ((overlapUnii5 > 0.0) && (overlapUnii7 > 0.0)) {
+              anomalousReason.append("Band overlaps both Unii5 and Unii7, ");
+          } else {
+
+              /************************************************************************************/
+              /* Fix RX Antenna Gain/Diameter according to WINNF-21-I-00132                       */
+              /************************************************************************************/
+              double centerFreqMHz = (lowFreq + highFreq)/2;
+              if (std::isnan(rxAnt.gain)) {
+                  if (overlapUnii5 > 0.0) {
+                      fixedReason.append("Rx Gain missing, set to UNII-5 value 38.8");
+                      rxAnt.gain = 38.8;
+                  } else {
+                      fixedReason.append("Rx Gain missing, set to UNII-7 value 39.5");
+                      rxAnt.gain = 39.5;
+                  }
+                  rxAntennaDiameter = 1.83;
+              } else {
+                  double G;
+                  if (rxAnt.gain < 32.0) {
+                      fixedReason.append(QString("Rx Gain = %1 < 32, Rx Gain set to 32").arg(rxAnt.gain));
+                      G = 32.0;
+                  } else if (rxAnt.gain > 48.0) {
+                      fixedReason.append(QString("Rx Gain = %1 > 48, Rx Gain set to 48").arg(rxAnt.gain));
+                      G = 48.0;
+                  } else {
+                      G = rxAnt.gain;
+                  }
+                  double Fc;
+                  if (overlapUnii5 > 0.0) {
+                      Fc = 6175.0e6;
+                  } else {
+                      Fc = 6700.0e6;
+                  }
+                  double oneOverSqrtK = 1.0/sqrt(0.54);
+                  rxAntennaDiameter = (speedOfLight/(M_PI*Fc))*exp(log(10.0)*G/20)*oneOverSqrtK;
+
+                  rxAnt.gain = G;
+              }
+              /************************************************************************************/
+          }
       }
-      // entry is anomlous if either frequency value is NaN
-      else if(isnan(lowFreq) || isnan(highFreq)) {
-        anomalousReason.append("NaN frequency value, ");
-      } 
-      // skip if no overlap 10700 - 11700
-      // if (lowFreq >= 11700 || highFreq <= 10700) {
-      //   // qDebug() << "Skipping outside 10700-11700";
-      //   continue;
-      // }
-      // else if(isnan(lowFreq) || isnan(highFreq)) {
-      //   anomalousReason.append("NaN frequency value, ");
-      // } 
-      
 
       // now that we have everything, ensure that inputs have what we need
       anomalousReason.append(hasNecessaryFields(e, path, rxLoc, txLoc, rxAnt, txAnt, txHeader, prLocList, prAntList));
@@ -939,6 +923,7 @@ int main(int argc, char **argv)
       row << makeNumber(
           rxAnt.heightToCenterRAAT);            // Rx Height to Center RAAT (m)
       row << makeNumber(rxAnt.gain);            // Rx Gain (dBi)
+      row << makeNumber(rxAntennaDiameter);     // Rx Ant Diameter (m)
       row << makeNumber(rxAnt.diversityHeight); // Rx Diveristy Height (m)
       row << makeNumber(rxAnt.diversityGain);   // Rx Diversity Gain (dBi)
 
@@ -989,13 +974,18 @@ int main(int argc, char **argv)
           }
       }
       if(anomalousReason.length() > 0) {
-        row << anomalousReason; 
+        row << "0" << anomalousReason; 
         anomalous.writeRow(row);
         anomalousReason = "";
       } else {
         wt.writeRow(row);
+        if (fixedReason.length() > 0) {
+            row << "1" << fixedReason; 
+            anomalous.writeRow(row);
+        }
         numRecs++;
       }
+      fixedReason = "";
       
     }
     }
