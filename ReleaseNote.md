@@ -17,6 +17,30 @@
  * See the test case attached to OA-176 ticket. Note this uses the old ULS structure.
 
 ## **Open Issues**
+|Version|**3.3.16**|
+| :- | :- |
+|**Date**|**04/21/2022**|
+
+## **Issues Addressed**
+ * Jira OA-127: Implement WINNF rules on FS Antenna Diameter and Gain (WINN-21-I-00132 r14)
+ 
+## **Interface Changes**
+ * The ULS parser has been updated. This includes computation of 1) FS Rx antenna diameter based on the gain and 2) altering the Rx gain (if missing or below or above a threshold).
+ * The sqlite3 has now an additional column (rx_ant_diameter).
+
+## **Testing Done**
+In addition to all tests done by the developer making changes, the following additonal tests were done by another person.
+ * Confirmed that sqlite3 uls table has the new (rx_ant_diameter) column. 
+ * Confirmed in the anomalous_uls.csv file (in the zipped debug folder under ULS Database) that when Rx gain is missing, antenna diamteter is set to 1.83m and the Rx gain is set to 39.5 dBi (when in UNII-7) and set to 38.8 dBi (when in UNII-5). This confirms part (e) of R2-AIP-05 in the WINNF document.
+ * Confirmed that the missing Rx gain values (and the corresponding diameters) are set correctly in the .csv ULS file.
+ * Confirmed in the .csv ULS file that the diameter is set in accordance with part (d) of WINNF's R2-AIP-05 by implementing the formula in excel separately and comparing the results from the parser. 
+ * Confirmed in the .csv ULS file that the Rx gain value is between 32 and 48 dBi per part (d) of WINNF's R2-AIP-05.
+ * Confirmed in the anomalous_uls.csv file (based on its last column) that when the Rx gain is below 32, it is set to 32 and when it's above 48, it is set to 48 dBi. An example message is "Rx Gain = 26.4 < 32, Rx Gain set to 32."
+ * See attached uls and anomalous files (in .xlsx) to the ticket.
+
+## **Open Issues**
+The manual parser not working from the GUI.
+
 
 ## **Version and Date**
 |Version|**3.3.15**|
