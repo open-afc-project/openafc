@@ -1,6 +1,24 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-176, OA-188**|
+| :- | :- |
+|**Date**|**04/22/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-176: Support for global operating class 135 and 136
+ * Jira OA-188: web UI changes to support start frequency of 5925MHz
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Checked in-band EIRP and PSD calculations for a few bands (for the new channel and some of the previous channels) as well as adjacent channel interference levels.
+ * See the test case attached to OA-176 ticket. Note this uses the old ULS structure.
+
+## **Open Issues**
+
+## **Version and Date**
 |Version|**3.3.15**|
 | :- | :- |
 |**Date**|**04/19/2022**|
