@@ -282,26 +282,28 @@ export class AFCForm extends React.Component<
         const setUseClutter = (x: boolean) => {
             const conf = this.state.config;
             //If changing to true, and was false, and there is no clutter model, use the defaults
-            if(x && !conf.clutterAtFS && !conf.fsClutterModel) {
-                conf.fsClutterModel = {maxFsAglHeight: 6, p2108Confidence: 5};
+            if (x && !conf.clutterAtFS && !conf.fsClutterModel) {
+                conf.fsClutterModel = { maxFsAglHeight: 6, p2108Confidence: 5 };
             }
             conf.clutterAtFS = x;
             this.setState({ config: conf });
         }
 
-        const setFsClutterConfidence = (n: number) => {
+        const setFsClutterConfidence = (n: number | string) => {
+            const val = Number(n);
             const conf = this.state.config;
-            const newParams = {...conf.fsClutterModel};
-            newParams.p2108Confidence = n;
+            const newParams = { ...conf.fsClutterModel };
+            newParams.p2108Confidence = val
             conf.fsClutterModel = newParams;
-            this.setState({config:conf});
+            this.setState({ config: conf });
         }
-        const setFsClutterMaxHeight = (n: number) => {
+        const setFsClutterMaxHeight = (n: number | string) => {
+            const val = Number(n);
             const conf = this.state.config;
-            const newParams = {...conf.fsClutterModel};
-            newParams.maxFsAglHeight = n;
+            const newParams = { ...conf.fsClutterModel };
+            newParams.maxFsAglHeight = val;
             conf.fsClutterModel = newParams;
-            this.setState({config:conf});
+            this.setState({ config: conf });
         }
 
 
@@ -327,7 +329,7 @@ export class AFCForm extends React.Component<
                     isOpen={this.state.isModalOpen}
                     onClose={() => this.setState({ isModalOpen: false })}
                     actions={[<Button key="update" variant="primary" onClick={() => this.setState({ isModalOpen: false })}>Close</Button>]}>
-                    <ClipboardCopy variant={ClipboardCopyVariant.expansion} onChange={(v: string) => this.setConfig(v)} aria-label="text area">{this.getConfig()}</ClipboardCopy>
+                    <ClipboardCopy variant={ClipboardCopyVariant.expansion} isExpanded onChange={(v: string | number) => this.setConfig(String(v).trim())} aria-label="text area">{this.getConfig()}</ClipboardCopy>
                 </Modal>
                 <CardBody>
                     <Gallery gutter="sm">
@@ -679,53 +681,54 @@ export class AFCForm extends React.Component<
 
                                 }
                             >
-                                <InputGroup label="">
-                                    <Checkbox
-                                        label="Add Clutter at FS Receiver"
-                                        isChecked={this.state.config.clutterAtFS}
-                                        onChange={setUseClutter}
-                                        id="horizontal-form-clutter"
-                                        name="horizontal-form-clutter"
-                                        style={{ textAlign: "right" }}
-                                    />
+                                <FormGroup fieldId="horizontal-form-clutter">
+                                    <InputGroup label="">
+                                        <Checkbox
+                                            label="Add Clutter at FS Receiver"
+                                            isChecked={this.state.config.clutterAtFS}
+                                            onChange={setUseClutter}
+                                            id="horizontal-form-clutter"
+                                            name="horizontal-form-clutter"
+                                            style={{ textAlign: "right" }}
+                                        />
 
-                                    <OutlinedQuestionCircleIcon style={{ marginLeft: "5px" }} />
-                                    {/* {this.state.config.?clutterAtFS ? */}
-                                        <InputGroup >
-                                            <InputGroup
-                                                label="P.2108 Percentage of Locations"
-                                                >
-                                                <InputGroup>
-                                                    <TextInput
-                                                        type="number"
-                                                        id="fsclutter-p2180-confidence"
-                                                        name="fsclutter-p2180-confidence"
-                                                        isValid={true}
-                                                        value={this.state.config?.fsClutterModel?.p2108Confidence}
-                                                        onChange={setFsClutterConfidence}
-                                                        style={{ textAlign: "right" }} />
-                                                    <InputGroupText>%</InputGroupText>
-                                                </InputGroup>
-                                            </InputGroup>
-                                            <InputGroup
-                                                label="Max FS AGL Height (m)"
-                                               >
-                                                <InputGroup>
-                                                    <TextInput
-                                                        type="number"
-                                                        id="fsclutter-maxFsAglHeight"
-                                                        name="fsclutter-maxFsAglHeight"
-                                                        isValid={true}
-                                                        value={this.state.config?.fsClutterModel?.maxFsAglHeight}
-                                                        onChange={setFsClutterMaxHeight}
-                                                        style={{ textAlign: "right" }} />
-                                                    <InputGroupText>m</InputGroupText>
-                                                </InputGroup>
-                                            </InputGroup>
-                                        </InputGroup>
-                                    {/* :false} */}
-                                </InputGroup>
+                                        <OutlinedQuestionCircleIcon style={{ marginLeft: "5px" }} />
+                                    </InputGroup>
+                                </FormGroup>
                             </Tooltip>
+                            {this.state.config.clutterAtFS == true ?
+                                <FormGroup fieldId="fsclutter-p2180-confidence"  label="P.2108 Percentage of Locations" >
+                                   
+                                        <InputGroup>
+                                            <TextInput
+                                                type="number"
+                                                id="fsclutter-p2180-confidence"
+                                                name="fsclutter-p2180-confidence"
+                                                isValid={true}
+                                                value={this.state.config.fsClutterModel.p2108Confidence}
+                                                onChange={setFsClutterConfidence}
+                                                style={{ textAlign: "right" }} />
+                                            <InputGroupText>%</InputGroupText>
+                                        </InputGroup>
+                                </FormGroup>
+                                : <></>}
+                            {this.state.config.clutterAtFS == true ?
+                                <FormGroup fieldId="fsclutter-maxFsAglHeight"
+                                    label="Max FS AGL Height (m)"
+                                >
+                                    <InputGroup>
+                                        <TextInput
+                                            type="number"
+                                            id="fsclutter-maxFsAglHeight"
+                                            name="fsclutter-maxFsAglHeight"
+                                            isValid={true}
+                                            value={this.state.config.fsClutterModel.maxFsAglHeight}
+                                            onChange={setFsClutterMaxHeight}
+                                            style={{ textAlign: "right" }} />
+                                        <InputGroupText>m</InputGroupText>
+                                    </InputGroup>
+                                </FormGroup>
+                                : <></>}
                         </GalleryItem>
                         <GalleryItem>
                             <AllowedRangesDisplay data={this.props.frequencyBands} />
@@ -788,6 +791,6 @@ export class AFCForm extends React.Component<
                         <Button key="open-modal" variant="secondary" onClick={() => this.setState({ isModalOpen: true })}>Copy/Paste</Button>
                     </>
                 </CardBody>
-            </Card>);
+            </Card >);
     }
 }

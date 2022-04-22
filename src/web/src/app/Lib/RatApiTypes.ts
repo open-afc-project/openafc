@@ -60,9 +60,9 @@ export type FreqRange = {
 }
 
 export type FSReceiverFeederLoss = {
-    UNII5: Number,
-    UNII7: Number,
-    other: Number
+    UNII5: number,
+    UNII7: number,
+    other: number
 }
 
 export type FSReceiverNoise = FSReceiverFeederLoss;
