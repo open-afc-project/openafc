@@ -82,7 +82,7 @@ export interface Channels {
 
 export interface AvailableSpectrumInquiryResponse {
     requestId: number,
-    availableSpectrumInfo?: AvailableSpectrumInfo[],
+    availableFrequencyInfo?: AvailableSpectrumInfo[],
     availableChannelInfo?: AvailableChannelInfo[],
     availabilityExpireTime?: string,
     response: InquiryResponse

@@ -12,10 +12,11 @@ import { KonvaEventObject } from "konva/types/Node";
  * Test data
  */
 const emptyChannels: ChannelData[] = [
-    { channelWidth: 20, channels: Array(59).fill(0).map((_, i) => ({ name: String(1 + 4 * i), color: "grey", maxEIRP: 0 })) },
-    { channelWidth: 40, channels: Array(29).fill(0).map((_, i) => ({ name: String(3 + 8 * i), color: "grey", maxEIRP: 0 })) },
-    { channelWidth: 80, channels: Array(14).fill(0).map((_, i) => ({ name: String(7 + 16 * i), color: "grey", maxEIRP: 0 })) },
-    { channelWidth: 160, channels: Array(7).fill(0).map((_, i) => ({ name: String(15 + 32 * i), color: "grey", maxEIRP: 0 })) }
+    { channelWidth: 20, startFrequency: 5945, channels: Array(59).fill(0).map((_, i) => ({ name: String(1 + 4 * i), color: "grey", maxEIRP: 0 })) },
+    { channelWidth: 40, startFrequency: 5945, channels: Array(29).fill(0).map((_, i) => ({ name: String(3 + 8 * i), color: "grey", maxEIRP: 0 })) },
+    { channelWidth: 80, startFrequency: 5945, channels: Array(14).fill(0).map((_, i) => ({ name: String(7 + 16 * i), color: "grey", maxEIRP: 0 })) },
+    { channelWidth: 160, startFrequency: 5945, channels: Array(7).fill(0).map((_, i) => ({ name: String(15 + 32 * i), color: "grey", maxEIRP: 0 })) },
+    { channelWidth: 20, startFrequency: 5925, channels: Array(1).fill(0).map((_, i) => ({ name: String(2 + 4 * i), color: "grey", maxEIRP: 0 })) },
 ];
 
 interface ChannelProps {
@@ -77,7 +78,7 @@ class Channel extends React.Component<ChannelProps, { showToolTip: boolean }> {
                 <Text
                     name="tootTipText"
                     fontSize={12}
-                    text={(this.props.name ? ("Channel Index: " + this.props.name + "\n") : "") + "Max. EIRP (dBm): " + (this.props.color!=="grey" ? this.props.maxEIRP:"")}
+                    text={(this.props.name ? ("Channel Index: " + this.props.name + "\n") : "") + "Max. EIRP (dBm): " + (this.props.color !== "grey" ? this.props.maxEIRP : "")}
                     x={Math.min(this.props.start + 5, this.props.stageSize.width - 235)}
                     y={this.props.vertical - (this.props.name ? 30 : 20)} /></>
                 : <></>}
@@ -88,6 +89,7 @@ interface ChannelArrayProps {
     topLeft: { x: number, y: number },
     height: number,
     channelWidth: number,
+    startOffset: number,
     channels: { name: string, color: string, maxEIRP?: number }[],
     stageSize: { width: number, height: number }
 }
@@ -103,9 +105,9 @@ const ChannelArray: React.FunctionComponent<ChannelArrayProps> = (props: Channel
             key={i}
             color={chan.color}
             maxEIRP={chan.maxEIRP}
-            start={i * props.channelWidth + props.topLeft.x}
+            start={i * props.channelWidth + props.topLeft.x + props.startOffset}
             height={props.height}
-            end={(i + 1) * props.channelWidth + props.topLeft.x}
+            end={(i + 1) * props.channelWidth + props.topLeft.x + props.startOffset}
             vertical={props.topLeft.y}
             stageSize={props.stageSize} />)
     )}
@@ -125,14 +127,14 @@ interface ChannelDisplayProps {
  */
 const calcScaleFactor = (props: ChannelDisplayProps): number => {
     const maxWidth = props.channels!    // will only be called after props.channels !== undefined
-        .map(row => row.channelWidth * row.channels.length) // get total size
+        .map(row => row.channelWidth * row.channels.length + (row.startFrequency - startFreq)) // get total size
         .reduce((a, b) => a > b ? a : b); // maximum
     const f = 0.98 * props.totalWidth / maxWidth;
     return f;
 }
 
 
-const startFreq = 5945;
+const startFreq = 5925;
 const lines = Array(15).fill(0);
 
 /**
@@ -164,7 +166,7 @@ const ChannelDisplay: React.FunctionComponent<ChannelDisplayProps> = (props) => 
                     ).concat([
                         <Line
                             key={-1}
-                            x={59 * 20 * scaleFactor + 5}
+                            x={60 * 20 * scaleFactor + 5}
                             y={20}
                             points={[
                                 0, // realtive start x
@@ -196,7 +198,7 @@ const ChannelDisplay: React.FunctionComponent<ChannelDisplayProps> = (props) => 
                             rotation={-90}
                             fontSize={14}
                             verticalAlign="top"
-                            x={59 * 20 * scaleFactor}
+                            x={60 * 20 * scaleFactor}
                             y={140 + (10 + props.channelHeight) * props.channels!.length}
                         />
                     ])
@@ -208,6 +210,7 @@ const ChannelDisplay: React.FunctionComponent<ChannelDisplayProps> = (props) => 
                         topLeft={{ x: props.topLeft.x, y: props.topLeft.y + (props.channelHeight + 10) * i + 40 }}
                         height={props.channelHeight}
                         channelWidth={row.channelWidth * scaleFactor}
+                        startOffset = {(row.startFrequency - startFreq) * scaleFactor }
                         channels={row.channels} />
                 ))}
             </Layer>
