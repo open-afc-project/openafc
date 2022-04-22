@@ -50,37 +50,39 @@ const applicationCache: { [k: string]: any } = {};
  * @returns Default AFC config object
  */
 const defaultAfcConf: () => AFCConfigFile = () => ({
-    "freqBands": [           
-        {       
-            "name" : "UNII-5",
-            "startFreqMHz" : 5925,
-            "stopFreqMHz" : 6425
-        },      
-        {       
-            "name" : "UNII-7",
-            "startFreqMHz" : 6525,
-            "stopFreqMHz" : 6875
-        }               
+    "freqBands": [
+        {
+            "name": "UNII-5",
+            "startFreqMHz": 5925,
+            "stopFreqMHz": 6425
+        },
+        {
+            "name": "UNII-7",
+            "startFreqMHz": 6525,
+            "stopFreqMHz": 6875
+        }
     ],
-    "antennaPattern":{"kind":'None',"value":''},
+    "antennaPattern": { "kind": 'None', "value": '' },
     "ulsDefaultAntennaType": "F.699",
     "scanPointBelowGroundMethod": "discard",
-    "polarizationMismatchLoss":{"kind":"Fixed Value","value":3},
-    "bodyLoss":{"kind":"Fixed Value","valueIndoor":0,"valueOutdoor":0},
-    "buildingPenetrationLoss":{"kind":"Fixed Value","value":20.5},
-    "receiverFeederLoss":{"UNII5":3,"UNII7":2.5,"other":2},
-    "fsReceiverNoise":{"UNII5":-110,"UNII7":-109.5,"other":-109},
-    "threshold":-6,"maxLinkDistance":50,"maxEIRP":36,"minEIRP":18,
-    "propagationModel":{"kind":"FCC 6GHz Report & Order","win2Confidence":50,"itmConfidence":50,"p2108Confidence":50,"buildingSource":"None","terrainSource":"3DEP (30m)"},
-    "propagationEnv":"NLCD Point",
-    "ulsDatabase":"CONUS_ULS_2022-03-02T03_34_41.097782_fixedBPS_sorted.sqlite3",
-    "regionStr":"CONUS",
-    "rasDatabase":"RASdatabase.csv",
-    "APUncertainty":{"horizontal":30,"height":5},
-    "ITMParameters":{"polarization":"Vertical","ground":"Good Ground","dielectricConst":25,"conductivity":0.02,"minSpacing":3,"maxPoints":2000},
-    "rlanITMTxClutterMethod": 'FORCE_TRUE' ,
-    "clutterAtFS":false,
-    "version": guiConfig.version});
+    "polarizationMismatchLoss": { "kind": "Fixed Value", "value": 3 },
+    "bodyLoss": { "kind": "Fixed Value", "valueIndoor": 0, "valueOutdoor": 0 },
+    "buildingPenetrationLoss": { "kind": "Fixed Value", "value": 20.5 },
+    "receiverFeederLoss": { "UNII5": 3, "UNII7": 2.5, "other": 2 },
+    "fsReceiverNoise": { "UNII5": -110, "UNII7": -109.5, "other": -109 },
+    "threshold": -6, "maxLinkDistance": 50, "maxEIRP": 36, "minEIRP": 18,
+    "propagationModel": { "kind": "FCC 6GHz Report & Order", "win2Confidence": 50, "itmConfidence": 50, "p2108Confidence": 50, "buildingSource": "None", "terrainSource": "3DEP (30m)" },
+    "propagationEnv": "NLCD Point",
+    "ulsDatabase": "CONUS_ULS_2022-03-02T03_34_41.097782_fixedBPS_sorted.sqlite3",
+    "regionStr": "CONUS",
+    "rasDatabase": "RASdatabase.csv",
+    "APUncertainty": { "horizontal": 30, "height": 5 },
+    "ITMParameters": { "polarization": "Vertical", "ground": "Good Ground", "dielectricConst": 25, "conductivity": 0.02, "minSpacing": 3, "maxPoints": 2000 },
+    "rlanITMTxClutterMethod": 'FORCE_TRUE',
+    "clutterAtFS": false,
+    "fsClutterModel": { p2108Confidence: 5, maxFsAglHeight: 6 },
+    "version": guiConfig.version
+});
 
 // API Calls
 
@@ -142,7 +144,7 @@ export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<strin
         headers: addAuth({
             "Content-Type": "application/json"
         }),
-        body: JSON.stringify(conf,undefined,3)
+        body: JSON.stringify(conf, undefined, 3)
     }).then(res => {
         if (res.status === 204) {
             return success("AFC configuration updated");
@@ -186,7 +188,7 @@ function analysisContinuation<T>(isCanceled?: () => boolean, status?: (progress:
         const task = await startResponse.json() as any
         const url: string = task.statusUrl;
         const kml: string | undefined = task.kmlUrl;
-        
+
         // enter polling loop
         while (true) {
             await delay(3000); // wait 3 seconds before polling
@@ -366,7 +368,7 @@ function ulsParseContinuation(isCanceled?: () => boolean, status?: (progress: { 
                 const data = (await res.json() as { entriesUpdated: number, entriesAdded: number, finishTime: string });
                 // exit and return
                 return success(data);
-            } else if(res.status == 503) {
+            } else if (res.status == 503) {
                 return error('Manual parse already in progress')
             }
             else {
@@ -386,37 +388,37 @@ function ulsParseContinuation(isCanceled?: () => boolean, status?: (progress: { 
  *          Error: information on why file could not be converted
  */
 //(params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>> 
- export const ulsDailyParse = (isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<{ entriesUpdated: number, entriesAdded: number, finishTime: string }>> =>
+export const ulsDailyParse = (isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<{ entriesUpdated: number, entriesAdded: number, finishTime: string }>> =>
     fetch(guiConfig.uls_daily_url, {
         method: "POST",
         headers: addAuth({})
     }).then(ulsParseContinuation(isCanceled, status))
-    .catch(err => {
-        logger.error(err);
-        return error("Your request was unable to be processed", undefined, err);
-    });
-        // async res => {
-        //     if (res.ok) {
-        //         const data = (await res.json()) as { entriesUpdated: number, entriesAdded: number };
-        //         return success(data);
-        //     } else {
-        //         logger.error(res);
-        //         return error(res.statusText, res.status, (await res.json()) as any);
-        //     }
-        // }
-    
-    
-    
-    
+        .catch(err => {
+            logger.error(err);
+            return error("Your request was unable to be processed", undefined, err);
+        });
+// async res => {
+//     if (res.ok) {
+//         const data = (await res.json()) as { entriesUpdated: number, entriesAdded: number };
+//         return success(data);
+//     } else {
+//         logger.error(res);
+//         return error(res.statusText, res.status, (await res.json()) as any);
+//     }
+// }
+
+
+
+
 /**
  * Gets the last successful run time of the daily parse. 
  * @returns Success: An ISO string containing the last run time. 
  *          Error: why it failed
  */
- export const ulsLastRuntime = (): Promise<RatResponse<{ lastSuccessfulRun: string }>> =>
- fetch(guiConfig.uls_daily_url, {
+export const ulsLastRuntime = (): Promise<RatResponse<{ lastSuccessfulRun: string }>> =>
+    fetch(guiConfig.uls_daily_url, {
         method: "GET",
-        headers: addAuth({ "Content-Type": "application/json"})
+        headers: addAuth({ "Content-Type": "application/json" })
     }).then(
         async res => {
             if (res.ok) {
@@ -432,34 +434,34 @@ function ulsParseContinuation(isCanceled?: () => boolean, status?: (progress: { 
             logger.error(err);
             return error("Your request was unable to be processed", undefined, err);
         }
- )
+    )
 
- /**
- * Updates the backend celery task for daily parsing to the given time
- * @returns Success: An ISO string containing the new time. 
- *          Error: why it failed
- */
-  export const setUlsParseTime = (hours: number, minutes: number): Promise<RatResponse<{ newTime: string }>> =>
-  fetch(guiConfig.uls_daily_url, {
-         method: "PUT",
-         headers: addAuth({}),
-         body: JSON.stringify({hours: hours, mins: minutes})
-     }).then(
-         async res => {
-             if (res.ok) {
-                 const data = (await res.json()) as { newTime: string };
-                 return success(data);
-             } else {
-                 logger.error(res);
-                 return error(res.statusText, res.status, (await res.json()) as any);
-             }
-         }
-     ).catch(
-         err => {
-             logger.error(err);
-             return error("Your request was unable to be processed", undefined, err);
-         }
-  )
+/**
+* Updates the backend celery task for daily parsing to the given time
+* @returns Success: An ISO string containing the new time. 
+*          Error: why it failed
+*/
+export const setUlsParseTime = (hours: number, minutes: number): Promise<RatResponse<{ newTime: string }>> =>
+    fetch(guiConfig.uls_daily_url, {
+        method: "PUT",
+        headers: addAuth({}),
+        body: JSON.stringify({ hours: hours, mins: minutes })
+    }).then(
+        async res => {
+            if (res.ok) {
+                const data = (await res.json()) as { newTime: string };
+                return success(data);
+            } else {
+                logger.error(res);
+                return error(res.statusText, res.status, (await res.json()) as any);
+            }
+        }
+    ).catch(
+        err => {
+            logger.error(err);
+            return error("Your request was unable to be processed", undefined, err);
+        }
+    )
 
 /**
  * Cache an item in the global application cache

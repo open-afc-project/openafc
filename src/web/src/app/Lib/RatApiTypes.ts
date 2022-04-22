@@ -48,6 +48,7 @@ export interface AFCConfigFile {
     fsReceiverNoise: FSReceiverNoise,
     rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
     clutterAtFS: boolean,
+    fsClutterModel?: FSClutterModel,
     regionStr?: string,
     rasDatabase?: string
 }
@@ -166,6 +167,10 @@ export interface CustomPropagation {
     rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
 }
 
+export interface FSClutterModel {
+    p2108Confidence: number,
+    maxFsAglHeight: number
+}
 
 export type ScanPointBelowGroundMethod = "discard" | "truncate"
 

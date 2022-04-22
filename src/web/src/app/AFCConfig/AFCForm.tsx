@@ -242,26 +242,26 @@ export class AFCForm extends React.Component<
             if (x.kind === "Custom") {
                 //rlanITMTxClutterMethod is set in the CustomPropagation but stored at the top level
                 // so move it up if present
-                const conf = {...this.state.config};
+                const conf = { ...this.state.config };
                 var model = x as CustomPropagation;
                 var itmTxClutterMethod = model.rlanITMTxClutterMethod;
                 delete model.rlanITMTxClutterMethod;
                 conf.propagationModel = model;
-                if(!!itmTxClutterMethod ){
+                if (!!itmTxClutterMethod) {
                     conf.rlanITMTxClutterMethod = itmTxClutterMethod;
-                }else{
+                } else {
                     delete conf.rlanITMTxClutterMethod;
                 }
-                this.setState({ config: conf});
+                this.setState({ config: conf });
 
 
             } else {
                 const conf = this.state.config;
                 conf.propagationModel = x;
-                if(x.kind === "ITM with building data"){
+                if (x.kind === "ITM with building data") {
                     conf.rlanITMTxClutterMethod = "BLDG_DATA"
-                }else{
-                    conf.rlanITMTxClutterMethod="FORCE_TRUE"
+                } else {
+                    conf.rlanITMTxClutterMethod = "FORCE_TRUE"
                 }
                 this.setState({ config: conf });
             }
@@ -281,23 +281,43 @@ export class AFCForm extends React.Component<
 
         const setUseClutter = (x: boolean) => {
             const conf = this.state.config;
+            //If changing to true, and was false, and there is no clutter model, use the defaults
+            if(x && !conf.clutterAtFS && !conf.fsClutterModel) {
+                conf.fsClutterModel = {maxFsAglHeight: 6, p2108Confidence: 5};
+            }
             conf.clutterAtFS = x;
             this.setState({ config: conf });
         }
 
-        const getPropagationModelForForm= () =>{
+        const setFsClutterConfidence = (n: number) => {
+            const conf = this.state.config;
+            const newParams = {...conf.fsClutterModel};
+            newParams.p2108Confidence = n;
+            conf.fsClutterModel = newParams;
+            this.setState({config:conf});
+        }
+        const setFsClutterMaxHeight = (n: number) => {
+            const conf = this.state.config;
+            const newParams = {...conf.fsClutterModel};
+            newParams.maxFsAglHeight = n;
+            conf.fsClutterModel = newParams;
+            this.setState({config:conf});
+        }
+
+
+        const getPropagationModelForForm = () => {
             //rlanITMTxClutterMethod is stored at the top level but set in the form
             // so move it down if present
-            if(this.state.config.propagationModel.kind !== "Custom"){
+            if (this.state.config.propagationModel.kind !== "Custom") {
                 return { ...this.state.config.propagationModel };
-            }else{
-                const customModel =  { ...this.state.config.propagationModel } as CustomPropagation;
+            } else {
+                const customModel = { ...this.state.config.propagationModel } as CustomPropagation;
                 customModel.rlanITMTxClutterMethod = this.state.config.rlanITMTxClutterMethod;
                 return customModel;
             }
 
         }
-        
+
 
         return (
             <Card>
@@ -655,7 +675,7 @@ export class AFCForm extends React.Component<
                                 //className="prop-env-tooltip"
                                 maxWidth="40.0rem"
                                 content={
-                                    <p>When distance &gt; 1km, clutter loss is added at FS Receiver when FS Receiver AGL height &lt;10m. Clutter models are the same as those used for APs.​</p>
+                                    <p>When distance &gt; 1km, clutter loss is added at FS Receiver when FS Receiver AGL height &lt; maximum FS GL height. Clutter models are the same as those used for APs.​</p>
 
                                 }
                             >
@@ -670,7 +690,40 @@ export class AFCForm extends React.Component<
                                     />
 
                                     <OutlinedQuestionCircleIcon style={{ marginLeft: "5px" }} />
-
+                                    {/* {this.state.config.?clutterAtFS ? */}
+                                        <InputGroup >
+                                            <InputGroup
+                                                label="P.2108 Percentage of Locations"
+                                                >
+                                                <InputGroup>
+                                                    <TextInput
+                                                        type="number"
+                                                        id="fsclutter-p2180-confidence"
+                                                        name="fsclutter-p2180-confidence"
+                                                        isValid={true}
+                                                        value={this.state.config?.fsClutterModel?.p2108Confidence}
+                                                        onChange={setFsClutterConfidence}
+                                                        style={{ textAlign: "right" }} />
+                                                    <InputGroupText>%</InputGroupText>
+                                                </InputGroup>
+                                            </InputGroup>
+                                            <InputGroup
+                                                label="Max FS AGL Height (m)"
+                                               >
+                                                <InputGroup>
+                                                    <TextInput
+                                                        type="number"
+                                                        id="fsclutter-maxFsAglHeight"
+                                                        name="fsclutter-maxFsAglHeight"
+                                                        isValid={true}
+                                                        value={this.state.config?.fsClutterModel?.maxFsAglHeight}
+                                                        onChange={setFsClutterMaxHeight}
+                                                        style={{ textAlign: "right" }} />
+                                                    <InputGroupText>m</InputGroupText>
+                                                </InputGroup>
+                                            </InputGroup>
+                                        </InputGroup>
+                                    {/* :false} */}
                                 </InputGroup>
                             </Tooltip>
                         </GalleryItem>
