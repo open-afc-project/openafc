@@ -9693,7 +9693,7 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 						if ((initFlag) || (psd < minPSD)) {
 							minPSD = psd;
 						}
-						if ((initFlag) || (channel.stopFreqMHz < nextFreqMHz)) {
+						if (channel.stopFreqMHz < nextFreqMHz) {
 							nextFreqMHz = channel.stopFreqMHz;
 						}
 						initFlag = false;
@@ -9764,13 +9764,17 @@ void AfcManager::createChannelList()
 					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
 					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 
-                    if ( (channel.stopFreqMHz > inquiredStartFreqMHz) && (channel.startFreqMHz < inquiredStopFreqMHz) ) {
-						channel.availability = GREEN; // Everything initialized to GREEN
-						channel.eirpLimit_dBm = 0;
-						channel.type = INQUIRED_FREQUENCY;
-						_channelList.push_back(channel);
-						numChan++;
-						totalNumChan++;
+					if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
+                    	if ( (channel.stopFreqMHz > inquiredStartFreqMHz) && (channel.startFreqMHz < inquiredStopFreqMHz) ) {
+						    channel.operatingClass = opClass.opClass;
+						    channel.index = cfi;
+							channel.availability = GREEN; // Everything initialized to GREEN
+							channel.eirpLimit_dBm = 0;
+							channel.type = INQUIRED_FREQUENCY;
+							_channelList.push_back(channel);
+							numChan++;
+							totalNumChan++;
+						}
 					}
 				}
 			}
