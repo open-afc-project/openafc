@@ -9764,20 +9764,7 @@ void AfcManager::createChannelList()
 					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
 					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 
-					// Include inquired frequencies if they are within the supported opclass frequencies or
-					// if the channel in an opclass is within the inquired frequency range
-					if ((inquiredStartFreqMHz >= channel.startFreqMHz &&
-						inquiredStopFreqMHz <= channel.stopFreqMHz) ||
-						(channel.startFreqMHz >= inquiredStartFreqMHz &&
-						channel.stopFreqMHz <= inquiredStopFreqMHz)) {
-						// Limit frequencies within the inquired frequency range
-						if (inquiredStartFreqMHz > channel.startFreqMHz) {
-							channel.startFreqMHz = inquiredStartFreqMHz;
-						}
-						if (inquiredStopFreqMHz < channel.stopFreqMHz) {
-							channel.stopFreqMHz = inquiredStopFreqMHz;
-						}
-
+                    if ( (channel.stopFreqMHz > inquiredStartFreqMHz) && (channel.startFreqMHz < inquiredStopFreqMHz) ) {
 						channel.availability = GREEN; // Everything initialized to GREEN
 						channel.eirpLimit_dBm = 0;
 						channel.type = INQUIRED_FREQUENCY;
