@@ -114,7 +114,7 @@ class AfcTester:
             'i': import_tests
         }
         for k in params:
-            if not set_db_opts[k](self, params[k][0]):
+            if not set_db_opts[k](self, params[k]):
                 return AFC_ERR
         return AFC_OK
 
@@ -226,8 +226,8 @@ def make_arg_parser():
                                   "<d> - dump all DB tables,"
                                   "<e> - export admin config,"
                                   "<r[=filename]> - run request from file"
-                                  "<i[=identifier]> - parse WFA tests to external file,"
-                                  "where identifier are <srs|urs|sri|fsp|ibp|sip>"
+                                  "<i[=identifier[,filename]]> - parse WFA tests to external file,"
+                                  "where identifier are <all|srs|urs|sri|fsp|ibp|sip>"
                                   "external filename is <identifier>_afc_test_reqs.json")
     args_parser.add_argument('--test', metavar='KEY=VALUE',
                              nargs='+', action=ParseDict,
@@ -243,7 +243,7 @@ def export_admin_cfg(self, opt):
     """Export admin server configuration"""
     app_log.debug('%s() %s', inspect.stack()[0][3], opt)
 
-    filename = opt
+    filename = opt[0]
     con = sqlite3.connect(self.db_filename)
     cur = con.cursor()
     cur.execute('SELECT COUNT(*) FROM ' + TBL_USERS_NAME)
@@ -277,7 +277,7 @@ def export_admin_cfg(self, opt):
                 out_str += '\n'
             fp_exp.write(out_str)
     con.close()
-    app_log.info('Server admin config exported to %s', opt)
+    app_log.info('Server admin config exported to %s', opt[0])
     return True
 
 
@@ -304,8 +304,8 @@ def add_reqs(self, opt):
     """Prepare DB source files"""
     app_log.debug('%s()', inspect.stack()[0][3])
     filename = ADD_AFC_TEST_REQS
-    if opt != 'True':
-        filename = opt
+    if opt[0] != 'True':
+        filename = opt[0]
 
     if not os.path.isfile(filename):
         app_log.error('Missing raw test data file %s', filename)
@@ -352,8 +352,8 @@ def run_reqs(self, opt):
     """Run one or more requests from provided file"""
     app_log.debug('%s()', inspect.stack()[0][3])
     filename = ADD_AFC_TEST_REQS
-    if opt != 'True':
-        filename = opt
+    if opt[0] != 'True':
+        filename = opt[0]
 
     if not os.path.isfile(filename):
         app_log.error('Missing raw test data file %s', filename)
@@ -387,8 +387,8 @@ def dump_db(self, opt):
     """Ful dump from DB tables"""
     app_log.debug('%s() %s', inspect.stack()[0][3], opt)
     find_key = ''
-    if opt != 'True':
-        find_key = opt
+    if opt[0] != 'True':
+        find_key = opt[0]
 
     if not os.path.isfile(self.db_filename):
         app_log.error('Missing DB file %s', self.db_filename)
@@ -421,13 +421,18 @@ def import_tests(self, opt):
     app_log.debug('%s() %s\n', inspect.stack()[0][3], opt)
     filename = "AFC System (SUT) Test Vectors r5.xlsx"
     test_ident = 'all'
+    out_fname = ''
 
-    if (opt != 'True'):
-        if (AFC_TEST_IDENT.get(opt.lower()) is None):
-            app_log.error('Unsupported test identifier (%s)', opt)
+    if (opt[0] != 'True'):
+        if (AFC_TEST_IDENT.get(opt[0].lower()) is None):
+            app_log.error('Unsupported test identifier (%s)', opt[0])
             return False
         else:
-            test_ident = opt
+            test_ident = opt[0]
+        if (opt[1]):
+            out_fname = opt[1]
+    if out_fname == '':
+        out_fname = test_ident + NEW_AFC_TEST_SUFX
 
     wb = oxl.load_workbook(filename)
 
@@ -435,7 +440,8 @@ def import_tests(self, opt):
         app_log.debug('Sheet title: %s', sh.title)
         app_log.debug('rows %d, cols %d\n', sh.max_row, sh.max_column)
 
-    fp_new = open(test_ident + NEW_AFC_TEST_SUFX, 'w')
+    app_log.info('Export tests into file: %s', out_fname)
+    fp_new = open(out_fname, 'w')
     sheet = wb.active
     nbr_rows = sheet.max_row
     app_log.debug('Rows range 1 - %d', nbr_rows + 1)
@@ -446,7 +452,7 @@ def import_tests(self, opt):
             (cell.value == 'SRI')):
             continue
 
-        if (test_ident != 'True') and (cell.value.lower() != test_ident):
+        if (test_ident != 'all') and (cell.value.lower() != test_ident):
             continue
 
         res_str = REQ_HEADER + REQ_INQUIRY_HEADER + REQ_INQ_CHA_HEADER
