@@ -429,7 +429,7 @@ def import_tests(self, opt):
             return False
         else:
             test_ident = opt[0]
-        if (opt[1]):
+        if (len(opt) > 1):
             out_fname = opt[1]
     if out_fname == '':
         out_fname = test_ident + NEW_AFC_TEST_SUFX
