@@ -54,12 +54,12 @@ namespace
 	// Logger for all instances of class
 	LOGGER_DEFINE_GLOBAL(logger, "AfcManager")
 
-	// const double fixedEpsDielect = 15;
-	// const double fixedSgmConductivity = 0.005;
-	// const double fixedEsNoSurfRef = 301;
-	// const int fixedRadioClimate = 6;
-	// const int fixedPolarization = 1;
-	const double fixedConfidence = 0.5;
+		// const double fixedEpsDielect = 15;
+		// const double fixedSgmConductivity = 0.005;
+		// const double fixedEsNoSurfRef = 301;
+		// const int fixedRadioClimate = 6;
+		// const int fixedPolarization = 1;
+		const double fixedConfidence = 0.5;
 	const double fixedRelevance = 0.5;
 	/**
 	 * Encapsulates a CSV writer to a file gzip'd
@@ -136,10 +136,10 @@ namespace OpClass
 		20,		// Bandwidth
 		5950,		// Start frequency.
 		{
-			  1,   5,   9,  13,  17,  21,  25,  29,
-			 33,  37,  41,  45,  49,  53,  57,  61,
-			 65,  69,  73,  77,  81,  85,  89,  93,
-			 97, 101, 105, 109, 113, 117, 121, 125,
+			1,   5,   9,  13,  17,  21,  25,  29,
+			33,  37,  41,  45,  49,  53,  57,  61,
+			65,  69,  73,  77,  81,  85,  89,  93,
+			97, 101, 105, 109, 113, 117, 121, 125,
 			129, 133, 137, 141, 145, 149, 153, 157,
 			161, 165, 169, 173, 177, 181, 185, 189,
 			193, 197, 201, 205, 209, 213, 217, 221,
@@ -153,8 +153,8 @@ namespace OpClass
 		40,
 		5950,
 		{
-			  3,  11,  19,  27,  35,  43,  51, 59,
-			 67,  75,  83,  91,  99, 107, 115, 123,
+			3,  11,  19,  27,  35,  43,  51, 59,
+			67,  75,  83,  91,  99, 107, 115, 123,
 			131, 139, 147, 155, 163, 171, 179, 187,
 			195, 203, 211, 219, 227
 		}
@@ -5205,10 +5205,10 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 					if (distKm * 1000 <= 50.0) {
 						winner2LOSValue = 1;
 					} else if (
-						   (_winner2LOSOption == CConst::BldgDataLOSOption)
-						|| (_winner2LOSOption == CConst::BldgDataReqTxLOSOption)
-						|| (_winner2LOSOption == CConst::BldgDataReqRxLOSOption)
-						|| (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption) ) {
+							(_winner2LOSOption == CConst::BldgDataLOSOption)
+							|| (_winner2LOSOption == CConst::BldgDataReqTxLOSOption)
+							|| (_winner2LOSOption == CConst::BldgDataReqRxLOSOption)
+							|| (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption) ) {
 						double terrainHeight;
 						double bldgHeight;
 						MultibandRasterClass::HeightResult lidarHeightResult;
@@ -5220,12 +5220,12 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						bool reqRx = (_winner2LOSOption == CConst::BldgDataReqRxLOSOption) || (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption);  
 
 						if (    ((!reqTx) || (txHeightSource == CConst::lidarHeightSource))
-						     && ((!reqRx) || (rxHeightSource == CConst::lidarHeightSource)) ) {
+								&& ((!reqRx) || (rxHeightSource == CConst::lidarHeightSource)) ) {
 							int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
 							bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
-								QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
-								QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-								distKm, numPts, heightProfilePtr);
+									QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+									QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+									distKm, numPts, heightProfilePtr);
 							winner2LOSValue = (losFlag ? 1 : 2);
 						}
 					} else if (_winner2LOSOption == CConst::ForceLOSLOSOption) {
@@ -5487,7 +5487,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 			if (distKm * 1000 <= 50.0) {
 				winner2LOSValue = 1;
 			} else if (
-				       (_winner2LOSOption == CConst::BldgDataLOSOption)
+					(_winner2LOSOption == CConst::BldgDataLOSOption)
 					|| (_winner2LOSOption == CConst::BldgDataReqTxLOSOption)
 					|| (_winner2LOSOption == CConst::BldgDataReqRxLOSOption)
 					|| (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption) ) {
@@ -5545,9 +5545,9 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 					{
 						int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
 						bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
-															QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
-															QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-																		distKm, numPts, heightProfilePtr);
+								QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+								QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+								distKm, numPts, heightProfilePtr);
 						rlanHasClutter = !losFlag;
 					}
 					break;
@@ -5565,10 +5565,10 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
 				double u = _confidenceITM;
 				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
-					false,
-					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
-					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
+						false,
+						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
 				pathLossModelStr = "ITM";
 				pathLossCDF = _confidenceITM;
 
@@ -5607,10 +5607,10 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				}
 				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
 				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
-					false,
-					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
-					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
+						false,
+						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
 				pathLossModelStr = "ITM";
 				pathLossCDF = _confidenceITM;
 
@@ -5624,23 +5624,23 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						case CConst::deciduousTreesNLCDLandCat:
 							ha = 15.0;
 							dk = 0.05;
-						if (txClutterStrPtr) { *txClutterStrPtr = "DECIDUOUS_TREES"; }
+							if (txClutterStrPtr) { *txClutterStrPtr = "DECIDUOUS_TREES"; }
 							break;
 						case CConst::coniferousTreesNLCDLandCat:
 							ha = 20.0;
 							dk = 0.05;
-						if (txClutterStrPtr) { *txClutterStrPtr = "CONIFEROUS_TREES"; }
+							if (txClutterStrPtr) { *txClutterStrPtr = "CONIFEROUS_TREES"; }
 							break;
 						case CConst::highCropFieldsNLCDLandCat:
 							ha = 4.0;
 							dk = 0.1;
-						if (txClutterStrPtr) { *txClutterStrPtr = "HIGH_CROP_FIELDS"; }
+							if (txClutterStrPtr) { *txClutterStrPtr = "HIGH_CROP_FIELDS"; }
 							break;
 						case CConst::villageCenterNLCDLandCat:
 						case CConst::unknownNLCDLandCat:
 							ha = 5.0;
 							dk = 0.07;
-						if (txClutterStrPtr) { *txClutterStrPtr = "VILLAGE_CENTER"; }
+							if (txClutterStrPtr) { *txClutterStrPtr = "VILLAGE_CENTER"; }
 							break;
 						default:
 							CORE_DUMP;
@@ -9509,7 +9509,7 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 				nlcdLandCat = CConst::villageCenterNLCDLandCat;
 				propEnv = CConst::ruralPropEnv;
 				break;
-            }
+		}
 	} else if (_propagationEnviro.toStdString() == "Population Density Map") {
 		int regionIdx;
 		char propEnvChar;
@@ -9765,9 +9765,9 @@ void AfcManager::createChannelList()
 					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 
 					if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
-                    	if ( (channel.stopFreqMHz > inquiredStartFreqMHz) && (channel.startFreqMHz < inquiredStopFreqMHz) ) {
-						    channel.operatingClass = opClass.opClass;
-						    channel.index = cfi;
+						if ( (channel.stopFreqMHz > inquiredStartFreqMHz) && (channel.startFreqMHz < inquiredStopFreqMHz) ) {
+							channel.operatingClass = opClass.opClass;
+							channel.index = cfi;
 							channel.availability = GREEN; // Everything initialized to GREEN
 							channel.eirpLimit_dBm = 0;
 							channel.type = INQUIRED_FREQUENCY;
