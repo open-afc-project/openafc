@@ -603,9 +603,10 @@ void ULSClass::setUseFrequency()
 /******************************************************************************************/
 /**** FUNCTION: ULSClass::computeRxGain                                                ****/
 /******************************************************************************************/
-double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency)
+double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency, std::string &subModelStr)
 {
 	double rxGainDB;
+    subModelStr = "";
 
 	switch(rxAntennaType) {
 	case CConst::F1245AntennaType:
@@ -618,7 +619,7 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 		rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleDeg, rxGain, frequency);
 		break;
 	case CConst::R2AIP07AntennaType:
-		rxGainDB = calcR2AIP07Antenna(angleOffBoresightDeg, frequency);
+		rxGainDB = calcR2AIP07Antenna(angleOffBoresightDeg, frequency, subModelStr);
 		break;
 	case CConst::OmniAntennaType:
 		rxGainDB = 0.0;
@@ -627,7 +628,7 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 		rxGainDB = rxAntenna->gainDB(angleOffBoresightDeg*M_PI/180.0) + rxGain;
 		break;
 	default:
-		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeRxGain: rxAntennaType = " << rxAntennaType << " INVALID value");
+		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeRxGain: rxAntennaType = " << rxAntennaType << " INVALID value for FSID = " << id);
 		break;
 	}
 
@@ -638,7 +639,7 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 /******************************************************************************************/
 /**** FUNCTION: ULSClass::calcR2AIP07Antenna                                           ****/
 /******************************************************************************************/
-double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency)
+double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, std::string &subModelStr)
 {
     int freqIdx;
 	double rxGainDB;
@@ -646,13 +647,14 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
     if ((frequency >= 5925.0e6) && (frequency <= 6425.0e6)) {
         freqIdx = 0;
     } else if ((frequency >= 6525.0e6) && (frequency <= 6875.0e6)) {
-        freqIdx = 0;
+        freqIdx = 1;
     } else {
-		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value");
+		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value for FSID = " << id);
     }
 
     if (rxGain < 38) {
         if (angleOffBoresightDeg < 5) {
+            subModelStr = ":F.699";
             rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
         } else {
             // Table 2, Category B2
@@ -670,10 +672,12 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
             } else {
                 minSuppression = 60.0;
             }
+            subModelStr = ":catB2";
             rxGainDB = rxGain - minSuppression;
         }
     } else {
         if (angleOffBoresightDeg < 5) {
+            subModelStr = ":F.699";
             rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
         } else {
             bool antennaModelBlank = rxAntennaModel.empty();
@@ -697,6 +701,7 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
                 } else {
                     minSuppression = 45.0;
                 }
+                subModelStr = ":catB1";
                 rxGainDB = rxGain - minSuppression;
             } else {
                 // Table 2, Category A
@@ -717,7 +722,14 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 
                 double descrimination699 = rxGain - calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
 
-                double descriminationDB = std::max(minSuppressionA, descrimination699);
+                double descriminationDB;
+                if (descrimination699 >= minSuppressionA) {
+                    subModelStr = ":F.699";
+                    descriminationDB = descrimination699;
+                } else {
+                    subModelStr = ":catA";
+                    descriminationDB = minSuppressionA;
+                }
 
                 rxGainDB = rxGain - descriminationDB;
             }
@@ -747,6 +759,7 @@ double ULSClass::computeBeamWidth(double attnDB)
 	}
 
 	double a1 = 0.0;
+    double frequency = (startUseFreq + stopUseFreq)/2;
 
 	double a2 = a1;
 	double e2;
@@ -761,7 +774,8 @@ double ULSClass::computeBeamWidth(double attnDB)
 		}
 		double angleOffBoresightDeg = a2;
 
-		rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, -1.0);
+        std::string subModelStr;
+		rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, frequency, subModelStr);
 
 		e2 = rxGainDB - g0 + attnDB;
 	} while(e2 > 0.0);
@@ -770,7 +784,8 @@ double ULSClass::computeBeamWidth(double attnDB)
 		double a3 = (a1+a2)/2;
 		double angleOffBoresightDeg = a3;
 
-		rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, -1.0);
+        std::string subModelStr;
+		rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, frequency, subModelStr);
 
 		double e3 = rxGainDB - g0 + attnDB;
 

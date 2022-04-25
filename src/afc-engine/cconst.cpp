@@ -80,7 +80,7 @@ const StrTypeClass CConst::strULSAntennaTypeList[] = {
 	{      CConst::F1336OmniAntennaType, "F.1336 Omni"  },
 	{          CConst::F1245AntennaType, "F.1245"       },
 	{           CConst::F699AntennaType, "F.699"        },
-	{        CConst::R2AIP07AntennaType, "R2-AIP-07"    },
+	{        CConst::R2AIP07AntennaType, "WINNF-AIP-07" },
 	{                                -1,  (char *) 0    }
 };
 

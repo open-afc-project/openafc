@@ -7051,8 +7051,9 @@ void AfcManager::runPointAnalysis()
 #endif
 											);
 
+                                    std::string rxAntennaSubModelStr;
 									double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-									double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
+									double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
 
 									double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
@@ -7096,7 +7097,7 @@ void AfcManager::runPointAnalysis()
 										if (ulsRxAntennaType == CConst::LUTAntennaType) {
 											rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
 										} else {
-											rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType));
+											rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
 										}
 
 										std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
@@ -8053,9 +8054,9 @@ void AfcManager::runScanAnalysis()
 #endif
 										);
 
+                                std::string rxAntennaSubModelStr;
 								double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-
-								double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
+								double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
 
 								double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
@@ -8581,9 +8582,9 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 #endif
 				);
 
+        std::string rxAntennaSubModelStr;
 		double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-
-		double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
+		double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
 
 		double rxPowerDBW = (_exclusionZoneRLANEIRPDBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
@@ -8622,7 +8623,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 			if (ulsRxAntennaType == CConst::LUTAntennaType) {
 				rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
 			} else {
-				rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType));
+				rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
 			}
 
 			std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
@@ -9085,8 +9086,9 @@ void AfcManager::runHeatmapAnalysis()
 #endif
 									);
 
+                            std::string rxAntennaSubModelStr;
 							double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-							double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
+							double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
 
 							double rxPowerDBW = (rlanEIRP - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
@@ -9124,7 +9126,7 @@ void AfcManager::runHeatmapAnalysis()
 								if (ulsRxAntennaType == CConst::LUTAntennaType) {
 									rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
 								} else {
-									rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType));
+									rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
 								}
 
 								std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :

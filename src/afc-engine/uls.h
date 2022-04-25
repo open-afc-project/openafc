@@ -79,8 +79,8 @@ public:
 	double getFadeMarginDB();
 	std::string getStatus();
 	double computeBeamWidth(double attnDB);
-	double computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency);
-	double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency);
+	double computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency, std::string &subModelStr);
+	double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, std::string &subModelStr);
 	std::string getRxAntennaModel() { return rxAntennaModel; }
 	CConst::ULSAntennaTypeEnum getRxAntennaType();
 	CConst::ULSAntennaTypeEnum getTxAntennaType();
