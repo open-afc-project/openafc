@@ -80,6 +80,8 @@ public:
 	std::string getStatus();
 	double computeBeamWidth(double attnDB);
 	double computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency);
+	double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency);
+	std::string getRxAntennaModel() { return rxAntennaModel; }
 	CConst::ULSAntennaTypeEnum getRxAntennaType();
 	CConst::ULSAntennaTypeEnum getTxAntennaType();
 	AntennaClass *getRxAntenna();
@@ -145,6 +147,7 @@ public:
 	void setRxAntennaFeederLossDB(double rxAntennaFeederLossDBVal);
 	void setFadeMarginDB(double fadeMarginDBVal);
 	void setStatus(std::string statusVal);
+	void setRxAntennaModel(std::string rxAntennaModelVal) { rxAntennaModel = rxAntennaModelVal; return; }
 	void setRxAntennaType(CConst::ULSAntennaTypeEnum rxAntennaTypeVal);
 	void setTxAntennaType(CConst::ULSAntennaTypeEnum txAntennaTypeVal);
 	void setRxAntenna(AntennaClass *rxAntennaVal);
@@ -258,6 +261,7 @@ private:
 	PopGridClass *mobilePopGrid; // Pop grid for mobile simulation
 	CConst::ULSAntennaTypeEnum rxAntennaType;
 	CConst::ULSAntennaTypeEnum txAntennaType;
+	std::string rxAntennaModel;
 	AntennaClass *rxAntenna;
 	AntennaClass *txAntenna;
 	double rxAntennaFeederLossDB;

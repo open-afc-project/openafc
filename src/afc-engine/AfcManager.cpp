@@ -4430,6 +4430,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setPRLongitudeDeg(prLongitudeDeg);
 				uls->setRxGain(rxGain);
 				uls->setRxDlambda(rxDlambda);
+				uls->setRxAntennaModel(row.rxAntennaModel);
 				uls->setRxAntennaType(rxAntennaType);
 				uls->setTxAntennaType(txAntennaType);
 				uls->setRxAntenna(rxAntenna);

@@ -617,6 +617,9 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 	case CConst::F1336OmniAntennaType:
 		rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleDeg, rxGain, frequency);
 		break;
+	case CConst::R2AIP07AntennaType:
+		rxGainDB = calcR2AIP07Antenna(angleOffBoresightDeg, frequency);
+		break;
 	case CConst::OmniAntennaType:
 		rxGainDB = 0.0;
 		break;
@@ -627,6 +630,99 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::computeRxGain: rxAntennaType = " << rxAntennaType << " INVALID value");
 		break;
 	}
+
+	return(rxGainDB);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: ULSClass::calcR2AIP07Antenna                                           ****/
+/******************************************************************************************/
+double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency)
+{
+    int freqIdx;
+	double rxGainDB;
+
+    if ((frequency >= 5925.0e6) && (frequency <= 6425.0e6)) {
+        freqIdx = 0;
+    } else if ((frequency >= 6525.0e6) && (frequency <= 6875.0e6)) {
+        freqIdx = 0;
+    } else {
+		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value");
+    }
+
+    if (rxGain < 38) {
+        if (angleOffBoresightDeg < 5) {
+            rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
+        } else {
+            // Table 2, Category B2
+            double minSuppression;
+            if (angleOffBoresightDeg < 10.0) {
+                minSuppression = 15.0;
+            } else if (angleOffBoresightDeg < 15.0) {
+                minSuppression = 20.0;
+            } else if (angleOffBoresightDeg < 20.0) {
+                minSuppression = 23.0;
+            } else if (angleOffBoresightDeg < 30.0) {
+                minSuppression = 28.0;
+            } else if (angleOffBoresightDeg < 100.0) {
+                minSuppression = 29.0;
+            } else {
+                minSuppression = 60.0;
+            }
+            rxGainDB = rxGain - minSuppression;
+        }
+    } else {
+        if (angleOffBoresightDeg < 5) {
+            rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
+        } else {
+            bool antennaModelBlank = rxAntennaModel.empty();
+            bool categoryB1Flag = false;
+
+            if (antennaModelBlank || categoryB1Flag) {
+                // Table 2, Category B1
+                double minSuppression;
+                if (angleOffBoresightDeg < 10.0) {
+                    minSuppression = 21.0;
+                } else if (angleOffBoresightDeg < 15.0) {
+                    minSuppression = 25.0;
+                } else if (angleOffBoresightDeg < 20.0) {
+                    minSuppression = 29.0;
+                } else if (angleOffBoresightDeg < 30.0) {
+                    minSuppression = 32.0;
+                } else if (angleOffBoresightDeg < 100.0) {
+                    minSuppression = 35.0;
+                } else if (angleOffBoresightDeg < 140.0) {
+                    minSuppression = 39.0;
+                } else {
+                    minSuppression = 45.0;
+                }
+                rxGainDB = rxGain - minSuppression;
+            } else {
+                // Table 2, Category A
+                double minSuppressionA;
+                if (angleOffBoresightDeg < 10.0) {
+                    minSuppressionA = 25.0;
+                } else if (angleOffBoresightDeg < 15.0) {
+                    minSuppressionA = 29.0;
+                } else if (angleOffBoresightDeg < 20.0) {
+                    minSuppressionA = 33.0;
+                } else if (angleOffBoresightDeg < 30.0) {
+                    minSuppressionA = 36.0;
+                } else if (angleOffBoresightDeg < 100.0) {
+                    minSuppressionA = 42.0;
+                } else {
+                    minSuppressionA = 55.0;
+                }
+
+                double descrimination699 = rxGain - calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
+
+                double descriminationDB = std::max(minSuppressionA, descrimination699);
+
+                rxGainDB = rxGain - descriminationDB;
+            }
+        }
+    }
 
 	return(rxGainDB);
 }
