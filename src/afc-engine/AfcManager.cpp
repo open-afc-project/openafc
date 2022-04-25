@@ -405,8 +405,8 @@ void AfcManager::initializeDatabases()
 	/* Setup NLCD data                                                                    */
 	/**************************************************************************************/
 	if (!_nlcdFile.empty()) {
-		int tileSizeX = 161190;
-		int tileSizeY = 10000;
+		int tileSizeX = 3600;
+		int tileSizeY = 3600;
 		LOGGER_INFO(logger) << "Reading NLCD data file: " << _nlcdFile;
 		nlcdImageFile = new GdalImageFile2(QString::fromStdString(_nlcdFile), tileSizeX, tileSizeY);
 	} else {
@@ -1648,8 +1648,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
 	QJsonObject jsonObj = jsonDoc.object();
 
 	/**********************************************************************/
-	/* Create _allowableFreqBandList                                      */
-	/**********************************************************************/
+    /* Create _allowableFreqBandList                                      */
+    /**********************************************************************/
 	QJsonArray freqBandArray = jsonObj["freqBands"].toArray();
 	for (QJsonValue freqBandVal : freqBandArray) {
 		QJsonObject freqBandObj = freqBandVal.toObject();
@@ -1659,11 +1659,11 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
 
 		if (stopFreqMHz <= startFreqMHz) {
 			errMsg = QString("ERROR: Freq Band %1 Invalid, startFreqMHz = %2, stopFreqMHz = %3.  Require startFreqMHz < stopFreqMHz")
-				.arg(QString::fromStdString(name)).arg(startFreqMHz).arg(stopFreqMHz);
+					 .arg(QString::fromStdString(name)).arg(startFreqMHz).arg(stopFreqMHz);
 			throw std::runtime_error(errMsg.toStdString());
 		} else if ((stopFreqMHz <= _wlanMinFreqMHz) || (startFreqMHz >= _wlanMaxFreqMHz)) {
 			errMsg = QString("ERROR: Freq Band %1 Invalid, startFreqMHz = %2, stopFreqMHz = %3.  Has no overlap with band [%4,%5].")
-				.arg(QString::fromStdString(name)).arg(startFreqMHz).arg(stopFreqMHz).arg(_wlanMinFreqMHz).arg(_wlanMaxFreqMHz);
+					 .arg(QString::fromStdString(name)).arg(startFreqMHz).arg(stopFreqMHz).arg(_wlanMinFreqMHz).arg(_wlanMaxFreqMHz);
 			throw std::runtime_error(errMsg.toStdString());
 		}
 
@@ -1688,6 +1688,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
 		_regionPolygonFileList = SearchPaths::forReading("data", "fbrat/rat_transfer/population/Canada.kml", true).toStdString();
 	} else {
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): Invalid regionStr specified.");
+	}
+
+	if (jsonObj.contains("nlcdFile") && !jsonObj["nlcdFile"].isUndefined()) {
+		_nlcdFile = SearchPaths::forReading("data", QString("fbrat/rat_transfer/nlcd/") + jsonObj["nlcdFile"].toString(), true).toStdString();
+	} else {
+		_nlcdFile = SearchPaths::forReading("data", "fbrat/rat_transfer/nlcd/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
 	}
 
 	// ***********************************
@@ -1898,7 +1904,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
 
 	/**************************************************************************************/
 	/* Path Loss Model Parmeters                                                       ****/
-	/**************************************************************************************/
+    /**************************************************************************************/
 	_pathLossClampFSPL = false;
 
 	// Set pathLossModel
@@ -1919,7 +1925,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
 			// FSPL
 			break;
 		case CConst::ITMBldgPathLossModel:
-			// ITM model using Building data as terrain
+		// ITM model using Building data as terrain
 			// GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
 			_winner2ProbLOSThr = propModel["win2ProbLosThreshold"].toDouble()/100.0;
 			_confidenceWinner2 = propModel["win2Confidence"].toDouble()/100.0;
@@ -3283,7 +3289,7 @@ double AfcManager::computeSpectralOverlap(double sigStartFreq, double sigStopFre
 /****                2: RX and TX                                                      ****/
 /******************************************************************************************/
 void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::string>>& ulsDatabaseList, PopGridClass *popGridVal, int linkDirection, double minFreq, double maxFreq, bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
-		const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
+                             const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
 
 	auto fs_anom_writer = GzipCsvWriter(_fsAnomFile);
@@ -3333,6 +3339,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		std::string txPolarization;
 		double txHeightAboveTerrain;
 		double rxGain;
+		double rxAntennaDiameter;
 		double txGain;
 		double txEIRP;
 		CConst::ULSAntennaTypeEnum rxAntennaType;
@@ -3988,8 +3995,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/**************************************************************************/
 
 			/**************************************************************************/
-			/* Check txLatitude and txLongitude region defined by popGrid             */
-			/* (SIMULATION REGION)                                                    */
+			/* Check txLatitude and txLongitude region defined by popGrid (SIMULATION REGION)     */
 			/**************************************************************************/
 			if ((!ignoreFlag) && ((linkDirection == 1) || (linkDirection == 2)) && popGridVal)
 			{
@@ -4195,6 +4201,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					/**************************************************************************/
 
 					/**************************************************************************/
+					/* rxAntennaDiameter                                                      */
+					/**************************************************************************/
+					rxAntennaDiameter = row.rxAntennaDiameter;
+					/**************************************************************************/
+
+					/**************************************************************************/
 					/* rxAntenna                                                              */
 					/**************************************************************************/
 					if (!ignoreFlag) {
@@ -4215,8 +4227,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								if (!validFlag) {
 									std::ostringstream errStr;
 									errStr << "Invalid ULS data for FSID = " << fsid
-										<< ", Unknown Rx Antenna \"" << strval
-										<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
+									       << ", Unknown Rx Antenna \"" << strval
+									       << "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
 									LOGGER_WARN(logger) << errStr.str();
 									statusMessageList.push_back(errStr.str());
 
@@ -4393,6 +4405,9 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					rxAntennaFeederLossDB = _rxFeederLossDBOther;
 					noiseFigureDB = _ulsNoiseFigureDBOther;
 				}
+				double centerFreq = (startFreq + stopFreq)/2;
+				double lambda = CConst::c / centerFreq;
+				double rxDlambda = rxAntennaDiameter / lambda;
 
 				uls = new ULSClass(this, fsid, dbIdx);
 				_ulsList->append(uls);
@@ -4414,6 +4429,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setPRLatitudeDeg(prLatitudeDeg);
 				uls->setPRLongitudeDeg(prLongitudeDeg);
 				uls->setRxGain(rxGain);
+				uls->setRxDlambda(rxDlambda);
 				uls->setRxAntennaType(rxAntennaType);
 				uls->setTxAntennaType(txAntennaType);
 				uls->setRxAntenna(rxAntenna);
@@ -4589,7 +4605,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 	return;
 }
 /******************************************************************************************/
-
 /******************************************************************************************/
 /**** AfcManager::readRASData()                                                        ****/
 /******************************************************************************************/
@@ -9542,7 +9557,6 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_visibilityThreshold = -10000.0;
 
 	_worldPopulationFile = SearchPaths::forReading("data", "fbrat/rat_transfer/population/gpw_v4_population_density_rev11_2020_30_sec.tif", true).toStdString();
-	_nlcdFile = SearchPaths::forReading("data", "fbrat/rat_transfer/nlcd/nlcd_2019_land_cover_l48_20210604.img", true).toStdString();
 	_radioClimateFile = SearchPaths::forReading("data", "fbrat/rat_transfer/itudata/TropoClim.txt", true).toStdString();
 	_surfRefracFile = SearchPaths::forReading("data", "fbrat/rat_transfer/itudata/N050.TXT", true).toStdString();
 	_regionPolygonResolution = 1.0e-5;

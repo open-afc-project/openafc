@@ -38,6 +38,7 @@ struct UlsRecord
 	double rxGroundElevation;
 	double rxHeightAboveTerrain;
 	double rxGain;
+	double rxAntennaDiameter;
 	std::string status;
 	bool mobile;
 	std::string rxAntennaModel;
@@ -49,64 +50,65 @@ struct UlsRecord
 
 class UlsDatabase
 {
-	public:
-		UlsDatabase();
-		~UlsDatabase();
+public:
+	UlsDatabase();
+	~UlsDatabase();
 
-		// Loads all FS within lat/lon bounds
-		void loadUlsData(const QString& dbName, std::vector<UlsRecord>& target,
-				const double& minLat=-90, const double& maxLat=90, const double& minLon=-180, const double& maxLon=180);
+	// Loads all FS within lat/lon bounds
+	void loadUlsData(const QString& dbName, std::vector<UlsRecord>& target,
+	                 const double& minLat=-90, const double& maxLat=90, const double& minLon=-180, const double& maxLon=180);
 
-		// Loads a single FS by looking up its Id
-		void loadFSById(const QString& dbName, std::vector<UlsRecord>& target, const int& fsid);
-		UlsRecord getFSById(const QString& dbName, const int& fsid)
-		{
-			// list of size 1
-			auto list = std::vector<UlsRecord>();
-			loadFSById(dbName, list, fsid);
-			if (list.size() != 1)
-				throw std::runtime_error("FS not found");
-			return list.at(0);
-		};
+	// Loads a single FS by looking up its Id
+	void loadFSById(const QString& dbName, std::vector<UlsRecord>& target, const int& fsid);
+	UlsRecord getFSById(const QString& dbName, const int& fsid)
+	{
+		// list of size 1
+		auto list = std::vector<UlsRecord>();
+		loadFSById(dbName, list, fsid);
+		if (list.size() != 1)
+			throw std::runtime_error("FS not found");
+		return list.at(0);
+	};
 
-		void fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vector<UlsRecord>& target, QSqlQuery& ulsQueryRes);
+	void fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vector<UlsRecord>& target, QSqlQuery& ulsQueryRes);
 
-		QStringList columns;
-		std::vector<int *> fieldIdxList;
+	QStringList columns;
+	std::vector<int *> fieldIdxList;
 
-		QStringList prColumns;
-		std::vector<int *> prFieldIdxList;
+	QStringList prColumns;
+	std::vector<int *> prFieldIdxList;
 
-		int fsidIdx;
-		int callsignIdx;
-		int radio_serviceIdx;
-		int nameIdx;
-		int rx_callsignIdx;
-		int rx_antenna_numIdx;
-		int freq_assigned_start_mhzIdx;
-		int freq_assigned_end_mhzIdx;
-		int emissions_desIdx;
-		int tx_lat_degIdx;
-		int tx_long_degIdx;
-		int tx_ground_elev_mIdx;
-		int tx_polarizationIdx;
-		int tx_gainIdx;
-		int tx_eirpIdx;
-		int tx_height_to_center_raat_mIdx;
-		int rx_lat_degIdx;
-		int rx_long_degIdx;
-		int rx_ground_elev_mIdx;
-		int rx_height_to_center_raat_mIdx;
-		int rx_gainIdx;
-		int statusIdx;
-		int mobileIdx;
-		int rx_ant_modelIdx;
-		int p_rp_numIdx;
+	int fsidIdx;
+	int callsignIdx;
+	int radio_serviceIdx;
+	int nameIdx;
+	int rx_callsignIdx;
+	int rx_antenna_numIdx;
+	int freq_assigned_start_mhzIdx;
+	int freq_assigned_end_mhzIdx;
+	int emissions_desIdx;
+	int tx_lat_degIdx;
+	int tx_long_degIdx;
+	int tx_ground_elev_mIdx;
+	int tx_polarizationIdx;
+	int tx_gainIdx;
+	int tx_eirpIdx;
+	int tx_height_to_center_raat_mIdx;
+	int rx_lat_degIdx;
+	int rx_long_degIdx;
+	int rx_ground_elev_mIdx;
+	int rx_height_to_center_raat_mIdx;
+	int rx_gainIdx;
+	int rx_antennaDiameterIdx;
+	int statusIdx;
+	int mobileIdx;
+	int rx_ant_modelIdx;
+	int p_rp_numIdx;
 
-		int prSeqIdx;
-		int pr_lat_degIdx;
-		int pr_lon_degIdx;
-		int pr_height_to_center_raat_mIdx;
+	int prSeqIdx;
+	int pr_lat_degIdx;
+	int pr_lon_degIdx;
+	int pr_height_to_center_raat_mIdx;
 };
 
 #endif /* AFCENGINE_ULS_DATABASE_H */

@@ -32,10 +32,13 @@ import inspect
 import json
 import logging
 import os
+import openpyxl as oxl
 import requests
 import sqlite3
 import sys
+from _afc_errors import *
 from _version import __version__
+from _wfa_tests import *
 
 
 ADD_AFC_TEST_REQS = 'add_test_req.txt'
@@ -107,10 +110,11 @@ class AfcTester:
             'a': add_reqs,
             'd': dump_db,
             'e': export_admin_cfg,
-            'r': run_reqs
+            'r': run_reqs,
+            'i': import_tests
         }
         for k in params:
-            if not set_db_opts[k](self, params[k][0]):
+            if not set_db_opts[k](self, params[k]):
                 return AFC_ERR
         return AFC_OK
 
@@ -214,14 +218,17 @@ def make_arg_parser():
                              nargs='+', action=ParseDict,
                              help='<addr=<ip address|hostname>>, '
                                   '[port=<port>], '
-                                  '[post=n], '
+                                  '[post=n] - not to check for SSL, '
                                   '[log=<info|debug|warn|error|critical>]')
     args_parser.add_argument('--db', metavar='KEY,KEY=VALUE',
                              nargs='+', action=ParseDict,
-                             help='<a[=filename]> - add new request record,'
-                                  '<d> - dump all DB tables,'
-                                  '<e> - export admin config,'
-                                  '<r[=filename]> - run request from file')
+                             help="<a[=filename]> - add new request record,\n"
+                                  "<d> - dump all DB tables,"
+                                  "<e> - export admin config,"
+                                  "<r[=filename]> - run request from file"
+                                  "<i[=identifier[,filename]]> - parse WFA tests to external file,"
+                                  "where identifier are <all|srs|urs|sri|fsp|ibp|sip>"
+                                  "external filename is <identifier>_afc_test_reqs.json")
     args_parser.add_argument('--test', metavar='KEY=VALUE',
                              nargs='+', action=ParseDict,
                              help='<r=[number]>  - run number of tests '
@@ -236,7 +243,7 @@ def export_admin_cfg(self, opt):
     """Export admin server configuration"""
     app_log.debug('%s() %s', inspect.stack()[0][3], opt)
 
-    filename = opt
+    filename = opt[0]
     con = sqlite3.connect(self.db_filename)
     cur = con.cursor()
     cur.execute('SELECT COUNT(*) FROM ' + TBL_USERS_NAME)
@@ -270,7 +277,7 @@ def export_admin_cfg(self, opt):
                 out_str += '\n'
             fp_exp.write(out_str)
     con.close()
-    app_log.info('Server admin config exported to %s', opt)
+    app_log.info('Server admin config exported to %s', opt[0])
     return True
 
 
@@ -297,8 +304,8 @@ def add_reqs(self, opt):
     """Prepare DB source files"""
     app_log.debug('%s()', inspect.stack()[0][3])
     filename = ADD_AFC_TEST_REQS
-    if opt != 'True':
-        filename = opt
+    if opt[0] != 'True':
+        filename = opt[0]
 
     if not os.path.isfile(filename):
         app_log.error('Missing raw test data file %s', filename)
@@ -345,8 +352,8 @@ def run_reqs(self, opt):
     """Run one or more requests from provided file"""
     app_log.debug('%s()', inspect.stack()[0][3])
     filename = ADD_AFC_TEST_REQS
-    if opt != 'True':
-        filename = opt
+    if opt[0] != 'True':
+        filename = opt[0]
 
     if not os.path.isfile(filename):
         app_log.error('Missing raw test data file %s', filename)
@@ -357,7 +364,8 @@ def run_reqs(self, opt):
             dataline = fp_test.readline()
             if not dataline:
                 break
-
+            app_log.info('Request:')
+            app_log.info(dataline)
             new_req, resp = self._send_recv(dataline)
 
             resp_res = json_lookup('shortDescription', resp, None)
@@ -366,7 +374,9 @@ def run_reqs(self, opt):
                 app_log.debug(resp)
                 break
             app_log.info('Got response for the request')
-
+            app_log.info('Resp:')
+            app_log.info(resp)
+            app_log.info('\n\n')
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)
             hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
@@ -377,8 +387,8 @@ def dump_db(self, opt):
     """Ful dump from DB tables"""
     app_log.debug('%s() %s', inspect.stack()[0][3], opt)
     find_key = ''
-    if opt != 'True':
-        find_key = opt
+    if opt[0] != 'True':
+        find_key = opt[0]
 
     if not os.path.isfile(self.db_filename):
         app_log.error('Missing DB file %s', self.db_filename)
@@ -403,6 +413,131 @@ def dump_db(self, opt):
                     app_log.info('%s', in_val)
     con.close()
     app_log.info('\n\n\tDump DB table - %s')
+    return True
+
+# get test identifier as parameter or 'True' if
+# parameter is missing
+def import_tests(self, opt):
+    app_log.debug('%s() %s\n', inspect.stack()[0][3], opt)
+    filename = "AFC System (SUT) Test Vectors r5.xlsx"
+    test_ident = 'all'
+    out_fname = ''
+
+    if (opt[0] != 'True'):
+        if (AFC_TEST_IDENT.get(opt[0].lower()) is None):
+            app_log.error('Unsupported test identifier (%s)', opt[0])
+            return False
+        else:
+            test_ident = opt[0]
+        if (len(opt) > 1):
+            out_fname = opt[1]
+    if out_fname == '':
+        out_fname = test_ident + NEW_AFC_TEST_SUFX
+
+    wb = oxl.load_workbook(filename)
+
+    for sh in wb:
+        app_log.debug('Sheet title: %s', sh.title)
+        app_log.debug('rows %d, cols %d\n', sh.max_row, sh.max_column)
+
+    app_log.info('Export tests into file: %s', out_fname)
+    fp_new = open(out_fname, 'w')
+    sheet = wb.active
+    nbr_rows = sheet.max_row
+    app_log.debug('Rows range 1 - %d', nbr_rows + 1)
+    for i in range(1, nbr_rows + 1):
+        cell = sheet.cell(row = i, column = PURPOSE_CLM)
+        if ((cell.value is None) or
+            (AFC_TEST_IDENT.get(cell.value.lower()) is None) or
+            (cell.value == 'SRI')):
+            continue
+
+        if (test_ident != 'all') and (cell.value.lower() != test_ident):
+            continue
+
+        res_str = REQ_HEADER + REQ_INQUIRY_HEADER + REQ_INQ_CHA_HEADER
+        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_90)
+        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_92)
+        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_94)
+        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_96)
+        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}'
+        res_str += REQ_INQ_CHA_FOOTER + ' '
+
+        cell = sheet.cell(row = i, column = PURPOSE_CLM)
+        purpose = cell.value
+        cell = sheet.cell(row = i, column = TEST_VEC_CLM)
+        test_vec = cell.value
+
+        res_str += REQ_DEV_DESC_HEADER
+        cell = sheet.cell(row = i, column = RULESET_CLM)
+        res_str += REQ_RULESET + '["' + str(cell.value) + '"],'
+        cell = sheet.cell(row = i, column = SER_NBR_CLM)
+        res_str += REQ_SER_NBR + '"SN-' + purpose + str(test_vec) + '",'
+        res_str += REQ_CERT_ID_HEADER
+        cell = sheet.cell(row = i, column = NRA_CLM)
+        res_str += REQ_NRA + '"' + cell.value + '",'
+        res_str += REQ_ID + '"FCCID-' + purpose +\
+                   str(test_vec) + '"' + REQ_CERT_ID_FOOTER
+        res_str += REQ_DEV_DESC_FOOTER + REQ_INQ_FREQ_RANG_HEADER
+
+        freq_range = AfcFreqRange()
+        freq_range.set_range_limit(sheet.cell(row = i, column = LOWFREQUENCY_86), 'low')
+        freq_range.set_range_limit(sheet.cell(row = i, column = HIGHFREQUENCY_87), 'high')
+        try:
+            res_str += freq_range.append_range()
+        except IncompleteFreqRange as e:
+            app_log.debug(e)
+        freq_range = AfcFreqRange()
+        freq_range.set_range_limit(sheet.cell(row = i, column = LOWFREQUENCY_88), 'low')
+        freq_range.set_range_limit(sheet.cell(row = i, column = HIGHFREQUENCY_89), 'high')
+        try:
+            tmp_str = freq_range.append_range()
+            res_str += ', ' + tmp_str
+        except IncompleteFreqRange as e:
+            app_log.debug(e)
+
+        res_str += REQ_INQ_FREQ_RANG_FOOTER
+
+        cell = sheet.cell(row = i, column = MINDESIREDPOWER)
+        if (cell.value):
+            res_str += REQ_MIN_DESIRD_PWR + str(cell.value) + ', '
+
+        res_str += REQ_LOC_HEADER
+        cell = sheet.cell(row = i, column = INDOORDEPLOYMENT)
+        res_str += REQ_LOC_INDOORDEPL + str(cell.value) + ', '
+        res_str += REQ_LOC_ELEV_HEADER
+        cell = sheet.cell(row = i, column = VERTICALUNCERTAINTY)
+        res_str += REQ_LOC_VERT_UNCERT + str(cell.value) + ', '
+        cell = sheet.cell(row = i, column = HEIGHTTYPE)
+        res_str += REQ_LOC_HEIGHT_TYPE + '"' + str(cell.value) + '", '
+        cell = sheet.cell(row = i, column = HEIGHT)
+        res_str += REQ_LOC_HEIGHT + str(cell.value) + '}, '
+
+        res_str += REQ_LOC_ELLIP_HEADER
+        cell = sheet.cell(row = i, column = ORIENTATION_CLM)
+        res_str += REQ_LOC_ORIENT + str(cell.value) + ', '
+        cell = sheet.cell(row = i, column = MINORAXIS_CLM)
+        res_str += REQ_LOC_MINOR_AXIS + str(cell.value) + ', '
+        res_str += REQ_LOC_CENTER
+        cell = sheet.cell(row = i, column = LATITUDE_CLM)
+        res_str += REQ_LOC_LATITUDE + str(cell.value) + ', '
+        cell = sheet.cell(row = i, column = LONGITUDE_CLM)
+        res_str += REQ_LOC_LONGITUDE + str(cell.value) + '}, '
+        cell = sheet.cell(row = i, column = MAJORAXIS_CLM)
+        res_str += REQ_LOC_MAJOR_AXIS + str(cell.value) + '}'
+        res_str += REQ_LOC_FOOTER
+
+        res_str += REQ_REQUEST_ID + '"REQ-' + purpose + str(test_vec) + '"'
+        res_str += REQ_INQUIRY_FOOTER
+        cell = sheet.cell(row = i, column = VERSION_CLM)
+        res_str += REQ_VERSION + '"' + str(cell.value) + '"'
+        res_str += REQ_FOOTER
+        app_log.debug(res_str)
+        fp_new.write(res_str+'\n')
+    fp_new.close()
     return True
 
 
