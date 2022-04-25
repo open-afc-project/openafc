@@ -796,7 +796,7 @@ int main(int argc, char **argv)
                   } else {
                       Fc = 6700.0e6;
                   }
-                  double oneOverSqrtK = 1.0/sqrt(0.54);
+                  double oneOverSqrtK = 1.0/sqrt(0.55);
                   rxAntennaDiameter = (speedOfLight/(M_PI*Fc))*exp(log(10.0)*G/20)*oneOverSqrtK;
 
                   rxAnt.gain = G;
