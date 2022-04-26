@@ -73,6 +73,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "threshold":-6,"maxLinkDistance":50,"maxEIRP":36,"minEIRP":18,
     "propagationModel":{"kind":"FCC 6GHz Report & Order","win2Confidence":50,"itmConfidence":50,"p2108Confidence":50,"buildingSource":"None","terrainSource":"3DEP (30m)"},
     "propagationEnv":"NLCD Point",
+    "nlcdFile": 'nlcd_2019_land_cover_l48_20210604_resample.tif',
     "ulsDatabase":"CONUS_ULS_2022-03-02T03_34_41.097782_fixedBPS_sorted.sqlite3",
     "regionStr":"CONUS",
     "rasDatabase":"RASdatabase.csv",

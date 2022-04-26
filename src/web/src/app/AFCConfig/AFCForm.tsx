@@ -74,7 +74,21 @@ export class AFCForm extends React.Component<
     private setMaxLinkDistance = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxLinkDistance: n }) });
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
-    private setPropogationEnv = (n: string) => this.setState({ config: Object.assign(this.state.config, { propagationEnv: n }) });
+    private setPropogationEnv = (n: string) => {
+
+        const newConfig = {...this.state.config};
+            
+        newConfig.propagationEnv = n as "NLCD Point" | "Population Density Map" | "Urban" | "Suburban" | "Rural";
+        if (n != "NLCD Point" && this.state.config.propagationEnv == 'NLCD Point') {
+            delete newConfig.nlcdFile;
+        }
+        if (n == "NLCD Point" && this.state.config.propagationEnv != 'NLCD Point' && !this.state.config.nlcdFile) {
+            newConfig.nlcdFile = "nlcd_2019_land_cover_l48_20210604_resample.tif";
+        }
+        this.setState({ config: newConfig });
+    }
+    private setNlcdFile = (n: string) => this.setState({ config: Object.assign(this.state.config, { nlcdFile: n }) });
+
     private setScanBelowGround = (n: string) => {
         const conf = this.state.config;
         switch (n) {
@@ -242,26 +256,26 @@ export class AFCForm extends React.Component<
             if (x.kind === "Custom") {
                 //rlanITMTxClutterMethod is set in the CustomPropagation but stored at the top level
                 // so move it up if present
-                const conf = {...this.state.config};
+                const conf = { ...this.state.config };
                 var model = x as CustomPropagation;
                 var itmTxClutterMethod = model.rlanITMTxClutterMethod;
                 delete model.rlanITMTxClutterMethod;
                 conf.propagationModel = model;
-                if(!!itmTxClutterMethod ){
+                if (!!itmTxClutterMethod) {
                     conf.rlanITMTxClutterMethod = itmTxClutterMethod;
-                }else{
+                } else {
                     delete conf.rlanITMTxClutterMethod;
                 }
-                this.setState({ config: conf});
+                this.setState({ config: conf });
 
 
             } else {
                 const conf = this.state.config;
                 conf.propagationModel = x;
-                if(x.kind === "ITM with building data"){
+                if (x.kind === "ITM with building data") {
                     conf.rlanITMTxClutterMethod = "BLDG_DATA"
-                }else{
-                    conf.rlanITMTxClutterMethod="FORCE_TRUE"
+                } else {
+                    conf.rlanITMTxClutterMethod = "FORCE_TRUE"
                 }
                 this.setState({ config: conf });
             }
@@ -285,19 +299,19 @@ export class AFCForm extends React.Component<
             this.setState({ config: conf });
         }
 
-        const getPropagationModelForForm= () =>{
+        const getPropagationModelForForm = () => {
             //rlanITMTxClutterMethod is stored at the top level but set in the form
             // so move it down if present
-            if(this.state.config.propagationModel.kind !== "Custom"){
+            if (this.state.config.propagationModel.kind !== "Custom") {
                 return { ...this.state.config.propagationModel };
-            }else{
-                const customModel =  { ...this.state.config.propagationModel } as CustomPropagation;
+            } else {
+                const customModel = { ...this.state.config.propagationModel } as CustomPropagation;
                 customModel.rlanITMTxClutterMethod = this.state.config.rlanITMTxClutterMethod;
                 return customModel;
             }
 
         }
-        
+
 
         return (
             <Card>
@@ -641,6 +655,20 @@ export class AFCForm extends React.Component<
                                         <FormSelectOption key="Suburban" value="Suburban" label="Suburban" />
                                         <FormSelectOption key="Rural" value="Rural" label="Rural" />
                                     </FormSelect>
+                                    {this.state.config.propagationEnv == 'NLCD Point' ?
+                                        <FormGroup label="NLCD Database" fieldId="nlcd-database">
+                                            <FormSelect
+                                                value={this.state.config.nlcdFile ?? "nlcd_2019_land_cover_l48_20210604_resample.tif"}
+                                                onChange={(x) => this.setNlcdFile(x)}
+                                                id="nlcd-database"
+                                                name="nlcd-database"
+                                                style={{ textAlign: "right" }}
+                                            >
+                                                <FormSelectOption key="Production NLCD " value="nlcd_2019_land_cover_l48_20210604_resample.tif" label="Production NLCD" />
+                                                <FormSelectOption key="WFA Test NLCD " value="federated_nlcd.tif" label="WFA Test NLCD" />
+                                            </FormSelect>
+                                        </FormGroup>
+                                        : <></>}
                                 </FormGroup>
                             </GalleryItem>}
                         {this.state.config.propagationModel.kind != "FSPL" ?
