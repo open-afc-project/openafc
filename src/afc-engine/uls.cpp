@@ -750,6 +750,7 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
                     minSuppressionA = 55.0;
                 }
 
+                subModelStr = ":catA";
                 rxGainDB = rxGain - minSuppressionA;
             }
         }
