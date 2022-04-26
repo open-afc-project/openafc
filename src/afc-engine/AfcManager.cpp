@@ -5634,7 +5634,8 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				pathClutterRxModelStr = "P.2108";
 				pathClutterRxCDF = q(-gauss[0]);
 			} else if ( (propEnvRx == CConst::ruralPropEnv) || (propEnvRx == CConst::barrenPropEnv) ) {
-				bool clutterFlag = (nlcdLandCatRx == CConst::noClutterNLCDLandCat ? false : true);
+                bool allowRuralFSClutterFlag = false;
+				bool clutterFlag = allowRuralFSClutterFlag && (nlcdLandCatRx == CConst::noClutterNLCDLandCat ? false : true);
 
 				if (clutterFlag) {
 					double ha, dk;
