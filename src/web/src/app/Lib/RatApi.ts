@@ -63,7 +63,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
         }               
     ],
     "antennaPattern":{"kind":'None',"value":''},
-    "ulsDefaultAntennaType": "F.699",
+    "ulsDefaultAntennaType": 'WINNF-AIP-07',
     "scanPointBelowGroundMethod": "discard",
     "polarizationMismatchLoss":{"kind":"Fixed Value","value":3},
     "bodyLoss":{"kind":"Fixed Value","valueIndoor":0,"valueOutdoor":0},

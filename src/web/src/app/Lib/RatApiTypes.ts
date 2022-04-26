@@ -112,7 +112,7 @@ export type AntennaPatternState = {
     userUpload?: UserUpload
 }
 
-export type DefaultAntennaType = 'F.1245' | 'F.699'
+export type DefaultAntennaType = 'F.1245' | 'F.699' | 'WINNF-AIP-07'
 
 export type UserAntennaPattern = {
     kind: string,
