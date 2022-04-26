@@ -15,10 +15,14 @@ rabbitmqctl set_permissions -p fbrat celery '.*' '.*' '.*'
 rabbitmqctl list_users
 
 #celery
-/bin/sh -c '/bin/celery multi start rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10 -A ratapi.tasks.afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=INFO'
+CELERY_OPTIONS=${CELERY_OPTIONS:="rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10"}
+CELERY_LOG=${CELERY_LOG:=INFO}
+/bin/celery multi start $CELERY_OPTIONS -A ratapi.tasks.afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=$CELERY_LOG &
 
 # apache
-/usr/sbin/httpd $OPTIONS -DFOREGROUND &
+HTTPD_OPTIONS=${HTTPD_OPTIONS}
+echo "/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND >"
+/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND &
 
 wait
 
