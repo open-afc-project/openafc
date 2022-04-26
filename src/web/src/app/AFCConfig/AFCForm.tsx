@@ -677,8 +677,8 @@ export class AFCForm extends React.Component<
                                 //className="prop-env-tooltip"
                                 maxWidth="40.0rem"
                                 content={
-                                    <p>When distance &gt; 1km, clutter loss is added at FS Receiver when FS Receiver AGL height &lt; <b>Max FS AGL Height</b>. Clutter models are the same as those used for APs.​</p>
-
+                                    <p>When distance &gt; 1km and FS Receiver (Rx) is in Urban/Suburban, P.2108 clutter loss is added at
+                                         FS Rx when FS Receiver AGL height &lt; <b>Max FS AGL Height</b></p>
                                 }
                             >
                                 <FormGroup fieldId="horizontal-form-clutter">
