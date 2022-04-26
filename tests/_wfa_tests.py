@@ -80,7 +80,7 @@ REQ_LOC_LONGITUDE = '"longitude": '
 REQ_LOC_MAJOR_AXIS = '"majorAxis": '
 
 NEW_AFC_TEST_SUFX = '_afc_test_reqs.json'
-AFC_TEST_IDENT = { 'srs':0, 'urs':1, 'sri':2, 'fsp':3, 'ibp':4, 'sip':5 }
+AFC_TEST_IDENT = { 'all':0, 'srs':1, 'urs':2, 'sri':3, 'fsp':4, 'ibp':5, 'sip':6 }
 
 
 class AfcFreqRange:
