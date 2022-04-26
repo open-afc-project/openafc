@@ -19,6 +19,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Add AFC Server admin configuration](#add-afc-server-admin-configuration)
   - [Remove AFC Server admin configuration](#remove-afc-server-admin-configuration)
   - [List AFC Server admin configuration](#list-afc-server-admin-configuration)
+  - [Export tests from WFA file to JSON format](#export-tests-from-wfa-file-to-json-format)
 - [**Testing setup**](#testing-setup)
 
 - [Back to main readme](/README.md)
@@ -139,6 +140,18 @@ rat-manage-api cfg del src=./del_admin_cfg.json
 List internal data from provided admin configuration file
 ```
 rat-manage-api cfg list src=./add_admin_cfg.json
+```
+
+## Export tests from WFA file to JSON format
+
+How to export test vectors from WFA file into JSON format file.
+```
+afc_tests.py --db i=<input file>,[test category,[output file]]
+```
+For example,
+
+```
+afc_tests.py --db i="AFC System (SUT) Test Vectors r6.xlsx",all,/tests/abc.txt
 ```
 
 <br /><br />
