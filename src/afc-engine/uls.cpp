@@ -682,6 +682,7 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
         } else {
             bool antennaModelBlank = rxAntennaModel.empty();
             bool categoryB1Flag = false;
+            bool knownHighPerformance = false;
 
             if (antennaModelBlank || categoryB1Flag) {
                 // Table 2, Category B1
@@ -703,7 +704,7 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
                 }
                 subModelStr = ":catB1";
                 rxGainDB = rxGain - minSuppression;
-            } else {
+            } else if (knownHighPerformance) {
                 // Table 2, Category A
                 double minSuppressionA;
                 if (angleOffBoresightDeg < 10.0) {
@@ -732,6 +733,24 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
                 }
 
                 rxGainDB = rxGain - descriminationDB;
+            } else {
+                // Table 2, Category A
+                double minSuppressionA;
+                if (angleOffBoresightDeg < 10.0) {
+                    minSuppressionA = 25.0;
+                } else if (angleOffBoresightDeg < 15.0) {
+                    minSuppressionA = 29.0;
+                } else if (angleOffBoresightDeg < 20.0) {
+                    minSuppressionA = 33.0;
+                } else if (angleOffBoresightDeg < 30.0) {
+                    minSuppressionA = 36.0;
+                } else if (angleOffBoresightDeg < 100.0) {
+                    minSuppressionA = 42.0;
+                } else {
+                    minSuppressionA = 55.0;
+                }
+
+                rxGainDB = rxGain - minSuppressionA;
             }
         }
     }
