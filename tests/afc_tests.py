@@ -419,18 +419,24 @@ def dump_db(self, opt):
 # parameter is missing
 def import_tests(self, opt):
     app_log.debug('%s() %s\n', inspect.stack()[0][3], opt)
-    filename = "AFC System (SUT) Test Vectors r5.xlsx"
+    filename = ''
     test_ident = 'all'
     out_fname = ''
 
-    if (opt[0] != 'True'):
-        if (AFC_TEST_IDENT.get(opt[0].lower()) is None):
-            app_log.error('Unsupported test identifier (%s)', opt[0])
-            return False
-        else:
-            test_ident = opt[0]
-        if (len(opt) > 1):
-            out_fname = opt[1]
+    app_log.debug(len(opt))
+    if (len(opt) < 2):
+        app_log.error('Missing input file (%s)')
+        return False
+
+    filename = opt[0]
+
+    if (AFC_TEST_IDENT.get(opt[1].lower()) is None):
+        app_log.error('Unsupported test identifier (%s)', opt[1])
+        return False
+    else:
+        test_ident = opt[1]
+    if (len(opt) > 2):
+        out_fname = opt[2]
     if out_fname == '':
         out_fname = test_ident + NEW_AFC_TEST_SUFX
 
