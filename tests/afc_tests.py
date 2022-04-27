@@ -36,6 +36,7 @@ import openpyxl as oxl
 import requests
 import sqlite3
 import sys
+import time
 from _afc_errors import *
 from _version import __version__
 from _wfa_tests import *
@@ -145,10 +146,13 @@ class AfcTester:
         new_req_json = json.loads(params.encode('utf-8'))
         new_req = json.dumps(new_req_json, sort_keys=True)
         app_log.debug(new_req)
+        before_ts = time.monotonic()
         rawresp = requests.post(
             self.url_path, data=new_req, headers=headers,
             timeout=None, verify=self.post_verify)
         resp = rawresp.json()
+        tm_secs = time.monotonic() - before_ts
+        app_log.info('Test done at %.1f secs', tm_secs)
         return new_req, resp
 
 
@@ -366,6 +370,7 @@ def run_reqs(self, opt):
                 break
             app_log.info('Request:')
             app_log.info(dataline)
+
             new_req, resp = self._send_recv(dataline)
 
             resp_res = json_lookup('shortDescription', resp, None)
@@ -469,6 +474,8 @@ def import_tests(self, opt):
         cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_94)
         res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
         cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_96)
+        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_98)
         res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}'
         res_str += REQ_INQ_CHA_FOOTER + ' '
 
@@ -627,12 +634,15 @@ def start_test(self, test_number):
     while row_idx < found_range:
         # Fetch test vector to create request
         req_id = json_lookup('requestId', eval(found_reqs[row_idx][0]), None)
+        before_ts = time.monotonic()
         rawresp = requests.post(self.url_path,
                                 data=json.dumps(eval(found_reqs[row_idx][0])),
                                 headers=headers,
                                 timeout=None,
                                 verify=self.post_verify)
         resp = rawresp.json()
+        tm_secs = time.monotonic() - before_ts
+        app_log.info('Test done at %.1f secs', tm_secs)
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
         hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
