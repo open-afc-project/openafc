@@ -1500,14 +1500,12 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 				ChannelStruct channel;
 				channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
 				channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
-				if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
-					channel.operatingClass = opClass.opClass;
-					channel.index = cfi;
-					channel.availability = GREEN; // Everything initialized to GREEN
-					channel.eirpLimit_dBm = 0;
-					channel.type = ChannelType::INQUIRED_CHANNEL;
-					_channelList.push_back(channel);
-				}
+				channel.operatingClass = opClass.opClass;
+				channel.index = cfi;
+				channel.availability = GREEN; // Everything initialized to GREEN
+				channel.eirpLimit_dBm = 0;
+				channel.type = ChannelType::INQUIRED_CHANNEL;
+				_channelList.push_back(channel);
 			}
 		}
 	}
