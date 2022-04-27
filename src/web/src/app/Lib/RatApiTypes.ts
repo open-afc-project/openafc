@@ -397,6 +397,7 @@ export interface GeoJson {
  */
 export interface ChannelData {
     channelWidth: number,
+    startFrequency: number,
     channels: {
         color: string,
         name: string,

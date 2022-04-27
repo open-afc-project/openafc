@@ -122,6 +122,97 @@ namespace
 	}
 }; // end namespace
 
+namespace OpClass
+{
+	// Note: Per 11ax D 8.0, section 27.3..23.2
+	// Channel's start frequency is calculated using formula
+	// Channel center frequency = Channel starting frequency + 5 × nch
+	// where nch = 1, 2, ...233, is the channel index
+	// For channel 1, center frequency is (5950 + 5 * 1) = 5955
+	// and start frequency = (center frequency - BW/2) = (5955 - 20/2) = 5945
+	OpClass  GlobalOpClass_131 =
+	{
+		131,		// Operating class
+		20,		// Bandwidth
+		5950,		// Start frequency.
+		{
+			1,   5,   9,  13,  17,  21,  25,  29,
+			33,  37,  41,  45,  49,  53,  57,  61,
+			65,  69,  73,  77,  81,  85,  89,  93,
+			97, 101, 105, 109, 113, 117, 121, 125,
+			129, 133, 137, 141, 145, 149, 153, 157,
+			161, 165, 169, 173, 177, 181, 185, 189,
+			193, 197, 201, 205, 209, 213, 217, 221,
+			225, 229, 233
+		}
+	};
+
+	const OpClass GlobalOpClass_132 =
+	{
+		132,
+		40,
+		5950,
+		{
+			3,  11,  19,  27,  35,  43,  51, 59,
+			67,  75,  83,  91,  99, 107, 115, 123,
+			131, 139, 147, 155, 163, 171, 179, 187,
+			195, 203, 211, 219, 227
+		}
+	};
+
+	const OpClass GlobalOpClass_133 =
+	{
+		133,
+		80,
+		5950,
+		{
+			7,   23,   39,  55,  71,  87, 103, 119,
+			135, 151, 167, 183, 199, 215
+		}
+	};
+
+	const OpClass GlobalOpClass_134 =
+	{
+		134,
+		160,
+		5950,
+		{
+			15,  47,  79, 111, 143, 175, 207
+		}
+	};
+
+	const OpClass GlobalOpClass_135 =
+	{
+		135,
+		80,
+		5950,
+		{
+			7,   23,   39,  55,  71,  87, 103, 119,
+			135, 151, 167, 183, 199, 215
+		}
+	};
+
+	const OpClass GlobalOpClass_136 =
+	{
+		136,
+		20,
+		5925,
+		{ 2 }
+	};
+
+	const std::vector<OpClass> USOpClass =
+	{
+		GlobalOpClass_131,
+		GlobalOpClass_132,
+		GlobalOpClass_133,
+		GlobalOpClass_134,
+		// Opclass 135 is a non contiguous 80+80 channels.
+		// GlobalOpClass_135,
+		GlobalOpClass_136
+	};
+
+}
+
 AfcManager::AfcManager()
 {
 	_terrainDataModel = (TerrainClass *) NULL;
@@ -1401,16 +1492,16 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 			_rlanType = RLANType::RLAN_INDOOR;
 		}
 
-		auto numChannels = std::vector<int> { 59, 29, 14, 7 };
-		auto bwList = std::vector<int> { 20, 40, 80, 160 };
-		int startFreq = 5945; // MHz
-		for(int bwIdx = 0; bwIdx < (int) bwList.size(); bwIdx++) 
+		// Add all channels from all supported operating classes
+		for (auto &opClass: _opClass)
 		{
-			for (int chanIdx = 0; chanIdx < numChannels.at(bwIdx); chanIdx++)
+			for (auto &cfi: opClass.channels)
 			{
 				ChannelStruct channel;
-				channel.startFreqMHz = startFreq + chanIdx * bwList.at(bwIdx);
-				channel.stopFreqMHz = startFreq + (chanIdx + 1) * bwList.at(bwIdx);
+				channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
+				channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
+				channel.operatingClass = opClass.opClass;
+				channel.index = cfi;
 				channel.availability = GREEN; // Everything initialized to GREEN
 				channel.eirpLimit_dBm = 0;
 				channel.type = ChannelType::INQUIRED_CHANNEL;
@@ -1428,7 +1519,9 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 		channel.eirpLimit_dBm = 0;
 		channel.startFreqMHz = jsonObj["centerFrequency"].toInt() - jsonObj["bandwidth"].toInt()/2;
 		channel.stopFreqMHz = jsonObj["centerFrequency"].toInt() + jsonObj["bandwidth"].toInt()/2;
-		_channelList.push_back(channel);
+		if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
+			_channelList.push_back(channel);
+		}
 
 		_exclusionZoneRLANChanIdx = 0;//round((centerFreq - _wlanMinFreq) / _exclusionZoneRLANBWHz - 0.5);
 		_exclusionZoneRLANEIRPDBm = jsonObj["EIRP"].toDouble();
@@ -1475,7 +1568,9 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 		channel.eirpLimit_dBm = 0;
 		channel.startFreqMHz = jsonObj["centerFrequency"].toInt() - jsonObj["bandwidth"].toInt()/2;
 		channel.stopFreqMHz = jsonObj["centerFrequency"].toInt() + jsonObj["bandwidth"].toInt()/2;
-		_channelList.push_back(channel);
+		if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
+			_channelList.push_back(channel);
+		}
 
 		QJsonObject inOutdoor = jsonObj["indoorOutdoor"].toObject();
 		if (inOutdoor["kind"].toString() == "Selected per Building Data")
@@ -5140,10 +5235,10 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 					if (distKm * 1000 <= 50.0) {
 						winner2LOSValue = 1;
 					} else if (
-						   (_winner2LOSOption == CConst::BldgDataLOSOption)
-						|| (_winner2LOSOption == CConst::BldgDataReqTxLOSOption)
-						|| (_winner2LOSOption == CConst::BldgDataReqRxLOSOption)
-						|| (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption) ) {
+							(_winner2LOSOption == CConst::BldgDataLOSOption)
+							|| (_winner2LOSOption == CConst::BldgDataReqTxLOSOption)
+							|| (_winner2LOSOption == CConst::BldgDataReqRxLOSOption)
+							|| (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption) ) {
 						double terrainHeight;
 						double bldgHeight;
 						MultibandRasterClass::HeightResult lidarHeightResult;
@@ -5155,12 +5250,12 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						bool reqRx = (_winner2LOSOption == CConst::BldgDataReqRxLOSOption) || (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption);  
 
 						if (    ((!reqTx) || (txHeightSource == CConst::lidarHeightSource))
-						     && ((!reqRx) || (rxHeightSource == CConst::lidarHeightSource)) ) {
+								&& ((!reqRx) || (rxHeightSource == CConst::lidarHeightSource)) ) {
 							int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
 							bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
-								QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
-								QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-								distKm, numPts, heightProfilePtr);
+									QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+									QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+									distKm, numPts, heightProfilePtr);
 							winner2LOSValue = (losFlag ? 1 : 2);
 						}
 					} else if (_winner2LOSOption == CConst::ForceLOSLOSOption) {
@@ -5422,7 +5517,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 			if (distKm * 1000 <= 50.0) {
 				winner2LOSValue = 1;
 			} else if (
-				       (_winner2LOSOption == CConst::BldgDataLOSOption)
+					(_winner2LOSOption == CConst::BldgDataLOSOption)
 					|| (_winner2LOSOption == CConst::BldgDataReqTxLOSOption)
 					|| (_winner2LOSOption == CConst::BldgDataReqRxLOSOption)
 					|| (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption) ) {
@@ -5480,9 +5575,9 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 					{
 						int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
 						bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
-															QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
-															QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-																		distKm, numPts, heightProfilePtr);
+								QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+								QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+								distKm, numPts, heightProfilePtr);
 						rlanHasClutter = !losFlag;
 					}
 					break;
@@ -5500,10 +5595,10 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
 				double u = _confidenceITM;
 				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
-					false,
-					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
-					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
+						false,
+						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
 				pathLossModelStr = "ITM";
 				pathLossCDF = _confidenceITM;
 
@@ -5542,10 +5637,10 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				}
 				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
 				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
-					false,
-					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
-					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
+						false,
+						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
 				pathLossModelStr = "ITM";
 				pathLossCDF = _confidenceITM;
 
@@ -5559,23 +5654,23 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						case CConst::deciduousTreesNLCDLandCat:
 							ha = 15.0;
 							dk = 0.05;
-						if (txClutterStrPtr) { *txClutterStrPtr = "DECIDUOUS_TREES"; }
+							if (txClutterStrPtr) { *txClutterStrPtr = "DECIDUOUS_TREES"; }
 							break;
 						case CConst::coniferousTreesNLCDLandCat:
 							ha = 20.0;
 							dk = 0.05;
-						if (txClutterStrPtr) { *txClutterStrPtr = "CONIFEROUS_TREES"; }
+							if (txClutterStrPtr) { *txClutterStrPtr = "CONIFEROUS_TREES"; }
 							break;
 						case CConst::highCropFieldsNLCDLandCat:
 							ha = 4.0;
 							dk = 0.1;
-						if (txClutterStrPtr) { *txClutterStrPtr = "HIGH_CROP_FIELDS"; }
+							if (txClutterStrPtr) { *txClutterStrPtr = "HIGH_CROP_FIELDS"; }
 							break;
 						case CConst::villageCenterNLCDLandCat:
 						case CConst::unknownNLCDLandCat:
 							ha = 5.0;
 							dk = 0.07;
-						if (txClutterStrPtr) { *txClutterStrPtr = "VILLAGE_CENTER"; }
+							if (txClutterStrPtr) { *txClutterStrPtr = "VILLAGE_CENTER"; }
 							break;
 						default:
 							CORE_DUMP;
@@ -7471,9 +7566,7 @@ void AfcManager::runScanAnalysis()
 
 	LOGGER_INFO(logger) << "Executing AfcManager::runScanAnalysis()";
 
-	const int numBW = 4;
-	auto bwList = std::vector<int> { 20, 40, 80, 160 };
-	int bwIdx;
+	std::map<int, int> bw_index_map;
 
 	FILE *fscan;
 	std::string scanFileName = _serialNumber.toStdString() + "_scan.csv";
@@ -7488,9 +7581,19 @@ void AfcManager::runScanAnalysis()
 			",RLAN_TERRAIN_SOURCE"
 			",RLAN_PROP_ENV");
 
-	for(bwIdx=0; bwIdx<numBW; ++bwIdx) {
-		int bw = bwList[bwIdx];
+
+	// List all bandwidths covered by op-classes, merge duplicates
+	for (auto &opClass: _opClass) {
+		int bw = opClass.bandWidth;
+		bw_index_map[opClass.bandWidth] = 0;
+	}
+
+	int numBW = 0;
+	for (auto &map: bw_index_map) {
+		int bw = map.first;
 		fprintf(fscan, ",NUM_CHAN_BLACK_%d_MHZ,NUM_CHAN_RED_%d_MHZ,NUM_CHAN_YELLOW_%d_MHZ,NUM_CHAN_GREEN_%d_MHZ", bw, bw, bw, bw);
+		// Note down the index of bandwidth in the map
+		map.second = numBW++;
 	}
 	fprintf(fscan, "\n");
 	fflush(fscan);
@@ -7502,6 +7605,7 @@ void AfcManager::runScanAnalysis()
 	Vector3 rlanPosnList[2*NHt+1];
 	GeodeticCoord rlanCoordList[2*NHt+1];
 
+	int bwIdx;
 	int numBlack[numBW];
 	int numGreen[numBW];
 	int numYellow[numBW];
@@ -8108,7 +8212,7 @@ void AfcManager::runScanAnalysis()
 
 			for (auto& channel : _channelList) {
 				if (channel.type == ChannelType::INQUIRED_CHANNEL) {
-					bwIdx = channel.operatingClass - 131;
+					bwIdx = bw_index_map[channel.bandwidth()];
 					if (channel.availability == BLACK) {
 						numBlack[bwIdx]++;
 					} else if (channel.eirpLimit_dBm == _maxEIRP_dBm) {
@@ -9442,7 +9546,7 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 				nlcdLandCat = CConst::villageCenterNLCDLandCat;
 				propEnv = CConst::ruralPropEnv;
 				break;
-            }
+		}
 	} else if (_propagationEnviro.toStdString() == "Population Density Map") {
 		int regionIdx;
 		char propEnvChar;
@@ -9547,8 +9651,14 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_closeInDist = 1.0e3;              // Radius in which close in path loss model is used
 	_closeInPathLossModel = "WINNER2"; // Close in path loss model is used
 
-	_wlanMinFreqMHz = 5945;
+	_wlanMinFreqMHz = 5925;
 	_wlanMaxFreqMHz = 7125;
+
+	// Hardcode to US for now.
+	// When multiple countries are supported this need to come from AFC Configuration
+	for (auto opClass: OpClass::USOpClass) {
+		_opClass.push_back(opClass);
+	}
 
 	_wlanMinFreq = _wlanMinFreqMHz*1.0e6;
 	_wlanMaxFreq = _wlanMaxFreqMHz*1.0e6;
@@ -9596,35 +9706,6 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 /**************************************************************************************/
 
 /**************************************************************************************/
-/* AfcManager::convertCFI()                                                           */
-/**************************************************************************************/
-int AfcManager::convertCFI(int cfi, int& bandwidthMHz, int& startFreqMHz, int& stopFreqMHz)
-{
-	int posn = 0;
-	int retval;
-
-	while((posn <= 4) && (cfi & (1<<posn))) {
-		posn++;
-	}
-
-	if ((posn == 0) || (posn > 4) || (cfi < 0)) {
-		retval = 0;
-	} else {
-		bandwidthMHz = 20*(1<<(posn-1));
-		startFreqMHz = _wlanMinFreqMHz + (cfi - (1<<posn) + 1)*5;
-		stopFreqMHz = startFreqMHz + bandwidthMHz;
-		if (stopFreqMHz > _wlanMaxFreqMHz) {
-			retval = 0;
-		} else {
-			retval = 1;
-		}
-	}
-
-	return(retval);
-}
-/**************************************************************************************/
-
-/**************************************************************************************/
 /* AfcManager::computeInquiredFreqRangesPSD()                                         */
 /**************************************************************************************/
 void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &psdFreqRangeList)
@@ -9648,7 +9729,7 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 						if ((initFlag) || (psd < minPSD)) {
 							minPSD = psd;
 						}
-						if ((initFlag) || (channel.stopFreqMHz < nextFreqMHz)) {
+						if (channel.stopFreqMHz < nextFreqMHz) {
 							nextFreqMHz = channel.stopFreqMHz;
 						}
 						initFlag = false;
@@ -9693,7 +9774,7 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 void AfcManager::createChannelList()
 {
 	// add channel plan to channel list
-	auto bwList = std::vector<int> { 20, 40, 80, 160 };
+	int totalNumChan = 0;
 
 	for(auto freqRange : _inquiredFrquencyRangesMHz) {
 		auto inquiredStartFreqMHz = freqRange.first;
@@ -9706,34 +9787,31 @@ void AfcManager::createChannelList()
 		}
 
 		if (containsChannel(_allowableFreqBandList, inquiredStartFreqMHz, inquiredStopFreqMHz)) {
+			int numChan;
 
-			auto startFreqMHz = inquiredStartFreqMHz;
-			auto stopFreqMHz = inquiredStopFreqMHz;
+			numChan = 0;
 
-			if (startFreqMHz < _wlanMinFreqMHz) {
-				startFreqMHz = _wlanMinFreqMHz;
-			}
-			if (stopFreqMHz > _wlanMaxFreqMHz) {
-				stopFreqMHz = _wlanMaxFreqMHz;
-			}
-
-			int numChan = 0;
-			for(auto bwMHz : bwList) {
-				int startChanIdx = (startFreqMHz - _wlanMinFreqMHz + bwMHz - 1)/bwMHz;
-				int stopChanIdx = (stopFreqMHz - _wlanMinFreqMHz)/bwMHz - 1;
-				for (int chanIdx = startChanIdx; chanIdx <= stopChanIdx; ++chanIdx) {
-					int chanStartFreqMHz = _wlanMinFreqMHz + chanIdx*bwMHz;
-					int chanStopFreqMHz = chanStartFreqMHz + bwMHz;
-
+			// Iterate each operating classes and add all channels within the given frequency range
+			for (auto &opClass: _opClass)
+			{
+				for (auto &cfi: opClass.channels)
+				{
 					ChannelStruct channel;
-					channel.startFreqMHz = chanStartFreqMHz;
-					channel.stopFreqMHz = chanStopFreqMHz;
-					channel.availability = GREEN; // Everything initialized to GREEN
-					channel.type = INQUIRED_FREQUENCY;
-					channel.eirpLimit_dBm = 0;
-					_channelList.push_back(channel);
+					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
+					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
 
-					numChan++;
+					if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
+						if ( (channel.stopFreqMHz > inquiredStartFreqMHz) && (channel.startFreqMHz < inquiredStopFreqMHz) ) {
+							channel.operatingClass = opClass.opClass;
+							channel.index = cfi;
+							channel.availability = GREEN; // Everything initialized to GREEN
+							channel.eirpLimit_dBm = 0;
+							channel.type = INQUIRED_FREQUENCY;
+							_channelList.push_back(channel);
+							numChan++;
+							totalNumChan++;
+						}
+					}
 				}
 			}
 
@@ -9753,70 +9831,69 @@ void AfcManager::createChannelList()
 
 	for(auto channelPair : _inquiredChannels) {
 		LOGGER_DEBUG(logger) << "creating channels for operating class " << channelPair.first; 
-		auto cfiList = channelPair.second;
-		int bwIdx = channelPair.first - 131;
-		if ((bwIdx < 0) || (bwIdx >= (int) bwList.size())) {
-			// throw std::runtime_error("UNSUPPORTED_SPECTRUM Global operating class " + std::to_string(channelPair.first) + " not supported. [131,13] are currently the only supported classes.");
-			LOGGER_DEBUG(logger) << "Inquired Channel INVALID Operating Class: " << channelPair.first << std::endl;
-			_responseCode = CConst::unsupportedSpectrumResponseCode;
-			return;
-		}
-		int bwMHz = bwList[bwIdx];
-		if (cfiList.size() == 0) {
-			LOGGER_DEBUG(logger) << "creating ALL channels for operating class " << channelPair.first;
-			// include all channels in global operating class
-			auto numChannels = std::vector<int> { 59, 29, 14, 7 };
-			auto startIndex = std::vector<int> { 1, 3, 7, 15 };
-			auto indexInc = std::vector<int> { 4, 8, 16, 32 };
-			int numChannelAdded = 0;
-			for (int chanIdx = 0; chanIdx < numChannels.at(bwIdx); chanIdx++) {
-				int chanStartFreqMHz = _wlanMinFreqMHz + chanIdx*bwMHz;
-				int chanStopFreqMHz = chanStartFreqMHz + bwMHz;
-				if (containsChannel(_allowableFreqBandList, chanStartFreqMHz, chanStopFreqMHz)) {
-					ChannelStruct channel;
-					channel.operatingClass = channelPair.first;
-					channel.index = startIndex.at(bwIdx) + chanIdx * indexInc.at(bwIdx);
-					channel.startFreqMHz = chanStartFreqMHz;
-					channel.stopFreqMHz = chanStopFreqMHz;
-					channel.type = ChannelType::INQUIRED_CHANNEL;
-					channel.availability = GREEN; // Everything initialized to GREEN
-					channel.eirpLimit_dBm = 0;
-					_channelList.push_back(channel);
-					numChannelAdded++;
-				}
+
+		int numChan;
+		numChan = 0;
+
+		// Iterate each operating classes and add all channels of given operating class
+		for (auto &opClass: _opClass)
+		{
+			// Skip of classes of not in inquired channel list
+			if (opClass.opClass != channelPair.first) {
+				continue;
 			}
-			LOGGER_DEBUG(logger) << "added " << numChannelAdded << " channels";
-		} else {
-			for(auto cfi : cfiList) {
-				LOGGER_DEBUG(logger) << "creating cherry picked channels in operating class " << channelPair.first;
-				int bandwidthMHz, startFreqMHz, stopFreqMHz;
-				if (convertCFI(cfi, bandwidthMHz, startFreqMHz, stopFreqMHz)) {
-					if (bandwidthMHz != bwMHz) {
-						LOGGER_DEBUG(logger) << "ERROR: Channnel number " << cfi << " is not in operating class " << channelPair.first << std::endl;
-						_responseCode = CConst::unsupportedSpectrumResponseCode;
-						return;
-					}
-					if (containsChannel(_allowableFreqBandList, startFreqMHz, stopFreqMHz)) {
-						ChannelStruct channel;
-						channel.startFreqMHz = startFreqMHz;
-						channel.stopFreqMHz = stopFreqMHz;
-						channel.index = cfi;
-						channel.operatingClass = channelPair.first;
-						channel.availability = GREEN; // Everything initialized to GREEN
-						channel.type = INQUIRED_CHANNEL;
-						channel.eirpLimit_dBm = 0;
-						_channelList.push_back(channel);
-					} else {
-						LOGGER_DEBUG(logger) << "ERROR: Channnel index " << cfi << " [" << startFreqMHz << ", " << stopFreqMHz << "] not in allowable freq range" << std::endl;
-						_responseCode = CConst::unsupportedSpectrumResponseCode;
-						return;
+
+			for (auto &cfi: opClass.channels)
+			{
+				bool includeChannel;
+
+				includeChannel = false;
+
+				// If channel indexes are provided check for channel validity.
+				// If channel indexes are not provided then include all channels of
+				// given operating class.
+				if (channelPair.second.size() != 0) {
+					for(auto inquired_cfi : channelPair.second) {
+						if (inquired_cfi == cfi) {
+							includeChannel = true;
+							break;
+						}
 					}
 				} else {
-					LOGGER_DEBUG(logger) << "ERROR: Channnel index " << cfi << " INVALID" << std::endl;
-					_responseCode = CConst::unsupportedSpectrumResponseCode;
-					return;
+					includeChannel = true;
+				}
+
+				if (includeChannel) {
+					ChannelStruct channel;
+					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
+					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
+
+					// Include channel if it is within the frequency bands in AFC config
+					if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
+						channel.operatingClass = opClass.opClass;
+						channel.index = cfi;
+
+						channel.availability = GREEN; // Everything initialized to GREEN
+						channel.eirpLimit_dBm = 0;
+						channel.type = ChannelType::INQUIRED_CHANNEL;
+						_channelList.push_back(channel);
+						numChan++;
+						totalNumChan++;
+						LOGGER_DEBUG(logger) << "added " << numChan << " channels";
+					}
 				}
 			}
+			if (numChan == 0) {
+				LOGGER_DEBUG(logger) << "Inquired Channel INVALID Operating Class: " << channelPair.first << std::endl;
+				_responseCode = CConst::unsupportedSpectrumResponseCode;
+				return;
+			}
+		}
+
+		if (totalNumChan == 0) {
+			LOGGER_DEBUG(logger) << "Missing valid Inquired channel and frequency " << std::endl;
+			_responseCode = CConst::missingParamResponseCode;
+			return;
 		}
 	}
 }

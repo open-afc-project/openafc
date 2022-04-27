@@ -52,11 +52,11 @@ export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSRespo
           <CartesianGrid />
           <XAxis 
           label={{ value: "Frequency (MHz)", position: "bottom" }} 
-          domain={[5945, 7125]} 
+          domain={[5925, 7125]} 
           type="number" 
           dataKey="hz" 
           name="Frequency (MHz)" 
-          ticks={Array(15).fill(0).map((_, i) => 5945 + i * 80).concat([7125])}
+          ticks={Array(15).fill(0).map((_, i) => 5925 + i * 80).concat([7125])}
           />
           <YAxis
             domain={["dataMin", "auto"]}
@@ -112,7 +112,7 @@ const makeSteps = (sections: AvailableSpectrumInfo[]): { hz: number, dbm?: numbe
  * @param spectrum `AvailableSpectrumInquiryResponse` object to graph
  */
 export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableSpectrumInquiryResponse }> = (props) => (
-  !props.spectrum || !props.spectrum.availableSpectrumInfo || props.spectrum.availableSpectrumInfo.length === 0 ?
+  !props.spectrum || !props.spectrum.availableFrequencyInfo || props.spectrum.availableFrequencyInfo.length === 0 ?
     <Card><CardHeader>There is no spectrum data to display.</CardHeader></Card> :
     <><Card key={1} isHoverable={true}>
       <CardHeader><Title size="md" style={{ textAlign: "center" }}>{"Request " + props.spectrum?.requestId + ": expires at " + (props.spectrum?.availabilityExpireTime || "No expiration")}</Title></CardHeader>
@@ -125,24 +125,24 @@ export const SpectrumDisplayAFC: React.FunctionComponent<{ spectrum?: AvailableS
           <CartesianGrid />
           <XAxis 
           label={{ value: "Frequency (MHz)", position: "bottom" }} 
-          domain={[5945, 7125]} 
+          domain={[5925, 7125]} 
           type="number" 
           dataKey="hz" 
           name="Frequency (MHz)" 
-          ticks={Array(15).fill(0).map((_, i) => 5945 + i * 80).concat([7125])}
+          ticks={Array(15).fill(0).map((_, i) => 5925 + i * 80).concat([7125])}
           />
           <YAxis
             domain={["dataMin", "auto"]}
             type="number"
             dataKey="dbm"
-            name="EIRP Density (dBm/MHz)"
-            label={{ value: "EIRP Density (dBm/MHz)", angle: -90, position: "insideLeft" }}
+            name="PSD (dBm/MHz)"
+            label={{ value: "PSD (dBm/MHz)", angle: -90, position: "insideLeft" }}
           />
           <Tooltip cursor={true} />
           <Scatter
             key={1}
-            name={"EIRP Density"}
-            data={makeSteps(props.spectrum.availableSpectrumInfo)}
+            name={"PSD"}
+            data={makeSteps(props.spectrum.availableFrequencyInfo)}
             fill={colors[0]}
             line={true} />
           <Legend verticalAlign="top" />

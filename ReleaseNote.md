@@ -2,6 +2,22 @@
 
 ## **Version and Date**
 
+|Version|**OA-176, OA-188**|
+| :- | :- |
+|**Date**|**04/22/2022**|
+
+## **Issues Addressed**
+ * Jira OA-176: Support for global operating class 135 and 136
+ * Jira OA-188: web UI changes to support start frequency of 5925MHz
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Checked in-band EIRP and PSD calculations for a few bands (for the new channel and some of the previous channels) as well as adjacent channel interference levels.
+ * See the test case attached to OA-176 ticket. Note this uses the old ULS structure.
+
+## **Open Issues**
+
 |Version|**OA-192**|
 | :- | :- |
 |**Date**|**04/26/2022**|
@@ -18,7 +34,6 @@
  * Test2: Confirmed in exc_thr file that a different AFC Config parameters (50% P.2108 and 20m Max FS AGL height) are used correctly.
 
 ## **Open Issues**
-
 
 |Version|**OA-190, OA-191**|
 | :- | :- |
@@ -49,6 +64,7 @@
 
 
 ## **Version and Date**
+
 |Version|**3.3.16**|
 | :- | :- |
 |**Date**|**04/21/2022**|
