@@ -88,6 +88,10 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                     num: 134,
                     include: OperatingClassIncludeType.None
                 },
+                {
+                    num: 136,
+                    include: OperatingClassIncludeType.None
+                },
             ]
         };
     }
@@ -95,7 +99,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
     componentDidMount() {
         const st: RatAfcFormState = getCacheItem("ratAfcFormCache");
         if (st !== undefined) {
-          
+
             this.setState(st);
         }
     }
@@ -164,7 +168,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
         inquiredChannels:
             this.state.operatingClasses.filter(x => x.include != OperatingClassIncludeType.None).map(x => this.fromOperatingClass(x)),
 
-        inquiredFrequencyRange:this.state.inquiredFrequencyRange && this.state.inquiredFrequencyRange.length > 0 ? this.state.inquiredFrequencyRange : []
+        inquiredFrequencyRange: this.state.inquiredFrequencyRange && this.state.inquiredFrequencyRange.length > 0 ? this.state.inquiredFrequencyRange : []
     }) as AvailableSpectrumInquiryRequest;
 
 
@@ -208,6 +212,11 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                 channels: [],
                 include: OperatingClassIncludeType.None
             },
+            {
+                num: 136,
+                channels: [],
+                include: OperatingClassIncludeType.None
+            },
         ];
 
         if (!c)
@@ -237,46 +246,6 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
         return oc;
 
     }
-
-    private mapChannelsToOperatingClassArray(channels: number[]) {
-        var result = [
-            {
-                globalOperatingClass: 131,
-                channelCfi: []
-            },
-            {
-                globalOperatingClass: 132,
-                channelCfi: []
-            },
-            {
-                globalOperatingClass: 133,
-                channelCfi: []
-            },
-            {
-                globalOperatingClass: 134,
-                channelCfi: []
-            },
-        ];
-
-        channels.forEach(n => {
-            if (n % 4 == 1) {
-                result[0].channelCfi.push(n);
-            } else if (n % 8 == 3) {
-                result[1].channelCfi.push(n);
-            } else if (n % 16 == 7) {
-                result[2].channelCfi.push(n);
-            } else if (n % 32 == 15) {
-                result[3].channelCfi.push(n);
-            }
-        });
-
-        var filteredResult = result.filter(x => x.channelCfi.length > 0);
-
-
-        return filteredResult;
-    }
-
-
 
     private copyPasteClick() {
         this.setState({ isModalOpen: true });
@@ -337,7 +306,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
         console.log('value for validInput' + this.validInputs())
         if (!this.validInputs()) {
             this.setState({ status: "Error", message: "One or more inputs are invalid." });
-         } else {
+        } else {
             this.setState({ status: undefined, message: "" });
             const params = this.getParamsJSON();
             this.props.onSubmit(params)

@@ -117,6 +117,7 @@ public:
 		F1336OmniAntennaType,
 		F1245AntennaType,
 		F699AntennaType,
+		R2AIP07AntennaType,
 		LUTAntennaType
 	};
 	/**************************************************************************************/

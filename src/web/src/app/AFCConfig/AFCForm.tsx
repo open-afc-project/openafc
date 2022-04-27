@@ -181,6 +181,25 @@ export class AFCForm extends React.Component<
     }
 
     /**
+     * Use this method when updating the entire configuration as it will also update the antenna pattern subcomponent.  When updating just
+     * another item (like just updating the PenatrationLossModel) use setState as normal
+     * @param config new configuation file
+     */
+    private updateEntireConfigState(config: AFCConfigFile) {
+        this.setState({
+            config: config,
+            antennaPatternData: {
+                defaultAntennaPattern: config.ulsDefaultAntennaType,
+                userUpload: {
+                    kind: config.antennaPattern?.kind == "User Upload" ? "User Upload" : "None",
+                    value: config.antennaPattern?.value
+                }
+            }
+        }
+        );
+    }
+
+    /**
      * Push completed form to parent if valid
      */
     private submit = () => {
@@ -207,14 +226,14 @@ export class AFCForm extends React.Component<
         } else {
             config.freqBands = defaultRanges;
         }
-        this.setState({ config: config });
+        this.updateEntireConfigState(config);
     }
 
     private setConfig = (newConf: string) => {
         try {
             const parsed = JSON.parse(newConf) as AFCConfigFile;
             if (parsed.version == guiConfig.version) {
-                this.setState({ config: Object.assign(this.state.config, parsed) });
+                this.updateEntireConfigState(Object.assign(this.state.config, parsed));
             } else {
                 this.setState({ messageError: "The imported configuration (version: " + parsed.version + ") is not compatible with the current version (" + guiConfig.version + ")." })
             }
@@ -295,9 +314,32 @@ export class AFCForm extends React.Component<
 
         const setUseClutter = (x: boolean) => {
             const conf = this.state.config;
+            //If changing to true, and was false, and there is no clutter model, use the defaults
+            if (x && !conf.clutterAtFS && !conf.fsClutterModel) {
+                conf.fsClutterModel = { maxFsAglHeight: 6, p2108Confidence: 5 };
+            }
             conf.clutterAtFS = x;
             this.setState({ config: conf });
         }
+
+        const setFsClutterConfidence = (n: number | string) => {
+            const val = Number(n);
+            const conf = this.state.config;
+            const newParams = { ...conf.fsClutterModel };
+            newParams.p2108Confidence = val
+            conf.fsClutterModel = newParams;
+            this.setState({ config: conf });
+        }
+        const setFsClutterMaxHeight = (n: number | string) => {
+            const val = Number(n);
+            const conf = this.state.config;
+            const newParams = { ...conf.fsClutterModel };
+            newParams.maxFsAglHeight = val;
+            conf.fsClutterModel = newParams;
+            this.setState({ config: conf });
+        }
+
+
 
         const getPropagationModelForForm = () => {
             //rlanITMTxClutterMethod is stored at the top level but set in the form
@@ -321,7 +363,7 @@ export class AFCForm extends React.Component<
                     isOpen={this.state.isModalOpen}
                     onClose={() => this.setState({ isModalOpen: false })}
                     actions={[<Button key="update" variant="primary" onClick={() => this.setState({ isModalOpen: false })}>Close</Button>]}>
-                    <ClipboardCopy variant={ClipboardCopyVariant.expansion} onChange={(v: string) => this.setConfig(v)} aria-label="text area">{this.getConfig()}</ClipboardCopy>
+                    <ClipboardCopy variant={ClipboardCopyVariant.expansion} isExpanded onChange={(v: string | number) => this.setConfig(String(v).trim())} aria-label="text area">{this.getConfig()}</ClipboardCopy>
                 </Modal>
                 <CardBody>
                     <Gallery gutter="sm">
@@ -683,24 +725,58 @@ export class AFCForm extends React.Component<
                                 //className="prop-env-tooltip"
                                 maxWidth="40.0rem"
                                 content={
-                                    <p>When distance &gt; 1km, clutter loss is added at FS Receiver when FS Receiver AGL height &lt;10m. Clutter models are the same as those used for APs.​</p>
-
+                                    <p>When distance &gt; 1km and FS Receiver (Rx) is in Urban/Suburban, P.2108 clutter loss is added at
+                                         FS Rx when FS Receiver AGL height &lt; <b>Max FS AGL Height</b></p>
                                 }
                             >
-                                <InputGroup label="">
-                                    <Checkbox
-                                        label="Add Clutter at FS Receiver"
-                                        isChecked={this.state.config.clutterAtFS}
-                                        onChange={setUseClutter}
-                                        id="horizontal-form-clutter"
-                                        name="horizontal-form-clutter"
-                                        style={{ textAlign: "right" }}
-                                    />
+                                <FormGroup fieldId="horizontal-form-clutter">
+                                    <InputGroup label="">
+                                        <Checkbox
+                                            label="Add Clutter at FS Receiver"
+                                            isChecked={this.state.config.clutterAtFS}
+                                            onChange={setUseClutter}
+                                            id="horizontal-form-clutter"
+                                            name="horizontal-form-clutter"
+                                            style={{ textAlign: "right" }}
+                                        />
 
-                                    <OutlinedQuestionCircleIcon style={{ marginLeft: "5px" }} />
-
-                                </InputGroup>
+                                        <OutlinedQuestionCircleIcon style={{ marginLeft: "5px" }} />
+                                    </InputGroup>
+                                </FormGroup>
                             </Tooltip>
+                            {this.state.config.clutterAtFS == true ?
+                                <FormGroup fieldId="fsclutter-p2180-confidence"  label="P.2108 Percentage of Locations" >
+                                   
+                                        <InputGroup>
+                                            <TextInput
+                                                type="number"
+                                                id="fsclutter-p2180-confidence"
+                                                name="fsclutter-p2180-confidence"
+                                                isValid={true}
+                                                value={this.state.config.fsClutterModel.p2108Confidence}
+                                                onChange={setFsClutterConfidence}
+                                                style={{ textAlign: "right" }} />
+                                            <InputGroupText>%</InputGroupText>
+                                        </InputGroup>
+                                </FormGroup>
+                                : <></>}
+                            {this.state.config.clutterAtFS == true ?
+                                <FormGroup fieldId="fsclutter-maxFsAglHeight"
+                                    label="Max FS AGL Height (m)"
+                                >
+                                    <InputGroup>
+                                        <TextInput
+                                            type="number"
+                                            id="fsclutter-maxFsAglHeight"
+                                            name="fsclutter-maxFsAglHeight"
+                                            isValid={true}
+                                            value={this.state.config.fsClutterModel.maxFsAglHeight}
+                                            onChange={setFsClutterMaxHeight}
+                                            style={{ textAlign: "right" }} />
+                                        <InputGroupText>m</InputGroupText>
+                                    </InputGroup>
+                                </FormGroup>
+                                : <></>}
                         </GalleryItem>
                         <GalleryItem>
                             <AllowedRangesDisplay data={this.props.frequencyBands} />
@@ -763,6 +839,6 @@ export class AFCForm extends React.Component<
                         <Button key="open-modal" variant="secondary" onClick={() => this.setState({ isModalOpen: true })}>Copy/Paste</Button>
                     </>
                 </CardBody>
-            </Card>);
+            </Card >);
     }
 }
