@@ -149,7 +149,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         </FormSelect>
                     </FormGroup>
                 </>
-            case "ITM with no building data":
+            /* case "ITM with no building data":
                 return <>
                     <FormGroup
                         label="Winner II Probability Line of Sight Threshold"
@@ -191,7 +191,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
-                        label="P.2108 Confidence"
+                        label="P.2108 Percentage of Locations"
                         fieldId="propogation-model-p2108-confidence"
                     ><InputGroup><TextInput
                         value={model.p2108Confidence}
@@ -218,7 +218,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <FormSelectOption key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
                         </FormSelect>
                     </FormGroup>
-                </>
+                </> */
             case "FCC 6GHz Report & Order":
                 return <>
                     <FormGroup
@@ -248,7 +248,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
-                        label="P.2108 Confidence"
+                        label="P.2108 Percentage of Locations"
                         fieldId="propogation-model-p2108-confidence"
                     ><InputGroup><TextInput
                         value={model.p2108Confidence}
@@ -348,7 +348,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             maxWidth="40.0rem"
                             content={
                                 <>
-                                    <p>If <strong>Clutter/No clutter per building</strong> is selected, the path is determined to be LoS or NLoS based on terrain and/or building database (if available). 
+                                    <p>If <strong>Clutter/No clutter per building</strong> is selected, the path is determined to be LoS or NLoS based on terrain and/or building database (if available).
                                         By the same logic, if the <strong>Building Data Source</strong> is None, blockage is determined based solely on terrain database.</p>
                                 </>
                             }
@@ -373,7 +373,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <InputGroupText>%</InputGroupText>
                         </InputGroup>
                     </FormGroup>
-                    <FormGroup label="P.2108 Confidence" fieldId="propogation-model-p2108-confidence">
+                    <FormGroup label="P.2108 Percentage of Locations" fieldId="propogation-model-p2108-confidence">
                         <InputGroup>
                             <TextInput value={model.p2108Confidence} type="number" onChange={this.setP2108Confidence}
                                 id="propogation-model-p2108-confidence" name="propogation-model-p2108-confidence" style={{

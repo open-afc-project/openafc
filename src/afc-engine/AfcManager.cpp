@@ -1835,6 +1835,22 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
 		_applyClutterFSRxFlag = false;
 	}
 
+    if (jsonObj.contains("fsClutterModel") && !jsonObj["fsClutterModel"].isUndefined()) {
+	    QJsonObject fsClutterModel = jsonObj["fsClutterModel"].toObject();
+        if (fsClutterModel.contains("p2108Confidence") && !fsClutterModel["p2108Confidence"].isUndefined()) {
+	        _fsConfidenceClutter2108 = fsClutterModel["p2108Confidence"].toDouble()/100.0;
+        } else {
+		    throw std::runtime_error("AfcManager::importConfigAFCjson(): fsClutterModel[p2108Confidence] missing.");
+        }
+        if (fsClutterModel.contains("maxFsAglHeight") && !fsClutterModel["maxFsAglHeight"].isUndefined()) {
+	        _maxFsAglHeight = fsClutterModel["maxFsAglHeight"].toDouble();
+        } else {
+		    throw std::runtime_error("AfcManager::importConfigAFCjson(): fsClutterModel[maxFsAglHeight] missing.");
+        }
+    } else {
+		throw std::runtime_error("AfcManager::importConfigAFCjson(): fsClutterModel missing.");
+    }
+
 	int validFlag;
 	if (jsonObj.contains("rlanITMTxClutterMethod") && !jsonObj["rlanITMTxClutterMethod"].isUndefined()) {
 		_rlanITMTxClutterMethod = (CConst::ITMClutterMethodEnum) CConst::strITMClutterMethodList->str_to_type(jsonObj["rlanITMTxClutterMethod"].toString().toStdString(), validFlag, 0);
@@ -5593,7 +5609,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 			}
 		}
 
-		if (_applyClutterFSRxFlag && (rxHeightM <= 10.0) && (distKm >= 1.0)) {
+		if (_applyClutterFSRxFlag && (rxHeightM <= _maxFsAglHeight) && (distKm >= 1.0)) {
 			if (distKm * 1000 < _closeInDist) {
 				pathClutterRxDB = 0.0;
 				pathClutterRxModelStr = "NONE";
@@ -5606,7 +5622,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				arma::vec gauss(1);
 				if (fixedProbFlag)
 				{
-					gauss[0] = _zclutter2108;
+					gauss[0] = _fsZclutter2108;
 				}
 				else
 				{
@@ -5619,7 +5635,8 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				pathClutterRxModelStr = "P.2108";
 				pathClutterRxCDF = q(-gauss[0]);
 			} else if ( (propEnvRx == CConst::ruralPropEnv) || (propEnvRx == CConst::barrenPropEnv) ) {
-				bool clutterFlag = (nlcdLandCatRx == CConst::noClutterNLCDLandCat ? false : true);
+                bool allowRuralFSClutterFlag = false;
+				bool clutterFlag = allowRuralFSClutterFlag && (nlcdLandCatRx == CConst::noClutterNLCDLandCat ? false : true);
 
 				if (clutterFlag) {
 					double ha, dk;
@@ -6728,6 +6745,7 @@ void AfcManager::runPointAnalysis()
 	/**************************************************************************************/
 	_zbldg2109 = -qerfi(_confidenceBldg2109);
 	_zclutter2108 = -qerfi(_confidenceClutter2108);
+	_fsZclutter2108 = -qerfi(_fsConfidenceClutter2108);
 	_zwinner2 = -qerfi(_confidenceWinner2);
 
 	const double exclusionDistKmSquared = (_exclusionDist / 1000.0) * (_exclusionDist / 1000.0);
@@ -6885,7 +6903,7 @@ void AfcManager::runPointAnalysis()
 			/**************************************************************************************/
 			CConst::NLCDLandCatEnum nlcdLandCatRx;
 			CConst::PropEnvEnum fsPropEnv;
-			if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= 10.0)) {
+			if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= _maxFsAglHeight)) {
 				fsPropEnv = computePropEnv(uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), nlcdLandCatRx);
 				switch(fsPropEnv) {
 					case CConst::urbanPropEnv:    ulsRxPropEnv = 'U'; break;
@@ -7899,6 +7917,7 @@ void AfcManager::runScanAnalysis()
 	/**************************************************************************************/
 	_zbldg2109 = -qerfi(_confidenceBldg2109);
 	_zclutter2108 = -qerfi(_confidenceClutter2108);
+	_fsZclutter2108 = -qerfi(_fsConfidenceClutter2108);
 	_zwinner2 = -qerfi(_confidenceWinner2);
 
 	const double exclusionDistKmSquared = (_exclusionDist / 1000.0) * (_exclusionDist / 1000.0);
@@ -7999,7 +8018,7 @@ void AfcManager::runScanAnalysis()
 					char ulsRxPropEnv;
 					CConst::NLCDLandCatEnum nlcdLandCatRx;
 					CConst::PropEnvEnum fsPropEnv;
-					if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= 10.0)) {
+					if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= _maxFsAglHeight)) {
 						fsPropEnv = computePropEnv(uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), nlcdLandCatRx);
 						switch(fsPropEnv) {
 							case CConst::urbanPropEnv:    ulsRxPropEnv = 'U'; break;
@@ -8296,6 +8315,7 @@ void AfcManager::runExclusionZoneAnalysis()
 	LOGGER_INFO(logger) << "Begin computing exclusion zone";
 	_zbldg2109 = -qerfi(_confidenceBldg2109);
 	_zclutter2108 = -qerfi(_confidenceClutter2108);
+	_fsZclutter2108 = -qerfi(_fsConfidenceClutter2108);
 	_zwinner2 = -qerfi(_confidenceWinner2);
 
 	/******************************************************************************/
@@ -8517,7 +8537,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 	/**************************************************************************************/
 	CConst::NLCDLandCatEnum nlcdLandCatRx;
 	CConst::PropEnvEnum fsPropEnv;
-	if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= 10.0)) {
+	if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= _maxFsAglHeight)) {
 		fsPropEnv = computePropEnv(uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), nlcdLandCatRx);
 	} else {
 		fsPropEnv = CConst::unknownPropEnv;
@@ -8883,6 +8903,7 @@ void AfcManager::runHeatmapAnalysis()
 	/**************************************************************************************/
 	_zbldg2109 = -qerfi(_confidenceBldg2109);
 	_zclutter2108 = -qerfi(_confidenceClutter2108);
+	_fsZclutter2108 = -qerfi(_fsConfidenceClutter2108);
 	_zwinner2 = -qerfi(_confidenceWinner2);
 
 	const double exclusionDistKmSquared = (_exclusionDist / 1000.0) * (_exclusionDist / 1000.0);
@@ -9038,7 +9059,7 @@ void AfcManager::runHeatmapAnalysis()
 						/**************************************************************************************/
 						CConst::NLCDLandCatEnum nlcdLandCatRx;
 						CConst::PropEnvEnum fsPropEnv;
-						if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= 10.0)) {
+						if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= _maxFsAglHeight)) {
 							fsPropEnv = computePropEnv(uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), nlcdLandCatRx);
 						} else {
 							fsPropEnv = CConst::unknownPropEnv;

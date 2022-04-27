@@ -353,6 +353,8 @@ class AfcManager
 		double _heatmapRLANOutdoorHeightUncertainty; // RLAN Outdoor Height Uncertainty (m) to use for Heatmap Analysis
 
 		bool _applyClutterFSRxFlag;
+        double _fsConfidenceClutter2108;
+        double _maxFsAglHeight;
 
 		CConst::ITMClutterMethodEnum _rlanITMTxClutterMethod;
 
@@ -453,6 +455,7 @@ class AfcManager
 
 		double _zbldg2109;
 		double _zclutter2108;
+		double _fsZclutter2108;
 		double _zwinner2;
 
 		std::vector<int> _ulsIdxList;            // Stores the indices of the ULS stations we are analyzing
