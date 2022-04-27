@@ -48,6 +48,7 @@ export interface AFCConfigFile {
     fsReceiverNoise: FSReceiverNoise,
     rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
     clutterAtFS: boolean,
+    fsClutterModel?: FSClutterModel,
     regionStr?: string,
     rasDatabase?: string
 }
@@ -59,9 +60,9 @@ export type FreqRange = {
 }
 
 export type FSReceiverFeederLoss = {
-    UNII5: Number,
-    UNII7: Number,
-    other: Number
+    UNII5: number,
+    UNII7: number,
+    other: number
 }
 
 export type FSReceiverNoise = FSReceiverFeederLoss;
@@ -112,7 +113,7 @@ export type AntennaPatternState = {
     userUpload?: UserUpload
 }
 
-export type DefaultAntennaType = 'F.1245' | 'F.699'
+export type DefaultAntennaType = 'F.1245' | 'F.699' | 'WINNF-AIP-07'
 
 export type UserAntennaPattern = {
     kind: string,
@@ -166,6 +167,10 @@ export interface CustomPropagation {
     rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
 }
 
+export interface FSClutterModel {
+    p2108Confidence: number,
+    maxFsAglHeight: number
+}
 
 export type ScanPointBelowGroundMethod = "discard" | "truncate"
 
