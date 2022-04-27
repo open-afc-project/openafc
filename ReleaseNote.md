@@ -1,6 +1,7 @@
 # Release Note
 
 ## **Version and Date**
+
 |Version|**OA-176, OA-188**|
 | :- | :- |
 |**Date**|**04/22/2022**|
@@ -17,6 +18,8 @@
  * See the test case attached to OA-176 ticket. Note this uses the old ULS structure.
 
 ## **Open Issues**
+=======
+
 |Version|**3.3.16**|
 | :- | :- |
 |**Date**|**04/21/2022**|
