@@ -1,6 +1,20 @@
 # Release Note
-
 ## **Version and Date**
+|Version|**OA-193**|
+| :- | :- |
+|**Date**|**04/27/2022**|
+
+## **Issues Addressed**
+ * Jira OA-193: Update AFC-Config Default form to WFA test vector configuration
+ 
+## **Interface Changes**
+ * The part of the code that sets the default setting (hard-coded) has been updated.
+
+## **Testing Done**
+ * Tested that when clicking "Reset to Default" in AFC Config, the default configuration is loaded.
+ * Two afc_config json files are attached to this ticket: 1) afc_config_default.json and 2) afc_config_horizontal.json
+
+## **Open Issues**
 
 |Version|**OA-176, OA-188**|
 | :- | :- |
