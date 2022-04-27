@@ -1,6 +1,6 @@
 # Release Note
 ## **Version and Date**
-|Version|**OA-195**|
+|Version|**3.3.17**|
 | :- | :- |
 |**Date**|**04/27/2022**|
 
