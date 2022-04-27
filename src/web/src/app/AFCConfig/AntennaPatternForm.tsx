@@ -14,6 +14,7 @@ import { AntennaPatternState } from "../Lib/RatApiTypes";
  * Enumeration of antenna pattern types
  */
 const antennaPatterns = [
+    'WINNF-AIP-07',
     "F.699",
     "F.1245"
 ];
@@ -31,6 +32,10 @@ export default class AntennaPatternForm extends React.PureComponent<{ data: Ante
             case "F.699":
                 this.props.onChange({ defaultAntennaPattern: "F.699", userUpload: this.props.data.userUpload });
                 break;
+            case 'WINNF-AIP-07':
+                this.props.onChange({ defaultAntennaPattern: 'WINNF-AIP-07', userUpload: this.props.data.userUpload });
+                break;
+
             default:
             // Do nothing
         }

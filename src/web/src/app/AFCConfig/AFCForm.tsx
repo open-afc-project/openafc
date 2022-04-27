@@ -167,6 +167,25 @@ export class AFCForm extends React.Component<
     }
 
     /**
+     * Use this method when updating the entire configuration as it will also update the antenna pattern subcomponent.  When updating just
+     * another item (like just updating the PenatrationLossModel) use setState as normal
+     * @param config new configuation file
+     */
+    private updateEntireConfigState(config: AFCConfigFile) {
+        this.setState({
+            config: config,
+            antennaPatternData: {
+                defaultAntennaPattern: config.ulsDefaultAntennaType,
+                userUpload: {
+                    kind: config.antennaPattern?.kind == "User Upload" ? "User Upload" : "None",
+                    value: config.antennaPattern?.value
+                }
+            }
+        }
+        );
+    }
+
+    /**
      * Push completed form to parent if valid
      */
     private submit = () => {
@@ -193,14 +212,14 @@ export class AFCForm extends React.Component<
         } else {
             config.freqBands = defaultRanges;
         }
-        this.setState({ config: config });
+        this.updateEntireConfigState(config);
     }
 
     private setConfig = (newConf: string) => {
         try {
             const parsed = JSON.parse(newConf) as AFCConfigFile;
             if (parsed.version == guiConfig.version) {
-                this.setState({ config: Object.assign(this.state.config, parsed) });
+                this.updateEntireConfigState(Object.assign(this.state.config, parsed));
             } else {
                 this.setState({ messageError: "The imported configuration (version: " + parsed.version + ") is not compatible with the current version (" + guiConfig.version + ")." })
             }
@@ -242,26 +261,26 @@ export class AFCForm extends React.Component<
             if (x.kind === "Custom") {
                 //rlanITMTxClutterMethod is set in the CustomPropagation but stored at the top level
                 // so move it up if present
-                const conf = {...this.state.config};
+                const conf = { ...this.state.config };
                 var model = x as CustomPropagation;
                 var itmTxClutterMethod = model.rlanITMTxClutterMethod;
                 delete model.rlanITMTxClutterMethod;
                 conf.propagationModel = model;
-                if(!!itmTxClutterMethod ){
+                if (!!itmTxClutterMethod) {
                     conf.rlanITMTxClutterMethod = itmTxClutterMethod;
-                }else{
+                } else {
                     delete conf.rlanITMTxClutterMethod;
                 }
-                this.setState({ config: conf});
+                this.setState({ config: conf });
 
 
             } else {
                 const conf = this.state.config;
                 conf.propagationModel = x;
-                if(x.kind === "ITM with building data"){
+                if (x.kind === "ITM with building data") {
                     conf.rlanITMTxClutterMethod = "BLDG_DATA"
-                }else{
-                    conf.rlanITMTxClutterMethod="FORCE_TRUE"
+                } else {
+                    conf.rlanITMTxClutterMethod = "FORCE_TRUE"
                 }
                 this.setState({ config: conf });
             }
@@ -285,19 +304,19 @@ export class AFCForm extends React.Component<
             this.setState({ config: conf });
         }
 
-        const getPropagationModelForForm= () =>{
+        const getPropagationModelForForm = () => {
             //rlanITMTxClutterMethod is stored at the top level but set in the form
             // so move it down if present
-            if(this.state.config.propagationModel.kind !== "Custom"){
+            if (this.state.config.propagationModel.kind !== "Custom") {
                 return { ...this.state.config.propagationModel };
-            }else{
-                const customModel =  { ...this.state.config.propagationModel } as CustomPropagation;
+            } else {
+                const customModel = { ...this.state.config.propagationModel } as CustomPropagation;
                 customModel.rlanITMTxClutterMethod = this.state.config.rlanITMTxClutterMethod;
                 return customModel;
             }
 
         }
-        
+
 
         return (
             <Card>
