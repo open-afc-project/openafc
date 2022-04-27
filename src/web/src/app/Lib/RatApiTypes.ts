@@ -44,6 +44,7 @@ export interface AFCConfigFile {
     propagationModel: PropagationModel,
     APUncertainty: APUncertainty,
     propagationEnv: "NLCD Point" | "Population Density Map" | "Urban" | "Suburban" | "Rural",
+    nlcdFile?: string,
     ITMParameters: ITMParameters,
     fsReceiverNoise: FSReceiverNoise,
     rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',

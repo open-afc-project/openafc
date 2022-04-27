@@ -1,5 +1,27 @@
 # Release Note
 ## **Version and Date**
+|Version|**OA-195**|
+| :- | :- |
+|**Date**|**04/27/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-195: Add RKF and Federated Resampled NLCD database to AFC Config
+ 
+## **Interface Changes**
+ * There is a change in AFC Config UI and json file. The NLCD database can now be selected by the user.
+ * Note that "WFA Test NLCD" (selected in UI) points to "federated_nlcd.tif" in afc_config.json file. And "Production NLCD" (selected in UI) points to ": "nlcd_2019_land_cover_l48_20210604_resample.tif" in afc_config.json file.
+ 
+
+## **Testing Done**
+ * Did two tests: one with Production NLCD and another with WFA Test NLCD and the response json files and the exc_thr files matched. These are attached to the Jira ticket.
+
+
+## **Open Issues**
+ * More tests are needed (this will be done as part of prepartion of WFA test results) to see whether federated's NLCD matches RKF's at least for the WFA tests.
+ * Next, more tests are needed to ensure all tiles over CONUS are equivalent (if desired).  
+ * 
+## **Version and Date**
 |Version|**OA-193**|
 | :- | :- |
 |**Date**|**04/27/2022**|

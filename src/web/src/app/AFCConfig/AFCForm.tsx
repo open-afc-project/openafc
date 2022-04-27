@@ -74,7 +74,21 @@ export class AFCForm extends React.Component<
     private setMaxLinkDistance = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxLinkDistance: n }) });
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
-    private setPropogationEnv = (n: string) => this.setState({ config: Object.assign(this.state.config, { propagationEnv: n }) });
+    private setPropogationEnv = (n: string) => {
+
+        const newConfig = {...this.state.config};
+            
+        newConfig.propagationEnv = n as "NLCD Point" | "Population Density Map" | "Urban" | "Suburban" | "Rural";
+        if (n != "NLCD Point" && this.state.config.propagationEnv == 'NLCD Point') {
+            delete newConfig.nlcdFile;
+        }
+        if (n == "NLCD Point" && this.state.config.propagationEnv != 'NLCD Point' && !this.state.config.nlcdFile) {
+            newConfig.nlcdFile = "nlcd_2019_land_cover_l48_20210604_resample.tif";
+        }
+        this.setState({ config: newConfig });
+    }
+    private setNlcdFile = (n: string) => this.setState({ config: Object.assign(this.state.config, { nlcdFile: n }) });
+
     private setScanBelowGround = (n: string) => {
         const conf = this.state.config;
         switch (n) {
@@ -371,6 +385,19 @@ export class AFCForm extends React.Component<
                         </GalleryItem>
                         <GalleryItem>
                             <FormGroup label="ULS Database" fieldId="horizontal-form-uls-db">
+                                {" "}<Tooltip
+                                    position={TooltipPosition.top}
+                                    enableFlip={true}
+                                    className="fs-feeder-loss-tooltip"
+                                    maxWidth="40.0rem"
+                                    content={
+                                        <>
+                                            <p>CONUS_ULS_LATEST.sqlite3 refers to the latest stable CONUS ULS database .</p>
+                                        </>
+                                    }
+                                >
+                                    <OutlinedQuestionCircleIcon />
+                                </Tooltip>
                                 <FormSelect
                                     value={this.state.config.ulsDatabase}
                                     onChange={x => this.setUlsDatabase(x)}
@@ -683,6 +710,20 @@ export class AFCForm extends React.Component<
                                         <FormSelectOption key="Suburban" value="Suburban" label="Suburban" />
                                         <FormSelectOption key="Rural" value="Rural" label="Rural" />
                                     </FormSelect>
+                                    {this.state.config.propagationEnv == 'NLCD Point' ?
+                                        <FormGroup label="NLCD Database" fieldId="nlcd-database">
+                                            <FormSelect
+                                                value={this.state.config.nlcdFile ?? "nlcd_2019_land_cover_l48_20210604_resample.tif"}
+                                                onChange={(x) => this.setNlcdFile(x)}
+                                                id="nlcd-database"
+                                                name="nlcd-database"
+                                                style={{ textAlign: "right" }}
+                                            >
+                                                <FormSelectOption key="Production NLCD " value="nlcd_2019_land_cover_l48_20210604_resample.tif" label="Production NLCD" />
+                                                <FormSelectOption key="WFA Test NLCD " value="federated_nlcd.tif" label="WFA Test NLCD" />
+                                            </FormSelect>
+                                        </FormGroup>
+                                        : <></>}
                                 </FormGroup>
                             </GalleryItem>}
                         {this.state.config.propagationModel.kind != "FSPL" ?
@@ -698,7 +739,7 @@ export class AFCForm extends React.Component<
                                 maxWidth="40.0rem"
                                 content={
                                     <p>When distance &gt; 1km and FS Receiver (Rx) is in Urban/Suburban, P.2108 clutter loss is added at
-                                         FS Rx when FS Receiver AGL height &lt; <b>Max FS AGL Height</b></p>
+                                        FS Rx when FS Receiver AGL height &lt; <b>Max FS AGL Height</b></p>
                                 }
                             >
                                 <FormGroup fieldId="horizontal-form-clutter">
@@ -717,19 +758,19 @@ export class AFCForm extends React.Component<
                                 </FormGroup>
                             </Tooltip>
                             {this.state.config.clutterAtFS == true ?
-                                <FormGroup fieldId="fsclutter-p2180-confidence"  label="P.2108 Percentage of Locations" >
-                                   
-                                        <InputGroup>
-                                            <TextInput
-                                                type="number"
-                                                id="fsclutter-p2180-confidence"
-                                                name="fsclutter-p2180-confidence"
-                                                isValid={true}
-                                                value={this.state.config.fsClutterModel.p2108Confidence}
-                                                onChange={setFsClutterConfidence}
-                                                style={{ textAlign: "right" }} />
-                                            <InputGroupText>%</InputGroupText>
-                                        </InputGroup>
+                                <FormGroup fieldId="fsclutter-p2180-confidence" label="P.2108 Percentage of Locations" >
+
+                                    <InputGroup>
+                                        <TextInput
+                                            type="number"
+                                            id="fsclutter-p2180-confidence"
+                                            name="fsclutter-p2180-confidence"
+                                            isValid={true}
+                                            value={this.state.config.fsClutterModel.p2108Confidence}
+                                            onChange={setFsClutterConfidence}
+                                            style={{ textAlign: "right" }} />
+                                        <InputGroupText>%</InputGroupText>
+                                    </InputGroup>
                                 </FormGroup>
                                 : <></>}
                             {this.state.config.clutterAtFS == true ?
