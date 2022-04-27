@@ -167,6 +167,25 @@ export class AFCForm extends React.Component<
     }
 
     /**
+     * Use this method when updating the entire configuration as it will also update the antenna pattern subcomponent.  When updating just
+     * another item (like just updating the PenatrationLossModel) use setState as normal
+     * @param config new configuation file
+     */
+    private updateEntireConfigState(config: AFCConfigFile) {
+        this.setState({
+            config: config,
+            antennaPatternData: {
+                defaultAntennaPattern: config.ulsDefaultAntennaType,
+                userUpload: {
+                    kind: config.antennaPattern?.kind == "User Upload" ? "User Upload" : "None",
+                    value: config.antennaPattern?.value
+                }
+            }
+        }
+        );
+    }
+
+    /**
      * Push completed form to parent if valid
      */
     private submit = () => {
@@ -193,14 +212,14 @@ export class AFCForm extends React.Component<
         } else {
             config.freqBands = defaultRanges;
         }
-        this.setState({ config: config });
+        this.updateEntireConfigState(config);
     }
 
     private setConfig = (newConf: string) => {
         try {
             const parsed = JSON.parse(newConf) as AFCConfigFile;
             if (parsed.version == guiConfig.version) {
-                this.setState({ config: Object.assign(this.state.config, parsed) });
+                this.updateEntireConfigState(Object.assign(this.state.config, parsed));
             } else {
                 this.setState({ messageError: "The imported configuration (version: " + parsed.version + ") is not compatible with the current version (" + guiConfig.version + ")." })
             }
@@ -305,6 +324,7 @@ export class AFCForm extends React.Component<
             conf.fsClutterModel = newParams;
             this.setState({ config: conf });
         }
+
 
 
         const getPropagationModelForForm = () => {
