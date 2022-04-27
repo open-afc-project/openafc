@@ -18,7 +18,6 @@
  * See the test case attached to OA-176 ticket. Note this uses the old ULS structure.
 
 ## **Open Issues**
-=======
 
 |Version|**3.3.16**|
 | :- | :- |
