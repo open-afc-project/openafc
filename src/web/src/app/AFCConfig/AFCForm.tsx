@@ -74,7 +74,21 @@ export class AFCForm extends React.Component<
     private setMaxLinkDistance = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxLinkDistance: n }) });
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
-    private setPropogationEnv = (n: string) => this.setState({ config: Object.assign(this.state.config, { propagationEnv: n }) });
+    private setPropogationEnv = (n: string) => {
+
+        const newConfig = {...this.state.config};
+            
+        newConfig.propagationEnv = n as "NLCD Point" | "Population Density Map" | "Urban" | "Suburban" | "Rural";
+        if (n != "NLCD Point" && this.state.config.propagationEnv == 'NLCD Point') {
+            delete newConfig.nlcdFile;
+        }
+        if (n == "NLCD Point" && this.state.config.propagationEnv != 'NLCD Point' && !this.state.config.nlcdFile) {
+            newConfig.nlcdFile = "nlcd_2019_land_cover_l48_20210604_resample.tif";
+        }
+        this.setState({ config: newConfig });
+    }
+    private setNlcdFile = (n: string) => this.setState({ config: Object.assign(this.state.config, { nlcdFile: n }) });
+
     private setScanBelowGround = (n: string) => {
         const conf = this.state.config;
         switch (n) {
@@ -696,6 +710,20 @@ export class AFCForm extends React.Component<
                                         <FormSelectOption key="Suburban" value="Suburban" label="Suburban" />
                                         <FormSelectOption key="Rural" value="Rural" label="Rural" />
                                     </FormSelect>
+                                    {this.state.config.propagationEnv == 'NLCD Point' ?
+                                        <FormGroup label="NLCD Database" fieldId="nlcd-database">
+                                            <FormSelect
+                                                value={this.state.config.nlcdFile ?? "nlcd_2019_land_cover_l48_20210604_resample.tif"}
+                                                onChange={(x) => this.setNlcdFile(x)}
+                                                id="nlcd-database"
+                                                name="nlcd-database"
+                                                style={{ textAlign: "right" }}
+                                            >
+                                                <FormSelectOption key="Production NLCD " value="nlcd_2019_land_cover_l48_20210604_resample.tif" label="Production NLCD" />
+                                                <FormSelectOption key="WFA Test NLCD " value="federated_nlcd.tif" label="WFA Test NLCD" />
+                                            </FormSelect>
+                                        </FormGroup>
+                                        : <></>}
                                 </FormGroup>
                             </GalleryItem>}
                         {this.state.config.propagationModel.kind != "FSPL" ?
