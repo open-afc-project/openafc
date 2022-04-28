@@ -19,6 +19,10 @@ class IncompleteFreqRange(IncompleteRange):
     def __init__(self, left, right, msg='Incomplete freq range'):
         IncompleteRange.__init__(self, left, right, msg)
 
+class IncompleteGeoCoordinates(IncompleteRange):
+    def __init__(self, left, right, msg='Incomplete Geo coordinates'):
+        IncompleteRange.__init__(self, left, right, msg)
+
 # Local Variables:
 # mode: Python
 # indent-tabs-mode: nil

@@ -216,28 +216,29 @@ def make_arg_parser():
     """Define command line options"""
     args_parser = argparse.ArgumentParser(
         epilog=__doc__.strip(),
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        formatter_class=argparse.RawTextHelpFormatter)
 
     args_parser.add_argument('--cfg', metavar='KEY=VALUE',
                              nargs='+', action=ParseDict,
-                             help='<addr=<ip address|hostname>>, '
-                                  '[port=<port>], '
-                                  '[post=n] - not to check for SSL, '
-                                  '[log=<info|debug|warn|error|critical>]')
+                             help='<addr=<ip address|hostname>>,\n'
+                                  '[port=<port>],\n'
+                                  '[post=n] - not to check for SSL,\n'
+                                  '[log=<info|debug|warn|error|critical>]\n')
     args_parser.add_argument('--db', metavar='KEY,KEY=VALUE',
                              nargs='+', action=ParseDict,
                              help="<a[=filename]> - add new request record,\n"
-                                  "<d> - dump all DB tables,"
-                                  "<e> - export admin config,"
-                                  "<r[=filename]> - run request from file"
-                                  "<i[=identifier[,filename]]> - parse WFA tests to external file,"
-                                  "where identifier are <all|srs|urs|sri|fsp|ibp|sip>"
-                                  "external filename is <identifier>_afc_test_reqs.json")
+                                  "<d> - dump all DB tables,\n"
+                                  "<e> - export admin config,\n"
+                                  "<r[=filename]> - run request from file,\n"
+                                  "<i=<src file>[,identifier[,filename]]>\n"
+                                  "\t- parse WFA tests to external file,\n"
+                                  "\twhere identifier are <all|srs|urs|sri|fsp|ibp|sip>\n"
+                                  "\texternal filename is <identifier>_afc_test_reqs.json\n")
     args_parser.add_argument('--test', metavar='KEY=VALUE',
                              nargs='+', action=ParseDict,
                              help='<r=[number]>  - run number of tests '
-                             '(0 - all cases)'
-                             '<a>  - response aquisition for all tests')
+                             '(0 - all cases)\n'
+                             '<a>  - response aquisition for all tests\n')
     args_parser.add_argument('-v', '--ver', action = 'store_true',
                              help='get utility version')
     return args_parser
@@ -327,10 +328,12 @@ def add_reqs(self, opt):
 
             new_req, resp = self._send_recv(dataline)
 
+            # request id contains test category
+            req_id = json_lookup('requestId', resp, None)
+
             resp_res = json_lookup('shortDescription', resp, None)
-            if resp_res[0] != 'Success':
+            if (resp_res[0] != 'Success') and (req_id[0].lower().find('urs') == -1):
                 app_log.error('Failed in test response - %s', resp_res)
-                app_log.debug(resp)
                 break
             app_log.info('Got response for the request')
             json_lookup('availabilityExpireTime', resp, '0')
@@ -373,11 +376,15 @@ def run_reqs(self, opt):
 
             new_req, resp = self._send_recv(dataline)
 
+            # request id contains test category
+            req_id = json_lookup('requestId', resp, None)
+            
             resp_res = json_lookup('shortDescription', resp, None)
-            if resp_res[0] != 'Success':
+            if (resp_res[0] != 'Success') and (req_id[0].lower().find('urs') == -1):
                 app_log.error('Failed in test response - %s', resp_res)
                 app_log.debug(resp)
                 break
+
             app_log.info('Got response for the request')
             app_log.info('Resp:')
             app_log.info(resp)
@@ -419,6 +426,7 @@ def dump_db(self, opt):
     con.close()
     app_log.info('\n\n\tDump DB table - %s')
     return True
+
 
 # get test identifier as parameter or 'True' if
 # parameter is missing
@@ -487,13 +495,21 @@ def import_tests(self, opt):
         res_str += REQ_DEV_DESC_HEADER
         cell = sheet.cell(row = i, column = RULESET_CLM)
         res_str += REQ_RULESET + '["' + str(cell.value) + '"],'
+
+        serial_id = '"",'
         cell = sheet.cell(row = i, column = SER_NBR_CLM)
-        res_str += REQ_SER_NBR + '"SN-' + purpose + str(test_vec) + '",'
-        res_str += REQ_CERT_ID_HEADER
+        if isinstance(cell.value, str):
+            serial_id = '"SN-' + purpose + str(test_vec) + '",'
+        res_str += REQ_SER_NBR + serial_id + REQ_CERT_ID_HEADER
+
         cell = sheet.cell(row = i, column = NRA_CLM)
         res_str += REQ_NRA + '"' + cell.value + '",'
-        res_str += REQ_ID + '"FCCID-' + purpose +\
-                   str(test_vec) + '"' + REQ_CERT_ID_FOOTER
+
+        cell = sheet.cell(row = i, column = ID_CLM)
+        cert_id = '""'
+        if isinstance(cell.value, str):
+            cert_id = '"FCCID-' + purpose + str(test_vec) + '"'
+        res_str += REQ_ID + cert_id + REQ_CERT_ID_FOOTER
         res_str += REQ_DEV_DESC_FOOTER + REQ_INQ_FREQ_RANG_HEADER
 
         freq_range = AfcFreqRange()
@@ -518,30 +534,61 @@ def import_tests(self, opt):
         if (cell.value):
             res_str += REQ_MIN_DESIRD_PWR + str(cell.value) + ', '
 
+        #
+        # Location
+        #
         res_str += REQ_LOC_HEADER
         cell = sheet.cell(row = i, column = INDOORDEPLOYMENT)
         res_str += REQ_LOC_INDOORDEPL + str(cell.value) + ', '
+
+        # Location - elevation
         res_str += REQ_LOC_ELEV_HEADER
         cell = sheet.cell(row = i, column = VERTICALUNCERTAINTY)
-        res_str += REQ_LOC_VERT_UNCERT + str(cell.value) + ', '
+        if isinstance(cell.value, int):
+            res_str += REQ_LOC_VERT_UNCERT + str(cell.value) + ', '
         cell = sheet.cell(row = i, column = HEIGHTTYPE)
-        res_str += REQ_LOC_HEIGHT_TYPE + '"' + str(cell.value) + '", '
+        res_str += REQ_LOC_HEIGHT_TYPE + '"' + str(cell.value) + '"'
         cell = sheet.cell(row = i, column = HEIGHT)
-        res_str += REQ_LOC_HEIGHT + str(cell.value) + '}, '
+        if isinstance(cell.value, int):
+            res_str += ', ' + REQ_LOC_HEIGHT + str(cell.value)
+        res_str += '}, '
 
+        # Location - uncertainty
+        is_set = 0
         res_str += REQ_LOC_ELLIP_HEADER
+        geo_coor = AfcGeoCoordinates()
+        geo_coor.set_coordinates(sheet.cell(row = i, column = LATITUDE_CLM), 'latitude')
+        geo_coor.set_coordinates(sheet.cell(row = i, column = LONGITUDE_CLM), 'longitude')
+        try:
+            res_str += geo_coor.append_coordinates()
+            is_set = 1
+        except IncompleteGeoCoordinates as e:
+            app_log.debug(e)
+
         cell = sheet.cell(row = i, column = ORIENTATION_CLM)
-        res_str += REQ_LOC_ORIENT + str(cell.value) + ', '
+        uncert = ''
+        if isinstance(cell.value, int):
+            if is_set:
+                res_str += ', '
+            is_set = 1
+            uncert = REQ_LOC_ORIENT + str(cell.value)
+        res_str += uncert
+
         cell = sheet.cell(row = i, column = MINORAXIS_CLM)
-        res_str += REQ_LOC_MINOR_AXIS + str(cell.value) + ', '
-        res_str += REQ_LOC_CENTER
-        cell = sheet.cell(row = i, column = LATITUDE_CLM)
-        res_str += REQ_LOC_LATITUDE + str(cell.value) + ', '
-        cell = sheet.cell(row = i, column = LONGITUDE_CLM)
-        res_str += REQ_LOC_LONGITUDE + str(cell.value) + '}, '
+        if isinstance(cell.value, int):
+            if is_set:
+                res_str += ', '
+            is_set = 1
+            uncert = REQ_LOC_MINOR_AXIS + str(cell.value)
+        res_str += uncert
+
         cell = sheet.cell(row = i, column = MAJORAXIS_CLM)
-        res_str += REQ_LOC_MAJOR_AXIS + str(cell.value) + '}'
-        res_str += REQ_LOC_FOOTER
+        if isinstance(cell.value, int):
+            if is_set:
+                res_str += ', '
+            uncert = REQ_LOC_MAJOR_AXIS + str(cell.value)
+        res_str += uncert
+        res_str += REQ_LOC_ELLIP_FOOTER + REQ_LOC_FOOTER
 
         res_str += REQ_REQUEST_ID + '"REQ-' + purpose + str(test_vec) + '"'
         res_str += REQ_INQUIRY_FOOTER
