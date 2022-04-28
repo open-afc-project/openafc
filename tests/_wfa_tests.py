@@ -72,6 +72,7 @@ REQ_LOC_VERT_UNCERT = '"verticalUncertainty": '
 REQ_LOC_HEIGHT_TYPE = '"heightType": '
 REQ_LOC_HEIGHT = '"height": '
 REQ_LOC_ELLIP_HEADER = '"ellipse": {'
+REQ_LOC_ELLIP_FOOTER = '}'
 REQ_LOC_ORIENT = '"orientation": '
 REQ_LOC_MINOR_AXIS = '"minorAxis": '
 REQ_LOC_CENTER = '"center": {'
@@ -97,6 +98,23 @@ class AfcFreqRange:
         if (self.low + self.high):
             return '{' + REQ_LOWFREQUENCY + str(self.low) + ', ' +\
                    REQ_HIGHFREQUENCY + str(self.high) + '}'
+
+
+class AfcGeoCoordinates:
+    """Afc Geo coordinates"""
+    def __init__(self):
+        self.latitude = 0
+        self.longitude = 0
+    def set_coordinates(self, cell, type):
+        if isinstance(cell.value, float):
+            setattr(self, type, cell.value)
+    def append_coordinates(self):
+        if (not self.latitude or not self.longitude):
+            raise IncompleteGeoCoordinates(self.latitude, self.longitude)
+        if (self.latitude + self.longitude):
+            return REQ_LOC_CENTER + REQ_LOC_LATITUDE +\
+                   str(self.latitude) + ', ' + REQ_LOC_LONGITUDE +\
+                   str(self.longitude) + '}'
 
 # Local Variables:
 # mode: Python
