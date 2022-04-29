@@ -87,7 +87,9 @@ jobs:
     - name: Build the regression tests docker image
       run: cd tests && docker build -t afc-regression-test .
     - name: run regression test
-      run: docker run --rm afc-regression-test --cfg addr=${{ secrets.AFC_DEV_SERVER }} --test r
+      run: |
+        ${{ github.workspace }}/${{ env.REGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} 443
+
 # }run tests
 
 # stop dev srvr {
