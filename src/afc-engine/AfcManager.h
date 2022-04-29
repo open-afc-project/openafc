@@ -127,7 +127,7 @@ class AfcManager
 		void importGUIjson(const std::string &inputJSONpath);
 
 		// Read configuration parameters for AFC
-		void importConfigAFCjson(const std::string &inputJSONpath);
+		void importConfigAFCjson(const std::string &inputJSONpath, const std::string &tempDir);
 
 		// create JSON object for exclusion zone to be sent to GUI
 		QJsonDocument generateExclusionZoneJson();
@@ -436,6 +436,7 @@ class AfcManager
 		std::string _fsAnomFile;                 // Generate file containing anomalous FS entries
 		std::string _userInputsFile;             // Generate file containing user inputs
 		std::string _kmlFile;                    // Generate kml file showing simulation results, primarily for debugging
+		std::string _fsAnalysisListFile;         // File containing list of FS used in the analysis
 		std::string _progressFile;               // stores messages to be sent to GUI on progress of execution. line 0: percentage (number), line 1: message (string)
 		int _maxLidarRegionLoadVal;
 		/**************************************************************************************/

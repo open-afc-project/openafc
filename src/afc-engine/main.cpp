@@ -69,7 +69,7 @@ int main(int argc, char **argv) { // Accepts input from command line
 		// Import user configuration from the GUI
 		LOGGER_DEBUG(logger) << "AFC Engine is importing configuration...";
 		try {
-			afcManager.importConfigAFCjson(configFilePath);
+			afcManager.importConfigAFCjson(configFilePath, tempDir);
 		}
 		catch (std::exception &err) {
 			throw std::runtime_error(
