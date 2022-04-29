@@ -1,5 +1,27 @@
 # Release Note
 ## **Version and Date**
+|Version|**OA-216**|
+| :- | :- |
+|**Date**|**04/29/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-216: Log FS Rx that were not analyzed due to being inside uncertainty region
+ * Per comments in the ticket, a new log file is generated that contains the following information for each FS that is in-band with at least one of RLAN channels, including FS inside RLAN uncertainty region. 
+ * The file contains: FS ID, Rx CallSign, Tx CallSign, FS start and end frequency, Rx Lat/Long, Rx AGL height, Min distance to the scan points. 
+ * If the FS is inside RLAN uncertainty region, distance is set to 0 meters. 
+ * The file is called "fs_analysis_list.csv” by default but the filename can be changed in the AFC-Config
+ 
+## **Interface Changes**
+ * afc_config.json can specify the name of this file (if desired). If it's missing, the default filename is used.
+
+## **Testing Done**
+ * Did a test and confirmed list of FS in "fs_analysis_list.csv” with engine logs (that shows FS inside RLAN uncertainy region) and exc_thr (list of other FS) and the .sqlite3 (on the remaining FS data).
+
+## **Open Issues**
+
+
+## **Version and Date**
 |Version|**3.3.17**|
 | :- | :- |
 |**Date**|**04/27/2022**|
