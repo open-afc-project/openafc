@@ -29,11 +29,13 @@ EXAMPLES
 import argparse
 import hashlib
 import inspect
+import io
 import json
 import logging
 import os
 import openpyxl as oxl
 import requests
+import shutil
 import sqlite3
 import sys
 import time
@@ -227,7 +229,14 @@ def make_arg_parser():
     args_parser.add_argument('--db', metavar='KEY,KEY=VALUE',
                              nargs='+', action=ParseDict,
                              help="<a[=filename]> - add new request record,\n"
-                                  "<d> - dump all DB tables,\n"
+                                  "<d[=<wfa|req|resp|ap|cfg|user>[,<out file>]]>\n"
+                                  "\t- dump DB tables, where\n"
+                                  "\twfa - dump all requests and responses\n"
+                                  "\treq - dump all requests\n"
+                                  "\tresp - dump all responses\n"
+                                  "\tap - dump all APs configurations\n"
+                                  "\tcfg - dump all AFC Server configurations\n"
+                                  "\tuser - dump all users configuration\n"
                                   "<e> - export admin config,\n"
                                   "<r[=filename]> - run request from file,\n"
                                   "<i=<src file>[,identifier[,filename]]>\n"
@@ -395,36 +404,75 @@ def run_reqs(self, opt):
     return True
 
 
+def dump_table(conn, tbl_name, out_file):
+    app_log.debug('%s() %s', inspect.stack()[0][3], tbl_name)
+    app_log.info('\n\tDump DB table - %s\n', tbl_name)
+    fp_new = ''
+
+    if (out_file) and (out_file != 'split'):
+        fp_new = open(out_file, 'w')
+
+    conn.execute('SELECT * FROM ' + tbl_name)
+    found_data = conn.fetchall()
+    for val in enumerate(found_data):
+        if isinstance(fp_new, io.IOBase): 
+            fp_new.write(val[1][0] + '\n')
+        elif out_file == 'split':
+            req_id = json_lookup('requestId', eval(val[1][0]), None)
+            fp_test = open(WFA_TEST_DIR + '/' + req_id[0], 'a')
+            fp_test.write(val[1][0] + '\n')
+            fp_test.close()
+        else:
+            # Just dump to the console
+            app_log.info('%s', val[1])
+
+    if isinstance(fp_new, io.IOBase): 
+        fp_new.close()
+    
+
 def dump_db(self, opt):
     """Ful dump from DB tables"""
     app_log.debug('%s() %s', inspect.stack()[0][3], opt)
     find_key = ''
-    if opt[0] != 'True':
-        find_key = opt[0]
+    found_tables = []
+    out_file = ''
 
+    app_log.debug(opt)
     if not os.path.isfile(self.db_filename):
         app_log.error('Missing DB file %s', self.db_filename)
         return False
 
+    set_dump_db_opts = {
+        'wfa': [('test_vectors',), ('test_data',)],
+        'req': [('test_vectors',)],
+        'resp': [('test_data',)],
+        'ap': [('ap_config',)],
+        'cfg': [('afc_config',)],
+        'user': [('user_config',)]
+    }
+
     con = sqlite3.connect(self.db_filename)
     cur = con.cursor()
-    cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
-    found_tables = cur.fetchall()
+
+    if opt[0] in set_dump_db_opts:
+        # Dump only tables with requests and responses
+        found_tables.extend(set_dump_db_opts[opt[0]])
+    elif opt[0] == 'True':
+        # Dump all tables if no options provided
+        cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        found_tables = cur.fetchall()
+
+    if opt[0] == 'wfa':
+        out_file = 'split'
+        if os.path.exists(WFA_TEST_DIR):
+            shutil.rmtree(WFA_TEST_DIR)
+        os.mkdir(WFA_TEST_DIR)
+    elif len(opt) > 1:
+        out_file = opt[1]
+
     for tbl in enumerate(found_tables):
-        app_log.info('\n\n\tDump DB table - %s', tbl[1][0])
-        cur.execute('SELECT * FROM ' + tbl[1][0])
-        found_data = cur.fetchall()
-        for val in enumerate(found_data):
-            for in_val in val:
-                if len(find_key) > 0:
-                    if isinstance(in_val, tuple):
-                        new_json = json.loads(in_val[0].encode('utf-8'))
-                        found_vals = json_lookup(find_key, new_json, '111')
-                        app_log.info(found_vals[0])
-                else:
-                    app_log.info('%s', in_val)
+        dump_table(cur, tbl[1][0], out_file)
     con.close()
-    app_log.info('\n\n\tDump DB table - %s')
     return True
 
 
