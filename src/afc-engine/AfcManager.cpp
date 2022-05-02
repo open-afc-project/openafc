@@ -1641,8 +1641,8 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		("config-file-path,c", po::value<std::string>()->default_value("configFile.json"), "set config-file-path level")
 		("output-file-path,o", po::value<std::string>()->default_value("outputFile.json"), "set output-file-path level")
 		("temp-dir,t", po::value<std::string>()->default_value(""), "set temp-dir level")
-		("log-level,l", po::value<std::string>()->default_value("error"), "set log-level")
-		("runtime_opt,u", po::value<uint32_t>()->default_value(0), "bit 0: create debug files; bit 1: create kmz and progress files");
+		("log-level,l", po::value<std::string>()->default_value("debug"), "set log-level")
+		("runtime_opt,u", po::value<uint32_t>()->default_value(3), "bit 0: create debug files; bit 1: create kmz and progress files");
 
 	po::variables_map cmdLineArgs;
 	po::store(po::parse_command_line(argc, argv, optDescript), cmdLineArgs); // ac and av are parameters passed into main
