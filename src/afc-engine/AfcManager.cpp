@@ -234,6 +234,8 @@ AfcManager::AfcManager()
 	_responseCode = CConst::successResponseCode;
 	_ulsDefaultAntennaType = CConst::F1245AntennaType;
 	_rlanITMTxClutterMethod = CConst::ForceTrueITMClutterMethod;
+	_createKmz = false;
+	_createDebugFiles = false;
 }
 
 /******************************************************************************************/
@@ -1639,7 +1641,8 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		("config-file-path,c", po::value<std::string>()->default_value("configFile.json"), "set config-file-path level")
 		("output-file-path,o", po::value<std::string>()->default_value("outputFile.json"), "set output-file-path level")
 		("temp-dir,t", po::value<std::string>()->default_value(""), "set temp-dir level")
-		("log-level,l", po::value<std::string>()->default_value("debug"), "set log-level");
+		("log-level,l", po::value<std::string>()->default_value("error"), "set log-level")
+		("runtime_opt,u", po::value<uint32_t>()->default_value(0), "bit 0: create debug files; bit 1: create kmz and progress files");
 
 	po::variables_map cmdLineArgs;
 	po::store(po::parse_command_line(argc, argv, optDescript), cmdLineArgs); // ac and av are parameters passed into main
@@ -1713,6 +1716,16 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 	else
 	{
 		throw std::runtime_error("AfcManager::setCmdLineParams(): log-level command line argument was not set.");
+	}
+	if (cmdLineArgs.count("runtime_opt"))
+	{
+		uint32_t tmp = cmdLineArgs["runtime_opt"].as<uint32_t>();
+		if (tmp & 1) {
+			AfcManager::_createDebugFiles = true;
+		}
+		if (tmp & 2) {
+			AfcManager::_createKmz = true;
+		}
 	}
 }
 
@@ -4687,7 +4700,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 				double noiseLevelDBW = 10.0 * log(CConst::boltzmannConstant * CConst::T0 * bandwidth) / log(10.0) + noiseFigureDB;
 				uls->setNoiseLevelDBW(noiseLevelDBW);
-				if (fixedFlag) {
+				if (fixedFlag && fanom) {
 					fanom->writeRow({QString::asprintf("%d,%s,%s,%.15f,%.15f,%s\n", fsid, name.c_str(), callsign.c_str(), rxLatitudeDeg, rxLongitudeDeg, fixedStr.c_str())});
 				}
 			} else if (fanom) {
@@ -9458,6 +9471,9 @@ void AfcManager::runHeatmapAnalysis()
 /******************************************************************************************/
 void AfcManager::printUserInputs()
 {
+	if (!AfcManager::_createDebugFiles) {
+		return;
+	}
 	QStringList msg;
 
 	LOGGER_INFO(logger) << "printing user inputs " << _userInputsFile;
@@ -9548,6 +9564,7 @@ void AfcManager::printUserInputs()
 		}
 
 	}
+	LOGGER_DEBUG(logger) << "User inputs written to userInputs.csv";
 }
 /******************************************************************************************/
 
@@ -9754,12 +9771,15 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_surfRefracFile = SearchPaths::forReading("data", "fbrat/rat_transfer/itudata/N050.TXT", true).toStdString();
 	_regionPolygonResolution = 1.0e-5;
 
-	_excThrFile = QDir(QString::fromStdString(tempDir)).filePath("exc_thr.csv.gz").toStdString();
-	_fsAnomFile = QDir(QString::fromStdString(tempDir)).filePath("fs_anom.csv.gz").toStdString();
-	_userInputsFile = QDir(QString::fromStdString(tempDir)).filePath("userInputs.csv.gz").toStdString();
-	_kmlFile = QDir(QString::fromStdString(tempDir)).filePath("results.kmz").toStdString();
-	_progressFile = QDir(QString::fromStdString(tempDir)).filePath("progress.txt").toStdString();
-
+	if (AfcManager::_createDebugFiles) {
+		_excThrFile = QDir(QString::fromStdString(tempDir)).filePath("exc_thr.csv.gz").toStdString();
+		_fsAnomFile = QDir(QString::fromStdString(tempDir)).filePath("fs_anom.csv.gz").toStdString();
+		_userInputsFile = QDir(QString::fromStdString(tempDir)).filePath("userInputs.csv.gz").toStdString();
+	}
+	if (AfcManager::_createKmz) {
+		_kmlFile = QDir(QString::fromStdString(tempDir)).filePath("results.kmz").toStdString();
+		_progressFile = QDir(QString::fromStdString(tempDir)).filePath("progress.txt").toStdString();
+	}
 	/**************************************************************************************/
 }
 /**************************************************************************************/
