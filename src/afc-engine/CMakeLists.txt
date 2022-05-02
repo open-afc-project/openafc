@@ -20,6 +20,4 @@ target_link_libraries(${TGT_NAME} PUBLIC rkflogging)
 target_link_libraries(${TGT_NAME} PUBLIC rkfsql)
 if (CMAKE_BUILD_TYPE STREQUAL "DebugWithTest")
 target_link_libraries(${TGT_NAME} PUBLIC rkfunittest)
-
-  add_subdirectory(test)
 endif()

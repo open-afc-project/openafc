@@ -1715,7 +1715,7 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 	}
 }
 
-void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
+void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std::string &tempDir)
 {
 	QString errMsg;
 
@@ -1790,6 +1790,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath)
 	} else {
 		_nlcdFile = SearchPaths::forReading("data", "fbrat/rat_transfer/nlcd/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
 	}
+
+	if (jsonObj.contains("fsAnalysisListFile") && !jsonObj["fsAnalysisListFile"].isUndefined()) {
+	    _fsAnalysisListFile = QDir(QString::fromStdString(tempDir)).filePath(jsonObj["fsAnalysisListFile"].toString()).toStdString();
+    } else {
+	    _fsAnalysisListFile = QDir(QString::fromStdString(tempDir)).filePath("fs_analysis_list.csv").toStdString();
+    }
 
 	// ***********************************
 	// If this flag is set, indoor rlan's have a fixed AMSL height over the uncertainty region (with no height uncertainty).
@@ -6419,6 +6425,32 @@ void AfcManager::runPointAnalysis()
 	/**************************************************************************************/
 
 	/**************************************************************************************/
+	/* Create _fsAnalysisListFile                                                         */
+	/**************************************************************************************/
+	FILE *fFSList;
+    if (_fsAnalysisListFile.empty()) {
+	    fFSList = (FILE *) NULL;
+    } else {
+	    if ( !(fFSList = fopen(_fsAnalysisListFile.c_str(), "wb")) ) {
+		    errStr << std::string("ERROR: Unable to open fsAnalysisListFile \"") + _fsAnalysisListFile + std::string("\"\n");
+		    throw std::runtime_error(errStr.str());
+	    }
+	}
+    if (fFSList) {
+	    fprintf(fFSList,   "FSID"
+			              ",RX_CALLSIGN"
+			              ",TX_CALLSIGN"
+			              ",FS_START_FREQ (MHz)"
+			              ",FS_STOP_FREQ (MHz)"
+			              ",FS_RX_LONGITUDE (deg)"
+			              ",FS_RX_LATITUDE (deg)"
+			              ",FS_RX_HEIGHT_AGL (m)"
+			              ",FS_RX_RLAN_DIST (m)"
+	                      "\n");
+    }
+	/**************************************************************************************/
+
+	/**************************************************************************************/
 	/* Create KML file                                                                    */
 	/**************************************************************************************/
 	ZXmlWriter kml_writer(_kmlFile);
@@ -6964,7 +6996,7 @@ void AfcManager::runPointAnalysis()
 		}
 #endif
 
-		if ((distKmSquared < maxRadiusKmSquared) && (distKmSquared > exclusionDistKmSquared) && (uls->getLinkDistance() > 0.0))
+		if ((distKmSquared < maxRadiusKmSquared) && (uls->getLinkDistance() > 0.0))
 		{
 #           if DEBUG_AFC
 			time_t t1 = time(NULL);
@@ -7019,7 +7051,11 @@ void AfcManager::runPointAnalysis()
 
 			_rlanRegion->closestPoint(ulsRxLatLon, contains);
 
-			if (contains) {
+            double minRLANDist = -1.0;
+            if (distKmSquared <= exclusionDistKmSquared) {
+				LOGGER_INFO(logger) << "FSID = " << uls->getID() << " is inside exclusion distance.";
+                minRLANDist = sqrt(distKmSquared)*1000.0;
+			} else if (contains) {
 				int chanIdx;
 				for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 					ChannelStruct *channel = &(_channelList[chanIdx]);
@@ -7041,6 +7077,7 @@ void AfcManager::runPointAnalysis()
 					}
 				}
 				LOGGER_INFO(logger) << "FSID = " << uls->getID() << " is inside specified RLAN region.";
+                minRLANDist = 0.0;
 			} else {
 
 				int scanPtIdx;
@@ -7120,6 +7157,9 @@ void AfcManager::runPointAnalysis()
 						double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
 						double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
 
+                        if ((minRLANDist == -1.0) || (distKm*1000.0 < minRLANDist)) {
+                            minRLANDist = distKm*1000.0;
+                        }
 
 						int chanIdx;
 						for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
@@ -7266,6 +7306,20 @@ void AfcManager::runPointAnalysis()
 
 			}
 
+            if (fFSList) {
+	            fprintf(fFSList,   "%d,%s,%s,%.1f,%.1f,%.6f,%.6f,%.1f,%.1f\n",
+                    uls->getID(),
+                    uls->getRxCallsign().c_str(),
+                    uls->getCallsign().c_str(),
+                    uls->getStartUseFreq()*1.0e-6,
+                    uls->getStopUseFreq()*1.0e-6,
+                    uls->getRxLongitudeDeg(),
+                    uls->getRxLatitudeDeg(),
+                    uls->getRxHeightAboveTerrain(),
+                    minRLANDist
+                );
+            }
+
 #           if DEBUG_AFC
 			time_t t2 = time(NULL);
 			tstr = strdup(ctime(&t2));
@@ -7323,8 +7377,10 @@ void AfcManager::runPointAnalysis()
 		}
 		else
 		{
+#           if DEBUG_AFC
 			// uls is not included in calculations
-			//LOGGER_DEBUG(logger) << "ID: " << uls->getID() << ", distKm: " << distKmSquared << ", link: " << uls->getLinkDistance() << ",";
+			    LOGGER_DEBUG(logger) << "ID: " << uls->getID() << ", distKm: " << sqrt(distKmSquared) << ", link: " << uls->getLinkDistance() << ",";
+#           endif
 		}
 
 		numProc++;
@@ -7494,6 +7550,10 @@ void AfcManager::runPointAnalysis()
 		fkml->writeEndElement(); // kml
 		fkml->writeEndDocument();
 	}
+
+    if (fFSList) {
+        fclose(fFSList);
+    }
 
 	if (numProc == 0) {
 		errStr << "Analysis region contains no FS receivers";
