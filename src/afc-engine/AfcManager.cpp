@@ -2,6 +2,10 @@
 #include "AfcManager.h"
 #include "RlanRegion.h"
 
+// "--runtime_opt" masks
+#define RUNTIME_OPT_ENABLE_DBG 1
+#define RUNTIME_OPT_ENABLE_GUI 2
+
 extern double qerfi(double q);
 
 QJsonArray jsonChannelData(const std::vector<ChannelStruct> &channelList);
@@ -1720,10 +1724,10 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 	if (cmdLineArgs.count("runtime_opt"))
 	{
 		uint32_t tmp = cmdLineArgs["runtime_opt"].as<uint32_t>();
-		if (tmp & 1) {
+		if (tmp & RUNTIME_OPT_ENABLE_DBG) {
 			AfcManager::_createDebugFiles = true;
 		}
-		if (tmp & 2) {
+		if (tmp & RUNTIME_OPT_ENABLE_GUI) {
 			AfcManager::_createKmz = true;
 		}
 	}
