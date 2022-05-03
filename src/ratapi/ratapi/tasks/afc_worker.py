@@ -1,3 +1,12 @@
+#
+# This Python file uses the following encoding: utf-8
+#
+# Portions copyright © 2021 Broadcom.
+# All rights reserved. The term “Broadcom” refers solely
+# to the Broadcom Inc. corporate affiliate that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which
+# is included with this software program.
+#
 from genericpath import exists
 from inspect import cleandoc
 import logging
@@ -8,6 +17,7 @@ import subprocess
 import datetime
 from celery import Celery
 from ..db.daily_uls_parse import daily_uls_parse
+from ..defs import RNTM_OPT_DBG
 from runcelery import init_config
 from celery.schedules import crontab
 from flask.config import Config
@@ -46,7 +56,9 @@ def setup_periodic_tasks(sender, **kwargs):
    
 
 @client.task(bind=True)
-def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type, request_file_path, config_file_path, response_file_path, history_dir, debug):
+def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
+        request_file_path, config_file_path, response_file_path, history_dir,
+        runtime_opts):
     """ Run AFC Engine
 
         The parameters are all serializable so they can be passed through the message queue.
@@ -73,8 +85,9 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type, re
         :param history_dir: path to history directory if values in temp_dir are to be saved
         :type history_dir: path or None
 
-        :param debug: indicates if AFC Engine should use DEBUG mode (uses INFO otherwise)
-        :type debug: boolean
+        :param runtime_opts: indicates if AFC Engine should use DEBUG mode
+         (uses INFO otherwise) or prepare GUI options
+        :type runtime_opts: int
     """
     proc = None
     response_dir = os.path.join(state_root, 'responses')
@@ -88,6 +101,10 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type, re
         LOGGER.debug("entering run function")
         err_file = open(os.path.join(temp_dir, 'engine-error.txt'), 'wb')
         log_file = open(os.path.join(temp_dir, 'engine-log.txt'), 'wb')
+
+        debug = ''
+        if runtime_opts & RNTM_OPT_DBG:
+            debug = True
 
         # run the AFC Engine
         try:

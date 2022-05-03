@@ -1,3 +1,12 @@
+#
+# This Python file uses the following encoding: utf-8
+#
+# Portions copyright © 2021 Broadcom.
+# All rights reserved. The term “Broadcom” refers solely
+# to the Broadcom Inc. corporate affiliate that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which
+# is included with this software program.
+#
 ''' The custom REST api for using the web UI and configuring AFC.
 '''
 
@@ -12,6 +21,7 @@ import glob
 import re, datetime
 from flask.views import MethodView
 import werkzeug.exceptions
+from ..defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
 from ..tasks.afc_worker import run, parseULS
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User
@@ -24,7 +34,9 @@ LOGGER = logging.getLogger(__name__)
 module = flask.Blueprint('ratapi-v1', 'ratapi')
 
 
-def build_task(request_file_path, response_file_path, request_type, user_id, user, temp_dir, config_file_path=None):
+def build_task(request_file_path, response_file_path, request_type, user_id,
+               user, temp_dir, config_file_path=None,
+               runtime_opts=RNTM_OPT_DBG_GUI):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
     
@@ -54,6 +66,8 @@ def build_task(request_file_path, response_file_path, request_type, user_id, use
                  os.path.join(temp_dir, 'afc_config.json'),
                  response_file_path,
                  temp_dir)
+    if flask.current_app.config['DEBUG']:
+        runtime_opts &= RNTM_OPT_DBG
     task = run.apply_async(args=[
         user_id,
         user.email,
@@ -65,7 +79,7 @@ def build_task(request_file_path, response_file_path, request_type, user_id, use
         os.path.join(temp_dir, 'afc_config.json'),
         response_file_path,
         flask.current_app.config['HISTORY_DIR'],
-        flask.current_app.config['DEBUG'],
+        runtime_opts,
     ])
     return task
 

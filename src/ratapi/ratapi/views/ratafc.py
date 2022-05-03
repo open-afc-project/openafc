@@ -22,6 +22,7 @@ import glob
 import re, datetime
 from flask.views import MethodView
 import werkzeug.exceptions
+from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG_NOGUI, RNTM_OPT_NODBG_GUI, RNTM_OPT_DBG_GUI
 from ..tasks.afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint
@@ -156,6 +157,7 @@ class RatAfc(MethodView):
     def _auth_ap(self, serial_number, certification_id, rulesets):
         ''' Authenticate an access point. If must match the serial_number and certification_id in the database to be valid
         '''
+        LOGGER.debug('RatAfc::_auth_ap()')
         LOGGER.debug('Starting auth_ap,serial: %s; certId: %s; ruleset %s.',serial_number,certification_id,rulesets )
 
 
@@ -180,6 +182,7 @@ class RatAfc(MethodView):
     def post(self):
         ''' POST method for RAT AFC
         '''
+        LOGGER.debug('RatAfc::post()')
 
         # check request version
         ver = flask.request.json["version"]
@@ -191,6 +194,10 @@ class RatAfc(MethodView):
         firstRequest = flask.request.json["availableSpectrumInquiryRequests"][0] # as of now, there can be only one request
         LOGGER.debug("Running AFC analysis with params: %s", args)
         request_type = 'AP-AFC'
+
+        runtime_opts = RNTM_OPT_DBG_GUI
+        if hasattr(self, 'runtime_opts'):
+            runtime_opts = self.runtime_opts
 
         try:
             config = None
@@ -210,9 +217,9 @@ class RatAfc(MethodView):
                 firstCertId = None
 
             user_id = self._auth_ap(device_desc.get('serialNumber'), firstCertId, device_desc.get('rulesetIds'))
-            
+
             user = User.query.filter_by(id=user_id).first()
-            
+
             # process request
             # write guiJson and afc config to separate files in temp directory
             # if no config is in request then look for config accociated with the user
@@ -253,7 +260,9 @@ class RatAfc(MethodView):
             
 
 
-            task = build_task(request_file_path, response_file_path, request_type, 0, user, temp_dir, config_file_path)        
+            task = build_task(request_file_path, response_file_path,
+                              request_type, 0, user, temp_dir, config_file_path,
+                              runtime_opts)
 
             # wait for request to finish processing
             task.wait()
@@ -314,7 +323,47 @@ class RatAfc(MethodView):
             return resp
 
 
+class RatAfc_DbgNoGui(RatAfc):
+   def __init__(self):
+       LOGGER.debug('RatAfc_DbgNoGui::__init__()')
+       self.runtime_opts = RNTM_OPT_DBG_NOGUI
+       super(RatAfc_DbgNoGui, self).__init__()
 
+
+class RatAfc_NoDbgGui(RatAfc):
+   def __init__(self):
+       LOGGER.debug('RatAfc_NoDbgGui::__init__()')
+       self.runtime_opts = RNTM_OPT_NODBG_GUI
+       super(RatAfc_NoDbgGui, self).__init__()
+
+
+class RatAfc_NoDbgNoGui(RatAfc):
+   def __init__(self):
+       LOGGER.debug('RatAfc_NoDbgNoGui::__init__()')
+       self.runtime_opts = RNTM_OPT_NODBG_NOGUI
+       super(RatAfc_NoDbgNoGui, self).__init__()
+
+
+class RatAfc_DbgGui(RatAfc):
+   def __init__(self):
+       LOGGER.debug('RatAfc_DbgGui::__init__()')
+       self.runtime_opts = RNTM_OPT_DBG_GUI
+       super(RatAfc_DbgGui, self).__init__()
+
+
+# registration with runtime option NoDebug and NoGui
+module.add_url_rule('/1.1/nodbg_nogui/availableSpectrumInquiry',
+                    view_func=RatAfc_DbgNoGui.as_view('RatAfc_NoDbgNoGui'))
+# registration with runtime option Debug and NoGui
+module.add_url_rule('/1.1/dbg_nogui/availableSpectrumInquiry',
+                    view_func=RatAfc_DbgNoGui.as_view('RatAfc_DbgNoGui'))
+# registration with runtime option NoDebug and Gui
+module.add_url_rule('/1.1/nodbg_gui/availableSpectrumInquiry',
+                    view_func=RatAfc_NoDbgGui.as_view('RatAfc_NoDbgGui'))
+# registration with runtime option Debug and Gui
+module.add_url_rule('/1.1/dbg_gui/availableSpectrumInquiry',
+                    view_func=RatAfc_DbgGui.as_view('RatAfc_DbgGui'))
+# registration of default runtime options
 module.add_url_rule('/1.1/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))
 
