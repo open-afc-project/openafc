@@ -44,8 +44,9 @@ from _version import __version__
 from _wfa_tests import *
 
 
+AFC_URL_SUFFIX = '/fbrat/ap-afc/1.1/'
+AFC_REQ_NAME = 'availableSpectrumInquiry'
 ADD_AFC_TEST_REQS = 'add_test_req.txt'
-AFC_URL_SUFFIX = '/fbrat/ap-afc/1.1/availableSpectrumInquiry'
 headers = {'content-type': 'application/json'}
 TBL_REQS_NAME = 'test_vectors'
 TBL_RESPS_NAME = 'test_data'
@@ -71,6 +72,8 @@ class AfcTester:
         self.db_filename = AFC_TEST_DB_FILENAME
         self.resp = ''
         self.post_verify = True
+        self.dbg = ''
+        self.gui = ''
 
     def run(self, opts):
         """Main entry to find and execute commands"""
@@ -100,9 +103,24 @@ class AfcTester:
             self.addr = params['addr'][0]
         if 'port' in params:
             self.port = params['port'][0]
+        change_url = 0
+        if 'nodbg' in params:
+            self.dbg = 'nodbg'
+            change_url += 1
+        else:
+            self.dbg = 'dbg'
+        if 'nogui' in params:
+            self.gui = 'nogui'
+            change_url += 1
+        else:
+            self.gui = 'gui'
         if ('post' in params) and (params['post'][0] == 'n'):
             self.post_verify = False
-        self.url_path += self.addr + ':' + str(self.port) + AFC_URL_SUFFIX
+        rtm_opt = ''
+        if change_url:
+            rtm_opt = self.dbg + '_' + self.gui + '/'
+        self.url_path += self.addr + ':' + str(self.port) + AFC_URL_SUFFIX +\
+                         rtm_opt + AFC_REQ_NAME
         return AFC_OK
 
     def _set_db(self, params):
@@ -221,11 +239,13 @@ def make_arg_parser():
         formatter_class=argparse.RawTextHelpFormatter)
 
     args_parser.add_argument('--cfg', metavar='KEY=VALUE',
-                             nargs='+', action=ParseDict,
-                             help='<addr=<ip address|hostname>>,\n'
-                                  '[port=<port>],\n'
-                                  '[post=n] - not to check for SSL,\n'
-                                  '[log=<info|debug|warn|error|critical>]\n')
+                         nargs='+', action=ParseDict,
+                         help="<addr=<ip address|hostname>>,\n"
+                              "[port=<port>],\n"
+                              "[post=n] - not to check for SSL,\n"
+                              "[dbg|nodbg] - set runtime debug option,\n"
+                              "[gui|nogui] - set runtime GUI support option,\n"
+                              "[log=<info|debug|warn|error|critical>]\n")
     args_parser.add_argument('--db', metavar='KEY,KEY=VALUE',
                              nargs='+', action=ParseDict,
                              help="<a[=filename]> - add new request record,\n"
@@ -698,7 +718,8 @@ def start_acquisition(self, test_number):
 
 def start_test(self, test_number):
     """Fetch test vectors from the DB and run tests"""
-    app_log.debug('%s() %s', inspect.stack()[0][3], test_number)
+    app_log.debug('%s() %s (%s)',
+                  inspect.stack()[0][3], test_number, self.url_path)
     if test_number == 'True':
         found_range = 0
     else:
