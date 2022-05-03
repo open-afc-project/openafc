@@ -147,7 +147,6 @@ class AfcTester:
         """Run AFC test and wait for respons"""
         new_req_json = json.loads(params.encode('utf-8'))
         new_req = json.dumps(new_req_json, sort_keys=True)
-        app_log.debug(new_req)
         before_ts = time.monotonic()
         rawresp = requests.post(
             self.url_path, data=new_req, headers=headers,
@@ -337,8 +336,10 @@ def add_reqs(self, opt):
 
             new_req, resp = self._send_recv(dataline)
 
-            # request id contains test category
-            req_id = json_lookup('requestId', resp, None)
+            # get request id from a request, response not always has it
+            # the request contains test category
+            new_req_json = json.loads(new_req.encode('utf-8'))
+            req_id = json_lookup('requestId', new_req_json, None)
 
             resp_res = json_lookup('shortDescription', resp, None)
             if (resp_res[0] != 'Success') and (req_id[0].lower().find('urs') == -1):
@@ -385,8 +386,10 @@ def run_reqs(self, opt):
 
             new_req, resp = self._send_recv(dataline)
 
-            # request id contains test category
-            req_id = json_lookup('requestId', resp, None)
+            # get request id from a request, response not always has it
+            # the request contains test category
+            new_req_json = json.loads(new_req.encode('utf-8'))
+            req_id = json_lookup('requestId', new_req_json, None)
             
             resp_res = json_lookup('shortDescription', resp, None)
             if (resp_res[0] != 'Success') and (req_id[0].lower().find('urs') == -1):
@@ -398,6 +401,7 @@ def run_reqs(self, opt):
             app_log.info('Resp:')
             app_log.info(resp)
             app_log.info('\n\n')
+
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)
             hash_obj = hashlib.sha256(upd_data.encode('utf-8'))

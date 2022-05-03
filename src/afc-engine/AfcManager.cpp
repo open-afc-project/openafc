@@ -231,8 +231,9 @@ AfcManager::AfcManager()
 	_heatmapNumPtsLat = 0;
 
 	_pathLossModel = CConst::unknownPathLossModel;
-
 	_responseCode = CConst::successResponseCode;
+	_ulsDefaultAntennaType = CConst::F1245AntennaType;
+	_rlanITMTxClutterMethod = CConst::ForceTrueITMClutterMethod;
 }
 
 /******************************************************************************************/
@@ -1978,8 +1979,6 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		if (!validFlag) {
 			throw std::runtime_error("ERROR: Invalid ulsDefaultAntennaType");
 		}
-	} else {
-		_ulsDefaultAntennaType = CConst::F1245AntennaType;
 	}
 
 	// ***********************************

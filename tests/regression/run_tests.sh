@@ -36,7 +36,7 @@ loop() {
 }
 
 cd $wd/tests
-loop 52 20
+loop 58 20
 
 
 # Local Variables:
