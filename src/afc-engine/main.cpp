@@ -81,7 +81,6 @@ int main(int argc, char **argv) { // Accepts input from command line
 
 		// Prints user input files for debugging
 		afcManager.printUserInputs();
-		LOGGER_DEBUG(logger) << "User inputs written to userInputs.csv";
 
 		// Read in the databases' information
 		try {

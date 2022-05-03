@@ -253,6 +253,8 @@ class AfcManager
 		/**************************************************************************************/
 		std::string _analysisType;              // Parsed Analysis Type: "PointAnalysis", "APAnalysis", "ExclusionZoneAnalysis", "HeatmapAnalysis";
 		std::string _stateRoot;                 // Parsed path of fbrat state root
+		bool _createKmz;
+		bool _createDebugFiles;
 
 		RLANBoundary _rlanUncertaintyRegionType = RLANBoundary::NO_BOUNDARY;          // specifies the type of horizontal uncertainty region being used (ellipse, linear polygon, or radial polygon)
 		DoubleTriplet _rlanLLA = std::make_tuple(quietNaN, quietNaN, quietNaN);       // lat (deg) (NaN if not ellipse), lon (deg) (NaN if not ellipse), height (m)
