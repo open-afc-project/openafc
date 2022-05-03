@@ -45,7 +45,9 @@ def build_task(request_file_path, response_file_path, request_type, user_id, use
     LOGGER.debug("Writing request file: %s", request_file_path)
 
     # call c++ command
-    LOGGER.debug("Calling afc-engine: %s --request-type=%s --input-file-path=%s --config-file-path=%s --output-file-path=%s --temp-dir=%s",
+    LOGGER.debug("Calling afc-engine: %s --request-type=%s "
+                 "--input-file-path=%s --config-file-path=%s "
+                 "--output-file-path=%s --temp-dir=%s",
                  os.path.join(flask.current_app.config['AFC_ENGINE']),
                  request_type,
                  request_file_path,
