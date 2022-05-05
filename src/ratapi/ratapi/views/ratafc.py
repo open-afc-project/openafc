@@ -353,7 +353,7 @@ class RatAfc_DbgGui(RatAfc):
 
 # registration with runtime option NoDebug and NoGui
 module.add_url_rule('/1.1/nodbg_nogui/availableSpectrumInquiry',
-                    view_func=RatAfc_DbgNoGui.as_view('RatAfc_NoDbgNoGui'))
+                    view_func=RatAfc_NoDbgNoGui.as_view('RatAfc_NoDbgNoGui'))
 # registration with runtime option Debug and NoGui
 module.add_url_rule('/1.1/dbg_nogui/availableSpectrumInquiry',
                     view_func=RatAfc_DbgNoGui.as_view('RatAfc_DbgNoGui'))

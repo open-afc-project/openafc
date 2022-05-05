@@ -118,6 +118,7 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
                 "--output-file-path=" + response_file_path,
                 "--temp-dir=" + temp_dir,
                 "--log-level=" + ("debug" if debug else "info"),
+                "--runtime_opt=" + str(runtime_opts),
             ]
             proc = subprocess.Popen(cmd, stderr=err_file, stdout=log_file)
 

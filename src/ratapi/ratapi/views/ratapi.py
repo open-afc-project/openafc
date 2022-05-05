@@ -56,18 +56,22 @@ def build_task(request_file_path, response_file_path, request_type, user_id,
     # copy config to temp so that it is fixed for run
     LOGGER.debug("Writing request file: %s", request_file_path)
 
+    if flask.current_app.config['DEBUG']:
+        runtime_opts &= RNTM_OPT_DBG
+    LOGGER.info(runtime_opts)
     # call c++ command
     LOGGER.debug("Calling afc-engine: %s --request-type=%s "
                  "--input-file-path=%s --config-file-path=%s "
-                 "--output-file-path=%s --temp-dir=%s",
+                 "--output-file-path=%s --temp-dir=%s"
+                 "--log-level=%s --runtime_opt=%d",
                  os.path.join(flask.current_app.config['AFC_ENGINE']),
                  request_type,
                  request_file_path,
                  os.path.join(temp_dir, 'afc_config.json'),
                  response_file_path,
-                 temp_dir)
-    if flask.current_app.config['DEBUG']:
-        runtime_opts &= RNTM_OPT_DBG
+                 temp_dir,
+                 flask.current_app.config['DEBUG'],
+                 runtime_opts)
     task = run.apply_async(args=[
         user_id,
         user.email,
