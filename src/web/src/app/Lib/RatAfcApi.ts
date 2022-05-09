@@ -1,6 +1,8 @@
-import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, DeploymentEnum } from "./RatAfcTypes";
+import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, DeploymentEnum, VendorExtension } from "./RatAfcTypes";
 import { RatResponse, success, error } from "./RatApiTypes";
 import { guiConfig, getDefaultAfcConf } from "./RatApi";
+import { addAuth } from "./User";
+
 
 /**
  * RatAfcApi.ts
@@ -16,24 +18,45 @@ export const spectrumInquiryRequest = (request: AvailableSpectrumInquiryRequest)
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ version: "1.1", availableSpectrumInquiryRequests: [request]})
+        body: JSON.stringify({ version: "1.1", availableSpectrumInquiryRequests: [request] })
     })
-    .then(async resp => {
-        if (resp.status == 200) {
-            const data = (await resp.json()) as { version: string, availableSpectrumInquiryResponses: AvailableSpectrumInquiryResponse[] };
-            const response = data.availableSpectrumInquiryResponses[0];
-            if (response.response.responseCode == 0) {
-                return success(data.availableSpectrumInquiryResponses[0]);
+        .then(async resp => {
+            if (resp.status == 200) {
+                const data = (await resp.json()) as {
+                    version: string, availableSpectrumInquiryResponses: AvailableSpectrumInquiryResponse[], vendorExtensions?: VendorExtension[]
+                };
+                // Get the first response until API can handle multiple requests
+                const response = data.availableSpectrumInquiryResponses[0];
+                if (response.response.responseCode == 0) {
+                    if (data.vendorExtensions && data.vendorExtensions.length > 0) {
+                        response.vendorExtensions = data.vendorExtensions;
+                    }
+                    return success(response);
+                } else {
+                    return error(response.response.shortDescription, response.response.responseCode, response);
+                }
             } else {
-                return error(response.response.shortDescription, response.response.responseCode, response);
+                return error(resp.statusText, resp.status, resp);
             }
-        } else {
-            return error(resp.statusText, resp.status, resp);
-        }
+        })
+        .catch(e => {
+            return error("encountered an error when running request", undefined, e);
+        })
+
+
+/**
+* name
+*/
+export function downloadMapData(kml_filename: any, method: string): Promise<Response> {
+    var url = guiConfig.afc_kml.replace('p_kml_file',kml_filename)
+    return fetch(url, {
+        method: method,
+        headers: addAuth({
+            "Content-Type": "application/json",
+            "Content-Encoding": "gzip"
+        })
     })
-    .catch(e => {
-        return error("encountered an error when running request", undefined, e);
-    })
+}
 
 export const sampleRequestObject: AvailableSpectrumInquiryRequest = {
     requestId: "0",
@@ -57,12 +80,12 @@ export const sampleRequestObject: AvailableSpectrumInquiryRequest = {
             minorAxis: 100,
             orientation: 90
         },
-        elevation:{
+        elevation: {
             height: 15,
             verticalUncertainty: 5,
             heightType: "AGL"
         },
-        
+
         indoorDeployment: DeploymentEnum.indoorDeployment
     },
     minDesiredPower: 15,

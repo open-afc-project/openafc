@@ -19,7 +19,8 @@ import pkg_resources
 import flask
 import json
 import glob
-import re, datetime
+import re
+import datetime
 from flask.views import MethodView
 import werkzeug.exceptions
 from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG_NOGUI, RNTM_OPT_NODBG_GUI, RNTM_OPT_DBG_GUI
@@ -36,6 +37,7 @@ RULESET = 'US_47_CFR_PART_15_SUBPART_E'
 
 #: All views under this API blueprint
 module = flask.Blueprint('ap-afc', 'ap-afc')
+
 
 class AP_Exception(Exception):
     ''' Exception type used for RAT AFC respones
@@ -68,7 +70,9 @@ class VersionNotSupportedException(AP_Exception):
     '''
 
     def __init__(self, invalid_version=[]):
-        super(VersionNotSupportedException, self).__init__(100, 'The requested version number is invalid', { 'invalidVersion': invalid_version })
+        super(VersionNotSupportedException, self).__init__(
+            100, 'The requested version number is invalid', {'invalidVersion': invalid_version})
+
 
 class DeviceUnallowedException(AP_Exception):
     '''
@@ -79,54 +83,60 @@ class DeviceUnallowedException(AP_Exception):
     '''
 
     def __init__(self):
-        super(DeviceUnallowedException, self).__init__(101, 'This specific device is not allowed to operate under AFC control.')
+        super(DeviceUnallowedException, self).__init__(
+            101, 'This specific device is not allowed to operate under AFC control.')
+
 
 class MissingParamException(AP_Exception):
     '''
     102	Name:	MISSING_PARAM
-	Interpretation:	One or more fields required to be included in the request are missing.
-	Required Action:	Not specified.
-	Other Information:	The supplementalInfo field may carry a list of missing parameter names.
+        Interpretation:	One or more fields required to be included in the request are missing.
+        Required Action:	Not specified.
+        Other Information:	The supplementalInfo field may carry a list of missing parameter names.
     '''
 
     def __init__(self, missing_params=[]):
-        super(MissingParamException, self).__init__(102, 'One or more fields required to be included in the request are missing.', { 'missingParams': missing_params })
+        super(MissingParamException, self).__init__(
+            102, 'One or more fields required to be included in the request are missing.', {'missingParams': missing_params})
 
 
 class InvalidValueException(AP_Exception):
     '''
     103	Name:	INVALID_VALUE
-	Interpretation:	One or more fields have an invalid value.
-	Required Action:	Not specified.
-	Other Information:	The supplementalInfo field may carry a list of the names of the fields set to invalid value.
+        Interpretation:	One or more fields have an invalid value.
+        Required Action:	Not specified.
+        Other Information:	The supplementalInfo field may carry a list of the names of the fields set to invalid value.
     '''
 
     def __init__(self, invalid_params=[]):
-        super(InvalidValueException, self).__init__(103, 'One or more fields have an invalid value.', { 'invalidParams': invalid_params })
+        super(InvalidValueException, self).__init__(
+            103, 'One or more fields have an invalid value.', {'invalidParams': invalid_params})
 
 
 class UnexpectedParamException(AP_Exception):
     '''
     106	Name:	UNEXPECTED_PARAM
-	Interpretation:	Unknown parameter found, or conditional parameter found, but condition is not met.
-	Required Action:	Not specified.
-	Other Information:	The supplementalInfo field may carry a list of unexpected parameter names.
+        Interpretation:	Unknown parameter found, or conditional parameter found, but condition is not met.
+        Required Action:	Not specified.
+        Other Information:	The supplementalInfo field may carry a list of unexpected parameter names.
     '''
 
     def __init__(self, unexpected_params=[]):
-        super(UnexpectedParamException, self).__init__(106, 'Unknown parameter found, or conditional parameter found, but condition is not met.', { 'unexpectedParams': unexpected_params })
+        super(UnexpectedParamException, self).__init__(
+            106, 'Unknown parameter found, or conditional parameter found, but condition is not met.', {'unexpectedParams': unexpected_params})
 
 
 class UnsupportedSpectrumException(AP_Exception):
     '''
     300	Name:	UNSUPPORTED_SPECTRUM
-	Interpretation:	The frequency range indicated in the Available Spectrum Inquiry Request is at least partially outside of the frequency band under the management of the AFC (e.g. 5.925-6.425 GHz and 6.525-6.875 GHz bands in US).
-	Required Action:	Not specified.
-	Other Information:	None
+        Interpretation:	The frequency range indicated in the Available Spectrum Inquiry Request is at least partially outside of the frequency band under the management of the AFC (e.g. 5.925-6.425 GHz and 6.525-6.875 GHz bands in US).
+        Required Action:	Not specified.
+        Other Information:	None
     '''
 
     def __init__(self):
-        super(UnsupportedSpectrumException, self).__init__(300, 'The frequency range indicated in the Available Spectrum Inquiry Request is at least partially outside of the frequency band under the management of the AFC.')
+        super(UnsupportedSpectrumException, self).__init__(
+            300, 'The frequency range indicated in the Available Spectrum Inquiry Request is at least partially outside of the frequency band under the management of the AFC.')
 
 
 def _translate_afc_error(error_msg):
@@ -150,6 +160,7 @@ def _translate_afc_error(error_msg):
     if invalid_version != -1:
         raise VersionNotSupported()
 
+
 class RatAfc(MethodView):
     ''' RAT AFC resources
     '''
@@ -169,15 +180,14 @@ class RatAfc(MethodView):
         if rulesets is None or len(rulesets) != 1 or rulesets[0] != RULESET:
             raise InvalidValueException(["rulesets"])
         if ap is None:
-            raise DeviceUnallowedException() #InvalidCredentialsException()
+            raise DeviceUnallowedException()  # InvalidCredentialsException()
         if certification_id is None:
             raise MissingParamException(missing_params=['certificationId'])
         if ap.certification_id != certification_id:
-            raise DeviceUnallowedException() #InvalidCredentialsException()
+            raise DeviceUnallowedException()  # InvalidCredentialsException()
 
         LOGGER.info('Found AP, certifiying User with Id: %i', ap.user_id)
         return ap.user_id
-
 
     def post(self):
         ''' POST method for RAT AFC
@@ -190,8 +200,10 @@ class RatAfc(MethodView):
             raise VersionNotSupportedException([ver])
 
         # start request
-        args = flask.request.json # Get the entire JSON to allow for multiple requests and match v1.1 expected format
-        firstRequest = flask.request.json["availableSpectrumInquiryRequests"][0] # as of now, there can be only one request
+        # Get the entire JSON to allow for multiple requests and match v1.1 expected format
+        args = flask.request.json
+        # as of now, there can be only one request
+        firstRequest = flask.request.json["availableSpectrumInquiryRequests"][0]
         LOGGER.debug("Running AFC analysis with params: %s", args)
         request_type = 'AP-AFC'
 
@@ -210,9 +222,10 @@ class RatAfc(MethodView):
 
             # authenticate
             device_desc = firstRequest.get('deviceDescriptor')
- 
+
             try:
-                firstCertId = device_desc['certificationId'][0]['nra'] + ' ' + device_desc['certificationId'][0]['id']
+                firstCertId = device_desc['certificationId'][0]['nra'] + \
+                    ' ' + device_desc['certificationId'][0]['id']
             except:
                 firstCertId = None
 
@@ -232,33 +245,33 @@ class RatAfc(MethodView):
 
             config_file_path = None
             if config is None:
-                LOGGER.debug('Config file not in vendor extension, using user specified config')
+                LOGGER.debug(
+                    'Config file not in vendor extension, using user specified config')
                 config_file_path = os.path.join(
-                flask.current_app.config['STATE_ROOT_PATH'],
-                'afc_config',
-                # use scoped user config and fallback to default if not available
-                str(user_id) if os.path.exists(os.path.join(
-                    flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user_id))) else '',
-                'afc_config.json')
+                    flask.current_app.config['STATE_ROOT_PATH'],
+                    'afc_config',
+                    # use scoped user config and fallback to default if not available
+                    str(user_id) if os.path.exists(os.path.join(
+                        flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user_id))) else '',
+                    'afc_config.json')
                 shutil.copy(config_file_path, temp_dir)
             else:
-                LOGGER.debug('AP specified config vendor extension. Writing contents to afc_config.json')
+                LOGGER.debug(
+                    'AP specified config vendor extension. Writing contents to afc_config.json')
                 config_file_path = os.path.join(
                     temp_dir, 'afc_config.json')
                 LOGGER.debug("Writing config file: %s", config_file_path)
                 config_json_bytes = json.dumps(config).encode('utf-8')
                 with open(config_file_path, 'wb') as fout:
-                    fout.write(config_json_bytes)     
+                    fout.write(config_json_bytes)
                 LOGGER.debug("config file written")
                 LOGGER.debug('config: %s', config_json_bytes)
 
             request_json_bytes = json.dumps(args).encode('utf-8')
             LOGGER.debug("Writing request file: %s", request_file_path)
             with open(request_file_path, 'wb') as fout:
-                fout.write(request_json_bytes)     
+                fout.write(request_json_bytes)
             LOGGER.debug("Request file written")
-            
-
 
             task = build_task(request_file_path, response_file_path,
                               request_type, 0, user, temp_dir, config_file_path,
@@ -267,18 +280,38 @@ class RatAfc(MethodView):
             # wait for request to finish processing
             task.wait()
 
+            LOGGER.debug('task result: %s', task.result)
+
             if task.successful() and task.result['status'] == 'DONE':
                 if not os.path.exists(task.result['result_path']):
                     raise ServerError('Resource already deleted')
                 # read temporary file generated by afc-engine
-                LOGGER.debug("Reading result file: %s", task.result['result_path'])
+                LOGGER.debug("Reading result file: %s",
+                             task.result['result_path'])
+                kmz_file = task.result.get('kml_path')
+                geo_file = task.result.get('geoJson_path')
                 resp_data = None
                 with gzip.open(task.result['result_path'], 'rb') as resp_file:
                     resp_data = resp_file.read()
+
+                LOGGER.debug('resp data before: %s', resp_data)
+                LOGGER.debug('kmz and geo files: %s %s', kmz_file, geo_file)
+                #add the map data file (if it is generated) into a vendor extension
+                # will have to revist when API can handle multiple requests
+                if geo_file is not None and os.path.exists(geo_file) and kmz_file is not None and os.path.exists(kmz_file):
+                    resp_json = json.loads(resp_data)
+                    resp_json["vendorExtensions"] = [{
+                        "extensionID": "openAfc.mapinfo",
+                        "parameters": {
+                            "kmzFile": os.path.basename(kmz_file),
+                            "geoJsonFile": os.path.basename(geo_file)
+                        }
+                    }]
+                    resp_data = json.dumps(resp_json)
+
                 os.remove(task.result['result_path'])
-                #os.remove(task.result['result_path'].replace('.json', '.kmz'))
+                LOGGER.debug('resp data after: %s', resp_data)
                 resp = flask.make_response()
-                LOGGER.debug('resp data: %s', resp_data)
                 resp.data = resp_data
                 #resp.content_type = 'application/json'
                 #resp.content_encoding = 'gzip'
@@ -289,7 +322,8 @@ class RatAfc(MethodView):
                 if not os.path.exists(task.result['error_path']):
                     raise ServerError('Resource already deleted')
                 # read temporary file generated by afc-engine
-                LOGGER.debug("Reading error file: %s", task.result['error_path'])
+                LOGGER.debug("Reading error file: %s",
+                             task.result['error_path'])
                 error_data = None
                 with open(task.result['error_path'], 'rb') as error_file:
                     error_data = error_file.read()
@@ -300,21 +334,22 @@ class RatAfc(MethodView):
                 _translate_afc_error(error_data)
 
                 # raise for internal AFC Engine error
-                raise AP_Exception(-1, error_data) 
+                raise AP_Exception(-1, error_data)
             else:
-                raise AP_Exception(-1, 'The completed task state is invalid. Try again later, and if this issue persists contact support.')
+                raise AP_Exception(
+                    -1, 'The completed task state is invalid. Try again later, and if this issue persists contact support.')
 
         except AP_Exception as e:
             LOGGER.error('catching exception: %s', e.message)
             result = {
                 'version': '1.1',
                 'availableSpectrumInquiryResponses': [{
-                'requestId': firstRequest.get('requestId'),
-                'response': {
-                    'responseCode': e.response_code,
-                    'shortDescription': e.description,
-                    'supplementalInfo': e.supplemental_info
-                }
+                    'requestId': firstRequest.get('requestId'),
+                    'response': {
+                        'responseCode': e.response_code,
+                        'shortDescription': e.description,
+                        'supplementalInfo': e.supplemental_info
+                    }
                 }]
             }
             LOGGER.error(str(result))

@@ -142,7 +142,10 @@ class AfcManager
 		void addBuildingDatabaseTiles(OGRLayer *layer);
 
 		// Export calculations and FS locations in geoJSON format for GUI
-		void exportGUIjson(const QString &exportJsonPath);
+		void exportGUIjson(const QString &exportJsonPath, const std::string& tempDir);
+
+		// Generate map data geojson file
+		void generateMapDataGeoJson(const std::string& tempDir);
 
 		// Print the user inputs for testing and debugging
 		void printUserInputs();
@@ -372,6 +375,7 @@ class AfcManager
 		CConst::ITMClutterMethodEnum _rlanITMTxClutterMethod;
 
 		std::vector<FreqBandClass> _allowableFreqBandList; // List of allowable freq bands.  For USA, correspond to UNII-5 and UNII-7
+		std::string _mapDataGeoJsonFile;               // File to write map data geojson
 		/**************************************************************************************/
 
 		/**************************************************************************************/

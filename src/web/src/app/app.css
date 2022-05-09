@@ -103,3 +103,7 @@ pre {
   max-width: 15%;
   display: inline;
 }
+
+.custom-tooltip{
+  background-color: white;
+}

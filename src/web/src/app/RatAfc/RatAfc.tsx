@@ -1,19 +1,24 @@
 import * as React from "react";
-import { PageSection, Title, Card, Modal, Button, ClipboardCopy, ClipboardCopyVariant, CardBody, Expandable, Alert, AlertActionCloseButton } from "@patternfly/react-core";
-import { spectrumInquiryRequest, sampleRequestObject } from "../Lib/RatAfcApi";
+import { PageSection, Title, Card, CardBody, Alert, AlertActionCloseButton } from "@patternfly/react-core";
+import { spectrumInquiryRequest, downloadMapData } from "../Lib/RatAfcApi";
 import { getCacheItem, cacheItem } from "../Lib/RatApi";
-import { PAWSResponse, ResError, PAWSRequest, AFCConfigFile, RatResponse, error, ChannelData } from "../Lib/RatApiTypes";
+import { ResError, AFCConfigFile, RatResponse, error, ChannelData, GeoJson } from "../Lib/RatApiTypes";
 import { PAWSForm } from "../VirtualAP/PAWSForm";
-import { SpectrumDisplayAFC } from "../Components/SpectrumDisplay";
+import { SpectrumDisplayAFC, SpectrumDisplayLineAFC } from "../Components/SpectrumDisplay";
 import { ChannelDisplay, emptyChannels } from "../Components/ChannelDisplay";
 import { JsonRawDisp } from "../Components/JsonRawDisp";
-import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, AvailableChannelInfo } from "../Lib/RatAfcTypes";
+import { MapContainer, MapProps } from "../Components/MapContainer";
+import DownloadContents from "../Components/DownloadContents";
+import LoadLidarBounds from "../Components/LoadLidarBounds";
+import LoadRasBounds from "../Components/LoadRasBounds";
+import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, AvailableChannelInfo, Ellipse } from "../Lib/RatAfcTypes";
 import { Timer } from "../Components/Timer";
 import { logger } from "../Lib/Logger";
 import { RatAfcForm } from "./RatAfcForm";
 import { clone } from "../Lib/Utils";
 import Measure from "react-measure";
 import { Limit } from "../Lib/Admin";
+import { rotate, meterOffsetToDeg } from "../Lib/Utils"
 
 /**
  * RatAfc.tsx: virtual AP page for AP-AFC specification
@@ -39,8 +44,42 @@ interface RatAfcState {
     extraWarningTitle?: string,
     minEirp: number,
     maxEirp: number
-    width: number
+    width: number,
+    mapState: MapState,
+    mapCenter: {
+        lat: number,
+        lng: number
+    },
+    kml?: Blob,
+    includeMap: boolean
 }
+
+const mapProps: MapProps = {
+    geoJson: {
+        type: "FeatureCollection",
+        features: []
+    },
+    center: {
+        lat: 40,
+        lng: -100
+    },
+    mode: "Point",
+    zoom: 2,
+    versionId: 0
+}
+
+interface MapState {
+    val: GeoJson,
+    text: string,
+    valid: boolean,
+    dimensions: {
+        width: number,
+        height: number
+    },
+    isModalOpen: boolean,
+    versionId: number
+}
+
 
 /**
  * generates channel data to be displayed from AP-AFC `AvailableChannelInfo` results
@@ -74,11 +113,24 @@ const generateChannelData = (channelClasses: AvailableChannelInfo[], minEirp: nu
     return channelData;
 }
 
+// There is another rasterizeEllipse that uses the wrong Ellipse type so reimpliment here
+export const rasterizeEllipse = (e: Ellipse, n: number): [number, number][] => {
+    const omega = 2 * Math.PI / n; // define the angle increment in angle to use in raster
+    return Array(n + 1).fill(undefined).map((_, i) => {
+        const alpha = omega * i; // define angle to transform for this step
+        // use ellipse parameterization to generate offset point before rotation
+        return ([e.majorAxis * Math.sin(alpha), e.minorAxis * Math.cos(alpha)]) as [number, number];
+    })
+        .map(rotate(e.orientation * Math.PI / 180))    // rotate offset in meter coordinates by orientation (- sign gives correct behavior with sin/cos)
+        .map(meterOffsetToDeg(e.center.latitude))   // transform offset point in meter coordinates to degree offset
+        .map(([dLng, dLat]) => [dLng + e.center.longitude, dLat + e.center.latitude])   // add offset to center point
+};
+
+
 /**
  * RatAfc component class
  */
 export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
-
     constructor(props: RatAfcProps) {
         super(props);
 
@@ -90,7 +142,19 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 extraWarning: undefined,
                 extraWarningTitle: undefined,
                 status: "Error",
-                err: error("AFC config was not loaded properly. Try refreshing the page.")
+                err: error("AFC config was not loaded properly. Try refreshing the page."),
+                mapState: {
+                    isModalOpen: false,
+                    val: mapProps.geoJson,
+                    text: "", valid: false,
+                    dimensions: { width: 0, height: 0 },
+                    versionId: 0
+                },
+                mapCenter: {
+                    lat: 40,
+                    lng: -100
+                },
+                includeMap: false
             }
         } else {
             this.state = {
@@ -98,15 +162,46 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 minEirp: props.afcConfig.result.minEIRP,
                 maxEirp: props.afcConfig.result.maxEIRP,
                 extraWarning: undefined,
-                extraWarningTitle: undefined
+                extraWarningTitle: undefined,
+                mapState: {
+                    isModalOpen: false,
+                    val: mapProps.geoJson,
+                    text: "", valid: false,
+                    dimensions: { width: 0, height: 0 },
+                    versionId: 0
+                },
+                mapCenter: {
+                    lat: 40,
+                    lng: -100
+                },
+                includeMap: props.afcConfig.kind === "Success" ? props.afcConfig.result.enableMapInVirtualAp ?? false : false
             };
         }
     }
 
+    private styles: Map<string, any> = new Map([
+        ["BLDB", { fillOpacity: 0, strokeColor: "blue" }],
+        ["RLAN", { strokeColor: "blue", fillColor: "lightblue" }]
+    ]);
+
     componentDidMount() {
         const st = getCacheItem("ratAfcCache");
-        if (st !== undefined)
-            this.setState(st);
+        if (st !== undefined) {
+            st.includeMap = this.props.afcConfig.kind === "Success" ? this.props.afcConfig.result.enableMapInVirtualAp ?? false : false
+            if (st.mapState.val.features.length <= 646) {
+                this.setState(st);
+            } else {
+                this.setState({
+                    ...st, mapState: {
+                        isModalOpen: false,
+                        val: mapProps.geoJson,
+                        text: "", valid: false,
+                        dimensions: { width: 0, height: 0 },
+                        versionId: 0
+                    }, messageType: "Warn", messageTile: "Google Map API Error", messageValue: "Due to a limitation of the Google Maps API, map data could not be saved. Run again to see map data."
+                });
+            }
+        }
     }
 
     componentWillUnmount() {
@@ -115,33 +210,28 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
         cacheItem("ratAfcCache", state);
     }
 
+    private setMapState(obj: any) {
+        this.setState({ mapState: Object.assign(this.state.mapState, obj) });
+    }
+
+    private setKml(kml: Blob) {
+        this.setState({ kml: kml })
+    }
+
+    //Leaving this in for later addition of marker move functionality
+    private onMarkerUpdate(lat: number, lon: number) {
+        // this.setState({
+        //   latVal: lat,
+        //   latValid: true,
+        //   lonVal: lon,
+        //   lonValid: true
+        // })
+    }
     /**
      * make a request to AFC Engine
      * @param request request to send
      */
     private sendRequest = (request: AvailableSpectrumInquiryRequest) => {
-
-        // Removed per RAT-285
-        // check AGL settings and possibly truncate
-        // if (request.location.elevation.height - request.location.elevation.verticalUncertainty < 1) {
-        //     // modify if height is not 1m above terrain height
-        //     const minHeight = 1;
-        //     const maxHeight = request.location.elevation.height + request.location.elevation.verticalUncertainty;
-        //     if (maxHeight < minHeight) {
-        //         this.setState({
-        //             err: error(`The height value must allow the AP to be at least 1m above the terrain. Currently the maximum height is ${maxHeight}m`),
-        //             status: "Error"
-        //         });
-        //         return;
-        //     }
-        //     const newHeight = (minHeight + maxHeight) / 2;
-        //     const newUncertainty = newHeight - minHeight;
-        //     request.location.elevation.height = newHeight;
-        //     request.location.elevation.verticalUncertainty = newUncertainty;
-        //     logger.warn("Height was not at least 1 m above terrain, so it was truncated to fit AFC requirement");
-        //     this.setState({ extraWarningTitle: "Truncated Height", extraWarning: `The AP height has been truncated so that its minimum height is 1m above the terrain. The new height is ${newHeight}+/-${newUncertainty}m` });
-        // }
-
         // make api call
         this.setState({ status: "Info" });
         return spectrumInquiryRequest(request)
@@ -154,12 +244,77 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             status: "Success",
                             response: resp.result,
                             minEirp: minEirp,
+                            mapCenter: this.getLatLongFromRequest(request)
                         });
+                        if (this.state.includeMap
+                            && response.vendorExtensions
+                            && response.vendorExtensions.length > 0
+                            && response.vendorExtensions.findIndex(x => x.extensionID == "openAfc.mapinfo") >= 0) {
+                            //Get the KML file and load it into the state.kml parameters; get the GeoJson if present
+                            let kml_filename = response.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["kmzFile"];
+                            let geoJson_filename = response.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["geoJsonFile"];
+                            downloadMapData(kml_filename, "GET")
+                                .then(async kmlResp => {
+                                    if (kmlResp.ok) {
+                                        this.setKml(await kmlResp.blob());
+                                    }
+                                    downloadMapData(kml_filename, "DELETE")
+                                }
+                                );
+                            downloadMapData(geoJson_filename, "GET")
+                                .then(async jsonResp => {
+                                    if (jsonResp.ok) {
+                                        let geojson = JSON.parse(await jsonResp.text());
+                                        if (request.location.ellipse && geojson && geojson.geoJson) {
+
+                                            geojson.geoJson.features.push(
+                                                {
+                                                    type: "Feature",
+                                                    properties: {
+                                                        kind: "RLAN",
+                                                        FSLonLat: [
+                                                            this.state.mapCenter.lng,
+                                                            this.state.mapCenter.lat
+                                                        ]
+                                                    },
+                                                    geometry: {
+                                                        type: "Polygon",
+                                                        coordinates: [rasterizeEllipse(request.location.ellipse, 32)]
+                                                    }
+                                                });
+
+
+                                        }
+                                        this.setMapState({ val: geojson.geoJson, valid: true, versionId: this.state.mapState.versionId + 1 })
+                                    }
+                                    downloadMapData(geoJson_filename, "DELETE")
+                                }
+                                );
+                        }
                     }
                 } else if (!resp.kind || resp.kind == "Error") {
                     this.setState({ status: "Error", err: error(resp.description, resp.errorCode, resp.body), response: resp.body });
                 }
             });
+    }
+
+    private getLatLongFromRequest(request: AvailableSpectrumInquiryRequest): { lat: number, lng: number } | undefined {
+        if (request.location.ellipse) {
+            return { lat: request.location.ellipse.center.latitude, lng: request.location.ellipse.center.longitude }
+        } else if (request.location.linearPolygon) {
+            return {
+                lat: request.location.linearPolygon.outerBoundary.map(x => x.latitude).reduce((a, b) => (a + b)) / request.location.linearPolygon.outerBoundary.length,
+                lng: request.location.linearPolygon.outerBoundary.map(x => x.longitude).reduce((a, b) => (a + b)) / request.location.linearPolygon.outerBoundary.length
+            }
+        }
+        else if (request.location.radialPolygon) {
+            return {
+                lat: request.location.radialPolygon.center.latitude,
+                lng: request.location.radialPolygon.center.longitude
+            }
+        }
+        else
+            return undefined
     }
 
     render() {
@@ -203,6 +358,30 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 }
 
                 <br />
+                {this.state.includeMap ? <>
+                    <Card><CardBody>
+                        <div style={{ width: "100%" }}>
+                            {" "}<LoadLidarBounds currentGeoJson={this.state.mapState.val} onLoad={data => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })} />
+                            <LoadRasBounds currentGeoJson={this.state.mapState.val} onLoad={data => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })} />
+                            <MapContainer
+                                mode="Point"
+                                onMarkerUpdate={(lat: number, lon: number) => this.onMarkerUpdate(lat, lon)}
+                                markerPosition={({ lat: this.state.mapCenter.lat, lng: this.state.mapCenter.lng })}
+                                geoJson={this.state.mapState.val}
+                                styles={this.styles}
+                                center={mapProps.center}
+                                zoom={mapProps.zoom}
+                                versionId={this.state.mapState.versionId} />
+                        </div>
+                        {
+                            (this.state.response?.response && this.state.kml) &&
+                            <DownloadContents contents={() => this.state.kml} fileName="results.kmz" />
+                        }
+                    </CardBody></Card>
+                    <br />
+                </>
+                    : <></>
+                }
                 <Card isHoverable={true}><CardBody><Measure bounds={true}
                     onResize={contentRect => this.setState({ width: contentRect.bounds!.width })}>
                     {({ measureRef }) => <div ref={measureRef}>
@@ -214,7 +393,10 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                     </div>}
                 </Measure></CardBody></Card>
                 <br />
+
                 {this.state.response?.availableFrequencyInfo && <SpectrumDisplayAFC spectrum={this.state.response} />}
+                <br />
+                {this.state.response?.availableChannelInfo && <SpectrumDisplayLineAFC spectrum={this.state.response} />}
                 <br />
                 <JsonRawDisp value={this.state?.response ? this.state.response : this.state?.err?.body} />
             </PageSection>);

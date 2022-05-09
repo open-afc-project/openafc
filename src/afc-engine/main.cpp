@@ -117,7 +117,7 @@ int main(int argc, char **argv) { // Accepts input from command line
 		/* Write output files                                                                 */
 		/**************************************************************************************/
 		QString outputPath = QString::fromStdString(outputFilePath);
-		afcManager.exportGUIjson(outputPath);
+		afcManager.exportGUIjson(outputPath, tempDir);
 
 		LOGGER_DEBUG(logger) << "AFC Engine has exported the data for the GUI...";
 		/**************************************************************************************/

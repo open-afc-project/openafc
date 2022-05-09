@@ -9,7 +9,8 @@ import { KonvaEventObject } from "konva/types/Node";
  */
 
 /**
- * Test data
+ * Channel set up data
+ *   If changes are made here they need to be made in SpectrumDisplay.tsx as well
  */
 const emptyChannels: ChannelData[] = [
     { channelWidth: 20, startFrequency: 5945, channels: Array(59).fill(0).map((_, i) => ({ name: String(1 + 4 * i), color: "grey", maxEIRP: 0 })) },
@@ -210,7 +211,7 @@ const ChannelDisplay: React.FunctionComponent<ChannelDisplayProps> = (props) => 
                         topLeft={{ x: props.topLeft.x, y: props.topLeft.y + (props.channelHeight + 10) * i + 40 }}
                         height={props.channelHeight}
                         channelWidth={row.channelWidth * scaleFactor}
-                        startOffset = {(row.startFrequency - startFreq) * scaleFactor }
+                        startOffset={(row.startFrequency - startFreq) * scaleFactor}
                         channels={row.channels} />
                 ))}
             </Layer>

@@ -4,17 +4,17 @@
 
 ### **Details of Databases**
 #### **ULS_Database:**
- contains parameters defining the FS links for interference analysis. 
-These are: 
-* FS Tx/Rx Lat/Long and Height above ground level, 
+ contains parameters defining the FS links for interference analysis.
+These are:
+* FS Tx/Rx Lat/Long and Height above ground level,
 * FS Rx Gain,
-* FS Start/End Frequencies and Bandwidth, 
+* FS Start/End Frequencies and Bandwidth,
 * FS passive repeater Lat/Long and Height above ground level
 
-#### **srtm3arcsecondv003:** 
+#### **srtm3arcsecondv003:**
 terrain height from SRTM database with 3-arcsec resolution (=90 meters at the equator)
 
-#### **RAS_Database:** 
+#### **RAS_Database:**
 contains parameters defining exclusion zone(s) around each RAS antenna that needs to be protected
 
 #### **proc_lidar_2019:**
@@ -24,24 +24,24 @@ contains json files that allow showing boundaries of RAS exclusion zones and LiD
 
 This also contains all lidar tiles where each city has a subdirectory with tiles with a .csv that isn’t under the city subdirectory. The lidar zip file contains all of this.
 
-* **population:** contains the Gridded Population of the World (GPW), v4.11, population density database along with conus/canada.kml that defines the analysis boundary. 
+* **population:** contains the Gridded Population of the World (GPW), v4.11, population density database along with conus/canada.kml that defines the analysis boundary.
 **this is no longer used.** Previously this was used to determine RLAN morphology. This is being replaced by the NLCD database.
 * **Multiband-BDesign3D:** contains building database over Manhattan.
 * **globe:** contains NOAA GLOBE (1km resolution) terrain database.
 * **3dep:** The 1_arcsec subdirectory (one currently used) contains 1arcsec (=30m) 3DEP terrain database files
-* **nlcd:** contains nlcd_2019_land_cover_148_20210604 files. This is used to determine RLAN/FS morphology (i.e. Urban, Suburban or Rural) to pick the appropriate path/clutter loss model. In addition, it is used to determine the appropriate P.452 Rural clutter category.
+* **nlcd:** contains nlcd_2019_land_cover_I48_20210604_resample.zip (referred to as "Production NLCD" in AFC Config UI) and federated_nlcd.zip (referred to as "WFA Test NLCD" in AFC Config UI) files. This is used to determine RLAN/FS morphology (i.e. Urban, Suburban or Rural) to pick the appropriate path/clutter loss model. In addition, it is used to determine the appropriate P.452 Rural clutter category.
 * **itudata:** contains two ITU maps that are used by the ITM path loss model. 1) Radio Climate map (TropoClim.txt) and 2) Surface Refractivity map (N050.txt)
 
 ### **Location or procedure to download/acquire these databases**
 * **ULS_Database:** Created using ULS Script Parser from ULS raw data on FCC website (see details in the ULS Script documentation)
 * **srtm3arcsecondv003:** https://www2.jpl.nasa.gov/srtm/
 * **RAS_Database:** File created based on the Exclusion zones listed in US385
-* **proc_lidar_2019:** raw data obtained from https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities/  
+* **proc_lidar_2019:** raw data obtained from https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities/
 * **population:** https://sedac.ciesin.columbia.edu/data/set/gpw-v4-population-density-rev11
 * **Multiband-BDesign3D:** this was purchased https://www.b-design3d.com/
 * **globe:** https://ngdc.noaa.gov/mgg/topo/globe.html
 * **3dep:** https://data.globalchange.gov/dataset/usgs-national-elevation-dataset-ned-1-arc-second
-* **nlcd:** https://www.mrlc.gov/data?f%5B0%5D=category%3Aland%20cover (download NLCD 2019 Land Cover (CONUS))
+* **nlcd:** original file nlcd_2019_land_cover_I48_20210604 was downloaded from [link](https://www.mrlc.gov/data?f%5B0%5D=category%3Aland%20cover) (download NLCD 2019 Land Cover (CONUS)). Usig gdal utilties this file was translated to nlcd_2019_land_cover_I48_20210604_resample.zip so that the 1-arcsec tiles matchup with 1-arcsec 3DEP tiles. The federated_nlcd.zip file was obtained by using other gdal utilities to convert federated's many files to one file covering CONUS.
 * **itudata:** Radio Climate map from ITU-R Rec, P.617-3 (https://www.itu.int/rec/R-REC-P.617-3-201309-S/en) and Surface Refractivity map from ITU-R Rec, P.452-17 (https://www.itu.int/rec/R-REC-P.452-17-202109-I/en)
 
 
@@ -67,13 +67,13 @@ This also contains all lidar tiles where each city has a subdirectory with tiles
 * **population:** download database and put in the proper directory
 * **globe:** download database and put in the proper directory
 * **3dep:** download database and put in the proper directory
-* **nlcd:** download database and put in the proper directory
+* **nlcd:** download database, run proper gdal utilties to orient the tiles matching 3DEP 1-arcsec tiles and put in the proper directory
 
 ## **Database Processing/Format**
 ### **Processing done (in any) on the original database to convert it to a format usable by afc-engine**
-* **ULS_Database:** generated by the ULS Script Parser. 
+* **ULS_Database:** generated by the ULS Script Parser.
 * **RAS_Database:** generated from the parameters defining RAS exclusion zones.
-* **LiDAR_Database:** generated from significant post-processing: 
+* **LiDAR_Database:** generated from significant post-processing:
     For each city:
    * (1) Identify bare earth and building files available.
    * (2) Identify pairs of files where a pair consists of a bare earth and building polygon file that cover the same region.
@@ -84,7 +84,72 @@ This also contains all lidar tiles where each city has a subdirectory with tiles
 * **srtm3arcsecondv003:** the two SRTM tiles over Manhattan are removed since they erroneously contain building height
 
 ### **Scripts to be used and procedure to invoke these scripts**
-* ULS_Database: ULS Script Parser. The AFC Administrator can run the parser manually or set the time for the daily update. The parser fetches the raw daily and weekly ULS data from the FCC website.
+##### ULS_Database:
+ULS Script Parser. The AFC Administrator can run the parser manually or set the time for the daily update. The parser fetches the raw daily and weekly ULS data from the FCC website.
+
+##### NLCD creation:
+###### Step 1.
+Ensure that gdal utilities are installed on your machine(currently gdal ver 3.3.3 used):
+```
+dnf install gdal
+```
+
+###### Step 2.
+Get extents of the original file by executing command below:
+```
+gdalinfo -norat -nomd -noct   nlcd_2019_land_cover_l48_20210604.img
+```
+###### Corner Coordinates:
+```
+Upper Left  (-2493045.000, 3310005.000) (130d13'58.18"W, 48d42'26.63"N)
+Lower Left  (-2493045.000,  177285.000) (119d47' 9.98"W, 21d44'32.31"N)
+Upper Right ( 2342655.000, 3310005.000) ( 63d40'19.89"W, 49d10'37.43"N)
+Lower Right ( 2342655.000,  177285.000) ( 73d35'40.55"W, 22d 4'36.23"N)
+Center      (  -75195.000, 1743645.000) ( 96d52'22.83"W, 38d43' 4.71"N)
+```
+###### Step 3.
+Define the minimum/maximum Latitude and Longitude coordinates that contain the entire region covered by the file. In order to line up with 3DEP database, we want to make sure that each of these values are integer multiple of 1-arcsec. From the above extents, we see that the min longitude is 130d13'58.18"W. This can be rounded down to integer multiple of 1-arcsec as -(130 + 15/60). Similarly, maximum values are rounded up to integer multiple of 1-arcsec. Finally, the resolution is defined as 1-arcsec which equals 1/3600 degrees. Below commands can be typed directly into a bash shell.
+```
+minLon=`bc <<< 'scale = 6; -(130 + 15/60)'`
+maxLon=`bc <<< 'scale = 6; -(63 + 37.5/60)'`
+minLat=`bc <<< 'scale = 6; (21 + 41.25/60)'`
+maxLat=`bc <<< 'scale = 6; (49 + 11.25/60)'`
+lonlatRes=`bc <<< 'scale = 20; (1/3600)'`
+
+echo minLon = $minLon
+echo maxLon = $maxLon
+echo minLat = $minLat
+echo maxLat = $maxLat
+```
+###### Step 4.
+Define the input and output files for the conversion using commands below:
+fin=nlcd_2019_land_cover_l48_20210604.img
+fout=nlcd_2019_land_cover_l48_20210604_resample.tif
+
+###### Step 5.
+Use gdal utility gdalwarp to convert the file to desired output
+```
+gdalwarp -t_srs '+proj=longlat +datum=WGS84' -tr $lonlatRes $lonlatRes -te $minLon $minLat $maxLon $maxLat $fin $fout
+```
+
+###### Step 6:
+Combine 900+ federated .int files into a single gdal .vrt file.
+```
+gdalbuildvrt federated_nlcd.vrt output/*.int
+```
+
+###### Step 7:
+Define the input and output files for the Federated file conversion
+```
+fin=federated_nlcd.vrt
+fout=federated_nlcd.tif
+```
+
+###### Step 8:
+Run gdal utility gdalwarp to convert the federated file using the exact same file extents as for the nlcd_2019_land_cover_l48_20210604_resample.tif file:
+```
+gdalwarp -te $minLon $minLat $maxLon $maxLat $fin $fout
+```
 
 
 ## **Database Usage**
@@ -97,10 +162,10 @@ There are three category of databases: Dynamic, Static and ULS.
 * Examples are: ULS_Database, afc_config, AntennaPatterns, RAS_Database, and analysis responses
 * Note that the RAS_Database technically lives as a static asset but the code uses a symlink at /var/lib/fbrat/RAS_Database
 
-2. **Static:** 
+2. **Static:**
 * These are the assets that are not expected to change for at least a year (and some for many years)
 * Live under /usr/share/fbrat/rat_transfer
-* Examples are: Terrain (3DEP, SRTM, Globe), Building (LiDAR, Multiband-BDesign3D), NLCD, Population Density 
+* Examples are: Terrain (3DEP, SRTM, Globe), Building (LiDAR, Multiband-BDesign3D), NLCD, Population Density
 * Below are the database directories under /usr/share/fbrat/rat_transfer
   * **ULS_Database:** Fallback (static) ULS_Database in case an active ULS_Database under fbrat is missing
   * **srtm3arcsecondv003**
@@ -118,10 +183,9 @@ There are three category of databases: Dynamic, Static and ULS.
 * Live under /var/lib/fbrat/daily_uls_parse/data_files
   * **WIP:** Functionality built into API
   * Data for yesterdaysDB (used to retain FSID from day to day) and highest known FSID (to avoid collision, FSIDs are not reused currently) are stored here.
-	
+
 
 ### **Configuration options to change the location of the database**
 TBD
-
 
 

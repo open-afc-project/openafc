@@ -117,7 +117,7 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
                 "--config-file-path=" + config_file_path,
                 "--output-file-path=" + response_file_path,
                 "--temp-dir=" + temp_dir,
-                "--log-level=" + ("debug" if debug else "info"),
+                "--log-level=" + "debug",
                 "--runtime_opt=" + str(runtime_opts),
             ]
             proc = subprocess.Popen(cmd, stderr=err_file, stdout=log_file)
@@ -161,11 +161,18 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
             response_dir, self.request.id + '.json'))
 
         # copy kml result if it was produced by AFC Engine
-        if 'results.kmz' in os.listdir(temp_dir) and request_type not in ['AP-AFC', 'APAnalysis']:
+        if 'results.kmz' in os.listdir(temp_dir) and request_type not in ['APAnalysis']:
             shutil.copy2(os.path.join(temp_dir, 'results.kmz'),
                          os.path.join(response_dir, self.request.id + '.kmz'))
             additional_paths['kml_path'] = os.path.join(
                 response_dir, self.request.id + '.kmz')
+        # copy geoJson file if generated
+        if 'mapData.json.gz' in os.listdir(temp_dir) and request_type not in ['APAnalysis']:
+            shutil.copy2(os.path.join(temp_dir, 'mapData.json.gz'),
+                         os.path.join(response_dir, self.request.id + '-mapData.json.gz'))
+            additional_paths['geoJson_path'] = os.path.join(
+                response_dir, self.request.id + '-mapData.json.gz')
+
 
         # copy contents of temporary directory to history directory
         if history_dir is not None:
