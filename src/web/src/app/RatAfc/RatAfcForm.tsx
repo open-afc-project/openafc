@@ -1,9 +1,12 @@
 import * as React from "react";
-import { AvailableSpectrumInquiryRequest, LinearPolygon, RadialPolygon, Ellipse, DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange } from "../Lib/RatAfcTypes";
+import {
+    AvailableSpectrumInquiryRequest, LinearPolygon, RadialPolygon, Ellipse,
+    DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange, Point
+} from "../Lib/RatAfcTypes";
 import { logger } from "../Lib/Logger";
 import {
     Modal, Button, ClipboardCopy, ClipboardCopyVariant, Alert, Gallery, GalleryItem,
-    FormGroup, TextInput, InputGroup, InputGroupText, FormSelect, FormSelectOption, 
+    FormGroup, TextInput, InputGroup, InputGroupText, FormSelect, FormSelectOption,
     ChipGroup, Chip
 } from "@patternfly/react-core";
 import { getCacheItem, cacheItem, getAfcConfigFile } from "../Lib/RatApi";
@@ -19,7 +22,8 @@ import { InquiredFrequencyForm } from "./InquiredFrequencyForm";
 interface RatAfcFormParams {
     onSubmit: (a: AvailableSpectrumInquiryRequest) => Promise<void>,
     config: RatResponse<AFCConfigFile>,
-    limit: Limit
+    limit: Limit,
+    ellipseCenterPoint?: Point
 }
 
 interface RatAfcFormState {
@@ -59,7 +63,11 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
             status: props.config.kind === "Error" ? "Error" : undefined,
             message: props.config.kind === "Error" ? "AFC config file could not be loaded" : "",
             submitting: false,
-            location: { elevation: {} },
+            location: {
+                elevation: {},
+                ellipse: !props.ellipseCenterPoint ? undefined : { center: props.ellipseCenterPoint, majorAxis: 0, minorAxis: 0, orientation: 0 }
+
+            },
             serialNumber: undefined,
             certificationId: [],
             indoorDeployment: undefined,
@@ -90,7 +98,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                     include: OperatingClassIncludeType.None
                 },
             ]
-        
+
         };
     }
 
@@ -312,6 +320,21 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
         }
     }
 
+    setEllipseCenter = (center:Point) => {
+        if(this.state.location.radialPolygon || this.state.location.linearPolygon ){
+            return;// Not an ellipse then do nothing
+        }
+        if(!this.state.location.ellipse){
+            const location = {...this.state.location};
+            location.ellipse={ center: center, majorAxis: 0, minorAxis: 0, orientation: 0 }
+            this.setState({location:location});
+        }else  {
+            const location = {...this.state.location};
+            location.ellipse={ center: center, majorAxis: location.ellipse.majorAxis, minorAxis: location.ellipse.minorAxis, orientation: location.ellipse.orientation }
+            this.setState({location:location});
+        }
+    }
+
     render() {
         return (
             <>
@@ -321,7 +344,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                     isOpen={this.state.isModalOpen}
                     onClose={() => this.setState({ isModalOpen: false })}
                     actions={[<Button key="update" variant="primary" onClick={() => this.setState({ isModalOpen: false })}>Close</Button>]}>
-                    <ClipboardCopy variant={ClipboardCopyVariant.expansion} 
+                    <ClipboardCopy variant={ClipboardCopyVariant.expansion}
                         onChange={(text: string | number) => this.setConfig(String(text).trim())} aria-label="text area">{JSON.stringify(this.getParamsJSON())}</ClipboardCopy>
                 </Modal>
                 <Gallery gutter="sm">
