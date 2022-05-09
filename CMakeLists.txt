@@ -7,7 +7,7 @@ endif()
 # Debug
 # Release
 # DebugWithTest
-set(default_build_type "Debug")
+set(default_build_type "Release")
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "${default_build_type}")
 endif()
