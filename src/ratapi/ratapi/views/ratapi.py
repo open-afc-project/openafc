@@ -120,6 +120,7 @@ class GuiConfig(MethodView):
             admin_url=flask.url_for('admin.User', user_id=-1),
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
+            afc_kml=flask.url_for('ratapi-v1.VapKmlResult', kml_file='p_kml_file'),
             version=serververs,
         )
         return resp
@@ -519,6 +520,51 @@ class AnalysisKmlResult(MethodView):
             raise werkzeug.exceptions.NotFound('KML not found')
 
 
+class VapKmlResult(MethodView):
+    ''' Get a KML result file from AFC Engine based on response filename'''
+
+    methods = ['GET', 'DELETE']
+
+    def _open(self, abs_path, mode):
+        ''' Open a response file.
+
+        :param rel_path: The specific file name to open.
+
+        :return: The opened file.
+        :rtype: file-like
+        '''
+
+        LOGGER.debug('Attempting to open response file "%s"', abs_path)
+        if not os.path.exists(abs_path):
+            raise werkzeug.exceptions.InternalServerError(
+                description='Your analysis was unable to be processed.')
+        return open(abs_path, mode)
+
+    def get(self, kml_file):
+        ''' GET method for KML Result '''
+
+        kml_path = os.path.join('/var/lib/fbrat/responses',kml_file)
+        LOGGER.debug('Attempting to download KML file from  "%s"', kml_path)
+        if not os.path.exists(kml_path):
+            return flask.make_response(flask.json.dumps(dict(message='Resource not found')), 410)
+        resp = flask.make_response()
+        LOGGER.debug("Reading kml file: %s", kml_path)
+        with self._open(kml_path, 'rb') as resp_file:
+            resp.data = resp_file.read()
+        
+        if(kml_path.endswith("json.gz")):
+            resp.content_encoding = "gzip"
+            resp.content_type = 'application/json'
+        else:
+            resp.content_type = 'application/octet-stream'
+        return resp
+
+    def delete(self, kml_file):
+         kml_path = os.path.join('/var/lib/fbrat/responses',kml_file)
+         if  os.path.exists(kml_path):
+            os.remove(kml_path)
+         return flask.make_response(flask.json.dumps(dict(message='file deleted')), 200)
+
 class AnalysisStatus(MethodView):
     ''' Check status of task '''
 
@@ -852,3 +898,5 @@ module.add_url_rule('/ulsparse/<task_id>',
                     view_func=DailyULSStatus.as_view('DailyULSStatus'))
 module.add_url_rule('/replay',
                     view_func=ReloadAnalysis.as_view('ReloadAnalysis'))
+module.add_url_rule('/kml/<path:kml_file>',
+                    view_func=VapKmlResult.as_view('VapKmlResult'))

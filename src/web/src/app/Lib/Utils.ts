@@ -11,7 +11,7 @@ import { Ellipse, AnalysisResults, SpectrumProfile, PAWSRequest, PAWSResponse } 
  * @param (x, y) Point coordinates to be rotated by `theta`
  * @returns The rotated point
  */
-const rotate = (theta: number) => ([x, y]: [number, number]): [number, number] =>
+export const rotate = (theta: number) => ([x, y]: [number, number]): [number, number] =>
     [x * Math.cos(theta) - y * Math.sin(theta), y * Math.cos(theta) + x * Math.sin(theta)];
 
 /**
@@ -21,7 +21,7 @@ const rotate = (theta: number) => ([x, y]: [number, number]): [number, number] =
  * @param (dy, dx) amount to offset in units of meters in each direction
  * @returns a new offset vector in units of degrees of `[longitude, latitude]`
  */
-const meterOffsetToDeg = (lat: number) => ([dy, dx]: [number, number]): [number, number] => {
+export const meterOffsetToDeg = (lat: number) => ([dy, dx]: [number, number]): [number, number] => {
     const latOffset = dy / 111111; // 1 degree of lat ~ 111111 m in flat approximation which should work here since we have small meter values of uncertainty and it is only a visual display
     const lngOffset = (dx / Math.cos(lat * Math.PI / 180)) / 111111; // 1 degree lng ~ 111111 * sec(lat) m
     return [lngOffset, latOffset]

@@ -1,5 +1,27 @@
 # Release Note
 ## **Version and Date**
+|Version|**OA-85**|
+| :- | :- |
+|**Date**|**05/06/2022**|
+
+## **Issues Addressed**
+ * Jira OA-85: Merge Point Analysis and Virtual AP
+   - Add EIRP chart and mapping to the Virtual AP page
+ 
+## **Interface Changes**
+ * afc_config.json added a new optional property "enableMapInVirtualAp" which if set to true will enable the map control on the virtual AP page and have the engine generate the map data
+ * Data files containing map data are provided to the Virtual AP page if the enableMapInVirtualAp is true via a vendor extension on the AvailableSpectrumInquiryResponse using the extension ID openAfc.mapinfo
+
+## **Testing Done**
+ * Reviewed modified output pages
+
+## **Open Issues**
+* The only location type that is mapped is an Ellipse. Polygon locations will be handled in a later ticket
+* Clicking the map to change the location point is not supported and will be handled in a later ticket
+* The obsolete code for the Point Analysis pages remains in the project until these two issues are resolved
+
+
+## **Version and Date**
 |Version|**OA-216**|
 | :- | :- |
 |**Date**|**04/29/2022**|

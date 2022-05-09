@@ -240,6 +240,7 @@ AfcManager::AfcManager()
 	_rlanITMTxClutterMethod = CConst::ForceTrueITMClutterMethod;
 	_createKmz = false;
 	_createDebugFiles = false;
+	_mapDataGeoJsonFile = "";
 }
 
 /******************************************************************************************/
@@ -2109,6 +2110,16 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (propModel.contains("winner2LOSOption") && !propModel["winner2LOSOption"].isUndefined()) {
 		_winner2LOSOption = (CConst::LOSOptionEnum)CConst::strLOSOptionList->str_to_type(propModel["winner2LOSOption"].toString().toStdString(), validFlag, 1);
 	}
+
+	// ***********************************
+	// If this flag is set, map data geojson is generated
+	// ***********************************
+	_mapDataGeoJsonFile = "";
+	if (jsonObj.contains("enableMapInVirtualAp") && !jsonObj["enableMapInVirtualAp"].isUndefined()) {
+		if (jsonObj["enableMapInVirtualAp"].toBool()) {
+		_mapDataGeoJsonFile = "mapData.json.gz";
+		}
+	}
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -2589,7 +2600,7 @@ QJsonDocument AfcManager::generateHeatmap()
 	return QJsonDocument(analysisJsonObj);
 }
 
-void AfcManager::exportGUIjson(const QString &exportJsonPath)
+void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string& tempDir)
 {
 
 	QJsonDocument outputDocument;
@@ -2611,6 +2622,10 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath)
 		// temporarily return PAWS until we write new generator function
 		//outputDocument = QJsonDocument(jsonSpectrumData(_rlanBWList, _numChan, _channelData, _deviceDesc, _wlanMinFreq));
 		outputDocument = generateRatAfcJson();
+
+        if (!_mapDataGeoJsonFile.empty()) {
+            generateMapDataGeoJson(tempDir);
+        }
 	}
 	else if (_analysisType == "ExclusionZoneAnalysis")
 	{
@@ -2626,153 +2641,7 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath)
 	}
 	else
 	{
-		// Temporarily export layer so that we can re-import it as a geoJSON-formatted string
-		const std::string gdalDriverName = "GeoJSON";
-		OGRRegisterAll();
-
-		OGRSFDriver* ptrDriver = OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
-		// This is the same as !(unique_ptr.get() != nullptr)
-		if (ptrDriver == nullptr)
-		{
-			throw std::runtime_error("AfcManager::exportGUIjson(): " + gdalDriverName + " driver was not found");
-		}
-
-		QTemporaryDir tempDir;
-		if (!tempDir.isValid())
-		{
-			throw std::runtime_error("AfcManager::exportGUIjson(): Failed to create a temporary directory to store output of GeoJSON driver");
-		}
-
-		const QString tempOutFileName = "output.tmp";
-		const QString tempOutFilePath = tempDir.filePath(tempOutFileName);
-
-		std::unique_ptr<OGRDataSource> ptrOutputDS(ptrDriver->CreateDataSource(tempOutFilePath.toStdString().c_str(), NULL));
-		if (ptrOutputDS == nullptr)
-		{
-			throw std::runtime_error("AfcManager::exportGUIjson(): Could not create a data source at " + tempOutFilePath.toStdString());
-		}
-
-		OGRSpatialReference spatialRefWGS84; // Set the desired spatial reference (WGS84 in this case)
-		spatialRefWGS84.SetWellKnownGeogCS("WGS84");
-		OGRLayer *coneLayer = ptrOutputDS->CreateLayer("Temp_Output", &spatialRefWGS84, wkbPolygon, NULL);
-		if (coneLayer == nullptr)
-		{
-			throw std::runtime_error("AfcManager::exportGUIjson(): Could not create a layer in output data source");
-		}
-
-		OGRFieldDefn objKind("kind", OFTString);
-		OGRFieldDefn dbNameField("DBNAME", OFTString);
-		OGRFieldDefn fsidField("FSID", OFTInteger);
-		OGRFieldDefn startFreq("startFreq", OFTReal);
-		OGRFieldDefn stopFreq("stopFreq", OFTReal);
-		objKind.SetWidth(64); /* fsLonField.SetWidth(64); fsLatField.SetWidth(64);*/
-		fsidField.SetWidth(32); /* fsLonField.SetWidth(64); fsLatField.SetWidth(64);*/
-		startFreq.SetWidth(32);
-		stopFreq.SetWidth(32);
-
-		if (coneLayer->CreateField(&objKind) != OGRERR_NONE)
-		{
-			throw std::runtime_error("AfcManager::exportGUIjson(): Could not create 'kind' field in layer of the output data source");
-		}
-		if (coneLayer->CreateField(&dbNameField) != OGRERR_NONE)
-		{
-			throw std::runtime_error("AfcManager::exportGUIjson(): Could not create 'DBNAME' field in layer of the output data source");
-		}
-		if (coneLayer->CreateField(&fsidField) != OGRERR_NONE)
-		{
-			throw std::runtime_error("AfcManager::exportGUIjson(): Could not create 'FSID' field in layer of the output data source");
-		}
-		if (coneLayer->CreateField(&startFreq) != OGRERR_NONE)
-		{
-			throw std::runtime_error("AfcManager::exportGUIjson(): Could not create 'startFreq' field in layer of the output data source");
-		}
-		if (coneLayer->CreateField(&stopFreq) != OGRERR_NONE)
-		{
-			throw std::runtime_error("AfcManager::exportGUIjson(): Could not create 'stopFreq' field in layer of the output data source");
-		}
-
-		// Calculate the cones in iterative loop
-		LatLon FSLatLonVal, posPointLatLon, negPointLatLon;
-		for (const auto &ulsIdx : _ulsIdxList)
-		{
-			ULSClass *uls = (*_ulsList)[ulsIdx];
-
-			// Instantiate cone object
-			std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> coneFeature(OGRFeature::CreateFeature(coneLayer->GetLayerDefn()));
-
-			// Grab FSID for storing with coverage polygon
-			int FSID = uls->getID();
-
-			std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
-
-			// Compute the beam coordinates and store into DoublePairs
-			std::tie(FSLatLonVal, posPointLatLon, negPointLatLon) = computeBeamConeLatLon(uls);
-
-			// Intantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
-			GdalHelpers::GeomUniquePtr<OGRPolygon> beamCone(GdalHelpers::createGeometry<OGRPolygon>()); // Use GdalHelpers.h templates to have unique pointers create these on the heap
-			GdalHelpers::GeomUniquePtr<OGRLinearRing> exteriorOfCone(GdalHelpers::createGeometry<OGRLinearRing>());
-
-			// Create OGRPoints to store the coordinates of the beam triangle
-			// ***IMPORTANT NOTE: Coordinates stored as (Lon,Lat) here, required by geoJSON specifications
-			GdalHelpers::GeomUniquePtr<OGRPoint> FSPoint(GdalHelpers::createGeometry<OGRPoint>());
-			FSPoint->setX(FSLatLonVal.second);
-			FSPoint->setY(FSLatLonVal.first); // Must set points manually since cannot construct while pointing at with unique pointer
-			GdalHelpers::GeomUniquePtr<OGRPoint> posPoint(GdalHelpers::createGeometry<OGRPoint>());
-			posPoint->setX(posPointLatLon.second);
-			posPoint->setY(posPointLatLon.first);
-			GdalHelpers::GeomUniquePtr<OGRPoint> negPoint(GdalHelpers::createGeometry<OGRPoint>());
-			negPoint->setX(negPointLatLon.second);
-			negPoint->setY(negPointLatLon.first);
-
-			// Adding the polygon vertices to a OGRLinearRing object for geoJSON export
-			exteriorOfCone->addPoint(FSPoint.get()); // Using .get() gives access to the pointer without giving up ownership
-			exteriorOfCone->addPoint(posPoint.get());
-			exteriorOfCone->addPoint(negPoint.get());
-			exteriorOfCone->addPoint(FSPoint.get()); // Adds this again just so that the polygon closes where it starts (at FS location)
-
-			// Add exterior boundary of cone's polygon
-			beamCone->addRingDirectly(exteriorOfCone.release()); // Points unique-pointer to null and gives up ownership of exteriorOfCone to beamCone
-
-			// Add properties to the geoJSON features
-			coneFeature->SetField("FSID", FSID);
-			coneFeature->SetField("DBNAME", dbName.c_str());
-			coneFeature->SetField("kind", "FS");
-			coneFeature->SetField("startFreq", uls->getStartAllocFreq() / 1.0e6);
-			coneFeature->SetField("stopFreq", uls->getStopAllocFreq() / 1.0e6);
-			/* coneFeature->SetField("FS Lon", FSLatLonVal.second); coneFeature->SetField("FS lat", FSLatLonVal.first);*/
-
-			// Add geometry to feature
-			coneFeature->SetGeometryDirectly(beamCone.release());
-
-			if (coneLayer->CreateFeature(coneFeature.release()) != OGRERR_NONE)
-			{
-				throw std::runtime_error("Could not add cone feature in layer of output data source");
-			}
-		}
-
-		// add building database raster boundary if loaded
-		addBuildingDatabaseTiles(coneLayer);
-
-		// Allocation clean-up
-		OGRDataSource::DestroyDataSource(ptrOutputDS.release()); // Remove the reference to the data source
-
-		// Create file to be written to (creates a file, a json object, and a json document in order to store)
-		std::ifstream tempFileStream(tempOutFilePath.toStdString(), std::ifstream::in);
-		const std::string geoJsonCollection = slurp(tempFileStream);
-
-		QJsonDocument geoJsonDoc = QJsonDocument::fromJson(QString::fromStdString(geoJsonCollection).toUtf8());
-		QJsonObject geoJsonObj = geoJsonDoc.object();
-
-		QJsonObject analysisJsonObj = 
-		{
-			{"geoJson", geoJsonObj},
-			{"spectrumData", jsonSpectrumData(_channelList, _deviceDesc, _wlanMinFreq)},
-			{"channelData", jsonChannelData(_channelList)},
-			{"statusMessageList", generateStatusMessages(statusMessageList)}
-		};
-
-		outputDocument = QJsonDocument(analysisJsonObj);
-		//QJsonDocument analysisJsonDoc(analysisJsonObj);
+		throw std::runtime_error(ErrStream() << "ERROR: Unrecognized analysis type = \"" << _analysisType << "\"");
 	}
 
 	// Write analysis outputs to JSON file
@@ -2785,6 +2654,167 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath)
 	gzip_writer->write(outputDocument.toJson());
 	gzip_writer->close();
 	LOGGER_DEBUG(logger) << "Output file written to " << outputAnalysisFile->fileName().toStdString();
+}
+
+void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
+{
+	QJsonDocument outputDocument;
+
+	// Temporarily export layer so that we can re-import it as a geoJSON-formatted string
+	const std::string gdalDriverName = "GeoJSON";
+	OGRRegisterAll();
+
+	OGRSFDriver* ptrDriver = OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
+	// This is the same as !(unique_ptr.get() != nullptr)
+	if (ptrDriver == nullptr)
+	{
+		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): " + gdalDriverName + " driver was not found");
+	}
+
+	QTemporaryDir geoTempDir;
+	if (!geoTempDir.isValid())
+	{
+		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Failed to create a temporary directory to store output of GeoJSON driver");
+	}
+
+	const QString tempOutFileName = "output.tmp";
+	const QString tempOutFilePath = geoTempDir.filePath(tempOutFileName);
+
+	std::unique_ptr<OGRDataSource> ptrOutputDS(ptrDriver->CreateDataSource(tempOutFilePath.toStdString().c_str(), NULL));
+	if (ptrOutputDS == nullptr)
+	{
+		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create a data source at " + tempOutFilePath.toStdString());
+	}
+
+	OGRSpatialReference spatialRefWGS84; // Set the desired spatial reference (WGS84 in this case)
+	spatialRefWGS84.SetWellKnownGeogCS("WGS84");
+	OGRLayer *coneLayer = ptrOutputDS->CreateLayer("Temp_Output", &spatialRefWGS84, wkbPolygon, NULL);
+	if (coneLayer == nullptr)
+	{
+		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create a layer in output data source");
+	}
+
+	OGRFieldDefn objKind("kind", OFTString);
+	OGRFieldDefn dbNameField("DBNAME", OFTString);
+	OGRFieldDefn fsidField("FSID", OFTInteger);
+	OGRFieldDefn startFreq("startFreq", OFTReal);
+	OGRFieldDefn stopFreq("stopFreq", OFTReal);
+	objKind.SetWidth(64); /* fsLonField.SetWidth(64); fsLatField.SetWidth(64);*/
+	fsidField.SetWidth(32); /* fsLonField.SetWidth(64); fsLatField.SetWidth(64);*/
+	startFreq.SetWidth(32);
+	stopFreq.SetWidth(32);
+
+	if (coneLayer->CreateField(&objKind) != OGRERR_NONE)
+	{
+		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create 'kind' field in layer of the output data source");
+	}
+	if (coneLayer->CreateField(&dbNameField) != OGRERR_NONE)
+	{
+		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create 'DBNAME' field in layer of the output data source");
+	}
+	if (coneLayer->CreateField(&fsidField) != OGRERR_NONE)
+	{
+		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create 'FSID' field in layer of the output data source");
+	}
+	if (coneLayer->CreateField(&startFreq) != OGRERR_NONE)
+	{
+		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create 'startFreq' field in layer of the output data source");
+	}
+	if (coneLayer->CreateField(&stopFreq) != OGRERR_NONE)
+	{
+		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create 'stopFreq' field in layer of the output data source");
+	}
+
+	// Calculate the cones in iterative loop
+	LatLon FSLatLonVal, posPointLatLon, negPointLatLon;
+	for (const auto &ulsIdx : _ulsIdxList)
+	{
+		ULSClass *uls = (*_ulsList)[ulsIdx];
+
+		// Instantiate cone object
+		std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> coneFeature(OGRFeature::CreateFeature(coneLayer->GetLayerDefn()));
+
+		// Grab FSID for storing with coverage polygon
+		int FSID = uls->getID();
+
+		std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+
+		// Compute the beam coordinates and store into DoublePairs
+		std::tie(FSLatLonVal, posPointLatLon, negPointLatLon) = computeBeamConeLatLon(uls);
+
+		// Intantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
+		GdalHelpers::GeomUniquePtr<OGRPolygon> beamCone(GdalHelpers::createGeometry<OGRPolygon>()); // Use GdalHelpers.h templates to have unique pointers create these on the heap
+		GdalHelpers::GeomUniquePtr<OGRLinearRing> exteriorOfCone(GdalHelpers::createGeometry<OGRLinearRing>());
+
+		// Create OGRPoints to store the coordinates of the beam triangle
+		// ***IMPORTANT NOTE: Coordinates stored as (Lon,Lat) here, required by geoJSON specifications
+		GdalHelpers::GeomUniquePtr<OGRPoint> FSPoint(GdalHelpers::createGeometry<OGRPoint>());
+		FSPoint->setX(FSLatLonVal.second);
+		FSPoint->setY(FSLatLonVal.first); // Must set points manually since cannot construct while pointing at with unique pointer
+		GdalHelpers::GeomUniquePtr<OGRPoint> posPoint(GdalHelpers::createGeometry<OGRPoint>());
+		posPoint->setX(posPointLatLon.second);
+		posPoint->setY(posPointLatLon.first);
+		GdalHelpers::GeomUniquePtr<OGRPoint> negPoint(GdalHelpers::createGeometry<OGRPoint>());
+		negPoint->setX(negPointLatLon.second);
+		negPoint->setY(negPointLatLon.first);
+
+		// Adding the polygon vertices to a OGRLinearRing object for geoJSON export
+		exteriorOfCone->addPoint(FSPoint.get()); // Using .get() gives access to the pointer without giving up ownership
+		exteriorOfCone->addPoint(posPoint.get());
+		exteriorOfCone->addPoint(negPoint.get());
+		exteriorOfCone->addPoint(FSPoint.get()); // Adds this again just so that the polygon closes where it starts (at FS location)
+
+		// Add exterior boundary of cone's polygon
+		beamCone->addRingDirectly(exteriorOfCone.release()); // Points unique-pointer to null and gives up ownership of exteriorOfCone to beamCone
+
+		// Add properties to the geoJSON features
+		coneFeature->SetField("FSID", FSID);
+		coneFeature->SetField("DBNAME", dbName.c_str());
+		coneFeature->SetField("kind", "FS");
+		coneFeature->SetField("startFreq", uls->getStartAllocFreq() / 1.0e6);
+		coneFeature->SetField("stopFreq", uls->getStopAllocFreq() / 1.0e6);
+		/* coneFeature->SetField("FS Lon", FSLatLonVal.second); coneFeature->SetField("FS lat", FSLatLonVal.first);*/
+
+		// Add geometry to feature
+		coneFeature->SetGeometryDirectly(beamCone.release());
+
+		if (coneLayer->CreateFeature(coneFeature.release()) != OGRERR_NONE)
+		{
+			throw std::runtime_error("Could not add cone feature in layer of output data source");
+		}
+	}
+
+	// add building database raster boundary if loaded
+	addBuildingDatabaseTiles(coneLayer);
+
+	// Allocation clean-up
+	OGRDataSource::DestroyDataSource(ptrOutputDS.release()); // Remove the reference to the data source
+
+	// Create file to be written to (creates a file, a json object, and a json document in order to store)
+	std::ifstream tempFileStream(tempOutFilePath.toStdString(), std::ifstream::in);
+	const std::string geoJsonCollection = slurp(tempFileStream);
+
+	QJsonDocument geoJsonDoc = QJsonDocument::fromJson(QString::fromStdString(geoJsonCollection).toUtf8());
+	QJsonObject geoJsonObj = geoJsonDoc.object();
+
+	QJsonObject analysisJsonObj = 
+	{
+		{"geoJson", geoJsonObj}
+	};
+
+	outputDocument = QJsonDocument(analysisJsonObj);
+
+	// Write map data GEOJSON file
+    std::string fullPathMapDataFile = QDir(QString::fromStdString(tempDir)).filePath(QString::fromStdString(_mapDataGeoJsonFile)).toStdString();
+	auto mapDataFile = FileHelpers::open(QString::fromStdString(fullPathMapDataFile), QIODevice::WriteOnly);
+	auto gzip_writer = new GzipStream(mapDataFile.get());
+	if (!gzip_writer->open(QIODevice::WriteOnly))
+	{
+		throw std::runtime_error("Gzip failed to open.");
+	}
+	gzip_writer->write(outputDocument.toJson());
+	gzip_writer->close();
+	LOGGER_DEBUG(logger) << "Output file written to " << mapDataFile->fileName().toStdString();
 }
 
 // Convert channel data into a valid JSON Object

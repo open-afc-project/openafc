@@ -23,6 +23,7 @@ export interface GuiConfig {
     admin_url: string,
     ap_admin_url: string,
     rat_afc: string,
+    afc_kml:string
     version: string
 }
 
@@ -51,7 +52,8 @@ export interface AFCConfigFile {
     clutterAtFS: boolean,
     fsClutterModel?: FSClutterModel,
     regionStr?: string,
-    rasDatabase?: string
+    rasDatabase?: string,
+    enableMapInVirtualAp?: boolean
 }
 
 export type FreqRange = {

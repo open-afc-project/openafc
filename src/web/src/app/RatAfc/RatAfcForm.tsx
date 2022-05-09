@@ -3,17 +3,14 @@ import { AvailableSpectrumInquiryRequest, LinearPolygon, RadialPolygon, Ellipse,
 import { logger } from "../Lib/Logger";
 import {
     Modal, Button, ClipboardCopy, ClipboardCopyVariant, Alert, Gallery, GalleryItem,
-    FormGroup, TextInput, InputGroup, InputGroupText, FormSelect, FormSelectOption, FormHelperText,
+    FormGroup, TextInput, InputGroup, InputGroupText, FormSelect, FormSelectOption, 
     ChipGroup, Chip
 } from "@patternfly/react-core";
-import { Timer } from "../Components/Timer";
 import { getCacheItem, cacheItem, getAfcConfigFile } from "../Lib/RatApi";
 import { AFCConfigFile, RatResponse, IndoorOutdoorType } from "../Lib/RatApiTypes";
 import { ifNum } from "../Lib/Utils";
 import { LocationForm } from "./LocationForm";
 import { Limit } from "../Lib/Admin";
-import { ElevationForm } from "./ElevationForm";
-import ExclamationCircleIcon from '@patternfly/react-icons/dist/esm/icons/exclamation-circle-icon';
 import { OperatingClass, OperatingClassIncludeType } from "../Lib/RatAfcTypes";
 import { OperatingClassForm } from "./OperatingClassForm";
 import { InquiredFrequencyForm } from "./InquiredFrequencyForm";
@@ -93,6 +90,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                     include: OperatingClassIncludeType.None
                 },
             ]
+        
         };
     }
 
@@ -323,8 +321,8 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                     isOpen={this.state.isModalOpen}
                     onClose={() => this.setState({ isModalOpen: false })}
                     actions={[<Button key="update" variant="primary" onClick={() => this.setState({ isModalOpen: false })}>Close</Button>]}>
-                    <ClipboardCopy variant={ClipboardCopyVariant.expansion}
-                        onChange={(text: string | number) => this.setConfig(String(text))} aria-label="text area">{JSON.stringify(this.getParamsJSON())}</ClipboardCopy>
+                    <ClipboardCopy variant={ClipboardCopyVariant.expansion} 
+                        onChange={(text: string | number) => this.setConfig(String(text).trim())} aria-label="text area">{JSON.stringify(this.getParamsJSON())}</ClipboardCopy>
                 </Modal>
                 <Gallery gutter="sm">
                     <GalleryItem>

@@ -74,10 +74,11 @@ export class AFCForm extends React.Component<
     private setMaxLinkDistance = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxLinkDistance: n }) });
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
+    private setEnableMapInVirtualAp = (n: boolean) => this.setState({ config: Object.assign(this.state.config, { enableMapInVirtualAp: n }) });
     private setPropogationEnv = (n: string) => {
 
-        const newConfig = {...this.state.config};
-            
+        const newConfig = { ...this.state.config };
+
         newConfig.propagationEnv = n as "NLCD Point" | "Population Density Map" | "Urban" | "Suburban" | "Rural";
         if (n != "NLCD Point" && this.state.config.propagationEnv == 'NLCD Point') {
             delete newConfig.nlcdFile;
@@ -824,6 +825,32 @@ export class AFCForm extends React.Component<
                                     <FormSelectOption key={"discard"} value={"discard"} label={"Discard scan point"} />
                                 </FormSelect>
                             </FormGroup>
+                        </GalleryItem>
+                        <GalleryItem>
+                            <Tooltip
+                                position={TooltipPosition.top}
+                                enableFlip={true}
+                                //className="prop-env-tooltip"
+                                maxWidth="40.0rem"
+                                content={
+                                    <p>If enabled, the Virtual AP page will add map information via the Vendor extension and present a Google Map on the page</p>
+                                }
+                            >
+                                <FormGroup fieldId="horizontal-form-clutter">
+                                    <InputGroup label="">
+                                        <Checkbox
+                                            label="Enable Map in Virtual AP"
+                                            isChecked={this.state.config.enableMapInVirtualAp ?? false}
+                                            onChange={this.setEnableMapInVirtualAp}
+                                            id="horizontal-form-clutter"
+                                            name="horizontal-form-clutter"
+                                            style={{ textAlign: "right" }}
+                                        />
+
+                                        <OutlinedQuestionCircleIcon style={{ marginLeft: "5px" }} />
+                                    </InputGroup>
+                                </FormGroup>
+                            </Tooltip>
                         </GalleryItem>
                     </Gallery>
                     <br />

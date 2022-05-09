@@ -85,7 +85,9 @@ export interface AvailableSpectrumInquiryResponse {
     availableFrequencyInfo?: AvailableSpectrumInfo[],
     availableChannelInfo?: AvailableChannelInfo[],
     availabilityExpireTime?: string,
-    response: InquiryResponse
+    response: InquiryResponse,
+    vendorExtensions?: VendorExtension[]
+
 }
 
 export interface AvailableSpectrumInfo {
@@ -106,8 +108,8 @@ export interface InquiryResponse {
 }
 
 export interface VendorExtension {
-    extensionID: "RAT v1.1AFC Config"
-    parameters: AFCConfigFile
+    extensionID: string
+    parameters: any
 }
 
 export enum DeploymentEnum {
