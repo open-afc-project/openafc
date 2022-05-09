@@ -16,7 +16,7 @@ node 'default' {
     pgsql_password       => 'N3SF0LVKJx1RAhFGx4fcw',
     flask_secret_key     => '9XXc5Lw+DZwXINyOmKcY5c41AMhLabqn4jFLXJntsVutrZCauB5W/AOv7tDbp63ge2SS2Ujz/OnfeQboJOrbsQ',
     http_allow_plaintext => true,
-    ratapi_debug_mode    => true,
+    ratapi_debug_mode    => false,
     ratapi_google_apikey => 'AIzaSyAjcMamfS5LhIRzQ6Qapi0uKX151himkmQ',
     ratapi_history_dir   => '/var/log/fbrat/history',
   }
