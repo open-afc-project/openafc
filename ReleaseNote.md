@@ -1,5 +1,10 @@
 # Release Note
 ## **Version and Date**
+|Version|3.3.18|
+| :- | :- |
+|**Date**|**05/09/2022**|
+
+## **Version and Date**
 |Version|**OA-85**|
 | :- | :- |
 |**Date**|**05/06/2022**|
