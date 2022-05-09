@@ -1,5 +1,15 @@
 # Release Note
 ## **Version and Date**
+|Version|**OA-239**|
+| :- | :- |
+|**Date**|**05/06/2022**|
+
+## **Issues Addressed**
+ * Jira OA-239: Add additional features to Virtual AP's google map
+   - Added functionality to update the coordinates in the location for ellipse center when map is clicked on
+   - Changed the map display to update when Send Request is clicked instead of when response is received  
+
+## **Version and Date**
 |Version|3.3.18|
 | :- | :- |
 |**Date**|**05/09/2022**|
