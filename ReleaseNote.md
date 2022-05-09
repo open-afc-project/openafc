@@ -2,7 +2,7 @@
 ## **Version and Date**
 |Version|**OA-239**|
 | :- | :- |
-|**Date**|**05/06/2022**|
+|**Date**|**05/09/2022**|
 
 ## **Issues Addressed**
  * Jira OA-239: Add additional features to Virtual AP's google map
