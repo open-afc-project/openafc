@@ -3,7 +3,6 @@ import { PageSection, Title, Card, CardBody, Alert, AlertActionCloseButton } fro
 import { spectrumInquiryRequest, downloadMapData } from "../Lib/RatAfcApi";
 import { getCacheItem, cacheItem } from "../Lib/RatApi";
 import { ResError, AFCConfigFile, RatResponse, error, ChannelData, GeoJson } from "../Lib/RatApiTypes";
-import { PAWSForm } from "../VirtualAP/PAWSForm";
 import { SpectrumDisplayAFC, SpectrumDisplayLineAFC } from "../Components/SpectrumDisplay";
 import { ChannelDisplay, emptyChannels } from "../Components/ChannelDisplay";
 import { JsonRawDisp } from "../Components/JsonRawDisp";
@@ -11,7 +10,7 @@ import { MapContainer, MapProps } from "../Components/MapContainer";
 import DownloadContents from "../Components/DownloadContents";
 import LoadLidarBounds from "../Components/LoadLidarBounds";
 import LoadRasBounds from "../Components/LoadRasBounds";
-import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, AvailableChannelInfo, Ellipse } from "../Lib/RatAfcTypes";
+import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, AvailableChannelInfo, Ellipse, Point } from "../Lib/RatAfcTypes";
 import { Timer } from "../Components/Timer";
 import { logger } from "../Lib/Logger";
 import { RatAfcForm } from "./RatAfcForm";
@@ -51,7 +50,8 @@ interface RatAfcState {
         lng: number
     },
     kml?: Blob,
-    includeMap: boolean
+    includeMap: boolean,
+    clickedMapPoint?: Point
 }
 
 const mapProps: MapProps = {
@@ -154,7 +154,11 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                     lat: 40,
                     lng: -100
                 },
-                includeMap: false
+                includeMap: false,
+                clickedMapPoint: {
+                    latitude: 40,
+                    longitude: -100
+                }
             }
         } else {
             this.state = {
@@ -174,10 +178,17 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                     lat: 40,
                     lng: -100
                 },
-                includeMap: props.afcConfig.kind === "Success" ? props.afcConfig.result.enableMapInVirtualAp ?? false : false
+                includeMap: props.afcConfig.kind === "Success" ? props.afcConfig.result.enableMapInVirtualAp ?? false : false,
+                clickedMapPoint: {
+                    latitude: 40,
+                    longitude: -100
+                }
             };
         }
+        this.changeMapLocationChild = React.createRef();
     }
+
+    private changeMapLocationChild: any;
 
     private styles: Map<string, any> = new Map([
         ["BLDB", { fillOpacity: 0, strokeColor: "blue" }],
@@ -220,12 +231,12 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
 
     //Leaving this in for later addition of marker move functionality
     private onMarkerUpdate(lat: number, lon: number) {
-        // this.setState({
-        //   latVal: lat,
-        //   latValid: true,
-        //   lonVal: lon,
-        //   lonValid: true
-        // })
+
+        var newGeoJson = { ...this.state.mapState.val };
+
+        this.setState({ clickedMapPoint: { latitude: lat, longitude: lon } })
+        this.setMapState({ val: newGeoJson, versionId: this.state.mapState.versionId + 1 });
+        this.changeMapLocationChild.current.setEllipseCenter({ latitude: lat, longitude: lon })
     }
     /**
      * make a request to AFC Engine
@@ -234,18 +245,26 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
     private sendRequest = (request: AvailableSpectrumInquiryRequest) => {
         // make api call
         this.setState({ status: "Info" });
+        const rlanLoc = this.getLatLongFromRequest(request);
+        this.setState({
+            mapCenter: rlanLoc,
+            clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng }
+        });
         return spectrumInquiryRequest(request)
             .then(resp => {
                 if (resp.kind == "Success") {
                     const response = resp.result;
                     if (response.response.responseCode === 0) {
                         const minEirp = request.minDesiredPower || this.state.minEirp;
+
                         this.setState({
                             status: "Success",
                             response: resp.result,
                             minEirp: minEirp,
-                            mapCenter: this.getLatLongFromRequest(request)
+                            mapCenter: rlanLoc,
+                            clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng },
                         });
+                       
                         if (this.state.includeMap
                             && response.vendorExtensions
                             && response.vendorExtensions.length > 0
@@ -323,7 +342,12 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 <Title size="lg">RAT AFC AP</Title>
                 <Card>
                     <CardBody>
-                        <RatAfcForm limit={this.props.limit.kind == "Success" ? this.props.limit.result : new Limit(false, 0)} config={this.props.afcConfig} onSubmit={req => this.sendRequest(req)} />
+                        <RatAfcForm ref={this.changeMapLocationChild}
+                            limit={this.props.limit.kind == "Success" ? this.props.limit.result : new Limit(false, 0)}
+                            config={this.props.afcConfig}
+                            onSubmit={req => this.sendRequest(req)}
+                            ellipseCenterPoint={!this.state.clickedMapPoint ? undefined : this.state.clickedMapPoint}
+                        />
                     </CardBody>
                 </Card>
                 <br />
@@ -366,7 +390,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             <MapContainer
                                 mode="Point"
                                 onMarkerUpdate={(lat: number, lon: number) => this.onMarkerUpdate(lat, lon)}
-                                markerPosition={({ lat: this.state.mapCenter.lat, lng: this.state.mapCenter.lng })}
+                                markerPosition={({ lat: this.state.clickedMapPoint.latitude, lng: this.state.clickedMapPoint.longitude })}
                                 geoJson={this.state.mapState.val}
                                 styles={this.styles}
                                 center={mapProps.center}
