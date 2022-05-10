@@ -70,6 +70,7 @@
 #include <iturp452/ITURP452.h>
 // Uses OGR from GDAL v1.11
 #include "gdal/ogrsf_frmts.h"
+#include "data_if.h"
 
 #include "AfcDefinitions.h"
 
@@ -258,6 +259,8 @@ class AfcManager
 		std::string _stateRoot;                 // Parsed path of fbrat state root
 		bool _createKmz;
 		bool _createDebugFiles;
+
+		AfcDataIf* _dataIf;
 
 		RLANBoundary _rlanUncertaintyRegionType = RLANBoundary::NO_BOUNDARY;          // specifies the type of horizontal uncertainty region being used (ellipse, linear polygon, or radial polygon)
 		DoubleTriplet _rlanLLA = std::make_tuple(quietNaN, quietNaN, quietNaN);       // lat (deg) (NaN if not ellipse), lon (deg) (NaN if not ellipse), height (m)
