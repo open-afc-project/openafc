@@ -264,7 +264,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             mapCenter: rlanLoc,
                             clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng },
                         });
-                        this.setMapState({ markerPosi })
+                       
                         if (this.state.includeMap
                             && response.vendorExtensions
                             && response.vendorExtensions.length > 0
