@@ -43,17 +43,10 @@ AfcDataIf::~AfcDataIf()
 	}
 }
 
-void AfcDataIf::downloadFinished(QNetworkReply *reply)
-{
-	LOGGER_ERROR(logger) << "AfcDataIf::downloadFinished";
-}
-
-
 bool AfcDataIf::readFile(QString fileName, QByteArray& data)
 {
 	LOGGER_DEBUG(logger)  << "AfcDataIf::readFile(" << fileName << ")" << std::endl;
 	if (AfcDataIf::_remote.isEmpty()) {
-		LOGGER_ERROR(logger) << "readFile local";
 		QFile inFile;
 
 		inFile.setFileName(fileName);

@@ -22,6 +22,4 @@ private:
 #if GUNZIP_INPUT_FILES
 	bool gunzipBuffer(QByteArray &input, QByteArray &output);
 #endif
-public slots:
-	void downloadFinished(QNetworkReply *reply);
 };
