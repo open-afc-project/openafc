@@ -62,7 +62,7 @@ We want to accept your pull requests. Please follow these steps:
 
 ### Step 1: File an issue
 
-Before writing any code, please file an issue stating the problem you want to solve or the feature you want to implement. This allows us to give you feedback before you spend any time writing code. There may be a known limitation that can't be addressed, or a bug that has already been fixed in a different way. The issue allows us to communicate and figure out if it's worth your time to write a bunch of code for the project.
+Before writing any code, please file a Jira ticket [here](https://telecominfraproject.atlassian.net/jira/software/c/projects/OA/issues) stating the problem you want to solve or the feature you want to implement. This allows us to give you feedback before you spend any time writing code. There may be a known limitation that can't be addressed, or a bug that has already been fixed in a different way. The jira ticket allows us to communicate and figure out if it's worth your time to write a bunch of code for the project.
 
 ### Step 2: Clone OpenAFC GitHub repository
 
@@ -129,7 +129,7 @@ Send the pull request from your feature branch to us.
 When submitting a pull request, please use the following template to submit the change description, risks and validations done after making the changes
 (not a book, but an info required to understand the change/scenario/risks/test coverage)
 
-- Issue Description: Issue # (from [Step 1](#step-1-file-an-issue)). A brief description of issue(s) being fixed and likelihood/frequency/severity of the issue,   or description of new feature if it is a new feature.
+- JIRA-ID number (from [Step 1](#step-1-file-an-issue)). A brief description of issue(s) being fixed and likelihood/frequency/severity of the issue, or description of new feature if it is a new feature.
 - Reproduction procedure: Details of how the issue could be reproduced / procedure to reproduce the issue.
 Description of Change:  A detailed description of what the change is and assumptions / decisions made
 - Risks: Low, Medium or High and reasoning for the same.
