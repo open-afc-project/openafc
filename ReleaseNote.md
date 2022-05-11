@@ -1,5 +1,12 @@
 # Release Note
 ## **Version and Date**
+|Version|3.3.18.2|
+| :- | :- |
+|**Date**|**05/10/2022**|
+|compiled server's version is 3.3.18-0ca8ecf |git tag 3.3.18.2|
+
+
+## **Version and Date**
 |Version|**OA-239**|
 | :- | :- |
 |**Date**|**05/09/2022**|
@@ -13,7 +20,8 @@
 |Version|3.3.18|
 | :- | :- |
 |**Date**|**05/09/2022**|
-
+|compiled server's version is 3.3.18-1e88408 |git tag 3.3.18.1|
+ 
 ## **Version and Date**
 |Version|**OA-85**|
 | :- | :- |
