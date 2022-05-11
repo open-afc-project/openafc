@@ -249,6 +249,9 @@ AfcManager::AfcManager()
 AfcManager::~AfcManager()
 {
 	clearData();
+	if (AfcManager::_dataIf) {
+		delete AfcManager::_dataIf;
+	}
 	delete _ulsList;
 	delete _rasList;
 }
@@ -638,13 +641,12 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 {
 	// Read input parameters from GUI in JSON file
 	QJsonDocument jsonDoc;
-	QFile inFile;
 	// Use SearchPaths::forReading("data", ..., true) to ensure that the input file exists before reading it in
-	inFile.setFileName(inputJSONpath.c_str());
-	if (inFile.open(QFile::ReadOnly | QFile::Text))
-	{
-		jsonDoc = QJsonDocument::fromJson(inFile.readAll());
-		inFile.close();
+	QString fName = QString(inputJSONpath.c_str());
+	QByteArray data;
+
+	if (AfcManager::_dataIf->readFile(fName, data)) {
+		jsonDoc = QJsonDocument::fromJson(data);
 	} else {
 		throw std::runtime_error("AfcManager::importGUIjson(): Failed to open JSON file specifying user's input parameters.");
 	}
@@ -1647,6 +1649,7 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		("output-file-path,o", po::value<std::string>()->default_value("outputFile.json"), "set output-file-path level")
 		("temp-dir,t", po::value<std::string>()->default_value(""), "set temp-dir level")
 		("log-level,l", po::value<std::string>()->default_value("debug"), "set log-level")
+		("remote-data-storage,e", po::value<std::string>()->default_value(""), "use remote files in this link")
 		("runtime_opt,u", po::value<uint32_t>()->default_value(3), "bit 0: create debug files; bit 1: create kmz and progress files");
 
 	po::variables_map cmdLineArgs;
@@ -1722,6 +1725,14 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 	{
 		throw std::runtime_error("AfcManager::setCmdLineParams(): log-level command line argument was not set.");
 	}
+	if (cmdLineArgs.count("remote-data-storage"))
+	{
+		AfcManager::_dataIf = new AfcDataIf(cmdLineArgs["remote-data-storage"].as<std::string>());
+	}
+	else
+	{
+		throw std::runtime_error("AfcManager::setCmdLineParams(): remote-data-storage command line argument was not set.");
+	}
 	if (cmdLineArgs.count("runtime_opt"))
 	{
 		uint32_t tmp = cmdLineArgs["runtime_opt"].as<uint32_t>();
@@ -1744,13 +1755,10 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 	// read json file in
 	QJsonDocument jsonDoc;
-	QFile inFile;
 	QString fName = QString(inputJSONpath.c_str());
-	inFile.setFileName(fName);
-	//inFile.open(inputJSONpath, std::ifstream::in);
-	if (inFile.open(QFile::ReadOnly | QFile::Text)) {
-		jsonDoc = QJsonDocument::fromJson(inFile.readAll());
-		inFile.close();
+	QByteArray data;
+	if (AfcManager::_dataIf->readFile(fName, data)) {
+		jsonDoc = QJsonDocument::fromJson(data);
 	} else {
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): Failed to open JSON file specifying configuration parameters.");
 	}
@@ -2645,15 +2653,11 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string&
 	}
 
 	// Write analysis outputs to JSON file
-	auto outputAnalysisFile = FileHelpers::open(exportJsonPath, QIODevice::WriteOnly);
-	auto gzip_writer = new GzipStream(outputAnalysisFile.get());
-	if (!gzip_writer->open(QIODevice::WriteOnly))
-	{
-		throw std::runtime_error("Gzip failed to open.");
+	QByteArray data = outputDocument.toJson();
+	if (!AfcManager::_dataIf->writeFile(exportJsonPath, data)) {
+		throw std::runtime_error("Error writing output file");
 	}
-	gzip_writer->write(outputDocument.toJson());
-	gzip_writer->close();
-	LOGGER_DEBUG(logger) << "Output file written to " << outputAnalysisFile->fileName().toStdString();
+	LOGGER_DEBUG(logger) << "Output file written to " << exportJsonPath.toStdString();
 }
 
 void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
