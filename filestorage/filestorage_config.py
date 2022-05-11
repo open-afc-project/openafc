@@ -15,8 +15,8 @@ import os
 import logging
 
 # LOG_FILE or LOG_STREAM shold be None
-LOG_FILE = None
-LOG_STREAM = sys.stdout
+LOG_FILE = "/proc/self/fd/2"
+LOG_STREAM = None
 
 # use "logging.ERROR" to shut it up
 LOG_LEVEL = logging.DEBUG
