@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-FROM python:3
+FROM python:3.10
 
 WORKDIR /usr/app
 RUN mkdir -p /dl && chmod 777 /dl
