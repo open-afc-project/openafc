@@ -14,6 +14,7 @@ public:
 	~AfcDataIf();
 	bool readFile(QString fileName, QByteArray& data);
 	bool writeFile(QString fileName, QByteArray& data);
+	bool gzipAndWriteFile(QString fileName, QByteArray& data);
 private:
 	QString _remote;
 	QNetworkAccessManager _mngr;

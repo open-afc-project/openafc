@@ -2654,7 +2654,7 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string&
 
 	// Write analysis outputs to JSON file
 	QByteArray data = outputDocument.toJson();
-	if (!AfcManager::_dataIf->writeFile(exportJsonPath, data)) {
+	if (!AfcManager::_dataIf->gzipAndWriteFile(exportJsonPath, data)) {
 		throw std::runtime_error("Error writing output file");
 	}
 	LOGGER_DEBUG(logger) << "Output file written to " << exportJsonPath.toStdString();
@@ -7439,17 +7439,19 @@ void AfcManager::runPointAnalysis()
 			if (xN == 1) {
 				tstart = std::chrono::high_resolution_clock::now();
 				pctIdx = 1;
-			} else {
+			} else if (!_progressFile.empty()) {
 				auto tcurrent = std::chrono::high_resolution_clock::now();
 				double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(tcurrent-tstart).count();
 				double remainingTime = elapsedTime*(totNumProc-numProc)/(numProc-1);
+				std::ostringstream progress;
+				QByteArray progressBA;
 
-				std::ofstream progressFile;
-				progressFile.open(_progressFile);
-				progressFile << (int) std::floor(100.0*numProc/totNumProc) << std::endl
+				progress << (int) std::floor(100.0*numProc/totNumProc) << std::endl
 					<< "Elapsed Time: " << (int) std::floor(elapsedTime)
 					<< " s, Remaining: " << (int) std::floor(remainingTime) << " s";
-				progressFile.close();
+				progressBA = QByteArray(progress.str().c_str());
+				/* dont throw error */
+				AfcManager::_dataIf->writeFile(QString::fromStdString(_progressFile), progressBA);
 
 				// printf("%f %%  :  Elapsed Time = %f seconds, Remaining %f seconds\n", 100.0*numProc/totNumProc, elapsedTime, remainingTime);
 				pctIdx++;
@@ -8659,17 +8661,19 @@ void AfcManager::runExclusionZoneAnalysis()
 			if (xN == 1) {
 				tstart = std::chrono::high_resolution_clock::now();
 				pctIdx = 1;
-			} else {
+			} else if (!_progressFile.empty()) {
 				auto tcurrent = std::chrono::high_resolution_clock::now();
 				double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(tcurrent-tstart).count();
 				double remainingTime = elapsedTime*(totNumProc-numProc)/(numProc-1);
+				std::ostringstream progress;
+				QByteArray progressBA;
 
-				std::ofstream progressFile;
-				progressFile.open(_progressFile);
-				progressFile << (int) std::floor(100.0*numProc/totNumProc) << std::endl
+				progress << (int) std::floor(100.0*numProc/totNumProc) << std::endl
 					<< "Elapsed Time: " << (int) std::floor(elapsedTime)
 					<< " s, Remaining: " << (int) std::floor(remainingTime) << " s";
-				progressFile.close();
+				progressBA = QByteArray(progress.str().c_str());
+				/* dont throw error */
+				AfcManager::_dataIf->writeFile(QString::fromStdString(_progressFile), progressBA);
 
 				// printf("%f %%  :  Elapsed Time = %f seconds, Remaining %f seconds\n", 100.0*numProc/totNumProc, elapsedTime, remainingTime);
 				pctIdx++;
@@ -9447,17 +9451,19 @@ void AfcManager::runHeatmapAnalysis()
 				if (xN == 1) {
 					tstart = std::chrono::high_resolution_clock::now();
 					pctIdx = 1;
-				} else {
+				} else if (!_progressFile.empty()) {
 					auto tcurrent = std::chrono::high_resolution_clock::now();
 					double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(tcurrent-tstart).count();
 					double remainingTime = elapsedTime*(totNumProc-numProc)/(numProc-1);
+					std::ostringstream progress;
+					QByteArray progressBA;
 
-					std::ofstream progressFile;
-					progressFile.open(_progressFile);
-					progressFile << (int) std::floor(100.0*numProc/totNumProc) << std::endl
+					progress << (int) std::floor(100.0*numProc/totNumProc) << std::endl
 						<< "Elapsed Time: " << (int) std::floor(elapsedTime)
 						<< " s, Remaining: " << (int) std::floor(remainingTime) << " s";
-					progressFile.close();
+					progressBA = QByteArray(progress.str().c_str());
+					/* dont throw error */
+					AfcManager::_dataIf->writeFile(QString::fromStdString(_progressFile), progressBA);
 
 					// printf("%f %%  :  Elapsed Time = %f seconds, Remaining %f seconds\n", 100.0*numProc/totNumProc, elapsedTime, remainingTime);
 					pctIdx++;

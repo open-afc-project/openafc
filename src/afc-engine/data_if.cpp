@@ -95,20 +95,25 @@ bool AfcDataIf::readFile(QString fileName, QByteArray& data)
 	}
 }
 
-bool AfcDataIf::writeFile(QString fileName, QByteArray& data)
+bool AfcDataIf::gzipAndWriteFile(QString fileName, QByteArray& data)
 {
-	LOGGER_DEBUG(logger) << "writeFile " << AfcDataIf::_remote << fileName << std::endl;
 	QByteArray gziped;
 	if (!AfcDataIf::gzipBuffer(data, gziped)) {
 		return false;
 	}
+	return AfcDataIf::writeFile(fileName, gziped);
+}
+
+bool AfcDataIf::writeFile(QString fileName, QByteArray& data)
+{
+	LOGGER_DEBUG(logger) << "writeFile " << AfcDataIf::_remote << fileName << std::endl;
 	if (AfcDataIf::_remote.isEmpty()) {
 		QFile outFile;
 
 		outFile.setFileName(fileName);
 		if (outFile.open(QFile::WriteOnly))
 		{
-			if (outFile.write(gziped) == gziped.size()) {
+			if (outFile.write(data) == data.size()) {
 				outFile.close();
 				return true;
 			}
