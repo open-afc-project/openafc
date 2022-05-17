@@ -27,6 +27,8 @@ EXAMPLES
 """
 
 import argparse
+import csv
+import datetime
 import hashlib
 import inspect
 import io
@@ -74,6 +76,7 @@ class AfcTester:
         self.post_verify = True
         self.dbg = ''
         self.gui = ''
+        self.out = ''
 
     def run(self, opts):
         """Main entry to find and execute commands"""
@@ -103,6 +106,8 @@ class AfcTester:
             self.addr = params['addr'][0]
         if 'port' in params:
             self.port = params['port'][0]
+        if 'out' in params:
+            self.out = os.getcwd() + "/" + params['out'][0] + ".csv"
         change_url = 0
         if 'nodbg' in params:
             self.dbg = 'nodbg'
@@ -244,6 +249,7 @@ def make_arg_parser():
                               "[post=n] - not to check for SSL,\n"
                               "[dbg|nodbg] - set runtime debug option,\n"
                               "[gui|nogui] - set runtime GUI support option,\n"
+                              "[out=filename] - set test results output option,\n"
                               "[log=<info|debug|warn|error|critical>]\n")
     args_parser.add_argument('--db', metavar='KEY,KEY=VALUE',
                              nargs='+', action=ParseDict,
@@ -775,7 +781,36 @@ def start_test(self, test_number):
             app_log.error(hash_obj.hexdigest())
             test_res = AFC_ERR
         row_idx += 1
+
+        # For saving test results option
+        if self.out != "":
+            test_report(self, float(tm_secs), test_number, req_id[0],
+                        test_res, upd_data)
     return test_res
+
+def test_report(self, runtimedata, testnumdata, testvectordata,
+                test_result, upd_data):
+    """Procedure to generate AFC test results report.
+    Args:
+        runtimedata(str) : Tested case running time.
+        testnumdata(str): Tested case id.
+        testvectordata(int): Tested vector id.
+        test_result(str: Test result Pass is 0 or Fail is 1)
+        upd_data(list): List for test response data
+    Return:
+        Create test results file.
+    """
+    ts_time = datetime.datetime.fromtimestamp(time.time()).\
+        strftime('%Y_%m_%d_%H%M%S')
+    # Test results output args
+    data_names = ['Date', 'Test Number', 'Test Vector', 'Running Time',
+                  'Test Results', 'Response data']
+    data = {'Date': [ts_time], 'Test Number': [testnumdata],
+            'Test Vector': [testvectordata], 'Running Time': [runtimedata],
+            'Test Result': [test_result], 'Response data': [upd_data]}
+    with open(self.out, "a") as f:
+        file_writer = csv.DictWriter(f, fieldnames=data_names)
+        file_writer.writerow(data)
 
 
 def main():

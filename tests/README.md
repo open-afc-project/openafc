@@ -84,6 +84,10 @@ Run a test or number of tests according to database index
 ```
 afc_tests.py --cfg addr=1.2.3.4 --test r=1,13,30
 ```
+Run a test and save test result to csv format file.
+```
+afc_tests.py --cfg addr=1.2.3.4 out=filename --test a
+```
 Start run all tests and save results as ‘golden reference’ in the database
 ```
 afc_tests.py --cfg addr=1.2.3.4 --test a
