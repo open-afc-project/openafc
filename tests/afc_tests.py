@@ -804,7 +804,7 @@ def test_report(self, runtimedata, testnumdata, testvectordata,
         strftime('%Y_%m_%d_%H%M%S')
     # Test results output args
     data_names = ['Date', 'Test Number', 'Test Vector', 'Running Time',
-                  'Test Results', 'Response data']
+                  'Test Result', 'Response data']
     data = {'Date': [ts_time], 'Test Number': [testnumdata],
             'Test Vector': [testvectordata], 'Running Time': [runtimedata],
             'Test Result': [test_result], 'Response data': [upd_data]}
