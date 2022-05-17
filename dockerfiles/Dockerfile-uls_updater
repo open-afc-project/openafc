@@ -1,0 +1,50 @@
+#
+# Copyright © 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+# default value of args
+ARG BLD_TAG=latest
+ARG BLD_NAME=openafc/centos-build-image
+
+# Stage Build
+FROM ${BLD_NAME}:${BLD_TAG} as build_image
+ARG BUILDREV=localbuild
+COPY CMakeLists.txt LICENSE.txt version.txt fbrat.rpmlintrc Doxyfile.in /wd/
+RUN echo $BUILDREV > /wd/svnrevision.txt
+
+COPY cmake /wd/cmake/
+COPY pkg /wd/pkg/
+COPY selinux /wd/selinux/
+COPY src /wd/src/
+
+RUN set -e ; \
+    N_THREADS=$(nproc --all --ignore=2); \
+    ROOTDIR=$(readlink -f $(dirname "${BASH_SOURCE[0]}")); \
+CMAKE="cmake3 -G Ninja"; \
+    NINJA="ninja-build -j$N_THREADS"; \
+    RPMBUILD="rpmbuild -ba --without apidoc $@"; \
+    RPMLINT="rpmlint"; \
+    CMAKE="${CMAKE} -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169" ; \
+    BUILDDIR=${ROOTDIR}/build; \
+    mkdir -p $BUILDDIR; \
+    pushd $BUILDDIR; \
+    ${CMAKE} .. ; \
+    rm -rf dist; \
+    ${NINJA} src/coalition_ulsprocessor/all src/ratapi/all
+
+FROM centos:7 as install_image
+RUN mkdir -p /var/lib/fbrat/daily_uls_parse/data_files /var/lib/fbrat/daily_uls_parse/temp /var/lib/fbrat/ULS_Database
+COPY --from=build_image /wd/build/src/coalition_ulsprocessor/src/uls-script/uls-script /var/lib/fbrat/daily_uls_parse/
+COPY --from=build_image /wd/build/src/ratapi/pkg/ratapi/db /var/lib/fbrat/daily_uls_parse/
+RUN chmod +x /var/lib/fbrat/daily_uls_parse/daily_uls_parse.py
+RUN yum -y install epel-release
+RUN yum -y install qt5-qtbase-devel python-sqlalchemy python2-numpy
+RUN yum -y clean all
+
+#FROM centos:7
+#COPY --from=install_image / /
+
+WORKDIR /wd
+CMD ["python", "/var/lib/fbrat/daily_uls_parse/daily_uls_parse.py"]
