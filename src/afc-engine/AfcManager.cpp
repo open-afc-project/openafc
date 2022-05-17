@@ -63,8 +63,8 @@ namespace
 		// const double fixedEsNoSurfRef = 301;
 		// const int fixedRadioClimate = 6;
 		// const int fixedPolarization = 1;
-		const double fixedConfidence = 0.5;
-	const double fixedRelevance = 0.5;
+		// const double fixedConfidence = 0.5;
+	    // const double fixedRelevance = 0.5;
 	/**
 	 * Encapsulates a CSV writer to a file gzip'd
 	 * All fields are NULL if filename parameter in constructor is not a valid path.
@@ -2113,6 +2113,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		default:
 			CORE_DUMP;
 			break;
+	}
+
+	if (propModel.contains("itmReliability") && !propModel["itmReliability"].isUndefined()) {
+		_reliabilityITM = propModel["itmReliability"].toDouble()/100.0;
+	} else {
+		_reliabilityITM = 0.5;
 	}
 
 	if (propModel.contains("winner2LOSOption") && !propModel["winner2LOSOption"].isUndefined()) {
@@ -5360,7 +5366,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						true,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL, heightProfilePtr);
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, heightProfilePtr);
 				pathLossModelStr = "ITM_BLDG";
 				pathLossCDF = _confidenceITM;
 			}
@@ -5381,7 +5387,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 					true,
 					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL, heightProfilePtr);
+					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, heightProfilePtr);
 			pathLossModelStr = "ITM_BLDG";
 			pathLossCDF = _confidenceITM;
 
@@ -5481,7 +5487,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL,heightProfilePtr);
 				pathLossModelStr = "ITM";
 				pathLossCDF = _confidenceITM;
 
@@ -5531,7 +5537,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 					false,
 					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
+					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL,heightProfilePtr);
 			pathLossModelStr = "ITM";
 			pathLossCDF = _confidenceITM;
 
@@ -5654,7 +5660,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL,heightProfilePtr);
 				pathLossModelStr = "ITM";
 				pathLossCDF = _confidenceITM;
 
@@ -5696,7 +5702,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, fixedRelevance, numPts, NULL,heightProfilePtr);
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL,heightProfilePtr);
 				pathLossModelStr = "ITM";
 				pathLossCDF = _confidenceITM;
 
@@ -9564,11 +9570,13 @@ void AfcManager::printUserInputs()
 			fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", QString::number(_winner2ProbLOSThr, 'e', 20) } );
 			fUserInputs->writeRow({ "WINNER_II_CONFIDENCE", QString::number(_confidenceWinner2, 'e', 20) } );
 			fUserInputs->writeRow({ "ITM_CONFIDENCE", QString::number(_confidenceITM, 'e', 20) } );
+			fUserInputs->writeRow({ "ITM_RELIABILITY", QString::number(_reliabilityITM, 'e', 20) } );
 			fUserInputs->writeRow({ "P.2108_CONFIDENCE", QString::number(_confidenceClutter2108, 'e', 20) } );
 		} else if (_pathLossModel == CConst::ITMBldgPathLossModel) {
 			fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", "N/A" } );
 			fUserInputs->writeRow({ "WINNER_II_CONFIDENCE", "N/A" } );
 			fUserInputs->writeRow({ "ITM_CONFIDENCE", QString::number(_confidenceITM, 'e', 20) } );
+			fUserInputs->writeRow({ "ITM_RELIABILITY", QString::number(_reliabilityITM, 'e', 20) } );
 			fUserInputs->writeRow({ "P.2108_CONFIDENCE", "N/A" } );
 		} else {
 			fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", "N/A" } );

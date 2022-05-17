@@ -1,7 +1,7 @@
 import * as React from "react";
 import { FormGroup, FormSelect, FormSelectOption, TextInput, InputGroup, InputGroupText, Tooltip, TooltipPosition } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
-import { CustomPropagation, PropagationModel } from "../Lib/RatApiTypes";
+import { CustomPropagation, FCC6GHz, PropagationModel, Win2ItmDb } from "../Lib/RatApiTypes";
 
 /**
  * PropogationModelForm.tsx: sub form of afc config form
@@ -31,19 +31,19 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 this.props.onChange({ kind: s });
                 break;
             case "ITM with building data":
-                this.props.onChange({ kind: s, win2ProbLosThreshold: 10, win2Confidence: 50, itmConfidence: 50, p2108Confidence: 50, buildingSource: "LiDAR" });
+                this.props.onChange({ kind: s, win2ProbLosThreshold: 10, win2Confidence: 50, itmConfidence: 50, itmReliability: 50, p2108Confidence: 50, buildingSource: "LiDAR" });
                 break;
             case "ITM with no building data":
-                this.props.onChange({ kind: s, win2ProbLosThreshold: 10, win2Confidence: 50, itmConfidence: 50, p2108Confidence: 50, terrainSource: "SRTM (90m)" });
+                this.props.onChange({ kind: s, win2ProbLosThreshold: 10, win2Confidence: 50, itmConfidence: 50, itmReliability: 50, p2108Confidence: 50, terrainSource: "SRTM (90m)" });
                 break;
             case "FCC 6GHz Report & Order":
-                this.props.onChange({ kind: s, win2Confidence: 50, itmConfidence: 50, p2108Confidence: 50, buildingSource: "LiDAR", terrainSource: "3DEP (30m)" });
+                this.props.onChange({ kind: s, win2Confidence: 50, itmConfidence: 50, itmReliability: 50, p2108Confidence: 50, buildingSource: "LiDAR", terrainSource: "3DEP (30m)" });
                 break;
             case "Ray Tracing":
                 break; // do nothing
             case "Custom":
                 this.props.onChange({
-                    kind: s, winner2LOSOption: "UNKNOWN", win2Confidence: 50, itmConfidence: 50,
+                    kind: s, winner2LOSOption: "UNKNOWN", win2Confidence: 50, itmConfidence: 50, itmReliability: 50,
                     p2108Confidence: 50, rlanITMTxClutterMethod: "FORCE_TRUE", buildingSource: "None", terrainSource: "3DEP (30m)"
                 })
                 break;
@@ -59,6 +59,13 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
         const n: number = Number(s);
         this.props.onChange(Object.assign(this.props.data, { itmConfidence: n }));
     }
+
+    setItmReliability = (s: string) => {
+        const n: number = Number(s);
+        this.props.onChange(Object.assign(this.props.data, { itmReliability: n }));
+    }
+
+
     setP2108Confidence = (s: string) => {
         const n: number = Number(s);
         this.props.onChange(Object.assign(this.props.data, { p2108Confidence: n }));
@@ -73,7 +80,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
         const model = this.props.data;
         if (model.hasOwnProperty('buildingSource')) {
             // Ensure that there is terrain source is set to default when there is building data
-            if (model.buildingSource === "None" && s !== "None") {
+            if ((model as Win2ItmDb | FCC6GHz | CustomPropagation).buildingSource === "None" && s !== "None") {
                 this.setTerrainSource("3DEP (30m)");
             }
             this.props.onChange(Object.assign(this.props.data, { buildingSource: s }));
@@ -134,6 +141,20 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
+                        label="ITM Reliability"
+                        fieldId="propogation-model-itm-reliability"
+                    >
+                        <InputGroup><TextInput
+                            value={model.itmReliability}
+                            type="number"
+                            onChange={this.setItmReliability}
+                            id="propogation-model-itm-reliability"
+                            name="propogation-model-itm-reliability"
+                            style={{ textAlign: "right" }}
+                            isValid={model.itmReliability >= 0 && model.itmReliability <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
+                    </FormGroup>
+                    <FormGroup
                         label="Building Data Source"
                         fieldId="propogation-model-data-source"
                     >
@@ -191,6 +212,20 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
+                        label="ITM Reliability"
+                        fieldId="propogation-model-itm-reliability"
+                    >
+                        <InputGroup><TextInput
+                            value={model.itmReliability}
+                            type="number"
+                            onChange={this.setItmReliability}
+                            id="propogation-model-itm-reliability"
+                            name="propogation-model-itm-reliability"
+                            style={{ textAlign: "right" }}
+                            isValid={model.itmReliability >= 0 && model.itmReliability <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
+                    </FormGroup>
+                    <FormGroup
                         label="P.2108 Percentage of Locations"
                         fieldId="propogation-model-p2108-confidence"
                     ><InputGroup><TextInput
@@ -245,6 +280,20 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         name="propogation-model-itm-confidence"
                         style={{ textAlign: "right" }}
                         isValid={model.itmConfidence >= 0 && model.itmConfidence <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
+                    </FormGroup>
+                    <FormGroup
+                        label="ITM Reliability"
+                        fieldId="propogation-model-itm-reliability"
+                    >
+                        <InputGroup><TextInput
+                            value={model.itmReliability}
+                            type="number"
+                            onChange={this.setItmReliability}
+                            id="propogation-model-itm-reliability"
+                            name="propogation-model-itm-reliability"
+                            style={{ textAlign: "right" }}
+                            isValid={model.itmReliability >= 0 && model.itmReliability <= 100} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
@@ -372,6 +421,20 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                                     <= 100} />
                             <InputGroupText>%</InputGroupText>
                         </InputGroup>
+                    </FormGroup>
+                    <FormGroup
+                        label="ITM Reliability"
+                        fieldId="propogation-model-itm-reliability"
+                    >
+                        <InputGroup><TextInput
+                            value={model.itmReliability}
+                            type="number"
+                            onChange={this.setItmReliability}
+                            id="propogation-model-itm-reliability"
+                            name="propogation-model-itm-reliability"
+                            style={{ textAlign: "right" }}
+                            isValid={model.itmReliability >= 0 && model.itmReliability <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup label="P.2108 Percentage of Locations" fieldId="propogation-model-p2108-confidence">
                         <InputGroup>

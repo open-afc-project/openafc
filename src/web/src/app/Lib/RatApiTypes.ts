@@ -136,6 +136,7 @@ export interface Win2ItmDb {
     win2ProbLosThreshold: number,
     win2Confidence: number,
     itmConfidence: number,
+    itmReliability: number,
     p2108Confidence: number,
     buildingSource: "B-Design3D" | "LiDAR"
 }
@@ -144,6 +145,7 @@ export interface Win2ItmClutter {
     win2ProbLosThreshold: number,
     win2Confidence: number,
     itmConfidence: number,
+    itmReliability: number,
     p2108Confidence: number,
     terrainSource: "SRTM (90m)" | "3DEP (30m)"
 }
@@ -154,6 +156,7 @@ export interface FCC6GHz {
     kind: "FCC 6GHz Report & Order",
     win2Confidence: number,
     itmConfidence: number,
+    itmReliability: number,
     p2108Confidence: number,
     buildingSource: "B-Design3D" | "LiDAR" | "None",
     terrainSource: "SRTM (90m)" | "3DEP (30m)"
@@ -164,6 +167,7 @@ export interface CustomPropagation {
     winner2LOSOption: 'UNKNOWN' | 'FORCE_LOS' | 'FORCE_NLOS' | 'BLDG_DATA_REQ_TX',
     win2Confidence: number,
     itmConfidence: number,
+    itmReliability: number,
     p2108Confidence: number,
     buildingSource: "B-Design3D" | "LiDAR" | "None",
     terrainSource: "SRTM (90m)" | "3DEP (30m)"

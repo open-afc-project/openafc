@@ -1,4 +1,23 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-245**|
+| :- | :- |
+|**Date**|**05/16/2022**|
+
+## **Issues Addressed**
+ * Jira OA-245: Add ITM reliability as configurable parameter to AFC Config
+
+## **Interface Changes**
+ * UI and afc_config.json now have itmReliability as a configurable parameter whenever ITM is used in the Propagation Model.
+
+## **Testing Done**
+ * Did a test, one with 0.1% Reliability and another with 99.9% Reliability. 
+ * Confirmed in engine logs and afc-config.json that the correct value was passed to the engine. 
+ * In the exc_thr file attached to JIRA ticket (see columns AC to AG), confirmed that ITM path loss for 99.9% Relability is higher than that at 0.1%. Note that since we clamp path loss lower than FSPL to FSPL, we don't see much change in the results.
+
+## **Open Issues**
+
 ## **Version and Date**
 |Version|3.3.18.2|
 | :- | :- |

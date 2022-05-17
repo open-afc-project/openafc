@@ -144,6 +144,7 @@ export class AFCForm extends React.Component<
         switch (propModel.kind) {
             case "ITM with no building data":
                 if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
+                if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
                 if (propModel.win2Confidence < 0 || propModel.win2Confidence > 100) return err();
                 if (propModel.win2ProbLosThreshold < 0 || propModel.win2ProbLosThreshold > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
@@ -151,10 +152,12 @@ export class AFCForm extends React.Component<
                 break;
             case "ITM with building data":
                 if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
+                if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
                 if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D") return err();
                 break;
             case "FCC 6GHz Report & Order":
                 if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
+                if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
                 if (propModel.win2Confidence < 0 || propModel.win2Confidence > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
                 if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
@@ -166,6 +169,7 @@ export class AFCForm extends React.Component<
                 break;
             case "Custom":
                 if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
+                if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
                 if (propModel.win2Confidence < 0 || propModel.win2Confidence > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
                 if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();

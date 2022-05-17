@@ -308,6 +308,7 @@ class AfcManager
 		double _confidenceClutter2108;          // Statistical confidence for P.2108 clutter loss
 		double _confidenceWinner2;              // Statistical confidence for Winner2 path loss model
 		double _confidenceITM;                  // Statistical confidence for ITM path loss model
+		double _reliabilityITM;                 // Statistical reliability   for ITM path loss model
 
 		CConst::LOSOptionEnum _winner2LOSOption;  // Method used to determine LOS for Winner2
 		// LOS Unknown, always use _winner2UnknownLOSMethod
