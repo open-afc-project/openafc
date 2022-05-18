@@ -9,14 +9,15 @@ import {
     FormGroup, TextInput, InputGroup, InputGroupText, FormSelect, FormSelectOption,
     ChipGroup, Chip
 } from "@patternfly/react-core";
-import { getCacheItem, cacheItem, getAfcConfigFile } from "../Lib/RatApi";
-import { AFCConfigFile, RatResponse, IndoorOutdoorType } from "../Lib/RatApiTypes";
+import { getCacheItem, cacheItem } from "../Lib/RatApi";
+import { AFCConfigFile, RatResponse } from "../Lib/RatApiTypes";
 import { ifNum } from "../Lib/Utils";
 import { LocationForm } from "./LocationForm";
 import { Limit } from "../Lib/Admin";
 import { OperatingClass, OperatingClassIncludeType } from "../Lib/RatAfcTypes";
 import { OperatingClassForm } from "./OperatingClassForm";
 import { InquiredFrequencyForm } from "./InquiredFrequencyForm";
+import { hasRole } from "../Lib/User";
 
 
 interface RatAfcFormParams {
@@ -148,6 +149,11 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
         this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationNra: '' });
     }
 
+    resetCertificationId(newCertificationId: CertificationId): void {
+        const copyOfcertificationId = [];
+        copyOfcertificationId.push({ id: newCertificationId.id, nra: newCertificationId.nra });
+        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationNra: '' });
+    }
 
     private updateOperatingClass(e: OperatingClass, i: number) {
         var opClassesCopy = this.state.operatingClasses.slice();
@@ -320,18 +326,18 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
         }
     }
 
-    setEllipseCenter = (center:Point) => {
-        if(this.state.location.radialPolygon || this.state.location.linearPolygon ){
+    setEllipseCenter = (center: Point) => {
+        if (this.state.location.radialPolygon || this.state.location.linearPolygon) {
             return;// Not an ellipse then do nothing
         }
-        if(!this.state.location.ellipse){
-            const location = {...this.state.location};
-            location.ellipse={ center: center, majorAxis: 0, minorAxis: 0, orientation: 0 }
-            this.setState({location:location});
-        }else  {
-            const location = {...this.state.location};
-            location.ellipse={ center: center, majorAxis: location.ellipse.majorAxis, minorAxis: location.ellipse.minorAxis, orientation: location.ellipse.orientation }
-            this.setState({location:location});
+        if (!this.state.location.ellipse) {
+            const location = { ...this.state.location };
+            location.ellipse = { center: center, majorAxis: 0, minorAxis: 0, orientation: 0 }
+            this.setState({ location: location });
+        } else {
+            const location = { ...this.state.location };
+            location.ellipse = { center: center, majorAxis: location.ellipse.majorAxis, minorAxis: location.ellipse.minorAxis, orientation: location.ellipse.orientation }
+            this.setState({ location: location });
         }
     }
 
@@ -354,6 +360,12 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                             fieldId="horizontal-form-name"
                             helperText="Must be unique for every AP"
                         >
+                            {hasRole("Trial") ?
+                                <Button key="trial-cert-fill-btn" variant="link" sizes="sm" onClick={() => this.setState({ serialNumber: 'TestSerialNumber'})}>
+                                    Fill Trial Serial
+                                </Button>
+                                : <></>
+                            }
                             <TextInput
                                 value={this.state.serialNumber}
                                 type="text"
@@ -374,6 +386,14 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                             // helperTextInvalidIcon={<ExclamationCircleIcon />} //This is not supported in our version of Patternfly
                             validated={this.state.certificationId.length > 0 ? "success" : "error"}
                         >
+                           {hasRole("Trial") ?
+                                <Button key="trial-cert-fill-btn" variant="link" sizes="sm"
+                                onClick={() => this.resetCertificationId({ id: 'TestCertificationId', nra: 'FCC'})}>
+                                    Fill Trial Cert Id
+                                </Button>
+                                : <></>
+                            }
+
                             <ChipGroup aria-orientation="vertical"
                             >
                                 {this.state.certificationId.map(currentCid => (

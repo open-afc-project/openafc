@@ -19,6 +19,7 @@ import Measure from "react-measure";
 import { Limit } from "../Lib/Admin";
 import { rotate, meterOffsetToDeg } from "../Lib/Utils"
 
+
 /**
  * RatAfc.tsx: virtual AP page for AP-AFC specification
  * author: Sam Smucny
@@ -196,7 +197,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
     ]);
 
     componentDidMount() {
-        const st = getCacheItem("ratAfcCache");
+        const st = getCacheItem("ratAfcCache") as RatAfcState;
         if (st !== undefined) {
             st.includeMap = this.props.afcConfig.kind === "Success" ? this.props.afcConfig.result.enableMapInVirtualAp ?? false : false
             if (st.mapState.val.features.length <= 646) {
@@ -209,7 +210,9 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                         text: "", valid: false,
                         dimensions: { width: 0, height: 0 },
                         versionId: 0
-                    }, messageType: "Warn", messageTile: "Google Map API Error", messageValue: "Due to a limitation of the Google Maps API, map data could not be saved. Run again to see map data."
+                    },
+                    extraWarningTitle: "Google Map API Error",
+                    extraWarning: "Due to a limitation of the Google Maps API, map data could not be saved. Run again to see map data."
                 });
             }
         }

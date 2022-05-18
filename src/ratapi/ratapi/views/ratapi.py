@@ -18,14 +18,16 @@ import pkg_resources
 import flask
 import json
 import glob
-import re, datetime
+import re
+import datetime
 from flask.views import MethodView
 import werkzeug.exceptions
 from ..defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
 from ..tasks.afc_worker import run, parseULS
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from ..models.aaa import User
+from ..models.aaa import User, AccessPoint
 from .auth import auth
+from ..models import aaa
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -39,7 +41,7 @@ def build_task(request_file_path, response_file_path, request_type, user_id,
                runtime_opts=RNTM_OPT_DBG_GUI):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
-    
+
     If the config path is specified the file name itself must be names afc_config.json exactly
     """
     LOGGER.debug("Temp directory opened: %s", temp_dir)
@@ -118,13 +120,15 @@ class GuiConfig(MethodView):
             uls_convert_url=flask.url_for(
                 'ratapi-v1.UlsDb', uls_file='p_uls_file'),
             uls_daily_url=flask.url_for(
-                'ratapi-v1.UlsParse'),   
+                'ratapi-v1.UlsParse'),
             login_url=flask.url_for('auth.LoginAPI'),
             user_url=flask.url_for('user.register'),
             admin_url=flask.url_for('admin.User', user_id=-1),
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
-            afc_kml=flask.url_for('ratapi-v1.VapKmlResult', kml_file='p_kml_file'),
+            afc_kml=flask.url_for('ratapi-v1.VapKmlResult',
+                                  kml_file='p_kml_file'),
+            afcconfig_trial=flask.url_for('ratapi-v1.TrialAfcConfigFile'),
             version=serververs,
         )
         return resp
@@ -138,7 +142,7 @@ class ReloadAnalysis(MethodView):
         )
     }
 
-    def _open(self, rel_path, mode, username,user=None):
+    def _open(self, rel_path, mode, username, user=None):
         ''' Open a configuration file.
 
         :param rel_path: The specific config name to open.
@@ -147,26 +151,29 @@ class ReloadAnalysis(MethodView):
         :rtype: file-like
         need to find the latest file? how to do that? - Glob
         '''
-        files= glob.glob(os.path.join(flask.current_app.config['HISTORY_DIR'], username + "*"))
-        dates=[]
+        files = glob.glob(os.path.join(
+            flask.current_app.config['HISTORY_DIR'], username + "*"))
+        dates = []
         for x in files:
-        
-            dateMatch = re.search('\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}',x)
-            if dateMatch: 
-                date = datetime.datetime.strptime(dateMatch.group(), '%Y-%m-%dT%H:%M:%S.%f')
-                dates.append(date) #dates loaded
-            
+
+            dateMatch = re.search(
+                '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}', x)
+            if dateMatch:
+                date = datetime.datetime.strptime(
+                    dateMatch.group(), '%Y-%m-%dT%H:%M:%S.%f')
+                dates.append(date)  # dates loaded
 
         strDate = str(max(dates))
         strDate = strDate.replace(" ", "T")
         fileName = username + '-' + strDate
 
-        LOGGER.debug(os.path.join(flask.current_app.config['HISTORY_DIR'], fileName))
+        LOGGER.debug(os.path.join(
+            flask.current_app.config['HISTORY_DIR'], fileName))
         if mode == 'wb' and user is not None and not \
                 os.path.exists(os.path.join(flask.current_app.config['HISTORY_DIR'], fileName)):
             # create scoped user directory so people don't clash over each others config
             os.mkdir(os.path.join(
-                flask.current_app.config['HISTORY_DIR'],fileName))
+                flask.current_app.config['HISTORY_DIR'], fileName))
 
         config_path = ''
         if user is not None and os.path.exists(os.path.join(flask.current_app.config['HISTORY_DIR'], fileName)):
@@ -221,27 +228,27 @@ class ReloadAnalysis(MethodView):
         LOGGER.debug(resp.data)
         json_resp = json.loads(resp.data)
         LOGGER.debug(json_resp)
-        #has key deviceDesc and deviceDesc.serialNumber == "analysis-ap" => PointAnalysis
-        #has key deviceDesc and deviceDesc.serialNumber != "analysis-ap" => Virtual AP
-        #has key spacing => HeatMap
-        #has key FSID => ExclusionZone 
+        # has key deviceDesc and deviceDesc.serialNumber == "analysis-ap" => PointAnalysis
+        # has key deviceDesc and deviceDesc.serialNumber != "analysis-ap" => Virtual AP
+        # has key spacing => HeatMap
+        # has key FSID => ExclusionZone
         if('deviceDesc' in json_resp and json_resp['deviceDesc']['serialNumber'] == "analysis-ap"):
             resp.headers['AnalysisType'] = 'PointAnalysis'
-        
+
         elif('deviceDesc' in json_resp and json_resp['deviceDesc']['serialNumber'] != "analysis-ap"):
             resp.headers['AnalysisType'] = 'VirtualAP'
-        
+
         elif('key spacing' in json_resp):
             resp.headers['AnalysisType'] = 'HeatMap'
-        
+
         elif('FSID' in json_resp):
             resp.headers['AnalysisType'] = 'ExclusionZone'
         else:
             resp.headers['AnalysisType'] = 'None'
         LOGGER.debug(json_resp['deviceDesc']['serialNumber'])
         LOGGER.debug(resp.headers['AnalysisType'])
-        #json.dumps(json_resp, resp.data)
-        #LOGGER.debug(resp.data)
+        # json.dumps(json_resp, resp.data)
+        # LOGGER.debug(resp.data)
         resp.content_type = filedesc['content_type']
         return resp
 
@@ -325,6 +332,76 @@ class AfcConfigFile(MethodView):
             shutil.copyfileobj(flask.request.stream, outfile)
         return flask.make_response('AFC configuration file updated', 204)
 
+
+class TrialAfcConfigFile(MethodView):
+    ''' Allow the web UI to pull the config to be used for Trial users.
+    '''
+
+    def _open(self, rel_path, mode, user=None):
+        ''' Open a configuration file.
+
+        :param rel_path: The specific config name to open.
+        :param mode: The file open mode.
+        :return: The opened file.
+        :rtype: file-like
+        '''
+        if mode == 'wb' and user is not None and not \
+                os.path.exists(os.path.join(flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user))):
+            # create scoped user directory so people don't clash over each others config
+            os.mkdir(os.path.join(
+                flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user)))
+
+        config_path = ''
+        if user is not None and os.path.exists(os.path.join(flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user))):
+            config_path = os.path.join(
+                flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user))
+        else:
+            config_path = os.path.join(
+                flask.current_app.config['STATE_ROOT_PATH'], 'afc_config')
+        if not os.path.exists(config_path):
+            os.makedirs(config_path)
+
+        file_path = os.path.join(config_path, rel_path)
+        LOGGER.debug('Opening config file "%s"', file_path)
+        if not os.path.exists(file_path) and mode != 'wb':
+            raise werkzeug.exceptions.NotFound()
+
+        handle = open(file_path, mode)
+
+        if mode == 'wb':
+            os.chmod(file_path, 0o666)
+
+        return handle
+
+    def get(self):
+        ''' GET method for afc config
+        '''
+        filedesc = {
+        'afc_config.json': dict(
+            content_type='application/json',
+        )
+        }
+        LOGGER.debug('getting afc_conf for trial user')
+        user_id = auth(roles=['Trial'])
+        # ensure that webdav is populated with default files
+        require_default_uls()
+
+        ap = aaa.AccessPoint.query.filter_by(
+            serial_number="TestSerialNumber", certification_id="FCC TestCertificationId").first()
+        if ap is not None:
+            LOGGER.debug('getting ap for trial user  %s ', ap)
+            user_id = ap.user_id
+       
+            resp = flask.make_response()
+            with self._open('afc_config.json', 'rb', user_id) as conf_file:
+                resp.data = conf_file.read()
+            resp.content_type = "application/json"
+            return resp
+        else:
+            LOGGER.debug('unable to find AP for trial user')
+            raise werkzeug.exceptions.NotFound()
+
+
 class LiDAR_Bounds(MethodView):
     ''' Allow the web UI to manipulate configuration directly.
     '''
@@ -406,7 +483,7 @@ class RAS_Bounds(MethodView):
             with self._open(full_path, 'rb', user_id) as data_file:
                 resp.data = data_file.read()
             resp.content_type = 'application/json'
-            #resp.content_encoding = 'gzip'
+            # resp.content_encoding = 'gzip'
             return resp
         except StopIteration:
             raise werkzeug.exceptions.NotFound('Path not found to file')
@@ -623,7 +700,7 @@ class AnalysisStatus(MethodView):
 
         if task.failed():
             raise werkzeug.exceptions.InternalServerError(
-                'Task excecution failed')
+                'Task execution failed')
 
         if task.successful() and task.result['status'] == 'DONE':
             auth(is_user=task.result['user_id'])
@@ -818,7 +895,7 @@ class DailyULSStatus(MethodView):
         ''' GET method for uls parse Status '''
         LOGGER.debug("Getting ULS Parse status with task id: " + task_id)
         task = parseULS.AsyncResult(task_id)
-        #LOGGER.debug('state: %s', task.state)
+        # LOGGER.debug('state: %s', task.state)
 
         if task.state == 'PROGRESS':
             LOGGER.debug("Found Task in progress")
@@ -831,7 +908,7 @@ class DailyULSStatus(MethodView):
             return flask.make_response(flask.json.dumps(dict(percent=0, message='Pending...')), 202)
         if task.state == 'REVOKED':
             LOGGER.debug("Found task already in progress")
-            #LOGGER.debug("task info %s", task.info)
+            # LOGGER.debug("task info %s", task.info)
             raise werkzeug.exceptions.ServiceUnavailable()
 
         elif task.failed():
@@ -884,6 +961,7 @@ class DailyULSStatus(MethodView):
 module.add_url_rule('/guiconfig', view_func=GuiConfig.as_view('GuiConfig'))
 module.add_url_rule('/afcconfig/<path:filename>',
                     view_func=AfcConfigFile.as_view('AfcConfigFile'))
+module.add_url_rule('/afcconfig/trial', view_func= TrialAfcConfigFile.as_view('TrialAfcConfigFile'))
 module.add_url_rule('/files/lidar_bounds',
                     view_func=LiDAR_Bounds.as_view('LiDAR_Bounds'))
 module.add_url_rule('/files/ras_bounds', 

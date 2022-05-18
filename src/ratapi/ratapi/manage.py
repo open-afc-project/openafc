@@ -207,6 +207,7 @@ class DbCreate(Command):
             get_or_create(db.session, Role, name='Admin')
             get_or_create(db.session, Role, name='Analysis')
             get_or_create(db.session, Role, name='AP')
+            get_or_create(db.session, Role, name='Trial')
 
 
 class UserCreate(Command):
@@ -220,7 +221,7 @@ class UserCreate(Command):
                     'example: rat-manage-api'
                     ' user create email password'),
         Option('--role', type=str, default=[], action='append',
-               choices=['Admin', 'Analysis', 'AP'],
+               choices=['Admin', 'Analysis', 'AP', 'Trial'],
                help='role to include with the new user'),
     )
 

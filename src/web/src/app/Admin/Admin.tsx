@@ -22,7 +22,7 @@ import { FrequencyRangeInput } from "./FrequencyRangeInput";
 /**
  * Possible roles enumerated
  */
-const roles: Role[] = ["AP", "Analysis", "Admin"];
+const roles: Role[] = ["AP", "Analysis", "Admin", "Trial"];
 
 const cols = ["Name", "Low Frequency (MHz)", "High Frequency (MHz)"]
 
@@ -39,7 +39,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
 { 
   users: UserModel[],
   userId?: number
-  addRoleModelOpen: boolean,
+  addRoleModalOpen: boolean,
   newRole?: Role,
   removeRoleModalOpen: boolean,
   removeRole?: Role,
@@ -72,7 +72,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
 
     this.state = { 
       users: userList,
-      addRoleModelOpen: false,
+      addRoleModalOpen: false,
       removeRoleModalOpen: false,
       deleteModalOpen: false,
       apModalOpen: false,
@@ -190,7 +190,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
     this.handleUserModalToggle();
   }
 
-  private handleAddRoleModalToggle = (id?: number) => this.setState(s => ({ userId: id, addRoleModelOpen: !s.addRoleModelOpen }));
+  private handleAddRoleModalToggle = (id?: number) => this.setState(s => ({ userId: id, addRoleModalOpen: !s.addRoleModalOpen }));
   private handleRemoveRoleModalToggle = (id?: number) => this.setState(s => ({ userId: id, removeRoleModalOpen: !s.removeRoleModalOpen }));
   private handleDeleteModalToggle = (id?: number) => this.setState(s => ({ userId: id, deleteModalOpen: !s.deleteModalOpen }));
   private handleAPModalToggle = (id?: number) => this.setState(s => ({ userId: id, apModalOpen: !s.apModalOpen }));
@@ -375,7 +375,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
           <Modal
             isSmall={true}
             title="Add Role"
-            isOpen={this.state.addRoleModelOpen}
+            isOpen={this.state.addRoleModalOpen}
             onClose={this.handleAddRoleModalToggle}
             actions={[
               <Button key="confirm" variant="primary" onClick={() => this.addRole()}>

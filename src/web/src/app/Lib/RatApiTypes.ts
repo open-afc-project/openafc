@@ -3,6 +3,8 @@
  * author: Sam Smucny
  */
 
+import { string } from "prop-types"
+
 /**
  * Interface of GUI configuration
  */
@@ -12,6 +14,7 @@ export interface GuiConfig {
     antenna_url: string,
     history_url: string,
     afcconfig_defaults: string,
+    afcconfig_trial:string,
     lidar_bounds: string,
     ras_bounds: string,
     google_apikey: string,

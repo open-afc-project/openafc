@@ -1,5 +1,5 @@
 import { createContext } from "react";
-import { guiConfig } from "./RatApi";
+import { clearCache, guiConfig, importCache } from "./RatApi";
 import { logger } from "./Logger";
 import { RatResponse, error, success } from "./RatApiTypes";
 import { letin } from "./Utils";
@@ -30,7 +30,7 @@ export interface UserState {
 /**
  * Sum type of possible roles a user can have
  */
-export type Role = "AP" | "Analysis" | "Admin";
+export type Role = "AP" | "Analysis" | "Admin" | "Trial";
 
 /**
  * Create React context. This is used to provide a global service so that any component can access user state.
@@ -42,7 +42,7 @@ export const UserContext = createContext<UserState>({ data: { loggedIn: false } 
  * update the current user. To be overridden by configure.
  * @param user The user to set as the current user in the application
  */
-var setUser: (user: UserState) => void = () => {};
+var setUser: (user: UserState) => void = () => { };
 
 /**
  * get the current user. To be overridden by configure.
@@ -111,7 +111,8 @@ export const logout = async (): Promise<RatResponse<string>> => {
     });
     if (logoutResult.ok) {
         document.cookie = "";
-        setUser({ data: { loggedIn: false }});
+        setUser({ data: { loggedIn: false } });
+        clearCache();
         window.location.hash = "#";
         logger.info("User logged out");
         return success((await logoutResult.json()).message);
@@ -164,10 +165,12 @@ const retrieveUserData = async (token: string, rememberMe?: boolean): Promise<Ra
 
     logger.info("User is logged in");
     // set the user session
-    setUser({ data: Object.assign({
-        loggedIn: true,
-        token: token
-    }, userInfo.data) });
+    setUser({
+        data: Object.assign({
+            loggedIn: true,
+            token: token
+        }, userInfo.data)
+    });
 
     if (rememberMe) putCookie(token);
     logger.info("User: ", getUser().data);

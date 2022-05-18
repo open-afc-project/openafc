@@ -187,6 +187,29 @@ class AccessPoint(MethodView):
 
         return flask.make_response()
 
+class AccessPointTrial(MethodView):
+    ''' resource to get the access point for getting trial configuration'''
+
+    methods = ['GET']
+
+    def get(self):
+      
+        ap = aaa.AccessPoint.query.filter_by(serial_number="TestSerialNumber", certification_id = "FCC TestCertificationId").first()
+
+
+        return flask.jsonify(accessPoint=
+            { 
+                'id': ap.id,
+                'serialNumber': ap.serial_number, 
+                'model': ap.model, 
+                'manufacturer': ap.manufacturer, 
+                'ownerId': ap.user_id,
+                'certificationId': ap.certification_id
+            }    
+        )
+
+
+
 class Limits(MethodView): 
     methods = ['PUT', 'GET']
     def put(self):
@@ -290,3 +313,4 @@ module.add_url_rule('/user/<int:user_id>', view_func=User.as_view('User'))
 module.add_url_rule('/user/ap/<int:id>', view_func=AccessPoint.as_view('AccessPoint'))
 module.add_url_rule('/user/eirp_min', view_func=Limits.as_view('Eirp'))
 module.add_url_rule('/user/frequency_range', view_func=AllowedFreqRanges.as_view('Frequency'))
+module.add_url_rule('/user/ap/trial', view_func=AccessPoint.as_view('AccessPointTrial'))

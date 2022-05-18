@@ -1,7 +1,7 @@
 import { GuiConfig, AFCConfigFile, PAWSRequest, PAWSResponse, AnalysisResults, RatResponse, ResSuccess, ResError, success, error, AFCEngineException, ExclusionZoneRequest, HeatMapRequest, ExclusionZoneResult, HeatMapResult, FreqRange } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { delay } from "./Utils";
-import { addAuth } from "./User";
+import { addAuth, hasRole } from "./User";
 
 /**
  * RatApi.ts: member values and functions for utilizing server ratpi services
@@ -31,6 +31,7 @@ export var guiConfig: GuiConfig = Object.freeze({
     lidar_bounds: "",
     ras_bounds: "",
     rat_afc: "",
+    afcconfig_trial: "",
     afc_kml: "",
     version: "API NOT LOADED"
 });
@@ -126,8 +127,12 @@ export const getAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => (
             const config = await (res.json() as Promise<AFCConfigFile>);
             return success(config);
         } else {
-            logger.error("could not load afc configuration so falling back to dev default");
-            return error(res.statusText, res.status, res.body);
+            if (hasRole("Trial")) {
+                return getTrialAfcConfigFile()
+            } else {
+                logger.error("could not load afc configuration so falling back to dev default");
+                return error(res.statusText, res.status, res.body);
+            }
         }
     }).catch((err: any) => {
         logger.error(err);
@@ -135,6 +140,28 @@ export const getAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => (
         return error("unable to load afc configuration");
     })
 )
+
+/**
+ * Get the special config file for the Trial users
+ */
+export const getTrialAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => {
+    return fetch(guiConfig.afcconfig_trial, {
+        method: "GET",
+        headers: addAuth({})
+    }).then(async (res: Response) => {
+        if (res.ok) {
+            const config = await (res.json() as Promise<AFCConfigFile>);
+            return success(config);
+        } else {
+            logger.error("could not load trial afc configuration");
+            return error(res.statusText, res.status, res.body);
+        }
+    }).catch((err: any) => {
+        logger.error(err);
+        logger.error("could not load trial afc configuration");
+        return error("unable to load trial afc configuration");
+    });
+}
 
 /** 
  * Update the afc config on the server with the one created by the user
@@ -495,3 +522,8 @@ export const exportCache = () => JSON.parse(JSON.stringify(applicationCache));
  */
 export const importCache = (s: { [k: string]: any }) =>
     Object.assign(applicationCache, s);
+
+/**
+ * Removes all items in cache
+ */
+export const clearCache = (): void => Object.keys(applicationCache).forEach(key => delete applicationCache[key]);
