@@ -327,14 +327,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
     }
 
     setEllipseCenter = (center: Point) => {
-        if (this.state.location.radialPolygon || this.state.location.linearPolygon) {
-            return;// Not an ellipse then do nothing
-        }
-        if (!this.state.location.ellipse) {
-            const location = { ...this.state.location };
-            location.ellipse = { center: center, majorAxis: 0, minorAxis: 0, orientation: 0 }
-            this.setState({ location: location });
-        } else {
+        if (!!this.state.location.ellipse) {
             const location = { ...this.state.location };
             location.ellipse = { center: center, majorAxis: location.ellipse.majorAxis, minorAxis: location.ellipse.minorAxis, orientation: location.ellipse.orientation }
             this.setState({ location: location });

@@ -58,7 +58,6 @@ export class LocationForm extends React.PureComponent<LocationFormParams> {
     }
 
     private setFormDisplay(dispType: "Ellipse" | "Linear Polygon" | "Radial Polygon") {
-        if (this.lastType === dispType) return;
         if (dispType === "Ellipse") {
             this.props.onChange({
                 ellipse: {

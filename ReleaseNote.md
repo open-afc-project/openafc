@@ -1,6 +1,21 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-246**|
+| :- | :- |
+|**Date**|**05/17/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-246: When Virtual AP location type is set to one of the Polygons, can't select Ellipse
+
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * In Virtual AP, was able to go from Ellipse to Radial Polgon to Linear Polygon and back to Ellipse successfully. Also ran some of the end2end tests (1, 3 and 4) with Ellipse, Radial Polygon and Linear Polygon. 
+
+## **Open Issues**
 |Version|**OA-204**|
 | :- | :- |
 |**Date**|**05/16/2022**|
