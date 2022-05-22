@@ -320,7 +320,7 @@ void AfcManager::initializeDatabases()
 
 	/**************************************************************************************/
 
-	if (_analysisType == "PointAnalysis" || _analysisType == "APAnalysis" || _analysisType == "AP-AFC" ||  _analysisType == "ScanAnalysis") {
+	if (_analysisType == "AP-AFC" ||  _analysisType == "ScanAnalysis") {
 		bool fixedHeightAMSL;
 		if (_rlanType ==  RLANType::RLAN_INDOOR) {
 			fixedHeightAMSL = _indoorFixedHeightAMSL;
@@ -546,7 +546,7 @@ void AfcManager::initializeDatabases()
 	/**************************************************************************************/
 	//_ulsDataFile = "/home/ssmucny/ULS_23Jan2019_perlink_fixedwithbas.sqlite3";
 
-	if (_analysisType == "PointAnalysis" || _analysisType == "APAnalysis" || _analysisType == "HeatmapAnalysis" || _analysisType == "AP-AFC" || _analysisType == "ScanAnalysis") {
+	if (_analysisType == "HeatmapAnalysis" || _analysisType == "AP-AFC" || _analysisType == "ScanAnalysis") {
 		readULSData(_ulsDatabaseList, _popGrid, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, minLat, maxLat, minLon, maxLon);
 		readRASData(_rasDataFile);
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
@@ -1460,65 +1460,6 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 			throw std::invalid_argument("must specify either inquiredChannels or inquiredFrequencies");
 		}
 	}
-	else if (_analysisType == "PointAnalysis" || _analysisType == "APAnalysis")
-	{
-		// Adjacent Channel only for Point Analysis
-		if (_analysisType == "PointAnalysis") {
-			_aciFlag = jsonObj["useAdjacentChannel"].toBool();
-		}
-
-
-		// These are created for ease of copying
-		QJsonObject ellipsePoint = jsonObj["location"].toObject()["point"].toObject();
-		QJsonObject antenna = jsonObj["antenna"].toObject();
-
-		// Assign the read values to the parts of the UserInputs struct
-		_rlanUncertaintyRegionType = RLANBoundary::ELLIPSE;
-		_deviceDesc = jsonObj["deviceDesc"].toObject();
-		_serialNumber = _deviceDesc["serialNumber"].toString();
-		_rlanLLA = std::make_tuple(ellipsePoint["center"].toObject()["latitude"].toDouble(),
-				ellipsePoint["center"].toObject()["longitude"].toDouble(),
-				antenna["height"].toDouble());
-		_rlanUncerts_m = std::make_tuple(ellipsePoint["semiMinorAxis"].toDouble(),
-				ellipsePoint["semiMajorAxis"].toDouble(),
-				antenna["heightUncertainty"].toDouble());
-		_rlanOrientation_deg = ellipsePoint["orientation"].toDouble();
-
-		QString rlanHeightType = antenna["heightType"].toString();
-		if (rlanHeightType == "AMSL") {
-			_rlanHeightType = CConst::AMSLHeightType;
-		} else if (rlanHeightType == "AGL") {
-			_rlanHeightType = CConst::AGLHeightType;
-		} else {
-			throw std::runtime_error(QString("Invalid height type: %1").arg(rlanHeightType).toStdString());
-		}
-
-		if (jsonObj["capabilities"].toObject()["indoorOutdoor"].toString() == "Outdoor")
-		{
-			_rlanType = RLANType::RLAN_OUTDOOR;
-		}
-		else
-		{ // Defaults to RLAN_INDOOR
-			_rlanType = RLANType::RLAN_INDOOR;
-		}
-
-		// Add all channels from all supported operating classes
-		for (auto &opClass: _opClass)
-		{
-			for (auto &cfi: opClass.channels)
-			{
-				ChannelStruct channel;
-				channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
-				channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
-				channel.operatingClass = opClass.opClass;
-				channel.index = cfi;
-				channel.availability = GREEN; // Everything initialized to GREEN
-				channel.eirpLimit_dBm = 0;
-				channel.type = ChannelType::INQUIRED_CHANNEL;
-				_channelList.push_back(channel);
-			}
-		}
-	}
 	else if (_analysisType == "ExclusionZoneAnalysis")
 	{
 		_exclusionZoneFSID = jsonObj["FSID"].toInt();
@@ -1642,7 +1583,7 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 	// Create command line options
 	optDescript.add_options()
 		("help,h", "Use input-file-path, config-file-path, or output-file-path.")
-		("request-type,r", po::value<std::string>()->default_value("PointAnalysis"), "set request-type (PointAnalysis, APAnalysis, HeatmapAnalysis, ExclusionZoneAnalysis)")
+		("request-type,r", po::value<std::string>()->default_value("AP-AFC"), "set request-type (AP-AFC, HeatmapAnalysis, ExclusionZoneAnalysis)")
 		("state-root,s", po::value<std::string>()->default_value("/var/lib/fbrat"), "set fbrat state root directory")
 		("input-file-path,i", po::value<std::string>()->default_value("inputFile.json"), "set input-file-path level")
 		("config-file-path,c", po::value<std::string>()->default_value("configFile.json"), "set config-file-path level")
@@ -6341,20 +6282,7 @@ void AfcManager::compute()
 	for (auto& channel : _channelList)
 		channel.eirpLimit_dBm = _maxEIRP_dBm;
 
-	if (_analysisType == "PointAnalysis") {
-#if 0
-		double longitudeDeg = -7.174311111000000e+01;
-		double latitudeDeg = 4.189369444000000e+01;
-		double terrainHeight, bldgHeight;
-		MultibandRasterClass::HeightResult lidarHeightResult;
-		CConst::HeightSourceEnum rxHeightSource;
-		_terrainDataModel->getTerrainHeight(longitudeDeg, latitudeDeg, terrainHeight,bldgHeight, lidarHeightResult, rxHeightSource);
-		exit(0);
-#endif
-		runPointAnalysis();
-	} else if (_analysisType == "APAnalysis") {
-		runPointAnalysis();
-	} else if (_analysisType == "AP-AFC") {
+	if (_analysisType == "AP-AFC") {
 		runPointAnalysis();
 	} else if (_analysisType == "ScanAnalysis") {
 		runScanAnalysis();

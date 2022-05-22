@@ -128,14 +128,6 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
               to="/heat-map"
               activeClassName="pf-m-current">Heat Map Analysis</NavLink>
           </NavItem>}
-        {hasRole("Analysis") &&
-          <NavItem
-            id="analysis-link"
-            itemId={"analysis"}>
-            <NavLink
-              to="/analysis"
-              activeClassName="pf-m-current">Point Analysis</NavLink>
-          </NavItem>}
         {hasRole("AP") &&
           <NavItem
             id="mobile-ap-link"

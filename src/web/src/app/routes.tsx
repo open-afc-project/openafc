@@ -35,19 +35,6 @@ const Support = () => {
   );
 }
 
-const getAnalysisModuleAsync = () => {
-  return () => import(/* webpackChunkName: "analysis" */ "./Analysis/Analysis");
-}
-const Analysis = () => {
-  return (
-    <DynamicImport load={getAnalysisModuleAsync()}>
-      {(Component: any) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> : <Component.Analysis />
-      }}
-    </DynamicImport>
-  );
-}
-
 const getRatAfcModuleAsync = () => {
   return () => import(/* webpackChunkName: "ap-afc" */ "./RatAfc/RatAfc");
 }
@@ -59,8 +46,8 @@ const RatAfc = () => {
   return (
     <DynamicImport load={getRatAfcModuleAsync()} resolve={ratAfcResolves()}>
       {(Component: any, resolve) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
-        : <Component.RatAfc afcConfig={resolve.conf} limit={resolve.limit} />
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
+          : <Component.RatAfc afcConfig={resolve.conf} limit={resolve.limit} />
       }}
     </DynamicImport>
   );
@@ -86,7 +73,7 @@ const VirtualAP = () => {
   return (
     <DynamicImport load={getVirtualAPModuleAsync()}>
       {(Component: any, resolve) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> : <Component.VirtualAP/>
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> : <Component.VirtualAP />
       }}
     </DynamicImport>
   );
@@ -96,17 +83,17 @@ const getAfcConfigModuleAsync = () => {
   return () => import(/* webpackChunkName: "afcconfig" */ "./AFCConfig/AFCConfig");
 }
 const afcConfigResolves = async () => ({
-    conf: await getAfcConfigFile(),
-    ulsFiles: await getUlsFiles(),
-    antennaPatterns: await getAntennaPatterns(),
-    limit: await getMinimumEIRP(),
-    frequencyBands: await getAllowedRanges()
+  conf: await getAfcConfigFile(),
+  ulsFiles: await getUlsFiles(),
+  antennaPatterns: await getAntennaPatterns(),
+  limit: await getMinimumEIRP(),
+  frequencyBands: await getAllowedRanges()
 })
 const AFCConfig = () => {
   return (
     <DynamicImport load={getAfcConfigModuleAsync()} resolve={afcConfigResolves()}>
       {(Component: any, resolve) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
           : <Component.AFCConfig limit={resolve.limit} ulsFiles={resolve.ulsFiles} afcConf={resolve.conf} antennaPatterns={resolve.antennaPatterns} frequencyBands={resolve.frequencyBands} />
       }}
     </DynamicImport>
@@ -117,13 +104,13 @@ const getImportExportModuleAsync = () => {
   return () => import(/* webpackChunkName: "importexport" */ "./ImportExport/ImportExport");
 }
 const ImportExportResolves = async () => ({
-    conf: await getAfcConfigFile(),
+  conf: await getAfcConfigFile(),
 })
 const ImportExportPage = () => {
   return (
     <DynamicImport load={getImportExportModuleAsync()} resolve={ImportExportResolves()}>
       {(Component: any, resolve) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
           : <Component.ImportExport afcConfig={resolve.conf} />
       }}
     </DynamicImport>
@@ -134,13 +121,13 @@ const getConvertModuleAsync = () => {
   return () => import(/* webpackChunkName: "convert" */ "./Convert/Convert");
 }
 const convertResolves = async () => ({
-    ulsFilesCsv: await getUlsFilesCsv(),
+  ulsFilesCsv: await getUlsFilesCsv(),
 })
 const Convert = () => {
   return (
     <DynamicImport load={getConvertModuleAsync()} resolve={convertResolves()}>
       {(Component: any, resolve) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
           : <Component.Convert ulsFilesCsv={resolve.ulsFilesCsv} />
       }}
     </DynamicImport>
@@ -157,8 +144,8 @@ const ExclusionZone = () => {
   return (
     <DynamicImport load={getExclusionZoneModuleAsync()} resolve={limitResolves()}>
       {(Component: any, resolve) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
-          : <Component.ExclusionZone limit={resolve.limit}/>
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
+          : <Component.ExclusionZone limit={resolve.limit} />
       }}
     </DynamicImport>
   );
@@ -171,8 +158,8 @@ const HeatMap = () => {
   return (
     <DynamicImport load={getHeatMapModuleAsync()} resolve={limitResolves()}>
       {(Component: any, resolve) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
-          : <Component.HeatMap limit={resolve.limit}/>
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
+          : <Component.HeatMap limit={resolve.limit} />
       }}
     </DynamicImport>
   );
@@ -190,8 +177,8 @@ const Admin = () => {
   return (
     <DynamicImport load={getAdminModuleAsync()} resolve={adminResolves()}>
       {(Component: any, resolve) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
-          : <Component.Admin users={resolve.users} limit={resolve.limit} frequencyBands={resolve.frequencyBands}/>
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
+          : <Component.Admin users={resolve.users} limit={resolve.limit} frequencyBands={resolve.frequencyBands} />
       }}
     </DynamicImport>
   );
@@ -204,7 +191,7 @@ const APListPage = () => {
   return (
     <DynamicImport load={getAPListModuleAsync()}>
       {(Component: any) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
           : <Component.APListPage />
       }}
     </DynamicImport>
@@ -212,18 +199,18 @@ const APListPage = () => {
 }
 
 const getReplayModuleAsync = () => {
-    return () => import(/* webpackChunkName: "replay" */ "./Replay/Replay");
-  }
-  const ReplayPage = () => {
-    return (
-      <DynamicImport load={getReplayModuleAsync()}>
-        {(Component: any) => {
-          return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> 
-            : <Component.ReplayPage />
-        }}
-      </DynamicImport>
-    );
-  }
+  return () => import(/* webpackChunkName: "replay" */ "./Replay/Replay");
+}
+const ReplayPage = () => {
+  return (
+    <DynamicImport load={getReplayModuleAsync()}>
+      {(Component: any) => {
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
+          : <Component.ReplayPage />
+      }}
+    </DynamicImport>
+  );
+}
 
 export interface IAppRoute {
   label: string;
@@ -255,13 +242,6 @@ const routes: IAppRoute[] = [
     icon: null,
     label: "Support",
     path: "/support"    // not pointed to anywhere
-  },
-  {
-    component: Analysis,
-    exact: true,
-    icon: null,
-    label: "Point Analysis",
-    path: "/analysis"
   },
   {
     component: RatAfc,
@@ -344,11 +324,11 @@ const routes: IAppRoute[] = [
 
 const AppRoutes = () => (
   <Switch>
-    {routes.map(({path, exact, component}, idx) => (
+    {routes.map(({ path, exact, component }, idx) => (
       <Route path={path} exact={exact} component={component} key={idx} />
     ))}
     <Route path="/replay" exact={true} component={Replay}></Route>
-    <Redirect exact={true} from="/" to="/dashboard" /> 
+    <Redirect exact={true} from="/" to="/dashboard" />
     <Redirect exact={true} from="www" to="/dashboard" />
     <Route component={Dashboard} />
     <Route component={NotFound} />

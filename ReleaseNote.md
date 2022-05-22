@@ -1,10 +1,24 @@
 # Release Note
 
 ## **Version and Date**
+
+|Version|**OA-247**|
+| :- | :- |
+|**Date**|**05/18/2022**|
+
+## **Issues Addressed**
+ * Jira OA-247: Remove Point Analysis from Dashboard
+   * Removed navigation and pages for Point Analysis
+   * Removed Point Analysis specific code in engine
+
+## **Interface Changes**
+None
+
+## **Testing Done**
+ * Exercised remaining functions in UI and end to end tests. 
 |Version|**OA-246**|
 | :- | :- |
 |**Date**|**05/17/2022**|
-
 
 ## **Issues Addressed**
  * Jira OA-246: When Virtual AP location type is set to one of the Polygons, can't select Ellipse

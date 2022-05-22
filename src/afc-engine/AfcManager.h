@@ -255,7 +255,7 @@ class AfcManager
 		/**************************************************************************************/
 		/* Input Parameters                                                                   */
 		/**************************************************************************************/
-		std::string _analysisType;              // Parsed Analysis Type: "PointAnalysis", "APAnalysis", "ExclusionZoneAnalysis", "HeatmapAnalysis";
+		std::string _analysisType;              // Parsed Analysis Type: "AP-AFC", "ExclusionZoneAnalysis", "HeatmapAnalysis";
 		std::string _stateRoot;                 // Parsed path of fbrat state root
 		bool _createKmz;
 		bool _createDebugFiles;
