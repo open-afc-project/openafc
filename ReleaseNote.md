@@ -1,6 +1,38 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-257**|
+| :- | :- |
+|**Date**|**05/19/2022**|
+
+## **Issues Addressed**
+ * Jira OA-257: Add configurability of WinnerII confidence (for Combined vs. LoS/NLoS) in AFC Config's FCC R&O
+ * When "FCC 6GHz Report & Order" or "Custom" propagation models are selected with building database (e.g. LiDAR), both Winner Combined and LoS/NLoS confidences need to be specified. In this case, if RLAN is in LiDAR region, WinnerII LoS or NLOS path loss is used; else, WinnerII Combined path loss is used.
+
+## **Interface Changes**
+ * In AFC-Config UI, added "WinnerII LOS/NLOS Confidence" and "WinnerII Combined Confidence" (in place of "WinnerII Confidence") for "FCC 6GHz Report & Order" and "Custom" Propagation models.
+ * Note that only the parameter(s) needed is shown based on the propagation model (e.g. use of LIDAR or not) selected.
+ * In addition, these parameters also appear in the updated afc-config.json file.
+ <pre>
+      propagationModel": {
+        "kind": "FCC 6GHz Report & Order",
+        <strong>"win2ConfidenceLOS": 30,</strong>
+        <strong>"win2ConfidenceNLOS": 40,</strong>
+        <strong>"win2ConfidenceCombined": 50,</strong>
+        [...]
+</pre>
+## **Testing Done**
+ * Did the following tests (these are attached to the Jira ticket):
+ * In "FCC 6GHz R&O with LiDAR", set WII LOS/NLOS Confidence to 5% and confirmed in exc_thr (PATH_LOSS_MODEL and PATH_LOSS_CDF) this was set correctly.
+ * In "FCC 6GHz R&O with WII-Combined", set WII Combined Confidence to 95% and confirmed in exc_thr (PATH_LOSS_MODEL and PATH_LOSS) this was used correctly. Also, spectrum availability was alot more than the LiDAR test above as expected.
+ * In "Custom WII Combined", set WII Combined Confidence to 95% and confirmed in exc_thr (PATH_LOSS_MODEL and PATH_LOSS) this was set correctly. Also, spectrum availability was similar to above test case (FCC R&O with WII Combined) as expected.
+ * In "Custom WII LoS/NLoS based on LiDAR", set WII Combined Confidence to 95% and WII LOS/NLOS confidence to 5% and confirmed in exc_thr (PATH_LOSS_MODEL and PATH_LOSS) this was set correctly. Also, spectrum availability was alot worse than above test case (Custom with WII Combined) as expected.
+ * In all cases, confirmed parameters were set correctly in afc-config.json files.
+
+## **Open Issues**
+
+## **Version and Date**
+
 
 |Version|**OA-247**|
 | :- | :- |
@@ -16,6 +48,7 @@ None
 
 ## **Testing Done**
  * Exercised remaining functions in UI and end to end tests. 
+ 
 |Version|**OA-246**|
 | :- | :- |
 |**Date**|**05/17/2022**|

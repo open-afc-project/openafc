@@ -1,7 +1,7 @@
 import * as React from "react";
 import { FormGroup, FormSelect, FormSelectOption, TextInput, InputGroup, InputGroupText, Tooltip, TooltipPosition } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
-import { CustomPropagation, FCC6GHz, PropagationModel, Win2ItmDb } from "../Lib/RatApiTypes";
+import { BuildingSourceValues, CustomPropagation, CustomPropagationLOSOptions, FCC6GHz, PropagationModel, Win2ItmDb } from "../Lib/RatApiTypes";
 
 /**
  * PropogationModelForm.tsx: sub form of afc config form
@@ -37,23 +37,41 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 this.props.onChange({ kind: s, win2ProbLosThreshold: 10, win2Confidence: 50, itmConfidence: 50, itmReliability: 50, p2108Confidence: 50, terrainSource: "SRTM (90m)" });
                 break;
             case "FCC 6GHz Report & Order":
-                this.props.onChange({ kind: s, win2Confidence: 50, itmConfidence: 50, itmReliability: 50, p2108Confidence: 50, buildingSource: "LiDAR", terrainSource: "3DEP (30m)" });
+                this.props.onChange({ kind: s, winner2LOSOption: "BLDG_DATA_REQ_TX", win2ConfidenceCombined: 50, itmConfidence: 50, win2ConfidenceLOS: 50, win2ConfidenceNLOS: 50, itmReliability: 50, p2108Confidence: 50, buildingSource: "LiDAR", terrainSource: "3DEP (30m)" });
                 break;
             case "Ray Tracing":
                 break; // do nothing
             case "Custom":
                 this.props.onChange({
-                    kind: s, winner2LOSOption: "UNKNOWN", win2Confidence: 50, itmConfidence: 50, itmReliability: 50,
+                    kind: s, winner2LOSOption: "UNKNOWN", win2ConfidenceCombined: 50, itmConfidence: 50, itmReliability: 50,
                     p2108Confidence: 50, rlanITMTxClutterMethod: "FORCE_TRUE", buildingSource: "None", terrainSource: "3DEP (30m)"
                 })
                 break;
         }
     }
 
-    setWin2Confidence = (s: string) => {
+    setWin2ConfidenceCombined = (s: string) => {
         const n: number = Number(s);
-        this.props.onChange(Object.assign(this.props.data, { win2Confidence: n }));
+        this.props.onChange(Object.assign(this.props.data, { win2ConfidenceCombined: n }));
     }
+
+
+    setWin2ConfidenceLOS = (s: string) => {
+        const n: number = Number(s);
+        this.props.onChange(Object.assign(this.props.data, { win2ConfidenceLOS: n, }));
+    }
+
+
+    setWinConfidenceNLOS = (s: string) => {
+        const n: number = Number(s);
+        this.props.onChange(Object.assign(this.props.data, { win2ConfidenceNLOS: n }));
+    }
+
+    setWin2ConfidenceLOS_NLOS = (s: string) => {
+        const n: number = Number(s);
+        this.props.onChange(Object.assign(this.props.data, { win2ConfidenceLOS: n, win2ConfidenceNLOS: n }));
+    }
+
 
     setItmConfidence = (s: string) => {
         const n: number = Number(s);
@@ -76,14 +94,37 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
         this.props.onChange(Object.assign(this.props.data, { win2ProbLosThreshold: n }));
     }
 
-    setBuildingSource = (s: string) => {
+    setBuildingSource = (s: BuildingSourceValues) => {
         const model = this.props.data;
         if (model.hasOwnProperty('buildingSource')) {
             // Ensure that there is terrain source is set to default when there is building data
-            if ((model as Win2ItmDb | FCC6GHz | CustomPropagation).buildingSource === "None" && s !== "None") {
-                this.setTerrainSource("3DEP (30m)");
+
+            if (model.kind === "FCC 6GHz Report & Order") {
+                let newData: Partial<FCC6GHz> = { buildingSource: s };
+                if (model.buildingSource === "None" && s !== "LiDAR") {
+                    newData.terrainSource = "3DEP (30m)";
+                }
+
+                if (s == "LiDAR" && !model.win2ConfidenceLOS) {
+                    newData.win2ConfidenceLOS = 50;
+                    newData.win2ConfidenceNLOS = 50;
+                }
+                if (s === "None") {
+                    newData.winner2LOSOption = "UNKNOWN";
+                } else {
+                    newData.winner2LOSOption = "BLDG_DATA_REQ_TX";
+                }
+
+                this.props.onChange(Object.assign(this.props.data, newData));
             }
-            this.props.onChange(Object.assign(this.props.data, { buildingSource: s }));
+            else {
+                if ((model as Win2ItmDb | FCC6GHz | CustomPropagation).buildingSource === "None" && s !== "None") {
+                    this.props.onChange(Object.assign(this.props.data, { buildingSource: s, terrainSource: "3DEP (30m)" }));
+                } else {
+                    this.props.onChange(Object.assign(this.props.data, { buildingSource: s }));
+                }
+            }
+
         }
     }
 
@@ -92,17 +133,50 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
     }
 
     setLosOption = (s: string) => {
-        const model = this.props.data as CustomPropagation;
+        let newLos = s as CustomPropagationLOSOptions
 
-        if (model.winner2LOSOption === "BLDG_DATA_REQ_TX" && s !== "BLDG_DATA_REQ_TX") {
-            this.props.onChange(Object.assign(this.props.data, {
-                winner2LOSOption: s,
-                buildingSource: "None",
-                terrainSource: "3DEP (30m)"
-            }));
-        } else {
-            this.props.onChange(Object.assign(this.props.data, { winner2LOSOption: s }));
+        const model = this.props.data as CustomPropagation;
+        let newModel: Partial<CustomPropagation> = { winner2LOSOption: newLos, };
+
+        switch (newLos) {
+            case "BLDG_DATA_REQ_TX":
+                if (!model.win2ConfidenceLOS) {
+                    newModel.win2ConfidenceLOS = 50;
+                }
+                if (!model.win2ConfidenceNLOS) {
+                    newModel.win2ConfidenceNLOS = 50;
+                }
+
+            case "FORCE_LOS":
+                if (model.winner2LOSOption === "BLDG_DATA_REQ_TX") {
+                    newModel.buildingSource = "None";
+                    newModel.terrainSource = "3DEP (30m)"
+                }
+                if (!model.win2ConfidenceLOS) {
+                    newModel.win2ConfidenceLOS = 50;
+                }
+
+            case "FORCE_NLOS":
+                if (model.winner2LOSOption === "BLDG_DATA_REQ_TX") {
+                    newModel.buildingSource = "None";
+                    newModel.terrainSource = "3DEP (30m)"
+                }
+                if (!model.win2ConfidenceNLOS) {
+                    newModel.win2ConfidenceNLOS = 50;
+                }
+
+            case "UNKNOWN":
+                if (!model.win2ConfidenceCombined) {
+                    newModel.win2ConfidenceCombined = 50;
+                }
+                if (model.winner2LOSOption === "BLDG_DATA_REQ_TX") {
+                    newModel.buildingSource = "None";
+                    newModel.terrainSource = "3DEP (30m)"
+                }
         }
+
+        this.props.onChange(Object.assign(this.props.data, newModel));
+
     }
 
     setItmClutterMethod = (s: string) => {
@@ -115,6 +189,100 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
             }));
         } else {
             this.props.onChange(Object.assign(this.props.data, { rlanITMTxClutterMethod: s }));
+        }
+    }
+    renderCustomLosNlosConfidence(model: CustomPropagation) {
+        switch (model.winner2LOSOption) {
+            case "UNKNOWN":
+                //Combined, show nothing
+                return <>
+                    <FormGroup
+                        label="WinnerII Combined Confidence"
+                        fieldId="propogation-model-win-confidence">
+                        <InputGroup>
+                            <TextInput
+                                value={model.win2ConfidenceCombined}
+                                type="number"
+                                onChange={this.setWin2ConfidenceCombined}
+                                id="propogation-model-win-confidence"
+                                name="propogation-model-win-confidence"
+                                style={{
+                                    textAlign: "right"
+                                }}
+                                isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100} />
+                            <InputGroupText>%</InputGroupText>
+                        </InputGroup>
+                    </FormGroup>
+                </>;
+            case 'FORCE_LOS':
+                return <>
+                    <FormGroup
+                        label="Winner II LOS Confidence"
+                        fieldId="propogation-model-win-los-confidence"
+                    >
+                        <InputGroup><TextInput
+                            value={model.win2ConfidenceLOS}
+                            type="number"
+                            onChange={v => { this.setWin2ConfidenceLOS(v); }}
+                            id="propogation-model-win-los-confidence"
+                            name="propogation-model-win-los-confidence"
+                            style={{ textAlign: "right" }}
+                            isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
+                    </FormGroup>
+                </>
+            case 'FORCE_NLOS':
+                return <>
+                    <FormGroup
+                        label="Winner II NLOS Confidence"
+                        fieldId="propogation-model-win-nlos-confidence"
+                    >
+                        <InputGroup><TextInput
+                            value={model.win2ConfidenceNLOS}
+                            type="number"
+                            onChange={v => { this.setWinConfidenceNLOS(v); }}
+                            id="propogation-model-win-nlos-confidence"
+                            name="propogation-model-win-nlos-confidence"
+                            style={{ textAlign: "right" }}
+                            isValid={model.win2ConfidenceNLOS >= 0 && model.win2ConfidenceNLOS <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
+                    </FormGroup>
+                </>
+            case "BLDG_DATA_REQ_TX":
+                return <>
+                    <FormGroup
+                        label="WinnerII Combined Confidence"
+                        fieldId="propogation-model-win-confidence">
+                        <InputGroup>
+                            <TextInput
+                                value={model.win2ConfidenceCombined}
+                                type="number"
+                                onChange={this.setWin2ConfidenceCombined}
+                                id="propogation-model-win-confidence"
+                                name="propogation-model-win-confidence"
+                                style={{
+                                    textAlign: "right"
+                                }}
+                                isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100} />
+                            <InputGroupText>%</InputGroupText>
+                        </InputGroup>
+                    </FormGroup>
+
+                    <FormGroup
+                        label="Winner II LOS/NLOS Confidence"
+                        fieldId="propogation-model-win-los-nlos-confidence"
+                    >
+                        <InputGroup><TextInput
+                            value={model.win2ConfidenceLOS}
+                            type="number"
+                            onChange={v => { this.setWin2ConfidenceLOS(v); this.setWinConfidenceNLOS(v); }}
+                            id="propogation-model-win-los-nlos-confidence"
+                            name="propogation-model-win-los-nlos-confidence"
+                            style={{ textAlign: "right" }}
+                            isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
+                    </FormGroup>
+                </>
         }
     }
 
@@ -160,7 +328,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                     >
                         <FormSelect
                             value={model.buildingSource}
-                            onChange={this.setBuildingSource}
+                            onChange={v => this.setBuildingSource(v as BuildingSourceValues)}
                             id="propogation-model-data-source"
                             name="propogation-model-data-source"
                             style={{ textAlign: "right" }}
@@ -257,18 +425,38 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
             case "FCC 6GHz Report & Order":
                 return <>
                     <FormGroup
-                        label="Winner II Confidence"
+                        label="Winner II Combined Confidence"
                         fieldId="propogation-model-win-confidence"
                     ><InputGroup><TextInput
-                        value={model.win2Confidence}
+                        value={model.win2ConfidenceCombined}
                         type="number"
-                        onChange={this.setWin2Confidence}
+                        onChange={this.setWin2ConfidenceCombined}
                         id="propogation-model-win-confidence"
                         name="propogation-model-win-confidence"
                         style={{ textAlign: "right" }}
-                        isValid={model.win2Confidence >= 0 && model.win2Confidence <= 100} />
+                        isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
+                    {model.buildingSource === "LiDAR" ?
+                        <>
+                            <FormGroup
+                                label="Winner II LOS/NLOS Confidence"
+                                fieldId="propogation-model-win-los-nlos-confidence"
+                            >
+                                <InputGroup><TextInput
+                                    value={model.win2ConfidenceLOS}
+                                    type="number"
+                                    onChange={v => { this.setWin2ConfidenceLOS_NLOS(v); }}
+                                    id="propogation-model-win-los-nlos-confidence"
+                                    name="propogation-model-win-los-nlos-confidence"
+                                    style={{ textAlign: "right" }}
+                                    isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100} />
+                                    <InputGroupText>%</InputGroupText></InputGroup>
+                            </FormGroup>
+                        </>
+                        :
+                        <></>
+                    }
                     <FormGroup
                         label="ITM Confidence"
                         fieldId="propogation-model-itm-confidence"
@@ -315,7 +503,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                     >
                         <FormSelect
                             value={model.buildingSource}
-                            onChange={this.setBuildingSource}
+                            onChange={v => this.setBuildingSource(v as BuildingSourceValues)}
                             id="propogation-model-data-source"
                             name="propogation-model-data-source"
                             style={{ textAlign: "right" }}
@@ -324,9 +512,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
                             <FormSelectOption key="None" value="None" label="None" />
                         </FormSelect>
-
                     </FormGroup>
-
                     {model.buildingSource === "None" ?
                         <FormGroup
                             label="Terrain Source"
@@ -345,7 +531,6 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         </FormGroup>
                         :
                         false}
-
                 </>
             case "Ray Tracing":
                 return <></>;
@@ -377,18 +562,8 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <FormSelectOption key="BLDG_DATA_REQ_TX" value="BLDG_DATA_REQ_TX" label="Los/NLoS per building data" />
                         </FormSelect>
                     </FormGroup>
-                    <FormGroup label="WinnerII Confidence" fieldId="propogation-model-win-confidence">
-                        <InputGroup>
-                            <TextInput value={model.win2Confidence} type="number" onChange={this.setWin2Confidence}
-                                id="propogation-model-win-confidence"
-                                name="propogation-model-win-confidence"
-                                style={{
-                                    textAlign: "right"
-                                }}
-                                isValid={model.win2Confidence >= 0 && model.win2Confidence <= 100} />
-                            <InputGroupText>%</InputGroupText>
-                        </InputGroup>
-                    </FormGroup>
+
+                    {this.renderCustomLosNlosConfidence(model)}
                     <FormGroup label="ITM with Tx Clutter Method" fieldId="propogation-model-itm-tx-clutter">
                         {" "}<Tooltip
                             position={TooltipPosition.top}
@@ -451,8 +626,13 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         <>
 
                             <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
-                                <FormSelect value={model.buildingSource} onChange={this.setBuildingSource} id="propogation-model-data-source"
-                                    name="propogation-model-data-source" style={{ textAlign: "right" }} isValid={model.buildingSource === "LiDAR"
+                                <FormSelect
+                                    value={model.buildingSource}
+                                    onChange={v => this.setBuildingSource(v as BuildingSourceValues)}
+                                    id="propogation-model-data-source"
+                                    name="propogation-model-data-source"
+                                    style={{ textAlign: "right" }}
+                                    isValid={model.buildingSource === "LiDAR"
                                         || model.buildingSource === "B-Design3D" || model.buildingSource === "None"}>
                                     <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
                                     <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
@@ -538,3 +718,4 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
             {this.getExpansion()}
         </FormGroup>
 }
+

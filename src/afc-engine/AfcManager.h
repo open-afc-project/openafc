@@ -306,7 +306,9 @@ class AfcManager
 
 		double _confidenceBldg2109;             // Statistical confidence for P.2109 building penetration loss
 		double _confidenceClutter2108;          // Statistical confidence for P.2108 clutter loss
-		double _confidenceWinner2;              // Statistical confidence for Winner2 path loss model
+		double _confidenceWinner2LOS;           // Statistical confidence for Winner2 LOS path loss model
+		double _confidenceWinner2NLOS;          // Statistical confidence for Winner2 NLOS path loss model
+		double _confidenceWinner2Combined;      // Statistical confidence for Winner2 combined path loss model
 		double _confidenceITM;                  // Statistical confidence for ITM path loss model
 		double _reliabilityITM;                 // Statistical reliability   for ITM path loss model
 
@@ -479,7 +481,9 @@ class AfcManager
 		double _zbldg2109;
 		double _zclutter2108;
 		double _fsZclutter2108;
-		double _zwinner2;
+		double _zwinner2LOS;
+		double _zwinner2NLOS;
+		double _zwinner2Combined;
 
 		std::vector<int> _ulsIdxList;            // Stores the indices of the ULS stations we are analyzing
 		DoubleTriplet _beamConeLatLons;          // Stores beam cone coordinates together to be loaded into geometries

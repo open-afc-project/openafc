@@ -64,7 +64,7 @@ namespace
 		// const int fixedRadioClimate = 6;
 		// const int fixedPolarization = 1;
 		// const double fixedConfidence = 0.5;
-	    // const double fixedRelevance = 0.5;
+		// const double fixedRelevance = 0.5;
 	/**
 	 * Encapsulates a CSV writer to a file gzip'd
 	 * All fields are NULL if filename parameter in constructor is not a valid path.
@@ -554,6 +554,17 @@ void AfcManager::initializeDatabases()
 	} else {
 		throw std::runtime_error(QString("Invalid analysis type: %1").arg(QString::fromStdString(_analysisType)).toStdString());
 	}
+	/**************************************************************************************/
+
+	/**************************************************************************************/
+	/* Convert confidences it gaussian thresholds                                         */
+	/**************************************************************************************/
+	_zbldg2109 = -qerfi(_confidenceBldg2109);
+	_zclutter2108 = -qerfi(_confidenceClutter2108);
+	_fsZclutter2108 = -qerfi(_fsConfidenceClutter2108);
+	_zwinner2LOS = -qerfi(_confidenceWinner2LOS);
+	_zwinner2NLOS = -qerfi(_confidenceWinner2NLOS);
+	_zwinner2Combined = -qerfi(_confidenceWinner2Combined);
 	/**************************************************************************************/
 }
 /**************************************************************************************/
@@ -1711,8 +1722,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	QJsonObject jsonObj = jsonDoc.object();
 
 	/**********************************************************************/
-    /* Create _allowableFreqBandList                                      */
-    /**********************************************************************/
+	/* Create _allowableFreqBandList                                      */
+	/**********************************************************************/
 	QJsonArray freqBandArray = jsonObj["freqBands"].toArray();
 	for (QJsonValue freqBandVal : freqBandArray) {
 		QJsonObject freqBandObj = freqBandVal.toObject();
@@ -1760,10 +1771,10 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	}
 
 	if (jsonObj.contains("fsAnalysisListFile") && !jsonObj["fsAnalysisListFile"].isUndefined()) {
-	    _fsAnalysisListFile = QDir(QString::fromStdString(tempDir)).filePath(jsonObj["fsAnalysisListFile"].toString()).toStdString();
-    } else {
-	    _fsAnalysisListFile = QDir(QString::fromStdString(tempDir)).filePath("fs_analysis_list.csv").toStdString();
-    }
+		_fsAnalysisListFile = QDir(QString::fromStdString(tempDir)).filePath(jsonObj["fsAnalysisListFile"].toString()).toStdString();
+	} else {
+		_fsAnalysisListFile = QDir(QString::fromStdString(tempDir)).filePath("fs_analysis_list.csv").toStdString();
+	}
 
 	// ***********************************
 	// If this flag is set, indoor rlan's have a fixed AMSL height over the uncertainty region (with no height uncertainty).
@@ -1904,21 +1915,21 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_applyClutterFSRxFlag = false;
 	}
 
-    if (jsonObj.contains("fsClutterModel") && !jsonObj["fsClutterModel"].isUndefined()) {
-	    QJsonObject fsClutterModel = jsonObj["fsClutterModel"].toObject();
-        if (fsClutterModel.contains("p2108Confidence") && !fsClutterModel["p2108Confidence"].isUndefined()) {
-	        _fsConfidenceClutter2108 = fsClutterModel["p2108Confidence"].toDouble()/100.0;
-        } else {
-		    throw std::runtime_error("AfcManager::importConfigAFCjson(): fsClutterModel[p2108Confidence] missing.");
-        }
-        if (fsClutterModel.contains("maxFsAglHeight") && !fsClutterModel["maxFsAglHeight"].isUndefined()) {
-	        _maxFsAglHeight = fsClutterModel["maxFsAglHeight"].toDouble();
-        } else {
-		    throw std::runtime_error("AfcManager::importConfigAFCjson(): fsClutterModel[maxFsAglHeight] missing.");
-        }
-    } else {
+	if (jsonObj.contains("fsClutterModel") && !jsonObj["fsClutterModel"].isUndefined()) {
+		QJsonObject fsClutterModel = jsonObj["fsClutterModel"].toObject();
+		if (fsClutterModel.contains("p2108Confidence") && !fsClutterModel["p2108Confidence"].isUndefined()) {
+			_fsConfidenceClutter2108 = fsClutterModel["p2108Confidence"].toDouble()/100.0;
+		} else {
+			throw std::runtime_error("AfcManager::importConfigAFCjson(): fsClutterModel[p2108Confidence] missing.");
+		}
+		if (fsClutterModel.contains("maxFsAglHeight") && !fsClutterModel["maxFsAglHeight"].isUndefined()) {
+			_maxFsAglHeight = fsClutterModel["maxFsAglHeight"].toDouble();
+		} else {
+			throw std::runtime_error("AfcManager::importConfigAFCjson(): fsClutterModel[maxFsAglHeight] missing.");
+		}
+	} else {
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): fsClutterModel missing.");
-    }
+	}
 
 	int validFlag;
 	if (jsonObj.contains("rlanITMTxClutterMethod") && !jsonObj["rlanITMTxClutterMethod"].isUndefined()) {
@@ -1987,7 +1998,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 	/**************************************************************************************/
 	/* Path Loss Model Parmeters                                                       ****/
-    /**************************************************************************************/
+	/**************************************************************************************/
 	_pathLossClampFSPL = false;
 
 	// Set pathLossModel
@@ -2011,7 +2022,6 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		// ITM model using Building data as terrain
 			// GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
 			_winner2ProbLOSThr = propModel["win2ProbLosThreshold"].toDouble()/100.0;
-			_confidenceWinner2 = propModel["win2Confidence"].toDouble()/100.0;
 			_confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
 			_confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
 			_useBDesignFlag = propModel["buildingSource"].toString() == "B-Design3D";
@@ -2024,7 +2034,6 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 			// No buildings, Winner II, ITM, P.456 Clutter
 			// GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
 			_winner2ProbLOSThr = propModel["win2ProbLosThreshold"].toDouble()/100.0;
-			_confidenceWinner2 = propModel["win2Confidence"].toDouble()/100.0;
 			_confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
 			_confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
 
@@ -2037,7 +2046,6 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 			// FCC_6GHZ_REPORT_AND_ORDER path loss model
 			// GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
 			_winner2ProbLOSThr = std::numeric_limits<double>::quiet_NaN();
-			_confidenceWinner2 = propModel["win2Confidence"].toDouble()/100.0;
 			_confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
 			_confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
 
@@ -2054,6 +2062,29 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		default:
 			CORE_DUMP;
 			break;
+	}
+
+
+	if (propModel.contains("win2Confidence") && !propModel["win2Confidence"].isUndefined()) {
+		throw std::runtime_error("AfcManager::importConfigAFCjson(): Outdated afc_config, win2Confidence not supported parameter.");
+	}
+
+	if (propModel.contains("win2ConfidenceCombined") && !propModel["win2ConfidenceCombined"].isUndefined()) {
+		_confidenceWinner2Combined = propModel["win2ConfidenceCombined"].toDouble()/100.0;
+	} else {
+		_confidenceWinner2Combined = 0.5;
+	}
+
+	if (propModel.contains("win2ConfidenceLOS") && !propModel["win2ConfidenceLOS"].isUndefined()) {
+		_confidenceWinner2LOS = propModel["win2ConfidenceLOS"].toDouble()/100.0;
+	} else {
+		_confidenceWinner2LOS = 0.5;
+	}
+
+	if (propModel.contains("win2ConfidenceNLOS") && !propModel["win2ConfidenceNLOS"].isUndefined()) {
+		_confidenceWinner2NLOS = propModel["win2ConfidenceNLOS"].toDouble()/100.0;
+	} else {
+		_confidenceWinner2NLOS = 0.5;
 	}
 
 	if (propModel.contains("itmReliability") && !propModel["itmReliability"].isUndefined()) {
@@ -2578,9 +2609,9 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string&
 		//outputDocument = QJsonDocument(jsonSpectrumData(_rlanBWList, _numChan, _channelData, _deviceDesc, _wlanMinFreq));
 		outputDocument = generateRatAfcJson();
 
-        if (!_mapDataGeoJsonFile.empty()) {
-            generateMapDataGeoJson(tempDir);
-        }
+		if (!_mapDataGeoJsonFile.empty()) {
+			generateMapDataGeoJson(tempDir);
+		}
 	}
 	else if (_analysisType == "ExclusionZoneAnalysis")
 	{
@@ -2756,7 +2787,7 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 	outputDocument = QJsonDocument(analysisJsonObj);
 
 	// Write map data GEOJSON file
-    std::string fullPathMapDataFile = QDir(QString::fromStdString(tempDir)).filePath(QString::fromStdString(_mapDataGeoJsonFile)).toStdString();
+	std::string fullPathMapDataFile = QDir(QString::fromStdString(tempDir)).filePath(QString::fromStdString(_mapDataGeoJsonFile)).toStdString();
 	auto mapDataFile = FileHelpers::open(QString::fromStdString(fullPathMapDataFile), QIODevice::WriteOnly);
 	auto gzip_writer = new GzipStream(mapDataFile.get());
 	if (!gzip_writer->open(QIODevice::WriteOnly))
@@ -5733,7 +5764,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				pathClutterRxModelStr = "P.2108";
 				pathClutterRxCDF = q(-gauss[0]);
 			} else if ( (propEnvRx == CConst::ruralPropEnv) || (propEnvRx == CConst::barrenPropEnv) ) {
-                bool allowRuralFSClutterFlag = false;
+				bool allowRuralFSClutterFlag = false;
 				bool clutterFlag = allowRuralFSClutterFlag && (nlcdLandCatRx == CConst::noClutterNLCDLandCat ? false : true);
 
 				if (clutterFlag) {
@@ -5927,7 +5958,7 @@ double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, d
 			arma::vec gauss(1);
 			if (fixedProbFlag)
 			{
-				gauss[0] = _zwinner2;
+				gauss[0] = _zwinner2Combined;
 			}
 			else
 			{
@@ -5941,22 +5972,22 @@ double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, d
 		} else if (_winner2UnknownLOSMethod == CConst::PLOSThresholdWinner2UnknownLOSMethod) {
 			if (probLOS > _winner2ProbLOSThr)
 			{
-				retval = Winner2_C1suburban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+				retval = Winner2_C1suburban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2C1_SUBURBAN_LOS";
 			}
 			else
 			{
-				retval = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+				retval = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2C1_SUBURBAN_NLOS";
 			}
 		} else {
 			CORE_DUMP;
 		}
 	} else if (losValue == 1) {
-		retval = Winner2_C1suburban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+		retval = Winner2_C1suburban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2C1_SUBURBAN_LOS";
 	} else if (losValue == 2) {
-		retval = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+		retval = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2C1_SUBURBAN_NLOS";
 	} else {
 		CORE_DUMP;
@@ -6080,7 +6111,7 @@ double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, doub
 			arma::vec gauss(1);
 			if (fixedProbFlag)
 			{
-				gauss[0] = _zwinner2;
+				gauss[0] = _zwinner2Combined;
 			} else {
 				gauss = arma::randn(1);
 			}
@@ -6092,22 +6123,22 @@ double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, doub
 		} else if (_winner2UnknownLOSMethod == CConst::PLOSThresholdWinner2UnknownLOSMethod) {
 			if (probLOS > _winner2ProbLOSThr)
 			{
-				retval = Winner2_C2urban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+				retval = Winner2_C2urban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2C2_URBAN_LOS";
 			}
 			else
 			{
-				retval = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+				retval = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2C2_URBAN_NLOS";
 			}
 		} else {
 			CORE_DUMP;
 		}
 	} else if (losValue == 1) {
-		retval = Winner2_C2urban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+		retval = Winner2_C2urban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2C2_URBAN_LOS";
 	} else if (losValue == 2) {
-		retval = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+		retval = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2C2_URBAN_NLOS";
 	} else {
 		CORE_DUMP;
@@ -6231,7 +6262,7 @@ double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, doub
 			arma::vec gauss(1);
 			if (fixedProbFlag)
 			{
-				gauss[0] = _zwinner2;
+				gauss[0] = _zwinner2Combined;
 			} else {
 				gauss = arma::randn(1);
 			}
@@ -6244,22 +6275,22 @@ double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, doub
 
 			if (probLOS > _winner2ProbLOSThr)
 			{
-				retval = Winner2_D1rural_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+				retval = Winner2_D1rural_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2D1_RURAL_LOS";
 			}
 			else
 			{
-				retval = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+				retval = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2D1_RURAL_NLOS";
 			}
 		} else {
 			CORE_DUMP;
 		}
 	} else if (losValue == 1) {
-		retval = Winner2_D1rural_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+		retval = Winner2_D1rural_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2D1_RURAL_LOS";
 	} else if (losValue == 2) {
-		retval = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2, sigma, pathLossCDF);
+		retval = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2D1_RURAL_NLOS";
 	} else {
 		CORE_DUMP;
@@ -6412,16 +6443,16 @@ void AfcManager::runPointAnalysis()
 	/* Create _fsAnalysisListFile                                                         */
 	/**************************************************************************************/
 	FILE *fFSList;
-    if (_fsAnalysisListFile.empty()) {
-	    fFSList = (FILE *) NULL;
-    } else {
-	    if ( !(fFSList = fopen(_fsAnalysisListFile.c_str(), "wb")) ) {
-		    errStr << std::string("ERROR: Unable to open fsAnalysisListFile \"") + _fsAnalysisListFile + std::string("\"\n");
-		    throw std::runtime_error(errStr.str());
-	    }
+	if (_fsAnalysisListFile.empty()) {
+		fFSList = (FILE *) NULL;
+	} else {
+		if ( !(fFSList = fopen(_fsAnalysisListFile.c_str(), "wb")) ) {
+			errStr << std::string("ERROR: Unable to open fsAnalysisListFile \"") + _fsAnalysisListFile + std::string("\"\n");
+			throw std::runtime_error(errStr.str());
+		}
 	}
-    if (fFSList) {
-	    fprintf(fFSList,   "FSID"
+	if (fFSList) {
+		fprintf(fFSList,   "FSID"
 			              ",RX_CALLSIGN"
 			              ",TX_CALLSIGN"
 			              ",FS_START_FREQ (MHz)"
@@ -6431,7 +6462,7 @@ void AfcManager::runPointAnalysis()
 			              ",FS_RX_HEIGHT_AGL (m)"
 			              ",FS_RX_RLAN_DIST (m)"
 	                      "\n");
-    }
+	}
 	/**************************************************************************************/
 
 	/**************************************************************************************/
@@ -6854,11 +6885,6 @@ void AfcManager::runPointAnalysis()
 	/**************************************************************************************/
 	/* Compute Channel Availability                                                       */
 	/**************************************************************************************/
-	_zbldg2109 = -qerfi(_confidenceBldg2109);
-	_zclutter2108 = -qerfi(_confidenceClutter2108);
-	_fsZclutter2108 = -qerfi(_fsConfidenceClutter2108);
-	_zwinner2 = -qerfi(_confidenceWinner2);
-
 	const double exclusionDistKmSquared = (_exclusionDist / 1000.0) * (_exclusionDist / 1000.0);
 	const double maxRadiusKmSquared = (_maxRadius / 1000.0) * (_maxRadius / 1000.0);
 
@@ -7035,10 +7061,10 @@ void AfcManager::runPointAnalysis()
 
 			_rlanRegion->closestPoint(ulsRxLatLon, contains);
 
-            double minRLANDist = -1.0;
-            if (distKmSquared <= exclusionDistKmSquared) {
+			double minRLANDist = -1.0;
+			if (distKmSquared <= exclusionDistKmSquared) {
 				LOGGER_INFO(logger) << "FSID = " << uls->getID() << " is inside exclusion distance.";
-                minRLANDist = sqrt(distKmSquared)*1000.0;
+				minRLANDist = sqrt(distKmSquared)*1000.0;
 			} else if (contains) {
 				int chanIdx;
 				for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
@@ -7061,7 +7087,7 @@ void AfcManager::runPointAnalysis()
 					}
 				}
 				LOGGER_INFO(logger) << "FSID = " << uls->getID() << " is inside specified RLAN region.";
-                minRLANDist = 0.0;
+				minRLANDist = 0.0;
 			} else {
 
 				int scanPtIdx;
@@ -7141,9 +7167,9 @@ void AfcManager::runPointAnalysis()
 						double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
 						double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
 
-                        if ((minRLANDist == -1.0) || (distKm*1000.0 < minRLANDist)) {
-                            minRLANDist = distKm*1000.0;
-                        }
+						if ((minRLANDist == -1.0) || (distKm*1000.0 < minRLANDist)) {
+							minRLANDist = distKm*1000.0;
+						}
 
 						int chanIdx;
 						for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
@@ -7188,7 +7214,7 @@ void AfcManager::runPointAnalysis()
 #endif
 											);
 
-                                    std::string rxAntennaSubModelStr;
+									std::string rxAntennaSubModelStr;
 									double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
 									double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
 
@@ -7290,8 +7316,8 @@ void AfcManager::runPointAnalysis()
 
 			}
 
-            if (fFSList) {
-	            fprintf(fFSList,   "%d,%s,%s,%.1f,%.1f,%.6f,%.6f,%.1f,%.1f\n",
+			if (fFSList) {
+				fprintf(fFSList,   "%d,%s,%s,%.1f,%.1f,%.6f,%.6f,%.1f,%.1f\n",
                     uls->getID(),
                     uls->getRxCallsign().c_str(),
                     uls->getCallsign().c_str(),
@@ -7302,7 +7328,7 @@ void AfcManager::runPointAnalysis()
                     uls->getRxHeightAboveTerrain(),
                     minRLANDist
                 );
-            }
+			}
 
 #           if DEBUG_AFC
 			time_t t2 = time(NULL);
@@ -7362,8 +7388,8 @@ void AfcManager::runPointAnalysis()
 		else
 		{
 #           if DEBUG_AFC
-			// uls is not included in calculations
-			    LOGGER_DEBUG(logger) << "ID: " << uls->getID() << ", distKm: " << sqrt(distKmSquared) << ", link: " << uls->getLinkDistance() << ",";
+				// uls is not included in calculations
+				LOGGER_DEBUG(logger) << "ID: " << uls->getID() << ", distKm: " << sqrt(distKmSquared) << ", link: " << uls->getLinkDistance() << ",";
 #           endif
 		}
 
@@ -7537,9 +7563,9 @@ void AfcManager::runPointAnalysis()
 		fkml->writeEndDocument();
 	}
 
-    if (fFSList) {
-        fclose(fFSList);
-    }
+	if (fFSList) {
+		fclose(fFSList);
+	}
 
 	if (numProc == 0) {
 		errStr << "Analysis region contains no FS receivers";
@@ -8065,11 +8091,6 @@ void AfcManager::runScanAnalysis()
 	/**************************************************************************************/
 	/* Compute Channel Availability                                                       */
 	/**************************************************************************************/
-	_zbldg2109 = -qerfi(_confidenceBldg2109);
-	_zclutter2108 = -qerfi(_confidenceClutter2108);
-	_fsZclutter2108 = -qerfi(_fsConfidenceClutter2108);
-	_zwinner2 = -qerfi(_confidenceWinner2);
-
 	const double exclusionDistKmSquared = (_exclusionDist / 1000.0) * (_exclusionDist / 1000.0);
 	const double maxRadiusKmSquared = (_maxRadius / 1000.0) * (_maxRadius / 1000.0);
 
@@ -8223,7 +8244,7 @@ void AfcManager::runScanAnalysis()
 #endif
 										);
 
-                                std::string rxAntennaSubModelStr;
+								std::string rxAntennaSubModelStr;
 								double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
 								double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
 
@@ -8463,10 +8484,6 @@ void AfcManager::runExclusionZoneAnalysis()
 	/* Compute Exclusion Zone                                                             */
 	/**************************************************************************************/
 	LOGGER_INFO(logger) << "Begin computing exclusion zone";
-	_zbldg2109 = -qerfi(_confidenceBldg2109);
-	_zclutter2108 = -qerfi(_confidenceClutter2108);
-	_fsZclutter2108 = -qerfi(_fsConfidenceClutter2108);
-	_zwinner2 = -qerfi(_confidenceWinner2);
 
 	/******************************************************************************/
 	/* Estimate dist for which FSPL puts I/N below threshold                      */
@@ -8754,7 +8771,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 #endif
 				);
 
-        std::string rxAntennaSubModelStr;
+		std::string rxAntennaSubModelStr;
 		double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
 		double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
 
@@ -9053,11 +9070,6 @@ void AfcManager::runHeatmapAnalysis()
 	/**************************************************************************************/
 	/* Compute Heatmap                                                                    */
 	/**************************************************************************************/
-	_zbldg2109 = -qerfi(_confidenceBldg2109);
-	_zclutter2108 = -qerfi(_confidenceClutter2108);
-	_fsZclutter2108 = -qerfi(_fsConfidenceClutter2108);
-	_zwinner2 = -qerfi(_confidenceWinner2);
-
 	const double exclusionDistKmSquared = (_exclusionDist / 1000.0) * (_exclusionDist / 1000.0);
 	const double maxRadiusKmSquared = (_maxRadius / 1000.0) * (_maxRadius / 1000.0);
 
@@ -9259,7 +9271,7 @@ void AfcManager::runHeatmapAnalysis()
 #endif
 									);
 
-                            std::string rxAntennaSubModelStr;
+							std::string rxAntennaSubModelStr;
 							double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
 							double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
 
@@ -9494,24 +9506,13 @@ void AfcManager::printUserInputs()
 
 
 		fUserInputs->writeRow({ "PROPAGATION_MODEL", QString::fromStdString(CConst::strPathLossModelList->type_to_str(_pathLossModel)) } );
-		if (_pathLossModel == CConst::CoalitionOpt6PathLossModel) {
-			fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", QString::number(_winner2ProbLOSThr, 'e', 20) } );
-			fUserInputs->writeRow({ "WINNER_II_CONFIDENCE", QString::number(_confidenceWinner2, 'e', 20) } );
-			fUserInputs->writeRow({ "ITM_CONFIDENCE", QString::number(_confidenceITM, 'e', 20) } );
-			fUserInputs->writeRow({ "ITM_RELIABILITY", QString::number(_reliabilityITM, 'e', 20) } );
-			fUserInputs->writeRow({ "P.2108_CONFIDENCE", QString::number(_confidenceClutter2108, 'e', 20) } );
-		} else if (_pathLossModel == CConst::ITMBldgPathLossModel) {
-			fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", "N/A" } );
-			fUserInputs->writeRow({ "WINNER_II_CONFIDENCE", "N/A" } );
-			fUserInputs->writeRow({ "ITM_CONFIDENCE", QString::number(_confidenceITM, 'e', 20) } );
-			fUserInputs->writeRow({ "ITM_RELIABILITY", QString::number(_reliabilityITM, 'e', 20) } );
-			fUserInputs->writeRow({ "P.2108_CONFIDENCE", "N/A" } );
-		} else {
-			fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", "N/A" } );
-			fUserInputs->writeRow({ "WINNER_II_CONFIDENCE", "N/A" } );
-			fUserInputs->writeRow({ "ITM_CONFIDENCE", "N/A" } );
-			fUserInputs->writeRow({ "P.2108_CONFIDENCE", "N/A" } );
-		}
+		fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", QString::number(_winner2ProbLOSThr, 'e', 20) } );
+		fUserInputs->writeRow({ "WINNER_II_LOS_CONFIDENCE", QString::number(_confidenceWinner2LOS, 'e', 20) } );
+		fUserInputs->writeRow({ "WINNER_II_NLOS_CONFIDENCE", QString::number(_confidenceWinner2NLOS, 'e', 20) } );
+		fUserInputs->writeRow({ "WINNER_II_COMBINED_CONFIDENCE", QString::number(_confidenceWinner2Combined, 'e', 20) } );
+		fUserInputs->writeRow({ "ITM_CONFIDENCE", QString::number(_confidenceITM, 'e', 20) } );
+		fUserInputs->writeRow({ "ITM_RELIABILITY", QString::number(_reliabilityITM, 'e', 20) } );
+		fUserInputs->writeRow({ "P.2108_CONFIDENCE", QString::number(_confidenceClutter2108, 'e', 20) } );
 
 		if (_analysisType == "ExclusionZoneAnalysis") {
 			double chanCenterFreq = _wlanMinFreq + (_exclusionZoneRLANChanIdx + 0.5) * _exclusionZoneRLANBWHz;

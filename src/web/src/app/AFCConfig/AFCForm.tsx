@@ -158,7 +158,7 @@ export class AFCForm extends React.Component<
             case "FCC 6GHz Report & Order":
                 if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
                 if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
-                if (propModel.win2Confidence < 0 || propModel.win2Confidence > 100) return err();
+                if (propModel.win2ConfidenceCombined < 0 || propModel.win2ConfidenceCombined > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
                 if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
                 if (propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
@@ -170,7 +170,7 @@ export class AFCForm extends React.Component<
             case "Custom":
                 if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
                 if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
-                if (propModel.win2Confidence < 0 || propModel.win2Confidence > 100) return err();
+                if (propModel.win2ConfidenceCombined < 0 || propModel.win2ConfidenceCombined > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
                 if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
                 if (propModel.buildingSource !== "None" && propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
@@ -284,23 +284,44 @@ export class AFCForm extends React.Component<
                 var model = x as CustomPropagation;
                 var itmTxClutterMethod = model.rlanITMTxClutterMethod;
                 delete model.rlanITMTxClutterMethod;
-                conf.propagationModel = model;
                 if (!!itmTxClutterMethod) {
                     conf.rlanITMTxClutterMethod = itmTxClutterMethod;
                 } else {
                     delete conf.rlanITMTxClutterMethod;
                 }
+                switch (x.winner2LOSOption) {
+                    case "BLDG_DATA_REQ_TX":
+                        break;
+                    case "FORCE_LOS":
+                        delete model.win2ConfidenceNLOS;
+                        delete model.win2ConfidenceCombined;
+                        break;
+                    case "FORCE_NLOS":
+                        delete model.win2ConfidenceLOS;
+                        delete model.win2ConfidenceCombined;
+                        break;
+                    case "UNKNOWN":
+                        delete model.win2ConfidenceNLOS;
+                        delete model.win2ConfidenceLOS;
+                        break;
+                }
+
+                conf.propagationModel = model;
                 this.setState({ config: conf });
 
 
             } else {
                 const conf = this.state.config;
-                conf.propagationModel = x;
                 if (x.kind === "ITM with building data") {
                     conf.rlanITMTxClutterMethod = "BLDG_DATA"
                 } else {
                     conf.rlanITMTxClutterMethod = "FORCE_TRUE"
                 }
+                if (x.kind === "FCC 6GHz Report & Order" && x.buildingSource !== "LiDAR") {
+                    delete x.win2ConfidenceLOS;
+                    delete x.win2ConfidenceNLOS;
+                }
+                conf.propagationModel = x;
                 this.setState({ config: conf });
             }
         }

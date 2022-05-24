@@ -133,6 +133,8 @@ export interface UserUpload {
 
 export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FCC6GHz | CustomPropagation;
 
+export type BuildingSourceValues =  "B-Design3D" | "LiDAR" | "None"
+
 export interface FSPL { kind: "FSPL" }
 export interface Win2ItmDb {
     kind: "ITM with building data",
@@ -141,7 +143,7 @@ export interface Win2ItmDb {
     itmConfidence: number,
     itmReliability: number,
     p2108Confidence: number,
-    buildingSource: "B-Design3D" | "LiDAR"
+    buildingSource: BuildingSourceValues
 }
 export interface Win2ItmClutter {
     kind: "ITM with no building data",
@@ -157,22 +159,29 @@ export interface RayTrace {
 }
 export interface FCC6GHz {
     kind: "FCC 6GHz Report & Order",
-    win2Confidence: number,
+    win2ConfidenceCombined: number,
+    win2ConfidenceLOS?:number,
+    win2ConfidenceNLOS?:number,
     itmConfidence: number,
     itmReliability: number,
     p2108Confidence: number,
-    buildingSource: "B-Design3D" | "LiDAR" | "None",
+    buildingSource: BuildingSourceValues,
     terrainSource: "SRTM (90m)" | "3DEP (30m)"
+    winner2LOSOption: 'UNKNOWN' | 'BLDG_DATA_REQ_TX',
 }
+
+export type CustomPropagationLOSOptions =  'UNKNOWN' | 'FORCE_LOS' | 'FORCE_NLOS' | 'BLDG_DATA_REQ_TX'
 
 export interface CustomPropagation {
     kind: "Custom",
-    winner2LOSOption: 'UNKNOWN' | 'FORCE_LOS' | 'FORCE_NLOS' | 'BLDG_DATA_REQ_TX',
-    win2Confidence: number,
+    winner2LOSOption:CustomPropagationLOSOptions,
+    win2ConfidenceCombined?: number,
+    win2ConfidenceLOS?:number,
+    win2ConfidenceNLOS?:number,
     itmConfidence: number,
     itmReliability: number,
     p2108Confidence: number,
-    buildingSource: "B-Design3D" | "LiDAR" | "None",
+    buildingSource: BuildingSourceValues,
     terrainSource: "SRTM (90m)" | "3DEP (30m)"
     rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
 }

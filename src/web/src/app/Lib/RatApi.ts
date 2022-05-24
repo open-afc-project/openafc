@@ -73,7 +73,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "receiverFeederLoss": { "UNII5": 3, "UNII7": 2.5, "other": 2 },
     "fsReceiverNoise": { "UNII5": -110, "UNII7": -109.5, "other": -109 },
     "threshold": -6, "maxLinkDistance": 50, "maxEIRP": 36, "minEIRP": 21,
-    "propagationModel": { "kind": "FCC 6GHz Report & Order", "win2Confidence": 50, "itmConfidence": 50, "itmReliability": 50, "p2108Confidence": 50, "buildingSource": "None", "terrainSource": "3DEP (30m)" },
+    "propagationModel": { "kind": "FCC 6GHz Report & Order", "win2ConfidenceCombined": 50,"win2ConfidenceLOS":50, "win2ConfidenceNLOS":50, "winner2LOSOption":"BLDG_DATA_REQ_TX", "itmConfidence": 50, "itmReliability": 50, "p2108Confidence": 50, "buildingSource": "None", "terrainSource": "3DEP (30m)" },
     "propagationEnv": "NLCD Point",
     "ulsDatabase": "CONUS_ULS_2022-04-26T16_26_43.563627_fixedBPS_sorted_WFAtest.sqlite3",
     "regionStr": "CONUS",
