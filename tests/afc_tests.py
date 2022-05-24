@@ -785,7 +785,7 @@ def start_test(self, test_number):
         # For saving test results option
         if self.out != "":
             test_report(self, float(tm_secs), test_number, req_id[0],
-                        ("PASS" if test_res is AFC_OK else "FAIL"), upd_data)
+                        ("PASS" if test_res == AFC_OK else "FAIL"), upd_data)
     return test_res
 
 def test_report(self, runtimedata, testnumdata, testvectordata,
@@ -810,7 +810,7 @@ def test_report(self, runtimedata, testnumdata, testvectordata,
             'Test Result': [test_result], 'Response data': [upd_data]}
     with open(self.out, "a") as f:
         file_writer = csv.DictWriter(f, fieldnames=data_names)
-        if os.stat(self.out).st_size is 0: file_writer.writeheader()
+        if os.stat(self.out).st_size == 0: file_writer.writeheader()
         file_writer.writerow(data)
 
 
