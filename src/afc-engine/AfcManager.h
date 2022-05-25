@@ -190,7 +190,7 @@ class AfcManager
 				double& pathLoss, double& pathClutterTxDB, double& pathClutterRxDB, bool meanFlag,
 				std::string& pathLossModelStr, double& pathLossCDF,
 				std::string& pathClutterTxModelStr, double& pathClutterTxCDF, std::string& pathClutterRxModelStr, double& pathClutterRxCDF,
-				const iturp452::ITURP452 *itu452, std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **heightProfilePtr
+				const iturp452::ITURP452 *itu452, std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr
 #if DEBUG_AFC
 				, std::vector<std::string> &ITMHeightType
 #endif

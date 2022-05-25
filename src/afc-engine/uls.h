@@ -188,6 +188,7 @@ public:
 
 	char *location;
 	double *ITMHeightProfile;
+	double *isLOSHeightProfile;
 
 #if DEBUG_AFC
 	std::vector<std::string> ITMHeightType;

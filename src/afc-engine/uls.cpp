@@ -49,6 +49,7 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal) : dataSet(da
 	numOutOfBandRLAN = 0;
 
 	ITMHeightProfile = (double *) NULL;
+	isLOSHeightProfile = (double *) NULL;
 }
 /******************************************************************************************/
 

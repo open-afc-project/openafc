@@ -3434,7 +3434,7 @@ double AfcManager::computeSpectralOverlap(double sigStartFreq, double sigStopFre
 /****                2: RX and TX                                                      ****/
 /******************************************************************************************/
 void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::string>>& ulsDatabaseList, PopGridClass *popGridVal, int linkDirection, double minFreq, double maxFreq, bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
-                             const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
+							 const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
 
 	auto fs_anom_writer = GzipCsvWriter(_fsAnomFile);
@@ -4372,8 +4372,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								if (!validFlag) {
 									std::ostringstream errStr;
 									errStr << "Invalid ULS data for FSID = " << fsid
-									       << ", Unknown Rx Antenna \"" << strval
-									       << "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
+										   << ", Unknown Rx Antenna \"" << strval
+										   << "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
 									LOGGER_WARN(logger) << errStr.str();
 									statusMessageList.push_back(errStr.str());
 
@@ -5226,7 +5226,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 		double &pathLoss, double &pathClutterTxDB, double &pathClutterRxDB, bool fixedProbFlag,
 		std::string &pathLossModelStr, double &pathLossCDF,
 		std::string &pathClutterTxModelStr, double &pathClutterTxCDF, std::string &pathClutterRxModelStr, double &pathClutterRxCDF,
-		const iturp452::ITURP452 *itu452, std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **heightProfilePtr
+		const iturp452::ITURP452 *itu452, std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr
 #if DEBUG_AFC
 		, std::vector<std::string> &ITMHeightType
 #endif
@@ -5289,7 +5289,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 							bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
 									QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 									QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-									distKm, numPts, heightProfilePtr);
+									distKm, numPts, isLOSProfilePtr);
 							winner2LOSValue = (losFlag ? 1 : 2);
 						}
 					} else if (_winner2LOSOption == CConst::ForceLOSLOSOption) {
@@ -5338,7 +5338,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						true,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, heightProfilePtr);
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
 				pathLossModelStr = "ITM_BLDG";
 				pathLossCDF = _confidenceITM;
 			}
@@ -5359,7 +5359,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 					true,
 					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, heightProfilePtr);
+					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
 			pathLossModelStr = "ITM_BLDG";
 			pathLossCDF = _confidenceITM;
 
@@ -5408,7 +5408,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 							bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
 									QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 									QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-									distKm, numPts, heightProfilePtr);
+									distKm, numPts, isLOSProfilePtr);
 							winner2LOSValue = (losFlag ? 1 : 2);
 						}
 					} else if (_winner2LOSOption == CConst::ForceLOSLOSOption) {
@@ -5459,7 +5459,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL,heightProfilePtr);
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
 				pathLossModelStr = "ITM";
 				pathLossCDF = _confidenceITM;
 
@@ -5509,7 +5509,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 					false,
 					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL,heightProfilePtr);
+					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
 			pathLossModelStr = "ITM";
 			pathLossCDF = _confidenceITM;
 
@@ -5571,7 +5571,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 					bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
 							QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 							QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-							distKm, numPts, heightProfilePtr);
+							distKm, numPts, isLOSProfilePtr);
 					winner2LOSValue = (losFlag ? 1 : 2);
 				}
 			} else if (_winner2LOSOption == CConst::ForceLOSLOSOption) {
@@ -5611,7 +5611,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
 								QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 								QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-								distKm, numPts, heightProfilePtr);
+								distKm, numPts, isLOSProfilePtr);
 						rlanHasClutter = !losFlag;
 					}
 					break;
@@ -5632,7 +5632,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL,heightProfilePtr);
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
 				pathLossModelStr = "ITM";
 				pathLossCDF = _confidenceITM;
 
@@ -5674,7 +5674,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL,heightProfilePtr);
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
 				pathLossModelStr = "ITM";
 				pathLossCDF = _confidenceITM;
 
@@ -6453,15 +6453,15 @@ void AfcManager::runPointAnalysis()
 	}
 	if (fFSList) {
 		fprintf(fFSList,   "FSID"
-			              ",RX_CALLSIGN"
-			              ",TX_CALLSIGN"
-			              ",FS_START_FREQ (MHz)"
-			              ",FS_STOP_FREQ (MHz)"
-			              ",FS_RX_LONGITUDE (deg)"
-			              ",FS_RX_LATITUDE (deg)"
-			              ",FS_RX_HEIGHT_AGL (m)"
-			              ",FS_RX_RLAN_DIST (m)"
-	                      "\n");
+						  ",RX_CALLSIGN"
+						  ",TX_CALLSIGN"
+						  ",FS_START_FREQ (MHz)"
+						  ",FS_STOP_FREQ (MHz)"
+						  ",FS_RX_LONGITUDE (deg)"
+						  ",FS_RX_LATITUDE (deg)"
+						  ",FS_RX_HEIGHT_AGL (m)"
+						  ",FS_RX_RLAN_DIST (m)"
+						  "\n");
 	}
 	/**************************************************************************************/
 
@@ -7208,7 +7208,7 @@ void AfcManager::runPointAnalysis()
 											pathLoss, pathClutterTxDB, pathClutterRxDB, true,
 											pathLossModelStr, pathLossCDF,
 											pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-											(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile)
+											(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
 #if DEBUG_AFC
 											, uls->ITMHeightType
 #endif
@@ -7312,22 +7312,26 @@ void AfcManager::runPointAnalysis()
 						free(uls->ITMHeightProfile);
 						uls->ITMHeightProfile = (double *) NULL;
 					}
+					if (uls->isLOSHeightProfile) {
+						free(uls->isLOSHeightProfile);
+						uls->isLOSHeightProfile = (double *) NULL;
+					}
 				}
 
 			}
 
 			if (fFSList) {
 				fprintf(fFSList,   "%d,%s,%s,%.1f,%.1f,%.6f,%.6f,%.1f,%.1f\n",
-                    uls->getID(),
-                    uls->getRxCallsign().c_str(),
-                    uls->getCallsign().c_str(),
-                    uls->getStartUseFreq()*1.0e-6,
-                    uls->getStopUseFreq()*1.0e-6,
-                    uls->getRxLongitudeDeg(),
-                    uls->getRxLatitudeDeg(),
-                    uls->getRxHeightAboveTerrain(),
-                    minRLANDist
-                );
+					uls->getID(),
+					uls->getRxCallsign().c_str(),
+					uls->getCallsign().c_str(),
+					uls->getStartUseFreq()*1.0e-6,
+					uls->getStopUseFreq()*1.0e-6,
+					uls->getRxLongitudeDeg(),
+					uls->getRxLatitudeDeg(),
+					uls->getRxHeightAboveTerrain(),
+					minRLANDist
+				);
 			}
 
 #           if DEBUG_AFC
@@ -8238,7 +8242,7 @@ void AfcManager::runScanAnalysis()
 										pathLoss, pathClutterTxDB, pathClutterRxDB, true,
 										pathLossModelStr, pathLossCDF,
 										pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-										(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile)
+										(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
 #if DEBUG_AFC
 										, uls->ITMHeightType
 #endif
@@ -8267,6 +8271,10 @@ void AfcManager::runScanAnalysis()
 				if (uls->ITMHeightProfile) {
 					free(uls->ITMHeightProfile);
 					uls->ITMHeightProfile = (double *) NULL;
+				}
+				if (uls->isLOSHeightProfile) {
+					free(uls->isLOSHeightProfile);
+					uls->isLOSHeightProfile = (double *) NULL;
 				}
 			}
 
@@ -8765,7 +8773,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 				pathLoss, pathClutterTxDB, pathClutterRxDB, true,
 				pathLossModelStr, pathLossCDF,
 				pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-				(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile)
+				(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
 #if DEBUG_AFC
 				, uls->ITMHeightType
 #endif
@@ -8860,6 +8868,10 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 	if (uls->ITMHeightProfile) {
 		free(uls->ITMHeightProfile);
 		uls->ITMHeightProfile = (double *) NULL;
+	}
+	if (uls->isLOSHeightProfile) {
+		free(uls->isLOSHeightProfile);
+		uls->isLOSHeightProfile = (double *) NULL;
 	}
 	/**************************************************************************************/
 
@@ -9265,7 +9277,7 @@ void AfcManager::runHeatmapAnalysis()
 									pathLoss, pathClutterTxDB, pathClutterRxDB, true,
 									pathLossModelStr, pathLossCDF,
 									pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-									(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile)
+									(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
 #if DEBUG_AFC
 									, uls->ITMHeightType
 #endif
@@ -9359,6 +9371,10 @@ void AfcManager::runHeatmapAnalysis()
 						if (uls->ITMHeightProfile) {
 							free(uls->ITMHeightProfile);
 							uls->ITMHeightProfile = (double *) NULL;
+						}
+						if (uls->isLOSHeightProfile) {
+							free(uls->isLOSHeightProfile);
+							uls->isLOSHeightProfile = (double *) NULL;
 						}
 					}
 				} else {

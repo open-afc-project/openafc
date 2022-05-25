@@ -6,6 +6,14 @@
 |compiled server's version is 3.3.19-0563461 |git tag 3.3.19.1|
 
 ## **Version and Date**
+|Version|**OA-259**|
+| :- | :- |
+|**Date**|**05/23/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-259: Custom not setting ITM using Tx Clutter per building data correctly
+ 
 |Version|**OA-257**|
 | :- | :- |
 |**Date**|**05/19/2022**|
