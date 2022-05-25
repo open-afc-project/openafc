@@ -52,7 +52,8 @@ interface RatAfcState {
     },
     kml?: Blob,
     includeMap: boolean,
-    clickedMapPoint?: Point
+    clickedMapPoint?: Point,
+    fullJsonResponse?: string,
 }
 
 const mapProps: MapProps = {
@@ -256,25 +257,26 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
         return spectrumInquiryRequest(request)
             .then(resp => {
                 if (resp.kind == "Success") {
-                    const response = resp.result;
+                    const response = resp.result.availableSpectrumInquiryResponses[0];
                     if (response.response.responseCode === 0) {
                         const minEirp = request.minDesiredPower || this.state.minEirp;
 
                         this.setState({
                             status: "Success",
-                            response: resp.result,
+                            response: response,
                             minEirp: minEirp,
                             mapCenter: rlanLoc,
                             clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng },
+                            fullJsonResponse: JSON.stringify(resp.result, null, 2)
                         });
                        
                         if (this.state.includeMap
-                            && response.vendorExtensions
-                            && response.vendorExtensions.length > 0
-                            && response.vendorExtensions.findIndex(x => x.extensionID == "openAfc.mapinfo") >= 0) {
+                            && resp.result.vendorExtensions
+                            && resp.result.vendorExtensions.length > 0
+                            && resp.result.vendorExtensions.findIndex(x => x.extensionID == "openAfc.mapinfo") >= 0) {
                             //Get the KML file and load it into the state.kml parameters; get the GeoJson if present
-                            let kml_filename = response.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["kmzFile"];
-                            let geoJson_filename = response.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["geoJsonFile"];
+                            let kml_filename = resp.result.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["kmzFile"];
+                            let geoJson_filename = resp.result.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["geoJsonFile"];
                             downloadMapData(kml_filename, "GET")
                                 .then(async kmlResp => {
                                     if (kmlResp.ok) {
@@ -425,7 +427,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 <br />
                 {this.state.response?.availableChannelInfo && <SpectrumDisplayLineAFC spectrum={this.state.response} />}
                 <br />
-                <JsonRawDisp value={this.state?.response ? this.state.response : this.state?.err?.body} />
+                <JsonRawDisp value={this.state?.fullJsonResponse ? this.state.fullJsonResponse : this.state?.err?.body} />
             </PageSection>);
     }
 }

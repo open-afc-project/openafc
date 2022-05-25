@@ -17,7 +17,10 @@ export const JsonRawDisp: React.FunctionComponent<{ value?: any }> = (props) => 
     <Card>
         <CardHeader>Raw JSON</CardHeader>
         <CardBody><ClipboardCopy isReadOnly={true} variant={ClipboardCopyVariant.expansion} isCode={true} >
-            {JSON.stringify(props.value, undefined, 2)}
+            {!!props.value && typeof(props.value )=== "string"?
+            props.value:
+            JSON.stringify(props.value, undefined, 2)
+            }
             </ClipboardCopy></CardBody>
     </Card>
 );

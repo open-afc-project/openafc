@@ -80,6 +80,13 @@ export interface Channels {
     channelCfi?: number[]
 }
 
+export interface AvailableSpectrumInquiryResponseMessage{
+    version: string,
+    availableSpectrumInquiryResponses: AvailableSpectrumInquiryResponse[],
+    vendorExtensions?: VendorExtension[]
+}
+
+
 export interface AvailableSpectrumInquiryResponse {
     requestId: number,
     availableFrequencyInfo?: AvailableSpectrumInfo[],

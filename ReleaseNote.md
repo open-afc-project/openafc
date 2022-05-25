@@ -34,6 +34,22 @@
 ## **Version and Date**
 
 
+## **Version and Date**
+|Version|**OA-254**|
+| :- | :- |
+|**Date**|**05/23/2022**|
+
+## **Issues Addressed**
+ * Jira OA-254: Raw JSON to add back the missing part of the response message
+
+## **Interface Changes**
+ * No Change
+
+## **Testing Done**
+ * Confirmed in Virtual AP that the missing part of the response message is present in RAW JSON response (at the bottom of the page)
+
+## **Open Issues**
+
 |Version|**OA-247**|
 | :- | :- |
 |**Date**|**05/18/2022**|

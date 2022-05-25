@@ -1,4 +1,4 @@
-import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, DeploymentEnum, VendorExtension } from "./RatAfcTypes";
+import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, AvailableSpectrumInquiryResponseMessage, DeploymentEnum, VendorExtension } from "./RatAfcTypes";
 import { RatResponse, success, error } from "./RatApiTypes";
 import { guiConfig, getDefaultAfcConf } from "./RatApi";
 import { addAuth } from "./User";
@@ -12,7 +12,7 @@ import { addAuth } from "./User";
 /**
  * Call RAT AFC resource
  */
-export const spectrumInquiryRequest = (request: AvailableSpectrumInquiryRequest): Promise<RatResponse<AvailableSpectrumInquiryResponse>> =>
+export const spectrumInquiryRequest = (request: AvailableSpectrumInquiryRequest): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> =>
     fetch(guiConfig.rat_afc, {
         method: "POST",
         headers: {
@@ -22,16 +22,11 @@ export const spectrumInquiryRequest = (request: AvailableSpectrumInquiryRequest)
     })
         .then(async resp => {
             if (resp.status == 200) {
-                const data = (await resp.json()) as {
-                    version: string, availableSpectrumInquiryResponses: AvailableSpectrumInquiryResponse[], vendorExtensions?: VendorExtension[]
-                };
+                const data = (await resp.json()) as AvailableSpectrumInquiryResponseMessage;
                 // Get the first response until API can handle multiple requests
                 const response = data.availableSpectrumInquiryResponses[0];
                 if (response.response.responseCode == 0) {
-                    if (data.vendorExtensions && data.vendorExtensions.length > 0) {
-                        response.vendorExtensions = data.vendorExtensions;
-                    }
-                    return success(response);
+                    return success(data);
                 } else {
                     return error(response.response.shortDescription, response.response.responseCode, response);
                 }
