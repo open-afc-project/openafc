@@ -3,7 +3,7 @@
 |Version|3.3.19.1|
 | :- | :- |
 |**Date**|**05/25/2022**|
-|git tag 3.3.19.1|
+|compiled server's version is 3.3.19-0563461 |git tag 3.3.19.1|
 
 ## **Version and Date**
 |Version|**OA-257**|
