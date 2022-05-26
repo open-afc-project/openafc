@@ -108,6 +108,8 @@ class AfcTester:
             self.port = params['port'][0]
         if 'out' in params:
             self.out = os.getcwd() + "/" + params['out'][0] + ".csv"
+        if 'http' in params:
+            self.url_path = 'http://'
         change_url = 0
         if 'nodbg' in params:
             self.dbg = 'nodbg'
@@ -247,6 +249,7 @@ def make_arg_parser():
                          help="<addr=<ip address|hostname>>,\n"
                               "[port=<port>],\n"
                               "[post=n] - not to check for SSL,\n"
+                              "[http] - to use HTTP protocol,\n"
                               "[dbg|nodbg] - set runtime debug option,\n"
                               "[gui|nogui] - set runtime GUI support option,\n"
                               "[out=filename] - set test results output option,\n"

@@ -92,6 +92,10 @@ Start run all tests and save results as ‘golden reference’ in the database
 ```
 afc_tests.py --cfg addr=1.2.3.4 --test a
 ```
+Run the 1st test from test DB explicitly use HTTP
+```
+afc_tests.py --cfg addr=1.2.3.4 http port=80 --test r=1
+```
 
 ## Add new test vectors
 
