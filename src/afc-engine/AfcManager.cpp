@@ -215,6 +215,13 @@ namespace OpClass
 		GlobalOpClass_136
 	};
 
+	// Hardcode for PSD to only consider 20MHz channels
+	const std::vector<OpClass> PSDOpClassList =
+	{
+		GlobalOpClass_131,
+		GlobalOpClass_136
+	};
+
 }
 
 AfcManager::AfcManager()
@@ -7177,9 +7184,13 @@ void AfcManager::runPointAnalysis()
 							if (channel->availability != BLACK) {
 								double chanStartFreq = channel->startFreqMHz * 1.0e6;
 								double chanStopFreq = channel->stopFreqMHz * 1.0e6;
+				                bool useACI = (channel->type == INQUIRED_FREQUENCY ? false : _aciFlag);
 								// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
-								double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag);
+								double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI);
 								if (spectralOverlap > 0.0) {
+                                    if (channel->type == INQUIRED_FREQUENCY) {
+										spectralOverlap = (uls->getStopUseFreq() - uls->getStartUseFreq())/(chanStopFreq - chanStartFreq);
+                                    }
 									double bandwidth = chanStopFreq - chanStartFreq;
 									double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
 									double spectralOverlapLossDB = -10.0 * log(spectralOverlap) / log(10.0);
@@ -7216,6 +7227,7 @@ void AfcManager::runPointAnalysis()
 
 									std::string rxAntennaSubModelStr;
 									double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+
 									double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
 
 									double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
@@ -9733,6 +9745,10 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 		_opClass.push_back(opClass);
 	}
 
+	for (auto opClass: OpClass::PSDOpClassList) {
+		_psdOpClassList.push_back(opClass);
+	}
+
 	_wlanMinFreq = _wlanMinFreqMHz*1.0e6;
 	_wlanMaxFreq = _wlanMaxFreqMHz*1.0e6;
 
@@ -9868,7 +9884,7 @@ void AfcManager::createChannelList()
 			numChan = 0;
 
 			// Iterate each operating classes and add all channels within the given frequency range
-			for (auto &opClass: _opClass)
+			for (auto &opClass: _psdOpClassList)
 			{
 				for (auto &cfi: opClass.channels)
 				{

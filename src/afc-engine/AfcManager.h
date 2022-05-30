@@ -413,6 +413,7 @@ class AfcManager
 		double _wlanMinFreq;                    // Min Frequency for WiFi system (double in Hz)
 		double _wlanMaxFreq;                    // Max Frequency for WiFi system (double in Hz)
 		std::vector <OpClass::OpClass> _opClass;
+		std::vector <OpClass::OpClass> _psdOpClassList;
 
 		std::string _popDensityFile;            // File contining population density data
 		double _popDensityResLon;               // Population density file resolution for longitude

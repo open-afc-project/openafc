@@ -1,4 +1,25 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-263**|
+| :- | :- |
+|**Date**|**05/27/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-263: Change PSD calculation to be based on 20-MHz EIRP and without Spectral Overlap Loss
+ 
+## **Interface Changes**
+ * No Change
+
+## **Testing Done**
+ * Ran a test with both frequency and channel inquiry. Confirmed that the PSD levels made sense - they were following the 20-MHz EIRP levels and they were always as good or worse than max allowable EIRPs - 10*log10(20).
+ * Next ran the same test but without channel inquiry and using the exc_thr file (which contains the link budgets for PSD calculations only) derived the PSD levels (see columns AX to BD) and confirmed they matched.
+ 
+
+## **Open Issues**
+ * None
+
 ## **Version and Date**
 |Version|3.3.19.1|
 | :- | :- |
