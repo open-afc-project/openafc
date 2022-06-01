@@ -209,9 +209,9 @@ class AfcManager
 		double Winner2_D1rural_LOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double& pathLossCDF) const;
 		double Winner2_D1rural_NLOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double& pathLossCDF) const;
 
-		double Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, int losValue) const;
-		double Winner2_C2urban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, int losValue) const;
-		double Winner2_D1rural(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, int losValue) const;
+		double Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, double& probLOS, int losValue) const;
+		double Winner2_C2urban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, double& probLOS, int losValue) const;
+		double Winner2_D1rural(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, double& probLOS, int losValue) const;
 
 		void computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &psdFreqRangeList); // Compute list of psdSegments for each inquired frequency range
 
@@ -526,6 +526,7 @@ class AfcManager
 		//bool _configChange = false;
 
 #if DEBUG_AFC
+		void runTestWinner2(std::string inputFile, std::string outputFile);
 		void runAnalyzeNLCD();
 #endif
 };

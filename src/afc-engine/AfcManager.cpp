@@ -438,6 +438,10 @@ void AfcManager::initializeDatabases()
 			minLonBldg = minLon;
 			maxLonBldg = maxLon;
 		}
+#if DEBUG_AFC
+	} else if (_analysisType == "test_winner2") {
+		// Do nothing
+#endif
 	} else {
 		throw std::runtime_error(QString("Invalid analysis type: %1").arg(QString::fromStdString(_analysisType)).toStdString());
 	}
@@ -558,6 +562,10 @@ void AfcManager::initializeDatabases()
 		readRASData(_rasDataFile);
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		fixFSTerrain();
+#if DEBUG_AFC
+	} else if (_analysisType == "test_winner2") {
+		// Do nothing
+#endif
 	} else {
 		throw std::runtime_error(QString("Invalid analysis type: %1").arg(QString::fromStdString(_analysisType)).toStdString());
 	}
@@ -1319,6 +1327,10 @@ void AfcManager::importGUIjsonVersion1_1(const QJsonObject &jsonObj)
 		if (_invalidParams.size()) {
 			_responseCode = CConst::invalidValueResponseCode;
 		}
+#if DEBUG_AFC
+	} else if (_analysisType == "test_winner2") {
+		// Do nothing
+#endif
 	} else {
 		throw std::runtime_error(QString("Invalid analysis type for version 1.1: %1").arg(QString::fromStdString(_analysisType)).toStdString());
 	}
@@ -2631,6 +2643,10 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string&
 	else if (_analysisType == "ScanAnalysis")
 	{
 		outputDocument = QJsonDocument();
+#if DEBUG_AFC
+	} else if (_analysisType == "test_winner2") {
+		// Do nothing
+#endif
 	}
 	else
 	{
@@ -4379,8 +4395,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								if (!validFlag) {
 									std::ostringstream errStr;
 									errStr << "Invalid ULS data for FSID = " << fsid
-										   << ", Unknown Rx Antenna \"" << strval
-										   << "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
+										<< ", Unknown Rx Antenna \"" << strval
+										<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
 									LOGGER_WARN(logger) << errStr.str();
 									statusMessageList.push_back(errStr.str());
 
@@ -4758,6 +4774,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 	return;
 }
 /******************************************************************************************/
+
 /******************************************************************************************/
 /**** AfcManager::readRASData()                                                        ****/
 /******************************************************************************************/
@@ -5305,16 +5322,16 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						winner2LOSValue = 2;
 					}
 
-					double sigma;
+					double sigma, probLOS;
 					if (propEnv == CConst::urbanPropEnv)
 					{
 						// Winner2 C2: urban
-						pathLoss = Winner2_C2urban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, winner2LOSValue);
+						pathLoss = Winner2_C2urban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 					}
 					else if (propEnv == CConst::suburbanPropEnv)
 					{
 						// Winner2 C1: suburban
-						pathLoss = Winner2_C1suburban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, winner2LOSValue);
+						pathLoss = Winner2_C1suburban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 					}
 				}
 				else
@@ -5424,16 +5441,16 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 						winner2LOSValue = 2;
 					}
 
-					double sigma;
+					double sigma, probLOS;
 					if (propEnv == CConst::urbanPropEnv)
 					{
 						// Winner2 C2: urban
-						pathLoss = Winner2_C2urban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, winner2LOSValue);
+						pathLoss = Winner2_C2urban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 					}
 					else if (propEnv == CConst::suburbanPropEnv)
 					{
 						// Winner2 C1: suburban
-						pathLoss = Winner2_C1suburban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, winner2LOSValue);
+						pathLoss = Winner2_C1suburban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 					}
 				}
 				else
@@ -5587,16 +5604,16 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 				winner2LOSValue = 2;
 			}
 
-			double sigma;
+			double sigma, probLOS;
 			if (propEnv == CConst::urbanPropEnv) {
 				// Winner2 C2: urban
-				pathLoss = Winner2_C2urban(1000*distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, winner2LOSValue);
+				pathLoss = Winner2_C2urban(1000*distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 			} else if (propEnv == CConst::suburbanPropEnv) {
 				// Winner2 C1: suburban
-				pathLoss = Winner2_C1suburban(1000*distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, winner2LOSValue);
+				pathLoss = Winner2_C1suburban(1000*distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 			} else if ( (propEnv == CConst::ruralPropEnv) || (propEnv == CConst::barrenPropEnv) ) {
 				// Winner2 D1: rural
-				pathLoss = Winner2_D1rural(1000*distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, winner2LOSValue);
+				pathLoss = Winner2_D1rural(1000*distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 			} else {
 				throw std::runtime_error(ErrStream() << "ERROR: propEnv = " << propEnv << " INVALID value");
 			}
@@ -5948,13 +5965,13 @@ double AfcManager::Winner2_C1suburban_NLOS(double distance, double hBS, double /
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, int losValue) const
+double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
 {
 	double retval;
 
-	if (losValue == 0) {
-		double probLOS = (((_closeInHgtFlag) && (hMS > _closeInHgtLOS)) ? 1.0 : exp(-distance / 200));
+	probLOS = (((_closeInHgtFlag) && (hMS > _closeInHgtLOS)) ? 1.0 : exp(-distance / 200));
 
+	if (losValue == 0) {
 		if (_winner2UnknownLOSMethod == CConst::PLOSCombineWinner2UnknownLOSMethod) {
 			double sigmaLOS, sigmaNLOS;
 			double plLOS  = Winner2_C1suburban_LOS( distance, hBS, hMS, frequency, true, 0.0, sigmaLOS, pathLossCDF);
@@ -6092,22 +6109,20 @@ double AfcManager::Winner2_C2urban_NLOS(double distance, double hBS, double /* h
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, int losValue) const
+double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
 {
 	double retval;
 
+	if ((_closeInHgtFlag) && (hMS > _closeInHgtLOS))
+	{
+		probLOS = 1.0;
+	}
+	else
+	{
+		probLOS = (distance > 18.0 ? 18.0 / distance : 1.0) * (1.0 - exp(-distance / 63.0)) + exp(-distance / 63.0);
+	}
+
 	if (losValue == 0) {
-
-		double probLOS;
-		if ((_closeInHgtFlag) && (hMS > _closeInHgtLOS))
-		{
-			probLOS = 1.0;
-		}
-		else
-		{
-			probLOS = (distance > 18.0 ? 18.0 / distance : 1.0) * (1.0 - exp(-distance / 63.0)) + exp(-distance / 63.0);
-		}
-
 		if (_winner2UnknownLOSMethod == CConst::PLOSCombineWinner2UnknownLOSMethod) {
 			double sigmaLOS, sigmaNLOS;
 			double plLOS  = Winner2_C2urban_LOS( distance, hBS, hMS, frequency, true, 0.0, sigmaLOS, pathLossCDF);
@@ -6243,22 +6258,20 @@ double AfcManager::Winner2_D1rural_NLOS(double distance, double hBS, double hMS,
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, int losValue) const
+double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
 {
 	double retval;
 
+	if ((_closeInHgtFlag) && (hMS > _closeInHgtLOS))
+	{
+		probLOS = 1.0;
+	}
+	else
+	{
+		probLOS = exp(-distance / 1000);
+	}
+
 	if (losValue == 0) {
-
-		double probLOS;
-		if ((_closeInHgtFlag) && (hMS > _closeInHgtLOS))
-		{
-			probLOS = 1.0;
-		}
-		else
-		{
-			probLOS = exp(-distance / 1000);
-		}
-
 		if (_winner2UnknownLOSMethod == CConst::PLOSCombineWinner2UnknownLOSMethod) {
 			double sigmaLOS, sigmaNLOS;
 			double plLOS  = Winner2_D1rural_LOS( distance, hBS, hMS, frequency, true, 0.0, sigmaLOS, pathLossCDF);
@@ -6329,6 +6342,8 @@ void AfcManager::compute()
 	} else if (_analysisType == "HeatmapAnalysis") {
 		runHeatmapAnalysis();
 #if DEBUG_AFC
+	} else if (_analysisType == "test_winner2") {
+		runTestWinner2("w2_alignment.csv", "w2_alignment_afc.csv");
 	} else if (_analysisType == "test_aciFn") {
 		double fStartMHz = -5.0;
 		double fStopMHz  = 25.0;
@@ -10035,6 +10050,263 @@ bool AfcManager::containsChannel(const std::vector<FreqBandClass>& freqBandList,
 	return(containsFlag);
 }
 /**************************************************************************************/
+
+#if DEBUG_AFC
+/******************************************************************************************/
+/* AfcManager::runTestWinner2()                                                           */
+/******************************************************************************************/
+void AfcManager::runTestWinner2(std::string inputFile, std::string outputFile)
+{
+	LOGGER_INFO(logger) << "Executing AfcManager::runTestWinner2()";
+
+	int linenum, fIdx, validFlag;
+	std::string line, strval;
+	char *chptr;
+	std::string str;
+	std::string reasonIgnored;
+	std::ostringstream errStr;
+
+	int regionFieldIdx = -1;
+	int distanceFieldIdx = -1;
+	int hbFieldIdx = -1;
+	int hmFieldIdx = -1;
+	int frequencyFieldIdx = -1;
+	int confidenceFieldIdx = -1;
+
+	std::vector<int *> fieldIdxList;                       std::vector<std::string> fieldLabelList;
+	fieldIdxList.push_back(&regionFieldIdx);               fieldLabelList.push_back("Region");
+	fieldIdxList.push_back(&distanceFieldIdx);             fieldLabelList.push_back("Distance (m)");
+	fieldIdxList.push_back(&hbFieldIdx);                   fieldLabelList.push_back("hb (m)");
+	fieldIdxList.push_back(&hmFieldIdx);                   fieldLabelList.push_back("hm (m)");
+	fieldIdxList.push_back(&frequencyFieldIdx);            fieldLabelList.push_back("Frequency (GHz)");
+	fieldIdxList.push_back(&confidenceFieldIdx);           fieldLabelList.push_back("Confidence");
+
+	CConst::PropEnvEnum propEnv;
+	double distance;
+	double hb;
+	double hm;
+	double frequency;
+	double confidence;
+
+	int winner2LOSValue = 0;
+	_winner2UnknownLOSMethod = CConst::PLOSCombineWinner2UnknownLOSMethod;
+	double plLOS, plNLOS, plCombined;
+	double zval, probLOS, pathLossCDF;
+	double sigmaLOS, sigmaNLOS, sigmaCombined;
+	std::string pathLossModelStr;
+
+	int fieldIdx;
+
+	if (inputFile.empty()) {
+		throw std::runtime_error("ERROR: No Winner2 Test File specified");
+	}
+
+	LOGGER_INFO(logger) << "Reading Winner2 Test File: " << inputFile;
+
+	FILE *fin;
+	if ( !(fin = fopen(inputFile.c_str(), "rb")) ) {
+		str = std::string("ERROR: Unable to open Winner2 Test File \"") + inputFile + std::string("\"\n");
+		throw std::runtime_error(str);
+	}
+
+
+	FILE *fout;
+	if ( !(fout = fopen(outputFile.c_str(), "wb")) ) {
+		errStr << std::string("ERROR: Unable to open Winner2 Test Output File \"") + outputFile + std::string("\"\n");
+		throw std::runtime_error(errStr.str());
+	}
+
+	enum LineTypeEnum {
+		labelLineType,
+		dataLineType,
+		ignoreLineType,
+		unknownLineType
+	};
+
+	LineTypeEnum lineType;
+
+	linenum = 0;
+	bool foundLabelLine = false;
+	while (fgetline(fin, line, false)) {
+		linenum++;
+		std::vector<std::string> fieldList = splitCSV(line);
+
+		lineType = unknownLineType;
+		/**************************************************************************/
+		/**** Determine line type                                              ****/
+		/**************************************************************************/
+		if (fieldList.size() == 0) {
+			lineType = ignoreLineType;
+		} else {
+			fIdx = fieldList[0].find_first_not_of(' ');
+			if (fIdx == (int) std::string::npos) {
+				if (fieldList.size() == 1) {
+					lineType = ignoreLineType;
+				}
+			} else {
+				if (fieldList[0].at(fIdx) == '#') {
+					lineType = ignoreLineType;
+				}
+			}
+		}
+
+		if ((lineType == unknownLineType)&&(!foundLabelLine)) {
+			lineType = labelLineType;
+			foundLabelLine = 1;
+		}
+		if ((lineType == unknownLineType)&&(foundLabelLine)) {
+			lineType = dataLineType;
+		}
+		/**************************************************************************/
+
+		/**************************************************************************/
+		/**** Process Line                                                     ****/
+		/**************************************************************************/
+		bool found;
+		std::string field;
+		switch(lineType) {
+			case   labelLineType:
+				for(fieldIdx=0; fieldIdx<(int) fieldList.size(); fieldIdx++) {
+					field = fieldList.at(fieldIdx);
+
+					// std::cout << "FIELD: \"" << field << "\"" << std::endl;
+
+					found = false;
+					for(fIdx=0; (fIdx < (int) fieldLabelList.size())&&(!found); fIdx++) {
+						if (field == fieldLabelList.at(fIdx)) {
+							*fieldIdxList.at(fIdx) = fieldIdx;
+							found = true;
+						}
+					}
+				}
+
+				for(fIdx=0; fIdx < (int) fieldIdxList.size(); fIdx++) {
+					if (*fieldIdxList.at(fIdx) == -1) {
+						errStr << "ERROR: Invalid Winner2 Test Input file \"" << inputFile << "\" label line missing \"" << fieldLabelList.at(fIdx) << "\"" << std::endl;
+						throw std::runtime_error(errStr.str());
+					}
+				}
+
+				fprintf(fout, "%s,%s,%s,%s,%s\n", line.c_str(), "afc_probLOS", "afc_plLOS", "afc_plNLOS", "afc_plCombined");
+
+				break;
+			case    dataLineType:
+				/**************************************************************************/
+				/* REGION (propEnv)                                                        */
+				/**************************************************************************/
+				strval = fieldList.at(regionFieldIdx);
+				if (strval.empty()) {
+					errStr << "ERROR: Invalid Winner2 Test Input file \"" << inputFile << "\" line " << linenum << " missing REGION" << std::endl;
+					throw std::runtime_error(errStr.str());
+				}
+
+				propEnv = (CConst::PropEnvEnum) CConst::strPropEnvList->str_to_type(strval, validFlag);
+
+				if (!validFlag) {
+					errStr << "ERROR: Invalid Winner2 Test Input file \"" << inputFile << "\" line " << linenum << " INVALID REGION = " << strval << std::endl;
+					throw std::runtime_error(errStr.str());
+				}
+				/**************************************************************************/
+
+				/**************************************************************************/
+				/* distance                                                               */
+				/**************************************************************************/
+				strval = fieldList.at(distanceFieldIdx);
+				if (strval.empty()) {
+					errStr << "ERROR: Invalid Winner2 Test Input file \"" << inputFile << "\" line " << linenum << " missing Distance (m)" << std::endl;
+					throw std::runtime_error(errStr.str());
+				}
+				distance = std::strtod(strval.c_str(), &chptr);
+				/**************************************************************************/
+
+				/**************************************************************************/
+				/* hb                                                               */
+				/**************************************************************************/
+				strval = fieldList.at(hbFieldIdx);
+				if (strval.empty()) {
+					errStr << "ERROR: Invalid Winner2 Test Input file \"" << inputFile << "\" line " << linenum << " missing hb" << std::endl;
+					throw std::runtime_error(errStr.str());
+				}
+				hb = std::strtod(strval.c_str(), &chptr);
+				/**************************************************************************/
+
+				/**************************************************************************/
+				/* hm                                                               */
+				/**************************************************************************/
+				strval = fieldList.at(hmFieldIdx);
+				if (strval.empty()) {
+					errStr << "ERROR: Invalid Winner2 Test Input file \"" << inputFile << "\" line " << linenum << " missing hm" << std::endl;
+					throw std::runtime_error(errStr.str());
+				}
+				hm = std::strtod(strval.c_str(), &chptr);
+				/**************************************************************************/
+
+				/**************************************************************************/
+				/* frequency                                                              */
+				/**************************************************************************/
+				strval = fieldList.at(frequencyFieldIdx);
+				if (strval.empty()) {
+					errStr << "ERROR: Invalid Winner2 Test Input file \"" << inputFile << "\" line " << linenum << " missing Frequency (GHz)" << std::endl;
+					throw std::runtime_error(errStr.str());
+				}
+				frequency = std::strtod(strval.c_str(), &chptr)*1.0e9; // Convert GHz to Hz
+				/**************************************************************************/
+
+				/**************************************************************************/
+				/* confidence                                                             */
+				/**************************************************************************/
+				strval = fieldList.at(confidenceFieldIdx);
+				if (strval.empty()) {
+					errStr << "ERROR: Invalid Winner2 Test Input file \"" << inputFile << "\" line " << linenum << " missing Confidence" << std::endl;
+					throw std::runtime_error(errStr.str());
+				}
+				confidence = std::strtod(strval.c_str(), &chptr);
+				/**************************************************************************/
+
+
+				zval = -qerfi(confidence);
+				_zwinner2Combined = zval;
+				if (propEnv == CConst::urbanPropEnv) {
+					plLOS      = Winner2_C2urban_LOS( distance, hb, hm, frequency, true, zval, sigmaLOS, pathLossCDF);
+					plNLOS     = Winner2_C2urban_NLOS(distance, hb, hm, frequency, true, zval, sigmaNLOS, pathLossCDF);
+					plCombined = Winner2_C2urban(     distance, hb, hm, frequency, true, sigmaCombined, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+				} else if (propEnv == CConst::suburbanPropEnv) {
+					plLOS      = Winner2_C1suburban_LOS( distance, hb, hm, frequency, true, zval, sigmaLOS, pathLossCDF);
+					plNLOS     = Winner2_C1suburban_NLOS(distance, hb, hm, frequency, true, zval, sigmaNLOS, pathLossCDF);
+					plCombined = Winner2_C1suburban(     distance, hb, hm, frequency, true, sigmaCombined, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+				} else if (propEnv == CConst::ruralPropEnv) {
+					plLOS      = Winner2_D1rural_LOS( distance, hb, hm, frequency, true, zval, sigmaLOS, pathLossCDF);
+					plNLOS     = Winner2_D1rural_NLOS(distance, hb, hm, frequency, true, zval, sigmaNLOS, pathLossCDF);
+					plCombined = Winner2_D1rural(     distance, hb, hm, frequency, true, sigmaCombined, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+				} else {
+					CORE_DUMP;
+				}
+
+				if (distance < 50.0) {
+					probLOS = 1.0;
+					plCombined = plLOS;
+				}
+
+				fprintf(fout, "%s,%.3f,%3f,%.3f,%.3f\n", line.c_str(), probLOS, plLOS, plNLOS, plCombined);
+
+				break;
+			case  ignoreLineType:
+			case unknownLineType:
+				// do nothing
+				break;
+			default:
+				CORE_DUMP;
+				break;
+		}
+	}
+
+	if (fin) { fclose(fin); }
+	if (fout) { fclose(fout); }
+
+	return;
+}
+/******************************************************************************************/
+#endif
 
 #if DEBUG_AFC
 /******************************************************************************************/
