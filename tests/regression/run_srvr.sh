@@ -18,8 +18,7 @@ docker build -t afc-regression-test .
 cd $wd/tests/regression
 mkdir pipe
 mkdir afc_config
-docker run --rm --user 1003:1003 -v `pwd`/pipe:/pipe afc-regression-test --db e=/pipe/export_admin_cfg.json
-
+docker run --rm -v `pwd`/pipe:/pipe afc-regression-test --cmd exp_adm_cfg --outfile /pipe/export_admin_cfg.json
 # copy regr server config and run srvr
 cp -a ~/template_regrtest/*  $wd/tests/regression
 docker tag dr942120/srv_di:${rand} srvr_di

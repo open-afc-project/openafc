@@ -52,7 +52,7 @@ The sequence executes all required tests and returns fail if even one test fails
 The testing procedure begins by preparing a test database with test vectors and responses.
 Follows run of test utility with server and test options (for details see #tests-execution-options).
 ```
-afc_tests.py --cfg <server cfg> --test <test cfg>
+afc_tests.py --addr <server address> --cmd run [--test <test index>]
 ```
 Current implementation provides an already prepared database file (afc_input.sqlite3).
 
@@ -78,30 +78,30 @@ splitting JSON into fields which can be redesigned by request.
 
 Start sequential run of tests according to the data in the database
 ```
-afc_tests.py --cfg addr=1.2.3.4 --test r
+afc_tests.py --addr 1.2.3.4 --cmd run
 ```
 Run a test or number of tests according to database index
 ```
-afc_tests.py --cfg addr=1.2.3.4 --test r=1,13,30
+afc_tests.py --addr 1.2.3.4 --cmd run --test 1,13,30
 ```
 Run a test and save test result to csv format file.
 ```
-afc_tests.py --cfg addr=1.2.3.4 out=filename --test a
+afc_tests.py --addr 1.2.3.4 --outfile=filename.csv --cmd run --test 22
 ```
 Start run all tests and save results as ‘golden reference’ in the database
 ```
-afc_tests.py --cfg addr=1.2.3.4 --test a
+afc_tests.py --addr 1.2.3.4 --cmd add_reqs
 ```
 Run the 1st test from test DB explicitly use HTTP
 ```
-afc_tests.py --cfg addr=1.2.3.4 http port=80 --test r=1
+afc_tests.py --addr 1.2.3.4 --prot http --port 80 --test 1 --cmd run
 ```
 
 ## Add new test vectors
 
-To add new test vectors to the database provide a file to the following command line.
+Add new test vectors to the database provide a file to the following command line.
 ```
-afc_tests.py --cfg addr=1.2.3.4 --db a=add_test_vector.txt
+afc_tests.py --addr=1.2.3.4 --cmd add_reqs --infile add_test_vector.txt
 ```
 Provided file consists of any number of test vectors in the following format of AFC request.
 
@@ -113,20 +113,20 @@ By default, a new test vector is sent to the AFC server in order to acquire it�
 
 This is an option to run a test vector from a file without further saving it or it's response to the database file.
 ```
-afc_tests.py --cfg addr=1.2.3.4 --db r=add_test_vector.txt
+afc_tests.py --addr 1.2.3.4 --cmd  dry_run --infile add_test_vector.txt
 ```
 ## Dump test database
 
 Show all entries from the database (requests and responses)
 ```
-afc_tests.py --db d
+afc_tests.py --cmd dump_db
 ```
 
 ## Export AFC Server admin configuration
 
-Export from the testing database to text file in JSOn format.
+Export from the testing database to text file in JSON format.
 ```
-afc_tests.py --db e=./export_admin_cfg.json
+afc_tests.py --cmd exp_adm_cfg  --outfile export_admin_cfg.json
 ```
 
 ## Add AFC Server admin configuration
@@ -154,12 +154,12 @@ rat-manage-api cfg list src=./add_admin_cfg.json
 
 How to export test vectors from WFA file into JSON format file.
 ```
-afc_tests.py --db i=<input file>,[test category,[output file]]
+afc_tests.py --cmd parse_tests --infile <input file> --outfile <output file>
 ```
-For example,
+For example, export certain WFA test cases
 
 ```
-afc_tests.py --db i="AFC System (SUT) Test Vectors r6.xlsx",all,/tests/abc.txt
+afc_tests.py --cmd parse_tests --infile "AFC System (SUT) Test Vectors r6.xlsx" --outfile abc.txt --test_id srs
 ```
 
 <br /><br />
