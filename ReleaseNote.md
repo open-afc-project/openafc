@@ -1,4 +1,9 @@
 # Release Note
+## **Version and Date**
+|Version|3.3.20.1|
+| :- | :- |
+|**Date**|**06/07/2022**|
+|compiled server's version is tbd |git tag 3.3.20.1|
 
 ## **Version and Date**
 
@@ -9,7 +14,7 @@
 
 ## **Issues Addressed**
  * Jira OA-265: Enable/Disable consideration of FS channel overlap with RLAN
- 
+
 ## **Interface Changes**
  * There's a new configurable parameter in afc-config (both the GUI and hence the .json file). In the .json file, this is called "channelResponseAlgorithm" which is set to either "pwr" or "psd"
 
