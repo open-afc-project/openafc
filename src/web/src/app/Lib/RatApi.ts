@@ -85,6 +85,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "fsClutterModel": { p2108Confidence: 5, maxFsAglHeight: 6 },
     "nlcdFile": "federated_nlcd.tif",
     "enableMapInVirtualAp": false,
+    channelResponseAlgorithm: 'pwr',
     "version": guiConfig.version
 });
 

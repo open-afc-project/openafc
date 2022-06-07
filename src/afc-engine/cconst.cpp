@@ -92,3 +92,10 @@ const StrTypeClass CConst::strHeightSourceList[] = {
 	{          CConst::lidarHeightSource, "LiDAR"            },
 	{                                    -1,  (char *) 0     }
 };
+
+const StrTypeClass CConst::strSpectralAlgorithmList[] = {
+	{                 CConst::pwrSpectralAlgorithm, "pwr"    },
+	{                 CConst::psdSpectralAlgorithm, "psd"    },
+	{                                    -1,  (char *) 0     }
+
+};

@@ -56,7 +56,8 @@ export interface AFCConfigFile {
     fsClutterModel?: FSClutterModel,
     regionStr?: string,
     rasDatabase?: string,
-    enableMapInVirtualAp?: boolean
+    enableMapInVirtualAp?: boolean,
+    channelResponseAlgorithm: ChannelResponseAlgorithm
 }
 
 export type FreqRange = {
@@ -193,6 +194,7 @@ export interface FSClutterModel {
 
 export type ScanPointBelowGroundMethod = "discard" | "truncate"
 
+export type ChannelResponseAlgorithm = 'pwr' | 'psd'
 
 /**
  * PAWS request format is specified in 

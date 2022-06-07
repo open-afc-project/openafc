@@ -179,7 +179,7 @@ class AfcManager
 		double getBandwidth(std::string emissionsDesignator);
 		double getAngleFromDMS(std::string dmsStr);
 		int findULSAntenna(std::string strval);
-		double computeSpectralOverlap(double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq, bool aciFlag) const;
+		bool computeSpectralOverlapLoss(double *spectralOverlapLossDBptr, double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq, bool aciFlag, CConst::SpectralAlgorithmEnum spectralAlgorithm) const;
 
 		void readRASData(std::string filename);
 
@@ -317,6 +317,10 @@ class AfcManager
 		// BldgDataWinner2LOSOption : use building data 
 		// ForceLOSWinner2LOSOption : Always use LOS
 		// ForceNLOSWinner2LOSOption : Always use NLOS
+
+		CConst::SpectralAlgorithmEnum _channelResponseAlgorithm;
+		// pwrSpectralAlgorithm : use power method
+		// psdSpectralAlgorithm : use psd   method
 
 		CConst::Winner2UnknownLOSMethodEnum _winner2UnknownLOSMethod;  // Method used to compute Winner2 PL when LOS not known
 		// PLOSCombineWinner2UnknownLOSMethod : Compute probLOS, then combine

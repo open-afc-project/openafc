@@ -1752,11 +1752,11 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 		if (stopFreqMHz <= startFreqMHz) {
 			errMsg = QString("ERROR: Freq Band %1 Invalid, startFreqMHz = %2, stopFreqMHz = %3.  Require startFreqMHz < stopFreqMHz")
-					 .arg(QString::fromStdString(name)).arg(startFreqMHz).arg(stopFreqMHz);
+					.arg(QString::fromStdString(name)).arg(startFreqMHz).arg(stopFreqMHz);
 			throw std::runtime_error(errMsg.toStdString());
 		} else if ((stopFreqMHz <= _wlanMinFreqMHz) || (startFreqMHz >= _wlanMaxFreqMHz)) {
 			errMsg = QString("ERROR: Freq Band %1 Invalid, startFreqMHz = %2, stopFreqMHz = %3.  Has no overlap with band [%4,%5].")
-					 .arg(QString::fromStdString(name)).arg(startFreqMHz).arg(stopFreqMHz).arg(_wlanMinFreqMHz).arg(_wlanMaxFreqMHz);
+					.arg(QString::fromStdString(name)).arg(startFreqMHz).arg(stopFreqMHz).arg(_wlanMinFreqMHz).arg(_wlanMaxFreqMHz);
 			throw std::runtime_error(errMsg.toStdString());
 		}
 
@@ -2125,6 +2125,13 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_mapDataGeoJsonFile = "mapData.json.gz";
 		}
 	}
+
+	if (jsonObj.contains("channelResponseAlgorithm") && !jsonObj["channelResponseAlgorithm"].isUndefined()) {
+		std::string strval = jsonObj["channelResponseAlgorithm"].toString().toStdString();
+		_channelResponseAlgorithm = (CConst::SpectralAlgorithmEnum) CConst::strSpectralAlgorithmList->str_to_type(strval, validFlag, 1);
+	} else {
+		_channelResponseAlgorithm = CConst::pwrSpectralAlgorithm;
+	}
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -2223,7 +2230,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 				if (    (chan.type == ChannelType::INQUIRED_CHANNEL)
 						&& (chan.operatingClass == operatingClass)
 						&& (chan.availability != BLACK)
-				   ) {
+				) {
 					indexArray.append(chan.index);
 					eirpArray.append(chan.eirpLimit_dBm);
 				}
@@ -3349,7 +3356,7 @@ std::tuple<LatLon, LatLon, LatLon> AfcManager::computeBeamConeLatLon(ULSClass *u
 }
 
 /******************************************************************************************/
-/**** inline function aciFn() used only in computeSpectralOverlap                      ****/
+/**** inline function aciFn() used only in computeSpectralOverlapLoss                  ****/
 /******************************************************************************************/
 inline double aciFn(double fMHz, double BMHz)
 {
@@ -3420,33 +3427,74 @@ inline double aciFn(double fMHz, double BMHz)
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** AfcManager::computeSpectralOverlap                                               ****/
+/**** AfcManager::computeSpectralOverlapLoss                                           ****/
 /******************************************************************************************/
-double AfcManager::computeSpectralOverlap(double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq, bool aciFlag) const
+bool AfcManager::computeSpectralOverlapLoss(double *spectralOverlapLossDBptr, double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq,
+	bool aciFlag, CConst::SpectralAlgorithmEnum spectralAlgorithm) const
 {
-	double overlap;
+	bool hasOverlap;
 
 	if (!aciFlag) {
 		if ((sigStopFreq <= rxStartFreq) || (sigStartFreq >= rxStopFreq)) {
-			overlap = 0.0;
+			hasOverlap = false;
+			if (spectralOverlapLossDBptr) {
+				*spectralOverlapLossDBptr = -std::numeric_limits<double>::infinity();
+			}
 		} else {
-			double f1 = (sigStartFreq < rxStartFreq ? rxStartFreq : sigStartFreq);
-			double f2 = (sigStopFreq > rxStopFreq ? rxStopFreq : sigStopFreq);
-			overlap = (f2 - f1) / (sigStopFreq - sigStartFreq);
+			hasOverlap = true;
+			if (spectralOverlapLossDBptr) {
+				double f1 = (sigStartFreq < rxStartFreq ? rxStartFreq : sigStartFreq);
+				double f2 = (sigStopFreq > rxStopFreq ? rxStopFreq : sigStopFreq);
+				double overlap;
+				if (spectralAlgorithm == CConst::pwrSpectralAlgorithm) {
+					overlap = (f2 - f1) / (sigStopFreq - sigStartFreq);
+				} else {
+					overlap = (rxStopFreq - rxStartFreq) / (sigStopFreq - sigStartFreq);
+				}
+				*spectralOverlapLossDBptr = -10.0 * log(overlap) / log(10.0);
+			}
 		}
 	} else {
 		if ((2*sigStopFreq-sigStartFreq <= rxStartFreq) || (2*sigStartFreq-sigStopFreq >= rxStopFreq)) {
-			overlap = 0.0;
+			hasOverlap = false;
+			if (spectralOverlapLossDBptr) {
+				*spectralOverlapLossDBptr = -std::numeric_limits<double>::infinity();
+			}
 		} else {
-			double BMHz = (sigStopFreq - sigStartFreq)*1.0e-6;
-			double fStartMHz = (rxStartFreq - (sigStartFreq + sigStopFreq)/2)*1.0e-6;
-			double fStopMHz  = (rxStopFreq  - (sigStartFreq + sigStopFreq)/2)*1.0e-6;
-			overlap = aciFn(fStopMHz, BMHz) - aciFn(fStartMHz, BMHz);
+			hasOverlap = true;
+			if (spectralOverlapLossDBptr) {
+				double BMHz = (sigStopFreq - sigStartFreq)*1.0e-6;
+				double fStartMHz = (rxStartFreq - (sigStartFreq + sigStopFreq)/2)*1.0e-6;
+				double fStopMHz  = (rxStopFreq  - (sigStartFreq + sigStopFreq)/2)*1.0e-6;
+				if (spectralAlgorithm == CConst::pwrSpectralAlgorithm) {
+					double overlap = aciFn(fStopMHz, BMHz) - aciFn(fStartMHz, BMHz);
+					*spectralOverlapLossDBptr = -10.0 * log(overlap) / log(10.0);
+				} else {
+					double fCrit;
+					if ((fStartMHz <= 0.0) && (fStopMHz >= 0.0)) {
+						fCrit = 0.0;
+					} else {
+						fCrit = std::min(fabs(fStartMHz), fabs(fStopMHz));
+					}
+					double psdDB;
+					if (fCrit < BMHz/2) {
+						psdDB = 0.0;
+					} else if (fCrit < BMHz/2 + 1.0) {
+						psdDB = -20.0*(fCrit - BMHz/2);
+					} else if (fCrit < BMHz) {
+						psdDB = (-20.0*(BMHz - fCrit) - 28.0*(fCrit - BMHz/2 - 1.0))/(BMHz/2 - 1.0);
+					} else {
+						psdDB = (-28.0*(3*BMHz/2 - fCrit) - 40.0*(fCrit - BMHz))/(BMHz/2);
+					}
+					double overlap = (rxStopFreq - rxStartFreq) / (sigStopFreq - sigStartFreq);
+					*spectralOverlapLossDBptr = -psdDB - 10.0 * log(overlap) / log(10.0);
+				}
+			}
 
 		}
 	}
 
-	return (overlap);
+	return (hasOverlap);
 }
 /******************************************************************************************/
 
@@ -3457,7 +3505,7 @@ double AfcManager::computeSpectralOverlap(double sigStartFreq, double sigStopFre
 /****                2: RX and TX                                                      ****/
 /******************************************************************************************/
 void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::string>>& ulsDatabaseList, PopGridClass *popGridVal, int linkDirection, double minFreq, double maxFreq, bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
-							 const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
+	const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
 
 	auto fs_anom_writer = GzipCsvWriter(_fsAnomFile);
@@ -4551,12 +4599,9 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 			if (!ignoreFlag)
 			{
-				double spectralOverlap;
-				spectralOverlap = computeSpectralOverlap(startFreq, stopFreq, 5925.0e6, 6425.0e6, false);
-				bool unii5Flag = (spectralOverlap > 0.0);
+				bool unii5Flag = computeSpectralOverlapLoss((double *) NULL, startFreq, stopFreq, 5925.0e6, 6425.0e6, false, CConst::psdSpectralAlgorithm);
 
-				spectralOverlap = computeSpectralOverlap(startFreq, stopFreq, 6525.0e6, 6875.0e6, false);
-				bool unii7Flag = (spectralOverlap > 0.0);
+				bool unii7Flag = computeSpectralOverlapLoss((double *) NULL, startFreq, stopFreq, 6525.0e6, 6875.0e6, false, CConst::psdSpectralAlgorithm);
 
 				double rxAntennaFeederLossDB;
 				double noiseFigureDB;
@@ -6475,15 +6520,15 @@ void AfcManager::runPointAnalysis()
 	}
 	if (fFSList) {
 		fprintf(fFSList,   "FSID"
-						  ",RX_CALLSIGN"
-						  ",TX_CALLSIGN"
-						  ",FS_START_FREQ (MHz)"
-						  ",FS_STOP_FREQ (MHz)"
-						  ",FS_RX_LONGITUDE (deg)"
-						  ",FS_RX_LATITUDE (deg)"
-						  ",FS_RX_HEIGHT_AGL (m)"
-						  ",FS_RX_RLAN_DIST (m)"
-						  "\n");
+			",RX_CALLSIGN"
+			",TX_CALLSIGN"
+			",FS_START_FREQ (MHz)"
+			",FS_STOP_FREQ (MHz)"
+			",FS_RX_LONGITUDE (deg)"
+			",FS_RX_LATITUDE (deg)"
+			",FS_RX_HEIGHT_AGL (m)"
+			",FS_RX_RLAN_DIST (m)"
+			"\n");
 	}
 	/**************************************************************************************/
 
@@ -6943,8 +6988,8 @@ void AfcManager::runPointAnalysis()
 				if (channel->availability != BLACK) {
 					double chanStartFreq = channel->startFreqMHz * 1.0e6;
 					double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-					double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, ras->getStartFreq(), ras->getStopFreq(), false);
-					if (spectralOverlap > 0.0) {
+					bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, ras->getStartFreq(), ras->getStopFreq(), false, CConst::psdSpectralAlgorithm);
+					if (hasOverlap) {
 						channel->availability = BLACK;
 						channel->eirpLimit_dBm = -std::numeric_limits<double>::infinity();
 					}
@@ -7094,8 +7139,8 @@ void AfcManager::runPointAnalysis()
 					if (channel->availability != BLACK) {
 						double chanStartFreq = channel->startFreqMHz * 1.0e6;
 						double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-						double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag);
-						if (spectralOverlap > 0.0) {
+						bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
+						if (hasOverlap > 0.0) {
 							double eirpLimit_dBm = -std::numeric_limits<double>::infinity();
 
 							channel->availability = BLACK;
@@ -7199,16 +7244,14 @@ void AfcManager::runPointAnalysis()
 							if (channel->availability != BLACK) {
 								double chanStartFreq = channel->startFreqMHz * 1.0e6;
 								double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-				                bool useACI = (channel->type == INQUIRED_FREQUENCY ? false : _aciFlag);
+								bool useACI = (channel->type == INQUIRED_FREQUENCY ? false : _aciFlag);
+								CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel->type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
 								// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
-								double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI);
-								if (spectralOverlap > 0.0) {
-                                    if (channel->type == INQUIRED_FREQUENCY) {
-										spectralOverlap = (uls->getStopUseFreq() - uls->getStartUseFreq())/(chanStopFreq - chanStartFreq);
-                                    }
+								double spectralOverlapLossDB;
+								bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI, spectralAlgorithm);
+								if (hasOverlap) {
 									double bandwidth = chanStopFreq - chanStartFreq;
 									double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
-									double spectralOverlapLossDB = -10.0 * log(spectralOverlap) / log(10.0);
 
 									std::string buildingPenetrationModelStr;
 									double buildingPenetrationCDF;
@@ -8188,8 +8231,8 @@ void AfcManager::runScanAnalysis()
 						if (channel.availability != BLACK) {
 							double chanStartFreq = channel.startFreqMHz * 1.0e6;
 							double chanStopFreq = channel.stopFreqMHz * 1.0e6;
-							double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, ras->getStartFreq(), ras->getStopFreq(), false);
-							if (spectralOverlap > 0.0) {
+							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, ras->getStartFreq(), ras->getStopFreq(), false, CConst::psdSpectralAlgorithm);
+							if (hasOverlap) {
 								channel.availability = BLACK;
 								channel.eirpLimit_dBm = -std::numeric_limits<double>::infinity();
 							}
@@ -8240,12 +8283,15 @@ void AfcManager::runScanAnalysis()
 						if (channel.availability != BLACK) {
 							double chanStartFreq = channel.startFreqMHz * 1.0e6;
 							double chanStopFreq = channel.stopFreqMHz * 1.0e6;
-							double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag);
+							bool useACI = (channel.type == INQUIRED_FREQUENCY ? false : _aciFlag);
+							CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel.type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
+							// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
+							double spectralOverlapLossDB;
+							bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI, spectralAlgorithm);
 
-							if (spectralOverlap > 0.0) {
+							if (hasOverlap) {
 								// double bandwidth = chanStopFreq - chanStartFreq;
 								double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
-								double spectralOverlapLossDB = -10.0 * log(spectralOverlap) / log(10.0);
 
 								std::string buildingPenetrationModelStr;
 								double buildingPenetrationCDF;
@@ -8405,17 +8451,20 @@ void AfcManager::runExclusionZoneAnalysis()
 
 	double chanStopFreq = channel.stopFreqMHz*1.0e6;
 	double chanStartFreq = channel.startFreqMHz*1.0e6;
-	double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag);
+	bool useACI = (channel.type == INQUIRED_FREQUENCY ? false : _aciFlag);
+	CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel.type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
+	// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
+	double spectralOverlapLossDB;
+	bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI, spectralAlgorithm);
 	double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
 
-	if (spectralOverlap == 0.0) {
+	if (!hasOverlap) {
 		throw std::runtime_error(ErrStream() << "ERROR: Specified RLAN spectrum does not overlap FS spectrum. FSID: " << _exclusionZoneFSID
 				<< " goes from " << uls->getStartUseFreq() / 1.0e6 << " MHz to " << uls->getStopUseFreq() / 1.0e6 << " MHz");
 	}
 	LOGGER_INFO(logger) << "FSID = " << _exclusionZoneFSID << " found";
 	LOGGER_INFO(logger) << "LON: " << uls->getRxLongitudeDeg();
 	LOGGER_INFO(logger) << "LAT: " << uls->getRxLatitudeDeg();
-	double spectralOverlapLossDB = -10.0 * log(spectralOverlap) / log(10.0);
 	LOGGER_INFO(logger) << "SPECTRAL_OVERLAP_LOSS (dB) = " << spectralOverlapLossDB;
 
 	/**************************************************************************************/
@@ -9254,9 +9303,13 @@ void AfcManager::runHeatmapAnalysis()
 
 					int rlanPosnIdx;
 
-					double spectralOverlap = computeSpectralOverlap(chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag);
+					bool useACI = (channel.type == INQUIRED_FREQUENCY ? false : _aciFlag);
+					CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel.type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
+					// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
+					double spectralOverlapLossDB;
+					bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI, spectralAlgorithm);
 
-					if (spectralOverlap > 0.0) {
+					if (hasOverlap > 0.0) {
 						/**************************************************************************************/
 						/* Determine propagation environment of FS, if needed.                                */
 						/**************************************************************************************/
@@ -9277,8 +9330,6 @@ void AfcManager::runHeatmapAnalysis()
 							double duls = ulsRxPos.len();
 							double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
 							double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
-
-							double spectralOverlapLossDB = -10.0 * log(spectralOverlap) / log(10.0);
 
 							std::string buildingPenetrationModelStr;
 							double buildingPenetrationCDF;
@@ -9529,6 +9580,7 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "ORIENTATION (DEG)", QString::number(_rlanOrientation_deg, 'e', 20) } );
 		fUserInputs->writeRow({ "HEIGHT_TYPE", (_rlanHeightType == CConst::AMSLHeightType ? "AMSL" : _rlanHeightType == CConst::AGLHeightType ? "AGL" : "INVALID") } );
 		fUserInputs->writeRow({ "INDOOR/OUTDOOR", (_rlanType == RLAN_INDOOR ? "indoor" : _rlanType == RLAN_OUTDOOR ? "outdoor" : "error") } );
+		fUserInputs->writeRow({ "CHANNEL_RESPONSE_ALGORITHM", QString::fromStdString(CConst::strSpectralAlgorithmList->type_to_str(_channelResponseAlgorithm)) } );
 
 		// fUserInputs->writeRow({ "ULS_DATABASE", QString(_inputULSDatabaseStr) } );
 		fUserInputs->writeRow({ "AP/CLIENT_PROPAGATION_ENVIRO", QString(_propagationEnviro) } );

@@ -1,6 +1,29 @@
 # Release Note
 
 ## **Version and Date**
+
+|Version|**OA-265**|
+| :- | :- |
+|**Date**|**06/03/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-265: Enable/Disable consideration of FS channel overlap with RLAN
+ 
+## **Interface Changes**
+ * There's a new configurable parameter in afc-config (both the GUI and hence the .json file). In the .json file, this is called "channelResponseAlgorithm" which is set to either "pwr" or "psd"
+
+## **Testing Done**
+ * Ran the test for OA-263 and confirmed getting same results for inquired channel and inquired frequency when "channelResponseAlgorithm" is set to "pwr" as expected. This test is called "pwr" in the test folder attached.
+ * Note that this test case covers all cases: 1) RLAN full channel inside FS channel, 2) RLAN channel partially overlapping FS, 3) RLAN channel outside FS but its adjacent band inside FS band, 4) FS channel fully inside RLAN channel
+ * Next, ran the same test but with "channelResponseAlgorithm" set to "psd." Confirmed getting same results for inquired frequency as "pwr" test as expected since this only changes the channel response.
+ * However, the max allowable EIRP levels are different b/w "pwr" and "psd" with the "psd" always yielding lower EIRP levels (as expected).
+ * Using exc_thr file (for psd case using inquired channel only) validated calculation of max allowed EIRP for the psd-based approach using the different scenarios mentioned above and for the 4 bandwidths and the 5 operating classes.
+ * Note that the channel responses are the same when the FS channel is fully inside RLAN channel.
+
+## **Open Issues**
+ * None
+
 |Version|**OA-278**|
 | :- | :- |
 |**Date**|**06/03/2022**|
@@ -16,7 +39,6 @@
  
 ## **Open Issues**
  * Date that the Globe data was retrieved is unknown.  Opened Jira ticket OA-279 to update and review data to generate a new date.
-
 
 ## **Version and Date**
 |Version|**OA-263**|

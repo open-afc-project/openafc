@@ -1,5 +1,5 @@
 import * as React from "react";
-import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition } from "@patternfly/react-core";
+import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition, Radio } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import BuildlingPenetrationLossForm from "./BuildingPenetrationLossForm";
 import PolarizationMismatchLossForm from "./PolarizationMismatchLossForm";
@@ -8,7 +8,7 @@ import BodyLossForm from "./BodyLossForm";
 import AntennaPatternForm from "./AntennaPatternForm";
 import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
-import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation } from "../Lib/RatApiTypes";
+import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
 import { getDefaultAfcConf, guiConfig } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
@@ -380,6 +380,10 @@ export class AFCForm extends React.Component<
 
         }
 
+
+        const setChannelResponseAlgorithm = (v: ChannelResponseAlgorithm) => {
+            this.setState({ config: Object.assign(this.state.config, { channelResponseAlgorithm: v }) });
+        }
 
         return (
             <Card>
@@ -876,6 +880,35 @@ export class AFCForm extends React.Component<
                                     </InputGroup>
                                 </FormGroup>
                             </Tooltip>
+                        </GalleryItem>
+                        <GalleryItem>
+                            <FormGroup fieldId="horizontal-form-channelResponse" label="Channel Response Algorithm">
+                                <InputGroup id="">
+                                    <Radio
+                                        label="Total power within FS band"
+                                        isChecked={this.state.config.channelResponseAlgorithm === 'pwr'}
+                                        onChange={(b) => b && setChannelResponseAlgorithm('pwr')}
+                                        id="horizontal-form-channelResponse-pwr"
+                                        name="horizontal-form-channelResponse-pwr"
+                                        style={{ textAlign: "left" }}
+                                        value='pwr'
+
+                                    />
+                                </InputGroup>
+                                <InputGroup>
+                                    <Radio
+                                        label="Max PSD over FS band"
+                                        isChecked={this.state.config.channelResponseAlgorithm === 'psd'}
+                                        onChange={(b) => b && setChannelResponseAlgorithm('psd')}
+                                        id="horizontal-form-channelResponse-psd"
+                                        name="horizontal-form-channelResponse-psd"
+                                        style={{ textAlign: "left"}}
+                                        value='psd'
+                                    />
+
+                                </InputGroup>
+                            </FormGroup>
+
                         </GalleryItem>
                     </Gallery>
                     <br />

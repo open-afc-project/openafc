@@ -253,6 +253,16 @@ public:
 	/**************************************************************************************/
 
 	/**************************************************************************************/
+	/**** SpectralAlgorithm                                                            ****/
+	/**************************************************************************************/
+	enum SpectralAlgorithmEnum
+	{
+		pwrSpectralAlgorithm,
+		psdSpectralAlgorithm
+	};
+	/**************************************************************************************/
+
+	/**************************************************************************************/
 	/**** ITMClutterMethod                                                             ****/
 	/**************************************************************************************/
 	enum ITMClutterMethodEnum
@@ -306,6 +316,7 @@ public:
 	static const StrTypeClass strLOSOptionList[];
 	static const StrTypeClass strITMClutterMethodList[];
 	static const StrTypeClass strHeightSourceList[];
+	static const StrTypeClass strSpectralAlgorithmList[];
 };
 
 #endif
