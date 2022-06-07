@@ -1,6 +1,24 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-278**|
+| :- | :- |
+|**Date**|**06/03/2022**|
+
+## **Issues Addressed**
+ * Jira OA-278: Add the databases' attributions in database_readme file and the GUI's "i" 
+ 
+## **Interface Changes**
+ * No Change
+
+## **Testing Done**
+ * Reviewed updated content
+ 
+## **Open Issues**
+ * Date that the Globe data was retrieved is unknown.  Opened Jira ticket OA-279 to update and review data to generate a new date.
+
+
+## **Version and Date**
 |Version|**OA-263**|
 | :- | :- |
 |**Date**|**05/27/2022**|

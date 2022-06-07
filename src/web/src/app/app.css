@@ -107,3 +107,17 @@ pre {
 .custom-tooltip{
   background-color: white;
 }
+
+#aboutAccordion {
+  --pf-global--Color--100: white;
+  --pf-global--BackgroundColor--100:black;
+  --pf-c-accordion--BackgroundColor:black;
+  --pf-c-accordion__toggle--hover--BackgroundColor: darkgrey;
+  --pf-c-accordion__toggle--focus--BackgroundColor: darkgrey;
+	--pf-c-accordion__toggle--active--BackgroundColor: darkgrey;
+  --pf-c-accordion__expanded-content--Color: white; 
+}
+
+#parametersList{
+  font-size: large;
+}

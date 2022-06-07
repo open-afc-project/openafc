@@ -44,6 +44,41 @@ This also contains all lidar tiles where each city has a subdirectory with tiles
 * **nlcd:** original file nlcd_2019_land_cover_I48_20210604 was downloaded from [link](https://www.mrlc.gov/data?f%5B0%5D=category%3Aland%20cover) (download NLCD 2019 Land Cover (CONUS)). Usig gdal utilties this file was translated to nlcd_2019_land_cover_I48_20210604_resample.zip so that the 1-arcsec tiles matchup with 1-arcsec 3DEP tiles. The federated_nlcd.zip file was obtained by using other gdal utilities to convert federated's many files to one file covering CONUS.
 * **itudata:** Radio Climate map from ITU-R Rec, P.617-3 (https://www.itu.int/rec/R-REC-P.617-3-201309-S/en) and Surface Refractivity map from ITU-R Rec, P.452-17 (https://www.itu.int/rec/R-REC-P.452-17-202109-I/en)
 
+### **Licences and Source Citations**
+#### **NLCD**
+Public domain
+
+References:
+
+Dewitz, J., and U.S. Geological Survey, 2021, National Land Cover Database (NLCD) 2019 Products (ver. 2.0, June 2021): U.S. Geological Survey data release, https://doi.org/10.5066/P9KZCM54
+
+Wickham, J., Stehman, S.V., Sorenson, D.G., Gass, L., and Dewitz, J.A., 2021, Thematic accuracy assessment of the NLCD 2016 land cover for the conterminous United States: Remote Sensing of Environment, v. 257, art. no. 112357, at https://doi.org/10.1016/j.rse.2021.112357 
+
+Homer, Collin G., Dewitz, Jon A., Jin, Suming, Xian, George, Costello, C., Danielson, Patrick, Gass, L., Funk, M., Wickham, J., Stehman, S., Auch, Roger F., Riitters, K. H., Conterminous United States land cover change patterns 2001–2016 from the 2016 National Land Cover Database: ISPRS Journal of Photogrammetry and Remote Sensing, v. 162, p. 184–199, at https://doi.org/10.1016/j.isprsjprs.2020.02.019
+
+Jin, Suming, Homer, Collin, Yang, Limin, Danielson, Patrick, Dewitz, Jon, Li, Congcong, Zhu, Z., Xian, George, Howard, Danny, Overall methodology design for the United States National Land Cover Database 2016 products: Remote Sensing, v. 11, no. 24, at https://doi.org/10.3390/rs11242971
+
+Yang, L., Jin, S., Danielson, P., Homer, C., Gass, L., Case, A., Costello, C., Dewitz, J., Fry, J., Funk, M., Grannemann, B., Rigge, M. and G. Xian. 2018. A New Generation of the United States National Land Cover Database: Requirements, Research Priorities, Design, and Implementation Strategies, ISPRS Journal of Photogrammetry and Remote Sensing, 146, pp.108-123.
+
+#### **proc_lidar_2019**
+Available for public use with no restrictions
+
+Disclaimer and quality information is at https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities/00_NGA%20133%20US%20Cities%20Data%20Disclaimer%20and%20Explanation%20Readme.pdf 
+
+#### **3DEP**
+Public domain
+
+Data available from U.S. Geological Survey, National Geospatial Program.
+
+#### **Globe**
+Public domain
+
+NOAA National Geophysical Data Center. 1999: Global Land One-kilometer Base Elevation (GLOBE) v.1. NOAA National Centers for Environmental Information. https://doi.org/10.7289/V52R3PMS. Accessed TBD
+
+#### **population**
+Creative Commons Attribution 4.0 International (CC BY) License (https://creativecommons.org/licenses/by/4.0)
+
+Center for International Earth Science Information Network - CIESIN - Columbia University. 2018. Gridded Population of the World, Version 4 (GPWv4): Population Density, Revision 11. Palisades, New York: NASA Socioeconomic Data and Applications Center (SEDAC). https://doi.org/10.7927/H49C6VHW 
 
 ## **Database Update**
 
@@ -187,5 +222,4 @@ There are three category of databases: Dynamic, Static and ULS.
 
 ### **Configuration options to change the location of the database**
 TBD
-
 
