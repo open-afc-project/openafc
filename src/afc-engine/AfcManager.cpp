@@ -2120,7 +2120,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	// If this flag is set, map data geojson is generated
 	// ***********************************
 	_mapDataGeoJsonFile = "";
-	if (jsonObj.contains("enableMapInVirtualAp") && !jsonObj["enableMapInVirtualAp"].isUndefined()) {
+	if (jsonObj.contains("enableMapInVirtualAp") && !jsonObj["enableMapInVirtualAp"].isUndefined() &&
+		AfcManager::_createKmz) {
 		if (jsonObj["enableMapInVirtualAp"].toBool()) {
 		_mapDataGeoJsonFile = "mapData.json.gz";
 		}
