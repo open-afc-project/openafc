@@ -21,14 +21,18 @@ LOG_STREAM = None
 # use "logging.ERROR" to shut it up
 LOG_LEVEL = logging.DEBUG
 
-# file location on the server
-FILE_LOCATION = "/dl"
+# file download/upload location on the server
+FILE_LOCATION = os.getenv("FILESTORAGE_DIR", "/storage")
+PRO_LOCATION = FILE_LOCATION+"/"+"responses"
+CFG_LOCATION = FILE_LOCATION+"/"+"config"
+DBG_LOCATION = FILE_LOCATION+"/"+"history"
 
 # where the server is listening
 SERVER_HOST = os.getenv("FILESTORAGE_HOST", "0.0.0.0")
-SERVER_PORT = os.getenv("FILESTORAGE_PORT", "5000")
+SERVER_PORT = os.getenv("FILESTORAGE_PORT", 5000)
 
-FSVERSION = 'v1/'
+HISTORY_HOST = os.getenv("HISTORY_HOST", "0.0.0.0")
+HISTORY_PORT = os.getenv("HISTORY_PORT", 4999)
 
 # Local Variables:
 # mode: Python
