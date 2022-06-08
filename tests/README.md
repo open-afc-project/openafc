@@ -20,6 +20,8 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Remove AFC Server admin configuration](#remove-afc-server-admin-configuration)
   - [List AFC Server admin configuration](#list-afc-server-admin-configuration)
   - [Export tests from WFA file to JSON format](#export-tests-from-wfa-file-to-json-format)
+  - [Compare AFC config records](#compare-afc-config-records)
+  - [Reacquisition response records for exist requests](#reacquisition-response-records-for-exist-requests)
 - [**Testing setup**](#testing-setup)
 
 - [Back to main readme](/README.md)
@@ -115,6 +117,7 @@ This is an option to run a test vector from a file without further saving it or 
 ```
 afc_tests.py --addr 1.2.3.4 --cmd  dry_run --infile add_test_vector.txt
 ```
+
 ## Dump test database
 
 Show all entries from the database (requests and responses)
@@ -160,6 +163,23 @@ For example, export certain WFA test cases
 
 ```
 afc_tests.py --cmd parse_tests --infile "AFC System (SUT) Test Vectors r6.xlsx" --outfile abc.txt --test_id srs
+```
+
+## Compare AFC config records
+
+Compare provided AFC configuration with all/any records in the database.
+```
+afc_tests.py --cmd cmp_cfg --infile ../../afc_config.json
+```
+```
+afc_tests.py --cmd cmp_cfg --infile ../../afc_config.json --idx 1
+```
+
+## Reacquisition response records for exist requests
+
+Re-run tests from the database and update corresponded responses.
+```
+afc_tests.py --cmd reacq --addr 1.2.3.4
 ```
 
 <br /><br />

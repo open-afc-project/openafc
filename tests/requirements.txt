@@ -5,3 +5,5 @@ numpy>=1.12.1
 requests==2.27.1
 urllib3==1.26.8
 openpyxl==3.0.9
+ordered-set==4.1.0
+deepdiff==5.8.1

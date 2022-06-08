@@ -23,7 +23,10 @@ EXAMPLES
     ./afc_tests.py --addr 1.2.3.4 --cmd run
 
 3. Configure adrress and log level, run test number 2
-    ./afc_tests.py --test 2 --addr 1.2.3.4 --cmd run
+    ./afc_tests.py --test 2 --addr 1.2.3.4 --cmd run --log debug
+
+4. Refresh responses by reacquisition tests from the DB
+    ./afc_tests.py --addr 1.2.3.4 --cmd reacq
 """
 
 import argparse
@@ -41,6 +44,7 @@ import shutil
 import sqlite3
 import sys
 import time
+from deepdiff import DeepDiff
 from _afc_errors import *
 from _version import __version__
 from _wfa_tests import *
@@ -78,7 +82,17 @@ class TestCfg(dict):
 
     def _send_recv(self, params):
         """Run AFC test and wait for respons"""
-        new_req_json = json.loads(params.encode('utf-8'))
+        data = params.split("'")
+        get_req = ''
+        for item in data:
+            try:
+                json.loads(item)
+            except ValueError as e:
+                continue
+            get_req = item
+            break
+
+        new_req_json = json.loads(get_req.encode('utf-8'))
         new_req = json.dumps(new_req_json, sort_keys=True)
         before_ts = time.monotonic()
         rawresp = requests.post(
@@ -309,6 +323,116 @@ def make_db(filename):
                 ' (data json, hash varchar(255))')
     con.close()
     return True
+
+
+def compare_afc_config(cfg):
+    """
+    Compare AFC configuration from the DB with provided one.
+    """
+    app_log.debug('%s()', inspect.stack()[0][3])
+
+    if not os.path.isfile(cfg['db_filename']):
+        app_log.error('Missing DB file %s', cfg['db_filename'])
+        return AFC_ERR
+
+    con = sqlite3.connect(cfg['db_filename'])
+    cur = con.cursor()
+    cur.execute('SELECT * FROM %s' % TBL_AFC_CFG_NAME)
+    found_cfgs = cur.fetchall()
+    con.close()
+
+    # get record from the input file
+    if isinstance(cfg['infile'], type(None)):
+        app_log.debug('Missing input file to compare with.')
+        return AFC_OK
+
+    filename = cfg['infile'][0]
+    with open(filename, 'r') as fp_test:
+        while True:
+            rec = fp_test.read()
+            if not rec:
+                break
+            try:
+                get_rec = json.loads(rec)
+            except (ValueError, TypeError) as e:
+                continue
+            break
+    app_log.debug(json.dumps(get_rec, sort_keys=True, indent = 4))
+
+    get_cfg = ''
+    app_log.debug('Found %d config records', len(found_cfgs))
+    idx = 0
+    max_idx = len(found_cfgs)
+    if not isinstance(cfg['idx'], type(None)):
+        idx = cfg['idx']
+        if idx >= max_idx:
+            app_log.error("The index (%d) is out of range (0 - %d).",
+                          idx, max_idx - 1)
+            return AFC_ERR
+        max_idx = idx + 1
+    while idx < max_idx:
+        for item in list(found_cfgs[idx]):
+            try:
+                get_cfg = json.loads(item)
+            except (ValueError, TypeError) as e:
+                continue
+            break
+        app_log.debug("Record %d:\n%s",
+                      idx,
+                      json.dumps(get_cfg['afcConfig'],
+                                 sort_keys=True,
+                                 indent = 4))
+
+        get_diff = DeepDiff(get_cfg['afcConfig'],
+                            get_rec,
+                            report_repetition=True)
+        app_log.info("rec %d:\n%s", idx, get_diff)
+        idx += 1
+
+    return AFC_OK
+
+
+def start_acquisition(cfg):
+    """
+    Fetch test vectors from the DB, drop previous response table,
+    run tests and fill responses in the DB with hash values
+    """
+    app_log.debug('%s()', inspect.stack()[0][3])
+
+    if not os.path.isfile(cfg['db_filename']):
+        app_log.error('Missing DB file %s', cfg['db_filename'])
+        return AFC_ERR
+
+    con = sqlite3.connect(cfg['db_filename'])
+    cur = con.cursor()
+    cur.execute('SELECT * FROM %s' % TBL_REQS_NAME)
+    found_reqs = cur.fetchall()
+    try:
+        cur.execute('DROP TABLE ' + TBL_RESPS_NAME)
+    except Exception as OperationalError:
+        app_log.debug('Missing table %s', TBL_RESPS_NAME)
+    cur.execute('CREATE TABLE ' + TBL_RESPS_NAME +
+                ' (data json, hash varchar(255))')
+
+    row_idx = 0
+    found_range = len(found_reqs)
+    if len(found_reqs) == 0:
+        app_log.error('Missing request records')
+        return AFC_ERR
+    app_log.info('Acquisition to number of tests - %d', found_range - row_idx)
+
+    while row_idx < found_range:
+        # Fetch test vector to create request
+        new_req, resp = cfg._send_recv(found_reqs[row_idx][0])
+        json_lookup('availabilityExpireTime', resp, '0')
+        upd_data = json.dumps(resp, sort_keys=True)
+        hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
+        cur.execute('INSERT INTO ' + TBL_RESPS_NAME + ' values ( ?, ?)',
+                    [upd_data, hash_obj.hexdigest()])
+        con.commit()
+        row_idx += 1
+    con.close()
+    return AFC_OK
 
 
 def add_reqs(cfg):
@@ -660,6 +784,8 @@ execution_map = {
     'add_reqs' : add_reqs,
     'dump_db': dump_database,
     'parse_tests': parse_tests,
+    'reacq' : start_acquisition,
+    'cmp_cfg' : compare_afc_config,
     'ver' : get_version
 }
 
@@ -709,12 +835,26 @@ def make_arg_parser():
     args_parser.add_argument('--table', nargs=1, type=str,
                          help="<wfa|req|resp|ap|cfg|user> - set "
                          "database table name.\n")
+    args_parser.add_argument('--idx', nargs='?',
+                         type=int,
+                         help="<index> - set table record index.\n")
     args_parser.add_argument('--test_id',
                          default='all',
                          help="WFA test identifier, for example "
                          "srs, urs, fsp, ibp, sip, etc\n")
 
-    args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?')
+    args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?',
+        help="run - run test from DB and compare.\n"
+        "dry_run - run test from file and show response.\n"
+        "exp_adm_cfg - export admin config into a file.\n"
+        "add_reqs - run test from provided file and insert with response into "
+        "the databsse.\n"
+        "dump_db - dump tables from the database.\n"
+        "parse_tests - parse WFA provided tests into a files.\n"
+        "reqca - reacquision every test from the database and insert new "
+        "responses.\n"
+        "cmp_cfg - compare AFC config from the DB to provided from a file.\n"
+        "ver - get version.\n")
 
     return args_parser
 
