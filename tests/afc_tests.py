@@ -94,9 +94,11 @@ class TestCfg(dict):
 
         new_req_json = json.loads(get_req.encode('utf-8'))
         new_req = json.dumps(new_req_json, sort_keys=True)
+        params_data = {'conn_type':self['conn_type']}
         before_ts = time.monotonic()
         rawresp = requests.post(
-            self['url_path'], data=new_req, headers=headers,
+            self['url_path'], params=params_data,
+            data=new_req, headers=headers,
             timeout=None, verify=self['verif_post'])
         resp = rawresp.json()
         tm_secs = time.monotonic() - before_ts
@@ -502,7 +504,7 @@ def dump_table(conn, tbl_name, out_file):
     conn.execute('SELECT * FROM ' + tbl_name)
     found_data = conn.fetchall()
     for val in enumerate(found_data):
-        if isinstance(fp_new, io.IOBase): 
+        if isinstance(fp_new, io.IOBase):
             fp_new.write('%s\n' % str(val))
         elif out_file == 'split':
             app_log.debug(type(val))
@@ -515,9 +517,9 @@ def dump_table(conn, tbl_name, out_file):
             # Just dump to the console
             app_log.info('%s', val[1])
 
-    if isinstance(fp_new, io.IOBase): 
+    if isinstance(fp_new, io.IOBase):
         fp_new.close()
-    
+
 
 def dump_database(cfg):
     """Dump data from test DB tables"""
@@ -639,7 +641,7 @@ def dry_run_test(cfg):
             # the request contains test category
             new_req_json = json.loads(new_req.encode('utf-8'))
             req_id = json_lookup('requestId', new_req_json, None)
-            
+
             resp_res = json_lookup('shortDescription', resp, None)
             if (resp_res[0] != 'Success') and (req_id[0].lower().find('urs') == -1):
                 app_log.error('Failed in test response - %s', resp_res)
@@ -685,22 +687,40 @@ def test_report(fname, runtimedata, testnumdata, testvectordata,
 
 def _run_test(cfg, reqs, resps, row_idx, idx):
     """Run tests"""
-    app_log.debug('%s() %s (%s)', inspect.stack()[0][3],
+    app_log.debug('%s() test %s, (%s)', inspect.stack()[0][3],
                   cfg['tests'], cfg['url_path'])
 
     test_res = AFC_OK
     while row_idx < idx:
         # Fetch test vector to create request
         req_id = json_lookup('requestId', eval(reqs[row_idx][0]), None)
+        params_data = {'conn_type':cfg['conn_type']}
         before_ts = time.monotonic()
         rawresp = requests.post(cfg['url_path'],
+                                params=params_data,
                                 data=json.dumps(eval(reqs[row_idx][0])),
                                 headers=headers,
                                 timeout=None,
                                 verify=cfg['verif_post'])
         resp = rawresp.json()
+
+        tId = resp.get('taskId')
+        if (cfg['conn_type'] == 'async') and (not isinstance(tId, type(None))):
+            tState = resp.get('taskState')
+            params_data['task_id'] = tId
+            while (tState == 'PENDING') or (tState == 'PROGRESS'):
+                app_log.debug('_run_test() state %s, tid %s, status %d',
+                          tState, tId, rawresp.status_code)
+                time.sleep(2)
+                rawresp = requests.get(cfg['url_path'],
+                                       params=params_data)
+                if rawresp.status_code == 200:
+                    resp = rawresp.json()
+                    break
+
         tm_secs = time.monotonic() - before_ts
         app_log.info('Test done at %.1f secs', tm_secs)
+
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
         hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
@@ -708,7 +728,7 @@ def _run_test(cfg, reqs, resps, row_idx, idx):
         if resps[row_idx][1] == hash_obj.hexdigest():
             app_log.info('Test %s is Ok', req_id[0])
         else:
-            app_log.error('Test %s (%s) is Fail', test_number, req_id[0])
+            app_log.error('Test %s (%s) is Fail', row_idx, req_id[0])
             app_log.error(upd_data)
             app_log.error(hash_obj.hexdigest())
             test_res = AFC_ERR
@@ -798,19 +818,21 @@ def make_arg_parser():
 
     args_parser.add_argument('--addr', nargs=1, type=str,
                          help="<address> - set AFC Server address.\n")
-    args_parser.add_argument('--prot', nargs='?', choices=['htttps', 'http'],
+    args_parser.add_argument('--prot', nargs='?', choices=['https', 'http'],
                          default='https',
-                         help="<http|https> - set connection protocol.\n")
+                         help="<http|https> - set connection protocol "
+                              "(default=https).\n")
     args_parser.add_argument('--port', nargs='?', default='443',
                          type=int,
-                         help="<port> - set connection port.\n")
+                         help="<port> - set connection port "
+                              "(default=443).\n")
     args_parser.add_argument('--conn_type', nargs='?',
-                         choices=['sync', 'async'], default='sync',
+                         choices=['sync', 'async'], default='async',
                          help="<sync|async> - set connection to be "
-                              "synchronous or asynchronous.\n")
+                              "synchronous or asynchronous (default=async).\n")
     args_parser.add_argument('--conn_tm', nargs='?', default=None, type=int,
-                         help="<secs> - set timeout for asynchronous"
-                              "connection.\n")
+                         help="<secs> - set timeout for asynchronous "
+                              "connection (default=None). \n")
     args_parser.add_argument('--verif_post', action='store_false',
                          help="<verif_post> - verify SSL on post request.\n")
     args_parser.add_argument('--outfile', nargs=1, type=str,
@@ -828,7 +850,7 @@ def make_arg_parser():
     args_parser.add_argument('--log', type=set_log_level,
                          default='info', dest='log_level',
                          help="<info|debug|warn|err|crit> - set "
-                         "logging level.\n")
+                         "logging level (default=info).\n")
     args_parser.add_argument('--tests', nargs='?',
                          help="<N1,...> - set single or group of tests "
                          "to run.\n")
@@ -841,7 +863,7 @@ def make_arg_parser():
     args_parser.add_argument('--test_id',
                          default='all',
                          help="WFA test identifier, for example "
-                         "srs, urs, fsp, ibp, sip, etc\n")
+                         "srs, urs, fsp, ibp, sip, etc (default=all).\n")
 
     args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?',
         help="run - run test from DB and compare.\n"
@@ -864,7 +886,7 @@ def prepare_args(parser, cfg):
     cfg.update(vars(parser.parse_args()))
 
     if isinstance(cfg['addr'], list):
-        # set URL if protocol is not the default 
+        # set URL if protocol is not the default
         if cfg['prot'] != AFC_PROT_NAME:
             cfg['url_path'] = cfg['prot'] + '://'
 
