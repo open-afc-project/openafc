@@ -3,7 +3,7 @@
 |Version|3.3.20.2|
 | :- | :- |
 |**Date**|**06/13/2022**|
-|compiled server's version is tbd |git tag 3.3.20.2|
+|compiled server's version is 61bb85b |git tag 3.3.20.2|
 
 ## **Issues Addressed**
  * OA-284 rework async connectivity with test utility (#186)
