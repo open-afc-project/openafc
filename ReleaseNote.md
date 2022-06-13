@@ -1,5 +1,18 @@
 # Release Note
 ## **Version and Date**
+|Version|3.3.20.2|
+| :- | :- |
+|**Date**|**06/13/2022**|
+|compiled server's version is tbd |git tag 3.3.20.2|
+
+## **Issues Addressed**
+ * OA-284 rework async connectivity with test utility (#186)
+ * OA-285 update docker repo name to the TIPs ECR one (#184)
+ * OA-243 New local fs layout; history server (#180)
+ * Python IO wrapper supports local fs and http read/write/delete (#183)
+ * OA-283 update AFC config records in the test DB (#182)
+
+## **Version and Date**
 |Version|3.3.20.1|
 | :- | :- |
 |**Date**|**06/07/2022**|
