@@ -8,6 +8,7 @@ RUN curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum
 
 RUN rpm --import https://dl.yarnpkg.com/rpm/pubkey.gpg
 RUN yum -y install epel-release
+RUN yum -y upgrade
 COPY prereqs /wd/prereqs/
 
 RUN cd /wd/prereqs/repo/ && \
