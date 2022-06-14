@@ -19,6 +19,7 @@ import requests
 import hashlib
 import datetime
 import abc
+import urlparse
 
 RESPONSE_DIR = "responses"  # cache directory in STATE_ROOT_PATH
 HISTORY_DIR = "history"     # history directory in STATE_ROOT_PATH
@@ -196,20 +197,27 @@ class DataIf_v1():
         self.user_id = user_id
         self.user_name = user_name
         self.state_root = state_root
-        self.tmp = os.path.join(state_root, RESPONSE_DIR, self.id)
+        if self.id:
+            self.tmp = os.path.join(state_root, RESPONSE_DIR, self.id)
         if ('FILESTORAGE_HOST' in os.environ and
                 'FILESTORAGE_PORT' in os.environ):
             self.backend = "http"
             self.host = os.environ['FILESTORAGE_HOST']
             self.port = os.environ['FILESTORAGE_PORT']
-            self.file_types["pro"] = "http://" + self.host + ":" + str(self.port) + "/" + "pro" + "/" + self.id
-            self.file_types["cfg"] = "http://" + self.host + ":" + str(self.port) + "/" + "cfg" + "/" + str(self.user_id)
-            self.file_types["dbg"] = "http://" + self.host + ":" + str(self.port) + "/" + "dbg" + "/" + self.user_name + '-' + str(datetime.datetime.now().isoformat())
+            if self.id:
+                self.file_types["pro"] = "http://" + self.host + ":" + str(self.port) + "/" + "pro" + "/" + self.id
+            if self.user_id:
+                self.file_types["cfg"] = "http://" + self.host + ":" + str(self.port) + "/" + "cfg" + "/" + str(self.user_id)
+            if self.user_name:
+                self.file_types["dbg"] = "http://" + self.host + ":" + str(self.port) + "/" + "dbg" + "/" + self.user_name + '-' + str(datetime.datetime.now().isoformat())
         else:
             self.backend = "fs"
-            self.file_types["pro"] = os.path.join(state_root, RESPONSE_DIR, self.id)
-            self.file_types["cfg"] = os.path.join(state_root, CONFIG_DIR, str(self.user_id))
-            self.file_types["dbg"] = os.path.join(state_root, HISTORY_DIR, self.user_name, str(datetime.datetime.now().isoformat()))
+            if self.id:
+                self.file_types["pro"] = os.path.join(self.state_root, RESPONSE_DIR, self.id)
+            if self.user_id:
+                self.file_types["cfg"] = os.path.join(self.state_root, CONFIG_DIR, str(self.user_id))
+            if self.user_name:
+                self.file_types["dbg"] = os.path.join(self.local_history_dir(), self.user_name, str(datetime.datetime.now().isoformat()))
         LOGGER.debug("DataIf.__init__(id={}, userid={}, username={}, state_root={}) backend={}".format(self.id, self.user_id, self.user_name, self.state_root, self.backend))
 
     def __rname(self, file_type, base_name=""):
@@ -254,5 +262,20 @@ class DataIf_v1():
             LOGGER.debug("rmtmpdir({}) {}".format(fromWorker, self.tmp))
             if os.path.exists(self.tmp):
                 shutil.rmtree(self.tmp)
+
+    def local_history_dir(self):
+        if self.backend == "fs":
+            return os.path.join(self.state_root, HISTORY_DIR)
+        return None
+
+    def history_url(self, url, path):
+        newurl = None
+        u = urlparse.urlparse(url)
+        if self.backend == "fs":
+            newurl = u.scheme + "://" + u.netloc + path
+        elif self.backend == "http":
+            newurl = u.scheme + "://" + u.hostname + ":" + str(os.getenv("HISTORY_EXTERNAL_PORT")) + "/"
+        LOGGER.debug("history_url({}, {}) {}".format(url, path, newurl))
+        return newurl
 
 # vim: sw=4:et:tw=80:cc=+1

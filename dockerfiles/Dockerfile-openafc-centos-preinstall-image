@@ -7,13 +7,13 @@ RUN yum -y upgrade
 
 #this list is to be optimized in future
 RUN yum install -y https://yum.puppetlabs.com/puppet7-release-el-7.noarch.rpm epel-release && \
-    cd /wd/prereqs/repo/ && \
-    yum install -y \
-    rabbitmq-server \
+	cd /wd/prereqs/repo/ && \
+	yum install -y \
+	rabbitmq-server \
 	postfix \
 	python2-flask-mail-0.9.1-2.el7.noarch.rpm \
 	python2-flask-user-1.0.1.5-1.el7.noarch.rpm \
-    python2-flask_jsonrpc-0.3.1-1.el7.noarch.rpm \
+	python2-flask_jsonrpc-0.3.1-1.el7.noarch.rpm \
 	python2-jsmin-2.2.2-2.el7.noarch.rpm \
 	python-wsgidav-2.4.1-1.el7.noarch.rpm \
 	rpmconf \
@@ -21,13 +21,14 @@ RUN yum install -y https://yum.puppetlabs.com/puppet7-release-el-7.noarch.rpm ep
 	createrepo \
 	puppet-agent \
 	httpd \
-    httpd-tools \
-    mod_ssl \
+	httpd-tools \
+	mod_ssl \
 	/wd/prereqs/repo/iturp452* \
 	mailx \
 	python2-celery \
 	python-psycopg2 \
-	awstats
+	awstats \
+	python-requests
 
 RUN yum -y upgrade
 

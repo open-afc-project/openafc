@@ -59,6 +59,12 @@ class testv1(data_if.DataIf_v1):
         self.rmtmpdir(False)
 
 if __name__ == '__main__':
+    t = testv1(None, None, None, None)
+    del t
+    t = testv1(None, None, None, "/var/lib/fbrat")
+    del t
+    t = testv1(None, 1, "user123", "/var/lib/fbrat")
+    del t
     t = testv1("12345678901234567890123456789012", 1, "user123", "/var/lib/fbrat")
     t.test()
     del t

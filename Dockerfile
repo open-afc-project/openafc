@@ -49,7 +49,7 @@ RUN rabbitmq-server -detached ; \
     rabbitmqctl stop
 
 RUN mkdir -p /var/lib/fbrat/daily_uls_parse
-RUN chown fbrat:fbrat /var/log/fbrat/history /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/lib/fbrat/daily_uls_parse
+RUN chown fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/lib/fbrat/daily_uls_parse
 RUN chown -R fbrat:fbrat /var/celery
 RUN echo "DEFAULT_ULS_DIR = '/var/lib/fbrat/ULS_Database'" >> /etc/xdg/fbrat/ratapi.conf
 

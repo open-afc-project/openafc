@@ -23,6 +23,7 @@ from celery.schedules import crontab
 from flask.config import Config
 from celery.utils.log import get_task_logger
 from celery.exceptions import Ignore
+from .. import data_if
 
 LOGGER = get_task_logger(__name__)
 
@@ -57,7 +58,7 @@ def setup_periodic_tasks(sender, **kwargs):
 
 @client.task(bind=True)
 def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
-        request_file_path, config_file_path, response_file_path, history_dir,
+        request_file_path, config_file_path, response_file_path,
         runtime_opts):
     """ Run AFC Engine
 
@@ -71,7 +72,7 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
 
         :param state_root: path to directory where fbrat state is held
 
-        :param temp_dir: path to working directory where process can write files. Will be saved as history if history_dir is not None.
+        :param temp_dir: path to working directory where process can write files.
 
         :param request_type: request type of analysis
         :type request_type: str
@@ -82,14 +83,12 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
 
         :param response_file_path: path to json file that will be created as output
 
-        :param history_dir: path to history directory if values in temp_dir are to be saved
-        :type history_dir: path or None
-
         :param runtime_opts: indicates if AFC Engine should use DEBUG mode
          (uses INFO otherwise) or prepare GUI options
         :type runtime_opts: int
     """
     proc = None
+    dataif = data_if.DataIf_v1(None, user_id, username, state_root)
     response_dir = os.path.join(state_root, 'responses')
     try:
         self.update_state(state='PROGRESS',
@@ -101,10 +100,6 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
         LOGGER.debug("entering run function")
         err_file = open(os.path.join(temp_dir, 'engine-error.txt'), 'wb')
         log_file = open(os.path.join(temp_dir, 'engine-log.txt'), 'wb')
-
-        debug = ''
-        if runtime_opts & RNTM_OPT_DBG:
-            debug = True
 
         # run the AFC Engine
         try:
@@ -136,13 +131,13 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
 
             LOGGER.debug("copied error file from "+os.path.join(temp_dir, 'engine-error.txt')+" to "+os.path.join(response_dir, self.request.id + ".error"))
             # store error file in history dir so it can be seen via WebDav
-            if history_dir is not None:
+            if runtime_opts & RNTM_OPT_DBG:
                 LOGGER.debug("Moving temp files to history: %s",
                             str(os.listdir(temp_dir)))
                 shutil.move(
                     temp_dir,
-                    os.path.join(history_dir, username + '-' + str(datetime.datetime.now().isoformat())))
-                LOGGER.debug("Created history folder "+os.path.join(history_dir, username + '-' + str(datetime.datetime.now().isoformat())))
+                    os.path.join(dataif.local_history_dir(), username + '-' + str(datetime.datetime.now().isoformat())))
+                LOGGER.debug("Created history folder "+os.path.join(dataif.local_history_dir(), username + '-' + str(datetime.datetime.now().isoformat())))
                 
             return {
                 'status': 'ERROR',
@@ -175,15 +170,15 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
 
 
         # copy contents of temporary directory to history directory
-        if history_dir is not None:
+        if runtime_opts & RNTM_OPT_DBG:
             # remove error file since we completed successfully
             os.remove(os.path.join(temp_dir, 'engine-error.txt'))
             LOGGER.debug("Moving temp files to history: %s",
                          str(os.listdir(temp_dir)))
             shutil.move(
                 temp_dir,
-                os.path.join(history_dir, username + '-' + str(datetime.datetime.now().isoformat())))
-            LOGGER.debug("Created history folder "+os.path.join(history_dir, username + '-' + str(datetime.datetime.now().isoformat())))
+                os.path.join(dataif.local_history_dir(), username + '-' + str(datetime.datetime.now().isoformat())))
+            LOGGER.debug("Created history folder "+os.path.join(dataif.local_history_dir(), username + '-' + str(datetime.datetime.now().isoformat())))
 
         LOGGER.debug('task completed')
         result = {

@@ -28,6 +28,7 @@ from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint
 from .auth import auth
 from ..models import aaa
+from .. import data_if
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -84,7 +85,6 @@ def build_task(request_file_path, response_file_path, request_type, user_id,
         request_file_path,
         os.path.join(temp_dir, 'afc_config.json'),
         response_file_path,
-        flask.current_app.config['HISTORY_DIR'],
         runtime_opts,
     ])
     return task
@@ -105,11 +105,14 @@ class GuiConfig(MethodView):
             LOGGER.error('Failed to fetch server version: {0}'.format(err))
             serververs = 'unknown'
 
+        dataif = data_if.DataIf_v1(None, None, None, None)
+        histurl = dataif.history_url(flask.request.url, flask.url_for('files.history'))
+
         resp = flask.jsonify(
             paws_url=flask.url_for('paws'),
             uls_url=flask.url_for('files.uls_db'),
             antenna_url=flask.url_for('files.antenna_pattern'),
-            history_url=flask.url_for('files.history'),
+            history_url=histurl,
             afcconfig_defaults=flask.url_for(
                 'ratapi-v1.AfcConfigFile', filename='afc_config.json'),
             lidar_bounds=flask.url_for('ratapi-v1.LiDAR_Bounds'),
@@ -521,8 +524,6 @@ class Phase1Analysis(MethodView):
 
         args = flask.request.data
         LOGGER.debug("Running phase 1 analysis with params: %s", args)
-        LOGGER.debug("history directory: %s",
-                     flask.current_app.config['HISTORY_DIR'])
 
         valid_requests = ['PointAnalysis',
                           'ExclusionZoneAnalysis', 'HeatmapAnalysis']

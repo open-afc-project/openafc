@@ -5,6 +5,7 @@ import os
 import flask
 import logging
 from . import config
+from . import data_if
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -112,18 +113,22 @@ def create_app(config_override=None):
         if not os.path.exists(antenna_patterns):
             os.makedirs(antenna_patterns)
 
-        # create history directory if config is set to use history files
-        if (not flaskapp.config['HISTORY_DIR'] is None) and (not os.path.exists(flaskapp.config['HISTORY_DIR'])):
-            os.makedirs(flaskapp.config['HISTORY_DIR'])
-
         # List of (URL paths from root URL, absolute local filesystem paths, read-only boolean)
+        
         dav_trees = (
             ('/www', next(webdata_paths), True),
             ('/ratapi/v1/files/uls_db', uls_databases, False),
-            ('/ratapi/v1/files/antenna_pattern', antenna_patterns, False),
-            ('/ratapi/v1/files/history',
-             flaskapp.config['HISTORY_DIR'], False),
+            ('/ratapi/v1/files/antenna_pattern', antenna_patterns, False)
         )
+
+        dataif = data_if.DataIf_v1(None, None, None, flaskapp.config['STATE_ROOT_PATH'])
+        hist_dir = dataif.local_history_dir()
+        if hist_dir:
+            if not os.path.exists(hist_dir):
+                os.makedirs(hist_dir)
+            tmp = list(dav_trees)
+            tmp.append(('/ratapi/v1/files/history', hist_dir, False))
+            dav_trees = tuple(tmp)
 
         dav_wsgi_apps = {}
         for (url_path, fs_path, read_only) in dav_trees:
