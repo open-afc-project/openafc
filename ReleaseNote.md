@@ -1,5 +1,13 @@
 # Release Note
 ## **Version and Date**
+|Version|3.3.20.3|
+| :- | :- |
+|**Date**|**06/16/2022**|
+|compiled server's version is 490fe87 |git tag 3.3.20.3|
+
+## **Issues Addressed**
+ * OA-159 Eliminate HISTORY_DIR flask setting (#187)
+## **Version and Date**
 |Version|3.3.20.2|
 | :- | :- |
 |**Date**|**06/13/2022**|
