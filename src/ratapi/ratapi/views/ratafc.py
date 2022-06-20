@@ -23,7 +23,7 @@ import re
 import datetime
 from flask.views import MethodView
 import werkzeug.exceptions
-from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG_NOGUI, RNTM_OPT_NODBG_GUI, RNTM_OPT_DBG_GUI
+from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI
 from ..tasks.afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint
@@ -321,6 +321,7 @@ class RatAfc(MethodView):
         ''' POST method for RAT AFC
         '''
         LOGGER.debug('RatAfc::post()')
+        LOGGER.debug(flask.request.url)
 
         # check request version
         ver = flask.request.json["version"]
@@ -335,10 +336,6 @@ class RatAfc(MethodView):
         firstRequest = flask.request.json["availableSpectrumInquiryRequests"][0]
         LOGGER.debug("Running AFC analysis with params: %s", args)
         request_type = 'AP-AFC'
-
-        runtime_opts = RNTM_OPT_DBG_GUI
-        if hasattr(self, 'runtime_opts'):
-            runtime_opts = self.runtime_opts
 
         try:
             config = None
@@ -402,12 +399,20 @@ class RatAfc(MethodView):
                 fout.write(request_json_bytes)
             LOGGER.debug("Request file written")
 
+            runtime_opts = RNTM_OPT_NODBG_NOGUI
+            debug_opt = flask.request.args.get('debug')
+            if debug_opt == 'True':
+                runtime_opts |= RNTM_OPT_DBG
+            gui_opt = flask.request.args.get('gui')
+            if gui_opt == 'True':
+                runtime_opts |= RNTM_OPT_GUI
+            LOGGER.debug('RatAfc::post() runtime %d', runtime_opts)
             task = build_task(request_file_path, response_file_path,
                               request_type, 0, user, temp_dir, config_file_path,
                               runtime_opts)
 
             conn_type = flask.request.args.get('conn_type')
-            LOGGER.debug('RatAfc::post() %s, %s, %d',
+            LOGGER.debug("RatAfc::post() %s, %s, %s",
                          task.state, conn_type, task.id)
             if conn_type == 'async':
                 return flask.jsonify(taskId = task.id,
@@ -445,46 +450,6 @@ class RatAfc(MethodView):
             return resp
 
 
-class RatAfc_DbgNoGui(RatAfc):
-   def __init__(self):
-       LOGGER.debug('RatAfc_DbgNoGui::__init__()')
-       self.runtime_opts = RNTM_OPT_DBG_NOGUI
-       super(RatAfc_DbgNoGui, self).__init__()
-
-
-class RatAfc_NoDbgGui(RatAfc):
-   def __init__(self):
-       LOGGER.debug('RatAfc_NoDbgGui::__init__()')
-       self.runtime_opts = RNTM_OPT_NODBG_GUI
-       super(RatAfc_NoDbgGui, self).__init__()
-
-
-class RatAfc_NoDbgNoGui(RatAfc):
-   def __init__(self):
-       LOGGER.debug('RatAfc_NoDbgNoGui::__init__()')
-       self.runtime_opts = RNTM_OPT_NODBG_NOGUI
-       super(RatAfc_NoDbgNoGui, self).__init__()
-
-
-class RatAfc_DbgGui(RatAfc):
-   def __init__(self):
-       LOGGER.debug('RatAfc_DbgGui::__init__()')
-       self.runtime_opts = RNTM_OPT_DBG_GUI
-       super(RatAfc_DbgGui, self).__init__()
-
-
-# registration with runtime option NoDebug and NoGui
-module.add_url_rule('/1.1/nodbg_nogui/availableSpectrumInquiry',
-                    view_func=RatAfc_NoDbgNoGui.as_view('RatAfc_NoDbgNoGui'))
-# registration with runtime option Debug and NoGui
-module.add_url_rule('/1.1/dbg_nogui/availableSpectrumInquiry',
-                    view_func=RatAfc_DbgNoGui.as_view('RatAfc_DbgNoGui'))
-# registration with runtime option NoDebug and Gui
-module.add_url_rule('/1.1/nodbg_gui/availableSpectrumInquiry',
-                    view_func=RatAfc_NoDbgGui.as_view('RatAfc_NoDbgGui'))
-# registration with runtime option Debug and Gui
-module.add_url_rule('/1.1/dbg_gui/availableSpectrumInquiry',
-                    view_func=RatAfc_DbgGui.as_view('RatAfc_DbgGui'))
 # registration of default runtime options
 module.add_url_rule('/1.1/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))

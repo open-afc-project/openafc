@@ -13,7 +13,7 @@ import { addAuth } from "./User";
  * Call RAT AFC resource
  */
 export const spectrumInquiryRequest = (request: AvailableSpectrumInquiryRequest): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> =>
-    fetch(guiConfig.rat_afc, {
+    fetch(guiConfig.rat_afc+"?debug=True&gui=True", {
         method: "POST",
         headers: {
             "Content-Type": "application/json"

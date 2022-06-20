@@ -94,7 +94,11 @@ class TestCfg(dict):
 
         new_req_json = json.loads(get_req.encode('utf-8'))
         new_req = json.dumps(new_req_json, sort_keys=True)
-        params_data = {'conn_type':self['conn_type']}
+        params_data = {
+            'conn_type':self['conn_type'],
+            'debug':self['debug'],
+            'gui':self['gui']
+            }
         before_ts = time.monotonic()
         rawresp = requests.post(
             self['url_path'], params=params_data,
@@ -694,7 +698,11 @@ def _run_test(cfg, reqs, resps, row_idx, idx):
     while row_idx < idx:
         # Fetch test vector to create request
         req_id = json_lookup('requestId', eval(reqs[row_idx][0]), None)
-        params_data = {'conn_type':cfg['conn_type']}
+        params_data = {
+            'conn_type':cfg['conn_type'],
+            'debug':cfg['debug'],
+            'gui':cfg['gui']
+            }
         before_ts = time.monotonic()
         rawresp = requests.post(cfg['url_path'],
                                 params=params_data,
@@ -892,8 +900,6 @@ def prepare_args(parser, cfg):
 
         cfg['url_path'] += str(cfg['addr'][0]) + ':' + str(cfg['port']) +\
                            AFC_URL_SUFFIX +\
-                           ('dbg' if cfg['debug'] else 'nodbg') +\
-                           '_' + ('gui' if cfg['gui'] else 'nogui') +\
                            '/' + AFC_REQ_NAME
 
 
