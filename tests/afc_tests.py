@@ -105,6 +105,21 @@ class TestCfg(dict):
             data=new_req, headers=headers,
             timeout=None, verify=self['verif_post'])
         resp = rawresp.json()
+
+        tId = resp.get('taskId')
+        if (self['conn_type'] == 'async') and (not isinstance(tId, type(None))):
+            tState = resp.get('taskState')
+            params_data['task_id'] = tId
+            while (tState == 'PENDING') or (tState == 'PROGRESS'):
+                app_log.debug('_run_test() state %s, tid %s, status %d',
+                          tState, tId, rawresp.status_code)
+                time.sleep(2)
+                rawresp = requests.get(self['url_path'],
+                                       params=params_data)
+                if rawresp.status_code == 200:
+                    resp = rawresp.json()
+                    break
+
         tm_secs = time.monotonic() - before_ts
         app_log.info('Test done at %.1f secs', tm_secs)
         return new_req, resp
