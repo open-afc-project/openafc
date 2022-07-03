@@ -9,12 +9,11 @@
 """
 Provides wrappers for RATAPI file operations
 """
+import sys
 import os
 import errno
 import shutil
-import uuid
 import logging
-import flask
 import requests
 import hashlib
 import datetime
@@ -23,13 +22,15 @@ import urlparse
 
 RESPONSE_DIR = "responses"  # cache directory in STATE_ROOT_PATH
 HISTORY_DIR = "history"     # history directory in STATE_ROOT_PATH
-CONFIG_DIR = "config"       # afc_config files directory in STATE_ROOT_PATH
+CONFIG_DIR = "afc_config"       # afc_config files directory in STATE_ROOT_PATH
 
 LOGGER = logging.getLogger(__name__)
 
 def mkfolder(path):
     try:
-        os.makedirs(path)
+        # ratapi and workers run under different users now.
+        # Remove the mode and chmod-s below when this is fixed.
+        os.makedirs(path, 0o777)
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise e
@@ -39,8 +40,6 @@ def mkfolder(path):
 class DataInt:
     """ Abstract class for data backend operations """
     __metaclass__ = abc.ABCMeta
-
-    file_name = None
 
     def __init__(self, file_name):
         self.file_name = file_name
@@ -85,7 +84,6 @@ class DataIntFs(DataInt):
             LOGGER.error("write_file(): {} not exist".format(src))
             raise Exception("Source file doesnt found")
         if src != self.file_name:
-            mkfolder(os.path.dirname(self.file_name))
             with open(src, "rb") as f:
                 self.write(f.read())
             f.close()
@@ -93,17 +91,27 @@ class DataIntFs(DataInt):
     def read_file(self, dest):
         """ Will be removed. Copy file from remote storage to local fs """
         LOGGER.debug("DataIntFs.read_file({}) <- {}".format(dest, self.file_name))
-        if self.file_name != dest:
+        if self.file_name != dest and not os.path.exists(dest):
             mkfolder(os.path.dirname(dest))
             with open(dest, "wb") as f:
                 f.write(self.read())
             f.close()
+            try:
+                os.chmod(dest, 0o666)
+            except:
+                pass
 
     def write(self, data):
         """ write data to backend """
         LOGGER.debug("DataIntFs.write() {}".format(self.file_name))
-        with open(self.file_name, "wb") as f:
-            f.write(data)
+        if not os.path.exists(self.file_name):
+            mkfolder(os.path.dirname(self.file_name))
+            with open(self.file_name, "wb") as f:
+                f.write(data)
+            try:
+                os.chmod(self.file_name, 0o666)
+            except:
+                pass
 
     def read(self):
         """ read data from backend """
@@ -162,9 +170,10 @@ class DataIntHttp(DataInt):
     def read(self):
         """ read data from backend """
         LOGGER.debug("DataIntHttp.read({})".format(self.file_name))
-        r = requests.get(self.file_name)
+        r = requests.get(self.file_name, stream=True)
         if r.ok:
-            return r.content
+            r.raw.decode_content = False
+            return r.raw.read()
         raise Exception("Cant get file")
 
     def head(self):
@@ -181,22 +190,18 @@ class DataIntHttp(DataInt):
 
 class DataIf_v1():
     """ Wrappers for RATAPI data operations """
-    backend = None  # None, "fs" or "http"
-    host = "localhost"
-    port = 5000
-    id = None
-    state_root = None
-    file_types = {}
-    user_id = None
-    user_name = None
-    tmp = None
 
-    def __init__(self, id, user_id, user_name, state_root):
+    def __init__(self, id, user_id, history_dir, state_root):
         """ Check IO backend """
         self.id = id
         self.user_id = user_id
-        self.user_name = user_name
+        self.history_dir = history_dir
         self.state_root = state_root
+        self.file_types = {
+            "pro": None,
+            "cfg": None,
+            "dbg": None
+            }
         if self.id:
             self.tmp = os.path.join(state_root, RESPONSE_DIR, self.id)
         if ('FILESTORAGE_HOST' in os.environ and
@@ -208,19 +213,20 @@ class DataIf_v1():
                 self.file_types["pro"] = "http://" + self.host + ":" + str(self.port) + "/" + "pro" + "/" + self.id
             if self.user_id:
                 self.file_types["cfg"] = "http://" + self.host + ":" + str(self.port) + "/" + "cfg" + "/" + str(self.user_id)
-            if self.user_name:
-                self.file_types["dbg"] = "http://" + self.host + ":" + str(self.port) + "/" + "dbg" + "/" + self.user_name + '-' + str(datetime.datetime.now().isoformat())
+            if self.history_dir:
+                self.file_types["dbg"] = "http://" + self.host + ":" + str(self.port) + "/" + "dbg" + "/" + self.history_dir
         else:
             self.backend = "fs"
             if self.id:
                 self.file_types["pro"] = os.path.join(self.state_root, RESPONSE_DIR, self.id)
             if self.user_id:
                 self.file_types["cfg"] = os.path.join(self.state_root, CONFIG_DIR, str(self.user_id))
-            if self.user_name:
-                self.file_types["dbg"] = os.path.join(self.local_history_dir(), self.user_name, str(datetime.datetime.now().isoformat()))
-        LOGGER.debug("DataIf.__init__(id={}, userid={}, username={}, state_root={}) backend={}".format(self.id, self.user_id, self.user_name, self.state_root, self.backend))
+            if self.history_dir:
+                self.file_types["dbg"] = os.path.join(self.local_history_dir(), self.history_dir)
+        LOGGER.debug("DataIf.__init__(id={}, userid={}, history_dir={}, state_root={}) backend={}".
+                     format(self.id, self.user_id, self.history_dir, self.state_root, self.backend))
 
-    def __rname(self, file_type, base_name=""):
+    def rname(self, file_type, base_name=""):
         """ Return remote file name by basename """
         if self.backend == "fs":
             return os.path.join(self.file_types[file_type], base_name)
@@ -232,15 +238,18 @@ class DataIf_v1():
         """ Return local file path by basename """
         return os.path.join(self.tmp, base_name)
 
-    def open(self, file_type, base_name):
+    def open_by_name(self, r_name):
         """ Create FileInt instance """
-        r_name = self.__rname(file_type, base_name)
-        LOGGER.debug("DataIf.open({})".format(r_name))
+        LOGGER.debug("DataIf.open_by_name({})".format(r_name))
         if self.backend == "fs":
             return DataIntFs(r_name)
         if self.backend == "http":
             return DataIntHttp(r_name)
         raise Exception("Undeclared backend")
+
+    def open(self, file_type, base_name):
+        """ Create FileInt instance """
+        return self.open_by_name(self.rname(file_type, base_name))
 
     def genId(self, conf, req):
         """ Set id to md5 of both buffers """
@@ -248,27 +257,42 @@ class DataIf_v1():
         hash.update(conf)
         hash.update(req)
         self.id = hash.hexdigest()
-        LOGGER.debug("DataIf.setDataId id={}".format(self.id))
+        self.tmp = os.path.join(self.state_root, RESPONSE_DIR, self.id)
+        if self.backend == "http":
+            self.file_types["pro"] = "http://" + self.host + ":" + str(self.port) + "/" + "pro" + "/" + self.id
+        else:
+            self.file_types["pro"] = os.path.join(self.state_root, RESPONSE_DIR, self.id)
+        LOGGER.debug("DataIf.genId id={}".format(self.id))
 
-    def tmpdir(self):
-        return self.tmp
+    def get_id(self):
+            return self.id
 
     def mktmpdir(self):
+        """ Create afc-engine temporary dir """
+        LOGGER.debug("DataIf.mktmpdir() {}".format(self.tmp))
         mkfolder(self.tmp)
 
-    def rmtmpdir(self, fromWorker):
-        """ Remove local temporary dir """
-        if self.backend == "http" or (self.backend == "fs" and not fromWorker):
-            LOGGER.debug("rmtmpdir({}) {}".format(fromWorker, self.tmp))
+    def rmtmpdir(self, but=None):
+        """ Remove afc-engine temporary dir """
+        LOGGER.debug("rmtmpdir({}) {}".format(but, self.tmp))
+        if self.backend == "http" and not but:
             if os.path.exists(self.tmp):
+                shutil.rmtree(self.tmp)
+        elif self.backend == "fs" and but:
+            for fname in os.listdir(self.tmp):
+                if fname not in but:
+                    os.remove(os.path.join(self.tmp, fname))
+            if not os.listdir(self.tmp):
                 shutil.rmtree(self.tmp)
 
     def local_history_dir(self):
+        """ Return local history directory """
         if self.backend == "fs":
             return os.path.join(self.state_root, HISTORY_DIR)
         return None
 
     def history_url(self, url, path):
+        """ Build url for "Debug Files" key """
         newurl = None
         u = urlparse.urlparse(url)
         if self.backend == "fs":

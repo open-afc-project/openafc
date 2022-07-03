@@ -10,13 +10,13 @@ class AfcDataIf: public QObject
 {
 	Q_OBJECT
 public:
-	AfcDataIf(std::string remote);
+	AfcDataIf(bool useUrl);
 	~AfcDataIf();
 	bool readFile(QString fileName, QByteArray& data);
 	bool writeFile(QString fileName, QByteArray& data);
 	bool gzipAndWriteFile(QString fileName, QByteArray& data);
 private:
-	QString _remote;
+	bool _useUrl;
 	QNetworkAccessManager _mngr;
 	bool gzipBuffer(QByteArray& indata, QByteArray& outdata);
 	QCoreApplication* _app;

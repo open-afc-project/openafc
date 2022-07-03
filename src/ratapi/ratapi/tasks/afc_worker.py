@@ -17,16 +17,15 @@ import subprocess
 import datetime
 from celery import Celery
 from ..db.daily_uls_parse import daily_uls_parse
-from ..defs import RNTM_OPT_DBG
 from runcelery import init_config
 from celery.schedules import crontab
 from flask.config import Config
 from celery.utils.log import get_task_logger
 from celery.exceptions import Ignore
+from .. import defs
 from .. import data_if
 
 LOGGER = get_task_logger(__name__)
-
 
 APP_CONFIG = init_config(Config(root_path=None))
 LOGGER.info('Celery Backend: %s', APP_CONFIG['CELERY_RESULT_BACKEND'])
@@ -57,64 +56,63 @@ def setup_periodic_tasks(sender, **kwargs):
    
 
 @client.task(bind=True)
-def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
-        request_file_path, config_file_path, response_file_path,
-        runtime_opts):
+def run(self, user_id, history_dir, afc_exe, state_root, request_type,
+        runtime_opts, debug, hash):
     """ Run AFC Engine
 
         The parameters are all serializable so they can be passed through the message queue.
 
         :param user_id: Id of calling user
 
-        :param username: username of calling user
+        :param history_dir: history directory suffix
 
         :param afc_exe: path to AFC Engine executable
 
         :param state_root: path to directory where fbrat state is held
 
-        :param temp_dir: path to working directory where process can write files.
-
         :param request_type: request type of analysis
         :type request_type: str
-
-        :param request_file_path: path to json file with parameters for analysis
-
-        :param config_file_path: path to json file with AFC Config parameters
-
-        :param response_file_path: path to json file that will be created as output
 
         :param runtime_opts: indicates if AFC Engine should use DEBUG mode
          (uses INFO otherwise) or prepare GUI options
         :type runtime_opts: int
+
+        :param debug: log level of afc-engine
+
+        :param hash: md5 of request and config files
     """
+    LOGGER.debug('run(hash={}, runtime_opts={})'.format(hash, runtime_opts))
+    dataif = data_if.DataIf_v1(hash, user_id, history_dir, state_root)
+    dataif.mktmpdir()
+
     proc = None
-    dataif = data_if.DataIf_v1(None, user_id, username, state_root)
-    response_dir = os.path.join(state_root, 'responses')
     try:
         self.update_state(state='PROGRESS',
                           meta={
-                              'progress_file': os.path.join(temp_dir, 'progress.txt'),
-                              'user_id': user_id
+                            'user_id': user_id,
+                            'history_dir': history_dir,
+                            'hash': hash,
+                            "runtime_opts": runtime_opts
                           })
 
-        LOGGER.debug("entering run function")
-        err_file = open(os.path.join(temp_dir, 'engine-error.txt'), 'wb')
-        log_file = open(os.path.join(temp_dir, 'engine-log.txt'), 'wb')
+        err_file = open(dataif.lname('engine-error.txt'), 'wb')
+        log_file = open(dataif.lname('engine-log.txt'), 'wb')
 
         # run the AFC Engine
         try:
-            LOGGER.debug('running afc engine')
             cmd = [
                 afc_exe,
                 "--request-type=" + request_type,
                 "--state-root=" + state_root,
-                "--input-file-path=" + request_file_path,
-                "--config-file-path=" + config_file_path,
-                "--output-file-path=" + response_file_path,
-                "--temp-dir=" + temp_dir,
-                "--log-level=" + "debug",
+                "--input-file-path=" + dataif.rname("pro", "analysisRequest.json"),
+                "--config-file-path=" + dataif.rname("cfg", "afc_config.json"),
+                "--output-file-path=" + dataif.rname("pro", "analysisResponse.json.gz"),
+                "--progress-file-path=" + dataif.rname("pro", "progress.txt"),
+                "--temp-dir=" + dataif.lname(),
+                "--log-level=" + ("debug" if debug else "info"),
                 "--runtime_opt=" + str(runtime_opts),
             ]
+            LOGGER.debug(cmd)
             proc = subprocess.Popen(cmd, stderr=err_file, stdout=log_file)
 
             retcode = proc.wait()
@@ -122,71 +120,66 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
                 raise subprocess.CalledProcessError(retcode, cmd)
 
         except subprocess.CalledProcessError as error:
+            LOGGER.error("run(): afc-egine error")
             proc = None
             err_file.close()  # close the file just in case it is still open from writing
             log_file.close()
 
-            shutil.copy2(os.path.join(temp_dir, 'engine-error.txt'),
-                         os.path.join(response_dir, self.request.id + ".error"))
+            with dataif.open("pro", "engine-error.txt") as hfile:
+                hfile.write_file(dataif.lname('engine-error.txt'))
 
-            LOGGER.debug("copied error file from "+os.path.join(temp_dir, 'engine-error.txt')+" to "+os.path.join(response_dir, self.request.id + ".error"))
             # store error file in history dir so it can be seen via WebDav
-            if runtime_opts & RNTM_OPT_DBG:
-                LOGGER.debug("Moving temp files to history: %s",
-                            str(os.listdir(temp_dir)))
-                shutil.move(
-                    temp_dir,
-                    os.path.join(dataif.local_history_dir(), username + '-' + str(datetime.datetime.now().isoformat())))
-                LOGGER.debug("Created history folder "+os.path.join(dataif.local_history_dir(), username + '-' + str(datetime.datetime.now().isoformat())))
-                
+            if runtime_opts & defs.RNTM_OPT_DBG:
+                for fname in os.listdir(dataif.lname()):
+                    # request, responce and config are archived from ratapi
+                    if (fname != "analysisRequest.json" and fname != "afc_config.json"):
+                        with dataif.open("dbg", fname) as hfile:
+                            hfile.write_file(dataif.lname(fname))
+
             return {
                 'status': 'ERROR',
-                'user_id': user_id,
-                'error_path': os.path.join(response_dir, self.request.id + '.error'),
                 'exit_code': error.returncode,
+                'user_id': user_id,
+                'history_dir': history_dir,
+                'hash': hash,
+                "runtime_opts": runtime_opts
             }
 
         LOGGER.info('finished with task computation')
         proc = None
         log_file.close()
         err_file.close()
-        # store result file in /var/lib/fbrat/responses/{task_id}.json file
-        additional_paths = dict()
-        shutil.copy2(response_file_path, os.path.join(
-            response_dir, self.request.id + '.json'))
 
-        # copy kml result if it was produced by AFC Engine
-        if 'results.kmz' in os.listdir(temp_dir) and request_type not in ['APAnalysis']:
-            shutil.copy2(os.path.join(temp_dir, 'results.kmz'),
-                         os.path.join(response_dir, self.request.id + '.kmz'))
-            additional_paths['kml_path'] = os.path.join(
-                response_dir, self.request.id + '.kmz')
-        # copy geoJson file if generated
-        if 'mapData.json.gz' in os.listdir(temp_dir) and request_type not in ['APAnalysis']:
-            shutil.copy2(os.path.join(temp_dir, 'mapData.json.gz'),
-                         os.path.join(response_dir, self.request.id + '-mapData.json.gz'))
-            additional_paths['geoJson_path'] = os.path.join(
-                response_dir, self.request.id + '-mapData.json.gz')
+        if runtime_opts & defs.RNTM_OPT_GUI:
+            # copy kml result if it was produced by AFC Engine
+            if os.path.exists(dataif.lname('results.kmz')):
+                with dataif.open("pro", "results.kmz") as hfile:
+                    hfile.write_file(dataif.lname("results.kmz"))
+            # copy geoJson file if generated
+            if os.path.exists(dataif.lname('mapData.json.gz')):
+                with dataif.open("pro", "mapData.json.gz") as hfile:
+                    hfile.write_file(dataif.lname("mapData.json.gz"))
 
 
         # copy contents of temporary directory to history directory
-        if runtime_opts & RNTM_OPT_DBG:
+        if runtime_opts & defs.RNTM_OPT_DBG:
             # remove error file since we completed successfully
-            os.remove(os.path.join(temp_dir, 'engine-error.txt'))
-            LOGGER.debug("Moving temp files to history: %s",
-                         str(os.listdir(temp_dir)))
-            shutil.move(
-                temp_dir,
-                os.path.join(dataif.local_history_dir(), username + '-' + str(datetime.datetime.now().isoformat())))
-            LOGGER.debug("Created history folder "+os.path.join(dataif.local_history_dir(), username + '-' + str(datetime.datetime.now().isoformat())))
+            os.remove(dataif.lname('engine-error.txt'))
+            for fname in os.listdir(dataif.lname()):
+                # request, responce and config are archived from ratapi
+                if (fname != "analysisRequest.json" and fname != "afc_config.json"
+                    and fname != "analysisResponse.json.gz"):
+                    with dataif.open("dbg", fname) as hfile:
+                        hfile.write_file(dataif.lname(fname))
 
         LOGGER.debug('task completed')
         result = {
             'status': 'DONE',
             'user_id': user_id,
-            'result_path': os.path.join(response_dir, self.request.id + '.json'),
+            'history_dir': history_dir,
+            'hash': hash,
+            "runtime_opts": runtime_opts
         }
-        result.update(additional_paths)
         return result
 
     except Exception as e:
@@ -200,10 +193,7 @@ def run(self, user_id, username, afc_exe, state_root, temp_dir, request_type,
             LOGGER.debug('terminating afc-engine')
             proc.terminate()
             LOGGER.debug('afc-engine terminated')
-
-        if os.path.exists(temp_dir):
-            LOGGER.debug('cleaning up')
-            shutil.rmtree(temp_dir)
+        dataif.rmtmpdir()
         LOGGER.info('Worker resources cleaned up')
 
 

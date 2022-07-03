@@ -5,6 +5,7 @@
 // "--runtime_opt" masks
 #define RUNTIME_OPT_ENABLE_DBG 1
 #define RUNTIME_OPT_ENABLE_GUI 2
+#define RUNTIME_OPT_URL 4
 
 extern double qerfi(double q);
 
@@ -1618,10 +1619,10 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		("input-file-path,i", po::value<std::string>()->default_value("inputFile.json"), "set input-file-path level")
 		("config-file-path,c", po::value<std::string>()->default_value("configFile.json"), "set config-file-path level")
 		("output-file-path,o", po::value<std::string>()->default_value("outputFile.json"), "set output-file-path level")
+		("progress-file-path,p", po::value<std::string>()->default_value("progress.txt"), "set progress file path")
 		("temp-dir,t", po::value<std::string>()->default_value(""), "set temp-dir level")
 		("log-level,l", po::value<std::string>()->default_value("debug"), "set log-level")
-		("remote-data-storage,e", po::value<std::string>()->default_value(""), "use remote files in this link")
-		("runtime_opt,u", po::value<uint32_t>()->default_value(3), "bit 0: create debug files; bit 1: create kmz and progress files");
+		("runtime_opt,u", po::value<uint32_t>()->default_value(3), "bit 0: create debug files; bit 1: create kmz and progress files; bit 2: interpret file pathes as URLs");
 
 	po::variables_map cmdLineArgs;
 	po::store(po::parse_command_line(argc, argv, optDescript), cmdLineArgs); // ac and av are parameters passed into main
@@ -1696,14 +1697,6 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 	{
 		throw std::runtime_error("AfcManager::setCmdLineParams(): log-level command line argument was not set.");
 	}
-	if (cmdLineArgs.count("remote-data-storage"))
-	{
-		AfcManager::_dataIf = new AfcDataIf(cmdLineArgs["remote-data-storage"].as<std::string>());
-	}
-	else
-	{
-		throw std::runtime_error("AfcManager::setCmdLineParams(): remote-data-storage command line argument was not set.");
-	}
 	if (cmdLineArgs.count("runtime_opt"))
 	{
 		uint32_t tmp = cmdLineArgs["runtime_opt"].as<uint32_t>();
@@ -1713,7 +1706,21 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		if (tmp & RUNTIME_OPT_ENABLE_GUI) {
 			AfcManager::_createKmz = true;
 		}
+		AfcManager::_dataIf = new AfcDataIf(tmp & RUNTIME_OPT_URL);
 	}
+	if (cmdLineArgs.count("progress-file-path"))
+	{
+		if (AfcManager::_createKmz) {
+			std::string progressPath = cmdLineArgs["progress-file-path"].as<std::string>();
+			AfcManager::_progressFile =
+				QDir(QString::fromStdString(tempDir)).filePath(QString::fromStdString(progressPath)).toStdString();
+		}
+	}
+	else
+	{
+		throw std::runtime_error("AfcManager::setCmdLineParams(): progress-file-path(p) command line argument was not set.");
+	}
+
 }
 
 void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std::string &tempDir)
@@ -9859,7 +9866,6 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	}
 	if (AfcManager::_createKmz) {
 		_kmlFile = QDir(QString::fromStdString(tempDir)).filePath("results.kmz").toStdString();
-		_progressFile = QDir(QString::fromStdString(tempDir)).filePath("progress.txt").toStdString();
 	}
 	/**************************************************************************************/
 }

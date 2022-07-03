@@ -22,7 +22,7 @@ class testv1(data_if.DataIf_v1):
     def test(self):
         self.mktmpdir()
         for file_type in self.__ftypes:
-            fname = os.path.join(self.tmpdir(), "file_in_" + file_type)
+            fname = self.lname("file_in_" + file_type)
             with open(fname, "wb") as hfile:
                 hfile.write(fname)
 
@@ -47,7 +47,7 @@ class testv1(data_if.DataIf_v1):
                     raise Exception("head({}) error".format(fname))
 
         for file_type in self.__ftypes:
-            fname = os.path.join(self.tmpdir(), "file_in_" + file_type)
+            fname = self.lname("file_in_" + file_type)
             if not filecmp.cmp(fname, fname + ".copy"):
                 raise Exception("cmp({}, {}) error".format(fname, fname + ".copy"))
 
@@ -56,7 +56,7 @@ class testv1(data_if.DataIf_v1):
             with self.open(file_type, fname) as hfile:
                 hfile.delete()
 
-        self.rmtmpdir(False)
+        self.rmtmpdir()
 
 if __name__ == '__main__':
     t = testv1(None, None, None, None)

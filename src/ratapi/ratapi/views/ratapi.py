@@ -37,55 +37,20 @@ LOGGER = logging.getLogger(__name__)
 module = flask.Blueprint('ratapi-v1', 'ratapi')
 
 
-def build_task(request_file_path, response_file_path, request_type, user_id,
-               user, temp_dir, config_file_path=None,
-               runtime_opts=RNTM_OPT_DBG_GUI):
+def build_task(hash, request_type, user_id, history_dir, runtime_opts=RNTM_OPT_DBG_GUI):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
-
-    If the config path is specified the file name itself must be names afc_config.json exactly
     """
-    LOGGER.debug("Temp directory opened: %s", temp_dir)
-    if config_file_path is None:
-        config_file_path = os.path.join(
-            flask.current_app.config['STATE_ROOT_PATH'],
-            'afc_config',
-            # use scoped user config and fallback to default if not available
-            str(user_id) if os.path.exists(os.path.join(
-                flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user_id))) else '',
-            'afc_config.json')
-        shutil.copy(config_file_path, temp_dir)
 
-    # copy config to temp so that it is fixed for run
-    LOGGER.debug("Writing request file: %s", request_file_path)
-
-    if flask.current_app.config['DEBUG']:
-        runtime_opts &= RNTM_OPT_DBG
-    LOGGER.info(runtime_opts)
-    # call c++ command
-    LOGGER.debug("Calling afc-engine: %s --request-type=%s "
-                 "--input-file-path=%s --config-file-path=%s "
-                 "--output-file-path=%s --temp-dir=%s"
-                 "--log-level=%s --runtime_opt=%d",
-                 os.path.join(flask.current_app.config['AFC_ENGINE']),
-                 request_type,
-                 request_file_path,
-                 os.path.join(temp_dir, 'afc_config.json'),
-                 response_file_path,
-                 temp_dir,
-                 flask.current_app.config['DEBUG'],
-                 runtime_opts)
     task = run.apply_async(args=[
         user_id,
-        user.email,
+        history_dir,
         flask.current_app.config['AFC_ENGINE'],
         flask.current_app.config['STATE_ROOT_PATH'],
-        temp_dir,
         request_type,
-        request_file_path,
-        os.path.join(temp_dir, 'afc_config.json'),
-        response_file_path,
         runtime_opts,
+        flask.current_app.config['DEBUG'],
+        hash
     ])
     return task
 
@@ -607,45 +572,35 @@ class VapKmlResult(MethodView):
 
     methods = ['GET', 'DELETE']
 
-    def _open(self, abs_path, mode):
-        ''' Open a response file.
-
-        :param rel_path: The specific file name to open.
-
-        :return: The opened file.
-        :rtype: file-like
-        '''
-
-        LOGGER.debug('Attempting to open response file "%s"', abs_path)
-        if not os.path.exists(abs_path):
-            raise werkzeug.exceptions.InternalServerError(
-                description='Your analysis was unable to be processed.')
-        return open(abs_path, mode)
-
     def get(self, kml_file):
         ''' GET method for KML Result '''
 
-        kml_path = os.path.join('/var/lib/fbrat/responses',kml_file)
-        LOGGER.debug('Attempting to download KML file from  "%s"', kml_path)
-        if not os.path.exists(kml_path):
-            return flask.make_response(flask.json.dumps(dict(message='Resource not found')), 410)
+        LOGGER.debug("VapKmlResult.get({})".format(kml_file))
+        if kml_file.startswith("http:/"):
+            kml_file = kml_file.replace("http:/", "http://")
+        else:
+            kml_file = os.path.join("/", kml_file)
         resp = flask.make_response()
-        LOGGER.debug("Reading kml file: %s", kml_path)
-        with self._open(kml_path, 'rb') as resp_file:
-            resp.data = resp_file.read()
-        
-        if(kml_path.endswith("json.gz")):
+        dataif = data_if.DataIf_v1(None, None, None, None)
+        try:
+            with dataif.open_by_name(kml_file) as hfile:
+                resp.data = hfile.read()
+        except:
+            return flask.make_response(flask.json.dumps(dict(message='Resource not found')), 410)
+
+        if(kml_file.endswith("json.gz")):
             resp.content_encoding = "gzip"
             resp.content_type = 'application/json'
         else:
             resp.content_type = 'application/octet-stream'
+        LOGGER.debug("VapKmlResult.get({}) done".format(kml_file))
         return resp
 
     def delete(self, kml_file):
-         kml_path = os.path.join('/var/lib/fbrat/responses',kml_file)
-         if  os.path.exists(kml_path):
-            os.remove(kml_path)
-         return flask.make_response(flask.json.dumps(dict(message='file deleted')), 200)
+        dataif = data_if.DataIf_v1(None, None, None, None)
+        with dataif.open_by_name(kml_file) as hfile:
+            hfile.delete()
+        return flask.make_response(flask.json.dumps(dict(message='file deleted')), 200)
 
 class AnalysisStatus(MethodView):
     ''' Check status of task '''

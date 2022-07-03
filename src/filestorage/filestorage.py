@@ -80,7 +80,7 @@ def post(path):
         return make_response('OK', 200)
     mkdir_local(os.path.dirname(path))
     with open(path, 'wb') as f:
-        f.write(request.data)
+        f.write(request.get_data())
     flask.logger.debug('POST path {}'.format(path))
     return make_response('OK', 200)
 
