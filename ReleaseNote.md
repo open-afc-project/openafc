@@ -1,5 +1,22 @@
 # Release Note
 ## **Version and Date**
+|Version|**OA-296**|
+| :- | :- |
+|**Date**|**06/30/2022**|
+
+## **Issues Addressed**
+ * Jira OA-296: RLAN uncertainty region scan point Bug
+
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Retested FSP1 that had the extra scan point and the scan point is now gone as expected with all the other scan points same as before. See attached testcase and resulting scan points to the ticket.
+
+## **Open Issues**
+
+
+## **Version and Date**
 |Version|3.3.20.3|
 | :- | :- |
 |**Date**|**06/16/2022**|

@@ -315,7 +315,7 @@ std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
                 S[ix][iy] = 0;
             }
         }
-        S[0][0] = 1;
+        S[N][N] = 1;
 
         int latN0 = (int) floor(centerLatitude*pointsPerDegree);
         int lonN0 = (int) floor(centerLongitude*pointsPerDegree);
