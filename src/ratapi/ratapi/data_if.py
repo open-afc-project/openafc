@@ -19,6 +19,7 @@ import hashlib
 import datetime
 import abc
 import urlparse
+import uuid
 
 RESPONSE_DIR = "responses"  # cache directory in STATE_ROOT_PATH
 HISTORY_DIR = "history"     # history directory in STATE_ROOT_PATH
@@ -253,10 +254,11 @@ class DataIf_v1():
 
     def genId(self, conf, req):
         """ Set id to md5 of both buffers """
-        hash = hashlib.md5()
-        hash.update(conf)
-        hash.update(req)
-        self.id = hash.hexdigest()
+        #hash = hashlib.md5()
+        #hash.update(conf)
+        #hash.update(req)
+        #self.id = hash.hexdigest()
+        self.id = str(uuid.uuid4())
         self.tmp = os.path.join(self.state_root, RESPONSE_DIR, self.id)
         if self.backend == "http":
             self.file_types["pro"] = "http://" + self.host + ":" + str(self.port) + "/" + "pro" + "/" + self.id
