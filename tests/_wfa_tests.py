@@ -80,7 +80,11 @@ REQ_LOC_LATITUDE = '"latitude": '
 REQ_LOC_LONGITUDE = '"longitude": '
 REQ_LOC_MAJOR_AXIS = '"majorAxis": '
 
-NEW_AFC_TEST_SUFX = '_afc_test_reqs.json'
+META_HEADER = '{'
+META_TESTCASE_ID = '"testCaseId": '
+META_FOOTER = '}'
+
+NEW_AFC_TEST_SUFX = '_afc_test_reqs.txt'
 AFC_TEST_IDENT = { 'all':0, 'srs':1, 'urs':2, 'sri':3, 'fsp':4, 'ibp':5, 'sip':6 }
 
 WFA_TEST_DIR = './wfa_test'

@@ -54,7 +54,7 @@ The sequence executes all required tests and returns fail if even one test fails
 The testing procedure begins by preparing a test database with test vectors and responses.
 Follows run of test utility with server and test options (for details see #tests-execution-options).
 ```
-afc_tests.py --addr <server address> --cmd run [--test <test index>]
+afc_tests.py --addr <server address> --cmd run [--testcase_indexes <test index>] [--testcase_ids <test ids>]
 ```
 Current implementation provides an already prepared database file (afc_input.sqlite3).
 
@@ -82,13 +82,17 @@ Start sequential run of tests according to the data in the database
 ```
 afc_tests.py --addr 1.2.3.4 --cmd run
 ```
-Run a test or number of tests according to database index
+Run a test or number of tests according to test case row index
 ```
-afc_tests.py --addr 1.2.3.4 --cmd run --test 1,13,30
+afc_tests.py --addr 1.2.3.4 --cmd run --testcase_indexes 3,5,6,7
+```
+Run a test or number of tests according to test case ids
+```
+afc_tests.py --addr 1.2.3.4 --cmd run --testcase_ids AFCS.IBP.5, AFCS.FSP.18
 ```
 Run a test and save test result to csv format file.
 ```
-afc_tests.py --addr 1.2.3.4 --outfile=filename.csv --cmd run --test 22
+afc_tests.py --addr 1.2.3.4 --outfile=filename.csv --cmd run --testcase_indexes 22
 ```
 Start run all tests and save results as ‘golden reference’ in the database
 ```
@@ -96,7 +100,7 @@ afc_tests.py --addr 1.2.3.4 --cmd add_reqs
 ```
 Run the 1st test from test DB explicitly use HTTP
 ```
-afc_tests.py --addr 1.2.3.4 --prot http --port 80 --test 1 --cmd run
+afc_tests.py --addr 1.2.3.4 --prot http --port 80 --testcase_indexes 1 --cmd run
 ```
 
 ## Add new test vectors
@@ -107,7 +111,7 @@ afc_tests.py --addr=1.2.3.4 --cmd add_reqs --infile add_test_vector.txt
 ```
 Provided file consists of any number of test vectors in the following format of AFC request.
 
-{"availableSpectrumInquiryRequests": [{"inquiredChannels": [{"globalOperatingClass": 131}, {"globalOperatingClass": 132}, {"globalOperatingClass": 133}, {"globalOperatingClass": 134}], "deviceDescriptor": {"rulesetIds": ["US_47_CFR_PART_15_SUBPART_E"], "serialNumber": "Alpha001", "certificationId": [{"nra": "AlphaNRA01", "id": "AlphaID01"}]}, "vendorExtensions": [], "inquiredFrequencyRange": [{"lowFrequency": 5925, "highFrequency": 6425}, {"lowFrequency": 6525, "highFrequency": 6875}], "minDesiredPower": 18, "location": {"indoorDeployment": 2, "elevation": {"verticalUncertainty": 5, "heightType": "AGL", "height": 129}, "ellipse": {"orientation": 45, "minorAxis": 50, "center": {"latitude": 40.75924, "longitude": -73.97434}, "majorAxis": 100}}, "requestId": "1"}], "version": "1.1"}
+{"availableSpectrumInquiryRequests": [{"inquiredChannels": [{"globalOperatingClass": 131}, {"globalOperatingClass": 132}, {"globalOperatingClass": 133}, {"globalOperatingClass": 134}], "deviceDescriptor": {"rulesetIds": ["US_47_CFR_PART_15_SUBPART_E"], "serialNumber": "Alpha001", "certificationId": [{"nra": "AlphaNRA01", "id": "AlphaID01"}]}, "vendorExtensions": [], "inquiredFrequencyRange": [{"lowFrequency": 5925, "highFrequency": 6425}, {"lowFrequency": 6525, "highFrequency": 6875}], "minDesiredPower": 18, "location": {"indoorDeployment": 2, "elevation": {"verticalUncertainty": 5, "heightType": "AGL", "height": 129}, "ellipse": {"orientation": 45, "minorAxis": 50, "center": {"latitude": 40.75924, "longitude": -73.97434}, "majorAxis": 100}}, "requestId": "1"}], "version": "1.1"}, {"testCase": "AFC.FSP.1”, "optonal":”optional”}
 
 By default, a new test vector is sent to the AFC server in order to acquire it’s response and keep it in the database.
 

@@ -22,10 +22,13 @@ EXAMPLES
 2. Configure adrress and run all tests
     ./afc_tests.py --addr 1.2.3.4 --cmd run
 
-3. Configure adrress and log level, run test number 2
-    ./afc_tests.py --test 2 --addr 1.2.3.4 --cmd run --log debug
+3. Configure adrress and log level, run tests based on row index
+    ./afc_tests.py --testcase_indexes 2 --addr 1.2.3.4 --cmd run --log debug
+    
+4. Configure adrress and log level, run tests based on test case ID
+    ./afc_tests.py --testcase_ids AFCS.IBP.5, AFCS.FSP.18 --addr 1.2.3.4 --cmd run --log debug
 
-4. Refresh responses by reacquisition tests from the DB
+5. Refresh responses by reacquisition tests from the DB
     ./afc_tests.py --addr 1.2.3.4 --cmd reacq
 """
 
@@ -66,6 +69,10 @@ AFC_ERR = AFC_TEST_STATUS['Error']
 
 AFC_PROT_NAME = 'https'
 
+# metadata variables
+TESTCASE_ID = "testCaseId"
+MANDATORY_METADATA_KEYS = {TESTCASE_ID}    # mandatory keys that need to be read from input text file
+
 app_log = logging.getLogger(__name__)
 
 class TestCfg(dict):
@@ -77,7 +84,8 @@ class TestCfg(dict):
             'url_path' : AFC_PROT_NAME + '://',
             'log_level' : logging.INFO,
             'db_filename' : AFC_TEST_DB_FILENAME,
-            'tests' : 'all',
+            'tests' : None,
+            'is_test_by_index': True,
             'resp' : '',})
 
     def _send_recv(self, params):
@@ -177,7 +185,7 @@ def parse_tests(cfg):
     else:
         out_fname = cfg['outfile'][0]
 
-    wb = oxl.load_workbook(filename)
+    wb = oxl.load_workbook(filename, data_only=True)
 
     for sh in wb:
         app_log.debug('Sheet title: %s', sh.title)
@@ -211,29 +219,35 @@ def parse_tests(cfg):
         res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}'
         res_str += REQ_INQ_CHA_FOOTER + ' '
 
+        cell = sheet.cell(row = i, column = UNIT_NAME_CLM)
+        uut = cell.value
         cell = sheet.cell(row = i, column = PURPOSE_CLM)
         purpose = cell.value
         cell = sheet.cell(row = i, column = TEST_VEC_CLM)
         test_vec = cell.value
 
+        test_case_id = uut + "." + purpose + "." + str(test_vec)
+
         res_str += REQ_DEV_DESC_HEADER
         cell = sheet.cell(row = i, column = RULESET_CLM)
         res_str += REQ_RULESET + '["' + str(cell.value) + '"],'
 
-        serial_id = '"",'
         cell = sheet.cell(row = i, column = SER_NBR_CLM)
         if isinstance(cell.value, str):
-            serial_id = '"SN-' + purpose + str(test_vec) + '",'
-        res_str += REQ_SER_NBR + serial_id + REQ_CERT_ID_HEADER
+            serial_id = cell.value
+        else:
+            serial_id = ""
+        res_str += REQ_SER_NBR + '"' + serial_id + '",' + REQ_CERT_ID_HEADER
 
         cell = sheet.cell(row = i, column = NRA_CLM)
         res_str += REQ_NRA + '"' + cell.value + '",'
 
         cell = sheet.cell(row = i, column = ID_CLM)
-        cert_id = '""'
         if isinstance(cell.value, str):
-            cert_id = '"FCCID-' + purpose + str(test_vec) + '"'
-        res_str += REQ_ID + cert_id + REQ_CERT_ID_FOOTER
+            cert_id = cell.value
+        else:
+            cert_id = ""
+        res_str += REQ_ID + '"' + cert_id + '"' + REQ_CERT_ID_FOOTER
         res_str += REQ_DEV_DESC_FOOTER + REQ_INQ_FREQ_RANG_HEADER
 
         freq_range = AfcFreqRange()
@@ -315,14 +329,29 @@ def parse_tests(cfg):
             uncert = REQ_LOC_MAJOR_AXIS + str(cell.value)
         res_str += uncert
         res_str += REQ_LOC_ELLIP_FOOTER + REQ_LOC_FOOTER
-
-        res_str += REQ_REQUEST_ID + '"REQ-' + purpose + str(test_vec) + '"'
+        
+        cell = sheet.cell(row = i, column = REQ_ID_CLM)
+        if isinstance(cell.value, str):
+            req_id = cell.value
+        else:
+            req_id = ""
+        res_str += REQ_REQUEST_ID + '"' + req_id + '"'
         res_str += REQ_INQUIRY_FOOTER
         cell = sheet.cell(row = i, column = VERSION_CLM)
         res_str += REQ_VERSION + '"' + str(cell.value) + '"'
         res_str += REQ_FOOTER
+
+        # adding metadata parameters
+        res_str += ', '
+
+        # adding test case id
+        res_str += META_HEADER
+        res_str += META_TESTCASE_ID + '"' + test_case_id + '"'
+        res_str += META_FOOTER
+
         app_log.debug(res_str)
         fp_new.write(res_str+'\n')
+
     fp_new.close()
     return AFC_OK
 
@@ -339,9 +368,10 @@ def make_db(filename):
                  TBL_REQS_NAME, TBL_RESPS_NAME)
     con = sqlite3.connect(filename)
     cur = con.cursor()
-    cur.execute('CREATE TABLE ' + TBL_REQS_NAME + ' (data json)')
-    cur.execute('CREATE TABLE ' + TBL_RESPS_NAME +
-                ' (data json, hash varchar(255))')
+    cur.execute('CREATE TABLE IF NOT EXISTS ' + TBL_REQS_NAME + 
+                ' (test_id varchar(50), data json)')
+    cur.execute('CREATE TABLE IF NOT EXISTS ' + TBL_RESPS_NAME +
+                ' (test_id varchar(50), data json, hash varchar(255))')
     con.close()
     return True
 
@@ -456,6 +486,38 @@ def start_acquisition(cfg):
     return AFC_OK
 
 
+def process_jsonline(line):
+    """
+    Function to process the input line from .txt file containing comma 
+    separated json strings
+    """
+
+    # convert the input line to list of dictioanry/dictionaries
+    line_list = json.loads("[" + line + "]")
+    request_dict = line_list[0]
+    metadata_dict = line_list[1] if len(line_list)>1 else {}
+
+    return request_dict, metadata_dict
+
+
+def get_db_req_resp(cfg):
+    """
+    Function to retrieve request and response records from the database
+    """
+    con = sqlite3.connect(cfg['db_filename'])
+    cur = con.cursor()
+    cur.execute('SELECT * FROM %s' % TBL_REQS_NAME)
+    found_reqs = cur.fetchall()
+    db_reqs_list = [ row[0] for row in found_reqs ]
+
+    cur.execute('SELECT * FROM %s' % TBL_RESPS_NAME)
+    found_resps = cur.fetchall()
+    db_resp_list = [ row[0] for row in found_resps ]
+    con.close()
+
+    return db_reqs_list, db_resp_list
+
+
 def add_reqs(cfg):
     """Prepare DB source files"""
 
@@ -473,6 +535,9 @@ def add_reqs(cfg):
     if not make_db(cfg['db_filename']):
         return AFC_ERR
 
+    # fetch available requests and responses
+    db_reqs_list, db_resp_list = get_db_req_resp(cfg)
+
     con = sqlite3.connect(cfg['db_filename'])
     with open(filename, 'r') as fp_test:
         while True:
@@ -480,7 +545,27 @@ def add_reqs(cfg):
             if not dataline:
                 break
 
-            new_req, resp = cfg._send_recv(dataline)
+            # process dataline arguments
+            request_json, metadata_json = process_jsonline(dataline)
+
+            # reject the request if mandatory metadata arguments are not present
+            if not MANDATORY_METADATA_KEYS.issubset(
+                    set(metadata_json.keys())):
+                # missing mandatory keys in test case input
+                app_log.error("Test case input does not contain required"
+                    " mandatory arguments: %s",
+                    ", ".join(list(
+                        MANDATORY_METADATA_KEYS - set(metadata_json.keys()))))
+                return AFC_ERR
+
+            # check if the test case already exists in the database test vectors
+            if metadata_json[TESTCASE_ID] in db_reqs_list:
+                app_log.error("Test case: %s already exists in database", 
+                    metadata_json[TESTCASE_ID])
+                break
+
+            app_log.info("Executing test case: %s", metadata_json[TESTCASE_ID])
+            new_req, resp = cfg._send_recv(json.dumps(request_json))
 
             # get request id from a request, response not always has it
             # the request contains test category
@@ -488,24 +573,28 @@ def add_reqs(cfg):
             req_id = json_lookup('requestId', new_req_json, None)
 
             resp_res = json_lookup('shortDescription', resp, None)
-            if (resp_res[0] != 'Success') and (req_id[0].lower().find('urs') == -1):
+            if (resp_res[0] != 'Success') \
+                and (req_id[0].lower().find('urs') == -1) \
+                    and (req_id[0].lower().find('ibp') == -1):
                 app_log.error('Failed in test response - %s', resp_res)
                 break
+
             app_log.info('Got response for the request')
             json_lookup('availabilityExpireTime', resp, '0')
 
             app_log.info('Insert new request in DB')
             cur = con.cursor()
-            cur.execute('INSERT INTO ' + TBL_REQS_NAME + ' VALUES (?)',
-                        (new_req,))
+            cur.execute('INSERT INTO ' + TBL_REQS_NAME + ' VALUES ( ?, ?)',
+                        (metadata_json[TESTCASE_ID], new_req,))
             con.commit()
 
             app_log.info('Insert new resp in DB')
             upd_data = json.dumps(resp, sort_keys=True)
             hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
             cur = con.cursor()
-            cur.execute('INSERT INTO ' + TBL_RESPS_NAME + ' values ( ?, ?)',
-                        [upd_data, hash_obj.hexdigest()])
+            cur.execute('INSERT INTO ' + TBL_RESPS_NAME + ' values ( ?, ?, ?)',
+                        [metadata_json[TESTCASE_ID], 
+                        upd_data, hash_obj.hexdigest()])
             con.commit()
     con.close()
     return AFC_OK
@@ -654,7 +743,10 @@ def dry_run_test(cfg):
             app_log.info('Request:')
             app_log.info(dataline)
 
-            new_req, resp = cfg._send_recv(dataline)
+            # process dataline arguments
+            request_json, _ = process_jsonline(dataline)
+
+            new_req, resp = cfg._send_recv(json.dumps(request_json))
 
             # get request id from a request, response not always has it
             # the request contains test category
@@ -662,7 +754,8 @@ def dry_run_test(cfg):
             req_id = json_lookup('requestId', new_req_json, None)
 
             resp_res = json_lookup('shortDescription', resp, None)
-            if (resp_res[0] != 'Success') and (req_id[0].lower().find('urs') == -1):
+            if (resp_res[0] != 'Success') \
+                and (req_id[0].lower().find('urs') == -1):
                 app_log.error('Failed in test response - %s', resp_res)
                 app_log.debug(resp)
                 break
@@ -704,15 +797,27 @@ def test_report(fname, runtimedata, testnumdata, testvectordata,
         file_writer.writerow(data)
 
 
-def _run_test(cfg, reqs, resps, row_idx, idx):
-    """Run tests"""
+def _run_test(cfg, reqs, resps, test_cases):
+    """
+    Run tests
+    reqs: {testcaseid: [request_json_str]}
+    resps: {testcaseid: [response_json_str, response_hash]}
+    test_cases: [testcaseids]
+    """
     app_log.debug('%s() test %s, (%s)', inspect.stack()[0][3],
                   cfg['tests'], cfg['url_path'])
 
     test_res = AFC_OK
-    while row_idx < idx:
-        # Fetch test vector to create request
-        req_id = json_lookup('requestId', eval(reqs[row_idx][0]), None)
+    for test_case in test_cases:
+        app_log.info('Prepare to run test - %s', test_case)
+        if test_case not in reqs:
+            app_log.warning("The requested test case %s is invalid/not "
+                            "available in database", test_case)
+            continue
+            
+        request_data = reqs[test_case][0]
+
+        req_id = json_lookup('requestId', request_data, None)
         params_data = {
             'conn_type':cfg['conn_type'],
             'debug':cfg['debug'],
@@ -721,7 +826,7 @@ def _run_test(cfg, reqs, resps, row_idx, idx):
         before_ts = time.monotonic()
         rawresp = requests.post(cfg['url_path'],
                                 params=params_data,
-                                data=json.dumps(eval(reqs[row_idx][0])),
+                                data=json.dumps(request_data),
                                 headers=headers,
                                 timeout=None,
                                 verify=cfg['verif_post'])
@@ -748,21 +853,21 @@ def _run_test(cfg, reqs, resps, row_idx, idx):
         upd_data = json.dumps(resp, sort_keys=True)
         hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
 
-        if resps[row_idx][1] == hash_obj.hexdigest():
+        if resps[test_case][1] == hash_obj.hexdigest():
             app_log.info('Test %s is Ok', req_id[0])
         else:
-            app_log.error('Test %s (%s) is Fail', row_idx, req_id[0])
+            app_log.error('Test %s (%s) is Fail', test_case, req_id[0])
             app_log.error(upd_data)
             app_log.error(hash_obj.hexdigest())
             test_res = AFC_ERR
-        row_idx += 1
 
         # For saving test results option
         if isinstance(cfg['outfile'], list):
             test_report(cfg['outfile'][0], float(tm_secs),
-                        cfg['tests'], req_id[0],
+                        test_case, req_id[0],
                         ("PASS" if test_res == AFC_OK else "FAIL"), upd_data)
     return test_res
+
 
 
 def run_test(cfg):
@@ -780,25 +885,44 @@ def run_test(cfg):
     found_reqs = cur.fetchall()
     cur.execute('SELECT * FROM %s' % TBL_RESPS_NAME)
     found_resps = cur.fetchall()
+
+    if cfg["is_test_by_index"]:
+        # reformat the reqs_dict and resp_dict accordingly
+        reqs_dict = {
+            str(req_index+1): [json.loads(row[1])]
+            for req_index, row in enumerate(found_reqs)
+        }
+        resp_dict = {
+            str(resp_index+1): [row[1], row[2]]
+            for resp_index, row in enumerate(found_resps)
+        }
+    else:
+        reqs_dict = {
+            row[0]: [json.loads(row[1])]
+            for row in found_reqs
+        }
+        resp_dict = {
+            row[0]: [row[1], row[2]]
+            for row in found_resps
+        }
+
     con.close()
 
     if isinstance(cfg['tests'], type(None)):
-        found_range = 0
+        test_cases = 0
     else:
-        found_range = cfg['tests'].split(',')
+        test_cases = list(map(str.strip, cfg['tests'].split(',')))
 
-    row_idx = 0
-    if found_range != 0:
-        for i in found_range:
-            test_idx = int(i)
-            row_idx = test_idx - 1
-            app_log.info('Prepare to run test number - %d', test_idx)
-            _run_test(cfg, found_reqs, found_resps, row_idx, test_idx)
-    else:
-        found_range = len(found_reqs)
-        app_log.info('Prepare to run number of tests - %d',
-                     found_range - row_idx)
-        _run_test(cfg, found_reqs, found_resps, row_idx, found_range)
+    if test_cases == 0:
+        if cfg["is_test_by_index"]:
+            test_cases = [
+                str(item) for item in list(range(1, len(reqs_dict)+1))
+            ]
+        else:
+            test_cases = list(reqs_dict.keys())
+
+    # run required test cases
+    _run_test(cfg, reqs_dict, resp_dict, test_cases)
 
 
 log_level_map = {
@@ -874,8 +998,11 @@ def make_arg_parser():
                          default='info', dest='log_level',
                          help="<info|debug|warn|err|crit> - set "
                          "logging level (default=info).\n")
-    args_parser.add_argument('--tests', nargs='?',
+    args_parser.add_argument('--testcase_indexes', nargs='?',
                          help="<N1,...> - set single or group of tests "
+                         "to run.\n")
+    args_parser.add_argument('--testcase_ids ', nargs='?',
+                         help="<N1,...> - set single or group of test case ids "
                          "to run.\n")
     args_parser.add_argument('--table', nargs=1, type=str,
                          help="<wfa|req|resp|ap|cfg|user> - set "
@@ -908,6 +1035,21 @@ def prepare_args(parser, cfg):
     """Prepare required parameters"""
     cfg.update(vars(parser.parse_args()))
 
+    # check if test indexes and test ids are given
+    if cfg["testcase_indexes"] and cfg["testcase_ids "]:
+        # reject the request
+        app_log.error('Please use either "--testcase_indexes"'
+                      ' or "--testcase_ids " but not both')
+        return AFC_ERR
+
+    if cfg["testcase_indexes"]:
+        cfg["tests"] = cfg.pop("testcase_indexes")
+        cfg.pop("testcase_ids ")
+    elif cfg["testcase_ids "]:
+        cfg["is_test_by_index"] = False
+        cfg["tests"] = cfg.pop("testcase_ids ")
+        cfg.pop("testcase_indexes")
+
     if isinstance(cfg['addr'], list):
         # set URL if protocol is not the default
         if cfg['prot'] != AFC_PROT_NAME:
@@ -928,12 +1070,14 @@ def main():
     res = AFC_OK
     parser = make_arg_parser()
     test_cfg = TestCfg()
-    prepare_args(parser, test_cfg)
-
-    if isinstance(test_cfg['cmd'], type(None)):
-        parser.print_help()
+    if prepare_args(parser, test_cfg) == AFC_ERR:
+        # error in preparing arguments
+        res = AFC_ERR
     else:
-        res = execution_map[test_cfg['cmd']](test_cfg)
+        if isinstance(test_cfg['cmd'], type(None)):
+            parser.print_help()
+        else:
+            res = execution_map[test_cfg['cmd']](test_cfg)
     sys.exit(res)
 
 
