@@ -11,9 +11,12 @@ Unittest of data_if.py
 """
 
 import os
-import data_if
+import sys
 import logging
 import filecmp
+import json
+import data_if
+import task
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -66,6 +69,11 @@ if __name__ == '__main__':
     t = testv1(None, 1, "user123", "/var/lib/fbrat")
     del t
     t = testv1("12345678901234567890123456789012", 1, "user123", "/var/lib/fbrat")
+    tt = task.task(t)
+    tt.toJson(tt.toDict("PROGRESS"))
+    stat = tt.get()
+    print(stat)
+    sys.exit()
     t.test()
     del t
     os.environ['FILESTORAGE_HOST'] = "127.0.0.1"

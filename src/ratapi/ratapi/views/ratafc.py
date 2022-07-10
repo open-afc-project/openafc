@@ -33,6 +33,7 @@ from ..models.aaa import User, AccessPoint
 from .auth import auth
 from .ratapi import build_task
 from .. import data_if
+from .. import task
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -43,7 +44,8 @@ RULESET = 'US_47_CFR_PART_15_SUBPART_E'
 module = flask.Blueprint('ap-afc', 'ap-afc')
 
 # tuple listing files to remain in cache dir
-CACHED_FILES = ("analysisResponse.json.gz",)
+CACHED_FILES = ("analysisResponse.json.gz", "mapData.json.gz", "results.kmz")
+
 
 class AP_Exception(Exception):
     ''' Exception type used for RAT AFC respones
@@ -167,9 +169,9 @@ def _translate_afc_error(error_msg):
         raise VersionNotSupported()
 
 
-def fail_done(task, dataif):
+def fail_done(task_stat, dataif):
     error_data = None
-    if task.result['runtime_opts'] & RNTM_OPT_GUI:
+    if task_stat['runtime_opts'] & RNTM_OPT_GUI:
         with dataif.open("pro", "progress.txt") as hfile:
             hfile.delete()
     with dataif.open("pro", "analysisRequest.json") as hfile:
@@ -184,15 +186,14 @@ def fail_done(task, dataif):
             410)
     LOGGER.debug("Error data: %s", error_data)
     _translate_afc_error(error_data)
-    task.forget()
     dataif.rmtmpdir(CACHED_FILES)
     # raise for internal AFC E2yyngine error
     raise AP_Exception(-1, error_data)
 
 
-def in_progress(task, dataif):
+def in_progress(task_stat, dataif):
     # get progress and ETA
-    if task.result['runtime_opts'] & RNTM_OPT_GUI:
+    if task_stat['runtime_opts'] & RNTM_OPT_GUI:
         progress = None
         try:
             with dataif.open("pro", "progress.txt") as hfile:
@@ -216,19 +217,19 @@ def in_progress(task, dataif):
         503)
 
 
-def success_done(task, dataif):
+def success_done(task_stat, dataif):
     resp_data = None
     with dataif.open("pro", "analysisRequest.json") as hfile:
         hfile.delete()
     with dataif.open("pro", "analysisResponse.json.gz") as hfile:
         resp_data = hfile.read()
-    if task.result['runtime_opts'] & RNTM_OPT_DBG:
+    if task_stat['runtime_opts'] & RNTM_OPT_DBG:
         with dataif.open("dbg", "analysisResponse.json.gz") as hfile:
             hfile.write(resp_data)
     LOGGER.debug('resp_data size={}'.format(sys.getsizeof(resp_data)))
     resp_data = zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
 
-    if task.result['runtime_opts'] & RNTM_OPT_GUI:
+    if task_stat['runtime_opts'] & RNTM_OPT_GUI:
         with dataif.open("pro", "progress.txt") as hfile:
             hfile.delete()
         kmz_file = dataif.rname("pro", "results.kmz")
@@ -249,13 +250,13 @@ def success_done(task, dataif):
 
     resp = flask.make_response()
     resp.data = resp_data
-    task.forget()
     dataif.rmtmpdir(CACHED_FILES)
     return resp
 
+
 response_map = {
-    'DONE' : success_done,
-    'ERROR' : fail_done,
+    'SUCCESS' : success_done,
+    'FAILURE' : fail_done,
     'PROGRESS': in_progress
 }
 
@@ -293,25 +294,24 @@ class RatAfc(MethodView):
         LOGGER.debug('RatAfc::get()')
 
         task_id = flask.request.args['task_id']
-        task = run.AsyncResult(task_id)
+        print("RatAfc.get() task_id={}".format(task_id))
 
-        LOGGER.debug('RatAfc::get() state: %s', task.state)
+        dataif = data_if.DataIf_v1(task_id, None, None, flask.current_app.config['STATE_ROOT_PATH'])
+        t = task.task(dataif)
+        task_stat = t.get()
 
-        dataif = data_if.DataIf_v1(task.result['hash'], task.result['user_id'], task.result['history_dir'], flask.current_app.config['STATE_ROOT_PATH'])
-        if task.ready(): # The task is done
-            if task.successful(): # The task is done w/o exception 
-                LOGGER.debug('RatAfc::get() success state: %s status %s',
-                             task.state, task.result['status'])
-                return response_map[task.result['status']](task, dataif)
+        if t.ready(task_stat): # The task is done
+            if t.successful(task_stat): # The task is done w/o exception 
+                return response_map[task_stat['status']](task_stat, t.dataif)
             else: # The task raised an exception
                 raise werkzeug.exceptions.InternalServerError(
                     'Task execution failed')
         else: # The task in progress or pending
-            if task.state == 'PROGRESS': # The task in progress
+            if task_stat['status'] == 'PROGRESS': # The task in progress
                 # 'PROGRESS' is task.state value, not task.result['status']
-                return response_map['PROGRESS'](task, dataif)
+                return response_map['PROGRESS'](task_stat, t.dataif)
             else: # The task yet not started
-                LOGGER.debug('RatAfc::get() not ready state: %s', task.state)
+                LOGGER.debug('RatAfc::get() not ready state: %s', task_stat['status'])
                 return flask.make_response(
                     flask.json.dumps(dict(percent=0, message='Pending...')),
                     202)
@@ -380,30 +380,28 @@ class RatAfc(MethodView):
                 with dataif.open("dbg", "afc_config.json") as hfile:
                     hfile.write(config_bytes)
 
-            task = build_task(dataif.get_id(), request_type, user_id, history_dir, runtime_opts)
+            build_task(dataif.get_id(), request_type, user_id, history_dir, runtime_opts)
 
             conn_type = flask.request.args.get('conn_type')
-            LOGGER.debug("RatAfc::post() %s, %s, %s",
-                         task.state, conn_type, task.id)
+            LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
+            t = task.task(dataif)
+            task_stat = t.get()
             if conn_type == 'async':
-                return flask.jsonify(taskId = task.id,
-                                     taskState = task.state)
+#                return flask.jsonify(taskId = dataif.get_id(),
+#                                     taskState = task.state)
+                return flask.jsonify(taskId = dataif.get_id(),
+                                     taskState = task_stat["status"])
 
             # wait for request to finish processing
-            task.wait()
-
-            LOGGER.debug('task result: %s', task.result)
-
-            if runtime_opts & RNTM_OPT_GUI:
-                with dataif.open("pro", "progress.txt") as hfile:
-                    hfile.delete()
-            if task.successful():
-                return response_map[task.result['status']](task, dataif)
-            else:
+            try:
+                task_stat = t.wait()
+            except:
                 raise AP_Exception(-1,
-                                   'The completed task state is invalid. '
-                                   'Try again later, and if this issue '
-                                   'persists contact support.')
+                       'The task state is invalid. '
+                       'Try again later, and if this issue '
+                       'persists contact support.')
+
+            return response_map[task_stat['status']](task_stat, dataif)
 
         except AP_Exception as e:
             LOGGER.error('catching exception: %s', e.message)

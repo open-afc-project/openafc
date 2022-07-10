@@ -52,7 +52,6 @@ def build_task(hash, request_type, user_id, history_dir, runtime_opts=RNTM_OPT_D
         flask.current_app.config['DEBUG'],
         hash
     ])
-    return task
 
 
 class GuiConfig(MethodView):

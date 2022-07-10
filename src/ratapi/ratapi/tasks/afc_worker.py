@@ -24,18 +24,22 @@ from celery.utils.log import get_task_logger
 from celery.exceptions import Ignore
 from .. import defs
 from .. import data_if
+from .. import task
 
 LOGGER = get_task_logger(__name__)
 
 APP_CONFIG = init_config(Config(root_path=None))
-LOGGER.info('Celery Backend: %s', APP_CONFIG['CELERY_RESULT_BACKEND'])
 LOGGER.info('Celery Broker: %s', APP_CONFIG['BROKER_URL'])
 
 #: constant celery reference. Configure once flask app is created
 client = Celery(
     'fbrat',
+    # Remove backend when periodic task moved to Jenkins
     backend=APP_CONFIG['CELERY_RESULT_BACKEND'],
     broker=APP_CONFIG['BROKER_URL'],
+    # Enable the following flags when periodic task moved to Jenkins
+    #task_ignore_result=True,
+    #task_store_errors_even_if_ignored=False
 )
 
 client.conf.update(APP_CONFIG)
@@ -55,8 +59,8 @@ def setup_periodic_tasks(sender, **kwargs):
     )
    
 
-@client.task(bind=True)
-def run(self, user_id, history_dir, afc_exe, state_root, request_type,
+@client.task(ignore_result=True)
+def run(user_id, history_dir, afc_exe, state_root, request_type,
         runtime_opts, debug, hash):
     """ Run AFC Engine
 
@@ -84,20 +88,14 @@ def run(self, user_id, history_dir, afc_exe, state_root, request_type,
     LOGGER.debug('run(hash={}, runtime_opts={})'.format(hash, runtime_opts))
     dataif = data_if.DataIf_v1(hash, user_id, history_dir, state_root)
     dataif.mktmpdir()
+    t = task.task(dataif)
+    t.toJson(t.toDict("PROGRESS", runtime_opts=runtime_opts))
 
     proc = None
+    err_file = open(dataif.lname('engine-error.txt'), 'wb')
+    log_file = open(dataif.lname('engine-log.txt'), 'wb')
+
     try:
-        self.update_state(state='PROGRESS',
-                          meta={
-                            'user_id': user_id,
-                            'history_dir': history_dir,
-                            'hash': hash,
-                            "runtime_opts": runtime_opts
-                          })
-
-        err_file = open(dataif.lname('engine-error.txt'), 'wb')
-        log_file = open(dataif.lname('engine-log.txt'), 'wb')
-
         # run the AFC Engine
         try:
             cmd = [
@@ -136,14 +134,8 @@ def run(self, user_id, history_dir, afc_exe, state_root, request_type,
                         with dataif.open("dbg", fname) as hfile:
                             hfile.write_file(dataif.lname(fname))
 
-            return {
-                'status': 'ERROR',
-                'exit_code': error.returncode,
-                'user_id': user_id,
-                'history_dir': history_dir,
-                'hash': hash,
-                "runtime_opts": runtime_opts
-            }
+            t.toJson(t.toDict("FAILURE", runtime_opts=runtime_opts, exit_code=error.returncode))
+            return
 
         LOGGER.info('finished with task computation')
         proc = None
@@ -173,14 +165,8 @@ def run(self, user_id, history_dir, afc_exe, state_root, request_type,
                         hfile.write_file(dataif.lname(fname))
 
         LOGGER.debug('task completed')
-        result = {
-            'status': 'DONE',
-            'user_id': user_id,
-            'history_dir': history_dir,
-            'hash': hash,
-            "runtime_opts": runtime_opts
-        }
-        return result
+        t.toJson(t.toDict("SUCCESS", runtime_opts=runtime_opts))
+        return
 
     except Exception as e:
         raise e

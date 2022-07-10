@@ -105,14 +105,16 @@ class DataIntFs(DataInt):
     def write(self, data):
         """ write data to backend """
         LOGGER.debug("DataIntFs.write() {}".format(self.file_name))
-        if not os.path.exists(self.file_name):
-            mkfolder(os.path.dirname(self.file_name))
-            with open(self.file_name, "wb") as f:
-                f.write(data)
-            try:
-                os.chmod(self.file_name, 0o666)
-            except:
-                pass
+        mkfolder(os.path.dirname(self.file_name))
+        with open(self.file_name, "wb") as f:
+            f.write(data)
+        f.close()
+        try:
+            os.chmod(self.file_name, 0o666)
+        except:
+            pass
+        if (not self.head()):
+             raise Exception("Write failed")
 
     def read(self):
         """ read data from backend """
@@ -203,8 +205,8 @@ class DataIf_v1():
             "cfg": None,
             "dbg": None
             }
-        if self.id:
-            self.tmp = os.path.join(state_root, RESPONSE_DIR, self.id)
+        if self.id and self.state_root:
+            self.tmp = os.path.join(self.state_root, RESPONSE_DIR, self.id)
         if ('FILESTORAGE_HOST' in os.environ and
                 'FILESTORAGE_PORT' in os.environ):
             self.backend = "http"
@@ -253,13 +255,17 @@ class DataIf_v1():
         return self.open_by_name(self.rname(file_type, base_name))
 
     def genId(self, conf, req):
-        """ Set id to md5 of both buffers """
+        """ Set id to md5 of both buffers
+        md5 id is intended for request result caching. Until cache implementation,
+        ID is replaced with a unique number.
+        """
         #hash = hashlib.md5()
         #hash.update(conf)
         #hash.update(req)
         #self.id = hash.hexdigest()
         self.id = str(uuid.uuid4())
-        self.tmp = os.path.join(self.state_root, RESPONSE_DIR, self.id)
+        if (self.state_root):
+            self.tmp = os.path.join(self.state_root, RESPONSE_DIR, self.id)
         if self.backend == "http":
             self.file_types["pro"] = "http://" + self.host + ":" + str(self.port) + "/" + "pro" + "/" + self.id
         else:
@@ -283,7 +289,10 @@ class DataIf_v1():
         elif self.backend == "fs" and but:
             for fname in os.listdir(self.tmp):
                 if fname not in but:
+                    LOGGER.debug("        rm {}".format(fname))
                     os.remove(os.path.join(self.tmp, fname))
+                else:
+                    LOGGER.debug("        keep {}".format(fname))
             if not os.listdir(self.tmp):
                 shutil.rmtree(self.tmp)
 
