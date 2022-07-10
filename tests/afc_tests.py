@@ -71,7 +71,8 @@ AFC_PROT_NAME = 'https'
 
 # metadata variables
 TESTCASE_ID = "testCaseId"
-MANDATORY_METADATA_KEYS = {TESTCASE_ID}    # mandatory keys that need to be read from input text file
+# mandatory keys that need to be read from input text file
+MANDATORY_METADATA_KEYS = {TESTCASE_ID}
 
 app_log = logging.getLogger(__name__)
 
@@ -463,7 +464,7 @@ def start_acquisition(cfg):
     except Exception as OperationalError:
         app_log.debug('Missing table %s', TBL_RESPS_NAME)
     cur.execute('CREATE TABLE ' + TBL_RESPS_NAME +
-                ' (data json, hash varchar(255))')
+                ' (test_id varchar(50), data json, hash varchar(255))')
 
     row_idx = 0
     found_range = len(found_reqs)
@@ -474,12 +475,14 @@ def start_acquisition(cfg):
 
     while row_idx < found_range:
         # Fetch test vector to create request
-        new_req, resp = cfg._send_recv(found_reqs[row_idx][0])
+        new_req, resp = cfg._send_recv(found_reqs[row_idx][1])
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
         hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
-        cur.execute('INSERT INTO ' + TBL_RESPS_NAME + ' values ( ?, ?)',
-                    [upd_data, hash_obj.hexdigest()])
+        cur.execute('INSERT INTO ' + TBL_RESPS_NAME + ' values ( ?, ?, ?)',
+                    [found_reqs[row_idx][0],
+                     upd_data,
+                     hash_obj.hexdigest()])
         con.commit()
         row_idx += 1
     con.close()
@@ -922,7 +925,7 @@ def run_test(cfg):
             test_cases = list(reqs_dict.keys())
 
     # run required test cases
-    _run_test(cfg, reqs_dict, resp_dict, test_cases)
+    return _run_test(cfg, reqs_dict, resp_dict, test_cases)
 
 
 log_level_map = {
@@ -944,15 +947,16 @@ def get_version(cfg):
     app_log.info('AFC Test db hash %s', get_md5(AFC_TEST_DB_FILENAME))
 
 
+# available commands to execute in alphabetical order
 execution_map = {
-    'run' : run_test,
-    'dry_run' : dry_run_test,
-    'exp_adm_cfg': export_admin_config,
     'add_reqs' : add_reqs,
+    'cmp_cfg' : compare_afc_config,
+    'dry_run' : dry_run_test,
     'dump_db': dump_database,
+    'exp_adm_cfg': export_admin_config,
     'parse_tests': parse_tests,
     'reacq' : start_acquisition,
-    'cmp_cfg' : compare_afc_config,
+    'run' : run_test,
     'ver' : get_version
 }
 
