@@ -32,6 +32,7 @@ wd=${1}
 di_name=${2}
 addr=${3}
 port=${4:-443}
+ap_count=$(docker run --rm ${di_name} --cmd get_nbr_testcases;echo $?)
 
 loop() {
     start=0
@@ -59,7 +60,7 @@ loop() {
 }
 
 cd $wd/tests
-loop 58 20
+loop $ap_count 20
 
 
 # Local Variables:
