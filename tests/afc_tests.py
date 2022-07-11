@@ -774,6 +774,21 @@ def dry_run_test(cfg):
     return AFC_OK
 
 
+def get_nbr_testcases(cfg):
+    """ Find APs count on DB table """
+    if not os.path.isfile(cfg['db_filename']):
+        print ('INFO: Missing DB file %s', cfg['db_filename'])
+        return False
+    con = sqlite3.connect(cfg['db_filename'])
+    cur = con.cursor()
+    cur.execute('SELECT count("requestId") from ' + TBL_REQS_NAME)
+    found_data = cur.fetchall()
+    db_inquiry_count = found_data[0][0]
+    con.close()
+    app_log.debug("found %s ap lists from db table",db_inquiry_count)
+    return db_inquiry_count
+
+
 def test_report(fname, runtimedata, testnumdata, testvectordata,
                 test_result, upd_data):
     """Procedure to generate AFC test results report.
@@ -953,6 +968,7 @@ execution_map = {
     'cmp_cfg' : compare_afc_config,
     'dry_run' : dry_run_test,
     'dump_db': dump_database,
+    'get_nbr_testcases' : get_nbr_testcases,
     'exp_adm_cfg': export_admin_config,
     'parse_tests': parse_tests,
     'reacq' : start_acquisition,
@@ -1026,6 +1042,7 @@ def make_arg_parser():
         "add_reqs - run test from provided file and insert with response into "
         "the databsse.\n"
         "dump_db - dump tables from the database.\n"
+        "get_nbr_testcases - return number of testcases.\n"
         "parse_tests - parse WFA provided tests into a files.\n"
         "reqca - reacquision every test from the database and insert new "
         "responses.\n"
