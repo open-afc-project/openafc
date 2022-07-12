@@ -24,6 +24,7 @@ from .db.generators import shp_to_spatialite, spatialite_to_raster
 from prettytable import PrettyTable
 from flask_script import Manager, Command, Option, commands
 from . import cmd_utils
+from . import data_if
 
 LOGGER = logging.getLogger(__name__)
 
@@ -613,20 +614,10 @@ class ConfigAdd(Command):
                     with flaskapp.app_context():
                         import flask
 
-                        config_path = os.path.join(
-                            flask.current_app.config['STATE_ROOT_PATH'],
-                            'afc_config', str(user.id))
-                        if not os.path.isdir(config_path):
-                            os.makedirs(config_path)
-                            os.chown(config_path, 1003, 1003)
-                        file_path = os.path.join(config_path, 'afc_config.json')
-                        LOGGER.debug('Opening config file "%s"', file_path)
-
-                        if not os.path.isfile(file_path):
-                            with open(file_path, 'wb') as outfile:
-                                outfile.write(json.dumps(cfg_rcrd[0]))
-                            os.chmod(file_path, 0o666)
-                            os.chown(file_path, 1003, 1003)
+                        dataif = data_if.DataIf_v1(None, user.id, None, flask.current_app.config['STATE_ROOT_PATH'])
+                        with dataif.open("cfg", "afc_config.json") as hfile:
+                            LOGGER.debug('Opening config file "%s"', dataif.rname("cfg", "afc_config.json"))
+                            hfile.write(json.dumps(cfg_rcrd[0]))
                 except Exception as e:
                     LOGGER.error(e)
                     LOGGER.error('Rolling back...')
@@ -680,11 +671,10 @@ class ConfigRemove(Command):
                         with flaskapp.app_context():
                             import flask
 
-                            config_path = os.path.join(
-                                flask.current_app.config['STATE_ROOT_PATH'],
-                                'afc_config', str(user.id))
-                            shutil.rmtree(config_path)
-                            LOGGER.debug('Delete config dir "%s"', config_path)
+                            dataif = data_if.DataIf_v1(None, user.id, None, flask.current_app.config['STATE_ROOT_PATH'])
+                            with dataif.open("cfg", "afc_config.json") as hfile:
+                                LOGGER.debug('Delete config file "%s"', dataif.rname("cfg", "afc_config.json"))
+                                hfile.delete()
                     except RuntimeError:
                         LOGGER.debug('Delete missing user %s', username[0])
                     except Exception as e:

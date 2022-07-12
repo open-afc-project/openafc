@@ -230,46 +230,10 @@ class AfcConfigFile(MethodView):
         )
     }
 
-    def _open(self, rel_path, mode, user=None):
-        ''' Open a configuration file.
-
-        :param rel_path: The specific config name to open.
-        :param mode: The file open mode.
-        :return: The opened file.
-        :rtype: file-like
-        '''
-        if mode == 'wb' and user is not None and not \
-                os.path.exists(os.path.join(flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user))):
-            # create scoped user directory so people don't clash over each others config
-            os.mkdir(os.path.join(
-                flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user)))
-
-        config_path = ''
-        if user is not None and os.path.exists(os.path.join(flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user))):
-            config_path = os.path.join(
-                flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user))
-        else:
-            config_path = os.path.join(
-                flask.current_app.config['STATE_ROOT_PATH'], 'afc_config')
-        if not os.path.exists(config_path):
-            os.makedirs(config_path)
-
-        file_path = os.path.join(config_path, rel_path)
-        LOGGER.debug('Opening config file "%s"', file_path)
-        if not os.path.exists(file_path) and mode != 'wb':
-            raise werkzeug.exceptions.NotFound()
-
-        handle = open(file_path, mode)
-
-        if mode == 'wb':
-            os.chmod(file_path, 0o666)
-
-        return handle
-
     def get(self, filename):
         ''' GET method for afc config
         '''
-        LOGGER.debug('getting afc_conf')
+        LOGGER.debug('AfcConfigFile.get({})'.format(filename))
         user_id = auth(roles=['AP', 'Analysis'])
         # ensure that webdav is populated with default files
         require_default_uls()
@@ -279,14 +243,19 @@ class AfcConfigFile(MethodView):
         filedesc = self.ACCEPTABLE_FILES[filename]
 
         resp = flask.make_response()
-        with self._open('afc_config.json', 'rb', user_id) as conf_file:
-            resp.data = conf_file.read()
+        dataif = data_if.DataIf_v1(None, user_id, None, flask.current_app.config['STATE_ROOT_PATH'])
+        try:
+            with dataif.open("cfg", "afc_config.json") as hfile:
+                resp.data = hfile.read()
+        except:
+            raise werkzeug.exceptions.NotFound()
         resp.content_type = filedesc['content_type']
         return resp
 
     def put(self, filename):
         ''' PUT method for afc config
         '''
+        LOGGER.debug('AfcConfigFile.put({})'.format(filename))
         user_id = auth(roles=['AP', 'Analysis'])
         LOGGER.debug("current user: %s", user_id)
         if filename not in self.ACCEPTABLE_FILES:
@@ -295,8 +264,9 @@ class AfcConfigFile(MethodView):
         if flask.request.content_type != filedesc['content_type']:
             raise werkzeug.exceptions.UnsupportedMediaType()
 
-        with contextlib.closing(self._open(filename, 'wb', user_id)) as outfile:
-            shutil.copyfileobj(flask.request.stream, outfile)
+        dataif = data_if.DataIf_v1(None, user_id, None, flask.current_app.config['STATE_ROOT_PATH'])
+        with dataif.open("cfg", "afc_config.json") as hfile:
+            hfile.write(flask.request.stream.read())
         return flask.make_response('AFC configuration file updated', 204)
 
 

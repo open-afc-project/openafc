@@ -23,20 +23,33 @@ import uuid
 
 RESPONSE_DIR = "responses"  # cache directory in STATE_ROOT_PATH
 HISTORY_DIR = "history"     # history directory in STATE_ROOT_PATH
-CONFIG_DIR = "afc_config"       # afc_config files directory in STATE_ROOT_PATH
+CONFIG_DIR = "afc_config"   # afc_config files directory in STATE_ROOT_PATH
 
 LOGGER = logging.getLogger(__name__)
 
+def fix_file_mod(path):
+    # ratapi, workers, and user console are run under root and fbrat users.
+    # In the future, all those processes will be executed under 'fbrat' 1003:1003,
+    # and this function will be removed.
+    try:
+        os.chown(path, 1003, 1003)
+        mode = os.stat(path).st_mode
+        if mode & 0o111:
+            mode |= 0o111
+        mode |= 0o666
+        os.chmod(path, mode)
+    except:
+        pass
+
 def mkfolder(path):
     try:
-        # ratapi and workers run under different users now.
-        # Remove the mode and chmod-s below when this is fixed.
         os.makedirs(path, 0o777)
     except OSError as e:
         if e.errno != errno.EEXIST:
             raise e
     else:
         LOGGER.debug("mkfolder({})".format(path))
+    fix_file_mod(path)
 
 class DataInt:
     """ Abstract class for data backend operations """
@@ -87,7 +100,6 @@ class DataIntFs(DataInt):
         if src != self.file_name:
             with open(src, "rb") as f:
                 self.write(f.read())
-            f.close()
 
     def read_file(self, dest):
         """ Will be removed. Copy file from remote storage to local fs """
@@ -96,11 +108,7 @@ class DataIntFs(DataInt):
             mkfolder(os.path.dirname(dest))
             with open(dest, "wb") as f:
                 f.write(self.read())
-            f.close()
-            try:
-                os.chmod(dest, 0o666)
-            except:
-                pass
+            fix_file_mod(dest)
 
     def write(self, data):
         """ write data to backend """
@@ -108,13 +116,7 @@ class DataIntFs(DataInt):
         mkfolder(os.path.dirname(self.file_name))
         with open(self.file_name, "wb") as f:
             f.write(data)
-        f.close()
-        try:
-            os.chmod(self.file_name, 0o666)
-        except:
-            pass
-        if (not self.head()):
-             raise Exception("Write failed")
+        fix_file_mod(self.file_name)
 
     def read(self):
         """ read data from backend """
@@ -153,7 +155,6 @@ class DataIntHttp(DataInt):
             raise Exception("Source file doesnt found")
         with open(src, "rb") as f:
             self.write(f.read())
-        f.close()
 
     def read_file(self, dest):
         """ Will be removed. Copy file from remote storage to local fs """
@@ -161,7 +162,7 @@ class DataIntHttp(DataInt):
         mkfolder(os.path.dirname(dest))
         with open(dest, "wb") as f:
             f.write(self.read())
-        f.close()
+        fix_file_mod(dest)
 
     def write(self, data):
         """ write data to backend """
@@ -220,9 +221,9 @@ class DataIf_v1():
                 self.file_types["dbg"] = "http://" + self.host + ":" + str(self.port) + "/" + "dbg" + "/" + self.history_dir
         else:
             self.backend = "fs"
-            if self.id:
+            if self.id and self.state_root:
                 self.file_types["pro"] = os.path.join(self.state_root, RESPONSE_DIR, self.id)
-            if self.user_id:
+            if self.user_id and self.state_root:
                 self.file_types["cfg"] = os.path.join(self.state_root, CONFIG_DIR, str(self.user_id))
             if self.history_dir:
                 self.file_types["dbg"] = os.path.join(self.local_history_dir(), self.history_dir)
