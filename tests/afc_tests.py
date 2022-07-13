@@ -826,6 +826,7 @@ def _run_test(cfg, reqs, resps, test_cases):
                   cfg['tests'], cfg['url_path'])
 
     test_res = AFC_OK
+    accum_secs = 0
     for test_case in test_cases:
         app_log.info('Prepare to run test - %s', test_case)
         if test_case not in reqs:
@@ -865,7 +866,6 @@ def _run_test(cfg, reqs, resps, test_cases):
                     break
 
         tm_secs = time.monotonic() - before_ts
-        app_log.info('Test done at %.1f secs', tm_secs)
 
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
@@ -878,12 +878,17 @@ def _run_test(cfg, reqs, resps, test_cases):
             app_log.error(upd_data)
             app_log.error(hash_obj.hexdigest())
             test_res = AFC_ERR
+        
+        accum_secs += tm_secs
+        app_log.info('Test done at %.1f secs', tm_secs)
 
         # For saving test results option
         if isinstance(cfg['outfile'], list):
             test_report(cfg['outfile'][0], float(tm_secs),
                         test_case, req_id[0],
                         ("PASS" if test_res == AFC_OK else "FAIL"), upd_data)
+
+    app_log.info("Total testcases runtime : %s secs", round(accum_secs, 1))
     return test_res
 
 
