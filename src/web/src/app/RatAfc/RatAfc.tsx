@@ -277,43 +277,29 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             //Get the KML file and load it into the state.kml parameters; get the GeoJson if present
                             let kml_filename = resp.result.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["kmzFile"];
                             let geoJson_filename = resp.result.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["geoJsonFile"];
-                            downloadMapData(kml_filename, "GET")
-                                .then(async kmlResp => {
-                                    if (kmlResp.ok) {
-                                        this.setKml(await kmlResp.blob());
-                                    }
-                                    downloadMapData(kml_filename, "DELETE")
-                                }
-                                );
-                            downloadMapData(geoJson_filename, "GET")
-                                .then(async jsonResp => {
-                                    if (jsonResp.ok) {
-                                        let geojson = JSON.parse(await jsonResp.text());
-                                        if (request.location.ellipse && geojson && geojson.geoJson) {
+                            this.setKml(atob(kml_filename))
+                            let geojson = JSON.parse(geoJson_filename);
+                            if (request.location.ellipse && geojson && geojson.geoJson) {
 
-                                            geojson.geoJson.features.push(
-                                                {
-                                                    type: "Feature",
-                                                    properties: {
-                                                        kind: "RLAN",
-                                                        FSLonLat: [
-                                                            this.state.mapCenter.lng,
-                                                            this.state.mapCenter.lat
-                                                        ]
-                                                    },
-                                                    geometry: {
-                                                        type: "Polygon",
-                                                        coordinates: [rasterizeEllipse(request.location.ellipse, 32)]
-                                                    }
-                                                });
-
-
+                                geojson.geoJson.features.push(
+                                    {
+                                        type: "Feature",
+                                        properties: {
+                                            kind: "RLAN",
+                                            FSLonLat: [
+                                                this.state.mapCenter.lng,
+                                                this.state.mapCenter.lat
+                                            ]
+                                        },
+                                        geometry: {
+                                            type: "Polygon",
+                                            coordinates: [rasterizeEllipse(request.location.ellipse, 32)]
                                         }
-                                        this.setMapState({ val: geojson.geoJson, valid: true, versionId: this.state.mapState.versionId + 1 })
-                                    }
-                                    downloadMapData(geoJson_filename, "DELETE")
-                                }
-                                );
+                                    });
+
+                            }
+                            this.setMapState({ val: geojson.geoJson, valid: true, versionId: this.state.mapState.versionId + 1 })
+
                         }
                     }
                 } else if (!resp.kind || resp.kind == "Error") {

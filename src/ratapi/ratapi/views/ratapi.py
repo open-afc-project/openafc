@@ -93,8 +93,6 @@ class GuiConfig(MethodView):
             admin_url=flask.url_for('admin.User', user_id=-1),
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
-            afc_kml=flask.url_for('ratapi-v1.VapKmlResult',
-                                  kml_file='p_kml_file'),
             afcconfig_trial=flask.url_for('ratapi-v1.TrialAfcConfigFile'),
             version=serververs,
         )
@@ -535,42 +533,6 @@ class AnalysisKmlResult(MethodView):
         else:
             raise werkzeug.exceptions.NotFound('KML not found')
 
-
-class VapKmlResult(MethodView):
-    ''' Get a KML result file from AFC Engine based on response filename'''
-
-    methods = ['GET', 'DELETE']
-
-    def get(self, kml_file):
-        ''' GET method for KML Result '''
-
-        LOGGER.debug("VapKmlResult.get({})".format(kml_file))
-        if kml_file.startswith("http:/"):
-            kml_file = kml_file.replace("http:/", "http://")
-        else:
-            kml_file = os.path.join("/", kml_file)
-        resp = flask.make_response()
-        dataif = data_if.DataIf_v1(None, None, None, None)
-        try:
-            with dataif.open_by_name(kml_file) as hfile:
-                resp.data = hfile.read()
-        except:
-            return flask.make_response(flask.json.dumps(dict(message='Resource not found')), 410)
-
-        if(kml_file.endswith("json.gz")):
-            resp.content_encoding = "gzip"
-            resp.content_type = 'application/json'
-        else:
-            resp.content_type = 'application/octet-stream'
-        LOGGER.debug("VapKmlResult.get({}) done".format(kml_file))
-        return resp
-
-    def delete(self, kml_file):
-        dataif = data_if.DataIf_v1(None, None, None, None)
-        with dataif.open_by_name(kml_file) as hfile:
-            hfile.delete()
-        return flask.make_response(flask.json.dumps(dict(message='file deleted')), 200)
-
 class AnalysisStatus(MethodView):
     ''' Check status of task '''
 
@@ -905,5 +867,3 @@ module.add_url_rule('/ulsparse/<task_id>',
                     view_func=DailyULSStatus.as_view('DailyULSStatus'))
 module.add_url_rule('/replay',
                     view_func=ReloadAnalysis.as_view('ReloadAnalysis'))
-module.add_url_rule('/kml/<path:kml_file>',
-                    view_func=VapKmlResult.as_view('VapKmlResult'))

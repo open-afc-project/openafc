@@ -44,7 +44,7 @@ RULESET = 'US_47_CFR_PART_15_SUBPART_E'
 module = flask.Blueprint('ap-afc', 'ap-afc')
 
 # tuple listing files to remain in cache dir
-CACHED_FILES = ("analysisResponse.json.gz", "mapData.json.gz", "results.kmz")
+CACHED_FILES = ("analysisResponse.json.gz")
 
 
 class AP_Exception(Exception):
@@ -232,21 +232,30 @@ def success_done(task_stat, dataif):
     if task_stat['runtime_opts'] & RNTM_OPT_GUI:
         with dataif.open("pro", "progress.txt") as hfile:
             hfile.delete()
-        kmz_file = dataif.rname("pro", "results.kmz")
-        geo_file = dataif.rname("pro", "mapData.json.gz")
 
-        LOGGER.debug('kmz and geo files: %s %s', kmz_file, geo_file)
-        # add the map data file (if it is generated) into a vendor extension
-        # will have to revisit when API can handle multiple requests
-        resp_json = json.loads(resp_data)
-        resp_json["vendorExtensions"] = [{
-            "extensionID": "openAfc.mapinfo",
-            "parameters": {
-                "kmzFile": kmz_file,
-                "geoJsonFile": geo_file
-            }
-        }]
-        resp_data = json.dumps(resp_json)
+        # Add the map data file (if it is generated) into a vendor extension
+        kmz_data = None
+        try:
+            with dataif.open("pro", "results.kmz") as hfile:
+                kmz_data = hfile.read()
+        except:
+            pass
+        map_data = None
+        try:
+            with dataif.open("pro", "mapData.json.gz") as hfile:
+                map_data = hfile.read()
+        except:
+            pass
+        if kmz_data or map_data:
+            resp_json = json.loads(resp_data)
+            resp_json["vendorExtensions"] = [{
+                "extensionID": "openAfc.mapinfo",
+                "parameters": {
+                    "kmzFile": kmz_data.encode('base64') if kmz_data else None,
+                    "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS) if map_data else None
+                }
+            }]
+            resp_data = json.dumps(resp_json)
 
     resp = flask.make_response()
     resp.data = resp_data
