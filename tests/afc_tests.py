@@ -87,7 +87,8 @@ class TestCfg(dict):
             'db_filename' : AFC_TEST_DB_FILENAME,
             'tests' : None,
             'is_test_by_index': True,
-            'resp' : '',})
+            'resp' : '',
+            'precision': None})
 
     def _send_recv(self, params):
         """Run AFC test and wait for respons"""
@@ -132,6 +133,160 @@ class TestCfg(dict):
         tm_secs = time.monotonic() - before_ts
         app_log.info('Test done at %.1f secs', tm_secs)
         return new_req, resp
+
+
+class TestResultComparator:
+    """ AFC Response comparator
+
+    Private instance attributes:
+    _precision -- Precision for results' comparison in dB. 0 means exact match
+    """
+    def __init__(self, precision):
+        """ Constructor
+
+        Arguments:
+        precision -- Precision for results' comparison in dB. 0 means exact
+                     match
+        """
+        assert precision >= 0
+        self._precision = precision
+
+    def compare_results(self, ref_str, result_str):
+        """ Compares reference and actual AFC responses
+
+        Arguments:
+        ref_str    -- Reference response JSON in string representation
+        result_str -- Actual response json in string representation
+        Returns list of difference description strings. Empty list means match
+        """
+        # List of difference description strings
+        diffs = []
+        # Reference and actual JSON dictionaries
+        jsons = []
+        for s, kind in [(ref_str, "reference"), (result_str, "result")]:
+            try:
+                jsons.append(json.loads(s))
+            except json.JSONDecodeError as ex:
+                diffs.append(f"Failed to decode {kind} JSON data: {ex}")
+                return diffs
+        self._recursive_compare(jsons[0], jsons[1], [], diffs)
+        return diffs
+
+    def _recursive_compare(self, ref_json, result_json, path, diffs):
+        """ Recursive comparator of JSON nodes
+
+        Arguments:
+        ref_json    -- Reference response JSON dictionary
+        result_json -- Actual response JSON dictionary
+        path        -- Path (sequence of indices) to node in question
+        diffs       -- List of difference description strings to update
+        """
+        # Items in questions in JSON dictionaries
+        ref_item = self._get_item(ref_json, path)
+        result_item = self._get_item(result_json, path)
+        # Human readable path representation for difference messages
+        path_repr = f"[{']['.join(str(idx) for idx in path)}]"
+        if ref_item == result_item:
+            return  # Items are equal - nothing to do
+        # So, items are sifferent. What's the difference?
+        if isinstance(ref_item, dict):
+            # One item is dictionary. Other should also be dictionary...
+            if not isinstance(result_item, dict):
+                diffs.append(f"Different item types at {path_repr}")
+                return
+            # ... with same set of keys
+            ref_keys = set(ref_item.keys())
+            result_keys = set(result_item.keys())
+            if ref_keys != result_keys:
+                msg = f"Different set of keys at {path_repr}"
+                for kind, elems in [("reference", ref_keys - result_keys),
+                                    ("result", result_keys - ref_keys)]:
+                    if elems:
+                        msg += \
+                            f" Unique {kind} keys: {', '.join(sorted(elems))}."
+                diffs.append(msg)
+                return
+            # Comparing values fo rindividual keys
+            for key in sorted(ref_item.keys()):
+                self._recursive_compare(ref_json, result_json, path + [key],
+                                        diffs)
+        elif isinstance(ref_item, list):
+            # One item is list. Other should also be list...
+            if not isinstance(result_item, list):
+                diffs.append(f"Different item types at {path_repr}")
+                return
+            # ... with the same number of elements
+            if len(ref_item) != len(result_item):
+                diffs.append(
+                    (f"Different list lengths at at {path_repr}: "
+                     f"{len(ref_item)} elements in reference vs "
+                     f"{len(result_item)} elements in result"))
+                return
+            # Comparing individual elements
+            for i in range(len(ref_item)):
+                self._recursive_compare(ref_json, result_json, path + [i],
+                                        diffs)
+        else:
+            # Items should be scalars
+            numeric = True
+            for item, kind in [(ref_item, "Reference"),
+                               (result_item, "Result")]:
+                if isinstance(item, str):
+                    numeric = False
+                elif not isinstance(item, (int, float)):
+                    diffs.append((f"{kind} data contains unrecognized item "
+                                  f"type at {path_repr}"))
+                    return
+            # Are these items power results for channel?
+            chan_repr = self._get_channel(ref_json, path) if numeric else None
+            if chan_repr is None:
+                # No, hence they must match exactly
+                diffs.append((f"Difference at {path}: reference content is "
+                              f"{ref_item}, result content is {result_item}"))
+            elif abs(ref_item - result_item) > self._precision:
+                # Yes and difference exceeds precision
+                diffs.append(
+                    (f"Difference at channel {chan_repr}: reference content "
+                     f"is {ref_item}, result content is {result_item}, "
+                     f"difference is {abs(ref_item - result_item):g}dB"))
+
+    def _get_channel(self, j, path):
+        """ Tries to get channel description for value at given index
+
+        Arguments:
+        j    -- JSON dictionary
+        path -- Sequence of indices to the element in question
+        Returns string representation of channel if value is power limit for
+        channel, None otherwise
+        """
+        try:
+            # Value is element in list with "maxEirp" key?
+            if (len(path) >= 2) and (path[-2] == "maxEirp"):
+                # Returning channel number (None if some indices are wrong)
+                return str(self._get_item(j,
+                    path[: len(path) - 2] + ["channelCfi", path[-1]]))
+            # Value is element at "maxPSD" key?
+            if (len(path) >= 1) and (path[-1] == "maxPSD"):
+                # Returning string representation of frequency range (None if
+                # some indices are wrong)
+                fr = self._get_item(j,
+                                    path[:len(path) - 1] + ["frequencyRange"])
+                return f"[{fr['highFrequency']}-{fr['lowFrequency']}]"
+        except (KeyError, IndexError):
+            pass
+        return None
+
+    def _get_item(self, j, path):
+        """ Retrieves item by sequemce of indices
+
+        Arguments:
+        j    -- JSON dictionary
+        path -- Sequence of indices
+        Returns retrieved item
+        """
+        for idx in path:
+            j = j[idx]
+        return j
 
 
 def json_lookup(key, json_obj, val):
@@ -827,6 +982,7 @@ def _run_test(cfg, reqs, resps, test_cases):
 
     test_res = AFC_OK
     accum_secs = 0
+    results_comparator = TestResultComparator(precision=cfg['precision'] or 0)
     for test_case in test_cases:
         app_log.info('Prepare to run test - %s', test_case)
         if test_case not in reqs:
@@ -869,13 +1025,18 @@ def _run_test(cfg, reqs, resps, test_cases):
 
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
-        hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
 
-        if resps[test_case][1] == hash_obj.hexdigest():
+        diffs = []
+        hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
+        diffs = results_comparator.compare_results(ref_str=resps[test_case][0],
+                                                   result_str=upd_data)
+        if (resps[test_case][1] == hash_obj.hexdigest()) \
+                if cfg['precision'] is None else (not diffs):
             app_log.info('Test %s is Ok', req_id[0])
         else:
             app_log.error('Test %s (%s) is Fail', test_case, req_id[0])
-            app_log.error(upd_data)
+            for line in diffs:
+                app_log.error(f"  Difference: {line}")
             app_log.error(hash_obj.hexdigest())
             test_res = AFC_ERR
         
@@ -1039,6 +1200,11 @@ def make_arg_parser():
                          default='all',
                          help="WFA test identifier, for example "
                          "srs, urs, fsp, ibp, sip, etc (default=all).\n")
+    args_parser.add_argument("--precision", metavar="PRECISION_DB", type=float,
+                         help="Maximum allowed deviation of power limits from "
+                         "reference values in dB. 0 means exact match is "
+                         "required. Default is to use hash-based exact match "
+                         "comparison")
 
     args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?',
         help="run - run test from DB and compare.\n"
