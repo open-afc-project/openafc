@@ -1160,7 +1160,7 @@ def make_arg_parser():
                          help="<port> - set connection port "
                               "(default=443).\n")
     args_parser.add_argument('--conn_type', nargs='?',
-                         choices=['sync', 'async'], default='async',
+                         choices=['sync', 'async'], default='sync',
                          help="<sync|async> - set connection to be "
                               "synchronous or asynchronous (default=async).\n")
     args_parser.add_argument('--conn_tm', nargs='?', default=None, type=int,

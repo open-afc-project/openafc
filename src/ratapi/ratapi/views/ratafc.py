@@ -170,6 +170,7 @@ def _translate_afc_error(error_msg):
 
 
 def fail_done(task_stat, dataif):
+    LOGGER.debug('fail_done()')
     error_data = None
     if task_stat['runtime_opts'] & RNTM_OPT_GUI:
         with dataif.open("pro", "progress.txt") as hfile:
@@ -193,6 +194,7 @@ def fail_done(task_stat, dataif):
 
 def in_progress(task_stat, dataif):
     # get progress and ETA
+    LOGGER.debug('in_progress()')
     if task_stat['runtime_opts'] & RNTM_OPT_GUI:
         progress = None
         try:
@@ -218,6 +220,7 @@ def in_progress(task_stat, dataif):
 
 
 def success_done(task_stat, dataif):
+    LOGGER.debug('success_done()')
     resp_data = None
     with dataif.open("pro", "analysisRequest.json") as hfile:
         hfile.delete()
@@ -257,8 +260,8 @@ def success_done(task_stat, dataif):
             }]
             resp_data = json.dumps(resp_json)
 
-    resp = flask.make_response()
-    resp.data = resp_data
+    resp = flask.make_response(resp_data)
+    resp.content_type = 'application/json'
     dataif.rmtmpdir(CACHED_FILES)
     return resp
 
