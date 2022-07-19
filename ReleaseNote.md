@@ -1,4 +1,22 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-297**|
+| :- | :- |
+|**Date**|**07/14/2022**|
+
+## **Issues Addressed**
+ * Jira OA-297: Support multiple AP requests
+
+## **Interface Changes**
+ * Mapping data was previously passed via a vendorExtension on the entire set of responses, data is now attached as a vendorExtension to the particular availableSpectrumInquiryResponse that it is generated for.
+
+## **Testing Done**
+ * Tested against API using SOAPUI tool to generate and review responses for a single request and multiple requests with and without attached mapping data. Project with included inputs is attached to the JIRA ticket.
+ * Reviewed UI to verify mapping functions continue to work 
+
+## **Open Issues**
+
 ## **Version and Date**
 |Version|**OA-296**|
 | :- | :- |

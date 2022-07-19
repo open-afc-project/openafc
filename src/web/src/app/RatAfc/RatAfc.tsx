@@ -269,14 +269,14 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng },
                             fullJsonResponse: JSON.stringify(resp.result, null, 2)
                         });
-                       
+
                         if (this.state.includeMap
-                            && resp.result.vendorExtensions
-                            && resp.result.vendorExtensions.length > 0
-                            && resp.result.vendorExtensions.findIndex(x => x.extensionID == "openAfc.mapinfo") >= 0) {
+                            && response.vendorExtensions
+                            && response.vendorExtensions.length > 0
+                            && response.vendorExtensions.findIndex(x => x.extensionID == "openAfc.mapinfo") >= 0) {
                             //Get the KML file and load it into the state.kml parameters; get the GeoJson if present
-                            let kml_filename = resp.result.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["kmzFile"];
-                            let geoJson_filename = resp.result.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["geoJsonFile"];
+                            let kml_filename = response.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["kmzFile"];
+                            let geoJson_filename = response.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["geoJsonFile"];
                             this.setKml(atob(kml_filename))
                             let geojson = JSON.parse(geoJson_filename);
                             if (request.location.ellipse && geojson && geojson.geoJson) {

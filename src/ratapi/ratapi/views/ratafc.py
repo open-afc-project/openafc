@@ -72,8 +72,8 @@ class AP_Exception(Exception):
 class VersionNotSupportedException(AP_Exception):
     '''
     100 Name: VERSION_NOT_SUPPORTED
-    Interpretation: The requested version number is invalid 
-    The communication can be attempted again using a different version number. In the case of an AP attempting 
+    Interpretation: The requested version number is invalid
+    The communication can be attempted again using a different version number. In the case of an AP attempting
     to communicate with an AFC, communications with the same version but a different AFC could be attempted
     '''
 
@@ -86,7 +86,7 @@ class DeviceUnallowedException(AP_Exception):
     '''
     101 Name: DEVICE_UNALLOWED
     Interpretation: The provided credentials are invalid
-    This specific device as identified by the combination of its FCC ID and unique manufacturer's 
+    This specific device as identified by the combination of its FCC ID and unique manufacturer's
     serial number is not allowed to operate under AFC control due to regulatory action or other action.
     '''
 
@@ -166,7 +166,7 @@ def _translate_afc_error(error_msg):
 
     invalid_version = error_msg.find('VERSION_NOT_SUPPORTED')
     if invalid_version != -1:
-        raise VersionNotSupported()
+        raise VersionNotSupportedException()
 
 
 def fail_done(task_stat, dataif):
@@ -235,6 +235,8 @@ def success_done(task_stat, dataif):
     if task_stat['runtime_opts'] & RNTM_OPT_GUI:
         with dataif.open("pro", "progress.txt") as hfile:
             hfile.delete()
+        kmz_file = dataif.rname("pro", "results.kmz")
+        geo_file = dataif.rname("pro", "mapData.json.gz")
 
         # Add the map data file (if it is generated) into a vendor extension
         kmz_data = None
@@ -251,7 +253,7 @@ def success_done(task_stat, dataif):
             pass
         if kmz_data or map_data:
             resp_json = json.loads(resp_data)
-            resp_json["vendorExtensions"] = [{
+            resp_json["availableSpectrumInquiryResponses"][0]["vendorExtensions"] = [{
                 "extensionID": "openAfc.mapinfo",
                 "parameters": {
                     "kmzFile": kmz_data.encode('base64') if kmz_data else None,
@@ -263,12 +265,13 @@ def success_done(task_stat, dataif):
     resp = flask.make_response(resp_data)
     resp.content_type = 'application/json'
     dataif.rmtmpdir(CACHED_FILES)
+    LOGGER.debug("returning data: %s", resp.data)
     return resp
 
 
 response_map = {
-    'SUCCESS' : success_done,
-    'FAILURE' : fail_done,
+    'SUCCESS': success_done,
+    'FAILURE': fail_done,
     'PROGRESS': in_progress
 }
 
@@ -282,7 +285,7 @@ class RatAfc(MethodView):
         '''
         LOGGER.debug('RatAfc::_auth_ap()')
         LOGGER.debug('Starting auth_ap,serial: %s; certId: %s; ruleset %s.',
-                     serial_number,certification_id,rulesets )
+                     serial_number, certification_id, rulesets)
 
         if serial_number is None:
             raise MissingParamException(['serialNumber'])
@@ -308,28 +311,30 @@ class RatAfc(MethodView):
         task_id = flask.request.args['task_id']
         print("RatAfc.get() task_id={}".format(task_id))
 
-        dataif = data_if.DataIf_v1(task_id, None, None, flask.current_app.config['STATE_ROOT_PATH'])
+        dataif = data_if.DataIf_v1(
+            task_id, None, None, flask.current_app.config['STATE_ROOT_PATH'])
         t = task.task(dataif)
         task_stat = t.get()
 
-        if t.ready(task_stat): # The task is done
-            if t.successful(task_stat): # The task is done w/o exception 
+        if t.ready(task_stat):  # The task is done
+            if t.successful(task_stat):  # The task is done w/o exception
                 return response_map[task_stat['status']](task_stat, t.dataif)
-            else: # The task raised an exception
+            else:  # The task raised an exception
                 raise werkzeug.exceptions.InternalServerError(
                     'Task execution failed')
-        else: # The task in progress or pending
-            if task_stat['status'] == 'PROGRESS': # The task in progress
+        else:  # The task in progress or pending
+            if task_stat['status'] == 'PROGRESS':  # The task in progress
                 # 'PROGRESS' is task.state value, not task.result['status']
                 return response_map['PROGRESS'](task_stat, t.dataif)
-            else: # The task yet not started
-                LOGGER.debug('RatAfc::get() not ready state: %s', task_stat['status'])
+            else:  # The task yet not started
+                LOGGER.debug('RatAfc::get() not ready state: %s',
+                             task_stat['status'])
                 return flask.make_response(
                     flask.json.dumps(dict(percent=0, message='Pending...')),
                     202)
 
     def post(self):
-        ''' POST method for RAT AFC 
+        ''' POST method for RAT AFC
         '''
         LOGGER.debug('RatAfc::post()')
         LOGGER.debug(flask.request.url)
@@ -340,98 +345,136 @@ class RatAfc(MethodView):
             raise VersionNotSupportedException([ver])
 
         # start request
-        # Get the entire JSON to allow for multiple requests and
-        # match v1.1 expected format
+
         args = flask.request.json
-        # as of now, there can be only one request
-        firstRequest = flask.request.json["availableSpectrumInquiryRequests"][0]
+        # split multiple requests into an array of individual requests
+        requests = map(lambda r: {"availableSpectrumInquiryRequests": [
+                       r], "version": ver}, args["availableSpectrumInquiryRequests"])
+
         LOGGER.debug("Running AFC analysis with params: %s", args)
         request_type = 'AP-AFC'
 
-        try:
-            # authenticate
-            device_desc = firstRequest.get('deviceDescriptor')
+        results = {"availableSpectrumInquiryResponses": [], "version": ver}
 
+        for request in requests:
             try:
-                firstCertId = device_desc['certificationId'][0]['nra'] + \
-                    ' ' + device_desc['certificationId'][0]['id']
-            except:
-                firstCertId = None
+                # authenticate
+                LOGGER.debug("Request: %s", request)
+                device_desc = request["availableSpectrumInquiryRequests"][0].get(
+                    'deviceDescriptor')
 
-            user_id = self._auth_ap(device_desc.get('serialNumber'), firstCertId, device_desc.get('rulesetIds'))
+                try:
+                    firstCertId = device_desc['certificationId'][0]['nra'] + \
+                        ' ' + device_desc['certificationId'][0]['id']
+                except:
+                    firstCertId = None
 
-            user = User.query.filter_by(id=user_id).first()
+                user_id = self._auth_ap(device_desc.get(
+                    'serialNumber'), firstCertId, device_desc.get('rulesetIds'))
 
-            runtime_opts = RNTM_OPT_NODBG_NOGUI
-            debug_opt = flask.request.args.get('debug')
-            if debug_opt == 'True':
-                runtime_opts |= RNTM_OPT_DBG
-            gui_opt = flask.request.args.get('gui')
-            if gui_opt == 'True':
-                runtime_opts |= RNTM_OPT_GUI
-            LOGGER.debug('RatAfc::post() runtime %d', runtime_opts)
-            if ('FILESTORAGE_HOST' in os.environ and
-                    'FILESTORAGE_PORT' in os.environ):
-                runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
+                user = User.query.filter_by(id=user_id).first()
 
-            history_dir = None
-            if runtime_opts & RNTM_OPT_DBG:
-                history_dir = user.email + "/" + str(datetime.datetime.now().isoformat())
-            dataif = data_if.DataIf_v1(None, user_id, history_dir, flask.current_app.config['STATE_ROOT_PATH'])
-            request_json_bytes = json.dumps(args).encode('utf-8')
-            config_bytes = None
-            with dataif.open("cfg", "afc_config.json") as hfile:
-                config_bytes = hfile.read()
-            dataif.genId(config_bytes, request_json_bytes)
-            with dataif.open("pro", "analysisRequest.json") as hfile:
-                hfile.write(request_json_bytes)
+                runtime_opts = RNTM_OPT_NODBG_NOGUI
+                debug_opt = flask.request.args.get('debug')
+                if debug_opt == 'True':
+                    runtime_opts |= RNTM_OPT_DBG
+                gui_opt = flask.request.args.get('gui')
+                if gui_opt == 'True':
+                    runtime_opts |= RNTM_OPT_GUI
+                LOGGER.debug('RatAfc::post() runtime %d', runtime_opts)
+                if ('FILESTORAGE_HOST' in os.environ and
+                        'FILESTORAGE_PORT' in os.environ):
+                    runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
 
-            if runtime_opts & RNTM_OPT_DBG:
-                with dataif.open("dbg", "analysisRequest.json") as hfile:
+                history_dir = None
+                if runtime_opts & RNTM_OPT_DBG:
+                    history_dir = user.email + "/" + \
+                        str(datetime.datetime.now().isoformat())
+                dataif = data_if.DataIf_v1(
+                    None, user_id, history_dir, flask.current_app.config['STATE_ROOT_PATH'])
+                request_json_bytes = json.dumps(request).encode('utf-8')
+                config_bytes = None
+                with dataif.open("cfg", "afc_config.json") as hfile:
+                    config_bytes = hfile.read()
+                dataif.genId(config_bytes, request_json_bytes)
+                with dataif.open("pro", "analysisRequest.json") as hfile:
                     hfile.write(request_json_bytes)
-                with dataif.open("dbg", "afc_config.json") as hfile:
-                    hfile.write(config_bytes)
+                if runtime_opts & RNTM_OPT_DBG:
+                    with dataif.open("dbg", "analysisRequest.json") as hfile:
+                        hfile.write(request_json_bytes)
+                    with dataif.open("dbg", "afc_config.json") as hfile:
+                        hfile.write(config_bytes)
 
-            build_task(dataif.get_id(), request_type, user_id, history_dir, runtime_opts)
+                build_task(dataif.get_id(), request_type,
+                           user_id, history_dir, runtime_opts)
 
-            conn_type = flask.request.args.get('conn_type')
-            LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
-            t = task.task(dataif)
-            task_stat = t.get()
-            if conn_type == 'async':
-#                return flask.jsonify(taskId = dataif.get_id(),
-#                                     taskState = task.state)
-                return flask.jsonify(taskId = dataif.get_id(),
-                                     taskState = task_stat["status"])
+                conn_type = flask.request.args.get('conn_type')
+                LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
+                t = task.task(dataif)
+                task_stat = t.get()
+                if conn_type == 'async':
+                    #                return flask.jsonify(taskId = dataif.get_id(),
+                    #                                     taskState = task.state)
+                    #                return flask.jsonify(taskId = dataif.get_id(),
+                    #                                     taskState = task_stat["status"])
+                    results["availableSpectrumInquiryResponses"].append(
+                        {"taskId": dataif.get_id(), "taskState": task_stat["status"]})
+                else:
+                    # wait for request to finish processing
+                    try:
+                        t.wait()
+                        task_stat = t.get()
+                        LOGGER.debug("Task complete: %s", task_stat)
+                        if t.successful(task_stat):
+                            taskResponse = response_map[task_stat['status']](
+                                task_stat, dataif)
+                            # we might be able to clean this up by having the result functions not return a full response object
+                            # need to check everywhere they are called
+                            dataAsJson = json.loads(taskResponse.data)
+                            LOGGER.debug("dataAsJson: %s", dataAsJson)
+                            actualResult = dataAsJson.get(
+                                "availableSpectrumInquiryResponses")
+                            if actualResult is not None:
+                                # LOGGER.debug("actualResult: %s", actualResult)
+                                results["availableSpectrumInquiryResponses"].append(
+                                    actualResult[0])
+                            else:
+                                LOGGER.debug("actualResult was None")
+                                results["availableSpectrumInquiryResponses"].append(
+                                    dataAsJson)
+                        else:
+                            LOGGER.debug("Task was not successful")
+                            taskResponse = response_map[task_stat['status']](
+                                task_stat, dataif)
+                            dataAsJson = json.loads(taskResponse.data)
+                            LOGGER.debug(
+                                "Unsuccessful dataAsJson: %s", dataAsJson)
+                            results["availableSpectrumInquiryResponses"].append(
+                                dataAsJson)
 
-            # wait for request to finish processing
-            try:
-                task_stat = t.wait()
-            except:
-                raise AP_Exception(-1,
-                       'The task state is invalid. '
-                       'Try again later, and if this issue '
-                       'persists contact support.')
+                    except Exception as e:
+                        LOGGER.error(
+                            'catching and rethrowing exception: %s', e.message)
+                        raise AP_Exception(-1,
+                                           'The task state is invalid. '
+                                           'Try again later, and if this issue '
+                                           'persists contact support.')
 
-            return response_map[task_stat['status']](task_stat, dataif)
-
-        except AP_Exception as e:
-            LOGGER.error('catching exception: %s', e.message)
-            result = {
-                'version': '1.1',
-                'availableSpectrumInquiryResponses': [{
-                    'requestId': firstRequest.get('requestId'),
-                    'response': {
-                        'responseCode': e.response_code,
-                        'shortDescription': e.description,
-                        'supplementalInfo': e.supplemental_info
-                    }
-                }]
-            }
-            LOGGER.error(str(result))
-            resp = flask.make_response(flask.json.dumps(result), 200)
-            resp.content_type = 'application/json'
-            return resp
+            except AP_Exception as e:
+                LOGGER.error('catching exception: %s', e.message)
+                results["availableSpectrumInquiryResponses"].append(
+                    {
+                        'requestId': request["availableSpectrumInquiryRequests"][0]["requestId"],
+                        'response': {
+                            'responseCode': e.response_code,
+                            'shortDescription': e.description,
+                            'supplementalInfo': json.dumps(e.supplemental_info) if e.supplemental_info is not None else None
+                        }
+                    })
+        LOGGER.error("Final results: %s", str(results))
+        resp = flask.make_response(flask.json.dumps(results), 200)
+        resp.content_type = 'application/json'
+        return resp
 
 
 # registration of default runtime options
