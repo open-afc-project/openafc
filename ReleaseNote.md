@@ -4,7 +4,7 @@
 |Version|3.3.21.1|
 | :- | :- |
 |**Date**|**07/20/2022**|
-|compiled server's version is tbd |git tag 3.3.21.1|
+|compiled server's version is f5ad056 |git tag 3.3.21.1|
 
 ## **Version and Date**
 |Version|**OA-297**|
