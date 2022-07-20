@@ -992,12 +992,10 @@ int main(int argc, char **argv)
       row << makeNumber(txAnt.tilt);            // Tx Elevation Angle (deg)
       row << txAnt.antennaMake;                 // Tx Ant Manufacturer
       row << txAnt.antennaModel;                // Tx Ant Model
-
       row << txAntennaModelName.c_str();            // Tx Matched antenna model (blank if unmatched)
       row << AntennaModelClass::categoryStr(txAntennaCategory).c_str(); // Tx Antenna category
       row << makeNumber(txAntennaDiameter);     // Tx Ant Diameter (m)
       row << makeNumber(txAntennaMidbandGain);  // Tx Ant Midband Gain (dB)
-
       row << makeNumber(txAnt.heightToCenterRAAT); // Tx Height to Center RAAT (m)
       row << makeNumber(txAnt.beamwidth); // Tx Beamwidth
       row << makeNumber(txAnt.gain);      // Tx Gain (dBi)
