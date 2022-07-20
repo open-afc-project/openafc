@@ -443,7 +443,7 @@ def parse_tests(cfg):
         cell = sheet.cell(row = i, column = HEIGHTTYPE)
         res_str += REQ_LOC_HEIGHT_TYPE + '"' + str(cell.value) + '"'
         cell = sheet.cell(row = i, column = HEIGHT)
-        if isinstance(cell.value, int):
+        if isinstance(cell.value, int) or isinstance(cell.value, float):
             res_str += ', ' + REQ_LOC_HEIGHT + str(cell.value)
         res_str += '}, '
 
