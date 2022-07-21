@@ -23,6 +23,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Compare AFC config records](#compare-afc-config-records)
   - [Reacquisition response records for exist requests](#reacquisition-response-records-for-exist-requests)
 - [**Testing setup**](#testing-setup)
+- [**Change testing database manually**](#change-testing-database-manually*)
 
 - [Back to main readme](/README.md)
 <br /><br />
@@ -220,6 +221,33 @@ There is also the ability to delete AFC server administration configuration by p
                                 ]
 }
 ```
+
+# **Change testing database manually**
+
+The procedure requires to drop the DB into a SQL file, edit if needed and create a new DB based on changed SQL file.
+
+Open the DB and dump to a SQL file.
+```
+sqlite3 afc_input.sqlite3
+>
+> .output dump.sql
+> .dump
+> .quit
+```
+Open and edit dump.sql with any editor as it is a text file with not complicated SQL code.
+
+Make a backup from original DB.
+```
+mv ./afc_input.sqlite3 ./afc_input.sqlite3_backup
+```
+Open a new file and create tables in it.
+```
+sqlite3 ./afc_input.sqlite3
+>
+> .read dump.sql
+> .quit
+```
+At this stage there is a fixed DB that can be used.
 
 <br /><br />
 
