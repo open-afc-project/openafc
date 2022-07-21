@@ -1,6 +1,23 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-302**|
+| :- | :- |
+|**Date**|**07/19/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-302: Include additional heights for RLANs
+
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Validated four examples of different height and height uncertainty (per jira ticket). Test configuration and results are attached to the jira ticket.
+ * Valdiation is done by confirming expected heights (per Jira ticket) under "RLAN_HEIGHT_ABOVE_TERRAIN (m)" in exc_thr file.
+
+## **Open Issues**
+
 |Version|3.3.21.1|
 | :- | :- |
 |**Date**|**07/20/2022**|

@@ -6437,7 +6437,7 @@ void AfcManager::runPointAnalysis()
 	_rlanRegion->configure(_rlanHeightType, _terrainDataModel);
 
 	double heightUncertainty = _rlanRegion->getHeightUncertainty();
-	int NHt = (int) floor(heightUncertainty / _scanres_ht);
+	int NHt = (int) ceil(heightUncertainty / _scanres_ht);
 	Vector3 rlanPosnList[2*NHt+1];
 	GeodeticCoord rlanCoordList[2*NHt+1];
 
@@ -6804,7 +6804,7 @@ void AfcManager::runPointAnalysis()
 			int htIdx;
 			bool lowHeightFlag = false;
 			for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-				double heightAMSL = height0 + (NHt - htIdx)*_scanres_ht; // scan from top down
+				double heightAMSL = height0 + (NHt - htIdx)*heightUncertainty/NHt; // scan from top down
 				double heightAGL  = heightAMSL - rlanTerrainHeight;
 				bool useFlag;
 				if (heightAGL < _minRlanHeightAboveTerrain) {
@@ -7192,7 +7192,7 @@ void AfcManager::runPointAnalysis()
 					int numRlanPosn = 0;
 					bool lowHeightFlag = false;
 					for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-						double heightAMSL = height0 + (NHt - htIdx)*_scanres_ht; // scan from top down
+						double heightAMSL = height0 + (NHt - htIdx)*heightUncertainty/NHt; // scan from top down
 						double heightAGL  = heightAMSL - rlanTerrainHeight;
 						bool useFlag;
 						if (heightAGL < _minRlanHeightAboveTerrain) {
@@ -7755,7 +7755,7 @@ void AfcManager::runScanAnalysis()
 	_rlanRegion->configure(_rlanHeightType, _terrainDataModel);
 
 	double heightUncertainty = _rlanRegion->getHeightUncertainty();
-	int NHt = (int) floor(heightUncertainty / _scanres_ht);
+	int NHt = (int) ceil(heightUncertainty / _scanres_ht);
 	Vector3 rlanPosnList[2*NHt+1];
 	GeodeticCoord rlanCoordList[2*NHt+1];
 
@@ -8038,7 +8038,7 @@ void AfcManager::runScanAnalysis()
 
 			int htIdx;
 			for(htIdx=0; htIdx<=2*NHt; ++htIdx) {
-				double heightAMSL = height0 + (htIdx-NHt)*_scanres_ht;
+				double heightAMSL = height0 + (htIdx-NHt)*heightUncertainty/NHt;
 
 				fkml->writeStartElement("Placemark");
 				fkml->writeTextElement("name", QString::asprintf("SCAN_POINT_%d_%d", ptIdx, htIdx));
@@ -8210,7 +8210,7 @@ void AfcManager::runScanAnalysis()
 		int rlanPosnIdx;
 		int htIdx;
 		for(htIdx=0; htIdx<=2*NHt; ++htIdx) {
-			rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, (height0 + (htIdx-NHt)*_scanres_ht)/1000.0);
+			rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, (height0 + (htIdx-NHt)*heightUncertainty/NHt)/1000.0);
 			rlanPosnList[htIdx] = EcefModel::fromGeodetic(rlanCoordList[htIdx]);
 		}
 
@@ -9800,7 +9800,7 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	/* Constant Parameters                                                                */
 	/**************************************************************************************/
 
-	_minRlanHeightAboveTerrain = 1.0;
+	_minRlanHeightAboveTerrain = 1.5;
 
 	_maxRadius = 150.0e3;
 	_exclusionDist = 1.0;

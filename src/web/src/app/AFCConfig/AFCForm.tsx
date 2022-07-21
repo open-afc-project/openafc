@@ -833,7 +833,7 @@ export class AFCForm extends React.Component<
                                     maxWidth="40.0rem"
                                     content={
                                         <>
-                                            <p>Min allowable AGL height = 1m</p>
+                                            <p>Min allowable AGL height = 1.5 m</p>
                                             <p>Note that this is meant to mainly prevent the portion of uncertainty region to be underground due to height uncertainty and terrain variation.</p>
                                             <p>If the AGL height of all scan points is below ground (without height uncertainty), an error will be reported.</p>
                                         </>
