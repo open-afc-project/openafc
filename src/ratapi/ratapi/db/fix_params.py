@@ -126,16 +126,8 @@ def fixParams(inputPath, outputPath, logFile):
                     row.append("") # Rx Gain (dBi)
                     row.append("") # Tx Gain (dBi)
 
-                    FSID = row[FSIDIdx]
                     FRN = row[FRNIdx]
                     freq = float(row[freqIdx])
-                    txLat = float(row[txLatIdx])
-                    txLon = float(row[txLonIdx])
-                    txHeightAGL = row[txHeightAGLIdx]
-                    rxLat = float(row[rxLatIdx])
-                    rxLon = float(row[rxLonIdx])
-                    rxHeightAGL = row[rxHeightAGLIdx]
-                    return_FSID = row[return_FSIDIdx]
 
                     if (freq >= 5925.0) and (freq <= 6425.0):
                         uniiband = 5
