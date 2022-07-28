@@ -2140,6 +2140,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	} else {
 		_channelResponseAlgorithm = CConst::pwrSpectralAlgorithm;
 	}
+
+	if (jsonObj.contains("visibilityThreshold") && !jsonObj["visibilityThreshold"].isUndefined()) {
+		_visibilityThreshold = jsonObj["visibilityThreshold"].toDouble();
+	} else {
+	    _visibilityThreshold = -10000.0;
+	}
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -9647,6 +9653,7 @@ void AfcManager::printUserInputs()
 			fUserInputs->writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT (m)", QString::number(_heatmapRLANOutdoorHeight, 'e', 20) } );
 			fUserInputs->writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT_UNCERTAINTY (m)", QString::number(_heatmapRLANOutdoorHeightUncertainty, 'e', 20) } );
 		}
+		fUserInputs->writeRow({ "VISIBILITY_THRESHOLD", QString::number(_visibilityThreshold, 'e', 20) } );
 
 	}
 	LOGGER_DEBUG(logger) << "User inputs written to userInputs.csv";
@@ -9852,8 +9859,6 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_filterSimRegionOnly = false;
 
 	// _rlanBWStr = "20.0e6,40.0e6,80.0e6,160.0e6"; // Channel bandwidths in Hz
-
-	_visibilityThreshold = -10000.0;
 
 	_worldPopulationFile = SearchPaths::forReading("data", "fbrat/rat_transfer/population/gpw_v4_population_density_rev11_2020_30_sec.tif", true).toStdString();
 	_radioClimateFile = SearchPaths::forReading("data", "fbrat/rat_transfer/itudata/TropoClim.txt", true).toStdString();
