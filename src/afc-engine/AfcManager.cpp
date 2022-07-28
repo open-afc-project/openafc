@@ -6503,6 +6503,7 @@ void AfcManager::runPointAnalysis()
 				"FS_RX_FEEDER_LOSS (dB)",
 				"FS_RX_PWR (dBW)",
 				"FS I/N (dB)",
+				"EIRP_LIMIT (dBm)",
 				"ULS_LINK_DIST (m)",
 				"RLAN_CENTER_FREQ (Hz)",
 				"FS_TX_TO_RLAN_DIST (m)",
@@ -6804,7 +6805,7 @@ void AfcManager::runPointAnalysis()
 			int htIdx;
 			bool lowHeightFlag = false;
 			for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-				double heightAMSL = height0 + (NHt - htIdx)*heightUncertainty/NHt; // scan from top down
+				double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
 				double heightAGL  = heightAMSL - rlanTerrainHeight;
 				bool useFlag;
 				if (heightAGL < _minRlanHeightAboveTerrain) {
@@ -7192,7 +7193,7 @@ void AfcManager::runPointAnalysis()
 					int numRlanPosn = 0;
 					bool lowHeightFlag = false;
 					for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-						double heightAMSL = height0 + (NHt - htIdx)*heightUncertainty/NHt; // scan from top down
+				        double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
 						double heightAGL  = heightAMSL - rlanTerrainHeight;
 						bool useFlag;
 						if (heightAGL < _minRlanHeightAboveTerrain) {
@@ -7374,7 +7375,7 @@ void AfcManager::runPointAnalysis()
 										msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
 										msg << QString::number(_polarizationLossDB, 'f', 3);
 										msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
-										msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(rxPowerDBW - uls->getNoiseLevelDBW(), 'f', 3);
+										msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(I2NDB, 'f', 3) <<  QString::number(eirpLimit_dBm, 'f', 3);
 										msg << QString::number(ulsLinkDistance, 'f', 3) << QString::number(chanCenterFreq, 'f', 3) << QString::number(d2, 'f', 3) << QString::number(pathDifference, 'f', 6);
 										msg << QString::number(ulsWavelength * 1000, 'f', 3) << QString::number(fresnelIndex, 'f', 3);
 
@@ -8038,7 +8039,7 @@ void AfcManager::runScanAnalysis()
 
 			int htIdx;
 			for(htIdx=0; htIdx<=2*NHt; ++htIdx) {
-				double heightAMSL = height0 + (htIdx-NHt)*heightUncertainty/NHt;
+				double heightAMSL = height0 + (NHt ? (htIdx-NHt)*heightUncertainty/NHt : 0.0);
 
 				fkml->writeStartElement("Placemark");
 				fkml->writeTextElement("name", QString::asprintf("SCAN_POINT_%d_%d", ptIdx, htIdx));
@@ -8210,7 +8211,7 @@ void AfcManager::runScanAnalysis()
 		int rlanPosnIdx;
 		int htIdx;
 		for(htIdx=0; htIdx<=2*NHt; ++htIdx) {
-			rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, (height0 + (htIdx-NHt)*heightUncertainty/NHt)/1000.0);
+			rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, (height0 + (NHt ? (htIdx-NHt)*heightUncertainty/NHt : 0.0))/1000.0);
 			rlanPosnList[htIdx] = EcefModel::fromGeodetic(rlanCoordList[htIdx]);
 		}
 
