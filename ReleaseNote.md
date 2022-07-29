@@ -1,6 +1,25 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-321**|
+| :- | :- |
+|**Date**|**07/29/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-321: Add "Max Allowed EIRP" to exc_thr file and visibilityThreshold to afc_config.json
+
+## **Interface Changes**
+ * The visibilityThreshold is in the AFC_config.json file (see an example attached to the jira ticket) 
+
+## **Testing Done**
+ * Confirmed that exc_thr has a new column "EIRP_LIMIT (dBm)" after "FS I/N (dB)" column.
+ * Confirmed that the exc_thr file has all links with distance < 1km AND for distances > 1km, only links with I/N > -6 dB are included.
+ * See test attached to this jira ticket.
+
+## **Open Issues**
+
+## **Version and Date**
 |Version|**OA-302**|
 | :- | :- |
 |**Date**|**07/19/2022**|
