@@ -3564,6 +3564,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		double txHeightAboveTerrain;
 		double rxGain;
 		double rxAntennaDiameter;
+		CConst::AntennaCategoryEnum rxAntennaCategory;
 		double txGain;
 		double txEIRP;
 		CConst::ULSAntennaTypeEnum rxAntennaType;
@@ -4431,6 +4432,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					/**************************************************************************/
 
 					/**************************************************************************/
+					/* rxAntennaCategory                                                      */
+					/**************************************************************************/
+					rxAntennaCategory = row.rxAntennaCategory;
+					/**************************************************************************/
+
+					/**************************************************************************/
 					/* rxAntenna                                                              */
 					/**************************************************************************/
 					if (!ignoreFlag) {
@@ -4656,6 +4663,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setTxAntennaType(txAntennaType);
 				uls->setRxAntenna(rxAntenna);
 				uls->setTxAntenna(txAntenna);
+				uls->setRxAntennaCategory(rxAntennaCategory);
 				uls->setTxGain(txGain);
 				uls->setTxEIRP(txEIRP);
 				uls->setHasPR(numPR ? 1 : 0);
@@ -6496,6 +6504,7 @@ void AfcManager::runPointAnalysis()
 				"ULS START FREQ (MHz)",
 				"ULS STOP FREQ (MHz)",
 				"FS_ANT_TYPE",
+				"FS_ANT_CATEGORY",
 				"FS_ANT_GAIN_PEAK (dB)",
 				"FS_ANT_GAIN_TO_RLAN (dB)",
 				"RX_SPECTRAL_OVERLAP_LOSS (dB)",
@@ -7341,6 +7350,12 @@ void AfcManager::runPointAnalysis()
 											rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
 										}
 
+										CConst::AntennaCategoryEnum rxAntennaCategory = uls->getRxAntennaCategory();
+										std::string rxAntennaCategoryStr = (
+												rxAntennaCategory == CConst::B1AntennaCategory ? "B1" :
+												rxAntennaCategory == CConst::HPAntennaCategory ? "HP" :
+												"UNKNOWN");
+
 										std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
 												_buildingType == CConst::noBuildingType ? "OUTDOOR" :
 												_buildingType == CConst::traditionalBuildingType ?  "TRADITIONAL" :
@@ -7370,7 +7385,7 @@ void AfcManager::runPointAnalysis()
 										msg << QString::number(bandwidth * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
 											<< QString::number(uls->getStartUseFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopUseFreq() * 1.0e-6, 'f', 2);
 
-										msg << QString::fromStdString(rxAntennaTypeStr) << QString::number(uls->getRxGain(), 'f', 3);
+										msg << QString::fromStdString(rxAntennaTypeStr) << QString::fromStdString(rxAntennaCategoryStr) << QString::number(uls->getRxGain(), 'f', 3);
 										msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
 										msg << QString::number(_polarizationLossDB, 'f', 3);
 										msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);

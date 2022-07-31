@@ -211,6 +211,9 @@ double ULSClass::getRxGain()        {
 double ULSClass::getRxDlambda()        {
 	return(rxDlambda);
 }
+CConst::AntennaCategoryEnum ULSClass::getRxAntennaCategory()        {
+	return(rxAntennaCategory);
+}
 double ULSClass::getRxAntennaFeederLossDB() {
 	return(rxAntennaFeederLossDB);
 }
@@ -444,6 +447,10 @@ void ULSClass::setRxDlambda(double rxDlambdaVal) {
 	rxDlambda = rxDlambdaVal;
 	return;
 }
+void ULSClass::setRxAntennaCategory(CConst::AntennaCategoryEnum rxAntennaCategoryVal) {
+	rxAntennaCategory = rxAntennaCategoryVal;
+	return;
+}
 void ULSClass::setRxAntennaFeederLossDB(double rxAntennaFeederLossDBVal) {
 	rxAntennaFeederLossDB = rxAntennaFeederLossDBVal;
 	return;
@@ -620,7 +627,7 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 		rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleDeg, rxGain, frequency);
 		break;
 	case CConst::R2AIP07AntennaType:
-		rxGainDB = calcR2AIP07Antenna(angleOffBoresightDeg, frequency, subModelStr);
+		rxGainDB = calcR2AIP07Antenna(angleOffBoresightDeg, frequency, rxAntennaCategory, subModelStr);
 		break;
 	case CConst::OmniAntennaType:
 		rxGainDB = 0.0;
@@ -640,7 +647,7 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 /******************************************************************************************/
 /**** FUNCTION: ULSClass::calcR2AIP07Antenna                                           ****/
 /******************************************************************************************/
-double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, std::string &subModelStr)
+double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, CConst::AntennaCategoryEnum category, std::string &subModelStr)
 {
     int freqIdx;
 	double rxGainDB;
@@ -682,8 +689,8 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
             rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
         } else {
             bool antennaModelBlank = rxAntennaModel.empty();
-            bool categoryB1Flag = false;
-            bool knownHighPerformance = false;
+            bool categoryB1Flag = (category == CConst::B1AntennaCategory);
+            bool knownHighPerformance = (category == CConst::HPAntennaCategory);
 
             if (antennaModelBlank || categoryB1Flag) {
                 // Table 2, Category B1

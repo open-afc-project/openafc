@@ -1,5 +1,6 @@
 #include "CsvWriter.h"
 #include "UlsFileReader.h"
+#include "AntennaModelMap.h"
 #include <QDebug>
 #include <QStringList>
 #include <limits>
@@ -220,6 +221,8 @@ QStringList getCSVHeader(int numPR)
     header << "Rx Model";
     header << "Rx Ant Manufacturer";
     header << "Rx Ant Model";
+    header << "Rx Ant Model Name Matched";
+    header << "Rx Ant Category";
     header << "Rx Height to Center RAAT (m)";
     header << "Rx Gain (dBi)";
     header << "Rx Ant Diameter (m)";
@@ -284,8 +287,8 @@ int main(int argc, char **argv)
   }
   printf("Coalition ULS Processing Tool Version %s\n", VERSION);
   printf("Copyright 2019 (C) RKF Engineering Solutions\n");
-  if (argc < 3 || argc > 3) {
-    fprintf(stderr, "Syntax: %s [ULS file.csv] [Output File.csv]\n", argv[0]);
+  if (argc < 5 || argc > 5) {
+    fprintf(stderr, "Syntax: %s [ULS file.csv] [Output File.csv] [AntModelListFile.csv] [AntModelMapFile.csv]\n", argv[0]);
     return -1;
   }
 
@@ -297,7 +300,21 @@ int main(int argc, char **argv)
     std::cout << tstr << " : Begin processing." << std::endl;
     free(tstr);
 
-  UlsFileReader r(argv[1]);
+    std::string antModelListFile = argv[3];
+    std::string antModelMapFile = argv[4];
+
+    FILE *fwarn;
+    std::string warningFile = "warning_uls.txt";
+    if ( !(fwarn = fopen(warningFile.c_str(), "wb")) ) {
+        std::cout << std::string("WARNING: Unable to open warningFile \"") + warningFile + std::string("\"\n");
+    }
+
+	AntennaModelMapClass antennaModelMap(antModelListFile, antModelMapFile);
+
+    int numAntMatch = 0;
+    int numAntUnmatch = 0;
+
+  UlsFileReader r(argv[1], fwarn);
 
     int maxNumSegment = 0;
     std::string maxNumSegmentCallsign = "";
@@ -423,12 +440,6 @@ int main(int argc, char **argv)
         header << "Fixed";
         header << "Anomalous Reason";
         anomalous.writeRow(header);
-    }
-
-    FILE *fwarn;
-    std::string warningFile = "warning_uls.txt";
-    if ( !(fwarn = fopen(warningFile.c_str(), "wb")) ) {
-        std::cout << std::string("WARNING: Unable to open warningFile \"") + warningFile + std::string("\"\n");
     }
 
     qDebug() << "--- Beginning path processing";
@@ -753,7 +764,24 @@ int main(int argc, char **argv)
                           bwMhz / 2.0; // Upper Band (MHz)
       }
 
-      double rxAntennaDiameter = 0.0;
+      AntennaModelClass *rxAntModel = antennaModelMap.find(std::string(rxAnt.antennaModel));
+
+      AntennaModelClass::CategoryEnum rxAntCategory;
+      double rxAntennaDiameter;
+      std::string rxAntModelName;
+      if (rxAntModel) {
+          numAntMatch++;
+          rxAntModelName = rxAntModel->name;
+          rxAntCategory = rxAntModel->category;
+          rxAntennaDiameter = rxAntModel->diameterM;
+      } else {
+          numAntUnmatch++;
+          rxAntModelName = "";
+          rxAntCategory = AntennaModelClass::UnknownCategory;
+          rxAntennaDiameter = -1.0;
+          fixedReason.append("Rx Antenna Model Unmatched");
+      }
+
       if(isnan(lowFreq) || isnan(highFreq)) {
           anomalousReason.append("NaN frequency value, ");
       } else {
@@ -767,10 +795,12 @@ int main(int argc, char **argv)
           } else {
 
               /************************************************************************************/
-              /* Fix RX Antenna Gain/Diameter according to WINNF-21-I-00132                       */
+              /* Fix RX Antenna Gain/Diameter according to:                                       */
+              /*     Working Document WINNF-TS-1014 Version V1.1.0-r3.0                           */
               /************************************************************************************/
               double centerFreqMHz = (lowFreq + highFreq)/2;
               if (std::isnan(rxAnt.gain)) {
+                  // R2-AIP-05 (e)
                   if (overlapUnii5 > 0.0) {
                       fixedReason.append("Rx Gain missing, set to UNII-5 value 38.8");
                       rxAnt.gain = 38.8;
@@ -920,6 +950,8 @@ int main(int argc, char **argv)
       row << "";                                // Rx Model
       row << rxAnt.antennaMake;                 // Rx Ant Manufacturer
       row << rxAnt.antennaModel;                // Rx Ant Model
+      row << rxAntModelName.c_str();            // Rx Matched antenna model (blank if unmatched)
+      row << AntennaModelClass::categoryStr(rxAntCategory).c_str(); // Rx Antenna category
       row << makeNumber(
           rxAnt.heightToCenterRAAT);            // Rx Height to Center RAAT (m)
       row << makeNumber(rxAnt.gain);            // Rx Gain (dBi)
@@ -994,6 +1026,9 @@ int main(int argc, char **argv)
     if (fwarn) {
         fclose(fwarn);
     }
+
+    std::cout << "Num Antenna Matched: " << numAntMatch << std::endl;
+    std::cout << "Num Antenna Not Matched: " << numAntUnmatch << std::endl;
 
     std::cout<<"Processed " << r.frequencies().count()
              << " frequency records and output to file; a total of " << numRecs

@@ -30,7 +30,7 @@ void SetToNextLine(FILE *fi) {
 }
 }; // namespace
 
-UlsFileReader::UlsFileReader(const char *fpath) {
+UlsFileReader::UlsFileReader(const char *fpath, FILE *fwarn) {
   FILE *fi = fopen(fpath, "r");
 
   char front[3];
@@ -48,7 +48,7 @@ UlsFileReader::UlsFileReader(const char *fpath) {
     } else if (strcmp(front, "PA") == 0) {
       readIndividualPath(fi);
     } else if (strcmp(front, "AN") == 0) {
-      readIndividualAntenna(fi);
+      readIndividualAntenna(fi, fwarn);
     } else if (strcmp(front, "FR") == 0) {
       readIndividualFrequency(fi);
     } else if (strcmp(front, "LO") == 0) {
@@ -624,7 +624,12 @@ void UlsFileReader::readIndividualLocation(FILE *fi) {
   locationMap[current.callsign] << current;
 }
 
-void UlsFileReader::readIndividualAntenna(FILE *fi) {
+inline bool isInvalidChar(char c)
+{
+    return(c&0x80 ? true : false);
+}
+
+void UlsFileReader::readIndividualAntenna(FILE *fi, FILE *fwarn) {
   char string[1024];
   int pos;
   int numcol;
@@ -774,6 +779,28 @@ void UlsFileReader::readIndividualAntenna(FILE *fi) {
       string[pos++] = char(c);
     }
   }
+
+  std::string origAntennaModel = std::string(current.antennaModel);
+  std::string antennaModel = origAntennaModel;
+
+  antennaModel.erase(std::remove_if(antennaModel.begin(), antennaModel.end(), isInvalidChar), antennaModel.end());
+
+  if (antennaModel != origAntennaModel) {
+      if (fwarn) {
+          fprintf(fwarn, "WARNING: Antenna model \"");
+          for(int i=0; i<origAntennaModel.length(); ++i) {
+              char  ch = origAntennaModel[i];
+              if (isInvalidChar(ch)) {
+                  fprintf(fwarn, "\\x%2X", (unsigned char) ch);
+              } else {
+                  fprintf(fwarn, "%c", ch);
+              }
+          }
+          fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n", antennaModel.c_str());
+      }
+      strncpy(current.antennaModel, antennaModel.c_str(), 26);
+  }
+
   allAntennas << current;
   antennaMap[current.callsign] << current;
   return;
