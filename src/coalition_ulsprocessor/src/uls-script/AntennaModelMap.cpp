@@ -2,13 +2,14 @@
 /**** FILE: AntennaModelMap.cpp                                                        ****/
 /******************************************************************************************/
 
+#include <limits>
 #include "AntennaModelMap.h"
 
 /******************************************************************************************/
 /**** CONSTRUCTOR: AntennaModelClass::AntennaModelClass                                ****/
 /******************************************************************************************/
-AntennaModelClass::AntennaModelClass(std::string nameVal, CategoryEnum categoryVal, double diameterMVal) :
-	name(nameVal), category(categoryVal), diameterM(diameterMVal)
+AntennaModelClass::AntennaModelClass(std::string nameVal, CategoryEnum categoryVal, double diameterMVal, double midbandGainVal) :
+	name(nameVal), category(categoryVal), diameterM(diameterMVal), midbandGain(midbandGainVal)
 {
 }
 /******************************************************************************************/
@@ -68,15 +69,18 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 	int modelNameFieldIdx = -1;
 	int categoryFieldIdx = -1;
 	int diameterFieldIdx = -1;
+	int midbandGainFieldIdx = -1;
 
 	std::vector<int *> fieldIdxList;                       std::vector<std::string> fieldLabelList;
 	fieldIdxList.push_back(&modelNameFieldIdx);            fieldLabelList.push_back("Ant Model");
 	fieldIdxList.push_back(&categoryFieldIdx);             fieldLabelList.push_back("Category");
-	fieldIdxList.push_back(&diameterFieldIdx);             fieldLabelList.push_back("Diameter (ft)");
+	fieldIdxList.push_back(&diameterFieldIdx);             fieldLabelList.push_back("Diameter (m)");
+	fieldIdxList.push_back(&midbandGainFieldIdx);          fieldLabelList.push_back("Midband Gain (dBi)");
 
 	std::string name;
 	AntennaModelClass::CategoryEnum category;
     double diameter;
+    double midbandGain;
 
 	int fieldIdx;
 
@@ -189,7 +193,7 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 					category = AntennaModelClass::HPCategory;
 				} else if (strval == "B1") {
 					category = AntennaModelClass::B1Category;
-				} else if (strval == "OTHER") {
+				} else if ( (strval == "OTHER") || (strval == "Other") ) {
 					category = AntennaModelClass::OtherCategory;
 				} else {
 					errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " invalid category: " << strval << std::endl;
@@ -209,10 +213,23 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 					    errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " invalid diameter: \"" << strval << "\"" << std::endl;
 					    throw std::runtime_error(errStr.str());
                     }
-                    diameter *= 12*2.54*0.01; // convert ft to meters
+                    // Use meters in input file, no conversion here
+                    // diameter *= 12*2.54*0.01; // convert ft to meters
                 }
+				/**************************************************************************/
 
-				antennaModel = new AntennaModelClass(name, category, diameter);
+				/**************************************************************************/
+				/* midband gain                                                           */
+				/**************************************************************************/
+				strval = fieldList.at(midbandGainFieldIdx);
+				if (strval.empty()) {
+                    midbandGain = std::numeric_limits<double>::quiet_NaN();
+                } else {
+                    midbandGain = std::strtod(strval.c_str(), &chptr);
+                }
+				/**************************************************************************/
+
+				antennaModel = new AntennaModelClass(name, category, diameter, midbandGain);
 
 				antennaModelList.push_back(antennaModel);
 

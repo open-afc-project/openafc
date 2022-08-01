@@ -91,29 +91,27 @@ QString hasNecessaryFields(const UlsEmission &e, UlsPath path, UlsLocation rxLoc
   }
 
   // check recievers height to center RAAT
-  if(isnan(rxAnt.heightToCenterRAAT) || rxAnt.heightToCenterRAAT <= 0) {
-    failReason.append( "Invalid rx height to center RAAT, "); 
-  }
-  if(rxAnt.heightToCenterRAAT < 3) {
-    failReason.append( "rx height to center RAAT is < 3m, "); 
-  }
-  if(isnan(txAnt.heightToCenterRAAT) || txAnt.heightToCenterRAAT <= 0) {
-    failReason.append( "Invalid tx height to center RAAT, "); 
-  }
-  if(txAnt.heightToCenterRAAT < 3) {
-    failReason.append( "tx height to center RAAT is < 3m, "); 
-  }
+  // if(isnan(rxAnt.heightToCenterRAAT) || rxAnt.heightToCenterRAAT <= 0) {
+  //   failReason.append( "Invalid rx height to center RAAT, "); 
+  // }
+  // if(isnan(txAnt.heightToCenterRAAT) || txAnt.heightToCenterRAAT <= 0) {
+  //   failReason.append( "Invalid tx height to center RAAT, "); 
+  // }
+  // if(txAnt.heightToCenterRAAT < 3) {
+  //   failReason.append( "tx height to center RAAT is < 3m, "); 
+  // }
 
+  // Fix gain accordig to R2-AIP-05 in fix_param.py
   // check recievers gain 
-  if(isnan(rxAnt.gain) || rxAnt.gain < 0 ) {
-    failReason.append("Invalid rx gain value, "); 
-  } 
-  if(rxAnt.gain > 80 ) {
-    failReason.append("rx gain > 80 dBi, "); 
-  }
-  if(rxAnt.gain < 10 ) {
-    failReason.append("rx gain < 10 dBi, "); 
-  }
+  // if(isnan(rxAnt.gain) || rxAnt.gain < 0 ) {
+  //   failReason.append("Invalid rx gain value, "); 
+  // } 
+  // if(rxAnt.gain > 80 ) {
+  //   failReason.append("rx gain > 80 dBi, "); 
+  // }
+  // if(rxAnt.gain < 10 ) {
+  //   failReason.append("rx gain < 10 dBi, "); 
+ //  }
   
   // mobile 
   if ( removeMobile && (txHeader.mobile == 'Y') ) {
@@ -165,6 +163,7 @@ QStringList getCSVHeader(int numPR)
     header << "Status";
     header << "Radio Service";
     header << "Entity Name";
+    header << "FRN";
     header << "Grant";
     header << "Expiration";
     header << "Effective";
@@ -210,9 +209,13 @@ QStringList getCSVHeader(int numPR)
     header << "Tx Elevation Angle (deg)";
     header << "Tx Ant Manufacturer";
     header << "Tx Ant Model";
+    header << "Tx Ant Model Name Matched";
+    header << "Tx Ant Category";
+    header << "Tx Ant Diameter (m)";
+    header << "Tx Ant Midband Gain (dB)";
     header << "Tx Height to Center RAAT (m)";
     header << "Tx Beamwidth";
-    header << "Tx Gain (dBi)";
+    header << "Tx Gain ULS (dBi)";
     header << "Rx Location Name";
     header << "Rx Lat Coords";
     header << "Rx Long Coords";
@@ -223,9 +226,10 @@ QStringList getCSVHeader(int numPR)
     header << "Rx Ant Model";
     header << "Rx Ant Model Name Matched";
     header << "Rx Ant Category";
-    header << "Rx Height to Center RAAT (m)";
-    header << "Rx Gain (dBi)";
     header << "Rx Ant Diameter (m)";
+    header << "Rx Ant Midband Gain (dB)";
+    header << "Rx Height to Center RAAT (m)";
+    header << "Rx Gain ULS (dBi)";
     header << "Rx Diversity Height (m)";
     header << "Rx Diversity Gain (dBi)";
     header << "Num Passive Repeater";
@@ -316,6 +320,8 @@ int main(int argc, char **argv)
 
   UlsFileReader r(argv[1], fwarn);
 
+    int numMissingRxAntHeight = 0;
+    int numMissingTxAntHeight = 0;
     int maxNumSegment = 0;
     std::string maxNumSegmentCallsign = "";
 
@@ -766,20 +772,44 @@ int main(int argc, char **argv)
 
       AntennaModelClass *rxAntModel = antennaModelMap.find(std::string(rxAnt.antennaModel));
 
-      AntennaModelClass::CategoryEnum rxAntCategory;
+      AntennaModelClass::CategoryEnum rxAntennaCategory;
       double rxAntennaDiameter;
-      std::string rxAntModelName;
+      double rxAntennaMidbandGain;
+      std::string rxAntennaModelName;
       if (rxAntModel) {
           numAntMatch++;
-          rxAntModelName = rxAntModel->name;
-          rxAntCategory = rxAntModel->category;
+          rxAntennaModelName = rxAntModel->name;
+          rxAntennaCategory = rxAntModel->category;
           rxAntennaDiameter = rxAntModel->diameterM;
+          rxAntennaMidbandGain = rxAntModel->midbandGain;
       } else {
           numAntUnmatch++;
-          rxAntModelName = "";
-          rxAntCategory = AntennaModelClass::UnknownCategory;
+          rxAntennaModelName = "";
+          rxAntennaCategory = AntennaModelClass::UnknownCategory;
           rxAntennaDiameter = -1.0;
+          rxAntennaMidbandGain = std::numeric_limits<double>::quiet_NaN();
           fixedReason.append("Rx Antenna Model Unmatched");
+      }
+
+      AntennaModelClass *txAntModel = antennaModelMap.find(std::string(txAnt.antennaModel));
+
+      AntennaModelClass::CategoryEnum txAntennaCategory;
+      double txAntennaDiameter;
+      double txAntennaMidbandGain;
+      std::string txAntennaModelName;
+      if (txAntModel) {
+          numAntMatch++;
+          txAntennaModelName = txAntModel->name;
+          txAntennaCategory = txAntModel->category;
+          txAntennaDiameter = txAntModel->diameterM;
+          txAntennaMidbandGain = txAntModel->midbandGain;
+      } else {
+          numAntUnmatch++;
+          txAntennaModelName = "";
+          txAntennaCategory = AntennaModelClass::UnknownCategory;
+          txAntennaDiameter = -1.0;
+          txAntennaMidbandGain = std::numeric_limits<double>::quiet_NaN();
+          fixedReason.append("Tx Antenna Model Unmatched");
       }
 
       if(isnan(lowFreq) || isnan(highFreq)) {
@@ -794,6 +824,8 @@ int main(int argc, char **argv)
               anomalousReason.append("Band overlaps both Unii5 and Unii7, ");
           } else {
 
+#if 0
+              // Do this in fix_param.py after return link matching
               /************************************************************************************/
               /* Fix RX Antenna Gain/Diameter according to:                                       */
               /*     Working Document WINNF-TS-1014 Version V1.1.0-r3.0                           */
@@ -832,7 +864,22 @@ int main(int argc, char **argv)
                   rxAnt.gain = G;
               }
               /************************************************************************************/
+#endif
           }
+      }
+
+      if (std::isnan(rxAnt.heightToCenterRAAT)) {
+          rxAnt.heightToCenterRAAT = -1.0;
+          numMissingRxAntHeight++;
+      } else if (rxAnt.heightToCenterRAAT < 1.5) {
+          rxAnt.heightToCenterRAAT = 1.5;
+      }
+
+      if (std::isnan(txAnt.heightToCenterRAAT)) {
+          txAnt.heightToCenterRAAT = -1.0;
+          numMissingTxAntHeight++;
+      } else if (txAnt.heightToCenterRAAT < 1.5) {
+          txAnt.heightToCenterRAAT = 1.5;
       }
 
       // now that we have everything, ensure that inputs have what we need
@@ -843,6 +890,7 @@ int main(int argc, char **argv)
       row << QString(txHeader.licenseStatus); // Status
       row << txHeader.radioServiceCode;       // Radio Service
       row << txEntity.entityName;             // Entity Name
+      row << txEntity.frn;                    // FRN: Fcc Registration Number
       row << txHeader.grantDate;              // Grant
       row << txHeader.expiredDate;            // Expiration
       row << txHeader.effectiveDate;          // Effective
@@ -932,8 +980,13 @@ int main(int argc, char **argv)
       row << makeNumber(txAnt.tilt);            // Tx Elevation Angle (deg)
       row << txAnt.antennaMake;                 // Tx Ant Manufacturer
       row << txAnt.antennaModel;                // Tx Ant Model
-      row << makeNumber(txAnt.heightToCenterRAAT);
-      // Tx Height to Center RAAT (m)
+
+      row << txAntennaModelName.c_str();            // Tx Matched antenna model (blank if unmatched)
+      row << AntennaModelClass::categoryStr(txAntennaCategory).c_str(); // Tx Antenna category
+      row << makeNumber(txAntennaDiameter);     // Tx Ant Diameter (m)
+      row << makeNumber(txAntennaMidbandGain);  // Tx Ant Midband Gain (dB)
+
+      row << makeNumber(txAnt.heightToCenterRAAT); // Tx Height to Center RAAT (m)
       row << makeNumber(txAnt.beamwidth); // Tx Beamwidth
       row << makeNumber(txAnt.gain);      // Tx Gain (dBi)
       row << rxLoc.locationName;          // Rx Location Name
@@ -950,12 +1003,15 @@ int main(int argc, char **argv)
       row << "";                                // Rx Model
       row << rxAnt.antennaMake;                 // Rx Ant Manufacturer
       row << rxAnt.antennaModel;                // Rx Ant Model
-      row << rxAntModelName.c_str();            // Rx Matched antenna model (blank if unmatched)
-      row << AntennaModelClass::categoryStr(rxAntCategory).c_str(); // Rx Antenna category
+      row << rxAntennaModelName.c_str();            // Rx Matched antenna model (blank if unmatched)
+      row << AntennaModelClass::categoryStr(rxAntennaCategory).c_str(); // Rx Antenna category
       row << makeNumber(
           rxAnt.heightToCenterRAAT);            // Rx Height to Center RAAT (m)
       row << makeNumber(rxAnt.gain);            // Rx Gain (dBi)
       row << makeNumber(rxAntennaDiameter);     // Rx Ant Diameter (m)
+      row << makeNumber(rxAntennaMidbandGain);  // Rx Ant Midband Gain (dB)
+      row << makeNumber(rxAnt.heightToCenterRAAT);  // Rx Height to Center RAAT (m)
+      row << makeNumber(rxAnt.gain);            // Rx Gain (dBi)
       row << makeNumber(rxAnt.diversityHeight); // Rx Diveristy Height (m)
       row << makeNumber(rxAnt.diversityGain);   // Rx Diversity Gain (dBi)
 
@@ -1029,6 +1085,8 @@ int main(int argc, char **argv)
 
     std::cout << "Num Antenna Matched: " << numAntMatch << std::endl;
     std::cout << "Num Antenna Not Matched: " << numAntUnmatch << std::endl;
+    std::cout << "NUM Missing Rx Antenna Height: " << numMissingRxAntHeight << std::endl;
+    std::cout << "NUM Missing Tx Antenna Height: " << numMissingTxAntHeight << std::endl;
 
     std::cout<<"Processed " << r.frequencies().count()
              << " frequency records and output to file; a total of " << numRecs

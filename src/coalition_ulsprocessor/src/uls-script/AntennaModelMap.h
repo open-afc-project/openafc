@@ -15,13 +15,14 @@ public:
 		UnknownCategory
 	};
 
-	AntennaModelClass(std::string nameVal, CategoryEnum categoryVal, double diameterMVal);
+	AntennaModelClass(std::string nameVal, CategoryEnum categoryVal, double diameterMVal, double midbandGainVal);
 
 	static std::string categoryStr(CategoryEnum categoryVal);
 
 	std::string name;
 	CategoryEnum category;
 	double diameterM;      // Antenna diameter in meters
+	double midbandGain;    // Antenna midband gain (dB)
 };
 
 class AntennaModelMapClass {

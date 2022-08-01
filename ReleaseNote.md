@@ -1,6 +1,41 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-317 & OA-232**|
+| :- | :- |
+|**Date**|**07/25/2022**|
+
+## **Issues Addressed**
+ * Jira OA-317: Implement setting FS Rx height per WinnForum R2-AIP-14 (also implemented this for FS Tx height)
+ * Jira OA-232: Implement WINNF R2-AIP-05 remaining rules on Antenna Gain and Diameter 
+
+## **Interface Changes**
+ * For both tickets, there were changes in the ULS script, as such there's new ULS file that needs to be used.
+ * For OA-317, in the "_param.csv" ULS file there's a "return_FSID" column which has a valid value for forward paths with missing Rx height and their return paths. When paths A and B are matched, the return_FSID for A is set to B, and return_FSID for B is set to A, always.
+ * There's also "FRN" (FCC Registration Number) that is used for return path matching in "_param.csv" file.
+ * For OA-317, there's no new column in the .sqlite. The Rx height to center RAAT column shows the corrected value per R2-AIP-14.
+ * For OA-233, there's no new column in the .sqlite. However, there are new columns in the "_param.csv" file: "Tx Ant Model Name Matched", "Tx Ant Category", "Tx Ant Diameter (m)", "Tx Ant Midband Gain", "Rx Ant Midband Gain", "Tx Gain ULS" and "Rx Gain ULS."
+ * The "Rx Gain" and "Tx Gain" are the gains calculated per R2-AIP-05/06.
+ * Note: If FSID A has a return_FSID of B, then B has a return_FSID = A. In this case A and B are considered to be paired links. If A has return_FSID = -B, then then B has a return_FSID not equal to A, B has already been paired with a different link. I used the '-' to distinguish between a "pair" and using a "candidate" link.
+
+## **Testing Done**
+ * OA-317: ULS checks (on WFA Test Vector ULS): in the .csv ULS file with filename appended with "param," the last column "return_FSID" is used for validation.
+ * Confirmed in the anomalous file that there's no FS link with invalid/blank Tx/Rx height that was thrown out
+ * Confirmed that when "return_FSID" is blank, there was a valid "Rx Height to Center RAAT (m)" (99.8% of the links) by using Rx Height != -1 in _sorted.csv file.
+ * Height of 42.5m was set for only 25 links (return_FSID is blank as expected as in this case return path didn't have height either). Validated a few of the links via online ULS that they didn't have a height and nor did its return link (for example WAY91/WAY90 didn't have a return path). Confirmed that none of the 25 links had a return link.
+ * Confirmed that all 134 links were matched with return correctly. Only 14 of them didn't match on lat/long (Tx or Rx) perfectly but they were at max 0.000138889 different which is within 1 arcsec accuracy that's checked (2.78e-4 deg).
+ * For Tx heights, only 0.01% of the links (=9 links) had invalid Tx height for which R2-AIP-14 was applied. 6 (out of 9) got R2-AIP-14(a-iii)= 42.5m height and the remaining (3 out of 9) got the return path's Rx height.
+
+ * OA-232: ULS checks (on WFA Test Vector ULS):
+ * About 88.7% of links get R2-AIP-05(a) applied. Out of these cases, 88.1% got ULS-Gain, 11.8% got Midband Gain and 0.1% got Typical Gain.
+ * Next, out of 6107 blank Rx Ant Model, only two had a valid Tx Ant Model and same Gain where R2-AIP-05(b) is applied.
+ * Validated majority of R2-AIP-05(c) and (d) cases.
+ * There were 0.2% with blank Rx Gain where R2-AIP-05(e) is applied.
+ * Validated matching of the Rx Antenna models per the mapping created using the database on WinnForum antenna respository.
+ 
+## **Open Issues**
+ * There are 5 FS links with Rx height > 600m that are erroneous. These haven't been fixed yet. R2-AIP-14 most likely will be amended with a recommendation on how to fix these.
+## **Version and Date**
 |Version|**OA-302**|
 | :- | :- |
 |**Date**|**07/19/2022**|

@@ -428,6 +428,12 @@ void UlsFileReader::readIndividualEntity(FILE *fi) {
       case 5:
         strncpy(current.entityType, string, 3);
         break;
+      case 6:
+        strncpy(current.licenseeId, string, 10);
+        break;
+      case 22:
+        strncpy(current.frn, string, 11);
+        break;
       case 7:
         strncpy(current.entityName, string, 201);
         break;
@@ -626,7 +632,9 @@ void UlsFileReader::readIndividualLocation(FILE *fi) {
 
 inline bool isInvalidChar(char c)
 {
-    return(c&0x80 ? true : false);
+    bool isComma = (c == ',');
+    bool isInvalidAscii = (c&0x80 ? true : false);
+    return(isComma || isInvalidAscii);
 }
 
 void UlsFileReader::readIndividualAntenna(FILE *fi, FILE *fwarn) {
