@@ -124,6 +124,9 @@ class ULS(Base):
     #: Rx Ant Model
     rx_ant_model = Column(CoerceUTF8(64))
 
+    #: Rx Ant Category
+    rx_ant_category = Column(CoerceUTF8(64))
+
     #: Rx Height to Center RAAT (m)
     rx_height_to_center_raat_m = Column(Float)
 
@@ -267,6 +270,8 @@ def convertULS(data_file, state_root, logFile):
                             row["Rx Ground Elevation (m)"]),
                     #: Rx Ant Model
                     rx_ant_model=str(row["Rx Ant Model"]), 
+                    #: Rx Ant Category
+                    rx_ant_category=str(row["Rx Ant Category"]), 
                     #: Rx Height to Center RAAT (m)
                     rx_height_to_center_raat_m=_as_float(
                             row["Rx Height to Center RAAT (m)"]),

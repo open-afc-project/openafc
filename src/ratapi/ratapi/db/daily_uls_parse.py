@@ -5,6 +5,7 @@ from csvToSqliteULS import convertULS
 # from sort_callsigns_all import sortCallsigns
 from sort_callsigns_addfsid import sortCallsignsAddFSID
 from fix_bps import fixBPS
+from fix_params import fixParams
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -353,25 +354,29 @@ def daily_uls_parse(state_root, interactive):
 
         if runULSProcessor:
             value = raw_input("Enter ULS Processor output filename to generate (" + coalitionScriptOutputFilename + "): ")
+            if (value != ""):
+                coalitionScriptOutputFilename = value
+            fullPathCoalitionScriptOutput = fullPathTempDir + "/" + coalitionScriptOutputFilename
         else:
             flist = glob.glob(fullPathTempDir + "/CONUS_ULS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
             if (len(flist)):
                 coalitionScriptOutputFilename = flist[-1]
 
-            value = raw_input("Enter Enter existing ULS Processor output filename to process (" + coalitionScriptOutputFilename + "): ")
+            value = raw_input("Enter existing ULS Processor output filename to process (" + coalitionScriptOutputFilename + "): ")
 
-        if (value != ""):
-            coalitionScriptOutputFilename = value
+            if (value != ""):
+                coalitionScriptOutputFilename = value
+            fullPathCoalitionScriptOutput = coalitionScriptOutputFilename
     else:
+        fullPathCoalitionScriptOutput = fullPathTempDir + "/" + coalitionScriptOutputFilename
         runULSProcessor = True
 
-    fullPathCoalitionScriptOutput = fullPathTempDir + "/" + coalitionScriptOutputFilename
 
     if runULSProcessor:
         # run through the uls processor 
         logFile.write('Running through ULS processor' + '\n')
         try:
-            subprocess.call(['./uls-script', root + temp + '/combined.txt', fullPathCoalitionScriptOutput]) 
+            subprocess.call(['./uls-script', root + temp + '/combined.txt', fullPathCoalitionScriptOutput, root + '/antenna_model_list.csv', root + '/antenna_model_map.csv']) 
         except Exception as e: 
             logFile.write('ERROR: ULS processor error:')
             raise e
@@ -414,6 +419,23 @@ def daily_uls_parse(state_root, interactive):
         sortCallsignsAddFSID(bpsScriptOutput, fsidTableFile, sortedOutput, logFile)
 
     if interactive:
+        value = raw_input("Run fixParams? (y/n): ")
+        if value == "y":
+            runFixParams = True
+        elif value == "n":
+            runFixParams = False
+        else:
+            print("ERROR: Invalid input: " + value + ", must be y or n")
+    else:
+        runFixParams = True
+
+    paramOutput = sortedOutput.replace(".csv", "_param.csv")
+
+    if runFixParams:
+        logFile.write("Running fixParams" + '\n')
+        fixParams(sortedOutput, paramOutput, logFile)
+
+    if interactive:
         value = raw_input("Run conversion of CSV file to sqlite? (y/n): ")
         if value == "y":
             runConvertULS = True
@@ -426,7 +448,7 @@ def daily_uls_parse(state_root, interactive):
 
     # convert uls csv to sqlite   
     if runConvertULS:
-        convertULS(sortedOutput, state_root, logFile)
+        convertULS(paramOutput, state_root, logFile)
     
     finishTime = datetime.datetime.now()
 

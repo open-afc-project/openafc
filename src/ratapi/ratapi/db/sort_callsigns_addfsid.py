@@ -115,7 +115,7 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                             sys.exit('ERROR: Digital Mod Rate not found')
                         if txEirpIdx == -1:
                             sys.exit('ERROR: Tx EIRP (dBm) not found')
-                        if txGainIdx == -1:
+                        if remMissTxEIRPGFlag and (txGainIdx == -1):
                             sys.exit('ERROR: Tx Gain (dBi) not found')
 
                         row.insert(0, "FSID")

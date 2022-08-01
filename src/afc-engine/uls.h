@@ -75,12 +75,13 @@ public:
 	double getNoiseLevelDBW();
 	double getRxGain();
 	double getRxDlambda();
+	CConst::AntennaCategoryEnum getRxAntennaCategory();
 	double getRxAntennaFeederLossDB();
 	double getFadeMarginDB();
 	std::string getStatus();
 	double computeBeamWidth(double attnDB);
 	double computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency, std::string &subModelStr);
-	double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, std::string &subModelStr);
+	double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, CConst::AntennaCategoryEnum category, std::string &subModelStr);
 	std::string getRxAntennaModel() { return rxAntennaModel; }
 	CConst::ULSAntennaTypeEnum getRxAntennaType();
 	CConst::ULSAntennaTypeEnum getTxAntennaType();
@@ -144,6 +145,7 @@ public:
 	void setNoiseLevelDBW(double noiseLevelDBWVal);
 	void setRxGain(double rxGainVal);
 	void setRxDlambda(double rxDlambdaVal);
+	void setRxAntennaCategory(CConst::AntennaCategoryEnum rxAntennaCategoryVal);
 	void setRxAntennaFeederLossDB(double rxAntennaFeederLossDBVal);
 	void setFadeMarginDB(double fadeMarginDBVal);
 	void setStatus(std::string statusVal);
@@ -232,6 +234,7 @@ private:
 	bool txTerrainHeightFlag;
 	double noiseLevelDBW;
 	double txGain, rxGain, rxDlambda;
+	CConst::AntennaCategoryEnum rxAntennaCategory;
 	double txEIRP;
 	double linkDistance;
 	double operatingRadius;

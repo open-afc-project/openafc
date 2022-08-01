@@ -125,6 +125,16 @@ afc_tests.py --addr 1.2.3.4 --cmd  dry_run --infile add_test_vector.txt
 
 ## Dump test database
 
+Release testing database binary together with SQLITE dump file.
+Steps to produce such dump file (dump.sql).
+```
+sqlite3 afc_input.sqlite3
+>
+> .output dump.sql
+> .dump
+> .quit
+```
+
 Show all entries from the database (requests and responses)
 ```
 afc_tests.py --cmd dump_db
