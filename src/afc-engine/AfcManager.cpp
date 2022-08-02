@@ -7208,7 +7208,7 @@ void AfcManager::runPointAnalysis()
 					int numRlanPosn = 0;
 					bool lowHeightFlag = false;
 					for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-				        double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
+						double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
 						double heightAGL  = heightAMSL - rlanTerrainHeight;
 						bool useFlag;
 						if (heightAGL < _minRlanHeightAboveTerrain) {
