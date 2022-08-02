@@ -11,33 +11,19 @@ Unittest of data_if.py
 """
 
 import os
-import sys
 import logging
-import filecmp
-import json
 import data_if
 import task
 
 logging.basicConfig(level=logging.DEBUG)
 
-class testv1(data_if.DataIf_v1):
+class Test(data_if.DataIf):
     __ftypes = ["cfg", "pro", "dbg"]
     def test(self):
-        self.mktmpdir()
         for file_type in self.__ftypes:
-            fname = self.lname("file_in_" + file_type)
-            with open(fname, "wb") as hfile:
+            fname = "file_in_" + file_type
+            with self.open(file_type, fname) as hfile:
                 hfile.write(fname)
-
-        for file_type in self.__ftypes:
-            fname = "file_in_" + file_type
-            with self.open(file_type, fname) as hfile:
-                hfile.write_file(self.lname(fname))
-
-        for file_type in self.__ftypes:
-            fname = "file_in_" + file_type
-            with self.open(file_type, fname) as hfile:
-                hfile.read_file(self.lname(fname+".copy"))
 
         for file_type in self.__ftypes:
             fname = "file_in_" + file_type
@@ -50,35 +36,26 @@ class testv1(data_if.DataIf_v1):
                     raise Exception("head({}) error".format(fname))
 
         for file_type in self.__ftypes:
-            fname = self.lname("file_in_" + file_type)
-            if not filecmp.cmp(fname, fname + ".copy"):
-                raise Exception("cmp({}, {}) error".format(fname, fname + ".copy"))
+            fname = "file_in_" + file_type
+            with self.open(file_type, fname) as hfile:
+                data = hfile.read()
 
         for file_type in self.__ftypes:
             fname = "file_in_" + file_type
             with self.open(file_type, fname) as hfile:
                 hfile.delete()
 
-        self.rmtmpdir()
-
-if __name__ == '__main__':
-    t = testv1(None, None, None, None)
-    del t
-    t = testv1(None, None, None, "/var/lib/fbrat")
-    del t
-    t = testv1(None, 1, "user123", "/var/lib/fbrat")
-    del t
-    t = testv1("12345678901234567890123456789012", 1, "user123", "/var/lib/fbrat")
-    tt = task.task(t)
-    tt.toJson(tt.toDict("PROGRESS"))
-    stat = tt.get()
-    print(stat)
-    sys.exit()
+if __name__ == "__main__":
+    os.unsetenv("FILESTORAGE_HOST")
+    os.unsetenv("FILESTORAGE_PORT")
+    os.unsetenv("FILESTORAGE_SCHEME")
+    t = Test(fsroot="/tmp")
     t.test()
     del t
-    os.environ['FILESTORAGE_HOST'] = "127.0.0.1"
-    os.environ['FILESTORAGE_PORT'] = "5000"
-    t = testv1("12345678901234567890123456789012", 1, "user123", "/var/lib/fbrat")
+    os.environ["FILESTORAGE_HOST"] = "127.0.0.1"
+    os.environ["FILESTORAGE_PORT"] = "5000"
+    os.environ["FILESTORAGE_SCHEME"] = "HTTP"
+    t = Test(fsroot="/tmp")
     t.test()
     del t
     print("At ease!")

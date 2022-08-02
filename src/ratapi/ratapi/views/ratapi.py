@@ -20,6 +20,7 @@ import json
 import glob
 import re
 import datetime
+import urlparse
 from flask.views import MethodView
 import werkzeug.exceptions
 from ..defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
@@ -36,21 +37,28 @@ LOGGER = logging.getLogger(__name__)
 #: All views under this API blueprint
 module = flask.Blueprint('ratapi-v1', 'ratapi')
 
-
-def build_task(hash, request_type, user_id, history_dir, runtime_opts=RNTM_OPT_DBG_GUI):
+def build_task(dataif,
+        request_type,
+        task_id, hash, user_id, history_dir,
+        runtime_opts=RNTM_OPT_DBG_GUI):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
     """
 
-    task = run.apply_async(args=[
+    prot, host, port, state_root = dataif.getProtocol()
+    run.apply_async(args=[
+        prot,
+        host,
+        port,
+        state_root,
+        flask.current_app.config["AFC_ENGINE"],
+        request_type,
+        flask.current_app.config["DEBUG"],
+        task_id,
+        hash,
         user_id,
         history_dir,
-        flask.current_app.config['AFC_ENGINE'],
-        flask.current_app.config['STATE_ROOT_PATH'],
-        request_type,
-        runtime_opts,
-        flask.current_app.config['DEBUG'],
-        hash
+        runtime_opts
     ])
 
 
@@ -69,8 +77,15 @@ class GuiConfig(MethodView):
             LOGGER.error('Failed to fetch server version: {0}'.format(err))
             serververs = 'unknown'
 
-        dataif = data_if.DataIf_v1(None, None, None, None)
-        histurl = dataif.history_url(flask.request.url, flask.url_for('files.history'))
+        dataif = data_if.DataIf(
+            fsroot=flask.current_app.config["STATE_ROOT_PATH"],
+            probeHttps=False)
+        histurl = None
+        u = urlparse.urlparse(flask.request.url)
+        if dataif.isFsBackend():
+            histurl = u.scheme + "://" + u.netloc + flask.url_for('files.history')
+        else:
+            histurl = u.scheme + "://" + u.hostname + ":" + str(os.getenv("HISTORY_EXTERNAL_PORT")) + "/"
 
         resp = flask.jsonify(
             paws_url=flask.url_for('paws'),
@@ -241,9 +256,10 @@ class AfcConfigFile(MethodView):
         filedesc = self.ACCEPTABLE_FILES[filename]
 
         resp = flask.make_response()
-        dataif = data_if.DataIf_v1(None, user_id, None, flask.current_app.config['STATE_ROOT_PATH'])
+        dataif = data_if.DataIf(
+            fsroot=flask.current_app.config['STATE_ROOT_PATH'])
         try:
-            with dataif.open("cfg", "afc_config.json") as hfile:
+            with dataif.open("cfg", str(user_id) + "/afc_config.json") as hfile:
                 resp.data = hfile.read()
         except:
             raise werkzeug.exceptions.NotFound()
@@ -262,8 +278,9 @@ class AfcConfigFile(MethodView):
         if flask.request.content_type != filedesc['content_type']:
             raise werkzeug.exceptions.UnsupportedMediaType()
 
-        dataif = data_if.DataIf_v1(None, user_id, None, flask.current_app.config['STATE_ROOT_PATH'])
-        with dataif.open("cfg", "afc_config.json") as hfile:
+        dataif = data_if.DataIf(
+            fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+        with dataif.open("cfg", str(user_id) + "/afc_config.json") as hfile:
             hfile.write(flask.request.stream.read())
         return flask.make_response('AFC configuration file updated', 204)
 
