@@ -2140,6 +2140,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	} else {
 		_channelResponseAlgorithm = CConst::pwrSpectralAlgorithm;
 	}
+
+	if (jsonObj.contains("visibilityThreshold") && !jsonObj["visibilityThreshold"].isUndefined()) {
+		_visibilityThreshold = jsonObj["visibilityThreshold"].toDouble();
+	} else {
+		_visibilityThreshold = -10000.0;
+	}
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -6512,6 +6518,7 @@ void AfcManager::runPointAnalysis()
 				"FS_RX_FEEDER_LOSS (dB)",
 				"FS_RX_PWR (dBW)",
 				"FS I/N (dB)",
+				"EIRP_LIMIT (dBm)",
 				"ULS_LINK_DIST (m)",
 				"RLAN_CENTER_FREQ (Hz)",
 				"FS_TX_TO_RLAN_DIST (m)",
@@ -6813,7 +6820,7 @@ void AfcManager::runPointAnalysis()
 			int htIdx;
 			bool lowHeightFlag = false;
 			for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-				double heightAMSL = height0 + (NHt - htIdx)*heightUncertainty/NHt; // scan from top down
+				double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
 				double heightAGL  = heightAMSL - rlanTerrainHeight;
 				bool useFlag;
 				if (heightAGL < _minRlanHeightAboveTerrain) {
@@ -7201,7 +7208,7 @@ void AfcManager::runPointAnalysis()
 					int numRlanPosn = 0;
 					bool lowHeightFlag = false;
 					for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-						double heightAMSL = height0 + (NHt - htIdx)*heightUncertainty/NHt; // scan from top down
+						double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
 						double heightAGL  = heightAMSL - rlanTerrainHeight;
 						bool useFlag;
 						if (heightAGL < _minRlanHeightAboveTerrain) {
@@ -7389,7 +7396,7 @@ void AfcManager::runPointAnalysis()
 										msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
 										msg << QString::number(_polarizationLossDB, 'f', 3);
 										msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
-										msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(rxPowerDBW - uls->getNoiseLevelDBW(), 'f', 3);
+										msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(I2NDB, 'f', 3) <<  QString::number(eirpLimit_dBm, 'f', 3);
 										msg << QString::number(ulsLinkDistance, 'f', 3) << QString::number(chanCenterFreq, 'f', 3) << QString::number(d2, 'f', 3) << QString::number(pathDifference, 'f', 6);
 										msg << QString::number(ulsWavelength * 1000, 'f', 3) << QString::number(fresnelIndex, 'f', 3);
 
@@ -8053,7 +8060,7 @@ void AfcManager::runScanAnalysis()
 
 			int htIdx;
 			for(htIdx=0; htIdx<=2*NHt; ++htIdx) {
-				double heightAMSL = height0 + (htIdx-NHt)*heightUncertainty/NHt;
+				double heightAMSL = height0 + (NHt ? (htIdx-NHt)*heightUncertainty/NHt : 0.0);
 
 				fkml->writeStartElement("Placemark");
 				fkml->writeTextElement("name", QString::asprintf("SCAN_POINT_%d_%d", ptIdx, htIdx));
@@ -8225,7 +8232,7 @@ void AfcManager::runScanAnalysis()
 		int rlanPosnIdx;
 		int htIdx;
 		for(htIdx=0; htIdx<=2*NHt; ++htIdx) {
-			rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, (height0 + (htIdx-NHt)*heightUncertainty/NHt)/1000.0);
+			rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, (height0 + (NHt ? (htIdx-NHt)*heightUncertainty/NHt : 0.0))/1000.0);
 			rlanPosnList[htIdx] = EcefModel::fromGeodetic(rlanCoordList[htIdx]);
 		}
 
@@ -9661,6 +9668,7 @@ void AfcManager::printUserInputs()
 			fUserInputs->writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT (m)", QString::number(_heatmapRLANOutdoorHeight, 'e', 20) } );
 			fUserInputs->writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT_UNCERTAINTY (m)", QString::number(_heatmapRLANOutdoorHeightUncertainty, 'e', 20) } );
 		}
+		fUserInputs->writeRow({ "VISIBILITY_THRESHOLD", QString::number(_visibilityThreshold, 'e', 20) } );
 
 	}
 	LOGGER_DEBUG(logger) << "User inputs written to userInputs.csv";
@@ -9866,8 +9874,6 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_filterSimRegionOnly = false;
 
 	// _rlanBWStr = "20.0e6,40.0e6,80.0e6,160.0e6"; // Channel bandwidths in Hz
-
-	_visibilityThreshold = -10000.0;
 
 	_worldPopulationFile = SearchPaths::forReading("data", "fbrat/rat_transfer/population/gpw_v4_population_density_rev11_2020_30_sec.tif", true).toStdString();
 	_radioClimateFile = SearchPaths::forReading("data", "fbrat/rat_transfer/itudata/TropoClim.txt", true).toStdString();
