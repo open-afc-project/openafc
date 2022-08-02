@@ -23,6 +23,8 @@ import glob
 import re
 import datetime
 import zlib
+import hashlib
+import uuid
 from flask.views import MethodView
 import werkzeug.exceptions
 import StringIO
@@ -42,9 +44,6 @@ RULESET = 'US_47_CFR_PART_15_SUBPART_E'
 
 #: All views under this API blueprint
 module = flask.Blueprint('ap-afc', 'ap-afc')
-
-# tuple listing files to remain in cache dir
-CACHED_FILES = ("analysisResponse.json.gz")
 
 
 class AP_Exception(Exception):
@@ -169,36 +168,39 @@ def _translate_afc_error(error_msg):
         raise VersionNotSupportedException()
 
 
-def fail_done(task_stat, dataif):
+def fail_done(t):
     LOGGER.debug('fail_done()')
+    task_stat = t.getStat()
+    dataif = t.getDataif()
     error_data = None
-    if task_stat['runtime_opts'] & RNTM_OPT_GUI:
-        with dataif.open("pro", "progress.txt") as hfile:
-            hfile.delete()
-    with dataif.open("pro", "analysisRequest.json") as hfile:
+    with dataif.open("pro", task_stat['hash'] + "/analysisRequest.json") as hfile:
         hfile.delete()
     try:
-        with dataif.open("pro", "engine-error.txt") as hfile:
+        with dataif.open("pro", t.getId() + "/engine-error.txt") as hfile:
             error_data = hfile.read()
-            hfile.delete()
     except:
         return flask.make_response(
             flask.json.dumps(dict(message='Resource already deleted')),
             410)
     LOGGER.debug("Error data: %s", error_data)
     _translate_afc_error(error_data)
-    dataif.rmtmpdir(CACHED_FILES)
+    with dataif.open("pro", task_stat['hash']) as hfile:
+        hfile.delete()
+    with dataif.open("pro", t.getId()) as hfile:
+        hfile.delete()
     # raise for internal AFC E2yyngine error
     raise AP_Exception(-1, error_data)
 
 
-def in_progress(task_stat, dataif):
+def in_progress(t):
     # get progress and ETA
     LOGGER.debug('in_progress()')
+    task_stat = t.getStat()
+    dataif = t.getDataif()
     if task_stat['runtime_opts'] & RNTM_OPT_GUI:
         progress = None
         try:
-            with dataif.open("pro", "progress.txt") as hfile:
+            with dataif.open("pro", t.getId() + "/progress.txt") as hfile:
                 progress = dataif.read()
         except:
             return flask.jsonify(
@@ -219,35 +221,32 @@ def in_progress(task_stat, dataif):
         503)
 
 
-def success_done(task_stat, dataif):
+def success_done(t):
     LOGGER.debug('success_done()')
+    task_stat = t.getStat()
+    dataif = t.getDataif()
+    hash = task_stat['hash']
+
     resp_data = None
-    with dataif.open("pro", "analysisRequest.json") as hfile:
-        hfile.delete()
-    with dataif.open("pro", "analysisResponse.json.gz") as hfile:
+    with dataif.open("pro", hash + "/analysisResponse.json.gz") as hfile:
         resp_data = hfile.read()
     if task_stat['runtime_opts'] & RNTM_OPT_DBG:
-        with dataif.open("dbg", "analysisResponse.json.gz") as hfile:
+        with dataif.open("dbg", task_stat['history_dir'] + "/analysisResponse.json.gz") as hfile:
             hfile.write(resp_data)
     LOGGER.debug('resp_data size={}'.format(sys.getsizeof(resp_data)))
     resp_data = zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
 
     if task_stat['runtime_opts'] & RNTM_OPT_GUI:
-        with dataif.open("pro", "progress.txt") as hfile:
-            hfile.delete()
-        kmz_file = dataif.rname("pro", "results.kmz")
-        geo_file = dataif.rname("pro", "mapData.json.gz")
-
         # Add the map data file (if it is generated) into a vendor extension
         kmz_data = None
         try:
-            with dataif.open("pro", "results.kmz") as hfile:
+            with dataif.open("pro", t.getId() + "/results.kmz") as hfile:
                 kmz_data = hfile.read()
         except:
             pass
         map_data = None
         try:
-            with dataif.open("pro", "mapData.json.gz") as hfile:
+            with dataif.open("pro", t.getId() + "/mapData.json.gz") as hfile:
                 map_data = hfile.read()
         except:
             pass
@@ -264,15 +263,16 @@ def success_done(task_stat, dataif):
 
     resp = flask.make_response(resp_data)
     resp.content_type = 'application/json'
-    dataif.rmtmpdir(CACHED_FILES)
     LOGGER.debug("returning data: %s", resp.data)
+    with dataif.open("pro", t.getId()) as hfile:
+        hfile.delete()
     return resp
 
 
 response_map = {
-    'SUCCESS': success_done,
-    'FAILURE': fail_done,
-    'PROGRESS': in_progress
+    task.Task.STAT_SUCCESS: success_done,
+    task.Task.STAT_FAILURE: fail_done,
+    task.Task.STAT_PROGRESS: in_progress
 }
 
 
@@ -309,23 +309,24 @@ class RatAfc(MethodView):
         LOGGER.debug('RatAfc::get()')
 
         task_id = flask.request.args['task_id']
-        print("RatAfc.get() task_id={}".format(task_id))
+        LOGGER.debug("RatAfc.get() task_id={}".format(task_id))
 
-        dataif = data_if.DataIf_v1(
-            task_id, None, None, flask.current_app.config['STATE_ROOT_PATH'])
-        t = task.task(dataif)
+        dataif = data_if.DataIf(
+            fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+        t = task.Task(
+            task_id, dataif, flask.current_app.config['STATE_ROOT_PATH'])
         task_stat = t.get()
 
         if t.ready(task_stat):  # The task is done
             if t.successful(task_stat):  # The task is done w/o exception
-                return response_map[task_stat['status']](task_stat, t.dataif)
+                return response_map[task_stat['status']](t)
             else:  # The task raised an exception
                 raise werkzeug.exceptions.InternalServerError(
                     'Task execution failed')
         else:  # The task in progress or pending
-            if task_stat['status'] == 'PROGRESS':  # The task in progress
+            if task_stat['status'] == task.Task.STAT_PROGRESS:  # The task in progress
                 # 'PROGRESS' is task.state value, not task.result['status']
-                return response_map['PROGRESS'](task_stat, t.dataif)
+                return response_map[task.Task.STAT_PROGRESS](t)
             else:  # The task yet not started
                 LOGGER.debug('RatAfc::get() not ready state: %s',
                              task_stat['status'])
@@ -386,48 +387,76 @@ class RatAfc(MethodView):
                         'FILESTORAGE_PORT' in os.environ):
                     runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
 
+                task_id = str(uuid.uuid4())
+                dataif = data_if.DataIf(
+                    fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+
+                # calculate hash
+                request_json_bytes = json.dumps(request).encode('utf-8')
+                config_bytes = None
+                with dataif.open("cfg", str(user_id) + "/afc_config.json") as hfile:
+                    config_bytes = hfile.read()
+                hashlibobj = hashlib.md5()
+                hashlibobj.update(config_bytes)
+                hashlibobj.update(request_json_bytes)
+                hash = hashlibobj.hexdigest()
+
+                # check cache
+                if not runtime_opts & RNTM_OPT_GUI:
+                    try:
+                        with dataif.open(
+                            "pro", hash + "/analysisResponse.json.gz") as hfile:
+                            resp_data = hfile.read()
+                    except:
+                        pass
+                    else:
+                        resp_data = zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
+                        dataAsJson = json.loads(resp_data)
+                        LOGGER.debug("dataAsJson: %s", dataAsJson)
+                        actualResult = dataAsJson.get(
+                            "availableSpectrumInquiryResponses")
+                        if actualResult is not None:
+                            results["availableSpectrumInquiryResponses"].append(
+                                actualResult[0])
+                        else:
+                            LOGGER.debug("actualResult was None")
+                            results["availableSpectrumInquiryResponses"].append(
+                                dataAsJson)
+                        resp = flask.make_response(flask.json.dumps(results), 200)
+                        resp.content_type = 'application/json'
+                        return resp
+
+                with dataif.open("pro", hash + "/analysisRequest.json") as hfile:
+                    hfile.write(request_json_bytes)
                 history_dir = None
                 if runtime_opts & RNTM_OPT_DBG:
                     history_dir = user.email + "/" + \
                         str(datetime.datetime.now().isoformat())
-                dataif = data_if.DataIf_v1(
-                    None, user_id, history_dir, flask.current_app.config['STATE_ROOT_PATH'])
-                request_json_bytes = json.dumps(request).encode('utf-8')
-                config_bytes = None
-                with dataif.open("cfg", "afc_config.json") as hfile:
-                    config_bytes = hfile.read()
-                dataif.genId(config_bytes, request_json_bytes)
-                with dataif.open("pro", "analysisRequest.json") as hfile:
-                    hfile.write(request_json_bytes)
-                if runtime_opts & RNTM_OPT_DBG:
-                    with dataif.open("dbg", "analysisRequest.json") as hfile:
+                    with dataif.open("dbg", history_dir + "/analysisRequest.json") as hfile:
                         hfile.write(request_json_bytes)
-                    with dataif.open("dbg", "afc_config.json") as hfile:
+                    with dataif.open("dbg", history_dir + "/afc_config.json") as hfile:
                         hfile.write(config_bytes)
 
-                build_task(dataif.get_id(), request_type,
-                           user_id, history_dir, runtime_opts)
+                build_task(dataif,
+                        request_type,
+                        task_id, hash, user_id, history_dir,
+                        runtime_opts)
 
                 conn_type = flask.request.args.get('conn_type')
                 LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
-                t = task.task(dataif)
-                task_stat = t.get()
+                t = task.Task(task_id, dataif,
+                              flask.current_app.config['STATE_ROOT_PATH'],
+                              hash, user_id, history_dir)
                 if conn_type == 'async':
-                    #                return flask.jsonify(taskId = dataif.get_id(),
-                    #                                     taskState = task.state)
-                    #                return flask.jsonify(taskId = dataif.get_id(),
-                    #                                     taskState = task_stat["status"])
                     results["availableSpectrumInquiryResponses"].append(
-                        {"taskId": dataif.get_id(), "taskState": task_stat["status"]})
+                        {"taskId": task_id, "taskState": task_stat["status"]})
                 else:
                     # wait for request to finish processing
                     try:
-                        t.wait()
-                        task_stat = t.get()
+                        task_stat = t.wait()
                         LOGGER.debug("Task complete: %s", task_stat)
                         if t.successful(task_stat):
-                            taskResponse = response_map[task_stat['status']](
-                                task_stat, dataif)
+                            taskResponse = response_map[task_stat['status']](t)
                             # we might be able to clean this up by having the result functions not return a full response object
                             # need to check everywhere they are called
                             dataAsJson = json.loads(taskResponse.data)
@@ -444,8 +473,7 @@ class RatAfc(MethodView):
                                     dataAsJson)
                         else:
                             LOGGER.debug("Task was not successful")
-                            taskResponse = response_map[task_stat['status']](
-                                task_stat, dataif)
+                            taskResponse = response_map[task_stat['status']](t)
                             dataAsJson = json.loads(taskResponse.data)
                             LOGGER.debug(
                                 "Unsuccessful dataAsJson: %s", dataAsJson)

@@ -614,9 +614,11 @@ class ConfigAdd(Command):
                     with flaskapp.app_context():
                         import flask
 
-                        dataif = data_if.DataIf_v1(None, user.id, None, flask.current_app.config['STATE_ROOT_PATH'])
-                        with dataif.open("cfg", "afc_config.json") as hfile:
-                            LOGGER.debug('Opening config file "%s"', dataif.rname("cfg", "afc_config.json"))
+                        dataif = data_if.DataIf(
+                            fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+                        with dataif.open("cfg", str(user.id) + "/afc_config.json") as hfile:
+                            LOGGER.debug('Opening config file "%s"',
+                                         dataif.rname("cfg", str(user.id) + "/afc_config.json"))
                             hfile.write(json.dumps(cfg_rcrd[0]))
                 except Exception as e:
                     LOGGER.error(e)
@@ -671,9 +673,11 @@ class ConfigRemove(Command):
                         with flaskapp.app_context():
                             import flask
 
-                            dataif = data_if.DataIf_v1(None, user.id, None, flask.current_app.config['STATE_ROOT_PATH'])
-                            with dataif.open("cfg", "afc_config.json") as hfile:
-                                LOGGER.debug('Delete config file "%s"', dataif.rname("cfg", "afc_config.json"))
+                            dataif = data_if.DataIf(
+                                fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+                            with dataif.open("cfg", str(user.id) + "/afc_config.json") as hfile:
+                                LOGGER.debug('Delete config file "%s"',
+                                             dataif.rname("cfg", str(user.id) + "/afc_config.json"))
                                 hfile.delete()
                     except RuntimeError:
                         LOGGER.debug('Delete missing user %s', username[0])

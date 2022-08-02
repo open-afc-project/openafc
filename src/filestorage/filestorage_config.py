@@ -23,9 +23,9 @@ LOG_LEVEL = logging.DEBUG
 
 # file download/upload location on the server
 FILE_LOCATION = os.getenv("FILESTORAGE_DIR", "/storage")
-PRO_LOCATION = FILE_LOCATION+"/"+"responses"
-CFG_LOCATION = FILE_LOCATION+"/"+"afc_config"
-DBG_LOCATION = FILE_LOCATION+"/"+"history"
+PRO_LOCATION = FILE_LOCATION + "/responses"
+CFG_LOCATION = FILE_LOCATION + "/afc_config"
+DBG_LOCATION = FILE_LOCATION + "/history"
 
 # where the server is listening
 SERVER_HOST = os.getenv("FILESTORAGE_HOST", "0.0.0.0")

@@ -13,83 +13,112 @@ Provides replacement for AsyncResult routines
 import logging
 import json
 import time
-import data_if
 
 LOGGER = logging.getLogger(__name__)
 
-class task():
+
+class Task():
     """ Replacement for AsyncResult class and self serialization"""
-    def __init__(self, dataif):
-        LOGGER.debug("task.__init__(id={})".format(dataif.id))
-        self.dataif = dataif
+
+    STAT_PENDING = "PENDING"
+    STAT_PROGRESS = "PROGRESS"
+    STAT_SUCCESS = "SUCCESS"
+    STAT_FAILURE = "FAILURE"
+
+    def __init__(self, task_id, dataif, fsroot, hash=None,
+                 user_id=None, history_dir=None):
+        LOGGER.debug("task.__init__(task_id={})".format(task_id))
+        self.__dataif = dataif
+        self.__task_id = task_id
+        self.__stat = {
+            'status': self.STAT_PENDING,
+            'user_id': user_id,
+            'history_dir': history_dir,
+            'hash': hash,
+            'runtime_opts': None,
+            'exit_code': 0,
+            'state_root': fsroot
+            }
 
     def get(self):
+        LOGGER.debug("Task.get()")
         data = None
         try:
-            with self.dataif.open("pro", "status.json") as hfile:
+            with self.__dataif.open("pro", self.__task_id +
+                                  "/status.json") as hfile:
                 data = hfile.read()
         except:
-            LOGGER.debug("task.get() no {}".format(self.dataif.rname("pro", "status.json")))
-            return self.toDict("PENDING")
+            LOGGER.debug("task.get() no {}/status.json".
+                         format(self.__dataif.rname("pro", self.__task_id)))
+            return self.__toDict(self.STAT_PENDING)
         stat = json.loads(data)
 
         LOGGER.debug("task.get() {}".format(stat))
-        if (not 'status' in stat or
-            not 'user_id' in stat or
-            not 'history_dir' in stat or
-            not 'hash' in stat or
-            not 'runtime_opts' in stat or
-            not 'state_root' in stat
-            ):
-            LOGGER.error("task.get() bad {}: {}".
-                         format(self.dataif.rname("pro", "status.json"), stat))
+        if ('status' not in stat or
+                'user_id' not in stat or
+                'history_dir' not in stat or
+                'hash' not in stat or
+                'runtime_opts' not in stat or
+                'exit_code' not in stat or
+                'state_root' not in stat):
+            LOGGER.error("task.get() bad {}/status.json: {}".
+                         format(self.__dataif.rname("pro", self.__task_id), stat))
             raise Exception("Bad status.json")
-        if (stat['status'] != "PROGRESS" and
-            stat['status'] != "SUCCESS" and
-            stat['status'] != "FAILURE"):
-            LOGGER.error("task.get() bad ['status'] {} in {}".
-                         format(stat['status'], self.dataif.rname("pro", "status.json")))
+        if (stat['status'] != self.STAT_PROGRESS and
+                stat['status'] != self.STAT_SUCCESS and
+                stat['status'] != self.STAT_FAILURE):
+            LOGGER.error("task.get() bad status {} in {}/status.json".
+                         format(stat['status'],
+                                self.__dataif.rname("pro", self.__task_id)))
             raise Exception("Bad status in status.json")
+        self.__stat = stat
+        return self.__stat
 
-        return stat
-
-    def wait(self, timeout=200, delay=2):
+    def wait(self, delay=2, timeout=150):
         LOGGER.debug("task.wait()")
         stat = None
         time0 = time.clock()
         while True:
             stat = self.get()
-            LOGGER.debug("task.wait() {}".format(stat['status']))
-            if (stat['status'] == "SUCCESS" or stat['status'] == "FAILURE"):
-                LOGGER.debug("task.wait() return {}".format(stat['status']))
+            LOGGER.debug("task.wait() status {}".format(stat['status']))
+            if (stat['status'] == Task.STAT_SUCCESS or
+                    stat['status'] == Task.STAT_FAILURE):
                 return stat
             if (time. clock() - time0) > timeout:
                 LOGGER.debug("task.wait() timeout")
-                return self.toDict("FAILURE")
+                return self.__toDict(Task.STAT_PROGRESS)
             time.sleep(delay)
         LOGGER.debug("task.wait() exit")
 
     def ready(self, stat):
-        return stat['status'] == "SUCCESS" or stat['status'] == "FAILURE"
+        return stat['status'] == Task.STAT_SUCCESS or \
+            stat['status'] == self.STAT_FAILURE
 
     def successful(self, stat):
-        return stat['status'] == "SUCCESS"
+        return stat['status'] == Task.STAT_SUCCESS
 
-    def toDict(self, status, runtime_opts=None, exit_code=0):
-        return {
-            'status': status,
-            'user_id': self.dataif.user_id,
-            'history_dir': self.dataif.history_dir,
-            'hash': self.dataif.id,
-            'runtime_opts': runtime_opts,
-            'exit_code': exit_code,
-            'state_root': self.dataif.state_root
-            }
+    def __toDict(self, status, runtime_opts=None, exit_code=0):
+        self.__stat['status'] = status
+        self.__stat['runtime_opts'] = runtime_opts
+        self.__stat['exit_code'] = exit_code
+        return self.__stat
 
-    def toJson(self, stat):
-        print("toJson({})".format(stat))
-        data = json.dumps(stat)
-        with self.dataif.open("pro", "status.json") as hfile:
+    def toJson(self, status, runtime_opts=None, exit_code=0):
+        LOGGER.debug("toJson({})".format(status))
+        data = json.dumps(self.__toDict(status, runtime_opts, exit_code))
+        with self.__dataif.open("pro", self.__task_id + "/status.json") as hfile:
+            LOGGER.debug("toJson() write {}".format(data))
             hfile.write(data)
 
+    def forget(self):
+        with self.__dataif.open("pro", self.__task_id + "/status.json") as hfile:
+            hfile.delete()
 
+    def getStat(self):
+        return self.__stat
+
+    def getDataif(self):
+        return self.__dataif
+
+    def getId(self):
+        return self.__task_id
