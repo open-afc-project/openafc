@@ -42,6 +42,7 @@ RUN chmod +x /var/lib/fbrat/daily_uls_parse/daily_uls_parse.py
 RUN yum -y install epel-release
 RUN yum -y install qt5-qtbase-devel python-sqlalchemy python2-numpy
 RUN yum -y clean all
+COPY prereqs/antenna_model/antenna_model_map.csv prereqs/antenna_model/antenna_model_list.csv /var/lib/fbrat/daily_uls_parse/
 
 #FROM centos:7
 #COPY --from=install_image / /

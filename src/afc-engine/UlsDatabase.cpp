@@ -70,6 +70,8 @@ UlsDatabase::UlsDatabase()
 	fieldIdxList.push_back(&rx_gainIdx);
 	columns << "rx_ant_diameter";
 	fieldIdxList.push_back(&rx_antennaDiameterIdx);
+	columns << "rx_ant_category";
+	fieldIdxList.push_back(&rx_antennaCategoryIdx);
 	columns << "status";
 	fieldIdxList.push_back(&statusIdx);
 	columns << "mobile";
@@ -254,6 +256,19 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		target.at(r).mobile = q.value(mobileIdx).toBool();
 		target.at(r).rxAntennaModel = q.value(rx_ant_modelIdx).toString().toStdString();
 		target.at(r).numPR = numPR;
+
+		std::string rxAntennaCategoryStr = q.value(rx_antennaCategoryIdx).toString().toStdString();
+		CConst::AntennaCategoryEnum rxAntennaCategory;
+		if (rxAntennaCategoryStr == "B1") {
+			rxAntennaCategory = CConst::B1AntennaCategory;
+		} else if (rxAntennaCategoryStr == "HP") {
+			rxAntennaCategory = CConst::HPAntennaCategory;
+		} else if (rxAntennaCategoryStr == "OTHER") {
+			rxAntennaCategory = CConst::OtherAntennaCategory;
+		} else {
+			rxAntennaCategory = CConst::UnknownAntennaCategory;
+		}
+		target.at(r).rxAntennaCategory = rxAntennaCategory;
 
 		if (numPR) {
 			target.at(r).prLatitudeDeg = std::vector<double>(numPR);

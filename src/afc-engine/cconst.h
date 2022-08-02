@@ -310,6 +310,17 @@ public:
 	};
 	/**************************************************************************************/
 
+	/**************************************************************************************/
+	/**** AntennaCategory                                                              ****/
+	/**************************************************************************************/
+	enum AntennaCategoryEnum {
+		HPAntennaCategory,
+		B1AntennaCategory,
+		OtherAntennaCategory,
+		UnknownAntennaCategory
+	};
+	/**************************************************************************************/
+
 	static const StrTypeClass strULSAntennaTypeList[];
 	static const StrTypeClass strPropEnvList[];
 	static const StrTypeClass strPathLossModelList[];

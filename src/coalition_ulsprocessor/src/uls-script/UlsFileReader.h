@@ -22,7 +22,7 @@
 
 class UlsFileReader {
 public:
-  UlsFileReader(const char *filePath);
+  UlsFileReader(const char *filePath, FILE *fwarn);
 
   const QList<UlsPath> &paths() { return allPaths; }
   const QList<UlsEmission> &emissions() { return allEmissions; }
@@ -71,7 +71,7 @@ public:
 
 private:
   void readIndividualPath(FILE *from);
-  void readIndividualAntenna(FILE *from);
+  void readIndividualAntenna(FILE *from, FILE *fwarn);
   void readIndividualFrequency(FILE *from);
   void readIndividualLocation(FILE *from);
   void readIndividualEmission(FILE *from);

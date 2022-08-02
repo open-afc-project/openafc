@@ -179,8 +179,8 @@ def fail_done(task_stat, dataif):
         hfile.delete()
     try:
         with dataif.open("pro", "engine-error.txt") as hfile:
-            error_data = dataif.read()
-            dataif.delete()
+            error_data = hfile.read()
+            hfile.delete()
     except:
         return flask.make_response(
             flask.json.dumps(dict(message='Resource already deleted')),

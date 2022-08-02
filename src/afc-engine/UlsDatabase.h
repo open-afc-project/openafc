@@ -38,6 +38,7 @@ struct UlsRecord
 	double rxGroundElevation;
 	double rxHeightAboveTerrain;
 	double rxGain;
+	CConst::AntennaCategoryEnum rxAntennaCategory;
 	double rxAntennaDiameter;
 	std::string status;
 	bool mobile;
@@ -100,6 +101,7 @@ public:
 	int rx_height_to_center_raat_mIdx;
 	int rx_gainIdx;
 	int rx_antennaDiameterIdx;
+	int rx_antennaCategoryIdx;
 	int statusIdx;
 	int mobileIdx;
 	int rx_ant_modelIdx;
