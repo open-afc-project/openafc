@@ -9,7 +9,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [HTTP servers configuration](#http-servers-configuration)
   - [Building HTTP servers docker image](#building-http-servers-docker-image)
   - [RATAPI setup](#ratapi-setup)
-  - [docker-compose example](#docker-compose-example)
+  - [docker-compose examples](#docker-compose-examples)
 
 - [Back to main readme](/README.md)
 <br /><br />
@@ -45,7 +45,7 @@ Use Dockerfile for build or see docker-compose.yaml example below.
 RATAPI uses HTTP file storage for storing dynamic data when FILESTORAGE_HOST and FILESTORAGE_PORT environment variables are declared.
 When those variables aren't declared, RATAPI uses local FS for file storage.
 
-## docker-compose.yaml examples
+## docker-compose examples
 This example is intended for building 3 services: Postgres DB server service (ratdb), RATAPI server service (rat_server), and file storage server service (objstorage):
 
 ```
