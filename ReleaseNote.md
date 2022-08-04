@@ -1,5 +1,10 @@
 # Release Note
 
+|Version|3.3.22.2|
+| :- | :- |
+|**Date**|**08/04/2022**|
+|compiled server's version is f6b36be |git tag 3.3.22.2|
+
 # **Version and Date**
 |Version|**OA-323**|
 | :- | :- |
