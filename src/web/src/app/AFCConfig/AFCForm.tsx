@@ -301,8 +301,6 @@ export class AFCForm extends React.Component<
                         delete model.win2ConfidenceCombined;
                         break;
                     case "UNKNOWN":
-                        delete model.win2ConfidenceNLOS;
-                        delete model.win2ConfidenceLOS;
                         break;
                 }
 
@@ -317,10 +315,14 @@ export class AFCForm extends React.Component<
                 } else {
                     conf.rlanITMTxClutterMethod = "FORCE_TRUE"
                 }
-                if (x.kind === "FCC 6GHz Report & Order" && x.buildingSource !== "LiDAR") {
+                if (x.kind === "FCC 6GHz Report & Order" && x.buildingSource === "B-Design3D") {
                     delete x.win2ConfidenceLOS;
                     delete x.win2ConfidenceNLOS;
                 }
+                if (x.kind === "FCC 6GHz Report & Order" && x.buildingSource === "None") {
+                    delete x.win2ConfidenceNLOS;
+                }
+ 
                 conf.propagationModel = x;
                 this.setState({ config: conf });
             }

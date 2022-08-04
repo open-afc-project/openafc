@@ -1,4 +1,30 @@
 # Release Note
+
+# **Version and Date**
+|Version|**OA-323**|
+| :- | :- |
+|**Date**|**08/02/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-323: In FCC R&O, WII LOS confidence needs to be set to WII Combined Confidence
+
+## **Interface Changes**
+ * OA-323: UI/API changes to allow entering WinnerII LOS Confidence in the absence of building database (since LOS is used for distance of 30 to 50m). The changes are made to FCC 6GHz Report&Order and Custom. 
+ 
+
+## **Testing Done**
+ * All the tests are attached to the Jira ticket.
+ * Ran a test without LiDAR with WinnerII Combined and LOS confidence being different.
+ * Confirmed in afc_config.json that "win2ConfidenceLOS" is present and set to the value entered by the user.
+ * Confirmed in exc_thr file that when PATH_LOSS_MODEL is one of the W2 models, in PATH_LOSS_CDF column, the LOS confidence is used for distances between 30 to 50m and the Combined Confidence is used for distances > 50m.
+ * Ran another test with LiDAR and confirmed that the WinnerII LOS and NLOS confidences were set properly and used correctly in exc_thr file.
+ * Ran a third test with Custom with WinnerII LoS Option set to Combined LoS/NLoS and confirmed that the WinnerII Combined and LOS confidences were set properly and used correctly in exc_thr file.
+ * Ran a fourth test with Custom with WinnerII LoS Option set to LoS/NLoS per building data and confirmed that the WinnerII LOS and NLOS confidences were set properly and used correctly in exc_thr file.
+
+## **Open Issues**
+
+
 |Version|3.3.22.1|
 | :- | :- |
 |**Date**|**08/03/2022**|
