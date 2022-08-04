@@ -61,6 +61,29 @@
  * There are 5 FS links with Rx height > 600m that are erroneous. These haven't been fixed yet. R2-AIP-14 most likely will be amended with a recommendation on how to fix these.
 
 ## **Version and Date**
+|Version|**OA-309**|
+| :- | :- |
+|**Date**|**08/03/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-309: Correction of Error Responses for conformation with WFA 1.1 Interface Specification
+ 
+## **Interface Changes**
+ * No
+
+## **Testing Done**
+ * Tested each of the cases below in Virtual AP and confirmed correct response (as noted in Jira)
+ * Note that most of these tests cannot be done throught the GUI and instead can be done by sending the desired AP request json file directly to the engine.
+ * When version number is incorrect in the AP request, we get Error Code of 100.
+ * When "rulesetId" is missing from AP request message, we get Error Code of 102 (missing parameter).
+ * requestId="null" results in Error Code of 103
+ * Missing "device descriptor" in AP request message results in Error Code 102 (missing parameter).
+ * Missing NRA results in Error Code 102 (missing parameter) with description of missing NRA.
+
+## **Open Issues**
+
+## **Version and Date**
 |Version|**OA-302**|
 | :- | :- |
 |**Date**|**07/19/2022**|

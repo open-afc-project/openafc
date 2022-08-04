@@ -9588,6 +9588,9 @@ void AfcManager::printUserInputs()
 	if (!AfcManager::_createDebugFiles) {
 		return;
 	}
+	if (_responseCode != CConst::successResponseCode) {
+		return;
+	}
 	QStringList msg;
 
 	LOGGER_INFO(logger) << "printing user inputs " << _userInputsFile;
