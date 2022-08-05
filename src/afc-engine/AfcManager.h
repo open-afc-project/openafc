@@ -184,7 +184,7 @@ class AfcManager
 		void readRASData(std::string filename);
 
 		void computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx, CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
-				double distKm, double frequency,
+				double distKm, double win2DistKm, double frequency,
 				double txLongitudeDeg, double txLatitudeDeg, double txHeightM, double elevationAngleTxDeg,
 				double rxLongitudeDeg, double rxLatitudeDeg, double rxHeightM, double elevationAngleRxDeg,
 				double& pathLoss, double& pathClutterTxDB, double& pathClutterRxDB, bool meanFlag,
@@ -329,6 +329,8 @@ class AfcManager
 		double _winner2ProbLOSThr;              // Winner2 prob LOS threshold, if probLOS exceeds threshold, use LOS model, otherwise use NLOS
 		// bool _winner2CombineFlag;               // Whether or not to combine LOS and NLOS path loss values in Winner2.
 		// bool _winner2BldgLOSFlag;               // If set, use building data to determine if winner2 LOS or NLOS model is used
+
+		bool _winner2UseGroundDistanceFlag;     // If set, use ground distance in winner2 model
 
 		std::vector<std::tuple<std::string, std::string>> _ulsDatabaseList;
 		// List of tuples where each tuple contains database name and database sqlite file name.

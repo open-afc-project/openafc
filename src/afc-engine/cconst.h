@@ -12,6 +12,7 @@ public:
 	static const double logTable[];	// logTable[i] = LOG10(1+i)   i = [0,8]
 
 	static const double earthRadius;	// Radius of earth in m
+	static const double averageEarthRadius;	// Average radius of earth in m
 	static const double geoRadius;	// Radius of geosynchronous orbit
 	static const double boltzmannConstant;	// Boltzman's constant
 	static const double T0;	// Room temperature for noise figure calculations
