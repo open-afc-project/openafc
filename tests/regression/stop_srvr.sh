@@ -8,6 +8,8 @@ set -x
 hostname
 wd=${1}
 rand=${2}
+TAG=${rand}
+export TAG
 cd $wd/tests/regression
 docker ps -a
 docker-compose logs

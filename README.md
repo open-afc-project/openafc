@@ -30,6 +30,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Building Docker Container OpenAFC engine server](#building-docker-container-openafc-engine-server)
   - [Prereqs](#prereqs)
   - [docker-compose](#docker-compose)
+  - [RabbitMQ settings](#rabbitmq-settings)
   - [PostgreSQL structure](#postgresql-structure)
   - [Initial Administrator account](#initial-administrator-account)
 
@@ -295,6 +296,11 @@ services:
       POSTGRES_PASSWORD: N3SF0LVKJx1RAhFGx4fcw
       PGDATA: /var/lib/pgsql/data
       POSTGRES_DB: fbrat
+
+  rat_rmq:
+    image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:latest
+    restart: always
+
   rat_server:
     build:
       context: .
@@ -309,8 +315,14 @@ services:
       - /var/databases/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
       - /var/databases/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
       - /var/afc_config:/var/lib/fbrat/afc_config
+      - /var/databases/frequency_bands:/var/lib/fbrat/frequency_bands
     links:
       - ratdb
+      - rat_rmq
+    environment:
+      # RabbitMQ server name:
+      BROKER_TYPE: external
+      BROKER_FQDN: rat_rmq
 ```
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
 Just run in this folder following command and it is done:
@@ -342,6 +354,26 @@ docker-compose build --no-cache
 You can achieve it this way  (mind the real location of these folders on your host system):
 ```
 chown 999:999 /var/databases/pgdata
+```
+
+## RabbitMQ settings
+
+There is a way to conifugre AFC server to use a RabbitMQ broker from different docker image.
+Following the list of environment variables you may configure a server to use 'external' Rabbit MQ instance.
+```
+BROKER_TYPE = external
+BROKER_PROT = amqp
+BROKER_USER = celery
+BROKER_PWD  = celery
+BROKER_FQDN = <ip address>
+BROKER_PORT = 5672
+BROKER_MNG_PORT = 15672
+```
+Following the example to use RabbitMQ service in docker-compose.
+```
+  rat_rmq:
+    image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:latest
+    restart: always
 ```
 
 ## PostgreSQL structure
