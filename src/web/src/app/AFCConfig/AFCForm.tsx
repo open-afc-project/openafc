@@ -75,6 +75,7 @@ export class AFCForm extends React.Component<
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
     private setEnableMapInVirtualAp = (n: boolean) => this.setState({ config: Object.assign(this.state.config, { enableMapInVirtualAp: n }) });
+    private setVisiblityThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { visibilityThreshold: n }) });
     private setPropogationEnv = (n: string) => {
 
         const newConfig = { ...this.state.config };
@@ -912,6 +913,23 @@ export class AFCForm extends React.Component<
                             </FormGroup>
 
                         </GalleryItem>
+                        <GalleryItem>
+                            <FormGroup
+                                label="Visiblilty Threshold"
+                                fieldId="visiblity-threshold"
+                            >
+                                <InputGroup><TextInput
+                                    value={this.state.config.visibilityThreshold}
+                                    type="number"
+                                    onChange={(x) => this.setVisiblityThreshold(Number(x))}
+                                    id="visiblity-threshold"
+                                    name="visiblity-threshold"
+                                    style={{ textAlign: "right" }}
+                                    isValid={!!this.state.config.visibilityThreshold || this.state.config.visibilityThreshold === 0} />
+                                    <InputGroupText>dB I/N</InputGroupText></InputGroup>
+                            </FormGroup>
+                        </GalleryItem>
+     
                     </Gallery>
                     <br />
                     <>

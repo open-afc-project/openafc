@@ -57,7 +57,8 @@ export interface AFCConfigFile {
     regionStr?: string,
     rasDatabase?: string,
     enableMapInVirtualAp?: boolean,
-    channelResponseAlgorithm: ChannelResponseAlgorithm
+    channelResponseAlgorithm: ChannelResponseAlgorithm,
+    visibilityThreshold?: number
 }
 
 export type FreqRange = {
