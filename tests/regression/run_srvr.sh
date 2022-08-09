@@ -30,6 +30,8 @@ check_ret() {
 hostname
 wd=${1}
 tag=${2}
+TAG=${tag}
+export TAG
 
 # build regr test docker
 cd $wd/tests
@@ -43,7 +45,7 @@ docker run --rm -v `pwd`/pipe:/pipe afc-regression-test --cmd exp_adm_cfg --outf
 check_ret $?
 # copy regr server config and run srvr
 cp -a ~/template_regrtest/*  $wd/tests/regression
-docker tag ${SRV_DI}:${tag} srvr_di
+mv $wd/tests/regression/docker-compose_rabbit.yaml $wd/tests/regression/docker-compose.yaml
 check_ret $?
 docker-compose down && docker-compose up -d && docker ps -a
 check_ret $?

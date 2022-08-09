@@ -48,6 +48,10 @@ TASK_QUEUE = '/var/spool/fbrat'
 #: protocol to use to commuicate with rabbitmq
 CELERY_RESULT_BACKEND = 'file:///var/celery/results'
 #: address of rabbitmq server
-BROKER_URL = 'amqp://celery:celery@localhost:5672/fbrat'
+BROKER_DEFAULT_PROT = 'amqp'
+BROKER_DEFAULT_USER = 'celery'
+BROKER_DEFAULT_PWD = 'celery'
+BROKER_DEFAULT_FQDN = 'localhost'
+BROKER_DEFAULT_PORT = '5672'
 #: Tracks if the daily uls parser ran today. Overwritten by the tasks that use it.
 DAILY_ULS_RAN_TODAY = False 

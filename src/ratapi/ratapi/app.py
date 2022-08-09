@@ -55,8 +55,27 @@ def create_app(config_override=None):
         root_logger.addHandler(handler)
     LOGGER.info('Logging at level %s', flaskapp.config['LOG_LEVEL'])
 
+    flaskapp.config.update(
+        BROKER_URL=os.getenv('BROKER_PROT',
+                             flaskapp.config['BROKER_DEFAULT_PROT']) +
+                   "://" +
+                   os.getenv('BROKER_USER',
+                             flaskapp.config['BROKER_DEFAULT_USER']) +
+                   ":" +
+                   os.getenv('BROKER_PWD',
+                             flaskapp.config['BROKER_DEFAULT_PWD']) +
+                   "@" +
+                   os.getenv('BROKER_FQDN',
+                             flaskapp.config['BROKER_DEFAULT_FQDN']) +
+                   ":" +
+                   os.getenv('BROKER_PORT',
+                             flaskapp.config['BROKER_DEFAULT_PORT']) +
+                   "/fbrat"
+    )
+    LOGGER.debug('BROKER_URL %s', flaskapp.config['BROKER_URL'])
     # DB and AAA setup
     db = models.base.db
+
     db.init_app(flaskapp)
     Migrate(
         flaskapp, db, directory=os.path.join(owndir, 'migrations'))
