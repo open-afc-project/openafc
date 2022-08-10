@@ -14,6 +14,12 @@ ARG BUILDREV=localbuild
 COPY CMakeLists.txt LICENSE.txt version.txt fbrat.rpmlintrc Doxyfile.in /wd/
 RUN echo $BUILDREV > /wd/svnrevision.txt
 
+RUN yum -y install centos-release-scl
+RUN yum -y install devtoolset-7-gcc*
+RUN echo "source /opt/rh/devtoolset-7/enable" >> /etc/bashrc
+SHELL ["/bin/bash", "--login", "-c"]
+RUN gcc --version;
+
 COPY cmake /wd/cmake/
 COPY pkg /wd/pkg/
 COPY selinux /wd/selinux/
@@ -22,7 +28,7 @@ COPY src /wd/src/
 RUN set -e ; \
     N_THREADS=$(nproc --all --ignore=2); \
     ROOTDIR=$(readlink -f $(dirname "${BASH_SOURCE[0]}")); \
-CMAKE="cmake3 -G Ninja"; \
+    CMAKE="cmake3 -G Ninja"; \
     NINJA="ninja-build -j$N_THREADS"; \
     RPMBUILD="rpmbuild -ba --without apidoc $@"; \
     RPMLINT="rpmlint"; \
@@ -36,12 +42,13 @@ CMAKE="cmake3 -G Ninja"; \
 
 FROM centos:7 as install_image
 RUN mkdir -p /var/lib/fbrat/daily_uls_parse/data_files /var/lib/fbrat/daily_uls_parse/temp /var/lib/fbrat/ULS_Database
-COPY --from=build_image /wd/build/src/coalition_ulsprocessor/src/uls-script/uls-script /var/lib/fbrat/daily_uls_parse/
-COPY --from=build_image /wd/build/src/ratapi/pkg/ratapi/db /var/lib/fbrat/daily_uls_parse/
-RUN chmod +x /var/lib/fbrat/daily_uls_parse/daily_uls_parse.py
 RUN yum -y install epel-release
 RUN yum -y install qt5-qtbase-devel python-sqlalchemy python2-numpy
 RUN yum -y clean all
+
+COPY --from=build_image /wd/build/src/coalition_ulsprocessor/src/uls-script/uls-script /var/lib/fbrat/daily_uls_parse/
+COPY --from=build_image /wd/build/src/ratapi/pkg/ratapi/db /var/lib/fbrat/daily_uls_parse/
+RUN chmod +x /var/lib/fbrat/daily_uls_parse/daily_uls_parse.py
 COPY prereqs/antenna_model/antenna_model_map.csv prereqs/antenna_model/antenna_model_list.csv /var/lib/fbrat/daily_uls_parse/
 
 #FROM centos:7
