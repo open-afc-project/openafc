@@ -103,7 +103,7 @@ def verifyCountsFile(dirName, root, temp):
 
 # Removes any record with the given id from the given file
 def removeFromCombinedFile(fileName, ids_to_remove):
-    weeklyAndDailyPath = '../weekly/' + fileName + '_withDaily'
+    weeklyAndDailyPath = './weekly/' + fileName + '_withDaily'
     # if the weekly + daily data exists use that, otherwise make the file
     if(os.path.isfile(weeklyAndDailyPath)):
         # open new file that contains weekly and daily
@@ -119,6 +119,7 @@ def removeFromCombinedFile(fileName, ids_to_remove):
         os.remove(weeklyAndDailyPath)
         os.rename(weeklyAndDailyPath + '_temp', weeklyAndDailyPath)
     else:
+        weeklyAndDailyPath = '../weekly/' + fileName + '_withDaily'
         # create file that contains weekly and daily
         with open(weeklyAndDailyPath, 'w') as withDaily: 
             # open weekly file
@@ -453,7 +454,10 @@ def daily_uls_parse(state_root, interactive):
     finishTime = datetime.datetime.now()
 
     if not interactive:
-        outputSQL = sortedOutput.replace('.csv', '.sqlite3')
+        if runFixParams:
+            outputSQL = paramOutput.replace('.csv', '.sqlite3')
+        else:
+            outputSQL = sortedOutput.replace('.csv', '.sqlite3')
    
         logFile.write("Creating and moving debug files")
         # create debug zip containing final csv, anomalous_uls, and warning_uls and move it to where GUI can see
