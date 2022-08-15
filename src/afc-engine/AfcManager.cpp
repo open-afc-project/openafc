@@ -2119,6 +2119,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
         _winner2UseGroundDistanceFlag = true;
 	}
 
+	if (propModel.contains("fsplUseGroundDistance") && !propModel["fsplUseGroundDistance"].isUndefined()) {
+		_fsplUseGroundDistanceFlag = propModel["fsplUseGroundDistance"].toBool();
+	} else {
+        _fsplUseGroundDistanceFlag = false;
+	}
+
 	if (propModel.contains("itmReliability") && !propModel["itmReliability"].isUndefined()) {
 		_reliabilityITM = propModel["itmReliability"].toDouble()/100.0;
 	} else {
@@ -5317,7 +5323,7 @@ double AfcManager::computeBuildingPenetration(CConst::BuildingTypeEnum buildingT
 /**** AfcManager::computePathLoss                                                      ****/
 /******************************************************************************************/
 void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx, CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
-		double distKm, double win2DistKm, double frequency,
+		double distKm, double fsplDistKm, double win2DistKm, double frequency,
 		double txLongitudeDeg, double txLatitudeDeg, double txHeightM, double elevationAngleTxDeg,
 		double rxLongitudeDeg, double rxLatitudeDeg, double rxHeightM, double elevationAngleRxDeg,
 		double &pathLoss, double &pathClutterTxDB, double &pathClutterRxDB, bool fixedProbFlag,
@@ -5635,8 +5641,8 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 	{
 		// Path Loss Model used in FCC Report and Order
 
-		if (distKm*1000 < 30.0) {
-			pathLoss = 20.0 * log((4 * M_PI * frequency * distKm * 1000) / CConst::c) / log(10.0);
+		if (fsplDistKm*1000 < 30.0) {
+			pathLoss = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
 			pathLossModelStr = "FSPL";
 			pathLossCDF = 0.5;
 
@@ -5924,7 +5930,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 			pathClutterRxCDF = 0.5;
 		}
 	} else if (_pathLossModel == CConst::FSPLPathLossModel) {
-		pathLoss = 20.0 * log((4 * M_PI * frequency * distKm * 1000) / CConst::c) / log(10.0);
+		pathLoss = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
 		pathLossModelStr = "FSPL";
 		pathLossCDF = 0.5;
 
@@ -5940,7 +5946,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 	}
 
 	if (_pathLossClampFSPL) {
-		double fspl = 20.0 * log((4 * M_PI * frequency * distKm * 1000) / CConst::c) / log(10.0);
+		double fspl = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
 		if (pathLoss < fspl) {
 			pathLossModelStr += std::to_string(pathLoss) + "_CLAMPFSPL";
 			pathLoss = fspl;
@@ -7275,6 +7281,12 @@ void AfcManager::runPointAnalysis()
 						} else {
 							win2DistKm = distKm;
 						}
+						double fsplDistKm;
+						if (_fsplUseGroundDistanceFlag) {
+							fsplDistKm = groundDistanceKm;
+						} else {
+							fsplDistKm = distKm;
+						}
 						double dAP = rlanPosn.len();
 						double duls = ulsRxPos.len();
 						double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
@@ -7317,7 +7329,7 @@ void AfcManager::runPointAnalysis()
 
 									double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-									computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, win2DistKm, chanCenterFreq,
+									computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 											rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 											uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 											pathLoss, pathClutterTxDB, pathClutterRxDB, true,
@@ -8321,6 +8333,13 @@ void AfcManager::runScanAnalysis()
 					win2DistKm = distKm;
 				}
 
+				double fsplDistKm;
+				if (_fsplUseGroundDistanceFlag) {
+					fsplDistKm = groundDistanceKm;
+				} else {
+					fsplDistKm = distKm;
+				}
+
 				if ((distKmSquared < maxRadiusKmSquared) && (distKmSquared > exclusionDistKmSquared) && (uls->getLinkDistance() > 0.0)) {
 
 					CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
@@ -8377,7 +8396,7 @@ void AfcManager::runScanAnalysis()
 								double pathClutterRxCDF;
 								double pathClutterRxDB;
 
-								computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, win2DistKm, chanCenterFreq,
+								computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 										rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 										uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 										pathLoss, pathClutterTxDB, pathClutterRxDB, true,
@@ -8910,6 +8929,13 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 			win2DistKm = distKm;
 		}
 
+		double fsplDistKm;
+		if (_fsplUseGroundDistanceFlag) {
+			fsplDistKm = groundDistanceKm;
+		} else {
+			fsplDistKm = distKm;
+		}
+
 		std::string buildingPenetrationModelStr;
 		double buildingPenetrationCDF;
 		double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
@@ -8928,7 +8954,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 
 		double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-		computePathLoss((rlanPropEnv == CConst::unknownPropEnv ? CConst::barrenPropEnv : rlanPropEnv), fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, win2DistKm, chanCenterFreq,
+		computePathLoss((rlanPropEnv == CConst::unknownPropEnv ? CConst::barrenPropEnv : rlanPropEnv), fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 				rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 				uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 				pathLoss, pathClutterTxDB, pathClutterRxDB, true,
@@ -9433,6 +9459,13 @@ void AfcManager::runHeatmapAnalysis()
 								win2DistKm = distKm;
 							}
 
+							double fsplDistKm;
+							if (_fsplUseGroundDistanceFlag) {
+								fsplDistKm = groundDistanceKm;
+							} else {
+								fsplDistKm = distKm;
+							}
+
 							std::string buildingPenetrationModelStr;
 							double buildingPenetrationCDF;
 							double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
@@ -9451,7 +9484,7 @@ void AfcManager::runHeatmapAnalysis()
 
 							double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-							computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, win2DistKm, chanCenterFreq,
+							computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 									rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 									uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 									pathLoss, pathClutterTxDB, pathClutterRxDB, true,
@@ -9713,6 +9746,7 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "ITM_RELIABILITY", QString::number(_reliabilityITM, 'e', 20) } );
 		fUserInputs->writeRow({ "P.2108_CONFIDENCE", QString::number(_confidenceClutter2108, 'e', 20) } );
 		fUserInputs->writeRow({ "WINNER_II_USE_GROUND_DISTANCE", (_winner2UseGroundDistanceFlag ? "true" : "false" ) } );
+		fUserInputs->writeRow({ "FSPL_USE_GROUND_DISTANCE", (_fsplUseGroundDistanceFlag ? "true" : "false" ) } );
 
 		if (_analysisType == "ExclusionZoneAnalysis") {
 			double chanCenterFreq = _wlanMinFreq + (_exclusionZoneRLANChanIdx + 0.5) * _exclusionZoneRLANBWHz;
