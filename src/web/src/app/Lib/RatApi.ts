@@ -86,6 +86,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "nlcdFile": "federated_nlcd.tif",
     "enableMapInVirtualAp": false,
     channelResponseAlgorithm: 'pwr',
+    "visibilityThreshold": -1000,
     "version": guiConfig.version
 });
 
