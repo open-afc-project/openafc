@@ -980,10 +980,10 @@ def _run_test(cfg, reqs, resps, test_cases):
     app_log.debug('%s() test %s, (%s)', inspect.stack()[0][3],
                   cfg['tests'], cfg['url_path'])
 
-    test_res = AFC_OK
     accum_secs = 0
     results_comparator = TestResultComparator(precision=cfg['precision'] or 0)
     for test_case in test_cases:
+        test_res = AFC_OK
         app_log.info('Prepare to run test - %s', test_case)
         if test_case not in reqs:
             app_log.warning("The requested test case %s is invalid/not "

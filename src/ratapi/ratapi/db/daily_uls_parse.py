@@ -103,59 +103,69 @@ def verifyCountsFile(dirName, root, temp):
 
 # Removes any record with the given id from the given file
 def removeFromCombinedFile(fileName, ids_to_remove):
-    weeklyAndDailyPath = '../weekly/' + fileName + '_withDaily'
-    # if the weekly + daily data exists use that, otherwise make the file
-    if(os.path.isfile(weeklyAndDailyPath)):
-        # open new file that contains weekly and daily
-        with open(weeklyAndDailyPath + '_temp', 'w') as withDaily: 
-            # open older file 
-            with open(weeklyAndDailyPath , 'r' ) as weekly:
-                for line in weekly: 
-                    cols = line.split('|')
-                    # only write when the id is not in the list of ids 
-                    if(not cols[1] in ids_to_remove):
-                        withDaily.write(line)
-        # remove old combined, move new one to right place
-        os.remove(weeklyAndDailyPath)
-        os.rename(weeklyAndDailyPath + '_temp', weeklyAndDailyPath)
-    else:
-        # create file that contains weekly and daily
-        with open(weeklyAndDailyPath, 'w') as withDaily: 
-            # open weekly file
-            with open('../weekly/' + fileName , 'r' ) as weekly:
-                record = '' 
-                symbolCount = 0
-                numExpectedCols = neededFiles[fileName]
-                for line in weekly:
-                    # remove newline characters from line
-                    line = line.replace('\n', '')
-                    line = line.replace('\r', '')
-                    # the line was just newline character(s), skip it
-                    if(line == '' or line == ' '):
-                        continue
-                    # the line is a single piece of data that does not contain the | character
-                    elif(not '|' in line):
-                        record += line
-                        continue 
-                    else: 
-                        symbolCount += line.count('|') # this many | were in the line
-                        record += line  
-                    # the record is complete if the number of | symbols is equal to the number of expected cols
-                    if (symbolCount == numExpectedCols): 
-                        cols = record.split('|')
-                        fileType = cols[0]
-                        # Ensure we need this entry
-                        if(fileType + ".dat" in neededFiles.keys()):
+    workDir = os.getcwd()
+    weeklyAndDailyPath_bases = [os.path.join(workDir, 'weekly'),
+                                os.path.join(os.path.split(workDir)[0], 'weekly')
+                                ]
+    for weeklyAndDailyPath_base in weeklyAndDailyPath_bases:
+        if os.path.exists(weeklyAndDailyPath_base):
+            weeklyAndDailyPath = os.path.join(weeklyAndDailyPath_base, fileName + '_withDaily')
+            # if the weekly + daily data exists use that, otherwise make the file
+            if(os.path.isfile(weeklyAndDailyPath)):
+                # open new file that contains weekly and daily
+                with open(weeklyAndDailyPath + '_temp', 'w') as withDaily: 
+                    # open older file 
+                    with open(weeklyAndDailyPath , 'r' ) as weekly:
+                        for line in weekly: 
+                            cols = line.split('|')
                             # only write when the id is not in the list of ids 
                             if(not cols[1] in ids_to_remove):
-                                record += "\r\n" # add newline
-                                withDaily.write(record)
-                            #reset for the next record 
-                            record = ''
-                            symbolCount = 0
-                    elif (symbolCount > numExpectedCols):
-                        e = Exception('ERROR: Could not process record. More columns than expected in weekly file')
-                        raise e
+                                withDaily.write(line)
+                # remove old combined, move new one to right place
+                os.remove(weeklyAndDailyPath)
+                os.rename(weeklyAndDailyPath + '_temp', weeklyAndDailyPath)
+            else:
+                # create file that contains weekly and daily
+                with open(weeklyAndDailyPath, 'w') as withDaily: 
+                    # open weekly file
+                    with open(os.path.join(weeklyAndDailyPath_base, fileName), 'r' ) as weekly:
+                        record = '' 
+                        symbolCount = 0
+                        numExpectedCols = neededFiles[fileName]
+                        for line in weekly:
+                            # remove newline characters from line
+                            line = line.replace('\n', '')
+                            line = line.replace('\r', '')
+                            # the line was just newline character(s), skip it
+                            if(line == '' or line == ' '):
+                                continue
+                            # the line is a single piece of data that does not contain the | character
+                            elif(not '|' in line):
+                                record += line
+                                continue 
+                            else: 
+                                symbolCount += line.count('|') # this many | were in the line
+                                record += line  
+                            # the record is complete if the number of | symbols is equal to the number of expected cols
+                            if (symbolCount == numExpectedCols): 
+                                cols = record.split('|')
+                                fileType = cols[0]
+                                # Ensure we need this entry
+                                if(fileType + ".dat" in neededFiles.keys()):
+                                    # only write when the id is not in the list of ids 
+                                    if(not cols[1] in ids_to_remove):
+                                        record += "\r\n" # add newline
+                                        withDaily.write(record)
+                                    #reset for the next record 
+                                    record = ''
+                                    symbolCount = 0
+                            elif (symbolCount > numExpectedCols):
+                                e = Exception('ERROR: Could not process record. More columns than expected in weekly file')
+                                raise e
+            break
+    else:
+        raise Exception('ERROR: Wasn\'t able to find existing Weekly and/or Daily paths')
+        
 
 
 # Update specific datafile with daily data
@@ -453,7 +463,10 @@ def daily_uls_parse(state_root, interactive):
     finishTime = datetime.datetime.now()
 
     if not interactive:
-        outputSQL = sortedOutput.replace('.csv', '.sqlite3')
+        if runFixParams:
+            outputSQL = paramOutput.replace('.csv', '.sqlite3')
+        else:
+            outputSQL = sortedOutput.replace('.csv', '.sqlite3')
    
         logFile.write("Creating and moving debug files")
         # create debug zip containing final csv, anomalous_uls, and warning_uls and move it to where GUI can see

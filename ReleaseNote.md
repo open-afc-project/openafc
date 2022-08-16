@@ -1,4 +1,23 @@
 # Release Note
+## **Version and Date**
+|Version|**OA-90**|
+| :- | :- |
+|**Date**|**08/08/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-90:Add exc_thr visibility threshold to AFC Confg
+
+## **Interface Changes**
+ * In AFC Config, added visibilityThreshold to be configurable through the GUI. 
+ * Note that at the moment, this change applies only to links with distance > 1km. 
+ * For distances < 1km, all I/Ns are still recorded.
+
+## **Testing Done**
+ * In AFC Config GUI, set the VisibilityThreshold to -6 dB and confirmed that exc_thr only shows I/Ns > -6 dB for distances > 1km.
+ * Test is attached to the Jira ticket.
+
+## **Open Issues**
 
 |Version|3.3.22.2|
 | :- | :- |
