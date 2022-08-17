@@ -54,7 +54,7 @@ WorldData::WorldData(const QDir& globeDir, const double& latmin, const double& l
 {
 	LOGGER_INFO(logger) << "Loading globe files...";
 	GDALRegister_EHdr();
-	this->bounds = QRectF(QPoint(lonmin, latmax), QPoint(lonmax, latmin));
+	this->bounds = QRectF(QPointF(lonmin, latmax), QPointF(lonmax, latmin));
 
 	// filter for .bil files
 	QStringList files = globeDir.entryList(QStringList("*.bil")); 
