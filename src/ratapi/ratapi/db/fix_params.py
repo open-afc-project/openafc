@@ -167,6 +167,9 @@ def fixParams(inputPath, outputPath, logFile):
                         else:
                             sys.exit('ERROR:  "freq found not in UNII-5 or UNII-7')
 
+                        # 6 ft converted to m
+                        csmap[keyv][ri][rxAntDiameterIdx] = 6*12*2.54/100
+
                     # R2-AIP-05 (a)
                     elif (float(r[rxAntDiameterIdx]) != -1):
                         rxGainULS = float(r[rxGainULSIdx])
@@ -194,6 +197,7 @@ def fixParams(inputPath, outputPath, logFile):
                                 rxGain = float(r[txMidbandGainIdx])
                             else:
                                 rxGain = Gtypical
+                            csmap[keyv][ri][rxAntDiameterIdx] = Drx
 
                     if (rxGain == ""):
                         matchFlagRxGain = True
@@ -285,6 +289,8 @@ def fixParams(inputPath, outputPath, logFile):
                                         rxGain = float(m[txMidbandGainIdx])
                                     else:
                                         rxGain = Gtypical
+                                    csmap[keyv][ri][rxAntDiameterIdx] = Drx
+
                     # R2-AIP-05 (d)
                     if rxGain == "":
                         rxGainULS = float(r[rxGainULSIdx])
@@ -294,6 +300,9 @@ def fixParams(inputPath, outputPath, logFile):
                             rxGain = 48.0
                         else:
                             rxGain = rxGainULS
+                        oneOverSqrtEtaRx = 1.0/math.sqrt(0.55)
+                        Drx = (c/(math.pi*Fc_unii))*(10**((rxGain)/20))*oneOverSqrtEtaRx
+                        csmap[keyv][ri][rxAntDiameterIdx] = Drx
 
                     csmap[keyv][ri][rxGainIdx] = str(rxGain)
                     csmap[keyv][ri][txGainIdx] = r[txGainULSIdx]
