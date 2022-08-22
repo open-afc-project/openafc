@@ -27,6 +27,7 @@ const double CConst::logTable[] = {0.0,
 	log(8.0)/log(10.0),
 	log(9.0)/log(10.0)};
 const double CConst::earthRadius = 6378.137e3;
+const double CConst::averageEarthRadius = 6371.0e3;
 const double CConst::geoRadius = 42164.0e3;
 const double CConst::boltzmannConstant = 1.3806488e-23;
 const double CConst::T0                = 290;

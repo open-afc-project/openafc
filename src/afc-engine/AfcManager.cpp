@@ -2113,6 +2113,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_confidenceWinner2NLOS = 0.5;
 	}
 
+	if (propModel.contains("win2UseGroundDistance") && !propModel["win2UseGroundDistance"].isUndefined()) {
+		_winner2UseGroundDistanceFlag = propModel["win2UseGroundDistance"].toBool();
+	} else {
+        _winner2UseGroundDistanceFlag = true;
+	}
+
 	if (propModel.contains("itmReliability") && !propModel["itmReliability"].isUndefined()) {
 		_reliabilityITM = propModel["itmReliability"].toDouble()/100.0;
 	} else {
@@ -5311,7 +5317,7 @@ double AfcManager::computeBuildingPenetration(CConst::BuildingTypeEnum buildingT
 /**** AfcManager::computePathLoss                                                      ****/
 /******************************************************************************************/
 void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx, CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
-		double distKm, double frequency,
+		double distKm, double win2DistKm, double frequency,
 		double txLongitudeDeg, double txLatitudeDeg, double txHeightM, double elevationAngleTxDeg,
 		double rxLongitudeDeg, double rxLatitudeDeg, double rxHeightM, double elevationAngleRxDeg,
 		double &pathLoss, double &pathClutterTxDB, double &pathClutterRxDB, bool fixedProbFlag,
@@ -5352,12 +5358,12 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 	{
 		if ((propEnv == CConst::urbanPropEnv) || (propEnv == CConst::suburbanPropEnv))
 		{
-			if (distKm * 1000 < _closeInDist)
+			if (win2DistKm * 1000 < _closeInDist)
 			{
 				if (_closeInPathLossModel == "WINNER2")
 				{
 					int winner2LOSValue = 0; // 1: Force LOS, 2: Force NLOS, 0: Compute probLOS, then select or combine.
-					if (distKm * 1000 <= 50.0) {
+					if (win2DistKm * 1000 <= 50.0) {
 						winner2LOSValue = 1;
 					} else if (
 							(_winner2LOSOption == CConst::BldgDataLOSOption)
@@ -5393,12 +5399,12 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 					if (propEnv == CConst::urbanPropEnv)
 					{
 						// Winner2 C2: urban
-						pathLoss = Winner2_C2urban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+						pathLoss = Winner2_C2urban(1000 * win2DistKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 					}
 					else if (propEnv == CConst::suburbanPropEnv)
 					{
 						// Winner2 C1: suburban
-						pathLoss = Winner2_C1suburban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+						pathLoss = Winner2_C1suburban(1000 * win2DistKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 					}
 				}
 				else
@@ -5637,9 +5643,9 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 			pathClutterTxDB = 0.0;
 			pathClutterTxModelStr = "NONE";
 			pathClutterTxCDF = 0.5;
-		} else if (distKm * 1000 < _closeInDist) {
+		} else if (win2DistKm * 1000 < _closeInDist) {
 			int winner2LOSValue = 0; // 1: Force LOS, 2: Force NLOS, 0: Compute probLOS, then select or combine.
-			if (distKm * 1000 <= 50.0) {
+			if (win2DistKm * 1000 <= 50.0) {
 				winner2LOSValue = 1;
 			} else if (
 					(_winner2LOSOption == CConst::BldgDataLOSOption)
@@ -5674,13 +5680,13 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 			double sigma, probLOS;
 			if (propEnv == CConst::urbanPropEnv) {
 				// Winner2 C2: urban
-				pathLoss = Winner2_C2urban(1000*distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+				pathLoss = Winner2_C2urban(1000*win2DistKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 			} else if (propEnv == CConst::suburbanPropEnv) {
 				// Winner2 C1: suburban
-				pathLoss = Winner2_C1suburban(1000*distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+				pathLoss = Winner2_C1suburban(1000*win2DistKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 			} else if ( (propEnv == CConst::ruralPropEnv) || (propEnv == CConst::barrenPropEnv) ) {
 				// Winner2 D1: rural
-				pathLoss = Winner2_D1rural(1000*distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+				pathLoss = Winner2_D1rural(1000*win2DistKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 			} else {
 				throw std::runtime_error(ErrStream() << "ERROR: propEnv = " << propEnv << " INVALID value");
 			}
@@ -6485,6 +6491,7 @@ void AfcManager::runPointAnalysis()
 				"RLAN_TERRAIN_SOURCE",
 				"RLAN_PROP_ENV",
 				"RLAN_FS_RX_DIST (km)",
+				"RLAN_FS_RX_GROUND_DIST (km)",
 				"RLAN_FS_RX_ELEVATION_ANGLE (deg)",
 				"FS_RX_ANGLE_OFF_BORESIGHT (deg)",
 				"RLAN_TX_EIRP (dBm)",
@@ -7204,6 +7211,15 @@ void AfcManager::runPointAnalysis()
 						height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
 					}
 
+					// Use Haversine formula with average earth radius of 6371 km
+					double lon1Rad = scanPt.second*M_PI/180.0;
+					double lat1Rad = scanPt.first*M_PI/180.0;
+					double lon2Rad = uls->getRxLongitudeDeg()*M_PI/180.0;
+					double lat2Rad = uls->getRxLatitudeDeg()*M_PI/180.0;
+					double slat = sin((lat2Rad-lat1Rad)/2);
+					double slon = sin((lon2Rad-lon1Rad)/2);
+					double groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
 					int htIdx;
 					int numRlanPosn = 0;
 					bool lowHeightFlag = false;
@@ -7253,6 +7269,12 @@ void AfcManager::runPointAnalysis()
 						GeodeticCoord rlanCoord = rlanCoordList[rlanPosnIdx];
 						lineOfSightVectorKm = ulsRxPos - rlanPosn;
 						double distKm = lineOfSightVectorKm.len();
+						double win2DistKm;
+						if (_winner2UseGroundDistanceFlag) {
+							win2DistKm = groundDistanceKm;
+						} else {
+							win2DistKm = distKm;
+						}
 						double dAP = rlanPosn.len();
 						double duls = ulsRxPos.len();
 						double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
@@ -7295,7 +7317,7 @@ void AfcManager::runPointAnalysis()
 
 									double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-									computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, chanCenterFreq,
+									computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, win2DistKm, chanCenterFreq,
 											rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 											uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 											pathLoss, pathClutterTxDB, pathClutterRxDB, true,
@@ -7381,7 +7403,7 @@ void AfcManager::runPointAnalysis()
 										msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) << 
 											QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource)) <<
 											CConst::strPropEnvList->type_to_str(rlanPropEnv);
-										msg << QString::number(distKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
+										msg << QString::number(distKm, 'f', 3) << QString::number(groundDistanceKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
 										msg << QString::number(_maxEIRP_dBm, 'f', 3) << QString::number(_bodyLossDB, 'f', 3) << QString::fromStdString(txClutterStr) << QString::fromStdString(rxClutterStr) << QString::fromStdString(bldgTypeStr);
 										msg << QString::number(buildingPenetrationDB, 'f', 3) << QString::fromStdString(buildingPenetrationModelStr) << QString::number(buildingPenetrationCDF, 'f', 8);
 										msg << QString::number(pathLoss, 'f', 3) << QString::fromStdString(pathLossModelStr) << QString::number(pathLossCDF, 'f', 8);
@@ -8283,6 +8305,22 @@ void AfcManager::runScanAnalysis()
 				double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
 				double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
 
+				// Use Haversine formula with average earth radius of 6371 km
+				double lon1Rad = rlanCoord.longitudeDeg*M_PI/180.0;
+				double lat1Rad = rlanCoord.latitudeDeg*M_PI/180.0;
+				double lon2Rad = uls->getRxLongitudeDeg()*M_PI/180.0;
+				double lat2Rad = uls->getRxLatitudeDeg()*M_PI/180.0;
+				double slat = sin((lat2Rad-lat1Rad)/2);
+				double slon = sin((lon2Rad-lon1Rad)/2);
+				double groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
+				double win2DistKm;
+				if (_winner2UseGroundDistanceFlag) {
+					win2DistKm = groundDistanceKm;
+				} else {
+					win2DistKm = distKm;
+				}
+
 				if ((distKmSquared < maxRadiusKmSquared) && (distKmSquared > exclusionDistKmSquared) && (uls->getLinkDistance() > 0.0)) {
 
 					CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
@@ -8339,7 +8377,7 @@ void AfcManager::runScanAnalysis()
 								double pathClutterRxCDF;
 								double pathClutterRxDB;
 
-								computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, chanCenterFreq,
+								computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, win2DistKm, chanCenterFreq,
 										rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 										uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 										pathLoss, pathClutterTxDB, pathClutterRxDB, true,
@@ -8521,6 +8559,7 @@ void AfcManager::runExclusionZoneAnalysis()
 				"RLAN_TERRAIN_SOURCE",
 				"LAN_PROP_ENV",
 				"RLAN_FS_RX_DIST (km)",
+				"RLAN_FS_RX_GROUND_DIST (km)",
 				"RLAN_FS_RX_ELEVATION_ANGLE (deg)",
 				"FS_RX_ANGLE_OFF_BORESIGHT (deg)",
 				"RLAN_TX_EIRP (dBm)",
@@ -8855,6 +8894,22 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 		double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
 		double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
 
+		// Use Haversine formula with average earth radius of 6371 km
+		double lon1Rad = rlanCoord.longitudeDeg*M_PI/180.0;
+		double lat1Rad = rlanCoord.latitudeDeg*M_PI/180.0;
+		double lon2Rad = uls->getRxLongitudeDeg()*M_PI/180.0;
+		double lat2Rad = uls->getRxLatitudeDeg()*M_PI/180.0;
+		double slat = sin((lat2Rad-lat1Rad)/2);
+		double slon = sin((lon2Rad-lon1Rad)/2);
+		double groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
+		double win2DistKm;
+		if (_winner2UseGroundDistanceFlag) {
+			win2DistKm = groundDistanceKm;
+		} else {
+			win2DistKm = distKm;
+		}
+
 		std::string buildingPenetrationModelStr;
 		double buildingPenetrationCDF;
 		double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
@@ -8873,7 +8928,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 
 		double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-		computePathLoss((rlanPropEnv == CConst::unknownPropEnv ? CConst::barrenPropEnv : rlanPropEnv), fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, chanCenterFreq,
+		computePathLoss((rlanPropEnv == CConst::unknownPropEnv ? CConst::barrenPropEnv : rlanPropEnv), fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, win2DistKm, chanCenterFreq,
 				rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 				uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 				pathLoss, pathClutterTxDB, pathClutterRxDB, true,
@@ -8947,7 +9002,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 			msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) << 
 				QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource)) <<
 				CConst::strPropEnvList->type_to_str(rlanPropEnv);
-			msg << QString::number(distKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
+			msg << QString::number(distKm, 'f', 3) << QString::number(groundDistanceKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
 			msg << QString::number(_exclusionZoneRLANEIRPDBm, 'f', 3) << QString::number(_bodyLossDB, 'f', 3) << QString::fromStdString(txClutterStr) << QString::fromStdString(rxClutterStr) << QString::fromStdString(bldgTypeStr);
 			msg << QString::number(buildingPenetrationDB, 'f', 3) << QString::fromStdString(buildingPenetrationModelStr) << QString::number(buildingPenetrationCDF, 'f', 8);
 			msg << QString::number(pathLoss, 'f', 3) << QString::fromStdString(pathLossModelStr) << QString::number(pathLossCDF, 'f', 8);
@@ -9142,6 +9197,7 @@ void AfcManager::runHeatmapAnalysis()
 				"RLAN_TERRAIN_SOURCE",
 				"RLAN_PROP_ENV",
 				"RLAN_FS_RX_DIST (km)",
+				"RLAN_FS_RX_GROUND_DIST (km)",
 				"RLAN_FS_RX_ELEVATION_ANGLE (deg)",
 				"FS_RX_ANGLE_OFF_BORESIGHT (deg)",
 				"RLAN_TX_EIRP (dBm)",
@@ -9361,6 +9417,22 @@ void AfcManager::runHeatmapAnalysis()
 							double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
 							double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
 
+							// Use Haversine formula with average earth radius of 6371 km
+							double lon1Rad = rlanCoord.longitudeDeg*M_PI/180.0;
+							double lat1Rad = rlanCoord.latitudeDeg*M_PI/180.0;
+							double lon2Rad = uls->getRxLongitudeDeg()*M_PI/180.0;
+							double lat2Rad = uls->getRxLatitudeDeg()*M_PI/180.0;
+							double slat = sin((lat2Rad-lat1Rad)/2);
+							double slon = sin((lon2Rad-lon1Rad)/2);
+							double groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
+							double win2DistKm;
+							if (_winner2UseGroundDistanceFlag) {
+								win2DistKm = groundDistanceKm;
+							} else {
+								win2DistKm = distKm;
+							}
+
 							std::string buildingPenetrationModelStr;
 							double buildingPenetrationCDF;
 							double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
@@ -9379,7 +9451,7 @@ void AfcManager::runHeatmapAnalysis()
 
 							double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-							computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, chanCenterFreq,
+							computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, win2DistKm, chanCenterFreq,
 									rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 									uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 									pathLoss, pathClutterTxDB, pathClutterRxDB, true,
@@ -9453,7 +9525,7 @@ void AfcManager::runHeatmapAnalysis()
 									QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource))
 									<<
 									CConst::strPropEnvList->type_to_str(rlanPropEnv);
-								msg << QString::number(distKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
+								msg << QString::number(distKm, 'f', 3) << QString::number(groundDistanceKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
 								msg << QString::number(rlanEIRP, 'f', 3) << QString::number(_bodyLossDB, 'f', 3) << QString::fromStdString(txClutterStr) << QString::fromStdString(rxClutterStr) << QString::fromStdString(bldgTypeStr);
 								msg << QString::number(buildingPenetrationDB, 'f', 3) << QString::fromStdString(buildingPenetrationModelStr) << QString::number(buildingPenetrationCDF, 'f', 8);
 								msg << QString::number(pathLoss, 'f', 3) << QString::fromStdString(pathLossModelStr) << QString::number(pathLossCDF, 'f', 8);
@@ -9632,7 +9704,6 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "FS_RECEIVER_DEFAULT_ANTENNA", QString::fromStdString(CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType )) } );
 		fUserInputs->writeRow({ "RLAN_ITM_TX_CLUTTER_METHOD", QString::fromStdString(CConst::strITMClutterMethodList->type_to_str(_rlanITMTxClutterMethod)) } );
 
-
 		fUserInputs->writeRow({ "PROPAGATION_MODEL", QString::fromStdString(CConst::strPathLossModelList->type_to_str(_pathLossModel)) } );
 		fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", QString::number(_winner2ProbLOSThr, 'e', 20) } );
 		fUserInputs->writeRow({ "WINNER_II_LOS_CONFIDENCE", QString::number(_confidenceWinner2LOS, 'e', 20) } );
@@ -9641,6 +9712,7 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "ITM_CONFIDENCE", QString::number(_confidenceITM, 'e', 20) } );
 		fUserInputs->writeRow({ "ITM_RELIABILITY", QString::number(_reliabilityITM, 'e', 20) } );
 		fUserInputs->writeRow({ "P.2108_CONFIDENCE", QString::number(_confidenceClutter2108, 'e', 20) } );
+		fUserInputs->writeRow({ "WINNER_II_USE_GROUND_DISTANCE", (_winner2UseGroundDistanceFlag ? "true" : "false" ) } );
 
 		if (_analysisType == "ExclusionZoneAnalysis") {
 			double chanCenterFreq = _wlanMinFreq + (_exclusionZoneRLANChanIdx + 0.5) * _exclusionZoneRLANBWHz;

@@ -19,6 +19,31 @@
 
 ## **Open Issues**
 
+## **Version and Date**
+|Version|**OA-337**|
+| :- | :- |
+|**Date**|**08/08/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-337: Add a configurable parameter for WINNER-II to use ground distance vs. path distance
+
+## **Interface Changes**
+ * OA-323: UI/API changes to allow configuring AFC Config (via json file only) to use ground distance calculation for WinnerII path loss. This is done through setting "win2UseGroundDistance": true in the propagation model.
+ 
+
+## **Testing Done**
+ * All the tests are attached to the Jira ticket.
+ * Ran a test (FSP2) and the ground distance in exc_thr file (newly added column: RLAN_FS_RX_GROUND_DIST (km)) matched online ground distance calculator for 2 points (https://keisan.casio.com/exec/system/1224587128) where 6371 km is used for earth radius.
+ * Compared the 2 points in Qualcom's FSP2 data (that used ground distance) and confirmed we got same ground distance as Qualcom.  
+ * Confirmed that path distance is used for distnace < 30m in LOS computation
+ * Confirmed that for ground distance between 30m and 1km, WinnerII is used.
+ * Confirmed that for ground distance > 1km, ITM is used. 
+
+
+## **Open Issues**
+
+
 |Version|3.3.22.2|
 | :- | :- |
 |**Date**|**08/04/2022**|
