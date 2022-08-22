@@ -29,6 +29,26 @@
 
 
 ## **Version and Date**
+|Version|**OA-348**|
+| :- | :- |
+|**Date**|**08/16/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-348:Note that this is incorrect use of distance in FSPL. This is done only for calibration purposes temporarily. QCOM will be reverting to using LOS distance up to 1km.
+
+## **Interface Changes**
+ * A new configurable parameter can be used inside the propagation model in afc-fonig.
+ * The new parameter is "fsplUseGroundDistance":true" (it is set true here to allow use of ground distance for FSPL calculation.
+
+## **Testing Done**
+ * Tested FSP2 that previously had more than 5 dB difference in max allowed EIRP with QCOM and now they're matching within 0.2 dB and confirmed that we have same FSPL as QCOM.
+ * Confirmed in exc_thr file that when GroundDistance is set to true for FSPL, ground distance is used in the FSPL calculation.
+ * Confirmed in exc_thr file that when GroundDistance is set to false for FSPL, LOS/path distance is used in the FSPL calculation.
+
+## **Open Issues**
+
+## **Version and Date**
 |Version|**OA-90**|
 | :- | :- |
 |**Date**|**08/08/2022**|
