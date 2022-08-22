@@ -1,4 +1,33 @@
 # Release Note
+
+
+## **Version and Date**
+|Version|**OA-341**|
+| :- | :- |
+|**Date**|**08/15/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-341: Debug why SIP9 regression tests fails when OA-337 is used (this is addressed on OA-346)
+ * Jira OA-346: Bug in implementation of R2-AIP-05 calculated antenna diameter not properly inserted into sqlite ULS file.
+ * In OA-232, which implemented R2-AIP-05, there was a bug in that RX Antenna diameter was not properly included in the sqlite database. OA-346 has the fix.
+ * There is a new WFA uls database on google-drive (WFA_testvector_ULS_220811.zip). This ULS needs to be used.
+ * The nature of this bug is that the antenna diameter had a value of -1 in the sqlite.  When computing the Rx Antenna gain there was a log of a negative number, resulting in an arithmetic exception, and the gain was never set.  The gain used in subsequent I/N calculations was uninitialized.
+ * Note that -1 for Tx Ant Diameter in the ULS is OK as it's not being used in R2-AIP-05 and it just means that that the Tx antenna model in ULS was not matched with any model in our database that has a diameter.  
+ * The fix is in the ULS parser only.
+
+## **Interface Changes**
+ * ULS parser has been updated.
+ 
+
+## **Testing Done**
+ * Confirmed that in the updated ULS (per above), Rx diameter is never -1.
+ * Ran SIP9 test case and found results very different from last time.
+ * For Channel 41, confirmed that the Rx diameter was computed correctly (using R2-AIP-07 F.699 and R2-AIP-05(d)) and that the gain was computed correctly.
+
+## **Open Issues**
+
+
 ## **Version and Date**
 |Version|**OA-348**|
 | :- | :- |
@@ -38,6 +67,31 @@
  * Test is attached to the Jira ticket.
 
 ## **Open Issues**
+
+## **Version and Date**
+|Version|**OA-337**|
+| :- | :- |
+|**Date**|**08/08/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-337: Add a configurable parameter for WINNER-II to use ground distance vs. path distance
+
+## **Interface Changes**
+ * OA-323: UI/API changes to allow configuring AFC Config (via json file only) to use ground distance calculation for WinnerII path loss. This is done through setting "win2UseGroundDistance": true in the propagation model.
+ 
+
+## **Testing Done**
+ * All the tests are attached to the Jira ticket.
+ * Ran a test (FSP2) and the ground distance in exc_thr file (newly added column: RLAN_FS_RX_GROUND_DIST (km)) matched online ground distance calculator for 2 points (https://keisan.casio.com/exec/system/1224587128) where 6371 km is used for earth radius.
+ * Compared the 2 points in Qualcom's FSP2 data (that used ground distance) and confirmed we got same ground distance as Qualcom.  
+ * Confirmed that path distance is used for distnace < 30m in LOS computation
+ * Confirmed that for ground distance between 30m and 1km, WinnerII is used.
+ * Confirmed that for ground distance > 1km, ITM is used. 
+
+
+## **Open Issues**
+
 
 |Version|3.3.22.2|
 | :- | :- |

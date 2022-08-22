@@ -767,21 +767,25 @@ def dump_table(conn, tbl_name, out_file):
     if (out_file) and (out_file != 'split'):
         fp_new = open(out_file, 'w')
 
-    conn.execute('SELECT * FROM ' + tbl_name)
+    conn.execute(f"SELECT * FROM {tbl_name}")
     found_data = conn.fetchall()
     for val in enumerate(found_data):
         if isinstance(fp_new, io.IOBase):
-            fp_new.write('%s\n' % str(val))
+            fp_new.write(f"{str(val)}\n")
         elif out_file == 'split':
-            app_log.debug(type(val))
-            app_log.debug(val[1][0])
-            req_id = json_lookup('requestId', eval(val[1][0]), None)
-            fp_test = open(WFA_TEST_DIR + '/' + req_id[0], 'a')
-            fp_test.write(val[1][0] + '\n')
+            new_json = json.loads(val[1][1].encode('utf-8'))
+            req_id = json_lookup('requestId', new_json, None)
+            # omit URS testcases
+            if (req_id[0].lower().find('urs') != -1 or
+                len(req_id[0]) == 0):
+                continue
+
+            fp_test = open(f"{WFA_TEST_DIR}/{req_id[0]}", 'a')
+            fp_test.write(f"{val[1][1]}\n")
             fp_test.close()
         else:
             # Just dump to the console
-            app_log.info('%s', val[1])
+            app_log.info(f"{val[1]}")
 
     if isinstance(fp_new, io.IOBase):
         fp_new.close()
@@ -789,13 +793,13 @@ def dump_table(conn, tbl_name, out_file):
 
 def dump_database(cfg):
     """Dump data from test DB tables"""
-    app_log.debug('%s()', inspect.stack()[0][3])
+    app_log.debug(f"{inspect.stack()[0][3]}")
     find_key = ''
     found_tables = []
     out_file = ''
 
     if not os.path.isfile(cfg['db_filename']):
-        app_log.error('Missing DB file %s', cfg['db_filename'])
+        app_log.error(f"Missing DB file {cfg['db_filename']}")
         return AFC_ERR
 
     set_dump_db_opts = {
@@ -815,11 +819,11 @@ def dump_database(cfg):
 
     if tbl in set_dump_db_opts:
         # Dump only tables with requests and responses
-        app_log.debug('Dump from DB table %s', tbl)
+        app_log.debug(f"Dump from DB table {tbl}")
         found_tables.extend(set_dump_db_opts[tbl])
     elif tbl == 'True':
         # Dump all tables if no options provided
-        cur.execute("SELECT name FROM sqlite_master WHERE type='table';")
+        cur.execute(f"SELECT name FROM sqlite_master WHERE type='table';")
         found_tables = cur.fetchall()
 
     if tbl == 'wfa':
@@ -828,7 +832,7 @@ def dump_database(cfg):
             shutil.rmtree(WFA_TEST_DIR)
         os.mkdir(WFA_TEST_DIR)
     elif isinstance(cfg['outfile'], type(None)):
-        app_log.error('Missing output filename.\n')
+        app_log.error(f"Missing output filename.\n")
         return AFC_ERR
     else:
         out_file = cfg['outfile'][0]
