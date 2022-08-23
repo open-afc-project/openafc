@@ -33,6 +33,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [RabbitMQ settings](#rabbitmq-settings)
   - [PostgreSQL structure](#postgresql-structure)
   - [Initial Administrator account](#initial-administrator-account)
+  - [ULS database update automation](#uls-database-update-automation)
 
 
 - [Database info](/database_readme.md)
@@ -412,3 +413,48 @@ Once done, you can authorize with this user and password in WebUI.
 To exit the console press Ctrl+D or type the 'exit' command.
 
 Happy usage!
+
+## ULS database update automation
+
+ULS Database needs (preferrably daily) updates to be up-to-date with regulators requirements. So there is a set of scripts in the uls/ folder which automates this activity.
+
+Prerequisites:
+- Set up and running Jenkins server
+- At least one of jenkins executors have access to the folder where the ULS database is stored (in our example it will be "/var/databases/ULS_Database") should it be the executor on the same server where the afc engine runs or it should have access to the folder thru NFS - it is up to your choice. It should have a 'uls' label to make this pipeline run on it.
+- SSH key for (at least) read only access to this github repository
+
+First Log in to your Jenkins WebUI and create a new Pipeline (Dashboard -> + New Item)
+On the next screen set up the the name of the project (for example "ULS Update") and choose "Pipeline" option and click OK.
+
+On the next screen there are a lot of buttons for configuration and set up, most of them are up to you.
+
+It is essential to do following configuration:
+
+    1. Check option "This project is parameterized".A button "Add parameter" will appear.
+    2. Add parameter of type "Credentials Parameter". Give it name "GITHUB_CREDS_ID" (without quotes) and "SSH username with private key" as a Credential type. Check the option "Required" and set as a default value the credential mentioned in prerequisites.
+    3. In the same section add another parameter. Now of type "String Parameter" with name "ULS_FOLDER" and default value mentioned in prereqisites (in this example - "/var/databases/ULS_Database")
+    4. In section Pipeline choose option "Pipeline script form SCM". 
+        4.1 In SCM Type choose GIT.
+        4.2 In repository specify the ssh path to repository (in our case - "git@github.com:Telecominfraproject/open-afc.git"). In credentials Dropdown menu choose the valid credetials to this repository.
+        4.3 In "Branches to build" use "*/main" (without quotes)
+        4.4 In "Script Path" specify the path from github repository root to jenkinsfile ( uls/ULS_updater.Jenkinsfile )
+
+
+All the other configurations are up to you, but it is recommended to use following options:
+
+Check option "Do not allow concurrent builds"
+
+In Build Triggers section choose "Build Periodically" option and as a schedule type following:
+```cron
+H H/24 * * *
+```
+This will make ULS update run once every 24 hours.
+
+After that choose "Poll SCM" and in schedule type following:
+```cron
+H/5 * * * *
+```
+
+this will make jenkins to check changes in SCM and run the update if any change in Pipeline had happened.
+
+And click "Save". That's it! If everything is done right, after the next run of this pipeline, the new ULS Database will appear in the ULS_Database folder.
