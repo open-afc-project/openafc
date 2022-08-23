@@ -8,9 +8,14 @@
 /******************************************************************************************/
 /**** CONSTRUCTOR: AntennaModelClass::AntennaModelClass                                ****/
 /******************************************************************************************/
-AntennaModelClass::AntennaModelClass(std::string nameVal, CategoryEnum categoryVal, double diameterMVal, double midbandGainVal) :
-	name(nameVal), category(categoryVal), diameterM(diameterMVal), midbandGain(midbandGainVal)
+AntennaModelClass::AntennaModelClass(std::string nameVal) : name(nameVal)
 {
+	type = UnknownType;
+	category = UnknownCategory;
+	diameterM = -1.0;
+	midbandGain = std::numeric_limits<double>::quiet_NaN();
+	reflectorWidthM = -1.0;
+	reflectorHeightM = -1.0;
 }
 /******************************************************************************************/
 
@@ -67,20 +72,29 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 	std::ostringstream errStr;
 
 	int modelNameFieldIdx = -1;
+	int typeFieldIdx = -1;
 	int categoryFieldIdx = -1;
-	int diameterFieldIdx = -1;
+	int diameterMFieldIdx = -1;
 	int midbandGainFieldIdx = -1;
+	int reflectorWidthMFieldIdx = -1;
+	int reflectorHeightMFieldIdx = -1;
 
 	std::vector<int *> fieldIdxList;                       std::vector<std::string> fieldLabelList;
 	fieldIdxList.push_back(&modelNameFieldIdx);            fieldLabelList.push_back("Ant Model");
+	fieldIdxList.push_back(&typeFieldIdx);                 fieldLabelList.push_back("Type");
 	fieldIdxList.push_back(&categoryFieldIdx);             fieldLabelList.push_back("Category");
-	fieldIdxList.push_back(&diameterFieldIdx);             fieldLabelList.push_back("Diameter (m)");
+	fieldIdxList.push_back(&diameterMFieldIdx);            fieldLabelList.push_back("Diameter (m)");
 	fieldIdxList.push_back(&midbandGainFieldIdx);          fieldLabelList.push_back("Midband Gain (dBi)");
+	fieldIdxList.push_back(&reflectorWidthMFieldIdx);      fieldLabelList.push_back("Reflector Width (m)");
+	fieldIdxList.push_back(&reflectorHeightMFieldIdx);     fieldLabelList.push_back("Reflector Height (m)");
 
 	std::string name;
 	AntennaModelClass::CategoryEnum category;
-    double diameter;
+	AntennaModelClass::TypeEnum type;
+    double diameterM;
     double midbandGain;
+	double reflectorWidthM = -1;
+	double reflectorHeightM = -1;
 
 	int fieldIdx;
 
@@ -181,6 +195,25 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				/**************************************************************************/
 
 				/**************************************************************************/
+				/* type                                                                   */
+				/**************************************************************************/
+				strval = fieldList.at(typeFieldIdx);
+				if (strval.empty()) {
+					errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " missing type" << std::endl;
+					throw std::runtime_error(errStr.str());
+				}
+
+				if ( (strval == "Ant") || (strval == "Antenna") ) {
+					type = AntennaModelClass::AntennaType;
+				} else if ( (strval == "Ref") || (strval == "Reflector") ) {
+					type = AntennaModelClass::ReflectorType;
+				} else {
+					errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " invalid type: " << strval << std::endl;
+					throw std::runtime_error(errStr.str());
+				}
+				/**************************************************************************/
+
+				/**************************************************************************/
 				/* category                                                               */
 				/**************************************************************************/
 				strval = fieldList.at(categoryFieldIdx);
@@ -204,12 +237,12 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				/**************************************************************************/
 				/* diameter                                                               */
 				/**************************************************************************/
-				strval = fieldList.at(diameterFieldIdx);
+				strval = fieldList.at(diameterMFieldIdx);
 				if (strval.empty()) {
-                    diameter = -1.0; // Use -1 for unknown
+                    diameterM = -1.0; // Use -1 for unknown
                 } else {
-                    diameter = std::strtod(strval.c_str(), &chptr);
-                    if (diameter <= 0.0) {
+                    diameterM = std::strtod(strval.c_str(), &chptr);
+                    if (diameterM <= 0.0) {
 					    errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " invalid diameter: \"" << strval << "\"" << std::endl;
 					    throw std::runtime_error(errStr.str());
                     }
@@ -229,7 +262,43 @@ void AntennaModelMapClass::readModelList(const std::string filename)
                 }
 				/**************************************************************************/
 
-				antennaModel = new AntennaModelClass(name, category, diameter, midbandGain);
+				/**************************************************************************/
+				/* reflectorWidth                                                         */
+				/**************************************************************************/
+				strval = fieldList.at(reflectorWidthMFieldIdx);
+				if (strval.empty()) {
+                    reflectorWidthM = -1.0; // Use -1 for unknown
+                } else {
+                    reflectorWidthM = std::strtod(strval.c_str(), &chptr);
+                    if (reflectorWidthM <= 0.0) {
+					    errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " invalid reflector width: \"" << strval << "\"" << std::endl;
+					    throw std::runtime_error(errStr.str());
+                    }
+                }
+				/**************************************************************************/
+
+				/**************************************************************************/
+				/* reflectorHeight                                                        */
+				/**************************************************************************/
+				strval = fieldList.at(reflectorHeightMFieldIdx);
+				if (strval.empty()) {
+                    reflectorHeightM = -1.0; // Use -1 for unknown
+                } else {
+                    reflectorHeightM = std::strtod(strval.c_str(), &chptr);
+                    if (reflectorHeightM <= 0.0) {
+					    errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " invalid reflector height: \"" << strval << "\"" << std::endl;
+					    throw std::runtime_error(errStr.str());
+                    }
+                }
+				/**************************************************************************/
+
+				antennaModel = new AntennaModelClass(name);
+                antennaModel->setCategory(category);
+                antennaModel->setType(type);
+                antennaModel->setDiameterM(diameterM);
+                antennaModel->setMidbandGain(midbandGain);
+                antennaModel->setReflectorWidthM(reflectorWidthM);
+                antennaModel->setReflectorHeightM(reflectorHeightM);
 
 				antennaModelList.push_back(antennaModel);
 

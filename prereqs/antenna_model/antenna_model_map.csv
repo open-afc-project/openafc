@@ -1,14 +1,4 @@
 regex,Ant Model
-UHP *6[-. ?]*59W[-/ a-zA-Z0-9()]*,UHP659W
-UHP *8[-. ?]*59W[-/ a-zA-Z0-9()]*,UHP859W
-UHX *10[-. ?]*59[-/ a-zA-Z0-9()]*,UHX1059
-UHX *12[-. ?]*59[-/ a-zA-Z0-9()]*,UHX1259
-UHX *12[-. ?]*65[-/ a-zA-Z0-9()]*,UHX1265
-UHX *6[-. ?]*59[-/ a-zA-Z0-9()]*,UHX659
-UHX *6[-. ?]*65[-/ a-zA-Z0-9()]*,UHX665
-UHX *8[-. ?]*59[-/ a-zA-Z0-9()]*,UHX859
-UHX *8&8[-. ?]*59[-/ a-zA-Z0-9()]*,UHX859
-UHX *8[-. ?]*65[-/ a-zA-Z0-9()]*,UHX865
 UCC *10W?[-. ?]*59[-/ a-zA-Z0-9()]*,UCC1059
 UCC *10[xX][-. ?]*59DSE[-/ a-zA-Z0-9()]*,UCC10X59DSE
 UCC *12W?[-. ?]*59A[-/ a-zA-Z0-9()]*,UCC1259A
@@ -24,21 +14,18 @@ UWB *8[-. ?]*5968[-/ a-zA-Z0-9()]*,UWB85968
 UW *8[-. ?]*5968[-/ a-zA-Z0-9()]*,UWB85968
 UWB *[-. ?]*5968[-/ a-zA-Z0-9()]*,UWB85968
 UWB *8[-. ?]*5971A[-/ a-zA-Z0-9()]*,UWB85971A
-DA *6[-. ?]*59[-./ a-zA-Z0-9()]*,DA659
+DA *6[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,DA659
 DA *6[-. ?]*65[-./ a-zA-Z0-9()]*,DA665
-DA *6[-. ?]*W57[-./ a-zA-Z0-9()]*,DA6W57
-DAX *10[-. ?]*65[-./ a-zA-Z0-9()]*,DAX1065
+DA *6[-. ?]*W57[-./ a-vx-zA-VX-Z0-9()]*,DA6W57
+DAX *10[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,DAX1065
 DAX *6[-. ?]*65[-./ a-zA-Z0-9()]*,DAX665
-DAX *8[-. ?]*65[-./ a-zA-Z0-9()]*,DAX865
+DAX *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,DAX865
 DD *6[-. ?]*64DSE[-./ a-zA-Z0-9()]*,DD664DSE
 HDH *10[-. ?]*65[-./ a-zA-Z0-9()]*,HDH1065
 HDH *6[-. ?]*65[-./ a-zA-Z0-9()]*,HDH665
 HDH *8[-. ?]*65[-./ a-zA-Z0-9()]*,HDH865
 HDV *6[-. ?]*65[-./ a-zA-Z0-9()]*,HDV665
 HDV *8[-. ?]*65[-./ a-zA-Z0-9()]*,HDV865
-HP *10[-. ?]*57[-./ a-zA-Z0-9()]*,HP1057W
-HP *6[-. ?]*57[-./ a-zA-Z0-9()]*,HP657W
-HP *8[-. ?]*57[-./ a-zA-Z0-9()]*,HP857W
 P *10[-. ?]*59[-./ a-zA-Z0-9()]*,P1059
 P *10[-. ?]*65[-./ a-zA-Z0-9()]*,P1065
 P10&8-65D,P1065
@@ -59,7 +46,8 @@ PA *10[-. ?]*W59[-./ a-zA-Z0-9()]*,PA10W59
 PA *12[-. ?]*59[-./ a-zA-Z0-9()]*,PA1259
 PA *12[-. ?]*65[-./ a-zA-Z0-9()]*,PA1265
 PA *12[-. ?]*W59[-./ a-zA-Z0-9()]*,PA12W59
-PA *6[-. ?]*59[-./ a-zA-Z0-9()]*,PA659
+PA *6[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PA659
+PA *6[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,PA659W
 PA *6[-. ?]*65[-./ a-zA-Z0-9()]*,PA665
 PA *6[-. ?]*W57[-./ a-zA-Z0-9()]*,PA6W57
 PA *6[-. ?]*W59[-./ a-zA-Z0-9()]*,PA6W59
@@ -68,16 +56,19 @@ PA *8[-. ?]*65[-./ a-zA-Z0-9()]*,PA865
 PA/PAL *8[-. ?]*65[-./ a-zA-Z0-9()]*,PA865
 PA *8[-. ?]*W57[-./ a-zA-Z0-9()]*,PA8W57
 PA *8[-. ?]*W59[-./ a-zA-Z0-9()]*,PA8W59
-PL *10[-. ?]*57W[-./ a-zA-Z0-9()]*,PL1057W
-PL *10[-. ?]*59[-./ a-zA-Z0-9()]*,PL1059
-PL *10[-. ?]*65[-./ a-zA-Z0-9()]*,PL1065
-PL *12[-. ?]*59[-./ a-zA-Z0-9()]*,PL1259
-PL *12[-. ?]*65[-./ a-zA-Z0-9()]*,PL1265
+[Pp][Aa][Ll] *10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PAL1059
+[Pp][Ll] *10[-. ?]*57W[-./ a-vx-zA-VX-Z0-9()]*,PL1057W
+[Pp][Ll] *10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PL1059
+[Pp][Ll] *10[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,PL1059W
+[Pp][Ll] *10[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PL1065
+[Pp][Ll] *12[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PL1259
+[Pp][Ll] *12[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,PL1259W
+[Pp][Ll] *12[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PL1265
 PL *15[-. ?]*59[-./ a-zA-Z0-9()]*,PL1559
-PL *15[-. ?]*65[-./ a-zA-Z0-9()]*,PL1565
+[Pp][Ll] *15[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PL1565
 PL *6[-. ?]*57W[-./ a-zA-Z0-9()]*,PL657W
-PL *6[-. ?]*59[-./ a-zA-VX-Z0-9()]*,PL659
-PL *6[-. ?]*59W[-./ a-zA-Z0-9()]*,PL659W
+PL *6[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PL659
+PL *6[-. ?]*59W[-./ a-vx-zA-Z0-9()]*,PL659W
 PL *6[-. ?]*65[-./ a-zA-Z0-9()]*,PL665
 PL *8[-. ?]*57W[-./ a-zA-Z0-9()]*,PL857W
 PL *8[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PL859
@@ -86,13 +77,17 @@ PL *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PL865
 PL *8[-. ?]*65[Ww][-./ a-zA-Z0-9()]*,PL865W
 PXL *10[-. ?]*59[-./ a-zA-Z0-9()]*,PXL1059
 PXL *10[-. ?]*65[-./ a-zA-Z0-9()]*,PXL1065
-PXL *12[-. ?]*65[-./ a-zA-Z0-9()]*,PXL1265
+[Pp][Xx][Ll] *12[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PXL1265
 PXL *6[-. ?]*59[-./ a-zA-Z0-9()]*,PXL659
 PXL *6[-. ?]*65[-./ a-zA-Z0-9()]*,PXL665
 PXL *8[-. ?]*59[-./ a-zA-Z0-9()]*,PXL859
 PLX *8[-. ?]*59[-./ a-zA-Z0-9()]*,PXL859
 PXL *8[-. ?]*65[-./ a-zA-Z0-9()]*,PXL865
 PLX *8[-. ?]*65[-./ a-zA-Z0-9()]*,PXL865
+[Pp][Xx] *6[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PX659
+[Pp][Xx] *8[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PX859
+[Pp][Xx] *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PX865
+[Pp][Xx] *10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PX1059
 RFD *8[xX]?[-. ?]*264BSE[-/ a-zA-Z0-9()]*,RFD8264BSE
 SP *6[-. ?]*59[-./ a-zA-Z0-9()]*,SP659
 SP *6[-. ?]*64[-./ a-zA-Z0-9()]*,SP664
@@ -106,6 +101,20 @@ SP *8[-. ?]*59[-./ a-zA-Z0-9()]*,SP859
 A-ANG-6G-6,AANT6G6
 A-ANT-6G-6,AANT6G6
 A-ANT-6G-6-C,AANT6G6
+A-ANT-06G-36-C-A,AANT06G36
+A-ANT-06G-48-C-A,AANT06G48
+A-ANY-06G-48-C-A,AANT06G48
+A-ANT-06G-72-C-A,AANT06G72
+A-ANT-06G-96-W-A,AANT06G96
+A-ANT-6G-96,AANT06G96
+A-ANT-L6G-48-C-R,AANTL6G48
+A-ANT-L6G-72-C[-AR]*,AANTL6G72
+A-ANT_L6G-96-W-A,AANTL6G96
+A-ANT-L6G-96-W-A,AANTL6G96
+A-ANT-L6G-96-W-R,AANTL6G96
+A-ANT-U6G-72-C-A,AANTU6G72
+A-ANT-U6G-72-C,AANTU6G72
+A-ANT-U6G-72,AANTU6G72
 AD6G-3,AD6G3
 AD6G-3-T2,AD6G3
 AD6G-3T2,AD6G3
@@ -138,21 +147,17 @@ DA *10[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,DA1065
 DA *10[-. ?]*W57[-./ a-vx-zA-VX-Z0-9()]*,DA10W57
 DA *12[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,DA1259
 DA *12[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,DA1265
-DA *6[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,DA659
-DA *6[-. ?]*W57[-./ a-vx-zA-VX-Z0-9()]*,DA6W57
 DA *8[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,DA859
 DA *8[-. ?]*59W[-./ a-zA-Z0-9()]*,DA859W
 DA8-59ASHP-6W,DA859W
 DA *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,DA865
 DA *8[-. ?]*W57[-./ a-vx-zA-VX-Z0-9()]*,DA8W57
 DAX *10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,DAX1059
-DAX *10[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,DAX1065
 DAX *10[-. ?]*W59[-./ a-vx-zA-VX-Z0-9()]*,DAX10W59
 DAX *12[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,DAX1259
 DAX *12[-. ?]*W59[-./ a-vx-zA-VX-Z0-9()]*,DAX12W59
 DAX *8[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,DAX859
 DAX *8[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,DAX859W
-DAX *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,DAX865
 DAX *8[-. ?]*W59[-./ a-vx-zA-VX-Z0-9()]*,DAX8W59
 DRFB6[-. ?]*59[-. ?]*CSE,DRFB659CSE
 DRFB6[-. ?]*64[-. ?]*BSE,DRFB664BSE
@@ -164,44 +169,46 @@ HDX10-59 R DIV,HDX1059RDIV
 HDX10-59 RF MAINRF,HDX1059RFMAINRF
 HDX12-59 RF MAIN,HDX1259RFMAIN
 HDX *8[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HDX859
-HP[- ]*10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HP1059
-HP *10[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,HP1059W
+HP3-6,HP36
+HP3-6\.4,HP36.4
+HP4-5\.9,HP45.9
+HP4-6,HP46
+HP4-6\.4,HP46.4
+HP6-5\.9,HP65.9
+[Hh][Pp] *4[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HP459
+[Hh][Pp] *4[-. ?]*64[-./ a-vx-zA-VX-Z0-9()]*,HP464
+[Hh][Pp] *4[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,HP465
+[Hh][Pp] *6[-. ?]*57[-./ a-vx-zA-VX-Z0-9()]*,HP657
+[Hh][Pp] *6[-. ?]*57W[-./ a-vx-zA-VX-Z0-9()]*,HP657W
+[Hh][Pp] *6[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HP659
+[Hh][Pp] *6[-. ?]*59 *W[-./ a-vx-zA-VX-Z0-9()]*,HP659W
+[Hh][Pp] *6[-. ?]*64[-./ a-vx-zA-VX-Z0-9()]*,HP664
+[Hh][Pp] *6[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,HP665
+[Hh][Pp] *6[-. ?]*6[-./ a-vx-zA-VX-Z0-9()]*,HP66
+[Hh][Pp] *8[-. ?]*57[-./ a-zA-Z0-9()]*,HP857W
+[Hh][Pp] *8[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HP859
+[Hh][Pp] *8[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,HP859W
+[Hh][Pp] *8[-. ?]*186[-./ a-vx-zA-VX-Z0-9()]*,HP8186
+[Hh][Pp] *8[-. ?]*611[-./ a-vx-zA-VX-Z0-9()]*,HP8611
+[Hh][Pp] *8[-. ?]*6511[-./ a-vx-zA-VX-Z0-9()&]*,HP86511
+[Hh][Pp] *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()&]*,HP865
+[Hh][Pp] *10[-. ?]*57[-./ a-zA-Z0-9()]*,HP1057W
+[Hh][Pp][- ]*10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HP1059
+[Hh][Pp] *10[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,HP1059W
 [Hh][Pp] *10[-. ?]*611[-./ a-vx-zA-VX-Z0-9()]*,HP10611
 [Hh][Pp] *10[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,HP1065
 [Hh][Pp][- ]*12[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HP1259
 [Hh][Pp] *12[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,HP1259W
 [Hh][Pp] *12[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,HP1265
 [Hh][Pp] *15[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HP1559
-HP3-6,HP36
-HP3-6\.4,HP36.4
-HP4-5\.9,HP45.9
-[Hh][Pp] *4[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HP459
-HP4-6,HP46
-HP4-6\.4,HP46.4
-[Hh][Pp] *4[-. ?]*64[-./ a-vx-zA-VX-Z0-9()]*,HP464
-[Hh][Pp] *4[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,HP465
-HP6-5\.9,HP65.9
-[Hh][Pp] *6[-. ?]*57[-./ a-vx-zA-VX-Z0-9()]*,HP657
-[Hh][Pp] *6[-. ?]*57W[-./ a-vx-zA-VX-Z0-9()]*,HP657W
-[Hh][Pp] *6[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HP659
-[Hh][Pp] *6[-. ?]*59 *W[-./ a-vx-zA-VX-Z0-9()]*,HP659W
-[Hh][Pp] *6[-. ?]*6[-./ a-vx-zA-VX-Z0-9()]*,HP66
-[Hh][Pp] *6[-. ?]*64[-./ a-vx-zA-VX-Z0-9()]*,HP664
-[Hh][Pp] *6[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,HP665
-[Hh][Pp] *8[-. ?]*186[-./ a-vx-zA-VX-Z0-9()]*,HP8186
-[Hh][Pp] *8[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HP859
-[Hh][Pp] *8[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,HP859W
-[Hh][Pp] *8[-. ?]*611[-./ a-vx-zA-VX-Z0-9()]*,HP8611
-[Hh][Pp] *8[-. ?]*6511[-./ a-vx-zA-VX-Z0-9()&]*,HP86511
-[Hh][Pp] *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()&]*,HP865
 HPD3-6,HPD36
 HPD306,HPD36
 HPD4-59,HPD459
 HPD4-6,HPD46
 HPD4-64,HPD464
-HPD6[-. ?]*59,HPD659
-HPD6-6,HPD66
 HPD6-64,HPD664
+HPD6-6,HPD66
+HPD6[-. ?]*59,HPD659
 HPX *10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HPX1059
 HPX *10[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,HPX1065
 HPX *10[-. ?]*A[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,HPX10A59
@@ -229,7 +236,6 @@ KS15676[ BCD]*,KS15676
 KS-21972,KS21972
 LX *6[-. ?]*6W[-./ a-vx-zA-VX-Z0-9()]*,LX66W
 P *8[-. ?]*186[-./ a-vx-zA-VX-Z0-9()]*,P8186
-PA *6[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,PA659W
 PAAR *8[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,PAAR859W
 PAARX *8[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,PAARX859W
 PAD *10[-. ?]*50[-./ a-vx-zA-VX-Z0-9()]*,PAD1050
@@ -245,7 +251,6 @@ PAD *6[-. ?]*59W[-./ a-zA-Z0-9()]*,PAD659W
 PAD *6[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PAD665
 PAD *6[-. ?]*[Ww]57[-./ a-vx-zA-VX-Z0-9()]*,PAD6W57
 PAD *6[-. ?]*[Ww]59[-./ a-vx-zA-VX-Z0-9()]*,PAD6W59
-PAD8\.65A,PAD8.65
 PAD8-5\(A,PAD85
 PAD *8[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PAD859
 PAD *8[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,PAD859W
@@ -273,7 +278,6 @@ PADZ8-U57A,PADX8U57
 [Pp][Aa][Rr] *12[-. ?]*59-*W[-./ a-vx-zA-VX-Z0-9()]*,PAR1259W
 [Pp][Aa][Rr] *12[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PAR1265
 PAR6&6-59W,PAR6&659W
-PAR6\.65A,PAR6.65A
 PAR6059,PAR6059
 PAR6065A,PAR6065
 PAR6065B RF,PAR6065
@@ -300,21 +304,12 @@ PAR8065B LF,PAR8065
 [Pp][Aa][Rr][Xx] *8[-. ?]*59 *W[-./ a-vx-zA-VX-Z0-9()]*,PARX859W
 [Pp][Aa][Rr][Xx] *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PARX865
 PDH *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PDH865
-[Pp][Ll] *10[-. ?]*57W[-./ a-vx-zA-VX-Z0-9()]*,PL1057W
-[Pp][Ll] *10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PL1059
-[Pp][Ll] *10[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,PL1059W
-[Pp][Ll] *10[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PL1065
-[Pp][Ll] *12[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PL1259
-[Pp][Ll] *12[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,PL1259W
-[Pp][Ll] *12[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PL1265
-[Pp][Ll] *15[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PL1565
 [Pp][Ll] *4[-. ?]*107[-./ a-vx-zA-VX-Z0-9()]*,PL4107
 PL\*-57W,PL57W
 [Pp][Ll] *6[-. ?]*107[-./ a-vx-zA-VX-Z0-9()]*,PL6107
 PL65-F,PL65
 PPAD6-65B,PPAD665B
 [Pp][Xx][Ll] *12[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,PXL1259
-[Pp][Xx][Ll] *12[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,PXL1265
 RFMA-0736UH1\.2WS,RFMA0736UH1.2WS
 SB *4[-. ?]*W60[-./ a-zA-Z0-9()]*,SB4W60
 SB *6[-. ?]*W60[-./ a-zA-Z0-9()]*,SB6W60
@@ -333,8 +328,6 @@ SHPD8-6,SHPD86
 SHPD8-6.4,SHPD86
 SP4-5\.9,SP45.9
 SP6-5\.9,SP65.9
-SP6-59,SP659
-SP6-64,SP664
 SPD6-5\.9,SPD65.9
 SU4-59D,SU459
 SU *6[-. ?]*59[-./ a-zA-Z0-9()]*,SU659
@@ -362,13 +355,20 @@ UA *8[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UA859W
 UA *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,UA865
 UA *8[-. ?]*W59[-./ a-vx-zA-VX-Z0-9()]*,UA8W59
 UAX *10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UAX1059
-UHP *10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UHP1059
-UHP *10[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHP1059W
-UHP *12[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHP1259W
 UHP *6[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UHP659
 UHP *6[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHP659W
 UHP *8[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHP859W
+UHP *10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UHP1059
+UHP *10[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHP1059W
+UHP *12[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHP1259W
 UHP-MW-6-4,UHPMW64
+UHX[- ]*6[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UHX659
+UHX *6[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHX659W
+UHX *6[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,UHX665
+UHX *8&8[-. ?]*59[-/ a-zA-Z0-9()]*,UHX859
+UHX[- ]*8[-. ?/]*59[-./ a-vx-zA-VX-Z0-9()]*,UHX859
+UHX *8[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHX859W
+UHX *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,UHX865
 UHX *10[-. ?]*58[-./ a-vx-zA-VX-Z0-9()]*,UHX1058
 UHX *10[-. ?]*58W[-./ a-vx-zA-VX-Z0-9()]*,UHX1058W
 UHX *10[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UHX1059
@@ -377,14 +377,9 @@ UHX *10[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,UHX1065
 UHX10J-59J *RF,UHX10J59
 UHX *12[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UHX1259
 UHX *12[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHX1259W
+UHX *12[-. ?]*65[-/ a-zA-Z0-9()]*,UHX1265
 UHX *15[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UHX1559
 UHX *60[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UHX6059
-UHX[- ]*6[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UHX659
-UHX *6[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHX659W
-UHX *6[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,UHX665
-UHX[- ]*8[-. ?/]*59[-./ a-vx-zA-VX-Z0-9()]*,UHX859
-UHX *8[-. ?]*59W[-./ a-vx-zA-VX-Z0-9()]*,UHX859W
-UHX *8[-. ?]*65[-./ a-vx-zA-VX-Z0-9()]*,UHX865
 UKY 220 11/DC12,UKY22011DC
 UKY 220 12/DC12,UKY22012DC12
 UKY22012/DC12,UKY22012DC12
@@ -446,14 +441,31 @@ UXH *12[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UXH1259
 UXH *8[-. ?]*59[-./ a-vx-zA-VX-Z0-9()]*,UXH859
 VHLP *3[-. ?]*6W[-./ a-zA-Z0-9()]*,VHLP36W
 VHLP *4[-. ?]*6W[-./ a-zA-Z0-9()]*,VHLP46W
+VHLP6-6W-4GR/A,VHLP66W4GRA
 VHLP *6[-. ?]*6W[-./ a-vx-zA-VX-Z0-9()]*,VHLP66W
 VHLPX *3[-. ?]*6W[-./ a-vx-zA-VX-Z0-9()]*,VHLPX36W
 VHLPX *4[-. ?]*6W[-./ a-zA-Z0-9()]*,VHLPX46W
 VHLPX *60[-. ?]*6W[-./ a-vx-zA-VX-Z0-9()]*,VHLPX606W
-VHLPX *6[-. ?]*6W[-./ a-vx-zA-VX-Z0-9()]*,VHLPX66W
-VHLP6-6W-4GR/A,VHLP66W4GRA
 VHLPX6-6W-6WH/A,VHLPX66W6WHA
+VHLPX *6[-. ?]*6W[-./ a-vx-zA-VX-Z0-9()]*,VHLPX66W
 VHP *4[-. ?]*107[-./ a-vx-zA-VX-Z0-9()]*,VHP4107
 VHP *6[-. ?]*107[-./ a-vx-zA-VX-Z0-9()]*,VHP6107
 VHPX *10[-. ?]*6W[-./ a-vx-zA-VX-Z0-9()]*,VHPX106W
 VLHP *6[-. ?]*6W[-./ a-vx-zA-VX-Z0-9()]*,VLHP66W
+DBUX12-W60W103ACC,DBUX12W60W
+DBUX8-W60W103A,DBUX8W60W
+DBUX8-W60W103ACC,DBUX8W60W
+DBX8-W60W103ACC_L,DBUX8W60W
+N060080L006B,N060080L006B
+N060082D128[A]*,N060082D128
+N060082D129[A]*,N060082D129
+N060082D132[A]*,N060082D132
+N060082D151[A]*,N060082D151
+N060082D152[A]*,N060082D152
+N060082D153[A]*,N060082D153
+PTPX-620S-ANT-3,PTPX620S
+([Pp][Aa][Ss][Ss][Ii][Vv][Ee][ ]*)?0?6[ ']*[Xx][ ]*8(([Ff][Tt])|([Ff][Oo][Oo][Tt])|')?[-./ a-zA-Z0-9()`]*,6x8
+([Pp][Aa][Ss][Ss][Ii][Vv][Ee][ ]*)?0?8[ ']*[Xx][ ]*10(([Ff][Tt])|([Ff][Oo][Oo][Tt])|')?[-./ a-zA-Z0-9()`]*,8x10
+0810RF,8x10
+2\.4[ ]*m[ ]*[Xx][ ]*3\.0[ ]*m,8x10
+([Pp][Aa][Ss][Ss][Ii][Vv][Ee][ ]*)?0?8[ ']*[Xx][ ]*12(([Ff][Tt])|([Ff][Oo][Oo][Tt])|')?[-./ a-zA-Z0-9()`]*,8x12

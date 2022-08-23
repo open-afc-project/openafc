@@ -11,7 +11,12 @@ ssl._create_default_https_context = ssl._create_unverified_context
 
 currentWeekday = datetime.datetime.today().weekday() # weekday() is 0 indexed at monday
 # file types we need to consider along with their # of | symbols (i.e. # of cols - 1)
-neededFiles = {'AN.dat': 37, 'CP.dat': 13, 'EM.dat': 15, 'EN.dat': 29, 'FR.dat': 29, 'HD.dat': 58, 'LO.dat': 50, 'PA.dat': 21, 'SG.dat': 14}
+neededFiles = {}
+neededFiles[0] = {'AN.dat': 37, 'CP.dat': 13, 'EM.dat': 15, 'EN.dat': 29, 'FR.dat': 29, 'HD.dat': 58, 'LO.dat': 50, 'PA.dat': 21, 'SG.dat': 14}
+neededFiles[1] = {'AN.dat': 37, 'CP.dat': 13, 'EM.dat': 15, 'EN.dat': 29, 'FR.dat': 29, 'HD.dat': 58, 'LO.dat': 50, 'PA.dat': 23, 'SG.dat': 14}
+
+# Version changed AUG 18, 2022
+versionTime = datetime.datetime(2022, 8, 18, 0, 0, 0)
 
 
 # map to reuse weekday in loops
@@ -47,16 +52,14 @@ def downloadFiles(logFile):
     urllib.urlretrieve(weeklyURL, 'weekly.zip')
 
     # download all the daily updates starting from Sunday up to that day
-    # example: on Wednesday morning, we will download the weekly update PLUS Sun, Mon and Tue daily updates
+    # example: on Wednesday morning, we will download the weekly update PLUS Sun, Mon, Tue and Wed daily updates
     for key, day in dayMap.items():
-        if (currentWeekday == 6):
-            continue # this is LAST Sunday's files, so we skip this entry 
         dayStr = day
         dailyURL =  'https://data.fcc.gov/download/pub/uls/daily/l_mw_' + dayStr +'.zip'
         logFile.write('Downloading ' + dayStr + '\n')
         urllib.urlretrieve(dailyURL, dayStr + '.zip')
-        # Exit after processing yesterdays file
-        if (key == currentWeekday - 1 or (currentWeekday == 0 and key == 6)):
+        # Exit after processing today's file
+        if (key == currentWeekday) and (day != 'sun'):
             break
 
 # Extracts all the zip files into sub-directories
@@ -102,75 +105,64 @@ def verifyCountsFile(dirName, root, temp):
             
 
 # Removes any record with the given id from the given file
-def removeFromCombinedFile(fileName, ids_to_remove):
-    workDir = os.getcwd()
-    weeklyAndDailyPath_bases = [os.path.join(workDir, 'weekly'),
-                                os.path.join(os.path.split(workDir)[0], 'weekly')
-                                ]
-    for weeklyAndDailyPath_base in weeklyAndDailyPath_bases:
-        if os.path.exists(weeklyAndDailyPath_base):
-            weeklyAndDailyPath = os.path.join(weeklyAndDailyPath_base, fileName + '_withDaily')
-            # if the weekly + daily data exists use that, otherwise make the file
-            if(os.path.isfile(weeklyAndDailyPath)):
-                # open new file that contains weekly and daily
-                with open(weeklyAndDailyPath + '_temp', 'w') as withDaily: 
-                    # open older file 
-                    with open(weeklyAndDailyPath , 'r' ) as weekly:
-                        for line in weekly: 
-                            cols = line.split('|')
+def removeFromCombinedFile(fileName, ids_to_remove, day, versionIdx):
+    weeklyAndDailyPath = './weekly/' + fileName + '_withDaily'
+
+    if (day == 'weekly'):
+        # create file that contains weekly and daily
+        with open(weeklyAndDailyPath, 'w') as withDaily: 
+            # open weekly file
+            with open('./weekly/' + fileName , 'r' ) as weekly:
+                record = '' 
+                symbolCount = 0
+                numExpectedCols = neededFiles[versionIdx][fileName]
+                for line in weekly:
+                    # remove newline characters from line
+                    line = line.replace('\n', '')
+                    line = line.replace('\r', '')
+                    # the line was just newline character(s), skip it
+                    if(line == '' or line == ' '):
+                        continue
+                    # the line is a single piece of data that does not contain the | character
+                    elif(not '|' in line):
+                        record += line
+                        continue 
+                    else: 
+                        symbolCount += line.count('|') # this many | were in the line
+                        record += line  
+                    # the record is complete if the number of | symbols is equal to the number of expected cols
+                    if (symbolCount == numExpectedCols): 
+                        cols = record.split('|')
+                        fileType = cols[0]
+                        # Ensure we need this entry
+                        if(fileType + ".dat" in neededFiles[versionIdx].keys()):
                             # only write when the id is not in the list of ids 
                             if(not cols[1] in ids_to_remove):
-                                withDaily.write(line)
-                # remove old combined, move new one to right place
-                os.remove(weeklyAndDailyPath)
-                os.rename(weeklyAndDailyPath + '_temp', weeklyAndDailyPath)
-            else:
-                # create file that contains weekly and daily
-                with open(weeklyAndDailyPath, 'w') as withDaily: 
-                    # open weekly file
-                    with open(os.path.join(weeklyAndDailyPath_base, fileName), 'r' ) as weekly:
-                        record = '' 
-                        symbolCount = 0
-                        numExpectedCols = neededFiles[fileName]
-                        for line in weekly:
-                            # remove newline characters from line
-                            line = line.replace('\n', '')
-                            line = line.replace('\r', '')
-                            # the line was just newline character(s), skip it
-                            if(line == '' or line == ' '):
-                                continue
-                            # the line is a single piece of data that does not contain the | character
-                            elif(not '|' in line):
-                                record += line
-                                continue 
-                            else: 
-                                symbolCount += line.count('|') # this many | were in the line
-                                record += line  
-                            # the record is complete if the number of | symbols is equal to the number of expected cols
-                            if (symbolCount == numExpectedCols): 
-                                cols = record.split('|')
-                                fileType = cols[0]
-                                # Ensure we need this entry
-                                if(fileType + ".dat" in neededFiles.keys()):
-                                    # only write when the id is not in the list of ids 
-                                    if(not cols[1] in ids_to_remove):
-                                        record += "\r\n" # add newline
-                                        withDaily.write(record)
-                                    #reset for the next record 
-                                    record = ''
-                                    symbolCount = 0
-                            elif (symbolCount > numExpectedCols):
-                                e = Exception('ERROR: Could not process record. More columns than expected in weekly file')
-                                raise e
-            break
+                                record += "\r\n" # add newline
+                                withDaily.write(record)
+                            #reset for the next record 
+                            record = ''
+                            symbolCount = 0
+                    elif (symbolCount > numExpectedCols):
+                        e = Exception('ERROR: Could not process record. More columns than expected in weekly file')
+                        raise e
     else:
-        raise Exception('ERROR: Wasn\'t able to find existing Weekly and/or Daily paths')
-        
-
+        # open new file that contains weekly and daily
+        with open(weeklyAndDailyPath + '_temp', 'w') as withDaily: 
+            # open older file 
+            with open(weeklyAndDailyPath , 'r' ) as weekly:
+                for line in weekly: 
+                    cols = line.split('|')
+                    # only write when the id is not in the list of ids 
+                    if(not cols[1] in ids_to_remove):
+                        withDaily.write(line)
+        # remove old combined, move new one to right place
+        os.remove(weeklyAndDailyPath)
+        os.rename(weeklyAndDailyPath + '_temp', weeklyAndDailyPath)
 
 # Update specific datafile with daily data
-def updateIndividualFile(fileName, lineBuffer):
-    weeklyAndDailyPath = '../weekly/' + fileName + '_withDaily'
+def updateIndividualFile(dayFile, lineBuffer):
+    weeklyAndDailyPath = './weekly/' + dayFile + '_withDaily'
     if(os.path.isfile(weeklyAndDailyPath)):
         # open file that contains weekly and daily
         with open(weeklyAndDailyPath, 'a') as withDaily:       
@@ -181,15 +173,17 @@ def updateIndividualFile(fileName, lineBuffer):
 
 # Reads the file and creates well formed entries from FCC data. 
 # The ONLY thing that consititutes a valid entry is the number of | characters (e.g. AN files have 38 columns and thus 37 | per record)
-def readEntries(fileType):
+def readEntries(dayFile, day, versionIdx):
     recordBuffer = '' # buffer to limit number of file open() calls
     idsToRemove = []
-    with open(fileType) as infile:
-        numExpectedCols = neededFiles[fileType]
+    with open('./' + day + '/' + dayFile) as infile:
+        numExpectedCols = neededFiles[versionIdx][dayFile]
         record = ''
         symbolCount = 0   
         # Iterate over the lines in the file
+        linenum = 0
         for line in infile:
+            linenum += 1
             # remove newline characters from line
             line = line.replace('\n', '')
             line = line.replace('\r', '')
@@ -215,42 +209,44 @@ def readEntries(fileType):
                 record = '' #reset the record 
                 symbolCount = 0
             elif (symbolCount > numExpectedCols):
-                raise Exception('ERROR: Could not process record more columns than expected')
-    removeFromCombinedFile(fileType, idsToRemove)
-    updateIndividualFile(fileType, recordBuffer)
+                raise Exception('ERROR: Could not process record more columns than expected: ' + day + '/' + dayFile + ':' + str(linenum))
+    removeFromCombinedFile(dayFile, idsToRemove, day, versionIdx)
+    updateIndividualFile(dayFile, recordBuffer)
 
 # Processes the daily files, replacing weekly entries when needed 
 def processDailyFiles(weeklyCreation, root, logFile, temp):
     logFile.write('Processing daily files' + '\n')
-    weeklyFormatFixed = False
+
+    # Process weekly file
+    if (weeklyCreation >= versionTime):
+        versionIdx = 1
+    else:
+        versionIdx = 0
+    for file in neededFiles[versionIdx].keys():
+        # removeFromCombinedFile() will fix any formatting in FCC data
+        # passing an empty list for second arg means no records will be removed 
+        removeFromCombinedFile(file, [], 'weekly', versionIdx) 
+
+
     for key, day in dayMap.items():
-        if (currentWeekday == 6):
-            continue # this is LAST Sunday's files, so we skip this entry
         # ensure counts file is newer than weekly
         fileCreationDate = verifyCountsFile(day, root, temp)
         timeDiff = fileCreationDate - weeklyCreation
         if(timeDiff.total_seconds() > 0):
-            os.chdir(root + temp + '/' + day) # change into the folder for the day, starting with sunday 
-            for dailyFile in os.listdir(os.getcwd()):
-                if (dailyFile in neededFiles.keys()):
+            if (fileCreationDate >= versionTime):
+                versionIdx = 1
+            else:
+                versionIdx = 0
+            for dailyFile in os.listdir(root + temp + '/' + day):
+                if (dailyFile in neededFiles[versionIdx].keys()):
                     logFile.write('Processing ' + dailyFile + ' for: ' + day + '\n')
-                    readEntries(dailyFile)
-                    weeklyFormatFixed = True
+                    readEntries(dailyFile, day, versionIdx)
         else:
             logFile.write('INFO: Skipping ' + day + ' files because they are older than the weekly file' + '\n')
 
         # Exit after processing yesterdays file
-        if (key == currentWeekday - 1 or (currentWeekday == 0 and key == 6)):
+        if (key == currentWeekday):
             break
-        os.chdir(root + temp) # change back to temp
-
-    # in this case there were no daily files processed so we need to fix weekly data 
-    # normally weekly data formatting is corrected when adding daily data 
-    if (not weeklyFormatFixed):
-        for file in neededFiles.keys():
-            # removeFromCombinedFile() will fix any formatting in FCC data
-            # passing an empty list for second arg means no records will be removed 
-            removeFromCombinedFile(file, []) 
 
 # Generates the combined text file that the coalition processor uses. 
 def generateUlsScriptInput(root, logFile, temp):
@@ -267,6 +263,7 @@ def generateUlsScriptInput(root, logFile, temp):
 
 def daily_uls_parse(state_root, interactive):
     startTime = datetime.datetime.now()
+    nameTime =  startTime.isoformat().replace(":", '_')
     root = state_root + "/daily_uls_parse"# root so path is consisent
     temp = "/temp"
 
@@ -294,7 +291,7 @@ def daily_uls_parse(state_root, interactive):
             return
 
         os.chdir(fullPathTempDir) #change to temp 
-        logname = fullPathTempDir + "/dailyParse_" + startTime.isoformat() + ".log"
+        logname = fullPathTempDir + "/dailyParse_" + nameTime + ".log"
         logFile = open(logname, 'w', 1)
         logFile.write('Starting interactive mode update at: ' + startTime.isoformat() + '\n')
 
@@ -321,7 +318,7 @@ def daily_uls_parse(state_root, interactive):
         # create temp directory to download files to
         os.mkdir(fullPathTempDir)
         os.chdir(fullPathTempDir) #change to temp 
-        logname = fullPathTempDir + "/dailyParse_" + startTime.isoformat() + ".log"
+        logname = fullPathTempDir + "/dailyParse_" + nameTime + ".log"
         logFile = open(logname, 'w', 1)
         logFile.write('Starting update at: ' + startTime.isoformat() + '\n')
 
@@ -350,7 +347,6 @@ def daily_uls_parse(state_root, interactive):
         generateUlsScriptInput(root, logFile, temp) 
 
     os.chdir(root) # change back to root of this script
-    nameTime =  datetime.datetime.now().isoformat().replace(":", '_')
     coalitionScriptOutputFilename = 'CONUS_ULS_' + nameTime + '.csv'
 
     if interactive:
@@ -463,10 +459,7 @@ def daily_uls_parse(state_root, interactive):
     finishTime = datetime.datetime.now()
 
     if not interactive:
-        if runFixParams:
-            outputSQL = paramOutput.replace('.csv', '.sqlite3')
-        else:
-            outputSQL = sortedOutput.replace('.csv', '.sqlite3')
+        outputSQL = paramOutput.replace('.csv', '.sqlite3')
    
         logFile.write("Creating and moving debug files")
         # create debug zip containing final csv, anomalous_uls, and warning_uls and move it to where GUI can see
@@ -477,7 +470,7 @@ def daily_uls_parse(state_root, interactive):
             warningPath = root + '/' + 'warning_uls.txt'
             subprocess.call(['mv', anomalousPath, dirName]) 
             subprocess.call(['mv', warningPath, dirName]) 
-            subprocess.call(['cp', sortedOutput, dirName]) 
+            subprocess.call(['cp', paramOutput, dirName]) 
             shutil.make_archive( dirName , 'zip', dirName)
             zipName = dirName + ".zip"
             shutil.rmtree(dirName) #delete debug directory

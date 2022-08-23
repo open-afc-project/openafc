@@ -15,14 +15,30 @@ public:
 		UnknownCategory
 	};
 
-	AntennaModelClass(std::string nameVal, CategoryEnum categoryVal, double diameterMVal, double midbandGainVal);
+	enum TypeEnum {
+		AntennaType,
+		ReflectorType,
+		UnknownType
+	};
+
+	AntennaModelClass(std::string nameVal);
+
+    void setType(TypeEnum typeVal) { type = typeVal; }
+    void setCategory(CategoryEnum categoryVal) { category = categoryVal; }
+    void setDiameterM(double diameterMVal) { diameterM = diameterMVal; }
+	void setMidbandGain(double midbandGainVal) { midbandGain = midbandGainVal; }
+	void setReflectorWidthM(double reflectorWidthMVal) { reflectorWidthM = reflectorWidthMVal; }
+	void setReflectorHeightM(double reflectorHeightMVal) { reflectorHeightM = reflectorHeightMVal; }
 
 	static std::string categoryStr(CategoryEnum categoryVal);
 
 	std::string name;
+	TypeEnum type;
 	CategoryEnum category;
-	double diameterM;      // Antenna diameter in meters
-	double midbandGain;    // Antenna midband gain (dB)
+	double diameterM;        // Antenna diameter in meters
+	double midbandGain;      // Antenna midband gain (dB)
+	double reflectorWidthM;  // Reflector Width (m)
+	double reflectorHeightM; // AReflector Height (m)
 };
 
 class AntennaModelMapClass {

@@ -16,16 +16,12 @@ double emptyAtof(const char *str) {
     return z;
 }
 
-
-//NOTE: Below function commented out becuase issue was resolved by increasing maxcol per the documentation. May want to update in future to use this approach instead of manual updates.
-// Seeks forward in the file until a new line is found or EOF.
-// Used to avoid any offseting issues in files that exit their loop because of maxcol.
-void SetToNextLine(FILE *fi) {
-  return;
-  // char nextChar = fgetc(fi); 
-  // while(nextChar != '\n' && nextChar != EOF) {
-  //   nextChar = fgetc(fi);
-  // }
+// On AUG 18, 2022 the FCC modified the format of PA records increasing the number of columns from 22 to 24.  The variable maxcol is set to 22, and this function ignores any
+// additional columns after maxcol.
+void SetToNextLine(FILE *fi, char c) {
+  while(c != '\n' && c != EOF) {
+    c = fgetc(fi);
+  }
 
 }
 }; // namespace
@@ -216,7 +212,7 @@ void UlsFileReader::readIndividualPath(FILE *fi) {
         if (replace == true) {
           strcpy(current.rxCallsign, current.callsign);
         }
-        SetToNextLine(fi);
+        SetToNextLine(fi, c);
         break;
       }
     } else {
@@ -300,7 +296,7 @@ void UlsFileReader::readIndividualEmission(FILE *fi) {
       pos = 0;
       numcol++;
       if (numcol == maxcol) { // Done!
-        SetToNextLine(fi);
+        SetToNextLine(fi, c);
         break;
       }
     } else {
@@ -370,7 +366,7 @@ void UlsFileReader::readIndividualMarketFrequency(FILE *fi) {
       pos = 0;
       numcol++;
       if (numcol == maxcol) { // Done!
-        SetToNextLine(fi);
+        SetToNextLine(fi, c);
         break;
       }
     } else {
@@ -442,7 +438,7 @@ void UlsFileReader::readIndividualEntity(FILE *fi) {
       pos = 0;
       numcol++;
       if (numcol == maxcol) { // Done!
-        SetToNextLine(fi);
+        SetToNextLine(fi, c);
         break;
       }
     } else {
@@ -608,7 +604,7 @@ void UlsFileReader::readIndividualLocation(FILE *fi) {
       pos = 0;
       numcol++;
       if (numcol == maxcol) { // Done!
-        SetToNextLine(fi);
+        SetToNextLine(fi, c);
         break;
       }
     } else {
@@ -770,7 +766,7 @@ void UlsFileReader::readIndividualAntenna(FILE *fi, FILE *fwarn) {
       pos = 0;
       numcol++;
       if (numcol == maxcol) { // Done!
-        SetToNextLine(fi);
+        SetToNextLine(fi, c);
         break;
       }
     } else {
@@ -927,7 +923,7 @@ void UlsFileReader::readIndividualFrequency(FILE *fi) {
       numcol++;
       // qDebug() << numcol << maxcol << string;
       if (numcol == maxcol) { // Done!
-        SetToNextLine(fi);
+        SetToNextLine(fi, c);
         break;
       }
     } else {
@@ -1031,7 +1027,7 @@ void UlsFileReader::readIndividualHeader(FILE *fi) {
       pos = 0;
       numcol++;
       if (numcol == maxcol) { // Done!
-        SetToNextLine(fi);
+        SetToNextLine(fi, c);
         break;
       }
     } else {
@@ -1118,7 +1114,7 @@ void UlsFileReader::readIndividualControlPoint(FILE *fi) {
       pos = 0;
       numcol++;
       if (numcol == maxcol) { // Done!
-        SetToNextLine(fi);
+        SetToNextLine(fi, c);
         break;
       }
     } else {
@@ -1198,7 +1194,7 @@ void UlsFileReader::readIndividualSegment(FILE *fi) {
       pos = 0;
       numcol++;
       if (numcol == maxcol) { // Done!
-        SetToNextLine(fi);
+        SetToNextLine(fi, c);
         break;
       }
     } else {

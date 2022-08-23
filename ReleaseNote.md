@@ -49,6 +49,27 @@
 ## **Open Issues**
 
 ## **Version and Date**
+|Version|**OA-350**|
+| :- | :- |
+|**Date**|**08/22/2022**|
+
+## **Issues Addressed**
+ * Jira OA-350: anomalous behavior in uls-script and daily_uls_parse.py
+
+## **Interface Changes**
+ * The fix for a bug in the ULS parser that was fixed in a localy commit but didn't go through during Pull Request was put back in.
+ * With FCC chnage of "PA" table, the ULS parser uses the old table pre-18Aug and uses the new table post-18Aug. See the description in Jira ticket for more details.
+ * Please use latest WFA ULS Database (08/19/22) from OpenAFC TIP's Google Drive.
+
+## **Testing Done**
+ * WFA test vector ULS generated (and validated) previously without this bug and another one generated with the latest ULS parser were identical.
+ * Ran FSP1-10 and compared results against our previous ULS and QCOM and didn't see any issues.
+ * Generated a new ULS from start (download from FCC webiste) to finish (generate .sqlite file) and examined the content. The parser handled the PA tables from pre and post 18-Aug correctly. 
+
+## **Open Issues**
+
+
+## **Version and Date**
 |Version|**OA-90**|
 | :- | :- |
 |**Date**|**08/08/2022**|

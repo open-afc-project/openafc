@@ -241,8 +241,13 @@ QStringList getCSVHeader(int numPR)
         header << "Passive Repeater " + QString::number(prIdx) + " Polarization";
         header << "Passive Repeater " + QString::number(prIdx) + " Azimuth Angle (deg)";
         header << "Passive Repeater " + QString::number(prIdx) + " Elevation Angle (deg)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Height (m)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Reflector Width (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Ant Manufacturer";
+        header << "Passive Repeater " + QString::number(prIdx) + " Ant Model";
+        header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Name Matched";
+        header << "Passive Repeater " + QString::number(prIdx) + " ULS Reflector Height (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " ULS Reflector Width (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Reflector Height (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Reflector Width (m)";
         header << "Passive Repeater " + QString::number(prIdx) + " Line Loss (dB)";
         header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT (m)";
         header << "Passive Repeater " + QString::number(prIdx) + " Beamwidth";
@@ -1005,9 +1010,6 @@ int main(int argc, char **argv)
       row << rxAnt.antennaModel;                // Rx Ant Model
       row << rxAntennaModelName.c_str();            // Rx Matched antenna model (blank if unmatched)
       row << AntennaModelClass::categoryStr(rxAntennaCategory).c_str(); // Rx Antenna category
-      row << makeNumber(
-          rxAnt.heightToCenterRAAT);            // Rx Height to Center RAAT (m)
-      row << makeNumber(rxAnt.gain);            // Rx Gain (dBi)
       row << makeNumber(rxAntennaDiameter);     // Rx Ant Diameter (m)
       row << makeNumber(rxAntennaMidbandGain);  // Rx Ant Midband Gain (dB)
       row << makeNumber(rxAnt.heightToCenterRAAT);  // Rx Height to Center RAAT (m)
@@ -1024,6 +1026,37 @@ int main(int argc, char **argv)
               UlsAntenna &prAnt = prAntList[prIdx-1];
               UlsSegment &segment = segList[prIdx];
 
+			  AntennaModelClass *prAntModel = antennaModelMap.find(std::string(prAnt.antennaModel));
+
+              AntennaModelClass::TypeEnum prAntennaType;
+              AntennaModelClass::CategoryEnum prAntennaCategory;
+              double prAntennaDiameter;
+              double prAntennaMidbandGain;
+              double prReflectorWidth;
+              double prReflectorHeight;
+              std::string prAntennaModelName;
+
+              if (prAntModel) {
+                  numAntMatch++;
+                  prAntennaModelName = prAntModel->name;
+                  prAntennaType = prAntModel->type;
+                  prAntennaCategory = prAntModel->category;
+                  prAntennaDiameter = prAntModel->diameterM;
+                  prAntennaMidbandGain = prAntModel->midbandGain;
+                  prReflectorWidth = prAntModel->reflectorWidthM;
+                  prReflectorHeight = prAntModel->reflectorHeightM;
+              } else {
+                  numAntUnmatch++;
+                  prAntennaModelName = "";
+                  prAntennaType = AntennaModelClass::UnknownType;
+                  prAntennaCategory = AntennaModelClass::UnknownCategory;
+                  prAntennaDiameter = -1.0;
+                  prAntennaMidbandGain = std::numeric_limits<double>::quiet_NaN();
+                  prReflectorWidth = -1.0;
+                  prReflectorHeight = -1.0;
+                  fixedReason.append("PR Antenna Model Unmatched");
+              }
+
               row << prLoc.locationName;          // Passive Repeater Location Name
               row << makeNumber(prLoc.latitude);  // Passive Repeater Lat Coords
               row << makeNumber(prLoc.longitude); // Passive Repeater Lon Coords
@@ -1032,8 +1065,13 @@ int main(int argc, char **argv)
               row << prAnt.polarizationCode;    // Passive Repeater Polarization
               row << makeNumber(prAnt.azimuth); // Passive Repeater Azimuth Angle
               row << makeNumber(prAnt.tilt);    // Passive Repeater Elevation Angle
-              row << makeNumber(prAnt.reflectorHeight); // Passive Repeater Reflector Height
-              row << makeNumber(prAnt.reflectorWidth);  // Passive Repeater Reflector Width
+              row << prAnt.antennaMake;         // Passive Repeater Ant Make
+              row << prAnt.antennaModel;        // Passive Repeater Ant Model
+              row << prAntennaModelName.c_str();        // Passive Repeater antenna model (blank if unmatched)
+              row << makeNumber(prAnt.reflectorHeight); // Passive Repeater ULS Reflector Height
+              row << makeNumber(prAnt.reflectorWidth);  // Passive Repeater ULS Reflector Width
+              row << makeNumber(prReflectorHeight); // Passive Repeater Ant Model Reflector Height
+              row << makeNumber(prReflectorWidth);  // Passive Repeater Ant Model Reflector Width
               row << makeNumber(prAnt.lineLoss);        // Passive Repeater Line Loss
               row << makeNumber(
                   prAnt.heightToCenterRAAT); // Passive Repeater Height to Center RAAT
@@ -1044,6 +1082,11 @@ int main(int argc, char **argv)
                   prAnt.backtobackRxGain); // Passive Repeater Back-To-Back Rx Gain
               row << makeNumber(segment.segmentLength); // Segment Length (km)
           } else {
+              row << "";
+              row << "";
+              row << "";
+              row << "";
+              row << "";
               row << "";
               row << "";
               row << "";
