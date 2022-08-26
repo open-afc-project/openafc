@@ -18,7 +18,7 @@ export const spectrumInquiryRequest = (request: AvailableSpectrumInquiryRequest)
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ version: "1.1", availableSpectrumInquiryRequests: [request] })
+        body: JSON.stringify({ version: "1.3", availableSpectrumInquiryRequests: [request] })
     })
         .then(async resp => {
             if (resp.status == 200) {
@@ -85,7 +85,7 @@ export const sampleRequestObject: AvailableSpectrumInquiryRequest = {
     },
     minDesiredPower: 15,
     vendorExtensions: [{
-        extensionID: "RAT v1.1AFC Config",
+        extensionID: "RAT v1.3 AFC Config",
         parameters: getDefaultAfcConf()
     }],
     inquiredChannels: [

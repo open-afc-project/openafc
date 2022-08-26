@@ -45,6 +45,7 @@ RULESET = 'US_47_CFR_PART_15_SUBPART_E'
 #: All views under this API blueprint
 module = flask.Blueprint('ap-afc', 'ap-afc')
 
+ALLOWED_VERSIONS = ['1.1', '1.3']
 
 class AP_Exception(Exception):
     ''' Exception type used for RAT AFC respones
@@ -342,7 +343,7 @@ class RatAfc(MethodView):
 
         # check request version
         ver = flask.request.json["version"]
-        if not (ver == "1.1"):
+        if not (ver in ALLOWED_VERSIONS):
             raise VersionNotSupportedException([ver])
 
         # start request
@@ -507,6 +508,8 @@ class RatAfc(MethodView):
 
 # registration of default runtime options
 module.add_url_rule('/1.1/availableSpectrumInquiry',
+                    view_func=RatAfc.as_view('RatAfc-1.1'))
+module.add_url_rule('/1.3/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))
 
 # Local Variables:

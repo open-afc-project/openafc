@@ -692,11 +692,14 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	if (jsonObj.contains("version") && !jsonObj["version"].isUndefined()) {
 		_guiJsonVersion = jsonObj["version"].toString();
 	} else {
-		_guiJsonVersion = QString("1.0");
+		_guiJsonVersion = QString("1.3");
 	}
 
-	if (_guiJsonVersion == "1.1") {
-		importGUIjsonVersion1_1(jsonObj);
+	if (_guiJsonVersion == "1.3") {
+		importGUIjsonVersion1_3(jsonObj);
+	} else if (_guiJsonVersion == "1.1") {
+        // 1.3 and 1.1 are the same
+		importGUIjsonVersion1_3(jsonObj);
 	} else if (_guiJsonVersion == "1.0") {
 		importGUIjsonVersion1_0(jsonObj);
 	} else {
@@ -709,7 +712,7 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	return;
 }
 
-void AfcManager::importGUIjsonVersion1_1(const QJsonObject &jsonObj)
+void AfcManager::importGUIjsonVersion1_3(const QJsonObject &jsonObj)
 {
 	QString errMsg;
 

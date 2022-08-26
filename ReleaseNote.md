@@ -2,6 +2,27 @@
 
 
 ## **Version and Date**
+|Version|**OA-355**|
+| :- | :- |
+|**Date**|**08/24/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-355: Allow WFA SDI Spec version of 1.3
+
+## **Interface Changes**
+ * Engine now allows version 1.3 (to be treated same as 1.1)
+ * AP inserts version 1.3 in the AP request message.
+ * Engine would allow both 1.1 and 1.3 and treat them equally.
+
+## **Testing Done**
+ * Confirmed that request and response messages have version 1.3.
+ * Confirmed that version 1.1 works as before.
+
+## **Open Issues**
+
+
+## **Version and Date**
 |Version|**OA-341**|
 | :- | :- |
 |**Date**|**08/15/2022**|
