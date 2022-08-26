@@ -1,5 +1,27 @@
 # Release Note
 
+## **Version and Date**
+|Version|**OA-354**|
+| :- | :- |
+|**Date**|**08/24/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-354: Move RLAN height restriction configurable-parameters to afc-config.json
+
+## **Interface Changes**
+ * There are two new parameters in afc-config.json
+ * "winner2HgtFlag" to enable/disable use of the height restriciton and 
+ * "winner2HgtLOS" to set the height above which Winner2 LOS will be used (when the flag is set to true)
+
+## **Testing Done**
+ * TurnOffRLANHgtRestriciton test: Ran FSP10 (where 14 dB of difference was seen with QCOM due to the height restriction) with "winner2HgtFlag" = false and confirmed that the large EIRP differences were resolved.
+ * Confirmed in the exc_thr file that for high RLAN heights, WinnerII Combined is used as expected.
+ * TurnOnRLANHgtRestriction: created a quick test (to be added to the CICD regression test) where the height restriction is turned on. 
+ * In addition, use of ground distance is set to TRUE for both FSPL and WII (OA-348 and OA-337 respectively) and use "power-based" channel response (OA-265) to get these added to the regression test.
+ * Confirmed in the exc_thr file that WII-LOS is always used due to the RLAN height restriction setting as expected.
+
+## **Open Issues**
 
 ## **Version and Date**
 |Version|**OA-355**|

@@ -2122,6 +2122,20 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
         _winner2UseGroundDistanceFlag = true;
 	}
 
+	// Whether or not to force LOS when mobile height above closeInHgtLOS for close in model",
+	// RLAN height above which prob of LOS = 100% for close in model",
+	if (propModel.contains("winner2HgtFlag") && !propModel["winner2HgtFlag"].isUndefined()) {
+		_closeInHgtFlag = propModel["winner2HgtFlag"].toBool();
+	} else {
+        _closeInHgtFlag = true;
+	}
+
+	if (propModel.contains("winner2HgtLOS") && !propModel["winner2HgtLOS"].isUndefined()) {
+		 _closeInHgtLOS = propModel["winner2HgtLOS"].toDouble();
+	} else {
+		 _closeInHgtLOS = 0.5;
+	}
+
 	if (propModel.contains("fsplUseGroundDistance") && !propModel["fsplUseGroundDistance"].isUndefined()) {
 		_fsplUseGroundDistanceFlag = propModel["fsplUseGroundDistance"].toBool();
 	} else {
@@ -6051,7 +6065,12 @@ double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, d
 {
 	double retval;
 
-	probLOS = (((_closeInHgtFlag) && (hMS > _closeInHgtLOS)) ? 1.0 : exp(-distance / 200));
+	if ((losValue == 0) && (_closeInHgtFlag) && (hMS > _closeInHgtLOS)) {
+		losValue = 1;
+		probLOS = 1.0;
+	} else {
+		probLOS = exp(-distance / 200);
+	}
 
 	if (losValue == 0) {
 		if (_winner2UnknownLOSMethod == CConst::PLOSCombineWinner2UnknownLOSMethod) {
@@ -6195,12 +6214,10 @@ double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, doub
 {
 	double retval;
 
-	if ((_closeInHgtFlag) && (hMS > _closeInHgtLOS))
-	{
+	if ((losValue == 0) && (_closeInHgtFlag) && (hMS > _closeInHgtLOS)) {
+		losValue = 1;
 		probLOS = 1.0;
-	}
-	else
-	{
+	} else {
 		probLOS = (distance > 18.0 ? 18.0 / distance : 1.0) * (1.0 - exp(-distance / 63.0)) + exp(-distance / 63.0);
 	}
 
@@ -6344,12 +6361,10 @@ double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, doub
 {
 	double retval;
 
-	if ((_closeInHgtFlag) && (hMS > _closeInHgtLOS))
-	{
+	if ((losValue == 0) && (_closeInHgtFlag) && (hMS > _closeInHgtLOS)) {
+		losValue = 1;
 		probLOS = 1.0;
-	}
-	else
-	{
+	} else {
 		probLOS = exp(-distance / 1000);
 	}
 
@@ -9745,6 +9760,8 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "WINNER_II_LOS_CONFIDENCE", QString::number(_confidenceWinner2LOS, 'e', 20) } );
 		fUserInputs->writeRow({ "WINNER_II_NLOS_CONFIDENCE", QString::number(_confidenceWinner2NLOS, 'e', 20) } );
 		fUserInputs->writeRow({ "WINNER_II_COMBINED_CONFIDENCE", QString::number(_confidenceWinner2Combined, 'e', 20) } );
+		fUserInputs->writeRow({ "WINNER_II_HGT_FLAG", (_closeInHgtFlag ? "true" : "false" ) } );
+		fUserInputs->writeRow({ "WINNER_II_HGT_LOS", QString::number(_closeInHgtLOS, 'e', 20) } );
 		fUserInputs->writeRow({ "ITM_CONFIDENCE", QString::number(_confidenceITM, 'e', 20) } );
 		fUserInputs->writeRow({ "ITM_RELIABILITY", QString::number(_reliabilityITM, 'e', 20) } );
 		fUserInputs->writeRow({ "P.2108_CONFIDENCE", QString::number(_confidenceClutter2108, 'e', 20) } );
@@ -9941,8 +9958,6 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_exclusionDist = 1.0;
 
 	_illuminationEfficiency = 1.0;
-	_closeInHgtFlag = true;            // Whether or not to force LOS when mobile height above closeInHgtLOS for close in model",
-	_closeInHgtLOS = 15.0;             // RLAN height above which prob of LOS = 100% for close in model",
 	_closeInDist = 1.0e3;              // Radius in which close in path loss model is used
 	_closeInPathLossModel = "WINNER2"; // Close in path loss model is used
 
