@@ -66,6 +66,8 @@ UlsDatabase::UlsDatabase()
 	fieldIdxList.push_back(&rx_ground_elev_mIdx);
 	columns << "rx_height_to_center_raat_m";
 	fieldIdxList.push_back(&rx_height_to_center_raat_mIdx);
+	columns << "rx_line_loss";
+	fieldIdxList.push_back(&rx_line_loss_mIdx);
 	columns << "rx_gain";
 	fieldIdxList.push_back(&rx_gainIdx);
 	columns << "rx_ant_diameter";
@@ -250,6 +252,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		target.at(r).rxLongitudeDeg = q.value(rx_long_degIdx).toDouble();
 		target.at(r).rxGroundElevation = q.value(rx_ground_elev_mIdx).isNull() ? nan : q.value(rx_ground_elev_mIdx).toDouble();
 		target.at(r).rxHeightAboveTerrain = q.value(rx_height_to_center_raat_mIdx).isNull() ? nan : q.value(rx_height_to_center_raat_mIdx).toDouble();
+		target.at(r).rxLineLoss = q.value(rx_line_loss_mIdx).isNull() ? nan : q.value(rx_line_loss_mIdx).toDouble();
 		target.at(r).rxGain = q.value(rx_gainIdx).isNull() ? nan : q.value(rx_gainIdx).toDouble();
 		target.at(r).rxAntennaDiameter = q.value(rx_antennaDiameterIdx).isNull() ? nan : q.value(rx_antennaDiameterIdx).toDouble();
 		target.at(r).status = q.value(statusIdx).toString().toStdString();

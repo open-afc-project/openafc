@@ -4653,19 +4653,26 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 				bool unii7Flag = computeSpectralOverlapLoss((double *) NULL, startFreq, stopFreq, 6525.0e6, 6875.0e6, false, CConst::psdSpectralAlgorithm);
 
-				double rxAntennaFeederLossDB;
+				double rxAntennaFeederLossDB = row.rxLineLoss;
+				if (std::isnan(rxAntennaFeederLossDB)) {
+					if (unii5Flag && unii7Flag) {
+						rxAntennaFeederLossDB = std::min(_rxFeederLossDBUNII5, _rxFeederLossDBUNII7);
+					} else if (unii5Flag) {
+						rxAntennaFeederLossDB = _rxFeederLossDBUNII5;
+					} else if (unii7Flag) {
+						rxAntennaFeederLossDB = _rxFeederLossDBUNII7;
+					} else {
+						rxAntennaFeederLossDB = _rxFeederLossDBOther;
+					}
+				}
 				double noiseFigureDB;
 				if (unii5Flag && unii7Flag) {
-					rxAntennaFeederLossDB = std::min(_rxFeederLossDBUNII5, _rxFeederLossDBUNII7);
 					noiseFigureDB = std::min(_ulsNoiseFigureDBUNII5, _ulsNoiseFigureDBUNII7);
 				} else if (unii5Flag) {
-					rxAntennaFeederLossDB = _rxFeederLossDBUNII5;
 					noiseFigureDB = _ulsNoiseFigureDBUNII5;
 				} else if (unii7Flag) {
-					rxAntennaFeederLossDB = _rxFeederLossDBUNII7;
 					noiseFigureDB = _ulsNoiseFigureDBUNII7;
 				} else {
-					rxAntennaFeederLossDB = _rxFeederLossDBOther;
 					noiseFigureDB = _ulsNoiseFigureDBOther;
 				}
 				double centerFreq = (startFreq + stopFreq)/2;

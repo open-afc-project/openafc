@@ -1,5 +1,28 @@
 # Release Note
+# **Version and Date**
+|Version|**OA-235 & OA-320**|
+| :- | :- |
+|**Date**|**08/24/2022**|
 
+
+## **Issues Addressed**
+ * Jira OA-235: Implement WFA requirement on setting FS Rx Feederloss
+ * Jira OA-320: Remove FS links with the same Tx and Rx Coordinates
+
+## **Interface Changes**
+ * OA-235 includes changes to both ULS parser and engine. The ULS parser now has a new column "Rx Line Loss (dB)" that is read by the Engine.
+ * OA-320 involves changes to the ULS parser only.
+ * Need to use a new WFA ULS for these tests. This is CONUS_ULS_2022-08-24T14_27_06.213483_fixedBPS_sorted_param.sqlite3 that can be downloaded from OpenAFC TIP google drive.
+
+## **Testing Done**
+ * OA-235: confirmed that the new column is there. Only 0.3% of the WFA ULS links had a non-blank Rx feederloss as expected.
+ * Ran a test and confirmed in the exc_thr file, there were 6 FS with a feederloss other than 3 dB and confirmed these were correctly set per ULS database. (test is attached to the jira ticket)
+ * Also confirmed in the same test that all the links with 3 dB feederloss had blank feederloss in the ULS.
+ * Did another test to ensure 0 dB feederloss in the ULS is used as 0 dB (this is not attached to the ticket).
+ * OA-320: Confirmed that same Tx/Rx coordinates were removed and moved to the anomalous file. There were 51 such links in the WFA ULS (from 24Oct2021 weekly).
+
+## **Open Issues**
+ * 
 ## **Version and Date**
 |Version|**OA-354**|
 | :- | :- |
@@ -43,7 +66,6 @@
 
 ## **Open Issues**
 
-
 ## **Version and Date**
 |Version|**OA-341**|
 | :- | :- |
@@ -56,12 +78,12 @@
  * In OA-232, which implemented R2-AIP-05, there was a bug in that RX Antenna diameter was not properly included in the sqlite database. OA-346 has the fix.
  * There is a new WFA uls database on google-drive (WFA_testvector_ULS_220811.zip). This ULS needs to be used.
  * The nature of this bug is that the antenna diameter had a value of -1 in the sqlite.  When computing the Rx Antenna gain there was a log of a negative number, resulting in an arithmetic exception, and the gain was never set.  The gain used in subsequent I/N calculations was uninitialized.
- * Note that -1 for Tx Ant Diameter in the ULS is OK as it's not being used in R2-AIP-05 and it just means that that the Tx antenna model in ULS was not matched with any model in our database that has a diameter.  
+ * Note that -1 for Tx Ant Diameter in the ULS is OK as it's not being used in R2-AIP-05 and it just means that that the Tx antenna model in ULS was not matched with any model in our database that has a diameter.
  * The fix is in the ULS parser only.
 
 ## **Interface Changes**
  * ULS parser has been updated.
- 
+
 
 ## **Testing Done**
  * Confirmed that in the updated ULS (per above), Rx diameter is never -1.

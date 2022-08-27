@@ -61,7 +61,7 @@ loop() {
 }
 
 cd $wd/tests
-loop $ap_count 20
+loop $ap_count 8
 
 
 # Local Variables:

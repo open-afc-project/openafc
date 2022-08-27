@@ -75,6 +75,12 @@ QString hasNecessaryFields(const UlsEmission &e, UlsPath path, UlsLocation rxLoc
   if (isnan(txLoc.latitudeDeg) || isnan(txLoc.longitudeDeg)) {
     failReason.append( "Invalid tx lat degree or long degree, "); 
   } 
+  // check tx and rx not at same position
+  if (    (failReason == "")
+       && (fabs(txLoc.longitude - rxLoc.longitude) <=1.0e-5)
+       && (fabs(txLoc.latitude  - rxLoc.latitude ) <=1.0e-5) ) {
+    failReason.append( "RX and TX at same location, "); 
+  } 
   // check rx latitude/longitude direction
   if(rxLoc.latitudeDirection != 'N' && rxLoc.latitudeDirection != 'S') {
     failReason.append( "Invalid rx latitude direction, "); 
@@ -228,6 +234,7 @@ QStringList getCSVHeader(int numPR)
     header << "Rx Ant Category";
     header << "Rx Ant Diameter (m)";
     header << "Rx Ant Midband Gain (dB)";
+    header << "Rx Line Loss (dB)";
     header << "Rx Height to Center RAAT (m)";
     header << "Rx Gain ULS (dBi)";
     header << "Rx Diversity Height (m)";
@@ -1012,6 +1019,7 @@ int main(int argc, char **argv)
       row << AntennaModelClass::categoryStr(rxAntennaCategory).c_str(); // Rx Antenna category
       row << makeNumber(rxAntennaDiameter);     // Rx Ant Diameter (m)
       row << makeNumber(rxAntennaMidbandGain);  // Rx Ant Midband Gain (dB)
+      row << makeNumber(rxAnt.lineLoss);        // Rx Line Loss (dB)
       row << makeNumber(rxAnt.heightToCenterRAAT);  // Rx Height to Center RAAT (m)
       row << makeNumber(rxAnt.gain);            // Rx Gain (dBi)
       row << makeNumber(rxAnt.diversityHeight); // Rx Diveristy Height (m)

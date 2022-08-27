@@ -111,9 +111,12 @@ class TestCfg(dict):
             }
         before_ts = time.monotonic()
         rawresp = requests.post(
-            self['url_path'], params=params_data,
-            data=new_req, headers=headers,
-            timeout=None, verify=self['verif_post'])
+            self['url_path'],
+            params=params_data,
+            data=new_req,
+            headers=headers,
+            timeout=600,    #10 min
+            verify=self['verif_post'])
         resp = rawresp.json()
 
         tId = resp.get('taskId')
@@ -1007,7 +1010,7 @@ def _run_test(cfg, reqs, resps, test_cases):
                                 params=params_data,
                                 data=json.dumps(request_data),
                                 headers=headers,
-                                timeout=None,
+                                timeout=600,    #10 min
                                 verify=cfg['verif_post'])
         resp = rawresp.json()
 

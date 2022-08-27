@@ -37,6 +37,7 @@ struct UlsRecord
 	double rxLatitudeDeg, rxLongitudeDeg;
 	double rxGroundElevation;
 	double rxHeightAboveTerrain;
+	double rxLineLoss;
 	double rxGain;
 	CConst::AntennaCategoryEnum rxAntennaCategory;
 	double rxAntennaDiameter;
@@ -99,6 +100,7 @@ public:
 	int rx_long_degIdx;
 	int rx_ground_elev_mIdx;
 	int rx_height_to_center_raat_mIdx;
+	int rx_line_loss_mIdx;
 	int rx_gainIdx;
 	int rx_antennaDiameterIdx;
 	int rx_antennaCategoryIdx;
