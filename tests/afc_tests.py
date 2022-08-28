@@ -1169,7 +1169,7 @@ def make_arg_parser():
     args_parser.add_argument('--conn_type', nargs='?',
                          choices=['sync', 'async'], default='sync',
                          help="<sync|async> - set connection to be "
-                              "synchronous or asynchronous (default=async).\n")
+                              "synchronous or asynchronous (default=sync).\n")
     args_parser.add_argument('--conn_tm', nargs='?', default=None, type=int,
                          help="<secs> - set timeout for asynchronous "
                               "connection (default=None). \n")
