@@ -15,7 +15,7 @@ import json
 import time
 
 LOGGER = logging.getLogger(__name__)
-
+AFC_ENG_TIMEOUT = 600
 
 class Task():
     """ Replacement for AsyncResult class and self serialization"""
@@ -74,7 +74,7 @@ class Task():
         self.__stat = stat
         return self.__stat
 
-    def wait(self, delay=2, timeout=150):
+    def wait(self, delay=2, timeout=AFC_ENG_TIMEOUT):
         LOGGER.debug("task.wait()")
         stat = None
         time0 = time.clock()
