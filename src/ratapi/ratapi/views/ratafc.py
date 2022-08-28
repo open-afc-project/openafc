@@ -449,8 +449,9 @@ class RatAfc(MethodView):
                               flask.current_app.config['STATE_ROOT_PATH'],
                               hash, user_id, history_dir)
                 if conn_type == 'async':
-                    results["availableSpectrumInquiryResponses"].append(
-                        {"taskId": task_id, "taskState": task_stat["status"]})
+                    task_stat = t.get()
+                    return flask.jsonify(taskId = task_id,
+                                     taskState = task_stat["status"])
                 else:
                     # wait for request to finish processing
                     try:
