@@ -10,7 +10,7 @@ wd=${1}
 rand=${2}
 TAG=${rand}
 export TAG
-cd $wd/tests/regression
+cd $wd/tests/regression_${rand}
 docker ps -a
 docker-compose logs
 docker-compose down

@@ -35,14 +35,14 @@ TAG=${tag}
 export TAG
 
 # export test dut configuration
-cd $wd/tests/regression
+cd $wd/tests/regression_${tag}
 mkdir pipe
 mkdir afc_config
 docker run --rm -v `pwd`/pipe:/pipe ${RTEST_DI}:${tag} --cmd exp_adm_cfg --outfile /pipe/export_admin_cfg.json
 check_ret $?
 # copy regr server config and run srvr
-cp -a ~/template_regrtest/*  $wd/tests/regression
-mv $wd/tests/regression/docker-compose_randport.yaml $wd/tests/regression/docker-compose.yaml
+cp -a ~/template_regrtest/*  .
+mv docker-compose_randport.yaml docker-compose.yaml
 check_ret $?
 docker-compose down && docker-compose up -d && docker ps -a
 check_ret $?
