@@ -3,7 +3,7 @@
 |Version|3.3.23.1|
 | :- | :- |
 |**Date**|**08/04/2022**|
-|compiled server's version is TBD |git tag 3.3.23.1|
+|compiled server's version is da048f6 |git tag 3.3.23.1|
 
 
 # **Version and Date**
