@@ -12,7 +12,8 @@ PRINST_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image" # preinst i
 D4B_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-build-image"         # dev image name
 SRV_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"     # server image
 OBJST_DI="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"          # object storage
-RMQ_DI="public.ecr.aws/w9v6y1o0/openafc/rmq-image"               # rabbitmq image
+RMQ_DI="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                   # rabbitmq image
+RTEST_DI="rtest"                                                     # regression tests image
 # ADDR="git@github.com:Telecominfraproject/open-afc.git"
 
 
@@ -81,6 +82,7 @@ build_dev_server() {
 
   aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/w9v6y1o0
   BUILDREV=`git rev-parse --short HEAD`
+  cd ${wd}/tests && docker_build Dockerfile ${RTEST_DI}:${tag}; cd ${wd}
   (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag})
   cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST_DI}:${tag} ; cd ${wd}
   cd ${wd}/rabbitmq && docker_build_and_push Dockerfile ${RMQ_DI}:${tag} ; cd ${wd}

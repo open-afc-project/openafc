@@ -73,10 +73,16 @@ jobs:
           ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "sh -x ${{ env.WD }}/${{ env.REGRD }}/run_srvr.sh ${{ env.WD }} ${{ env.RAND }}"
 # } start dev srvr
 
+# get dev srvr port num{
+    - name: get dev srvr port num
+      run: |
+          echo TEST_PORT=`ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "cd ${{ env.WD }}/${{ env.REGRD }} && TAG=${{ env.RAND }} docker-compose port rat_server 443 |sed 's/.*://'"` >> $GITHUB_ENV
+# } get dev srvr port num
+
 # open srvr test port {
     - name: Allow Security group rule to connect Github Actions to OpenAFC servers
       run: |
-        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port 443 --cidr ${{ steps.ip.outputs.ipv4 }}/24
+        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT }} --cidr ${{ steps.ip.outputs.ipv4 }}/24
       env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -88,7 +94,7 @@ jobs:
       run: cd tests && docker build -t afc-regression-test .
     - name: run regression test
       run: |
-        ${{ github.workspace }}/${{ env.REGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} 443
+        ${{ github.workspace }}/${{ env.REGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} ${{ env.TEST_PORT }}
 
 # }run tests
 
@@ -120,7 +126,7 @@ jobs:
     - name: remove Security group rule that was added for this test
       if: ${{ always() }}
       run: |
-        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port 443 --cidr ${{ steps.ip.outputs.ipv4 }}/24
+        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT }} --cidr ${{ steps.ip.outputs.ipv4 }}/24
       env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

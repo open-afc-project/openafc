@@ -7,6 +7,7 @@
 #
 set -x
 SRV_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"     # server image
+RTEST_DI="rtest"                                                     # regression tests image
 
 # FUNCS
 msg() {
@@ -33,19 +34,15 @@ tag=${2}
 TAG=${tag}
 export TAG
 
-# build regr test docker
-cd $wd/tests
-docker build -t afc-regression-test .
-check_ret $?
 # export test dut configuration
 cd $wd/tests/regression
 mkdir pipe
 mkdir afc_config
-docker run --rm -v `pwd`/pipe:/pipe afc-regression-test --cmd exp_adm_cfg --outfile /pipe/export_admin_cfg.json
+docker run --rm -v `pwd`/pipe:/pipe ${RTEST_DI}:${tag} --cmd exp_adm_cfg --outfile /pipe/export_admin_cfg.json
 check_ret $?
 # copy regr server config and run srvr
 cp -a ~/template_regrtest/*  $wd/tests/regression
-mv $wd/tests/regression/docker-compose_rabbit.yaml $wd/tests/regression/docker-compose.yaml
+mv $wd/tests/regression/docker-compose_randport.yaml $wd/tests/regression/docker-compose.yaml
 check_ret $?
 docker-compose down && docker-compose up -d && docker ps -a
 check_ret $?
