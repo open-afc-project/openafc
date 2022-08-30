@@ -1,8 +1,44 @@
 # Release Note
+|Version|3.4.1.1|
+| :- | :- |
+|**Date**|**08/30/2022**|
+|compiled server's version is TBD |git tag 3.4.1.1|
+
+|Version|**OA-314**|
+| :- | :- |
+|**Date**|**08/30/2022**|
+
+## **Interface Changes**
+As part of the login cleanup and preparation for OIDC implementation, implemented in https://github.com/Telecominfraproject/open-afc/pull/212,
+user database schema is changed and it is not compatible with the existing user database.
+If you already have an AFC service deployed and your deployment is using a user database with old schema,
+once the above mentioned pull request is merged, error messages will be displayed during the docker startup, showing the migration steps.
+You have two options: to reinitialize your database, or migrate it.
+To preserve the user database, please follow the instructions to migrate the existing user database to the new schema.
+(These instructions are also included in the README.md file)
+**Option 1: Reinitialize the database without users:**
+```
+rat-manage-api db-drop
+rat-manage-api db-create
+```
+This will wipe out existing users, e.g. users need to register, or be manually recreated again.
+**Option 2: Migrate the database with users:**
+```
+RAT_DBVER=0 rat-manage-api db-export --dst data.json
+RAT_DBVER=0 rat-manage-api db-drop
+rat-manage-api db-create
+rat-manage-api db-import --src data.json
+```
+This migration will maintain all existing user data, including roles. Steps to migrate:
+1. Export the user database to .json file.  Since the database is an older version, use env variable to tell the command the the right schema to use to intepret the database.
+2. Delete the old version database.
+3. Recreate the database.
+4. Import the json file into the new database.
+
 
 |Version|3.3.23.1|
 | :- | :- |
-|**Date**|**08/04/2022**|
+|**Date**|**08/29/2022**|
 |compiled server's version is da048f6 |git tag 3.3.23.1|
 
 
