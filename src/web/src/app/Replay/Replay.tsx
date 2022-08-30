@@ -4,7 +4,6 @@ import { CardBody, PageSection, Card, CardHead, TextInput, Alert, AlertActionClo
 import DownloadContents from "../Components/DownloadContents";
 import { exportCache, putAfcConfigFile, importCache, guiConfig } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
-import { addAuth } from "../Lib/User";
 
 export class Replay extends React.Component{
     
@@ -25,7 +24,6 @@ export class Replay extends React.Component{
                 '../ratapi/v1/replay',
                 {
                     method:'GET',
-                    headers: addAuth({})
                 }
             ).then(
                 res => {

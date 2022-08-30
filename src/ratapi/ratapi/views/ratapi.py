@@ -103,8 +103,9 @@ class GuiConfig(MethodView):
                 'ratapi-v1.UlsDb', uls_file='p_uls_file'),
             uls_daily_url=flask.url_for(
                 'ratapi-v1.UlsParse'),
-            login_url=flask.url_for('auth.LoginAPI'),
-            user_url=flask.url_for('user.register'),
+            login_url=flask.url_for('user.login'),
+            logout_url=flask.url_for('user.logout'),
+            status_url=flask.url_for('auth.UserAPI'),
             admin_url=flask.url_for('admin.User', user_id=-1),
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),

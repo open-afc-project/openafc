@@ -380,16 +380,44 @@ Following the example to use RabbitMQ service in docker-compose.
 
 On the first start of the PostgreSQL server there are some initial steps to do. First to create the database. Its default name now is **fbrat**. If you are using compose script described above, everything will be done automatically.
 
-After that, once OpenAFC server is started, you need to create special DB structure. This can be done using a _rat-manage-api_ utility.
+After that, once OpenAFC server is started, you need to create DB structure for the user database. This can be done using a _rat-manage-api_ utility.
 
 ```
 rat-manage-api db-create
 ```
+
 If you do it with the server which is run thru the docker-compose script described above, you can do it using this command:
 ```
 docker-compose exec rat_server rat-manage-api db-create
 ```
 
+### Note for an existing user database
+
+You might find errors regarding missing fields in the user database upon bootup and upon login if the server has an existing user database with an old schema. The error message has instructions on how to migrate the database. You have two options:
+
+**1. Reinitialize the database without users:**
+
+```
+rat-manage-api db-drop
+rat-manage-api db-create
+```
+
+This will wipe out existing users, e.g. users need to register, or be manually recreated again.
+
+**2. Migrate the database with users:**
+
+```
+RAT_DBVER=0 rat-manage-api db-export --dst data.json
+RAT_DBVER=0 rat-manage-api db-drop
+rat-manage-api db-create
+rat-manage-api db-import --src data.json
+```
+
+This migration will maintain all existing user data, including roles. Steps to migrate:
+1. Export the user database to .json file.  Since the database is an older version, use env variable to tell the command the the right schema to use to intepret the database.
+2. Delete the old version database.
+3. Recreate the database.
+4. Import the json file into the new database.
 ## Initial Administrator account
 
 Once done with database and starting the server, you need to create default administrative user to handle your server from WebUI. It is done from the server console using the _rat-manage-api_ utility.

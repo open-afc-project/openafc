@@ -6,7 +6,7 @@ import { AppLayout } from "@app/AppLayout/AppLayout";
 import { AppRoutes } from "@app/routes";
 import "@app/app.css";
 import { logger } from "./Lib/Logger";
-import { login, loadUserData, UserContext, configure, UserState } from "./Lib/User";
+import { login, UserContext, configure, UserState, retrieveUserData} from "./Lib/User";
 import { clone } from "./Lib/Utils";
 
 // index.tsx: definition of app component
@@ -23,7 +23,7 @@ class App extends React.Component<{ conf: Promise<void> }, { isReady: boolean, u
     // when the configuration promise resolves then set the app config and render the app
     props.conf.then(async x => {
       logger.info("configuration loaded")
-      await loadUserData();
+      await retrieveUserData();
       this.setState({ isReady: true })
     });
   }

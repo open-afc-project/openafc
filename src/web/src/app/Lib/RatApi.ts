@@ -1,7 +1,7 @@
 import { GuiConfig, AFCConfigFile, PAWSRequest, PAWSResponse, AnalysisResults, RatResponse, ResSuccess, ResError, success, error, AFCEngineException, ExclusionZoneRequest, HeatMapRequest, ExclusionZoneResult, HeatMapResult, FreqRange } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { delay } from "./Utils";
-import { addAuth, hasRole } from "./User";
+import { hasRole } from "./User";
 
 /**
  * RatApi.ts: member values and functions for utilizing server ratpi services
@@ -25,7 +25,6 @@ export var guiConfig: GuiConfig = Object.freeze({
     uls_daily_url: "",
     allowed_freq_url: "",
     login_url: "",
-    user_url: "",
     admin_url: "",
     ap_admin_url: "",
     lidar_bounds: "",
@@ -40,7 +39,7 @@ export var guiConfig: GuiConfig = Object.freeze({
  * Storage object to save page state in copied object when travelling between pages.
  * The coppied object is a deep copy and breaks any references as the react component is destroyed.
  * On component mount/dismount it is the responsibility of the component to correctly load/save state.
- * 
+ *
  * The key for a cache item must be unique. Either use top level page name or combination of component name and parent component name
  */
 const applicationCache: { [k: string]: any } = {};
@@ -115,7 +114,7 @@ export async function getGuiConfig() {
  */
 export const getDefaultAfcConf = () => defaultAfcConf();
 
-/** 
+/**
  * Return the current afc config that is stored on the server.
  * The config will be scoped to the current user
  * @returns this user's current AFC Config or error
@@ -123,7 +122,6 @@ export const getDefaultAfcConf = () => defaultAfcConf();
 export const getAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => (
     fetch(guiConfig.afcconfig_defaults, {
         method: "GET",
-        headers: addAuth({})
     }).then(async (res: Response) => {
         if (res.ok) {
             const config = await (res.json() as Promise<AFCConfigFile>);
@@ -149,7 +147,6 @@ export const getAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => (
 export const getTrialAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => {
     return fetch(guiConfig.afcconfig_trial, {
         method: "GET",
-        headers: addAuth({})
     }).then(async (res: Response) => {
         if (res.ok) {
             const config = await (res.json() as Promise<AFCConfigFile>);
@@ -165,7 +162,7 @@ export const getTrialAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => 
     });
 }
 
-/** 
+/**
  * Update the afc config on the server with the one created by the user
  * @param conf The AFC Config that will overwrite the server
  * @returns success message or error
@@ -173,9 +170,7 @@ export const getTrialAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => 
 export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<string>> => (
     fetch(guiConfig.afcconfig_defaults, {
         method: "PUT",
-        headers: addAuth({
-            "Content-Type": "application/json"
-        }),
+        headers: {"Content-Type": "application/json" },
         body: JSON.stringify(conf, undefined, 3)
     }).then(res => {
         if (res.status === 204) {
@@ -198,10 +193,10 @@ export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<strin
 const analysisUpdate = (url: string, method: string) =>
     fetch(url, {
         method: method,
-        headers: addAuth({
+        headers: {
             "Content-Type": "application/json",
             "Content-Encoding": "gzip"
-        })
+        }
     })
 
 /**
@@ -288,9 +283,7 @@ function analysisContinuation<T>(isCanceled?: () => boolean, status?: (progress:
 export const phase1Analysis = (params: PAWSRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<AnalysisResults>> => (
     fetch(guiConfig.rat_api_analysis.replace("p_request_type", "PointAnalysis"), {
         method: "POST",
-        headers: addAuth({
-            "Content-Type": "application/json"
-        }),
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify(params)
     }).then(analysisContinuation<AnalysisResults>(isCanceled, status, setKml))
         .catch(
@@ -311,9 +304,7 @@ export const phase1Analysis = (params: PAWSRequest, isCanceled?: () => boolean, 
 export const runExclusionZone = (params: ExclusionZoneRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<ExclusionZoneResult>> =>
     fetch(guiConfig.rat_api_analysis.replace("p_request_type", "ExclusionZoneAnalysis"), {
         method: "POST",
-        headers: addAuth({
-            "Content-Type": "application/json"
-        }),
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify(params)
     })
         .then(analysisContinuation<ExclusionZoneResult>(isCanceled, status, setKml))
@@ -332,9 +323,7 @@ export const runExclusionZone = (params: ExclusionZoneRequest, isCanceled?: () =
 export const runHeatMap = (params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>> =>
     fetch(guiConfig.rat_api_analysis.replace("p_request_type", "HeatmapAnalysis"), {
         method: "POST",
-        headers: addAuth({
-            "Content-Type": "application/json"
-        }),
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify(params)
     })
         .then(analysisContinuation<HeatMapResult>(isCanceled, status))
@@ -351,7 +340,6 @@ export const runHeatMap = (params: HeatMapRequest, isCanceled?: () => boolean, s
 export const ulsFileConvert = (fileName: string): Promise<RatResponse<{ invalidRows: number, errors: string[] }>> =>
     fetch(guiConfig.uls_convert_url.replace("p_uls_file", fileName), {
         method: "POST",
-        headers: addAuth({})
     }).then(
         async res => {
             if (res.ok) {
@@ -415,15 +403,14 @@ function ulsParseContinuation(isCanceled?: () => boolean, status?: (progress: { 
 
 
 /**
- * Kick off a daily uls parse to create a new ULS database for that day. 
+ * Kick off a daily uls parse to create a new ULS database for that day.
  * @returns Success: number of ULSs updated and number of entries inserted. E
  *          Error: information on why file could not be converted
  */
-//(params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>> 
+//(params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>>
 export const ulsDailyParse = (isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<{ entriesUpdated: number, entriesAdded: number, finishTime: string }>> =>
     fetch(guiConfig.uls_daily_url, {
         method: "POST",
-        headers: addAuth({})
     }).then(ulsParseContinuation(isCanceled, status))
         .catch(err => {
             logger.error(err);
@@ -443,14 +430,14 @@ export const ulsDailyParse = (isCanceled?: () => boolean, status?: (progress: { 
 
 
 /**
- * Gets the last successful run time of the daily parse. 
- * @returns Success: An ISO string containing the last run time. 
+ * Gets the last successful run time of the daily parse.
+ * @returns Success: An ISO string containing the last run time.
  *          Error: why it failed
  */
 export const ulsLastRuntime = (): Promise<RatResponse<{ lastSuccessfulRun: string }>> =>
     fetch(guiConfig.uls_daily_url, {
         method: "GET",
-        headers: addAuth({ "Content-Type": "application/json" })
+        headers: { "Content-Type": "application/json" }
     }).then(
         async res => {
             if (res.ok) {
@@ -470,13 +457,12 @@ export const ulsLastRuntime = (): Promise<RatResponse<{ lastSuccessfulRun: strin
 
 /**
 * Updates the backend celery task for daily parsing to the given time
-* @returns Success: An ISO string containing the new time. 
+* @returns Success: An ISO string containing the new time.
 *          Error: why it failed
 */
 export const setUlsParseTime = (hours: number, minutes: number): Promise<RatResponse<{ newTime: string }>> =>
     fetch(guiConfig.uls_daily_url, {
         method: "PUT",
-        headers: addAuth({}),
         body: JSON.stringify({ hours: hours, mins: minutes })
     }).then(
         async res => {

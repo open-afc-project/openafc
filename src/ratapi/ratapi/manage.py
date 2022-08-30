@@ -34,6 +34,8 @@ def json_lookup(key, json_obj, val):
     keepit = []
 
     def lookup(key, json_obj, val, keepit):
+        '''lookup for key in json
+        '''
         if isinstance(json_obj, dict):
             for k, v in json_obj.items():
                 #LOGGER.debug('%s ... %s', k, type(v))
@@ -130,33 +132,8 @@ class CleanTmpFiles(Command):
                 shutil.rmtree(os.path.join(celery_backend, record))
 
 
-class CleanBlacklistTokens(Command):
-    ''' Remove old blacklist tokens
-    '''
-
-    # no extra options needed
-    option_list = ()
-
-    def __call__(self, flaskapp):
-        from datetime import timedelta, datetime
-        LOGGER.debug('removing blacklist tokens')
-
-        # delete if older than 30 days
-        since = datetime.now() - timedelta(days=30)
-        with flaskapp.app_context():
-            from .models.aaa import BlacklistToken
-            # select * from blacklist_tokens where blacklisted_on < since
-            tokens = BlacklistToken.query.filter(
-                BlacklistToken.blacklisted_on < since).all()
-            for t in tokens:
-                LOGGER.debug("removing token: %i", t.id)
-                db.session.remove(t)  # pylint: disable=too-many-function-args
-            LOGGER.info("%i tokens deleted", len(tokens))
-            db.session.commit()  # pylint: disable=no-member
-
-
 class RasterizeBuildings(Command):
-    ''' Convert building shape file into tiff raster 
+    ''' Convert building shape file into tiff raster
     '''
 
     option_list = (
@@ -193,7 +170,6 @@ class Data(Manager):
         Manager.__init__(self, *args, **kwargs)
         self.add_command('clean-history', CleanHistory())
         self.add_command('clean-tmp-files', CleanTmpFiles())
-        self.add_command('clean-blacklist-tokens', CleanBlacklistTokens())
         self.add_command('rasterize-buildings', RasterizeBuildings())
 
 
@@ -203,13 +179,142 @@ class DbCreate(Command):
     def __call__(self, flaskapp):
         LOGGER.debug('DbCreate.__call__()')
         with flaskapp.app_context():
-            from .models.aaa import User, Role
+            from .models.aaa import Role
             db.create_all()
             get_or_create(db.session, Role, name='Admin')
             get_or_create(db.session, Role, name='Analysis')
             get_or_create(db.session, Role, name='AP')
             get_or_create(db.session, Role, name='Trial')
 
+
+class DbDrop(Command):
+    ''' Create a full new database outside of alembic migrations. '''
+    def __call__(self, flaskapp):
+        LOGGER.debug('DbDrop.__call__()')
+        with flaskapp.app_context():
+            from .models.aaa import User, Role
+            db.drop_all()
+
+
+class DbExport(Command):
+    ''' Export database in db to a file in json. '''
+
+    option_list = (
+        Option('--dst', type=str, help='export user data file'),
+    )
+
+    def __init__(self, *args, **kwargs):
+        LOGGER.debug('DbExport.__init__()')
+
+    def __call__(self, flaskapp, dst):
+        LOGGER.debug('DbExportPrev.__call__()')
+        from .models.aaa import User, UserRole, Role, AccessPoint, Limit
+
+        filename = dst
+
+        with flaskapp.app_context():
+            limit = None
+            user_info = {}
+            user_cfg = {}
+            for user, _, role in db.session.query(User, UserRole,
+Role).filter(User.id == UserRole.user_id).filter(UserRole.role_id ==
+Role.id).all():  # pylint: disable=no-member
+                key = user.email + ":" + str(user.id)
+                if key in user_cfg:
+                    user_cfg[key]['rolename'].append(role.name)
+                else:
+                    user_cfg[key] = {
+                         'email':user.email,
+                         'password':user.password,
+                         'rolename':[role.name],
+                         'ap':[]
+                    }
+
+                    try:
+                        user_cfg[key]['username'] = user.username
+                    except:
+                        # if old db has no username field, use email field.
+                        user_cfg[key]['username'] = user.email
+
+            for ap,user in db.session.query(AccessPoint, User).filter(AccessPoint.user_id == User.id).all():
+                key = user.email + ":" + str(user.id)
+                user_cfg[key]['ap'].append( {'model':ap.model,
+                                             'serial_number':ap.serial_number,
+                                             'manufacturer':ap.manufacturer,
+                                             'certification_id':ap.certification_id})
+
+            try:
+                limits = db.session.query(Limit).filter_by(id=0).first()
+                limit = {'min_eirp':float(limits.min_eirp), 'enforce':bool(limits.enforce)}
+
+            except:
+                LOGGER.debug("Error exporting EIRP Limit")
+
+            with open(filename, 'w') as fpout:
+                for k, v in user_cfg.items():
+                    fpout.write("%s\n" %json.dumps({'userConfig':v}))
+                if limit:
+                    fpout.write("%s\n" %json.dumps({'Limit':limit}))
+
+
+class DbImport(Command):
+    ''' Import User Database. '''
+    option_list = (
+        Option('--src', type=str, help='configuration source file'),
+    )
+
+    def __init__(self, *args, **kwargs):
+        LOGGER.debug('ConfigAdd.__init__()')
+
+    def __call__(self, flaskapp, src):
+        LOGGER.debug('DbImport.__call__() %s', src)
+        from .models.aaa import User, Limit
+
+        filename = src
+        if not os.path.exists(filename):
+            raise RuntimeError(
+                '"{}" source file does not exist'.format(filename))
+
+        LOGGER.debug('Open admin cfg src file - %s', filename)
+        with flaskapp.app_context():
+            with open(filename, 'r') as fp_src:
+                while True:
+                    dataline = fp_src.readline()
+                    if not dataline:
+                        break
+                    # add user, APs and server configuration
+                    new_rcrd = json.loads(dataline)
+                    user_rcrd = json_lookup('userConfig', new_rcrd, None)
+                    if user_rcrd:
+                        username = json_lookup('username', user_rcrd, None)
+                        try:
+                            UserCreate(flaskapp, user_rcrd[0], True)
+                        except RuntimeError:
+                            LOGGER.debug('User %s already exists', username[0])
+
+                        try:
+                            ap_list = json_lookup('ap', user_rcrd, None)
+                            for ap in ap_list[0]:
+                                AccessPointCreate(flaskapp, ap['serial_number'],
+                                    ap['certification_id'], username[0])
+                        except RuntimeError:
+                            LOGGER.debug('AccessPoint %s user %s already exists', ap['serial_number'], username[0])
+                    else:
+                        limit = json_lookup('Limit', new_rcrd, None)
+                        try:
+                            limits = db.session.query(Limit).filter_by(id=0).first()
+                            #insert case
+                            if limits is None:
+                                limits = Limit(limit[0]['min_eirp'])
+                                db.session.add(limits)
+                            elif (limit[0]['enforce'] == False):
+                                limits.enforce = False
+                            else:
+                                limits.min_eirp = limit[0]['min_eirp']
+                                limits.enforce = True
+                            db.session.commit()
+                        except:
+                            raise RuntimeError("Can't commit DB for EIRP limits")
 
 class UserCreate(Command):
     ''' Create a new user functionality. '''
@@ -226,23 +331,26 @@ class UserCreate(Command):
                help='role to include with the new user'),
     )
 
-    def _create_user(self, flaskapp, email, password_in, role):
+    def _create_user(self, flaskapp, email, password_in, role, hashed):
         ''' Create user in database. '''
         from contextlib import closing
         import datetime
         from .models.aaa import User, Role
         LOGGER.debug('UserCreate.__create_user() %s %s %s',
-                      email, password_in, role)
+                     email, password_in, role)
 
         try:
-            if isinstance(password_in, (str, unicode)):
-                password = password_in.strip()
-            else:
-                with closing(open(password_in)) as pwfile:
-                    password = pwfile.read().strip()
+            if not hashed:
+                if isinstance(password_in, (str, unicode)):
+                    password = password_in.strip()
+                else:
+                    with closing(open(password_in)) as pwfile:
+                        password = pwfile.read().strip()
 
-            passhash = flaskapp.user_manager.password_manager.hash_password(
-                    password)
+                passhash = flaskapp.user_manager.password_manager.hash_password(
+                       password)
+            else:
+                passhash = password_in
 
             with flaskapp.app_context():
                 # select count(*) from aaa_user where email = ?
@@ -251,6 +359,7 @@ class UserCreate(Command):
                         'Existing user found with email "{0}"'.format(email))
 
                 user = User(
+                    username=email,
                     email=email,
                     email_confirmed_at=datetime.datetime.now(),
                     password=passhash,
@@ -268,15 +377,15 @@ class UserCreate(Command):
                 'i.e. echo "pass" | rat-manage api'
                 'user create email /dev/stdin')
 
-    def __init__(self, flaskapp=None, user_params=None):
+    def __init__(self, flaskapp=None, user_params=None, hashed=False):
         if flaskapp and isinstance(user_params, dict):
             self._create_user(flaskapp,
                               user_params['username'],
                               user_params['password'],
-                              user_params['rolename'])
+                              user_params['rolename'], hashed)
 
-    def __call__(self, flaskapp, email, password_in, role):
-        self._create_user(flaskapp, email, password_in, role)
+    def __call__(self, flaskapp, email, password_in, role, hashed=False):
+        self._create_user(flaskapp, email, password_in, role, hashed)
 
 
 class UserRemove(Command):
@@ -316,23 +425,27 @@ class UserList(Command):
         LOGGER.debug('UserList.__call__()')
         table = PrettyTable()
         from .models.aaa import User, UserRole, Role
+        table.field_names = ["ID", "UserName", "Email", "Roles"]
 
-        table.field_names = ["ID", "Email", "Roles"]
         with flaskapp.app_context():
             user_info = {}
-            # select email, name from aaa_user as au join aaa_user_role as aur on au.id = aur.user_id join aaa_role as ar on ar.id = aur.role_id;
-            for user, _, role in db.session.query(User, UserRole, Role).filter(User.id == UserRole.user_id).filter(UserRole.role_id == Role.id).all():  # pylint: disable=no-member
+            # select email, name from aaa_user as au join aaa_user_role as aur
+            # on au.id = aur.user_id join aaa_role as ar on ar.id = aur.role_id;
+            for user, _, role in db.session.query(User, UserRole,
+Role).filter(User.id == UserRole.user_id).filter(UserRole.role_id ==
+Role.id).all():  # pylint: disable=no-member
 
-                if user.email in user_info:
-                    user_info[user.email + ":" +
-                              str(user.id)] = user_info[user.email] + ", " + role.name
+                key = user.email + ":" + str(user.id) + ":" + user.username
+
+                if key in user_info:
+                    user_info[key] = user_info[key] + ", " + role.name
                 else:
-                    user_info[user.email + ":" + str(user.id)] = role.name
+                    user_info[key] = role.name
             for k, v in user_info.items():
-                email, _id = k.split(":")
-                table.add_row([_id, email, v])
-            print(table)
+                email, _id, name = k.split(":")
+                table.add_row([_id, name, email, v])
 
+            print(table)
 
 class User(Manager):
     ''' View and manage AAA state '''
@@ -589,7 +702,7 @@ class ConfigAdd(Command):
                 user_rcrd = json_lookup('userConfig', new_rcrd, None)
                 username = json_lookup('username', user_rcrd, None)
                 try:
-                    UserCreate(flaskapp, user_rcrd[0])
+                    UserCreate(flaskapp, user_rcrd[0], False)
                     f_str = "UserRemove(flaskapp, '" + username[0] + "')"
                     rollback.insert(0, f_str)
                 except RuntimeError:
@@ -752,6 +865,7 @@ def main():
     version_name = cmd_utils.packageversion(__package__)
 
     manager = Manager(appfact)
+
     if version_name is not None:
         dispver = '%(prog)s {0}'.format(version_name)
         manager.add_option('--version', action='version',
@@ -761,6 +875,9 @@ def main():
     manager.add_command('showurls', commands.ShowUrls())
     manager.add_command('db', MigrateCommand)
     manager.add_command('db-create', DbCreate())
+    manager.add_command('db-drop', DbDrop())
+    manager.add_command('db-export', DbExport())
+    manager.add_command('db-import', DbImport())
     manager.add_command('user', User())
     manager.add_command('data', Data())
     manager.add_command('celery', Celery())

@@ -6,7 +6,6 @@ import { Dashboard } from "./Dashboard/Dashboard";
 import { PageSection, Card, CardHeader } from "@patternfly/react-core";
 import { getAfcConfigFile } from "./Lib/RatApi";
 import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv } from "./Lib/FileApi";
-import AppLoginPage from "./AppLayout/AppLogin";
 import { UserAccountPage } from "./UserAccount/UserAccount";
 import { getUsers, getMinimumEIRP, Limit, getAllowedRanges } from "./Lib/Admin";
 import { ImportExport } from "./ImportExport/ImportExport";
@@ -228,13 +227,6 @@ const routes: IAppRoute[] = [
     icon: null,
     label: "Dashboard",
     path: "/dashboard"
-  },
-  {
-    component: AppLoginPage, // Currently empty
-    exact: true,
-    icon: null,
-    label: "Login",
-    path: "/login"
   },
   {
     component: Support, // currently empty

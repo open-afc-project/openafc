@@ -1,7 +1,7 @@
 import { guiConfig } from "./RatApi";
 import { UserModel, success, error, AccessPointModel, FreqRange } from "./RatApiTypes";
 import { logger } from "./Logger";
-import { Role, addAuth } from "./User";
+import { Role} from "./User";
 
 /** 
 * Admin.ts: Functions for Admin API. User and account management, and permissions
@@ -24,7 +24,6 @@ export class Limit {
 export const getMinimumEIRP = () => 
     fetch(guiConfig.admin_url.replace("-1", "eirp_min"), {
         method: "GET",
-        headers: addAuth({})
     }).then(async res => {
         if (res.ok) {
             return success((await res.json()) as Limit);
@@ -44,9 +43,7 @@ export const getMinimumEIRP = () =>
 export const setMinimumEIRP = (limit: number | boolean) =>
     fetch(guiConfig.admin_url.replace("-1", "eirp_min"), {
         method: "PUT",
-        headers: addAuth({
-            "Content-Type": "application/json"
-        }),
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify(limit)
     })
     .then(async res => {
@@ -66,7 +63,6 @@ export const setMinimumEIRP = (limit: number | boolean) =>
 export const getUsers = () => 
     fetch(guiConfig.admin_url.replace("-1", "0"), {
         method: "GET",
-        headers: addAuth({})
     }).then(async res => {
         if (res.ok) {
             return success((await res.json()).users as UserModel[]);
@@ -86,7 +82,6 @@ export const getUsers = () =>
 export const getUser = (id: number) =>
     fetch(guiConfig.admin_url.replace("-1", String(id)), {
         method: "GET",
-        headers: addAuth({})
     }).then(async res => 
         res.ok ?
         success((await res.json()).user as UserModel) :
@@ -104,7 +99,7 @@ export const updateUser = (user: { email: string, password: string, id: number, 
     fetch(guiConfig.admin_url.replace("-1", String(user.id)), {
         method: "POST",
         body: JSON.stringify(Object.assign(user, { setProps: true })),
-        headers: addAuth({ "Content-Type": "application/json" })
+        headers: { "Content-Type": "application/json" }
     }).then(res => 
         res.ok ? 
             success(res.statusText) : 
@@ -119,7 +114,7 @@ export const addUserRole = (id: number, role: Role) =>
     fetch(guiConfig.admin_url.replace("-1", String(id)), {
         method: "POST",
         body: JSON.stringify({ addRole: role }),
-        headers: addAuth({ "Content-Type": "application/json" })
+        headers: { "Content-Type": "application/json" }
     }).then(res => {
         if (res.ok) {
             return success(res.status);
@@ -137,7 +132,7 @@ export const removeUserRole = (id: number, role: Role) =>
 fetch(guiConfig.admin_url.replace("-1", id.toString()), {
     method: "POST",
     body: JSON.stringify({ removeRole: role }),
-    headers: addAuth({ "Content-Type": "application/json" })
+    headers: { "Content-Type": "application/json" }
 }).then(res => {
     if (res.ok) {
         return success(res.status);
@@ -153,7 +148,6 @@ fetch(guiConfig.admin_url.replace("-1", id.toString()), {
 export const deleteUser = (id: number) => 
     fetch(guiConfig.admin_url.replace("-1", String(id)), {
        method: "DELETE",
-       headers: addAuth({})
     }).then(res => {
         if (res.ok) {
             return success(res.status);
@@ -172,7 +166,6 @@ export const deleteUser = (id: number) =>
 export const getAccessPoints = (userId?: number) =>
     fetch(guiConfig.ap_admin_url.replace("-1", String(userId || 0)), {
         method: "GET",
-        headers: addAuth({})
     }).then(async res => {
         if (res.ok) {
             return success((await res.json()).accessPoints as AccessPointModel[]);
@@ -189,9 +182,7 @@ export const getAccessPoints = (userId?: number) =>
 export const addAccessPoint = (ap: AccessPointModel, userId: number) =>
     fetch(guiConfig.ap_admin_url.replace("-1", String(userId)), {
         method: "PUT",
-        headers: addAuth({
-            "Content-Type": "application/json"
-        }),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(ap)
     })
     .then(async res => {
@@ -213,7 +204,6 @@ export const deleteAccessPoint = (id: number) =>
     // here the id in the url is the ap id, not the user id
     fetch(guiConfig.ap_admin_url.replace("-1", String(id)), {
         method: "DELETE",
-        headers: addAuth({})
     })
     .then(res => {
         if (res.ok) {
@@ -233,7 +223,7 @@ export const deleteAccessPoint = (id: number) =>
  export const getAllowedRanges = () =>
  fetch(guiConfig.admin_url.replace('-1', "frequency_range"), {
         method: "GET",
-        headers: addAuth({ "Content-Type": "application/json"})
+        headers: { "Content-Type": "application/json"}
     }).then(
         async res => {
             if (res.ok) {
@@ -254,9 +244,7 @@ export const deleteAccessPoint = (id: number) =>
  export const updateAllowedRanges = (conf: FreqRange[]) => (
     fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
         method: "PUT",
-        headers: addAuth({
-            "Content-Type": "application/json"
-        }),
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(conf)
     }).then(res => {
         if (res.status === 204) {

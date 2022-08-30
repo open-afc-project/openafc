@@ -1,9 +1,10 @@
 import * as React from "react";
 import { Button } from "@patternfly/react-core";
 import { Route } from "react-router";
-import { isLoggedIn, logout, UserContext } from "../Lib/User";
+import { isLoggedIn, logout, login, UserContext } from "../Lib/User";
 import { UserIcon } from "@patternfly/react-icons";
 import { UnknownIcon } from "@patternfly/react-icons";
+import { guiConfig } from "../Lib/RatApi";
 
 /**
  * LoginAvatar.ts: component for top right of page to login/logout
@@ -17,19 +18,15 @@ import { UnknownIcon } from "@patternfly/react-icons";
 export class LoginAvatar extends React.Component {
 
     render() {
+        const showLogin = <a href={guiConfig.login_url} >
+            <button className='button-blue' type="button"> Login <UserIcon />
+            </button>
+            </a>
 
-        const showLogin = <Route render={
-            ({ history }) => (
-                <Button variant="plain" onClick={() => { history.push("/login") }}>
-                    <UnknownIcon />{" Login"}
-                </Button>
-            )
-            } 
-            />;
-
-        const showLogout = <Button variant="link" onClick={() => { logout() }}>
-            <UserIcon />{" Logout"}
-        </Button>;
+        const showLogout = <a href={guiConfig.logout_url} >
+            <button className='button-blue' type="button"> Logout <UserIcon />
+            </button>
+            </a>
 
         return (<UserContext.Consumer> 
             {user => isLoggedIn() ? showLogout : showLogin }

@@ -331,17 +331,6 @@ class fbrat::server(
     weekday  => absent,
     user     => 'root',
   }
-  cron { 'clean-blacklist-tokens': # clean blacklisted tokens (logouts)
-    ensure   => present,
-    command  => '/usr/bin/rat-manage-api data clean-blacklist-tokens',
-    hour     => 0,
-    minute   => 0,
-    month    => absent,
-    monthday => [1],
-    weekday  => absent,
-    user     => 'fbrat',
-  }
-
 /*   exec { 'rat-db-upgrade':
     path    => ['/usr/bin'],
     unless  => 'rat-manage-api db current 2>/dev/null | grep -E \' \(head\)$\'',

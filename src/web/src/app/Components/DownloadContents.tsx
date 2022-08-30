@@ -1,6 +1,5 @@
 import React from "react";
 import { Button } from "@patternfly/react-core";
-import { addAuth } from "../Lib/User";
 
 /**
  * React component that renders a button which can be used to download a file from the server

@@ -1,7 +1,6 @@
 import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, AvailableSpectrumInquiryResponseMessage, DeploymentEnum, VendorExtension } from "./RatAfcTypes";
 import { RatResponse, success, error } from "./RatApiTypes";
 import { guiConfig, getDefaultAfcConf } from "./RatApi";
-import { addAuth } from "./User";
 
 
 /**
@@ -46,10 +45,10 @@ export function downloadMapData(kml_filename: any, method: string): Promise<Resp
     var url = guiConfig.afc_kml.replace('p_kml_file',kml_filename)
     return fetch(url, {
         method: method,
-        headers: addAuth({
+        headers: {
             "Content-Type": "application/json",
             "Content-Encoding": "gzip"
-        })
+        }
     })
 }
 

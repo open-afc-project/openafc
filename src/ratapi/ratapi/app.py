@@ -2,10 +2,13 @@
 '''
 import sys
 import os
-import flask
+import datetime
 import logging
+import flask
 from . import config
 from . import data_if
+import datetime
+
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -24,6 +27,7 @@ def create_app(config_override=None):
     '''
     from flask_migrate import Migrate
     from flask_user import UserManager
+    from flask_user.user_manager__settings import UserManager__Settings
     import xdg.BaseDirectory
     # Child members
     from . import models, views, util
@@ -79,7 +83,12 @@ def create_app(config_override=None):
     db.init_app(flaskapp)
     Migrate(
         flaskapp, db, directory=os.path.join(owndir, 'migrations'))
-    UserManager(flaskapp, db, models.aaa.User)
+
+    flaskapp.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
+    # Clear default USER_USER_SESSION_EXPIRATION so that login session
+    # terminates when browser is restarted
+    UserManager__Settings.USER_USER_SESSION_EXPIRATION = None
+    user_manager = UserManager(flaskapp, db, models.aaa.User)
 
     # Check configuration
     state_path = flaskapp.config['STATE_ROOT_PATH']
@@ -133,7 +142,6 @@ def create_app(config_override=None):
             os.makedirs(antenna_patterns)
 
         # List of (URL paths from root URL, absolute local filesystem paths, read-only boolean)
-        
         dav_trees = (
             ('/www', next(webdata_paths), True),
             ('/ratapi/v1/files/uls_db', uls_databases, False),
@@ -188,7 +196,6 @@ def create_app(config_override=None):
         # set prefix middleware
     flaskapp.wsgi_app = util.PrefixMiddleware(
         flaskapp.wsgi_app, prefix=flaskapp.config['APPLICATION_ROOT'])
-    
     #set header middleware
     flaskapp.wsgi_app = util.HeadersMiddleware(
         flaskapp.wsgi_app)
@@ -298,6 +305,22 @@ def create_app(config_override=None):
             return redirect(flask.url_for(name, **kwargs), code=code)
 
         return view
+
+    # check database
+    with flaskapp.app_context():
+        try:
+            from .models.aaa import User
+            user = db.session.query(User).first()  # pylint: disable=no-member
+        except Exception as exception:
+            if 'aaa_user.username does not exist' in str(exception.args):
+                LOGGER.error("""
+DATABASE is in old format.  Upgrade using following command sequence:
+RAT_DBVER=0 rat-manage-api db-export --dst data.json
+RAT_DBVER=0 rat-manage-api db-drop
+rat-manage-api db-create
+rat-manage-api db-import --src data.json
+                """)
+                sys.exit()
 
     # Actual resources
     flaskapp.add_url_rule(

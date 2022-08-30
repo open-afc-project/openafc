@@ -1,6 +1,5 @@
 import React from "react";
 import { Button } from "@patternfly/react-core";
-import { addAuth } from "../Lib/User";
 
 /**
  * React component that renders a button which can be used to download a file from the server
@@ -14,9 +13,7 @@ class DownloadFile extends React.Component<{ url: string, fileName: string }> {
     }
 
     downloadFile = () => {
-        fetch(this.props.url, {
-            headers: addAuth({})
-        })
+        fetch(this.props.url)
             .then(response => {
                 response.blob().then(blob => {
                     const url = window.URL.createObjectURL(blob);

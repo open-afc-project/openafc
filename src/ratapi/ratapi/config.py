@@ -18,7 +18,6 @@ LOG_HANDLERS = [
 ]
 SECRET_KEY = None  # Must be set in app config
 
-
 # Flask-SQLAlchemy settings
 # postgresql://[user[:password]@][netloc][:port][/dbname][?param1=value1&...]
 SQLALCHEMY_DATABASE_URI = None  # Must be set in app config
@@ -27,7 +26,7 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False  # Avoids SQLAlchemy warning
 # Flask-User settings
 USER_APP_NAME = "RLAN AFC Tool"  # Shown in and email templates and page footers
 USER_ENABLE_EMAIL = True  # Enable email authentication
-USER_ENABLE_USERNAME = False  # Disable username authentication
+USER_ENABLE_USERNAME = True  # Enable username authentication
 USER_EMAIL_SENDER_NAME = USER_APP_NAME
 USER_EMAIL_SENDER_EMAIL = None
 

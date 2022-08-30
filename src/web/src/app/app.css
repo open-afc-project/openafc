@@ -104,6 +104,12 @@ pre {
   display: inline;
 }
 
+.button-blue {
+  background-color: #4282e2f4;
+  color: white;
+  border: 2px solid #0082ba;
+}
+
 .custom-tooltip{
   background-color: white;
 }

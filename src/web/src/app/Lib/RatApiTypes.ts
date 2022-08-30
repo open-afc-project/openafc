@@ -22,7 +22,6 @@ export interface GuiConfig {
     uls_convert_url: string,
     uls_daily_url: string,
     login_url: string,
-    user_url: string,
     admin_url: string,
     ap_admin_url: string,
     rat_afc: string,

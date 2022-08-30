@@ -13,7 +13,7 @@
 
 from flask_user import UserMixin
 import jwt
-from .base import db
+from .base import db, UserDbInfo
 import datetime
 
 
@@ -25,7 +25,20 @@ class User(db.Model, UserMixin):
     )
     id = db.Column(db.Integer, primary_key=True)
 
-    # Authentication fields (email is account name)
+    # UserDbInfo.VER indicates the version of the user database.
+    # This can be overriden with env variables in case the server
+    # is boot up with an older database before it's migrated.
+    try:
+        import os
+        DBVER = int(os.getenv('RAT_DBVER'))
+        UserDbInfo.VER = DBVER
+    except:
+        pass
+
+    if (UserDbInfo.VER >= 1):
+        username = db.Column(db.String(50), nullable=False, unique=True)
+        sub = db.Column(db.String(255))
+
     email = db.Column(db.String(255), nullable=False)
     email_confirmed_at = db.Column(db.DateTime())
     password = db.Column(db.String(255), nullable=False)
@@ -39,46 +52,16 @@ class User(db.Model, UserMixin):
     roles = db.relationship('Role', secondary='aaa_user_role')
     access_points = db.relationship('AccessPoint')
 
-    def encode_auth_token(self, user_id, active, roles, secret_key):
-        """
-        Generates the Auth Token
-        :return: string
-        """
-        try:
-            payload = {
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(days=30, seconds=0),
-                'iat': datetime.datetime.utcnow(),
-                'sub': user_id,
-                'active': active,
-                'roles': roles,
-            }
-            return jwt.encode(
-                payload,
-                secret_key,
-                algorithm='HS256'
-            )
-        except Exception as err:
-            return err
+    @staticmethod
+    def getsub(user_sub):
+        if (UserDbInfo.VER >= 1):
+            return (User.query.filter_by(sub=user_sub).first())
+        else:
+            return None
 
     @staticmethod
-    def decode_auth_token(auth_token, secret_key):
-        """
-        Validates the auth token
-        :param auth_token:
-        :return: integer|string
-        """
-        try:
-            payload = jwt.decode(auth_token, secret_key)
-            is_blacklisted_token = BlacklistToken.check_blacklist(auth_token)
-            if is_blacklisted_token:
-                return 'Token blacklisted. Please log in again.', None, None
-            else:
-                return payload['sub'], payload['active'], payload['roles']
-        except jwt.ExpiredSignatureError:
-            return 'Signature expired. Please log in again.', None, None
-        except jwt.InvalidTokenError:
-            return 'Invalid token. Please log in again.', None, None
-
+    def getemail(user_email):
+        return (User.query.filter_by(email=user_email).first())
 
 class Role(db.Model):
     ''' A role is used for authorization. '''
@@ -107,33 +90,6 @@ class UserRole(db.Model):
         'aaa_user.id', ondelete='CASCADE'))
     role_id = db.Column(db.Integer(), db.ForeignKey(
         'aaa_role.id', ondelete='CASCADE'))
-
-
-class BlacklistToken(db.Model):
-    """
-    Token Model for storing JWT tokens
-    """
-    __tablename__ = 'blacklist_tokens'
-
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    token = db.Column(db.String(500), unique=True, nullable=False)
-    blacklisted_on = db.Column(db.DateTime, nullable=False)
-
-    def __init__(self, token):
-        self.token = token
-        self.blacklisted_on = datetime.datetime.now()
-
-    def __repr__(self):
-        return '<id: token: {}'.format(self.token)
-
-    @staticmethod
-    def check_blacklist(auth_token):
-        # check whether auth token has been blacklisted
-        res = BlacklistToken.query.filter_by(token=str(auth_token)).first()
-        if res:
-            return True
-        else:
-            return False
 
 
 class AccessPoint(db.Model):
@@ -171,7 +127,7 @@ class Limit(db.Model):
     __table_args__ = (
         db.UniqueConstraint('min_eirp'),
     )
-    #only one set of limits currently 
+    #only one set of limits currently
     id = db.Column(db.Integer(), primary_key=True)
     # Application data fields
     min_eirp = db.Column(db.Numeric(50))
@@ -180,7 +136,7 @@ class Limit(db.Model):
 
     def __init__(self, min_eirp):
         self.id = 0
-        self.min_eirp = min_eirp 
+        self.min_eirp = min_eirp
         self.enforce = True
 
 # Local Variables:
