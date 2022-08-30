@@ -2,7 +2,7 @@
 |Version|3.4.1.1|
 | :- | :- |
 |**Date**|**08/30/2022**|
-|compiled server's version is TBD |git tag 3.4.1.1|
+|compiled server's version is 2d5319a |git tag 3.4.1.1|
 
 |Version|**OA-314**|
 | :- | :- |
