@@ -26,7 +26,7 @@ EXAMPLES
     ./afc_tests.py --testcase_indexes 2 --addr 1.2.3.4 --cmd run --log debug
     
 4. Configure adrress and log level, run tests based on test case ID
-    ./afc_tests.py --testcase_ids AFCS.IBP.5, AFCS.FSP.18 --addr 1.2.3.4 --cmd run --log debug
+    ./afc_tests.py --testcase_ids AFCS.IBP.5,AFCS.FSP.18 --addr 1.2.3.4 --cmd run --log debug
 
 5. Refresh responses by reacquisition tests from the DB
     ./afc_tests.py --addr 1.2.3.4 --cmd reacq
@@ -984,8 +984,8 @@ def _run_test(cfg, reqs, resps, test_cases):
     resps: {testcaseid: [response_json_str, response_hash]}
     test_cases: [testcaseids]
     """
-    app_log.debug('%s() test %s, (%s)', inspect.stack()[0][3],
-                  cfg['tests'], cfg['url_path'])
+    app_log.debug(f"{inspect.stack()[0][3]}() {test_cases} "
+                  f"{cfg['url_path']}")
 
     accum_secs = 0
     results_comparator = TestResultComparator(precision=cfg['precision'] or 0)
@@ -1005,6 +1005,8 @@ def _run_test(cfg, reqs, resps, test_cases):
             'debug':cfg['debug'],
             'gui':cfg['gui']
             }
+        if (cfg['cache'] == False):
+            params_data['nocache'] = 'True'
         before_ts = time.monotonic()
         rawresp = requests.post(cfg['url_path'],
                                 params=params_data,
@@ -1063,8 +1065,8 @@ def _run_test(cfg, reqs, resps, test_cases):
 
 def run_test(cfg):
     """Fetch test vectors from the DB and run tests"""
-    app_log.debug('%s() %s (%s)', inspect.stack()[0][3],
-                  cfg['tests'], cfg['url_path'])
+    app_log.debug(f"{inspect.stack()[0][3]}() {cfg['tests']}, "
+                  f"{cfg['url_path']}")
 
     if not os.path.isfile(cfg['db_filename']):
         app_log.error('Missing DB file %s', cfg['db_filename'])
@@ -1194,7 +1196,7 @@ def make_arg_parser():
     args_parser.add_argument('--testcase_indexes', nargs='?',
                          help="<N1,...> - set single or group of tests "
                          "to run.\n")
-    args_parser.add_argument('--testcase_ids ', nargs='?',
+    args_parser.add_argument('--testcase_ids', nargs='?',
                          help="<N1,...> - set single or group of test case ids "
                          "to run.\n")
     args_parser.add_argument('--table', nargs=1, type=str,
@@ -1212,6 +1214,9 @@ def make_arg_parser():
                          "reference values in dB. 0 means exact match is "
                          "required. Default is to use hash-based exact match "
                          "comparison")
+    args_parser.add_argument('--cache', action='store_true',
+                         help="enable cache during a request, otherwise "
+                         "disabled.\n")
 
     args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?',
         help="run - run test from DB and compare.\n"
@@ -1232,21 +1237,22 @@ def make_arg_parser():
 
 def prepare_args(parser, cfg):
     """Prepare required parameters"""
+    app_log.debug(f"{inspect.stack()[0][3]}() {parser.parse_args()}")
     cfg.update(vars(parser.parse_args()))
 
     # check if test indexes and test ids are given
-    if cfg["testcase_indexes"] and cfg["testcase_ids "]:
+    if cfg["testcase_indexes"] and cfg["testcase_ids"]:
         # reject the request
         app_log.error('Please use either "--testcase_indexes"'
-                      ' or "--testcase_ids " but not both')
+                      ' or "--testcase_ids" but not both')
         return AFC_ERR
 
     if cfg["testcase_indexes"]:
         cfg["tests"] = cfg.pop("testcase_indexes")
-        cfg.pop("testcase_ids ")
-    elif cfg["testcase_ids "]:
+        cfg.pop("testcase_ids")
+    elif cfg["testcase_ids"]:
         cfg["is_test_by_index"] = False
-        cfg["tests"] = cfg.pop("testcase_ids ")
+        cfg["tests"] = cfg.pop("testcase_ids")
         cfg.pop("testcase_indexes")
 
     if isinstance(cfg['addr'], list):

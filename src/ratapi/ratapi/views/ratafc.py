@@ -28,7 +28,7 @@ import uuid
 from flask.views import MethodView
 import werkzeug.exceptions
 import StringIO
-from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO
+from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE
 from ..tasks.afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint
@@ -383,6 +383,9 @@ class RatAfc(MethodView):
                 gui_opt = flask.request.args.get('gui')
                 if gui_opt == 'True':
                     runtime_opts |= RNTM_OPT_GUI
+                opt = flask.request.args.get('nocache')
+                if opt == 'True':
+                    runtime_opts |= RNTM_OPT_NOCACHE
                 LOGGER.debug('RatAfc::post() runtime %d', runtime_opts)
                 if ('FILESTORAGE_HOST' in os.environ and
                         'FILESTORAGE_PORT' in os.environ):
@@ -403,7 +406,7 @@ class RatAfc(MethodView):
                 hash = hashlibobj.hexdigest()
 
                 # check cache
-                if not runtime_opts & RNTM_OPT_GUI:
+                if not runtime_opts & (RNTM_OPT_GUI | RNTM_OPT_NOCACHE):
                     try:
                         with dataif.open(
                             "pro", hash + "/analysisResponse.json.gz") as hfile:
