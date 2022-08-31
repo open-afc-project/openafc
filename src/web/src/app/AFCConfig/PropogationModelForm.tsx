@@ -737,8 +737,9 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         <ul>
                             <li>- Path loss &lt; FSPL is clamped to FSPL</li>
                             <li>- Distance &lt; 30m: FSPL</li>
-                            <li>- 30m &le; Distance &lt; 1km: Combined Winner II Urban/Suburban/Rural</li>
-                            <li>- Distance &gt;= 1km: ITM + [P.2108 Clutter (Urban/Suburban) or P.452 Clutter (Rural)]</li>
+                            <li>- 30m &lt;= Distance &lt;= 50m: WinnerII LOS Urban/Suburban/Rural</li>
+                            <li>- 50m &lt; Distance &lt; 1km: Combined WinnerII (in absence of building database); WinnerII LOS or NLOS (in presence of building database)</li>
+                            <li>- Distance &gt; 1km: ITM + [P.2108 Clutter (Urban/Suburban) or P.452 Clutter (Rural) (in absence of building database)]; in presence of building database, if no obstruction is found in the path, no clutter is applied; otherwise, clutter is applied per above.</li>
                             <li>- For the terrain source, the highest resolution selected terrain source is used (1m LiDAR -&gt; 30m 3DEP -&gt; 90m SRTM -&gt; 1km Globe)</li>
                         </ul>
                     </>

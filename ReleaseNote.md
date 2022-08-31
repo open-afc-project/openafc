@@ -1,4 +1,22 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-358**|
+| :- | :- |
+|**Date**|**08/30/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-358: Update supplemental info in AFC-Config GUI
+ 
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * None since only the text in the GUI has changed. All regression tests should pass.
+
+## **Open Issues**
+
 |Version|3.4.1.1|
 | :- | :- |
 |**Date**|**08/30/2022**|

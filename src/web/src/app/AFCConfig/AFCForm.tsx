@@ -504,6 +504,7 @@ export class AFCForm extends React.Component<
                                                 <li> UNII-5: 5,925-6,425 MHz</li>
                                                 <li> UNII-7: 6,525-6,875 MHz</li>
                                             </ul>
+                                            <p>The <i>Line Loss</i> from the ULS database is used. Else, the values entered here are used.</p>
                                         </>
                                     }
                                 >

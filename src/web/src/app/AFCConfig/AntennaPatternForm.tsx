@@ -48,23 +48,7 @@ export default class AntennaPatternForm extends React.PureComponent<{ data: Ante
 
     render = () =>
         <FormGroup label="Default FS Receiver Antenna Pattern" fieldId="horizontal-form-antenna">
-            {" "}<Tooltip
-                position={TooltipPosition.top}
-                enableFlip={true}
-                className="fs-feeder-loss-tooltip"
-                maxWidth="40.0rem"
-                content={
-                    <>
-                        <p>WINNF-AIP-07: The following has been implemented from WINNF-TS-1014 R2-AIP-07 in the absence of reading antenna model from ULS:</p>
-                        <ul>
-                            <li>- When FS Rx peak gain &lt; 38 dBi, for angle-off-boresight &lt; 5 deg, F.699 is used. For angle-off-boresight &gt;= 5 deg, Category B2 is used.</li>
-                            <li>- When FS Rx peak gain &gt;= 38 dBi, for angle-off-boresight &lt; 5 deg, F.699 is used. For angle-off-boresight &gt;= 5 deg, if antenna model (in ULS) is blank, Category B1 is used, else Category A is used.</li>
-                        </ul>
-                    </>
-                }
-            >
-                <OutlinedQuestionCircleIcon />
-            </Tooltip>
+            {" "}
             <FormSelect
                 value={this.props.data.defaultAntennaPattern}
                 onChange={x => this.setKind(x)}
