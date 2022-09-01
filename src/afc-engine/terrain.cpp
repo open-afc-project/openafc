@@ -8,8 +8,6 @@
 #include <cstring>
 #include <QtCore>
 
-#include "GdalDataDir.h"
-#include "WorldData.h"
 #include "global_fn.h"
 #include "terrain.h"
 #include "cconst.h"
@@ -51,27 +49,31 @@ TerrainClass::TerrainClass(QString lidarDir, std::string srtmDir, std::string de
 
 	if (!depDir.empty())
 	{
-		LOGGER_INFO(logger) << "Loading DEP terrain data from " << depDir;
-		time_t t1 = time(NULL);
-		int pointsPerDegree = 3600;  // 1 arcsec => pointsPerDegree = 60*60
-		// int pointsPerDegree = 10800; // 1/3 arcsec => pointsPerDegree = 60*60*3
-		depDataset = new DEPDatasetClass(depDir, pointsPerDegree, false);
-		depDataset->readRegion(terrainMinLat, terrainMinLon, terrainMaxLat, terrainMaxLon);
-		time_t t2 = time(NULL);
-		LOGGER_DEBUG(logger) << "Elapsed Time: " << (t2-t1);
-	}
-	else
-	{
-		depDataset = nullptr;
+		cgDep.reset(new CachedGdal<float>(depDir, "dep",
+			GdalNameMapperPattern::make_unique(
+			"USGS_1_{latHem:ns}{latDegCeil:02}{lonHem:ew}{lonDegFloor:03}.tif", depDir)));
+		cgDep->setTransformationModifier(
+			[](GdalTransform *t) {
+				t->roundPpdToMultipleOf(1.);
+				t->setMarginsOutsideDeg(1.);
+			});
 	}
 
 	// STRM data is always loaded as fallback
-	LOGGER_INFO(logger) << "Loading SRTM terrain data from " << srtmDir;
-	gdalDir = new GdalDataDir(srtmDir.c_str(), terrainMinLat, terrainMinLon, terrainMaxLat, terrainMaxLon);
+	cgSrtm.reset(new CachedGdal<int16_t>(srtmDir, "srtm",
+		GdalNameMapperPattern::make_unique(
+		"{latHem:NS}{latDegFloor:02}{lonHem:EW}{lonDegFloor:03}.hgt")));
+	cgSrtm->setTransformationModifier(
+		[](GdalTransform *t)
+		{
+			t->roundPpdToMultipleOf(0.5);
+			t->setMarginsOutsideDeg(1.);
+		});
 
 	// GLOBE data is always loaded as final fallback
-	LOGGER_INFO(logger) << "Loading GLOBE terrain data from " << globeDir.toStdString();
-	globeModel = new WorldData(QDir(globeDir), terrainMinLat, terrainMinLon, terrainMaxLat, terrainMaxLon); 
+	cgGlobe.reset(new CachedGdal<int16_t>(globeDir.toStdString(), "globe",
+		GdalNameMapperDirect::make_unique("*.bil", globeDir.toStdString())));
+	cgGlobe->setNoData(0);
 
 	numLidar = (long long) 0;
 	numSRTM = (long long) 0;
@@ -85,17 +87,6 @@ TerrainClass::TerrainClass(QString lidarDir, std::string srtmDir, std::string de
 /******************************************************************************************/
 TerrainClass::~TerrainClass()
 {
-	if (gdalDir) {
-		delete gdalDir;
-	}
-	if (globeModel) {
-		delete globeModel;
-	}
-
-	if (depDataset) {
-		delete depDataset;
-	}
-
 	while(activeLidarRegionList.size()) {
 		int deleteLidarRegionIdx = activeLidarRegionList.back();
 		activeLidarRegionList.pop_back();
@@ -174,11 +165,9 @@ void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, dou
 		heightSource = CConst::unknownHeightSource;
 	}
 
-	if (heightSource == CConst::unknownHeightSource && depDataset) {
-		float ht = depDataset->getHeight(latitudeDeg, longitudeDeg);
-		if(ht == depDataset->INVALID_HEIGHT){
-			// Do nothing
-		} else {
+	if (heightSource == CConst::unknownHeightSource && cgDep.get()) {
+		float ht;
+		if (cgDep->getValueAt(latitudeDeg, longitudeDeg, &ht)) {
 			heightSource = CConst::depHeightSource;
 			terrainHeight = (double) ht;
 			numDEP++;
@@ -186,25 +175,16 @@ void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, dou
 	}
 	if (heightSource == CConst::unknownHeightSource) {
 		qint16 ht;
-		gdalDir->getHeight(ht,latitudeDeg, longitudeDeg);
-		// printf("longitudeDeg = %.15e\n", longitudeDeg);
-		// printf("latitudeDeg = %.15e\n", latitudeDeg);
-		// printf("ht = %d\n", (int) ht);
-		// printf("invalidHeight = %d\n", (int) gdalDir->getInvalidHeight());
-		// fflush(stdout);
-		if(ht == gdalDir->getInvalidHeight()){
-			// Do nothing
-		} else {
+		if (cgSrtm->getValueAt(latitudeDeg, longitudeDeg, &ht)) {
 			heightSource = CConst::srtmHeightSource;
 			terrainHeight = (double) ht;
 			numSRTM++;
 		}
-
 	}
 
 	if (heightSource == CConst::unknownHeightSource) {
+		terrainHeight = (double)cgGlobe->valueAt(latitudeDeg, longitudeDeg);
 		heightSource = CConst::globalHeightSource;
-		terrainHeight = (double) globeModel->valueAtLatLon(latitudeDeg, longitudeDeg);
 		numGlobal++;
 	}
 }

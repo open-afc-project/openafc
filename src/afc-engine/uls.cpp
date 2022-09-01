@@ -21,7 +21,6 @@
 #include "local_defines.h"
 #include "spline.h"
 #include "list.h"
-#include "GdalDataDir.h"
 #include "UlsMeasurementAnalysis.h"
 #include "EcefModel.h"
 
@@ -70,9 +69,6 @@ CConst::AngleUnitEnum ULSClass::azPointingUnit = CConst::degreeAngleUnit;
 
 double ULSClass::elPointing = 3.0*M_PI/180.0;
 CConst::AngleUnitEnum ULSClass::elPointingUnit = CConst::degreeAngleUnit;
-
-GdalDataDir *ULSClass::gdalDir = (GdalDataDir *) NULL;
-WorldData *ULSClass::globeModel = (WorldData *) NULL;
 
 CConst::PathLossModelEnum ULSClass::pathLossModel = CConst::unknownPathLossModel;
 /******************************************************************************************/

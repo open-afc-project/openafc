@@ -519,13 +519,10 @@ void AfcManager::initializeDatabases()
 	/* Setup NLCD data                                                                    */
 	/**************************************************************************************/
 	if (!_nlcdFile.empty()) {
-		int tileSizeX = 3600;
-		int tileSizeY = 3600;
-		LOGGER_INFO(logger) << "Reading NLCD data file: " << _nlcdFile;
-		nlcdImageFile = new GdalImageFile2(QString::fromStdString(_nlcdFile), tileSizeX, tileSizeY);
+		cgNlcd.reset(new CachedGdal<uint8_t>(_nlcdFile, "nlcd"));
+		cgNlcd->setNoData(0);
 	} else {
 		throw std::runtime_error("AfcManager::initializeDatabases(): _nlcdFile not defined.");
-		nlcdImageFile = (GdalImageFile2 *) NULL;
 	}
 	/**************************************************************************************/
 
@@ -9822,7 +9819,7 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 	CConst::PropEnvEnum propEnv;
 	nlcdLandCat = CConst::unknownNLCDLandCat;
 	if (_propagationEnviro.toStdString() == "NLCD Point" || _propagationEnviro.isEmpty()) { //.isEmpty() == true in DEBUG mode
-		unsigned int landcat = (unsigned int) nlcdImageFile->getValue(GeodeticCoord::fromLonLat(lonDeg, latDeg));
+		unsigned int landcat = cgNlcd->valueAt(latDeg, lonDeg);
 
 		switch(landcat) {
 			case 23:
@@ -10601,17 +10598,9 @@ void AfcManager::runAnalyzeNLCD()
 	}
 	/**************************************************************************************/
 
-	// int numTileX = nlcdImageFile->getNumTileX();
-	// int numTileY = nlcdImageFile->getNumTileY();
-	// int sizeX = nlcdImageFile->getSizeX();
-	// int sizeY = nlcdImageFile->getSizeY();
-
-	GeodeticCoord tr = nlcdImageFile->topRight();
-	GeodeticCoord bl = nlcdImageFile->bottomLeft();
-	GeodeticCoord lonlatCoord;
-
-	std::cout << "    NLCD_TOP_RIGHT: "   << tr.longitudeDeg << " " << tr.latitudeDeg << std::endl;
-	std::cout << "    NLCD_BOTTOM_LEFT: " << bl.longitudeDeg << " " << bl.latitudeDeg << std::endl;
+	GdalTransform::BoundRect nlcdBr(cgNlcd->boundRect());
+	std::cout << "    NLCD_TOP_RIGHT: "   << br.lonDegMax << " " << br.latDegMax << std::endl;
+	std::cout << "    NLCD_BOTTOM_LEFT: " << br.lonDegMin << " " << br.latDegMin << std::endl;
 
 	std::vector<std::string> colorList;
 
@@ -10738,7 +10727,7 @@ void AfcManager::runAnalyzeNLCD()
 					for(lonIdx=startLonIdx; lonIdx<=stopLonIdx; ++lonIdx) {
 						double lonDeg = longitudeDegStart + (lonIdx + 0.5)*resolutionLon;
 
-						unsigned int landcat = (unsigned int) nlcdImageFile->getValue(GeodeticCoord::fromLonLat(lonDeg, latDeg));
+						unsigned int landcat = (unsigned int)cgNlcd->valueAt(latDeg, lonDeg);
 
 						// printf("LON = %.6f LAT = %.6f LANDCAT = %d\n", lonDeg, latDeg, landcat);
 

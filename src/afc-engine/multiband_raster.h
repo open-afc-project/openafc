@@ -5,17 +5,16 @@
 #ifndef MULTIBAND_RASTER_H
 #define MULTIBAND_RASTER_H
 
-#include <QRectF>
-#include <vector>
-#include <utility>
-#include "gdal/gdal_priv.h"
+#include "CachedGdal.h"
 #include "cconst.h"
+#include <boost/core/noncopyable.hpp>
 #include "str_type.h"
+#include <string>
 
 /******************************************************************************************/
 /**** CLASS: MultibandRasterClass                                                       ****/
 /******************************************************************************************/
-class MultibandRasterClass
+class MultibandRasterClass: private boost::noncopyable
 {
 	public:
 
@@ -28,7 +27,6 @@ class MultibandRasterClass
 		};
 
 		MultibandRasterClass(const std::string& rasterFile, CConst::LidarFormatEnum formatVal);
-		~MultibandRasterClass();
 
 		// Returns building height at a specified (lat/lon) point. If there are no buildings present at the given position then a quiet NaN value is returned
 		void getHeight(const double& latDeg, const double& lonDeg, double& terrainHeight, double& bldgHeight, HeightResult& heightResult) const;
@@ -38,13 +36,8 @@ class MultibandRasterClass
 
 	private:
 
-		QRectF bounds;            // in lon/lat, with starting point in top left
-		double xres;              // degrees longitude per pixel
-		double yres;              // degrees latitude per pixel
-		float nodataBE;          // no data value for bare earth band
-		float nodataBldg;        // no data value for building band
-		CConst::LidarFormatEnum format;
-		GDALDataset* gdalDataset;
+		CConst::LidarFormatEnum _format;
+		mutable CachedGdal<float> _cgLidar;
 };
 /******************************************************************************************/
 

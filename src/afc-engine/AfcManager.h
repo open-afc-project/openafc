@@ -23,6 +23,7 @@
 #include <fstream>
 #include <string>
 #include <map>
+#include <memory>
 #include <chrono>
 #include <limits>
 #include <utility>
@@ -33,12 +34,7 @@
 #include "EcefModel.h"
 #include "freq_band.h"
 #include "global_fn.h"
-#include "WorldData.h"
 #include "GdalHelpers.h"
-#include "GdalDataDir.h"
-#include "GdalDataModel.h"
-#include "GdalImageFile2.h"
-#include "BuildingRasterModel.h"
 #include "ras.h"
 #include "readITUFiles.hpp"
 #include "str_type.h"
@@ -46,6 +42,7 @@
 #include "uls.h"
 #include "UlsMeasurementAnalysis.h"
 #include "terrain.h"
+#include "CachedGdal.h"
 // Loggers
 #include "rkflogging/ErrStream.h"
 #include "rkflogging/Logging.h"
@@ -66,6 +63,7 @@
 #include <QByteArray>
 #include <QTemporaryDir>
 #include <QRectF>
+#include <QtCore>
 // ITU-R P.452
 #include <iturp452/ITURP452.h>
 // Uses OGR from GDAL v1.11
@@ -76,10 +74,6 @@
 
 template<class T> class ListClass;
 class ULSClass;
-class GdalDataDir;
-class GdalDataModel;
-class BuildingRasterModel;
-class WorldData;
 class PopGridClass;
 class AntennaClass;
 class RlanRegionClass;
@@ -480,7 +474,7 @@ class AfcManager
 
 		ListClass<RASClass *> *_rasList;         // List of the RAS (Radio Astronomy Stations) that each have exclusion zone.
 
-		GdalImageFile2 *nlcdImageFile;
+		std::shared_ptr<CachedGdal<uint8_t>> cgNlcd; // NLCD data accessor
 
 		std::vector<AntennaClass *> _ulsAntennaList;
 

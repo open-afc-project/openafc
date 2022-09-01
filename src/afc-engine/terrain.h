@@ -11,12 +11,14 @@
 #include "multiband_raster.h"
 #include <QRectF>
 #include <QPointF>
+#include <QDir>
 #include <map>
+#include <memory>
 // Loggers
 #include "rkflogging/ErrStream.h"
 #include "rkflogging/Logging.h"
 #include "rkflogging/LoggingConfig.h"
-#include "DEPDataset.h"
+#include "CachedGdal.h"
 
 // Use lidar files that have been pre-processed to have:
 // bare-earth terrain height in band 1
@@ -34,9 +36,6 @@ struct LidarRegionStruct {
 	double maxLatDeg;
 	MultibandRasterClass *multibandRaster;
 };
-
-class GdalDataDir;
-class WorldData;
 
 /******************************************************************************************/
 /**** CLASS: TerrainClass                                                              ****/
@@ -80,9 +79,9 @@ class TerrainClass
 		double minLidarLatitude,  maxLidarLatitude;
 		int maxLidarRegionLoad;
 
-		GdalDataDir *gdalDir;
-		DEPDatasetClass *depDataset;  // DEP terrain model
-		WorldData *globeModel;
+		std::shared_ptr<CachedGdal<int16_t>> cgSrtm;
+		std::shared_ptr<CachedGdal<float>> cgDep;
+		std::shared_ptr<CachedGdal<int16_t>> cgGlobe;
 
 		std::map<CConst::HeightSourceEnum, std::string> sourceNames = {};
 
@@ -93,7 +92,6 @@ class TerrainClass
 
 		bool useLidarZIPFiles;
 		std::string lidarWorkingDir;
-
 };
 /******************************************************************************************/
 
