@@ -24,7 +24,7 @@ OIDC_CLIENT_ID = '1234'
 OIDC_CLIENT_SECRET = 'my_secret_string'
 OIDC_DISCOVERY_URL = 'https://accounts.mycompany.com'
 ```
-To convenience users to test with OIDC, src/ratapi/ratapi/config.py already is populated with a functional (non production) Google OIDC cloud account, and simply set OIDC_LOGIN = True will enable OIDC and forward traffic there, so that anyone with a valid gmail can use that to login.
+To convenience users to test with OIDC, src/ratapi/ratapi/config.py already is populated with a functional (non production) Google OIDC cloud account.  This cloud account has been configured to work with an AFC server at a particular URL. Simply set OIDC_LOGIN = True will enable OIDC and forward traffic there, so that anyone with a valid gmail can use that to login.  Other AFC servers will need to set up their own google accounts.
  
 More information on creating your own google cloud account can be found here:
 https://cloud.google.com/apigee/docs/hybrid/v1.3/precog-gcpaccount
