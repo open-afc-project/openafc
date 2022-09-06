@@ -85,9 +85,6 @@ def create_app(config_override=None):
         flaskapp, db, directory=os.path.join(owndir, 'migrations'))
 
     flaskapp.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
-    # Clear default USER_USER_SESSION_EXPIRATION so that login session
-    # terminates when browser is restarted
-    UserManager__Settings.USER_USER_SESSION_EXPIRATION = None
     user_manager = UserManager(flaskapp, db, models.aaa.User)
 
     # Check configuration

@@ -26,9 +26,11 @@ SQLALCHEMY_TRACK_MODIFICATIONS = False  # Avoids SQLAlchemy warning
 # Flask-User settings
 USER_APP_NAME = "RLAN AFC Tool"  # Shown in and email templates and page footers
 USER_ENABLE_EMAIL = True  # Enable email authentication
+USER_ENABLE_CONFIRM_EMAIL = False # Disable email confirmation
 USER_ENABLE_USERNAME = True  # Enable username authentication
 USER_EMAIL_SENDER_NAME = USER_APP_NAME
 USER_EMAIL_SENDER_EMAIL = None
+USER_USER_SESSION_EXPIRATION = None # Session ends when browser restarts
 
 #: API key used for google maps
 GOOGLE_APIKEY = None
