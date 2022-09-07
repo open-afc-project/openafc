@@ -113,8 +113,6 @@ def create_app(config_override=None):
         # terminates when browser is restarted
         flaskapp.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
         from flask_user import UserManager
-        from flask_user.user_manager__settings import UserManager__Settings
-        UserManager__Settings.USER_USER_SESSION_EXPIRATION = None
         user_manager = UserManager(flaskapp, db, models.aaa.User)
 
     # Check configuration
