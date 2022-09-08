@@ -87,7 +87,7 @@ META_FOOTER = '}'
 NEW_AFC_TEST_SUFX = '_afc_test_reqs.txt'
 AFC_TEST_IDENT = { 'all':0, 'srs':1, 'urs':2, 'sri':3, 'fsp':4, 'ibp':5, 'sip':6 }
 
-WFA_TEST_DIR = './wfa_test'
+WFA_TEST_DIR = 'wfa_test'
 
 class AfcFreqRange:
     """Afc Frequency range"""

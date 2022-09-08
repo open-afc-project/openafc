@@ -42,6 +42,7 @@ import json
 import logging
 import os
 import openpyxl as oxl
+import re
 import requests
 import shutil
 import sqlite3
@@ -762,20 +763,23 @@ def add_reqs(cfg):
 
 
 def dump_table(conn, tbl_name, out_file):
-    app_log.debug('%s() %s', inspect.stack()[0][3], tbl_name)
-    app_log.info('\n\tDump DB table (%s) to the file (%s).\n',
-                 tbl_name, out_file)
+    app_log.debug(f"{inspect.stack()[0][3]}() {tbl_name}")
+    app_log.info(f"\n\tDump DB table ({tbl_name}) to file.\n")
     fp_new = ''
 
-    if (out_file) and (out_file != 'split'):
-        fp_new = open(out_file, 'w')
+    if 'single' in out_file:
+        fp_new = open(out_file['single'], 'w')
 
     conn.execute(f"SELECT * FROM {tbl_name}")
     found_data = conn.fetchall()
     for val in enumerate(found_data):
         if isinstance(fp_new, io.IOBase):
             fp_new.write(f"{str(val)}\n")
-        elif out_file == 'split':
+        elif 'split' in out_file:
+            tbl_fname = {
+                TBL_REQS_NAME: '_Request.txt',
+                TBL_RESPS_NAME: '_Response.txt'
+            }
             new_json = json.loads(val[1][1].encode('utf-8'))
             req_id = json_lookup('requestId', new_json, None)
             # omit URS testcases
@@ -783,7 +787,9 @@ def dump_table(conn, tbl_name, out_file):
                 len(req_id[0]) == 0):
                 continue
 
-            fp_test = open(f"{WFA_TEST_DIR}/{req_id[0]}", 'a')
+            name, nbr = re.findall(r'(\w+?)(\d+)', req_id[0])[0];
+            fp_test = open(f"{out_file['split']}/AFCS_{name}_{nbr}" +\
+                           f"{tbl_fname[tbl_name]}", 'a')
             fp_test.write(f"{val[1][1]}\n")
             fp_test.close()
         else:
@@ -796,19 +802,22 @@ def dump_table(conn, tbl_name, out_file):
 
 def dump_database(cfg):
     """Dump data from test DB tables"""
-    app_log.debug(f"{inspect.stack()[0][3]}")
+    app_log.debug(f"{inspect.stack()[0][3]}()")
     find_key = ''
     found_tables = []
-    out_file = ''
+    # keep configuration for output path and files
+    # 'single' - only single file for whole output
+    # 'split' - separate file for each response
+    out_file = {}
 
     if not os.path.isfile(cfg['db_filename']):
         app_log.error(f"Missing DB file {cfg['db_filename']}")
         return AFC_ERR
 
     set_dump_db_opts = {
-        'wfa': [('test_vectors',), ('test_data',)],
-        'req': [('test_vectors',)],
-        'resp': [('test_data',)],
+        'wfa': [(TBL_REQS_NAME,), (TBL_RESPS_NAME,)],
+        'req': [(TBL_REQS_NAME,)],
+        'resp': [(TBL_RESPS_NAME,)],
         'ap': [('ap_config',)],
         'cfg': [('afc_config',)],
         'user': [('user_config',)]
@@ -822,7 +831,6 @@ def dump_database(cfg):
 
     if tbl in set_dump_db_opts:
         # Dump only tables with requests and responses
-        app_log.debug(f"Dump from DB table {tbl}")
         found_tables.extend(set_dump_db_opts[tbl])
     elif tbl == 'True':
         # Dump all tables if no options provided
@@ -830,17 +838,22 @@ def dump_database(cfg):
         found_tables = cur.fetchall()
 
     if tbl == 'wfa':
-        out_file = 'split'
-        if os.path.exists(WFA_TEST_DIR):
-            shutil.rmtree(WFA_TEST_DIR)
-        os.mkdir(WFA_TEST_DIR)
+        out_file['split'] = './'
+        if not isinstance(cfg['outpath'], type(None)):
+            out_file['split'] = cfg['outpath'][0] + '/'
+
+        out_file['split'] += WFA_TEST_DIR
+        if os.path.exists(out_file['split']):
+            shutil.rmtree(out_file['split'])
+        os.mkdir(out_file['split'])
     elif isinstance(cfg['outfile'], type(None)):
         app_log.error(f"Missing output filename.\n")
         return AFC_ERR
     else:
-        out_file = cfg['outfile'][0]
+        out_file['single'] = cfg['outfile'][0]
 
     for tbl in enumerate(found_tables):
+        app_log.debug(f"Dump {tbl} to {out_file}")
         dump_table(cur, tbl[1][0], out_file)
     con.close()
     return AFC_OK
@@ -1179,6 +1192,9 @@ def make_arg_parser():
                          help="<verif_post> - verify SSL on post request.\n")
     args_parser.add_argument('--outfile', nargs=1, type=str,
                          help="<filename> - set filename for test "
+                              "results output.\n")
+    args_parser.add_argument('--outpath', nargs=1, type=str,
+                         help="<filepath> - set path to output filename for "
                               "results output.\n")
     args_parser.add_argument('--infile', nargs=1, type=str,
                          help="<filename> - set filename as a source "

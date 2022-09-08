@@ -20,6 +20,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Remove AFC Server admin configuration](#remove-afc-server-admin-configuration)
   - [List AFC Server admin configuration](#list-afc-server-admin-configuration)
   - [Export tests from WFA file to JSON format](#export-tests-from-wfa-file-to-json-format)
+  - [Export tests requests and responses in WFA file format](#export-tests-requests-and-responses-in-wfa-file-format)
   - [Compare AFC config records](#compare-afc-config-records)
   - [Reacquisition response records for exist requests](#reacquisition-response-records-for-exist-requests)
 - [**Testing setup**](#testing-setup)
@@ -178,6 +179,20 @@ For example, export certain WFA test cases
 
 ```
 afc_tests.py --cmd parse_tests --infile "AFC System (SUT) Test Vectors r6.xlsx" --outfile abc.txt --test_id srs
+```
+
+## Export tests requests and responses in WFA file format
+
+Following example exports test vectors and corresponded responses to WFA format files.
+All files created in local directory "wfa_test".
+```
+afc_tests.py --cmd dump_db --table wfa --addr <ip> --outfile <output file>
+```
+An example how to use it with docker container, named "test".
+Following sequence creates files at path "`pwd`/data/wfa_test".
+
+```
+docker -rm -v `pwd`/data:/data test --cmd dump_db --table wfa --addr <ip> --outpath /data
 ```
 
 ## Compare AFC config records
