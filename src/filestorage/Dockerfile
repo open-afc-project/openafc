@@ -19,8 +19,6 @@ COPY filestorage_config.py filestorage.py history.py /usr/app/
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /usr/app/filestorage.py /usr/app/history.py /docker-entrypoint.sh
 
-copy google.cert.json /usr/app/google.cert.json
-
 ENV PYTHONPATH=/usr/app
 
 CMD ["/docker-entrypoint.sh"]
