@@ -24,14 +24,20 @@ OIDC_CLIENT_ID = '1234'
 OIDC_CLIENT_SECRET = 'my_secret_string'
 OIDC_DISCOVERY_URL = 'https://accounts.mycompany.com'
 ```
-To convenience users to test with OIDC, src/ratapi/ratapi/priv_config.py already is populated (commented out) with a functional (non production) Google OIDC cloud account.  This cloud account has been configured to work with an AFC server at a particular URL. Simply uncomment these configuration will enable OIDC and forward traffic there, so that anyone with a valid gmail can use that to login. However, this account is configured with a particular AFC server address so it won't work for any AFC server deployment and should be used only as a template.
+The following is an example configuration with non production Google OIDC cloud account.  This cloud account has been configured to work with an AFC server at a particular URL. Simply add this to priv_config.py will enable OIDC and forward traffic there, and anyone with a valid gmail can use that to login. However, this account is configured with a particular AFC server address so it won't work for any AFC server deployment and should be used only as a template:
+OIDC_LOGIN = True
+OIDC_CLIENT_ID='547511594635-h541g370p903uf082p42r9ic34qun5eb.apps.googleuserc
+ontent.com'
+OIDC_CLIENT_SECRET='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'
+OIDC_DISCOVERY_URL = 'https://accounts.google.com/.well-known/openid-configuration'
+
  
 More information on creating your own google cloud account can be found here:
 https://cloud.google.com/apigee/docs/hybrid/v1.3/precog-gcpaccount
 
 
 ### **Local User Creation**
-Local users can be created, using CLI just as described in README.md
+Local users can be created, using CLI just as described in [README.md](README.md)
 These users do not have accounts at the identity provider, and therefore, cannot log in via the WEB.  REST API continues to work with users added this way and this mechanism can be used to create test accounts used by regression tests.
 
 ```
@@ -57,7 +63,7 @@ Another way to assign roles is via the WEB.  Any user who has admin role and can
 ## **Migrate From non OIDC to OIDC login method**
 With OIDC method, the user acounts are stored in the identity server which maintains accounts of your employees.  Accounts created in non OIDC database are not recognized by OIDC identity server.  Therefore, after converting to OIDC, you will not be able to login via the WEB using test user accounts created via CLI, although those can still be used by test scripts, and the roles of those accounts continue will be maintained.
 
-To make it convenient to switch real (non test) accounts, if an non OIDC account has matching email address in the OIDC identity server, the account will be addopted upon conversion and the user can login via WEB GUI and automatically keeps all the roles (s)he had prior to the switch.
+To facilitate switching real (non test) accounts, when a user logs in for the first time via OIDC, and the email address from the OIDC identity server matches an existing user in the database, that existing account is converted while retaining all roles. Thus, when logging in via WEB GUI, the user has the same access as before the switch.
 
 ## **Switching from OIDC to non OIDC login method**
 Accounts that are maintained exclusively by OIDC identity provider are not maintained locally, so they cannot be logged in via the WEB GUI unless the admin modify the password. Accounts created via CLI can be logged in using the same password used in the CLI to create them.
