@@ -1,4 +1,19 @@
 # Release Note
+## **Version and Date**
+|Version|3.4.1.1|
+| :- | :- |
+|**Date**|**09/10/2022**|
+|compiled server's version is TBD |git tag 3.4.1.2|
+
+## **Version and Date**
+|Version|**OA-381**|
+| :- | :- |
+|**Date**|**09/10/2022**|
+## **Issues Addressed**
+ * Jira OA-381: Disable non OIDC email confirmation for new users
+
+## **Open Issues**
+
 
 ## **Version and Date**
 |Version|**OA-358**|
@@ -8,7 +23,7 @@
 
 ## **Issues Addressed**
  * Jira OA-358: Update supplemental info in AFC-Config GUI
- 
+
 ## **Interface Changes**
  * None
 
