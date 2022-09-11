@@ -6,7 +6,8 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 ## Table of Contents
 - [**Introduction**](#introduction)
 - [**Setup**](#setup)
-  - [HTTP servers configuration](#http-servers-configuration)
+  - [The file storage HTTP server configuration](#the-file-storage-http-server-configuration)
+  - [The history view HTTP server configuration](#the-history-view-http-server-configuration)
   - [Building HTTP servers docker image](#building-http-servers-docker-image)
   - [RATAPI setup](#ratapi-setup)
   - [docker-compose examples](#docker-compose-examples)
@@ -22,21 +23,37 @@ The file storage HTTP server implements file exchange between HTTPD, celery work
 The history view server provides read access to the debug files.
 
 # **Setup**
-## HTTP servers configuration
-The file storage and the history view HTTP servers receive their configuration from the following environment variables:
-- FILESTORAGE_HOST - file storage server host
-- FILESTORAGE_PORT - file storage server post
-- HISTORY_HOST - history view server host (currently the same as FILESTORAGE_HOST)
-- HISTORY_PORT - history view server port. This port should be mapped in "ports:" section of docker-compose.yaml
-- FILESTORAGE_DIR - file system path to stored files in file storage docker
+## The file storage HTTP server configuration
+The file storage HTTP server receive its configuration from the following environment variables:
+- **FILESTORAGE_HOST** - file storage server host (default: 0.0.0.0).
+- **FILESTORAGE_PORT** - file storage server post (default: 5000).
+    - The file storage Dockerfile exposes port 5000 for access to the file storage server.
+- **OBJSTORAGE** - The media used for storing files by the server (default: LocalFS). The possible values are
+    - **LocalFS** - store files on docker's FS.
+    - **GoogleCloudBucket** - store files on Google Store.
+- **FILESTORAGE_DIR** - file system path to stored files in file storage docker (default: /storage). Used only when **OBJSTORAGE**=**LocalFS**
+
+Using Google Storage bucket as file storage requires creating the bucket ([Create storage buckets](https://cloud.google.com/storage/docs/creating-buckets)),
+the service account ([Service accounts](https://cloud.google.com/iam/docs/service-accounts)),
+and the service account credentials JSON file ([Create access credentials](https://developers.google.com/workspace/guides/create-credentials#service-account)).
+Accordingly, the file storage server requires the following two variables:
+
+- **GOOGLE_CLOUD_BUCKET** - Bucket name as seen in column "Name" in [Storage Browser](https://console.cloud.google.com/storage/browser)
+- **GOOGLE_CLOUD_CREDENTIALS_JSON** - Path to service account credentials JSON file in the docker image.
+    - The directory contains the file must be mounted to the file storage docker image.
+
+## The history view HTTP server configuration
+The history view HTTP server receive its configuration from the following environment variables:
+- **HISTORY_HOST** - history view server host (currently the same as FILESTORAGE_HOST)
+- **HISTORY_PORT** - history view server port. This port should be mapped in "ports:" section of docker-compose.yaml
 
 ## RATAPI server configuration
 RATAPI server accesses file storage according to the following environment variables:
-- FILESTORAGE_HOST - file storage server host
-- FILESTORAGE_PORT - file storage server post
-- HISTORY_HOST - history view server host (currently the same as FILESTORAGE_HOST)
-- HISTORY_EXTERNAL_PORT - the port where HISTORY_PORT in HTTP server service of docker-compose.yaml is mapped
-- FILESTORAGE_SCHEME="HTTP" - indicate by which scheme the file storage is accessed from RATAPI server. Currently is always "HTTP".
+- **FILESTORAGE_HOST** - file storage server host
+- **FILESTORAGE_PORT** - file storage server post
+- **HISTORY_HOST** - history view server host (currently the same as **FILESTORAGE_HOST**)
+- **HISTORY_EXTERNAL_PORT** - the port where **HISTORY_PORT** in HTTP server service of docker-compose.yaml is mapped
+- **FILESTORAGE_SCHEME** - indicate by which scheme the file storage is accessed from RATAPI server. Currently is always **HTTP**.
 
 ## Building HTTP servers docker image
 Use Dockerfile for build or see docker-compose.yaml example below.
@@ -98,8 +115,14 @@ services:
       - HISTORY_HOST=0.0.0.0
       #History view server port is any free port
       - HISTORY_PORT=4999
-      #Some folder inside the image for file storing.
+      #Use docker FS to store files
+      - OBJSTORAGE=LocalFS
+      #Some folder inside the image for file storing. Ignored when OBJSTORAGE=GoogleCloudBucket
       - FILESTORAGE_DIR=/storage
+      # Google Cloud credentials file. Ignored when OBJSTORAGE="GoogleCloudBucket"
+      - GOOGLE_CLOUD_CREDENTIALS_JSON=/credentials/google.cert.json
+      # Google Cloud bucket name. Ignored when OBJSTORAGE="GoogleCloudBucket"
+      - GOOGLE_CLOUD_BUCKET=wcc-afc-objstorage
       build:
          context: ./src/objstorage
       #map 'objstorage:HISTORY_PORT' to 'rat_server:HISTORY_EXTERNAL_PORT'
@@ -157,7 +180,9 @@ services:
       - HISTORY_HOST=0.0.0.0
       #History view server port is any free port
       - HISTORY_PORT=4999
-      #Some folder inside the image for file storing.
+      #Use Google Storage to store files
+      - OBJSTORAGE=LocalFS
+      #Some folder inside the image for file storing. Ignored when OBJSTORAGE=GoogleCloudBucket
       - FILESTORAGE_DIR=/storage
       #map 'objstorage:HISTORY_PORT' to 'rat_server:HISTORY_EXTERNAL_PORT'
       ports:
