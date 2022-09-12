@@ -415,7 +415,7 @@ rat-manage-api user create --role Admin --role AP --role Analysis admin "Enter Y
 Once done, you can authorize with this user and password in WebUI.
 To exit the console press Ctrl+D or type the 'exit' command.
 
-If you would like to use OIDC login method, please read OIDC_Login.md
+If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Login.md)
 
 ### Note for an existing user database
 

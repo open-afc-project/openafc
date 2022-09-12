@@ -3,7 +3,7 @@
 You can configure AFC server to use one of two login mechanisms.  The OIDC login provides Single Sign On (SSO) where the handling of identity verification is done at the separate identity provider server.  The non OIDC login implements local authentication using the AFC server's local database.
 
 ## **Non OIDC Login**
-The legacy login mechanism performs authentication locally on the AFC server. It is configured by default.  Steps to configure are described in README.md
+The legacy login mechanism performs authentication locally on the AFC server. It is configured by default.  Steps to configure are described in [README.md](/README.md)
 
 ## **OIDC Login**
 OIDC relies on an identity provider outside of the AFC server to verify the users identity.  Your organization could already have its own identity server for its employees.  When a user logs in the AFC application, AFC server forwards a request to the identity provider to authenticate.  For your organization's employees, the authentication is completed by your identity provider.  For federated users, the identity provider will further forward the user to his/her respective identity server for verification.  
@@ -25,19 +25,19 @@ OIDC_CLIENT_SECRET = 'my_secret_string'
 OIDC_DISCOVERY_URL = 'https://accounts.mycompany.com'
 ```
 The following is an example configuration with non production Google OIDC cloud account.  This cloud account has been configured to work with an AFC server at a particular URL. Simply add this to priv_config.py will enable OIDC and forward traffic there, and anyone with a valid gmail can use that to login. However, this account is configured with a particular AFC server address so it won't work for any AFC server deployment and should be used only as a template:
+```
 OIDC_LOGIN = True
 OIDC_CLIENT_ID='547511594635-h541g370p903uf082p42r9ic34qun5eb.apps.googleuserc
 ontent.com'
 OIDC_CLIENT_SECRET='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'
 OIDC_DISCOVERY_URL = 'https://accounts.google.com/.well-known/openid-configuration'
-
- 
+```
 More information on creating your own google cloud account can be found here:
 https://cloud.google.com/apigee/docs/hybrid/v1.3/precog-gcpaccount
 
 
 ### **Local User Creation**
-Local users can be created, using CLI just as described in [README.md](README.md)
+Local users can be created, using CLI just as described in [README.md](/README.md)
 These users do not have accounts at the identity provider, and therefore, cannot log in via the WEB.  REST API continues to work with users added this way and this mechanism can be used to create test accounts used by regression tests.
 
 ```
