@@ -13,6 +13,8 @@ COPY requirements.txt /usr/app/
 RUN /usr/local/bin/python -m pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
+EXPOSE 5000
+
 COPY filestorage_config.py filestorage.py history.py /usr/app/
 COPY docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /usr/app/filestorage.py /usr/app/history.py /docker-entrypoint.sh
