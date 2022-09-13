@@ -100,6 +100,12 @@ export const retrieveUserData = async (): Promise<RatResponse<string>> => {
  * Is current user logged in?
  * @returns User login status
  */
+export const isEditCredential = () => getUser().data.editCredential;
+
+/**
+ * Is current user logged in?
+ * @returns User login status
+ */
 export const isLoggedIn = () => getUser().data.loggedIn;
 
 /**

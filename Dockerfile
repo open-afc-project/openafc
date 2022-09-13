@@ -36,6 +36,11 @@ COPY --from=build_image \
 COPY prereqs/repo/python-flask-wtf-0.14.2-7.el7.noarch.rpm /repos/CentOS/7/7/Packages/
 RUN createrepo /repos/CentOS/7/7/Packages/
 RUN echo -e "[fbrat-repo]\nname=FBRAT-Repo\nbaseurl=file:///repos/CentOS/7/7/Packages/\ngpgcheck=0\nenabled=1\n" >> /etc/yum.repos.d/fbrat-repo.repo
+RUN yum -y install python-pip
+# python2-secrets require requests 2.7.0
+RUN pip install 'requests==2.7.0'
+RUN pip install python2-secrets
+
 RUN yum -y clean all && \
     rm -rf /var/cache/yum && \
     yum install -y /repos/CentOS/7/7/Packages/fbrat* \

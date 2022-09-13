@@ -7,8 +7,7 @@ import logging
 import flask
 from . import config
 from . import data_if
-import datetime
-
+import requests
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -26,8 +25,7 @@ def create_app(config_override=None):
     :rtype: :py:cls:`flask.Flask`
     '''
     from flask_migrate import Migrate
-    from flask_user import UserManager
-    from flask_user.user_manager__settings import UserManager__Settings
+
     import xdg.BaseDirectory
     # Child members
     from . import models, views, util
@@ -84,8 +82,40 @@ def create_app(config_override=None):
     Migrate(
         flaskapp, db, directory=os.path.join(owndir, 'migrations'))
 
-    flaskapp.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
-    user_manager = UserManager(flaskapp, db, models.aaa.User)
+    try:
+        # private configuration. Override values from config
+        from . import priv_config
+        flaskapp.config.from_object(priv_config)
+    except:
+        pass
+
+    if flaskapp.config['OIDC_LOGIN']:
+        from models.aaa import User
+        from flask_login import  LoginManager
+        login_manager = LoginManager()
+        login_manager.init_app(flaskapp)
+
+        if (flaskapp.config['OIDC_DISCOVERY_URL']):
+            endpoints = requests.get(flaskapp.config['OIDC_DISCOVERY_URL'],
+                headers={'Accept' : 'application/json'}).json()
+            flaskapp.config['OIDC_ORG_AUTH_URL'] = endpoints['authorization_endpoint']
+            flaskapp.config['OIDC_ORG_TOKEN_URL'] = endpoints['token_endpoint']
+            flaskapp.config['OIDC_ORG_USER_INFO_URL'] = endpoints['userinfo_endpoint']
+
+        @login_manager.user_loader
+        def load_user(_id):
+            ''' Load user invoked from flask login
+            '''
+            return User.get(_id)
+    else:
+        # Non OIDC login.
+        # Clear default USER_USER_SESSION_EXPIRATION so that login session
+        # terminates when browser is restarted
+        flaskapp.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
+        from flask_user import UserManager
+        from flask_user.user_manager__settings import UserManager__Settings
+        UserManager__Settings.USER_USER_SESSION_EXPIRATION = None
+        user_manager = UserManager(flaskapp, db, models.aaa.User)
 
     # Check configuration
     state_path = flaskapp.config['STATE_ROOT_PATH']

@@ -31,12 +31,12 @@ class User(MethodView):
             # get query params
             users = aaa.User.query.all()
             return flask.jsonify(users=[
-                { 
+                {
                     'id': u.id,
-                    'email': u.email, 
-                    'firstName': u.first_name, 
-                    'lastName': u.last_name, 
-                    'active': u.active, 
+                    'email': u.email,
+                    'firstName': u.first_name,
+                    'lastName': u.last_name,
+                    'active': u.active,
                     'roles': [ r.name for r in u.roles ] }
                 for u in users
             ])
@@ -45,12 +45,12 @@ class User(MethodView):
             if user is None:
                 raise exceptions.NotFound("User does not exist")
             return flask.jsonify(user=
-                { 
+                {
                     'id': user.id,
-                    'email': user.email, 
-                    'firstName': user.first_name, 
-                    'lastName': user.last_name, 
-                    'active': user.active, 
+                    'email': user.email,
+                    'firstName': user.first_name,
+                    'lastName': user.last_name,
+                    'active': user.active,
                     'roles': [ r.name for r in user.roles ],
                 }
             )
@@ -73,7 +73,15 @@ class User(MethodView):
                 user.email_confirmed_at = datetime.datetime.now()
             user.active = user_props.get('active', user.active)
             if user_props.has_key('password'):
-                pass_hash = flask.current_app.user_manager.password_manager.hash_password(user_props['password'])
+                if flask.current_app.config['OIDC_LOGIN']:
+                    # OIDC, password is never stored locally
+                    # Still we hash it so that if we switch back
+                    # to non OIDC, the hash still match, and can be logged in
+                    from passlib.context import CryptContext
+                    password_crypt_context = CryptContext(['bcrypt'])
+                    pass_hash = password_crypt_context.encrypt(password_in)
+                else:
+                    pass_hash = flask.current_app.user_manager.password_manager.hash_password(user_props['password'])
                 user.password = pass_hash
             db.session.commit() # pylint: disable=no-member
 
@@ -108,7 +116,7 @@ class User(MethodView):
 
 
         return flask.make_response()
-    
+
     def delete(self, user_id):
         ''' Remove a user from the system. '''
 
@@ -143,11 +151,11 @@ class AccessPoint(MethodView):
 
 
         return flask.jsonify(accessPoints=[
-            { 
+            {
                 'id': ap.id,
-                'serialNumber': ap.serial_number, 
-                'model': ap.model, 
-                'manufacturer': ap.manufacturer, 
+                'serialNumber': ap.serial_number,
+                'model': ap.model,
+                'manufacturer': ap.manufacturer,
                 'ownerId': ap.user_id,
                 'certificationId': ap.certification_id
             }
@@ -172,7 +180,7 @@ class AccessPoint(MethodView):
         except IntegrityError:
             raise exceptions.BadRequest("Serial number must be unique")
 
-    
+
     def delete(self, id):
         ''' Remove an AP from the system. Here the id is the AP id instead of the user_id '''
 
@@ -193,24 +201,23 @@ class AccessPointTrial(MethodView):
     methods = ['GET']
 
     def get(self):
-      
         ap = aaa.AccessPoint.query.filter_by(serial_number="TestSerialNumber", certification_id = "FCC TestCertificationId").first()
 
 
         return flask.jsonify(accessPoint=
-            { 
+            {
                 'id': ap.id,
-                'serialNumber': ap.serial_number, 
-                'model': ap.model, 
-                'manufacturer': ap.manufacturer, 
+                'serialNumber': ap.serial_number,
+                'model': ap.model,
+                'manufacturer': ap.manufacturer,
                 'ownerId': ap.user_id,
                 'certificationId': ap.certification_id
-            }    
+            }
         )
 
 
 
-class Limits(MethodView): 
+class Limits(MethodView):
     methods = ['PUT', 'GET']
     def put(self):
         ''' set eirp limit '''
@@ -231,20 +238,20 @@ class Limits(MethodView):
                 limits.min_eirp = content
                 limits.enforce = True
             db.session.commit()
-            return flask.jsonify(limit=content) 
+            return flask.jsonify(limit=content)
         except IntegrityError:
             raise exceptions.BadRequest("DB Error")
-    
+
     def get(self):
         ''' get eirp limit '''
         try:
-            limits = aaa.Limit.query.filter_by(id=0).first()      
+            limits = aaa.Limit.query.filter_by(id=0).first()
             return flask.jsonify(limit=float(limits.min_eirp), enforce=limits.enforce)
         except IntegrityError:
             raise exceptions.BadRequest("DB Error")
 
-class AllowedFreqRanges(MethodView): 
-    ''' Allows an admin to update the JSON containing the allowed frequency bands and allow any user to view but not edit the file ''' 
+class AllowedFreqRanges(MethodView):
+    ''' Allows an admin to update the JSON containing the allowed frequency bands and allow any user to view but not edit the file '''
     methods = ['PUT', 'GET']
     ACCEPTABLE_FILES = {
         'allowed_frequencies.json': dict(

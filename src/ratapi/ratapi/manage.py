@@ -341,16 +341,26 @@ class UserCreate(Command):
 
         try:
             if not hashed:
+                # hash password field in non OIDC mode
                 if isinstance(password_in, (str, unicode)):
                     password = password_in.strip()
                 else:
                     with closing(open(password_in)) as pwfile:
                         password = pwfile.read().strip()
 
-                passhash = flaskapp.user_manager.password_manager.hash_password(
-                       password)
+                if flaskapp.config['OIDC_LOGIN']:
+                    # OIDC, password is never stored locally
+                    # Still we hash it so that if we switch back
+                    # to non OIDC, the hash still match, and can be logged in
+                    from passlib.context import CryptContext
+                    password_crypt_context = CryptContext(['bcrypt'])
+                    passhash = password_crypt_context.encrypt(password_in)
+                else:
+                    passhash = flaskapp.user_manager.password_manager.hash_password(
+                        password)
             else:
                 passhash = password_in
+
 
             with flaskapp.app_context():
                 # select count(*) from aaa_user where email = ?
@@ -386,6 +396,49 @@ class UserCreate(Command):
 
     def __call__(self, flaskapp, email, password_in, role, hashed=False):
         self._create_user(flaskapp, email, password_in, role, hashed)
+
+
+class UserUpdate(Command):
+    ''' Create a new user functionality. '''
+
+    option_list = (
+        Option('--email', type=str,
+               help='Email'),
+        Option('--role', type=str, default=[], action='append',
+               choices=['Admin', 'Analysis', 'AP', 'Trial'],
+               help='role to include with the new user'),
+    )
+
+    def _update_user(self, flaskapp, email, role):
+        ''' Create user in database. '''
+        from contextlib import closing
+        from .models.aaa import User, Role
+
+        try:
+            with flaskapp.app_context():
+                user = User.getemail(email)
+
+                if user:
+                    user.roles = []
+                    for rolename in role:
+                        if not rolename in user.roles:
+                            user.roles.append(get_or_create(
+                                db.session, Role, name=rolename))
+                    user.active = True,
+                    db.session.commit()  # pylint: disable=no-member
+                else:
+                    raise RuntimeError("User update: User not found")
+        except IOError:
+            raise RuntimeError("User update encounters unexpected error")
+
+    def __init__(self, flaskapp=None, user_params=None):
+        if flaskapp and isinstance(user_params, dict):
+            self._update_user(flaskapp,
+                              user_params['username'],
+                              user_params['rolename'])
+
+    def __call__(self, flaskapp, email, role):
+        self._update_user(flaskapp, email, role)
 
 
 class UserRemove(Command):
@@ -441,6 +494,12 @@ Role.id).all():  # pylint: disable=no-member
                     user_info[key] = user_info[key] + ", " + role.name
                 else:
                     user_info[key] = role.name
+
+            # Find all users without roles and show them last
+            for user in  db.session.query(User).filter(~User.roles.any()).all():
+                key = user.email + ":" + str(user.id) + ":" + user.username
+                user_info[key] = ""
+
             for k, v in user_info.items():
                 email, _id, name = k.split(":")
                 table.add_row([_id, name, email, v])
@@ -453,6 +512,7 @@ class User(Manager):
     def __init__(self, *args, **kwargs):
         LOGGER.debug('User.__init__()')
         Manager.__init__(self, *args, **kwargs)
+        self.add_command('update', UserUpdate())
         self.add_command('create', UserCreate())
         self.add_command('remove', UserRemove())
         self.add_command('list', UserList())
