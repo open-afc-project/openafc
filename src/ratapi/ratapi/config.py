@@ -1,8 +1,16 @@
+#
+# Portions copyright © 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate
+# affiliate that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy
+# of which is included with this software program.
+#
+
 ''' Application configuration data.
 '''
 import distutils.spawn
 import logging
-
+import datetime
 
 #: The externally-visible script root path
 APPLICATION_ROOT = '/fbrat'
@@ -30,7 +38,9 @@ USER_ENABLE_CONFIRM_EMAIL = False # Disable email confirmation
 USER_ENABLE_USERNAME = True  # Enable username authentication
 USER_EMAIL_SENDER_NAME = USER_APP_NAME
 USER_EMAIL_SENDER_EMAIL = None
-USER_USER_SESSION_EXPIRATION = None # Session ends when browser restarts
+REMEMBER_COOKIE_DURATION = datetime.timedelta(days=30) # remember me timeout
+USER_USER_SESSION_EXPIRATION = 3600 # One hour idle timeout
+PERMANENT_SESSION_LIFETIME = datetime.timedelta(seconds=USER_USER_SESSION_EXPIRATION) # idle session timeout
 
 #: API key used for google maps
 GOOGLE_APIKEY = None

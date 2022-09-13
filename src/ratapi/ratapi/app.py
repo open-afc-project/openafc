@@ -1,3 +1,11 @@
+#
+# Portions copyright © 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate
+# affiliate that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy
+# of which is included with this software program.
+#
+
 ''' Flask application generation.
 '''
 import sys
@@ -109,9 +117,6 @@ def create_app(config_override=None):
             return User.get(_id)
     else:
         # Non OIDC login.
-        # Clear default USER_USER_SESSION_EXPIRATION so that login session
-        # terminates when browser is restarted
-        flaskapp.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
         from flask_user import UserManager
         user_manager = UserManager(flaskapp, db, models.aaa.User)
 

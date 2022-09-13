@@ -1,3 +1,8 @@
+Copyright © 2022 Broadcom. All rights reserved. The term "Broadcom"
+refers solely to the Broadcom Inc. corporate affiliate that owns
+the software below.
+This work is licensed under the OpenAFC Project License, a copy of which is included with this software program.
+
 # AFC Login
 ## **Introduction**
 You can configure AFC server to use one of two login mechanisms.  The OIDC login provides Single Sign On (SSO) where the handling of identity verification is done at the separate identity provider server.  The non OIDC login implements local authentication using the AFC server's local database.
