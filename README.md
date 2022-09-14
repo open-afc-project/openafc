@@ -392,33 +392,6 @@ If you do it with the server which is run thru the docker-compose script describ
 docker-compose exec rat_server rat-manage-api db-create
 ```
 
-### Note for an existing user database
-
-You might find errors regarding missing fields in the user database upon bootup and upon login if the server has an existing user database with an old schema. The error message has instructions on how to migrate the database. You have two options:
-
-**1. Reinitialize the database without users:**
-
-```
-rat-manage-api db-drop
-rat-manage-api db-create
-```
-
-This will wipe out existing users, e.g. users need to register, or be manually recreated again.
-
-**2. Migrate the database with users:**
-
-```
-RAT_DBVER=0 rat-manage-api db-export --dst data.json
-RAT_DBVER=0 rat-manage-api db-drop
-rat-manage-api db-create
-rat-manage-api db-import --src data.json
-```
-
-This migration will maintain all existing user data, including roles. Steps to migrate:
-1. Export the user database to .json file.  Since the database is an older version, use env variable to tell the command the the right schema to use to intepret the database.
-2. Delete the old version database.
-3. Recreate the database.
-4. Import the json file into the new database.
 ## Initial Administrator account
 
 Once done with database and starting the server, you need to create default administrative user to handle your server from WebUI. It is done from the server console using the _rat-manage-api_ utility.
@@ -431,7 +404,9 @@ it will return something like this:
 ```
 [root@149372a2ac05 wd]#
 ```
-this means you are in. Type new password into quotes after _echo_ command and use the following command to create an administrator for your OpenAFC server.
+this means you are in. 
+
+By default, the login uses non OIDC login method which manages user accounts locally.  You can use the following command to create an administrator for your OpenAFC server.
 
 ```
 rat-manage-api user create --role Admin --role AP --role Analysis admin "Enter Your Password Here"
@@ -439,6 +414,37 @@ rat-manage-api user create --role Admin --role AP --role Analysis admin "Enter Y
 
 Once done, you can authorize with this user and password in WebUI.
 To exit the console press Ctrl+D or type the 'exit' command.
+
+If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Login.md)
+
+### Note for an existing user database
+
+Database format has changed over time.  If your user database uses older format, you might find errors indicating missing database fields upon bootup and login. The error message has instructions on how to migrate the database. These steps apply whether you're using OIDC or non OIDC login method.  You have two options:
+
+**1. Reinitialize the database without users:**
+
+```
+rat-manage-api db-drop
+rat-manage-api db-create
+```
+
+This will wipe out existing users, e.g. user acounts need to be manually recreated again.
+
+**2. Migrate the database with users:**
+
+```
+RAT_DBVER=0 rat-manage-api db-export --dst data.json
+RAT_DBVER=0 rat-manage-api db-drop
+rat-manage-api db-create
+rat-manage-api db-import --src data.json
+```
+
+This migration will maintain all existing user data, including roles. Steps to migrate above will:
+1. Export the user database to .json file.  Since the database is an older version, use env variable to tell the command the the right schema to use to intepret the database.
+2. Delete the old version database.
+3. Recreate the database.
+4. Import the json file into the new database.
+## Initial Administrator account
 
 Happy usage!
 

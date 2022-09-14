@@ -87,6 +87,13 @@ class GuiConfig(MethodView):
         else:
             histurl = u.scheme + "://" + u.hostname + ":" + str(os.getenv("HISTORY_EXTERNAL_PORT")) + "/"
 
+        if flask.current_app.config['OIDC_LOGIN']:
+            login_url=flask.url_for('auth.LoginAPI'),
+            logout_url=flask.url_for('auth.LogoutAPI'),
+        else:
+            login_url=flask.url_for('user.login'),
+            logout_url=flask.url_for('user.logout'),
+
         resp = flask.jsonify(
             paws_url=flask.url_for('paws'),
             uls_url=flask.url_for('files.uls_db'),
@@ -103,9 +110,9 @@ class GuiConfig(MethodView):
                 'ratapi-v1.UlsDb', uls_file='p_uls_file'),
             uls_daily_url=flask.url_for(
                 'ratapi-v1.UlsParse'),
-            login_url=flask.url_for('user.login'),
-            logout_url=flask.url_for('user.logout'),
             status_url=flask.url_for('auth.UserAPI'),
+            login_url=login_url,
+            logout_url=logout_url,
             admin_url=flask.url_for('admin.User', user_id=-1),
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
