@@ -49,6 +49,32 @@ std::string AntennaModelClass::categoryStr(CategoryEnum categoryVal)
 /******************************************************************************************/
 
 /******************************************************************************************/
+/**** STATIC FUNCTION: AntennaModelClass::typeStr()                                    ****/
+/******************************************************************************************/
+std::string AntennaModelClass::typeStr(TypeEnum typeVal)
+{
+    std::string str;
+
+    switch(typeVal) {
+        case AntennaType:
+            str = "Ant";
+            break;
+        case ReflectorType:
+            str = "Ref";
+            break;
+        case UnknownType:
+            str = "UNKNOWN";
+            break;
+        default:
+            CORE_DUMP;
+            break;
+    }
+
+    return(str);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
 /**** CONSTRUCTOR: AntennaModelMapClass::AntennaModelMapClass                          ****/
 /******************************************************************************************/
 AntennaModelMapClass::AntennaModelMapClass(std::string antModelListFile, std::string antModelMapFile)
