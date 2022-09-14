@@ -11,15 +11,15 @@ You can configure AFC server to use one of two login mechanisms.  The OIDC login
 The legacy login mechanism performs authentication locally on the AFC server. It is configured by default.  Steps to configure are described in [README.md](/README.md)
 
 ## **OIDC Login**
-OIDC relies on an identity provider outside of the AFC server to verify the users identity.  Your organization could already have its own identity server for its employees.  When a user logs in the AFC application, AFC server forwards a request to the identity provider to authenticate.  For your organization's employees, the authentication is completed by your identity provider.  For federated users, the identity provider will further forward the user to his/her respective identity server for verification.  
+OIDC relies on an identity provider outside of the AFC server to verify the users identity.  Your organization could already have its own identity server for its employees.  When a user logs in the AFC application, AFC server forwards a request to the identity provider to authenticate.  For your organization's employees, the authentication is completed by your identity provider.  For federated users, the identity provider will further forward the user to his/her respective identity server for verification.
 
 Background on OIDC can be found here: https://openid.net/connect/
 
 ### **OIDC Configuration **
 Default OIDC configuration is in src/ratapi/ratapi/config.py
-By default, it's configured with disable OIDC Login 
+By default, it's configured with disable OIDC Login
 ```
-OIDC_LOGIN = False 
+OIDC_LOGIN = False
 ```
 OIDC configuration can be customized by creating file src/ratapi/ratapi/priv_config.py. For example, to enable OIDC login, write to priv_config.py:
 
@@ -48,7 +48,7 @@ These users do not have accounts at the identity provider, and therefore, cannot
 ```
 rat-manage-api user create --role Admin --role AP --role Analysis myusername "Enter Your Password Here"
 ```
-Note: the password in above command has no effect and is kept only to be backward compatible with non OIDC method .  
+Note: the password in above command has no effect and is kept only to be backward compatible with non OIDC method.
 
 
 ### **OIDC Authenticated User **
