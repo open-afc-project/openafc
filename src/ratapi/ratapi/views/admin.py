@@ -1,3 +1,4 @@
+# This Python file uses the following encoding: utf-8
 #
 # Portions copyright © 2022 Broadcom. All rights reserved.
 # The term "Broadcom" refers solely to the Broadcom Inc. corporate
