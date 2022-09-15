@@ -11,6 +11,7 @@
 ''' Authentication, authorization, and accounting classes.
 '''
 
+import os
 from .. import config
 OIDC_LOGIN = config.OIDC_LOGIN
 
@@ -21,6 +22,7 @@ try:
 except:
     pass
 
+OIDC_LOGIN=(os.getenv('OIDC_LOGIN', str(OIDC_LOGIN)).lower() == "true")
 if OIDC_LOGIN:
     from flask_login import UserMixin
 else:

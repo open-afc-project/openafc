@@ -6,6 +6,7 @@
 # This work is licensed under the OpenAFC Project License, a copy
 # of which is included with this software program.
 #
+import os
 import logging
 import datetime
 import hashlib
@@ -25,6 +26,8 @@ try:
     OIDC_LOGIN = priv_config.OIDC_LOGIN
 except:
     pass
+
+OIDC_LOGIN=(os.getenv('OIDC_LOGIN', str(OIDC_LOGIN)).lower() == "true")
 
 if OIDC_LOGIN:
     from flask_login import (

@@ -98,11 +98,22 @@ def create_app(config_override=None):
     except:
         pass
 
+    # override config with environment variables
+    flaskapp.config['OIDC_LOGIN']=(
+       os.getenv('OIDC_LOGIN', str(flaskapp.config['OIDC_LOGIN'])).lower() == "true")
+
     if flaskapp.config['OIDC_LOGIN']:
         from models.aaa import User
         from flask_login import  LoginManager
         login_manager = LoginManager()
         login_manager.init_app(flaskapp)
+
+        flaskapp.config['OIDC_CLIENT_ID']=os.getenv('OIDC_CLIENT_ID', \
+            flaskapp.config['OIDC_CLIENT_ID'])
+        flaskapp.config['OIDC_CLIENT_SECRET']=os.getenv('OIDC_CLIENT_SECRET', \
+            flaskapp.config['OIDC_CLIENT_SECRET'])
+        flaskapp.config['OIDC_DISCOVERY_URL']=os.getenv('OIDC_DISCOVERY_URL', \
+            flaskapp.config['OIDC_DISCOVERY_URL'])
 
         if (flaskapp.config['OIDC_DISCOVERY_URL']):
             endpoints = requests.get(flaskapp.config['OIDC_DISCOVERY_URL'],

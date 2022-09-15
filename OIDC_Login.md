@@ -21,7 +21,7 @@ By default, it's configured with disable OIDC Login
 ```
 OIDC_LOGIN = False
 ```
-OIDC configuration can be customized by creating file src/ratapi/ratapi/priv_config.py. For example, to enable OIDC login, write to priv_config.py:
+OIDC configuration can be customized by creating file src/ratapi/ratapi/priv_config.py or by creating envinroment variables.  For example, to enable OIDC login, write to priv_config.py:
 
 ```
 OIDC_LOGIN = True
@@ -29,6 +29,14 @@ OIDC_CLIENT_ID = '1234'
 OIDC_CLIENT_SECRET = 'my_secret_string'
 OIDC_DISCOVERY_URL = 'https://accounts.mycompany.com'
 ```
+Alternatively, by adding similar lines in docker-compose.yaml, the environment variables will be created which overrides both the default config and priv_config.py if it exists. For example, under rat_server:
+        environment:
+          - OIDC_LOGIN=True
+          - OIDC_CLIENT_ID=1234
+          - OIDC_CLIENT_SECRET=my_secret_string
+          - OIDC_DISCOVERY_URL=https://accounts.mycompany.com
+The benefit of using docker-compose.yaml is that the admin can dynamically change the configuration without having to rebuild.
+
 The following is an example configuration with non production Google OIDC cloud account.  This cloud account has been configured to work with an AFC server at a particular URL. Simply add this to priv_config.py will enable OIDC and forward traffic there, and anyone with a valid gmail can use that to login. However, this account is configured with a particular AFC server address so it won't work for any AFC server deployment and should be used only as a template:
 ```
 OIDC_LOGIN = True
@@ -37,6 +45,7 @@ ontent.com'
 OIDC_CLIENT_SECRET='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'
 OIDC_DISCOVERY_URL = 'https://accounts.google.com/.well-known/openid-configuration'
 ```
+
 More information on creating your own google cloud account can be found here:
 https://cloud.google.com/apigee/docs/hybrid/v1.3/precog-gcpaccount
 

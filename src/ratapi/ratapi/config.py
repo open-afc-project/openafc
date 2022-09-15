@@ -70,3 +70,6 @@ DAILY_ULS_RAN_TODAY = False
 
 # OIDC default configurations
 OIDC_LOGIN = False
+OIDC_CLIENT_ID = ""
+OIDC_CLIENT_SECRET = ""
+OIDC_DISCOVERY_URL = ""
