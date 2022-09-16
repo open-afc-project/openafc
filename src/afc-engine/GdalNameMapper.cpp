@@ -231,13 +231,15 @@ GdalNameMapperDirect::GdalNameMapperDirect(const std::string &fnmatchPattern,
 		}
 		GDALDataset *gdalDataSet = nullptr;
 		try {
-			GDALDataset *gdalDataSet =
+			gdalDataSet =
 				static_cast<GDALDataset*>(GDALOpen(di->path().native().c_str(), GA_ReadOnly));
 			_files.push_back(
 				std::make_tuple(GdalTransform(gdalDataSet, filename).makeBoundRect(), filename));
 			GDALClose(gdalDataSet);
 		} catch (...) {
-			GDALClose(gdalDataSet);
+			if (gdalDataSet) {
+				GDALClose(gdalDataSet);
+			}
 			throw;
 		}
 	}
