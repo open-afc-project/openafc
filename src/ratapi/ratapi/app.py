@@ -1,3 +1,12 @@
+# This Python file uses the following encoding: utf-8
+#
+# Portions copyright © 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate
+# affiliate that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy
+# of which is included with this software program.
+#
+
 ''' Flask application generation.
 '''
 import sys
@@ -7,8 +16,7 @@ import logging
 import flask
 from . import config
 from . import data_if
-import datetime
-
+import requests
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -26,8 +34,7 @@ def create_app(config_override=None):
     :rtype: :py:cls:`flask.Flask`
     '''
     from flask_migrate import Migrate
-    from flask_user import UserManager
-    from flask_user.user_manager__settings import UserManager__Settings
+
     import xdg.BaseDirectory
     # Child members
     from . import models, views, util
@@ -84,8 +91,35 @@ def create_app(config_override=None):
     Migrate(
         flaskapp, db, directory=os.path.join(owndir, 'migrations'))
 
-    flaskapp.config['REMEMBER_COOKIE_DURATION'] = datetime.timedelta(days=30)
-    user_manager = UserManager(flaskapp, db, models.aaa.User)
+    try:
+        # private configuration. Override values from config
+        from . import priv_config
+        flaskapp.config.from_object(priv_config)
+    except:
+        pass
+
+    if flaskapp.config['OIDC_LOGIN']:
+        from models.aaa import User
+        from flask_login import  LoginManager
+        login_manager = LoginManager()
+        login_manager.init_app(flaskapp)
+
+        if (flaskapp.config['OIDC_DISCOVERY_URL']):
+            endpoints = requests.get(flaskapp.config['OIDC_DISCOVERY_URL'],
+                headers={'Accept' : 'application/json'}).json()
+            flaskapp.config['OIDC_ORG_AUTH_URL'] = endpoints['authorization_endpoint']
+            flaskapp.config['OIDC_ORG_TOKEN_URL'] = endpoints['token_endpoint']
+            flaskapp.config['OIDC_ORG_USER_INFO_URL'] = endpoints['userinfo_endpoint']
+
+        @login_manager.user_loader
+        def load_user(_id):
+            ''' Load user invoked from flask login
+            '''
+            return User.get(_id)
+    else:
+        # Non OIDC login.
+        from flask_user import UserManager
+        user_manager = UserManager(flaskapp, db, models.aaa.User)
 
     # Check configuration
     state_path = flaskapp.config['STATE_ROOT_PATH']

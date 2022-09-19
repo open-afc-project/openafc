@@ -1,3 +1,11 @@
+/**
+ * Portions copyright © 2022 Broadcom. All rights reserved.
+ * The term "Broadcom" refers solely to the Broadcom Inc. corporate
+ * affiliate that owns the software below.
+ * This work is licensed under the OpenAFC Project License, a copy
+ * of which is included with this software program.
+ */
+
 import * as React from "react";
 import {
     Card,
@@ -19,7 +27,7 @@ import {
 import { error, success } from "../Lib/RatApiTypes";
 import { getAccessPoints, addAccessPoint, deleteAccessPoint, getUser, updateUser } from "../Lib/Admin";
 import { logger } from "../Lib/Logger";
-import { UserContext, UserState, isLoggedIn, hasRole, isAdmin } from "../Lib/User";
+import { UserContext, UserState, isAdmin, isEditCredential } from "../Lib/User";
 
 // UserAccount.tsx: Page where user properties can be modified
 // author: Sam Smucny
@@ -36,7 +44,8 @@ interface UserAccountState {
     passwordConf?: string,
     active: boolean,
     messageType?: "danger" | "success",
-    messageValue: string
+    messageValue: string,
+    editCredential: boolean
 }
 
 export class UserAccount extends React.Component<UserAccountProps, UserAccountState> {
@@ -49,7 +58,8 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
             messageValue: "",
             email: "",
             password: "",
-            passwordConf: ""
+            passwordConf: "",
+            editCredential: false
         }
 
         getUser(props.userId)
@@ -58,7 +68,8 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
                 email: res.result.email,
                 active: res.result.active,
                 messageType: undefined,
-                messageValue: ""
+                messageValue: "",
+                editCredential: isEditCredential(),
              } as UserAccountState) :
              this.setState({
                 messageType: "danger",
@@ -69,8 +80,13 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
     private upperLower = (p: string) => /[A-Z]/.test(p) && /[a-z]/.test(p);
     private hasSymbol = (p: string) => /[-!$%^&*()_+|~=`{}\[\]:";'<>@#\)\(\{\}?,.\/\\]/.test(p);
 
-    private validEmail = (e?: string) => !!e && /(\w+)@(\w+).(\w+)/.test(e);
+    private validEmail = (e?: string) => {
+        if (!this.state.editCredential) return true;
+        return (!!e && /(\w+)@(\w+).(\w+)/.test(e));
+    }
+
     private validPass = (p?: string) => {
+        if (!this.state.editCredential) return true;
         if (!p) return false;
         if (p.length < 8)
             return false;
@@ -82,29 +98,36 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
             return false
         return true;
     }
-    private validPassConf = (p?: string) => p === this.state.password;
+
+    private validPassConf = (p?: string) => {
+        if (!this.state.editCredential) return true
+        return (p === this.state.password)
+    }
 
     private updateUser = () => {
-        if (!this.validEmail(this.state.email)) {
-            this.setState({ messageType: "danger", messageValue: "Invalid email" });
-            return;
+        if (this.state.editCredential) {
+            if (!this.validEmail(this.state.email)) {
+                this.setState({ messageType: "danger", messageValue: "Invalid email" });
+                return;
+            }
+            if (!this.validPass(this.state.password)) {
+                this.setState({ messageType: "danger", 
+                    messageValue: "Invalid password:\n Password must contain: minimum 8 characters, a number, upper and lower case letters, and a special character." });
+                return;
+            }
+            if (!this.validPassConf(this.state.passwordConf)) {
+                this.setState({ messageType: "danger", messageValue: "Passwords must match" });
+                return;
+            }
         }
-        if (!this.validPass(this.state.password)) {
-            this.setState({ messageType: "danger", 
-                messageValue: "Invalid password:\n Password must contain: minimum 8 characters, a number, upper and lower case letters, and a special character." });
-            return;
-        }
-        if (!this.validPassConf(this.state.passwordConf)) {
-            this.setState({ messageType: "danger", messageValue: "Passwords must match" });
-            return;
-        }
-        
+
         logger.info("Editing user: ", this.state.userId);
         updateUser({
             id: this.props.userId,
             email: this.state.email!,
             active: this.state.active,
-            password: this.state.password!
+            password: this.state.password!,
+            editCredential: this.state.editCredential
         })
         .then(res => {
             if (res.kind === "Success") {
@@ -120,7 +143,9 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
     }
 
     render = () => 
-    <Card><CardBody>
+    {
+        return (
+        <Card><CardBody>
         {this.state.messageType && (<>
           <Alert
             variant={this.state.messageType}
@@ -129,7 +154,7 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
           />
           <br/>
         </>)}
-        <FormGroup label="Email" fieldId="form-email">
+        {this.state.editCredential ? (<FormGroup label="Email" fieldId="form-email">
             <InputGroup>
               <TextInput
                 value={this.state.email}
@@ -140,8 +165,20 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
                 isValid={this.validEmail(this.state.email)}
               />
             </InputGroup>
+        </FormGroup>):
+        (<FormGroup label="Email" fieldId="form-email">
+            <InputGroup>
+              <TextInput
+                isReadOnly
+                value={this.state.email}
+                type="email"
+                id="form-email"
+                name="form-email"
+              />
+            </InputGroup>
         </FormGroup>
-        <FormGroup label="Password" fieldId="form-pass">
+        )}
+        {this.state.editCredential && (<FormGroup label="Password" fieldId="form-pass">
             <InputGroup>
               <TextInput
                 value={this.state.password}
@@ -152,8 +189,10 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
                 isValid={this.validPass(this.state.password)}
               />
             </InputGroup>
-        </FormGroup>
-        <FormGroup label="Confirm Password" fieldId="form-pass-c">
+        </FormGroup>)
+        }
+
+        {this.state.editCredential && (<FormGroup label="Confirm Password" fieldId="form-pass-c">
             <InputGroup>
               <TextInput
                 value={this.state.passwordConf}
@@ -164,11 +203,13 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
                 isValid={this.validPassConf(this.state.passwordConf)}
               />
             </InputGroup>
-        </FormGroup>
+        </FormGroup>)
+        }
+
         <br/>
-        <UserContext.Consumer>{(user: UserState) => isAdmin() && <><Checkbox 
-            label="Is Active" 
-            aria-label="User is active checkbox" 
+        <UserContext.Consumer>{(user: UserState) => isAdmin() && <><Checkbox
+            label="Is Active"
+            aria-label="User is active checkbox"
             id="user-active-check"
             name="user-active-check"
             isChecked={this.state.active}
@@ -179,7 +220,9 @@ export class UserAccount extends React.Component<UserAccountProps, UserAccountSt
         <Button key="submit" variant="primary" onClick={() => this.updateUser()}>
                 Update
             </Button>
-    </CardBody></Card>
+        </CardBody></Card>
+        );
+    }
 }
 
 /**

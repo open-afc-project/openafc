@@ -11,7 +11,21 @@
 ''' Authentication, authorization, and accounting classes.
 '''
 
-from flask_user import UserMixin
+from .. import config
+OIDC_LOGIN = config.OIDC_LOGIN
+
+try:
+    # priv_config overrides defaults
+    from .. import priv_config
+    OIDC_LOGIN = priv_config.OIDC_LOGIN
+except:
+    pass
+
+if OIDC_LOGIN:
+    from flask_login import UserMixin
+else:
+    from flask_user import UserMixin
+
 import jwt
 from .base import db, UserDbInfo
 import datetime
@@ -35,7 +49,7 @@ class User(db.Model, UserMixin):
     except:
         pass
 
-    if (UserDbInfo.VER >= 1):
+    if UserDbInfo.VER >= 1:
         username = db.Column(db.String(50), nullable=False, unique=True)
         sub = db.Column(db.String(255))
 
@@ -53,15 +67,19 @@ class User(db.Model, UserMixin):
     access_points = db.relationship('AccessPoint')
 
     @staticmethod
+    def get(user_id):
+        return User.query.filter_by(id=user_id).first()
+
+    @staticmethod
     def getsub(user_sub):
-        if (UserDbInfo.VER >= 1):
-            return (User.query.filter_by(sub=user_sub).first())
+        if UserDbInfo.VER >= 1:
+            return User.query.filter_by(sub=user_sub).first()
         else:
             return None
 
     @staticmethod
     def getemail(user_email):
-        return (User.query.filter_by(email=user_email).first())
+        return User.query.filter_by(email=user_email).first()
 
 class Role(db.Model):
     ''' A role is used for authorization. '''

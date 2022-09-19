@@ -1,3 +1,11 @@
+/**
+ * Portions copyright © 2022 Broadcom. All rights reserved.
+ * The term "Broadcom" refers solely to the Broadcom Inc. corporate
+ * affiliate that owns the software below.
+ * This work is licensed under the OpenAFC Project License, a copy
+ * of which is included with this software program.
+ */
+
 import { createContext } from "react";
 import { clearCache, guiConfig, importCache } from "./RatApi";
 import { logger } from "./Logger";
@@ -95,6 +103,12 @@ export const retrieveUserData = async (): Promise<RatResponse<string>> => {
 
     return success("User loaded");
 }
+
+/**
+ * Is current user logged in?
+ * @returns User login status
+ */
+export const isEditCredential = () => getUser().data.editCredential;
 
 /**
  * Is current user logged in?

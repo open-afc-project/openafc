@@ -192,9 +192,9 @@ class TestResultComparator:
         path_repr = f"[{']['.join(str(idx) for idx in path)}]"
         if ref_item == result_item:
             return  # Items are equal - nothing to do
-        # So, items are sifferent. What's the difference?
+        # So, items are different. What's the difference?
         if isinstance(ref_item, dict):
-            # One item is dictionary. Other should also be dictionary...
+            # One item is dictionary. Other should also should be dictionary...
             if not isinstance(result_item, dict):
                 diffs.append(f"Different item types at {path_repr}")
                 return
@@ -210,7 +210,7 @@ class TestResultComparator:
                             f" Unique {kind} keys: {', '.join(sorted(elems))}."
                 diffs.append(msg)
                 return
-            # Comparing values fo rindividual keys
+            # Comparing values for individual keys
             for key in sorted(ref_item.keys()):
                 self._recursive_compare(ref_json, result_json, path + [key],
                                         diffs)
@@ -219,7 +219,10 @@ class TestResultComparator:
             if not isinstance(result_item, list):
                 diffs.append(f"Different item types at {path_repr}")
                 return
-            # ... with the same number of elements
+            # If this is a channel list (or part thereof - handle it)
+            if self._compare_channel_lists(ref_json, result_json, path, diffs):
+                return
+            # Proceeding with comparison of other list kinds
             if len(ref_item) != len(result_item):
                 diffs.append(
                     (f"Different list lengths at at {path_repr}: "
@@ -232,56 +235,93 @@ class TestResultComparator:
                                         diffs)
         else:
             # Items should be scalars
-            numeric = True
             for item, kind in [(ref_item, "Reference"),
                                (result_item, "Result")]:
-                if isinstance(item, str):
-                    numeric = False
-                elif not isinstance(item, (int, float)):
+                if not isinstance(item, (int, float, str)):
                     diffs.append((f"{kind} data contains unrecognized item "
                                   f"type at {path_repr}"))
                     return
-            # Are these items power results for channel?
-            chan_repr = self._get_channel(ref_json, path) if numeric else None
-            if chan_repr is None:
-                # No, hence they must match exactly
-                diffs.append((f"Difference at {path}: reference content is "
-                              f"{ref_item}, result content is {result_item}"))
-            elif abs(ref_item - result_item) > self._precision:
-                # Yes and difference exceeds precision
-                diffs.append(
-                    (f"Difference at channel {chan_repr}: reference content "
-                     f"is {ref_item}, result content is {result_item}, "
-                     f"difference is {abs(ref_item - result_item):g}dB"))
+            diffs.append((f"Difference at {path}: reference content is "
+                          f"{ref_item}, result content is {result_item}"))
 
-    def _get_channel(self, j, path):
-        """ Tries to get channel description for value at given index
+    def _compare_channel_lists(self, ref_json, result_json, path, diffs):
+        """ Trying to compare channel lists
 
         Arguments:
-        j    -- JSON dictionary
-        path -- Sequence of indices to the element in question
-        Returns string representation of channel if value is power limit for
-        channel, None otherwise
+        ref_json    -- Reference response JSON dictionary
+        result_json -- Actual response JSON dictionary
+        path        -- Path (sequence of indices) to node in question
+        diffs       -- List of difference description strings to update
+        Returns true if channel list comparison was done, no further action
+        required, False if node is not a channel list, should be compared as
+        usual
         """
-        try:
-            # Value is element in list with "maxEirp" key?
-            if (len(path) >= 2) and (path[-2] == "maxEirp"):
-                # Returning channel number (None if some indices are wrong)
-                return str(self._get_item(j,
-                    path[: len(path) - 2] + ["channelCfi", path[-1]]))
-            # Value is element at "maxPSD" key?
-            if (len(path) >= 1) and (path[-1] == "maxPSD"):
-                # Returning string representation of frequency range (None if
-                # some indices are wrong)
-                fr = self._get_item(j,
-                                    path[:len(path) - 1] + ["frequencyRange"])
-                return f"[{fr['highFrequency']}-{fr['lowFrequency']}]"
-        except (KeyError, IndexError):
-            pass
-        return None
+        if path[-1] == "channelCfi":
+            # Comparison will be made at "maxEirp"
+            return True
+        # Human readable path representation for difference messages
+        path_repr = f"[{']['.join(str(idx) for idx in path)}]"
+        # EIRP dictionaries, indexed by channel identification (number or
+        # frequency range)
+        ref_channels = {}
+        result_channels = {}
+        if path[-1] == "maxEirp":
+            # Channel numbers
+            for kind, src, chan_dict in \
+                    [("reference", ref_json, ref_channels),
+                     ("result", result_json, result_channels)]:
+                try:
+                    numbers = self._get_item(src, path[:-1] + ["channelCfi"])
+                    chan_dict.update(dict(zip([str(n) for n in numbers],
+                                              self._get_item(src, path))))
+                except (TypeError, ValueError, KeyError):
+                    diffs.append((f"Unrecognized  channel list structure at "
+                                  f"{path_repr} in {kind}"))
+                    return True
+        elif path[-1] == "availableFrequencyInfo":
+            # Channel frequencies
+            for kind, src, chan_dict in \
+                    [("reference", ref_json, ref_channels),
+                     ("result", result_json, result_channels)]:
+                try:
+                    for freq_info in self._get_item(src, path):
+                        fr = freq_info["frequencyRange"]
+                        chan_dict[
+                            f"[{fr['lowFrequency']}-{fr['highFrequency']}"] = \
+                            float(freq_info["maxPSD"])
+                except (TypeError, ValueError, KeyError):
+                    diffs.append((f"Unrecognized  frequency list structure at "
+                                  f"{path_repr} in {kind}"))
+                    return True
+        else:
+            return False
+        # Now will compare two channel dictionaries
+        # First looking for unique channels
+        for this_kind, this_channels, other_kind, other_channels in \
+                [("reference", ref_channels, "result", result_channels),
+                 ("result", result_channels, "reference", ref_channels)]:
+            for channel in sorted(set(this_channels.keys()) -
+                                  set(other_channels.keys())):
+                diffs.append(
+                    (f"Channel {channel} present in {path_repr} of "
+                     f"{this_kind} with EIRP limit of "
+                     f"{this_channels[channel]}dBm, but absent in "
+                     f"{other_kind}"))
+        # Then looking for different EIRPs on common channels
+        for channel in sorted(set(ref_channels.keys()) &
+                              set(result_channels.keys())):
+            diff = abs(ref_channels[channel] - result_channels[channel])
+            if diff <= self._precision:
+                continue
+            diffs.append(
+                (f"Different values in {path_repr} for channel {channel}: "
+                 f"reference has EIRP of {ref_channels[channel]}dBm, "
+                 f"result has EIRP of {result_channels[channel]}dBm, "
+                 f"difference is: {diff:g}dB"))
+        return True
 
     def _get_item(self, j, path):
-        """ Retrieves item by sequemce of indices
+        """ Retrieves item by sequence of indices
 
         Arguments:
         j    -- JSON dictionary
