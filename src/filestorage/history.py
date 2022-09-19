@@ -27,6 +27,8 @@ import abc
 import google.cloud.storage
 import filestorage_config
 
+NET_TIMEOUT = 60 # The amount of time, in seconds, to wait for the server response
+
 flask = Flask(__name__)
 flask.config.from_pyfile('filestorage_config.py')
 
@@ -52,10 +54,10 @@ def generateHtml(baseurl, dirs, files):
     html = """<!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
+    <meta content="text/html; charset="utf-8">
 </head>
 <body>
-<h1>"""
+<h1>Directory listing for """
 
     baseSplit = baseurl.split("/")
     if len(baseSplit) >= 4:
@@ -69,18 +71,19 @@ def generateHtml(baseurl, dirs, files):
         baseSplit = ""
 
 
-    html += """</h1>
-<table>
+    html += """</h1><hr>
+<ul>
 """
 
     for e in dirs:
-        html += "<tr><td><a href=" + baseurl + "/" + e + "><b>" + e + """</b></a></td></tr>
+        html += "<li><a href=" + baseurl + "/" + e + "><b>" + e + """/</b></a></li>
 """
     for e in files:
-        html += "<tr><td><a href=" + baseurl + "/" + e + ">" + e + """</a></td></tr>
+        html += "<li><a href=" + baseurl + "/" + e + ">" + e + """</a></li>
 """
 
-    html += """</table>
+    html += """</ul>
+<hr>
 </body>
 </html>
 """
@@ -93,9 +96,6 @@ def generateHtml(baseurl, dirs, files):
 class ObjInt:
     """ Abstract class for data prot operations """
     __metaclass__ = abc.ABCMeta
-
-    def __init__(self, file_name):
-        self._file_name = file_name
 
     @abc.abstractmethod
     def isdir(self):
@@ -117,27 +117,50 @@ class ObjInt:
 
 
 class ObjIntLocalFS(ObjInt):
+    def __init__(self, file_name):
+        self.__file_name = file_name
+
     def isdir(self):
-        return os.path.isdir(self._file_name)
+        return os.path.isdir(self.__file_name)
 
     def list(self):
         flask.logger.debug("ObjIntLocalFS.list")
-        ls = os.listdir(self._file_name)
-        files = [f for f in ls if os.path.isfile(os.path.join(self._file_name, f))]
-        dirs = [f for f in ls if os.path.isdir(os.path.join(self._file_name, f))]
+        ls = os.listdir(self.__file_name)
+        files = [f for f in ls if os.path.isfile(os.path.join(self.__file_name, f))]
+        dirs = [f for f in ls if os.path.isdir(os.path.join(self.__file_name, f))]
         return dirs, files
 
     def read(self):
-        flask.logger.debug("ObjIntLocalFS.read({})".format(self._file_name))
-        if os.path.isfile(self._file_name):
-            with open(self._file_name, "rb") as hfile:
+        flask.logger.debug("ObjIntLocalFS.read({})".format(self.__file_name))
+        if os.path.isfile(self.__file_name):
+            with open(self.__file_name, "rb") as hfile:
                 return hfile.read()
         return None
 
 
 class ObjIntGoogleCloudBucket(ObjInt):
+    def __init__(self, file_name):
+        self.__file_name = file_name
+        self.__blob = bucket.blob(self.__file_name)
+
+    def isdir(self):
+        return not self.__blob.exists()
+
+    def list(self):
+        flask.logger.debug("ObjIntGoogleCloudBucket.list")
+        blobs = bucket.list_blobs(prefix=self.__file_name + "/")
+        files = []
+        dirs = set()
+        for blob in blobs:
+            name = blob.name.removeprefix(self.__file_name + "/")
+            if name.count("/"):
+                dirs.add(name.split("/")[0])
+            else:
+                files.append(name)
+        return list(dirs), files
+
     def read(self):
-        blob = bucket.blob(self._file_name)
+        blob = bucket.blob(self.__file_name)
         return blob.download_as_bytes(raw_download=True,
                                       timeout=NET_TIMEOUT)
 
@@ -191,8 +214,6 @@ def get(path):
 
 
 if __name__ == '__main__':
-    os.makedirs(flask.config["DBG_LOCATION"], exist_ok=True)
-
     #waitress.serve(flask, host=flask.config["HISTORY_HOST"],
     #      port=flask.config["HISTORY_PORT"])
 
