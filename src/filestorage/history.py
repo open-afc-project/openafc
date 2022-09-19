@@ -214,11 +214,11 @@ def get(path):
 
 
 if __name__ == '__main__':
-    #waitress.serve(flask, host=flask.config["HISTORY_HOST"],
-    #      port=flask.config["HISTORY_PORT"])
+    waitress.serve(flask, host=flask.config["HISTORY_HOST"],
+          port=flask.config["HISTORY_PORT"])
 
-    flask.run(host=flask.config['HISTORY_HOST'],
-               port=flask.config['HISTORY_PORT'], debug=True)
+    #flask.run(host=flask.config['HISTORY_HOST'],
+    #           port=flask.config['HISTORY_PORT'], debug=True)
 
 
 
