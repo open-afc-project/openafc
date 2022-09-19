@@ -15,7 +15,7 @@ import os
 import logging
 
 # LOG_FILE or LOG_STREAM should be None
-LOG_FILE = "/proc/self/fd/2"
+LOG_FILE = None #"/proc/self/fd/2"
 LOG_STREAM = None
 
 # use "logging.ERROR" to shut it up
@@ -25,7 +25,7 @@ LOG_LEVEL = logging.DEBUG
 OBJSTORAGE = os.getenv("OBJSTORAGE", "LocalFS")
 
 # file download/upload location on the server in case of OBJSTORAGE=LocalFS
-FILE_LOCATION = os.getenv("FILESTORAGE_DIR", "/storage")
+FILE_LOCATION = os.getenv("FILESTORAGE_DIR", "/centos7/storage")
 
 PRO_LOCATION = FILE_LOCATION + "/responses"
 CFG_LOCATION = FILE_LOCATION + "/afc_config"
