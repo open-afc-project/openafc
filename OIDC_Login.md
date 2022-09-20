@@ -30,11 +30,14 @@ OIDC_CLIENT_SECRET = 'my_secret_string'
 OIDC_DISCOVERY_URL = 'https://accounts.mycompany.com'
 ```
 Alternatively, by adding similar lines in docker-compose.yaml, the environment variables will be created which overrides both the default config and priv_config.py if it exists. For example, under rat_server:
-        environment:
-          - OIDC_LOGIN=True
-          - OIDC_CLIENT_ID=1234
-          - OIDC_CLIENT_SECRET=my_secret_string
-          - OIDC_DISCOVERY_URL=https://accounts.mycompany.com
+```
+rat_server:
+  environment:
+     OIDC_LOGIN: 'True'
+     OIDC_CLIENT_ID: 1234
+     OIDC_CLIENT_SECRET: my-secret-string
+     OIDC_DISCOVERY_URL: https://accounts.mycompany.com
+```
 The benefit of using docker-compose.yaml is that the admin can dynamically change the configuration without having to rebuild.
 
 The following is an example configuration with non production Google OIDC cloud account.  This cloud account has been configured to work with an AFC server at a particular URL. Simply add this to priv_config.py will enable OIDC and forward traffic there, and anyone with a valid gmail can use that to login. However, this account is configured with a particular AFC server address so it won't work for any AFC server deployment and should be used only as a template:
