@@ -10599,8 +10599,8 @@ void AfcManager::runAnalyzeNLCD()
 	/**************************************************************************************/
 
 	GdalTransform::BoundRect nlcdBr(cgNlcd->boundRect());
-	std::cout << "    NLCD_TOP_RIGHT: "   << br.lonDegMax << " " << br.latDegMax << std::endl;
-	std::cout << "    NLCD_BOTTOM_LEFT: " << br.lonDegMin << " " << br.latDegMin << std::endl;
+	std::cout << "    NLCD_TOP_RIGHT: "   << nlcdBr.lonDegMax << " " << nlcdBr.latDegMax << std::endl;
+	std::cout << "    NLCD_BOTTOM_LEFT: " << nlcdBr.lonDegMin << " " << nlcdBr.latDegMin << std::endl;
 
 	std::vector<std::string> colorList;
 
