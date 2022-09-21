@@ -108,12 +108,16 @@ def create_app(config_override=None):
         login_manager = LoginManager()
         login_manager.init_app(flaskapp)
 
-        flaskapp.config['OIDC_CLIENT_ID']=os.getenv('OIDC_CLIENT_ID', \
-            flaskapp.config['OIDC_CLIENT_ID'])
-        flaskapp.config['OIDC_CLIENT_SECRET']=os.getenv('OIDC_CLIENT_SECRET', \
-            flaskapp.config['OIDC_CLIENT_SECRET'])
-        flaskapp.config['OIDC_DISCOVERY_URL']=os.getenv('OIDC_DISCOVERY_URL', \
-            flaskapp.config['OIDC_DISCOVERY_URL'])
+        # Override values from config
+        flaskapp.config['OIDC_ARG']=os.getenv('OIDC_ARG')
+        if flaskapp.config['OIDC_ARG']:
+            import json
+            with open(flaskapp.config['OIDC_ARG']) as oidc_config:
+                data = json.load(oidc_config)
+
+            flaskapp.config['OIDC_CLIENT_SECRET']=data['OIDC_CLIENT_SECRET']
+            flaskapp.config['OIDC_CLIENT_ID']=data['OIDC_CLIENT_ID']
+            flaskapp.config['OIDC_DISCOVERY_URL']=data['OIDC_DISCOVERY_URL']
 
         if (flaskapp.config['OIDC_DISCOVERY_URL']):
             endpoints = requests.get(flaskapp.config['OIDC_DISCOVERY_URL'],
