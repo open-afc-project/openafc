@@ -6,6 +6,8 @@
 #ifndef LIST_H
 #define LIST_H
 
+#include <functional>
+
 /******************************************************************************************/
 /**** Template Class: ListClass                                                        ****/
 /**** Based on template class example from "C++ Inside & Out", pg 528.                 ****/
@@ -31,6 +33,8 @@ class ListClass
 		int ins_elem(T val, const int err = 1, int *insFlagPtr = (int *) 0);
 		int get_index(T val, const int err = 1) const;
 		int contains(T val) const;
+
+		void sort(const std::function<bool(const T&, const T&)> &compare);
 
 		void printlist(int n = 100, const char *elemSep = (const char *) 0, const char *grpSep = (const char *) 0, const char *endStr = (const char *) 0);
 
