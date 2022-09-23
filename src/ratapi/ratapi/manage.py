@@ -224,6 +224,7 @@ Role.id).all():  # pylint: disable=no-member
                     user_cfg[key]['rolename'].append(role.name)
                 else:
                     user_cfg[key] = {
+                         'id':user.id,
                          'email':user.email,
                          'password':user.password,
                          'rolename':[role.name],
@@ -320,7 +321,7 @@ class UserCreate(Command):
     ''' Create a new user functionality. '''
 
     option_list = (
-        Option('email', type=str,
+        Option('username', type=str,
                help='User name'),
         Option('password_in', type=str,
                help='Users password\n'
@@ -331,7 +332,7 @@ class UserCreate(Command):
                help='role to include with the new user'),
     )
 
-    def _create_user(self, flaskapp, email, password_in, role, hashed):
+    def _create_user(self, flaskapp, id, username, email, password_in, role, hashed):
         ''' Create user in database. '''
         from contextlib import closing
         import datetime
@@ -368,13 +369,23 @@ class UserCreate(Command):
                     raise RuntimeError(
                         'Existing user found with email "{0}"'.format(email))
 
-                user = User(
-                    username=email,
-                    email=email,
-                    email_confirmed_at=datetime.datetime.now(),
-                    password=passhash,
-                    active=True,
-                )
+                if id:
+                    user = User(
+                        id=id,
+                        username=username,
+                        email=email,
+                        email_confirmed_at=datetime.datetime.now(),
+                        password=passhash,
+                        active=True,
+                    )
+                else:
+                    user = User(
+                        username=username,
+                        email=email,
+                        email_confirmed_at=datetime.datetime.now(),
+                        password=passhash,
+                        active=True,
+                    )
                 for rolename in role:
                     user.roles.append(get_or_create(
                         db.session, Role, name=rolename))
@@ -389,13 +400,27 @@ class UserCreate(Command):
 
     def __init__(self, flaskapp=None, user_params=None, hashed=False):
         if flaskapp and isinstance(user_params, dict):
-            self._create_user(flaskapp,
-                              user_params['username'],
-                              user_params['password'],
-                              user_params['rolename'], hashed)
+            if 'id' in user_params.keys():
+                id = user_params['id']
+            else:
+                id = None
 
-    def __call__(self, flaskapp, email, password_in, role, hashed=False):
-        self._create_user(flaskapp, email, password_in, role, hashed)
+            if 'email' in user_params.keys():
+                email = user_params['email']
+            else:
+                email = user_params['username']
+
+            self._create_user(flaskapp,
+                              id,
+                              user_params['username'],
+                              email,
+                              user_params['password'],
+                              user_params['rolename'],
+                              hashed)
+
+    def __call__(self, flaskapp, username, password_in, role, hashed=False):
+        # command does not provide email.  Populate email field with username
+        self._create_user(flaskapp, None, username, username, password_in, role, hashed)
 
 
 class UserUpdate(Command):
