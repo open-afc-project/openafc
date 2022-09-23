@@ -201,6 +201,11 @@ class TestResultComparator:
             # ... with same set of keys
             ref_keys = set(ref_item.keys())
             result_keys = set(result_item.keys())
+            for unique_key in (ref_keys ^ result_keys):
+                if self._compare_channel_lists(ref_json, result_json,
+                                               path + [unique_key], diffs):
+                    ref_keys -= {unique_key}
+                    result_keys -= {unique_key}
             if ref_keys != result_keys:
                 msg = f"Different set of keys at {path_repr}"
                 for kind, elems in [("reference", ref_keys - result_keys),
@@ -211,7 +216,7 @@ class TestResultComparator:
                 diffs.append(msg)
                 return
             # Comparing values for individual keys
-            for key in sorted(ref_item.keys()):
+            for key in sorted(ref_keys):
                 self._recursive_compare(ref_json, result_json, path + [key],
                                         diffs)
         elif isinstance(ref_item, list):
@@ -271,9 +276,11 @@ class TestResultComparator:
                     [("reference", ref_json, ref_channels),
                      ("result", result_json, result_channels)]:
                 try:
-                    numbers = self._get_item(src, path[:-1] + ["channelCfi"])
-                    chan_dict.update(dict(zip([str(n) for n in numbers],
-                                              self._get_item(src, path))))
+                    numbers = self._get_item(src, path[:-1] + ["channelCfi"],
+                                             default_last=[])
+                    chan_dict.update(
+                        dict(zip([str(n) for n in numbers],
+                                 self._get_item(src, path, default_last=[]))))
                 except (TypeError, ValueError, KeyError):
                     diffs.append((f"Unrecognized  channel list structure at "
                                   f"{path_repr} in {kind}"))
@@ -284,7 +291,8 @@ class TestResultComparator:
                     [("reference", ref_json, ref_channels),
                      ("result", result_json, result_channels)]:
                 try:
-                    for freq_info in self._get_item(src, path):
+                    for freq_info in self._get_item(src, path,
+                                                    default_last=[]):
                         fr = freq_info["frequencyRange"]
                         chan_dict[
                             f"[{fr['lowFrequency']}-{fr['highFrequency']}"] = \
@@ -320,16 +328,25 @@ class TestResultComparator:
                  f"difference is: {diff:g}dB"))
         return True
 
-    def _get_item(self, j, path):
+    def _get_item(self, j, path, default_last=None):
         """ Retrieves item by sequence of indices
 
         Arguments:
-        j    -- JSON dictionary
-        path -- Sequence of indices
+        j            -- JSON dictionary
+        path         -- Sequence of indices
+        default_last -- What to return if item at last index is absent. None
+                        means throw exception (if nonlast item is absent -
+                        exception is also thrown)
         Returns retrieved item
         """
-        for idx in path:
-            j = j[idx]
+        for path_idx, elem_idx in enumerate(path):
+            try:
+                j = j[elem_idx]
+            except (KeyError, IndexError):
+                if (default_last is not None) and \
+                        (path_idx == (len(path) - 1)):
+                    return default_last
+                raise
         return j
 
 
