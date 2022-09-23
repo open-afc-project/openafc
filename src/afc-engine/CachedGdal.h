@@ -318,6 +318,15 @@ protected:
 	 */
 	const void *getTileVector(int band, double latDeg, double lonDeg, int *pixelIndex);
 
+	/** Read pixel data directly, bypassing caching mechanism
+	 * @param[in] band 1-based index of band in GDAL file
+	 * @param[in] latDeg North-positive latitude in degrees
+	 * @param[in] lonDeg East-positive longitude in degrees
+	 * @param[out] pixelBuf Buffer to read pixel into
+	 * @return True on success, false on fail
+	 */ 
+	bool getPixelDirect(int band, double latDeg, double lonDeg, void *pixelBuf);
+
 	/** Throws if given band index is invalid */
 	void checkBandIndex(int band) const;
 
@@ -642,31 +651,40 @@ public:
 	 * @param[in] lonDeg East-positive longitude in degrees
 	 * @param[out] value Geospatial value
 	 * @param[in] band 1-based band index
+	 * @param[in] direct True to read pixel directly, bypassing caching
+	 *	mechanism (may speed up accessing scattered data)
 	 * @return True on success, false if coordinates are outside of file(s)
 	 */
-	bool getValueAt(double latDeg, double lonDeg, PixelData *value, int band = 1)
+	bool getValueAt(double latDeg, double lonDeg, PixelData *value, int band = 1,
+		bool direct = false)
 	{
-		int pixelIndex;
-		auto tileVector = reinterpret_cast<const std::vector<PixelData> *>(
-			getTileVector(band, latDeg, lonDeg, &pixelIndex));
 		PixelData v;
-		bool ret = true;
-		if (tileVector) {
-			v = tileVector->at(pixelIndex);
-			if (v == static_cast<PixelData>(gdalNoData(band))) {
-				ret = false;
-			}
+		bool ret; // True if retrieval successful
+		if (direct) {
+			// Directly reading pixel
+			ret = getPixelDirect(band, latDeg, lonDeg, &v);
 		} else {
-			v = static_cast<PixelData>(gdalNoData(band));
+			// First - finding tile
+			int pixelIndex;
+			auto tileVector = reinterpret_cast<const std::vector<PixelData> *>(
+				getTileVector(band, latDeg, lonDeg, &pixelIndex));
+			ret = tileVector != nullptr;
+			if (ret) {
+				// if tile found - retrieving pixel from it
+				v = tileVector->at(pixelIndex);
+			}
+		}
+		if (ret && (v == static_cast<PixelData>(gdalNoData(band)))) {
+			// If 'no-data' pixel was retrieved - count as faiilure
 			ret = false;
 		}
-		if (!ret) {
-			auto ndi = _noData.find(band);
-			if (ndi != _noData.end()) {
-				v = ndi->second;
-			}
-		}
 		if (value) {
+			// Caller needs pixel value
+			if (!ret) {
+				// Value for 'no-data' pixel - overridden or from GHDAL file
+				auto ndi = _noData.find(band);
+				v = (ndi != _noData.end()) ? ndi->second : static_cast<PixelData>(gdalNoData(band));
+			}
 			*value = v;
 		}
 		return ret;
@@ -676,12 +694,15 @@ public:
 	 * @param[in] latDeg North-positive latitude in degrees
 	 * @param[in] lonDeg East-positive longitude in degrees
 	 * @param[in] band 1-based band index
+	 * @param[in] direct True to read pixel directly, bypassing caching
+	 *	mechanism (may speed up accessing scattered data)
 	 * @return Resulted geospatial value
 	 */
-	PixelData valueAt(double latDeg, double lonDeg, int band = 1)
+	PixelData valueAt(double latDeg, double lonDeg, int band = 1,
+		bool direct = false)
 	{
 		PixelData ret;
-		getValueAt(latDeg, lonDeg, &ret, band);
+		getValueAt(latDeg, lonDeg, &ret, band, direct);
 		return ret;
 	}
 
