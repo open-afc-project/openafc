@@ -34,7 +34,7 @@ TerrainClass::TerrainClass(QString lidarDir, std::string srtmDir, std::string de
 		double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon,
 		double terrainMinLatBldg, double terrainMinLonBldg, double terrainMaxLatBldg, double terrainMaxLonBldg,
 		int maxLidarRegionLoadVal) :
-	maxLidarRegionLoad(maxLidarRegionLoadVal)
+	maxLidarRegionLoad(maxLidarRegionLoadVal), gdalDirectMode(false)
 {
 	if (!lidarDir.isEmpty())
 	{
@@ -136,7 +136,7 @@ void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, dou
 	if (lidarRegionIdx != -1) {
 		// loadLidarRegion(lidarRegionIdx);
 		lidarRegionList[lidarRegionIdx].multibandRaster->getHeight(latitudeDeg, longitudeDeg,
-				terrainHeight, bldgHeight, lidarHeightResult);
+				terrainHeight, bldgHeight, lidarHeightResult, gdalDirectMode);
 
 		switch(lidarHeightResult) {
 			case MultibandRasterClass::OUTSIDE_REGION:
@@ -167,7 +167,7 @@ void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, dou
 
 	if (heightSource == CConst::unknownHeightSource && cgDep.get()) {
 		float ht;
-		if (cgDep->getValueAt(latitudeDeg, longitudeDeg, &ht)) {
+		if (cgDep->getValueAt(latitudeDeg, longitudeDeg, &ht, 1, gdalDirectMode)) {
 			heightSource = CConst::depHeightSource;
 			terrainHeight = (double) ht;
 			numDEP++;
@@ -175,7 +175,7 @@ void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, dou
 	}
 	if (heightSource == CConst::unknownHeightSource) {
 		qint16 ht;
-		if (cgSrtm->getValueAt(latitudeDeg, longitudeDeg, &ht)) {
+		if (cgSrtm->getValueAt(latitudeDeg, longitudeDeg, &ht, 1, gdalDirectMode)) {
 			heightSource = CConst::srtmHeightSource;
 			terrainHeight = (double) ht;
 			numSRTM++;
@@ -183,10 +183,30 @@ void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, dou
 	}
 
 	if (heightSource == CConst::unknownHeightSource) {
-		terrainHeight = (double)cgGlobe->valueAt(latitudeDeg, longitudeDeg);
+		terrainHeight = (double)cgGlobe->valueAt(latitudeDeg, longitudeDeg, 1, gdalDirectMode);
 		heightSource = CConst::globalHeightSource;
 		numGlobal++;
 	}
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: TerrainClass::getGdalDirectMode()                                        ****/
+/******************************************************************************************/
+bool TerrainClass::getGdalDirectMode() const
+{
+	return gdalDirectMode;
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: TerrainClass::setGdalDirectMode()                                        ****/
+/******************************************************************************************/
+bool TerrainClass::setGdalDirectMode(bool newGdalDirectMode)
+{
+	bool ret = gdalDirectMode;
+	gdalDirectMode = newGdalDirectMode;
+	return ret;
 }
 /******************************************************************************************/
 
