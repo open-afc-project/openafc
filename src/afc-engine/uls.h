@@ -45,8 +45,8 @@ public:
 	Vector3 getPRPosition();
 	Vector3 getAntennaPointing();
 
-	double getRxLatitudeDeg();
-	double getRxLongitudeDeg();
+	double getRxLatitudeDeg() const;
+	double getRxLongitudeDeg() const;
 	double getRxGroundElevation();
 	double getRxTerrainHeight();
 	double getRxHeightAboveTerrain();
