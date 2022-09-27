@@ -695,7 +695,7 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	if (_guiJsonVersion == "1.3") {
 		importGUIjsonVersion1_3(jsonObj);
 	} else if (_guiJsonVersion == "1.1") {
-        // 1.3 and 1.1 are the same
+		// 1.3 and 1.1 are the same
 		importGUIjsonVersion1_3(jsonObj);
 	} else if (_guiJsonVersion == "1.0") {
 		importGUIjsonVersion1_0(jsonObj);
@@ -2116,7 +2116,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (propModel.contains("win2UseGroundDistance") && !propModel["win2UseGroundDistance"].isUndefined()) {
 		_winner2UseGroundDistanceFlag = propModel["win2UseGroundDistance"].toBool();
 	} else {
-        _winner2UseGroundDistanceFlag = true;
+		_winner2UseGroundDistanceFlag = true;
 	}
 
 	// Whether or not to force LOS when mobile height above closeInHgtLOS for close in model",
@@ -2124,7 +2124,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (propModel.contains("winner2HgtFlag") && !propModel["winner2HgtFlag"].isUndefined()) {
 		_closeInHgtFlag = propModel["winner2HgtFlag"].toBool();
 	} else {
-        _closeInHgtFlag = true;
+		_closeInHgtFlag = true;
 	}
 
 	if (propModel.contains("winner2HgtLOS") && !propModel["winner2HgtLOS"].isUndefined()) {
@@ -2136,7 +2136,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (propModel.contains("fsplUseGroundDistance") && !propModel["fsplUseGroundDistance"].isUndefined()) {
 		_fsplUseGroundDistanceFlag = propModel["fsplUseGroundDistance"].toBool();
 	} else {
-        _fsplUseGroundDistanceFlag = false;
+		_fsplUseGroundDistanceFlag = false;
 	}
 
 	if (propModel.contains("itmReliability") && !propModel["itmReliability"].isUndefined()) {
@@ -5208,7 +5208,7 @@ void AfcManager::fixFSTerrain()
 			uls->setTxHeightSource(heightSource);
 		}
 		for(int prIdx=0; prIdx<uls->getNumPR(); ++prIdx) {
-            PRClass& pr = uls->getPR(prIdx);
+			PRClass& pr = uls->getPR(prIdx);
 
 			if (!pr.terrainHeightFlag) {
 			    _terrainDataModel->getTerrainHeight(pr.longitudeDeg, pr.latitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, heightSource);
@@ -7450,14 +7450,14 @@ void AfcManager::runPointAnalysis()
 												QStringList msg;
 												msg << QString::number(uls->getID()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
 												msg << QString::number(uls->getRxLongitudeDeg(), 'f', 5) << QString::number(uls->getRxLatitudeDeg(), 'f', 5);
-												msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2) << 
-													QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource())) <<
-													QString(ulsRxPropEnv);
+												msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2)
+													<< QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
+													<< QString(ulsRxPropEnv);
 												msg << QString::number(uls->getNumPR() ? 1 : 0);
 												msg << QString::number(rlanCoord.longitudeDeg, 'f', 5) << QString::number(rlanCoord.latitudeDeg, 'f', 5);
-												msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) << 
-													QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource)) <<
-													CConst::strPropEnvList->type_to_str(rlanPropEnv);
+												msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2)
+													<< QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource))
+													<< CConst::strPropEnvList->type_to_str(rlanPropEnv);
 												msg << QString::number(distKm, 'f', 3) << QString::number(groundDistanceKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
 												msg << QString::number(_maxEIRP_dBm, 'f', 3) << QString::number(_bodyLossDB, 'f', 3) << QString::fromStdString(txClutterStr) << QString::fromStdString(rxClutterStr) << QString::fromStdString(bldgTypeStr);
 												msg << QString::number(buildingPenetrationDB, 'f', 3) << QString::fromStdString(buildingPenetrationModelStr) << QString::number(buildingPenetrationCDF, 'f', 8);

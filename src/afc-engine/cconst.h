@@ -116,7 +116,7 @@ public:
 	{
 		backToBackAntennaPRType,
 		billboardReflectorPRType,
-        unknownPRType
+		unknownPRType
 	};
 	/**************************************************************************************/
 

@@ -23,13 +23,13 @@ class PRClass
 {
 public:
 	PRClass();
-    ~PRClass();
+	~PRClass();
 
 	double computeDiscriminationGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency);
 
-    // Path segment gain as defined in R2-AIP-31
-    double pathSegGain;
-    double effectiveGain;
+	// Path segment gain as defined in R2-AIP-31
+	double pathSegGain;
+	double effectiveGain;
 
 	CConst::PRTypeEnum type;
 
@@ -44,15 +44,15 @@ public:
 	bool terrainHeightFlag;
 	Vector3 position;
 	Vector3 pointing;
-    double segmentDistance;
+	double segmentDistance;
 
 	double txGain;
-    double txDlambda;
-    double rxGain;
-    double rxDlambda;
+	double txDlambda;
+	double rxGain;
+	double rxDlambda;
 
-    double reflectorHeight;
-    double reflectorWidth;
+	double reflectorHeight;
+	double reflectorWidth;
 
 };
 /******************************************************************************************/
@@ -81,7 +81,7 @@ public:
 	std::string getRxCallsign();
 	int getRxAntennaNumber();
 	int getNumPR();
-    PRClass& getPR(int prIdx) { return prList[prIdx]; }
+	PRClass& getPR(int prIdx) { return prList[prIdx]; }
 	Vector3 getRxPosition();
 	Vector3 getTxPosition();
 	Vector3 getAntennaPointing();
@@ -263,7 +263,7 @@ private:
 	double propLoss;
 
 	int numPR;
-    PRClass *prList;
+	PRClass *prList;
 
 	double minPathLossDB, maxPathLossDB;
 	Vector3 txPosition, rxPosition;

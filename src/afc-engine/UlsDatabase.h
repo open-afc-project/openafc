@@ -50,13 +50,13 @@ struct UlsRecord
 	std::vector<double> prHeightAboveTerrain;
 	std::vector<std::string> prType;
 
-    std::vector<double> prTxGain;
-    std::vector<double> prTxAntennaDiameter;
-    std::vector<double> prRxGain;
-    std::vector<double> prRxAntennaDiameter;
+	std::vector<double> prTxGain;
+	std::vector<double> prTxAntennaDiameter;
+	std::vector<double> prRxGain;
+	std::vector<double> prRxAntennaDiameter;
 
-    std::vector<double> prReflectorHeight;
-    std::vector<double> prReflectorWidth;
+	std::vector<double> prReflectorHeight;
+	std::vector<double> prReflectorWidth;
 
 };
 
