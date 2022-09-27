@@ -33,7 +33,7 @@ LOGGER_DEFINE_GLOBAL(logger, "ULSClass")
 /******************************************************************************************/
 /**** FUNCTION: ULSClass::ULSClass()                                                   ****/
 /******************************************************************************************/
-ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal) : dataSet(dataSetVal), id(idVal), dbIdx(dbIdxVal)
+ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal) : dataSet(dataSetVal), id(idVal), dbIdx(dbIdxVal), numPR(numPRVal)
 {
 	satellitePosnData = (ListClass<Vector3> *) NULL;
 	type = CConst::ESULSType;
@@ -44,11 +44,12 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal) : dataSet(da
 	txLidarRegion = -1;
 	rxTerrainHeightFlag = false;
 	txTerrainHeightFlag = false;
-	prTerrainHeightFlag = false;
 	numOutOfBandRLAN = 0;
 
 	ITMHeightProfile = (double *) NULL;
 	isLOSHeightProfile = (double *) NULL;
+
+    prList = new PRClass[numPR];
 }
 /******************************************************************************************/
 
@@ -88,9 +89,6 @@ Vector3 ULSClass::getRxPosition() {
 Vector3 ULSClass::getTxPosition() {
 	return(txPosition);
 }
-Vector3 ULSClass::getPRPosition() {
-	return(prPosition);
-}
 Vector3 ULSClass::getAntennaPointing() {
 	return(antennaPointing);
 }
@@ -115,8 +113,8 @@ double ULSClass::getStopUseFreq() {
 double ULSClass::getBandwidth() {
 	return(bandwidth);
 }
-bool ULSClass::getHasPR() {
-	return(hasPR);
+int ULSClass::getNumPR() {
+	return(numPR);
 }
 std::string ULSClass::getRadioService() {
 	return(radioService);
@@ -179,24 +177,6 @@ CConst::HeightSourceEnum ULSClass::getTxHeightSource()        {
 	return(txHeightSource);
 }
 
-double ULSClass::getPRLongitudeDeg() {
-	return(prLongitudeDeg);
-}
-double ULSClass::getPRLatitudeDeg() {
-	return(prLatitudeDeg);
-}
-double                   ULSClass::getPRTerrainHeight()       {
-	return(prTerrainHeight);
-}
-double                   ULSClass::getPRHeightAboveTerrain()  {
-	return(prHeightAboveTerrain);
-}
-double                   ULSClass::getPRHeightAMSL()          {
-	return(prHeightAMSL);
-}
-CConst::HeightSourceEnum ULSClass::getPRHeightSource()        {
-	return(prHeightSource);
-}
 
 double ULSClass::getNoiseLevelDBW() {
 	return(noiseLevelDBW);
@@ -264,17 +244,11 @@ int ULSClass::getRxLidarRegion() {
 int ULSClass::getTxLidarRegion() {
 	return(txLidarRegion);
 }
-int ULSClass::getPRLidarRegion() {
-	return(prLidarRegion);
-}
 bool ULSClass::getRxTerrainHeightFlag() {
 	return(rxTerrainHeightFlag);
 }
 bool ULSClass::getTxTerrainHeightFlag() {
 	return(txTerrainHeightFlag);
-}
-bool ULSClass::getPRTerrainHeightFlag() {
-	return(prTerrainHeightFlag);
 }
 int ULSClass::getNumOutOfBandRLAN() {
 	return(numOutOfBandRLAN);
@@ -290,10 +264,6 @@ void ULSClass::setRxPosition(Vector3 p) {
 }
 void ULSClass::setTxPosition(Vector3 p) {
 	txPosition = p;
-	return;
-}
-void ULSClass::setPRPosition(Vector3 p) {
-	prPosition = p;
 	return;
 }
 void ULSClass::setAntennaPointing(Vector3 p) {
@@ -322,10 +292,6 @@ void ULSClass::setStopUseFreq(double f) {
 }
 void ULSClass::setBandwidth(double b) {
 	bandwidth = b;
-	return;
-}
-void ULSClass::setHasPR(bool hasPRVal) {
-	hasPR = hasPRVal;
 	return;
 }
 void ULSClass::setRadioService(std::string radioServiceVal) {
@@ -406,30 +372,6 @@ void ULSClass::setTxHeightAMSL(double txHeightAMSLVal) {
 }
 void ULSClass::setTxHeightSource(CConst::HeightSourceEnum txHeightSourceVal) {
 	txHeightSource = txHeightSourceVal;
-	return;
-}
-void ULSClass::setPRLatitudeDeg(double prLatitudeDegVal) {
-	prLatitudeDeg = prLatitudeDegVal;
-	return;
-}
-void ULSClass::setPRLongitudeDeg(double prLongitudeDegVal) {
-	prLongitudeDeg = prLongitudeDegVal;
-	return;
-}
-void ULSClass::setPRTerrainHeight(double prTerrainHeightVal) {
-	prTerrainHeight = prTerrainHeightVal;
-	return;
-}
-void ULSClass::setPRHeightAboveTerrain(double prHeightAboveTerrainVal) {
-	prHeightAboveTerrain = prHeightAboveTerrainVal;
-	return;
-}
-void ULSClass::setPRHeightAMSL(double prHeightAMSLVal) {
-	prHeightAMSL = prHeightAMSLVal;
-	return;
-}
-void ULSClass::setPRHeightSource(CConst::HeightSourceEnum prHeightSourceVal) {
-	prHeightSource = prHeightSourceVal;
 	return;
 }
 void ULSClass::setNoiseLevelDBW(double noiseLevelDBWVal) {
@@ -523,20 +465,12 @@ void ULSClass::setTxLidarRegion(int lidarRegionVal) {
 	txLidarRegion = lidarRegionVal;
 	return;
 }
-void ULSClass::setPRLidarRegion(int lidarRegionVal) {
-	prLidarRegion = lidarRegionVal;
-	return;
-}
 void ULSClass::setRxTerrainHeightFlag(bool terrainHeightFlagVal) {
 	rxTerrainHeightFlag = terrainHeightFlagVal;
 	return;
 }
 void ULSClass::setTxTerrainHeightFlag(bool terrainHeightFlagVal) {
 	txTerrainHeightFlag = terrainHeightFlagVal;
-	return;
-}
-void ULSClass::setPRTerrainHeightFlag(bool terrainHeightFlagVal) {
-	prTerrainHeightFlag = terrainHeightFlagVal;
 	return;
 }
 void ULSClass::setNumOutOfBandRLAN(int numOutOfBandRLANVal) {
@@ -828,3 +762,49 @@ double ULSClass::computeBeamWidth(double attnDB)
 }
 /******************************************************************************************/
 
+/******************************************************************************************/
+/**** FUNCTION: PRClass::PRClass()                                                     ****/
+/******************************************************************************************/
+PRClass::PRClass()
+{
+    type = CConst::unknownPRType;
+
+    latitudeDeg = -1.0;
+    longitudeDeg = -1.0;
+    terrainHeight = -1.0;
+    heightAboveTerrain = -1.0;
+    heightAMSL = -1.0;
+    heightSource = CConst::unknownHeightSource;
+    lidarRegion = -1;
+    terrainHeightFlag = false;
+    position = Vector3(0.0, 0.0, 0.0);
+
+    txGain = -1.0;
+    txDlambda = -1.0;
+    rxGain = -1.0;
+    rxDlambda = -1.0;
+
+    reflectorHeight = -1.0;
+    reflectorWidth = -1.0;
+
+	terrainHeightFlag = false;
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: PRClass::~PRClass()                                                    ****/
+/******************************************************************************************/
+PRClass::~PRClass()
+{
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: PRClass::computeRxGain                                                 ****/
+/******************************************************************************************/
+double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency)
+{
+	// 2022.09.27: This is a placeholder function.  This function will be written with when
+	// the passive repeater logic is fully implemented.  --MM
+}
+/******************************************************************************************/
