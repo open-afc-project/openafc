@@ -1042,8 +1042,8 @@ int main(int argc, char **argv)
               AntennaModelClass::CategoryEnum prAntennaCategory;
               double prAntennaDiameter;
               double prAntennaMidbandGain;
-              double prReflectorWidth;
-              double prReflectorHeight;
+              double prAntennaReflectorWidth;
+              double prAntennaReflectorHeight;
               std::string prAntennaModelName;
 
               if (prAntModel) {
