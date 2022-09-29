@@ -17,7 +17,7 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 BuildRequires: cmake3 >= 3.1
 BuildRequires: ninja-build
 BuildRequires: make
-BuildRequires: devtoolset-7-gcc-c++ >= 7.3
+BuildRequires: devtoolset-11-gcc-c++ >= 11.2
 # Need rpm macros in python-devel
 BuildRequires: python-devel
 %if 0%{?fedora}

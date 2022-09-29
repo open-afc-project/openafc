@@ -18,11 +18,7 @@ RUN cd /wd/prereqs/repo/ && \
     iturp452-0.0.0-17626.el7.x86_64.rpm iturp452-devel-0.0.0-17626.el7.x86_64.rpm \
     iturp452-debuginfo-0.0.0-17626.el7.x86_64.rpm && \
     yum -y install centos-release-scl && \
-    yum -y install devtoolset-7-gcc*
-
-RUN echo "source /opt/rh/devtoolset-7/enable" >> /etc/bashrc
-RUN echo "export CC=/opt/rh/devtoolset-7/root/usr/bin/gcc" >> /etc/bashrc
-RUN echo "export CXX=/opt/rh/devtoolset-7/root/usr/bin/c++" >> /etc/bashrc
+    yum -y install devtoolset-11-gcc*
 
 RUN cd /wd/prereqs/repo/ && rpmbuild --rebuild python-wtforms-2.2.1-6.el7.src.rpm
 RUN cd /wd/prereqs/repo/ && \
