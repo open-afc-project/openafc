@@ -10,6 +10,10 @@ NINJA="ninja-build -j$N_THREADS"
 RPMBUILD="rpmbuild -ba --without apidoc $@"
 RPMLINT="rpmlint"
 
+source /opt/rh/devtoolset-7/enable
+export CC=/opt/rh/devtoolset-7/root/usr/bin/gcc
+export CXX=/opt/rh/devtoolset-7/root/usr/bin/c++
+
 if [[ -d "/usr/include/boost169" ]]; then
  CMAKE="${CMAKE} -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169"
 fi
