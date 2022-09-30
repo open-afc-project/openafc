@@ -1,4 +1,11 @@
 # Release Note
+
+## **Version and Date**
+|Version|3.4.2.1|
+| :- | :- |
+|**Date**|**09/30/2022**|
+|compiled server's version is TBD |git tag 3.4.2.1|
+
 ## **Version and Date**
 |Version|**OA-300**|
 | :- | :- |
@@ -6,11 +13,11 @@
 
 
 ## **Issues Addressed**
- * Jira OA-300 partially: Implement Passive Repeaters per R2-AIP-29 thru 32 
- * This includes changes to both ULS parser, the Python script and the AFC Engine. 
+ * Jira OA-300 partially: Implement Passive Repeaters per R2-AIP-29 thru 32
+ * This includes changes to both ULS parser, the Python script and the AFC Engine.
  * Although structures have been added to analyze passive repeaters, this commit bypasses the structures added until this is fully implemented.
  * As such, all the regression tests should pass WITH THE NEW ULS DATABASE.
- 
+
 ## **Interface Changes**
  * There are significant changes in the ULS parser to add and determine the values for the passive repeaters' parameters
  * Some of the ULS parser changes need to be updated per the latest WINNF R2-AIP-29/30 specification
