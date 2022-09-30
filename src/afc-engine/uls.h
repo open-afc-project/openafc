@@ -17,12 +17,53 @@ class AntennaClass;
 template<class T> class ListClass;
 
 /******************************************************************************************/
+/**** CLASS: PRClass - Passive Repeater                                                ****/
+/******************************************************************************************/
+class PRClass
+{
+public:
+	PRClass();
+	~PRClass();
+
+	double computeDiscriminationGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency);
+
+	// Path segment gain as defined in R2-AIP-31
+	double pathSegGain;
+	double effectiveGain;
+
+	CConst::PRTypeEnum type;
+
+	double latitudeDeg;
+	double longitudeDeg;
+	double heightAboveTerrain;
+
+	double terrainHeight;
+	double heightAMSL;
+	CConst::HeightSourceEnum heightSource;
+	int lidarRegion;
+	bool terrainHeightFlag;
+	Vector3 position;
+	Vector3 pointing;
+	double segmentDistance;
+
+	double txGain;
+	double txDlambda;
+	double rxGain;
+	double rxDlambda;
+
+	double reflectorHeight;
+	double reflectorWidth;
+
+};
+/******************************************************************************************/
+
+/******************************************************************************************/
 /**** CLASS: ULSClass                                                                  ****/
 /******************************************************************************************/
 class ULSClass
 {
 public:
-	ULSClass(AfcManager *dataSetVal, int idVal, int dbIdx);
+	ULSClass(AfcManager *dataSetVal, int idVal, int dbIdx, int numPR);
 	~ULSClass();
 
 	int getID() const;
@@ -39,10 +80,10 @@ public:
 	std::string getCallsign();
 	std::string getRxCallsign();
 	int getRxAntennaNumber();
-	bool getHasPR();
+	int getNumPR();
+	PRClass& getPR(int prIdx) { return prList[prIdx]; }
 	Vector3 getRxPosition();
 	Vector3 getTxPosition();
-	Vector3 getPRPosition();
 	Vector3 getAntennaPointing();
 
 	double getRxLatitudeDeg();
@@ -60,14 +101,6 @@ public:
 	double getTxHeightAboveTerrain();
 	double getTxHeightAMSL();
 	CConst::HeightSourceEnum getTxHeightSource();
-
-	double getPRLatitudeDeg();
-	double getPRLongitudeDeg();
-	double getPRGroundElevation();
-	double getPRTerrainHeight();
-	double getPRHeightAboveTerrain();
-	double getPRHeightAMSL();
-	CConst::HeightSourceEnum getPRHeightSource();
 
 	std::string getTxPolarization();
 	double getTxSrtmHeight();
@@ -98,10 +131,8 @@ public:
 	int getPairIdx();
 	int getRxLidarRegion();
 	int getTxLidarRegion();
-	int getPRLidarRegion();
 	bool getRxTerrainHeightFlag();
 	bool getTxTerrainHeightFlag();
-	bool getPRTerrainHeightFlag();
 	int getNumOutOfBandRLAN();
 
 	void setStartAllocFreq(double f);
@@ -132,15 +163,6 @@ public:
 	void setTxHeightSource(CConst::HeightSourceEnum txHeightSourceVal);
 	void setTxPolarization(std::string txPolarizationVal);
 
-	void setHasPR(bool hasPRVal);
-
-	void setPRLatitudeDeg(double prLatitudeDegVal);
-	void setPRLongitudeDeg(double prLongitudeDegVal);
-	void setPRTerrainHeight(double prTerrainHeightVal);
-	void setPRHeightAboveTerrain(double prHeightAboveTerrainVal);
-	void setPRHeightAMSL(double prHeightAMSLVal);
-	void setPRHeightSource(CConst::HeightSourceEnum prHeightSourceVal);
-
 	void setUseFrequency();
 	void setNoiseLevelDBW(double noiseLevelDBWVal);
 	void setRxGain(double rxGainVal);
@@ -166,15 +188,12 @@ public:
 	void setPairIdx(int pairIdxVal);
 	void setRxLidarRegion(int lidarRegionVal);
 	void setTxLidarRegion(int lidarRegionVal);
-	void setPRLidarRegion(int lidarRegionVal);
 	void setRxTerrainHeightFlag(bool terrainHeightFlagVal);
 	void setTxTerrainHeightFlag(bool terrainHeightFlagVal);
-	void setPRTerrainHeightFlag(bool terrainHeightFlagVal);
 	void setNumOutOfBandRLAN(int numOutOfBandRLANVal);
 
 	void setRxPosition(Vector3 p);
 	void setTxPosition(Vector3 p);
-	void setPRPosition(Vector3 p);
 	void setAntennaPointing(Vector3 p);
 	void setType(CConst::ULSTypeEnum typeVal);
 	void setSatellitePositionData(ListClass<Vector3> *spd);
@@ -206,7 +225,6 @@ private:
 	double startUseFreq;
 	double stopUseFreq;
 	double bandwidth;
-	bool hasPR;
 	std::string callsign;
 	std::string rxCallsign;
 	int rxAntennaNumber;
@@ -244,19 +262,11 @@ private:
 	double operatingCenterLatitudeDeg;
 	double propLoss;
 
-	double prLatitudeDeg;
-	double prLongitudeDeg;
-	double prGroundElevation;
-	double prTerrainHeight;
-	double prHeightAboveTerrain;
-	double prHeightAMSL;
-	double thresholdPFD;
-	CConst::HeightSourceEnum prHeightSource;
-	int prLidarRegion;
-	bool prTerrainHeightFlag;
+	int numPR;
+	PRClass *prList;
 
 	double minPathLossDB, maxPathLossDB;
-	Vector3 txPosition, rxPosition, prPosition;
+	Vector3 txPosition, rxPosition;
 	Vector3 antennaPointing;
 	double antHeight;
 	CConst::ULSTypeEnum type;

@@ -31,6 +31,7 @@ public:
 	void setReflectorHeightM(double reflectorHeightMVal) { reflectorHeightM = reflectorHeightMVal; }
 
 	static std::string categoryStr(CategoryEnum categoryVal);
+	static std::string typeStr(TypeEnum typeVal);
 
 	std::string name;
 	TypeEnum type;

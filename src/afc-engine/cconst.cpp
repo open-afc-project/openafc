@@ -98,5 +98,11 @@ const StrTypeClass CConst::strSpectralAlgorithmList[] = {
 	{                 CConst::pwrSpectralAlgorithm, "pwr"    },
 	{                 CConst::psdSpectralAlgorithm, "psd"    },
 	{                                    -1,  (char *) 0     }
+};
+
+const StrTypeClass CConst::strPRTypeList[] = {
+	{       CConst::backToBackAntennaPRType, "Ant"           },
+	{      CConst::billboardReflectorPRType, "Ref"           },
+	{                                    -1,  (char *) 0     }
 
 };

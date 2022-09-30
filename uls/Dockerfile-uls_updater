@@ -45,6 +45,7 @@ RUN mkdir -p /var/lib/fbrat/daily_uls_parse/data_files /var/lib/fbrat/daily_uls_
 RUN yum -y install epel-release
 RUN yum -y install qt5-qtbase-devel python-sqlalchemy python2-numpy
 RUN yum -y clean all
+COPY prereqs/antenna_model/antenna_model_map.csv prereqs/antenna_model/antenna_model_list.csv /var/lib/fbrat/daily_uls_parse/
 
 COPY --from=build_image /wd/build/src/coalition_ulsprocessor/src/uls-script/uls-script /var/lib/fbrat/daily_uls_parse/
 COPY --from=build_image /wd/build/src/ratapi/pkg/ratapi/db /var/lib/fbrat/daily_uls_parse/

@@ -48,6 +48,16 @@ struct UlsRecord
 	std::vector<double> prLatitudeDeg;
 	std::vector<double> prLongitudeDeg;
 	std::vector<double> prHeightAboveTerrain;
+	std::vector<std::string> prType;
+
+	std::vector<double> prTxGain;
+	std::vector<double> prTxAntennaDiameter;
+	std::vector<double> prRxGain;
+	std::vector<double> prRxAntennaDiameter;
+
+	std::vector<double> prReflectorHeight;
+	std::vector<double> prReflectorWidth;
+
 };
 
 class UlsDatabase
@@ -110,9 +120,18 @@ public:
 	int p_rp_numIdx;
 
 	int prSeqIdx;
+	int prTypeIdx;
 	int pr_lat_degIdx;
 	int pr_lon_degIdx;
 	int pr_height_to_center_raat_mIdx;
+
+	int prTxGainIdx;  
+	int prTxDiameterIdx;
+	int prRxGainIdx;  
+	int prRxDiameterIdx;
+	int prReflectorHeightIdx;
+	int prReflectorWidthIdx;
+
 };
 
 #endif /* AFCENGINE_ULS_DATABASE_H */

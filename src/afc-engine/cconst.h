@@ -110,6 +110,17 @@ public:
 	/**************************************************************************************/
 
 	/**************************************************************************************/
+	/**** PRType                                                                       ****/
+	/**************************************************************************************/
+	enum PRTypeEnum
+	{
+		backToBackAntennaPRType,
+		billboardReflectorPRType,
+		unknownPRType
+	};
+	/**************************************************************************************/
+
+	/**************************************************************************************/
 	/**** ULSAntennaType                                                               ****/
 	/**************************************************************************************/
 	enum ULSAntennaTypeEnum
@@ -329,6 +340,7 @@ public:
 	static const StrTypeClass strITMClutterMethodList[];
 	static const StrTypeClass strHeightSourceList[];
 	static const StrTypeClass strSpectralAlgorithmList[];
+	static const StrTypeClass strPRTypeList[];
 };
 
 #endif

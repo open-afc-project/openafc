@@ -695,7 +695,7 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	if (_guiJsonVersion == "1.3") {
 		importGUIjsonVersion1_3(jsonObj);
 	} else if (_guiJsonVersion == "1.1") {
-        // 1.3 and 1.1 are the same
+		// 1.3 and 1.1 are the same
 		importGUIjsonVersion1_3(jsonObj);
 	} else if (_guiJsonVersion == "1.0") {
 		importGUIjsonVersion1_0(jsonObj);
@@ -2116,7 +2116,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (propModel.contains("win2UseGroundDistance") && !propModel["win2UseGroundDistance"].isUndefined()) {
 		_winner2UseGroundDistanceFlag = propModel["win2UseGroundDistance"].toBool();
 	} else {
-        _winner2UseGroundDistanceFlag = true;
+		_winner2UseGroundDistanceFlag = true;
 	}
 
 	// Whether or not to force LOS when mobile height above closeInHgtLOS for close in model",
@@ -2124,7 +2124,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (propModel.contains("winner2HgtFlag") && !propModel["winner2HgtFlag"].isUndefined()) {
 		_closeInHgtFlag = propModel["winner2HgtFlag"].toBool();
 	} else {
-        _closeInHgtFlag = true;
+		_closeInHgtFlag = true;
 	}
 
 	if (propModel.contains("winner2HgtLOS") && !propModel["winner2HgtLOS"].isUndefined()) {
@@ -2136,7 +2136,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (propModel.contains("fsplUseGroundDistance") && !propModel["fsplUseGroundDistance"].isUndefined()) {
 		_fsplUseGroundDistanceFlag = propModel["fsplUseGroundDistance"].toBool();
 	} else {
-        _fsplUseGroundDistanceFlag = false;
+		_fsplUseGroundDistanceFlag = false;
 	}
 
 	if (propModel.contains("itmReliability") && !propModel["itmReliability"].isUndefined()) {
@@ -2253,7 +2253,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 						{ "highFrequency", freqRange.freqMHzList.at(i+1) }
 						}
 						},
-						{ "maxPSD", freqRange.psd_dBm_MHzList.at(i) }
+						{ "maxPsd", freqRange.psd_dBm_MHzList.at(i) }
 						});
 			}
 		}
@@ -3555,6 +3555,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		fanom->writeRow({"FSID,DBNAME,CALLSIGN,RX_LATITUDE,RX_LONGITUDE,ANOMALY_DESCRIPTION\n"});
 	}
 
+	int prIdx;
 	int dbIdx;
 	for(dbIdx=0; dbIdx<(int) ulsDatabaseList.size(); ++dbIdx) {
 		std::string name = std::get<0>(ulsDatabaseList[dbIdx]);
@@ -3604,8 +3605,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		// double operatingRadius;
 		// double rxSensitivity;
 		int mobileUnit = -1;
-		double prLatitudeDeg, prLongitudeDeg;
-		double prHeightAboveTerrain;
 
 		AntennaClass *rxAntenna = (AntennaClass *)NULL;
 		AntennaClass *txAntenna = (AntennaClass *)NULL;
@@ -3766,12 +3765,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/**************************************************************************/
 			callsign = row.callsign;
 			rxCallsign = row.rxCallsign;
-			/**************************************************************************/
-
-			/**************************************************************************/
-			/* numPR (Number of Passive Repeaters)                                    */
-			/**************************************************************************/
-			numPR = row.numPR;
 			/**************************************************************************/
 
 			/**************************************************************************/
@@ -4270,54 +4263,51 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/**************************************************************************/
 
 			/**************************************************************************/
-			/* prLongCoords => prLongitudeDeg                                         */
+			/* numPR (Number of Passive Repeaters)                                    */
 			/**************************************************************************/
-			prLongitudeDeg = 0.0;
-			if (!_filterSimRegionOnly) {
-				if ((!ignoreFlag)&&(numPR)) {
-					prLongitudeDeg = row.prLongitudeDeg[numPR-1];
+			numPR = row.numPR;
+			/**************************************************************************/
 
-					if (std::isnan(prLongitudeDeg) || (prLongitudeDeg == 0.0)) {
+			/**************************************************************************/
+			/* Passive Repeater Parameters                                            */
+			/**************************************************************************/
+			if ( (!_filterSimRegionOnly) && (!ignoreFlag) ) {
+			    for(prIdx=0; prIdx<numPR; ++prIdx) {
+
+					/******************************************************************/
+					/* prLongitudeDeg                                                 */
+					/******************************************************************/
+					if (std::isnan(row.prLongitudeDeg[prIdx]) || (row.prLongitudeDeg[prIdx] == 0.0)) {
 						reasonIgnored = "Ignored: PR Longitude has value nan or 0";
 						ignoreFlag = true;
 						numIgnoreInvalid++;
 					}
-				}
-			}
-			/**************************************************************************/
+					/******************************************************************/
 
-			/**************************************************************************/
-			/* prLatCoords => prLatitudeDeg                                           */
-			/**************************************************************************/
-			prLatitudeDeg = 0.0;
-			if (!_filterSimRegionOnly) {
-				if ((!ignoreFlag)&&(numPR)) {
-					prLatitudeDeg = row.prLatitudeDeg[numPR-1];
-
-					if (std::isnan(prLatitudeDeg) || (prLatitudeDeg == 0.0)) {
+					/******************************************************************/
+					/* prLatitudeDeg                                                  */
+					/******************************************************************/
+					if (std::isnan(row.prLatitudeDeg[prIdx]) || (row.prLatitudeDeg[prIdx] == 0.0)) {
 						reasonIgnored = "Ignored: PR Latitude has value nan or 0";
 						ignoreFlag = true;
 						numIgnoreInvalid++;
 					}
-				}
-			}
-			/**************************************************************************/
+					/******************************************************************/
 
-			/**************************************************************************/
-			/* prHeightAboveTerrain                                                   */
-			/**************************************************************************/
-			if (!_filterSimRegionOnly) {
-				if ((!ignoreFlag)&&(numPR)) {
-					prHeightAboveTerrain = row.prHeightAboveTerrain[numPR-1];
-					if (std::isnan(prHeightAboveTerrain)) {
+					/******************************************************************/
+					/* prHeightAboveTerrain                                           */
+					/******************************************************************/
+					if (std::isnan(row.prHeightAboveTerrain[prIdx])) {
 						ignoreFlag = true;
 						reasonIgnored = "missing PR Height above Terrain";
 						numIgnoreInvalid++;
 					}
 
 					if (!ignoreFlag) {
-						if (prHeightAboveTerrain <= 0.0) {
-							LOGGER_WARN(logger) << "WARNING: ULS data for FSID = " << fsid << ", prHeightAboveTerrain = " << prHeightAboveTerrain << " is < 0.0";
+						if (row.prHeightAboveTerrain[prIdx] <= 0.0) {
+							LOGGER_WARN(logger) << "WARNING: ULS data for FSID = " << fsid
+								<< ", Passive Repeater " << (prIdx+1)
+								<< ", prHeightAboveTerrain = " << row.prHeightAboveTerrain[prIdx] << " is < 0.0";
 						}
 					}
 				}
@@ -4605,18 +4595,17 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 			if (!_filterSimRegionOnly) {
 				if (!ignoreFlag) {
-					if ((!numPR) &&(rxLatitudeDeg == txLatitudeDeg) && (rxLongitudeDeg == txLongitudeDeg)) {
-						// randPointingFlag = true;
-						// fixedStr += "Fixed: RX and TX LON/LAT values are identical: using random direction for Rx antenna";
-						// fixedFlag = true;
+					for(int segIdx=0; segIdx<numPR+1; ++segIdx) {
+						Vector3 txLon = (segIdx==0     ? txLongitudeDeg : row.prLongitudeDeg[prIdx-1]);
+						Vector3 txLat = (segIdx==0     ? txLatitudeDeg  : row.prLatitudeDeg[prIdx-1]);
+						Vector3 rxLon = (segIdx==numPR ? rxLongitudeDeg : row.prLongitudeDeg[prIdx]);
+						Vector3 rxLat = (segIdx==numPR ? rxLatitudeDeg  : row.prLatitudeDeg[prIdx]);
 
-						reasonIgnored = "Ignored: RX and TX LON/LAT values are identical";
-						ignoreFlag = true;
-						numIgnoreInvalid++;
-					} else if ((numPR) && (rxLatitudeDeg == prLatitudeDeg) && (rxLongitudeDeg == prLongitudeDeg)) {
-						reasonIgnored = "Ignored: RX and Passive Repeater LON/LAT values are identical";
-						ignoreFlag = true;
-						numIgnoreInvalid++;
+						if ((rxLat == txLat) && (rxLon == txLon)) {
+							reasonIgnored = "Ignored: RX and TX LON/LAT values are identical for segment " + std::to_string(segIdx);
+							ignoreFlag = true;
+							numIgnoreInvalid++;
+						}
 					}
 				}
 
@@ -4676,7 +4665,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				double lambda = CConst::c / centerFreq;
 				double rxDlambda = rxAntennaDiameter / lambda;
 
-				uls = new ULSClass(this, fsid, dbIdx);
+				uls = new ULSClass(this, fsid, dbIdx, numPR);
 				_ulsList->append(uls);
 				uls->setCallsign(callsign);
 				uls->setRxCallsign(rxCallsign);
@@ -4693,8 +4682,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setTxPolarization(txPolarization);
 				uls->setTxLatitudeDeg(txLatitudeDeg);
 				uls->setTxLongitudeDeg(txLongitudeDeg);
-				uls->setPRLatitudeDeg(prLatitudeDeg);
-				uls->setPRLongitudeDeg(prLongitudeDeg);
 				uls->setRxGain(rxGain);
 				uls->setRxDlambda(rxDlambda);
 				uls->setRxAntennaModel(row.rxAntennaModel);
@@ -4705,7 +4692,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setRxAntennaCategory(rxAntennaCategory);
 				uls->setTxGain(txGain);
 				uls->setTxEIRP(txEIRP);
-				uls->setHasPR(numPR ? 1 : 0);
 				uls->setUseFrequency();
 				uls->setRxAntennaFeederLossDB(rxAntennaFeederLossDB);
 				uls->setFadeMarginDB(fadeMarginDB);
@@ -4737,7 +4723,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 #endif
 				}
 
-				bool rxTerrainHeightFlag, txTerrainHeightFlag, prTerrainHeightFlag;
+				bool rxTerrainHeightFlag, txTerrainHeightFlag;
 				double terrainHeight;
 				double bldgHeight;
 				MultibandRasterClass::HeightResult lidarHeightResult;
@@ -4793,28 +4779,34 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					uls->setTxPosition(txPosition);
 				}
 
-				if ((!mobileTxFlag) && (!randPointingFlag) && (numPR))
+				if ((!mobileTxFlag) && (!randPointingFlag))
 				{
-					if ( (_terrainDataModel))
-					{
-						_terrainDataModel->getTerrainHeight(prLongitudeDeg,prLatitudeDeg, terrainHeight,bldgHeight, lidarHeightResult, prHeightSource);
-						prTerrainHeightFlag = true;
-					}
-					else
-					{
-						prTerrainHeightFlag = false;
-						terrainHeight = 0.0;
-					}
-					double prHeight = prHeightAboveTerrain + terrainHeight;
+					for(prIdx=0; prIdx<numPR; ++prIdx) {
+						PRClass& pr = uls->getPR(prIdx);
 
-					uls->setPRTerrainHeightFlag(prTerrainHeightFlag);
-					uls->setPRTerrainHeight(terrainHeight);
-					uls->setPRHeightAboveTerrain(prHeightAboveTerrain);
-					uls->setPRHeightSource(prHeightSource);
-					uls->setPRHeightAMSL(prHeight);
+						int validFlag;
+						pr.type = (CConst::PRTypeEnum) CConst::strPRTypeList->str_to_type(row.prType[prIdx], validFlag, 1);
+						pr.longitudeDeg = row.prLongitudeDeg[prIdx];
+						pr.latitudeDeg = row.prLatitudeDeg[prIdx];
+						pr.heightAboveTerrain = row.prHeightAboveTerrain[prIdx];
 
-					prPosition = EcefModel::geodeticToEcef(prLatitudeDeg, prLongitudeDeg, prHeight / 1000.0);
-					uls->setPRPosition(prPosition);
+						if ( (_terrainDataModel))
+						{
+							_terrainDataModel->getTerrainHeight(pr.longitudeDeg, pr.latitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, prHeightSource);
+							pr.terrainHeightFlag = true;
+						}
+						else
+						{
+							pr.terrainHeightFlag = false;
+							terrainHeight = 0.0;
+						}
+
+						pr.terrainHeight = terrainHeight;
+						pr.heightAMSL = pr.heightAboveTerrain + pr.terrainHeight;
+						pr.heightSource = prHeightSource;
+
+						pr.position = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, pr.heightAMSL / 1000.0);
+					}
 				}
 
 				if ((!mobileRxFlag) && (!mobileTxFlag)) {
@@ -5189,16 +5181,14 @@ void AfcManager::fixFSTerrain()
 	int ulsIdx;
 	for (ulsIdx = 0; ulsIdx <= _ulsList->getSize() - 1; ulsIdx++) {
 		ULSClass *uls = (*_ulsList)[ulsIdx];
-		bool rxTerrainHeightFlag = false;
-		bool txTerrainHeightFlag = false;
-		bool prTerrainHeightFlag = false;
+		bool updateFlag = false;
 		double bldgHeight, terrainHeight;
 		MultibandRasterClass::HeightResult lidarHeightResult;
 		CConst::HeightSourceEnum heightSource;	
 		if (!uls->getRxTerrainHeightFlag()) {
 			_terrainDataModel->getTerrainHeight(uls->getRxLongitudeDeg(),uls->getRxLatitudeDeg(), terrainHeight,bldgHeight, lidarHeightResult, heightSource);
-			rxTerrainHeightFlag = true;
-			uls->setRxTerrainHeightFlag(rxTerrainHeightFlag);
+			updateFlag = true;
+			uls->setRxTerrainHeightFlag(true);
 			double rxHeight = uls->getRxHeightAboveTerrain() + terrainHeight;
 			Vector3 rxPosition = EcefModel::geodeticToEcef(uls->getRxLatitudeDeg(), uls->getRxLongitudeDeg(), rxHeight / 1000.0);
 			uls->setRxPosition(rxPosition);
@@ -5208,8 +5198,8 @@ void AfcManager::fixFSTerrain()
 		}
 		if (!uls->getTxTerrainHeightFlag()) {
 			_terrainDataModel->getTerrainHeight(uls->getTxLongitudeDeg(),uls->getTxLatitudeDeg(), terrainHeight,bldgHeight, lidarHeightResult, heightSource);
-			txTerrainHeightFlag = true;
-			uls->setTxTerrainHeightFlag(txTerrainHeightFlag);
+			updateFlag = true;
+			uls->setTxTerrainHeightFlag(true);
 			double txHeight = uls->getTxHeightAboveTerrain() + terrainHeight;
 			Vector3 txPosition = EcefModel::geodeticToEcef(uls->getTxLatitudeDeg(), uls->getTxLongitudeDeg(), txHeight / 1000.0);
 			uls->setTxPosition(txPosition);
@@ -5217,28 +5207,38 @@ void AfcManager::fixFSTerrain()
 			uls->setTxHeightAMSL(txHeight);
 			uls->setTxHeightSource(heightSource);
 		}
-		if ((uls->getHasPR()) && (!uls->getPRTerrainHeightFlag())) {
-			_terrainDataModel->getTerrainHeight(uls->getPRLongitudeDeg(),uls->getPRLatitudeDeg(), terrainHeight,bldgHeight, lidarHeightResult, heightSource);
-			prTerrainHeightFlag = true;
-			uls->setPRTerrainHeightFlag(prTerrainHeightFlag);
-			double prHeight = uls->getPRHeightAboveTerrain() + terrainHeight;
-			Vector3 prPosition = EcefModel::geodeticToEcef(uls->getPRLatitudeDeg(), uls->getPRLongitudeDeg(), prHeight / 1000.0);
-			uls->setPRPosition(prPosition);
-			uls->setPRTerrainHeight(terrainHeight);
-			uls->setPRHeightAMSL(prHeight);
-			uls->setPRHeightSource(heightSource);
+		for(int prIdx=0; prIdx<uls->getNumPR(); ++prIdx) {
+			PRClass& pr = uls->getPR(prIdx);
+
+			if (!pr.terrainHeightFlag) {
+			    _terrainDataModel->getTerrainHeight(pr.longitudeDeg, pr.latitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, heightSource);
+			    updateFlag = true;
+			    pr.terrainHeightFlag = true;
+
+			    double prHeight = pr.heightAboveTerrain + terrainHeight;
+			    Vector3 prPosition = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, prHeight / 1000.0);
+			    pr.position = prPosition;
+			    pr.terrainHeight = terrainHeight;
+			    pr.heightAMSL = prHeight;
+			    pr.heightSource = heightSource;
+		    }
 		}
 
-		if (rxTerrainHeightFlag || txTerrainHeightFlag || prTerrainHeightFlag) {
-			Vector3 rxPosition = uls->getRxPosition();
-			if (!uls->getHasPR()) {
-				Vector3 txPosition = uls->getTxPosition();
-				uls->setAntennaPointing((txPosition - rxPosition).normalized()); // Pointing of Rx antenna
-				uls->setLinkDistance((txPosition - rxPosition).len() * 1000.0);
-			} else {
-				Vector3 prPosition = uls->getPRPosition();
-				uls->setAntennaPointing((prPosition - rxPosition).normalized()); // Pointing of Rx antenna
-				uls->setLinkDistance((prPosition - rxPosition).len() * 1000.0);
+		if (updateFlag) {
+			for(int segIdx=0; segIdx<uls->getNumPR()+1; ++segIdx) {
+				Vector3 txPosition = (segIdx==0 ? uls->getTxPosition() : uls->getPR(segIdx-1).position);
+				Vector3 rxPosition = (segIdx==uls->getNumPR() ? uls->getRxPosition() : uls->getPR(segIdx).position);
+
+				Vector3 antennaPointing = (txPosition - rxPosition).normalized(); // boresight pointing direction of RX
+				double segmentDistance = (txPosition - rxPosition).len() * 1000.0;
+
+				if (segIdx==uls->getNumPR()) {
+					uls->setAntennaPointing(antennaPointing); // Pointing of Rx antenna
+					uls->setLinkDistance(segmentDistance);
+				} else {
+					uls->getPR(segIdx).pointing = antennaPointing;
+					uls->getPR(segIdx).segmentDistance = segmentDistance;
+				}
 			}
 		}
 	}
@@ -7121,9 +7121,6 @@ void AfcManager::runPointAnalysis()
 	{
 		LOGGER_DEBUG(logger) << "considering ULSIdx: " << ulsIdx << '/' << _ulsList->getSize();
 		ULSClass *uls = (*_ulsList)[ulsIdx];
-		const Vector3 ulsRxPos = uls->getRxPosition();
-		Vector3 lineOfSightVectorKm = ulsRxPos - _rlanRegion->getCenterPosn();
-		double distKmSquared = (lineOfSightVectorKm).dot(lineOfSightVectorKm);
 
 #if 0
 		// For debugging, identifies anomalous ULS entries
@@ -7131,426 +7128,451 @@ void AfcManager::runPointAnalysis()
 			std::cout << uls->getID() << std::endl;
 		}
 #endif
+		if (uls->getLinkDistance() > 0.0) {
 
-		if ((distKmSquared < maxRadiusKmSquared) && (uls->getLinkDistance() > 0.0))
-		{
-#           if DEBUG_AFC
-			time_t t1 = time(NULL);
+			int numPR = uls->getNumPR();
 
-			bool traceFlag = false;
-			if (traceIdx<(int) fsidTraceList.size()) {
-				if (uls->getID() == fsidTraceList[traceIdx]) {
-					traceFlag = true;
-				}
-			}
-#           endif
+			// 2022.09.27: This for statement loops over each segment in the path, segIdx ranges from 0 to numPR (total numPR+1 values).
+			// As a temporary measure, only the last segment of a path is considered.  When the passive repeater logic is fully implemented,
+			// this loop will be changed back to consider all segments in the path.  --MM
+			for(int segIdx=numPR /* 0 */; segIdx<numPR+1; ++segIdx) {
+				Vector3 ulsRxPos = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).position);
+				double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
+				double ulsRxLatitude = (segIdx == numPR ? uls->getRxLatitudeDeg() : uls->getPR(segIdx).latitudeDeg);
+				double ulsRxHeight = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSL);
 
-			_ulsIdxList.push_back(ulsIdx); // Store the ULS indices that are used in analysis
+
+				Vector3 lineOfSightVectorKm = ulsRxPos - _rlanRegion->getCenterPosn();
+				double distKmSquared = (lineOfSightVectorKm).dot(lineOfSightVectorKm);
+
+				if (distKmSquared < maxRadiusKmSquared) {
+#					if DEBUG_AFC
+					time_t t1 = time(NULL);
+
+					bool traceFlag = false;
+					if (traceIdx<(int) fsidTraceList.size()) {
+						if (uls->getID() == fsidTraceList[traceIdx]) {
+							traceFlag = true;
+						}
+					}
+#					endif
+
+					_ulsIdxList.push_back(ulsIdx); // Store the ULS indices that are used in analysis
 #if 0
-			int ulsLonIdx;
-			int ulsLatIdx;
-			int regionIdx;
-			char ulsRxPropEnv;
-			_popGrid->findDeg(uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), ulsLonIdx, ulsLatIdx, ulsRxPropEnv, regionIdx);
-			double ulsPopVal = _popGrid->getPop(ulsLonIdx, ulsLatIdx);
-			if (ulsPopVal == 0.0)
-			{
-				ulsRxPropEnv = 'Z';
-			}
-#else
-			char ulsRxPropEnv = ' ';
-#endif
-
-			/**************************************************************************************/
-			/* Determine propagation environment of FS, if needed.                                */
-			/**************************************************************************************/
-			CConst::NLCDLandCatEnum nlcdLandCatRx;
-			CConst::PropEnvEnum fsPropEnv;
-			if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= _maxFsAglHeight)) {
-				fsPropEnv = computePropEnv(uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), nlcdLandCatRx);
-				switch(fsPropEnv) {
-					case CConst::urbanPropEnv:    ulsRxPropEnv = 'U'; break;
-					case CConst::suburbanPropEnv: ulsRxPropEnv = 'S'; break;
-					case CConst::ruralPropEnv:    ulsRxPropEnv = 'R'; break;
-					case CConst::barrenPropEnv:   ulsRxPropEnv = 'B'; break;
-					case CConst::unknownPropEnv:  ulsRxPropEnv = 'X'; break;
-					default: CORE_DUMP;
-				}
-			} else {
-				fsPropEnv = CConst::unknownPropEnv;
-				ulsRxPropEnv = ' ';
-			}
-			/**************************************************************************************/
-
-			LatLon ulsRxLatLon = std::pair<double, double>(uls->getRxLatitudeDeg(), uls->getRxLongitudeDeg());
-			bool contains;
-
-			_rlanRegion->closestPoint(ulsRxLatLon, contains);
-
-			double minRLANDist = -1.0;
-			if (distKmSquared <= exclusionDistKmSquared) {
-				LOGGER_INFO(logger) << "FSID = " << uls->getID() << " is inside exclusion distance.";
-				minRLANDist = sqrt(distKmSquared)*1000.0;
-			} else if (contains) {
-				int chanIdx;
-				for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
-					ChannelStruct *channel = &(_channelList[chanIdx]);
-					if (channel->availability != BLACK) {
-						double chanStartFreq = channel->startFreqMHz * 1.0e6;
-						double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-						bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
-						if (hasOverlap > 0.0) {
-							double eirpLimit_dBm = -std::numeric_limits<double>::infinity();
-
-							channel->availability = BLACK;
-							channel->eirpLimit_dBm = eirpLimit_dBm;
-
-							if ( (!ulsFlagList[ulsIdx]) || (eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
-								eirpLimitList[ulsIdx] = eirpLimit_dBm;
-								ulsFlagList[ulsIdx] = true;
-							}
-						}
-					}
-				}
-				LOGGER_INFO(logger) << "FSID = " << uls->getID() << " is inside specified RLAN region.";
-				minRLANDist = 0.0;
-			} else {
-
-				int scanPtIdx;
-				for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
-					LatLon scanPt = scanPointList[scanPtIdx];
-
-					/**************************************************************************************/
-					/* Determine propagation environment of RLAN using scan point                         */
-					/**************************************************************************************/
-					CConst::NLCDLandCatEnum nlcdLandCatTx;
-					CConst::PropEnvEnum rlanPropEnv = computePropEnv(scanPt.second, scanPt.first, nlcdLandCatTx);
-					/**************************************************************************************/
-
-					double rlanTerrainHeight, bldgHeight;
-					MultibandRasterClass::HeightResult lidarHeightResult;
-					CConst::HeightSourceEnum rlanHeightSource;
-					_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight,bldgHeight, lidarHeightResult, rlanHeightSource);
-
-					double height0;
-					if (_rlanRegion->getFixedHeightAMSL()) {
-						height0 = _rlanRegion->getCenterHeightAMSL();
-					} else {
-						height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
-					}
-
-					// Use Haversine formula with average earth radius of 6371 km
-					double lon1Rad = scanPt.second*M_PI/180.0;
-					double lat1Rad = scanPt.first*M_PI/180.0;
-					double lon2Rad = uls->getRxLongitudeDeg()*M_PI/180.0;
-					double lat2Rad = uls->getRxLatitudeDeg()*M_PI/180.0;
-					double slat = sin((lat2Rad-lat1Rad)/2);
-					double slon = sin((lon2Rad-lon1Rad)/2);
-					double groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
-
-					int htIdx;
-					int numRlanPosn = 0;
-					bool lowHeightFlag = false;
-					for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-						double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
-						double heightAGL  = heightAMSL - rlanTerrainHeight;
-						bool useFlag;
-						if (heightAGL < _minRlanHeightAboveTerrain) {
-							switch(_scanPointBelowGroundMethod) {
-								case CConst::DiscardScanPointBelowGroundMethod:
-									useFlag = false;
-									break;
-								case CConst::TruncateScanPointBelowGroundMethod:
-									heightAMSL = rlanTerrainHeight + _minRlanHeightAboveTerrain;
-									useFlag = true;
-									break;
-								default: CORE_DUMP; break;
-							}
-							lowHeightFlag = true;
-						} else {
-							useFlag = true;
-						}
-						if (useFlag) {
-							rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, heightAMSL/1000.0);
-							rlanPosnList[htIdx] = EcefModel::fromGeodetic(rlanCoordList[htIdx]);
-							numRlanPosn++;
-						}
-					}
-
-					int rlanPosnIdx;
-
-#                               if DEBUG_AFC
-					if (traceFlag) {
-						ftrace->writeRow({ QString::asprintf("BEGIN_%d,,,,,-1\n", uls->getID()) });
-						for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx) {
-							ftrace->writeRow({ QString::asprintf("RLAN_%d,%.10f,%.10f,,%.5f,AMSL\n", rlanPosnIdx,rlanCoordList[rlanPosnIdx].longitudeDeg,rlanCoordList[rlanPosnIdx].latitudeDeg,rlanCoordList[rlanPosnIdx].heightKm*1000.0) } );
-						}
-						ftrace->writeRow({ QString::asprintf("FS_RX,%.10f,%.10f,,%.5f,AMSL\n", uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain()+uls->getRxTerrainHeight()) } );
-					}
-#                               endif
-
-					CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
-
-					for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx)
+					int ulsLonIdx;
+					int ulsLatIdx;
+					int regionIdx;
+					char ulsRxPropEnv;
+					_popGrid->findDeg(uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), ulsLonIdx, ulsLatIdx, ulsRxPropEnv, regionIdx);
+					double ulsPopVal = _popGrid->getPop(ulsLonIdx, ulsLatIdx);
+					if (ulsPopVal == 0.0)
 					{
-						Vector3 rlanPosn = rlanPosnList[rlanPosnIdx];
-						GeodeticCoord rlanCoord = rlanCoordList[rlanPosnIdx];
-						lineOfSightVectorKm = ulsRxPos - rlanPosn;
-						double distKm = lineOfSightVectorKm.len();
-						double win2DistKm;
-						if (_winner2UseGroundDistanceFlag) {
-							win2DistKm = groundDistanceKm;
-						} else {
-							win2DistKm = distKm;
-						}
-						double fsplDistKm;
-						if (_fsplUseGroundDistanceFlag) {
-							fsplDistKm = groundDistanceKm;
-						} else {
-							fsplDistKm = distKm;
-						}
-						double dAP = rlanPosn.len();
-						double duls = ulsRxPos.len();
-						double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
-						double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
+						ulsRxPropEnv = 'Z';
+					}
+#else
+					char ulsRxPropEnv = ' ';
+#endif
+					double ulsRxHeightAGL  = (segIdx == numPR ? uls->getRxHeightAboveTerrain() : uls->getPR(segIdx).heightAboveTerrain);
+					double ulsRxHeightAMSL = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSL);
 
-						if ((minRLANDist == -1.0) || (distKm*1000.0 < minRLANDist)) {
-							minRLANDist = distKm*1000.0;
+					/**************************************************************************************/
+					/* Determine propagation environment of FS segment RX, if needed.                     */
+					/**************************************************************************************/
+					CConst::NLCDLandCatEnum nlcdLandCatRx;
+					CConst::PropEnvEnum fsPropEnv;
+					if ((_applyClutterFSRxFlag) && (ulsRxHeightAGL <= _maxFsAglHeight)) {
+						fsPropEnv = computePropEnv(ulsRxLongitude, ulsRxLatitude, nlcdLandCatRx);
+						switch(fsPropEnv) {
+							case CConst::urbanPropEnv:    ulsRxPropEnv = 'U'; break;
+							case CConst::suburbanPropEnv: ulsRxPropEnv = 'S'; break;
+							case CConst::ruralPropEnv:    ulsRxPropEnv = 'R'; break;
+							case CConst::barrenPropEnv:   ulsRxPropEnv = 'B'; break;
+							case CConst::unknownPropEnv:  ulsRxPropEnv = 'X'; break;
+							default: CORE_DUMP;
 						}
+					} else {
+						fsPropEnv = CConst::unknownPropEnv;
+						ulsRxPropEnv = ' ';
+					}
+					/**************************************************************************************/
 
+					LatLon ulsRxLatLon = std::pair<double, double>(ulsRxLatitude, ulsRxLongitude);
+					bool contains;
+
+					_rlanRegion->closestPoint(ulsRxLatLon, contains);
+
+					double minRLANDist = -1.0;
+					if (distKmSquared <= exclusionDistKmSquared) {
+						LOGGER_INFO(logger) << "FSID = " << uls->getID() << (segIdx == numPR ? " RX" : " PR " + std::to_string(segIdx)) << " is inside exclusion distance.";
+						minRLANDist = sqrt(distKmSquared)*1000.0;
+					} else if (contains) {
 						int chanIdx;
 						for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 							ChannelStruct *channel = &(_channelList[chanIdx]);
 							if (channel->availability != BLACK) {
 								double chanStartFreq = channel->startFreqMHz * 1.0e6;
 								double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-								bool useACI = (channel->type == INQUIRED_FREQUENCY ? false : _aciFlag);
-								CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel->type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
-								// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
-								double spectralOverlapLossDB;
-								bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI, spectralAlgorithm);
-								if (hasOverlap) {
-									double bandwidth = chanStopFreq - chanStartFreq;
-									double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
-
-									std::string buildingPenetrationModelStr;
-									double buildingPenetrationCDF;
-									double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
-
-									std::string txClutterStr;
-									std::string rxClutterStr;
-									std::string pathLossModelStr;
-									double pathLossCDF;
-									double pathLoss;
-									std::string pathClutterTxModelStr;
-									double pathClutterTxCDF;
-									double pathClutterTxDB;
-									std::string pathClutterRxModelStr;
-									double pathClutterRxCDF;
-									double pathClutterRxDB;
-
-									double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
-
-									computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
-											rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
-											uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
-											pathLoss, pathClutterTxDB, pathClutterRxDB, true,
-											pathLossModelStr, pathLossCDF,
-											pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-											(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
-#if DEBUG_AFC
-											, uls->ITMHeightType
-#endif
-											);
-
-									std::string rxAntennaSubModelStr;
-									double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-
-									double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
-
-									double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
-
-									double I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
-
-									double marginDB = _IoverN_threshold_dB - I2NDB;
-
-									double eirpLimit_dBm = _maxEIRP_dBm + marginDB;
-
-									if (eirpLimit_dBm < channel->eirpLimit_dBm)
-									{
-										channel->eirpLimit_dBm = eirpLimit_dBm;
-									}
-
+								bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
+								if (hasOverlap > 0.0) {
+									double eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+		
+									channel->availability = BLACK;
+									channel->eirpLimit_dBm = eirpLimit_dBm;
+		
 									if ( (!ulsFlagList[ulsIdx]) || (eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
 										eirpLimitList[ulsIdx] = eirpLimit_dBm;
 										ulsFlagList[ulsIdx] = true;
 									}
+								}
+							}
+						}
+						LOGGER_INFO(logger) << "FSID = " << uls->getID() << " is inside specified RLAN region.";
+						minRLANDist = 0.0;
+					} else {
 
-									if ( fexcthrwifi && (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) )
-									{
-										double d1;
-										double d2;
-										double pathDifference;
-										double fresnelIndex = -1.0;
-										double ulsLinkDistance = uls->getLinkDistance();
-										double ulsWavelength = CConst::c / ((uls->getStartUseFreq() + uls->getStopUseFreq()) / 2);
-										if (ulsLinkDistance != -1.0) {
-											const Vector3 ulsTxPos = (uls->getHasPR() ? uls->getPRPosition() : uls->getTxPosition());
-											d1 = (ulsRxPos - rlanPosn).len() * 1000;
-											d2 = (ulsTxPos - rlanPosn).len() * 1000;
-											pathDifference = d1 + d2 - ulsLinkDistance;
-											fresnelIndex = pathDifference / (ulsWavelength / 2);
-										} else {
-											d1 = (ulsRxPos - rlanPosn).len() * 1000;
-											d2 = -1.0;
-											pathDifference = -1.0;
+						int scanPtIdx;
+						for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
+							LatLon scanPt = scanPointList[scanPtIdx];
+
+							/**************************************************************************************/
+							/* Determine propagation environment of RLAN using scan point                         */
+							/**************************************************************************************/
+							CConst::NLCDLandCatEnum nlcdLandCatTx;
+							CConst::PropEnvEnum rlanPropEnv = computePropEnv(scanPt.second, scanPt.first, nlcdLandCatTx);
+							/**************************************************************************************/
+
+							double rlanTerrainHeight, bldgHeight;
+							MultibandRasterClass::HeightResult lidarHeightResult;
+							CConst::HeightSourceEnum rlanHeightSource;
+							_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
+
+							double height0;
+							if (_rlanRegion->getFixedHeightAMSL()) {
+								height0 = _rlanRegion->getCenterHeightAMSL();
+							} else {
+								height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
+							}
+
+							// Use Haversine formula with average earth radius of 6371 km
+							double lon1Rad = scanPt.second*M_PI/180.0;
+							double lat1Rad = scanPt.first*M_PI/180.0;
+							double lon2Rad = uls->getRxLongitudeDeg()*M_PI/180.0;
+							double lat2Rad = uls->getRxLatitudeDeg()*M_PI/180.0;
+							double slat = sin((lat2Rad-lat1Rad)/2);
+							double slon = sin((lon2Rad-lon1Rad)/2);
+							double groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
+							int htIdx;
+							int numRlanPosn = 0;
+							bool lowHeightFlag = false;
+							for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
+								double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
+								double heightAGL  = heightAMSL - rlanTerrainHeight;
+								bool useFlag;
+								if (heightAGL < _minRlanHeightAboveTerrain) {
+									switch(_scanPointBelowGroundMethod) {
+										case CConst::DiscardScanPointBelowGroundMethod:
+											useFlag = false;
+											break;
+										case CConst::TruncateScanPointBelowGroundMethod:
+											heightAMSL = rlanTerrainHeight + _minRlanHeightAboveTerrain;
+											useFlag = true;
+											break;
+										default: CORE_DUMP; break;
+									}
+									lowHeightFlag = true;
+								} else {
+									useFlag = true;
+								}
+								if (useFlag) {
+									rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, heightAMSL/1000.0);
+									rlanPosnList[htIdx] = EcefModel::fromGeodetic(rlanCoordList[htIdx]);
+									numRlanPosn++;
+								}
+							}
+
+							int rlanPosnIdx;
+
+#if DEBUG_AFC
+							if (traceFlag) {
+								ftrace->writeRow({ QString::asprintf("BEGIN_%d,,,,,-1\n", uls->getID()) });
+								for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx) {
+									ftrace->writeRow({ QString::asprintf("RLAN_%d,%.10f,%.10f,,%.5f,AMSL\n", rlanPosnIdx,rlanCoordList[rlanPosnIdx].longitudeDeg,rlanCoordList[rlanPosnIdx].latitudeDeg,rlanCoordList[rlanPosnIdx].heightKm*1000.0) } );
+								}
+								ftrace->writeRow({ QString::asprintf("FS_RX,%.10f,%.10f,,%.5f,AMSL\n", ulsRxLongitude, ulsRxLatitude, ulsRxHeightAMSL) } );
+							}
+#endif
+
+					CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
+
+							for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx)
+							{
+								Vector3 rlanPosn = rlanPosnList[rlanPosnIdx];
+								GeodeticCoord rlanCoord = rlanCoordList[rlanPosnIdx];
+								lineOfSightVectorKm = ulsRxPos - rlanPosn;
+								double distKm = lineOfSightVectorKm.len();
+								double win2DistKm;
+								if (_winner2UseGroundDistanceFlag) {
+									win2DistKm = groundDistanceKm;
+								} else {
+									win2DistKm = distKm;
+								}
+								double fsplDistKm;
+								if (_fsplUseGroundDistanceFlag) {
+									fsplDistKm = groundDistanceKm;
+								} else {
+									fsplDistKm = distKm;
+								}
+								double dAP = rlanPosn.len();
+								double duls = ulsRxPos.len();
+								double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
+								double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
+
+								if ((minRLANDist == -1.0) || (distKm*1000.0 < minRLANDist)) {
+									minRLANDist = distKm*1000.0;
+								}
+
+								int chanIdx;
+								for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
+									ChannelStruct *channel = &(_channelList[chanIdx]);
+									if (channel->availability != BLACK) {
+										double chanStartFreq = channel->startFreqMHz * 1.0e6;
+										double chanStopFreq = channel->stopFreqMHz * 1.0e6;
+										bool useACI = (channel->type == INQUIRED_FREQUENCY ? false : _aciFlag);
+										CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel->type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
+										// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
+										double spectralOverlapLossDB;
+										bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI, spectralAlgorithm);
+										if (hasOverlap) {
+											double bandwidth = chanStopFreq - chanStartFreq;
+											double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
+
+											std::string buildingPenetrationModelStr;
+											double buildingPenetrationCDF;
+											double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
+
+											std::string txClutterStr;
+											std::string rxClutterStr;
+											std::string pathLossModelStr;
+											double pathLossCDF;
+											double pathLoss;
+											std::string pathClutterTxModelStr;
+											double pathClutterTxCDF;
+											double pathClutterTxDB;
+											std::string pathClutterRxModelStr;
+											double pathClutterRxCDF;
+											double pathClutterRxDB;
+
+											double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
+
+											computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
+													rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
+													ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
+													pathLoss, pathClutterTxDB, pathClutterRxDB, true,
+													pathLossModelStr, pathLossCDF,
+													pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
+													(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
+#if DEBUG_AFC
+													, uls->ITMHeightType
+#endif
+													);
+
+											double rxGainDB;
+											double discriminationGain;
+											Vector3 ulsAntennaPointing = (segIdx == numPR ? uls->getAntennaPointing() : uls->getPR(segIdx).pointing);
+											std::string rxAntennaSubModelStr;
+											double angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+											if (segIdx == numPR) {
+												rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
+											} else {
+												discriminationGain = uls->getPR(segIdx).computeDiscriminationGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
+												rxGainDB = uls->getPR(segIdx).effectiveGain - discriminationGain;
+											}
+
+											double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+
+											double I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
+
+											double marginDB = _IoverN_threshold_dB - I2NDB;
+
+											double eirpLimit_dBm = _maxEIRP_dBm + marginDB;
+
+											if (eirpLimit_dBm < channel->eirpLimit_dBm)
+											{
+												channel->eirpLimit_dBm = eirpLimit_dBm;
+											}
+
+											if ( (!ulsFlagList[ulsIdx]) || (eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+												eirpLimitList[ulsIdx] = eirpLimit_dBm;
+												ulsFlagList[ulsIdx] = true;
+											}
+
+											if ( fexcthrwifi && (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) )
+											{
+												double d1;
+												double d2;
+												double pathDifference;
+												double fresnelIndex = -1.0;
+												double ulsLinkDistance = uls->getLinkDistance();
+												double ulsWavelength = CConst::c / ((uls->getStartUseFreq() + uls->getStopUseFreq()) / 2);
+												if (ulsLinkDistance != -1.0) {
+													const Vector3 ulsTxPos = (segIdx ? uls->getPR(segIdx-1).position : uls->getTxPosition());
+													d1 = (ulsRxPos - rlanPosn).len() * 1000;
+													d2 = (ulsTxPos - rlanPosn).len() * 1000;
+													pathDifference = d1 + d2 - ulsLinkDistance;
+													fresnelIndex = pathDifference / (ulsWavelength / 2);
+												} else {
+													d1 = (ulsRxPos - rlanPosn).len() * 1000;
+													d2 = -1.0;
+													pathDifference = -1.0;
+												}
+
+												std::string rxAntennaTypeStr;
+												if (ulsRxAntennaType == CConst::LUTAntennaType) {
+													rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
+												} else {
+													rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
+												}
+
+												CConst::AntennaCategoryEnum rxAntennaCategory = uls->getRxAntennaCategory();
+												std::string rxAntennaCategoryStr = (
+														rxAntennaCategory == CConst::B1AntennaCategory ? "B1" :
+														rxAntennaCategory == CConst::HPAntennaCategory ? "HP" :
+														"UNKNOWN");
+
+												std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
+														_buildingType == CConst::noBuildingType ? "OUTDOOR" :
+														_buildingType == CConst::traditionalBuildingType ?  "TRADITIONAL" :
+														"THERMALLY_EFFICIENT");
+
+												std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+
+												QStringList msg;
+												msg << QString::number(uls->getID()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
+												msg << QString::number(uls->getRxLongitudeDeg(), 'f', 5) << QString::number(uls->getRxLatitudeDeg(), 'f', 5);
+												msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2)
+													<< QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
+													<< QString(ulsRxPropEnv);
+												msg << QString::number(uls->getNumPR() ? 1 : 0);
+												msg << QString::number(rlanCoord.longitudeDeg, 'f', 5) << QString::number(rlanCoord.latitudeDeg, 'f', 5);
+												msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2)
+													<< QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource))
+													<< CConst::strPropEnvList->type_to_str(rlanPropEnv);
+												msg << QString::number(distKm, 'f', 3) << QString::number(groundDistanceKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
+												msg << QString::number(_maxEIRP_dBm, 'f', 3) << QString::number(_bodyLossDB, 'f', 3) << QString::fromStdString(txClutterStr) << QString::fromStdString(rxClutterStr) << QString::fromStdString(bldgTypeStr);
+												msg << QString::number(buildingPenetrationDB, 'f', 3) << QString::fromStdString(buildingPenetrationModelStr) << QString::number(buildingPenetrationCDF, 'f', 8);
+												msg << QString::number(pathLoss, 'f', 3) << QString::fromStdString(pathLossModelStr) << QString::number(pathLossCDF, 'f', 8);
+		
+												msg << QString::number(pathClutterTxDB, 'f', 3) << QString::fromStdString(pathClutterTxModelStr) << QString::number(pathClutterTxCDF, 'f', 8);
+												msg << QString::number(pathClutterRxDB, 'f', 3) << QString::fromStdString(pathClutterRxModelStr) << QString::number(pathClutterRxCDF, 'f', 8);
+		
+												msg << QString::number(bandwidth * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
+													<< QString::number(uls->getStartUseFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopUseFreq() * 1.0e-6, 'f', 2);
+		
+												msg << QString::fromStdString(rxAntennaTypeStr) << QString::fromStdString(rxAntennaCategoryStr) << QString::number(uls->getRxGain(), 'f', 3);
+												msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
+												msg << QString::number(_polarizationLossDB, 'f', 3);
+												msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
+												msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(I2NDB, 'f', 3) <<  QString::number(eirpLimit_dBm, 'f', 3);
+												msg << QString::number(ulsLinkDistance, 'f', 3) << QString::number(chanCenterFreq, 'f', 3) << QString::number(d2, 'f', 3) << QString::number(pathDifference, 'f', 6);
+												msg << QString::number(ulsWavelength * 1000, 'f', 3) << QString::number(fresnelIndex, 'f', 3);
+		
+												fexcthrwifi->writeRow(msg);
+											}
 										}
-
-										std::string rxAntennaTypeStr;
-										if (ulsRxAntennaType == CConst::LUTAntennaType) {
-											rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
-										} else {
-											rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
-										}
-
-										CConst::AntennaCategoryEnum rxAntennaCategory = uls->getRxAntennaCategory();
-										std::string rxAntennaCategoryStr = (
-												rxAntennaCategory == CConst::B1AntennaCategory ? "B1" :
-												rxAntennaCategory == CConst::HPAntennaCategory ? "HP" :
-												"UNKNOWN");
-
-										std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
-												_buildingType == CConst::noBuildingType ? "OUTDOOR" :
-												_buildingType == CConst::traditionalBuildingType ?  "TRADITIONAL" :
-												"THERMALLY_EFFICIENT");
-
-										std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
-
-										QStringList msg;
-										msg << QString::number(uls->getID()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
-										msg << QString::number(uls->getRxLongitudeDeg(), 'f', 5) << QString::number(uls->getRxLatitudeDeg(), 'f', 5);
-										msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2) << 
-											QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource())) <<
-											QString(ulsRxPropEnv);
-										msg << QString::number(uls->getHasPR() ? 1 : 0);
-										msg << QString::number(rlanCoord.longitudeDeg, 'f', 5) << QString::number(rlanCoord.latitudeDeg, 'f', 5);
-										msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) << 
-											QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource)) <<
-											CConst::strPropEnvList->type_to_str(rlanPropEnv);
-										msg << QString::number(distKm, 'f', 3) << QString::number(groundDistanceKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
-										msg << QString::number(_maxEIRP_dBm, 'f', 3) << QString::number(_bodyLossDB, 'f', 3) << QString::fromStdString(txClutterStr) << QString::fromStdString(rxClutterStr) << QString::fromStdString(bldgTypeStr);
-										msg << QString::number(buildingPenetrationDB, 'f', 3) << QString::fromStdString(buildingPenetrationModelStr) << QString::number(buildingPenetrationCDF, 'f', 8);
-										msg << QString::number(pathLoss, 'f', 3) << QString::fromStdString(pathLossModelStr) << QString::number(pathLossCDF, 'f', 8);
-
-										msg << QString::number(pathClutterTxDB, 'f', 3) << QString::fromStdString(pathClutterTxModelStr) << QString::number(pathClutterTxCDF, 'f', 8);
-										msg << QString::number(pathClutterRxDB, 'f', 3) << QString::fromStdString(pathClutterRxModelStr) << QString::number(pathClutterRxCDF, 'f', 8);
-
-										msg << QString::number(bandwidth * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
-											<< QString::number(uls->getStartUseFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopUseFreq() * 1.0e-6, 'f', 2);
-
-										msg << QString::fromStdString(rxAntennaTypeStr) << QString::fromStdString(rxAntennaCategoryStr) << QString::number(uls->getRxGain(), 'f', 3);
-										msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
-										msg << QString::number(_polarizationLossDB, 'f', 3);
-										msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
-										msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(I2NDB, 'f', 3) <<  QString::number(eirpLimit_dBm, 'f', 3);
-										msg << QString::number(ulsLinkDistance, 'f', 3) << QString::number(chanCenterFreq, 'f', 3) << QString::number(d2, 'f', 3) << QString::number(pathDifference, 'f', 6);
-										msg << QString::number(ulsWavelength * 1000, 'f', 3) << QString::number(fresnelIndex, 'f', 3);
-
-										fexcthrwifi->writeRow(msg);
 									}
 								}
+							}
+
+
+							if (uls->ITMHeightProfile) {
+								free(uls->ITMHeightProfile);
+								uls->ITMHeightProfile = (double *) NULL;
+							}
+							if (uls->isLOSHeightProfile) {
+								free(uls->isLOSHeightProfile);
+								uls->isLOSHeightProfile = (double *) NULL;
 							}
 						}
 					}
 
-
-					if (uls->ITMHeightProfile) {
-						free(uls->ITMHeightProfile);
-						uls->ITMHeightProfile = (double *) NULL;
+					if (fFSList) {
+						fprintf(fFSList,   "%d,%s,%s,%.1f,%.1f,%.6f,%.6f,%.1f,%.1f\n",
+							uls->getID(),
+							uls->getRxCallsign().c_str(),
+							uls->getCallsign().c_str(),
+							uls->getStartUseFreq()*1.0e-6,
+							uls->getStopUseFreq()*1.0e-6,
+							uls->getRxLongitudeDeg(),
+							uls->getRxLatitudeDeg(),
+							uls->getRxHeightAboveTerrain(),
+							minRLANDist
+						);
 					}
-					if (uls->isLOSHeightProfile) {
-						free(uls->isLOSHeightProfile);
-						uls->isLOSHeightProfile = (double *) NULL;
+
+#           		if DEBUG_AFC
+					time_t t2 = time(NULL);
+					tstr = strdup(ctime(&t2));
+					strtok(tstr, "\n");
+
+					std::cout << numProc << " [" << ulsIdx+1 << " / " <<  _ulsList->getSize() << "] " << tstr << " Elapsed Time = " << (t2-t1) << std::endl << std::flush;
+
+					free(tstr);
+
+					if (false&&(numProc == 10)) {
+						cont = false;
 					}
-				}
 
-			}
+					if (traceFlag&&(!contains)) {
+						traceIdx++;
+						if (uls->ITMHeightProfile) {
+							double rlanLon = rlanCoordList[0].longitudeDeg;
+							double rlanLat = rlanCoordList[0].latitudeDeg;
+							double fsLon = uls->getRxLongitudeDeg();
+							double fsLat = uls->getRxLatitudeDeg();
+							int N = ((int) uls->ITMHeightProfile[0]) + 1;
+							Vector3 rlanCenterPosn = rlanPosnList[0];
+							lineOfSightVectorKm = ulsRxPos - rlanCenterPosn;
+							Vector3 upVec = rlanCenterPosn.normalized();
+							Vector3 horizVec = (lineOfSightVectorKm - (lineOfSightVectorKm.dot(upVec) * upVec));
+							double horizDistKm = sqrt((horizVec).dot(horizVec));
+							for(int ptIdx=0; ptIdx<N; ptIdx++) {
+								double ptLon = ( rlanLon * (N-1-ptIdx) + fsLon*ptIdx ) / (N-1);
+								double ptLat = ( rlanLat * (N-1-ptIdx) + fsLat*ptIdx ) / (N-1);
+								double ptDistKm = horizDistKm*ptIdx / (N-1);
 
-			if (fFSList) {
-				fprintf(fFSList,   "%d,%s,%s,%.1f,%.1f,%.6f,%.6f,%.1f,%.1f\n",
-					uls->getID(),
-					uls->getRxCallsign().c_str(),
-					uls->getCallsign().c_str(),
-					uls->getStartUseFreq()*1.0e-6,
-					uls->getStopUseFreq()*1.0e-6,
-					uls->getRxLongitudeDeg(),
-					uls->getRxLatitudeDeg(),
-					uls->getRxHeightAboveTerrain(),
-					minRLANDist
-				);
-			}
+								ftrace->writeRow({ QString::asprintf("PT_%d", ptIdx),
+										QString::number(ptLon, 'f', 10),
+										QString::number(ptLat, 'f', 10),
+										QString::number(ptDistKm, 'f', 5),
+										QString::number(uls->ITMHeightProfile[2+ptIdx], 'f', 5),
+										});
 
-#           if DEBUG_AFC
-			time_t t2 = time(NULL);
-			tstr = strdup(ctime(&t2));
-			strtok(tstr, "\n");
-
-			std::cout << numProc << " [" << ulsIdx+1 << " / " <<  _ulsList->getSize() << "] " << tstr << " Elapsed Time = " << (t2-t1) << std::endl << std::flush;
-
-			free(tstr);
-
-			if (false&&(numProc == 10)) {
-				cont = false;
-			}
-
-			if (traceFlag&&(!contains)) {
-				traceIdx++;
-				if (uls->ITMHeightProfile) {
-					double rlanLon = rlanCoordList[0].longitudeDeg;
-					double rlanLat = rlanCoordList[0].latitudeDeg;
-					double fsLon = uls->getRxLongitudeDeg();
-					double fsLat = uls->getRxLatitudeDeg();
-					int N = ((int) uls->ITMHeightProfile[0]) + 1;
-					Vector3 rlanCenterPosn = rlanPosnList[0];
-					lineOfSightVectorKm = ulsRxPos - rlanCenterPosn;
-					Vector3 upVec = rlanCenterPosn.normalized();
-					Vector3 horizVec = (lineOfSightVectorKm - (lineOfSightVectorKm.dot(upVec) * upVec));
-					double horizDistKm = sqrt((horizVec).dot(horizVec));
-					for(int ptIdx=0; ptIdx<N; ptIdx++) {
-						double ptLon = ( rlanLon * (N-1-ptIdx) + fsLon*ptIdx ) / (N-1);
-						double ptLat = ( rlanLat * (N-1-ptIdx) + fsLat*ptIdx ) / (N-1);
-						double ptDistKm = horizDistKm*ptIdx / (N-1);
-
-						ftrace->writeRow({ QString::asprintf("PT_%d", ptIdx),
-								QString::number(ptLon, 'f', 10),
-								QString::number(ptLat, 'f', 10),
-								QString::number(ptDistKm, 'f', 5),
-								QString::number(uls->ITMHeightProfile[2+ptIdx], 'f', 5),
+							}
+						}
+						std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+						ftrace->writeRow({
+								QString::asprintf("END_%s_%d", dbName.c_str(), uls->getID()),
+								QString(),
+								QString(),
+								QString(),
+								QString(),
+								QString(),
+								QString::number(-1)
 								});
 
 					}
+#		           endif
+
 				}
-				std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
-				ftrace->writeRow({
-						QString::asprintf("END_%s_%d", dbName.c_str(), uls->getID()),
-						QString(),
-						QString(),
-						QString(),
-						QString(),
-						QString(),
-						QString::number(-1)
-						});
-
+				else
+				{
+# 		          if DEBUG_AFC
+						// uls is not included in calculations
+						LOGGER_DEBUG(logger) << "ID: " << uls->getID() << ", distKm: " << sqrt(distKmSquared) << ", link: " << uls->getLinkDistance() << ",";
+#        		   endif
+				}
 			}
-#           endif
-
-		}
-		else
-		{
-#           if DEBUG_AFC
-				// uls is not included in calculations
-				LOGGER_DEBUG(logger) << "ID: " << uls->getID() << ", distKm: " << sqrt(distKmSquared) << ", link: " << uls->getLinkDistance() << ",";
-#           endif
 		}
 
 		numProc++;
@@ -7619,29 +7641,50 @@ void AfcManager::runPointAnalysis()
 					useFlag = ((eirpLimitList[ulsIdx] >= _maxEIRP_dBm) ? true : false);
 				}
 			}
-			if (useFlag) {
+			if ((useFlag) && (fkml)) {
 				ULSClass *uls = (*_ulsList)[ulsIdx];
-				const Vector3 ulsRxPos = uls->getRxPosition();
-				if (fkml) {
-					std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+				std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+
+				Vector3 ulsTxPos = uls->getTxPosition();
+				double ulsTxLongitude = uls->getTxLongitudeDeg();
+				double ulsTxLatitude = uls->getTxLatitudeDeg();
+				double ulsTxHeight = uls->getTxHeightAMSL();
+
+				fkml->writeStartElement("Folder");
+				fkml->writeTextElement("name", QString::fromStdString(dbName + "_" + std::to_string(uls->getID())));	
+				// fkml->writeTextElement("name", QString::fromStdString(uls->getCallsign()));	
+				if (addPlacemarks) {
+					fkml->writeStartElement("Placemark");
+					fkml->writeTextElement("name", QString::asprintf("%s %s_%d", "TX", dbName.c_str(), uls->getID()));
+					fkml->writeTextElement("visibility", "1");
+					fkml->writeTextElement("styleUrl", placemarkStyleStr.c_str());
+					fkml->writeStartElement("Point");
+					fkml->writeTextElement("altitudeMode", "absolute");
+					fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", ulsTxLongitude, ulsTxLatitude, ulsTxHeight));
+					fkml->writeEndElement(); // Point
+					fkml->writeEndElement(); // Placemark
+				}
+
+				int numPR = uls->getNumPR();
+				for(int segIdx=0; segIdx<numPR+1; ++segIdx) {
+
+				    Vector3 ulsRxPos = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).position);
+					double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
+					double ulsRxLatitude = (segIdx == numPR ? uls->getRxLatitudeDeg() : uls->getPR(segIdx).latitudeDeg);
+					double ulsRxHeight = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSL);
+
 
 					double beamWidthDeg = uls->computeBeamWidth(3.0);
 					double beamWidthRad = beamWidthDeg*(M_PI/180.0);
 
-					const Vector3 ulsTxPos = (uls->getHasPR() ? uls->getPRPosition() : uls->getTxPosition());
 					double linkDistKm = (ulsTxPos - ulsRxPos).len();
 
-					double ulsRxHeight = uls->getRxHeightAMSL();
-					double ulsTxHeight = (uls->getHasPR() ? uls->getPRHeightAMSL() : uls->getTxHeightAMSL());
 
 					Vector3 zvec = (ulsTxPos-ulsRxPos).normalized();
 					Vector3 xvec = (Vector3(zvec.y(), -zvec.x(),0.0)).normalized();
 					Vector3 yvec = zvec.cross(xvec);
 
 					int numCvgPoints = 32;
-					fkml->writeStartElement("Folder");
-					fkml->writeTextElement("name", QString::fromStdString(dbName + "_" + std::to_string(uls->getID())));	
-					// fkml->writeTextElement("name", QString::fromStdString(uls->getCallsign()));	
 
 					std::vector<GeodeticCoord> ptList;
 					double cvgTheta = beamWidthRad;
@@ -7655,31 +7698,25 @@ void AfcManager::runPointAnalysis()
 					}
 
 					if (addPlacemarks) {
+						std::string nameStr;
+						if (segIdx == numPR) {
+							nameStr = "RX";
+						} else {
+							nameStr = "PR " + std::to_string(segIdx+1);;
+						}
 						fkml->writeStartElement("Placemark");
-						fkml->writeTextElement("name", QString::asprintf("RX %s_%d", dbName.c_str(), uls->getID()));
+						fkml->writeTextElement("name", QString::asprintf("%s %s_%d", nameStr.c_str(), dbName.c_str(), uls->getID()));
 						fkml->writeTextElement("visibility", "1");
 						fkml->writeTextElement("styleUrl", placemarkStyleStr.c_str());
 						fkml->writeStartElement("Point");
 						fkml->writeTextElement("altitudeMode", "absolute");
-						fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), ulsRxHeight));
-						fkml->writeEndElement(); // Point
-						fkml->writeEndElement(); // Placemark
-
-						fkml->writeStartElement("Placemark");
-						fkml->writeTextElement("name", QString::asprintf("%s %s_%d", (uls->getHasPR() ? "PR" : "TX"), dbName.c_str(), uls->getID()));
-						fkml->writeTextElement("visibility", "1");
-						fkml->writeTextElement("styleUrl", placemarkStyleStr.c_str());
-						fkml->writeStartElement("Point");
-						fkml->writeTextElement("altitudeMode", "absolute");
-						fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f",
-									(uls->getHasPR() ? uls->getPRLongitudeDeg() : uls->getTxLongitudeDeg()),
-									(uls->getHasPR() ? uls->getPRLatitudeDeg()  : uls->getTxLatitudeDeg() ), ulsTxHeight));
+						fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", ulsRxLongitude, ulsRxLatitude, ulsRxHeight));
 						fkml->writeEndElement(); // Point
 						fkml->writeEndElement(); // Placemark
 					}
 
 					fkml->writeStartElement("Folder");
-					fkml->writeTextElement("name", "Beamcone");	
+					fkml->writeTextElement("name", QString::asprintf("Beamcone_%d", segIdx+1));
 
 					for(cvgPhiIdx=0; cvgPhiIdx<numCvgPoints; ++cvgPhiIdx) {
 						fkml->writeStartElement("Placemark");
@@ -7692,7 +7729,7 @@ void AfcManager::runPointAnalysis()
 						fkml->writeStartElement("outerBoundaryIs");
 						fkml->writeStartElement("LinearRing");
 
-						QString more_coords = QString::asprintf("%.10f,%.10f,%.2f\n", uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), ulsRxHeight);
+						QString more_coords = QString::asprintf("%.10f,%.10f,%.2f\n", ulsRxLongitude, ulsRxLatitude, ulsRxHeight);
 
 						GeodeticCoord pt = ptList[cvgPhiIdx];
 						more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, pt.heightKm*1000.0));
@@ -7700,7 +7737,7 @@ void AfcManager::runPointAnalysis()
 						pt = ptList[(cvgPhiIdx +1) % numCvgPoints];
 						more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, pt.heightKm*1000.0));
 
-						more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), ulsRxHeight));
+						more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", ulsRxLongitude, ulsRxLatitude, ulsRxHeight));
 
 						fkml->writeTextElement("coordinates", more_coords);
 						fkml->writeEndElement(); // LinearRing
@@ -7710,8 +7747,12 @@ void AfcManager::runPointAnalysis()
 					}
 					fkml->writeEndElement(); // Beamcone
 
-					fkml->writeEndElement(); // Folder
+					ulsTxPos       = ulsRxPos;
+					ulsTxLongitude = ulsRxLongitude;
+					ulsTxLatitude  = ulsRxLatitude;
+					ulsTxHeight    = ulsRxHeight;
 				}
+				fkml->writeEndElement(); // Folder
 			}
 		}
 		fkml->writeEndElement(); // Folder
@@ -9012,7 +9053,8 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 			double ulsWavelength = CConst::c / ((uls->getStartUseFreq() + uls->getStopUseFreq()) / 2);
 			if (ulsLinkDistance != -1.0)
 			{
-				const Vector3 ulsTxPos = (uls->getHasPR() ? uls->getPRPosition() : uls->getTxPosition());
+				int numPR = uls->getNumPR();
+				const Vector3 ulsTxPos = (numPR ? uls->getPR(numPR-1).position : uls->getTxPosition());
 				d1 = (ulsRxPos - rlanPosn).len() * 1000;
 				d2 = (ulsTxPos - rlanPosn).len() * 1000;
 				pathDifference = d1 + d2 - ulsLinkDistance;
@@ -9045,7 +9087,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 			msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2) <<
 				QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
 				<< QString(ulsRxPropEnv);
-			msg << QString::number(uls->getHasPR() ? 1 : 0);
+			msg << QString::number(uls->getNumPR() ? 1 : 0);
 			msg << QString::number(rlanCoord.longitudeDeg, 'f', 8) << QString::number(rlanCoord.latitudeDeg, 'f', 8);
 			msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) << 
 				QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource)) <<
@@ -9541,7 +9583,8 @@ void AfcManager::runHeatmapAnalysis()
 								double ulsWavelength = CConst::c / ((uls->getStartUseFreq() + uls->getStopUseFreq()) / 2);
 								if (ulsLinkDistance != -1.0)
 								{
-									const Vector3 ulsTxPos = (uls->getHasPR() ? uls->getPRPosition() : uls->getTxPosition());
+									int numPR = uls->getNumPR();
+									const Vector3 ulsTxPos = (numPR ? uls->getPR(numPR-1).position : uls->getTxPosition());
 									d1 = (ulsRxPos - rlanPosn).len() * 1000;
 									d2 = (ulsTxPos - rlanPosn).len() * 1000;
 									pathDifference = d1 + d2 - ulsLinkDistance;
@@ -9574,7 +9617,7 @@ void AfcManager::runHeatmapAnalysis()
 								msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2) <<
 									QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
 									<< QString(ulsRxPropEnv);
-								msg << QString::number(uls->getHasPR() ? 1 : 0);
+								msg << QString::number(uls->getNumPR() ? 1 : 0);
 								msg << QString::number(rlanCoord.longitudeDeg, 'f', 5) << QString::number(rlanCoord.latitudeDeg, 'f', 5);
 								msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) << 
 									QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource))
