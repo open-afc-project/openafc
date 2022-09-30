@@ -4,7 +4,7 @@
 |Version|3.4.2.1|
 | :- | :- |
 |**Date**|**09/30/2022**|
-|compiled server's version is TBD |git tag 3.4.2.1|
+|compiled server's version is 6e7335b |git tag 3.4.2.1|
 
 ## **Version and Date**
 |Version|**OA-300**|
