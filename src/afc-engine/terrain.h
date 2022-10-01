@@ -67,6 +67,9 @@ class TerrainClass
 		const std::string& getSourceName(const CConst::HeightSourceEnum& sourceVal) const;
 
 		std::vector<QRectF> getBounds() const;
+
+		bool getGdalDirectMode() const;
+		bool setGdalDirectMode(bool newGdalDirectMode);
 	private:
 		/**************************************************************************************/
 		/**** Data                                                                         ****/
@@ -82,6 +85,7 @@ class TerrainClass
 		std::shared_ptr<CachedGdal<int16_t>> cgSrtm;
 		std::shared_ptr<CachedGdal<float>> cgDep;
 		std::shared_ptr<CachedGdal<int16_t>> cgGlobe;
+		bool gdalDirectMode;
 
 		std::map<CConst::HeightSourceEnum, std::string> sourceNames = {};
 

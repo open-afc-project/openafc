@@ -3,6 +3,7 @@
 /**** Michael Mandell 7/30/04                                                          ****/
 /******************************************************************************************/
 
+#include <algorithm>
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -521,6 +522,18 @@ int ins_elem_sorted(ListClass<T> *lc_t, T val, const int err, int *insFlagPtr)
 
 	return(retval);
 };
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: ListClass::sort                                                        ****/
+/**** INPUTS: compare -- comparator function (kind of 'less'                           ****/
+/**** OUTPUTS:                                                                         ****/
+/**** Prints values of {list[0], list[1], ..., list[n-1]}                              ****/
+	template<class T>
+void ListClass<T>::sort(const std::function<bool(const T &, const T &)> &compare)
+{
+	std::sort(a, a+size, compare);
+}
 /******************************************************************************************/
 
 /******************************************************************************************/

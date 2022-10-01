@@ -3557,6 +3557,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 	int prIdx;
 	int dbIdx;
+	bool prevGdalDirectMode = _terrainDataModel->setGdalDirectMode(true);
 	for(dbIdx=0; dbIdx<(int) ulsDatabaseList.size(); ++dbIdx) {
 		std::string name = std::get<0>(ulsDatabaseList[dbIdx]);
 		std::string filename = std::get<1>(ulsDatabaseList[dbIdx]);
@@ -3638,6 +3639,21 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		{
 			ulsDatabase->loadUlsData(QString::fromStdString(filename), rows, minLat, maxLat, minLon, maxLon);
 		}
+		// Distributing FS TX by 1x1 degree squares to minimize GDAL reopening
+		std::sort(rows.begin(), rows.end(),
+			[](const UlsRecord &rl, const UlsRecord &rr) {
+				double latDegL = std::floor(rl.txLatitudeDeg);
+				double latDegR = std::floor(rr.txLatitudeDeg);
+				if (latDegL != latDegR) {
+					return latDegL < latDegR;
+				}
+				double lonDegL = std::floor(rl.txLongitudeDeg);
+				double lonDegR = std::floor(rr.txLongitudeDeg);
+				if (lonDegL != lonDegR) {
+					return lonDegL < lonDegR;
+				}
+				return false;
+			});
 
 		for (UlsRecord row : rows)
 		{
@@ -4839,6 +4855,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			}
 
 		}
+		_terrainDataModel->setGdalDirectMode(prevGdalDirectMode);
 
 		LOGGER_INFO(logger) << "TOTAL NUM VALID ULS: " << numValid;
 		LOGGER_INFO(logger) << "TOTAL NUM IGNORE ULS (invalid data):" << numIgnoreInvalid;
@@ -6483,6 +6500,19 @@ void AfcManager::runPointAnalysis()
 	LOGGER_INFO(logger) << "Executing AfcManager::runPointAnalysis()";
 
 	_rlanRegion->configure(_rlanHeightType, _terrainDataModel);
+
+	// Sorting by distance from AP
+	double cosLatSq = cos(_rlanRegion->getCenterLatitude() / 180.0 * M_PI);
+	cosLatSq *= cosLatSq;
+	_ulsList->sort(
+		[this, cosLatSq](ULSClass *const &l, ULSClass *const &r) {
+			double latDistL = l->getRxLatitudeDeg() - _rlanRegion->getCenterLatitude();
+			double latDistR = r->getRxLatitudeDeg() - _rlanRegion->getCenterLatitude();
+			double lonDistL = l->getRxLongitudeDeg() - _rlanRegion->getCenterLongitude();
+			double lonDistR = r->getRxLongitudeDeg() - _rlanRegion->getCenterLongitude();
+			return (latDistL * latDistL + lonDistL * lonDistL * cosLatSq) <
+				(latDistR * latDistR + lonDistR * lonDistR * cosLatSq);
+		});
 
 	double heightUncertainty = _rlanRegion->getHeightUncertainty();
 	int NHt = (int) ceil(heightUncertainty / _scanres_ht);

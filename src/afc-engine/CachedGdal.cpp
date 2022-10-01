@@ -254,6 +254,30 @@ const void *CachedGdalBase::getTileVector(int band, double latDeg, double lonDeg
 	return tileInfo.tileVector.get();
 }
 
+bool CachedGdalBase::getPixelDirect(int band, double latDeg, double lonDeg, void *pixelBuf)
+{
+	checkBandIndex(band);
+	// First need to find pixel whereabouts in file
+	const GdalInfo *gdalInfo;
+	int fileLatIdx, fileLonIdx;
+	if (!getGdalPixel(latDeg, lonDeg, &gdalInfo, &fileLatIdx, &fileLonIdx)) {
+		return false;	// GDAL file not found
+	}
+	// Bringing GDAL data set and reading from it
+	const GdalDatasetHolder *datasetHolder = getGdalDatasetHolder(gdalInfo->baseName);
+	CPLErr readError = datasetHolder->gdalDataset->GetRasterBand(band)->RasterIO(
+		GF_Read, fileLonIdx, fileLatIdx, 1, 1, pixelBuf, 1, 1, _pixelType, 0, 0);
+	if (readError != CPLErr::CE_None) {
+		std::ostringstream errStr;
+		errStr << "ERROR: CachedGdalBase::getPixelDirect(): Reading GDAL pixel from '" <<
+			gdalInfo->baseName << "' (band: " << band <<
+			", xOffset: " << fileLonIdx << ", yOffset: " << fileLatIdx << ") failed: " <<
+			CPLGetLastErrorMsg();
+		throw std::runtime_error(errStr.str());
+	}
+	return true;
+}
+
 bool CachedGdalBase::findTile(int band, double latDeg, double lonDeg)
 {
 	// Maybe recent tile would suffice?

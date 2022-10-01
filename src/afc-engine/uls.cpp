@@ -131,10 +131,10 @@ std::string ULSClass::getRxCallsign() {
 int ULSClass::getRxAntennaNumber() {
 	return(rxAntennaNumber);
 }
-double ULSClass::getRxLongitudeDeg() {
+double ULSClass::getRxLongitudeDeg() const {
 	return(rxLongitudeDeg);
 }
-double ULSClass::getRxLatitudeDeg() {
+double ULSClass::getRxLatitudeDeg() const {
 	return(rxLatitudeDeg);
 }
 double ULSClass::getRxGroundElevation()      {

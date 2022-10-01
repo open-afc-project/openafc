@@ -29,7 +29,7 @@ class MultibandRasterClass: private boost::noncopyable
 		MultibandRasterClass(const std::string& rasterFile, CConst::LidarFormatEnum formatVal);
 
 		// Returns building height at a specified (lat/lon) point. If there are no buildings present at the given position then a quiet NaN value is returned
-		void getHeight(const double& latDeg, const double& lonDeg, double& terrainHeight, double& bldgHeight, HeightResult& heightResult) const;
+		void getHeight(const double& latDeg, const double& lonDeg, double& terrainHeight, double& bldgHeight, HeightResult& heightResult, bool directGdalMode = false) const;
 		bool contains(const double& latDeg, const double& lonDeg);
 
 		static const StrTypeClass strHeightResultList[];
