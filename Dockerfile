@@ -5,8 +5,8 @@
 # a copy of which is included with this software program
 #
 # default value of args
-ARG BLD_TAG=latest
-ARG PRINST_TAG=latest
+ARG BLD_TAG=3.4.2.1
+ARG PRINST_TAG=3.4.2.1
 ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-build-image
 ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image
 
