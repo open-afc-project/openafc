@@ -25,6 +25,7 @@ RUN sh -x /wd/build-rpm.sh
 # Stage Install
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 COPY prereqs/devel.sh /wd/
+COPY prereqs/.bashrc /root/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
 RUN /wd/devel.sh

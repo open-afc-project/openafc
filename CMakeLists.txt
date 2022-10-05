@@ -73,6 +73,9 @@ if (DEBUG_AFC)
     message(STATUS "Using DEBUG_AFC build mode")
 endif()
 
+message("CMAKE_C_FLAGS ${CMAKE_C_FLAGS}")
+message("CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS}")
+
 # Coverage analysis
 include(CheckCoverage)
 

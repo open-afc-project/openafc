@@ -1,7 +1,9 @@
 #!/bin/sh
+echo -e "Hostname $HOSTNAME"
 N_THREADS=$(nproc --all --ignore=2)
 FBRAT_WORKING_DIR=/wd/afc/${AFC_SUFX}
 APIDOCDIR=${FBRAT_WORKING_DIR}/build/testroot/share/doc/fbrat-api
+source /opt/rh/$(scl -l)/enable
 mkdir -p ${FBRAT_WORKING_DIR}/build
 cd ${FBRAT_WORKING_DIR}/build
 cmake3 -DCMAKE_INSTALL_PREFIX=${FBRAT_WORKING_DIR}/build/testroot \
