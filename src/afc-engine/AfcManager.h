@@ -177,7 +177,8 @@ class AfcManager
 
 		void readRASData(std::string filename);
 
-		void computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx, CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
+		void computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx,
+				CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
 				double distKm, double fsplDistKm, double win2DistKm, double frequency,
 				double txLongitudeDeg, double txLatitudeDeg, double txHeightM, double elevationAngleTxDeg,
 				double rxLongitudeDeg, double rxLatitudeDeg, double rxHeightM, double elevationAngleRxDeg,

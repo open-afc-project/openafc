@@ -5360,7 +5360,8 @@ double AfcManager::computeBuildingPenetration(CConst::BuildingTypeEnum buildingT
 /******************************************************************************************/
 /**** AfcManager::computePathLoss                                                      ****/
 /******************************************************************************************/
-void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx, CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
+void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx,
+		CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
 		double distKm, double fsplDistKm, double win2DistKm, double frequency,
 		double txLongitudeDeg, double txLatitudeDeg, double txHeightM, double elevationAngleTxDeg,
 		double rxLongitudeDeg, double rxLatitudeDeg, double rxHeightM, double elevationAngleRxDeg,
@@ -5398,7 +5399,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 	pathClutterRxCDF = -1.0;
 
 
-	if (_pathLossModel == CConst::ITMBldgPathLossModel)
+	if (pathLossModel == CConst::ITMBldgPathLossModel)
 	{
 		if ((propEnv == CConst::urbanPropEnv) || (propEnv == CConst::suburbanPropEnv))
 		{
@@ -5518,7 +5519,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 		pathClutterRxModelStr = "NONE";
 		pathClutterRxCDF = 0.5;
 	}
-	else if (_pathLossModel == CConst::CoalitionOpt6PathLossModel)
+	else if (pathLossModel == CConst::CoalitionOpt6PathLossModel)
 	{
 #if 1
 		// As of 2021.12.03 this path loss model is no longer supported for AFC.
@@ -5675,7 +5676,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 		}
 #endif
 	}
-	else if (_pathLossModel == CConst::FCC6GHzReportAndOrderPathLossModel)
+	else if (pathLossModel == CConst::FCC6GHzReportAndOrderPathLossModel)
 	{
 		// Path Loss Model used in FCC Report and Order
 
@@ -5967,7 +5968,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 			pathClutterRxModelStr = "NONE";
 			pathClutterRxCDF = 0.5;
 		}
-	} else if (_pathLossModel == CConst::FSPLPathLossModel) {
+	} else if (pathLossModel == CConst::FSPLPathLossModel) {
 		pathLoss = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
 		pathLossModelStr = "FSPL";
 		pathLossCDF = 0.5;
@@ -5980,7 +5981,7 @@ void AfcManager::computePathLoss(CConst::PropEnvEnum propEnv, CConst::PropEnvEnu
 		pathClutterRxModelStr = "NONE";
 		pathClutterRxCDF = 0.5;
 	} else {
-		throw std::runtime_error(ErrStream() << "ERROR reading ULS data: pathLossModel = " << _pathLossModel << " INVALID value");
+		throw std::runtime_error(ErrStream() << "ERROR reading ULS data: pathLossModel = " << pathLossModel << " INVALID value");
 	}
 
 	if (_pathLossClampFSPL) {
@@ -7392,40 +7393,75 @@ void AfcManager::runPointAnalysis()
 											std::string pathClutterRxModelStr;
 											double pathClutterRxCDF;
 											double pathClutterRxDB;
+											double rxGainDB;
+											double discriminationGain;
+											std::string rxAntennaSubModelStr;
+											double angleOffBoresightDeg;
+											double rxPowerDBW;
+											double I2NDB;
+											double marginDB;
+											double eirpLimit_dBm;
 
 											double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-											computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
-													rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
-													ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
-													pathLoss, pathClutterTxDB, pathClutterRxDB, true,
-													pathLossModelStr, pathLossCDF,
-													pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-													(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
+
+											// Trying Free Space Path Loss then (if not skipped) - configured Path Loss.
+											bool skip = false;
+											for (bool forceFspl : {true, false}) {
+												if (forceFspl && (fsplDistKm == 0)) {
+													// Possible if FSPL distance is horizontal. This should be extremely rare
+													continue;
+												}
+												computePathLoss(forceFspl ? CConst::FSPLPathLossModel : _pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx,
+														nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
+														rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
+														ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
+														pathLoss, pathClutterTxDB, pathClutterRxDB, true,
+														pathLossModelStr, pathLossCDF,
+														pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
+														(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
 #if DEBUG_AFC
-													, uls->ITMHeightType
+														, uls->ITMHeightType
 #endif
-													);
+														);
 
-											double rxGainDB;
-											double discriminationGain;
-											Vector3 ulsAntennaPointing = (segIdx == numPR ? uls->getAntennaPointing() : uls->getPR(segIdx).pointing);
-											std::string rxAntennaSubModelStr;
-											double angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-											if (segIdx == numPR) {
-												rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
-											} else {
-												discriminationGain = uls->getPR(segIdx).computeDiscriminationGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
-												rxGainDB = uls->getPR(segIdx).effectiveGain - discriminationGain;
+												Vector3 ulsAntennaPointing = (segIdx == numPR ? uls->getAntennaPointing() : uls->getPR(segIdx).pointing);
+												angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+												if (segIdx == numPR) {
+													rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
+												} else {
+													discriminationGain = uls->getPR(segIdx).computeDiscriminationGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
+													rxGainDB = uls->getPR(segIdx).effectiveGain - discriminationGain;
+												}
+
+												rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+
+												I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
+
+												marginDB = _IoverN_threshold_dB - I2NDB;
+
+												eirpLimit_dBm = _maxEIRP_dBm + marginDB;
+
+
+												if (forceFspl) {
+													// Skipping further computation if Free Space path loss
+													// EIRP is larger than already established (hence
+													// configured path loss will be even larger),
+													// otherwise proceeding with (potentially slow)
+													// configured path loss computation
+
+													// 1dB allowance to accommodate for amplifying clutters and other artifacts
+													if ((eirpLimit_dBm - 1) < channel->eirpLimit_dBm) {
+														continue;	// Proceed to configured path loss
+													} else {
+														skip = true;
+														break;		// Skipping this scanpoint
+													}
+												}
 											}
-
-											double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
-
-											double I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
-
-											double marginDB = _IoverN_threshold_dB - I2NDB;
-
-											double eirpLimit_dBm = _maxEIRP_dBm + marginDB;
+											if (skip) {
+												continue;
+											}
 
 											if (eirpLimit_dBm < channel->eirpLimit_dBm)
 											{
@@ -7435,6 +7471,9 @@ void AfcManager::runPointAnalysis()
 											if ( (!ulsFlagList[ulsIdx]) || (eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
 												eirpLimitList[ulsIdx] = eirpLimit_dBm;
 												ulsFlagList[ulsIdx] = true;
+											}
+											if (channel->eirpLimit_dBm < _minEIRP_dBm) {
+												channel->availability = BLACK;
 											}
 
 											if ( fexcthrwifi && (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) )
@@ -8489,7 +8528,7 @@ void AfcManager::runScanAnalysis()
 								double pathClutterRxCDF;
 								double pathClutterRxDB;
 
-								computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
+								computePathLoss(_pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 										rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 										uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 										pathLoss, pathClutterTxDB, pathClutterRxDB, true,
@@ -9047,7 +9086,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 
 		double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-		computePathLoss((rlanPropEnv == CConst::unknownPropEnv ? CConst::barrenPropEnv : rlanPropEnv), fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
+		computePathLoss(_pathLossModel, (rlanPropEnv == CConst::unknownPropEnv ? CConst::barrenPropEnv : rlanPropEnv), fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 				rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 				uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 				pathLoss, pathClutterTxDB, pathClutterRxDB, true,
@@ -9578,7 +9617,7 @@ void AfcManager::runHeatmapAnalysis()
 
 							double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-							computePathLoss(rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
+							computePathLoss(_pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 									rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 									uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 									pathLoss, pathClutterTxDB, pathClutterRxDB, true,
