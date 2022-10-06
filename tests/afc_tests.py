@@ -110,6 +110,8 @@ class TestCfg(dict):
             'debug':self['debug'],
             'gui':self['gui']
             }
+        if (self['cache'] == False):
+            params_data['nocache'] = 'True'
         before_ts = time.monotonic()
         rawresp = requests.post(
             self['url_path'],
