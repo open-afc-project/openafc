@@ -1,6 +1,20 @@
 # Release Note
 
 ## **Version and Date**
+|Version|3.4.2.2|
+| :- | :- |
+|**Date**|**10/06/2022**|
+|compiled server's version is cd7836e |git tag 3.4.2.2|
+
+## **Issues Addressed**
+ * Jira OA-415 Disable cache on test response reacquisition
+ * Jira OA-412 Simplify build and install at docker container
+ * Jira OA-389 Speeding up AFC Engine. AFC Engine performance optimizations. Modifying test DB to cover removal of below-21dBm responses
+ * Jira OA-411 Adding support for maxPsd to afc_tests.py
+ * Jira OA-409 Provide support for new toolchain in standalone development environment. Minor improve to generalize path to toolchain.
+ * Jira OA-400. AFC Engine performance optimizations by direct GDAL access mode and ULS-data resorting
+
+## **Version and Date**
 |Version|3.4.2.1|
 | :- | :- |
 |**Date**|**09/30/2022**|
