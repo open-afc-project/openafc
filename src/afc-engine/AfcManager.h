@@ -262,6 +262,7 @@ class AfcManager
 		DoubleTriplet _rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, quietNaN); // minor uncertainity (NaN if not ellipse), major uncertainity (NaN if not ellipse), height uncertainty
 		std::vector<LatLon> _rlanLinearPolygon = std::vector<LatLon>();
 		std::vector<AngleRadius> _rlanRadialPolygon = std::vector<AngleRadius>();
+		bool _allowScanPtsInUncRegFlag;
 
 		CConst::ScanRegionMethodEnum _scanRegionMethod;
 

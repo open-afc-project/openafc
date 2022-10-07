@@ -1,5 +1,24 @@
 # Release Note
 
+
+## **Issues Addressed**
+ * Jira OA-395: Analysis of FS inside RLAN uncertainty region
+ 
+## **Interface Changes**
+ * There's a new boolean flag to enable analysis of FS insidde RLAN uncertainty region in afc-config.json which is: "allowScanPtsInUncReg" = true. By default (e.g. when absent), this is false.
+
+## **Testing Done**
+ * Ran FSP1 with the "allowScanPtsInUncReg" flag set to true and another test with this flag set to false. 
+ * From the google-map confirmed the FS ID of the 3 FS that are inside RLAN uncertainty region. 
+ * In exc_thr file, confirmed that all these FS were above RLAN uncertainty volume and as such they were all analyzed (using FSPL path loss) as expected in both tests.
+ * In addition, confirmed that all the RLAN channels have max EIRP levels.
+
+ * Next, adjusted FSP1's RLAN height so that the 3 FS inside RLAN uncertainty region would be inside the uncertainty volume.
+ * Confirmed that when "allowScanPtsInUncReg" flag is set to false, none of those FS are analyzed and the affected RLAN channels are grayed out.
+ * Confirmed that when "allowScanPtsInUncReg" flag is set to true, all of those FS are analyzed and all channels have max EIRP levels.
+ 
+## **Open Issues**
+
 ## **Version and Date**
 |Version|3.4.2.2|
 | :- | :- |
@@ -13,6 +32,10 @@
  * Jira OA-411 Adding support for maxPsd to afc_tests.py
  * Jira OA-409 Provide support for new toolchain in standalone development environment. Minor improve to generalize path to toolchain.
  * Jira OA-400. AFC Engine performance optimizations by direct GDAL access mode and ULS-data resorting
+=======
+|Version|**OA-395**|
+| :- | :- |
+|**Date**|**10/06/2022**|
 
 ## **Version and Date**
 |Version|3.4.2.1|

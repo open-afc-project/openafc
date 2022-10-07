@@ -2172,6 +2172,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	} else {
 		_visibilityThreshold = -10000.0;
 	}
+
+	if (jsonObj.contains("allowScanPtsInUncReg") && !jsonObj["allowScanPtsInUncReg"].isUndefined()) {
+		_allowScanPtsInUncRegFlag = jsonObj["allowScanPtsInUncReg"].toBool();
+	} else {
+		_allowScanPtsInUncRegFlag = false;
+	}
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -7228,15 +7234,42 @@ void AfcManager::runPointAnalysis()
 					/**************************************************************************************/
 
 					LatLon ulsRxLatLon = std::pair<double, double>(ulsRxLatitude, ulsRxLongitude);
-					bool contains;
+					bool contains2D, contains3D;
 
-					_rlanRegion->closestPoint(ulsRxLatLon, contains);
+					// If contains2D is set, FS lon/lat is inside 2D-uncertainty region, depending on height may be above, below, or actually inside uncertainty region.
+					// If contains3D is set, FS is inside 3D-uncertainty
+					_rlanRegion->closestPoint(ulsRxLatLon, contains2D);
+
+					contains3D = false;
+					if (contains2D) {
+						int scanPtIdx;
+						for(scanPtIdx=0; (scanPtIdx<(int) scanPointList.size())&&(!contains3D); scanPtIdx++) {
+							LatLon scanPt = scanPointList[scanPtIdx];
+
+							double rlanTerrainHeight, bldgHeight;
+							MultibandRasterClass::HeightResult lidarHeightResult;
+							CConst::HeightSourceEnum rlanHeightSource;
+							_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
+
+							double height0;
+							if (_rlanRegion->getFixedHeightAMSL()) {
+								height0 = _rlanRegion->getCenterHeightAMSL();
+							} else {
+								height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
+							}
+							double minHeight = height0 - heightUncertainty;
+							double maxHeight = height0 + heightUncertainty;
+                            if ((ulsRxHeightAMSL >= minHeight) && (ulsRxHeightAMSL <= maxHeight)) {
+                                contains3D = true;
+						    }
+						}
+					}
 
 					double minRLANDist = -1.0;
 					if (distKmSquared <= exclusionDistKmSquared) {
 						LOGGER_INFO(logger) << "FSID = " << uls->getID() << (segIdx == numPR ? " RX" : " PR " + std::to_string(segIdx)) << " is inside exclusion distance.";
 						minRLANDist = sqrt(distKmSquared)*1000.0;
-					} else if (contains) {
+					} else if ((contains3D) && (!_allowScanPtsInUncRegFlag)) {
 						int chanIdx;
 						for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 							ChannelStruct *channel = &(_channelList[chanIdx]);
@@ -7412,7 +7445,7 @@ void AfcManager::runPointAnalysis()
 													// Possible if FSPL distance is horizontal. This should be extremely rare
 													continue;
 												}
-												computePathLoss(forceFspl ? CConst::FSPLPathLossModel : _pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx,
+												computePathLoss((forceFspl || contains2D) ? CConst::FSPLPathLossModel : _pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx,
 														nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 														rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 														ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
@@ -7592,7 +7625,7 @@ void AfcManager::runPointAnalysis()
 						cont = false;
 					}
 
-					if (traceFlag&&(!contains)) {
+					if (traceFlag&&(!contains2D)) {
 						traceIdx++;
 						if (uls->ITMHeightProfile) {
 							double rlanLon = rlanCoordList[0].longitudeDeg;
@@ -9851,6 +9884,7 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "HEIGHT_UNCERTAINTY (M)", QString::number(height_uncert, 'e', 20) } );
 		fUserInputs->writeRow({ "ORIENTATION (DEG)", QString::number(_rlanOrientation_deg, 'e', 20) } );
 		fUserInputs->writeRow({ "HEIGHT_TYPE", (_rlanHeightType == CConst::AMSLHeightType ? "AMSL" : _rlanHeightType == CConst::AGLHeightType ? "AGL" : "INVALID") } );
+		fUserInputs->writeRow({ "ALLOW_SCAN_PTS_IN_UNC_REG", (_allowScanPtsInUncRegFlag ? "true" : "false" ) } );
 		fUserInputs->writeRow({ "INDOOR/OUTDOOR", (_rlanType == RLAN_INDOOR ? "indoor" : _rlanType == RLAN_OUTDOOR ? "outdoor" : "error") } );
 		fUserInputs->writeRow({ "CHANNEL_RESPONSE_ALGORITHM", QString::fromStdString(CConst::strSpectralAlgorithmList->type_to_str(_channelResponseAlgorithm)) } );
 
