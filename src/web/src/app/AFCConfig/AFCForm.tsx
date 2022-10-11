@@ -447,7 +447,7 @@ export class AFCForm extends React.Component<
                             </FormGroup>
                         </GalleryItem>
                         <GalleryItem>
-                            <FormGroup label={this.props.limit.enforce ? "AP/Client Min. EIRP (Min: " + this.props.limit.limit + " dBm)" : "AP/Client Min. EIRP"} fieldId="horizontal-form-min-eirp">
+                            <FormGroup label={this.props.limit.enforce ? "AP Min. EIRP (Min: " + this.props.limit.limit + " dBm)" : "AP Min. EIRP"} fieldId="horizontal-form-min-eirp">
                                 <InputGroup>
                                     <TextInput
                                         value={this.state.config.minEIRP}
@@ -464,7 +464,7 @@ export class AFCForm extends React.Component<
                             </FormGroup>
                         </GalleryItem>
                         <GalleryItem>
-                            <FormGroup label="AP/Client Max. EIRP" fieldId="horizontal-form-max-eirp">
+                            <FormGroup label="AP Max. EIRP" fieldId="horizontal-form-max-eirp">
                                 <InputGroup>
                                     <TextInput
                                         value={this.state.config.maxEIRP}
@@ -476,7 +476,7 @@ export class AFCForm extends React.Component<
                                         isValid={this.props.limit.enforce ? this.state.config.minEIRP <= this.state.config.maxEIRP && this.state.config.maxEIRP >= this.props.limit.limit : this.state.config.minEIRP <= this.state.config.maxEIRP}
                                         style={{ textAlign: "right" }}
                                     />
-                                    <InputGroupText>dBm</InputGroupText>
+                                    <InputGroupText>dBm/MHz</InputGroupText>
                                 </InputGroup>
                             </FormGroup>
                         </GalleryItem>
