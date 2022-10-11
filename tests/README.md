@@ -80,15 +80,15 @@ splitting JSON into fields which can be redesigned by request.
 # **Commands and procedures**
 ## Tests execution options
 
-Start sequential run of tests according to the data in the database
+Start sequential run of tests according to the data in the database.
 ```
 afc_tests.py --addr 1.2.3.4 --cmd run
 ```
-Run a test or number of tests according to test case row index
+Run a test or number of tests according to test case row index.
 ```
 afc_tests.py --addr 1.2.3.4 --cmd run --testcase_indexes 3,5,6,7
 ```
-Run a test or number of tests according to test case ids
+Run a test or number of tests according to test case ids.
 ```
 afc_tests.py --addr 1.2.3.4 --cmd run --testcase_ids AFCS.IBP.5, AFCS.FSP.18
 ```
@@ -96,13 +96,19 @@ Run a test and save test result to csv format file.
 ```
 afc_tests.py --addr 1.2.3.4 --outfile=filename.csv --cmd run --testcase_indexes 22
 ```
-Start run all tests and save results as ‘golden reference’ in the database
+Start run all tests and save results as ‘golden reference’ in the database.
 ```
 afc_tests.py --addr 1.2.3.4 --cmd add_reqs
 ```
-Run the 1st test from test DB explicitly use HTTP
+Run the 1st test from test DB explicitly use HTTP.
 ```
 afc_tests.py --addr 1.2.3.4 --prot http --port 80 --testcase_indexes 1 --cmd run
+```
+Run the 100 tests from test DB. If less exist reuse from the beggining of the DB.
+For example, if there are 11 testcases in DB and required to run 33, so
+the test app runs exist testcases 3 times.
+```
+afc_tests.py --addr 1.2.3.4 --cmd run --tests2run 1234
 ```
 
 ## Add new test vectors

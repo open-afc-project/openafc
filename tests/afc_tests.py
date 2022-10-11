@@ -1050,20 +1050,21 @@ def test_report(fname, runtimedata, testnumdata, testvectordata,
         file_writer.writerow(data)
 
 
-def _run_test(cfg, reqs, resps, test_cases):
+def _run_tests(cfg, reqs, resps, test_cases, comparator):
     """
     Run tests
     reqs: {testcaseid: [request_json_str]}
     resps: {testcaseid: [response_json_str, response_hash]}
     test_cases: [testcaseids]
+    comparator: reference to object
     """
     app_log.debug(f"{inspect.stack()[0][3]}() {test_cases} "
                   f"{cfg['url_path']}")
 
+    test_res = AFC_OK
     accum_secs = 0
-    results_comparator = TestResultComparator(precision=cfg['precision'] or 0)
+
     for test_case in test_cases:
-        test_res = AFC_OK
         app_log.info('Prepare to run test - %s', test_case)
         if test_case not in reqs:
             app_log.warning("The requested test case %s is invalid/not "
@@ -1110,8 +1111,8 @@ def _run_test(cfg, reqs, resps, test_cases):
 
         diffs = []
         hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
-        diffs = results_comparator.compare_results(ref_str=resps[test_case][0],
-                                                   result_str=upd_data)
+        diffs = comparator.compare_results(ref_str=resps[test_case][0],
+                                           result_str=upd_data)
         if (resps[test_case][1] == hash_obj.hexdigest()) \
                 if cfg['precision'] is None else (not diffs):
             app_log.info('Test %s is Ok', req_id[0])
@@ -1134,6 +1135,34 @@ def _run_test(cfg, reqs, resps, test_cases):
     app_log.info("Total testcases runtime : %s secs", round(accum_secs, 1))
     return test_res
 
+
+def prep_and_run_tests(cfg, reqs, resps, test_cases):
+    """
+    Run tests
+    reqs: {testcaseid: [request_json_str]}
+    resps: {testcaseid: [response_json_str, response_hash]}
+    test_cases: [testcaseids]
+    """
+    app_log.debug(f"{inspect.stack()[0][3]}() {test_cases} "
+                  f"{cfg['url_path']}")
+
+    test_res = AFC_OK
+    results_comparator = TestResultComparator(precision=cfg['precision'] or 0)
+
+    # calculate max number of tests to run
+    max_nbr_tests = len(test_cases)
+    if not isinstance(cfg['tests2run'], type(None)):
+        max_nbr_tests = int("".join(cfg['tests2run']))
+
+    while max_nbr_tests:
+        app_log.debug(f"{inspect.stack()[0][3]}() {max_nbr_tests}")
+        if max_nbr_tests < len(test_cases):
+            del test_cases[-(len(test_cases) - max_nbr_tests):]
+        res = _run_tests(cfg, reqs, resps, test_cases, results_comparator)
+        if res != AFC_OK:
+            test_res = res
+        max_nbr_tests -= len(test_cases)
+    return test_res
 
 
 def run_test(cfg):
@@ -1188,7 +1217,7 @@ def run_test(cfg):
             test_cases = list(reqs_dict.keys())
 
     # run required test cases
-    return _run_test(cfg, reqs_dict, resp_dict, test_cases)
+    return prep_and_run_tests(cfg, reqs_dict, resp_dict, test_cases)
 
 
 log_level_map = {
@@ -1293,6 +1322,8 @@ def make_arg_parser():
     args_parser.add_argument('--cache', action='store_true',
                          help="enable cache during a request, otherwise "
                          "disabled.\n")
+    args_parser.add_argument('--tests2run', nargs=1, type=str,
+                         help="<nbr> - the total number of tests to run.\n")
 
     args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?',
         help="run - run test from DB and compare.\n"
