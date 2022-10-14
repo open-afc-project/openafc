@@ -1,5 +1,26 @@
 # Release Note
 
+## **Version and Date**
+|Version|**OA-413**|
+| :- | :- |
+|**Date**|**10/14/2022**|
+
+## **Issues Addressed**
+ * Jira OA-413: maxPsd plot in Virtual AP is broken
+ * The PSD plot became blank when we changed maxPSD to maxPsd in the response message for compliance with WFA SDI (System-Device-Interface).
+ 
+ * Jira OA-414: Add "AP Min. PSD" in AFC Config GUI
+
+## **Interface Changes**
+ * A new parameter "AP Min. PSD" is added to AFC Config (GUI and .json).  In the .json file the parameter is "minPSD".
+
+## **Testing Done**
+ * OA-413: Ran FSP1 and confirmed that the PSD plot matches the maxPsd levels in the response message.
+ * OA-414: Confirmed presence of "AP Min. PSD" in the GUI and after doing an FSP1 run, the parameter "minPSD" is in the afc-config.json and set to the value in the GUI.
+ * Note that this parameter is not yet being used by the AFC-Engine. This will be done in a separate jira ticket/branch.
+
+## **Open Issues**
+
 
 ## **Issues Addressed**
  * Jira OA-395: Analysis of FS inside RLAN uncertainty region
