@@ -68,6 +68,7 @@ export class AFCForm extends React.Component<
 
     private setMinEIRP = (n: number) => this.setState({ config: Object.assign(this.state.config, { minEIRP: n }) });
     private setMaxEIRP = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxEIRP: n }) });
+    private setMinPSD = (n: number) => this.setState({ config: Object.assign(this.state.config, { minPSD: n }) });
     private setFeederLoss = (f: FSReceiverFeederLoss) => this.setState({ config: Object.assign(this.state.config, { receiverFeederLoss: f }) });
     private setReceiverNoise = (f: FSReceiverNoise) => this.setState({ config: Object.assign(this.state.config, { fsReceiverNoise: f }) });
     private setThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { threshold: n }) });
@@ -476,10 +477,28 @@ export class AFCForm extends React.Component<
                                         isValid={this.props.limit.enforce ? this.state.config.minEIRP <= this.state.config.maxEIRP && this.state.config.maxEIRP >= this.props.limit.limit : this.state.config.minEIRP <= this.state.config.maxEIRP}
                                         style={{ textAlign: "right" }}
                                     />
+                                    <InputGroupText>dBm</InputGroupText>
+                                </InputGroup>
+                            </FormGroup>
+                        </GalleryItem>
+                        <GalleryItem>
+                            <FormGroup label="AP Min. PSD" fieldId="horizontal-form-max-eirp">
+                                <InputGroup>
+                                    <TextInput
+                                        value={this.state.config.minPSD}
+                                        onChange={x => this.setMinPSD(Number(x))}
+                                        type="number"
+                                        step="any"
+                                        id="horizontal-form-max-eirp"
+                                        name="horizontal-form-max-eirp"
+                                        isValid={this.hasValue(this.state.config.minPSD)}
+                                        style={{ textAlign: "right" }}
+                                    />
                                     <InputGroupText>dBm/MHz</InputGroupText>
                                 </InputGroup>
                             </FormGroup>
                         </GalleryItem>
+
                         <GalleryItem>
                             <BuildlingPenetrationLossForm
                                 data={this.state.config.buildingPenetrationLoss}
