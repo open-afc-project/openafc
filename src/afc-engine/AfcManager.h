@@ -277,6 +277,8 @@ class AfcManager
 
 		double _minEIRP_dBm = std::numeric_limits<double>::quiet_NaN();                    // minimum RLAN EIRP (in dBm)
 		double _maxEIRP_dBm;                    // maximum RLAN EIRP (in dBm)
+		double _minPSD_dBmPerHz = std::numeric_limits<double>::quiet_NaN();                    // minimum RLAN PSD (in dBm/Hz)
+
 		double _IoverN_threshold_dB;            // IoverN not to exceed this value for a viable channel
 		double _bodyLossIndoorDB;               // Indoor body Loss (dB)
 		double _bodyLossOutdoorDB;              // Outdoor body Loss (dB)
