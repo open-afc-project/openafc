@@ -1902,9 +1902,18 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 	_rasDataFile = _stateRoot + "/RAS_Database/" + jsonObj["rasDatabase"].toString().toStdString();
 
-	if (std::isnan(_minEIRP_dBm)) { // only use config min eirp if not specified in request object
-		_minEIRP_dBm = jsonObj["minEIRP"].toDouble();
+    double cfgMinEIRP;
+	if (jsonObj.contains("minEIRP") && !jsonObj["minEIRP"].isUndefined()) {
+		cfgMinEIRP = jsonObj["minEIRP"].toDouble();
+	} else {
+		throw std::runtime_error("AfcManager::importConfigAFCjson(): minEIRP is missing.");
 	}
+
+	if (std::isnan(_minEIRP_dBm)) {
+		_minEIRP_dBm = cfgMinEIRP;
+	} else if (cfgMinEIRP > _minEIRP_dBm) {
+		_minEIRP_dBm = cfgMinEIRP;
+    }
 	_maxEIRP_dBm = jsonObj["maxEIRP"].toDouble();
 	_IoverN_threshold_dB = jsonObj["threshold"].toDouble();
 	_maxRadius = jsonObj["maxLinkDistance"].toDouble() * 1000.0; // convert from km to m
