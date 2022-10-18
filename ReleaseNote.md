@@ -1,5 +1,9 @@
 # Release Note
-
+## **Version and Date**
+|Version|3.4.3.1|
+| :- | :- |
+|**Date**|**10/06/2022**|
+|compiled server's version is TBD |git tag 3.4.3.1|
 
 ## **Issues Addressed**
  * Jira OA-395: Analysis of FS inside RLAN uncertainty region
