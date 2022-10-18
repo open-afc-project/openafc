@@ -7944,7 +7944,7 @@ void AfcManager::runPointAnalysis()
 	for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 		ChannelStruct *channel = &(_channelList[chanIdx]);
 
-		if ( (channel->availability != BLACK) && (channel->availability != RED) ) {
+		if ( (channel->type == ChannelType::INQUIRED_CHANNEL) && (channel->availability != BLACK) && (channel->availability != RED) ) {
 			if (channel->eirpLimit_dBm == _maxEIRP_dBm)
 			{
 				channel->availability = GREEN;
