@@ -789,6 +789,12 @@ void AfcManager::importGUIjsonVersion1_3(const QJsonObject &jsonObj)
 		if (!optionalParams.contains("inquiredChannels")) {
 			inquiredChannelsArray = requestObj["inquiredChannels"].toArray();
 		}
+
+		if (!optionalParams.contains("minDesiredPower")) {
+			_minEIRP_dBm = requestObj["minDesiredPower"].toDouble();
+		} else {
+			_minEIRP_dBm = std::numeric_limits<double>::quiet_NaN();
+		}
 		/**********************************************************************/
 
 		/**********************************************************************/
@@ -1917,7 +1923,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	_maxEIRP_dBm = jsonObj["maxEIRP"].toDouble();
 
 	if (jsonObj.contains("minPSD") && !jsonObj["minPSD"].isUndefined()) {
-		_minPSD_dBmPerHz = jsonObj["minPSD"].toDouble() - 60;  // Convert from dBm/MHz to dBm/Hz
+		_minPSD_dBmPerMHz = jsonObj["minPSD"].toDouble();
 	} else {
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): minPSD is missing.");
 	}
@@ -7520,9 +7526,9 @@ void AfcManager::runPointAnalysis()
 												}
 											} else {
 												// INQUIRED_FREQUENCY
-												double psd = eirpLimit_dBm - 10.0*log(channel->bandwidth())/log(10.0);
-                                                if (psd < _minPSD_dBmPerHz) {
-												    channel->eirpLimit_dBm = _minPSD_dBmPerHz + 10.0*log(channel->bandwidth())/log(10.0);
+												double psd = eirpLimit_dBm - 10.0*log((double) channel->bandwidth())/log(10.0);
+                                                if (psd < _minPSD_dBmPerMHz) {
+												    channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
 													channel->availability = RED;
 												}
 											}
@@ -10216,7 +10222,7 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 			for(auto channel : _channelList) {
 				if ( (channel.type == INQUIRED_FREQUENCY) && (channel.availability != BLACK) && (channel.availability != RED) ) {
 					if ((channel.startFreqMHz <= prevFreqMHz) && (channel.stopFreqMHz > prevFreqMHz)) {
-						double psd = channel.eirpLimit_dBm - 10.0*log(channel.bandwidth())/log(10.0);
+						double psd = channel.eirpLimit_dBm - 10.0*log((double) channel.bandwidth())/log(10.0);
 						if ((initFlag) || (psd < minPSD)) {
 							minPSD = psd;
 						}
