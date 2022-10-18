@@ -1,9 +1,31 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-383**|
+| :- | :- |
+|**Date**|**10/18/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-383: Remove from response when EIRP is below minDesiredPower or min EIRP in AFC-Config and when PSD is below minPSD
+ 
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Test1: Ran FSP1, first with minEIRP and minPSD in afc-config set to -100 and no minDesiredPower in AP request message. Confirmed that all EIRP and PSD levels are present.
+ * Test2: set minEIRP to 21 dBm (no minDesiredPower) and minPSD to 8 dBm/MHz and confirmed that the EIRP and PSDs below these levels were removed from the response. The remaining results were identical to the baseline test above.
+ * Test3: set minEIRP to 20 dBm, minDesiredPower to 30 dBm and minPSD to 20 dBm/MHz and confirmed that the EIRP and PSDs below these levels were removed from the response.
+ * Test4: set minEIRP to 21 dBm, minDesiredPower to 0 dBm and minPSD to -100 dBm/MHz and confirmed that EIRPs below 21 dBm were removed and no PSDs were removed.
+ 
+## **Open Issues**
+
 ## **Version and Date**
 |Version|3.4.3.1|
 | :- | :- |
 |**Date**|**10/18/2022**|
 |compiled server's version is 45668a0 |git tag 3.4.3.1|
+
 
 ## **Issues Addressed**
  * Jira OA-395: Analysis of FS inside RLAN uncertainty region
