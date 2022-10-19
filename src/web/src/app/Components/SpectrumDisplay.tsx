@@ -106,8 +106,8 @@ export const SpectrumDisplayPAWS: React.FunctionComponent<{ spectrum?: PAWSRespo
 const makeSteps = (sections: AvailableSpectrumInfo[]): { hz: number, dbm?: number }[] => {
   let prev = sections[0];
   let points: { hz: number, dbm?: number }[] = [
-    { hz: prev.frequencyRange.lowFrequency, dbm: prev.maxPSD },
-    { hz: prev.frequencyRange.highFrequency, dbm: prev.maxPSD },
+    { hz: prev.frequencyRange.lowFrequency, dbm: prev.maxPsd },
+    { hz: prev.frequencyRange.highFrequency, dbm: prev.maxPsd },
   ];
   for (let i = 1; i < sections.length; i++) {
     let curr = sections[i];
@@ -116,8 +116,8 @@ const makeSteps = (sections: AvailableSpectrumInfo[]): { hz: number, dbm?: numbe
       points.push({ hz: (curr.frequencyRange.lowFrequency + prev.frequencyRange.highFrequency) / 2, dbm: undefined });
     }
     points.push(
-      { hz: curr.frequencyRange.lowFrequency, dbm: curr.maxPSD },
-      { hz: curr.frequencyRange.highFrequency, dbm: curr.maxPSD }
+      { hz: curr.frequencyRange.lowFrequency, dbm: curr.maxPsd },
+      { hz: curr.frequencyRange.highFrequency, dbm: curr.maxPsd }
     );
 
     prev = curr;

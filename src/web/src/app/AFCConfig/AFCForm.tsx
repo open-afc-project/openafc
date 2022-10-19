@@ -68,6 +68,7 @@ export class AFCForm extends React.Component<
 
     private setMinEIRP = (n: number) => this.setState({ config: Object.assign(this.state.config, { minEIRP: n }) });
     private setMaxEIRP = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxEIRP: n }) });
+    private setMinPSD = (n: number) => this.setState({ config: Object.assign(this.state.config, { minPSD: n }) });
     private setFeederLoss = (f: FSReceiverFeederLoss) => this.setState({ config: Object.assign(this.state.config, { receiverFeederLoss: f }) });
     private setReceiverNoise = (f: FSReceiverNoise) => this.setState({ config: Object.assign(this.state.config, { fsReceiverNoise: f }) });
     private setThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { threshold: n }) });
@@ -447,7 +448,7 @@ export class AFCForm extends React.Component<
                             </FormGroup>
                         </GalleryItem>
                         <GalleryItem>
-                            <FormGroup label={this.props.limit.enforce ? "AP/Client Min. EIRP (Min: " + this.props.limit.limit + " dBm)" : "AP/Client Min. EIRP"} fieldId="horizontal-form-min-eirp">
+                            <FormGroup label={this.props.limit.enforce ? "AP Min. EIRP (Min: " + this.props.limit.limit + " dBm)" : "AP Min. EIRP"} fieldId="horizontal-form-min-eirp">
                                 <InputGroup>
                                     <TextInput
                                         value={this.state.config.minEIRP}
@@ -464,7 +465,7 @@ export class AFCForm extends React.Component<
                             </FormGroup>
                         </GalleryItem>
                         <GalleryItem>
-                            <FormGroup label="AP/Client Max. EIRP" fieldId="horizontal-form-max-eirp">
+                            <FormGroup label="AP Max. EIRP" fieldId="horizontal-form-max-eirp">
                                 <InputGroup>
                                     <TextInput
                                         value={this.state.config.maxEIRP}
@@ -480,6 +481,24 @@ export class AFCForm extends React.Component<
                                 </InputGroup>
                             </FormGroup>
                         </GalleryItem>
+                        <GalleryItem>
+                            <FormGroup label="AP Min. PSD" fieldId="horizontal-form-max-eirp">
+                                <InputGroup>
+                                    <TextInput
+                                        value={this.state.config.minPSD}
+                                        onChange={x => this.setMinPSD(Number(x))}
+                                        type="number"
+                                        step="any"
+                                        id="horizontal-form-max-eirp"
+                                        name="horizontal-form-max-eirp"
+                                        isValid={this.hasValue(this.state.config.minPSD)}
+                                        style={{ textAlign: "right" }}
+                                    />
+                                    <InputGroupText>dBm/MHz</InputGroupText>
+                                </InputGroup>
+                            </FormGroup>
+                        </GalleryItem>
+
                         <GalleryItem>
                             <BuildlingPenetrationLossForm
                                 data={this.state.config.buildingPenetrationLoss}

@@ -34,6 +34,7 @@ export interface AFCConfigFile {
     version: string,
     maxEIRP: number,
     minEIRP: number,
+    minPSD: number,
     ulsDatabase: string,
     buildingPenetrationLoss: PenetrationLossModel,
     polarizationMismatchLoss: PolarizationLossModel,
