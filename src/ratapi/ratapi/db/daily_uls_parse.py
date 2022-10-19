@@ -382,7 +382,7 @@ def daily_uls_parse(state_root, interactive):
         # run through the uls processor 
         logFile.write('Running through ULS processor' + '\n')
         try:
-            subprocess.call(['./uls-script', root + temp + '/combined.txt', fullPathCoalitionScriptOutput, root + '/antenna_model_list.csv', root + '/antenna_model_map.csv']) 
+            subprocess.call(['./uls-script', root + temp + '/combined.txt', fullPathCoalitionScriptOutput, root + '/antenna_model_list.csv', root + '/antenna_model_map.csv', "proc_uls"]) 
         except Exception as e: 
             logFile.write('ERROR: ULS processor error:')
             raise e
