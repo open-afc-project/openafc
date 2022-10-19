@@ -99,7 +99,7 @@ export interface AvailableSpectrumInquiryResponse {
 
 export interface AvailableSpectrumInfo {
     frequencyRange: FrequencyRange,
-    maxPSD: number
+    maxPsd: number
 }
 
 export interface AvailableChannelInfo {
