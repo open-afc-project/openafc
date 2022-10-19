@@ -789,6 +789,12 @@ void AfcManager::importGUIjsonVersion1_3(const QJsonObject &jsonObj)
 		if (!optionalParams.contains("inquiredChannels")) {
 			inquiredChannelsArray = requestObj["inquiredChannels"].toArray();
 		}
+
+		if (!optionalParams.contains("minDesiredPower")) {
+			_minEIRP_dBm = requestObj["minDesiredPower"].toDouble();
+		} else {
+			_minEIRP_dBm = std::numeric_limits<double>::quiet_NaN();
+		}
 		/**********************************************************************/
 
 		/**********************************************************************/
@@ -1902,10 +1908,26 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 	_rasDataFile = _stateRoot + "/RAS_Database/" + jsonObj["rasDatabase"].toString().toStdString();
 
-	if (std::isnan(_minEIRP_dBm)) { // only use config min eirp if not specified in request object
-		_minEIRP_dBm = jsonObj["minEIRP"].toDouble();
+    double cfgMinEIRP;
+	if (jsonObj.contains("minEIRP") && !jsonObj["minEIRP"].isUndefined()) {
+		cfgMinEIRP = jsonObj["minEIRP"].toDouble();
+	} else {
+		throw std::runtime_error("AfcManager::importConfigAFCjson(): minEIRP is missing.");
 	}
+
+	if (std::isnan(_minEIRP_dBm)) {
+		_minEIRP_dBm = cfgMinEIRP;
+	} else if (cfgMinEIRP > _minEIRP_dBm) {
+		_minEIRP_dBm = cfgMinEIRP;
+    }
 	_maxEIRP_dBm = jsonObj["maxEIRP"].toDouble();
+
+	if (jsonObj.contains("minPSD") && !jsonObj["minPSD"].isUndefined()) {
+		_minPSD_dBmPerMHz = jsonObj["minPSD"].toDouble();
+	} else {
+		throw std::runtime_error("AfcManager::importConfigAFCjson(): minPSD is missing.");
+	}
+
 	_IoverN_threshold_dB = jsonObj["threshold"].toDouble();
 	_maxRadius = jsonObj["maxLinkDistance"].toDouble() * 1000.0; // convert from km to m
 	_bodyLossIndoorDB = jsonObj["bodyLoss"].toObject()["valueIndoor"].toDouble();
@@ -2276,6 +2298,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 				if (    (chan.type == ChannelType::INQUIRED_CHANNEL)
 						&& (chan.operatingClass == operatingClass)
 						&& (chan.availability != BLACK)
+						&& (chan.availability != RED)
 				) {
 					indexArray.append(chan.index);
 					eirpArray.append(chan.eirpLimit_dBm);
@@ -7399,7 +7422,7 @@ void AfcManager::runPointAnalysis()
 								int chanIdx;
 								for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 									ChannelStruct *channel = &(_channelList[chanIdx]);
-									if (channel->availability != BLACK) {
+									if ( (channel->availability != BLACK) && (channel->availability != RED) ) {
 										double chanStartFreq = channel->startFreqMHz * 1.0e6;
 										double chanStopFreq = channel->stopFreqMHz * 1.0e6;
 										bool useACI = (channel->type == INQUIRED_FREQUENCY ? false : _aciFlag);
@@ -7496,17 +7519,27 @@ void AfcManager::runPointAnalysis()
 												continue;
 											}
 
-											if (eirpLimit_dBm < channel->eirpLimit_dBm)
-											{
+											if (channel->type == ChannelType::INQUIRED_CHANNEL) {
+												if (eirpLimit_dBm < _minEIRP_dBm) {
+													channel->eirpLimit_dBm = _minEIRP_dBm;
+													channel->availability = RED;
+												}
+											} else {
+												// INQUIRED_FREQUENCY
+												double psd = eirpLimit_dBm - 10.0*log((double) channel->bandwidth())/log(10.0);
+                                                if (psd < _minPSD_dBmPerMHz) {
+												    channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
+													channel->availability = RED;
+												}
+											}
+
+											if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
 												channel->eirpLimit_dBm = eirpLimit_dBm;
 											}
 
-											if ( (!ulsFlagList[ulsIdx]) || (eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
-												eirpLimitList[ulsIdx] = eirpLimit_dBm;
+											if ( (!ulsFlagList[ulsIdx]) || (channel->eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+												eirpLimitList[ulsIdx] = channel->eirpLimit_dBm;
 												ulsFlagList[ulsIdx] = true;
-											}
-											if (channel->eirpLimit_dBm < _minEIRP_dBm) {
-												channel->availability = BLACK;
 											}
 
 											if ( fexcthrwifi && (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) )
@@ -7911,7 +7944,7 @@ void AfcManager::runPointAnalysis()
 	for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 		ChannelStruct *channel = &(_channelList[chanIdx]);
 
-		if (channel->availability != BLACK) {
+		if ( (channel->type == ChannelType::INQUIRED_CHANNEL) && (channel->availability != BLACK) && (channel->availability != RED) ) {
 			if (channel->eirpLimit_dBm == _maxEIRP_dBm)
 			{
 				channel->availability = GREEN;
@@ -10187,9 +10220,9 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 			double minPSD;
 			int minNextFreq = stopFreqMHz;
 			for(auto channel : _channelList) {
-				if ( (channel.type == INQUIRED_FREQUENCY) && (channel.availability != BLACK) ) {
+				if ( (channel.type == INQUIRED_FREQUENCY) && (channel.availability != BLACK) && (channel.availability != RED) ) {
 					if ((channel.startFreqMHz <= prevFreqMHz) && (channel.stopFreqMHz > prevFreqMHz)) {
-						double psd = channel.eirpLimit_dBm - 10.0*log(channel.bandwidth())/log(10.0);
+						double psd = channel.eirpLimit_dBm - 10.0*log((double) channel.bandwidth())/log(10.0);
 						if ((initFlag) || (psd < minPSD)) {
 							minPSD = psd;
 						}
