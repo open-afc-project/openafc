@@ -16,6 +16,10 @@ const double unii5StartFreqMHz = 5925.0;
 const double unii5StopFreqMHz  = 6425.0;
 const double unii7StartFreqMHz = 6525.0;
 const double unii7StopFreqMHz  = 6875.0;
+const double unii8StartFreqMHz = 6875.0;
+const double unii8StopFreqMHz  = 7125.0;
+
+const bool includeUnii8 = false;
 
 namespace {
 QString makeNumber(const double &d) {
@@ -430,9 +434,11 @@ int main(int argc, char **argv)
                     highFreq = freq.frequencyAssigned + bwMhz / 2.0; // Upper Band (MHz)
                 }
                 // skip if no overlap UNII5 and 7
-                if (lowFreq >= 6875 || highFreq <= 5925) {
-                    invalidFlag = true;
-                } else if (lowFreq >= 6425 && highFreq <= 6525) {
+                bool overlapUnii5 = (highFreq > unii5StartFreqMHz) && (lowFreq < unii5StopFreqMHz)
+                bool overlapUnii7 = (highFreq > unii7StartFreqMHz) && (lowFreq < unii7StopFreqMHz)
+                bool overlapUnii8 = (highFreq > unii8StartFreqMHz) && (lowFreq < unii8StopFreqMHz)
+
+                if (!(overlapUnii5 || overlapUnii7 || (includeUnii8 && overlapUnii8))) {
                     invalidFlag = true;
                 }
             } 
@@ -846,56 +852,14 @@ int main(int argc, char **argv)
       if(isnan(lowFreq) || isnan(highFreq)) {
           anomalousReason.append("NaN frequency value, ");
       } else {
-          double overlapUnii5 = computeSpectralOverlap(lowFreq, highFreq, unii5StartFreqMHz, unii5StopFreqMHz);
-          double overlapUnii7 = computeSpectralOverlap(lowFreq, highFreq, unii7StartFreqMHz, unii7StopFreqMHz);
+          bool overlapUnii5 = (highFreq > unii5StartFreqMHz) && (lowFreq < unii5StopFreqMHz);
+          bool overlapUnii7 = (highFreq > unii7StartFreqMHz) && (lowFreq < unii7StopFreqMHz);
+          bool overlapUnii8 = (highFreq > unii8StartFreqMHz) && (lowFreq < unii8StopFreqMHz);
 
-          if ((overlapUnii5 == 0.0) && (overlapUnii7 == 0.0)) {
+          if (!(overlapUnii5 || overlapUnii7 || (includeUnii8 && overlapUnii8))) {
               continue;
-          } else if ((overlapUnii5 > 0.0) && (overlapUnii7 > 0.0)) {
+          } else if (overlapUnii5 && overlapUnii7)) {
               anomalousReason.append("Band overlaps both Unii5 and Unii7, ");
-          } else {
-
-#if 0
-              // Do this in fix_param.py after return link matching
-              /************************************************************************************/
-              /* Fix RX Antenna Gain/Diameter according to:                                       */
-              /*     Working Document WINNF-TS-1014 Version V1.1.0-r3.0                           */
-              /************************************************************************************/
-              double centerFreqMHz = (lowFreq + highFreq)/2;
-              if (std::isnan(rxAnt.gain)) {
-                  // R2-AIP-05 (e)
-                  if (overlapUnii5 > 0.0) {
-                      fixedReason.append("Rx Gain missing, set to UNII-5 value 38.8");
-                      rxAnt.gain = 38.8;
-                  } else {
-                      fixedReason.append("Rx Gain missing, set to UNII-7 value 39.5");
-                      rxAnt.gain = 39.5;
-                  }
-                  rxAntennaDiameter = 1.83;
-              } else {
-                  double G;
-                  if (rxAnt.gain < 32.0) {
-                      fixedReason.append(QString("Rx Gain = %1 < 32, Rx Gain set to 32").arg(rxAnt.gain));
-                      G = 32.0;
-                  } else if (rxAnt.gain > 48.0) {
-                      fixedReason.append(QString("Rx Gain = %1 > 48, Rx Gain set to 48").arg(rxAnt.gain));
-                      G = 48.0;
-                  } else {
-                      G = rxAnt.gain;
-                  }
-                  double Fc;
-                  if (overlapUnii5 > 0.0) {
-                      Fc = 6175.0e6;
-                  } else {
-                      Fc = 6700.0e6;
-                  }
-                  double oneOverSqrtK = 1.0/sqrt(0.55);
-                  rxAntennaDiameter = (speedOfLight/(M_PI*Fc))*exp(log(10.0)*G/20)*oneOverSqrtK;
-
-                  rxAnt.gain = G;
-              }
-              /************************************************************************************/
-#endif
           }
       }
 
