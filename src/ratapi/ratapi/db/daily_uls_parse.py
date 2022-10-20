@@ -264,6 +264,8 @@ def generateUlsScriptInput(root, logFile, temp):
 def daily_uls_parse(state_root, interactive):
     startTime = datetime.datetime.now()
     nameTime =  startTime.isoformat().replace(":", '_')
+    if includeUnii8:
+        nameTime +=  "_inclUnii8"
     root = state_root + "/daily_uls_parse"# root so path is consisent
     temp = "/temp"
 
@@ -379,10 +381,14 @@ def daily_uls_parse(state_root, interactive):
 
 
     if runULSProcessor:
+        if includeUnii8:
+            mode = "proc_uls_include_unii8"
+        else:
+            mode = "proc_uls"
         # run through the uls processor 
         logFile.write('Running through ULS processor' + '\n')
         try:
-            subprocess.call(['./uls-script', root + temp + '/combined.txt', fullPathCoalitionScriptOutput, root + '/antenna_model_list.csv', root + '/antenna_model_map.csv', "proc_uls"]) 
+            subprocess.call(['./uls-script', root + temp + '/combined.txt', fullPathCoalitionScriptOutput, root + '/antenna_model_list.csv', root + '/antenna_model_map.csv', mode]) 
         except Exception as e: 
             logFile.write('ERROR: ULS processor error:')
             raise e
@@ -439,7 +445,7 @@ def daily_uls_parse(state_root, interactive):
 
     if runFixParams:
         logFile.write("Running fixParams" + '\n')
-        fixParams(sortedOutput, paramOutput, logFile)
+        fixParams(sortedOutput, paramOutput, logFile, False)
 
     if interactive:
         value = raw_input("Run conversion of CSV file to sqlite? (y/n): ")
@@ -498,9 +504,13 @@ def daily_uls_parse(state_root, interactive):
 
 if __name__ == '__main__':
     interactive = False
+    includeUnii8 = False
     for arg in sys.argv[1:]:
         if arg == "-i":
             interactive = True
+        elif arg == "-unii8":
+            includeUnii8 = True
     print("Interactive = " + str(interactive))
+    print("Include UNII-8 = " + str(includeUnii8))
 
     daily_uls_parse("/var/lib/fbrat", interactive)

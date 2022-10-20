@@ -255,35 +255,31 @@ def convertULS(data_file, state_root, logFile):
                     #: Emissions Designator
                     emissions_des=str(row['Emissions Designator']),
                     #: Tx Lat Coords
-                    tx_lat_deg=row['Tx Lat Coords'],
+                    tx_lat_deg=_as_float(row['Tx Lat Coords']),
                     #: Tx Long Coords
-                    tx_long_deg=row['Tx Long Coords'],
+                    tx_long_deg=_as_float(row['Tx Long Coords']),
                     #: Tx Ground Elevation (m)
-                    tx_ground_elev_m=_as_float(
-                            row['Tx Ground Elevation (m)']),
+                    tx_ground_elev_m=_as_float(row['Tx Ground Elevation (m)']),
                     #: Tx Polarization
                     tx_polarization=str(row['Tx Polarization']),
                     #: Tx Height to Center RAAT (m)
-                    tx_height_to_center_raat_m=_as_float(
-                            row['Tx Height to Center RAAT (m)']),
+                    tx_height_to_center_raat_m=_as_float(row['Tx Height to Center RAAT (m)']),
                     #: Tx Gain (dBi)
                     tx_gain=_as_float(row['Tx Gain (dBi)']),
                     #: Rx Lat Coords
-                    rx_lat_deg=row['Rx Lat Coords'],
+                    rx_lat_deg=_as_float(row['Rx Lat Coords']),
                     #: Rx Long Coords
-                    rx_long_deg=row['Rx Long Coords'],
+                    rx_long_deg=_as_float(row['Rx Long Coords']),
                     #: Rx Ground Elevation (m)
-                    rx_ground_elev_m=_as_float(
-                            row['Rx Ground Elevation (m)']),
+                    rx_ground_elev_m=_as_float(row['Rx Ground Elevation (m)']),
                     #: Rx Ant Model
                     rx_ant_model=str(row['Rx Ant Model']), 
                     #: Rx Ant Category
                     rx_ant_category=str(row['Rx Ant Category']), 
                     #: Rx Line Loss (dB)
-                    rx_line_loss=_as_float( row['Rx Line Loss (dB)']),
+                    rx_line_loss=_as_float(row['Rx Line Loss (dB)']),
                     #: Rx Height to Center RAAT (m)
-                    rx_height_to_center_raat_m=_as_float(
-                            row['Rx Height to Center RAAT (m)']),
+                    rx_height_to_center_raat_m=_as_float(row['Rx Height to Center RAAT (m)']),
                     #: Rx Gain (dBi)
                     rx_gain=_as_float(row['Rx Gain (dBi)']),
                     #: Rx Ant Diameter (m)
@@ -292,9 +288,11 @@ def convertULS(data_file, state_root, logFile):
                     p_rp_num=numPR,
 
                     # Path number 
-                    path_number=row['Path Number']
+                    path_number=int(row['Path Number'])
                 )
+
                 s.add(uls)
+                # print "FSID = " + str(uls.fsid)
                 for idx in range(1, numPR+1):
                     pr = PR(
                         id = prCount,
@@ -303,7 +301,7 @@ def convertULS(data_file, state_root, logFile):
                         pr_lat_deg = _as_float(                 row['Passive Repeater ' + str(idx) + ' Lat Coords']),
                         pr_lon_deg = _as_float(                 row['Passive Repeater ' + str(idx) + ' Long Coords']),
                         pr_height_to_center_raat_m = _as_float( row['Passive Repeater ' + str(idx) + ' Height to Center RAAT (m)']),
-                        pr_ant_type =                           row['Passive Repeater ' + str(idx) + ' Ant Type'],
+                        pr_ant_type = str(                      row['Passive Repeater ' + str(idx) + ' Ant Type']),
                         pr_line_loss = _as_float(               row['Passive Repeater ' + str(idx) + ' Line Loss (dB)']),
                         pr_reflector_height_m = _as_float(      row['Passive Repeater ' + str(idx) + ' Reflector Height (m)']),
                         pr_reflector_width_m = _as_float(       row['Passive Repeater ' + str(idx) + ' Reflector Width (m)']),

@@ -1,5 +1,6 @@
 *.o
 *.pro
+.qmake.stash
 uls-script
 warning_uls.txt
 Makefile

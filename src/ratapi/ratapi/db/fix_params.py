@@ -5,6 +5,12 @@ from os.path import exists
 
 csmap = {}
 c  = 2.99792458e8
+unii5StartFreqMHz = 5925;
+unii5StopFreqMHz  = 6425;
+unii7StartFreqMHz = 6525;
+unii7StopFreqMHz  = 6875;
+unii8StartFreqMHz = 6875;
+unii8StopFreqMHz  = 7125;
 
 typicalReflectorDimensions = [
     (1.8,2.4),
@@ -36,7 +42,7 @@ def isTypicalReflectorDimension(height, width):
             break
     return found
 
-def fixParams(inputPath, outputPath, logFile):
+def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
     logFile.write('Fixing parameters' + '\n')
 
     file_handle = open(inputPath, 'rb')
@@ -77,6 +83,12 @@ def fixParams(inputPath, outputPath, logFile):
                        prWidthStr,
                        prHeightStr]
 
+    if backwardCompatiblePR:
+        fieldnames += ["Passive Receiver Indicator",
+                       "Passive Repeater Lat Coords",
+                       "Passive Repeater Long Coords",
+                       "Passive Repeater Height to Center RAAT (m)"]
+
     entriesFixed = 0
     with open(outputPath, 'w') as fout:
         csvwriter = csv.writer(fout, delimiter=',')
@@ -91,12 +103,14 @@ def fixParams(inputPath, outputPath, logFile):
             row['Rx Gain (dBi)'] = ''
             row['Tx Gain (dBi)'] = ''
 
-            if (freq >= 5925.0) and (freq <= 6425.0):
+            if (freq >= unii5StartFreqMHz) and (freq <= unii5StopFreqMHz):
                 uniiband = 5
-            elif (freq >= 6525.0) and (freq <= 6875.0):
+            elif (freq >= unii7StartFreqMHz) and (freq <= unii7StopFreqMHz):
                 uniiband = 7
+            elif (freq >= unii8StartFreqMHz) and (freq <= unii8StopFreqMHz):
+                uniiband = 8
             else:
-                sys.exit('ERROR: freq found not in UNII-5 or UNII-7')
+                sys.exit('ERROR: freq found not in UNII-5, UNII-7, UNII-8')
 
             keyv = tuple([FRN, uniiband])
             if keyv in csmap:
@@ -216,14 +230,29 @@ def fixParams(inputPath, outputPath, logFile):
                         r[prHeightStr] = str(prHeight)
                         r[prWidthStr] = str(prWidth)
 
+                if backwardCompatiblePR:
+                    if numPR == 0:
+                        r["Passive Receiver Indicator"] = "N"
+                        r["Passive Repeater Lat Coords"] = ""
+                        r["Passive Repeater Long Coords"] = ""
+                        r["Passive Repeater Height to Center RAAT (m)"] = ""
+                    else:
+                        r["Passive Receiver Indicator"] = "Y"
+                        r["Passive Repeater Lat Coords"] = r['Passive Repeater ' + str(numPR) + ' Lat Coords']
+                        r["Passive Repeater Long Coords"] = r['Passive Repeater ' + str(numPR) + ' Long Coords']
+                        r["Passive Repeater Height to Center RAAT (m)"] = r['Passive Repeater ' + str(numPR) + ' Height to Center RAAT (m)']
+
+
             for ri in range(len(csmap[keyv])):
                 r = csmap[keyv][ri]
                 if (keyv[1] == 5):
-                    Fc_unii = 6.175e9
+                    Fc_unii = (unii5StartFreqMHz + unii5StopFreqMHz)*0.5e6
                 elif (keyv[1] == 7):
-                    Fc_unii = 6.7e9
+                    Fc_unii = (unii7StartFreqMHz + unii7StopFreqMHz)*0.5e6
+                elif (keyv[1] == 8):
+                    Fc_unii = (unii8StartFreqMHz + unii8StopFreqMHz)*0.5e6
                 else:
-                    sys.exit('ERROR: freq found not in UNII-5 or UNII-7')
+                    sys.exit('ERROR: freq found not in UNII-5, UNII-7, UNII-8')
 
                 numPR = int(r['Num Passive Repeater'])
 
@@ -274,8 +303,10 @@ def fixParams(inputPath, outputPath, logFile):
                                 fwdGain = 38.8
                             elif (keyv[1] == 7):
                                 fwdGain = 39.5
+                            elif (keyv[1] == 8):
+                                fwdGain = 39.5
                             else:
-                                sys.exit('ERROR: freq found not in UNII-5 or UNII-7')
+                                sys.exit('ERROR: freq found not in UNII-5, UNII-7, UNII-8')
 
                             # 6 ft converted to m
                             r[fwdAntDiameterStr] = 6*12*2.54/100

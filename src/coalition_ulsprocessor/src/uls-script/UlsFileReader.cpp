@@ -555,16 +555,16 @@ void UlsFileReader::readIndividualLocation(FILE *fi) {
         current.latitudeDirection = string[0];
         break;
       case 23:
-        current.longitude = atoi(string);
+        current.longitude = emptyAtof(string);
         current.longitudeDeg = atoi(string);
         break;
       case 24:
-        current.longitude = current.longitude + atoi(string) / 60.0;
+        current.longitude = current.longitude + emptyAtof(string) / 60.0;
         current.longitudeMinutes = atoi(string);
         break;
       case 25:
         current.longitude = current.longitude + emptyAtof(string) / 3600.0;
-        current.longitudeSeconds = emptyAtof(string);
+        current.longitudeSeconds = atoi(string);
         break;
       case 26:
         if (string[0] == 'W')

@@ -10,6 +10,7 @@
 #define VERSION "1.3.0"
 
 bool removeMobile = false;
+bool includeUnii8 = false;
 
 const double speedOfLight = 2.99792458e8;
 const double unii5StartFreqMHz = 5925.0;
@@ -18,8 +19,6 @@ const double unii7StartFreqMHz = 6525.0;
 const double unii7StopFreqMHz  = 6875.0;
 const double unii8StartFreqMHz = 6875.0;
 const double unii8StopFreqMHz  = 7125.0;
-
-const bool includeUnii8 = false;
 
 namespace {
 QString makeNumber(const double &d) {
@@ -72,11 +71,11 @@ double emissionDesignatorToBandwidth(const QString &emDesig) {
 QString hasNecessaryFields(const UlsEmission &e, UlsPath path, UlsLocation rxLoc, UlsLocation txLoc, UlsAntenna rxAnt, UlsAntenna txAnt, UlsHeader txHeader, QList<UlsLocation> prLocList, QList<UlsAntenna> prAntList) {
   QString failReason = "";
   // check lat/lon degree for rx
-  if (isnan(rxLoc.latitudeDeg) || isnan(rxLoc.longitudeDeg)) {
+  if (isnan(rxLoc.latitude) || isnan(rxLoc.longitude)) {
     failReason.append( "Invalid rx lat degree or long degree, "); 
   } 
   // check lat/lon degree for rx
-  if (isnan(txLoc.latitudeDeg) || isnan(txLoc.longitudeDeg)) {
+  if (isnan(txLoc.latitude) || isnan(txLoc.longitude)) {
     failReason.append( "Invalid tx lat degree or long degree, "); 
   } 
   // check tx and rx not at same position
@@ -345,6 +344,8 @@ int main(int argc, char **argv)
         return 0;
     } else if (mode == "proc_uls") {
         // Do nothing
+    } else if (mode == "proc_uls_include_unii8") {
+        includeUnii8 = true;
     } else {
         fprintf(stderr, "ERROR: Invalid mode: %s\n", mode.c_str());
         return -1;
@@ -434,9 +435,9 @@ int main(int argc, char **argv)
                     highFreq = freq.frequencyAssigned + bwMhz / 2.0; // Upper Band (MHz)
                 }
                 // skip if no overlap UNII5 and 7
-                bool overlapUnii5 = (highFreq > unii5StartFreqMHz) && (lowFreq < unii5StopFreqMHz)
-                bool overlapUnii7 = (highFreq > unii7StartFreqMHz) && (lowFreq < unii7StopFreqMHz)
-                bool overlapUnii8 = (highFreq > unii8StartFreqMHz) && (lowFreq < unii8StopFreqMHz)
+                bool overlapUnii5 = (highFreq > unii5StartFreqMHz) && (lowFreq < unii5StopFreqMHz);
+                bool overlapUnii7 = (highFreq > unii7StartFreqMHz) && (lowFreq < unii7StopFreqMHz);
+                bool overlapUnii8 = (highFreq > unii8StartFreqMHz) && (lowFreq < unii8StopFreqMHz);
 
                 if (!(overlapUnii5 || overlapUnii7 || (includeUnii8 && overlapUnii8))) {
                     invalidFlag = true;
@@ -858,7 +859,7 @@ int main(int argc, char **argv)
 
           if (!(overlapUnii5 || overlapUnii7 || (includeUnii8 && overlapUnii8))) {
               continue;
-          } else if (overlapUnii5 && overlapUnii7)) {
+          } else if (overlapUnii5 && overlapUnii7) {
               anomalousReason.append("Band overlaps both Unii5 and Unii7, ");
           }
       }
