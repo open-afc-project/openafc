@@ -1,4 +1,27 @@
 # Release Note
+# Release Note
+
+## **Version and Date**
+|Version|**OA-422**|
+| :- | :- |
+|**Date**|**10/20/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-422: Add antenna-look-up function for external files in the ULS parser & Add ability to include UNII-8 FS in the ULS
+ * Note that addition of UNII-8 is a feature and will be turned off for OpenAFC
+
+## **Interface Changes**
+ * Changes are in the ULS parser only 
+ 
+
+## **Testing Done**
+ * Confirmed that the ULS file generated with UNII-8 has the UNII-8 links (4,444 on 10/20/222).
+ * Generated WFA ULS using UNII-5/7 only and validated that it was the same as the last generated WFA ULS from 09/28/2022. 
+ * There is no need to update the ULS file.
+
+
+## **Open Issues**
 
 ## **Version and Date**
 
