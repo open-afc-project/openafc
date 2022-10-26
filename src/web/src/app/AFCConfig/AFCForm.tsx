@@ -729,7 +729,7 @@ export class AFCForm extends React.Component<
                         {(this.state.config.propagationModel.kind === "ITM with no building data" || this.state.config.propagationModel.kind == "FCC 6GHz Report & Order") &&
                             <GalleryItem>
                                 <FormGroup
-                                    label="AP/Client Propagation Environment"
+                                    label="AP Propagation Environment"
                                     fieldId="propogation-env"
                                 >
                                     {" "}<Tooltip
@@ -739,7 +739,7 @@ export class AFCForm extends React.Component<
                                         maxWidth="40.0rem"
                                         content={
                                             <>
-                                                <p>AP/Client Propagation Environment:</p>
+                                                <p>AP Propagation Environment:</p>
                                                 <ul>
                                                     <li>- "NLCD Point" assigns propagation environment based on single NLCD tile class the RLAN resides in: Urban if NLCD tile = 23 or 24, Suburban if NLCD tile = 22, Rural-D (Deciduous trees) if NLCD tile = 41, 43 or 90, Rural-C (Coniferous trees) if NLCD tile = 42, and Rural-V (Village Center) otherwise. The various Rural types correspond to the P.452 clutter category.</li>
                                                     <li>- If “NLCD Point” is not selected, Village center is assumed for the Rural clutter category.</li>
