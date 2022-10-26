@@ -58,7 +58,8 @@ export interface AFCConfigFile {
     rasDatabase?: string,
     enableMapInVirtualAp?: boolean,
     channelResponseAlgorithm: ChannelResponseAlgorithm,
-    visibilityThreshold?: number
+    visibilityThreshold?: number,
+    allowScanPtsInUncReg?: boolean
 }
 
 export type FreqRange = {
@@ -137,7 +138,9 @@ export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FC
 
 export type BuildingSourceValues =  "B-Design3D" | "LiDAR" | "None"
 
-export interface FSPL { kind: "FSPL" }
+export interface FSPL { kind: "FSPL",
+    fsplUseGroundDistance: boolean,
+}
 export interface Win2ItmDb {
     kind: "ITM with building data",
     win2ProbLosThreshold: number,
@@ -170,6 +173,10 @@ export interface FCC6GHz {
     buildingSource: BuildingSourceValues,
     terrainSource: "SRTM (90m)" | "3DEP (30m)"
     winner2LOSOption: 'UNKNOWN' | 'BLDG_DATA_REQ_TX',
+    win2UseGroundDistance: boolean,
+    fsplUseGroundDistance: boolean,
+    winner2HgtFlag: boolean,
+    winner2HgtLOS: number
 }
 
 export type CustomPropagationLOSOptions =  'UNKNOWN' | 'FORCE_LOS' | 'FORCE_NLOS' | 'BLDG_DATA_REQ_TX'
@@ -186,6 +193,10 @@ export interface CustomPropagation {
     buildingSource: BuildingSourceValues,
     terrainSource: "SRTM (90m)" | "3DEP (30m)"
     rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
+    win2UseGroundDistance: boolean,
+    fsplUseGroundDistance: boolean,
+    winner2HgtFlag: boolean,
+    winner2HgtLOS: number
 }
 
 export interface FSClutterModel {
