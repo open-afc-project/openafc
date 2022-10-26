@@ -51,42 +51,96 @@ const applicationCache: { [k: string]: any } = {};
  * @returns Default AFC config object
  */
 const defaultAfcConf: () => AFCConfigFile = () => ({
-    "freqBands": [
-        {
-            "name": "UNII-5",
-            "startFreqMHz": 5925,
-            "stopFreqMHz": 6425
+        "freqBands": [
+           {
+              "name": "UNII-5",
+              "startFreqMHz": 5925,
+              "stopFreqMHz": 6425
+           },
+           {
+              "name": "UNII-7",
+              "startFreqMHz": 6525,
+              "stopFreqMHz": 6875
+           }
+        ],
+        "antennaPattern": {
+           "kind": "None",
+           "value": ""
         },
-        {
-            "name": "UNII-7",
-            "startFreqMHz": 6525,
-            "stopFreqMHz": 6875
-        }
-    ],
-    "antennaPattern": { "kind": 'None', "value": '' },
-    "ulsDefaultAntennaType": 'WINNF-AIP-07',
-    "scanPointBelowGroundMethod": "truncate",
-    "polarizationMismatchLoss": { "kind": "Fixed Value", "value": 3 },
-    "bodyLoss": { "kind": "Fixed Value", "valueIndoor": 0, "valueOutdoor": 0 },
-    "buildingPenetrationLoss": { "kind": "Fixed Value", "value": 20.5 },
-    "receiverFeederLoss": { "UNII5": 3, "UNII7": 2.5, "other": 2 },
-    "fsReceiverNoise": { "UNII5": -110, "UNII7": -109.5, "other": -109 },
-    "threshold": -6, "maxLinkDistance": 50, "maxEIRP": 36, "minEIRP": 21, "minPSD": 8,
-    "propagationModel": { "kind": "FCC 6GHz Report & Order", "win2ConfidenceCombined": 50,"win2ConfidenceLOS":50, "win2ConfidenceNLOS":50, "winner2LOSOption":"BLDG_DATA_REQ_TX", "itmConfidence": 50, "itmReliability": 50, "p2108Confidence": 50, "buildingSource": "None", "terrainSource": "3DEP (30m)" },
-    "propagationEnv": "NLCD Point",
-    "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
-    "regionStr": "CONUS",
-    "rasDatabase": "RASdatabase.csv",
-    "APUncertainty": { "horizontal": 30, "height": 5 },
-    "ITMParameters": { "polarization": "Vertical", "ground": "Good Ground", "dielectricConst": 25, "conductivity": 0.02, "minSpacing": 30, "maxPoints": 2000 },
-    "rlanITMTxClutterMethod": 'FORCE_TRUE',
-    "clutterAtFS": true,
-    "fsClutterModel": { p2108Confidence: 5, maxFsAglHeight: 6 },
-    "nlcdFile": "federated_nlcd.tif",
-    "enableMapInVirtualAp": false,
-    channelResponseAlgorithm: 'pwr',
-    "visibilityThreshold": -1000,
-    "version": guiConfig.version
+        "ulsDefaultAntennaType": "WINNF-AIP-07",
+        "scanPointBelowGroundMethod": "truncate",
+        "polarizationMismatchLoss": {
+           "kind": "Fixed Value",
+           "value": 3
+        },
+        "bodyLoss": {
+           "kind": "Fixed Value",
+           "valueIndoor": 0,
+           "valueOutdoor": 0
+        },
+        "buildingPenetrationLoss": {
+           "kind": "Fixed Value",
+           "value": 20.5
+        },
+        "receiverFeederLoss": {
+           "UNII5": 3,
+           "UNII7": 3,
+           "other": 3
+        },
+        "fsReceiverNoise": {
+           "UNII5": -110,
+           "UNII7": -109.5,
+           "other": -109
+        },
+        "threshold": -6,
+        "maxLinkDistance": 130,
+        "maxEIRP": 36,
+        "minEIRP": 21,
+     
+        "minPSD": 8,
+        "propagationModel": {
+           "kind": "FCC 6GHz Report & Order",
+           "win2ConfidenceCombined": 16,
+           "win2ConfidenceLOS": 16,
+           "winner2LOSOption": "BLDG_DATA_REQ_TX",
+           "win2UseGroundDistance": false,
+           "fsplUseGroundDistance": false,
+           "winner2HgtFlag": false,
+           "winner2HgtLOS": 15,
+           "itmConfidence": 5,
+           "itmReliability": 20,
+           "p2108Confidence": 25,
+           "buildingSource": "None",
+           "terrainSource": "3DEP (30m)"
+        },
+        "propagationEnv": "NLCD Point",
+        "ulsDatabase": "CONUS_ULS_2022-09-28T18_24_13.175695_fixedBPS_sorted_param.sqlite3",
+        "regionStr": "CONUS",
+        "rasDatabase": "RASdatabase.csv",
+        "APUncertainty": {
+           "horizontal": 30,
+           "height": 5
+        },
+        "ITMParameters": {
+           "polarization": "Vertical",
+           "ground": "Good Ground",
+           "dielectricConst": 25,
+           "conductivity": 0.02,
+           "minSpacing": 30,
+           "maxPoints": 1500
+        },
+        "rlanITMTxClutterMethod": "FORCE_TRUE",
+        "clutterAtFS": true,
+        "fsClutterModel": {
+           "p2108Confidence": 5,
+           "maxFsAglHeight": 6
+        },
+        "nlcdFile": "federated_nlcd.tif",
+        "enableMapInVirtualAp": false,
+        "channelResponseAlgorithm": "psd",
+        "visibilityThreshold": -6,
+        "version": guiConfig.version,
+        "allowScanPtsInUncReg": false
 });
 
 // API Calls

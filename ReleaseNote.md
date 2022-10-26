@@ -1,6 +1,21 @@
 # Release Note
-# Release Note
+ 
+## **Version and Date**
+|Version|**OA-426**|
+| :- | :- |
+|**Date**|**10/26/2022**|
 
+## **Issues Addressed**
+ * Jira OA-426: Change the default afc config
+ * Removed "Client" from AP/Client Propagation Environment in AFC Config GUI
+ 
+## **Interface Changes**
+ * Ensure that the parameters for which we don't have in the GUI appear in the afc-config.json
+
+## **Testing Done**
+ * Confirmed that the parameters are configured properly.
+
+## **Open Issues**
 ## **Version and Date**
 |Version|**OA-422**|
 | :- | :- |

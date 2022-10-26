@@ -1,7 +1,7 @@
 import * as React from "react";
 import { FormGroup, FormSelect, FormSelectOption, TextInput, InputGroup, InputGroupText, Tooltip, TooltipPosition } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
-import { BuildingSourceValues, CustomPropagation, CustomPropagationLOSOptions, FCC6GHz, PropagationModel, Win2ItmDb } from "../Lib/RatApiTypes";
+import { BuildingSourceValues, CustomPropagation, CustomPropagationLOSOptions, FCC6GHz, FSPL, PropagationModel, Win2ItmClutter, Win2ItmDb } from "../Lib/RatApiTypes";
 
 /**
  * PropogationModelForm.tsx: sub form of afc config form
@@ -28,16 +28,23 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
     private setKind = (s: string) => {
         switch (s) {
             case "FSPL":
-                this.props.onChange({ kind: s });
+                this.props.onChange({ kind: s,fsplUseGroundDistance: false  } as FSPL);
                 break;
             case "ITM with building data":
-                this.props.onChange({ kind: s, win2ProbLosThreshold: 10, win2Confidence: 50, itmConfidence: 50, itmReliability: 50, p2108Confidence: 50, buildingSource: "LiDAR" });
+                this.props.onChange({ kind: s, win2ProbLosThreshold: 10, 
+                    win2Confidence: 50, itmConfidence: 50, itmReliability: 50, p2108Confidence: 50, buildingSource: "LiDAR" } as Win2ItmDb );
                 break;
             case "ITM with no building data":
-                this.props.onChange({ kind: s, win2ProbLosThreshold: 10, win2Confidence: 50, itmConfidence: 50, itmReliability: 50, p2108Confidence: 50, terrainSource: "SRTM (90m)" });
+                this.props.onChange({ kind: s, win2ProbLosThreshold: 10, win2Confidence: 50, itmConfidence: 50,
+                     itmReliability: 50, p2108Confidence: 50, terrainSource: "SRTM (90m)" } as Win2ItmClutter);
                 break;
             case "FCC 6GHz Report & Order":
-                this.props.onChange({ kind: s, winner2LOSOption: "BLDG_DATA_REQ_TX", win2ConfidenceCombined: 50, itmConfidence: 50, win2ConfidenceLOS: 50, win2ConfidenceNLOS: 50, itmReliability: 50, p2108Confidence: 50, buildingSource: "LiDAR", terrainSource: "3DEP (30m)" });
+                this.props.onChange({ kind: s, winner2LOSOption: "BLDG_DATA_REQ_TX", win2ConfidenceCombined: 50, 
+                itmConfidence: 50, win2ConfidenceLOS: 50, win2ConfidenceNLOS: 50, itmReliability: 50, p2108Confidence: 50, 
+                buildingSource: "LiDAR", terrainSource: "3DEP (30m)",  win2UseGroundDistance: false,
+                fsplUseGroundDistance: false,
+                winner2HgtFlag: false,
+                winner2HgtLOS: 15, } as FCC6GHz);
                 break;
             case "Ray Tracing":
                 break; // do nothing
@@ -45,9 +52,11 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 this.props.onChange({
                     kind: s, winner2LOSOption: "UNKNOWN", win2ConfidenceCombined: 50, itmConfidence: 50, itmReliability: 50,
                     p2108Confidence: 50, rlanITMTxClutterMethod: "FORCE_TRUE", buildingSource: "None", terrainSource: "3DEP (30m)",
-                    win2ConfidenceLOS: 50
-
-                })
+                    win2ConfidenceLOS: 50, win2UseGroundDistance: false,
+                    fsplUseGroundDistance: false,
+                    winner2HgtFlag: false,
+                    winner2HgtLOS: 15, 
+                } as CustomPropagation)
                 break;
         }
     }
