@@ -10,12 +10,15 @@
 #define VERSION "1.3.0"
 
 bool removeMobile = false;
+bool includeUnii8 = false;
 
 const double speedOfLight = 2.99792458e8;
 const double unii5StartFreqMHz = 5925.0;
 const double unii5StopFreqMHz  = 6425.0;
 const double unii7StartFreqMHz = 6525.0;
 const double unii7StopFreqMHz  = 6875.0;
+const double unii8StartFreqMHz = 6875.0;
+const double unii8StopFreqMHz  = 7125.0;
 
 namespace {
 QString makeNumber(const double &d) {
@@ -68,11 +71,11 @@ double emissionDesignatorToBandwidth(const QString &emDesig) {
 QString hasNecessaryFields(const UlsEmission &e, UlsPath path, UlsLocation rxLoc, UlsLocation txLoc, UlsAntenna rxAnt, UlsAntenna txAnt, UlsHeader txHeader, QList<UlsLocation> prLocList, QList<UlsAntenna> prAntList) {
   QString failReason = "";
   // check lat/lon degree for rx
-  if (isnan(rxLoc.latitudeDeg) || isnan(rxLoc.longitudeDeg)) {
+  if (isnan(rxLoc.latitude) || isnan(rxLoc.longitude)) {
     failReason.append( "Invalid rx lat degree or long degree, "); 
   } 
   // check lat/lon degree for rx
-  if (isnan(txLoc.latitudeDeg) || isnan(txLoc.longitudeDeg)) {
+  if (isnan(txLoc.latitude) || isnan(txLoc.longitude)) {
     failReason.append( "Invalid tx lat degree or long degree, "); 
   } 
   // check tx and rx not at same position
@@ -292,6 +295,8 @@ double computeSpectralOverlap(double sigStartFreq, double sigStopFreq, double rx
 
 }; // namespace
 
+void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inputFile, std::string outputFile);
+
 int main(int argc, char **argv)
 {
   setvbuf(stdout, NULL, _IONBF, 0);
@@ -307,8 +312,8 @@ int main(int argc, char **argv)
   }
   printf("Coalition ULS Processing Tool Version %s\n", VERSION);
   printf("Copyright 2019 (C) RKF Engineering Solutions\n");
-  if (argc < 5 || argc > 5) {
-    fprintf(stderr, "Syntax: %s [ULS file.csv] [Output File.csv] [AntModelListFile.csv] [AntModelMapFile.csv]\n", argv[0]);
+  if (argc != 6) {
+    fprintf(stderr, "Syntax: %s [ULS file.csv] [Output File.csv] [AntModelListFile.csv] [AntModelMapFile.csv] [mode]\n", argv[0]);
     return -1;
   }
 
@@ -320,8 +325,11 @@ int main(int argc, char **argv)
     std::cout << tstr << " : Begin processing." << std::endl;
     free(tstr);
 
+    std::string inputFile = argv[1];
+    std::string outputFile = argv[2];
     std::string antModelListFile = argv[3];
     std::string antModelMapFile = argv[4];
+    std::string mode = argv[5];
 
     FILE *fwarn;
     std::string warningFile = "warning_uls.txt";
@@ -331,10 +339,22 @@ int main(int argc, char **argv)
 
 	AntennaModelMapClass antennaModelMap(antModelListFile, antModelMapFile);
 
+    if (mode == "test_antenna_model_map") {
+        testAntennaModelMap(antennaModelMap, inputFile, outputFile);
+        return 0;
+    } else if (mode == "proc_uls") {
+        // Do nothing
+    } else if (mode == "proc_uls_include_unii8") {
+        includeUnii8 = true;
+    } else {
+        fprintf(stderr, "ERROR: Invalid mode: %s\n", mode.c_str());
+        return -1;
+    }
+
     int numAntMatch = 0;
     int numAntUnmatch = 0;
 
-  UlsFileReader r(argv[1], fwarn);
+  UlsFileReader r(inputFile.c_str(), fwarn);
 
     int numMissingRxAntHeight = 0;
     int numMissingTxAntHeight = 0;
@@ -415,9 +435,11 @@ int main(int argc, char **argv)
                     highFreq = freq.frequencyAssigned + bwMhz / 2.0; // Upper Band (MHz)
                 }
                 // skip if no overlap UNII5 and 7
-                if (lowFreq >= 6875 || highFreq <= 5925) {
-                    invalidFlag = true;
-                } else if (lowFreq >= 6425 && highFreq <= 6525) {
+                bool overlapUnii5 = (highFreq > unii5StartFreqMHz) && (lowFreq < unii5StopFreqMHz);
+                bool overlapUnii7 = (highFreq > unii7StartFreqMHz) && (lowFreq < unii7StopFreqMHz);
+                bool overlapUnii8 = (highFreq > unii8StartFreqMHz) && (lowFreq < unii8StopFreqMHz);
+
+                if (!(overlapUnii5 || overlapUnii7 || (includeUnii8 && overlapUnii8))) {
                     invalidFlag = true;
                 }
             } 
@@ -450,7 +472,7 @@ int main(int argc, char **argv)
 
   int prIdx;
 
-    CsvWriter wt(argv[2]);
+    CsvWriter wt(outputFile.c_str());
     {
         QStringList header = getCSVHeader(maxNumPassiveRepeater);
         wt.writeRow(header);
@@ -831,56 +853,14 @@ int main(int argc, char **argv)
       if(isnan(lowFreq) || isnan(highFreq)) {
           anomalousReason.append("NaN frequency value, ");
       } else {
-          double overlapUnii5 = computeSpectralOverlap(lowFreq, highFreq, unii5StartFreqMHz, unii5StopFreqMHz);
-          double overlapUnii7 = computeSpectralOverlap(lowFreq, highFreq, unii7StartFreqMHz, unii7StopFreqMHz);
+          bool overlapUnii5 = (highFreq > unii5StartFreqMHz) && (lowFreq < unii5StopFreqMHz);
+          bool overlapUnii7 = (highFreq > unii7StartFreqMHz) && (lowFreq < unii7StopFreqMHz);
+          bool overlapUnii8 = (highFreq > unii8StartFreqMHz) && (lowFreq < unii8StopFreqMHz);
 
-          if ((overlapUnii5 == 0.0) && (overlapUnii7 == 0.0)) {
+          if (!(overlapUnii5 || overlapUnii7 || (includeUnii8 && overlapUnii8))) {
               continue;
-          } else if ((overlapUnii5 > 0.0) && (overlapUnii7 > 0.0)) {
+          } else if (overlapUnii5 && overlapUnii7) {
               anomalousReason.append("Band overlaps both Unii5 and Unii7, ");
-          } else {
-
-#if 0
-              // Do this in fix_param.py after return link matching
-              /************************************************************************************/
-              /* Fix RX Antenna Gain/Diameter according to:                                       */
-              /*     Working Document WINNF-TS-1014 Version V1.1.0-r3.0                           */
-              /************************************************************************************/
-              double centerFreqMHz = (lowFreq + highFreq)/2;
-              if (std::isnan(rxAnt.gain)) {
-                  // R2-AIP-05 (e)
-                  if (overlapUnii5 > 0.0) {
-                      fixedReason.append("Rx Gain missing, set to UNII-5 value 38.8");
-                      rxAnt.gain = 38.8;
-                  } else {
-                      fixedReason.append("Rx Gain missing, set to UNII-7 value 39.5");
-                      rxAnt.gain = 39.5;
-                  }
-                  rxAntennaDiameter = 1.83;
-              } else {
-                  double G;
-                  if (rxAnt.gain < 32.0) {
-                      fixedReason.append(QString("Rx Gain = %1 < 32, Rx Gain set to 32").arg(rxAnt.gain));
-                      G = 32.0;
-                  } else if (rxAnt.gain > 48.0) {
-                      fixedReason.append(QString("Rx Gain = %1 > 48, Rx Gain set to 48").arg(rxAnt.gain));
-                      G = 48.0;
-                  } else {
-                      G = rxAnt.gain;
-                  }
-                  double Fc;
-                  if (overlapUnii5 > 0.0) {
-                      Fc = 6175.0e6;
-                  } else {
-                      Fc = 6700.0e6;
-                  }
-                  double oneOverSqrtK = 1.0/sqrt(0.55);
-                  rxAntennaDiameter = (speedOfLight/(M_PI*Fc))*exp(log(10.0)*G/20)*oneOverSqrtK;
-
-                  rxAnt.gain = G;
-              }
-              /************************************************************************************/
-#endif
           }
       }
 
@@ -1177,3 +1157,142 @@ int main(int argc, char **argv)
     std::cout << elapsedTimeSec  << " sec";
     std::cout << std::endl;
 }
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** testAntennaModelMap                                                              ****/
+/******************************************************************************************/
+void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inputFile, std::string outputFile)
+{
+    char *chptr;
+    std::ostringstream errStr;
+    FILE *fin, *fout;
+
+    if ( !(fin = fopen(inputFile.c_str(), "rb")) ) {
+        errStr << std::string("ERROR: Unable to open inputFile: \"") << inputFile << "\"" << std::endl;
+        throw std::runtime_error(errStr.str());
+    }
+
+    if ( !(fout = fopen(outputFile.c_str(), "wb")) ) {
+        errStr << std::string("ERROR: Unable to open outputFile: \"") << outputFile << "\"" << std::endl;
+        throw std::runtime_error(errStr.str());
+    }
+
+    int linenum, fIdx;
+    std::string line, strval;
+
+    int antennaModelFieldIdx = -1;
+
+    std::vector<int *> fieldIdxList;                       std::vector<std::string> fieldLabelList;
+    fieldIdxList.push_back(&antennaModelFieldIdx);         fieldLabelList.push_back("antennaModel");
+
+    int fieldIdx;
+
+    enum LineTypeEnum {
+         labelLineType,
+          dataLineType,
+        ignoreLineType,
+       unknownLineType
+    };
+
+    LineTypeEnum lineType;
+
+    linenum = 0;
+    bool foundLabelLine = false;
+    while (fgetline(fin, line, false)) {
+        linenum++;
+        std::vector<std::string> fieldList = splitCSV(line);
+        std::string fixedStr = "";
+
+        lineType = unknownLineType;
+        /**************************************************************************/
+        /**** Determine line type                                              ****/
+        /**************************************************************************/
+        if (fieldList.size() == 0) {
+            lineType = ignoreLineType;
+        } else {
+            fIdx = fieldList[0].find_first_not_of(' ');
+            if (fIdx == (int) std::string::npos) {
+                if (fieldList.size() == 1) {
+                    lineType = ignoreLineType;
+                }
+            } else {
+                if (fieldList[0].at(fIdx) == '#') {
+                    lineType = ignoreLineType;
+                }
+            }
+        }
+
+        if ((lineType == unknownLineType)&&(!foundLabelLine)) {
+            lineType = labelLineType;
+            foundLabelLine = 1;
+        }
+        if ((lineType == unknownLineType)&&(foundLabelLine)) {
+            lineType = dataLineType;
+        }
+        /**************************************************************************/
+
+        /**************************************************************************/
+        /**** Process Line                                                     ****/
+        /**************************************************************************/
+        bool found;
+        std::string field;
+        int xIdx, yIdx;
+        switch(lineType) {
+            case   labelLineType:
+                for(fieldIdx=0; fieldIdx<(int) fieldList.size(); fieldIdx++) {
+                    field = fieldList.at(fieldIdx);
+
+                    // std::cout << "FIELD: \"" << field << "\"" << std::endl;
+
+                    found = false;
+                    for(fIdx=0; (fIdx < (int) fieldLabelList.size())&&(!found); fIdx++) {
+                        if (field == fieldLabelList.at(fIdx)) {
+                            *fieldIdxList.at(fIdx) = fieldIdx;
+                            found = true;
+                        }
+                    }
+                }
+
+                for(fIdx=0; fIdx < (int) fieldIdxList.size(); fIdx++) {
+                    if (*fieldIdxList.at(fIdx) == -1) {
+                        errStr << "ERROR: Invalid input file \"" << inputFile << "\" label line missing \"" << fieldLabelList.at(fIdx) << "\"" << std::endl;
+                        throw std::runtime_error(errStr.str());
+                    }
+                }
+
+                fprintf(fout, "%s,matchedAntennaModel\n", line.c_str());
+
+                break;
+            case    dataLineType:
+                {
+                    strval = fieldList.at(antennaModelFieldIdx);
+
+                    AntennaModelClass *antModel = antennaModelMap.find(strval);
+
+                    std::string matchedModelName;
+                    if (antModel) {
+                        matchedModelName = antModel->name;
+                    } else {
+                        matchedModelName = "";
+                    }
+
+                    fprintf(fout, "%s,%s\n", line.c_str(), matchedModelName.c_str());
+
+                }
+                break;
+            case  ignoreLineType:
+            case unknownLineType:
+                // do nothing
+                break;
+            default:
+                CORE_DUMP;
+                break;
+        }
+    }
+
+    if (fin) { fclose(fin); }
+    if (fout) { fclose(fout); }
+}
+/******************************************************************************************/
+
