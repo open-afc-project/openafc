@@ -49,6 +49,7 @@ import sqlite3
 import sys
 import time
 from deepdiff import DeepDiff
+from multiprocessing.pool import Pool
 from _afc_errors import *
 from _version import __version__
 from _wfa_tests import *
@@ -89,6 +90,7 @@ class TestCfg(dict):
             'tests' : None,
             'is_test_by_index': True,
             'resp' : '',
+            'stress' : 0,
             'precision': None})
 
     def _send_recv(self, params):
@@ -123,7 +125,8 @@ class TestCfg(dict):
         resp = rawresp.json()
 
         tId = resp.get('taskId')
-        if (self['conn_type'] == 'async') and (not isinstance(tId, type(None))):
+        if ((self['conn_type'] == 'async') and
+            (not isinstance(tId, type(None)))):
             tState = resp.get('taskState')
             params_data['task_id'] = tId
             while (tState == 'PENDING') or (tState == 'PROGRESS'):
@@ -1050,7 +1053,7 @@ def test_report(fname, runtimedata, testnumdata, testvectordata,
         file_writer.writerow(data)
 
 
-def _run_tests(cfg, reqs, resps, test_cases, comparator):
+def _run_tests(cfg, reqs, resps, comparator, test_cases):
     """
     Run tests
     reqs: {testcaseid: [request_json_str]}
@@ -1058,17 +1061,17 @@ def _run_tests(cfg, reqs, resps, test_cases, comparator):
     test_cases: [testcaseids]
     comparator: reference to object
     """
-    app_log.debug(f"{inspect.stack()[0][3]}() {test_cases} "
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() {test_cases} "
                   f"{cfg['url_path']}")
 
     test_res = AFC_OK
     accum_secs = 0
 
     for test_case in test_cases:
-        app_log.info('Prepare to run test - %s', test_case)
+        app_log.info(f"Prepare to run test - {test_case}")
         if test_case not in reqs:
-            app_log.warning("The requested test case %s is invalid/not "
-                            "available in database", test_case)
+            app_log.warning(f"The requested test case {test_case} is "
+                            f"invalid/not available in database")
             continue
             
         request_data = reqs[test_case][0]
@@ -1115,9 +1118,9 @@ def _run_tests(cfg, reqs, resps, test_cases, comparator):
                                            result_str=upd_data)
         if (resps[test_case][1] == hash_obj.hexdigest()) \
                 if cfg['precision'] is None else (not diffs):
-            app_log.info('Test %s is Ok', req_id[0])
+            app_log.info(f"Test {req_id[0]} is Ok")
         else:
-            app_log.error('Test %s (%s) is Fail', test_case, req_id[0])
+            app_log.error(f"Test {test_case} ({req_id[0]}) is Fail")
             for line in diffs:
                 app_log.error(f"  Difference: {line}")
             app_log.error(hash_obj.hexdigest())
@@ -1130,9 +1133,10 @@ def _run_tests(cfg, reqs, resps, test_cases, comparator):
         if isinstance(cfg['outfile'], list):
             test_report(cfg['outfile'][0], float(tm_secs),
                         test_case, req_id[0],
-                        ("PASS" if test_res == AFC_OK else "FAIL"), upd_data)
+                        ("PASS" if test_res == AFC_OK else "FAIL"),
+                        upd_data)
 
-    app_log.info("Total testcases runtime : %s secs", round(accum_secs, 1))
+    app_log.info(f"Total testcases runtime : {round(accum_secs, 1)} secs")
     return test_res
 
 
@@ -1143,7 +1147,7 @@ def prep_and_run_tests(cfg, reqs, resps, test_cases):
     resps: {testcaseid: [response_json_str, response_hash]}
     test_cases: [testcaseids]
     """
-    app_log.debug(f"{inspect.stack()[0][3]}() {test_cases} "
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() {test_cases} "
                   f"{cfg['url_path']}")
 
     test_res = AFC_OK
@@ -1154,21 +1158,37 @@ def prep_and_run_tests(cfg, reqs, resps, test_cases):
     if not isinstance(cfg['tests2run'], type(None)):
         max_nbr_tests = int("".join(cfg['tests2run']))
 
-    while max_nbr_tests:
-        app_log.debug(f"{inspect.stack()[0][3]}() {max_nbr_tests}")
+    while (max_nbr_tests != 0):
+        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() "
+                      f"{max_nbr_tests}")
         if max_nbr_tests < len(test_cases):
             del test_cases[-(len(test_cases) - max_nbr_tests):]
-        res = _run_tests(cfg, reqs, resps, test_cases, results_comparator)
-        if res != AFC_OK:
-            test_res = res
+
+        # if stress mode execute testcases in parallel and concurrent
+        if cfg['stress'] == 1:
+            app_log.debug(f"{inspect.stack()[0][3]}() max {max_nbr_tests}"
+                          f" len {len(test_cases)}")
+            inputs = [(cfg, reqs, resps, results_comparator, [test])
+                      for test in test_cases]
+            with Pool(max_nbr_tests) as my_pool:
+                results = my_pool.starmap(_run_tests, inputs)
+            if not any(r == 0 for r in results):
+                test_res = AFC_ERR
+        else:
+            res = _run_tests(cfg, reqs, resps,
+                             results_comparator, test_cases)
+            if res != AFC_OK:
+                test_res = res
+        # when required to run more tests than there are testcases
+        # start run run from the beginning
         max_nbr_tests -= len(test_cases)
     return test_res
 
 
 def run_test(cfg):
     """Fetch test vectors from the DB and run tests"""
-    app_log.debug(f"{inspect.stack()[0][3]}() {cfg['tests']}, "
-                  f"{cfg['url_path']}")
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() "
+                  f"{cfg['tests']}, {cfg['url_path']}")
 
     if not os.path.isfile(cfg['db_filename']):
         app_log.error('Missing DB file %s', cfg['db_filename'])
@@ -1220,6 +1240,18 @@ def run_test(cfg):
     return prep_and_run_tests(cfg, reqs_dict, resp_dict, test_cases)
 
 
+def stress_run(cfg):
+    """
+    Get test vectors from the database and run tests
+    in parallel
+    """
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() "
+                  f"{cfg['tests']}, {cfg['url_path']}")
+    cfg['stress'] = 1
+
+    return run_test(cfg)
+
+
 log_level_map = {
     'debug' : logging.DEBUG,    # 10
     'info' : logging.INFO,      # 20
@@ -1250,6 +1282,7 @@ execution_map = {
     'parse_tests': parse_tests,
     'reacq' : start_acquisition,
     'run' : run_test,
+    'stress' : stress_run,
     'ver' : get_version
 }
 
@@ -1337,6 +1370,7 @@ def make_arg_parser():
         "reqca - reacquision every test from the database and insert new "
         "responses.\n"
         "cmp_cfg - compare AFC config from the DB to provided from a file.\n"
+        "stress - run tests in stress mode.\n"
         "ver - get version.\n")
 
     return args_parser
