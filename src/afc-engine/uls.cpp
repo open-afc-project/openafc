@@ -784,8 +784,8 @@ PRClass::PRClass()
 	rxGain = -1.0;
 	rxDlambda = -1.0;
 
-	reflectorHeight = -1.0;
-	reflectorWidth = -1.0;
+	reflectorHeightLambda = -1.0;
+	reflectorWidthLambda = -1.0;
 
 	terrainHeightFlag = false;
 }
@@ -800,11 +800,34 @@ PRClass::~PRClass()
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: PRClass::computeRxGain                                                 ****/
+/**** FUNCTION: PRClass::computeDiscriminationGain                                     ****/
 /******************************************************************************************/
 double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency)
 {
-	// 2022.09.27: This is a placeholder function.  This function will be written with when
-	// the passive repeater logic is fully implemented.  --MM
+    double discriminationDB;
+
+	switch(type) {
+		case CConst::backToBackAntennaPRType:
+			{
+            	double rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, rxGain, rxDlambda);
+            	discriminationDB = rxGain - rxGainDB;
+			}
+			break;
+		case CConst::billboardReflectorPRType:
+			{
+				double D0 = -10.0*log10(4*M_PI*reflectorWidthLambda*reflectorHeightLambda*cos(angleOffBoresightDeg*M_PI/180.0));
+				double D1;
+            	// if (angleOffBoresightDeg < theta1) {
+            	// } else if (angleOffBoresightDeg < theta0) {
+            	// } else {
+            	// }
+			}
+			break;
+		default:
+			CORE_DUMP;
+			break;
+	}
+
+    return discriminationDB;
 }
 /******************************************************************************************/

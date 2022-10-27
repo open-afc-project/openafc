@@ -51,8 +51,15 @@ public:
 	double rxGain;
 	double rxDlambda;
 
-	double reflectorHeight;
-	double reflectorWidth;
+	double reflectorHeightLambda;
+	double reflectorWidthLambda;
+
+    // Reflector 3D coordinate system:
+	// X: horizontal vector on reflector surface in direction of width
+	// Y: vector on reflector surface in direction of height.  Note that when reflector is tilted, this is not vertical relative to the ground.
+	// X: vector perpendicular to reflector surface
+	// X, Y, Z are orthonormal
+	Vector3 reflectorX, reflectorY, reflectorZ;  // 3D vector perpendicular to surface of relector
 
 };
 /******************************************************************************************/

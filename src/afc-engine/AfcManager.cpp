@@ -4851,16 +4851,57 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 						pr.heightSource = prHeightSource;
 
 						pr.position = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, pr.heightAMSL / 1000.0);
+
+						if (row.prType[prIdx] == "Ant") {
+							pr.type = CConst::backToBackAntennaPRType;
+							pr.txGain = row.prTxGain[prIdx];
+							pr.txDlambda = row.prTxAntennaDiameter[prIdx] / lambda;
+							pr.rxGain = row.prRxGain[prIdx];
+							pr.rxDlambda = row.prRxAntennaDiameter[prIdx] / lambda;
+						} else if (row.prType[prIdx] == "Ref") {
+							pr.type = CConst::billboardReflectorPRType;
+							pr.reflectorHeightLambda = row.prReflectorHeight[prIdx] / lambda;
+							pr.reflectorWidthLambda = row.prReflectorWidth[prIdx] / lambda;
+
+						} else {
+							CORE_DUMP;
+						}
 					}
 				}
 
 				if ((!mobileRxFlag) && (!mobileTxFlag)) {
-					if ((!randPointingFlag)&&(!numPR)) {
-						uls->setAntennaPointing((txPosition - rxPosition).normalized()); // Pointing of Rx antenna
-						uls->setLinkDistance((txPosition - rxPosition).len() * 1000.0);
-					} else if ((!randPointingFlag)&&(numPR)) {
-						uls->setAntennaPointing((prPosition - rxPosition).normalized());  // Pointing of Rx antenna
-						uls->setLinkDistance((prPosition - rxPosition).len()*1000.0);
+					if (!randPointingFlag) {
+					    for(prIdx=0; prIdx<=numPR; ++prIdx) {
+							Vector3 segTxPosn = (prIdx == 0 ? txPosition : uls->getPR(prIdx-1).position);
+							Vector3 segRxPosn = (prIdx == numPR ? rxPosition : uls->getPR(prIdx).position);
+                            Vector3 pointing = (segTxPosn - segRxPosn).normalized();
+                            double segDist = (segTxPosn - segRxPosn).len() * 1000.0;
+
+							if (prIdx == numPR) {
+								uls->setAntennaPointing(pointing); // Pointing of Rx antenna
+								uls->setLinkDistance(segDist);
+							} else {
+								uls->getPR(prIdx).pointing = pointing; // Pointing of Passive Receiver
+								uls->getPR(prIdx).segmentDistance = segDist;
+							}
+						}
+
+						/******************************************************************/
+						/* Calculate reflector coordinate system                          */
+						/******************************************************************/
+					    for(prIdx=0; prIdx<numPR; ++prIdx) {
+						    PRClass& pr = uls->getPR(prIdx);
+                            if (pr.type == CConst::billboardReflectorPRType) {
+                                Vector3 pointingA = pr.pointing;
+                                Vector3 pointingB = -(prIdx == numPR-1 ? uls->getAntennaPointing() : uls->getPR(prIdx+1).pointing);
+                                pr.reflectorZ = (pointingA + pointingB).normalized();              // Perpendicular to reflector surface
+								Vector3 upVec = pr.position.normalized();
+								pr.reflectorX = (upVec.cross(pr.reflectorZ)).normalized();         // Horizontal
+								pr.reflectorY = (pr.reflectorZ.cross(pr.reflectorX)).normalized();
+                            }
+                        }
+						/******************************************************************/
+
 					} else {
 						double az, el;
 						Vector3 xvec, yvec, zvec;
@@ -7192,10 +7233,7 @@ void AfcManager::runPointAnalysis()
 
 			int numPR = uls->getNumPR();
 
-			// 2022.09.27: This for statement loops over each segment in the path, segIdx ranges from 0 to numPR (total numPR+1 values).
-			// As a temporary measure, only the last segment of a path is considered.  When the passive repeater logic is fully implemented,
-			// this loop will be changed back to consider all segments in the path.  --MM
-			for(int segIdx=numPR /* 0 */; segIdx<numPR+1; ++segIdx) {
+			for(int segIdx=0; segIdx<numPR+1; ++segIdx) {
 				Vector3 ulsRxPos = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).position);
 				double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
 				double ulsRxLatitude = (segIdx == numPR ? uls->getRxLatitudeDeg() : uls->getPR(segIdx).latitudeDeg);
@@ -7218,26 +7256,14 @@ void AfcManager::runPointAnalysis()
 #					endif
 
 					_ulsIdxList.push_back(ulsIdx); // Store the ULS indices that are used in analysis
-#if 0
-					int ulsLonIdx;
-					int ulsLatIdx;
-					int regionIdx;
-					char ulsRxPropEnv;
-					_popGrid->findDeg(uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), ulsLonIdx, ulsLatIdx, ulsRxPropEnv, regionIdx);
-					double ulsPopVal = _popGrid->getPop(ulsLonIdx, ulsLatIdx);
-					if (ulsPopVal == 0.0)
-					{
-						ulsRxPropEnv = 'Z';
-					}
-#else
-					char ulsRxPropEnv = ' ';
-#endif
+
 					double ulsRxHeightAGL  = (segIdx == numPR ? uls->getRxHeightAboveTerrain() : uls->getPR(segIdx).heightAboveTerrain);
 					double ulsRxHeightAMSL = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSL);
 
 					/**************************************************************************************/
 					/* Determine propagation environment of FS segment RX, if needed.                     */
 					/**************************************************************************************/
+					char ulsRxPropEnv = ' ';
 					CConst::NLCDLandCatEnum nlcdLandCatRx;
 					CConst::PropEnvEnum fsPropEnv;
 					if ((_applyClutterFSRxFlag) && (ulsRxHeightAGL <= _maxFsAglHeight)) {
@@ -7343,8 +7369,8 @@ void AfcManager::runPointAnalysis()
 							// Use Haversine formula with average earth radius of 6371 km
 							double lon1Rad = scanPt.second*M_PI/180.0;
 							double lat1Rad = scanPt.first*M_PI/180.0;
-							double lon2Rad = uls->getRxLongitudeDeg()*M_PI/180.0;
-							double lat2Rad = uls->getRxLatitudeDeg()*M_PI/180.0;
+							double lon2Rad = ulsRxLongitude*M_PI/180.0;
+							double lat2Rad = ulsRxLatitude*M_PI/180.0;
 							double slat = sin((lat2Rad-lat1Rad)/2);
 							double slon = sin((lon2Rad-lon1Rad)/2);
 							double groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
@@ -7390,7 +7416,6 @@ void AfcManager::runPointAnalysis()
 							}
 #endif
 
-					CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
 
 							for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx)
 							{
@@ -7563,6 +7588,7 @@ void AfcManager::runPointAnalysis()
 												}
 
 												std::string rxAntennaTypeStr;
+												CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
 												if (ulsRxAntennaType == CConst::LUTAntennaType) {
 													rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
 												} else {
