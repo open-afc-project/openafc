@@ -109,10 +109,10 @@ build_dev_server() {
   (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push})
 
   # build afc dynamic data storage image
-  cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST_DI}:${tag} ; cd ${wd} ${push}
+  cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST_DI}:${tag} ${push}; cd ${wd}
 
   # build afc rabbit MQ docker image
-  cd ${wd}/rabbitmq && docker_build_and_push Dockerfile ${RMQ_DI}:${tag} ; cd ${wd} ${push}
+  cd ${wd}/rabbitmq && docker_build_and_push Dockerfile ${RMQ_DI}:${tag} ${push}; cd ${wd}
 
   # build afc server docker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV} --build-arg BUILDREV=${BUILDREV}"
