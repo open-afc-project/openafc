@@ -119,7 +119,5 @@ build_dev_server() {
   docker_build_and_push ${wd}/Dockerfile ${SRV_DI}:${tag}  ${push} "${EXT_ARGS}"
 }
 
-build_dev_server $1 $2 $3
-
 # Local Variables:
 # vim: sw=2:et:tw=80:cc=+1
