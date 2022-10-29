@@ -6,8 +6,6 @@
 # a copy of which is included with this software program
 #
 
-set -x
-
 PRINST_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image" # preinst image name
 D4B_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-build-image"         # dev image name
 SRV_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"     # server image
