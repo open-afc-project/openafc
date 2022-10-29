@@ -5,8 +5,6 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 
-unset -x
-
 trap 'kill 0' SIGINT
 echo `pwd`
 wd=${1}
