@@ -5,7 +5,7 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 
-source regression.sh
+source ./regression.sh
 unset -x
 
 trap 'kill 0' SIGINT
