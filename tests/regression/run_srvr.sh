@@ -5,12 +5,13 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-source ./regression.sh
 set -x
 
 wd=${1}    # full path to the afc project path
 TAG=${2}   # docker images tag
 export TAG
+
+source $wd/tests/regression/regression.sh
 
 hostname
 # export test dut configuration

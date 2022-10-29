@@ -5,7 +5,6 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 
-source ./regression.sh
 unset -x
 
 trap 'kill 0' SIGINT
@@ -16,6 +15,8 @@ addr=${3}
 port=${4:-443}
 prot=${5:-"https"}
 ap_count=$(docker run --rm ${di_name} --cmd get_nbr_testcases;echo $?)
+
+source $wd/tests/regression/regression.sh
 
 loop() {
     start=0
