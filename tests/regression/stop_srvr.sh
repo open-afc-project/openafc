@@ -7,10 +7,9 @@
 set -x
 hostname
 wd=${1}
-rand=${2}
-TAG=${rand}
+TAG=${2}
 export TAG
-cd $wd/tests/regression_${rand}
+cd $wd/tests/regression_${TAG}
 docker ps -a
 docker-compose logs
 docker-compose down
