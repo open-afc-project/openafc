@@ -57,10 +57,10 @@ docker_push() {
 docker_build_and_push() {
   file=${1}    # Name of the Dockerfile
   image=${2}  # Name and optionally a tag in the 'name:tag' format
-  args=${3}
-  push=${4:-1}  # whether push new docker images into repo [0/1]
+  push=${3:-1}  # whether push new docker images into repo [0/1]
+  args=${4}
 
-  msg " docker_build_and_push args:  ${args}"
+  msg " docker_build_and_push push:${push} args:${args}"
 
   docker_build ${file} ${image} "${args}"
 
@@ -106,7 +106,7 @@ build_dev_server() {
   cd ${wd}/tests && docker_build Dockerfile ${RTEST_DI}:${tag}; cd ${wd}
 
   # build in parallel server docker prereq images (preinstall and docker_for_build)
-  (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push})
+  (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image {PRINST_DEV}:${tag} ${push} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push})
 
   # build afc dynamic data storage image
   cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST_DI}:${tag} ${push}; cd ${wd}
@@ -116,7 +116,7 @@ build_dev_server() {
 
   # build afc server docker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV} --build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push ${wd}/Dockerfile ${SRV_DI}:${tag} "${EXT_ARGS}" ${push}
+  docker_build_and_push ${wd}/Dockerfile ${SRV_DI}:${tag}  ${push} "${EXT_ARGS}"
 }
 
 build_dev_server $1 $2 $3
