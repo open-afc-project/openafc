@@ -55,10 +55,10 @@ docker_push() {
 }
 
 docker_build_and_push() {
-  file=${1}    # Name of the Dockerfile
-  image=${2}  # Name and optionally a tag in the 'name:tag' format
-  push=${3:-1}  # whether push new docker images into repo [0/1]
-  args=${4}
+  file=${1}     # Name of the Dockerfile
+  image=${2}    # Name and optionally a tag in the 'name:tag' format
+  push=${3}  # whether push new docker images into repo [0/1]
+  args=${4}     # extra arguments
 
   msg " docker_build_and_push push:${push} args:${args}"
 
