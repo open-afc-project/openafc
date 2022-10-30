@@ -65,7 +65,7 @@ jobs:
 # build regr test images {
     - name: build regr test images
       run: |
-          ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "sh -x ${{ env.WD }}/${{ env.REGRD }}/regression.sh ${{ env.WD }} ${{ env.RAND }}"
+          ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "sh -x ${{ env.WD }}/${{ env.REGRD }}/build_imgs.sh ${{ env.WD }} ${{ env.RAND }}"
 # } build regr test images
 
 # start dev srvr {

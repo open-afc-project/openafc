@@ -6,8 +6,6 @@
 # a copy of which is included with this software program
 #
 
-set -x
-
 PRINST_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image" # preinst image name
 D4B_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-build-image"         # dev image name
 SRV_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"     # server image
@@ -55,43 +53,61 @@ docker_push() {
 }
 
 docker_build_and_push() {
-  file=${1}    # Name of the Dockerfile
-  image=${2}  # Name and optionally a tag in the 'name:tag' format
-  args=${3}
+  file=${1}     # Name of the Dockerfile
+  image=${2}    # Name and optionally a tag in the 'name:tag' format
+  push=${3:-1}  # whether push new docker images into repo [0/1]
+  args=${4}     # extra arguments
 
-  msg " docker_build_and_push args:  ${args}"
+  msg " docker_build_and_push push:${push} args:${args}"
 
   docker_build ${file} ${image} "${args}"
+
   if [ $? -eq 0 ]; then
-    docker_push ${image}
+    if [ ${push} -eq 1 ]; then
+      docker_push ${image}
+    fi
   fi
 }
 
-git_clone() {
-  addr=${1}
-  wd=${2}
-  git clone ${addr} ${wd}
+docker_login() {
+# TODO: currently it is hardcoded to login into openAFC repo
+# should be implemented in more generic way
+  aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/w9v6y1o0
   check_ret $?
-  # ls -la ${wd}
+  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 110738915961.dkr.ecr.us-east-1.amazonaws.com
+  check_ret $?
 }
 
 build_dev_server() {
-  wd=${1}
-  tag=${2}
+  wd=${1}       # full path to the afc project dir
+  tag=${2}      # tag to be used for new docker images
+  push=${3:-1}  # whether push new docker images into repo [0/1]
+
+  # cd to a work dir
   cd ${wd}
-
-  aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/w9v6y1o0
+  # get last git commit hash number
   BUILDREV=`git rev-parse --short HEAD`
-  cd ${wd}/tests && docker_build Dockerfile ${RTEST_DI}:${tag}; cd ${wd}
-  (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag})
-  cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST_DI}:${tag} ; cd ${wd}
-  cd ${wd}/rabbitmq && docker_build_and_push Dockerfile ${RMQ_DI}:${tag} ; cd ${wd}
-  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 110738915961.dkr.ecr.us-east-1.amazonaws.com
-  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV} --build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push ${wd}/Dockerfile ${SRV_DI}:${tag} "${EXT_ARGS}"
-}
 
-build_dev_server $1 $2
+  if [ ${push} -eq 1 ]; then
+    docker_login
+  fi
+
+  # build regression test docker image
+  cd ${wd}/tests && docker_build Dockerfile ${RTEST_DI}:${tag}; cd ${wd}
+
+  # build in parallel server docker prereq images (preinstall and docker_for_build)
+  (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push})
+
+  # build afc dynamic data storage image
+  cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST_DI}:${tag} ${push}; cd ${wd}
+
+  # build afc rabbit MQ docker image
+  cd ${wd}/rabbitmq && docker_build_and_push Dockerfile ${RMQ_DI}:${tag} ${push}; cd ${wd}
+
+  # build afc server docker image
+  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV} --build-arg BUILDREV=${BUILDREV}"
+  docker_build_and_push ${wd}/Dockerfile ${SRV_DI}:${tag}  ${push} "${EXT_ARGS}"
+}
 
 # Local Variables:
 # vim: sw=2:et:tw=80:cc=+1

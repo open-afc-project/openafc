@@ -6,39 +6,19 @@
 # a copy of which is included with this software program
 #
 set -x
-SRV_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"     # server image
-RTEST_DI="rtest"                                                     # regression tests image
 
-# FUNCS
-msg() {
-   echo -e "\e[34m \e[1m$1\e[0m"
-}
-err() {
-  echo -e "\e[31m$1\e[0m"
-}
-ok() {
-  echo -e "\e[32m$1\e[0m"
-}
-check_ret() {
-  ret=${1}  # only 0 is OK
-
-  if [ ${ret} -eq 0 ]; then
-    ok "OK"
-    else err "FAIL"; exit ${ret}
-  fi
-}
-
-hostname
-wd=${1}
-tag=${2}
-TAG=${tag}
+wd=${1}    # full path to the afc project path
+TAG=${2}   # docker images tag
 export TAG
 
+source $wd/tests/regression/regression.sh
+
+hostname
 # export test dut configuration
-cd $wd/tests/regression_${tag}
+cd $wd/tests/regression_${TAG}
 mkdir pipe
 mkdir afc_config
-docker run --rm -v `pwd`/pipe:/pipe ${RTEST_DI}:${tag} --cmd exp_adm_cfg --outfile /pipe/export_admin_cfg.json
+docker run --rm -v `pwd`/pipe:/pipe ${RTEST_DI}:${TAG} --cmd exp_adm_cfg --outfile /pipe/export_admin_cfg.json
 check_ret $?
 # copy regr server config and run srvr
 cp -a ~/template_regrtest/*  .
