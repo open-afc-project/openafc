@@ -69,14 +69,6 @@ docker_build_and_push() {
   fi
 }
 
-git_clone() {
-  addr=${1}
-  wd=${2}
-  git clone ${addr} ${wd}
-  check_ret $?
-  # ls -la ${wd}
-}
-
 docker_login() {
 # TODO: currently it is hardcoded to login into openAFC repo
 # should be implemented in more generic way
