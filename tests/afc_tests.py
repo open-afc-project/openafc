@@ -83,6 +83,7 @@ class TestCfg(dict):
     def __init__(self):
         dict.__init__(self)
         self.update({
+            'cmd' : '',
             'port' : 443,
             'url_path' : AFC_PROT_NAME + '://',
             'log_level' : logging.INFO,
@@ -1252,6 +1253,65 @@ def stress_run(cfg):
     return run_test(cfg)
 
 
+def _run_cert_tests(cfg):
+    """
+    Run tests
+    """
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() {cfg['url_path']}")
+
+    test_res = AFC_OK
+
+    before_ts = time.monotonic()
+    try:
+        rawresp = requests.get(cfg['url_path'],
+                               cert=("".join(cfg['cli_cert']),
+                                     "".join(cfg['cli_key'])),
+                               verify="".join(cfg['ca_cert']))
+    except Exception as e:
+        app_log.error(f"({os.getpid()}) {inspect.stack()[0][3]}() {e}")
+        test_res = AFC_ERR
+    except OSError as os_err:
+        proc = psutil.Process()
+        app_log.error(f"({os.getpid()}) {inspect.stack()[0][3]}() "
+                      f"{os_err} - {proc.open_files()}")
+        test_res = AFC_ERR
+    else :
+        if rawresp.status_code != 200:
+            test_res = AFC_ERR
+
+    tm_secs = time.monotonic() - before_ts
+
+    app_log.info('Test done at %.1f secs', tm_secs)
+
+    return test_res
+
+
+def run_cert_tests(cfg):
+    """
+    Run certificate tests
+    """
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+
+    test_res = AFC_OK
+
+    # calculate max number of tests to run
+    if isinstance(cfg['tests2run'], type(None)):
+        app_log.error(f"Missing number of tests to run.")
+        return AFC_ERR
+
+    max_nbr_tests = int("".join(cfg['tests2run']))
+
+    while (max_nbr_tests != 0):
+        # if stress mode execute testcases in parallel and concurrent
+        inputs = [(cfg)]
+        with Pool(max_nbr_tests) as my_pool:
+            results = my_pool.map(_run_cert_tests, inputs)
+        if not any(r == 0 for r in results):
+            test_res = AFC_ERR
+        max_nbr_tests -= 1
+    return test_res
+
+
 log_level_map = {
     'debug' : logging.DEBUG,    # 10
     'info' : logging.INFO,      # 20
@@ -1271,21 +1331,48 @@ def get_version(cfg):
     app_log.info('AFC Test db hash %s', get_md5(AFC_TEST_DB_FILENAME))
 
 
+def parse_run_test_args(cfg):
+    """Parse arguments for command 'run_test'"""
+    app_log.debug(f"{inspect.stack()[0][3]}()")
+    if isinstance(cfg['addr'], list):
+        # set URL if protocol is not the default
+        if cfg['prot'] != AFC_PROT_NAME:
+            cfg['url_path'] = cfg['prot'] + '://'
+
+        cfg['url_path'] += str(cfg['addr'][0]) + ':' + str(cfg['port']) +\
+                           AFC_URL_SUFFIX +\
+                           '/' + AFC_REQ_NAME
+
+
+def parse_run_cert_args(cfg):
+    """Parse arguments for command 'run_cert'"""
+    app_log.debug(f"{inspect.stack()[0][3]}()")
+    if ((not isinstance(cfg['addr'], list)) or
+        isinstance(cfg['ca_cert'], type(None)) or
+        isinstance(cfg['cli_cert'], type(None)) or
+        isinstance(cfg['cli_key'], type(None))):
+        app_log.error(f"{inspect.stack()[0][3]}() Missing arguments")
+        return AFC_ERR
+
+    cfg['url_path'] = cfg['prot'] + '://' + str(cfg['addr'][0]) +\
+                      ':' + str(cfg['port']) + '/'
+
+
 # available commands to execute in alphabetical order
 execution_map = {
-    'add_reqs' : add_reqs,
-    'cmp_cfg' : compare_afc_config,
-    'dry_run' : dry_run_test,
-    'dump_db': dump_database,
-    'get_nbr_testcases' : get_nbr_testcases,
-    'exp_adm_cfg': export_admin_config,
-    'parse_tests': parse_tests,
-    'reacq' : start_acquisition,
-    'run' : run_test,
-    'stress' : stress_run,
-    'ver' : get_version
+    'add_reqs' : [add_reqs, parse_run_test_args],
+    'cmp_cfg' : [compare_afc_config, parse_run_test_args],
+    'dry_run' : [dry_run_test, parse_run_test_args],
+    'dump_db': [dump_database, parse_run_test_args],
+    'get_nbr_testcases' : [get_nbr_testcases, parse_run_test_args],
+    'exp_adm_cfg': [export_admin_config, parse_run_test_args],
+    'parse_tests': [parse_tests, parse_run_test_args],
+    'reacq' : [start_acquisition, parse_run_test_args],
+    'run' : [run_test, parse_run_test_args],
+    'run_cert' : [run_cert_tests, parse_run_cert_args],
+    'stress' : [stress_run, parse_run_test_args],
+    'ver' : [get_version, parse_run_test_args],
 }
-
 
 def make_arg_parser():
     """Define command line options"""
@@ -1357,6 +1444,13 @@ def make_arg_parser():
                          "disabled.\n")
     args_parser.add_argument('--tests2run', nargs=1, type=str,
                          help="<nbr> - the total number of tests to run.\n")
+    args_parser.add_argument('--ca_cert', nargs=1, type=str,
+                         help="<filename> - set CA certificate filename to "
+                              "verify the remote server.\n")
+    args_parser.add_argument('--cli_cert', nargs=1, type=str,
+                         help="<filename> - set client certificate filename.\n")
+    args_parser.add_argument('--cli_key', nargs=1, type=str,
+                         help="<filename> - set client private key filename.\n")
 
     args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?',
         help="run - run test from DB and compare.\n"
@@ -1396,14 +1490,7 @@ def prepare_args(parser, cfg):
         cfg["tests"] = cfg.pop("testcase_ids")
         cfg.pop("testcase_indexes")
 
-    if isinstance(cfg['addr'], list):
-        # set URL if protocol is not the default
-        if cfg['prot'] != AFC_PROT_NAME:
-            cfg['url_path'] = cfg['prot'] + '://'
-
-        cfg['url_path'] += str(cfg['addr'][0]) + ':' + str(cfg['port']) +\
-                           AFC_URL_SUFFIX +\
-                           '/' + AFC_REQ_NAME
+    return execution_map[cfg['cmd']][1](cfg)
 
 
 def main():
@@ -1423,7 +1510,7 @@ def main():
         if isinstance(test_cfg['cmd'], type(None)):
             parser.print_help()
         else:
-            res = execution_map[test_cfg['cmd']](test_cfg)
+            res = execution_map[test_cfg['cmd']][0](test_cfg)
     sys.exit(res)
 
 
