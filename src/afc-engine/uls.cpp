@@ -541,7 +541,7 @@ void ULSClass::setUseFrequency()
 /******************************************************************************************/
 /**** FUNCTION: ULSClass::computeRxGain                                                ****/
 /******************************************************************************************/
-double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency, std::string &subModelStr)
+double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency, std::string &subModelStr, int divIdx)
 {
 	double rxGainDB;
 	subModelStr = "";
@@ -557,7 +557,7 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 		rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleDeg, rxGain, frequency);
 		break;
 	case CConst::R2AIP07AntennaType:
-		rxGainDB = calcR2AIP07Antenna(angleOffBoresightDeg, frequency, rxAntennaCategory, subModelStr);
+		rxGainDB = calcR2AIP07Antenna(angleOffBoresightDeg, frequency, rxAntennaCategory, subModelStr, divIdx);
 		break;
 	case CConst::OmniAntennaType:
 		rxGainDB = 0.0;
@@ -577,7 +577,7 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 /******************************************************************************************/
 /**** FUNCTION: ULSClass::calcR2AIP07Antenna                                           ****/
 /******************************************************************************************/
-double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, CConst::AntennaCategoryEnum category, std::string &subModelStr)
+double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, CConst::AntennaCategoryEnum category, std::string &subModelStr, int divIdx)
 {
 	int freqIdx;
 	double rxGainDB;
@@ -590,11 +590,14 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value for FSID = " << id);
 	}
 
-	if (rxGain < 38) {
+    double maxGain = (divIdx == 0 ? rxGain    : diversityGain   );
+    double Dlambda = (divIdx == 0 ? rxDlambda : diversityDlambda);
+
+	if (maxGain < 38) {
 		if (angleOffBoresightDeg < 5) {
 			subModelStr = ":F.699";
-			rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
-		} else {
+			rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, maxGain, Dlambda);
+		} else if (divIdx == 0) {
 			// Table 2, Category B2
 			double minSuppression;
 			if (angleOffBoresightDeg < 10.0) {
@@ -611,12 +614,32 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 				minSuppression = 60.0;
 			}
 			subModelStr = ":catB2";
-			rxGainDB = rxGain - minSuppression;
+			rxGainDB = maxGain - minSuppression;
+		} else {
+			// Table 2, Category B1
+			double minSuppression;
+			if (angleOffBoresightDeg < 10.0) {
+				minSuppression = 21.0;
+			} else if (angleOffBoresightDeg < 15.0) {
+				minSuppression = 25.0;
+			} else if (angleOffBoresightDeg < 20.0) {
+				minSuppression = 29.0;
+			} else if (angleOffBoresightDeg < 30.0) {
+				minSuppression = 32.0;
+			} else if (angleOffBoresightDeg < 100.0) {
+				minSuppression = 35.0;
+			} else if (angleOffBoresightDeg < 140.0) {
+				minSuppression = 39.0;
+			} else {
+				minSuppression = 45.0;
+			}
+			subModelStr = ":catB1";
+			rxGainDB = maxGain - minSuppression;
 		}
 	} else {
 		if (angleOffBoresightDeg < 5) {
 			subModelStr = ":F.699";
-			rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
+			rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, maxGain, Dlambda);
 		} else {
 			bool antennaModelBlank = rxAntennaModel.empty();
 			bool categoryB1Flag = (category == CConst::B1AntennaCategory);
@@ -641,7 +664,7 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 					minSuppression = 45.0;
 				}
 				subModelStr = ":catB1";
-				rxGainDB = rxGain - minSuppression;
+				rxGainDB = maxGain - minSuppression;
 			} else if (knownHighPerformance) {
 				// Table 2, Category A
 				double minSuppressionA;
@@ -659,7 +682,7 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 					minSuppressionA = 55.0;
 				}
 
-				double descrimination699 = rxGain - calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
+				double descrimination699 = maxGain - calcItu699::CalcITU699(angleOffBoresightDeg, maxGain, Dlambda);
 
 				double descriminationDB;
 				if (descrimination699 >= minSuppressionA) {
@@ -670,7 +693,7 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 					descriminationDB = minSuppressionA;
 				}
 
-				rxGainDB = rxGain - descriminationDB;
+				rxGainDB = maxGain - descriminationDB;
 			} else {
 				// Table 2, Category A
 				double minSuppressionA;
@@ -689,7 +712,7 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 				}
 
 				subModelStr = ":catA";
-				rxGainDB = rxGain - minSuppressionA;
+				rxGainDB = maxGain - minSuppressionA;
 			}
 		}
 	}
@@ -733,7 +756,7 @@ double ULSClass::computeBeamWidth(double attnDB)
 		double angleOffBoresightDeg = a2;
 
 		std::string subModelStr;
-		rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, frequency, subModelStr);
+		rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, frequency, subModelStr, 0);
 
 		e2 = rxGainDB - g0 + attnDB;
 	} while(e2 > 0.0);
@@ -743,7 +766,7 @@ double ULSClass::computeBeamWidth(double attnDB)
 		double angleOffBoresightDeg = a3;
 
 		std::string subModelStr;
-		rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, frequency, subModelStr);
+		rxGainDB = computeRxGain(angleOffBoresightDeg, -1.0, frequency, subModelStr, 0);
 
 		double e3 = rxGainDB - g0 + attnDB;
 
@@ -817,10 +840,17 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 			{
 				double D0 = -10.0*log10(4*M_PI*reflectorWidthLambda*reflectorHeightLambda*cos(angleOffBoresightDeg*M_PI/180.0));
 				double D1;
-            	// if (angleOffBoresightDeg < theta1) {
-            	// } else if (angleOffBoresightDeg < theta0) {
-            	// } else {
-            	// }
+				double u_over_PI = reflectorSLambda*sin(angleOffBoresightDeg*M_PI/180.0);
+
+				if (angleOffBoresightDeg <= reflectorTheta1) {
+                    D1 = 20*log10(MathHelpers::sinc(u_over_PI));
+				} else if (angleOffBoresightDeg <= 20.0) {
+                    D1 = -20*log10(fabs(M_PI*u_over_PI));
+				} else {
+				    double u1_over_PI = reflectorSLambda*sin(reflectorTheta1*M_PI/180.0);
+                    D1 = 20*log10(MathHelpers::sinc(u1_over_PI)) - 0.4165*(angleOffBoresightDeg - 20.0);
+				}
+                discriminationDB = std::max(D0, D1);
 			}
 			break;
 		default:

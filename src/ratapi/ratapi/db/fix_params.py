@@ -48,7 +48,15 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
     file_handle = open(inputPath, 'rb')
     csvreader = csv.DictReader(file_handle)
 
-    fieldnames = csvreader.fieldnames + ['return_FSID', 'Rx Gain (dBi)', 'Tx Gain (dBi)']
+    fieldnames = csvreader.fieldnames + [
+        'return_FSID',
+         'Rx Gain (dBi)',
+         'Rx Height to Center RAAT (m)',
+         'Rx Diversity Gain (dBi)',
+         'Rx Diversity Height to Center RAAT (m)',
+         'Tx Gain (dBi)',
+         'Tx Height to Center RAAT (m)',
+    ]
 
     maxNumPR = 0
     for field in csvreader.fieldnames:
@@ -102,6 +110,10 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             row['return_FSID'] = ''
             row['Rx Gain (dBi)'] = ''
             row['Tx Gain (dBi)'] = ''
+
+            row['Rx Height to Center RAAT (m)']           = row['Rx Height to Center RAAT ULS (m)']
+            row['Rx Diversity Height to Center RAAT (m)'] = row['Rx Diversity Height to Center RAAT ULS (m)']
+            row['Tx Height to Center RAAT (m)']           = row['Tx Height to Center RAAT ULS (m)']
 
             if (freq >= unii5StartFreqMHz) and (freq <= unii5StopFreqMHz):
                 uniiband = 5
@@ -462,6 +474,47 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
 
                         if (antType == 'Ant'):
                             r[fwdGainStr] = str(fwdGain)
+
+                ####################################################################################
+                # R2-AIP-08 Diversity Antenna Gain and Diameter                                    #
+                # R2-AIP-15 Diversity Antenna Height                                               #
+                ####################################################################################
+                rxDiameterStr = 'Rx Ant Diameter (m)'
+                rxGainStrULS  = 'Rx Gain ULS (dBi)'
+                rxGainStr     = 'Rx Gain (dBi)'
+                diversityDiameterStr = 'Rx Diversity Ant Diameter (m)'
+                diversityGainStrULS  = 'Rx Diversity Gain ULS (dBi)'
+                diversityGainStr     = 'Rx Diversity Gain (dBi)'
+                rxAntModelMatchedStr = 'Rx Ant Model Name Matched'
+                rxHeightStr          = 'Rx Height to Center RAAT (m)'
+                diversityHeightStr   = 'Rx Diversity Height to Center RAAT (m)'
+
+                if (r[diversityGainStrULS] != '') and (float(r[diversityGainStrULS]) != 0.0):
+                    if (r[rxGainStrULS] != '') and (r[rxAntModelMatchedStr] != '') and (abs(float(r[rxGainStrULS])-float(r[diversityGainStrULS]) < 0.1)):
+                        r[diversityGainStr] = r[rxGainStr]
+                        r[diversityDiameterStr] = r[rxDiameterStr]
+                    else:
+                        diversityGainULS  = float(r[diversityGainStrULS])
+                        if (diversityGainULS >= 28.0) and (diversityGainULS <= 48.0):
+                            r[diversityGainStr] = r[diversityGainStrULS]
+                        else:
+                            r[diversityGainStr] = r[rxGainStrULS]
+
+                        diversityGain  = float(r[diversityGainStr])
+                        oneOverSqrtEta = 1.0/math.sqrt(0.55)
+                        D = (c/(math.pi*Fc_unii))*(10**((diversityGain)/20))*oneOverSqrtEta
+                        r[diversityDiameterStr] = str(D)
+
+                    if (r[diversityHeightStr] == ''):
+                        rxHeight = float(r[rxHeightStr])
+                        if (rxHeight < 14.0):
+                            r[diversityHeightStr] = str(rxHeight + 11)
+                        else:
+                            r[diversityHeightStr] = str(rxHeight - 11)
+
+                    if (float(r[diversityHeightStr]) < 1.5):
+                        r[diversityHeightStr] = str(1.5)
+                ####################################################################################
 
             for r in csmap[keyv]:
                 numPR = int(r['Num Passive Repeater'])

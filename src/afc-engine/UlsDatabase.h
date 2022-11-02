@@ -41,6 +41,12 @@ struct UlsRecord
 	double rxGain;
 	CConst::AntennaCategoryEnum rxAntennaCategory;
 	double rxAntennaDiameter;
+
+	bool hasDiversity;
+	double diversityGain;
+	double diversityAntennaDiameter;
+	double diversityHeightAboveTerrain;
+
 	std::string status;
 	bool mobile;
 	std::string rxAntennaModel;
@@ -118,6 +124,10 @@ public:
 	int mobileIdx;
 	int rx_ant_modelIdx;
 	int p_rp_numIdx;
+
+	int rx_diversity_height_to_center_raat_mIdx;
+	int rx_diversity_gainIdx;
+	int rx_diversity_antennaDiameterIdx;
 
 	int prSeqIdx;
 	int prTypeIdx;

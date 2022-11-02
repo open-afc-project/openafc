@@ -3636,6 +3636,11 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		// double rxSensitivity;
 		int mobileUnit = -1;
 
+        bool hasDiversity;
+		double diversityHeightAboveTerrain;
+		double diversityGain;
+		double diversityAntennaDiameter;
+
 		AntennaClass *rxAntenna = (AntennaClass *)NULL;
 		AntennaClass *txAntenna = (AntennaClass *)NULL;
 		double fadeMarginDB;
@@ -4538,6 +4543,52 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					/**************************************************************************/
 
 					/**************************************************************************/
+					/* hasDiversity                                                           */
+					/**************************************************************************/
+					hasDiversity = row.hasDiversity;
+					/**************************************************************************/
+
+					if (hasDiversity) {
+						/**********************************************************************/
+						/* diversityHeightAboveTerrain                                        */
+						/**********************************************************************/
+						diversityHeightAboveTerrain = row.diversityHeightAboveTerrain;
+						if (!ignoreFlag) {
+							if (std::isnan(diversityHeightAboveTerrain)) {
+								ignoreFlag = true;
+								reasonIgnored = "missing Rx Diversity Height above Terrain";
+								numIgnoreInvalid++;
+							}
+						}
+
+						if (!ignoreFlag) {
+							if (diversityHeightAboveTerrain < 3.0) {
+								LOGGER_WARN(logger) << "WARNING: ULS data for FSID = " << fsid << ", diversityHeightAboveTerrain = " << diversityHeightAboveTerrain << " is < 3.0";
+							}
+						}
+					    /**********************************************************************/
+
+						/**********************************************************************/
+						/* diversityGain                                                      */
+						/**********************************************************************/
+						diversityGain = row.diversityGain;
+						if (!ignoreFlag) {
+							if (std::isnan(diversityGain)) {
+								ignoreFlag = true;
+								reasonIgnored = "missing Rx Diversity Gain";
+								numIgnoreInvalid++;
+							}
+						}
+						/**********************************************************************/
+
+						/**********************************************************************/
+						/* rxAntennaDiameter                                                  */
+						/**********************************************************************/
+						diversityAntennaDiameter = row.diversityAntennaDiameter;
+						/**********************************************************************/
+					}
+
+					/**************************************************************************/
 					/* fadeMargin                                                             */
 					/**************************************************************************/
 
@@ -4742,6 +4793,14 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setFadeMarginDB(fadeMarginDB);
 				uls->setStatus(status);
 
+				uls->setHasDiversity(hasDiversity);
+				if (hasDiversity) {
+					uls->setDiversityGain(diversityGain);
+
+					double diversityDlambda = diversityAntennaDiameter / lambda;
+					uls->setDiversityDlambda(diversityDlambda);
+				}
+
 				bool mobileRxFlag = ((simulationFlag == CConst::MobileSimulation) && (mobileUnit == 0));
 				bool mobileTxFlag = ((simulationFlag == CConst::MobileSimulation) && (mobileUnit == 1));
 
@@ -4775,7 +4834,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				CConst::HeightSourceEnum rxHeightSource;
 				CConst::HeightSourceEnum txHeightSource;
 				CConst::HeightSourceEnum prHeightSource;
-				Vector3 rxPosition, txPosition, prPosition;
+				Vector3 rxPosition, txPosition, prPosition, diversityPosition;
 				if (!mobileRxFlag)
 				{
 					if ((_terrainDataModel))
@@ -4798,6 +4857,17 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 					rxPosition = EcefModel::geodeticToEcef(rxLatitudeDeg, rxLongitudeDeg, rxHeight / 1000.0);
 					uls->setRxPosition(rxPosition);
+
+					if (hasDiversity) {
+						double diversityHeight = diversityHeightAboveTerrain + terrainHeight;
+						uls->setDiversityHeightAboveTerrain(diversityHeightAboveTerrain);
+						uls->setDiversityHeightAMSL(diversityHeight);
+
+						diversityPosition = EcefModel::geodeticToEcef(rxLatitudeDeg, rxLongitudeDeg, diversityHeight / 1000.0);
+						uls->setDiversityPosition(diversityPosition);
+
+					}
+
 				}
 
 				if ((!mobileTxFlag) && (!randPointingFlag))
@@ -4880,6 +4950,10 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 							if (prIdx == numPR) {
 								uls->setAntennaPointing(pointing); // Pointing of Rx antenna
 								uls->setLinkDistance(segDist);
+								if (hasDiversity) {
+                            		pointing = (segTxPosn - diversityPosition).normalized();
+									uls->setAntennaPointing(pointing); // Pointing of Rx Diversity antenna
+								}
 							} else {
 								uls->getPR(prIdx).pointing = pointing; // Pointing of Passive Receiver
 								uls->getPR(prIdx).segmentDistance = segDist;
@@ -4887,18 +4961,51 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 						}
 
 						/******************************************************************/
-						/* Calculate reflector coordinate system                          */
+						/* Calculate PR parameters:                                       */
+						/*     Orthonormal basis                                          */
+						/*     thetaIN                                                    */
+						/*     alphaAZ                                                    */
+						/*     alphaEL                                                    */
 						/******************************************************************/
-					    for(prIdx=0; prIdx<numPR; ++prIdx) {
+					    for(prIdx=numPR-1; prIdx>=0; prIdx--) {
 						    PRClass& pr = uls->getPR(prIdx);
-                            if (pr.type == CConst::billboardReflectorPRType) {
+							double nextSegDist = ((prIdx == numPR-1) ? uls->getLinkDistance() : uls->getPR(prIdx+1).segmentDistance);
+							double nextSegFSPL = 20.0 * log((4 * M_PI * centerFreq * nextSegDist) / CConst::c) / log(10.0);
+                            if (pr.type == CConst::backToBackAntennaPRType) {
+                                pr.pathSegGain = pr.rxGain + pr.txGain - nextSegFSPL;
+                            } else if (pr.type == CConst::billboardReflectorPRType) {
                                 Vector3 pointingA = pr.pointing;
                                 Vector3 pointingB = -(prIdx == numPR-1 ? uls->getAntennaPointing() : uls->getPR(prIdx+1).pointing);
                                 pr.reflectorZ = (pointingA + pointingB).normalized();              // Perpendicular to reflector surface
 								Vector3 upVec = pr.position.normalized();
 								pr.reflectorX = (upVec.cross(pr.reflectorZ)).normalized();         // Horizontal
 								pr.reflectorY = (pr.reflectorZ.cross(pr.reflectorX)).normalized();
+
+								double Ax = pointingA.dot(pr.reflectorX);
+								double Ay = pointingA.dot(pr.reflectorY);
+								double Az = pointingA.dot(pr.reflectorZ);
+
+                                double alphaAZ = (180.0/M_PI)*fabs(atan(Ax/Az));
+                                double alphaEL = (180.0/M_PI)*fabs(atan(Ay/Az));
+
+                                double cosThetaIN = pointingA.dot(pr.reflectorZ);
+
+								if (alphaEL <= alphaAZ) {
+									pr.reflectorSLambda = pr.reflectorWidthLambda*cosThetaIN;
+								} else {
+									pr.reflectorSLambda = pr.reflectorHeightLambda*cosThetaIN;
+								}
+								pr.reflectorTheta1 = (180.0/M_PI)*asin(1.0/(2*pr.reflectorSLambda));
+								double Ks = 4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN*lambda/(M_PI*nextSegDist);
+								double alpha_n = 20*log10(M_PI*Ks/4);
+
+								if (Ks <= 0.4) {
+									pr.pathSegGain = std::min(3.0,alpha_n);
+								} else {
+									// Need to calculate alpha_NF
+								}
                             }
+							pr.effectiveGain = (prIdx == numPR-1 ? 0 : uls->getPR(prIdx+1).effectiveGain) + pr.pathSegGain;
                         }
 						/******************************************************************/
 
@@ -6612,7 +6719,11 @@ void AfcManager::runPointAnalysis()
 				"FS_RX_TERRAIN_HEIGHT (m)",
 				"FS_RX_TERRAIN_SOURCE",
 				"FS_RX_PROP_ENV",
-				"FS_HAS_PASSIVE_REPEATER",
+				"NUM_PASSIVE_REPEATER",
+				"IS_DIVERSITY_LINK",
+				"SEGMENT_IDX",
+				"SEGMENT_RX_LONGITUDE (deg)",
+				"SEGMENT_RX_LATITUDE (deg)",
 				"RLAN_LONGITUDE (deg)",
 				"RLAN_LATITUDE (deg)",
 				"RLAN_HEIGHT_ABOVE_TERRAIN (m)",
@@ -6648,6 +6759,9 @@ void AfcManager::runPointAnalysis()
 				"FS_ANT_TYPE",
 				"FS_ANT_CATEGORY",
 				"FS_ANT_GAIN_PEAK (dB)",
+				"PR_TYPE (dB)",
+				"PR_EFFECTIVE_GAIN (dB)",
+				"PR_DISCRIMINATION_GAIN (dB)",
 				"FS_ANT_GAIN_TO_RLAN (dB)",
 				"RX_SPECTRAL_OVERLAP_LOSS (dB)",
 				"POLARIZATION_LOSS (dB)",
@@ -7232,13 +7346,13 @@ void AfcManager::runPointAnalysis()
 		if (uls->getLinkDistance() > 0.0) {
 
 			int numPR = uls->getNumPR();
+			int numDiversity = (uls->getHasDiversity() ? 2 : 1);
 
 			for(int segIdx=0; segIdx<numPR+1; ++segIdx) {
-				Vector3 ulsRxPos = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).position);
+			for(int divIdx=0; divIdx<numDiversity; ++divIdx) {
+				Vector3 ulsRxPos = (segIdx == numPR ? (divIdx == 0 ? uls->getRxPosition() : uls->getDiversityPosition()) : uls->getPR(segIdx).position);
 				double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
 				double ulsRxLatitude = (segIdx == numPR ? uls->getRxLatitudeDeg() : uls->getPR(segIdx).latitudeDeg);
-				double ulsRxHeight = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSL);
-
 
 				Vector3 lineOfSightVectorKm = ulsRxPos - _rlanRegion->getCenterPosn();
 				double distKmSquared = (lineOfSightVectorKm).dot(lineOfSightVectorKm);
@@ -7257,8 +7371,8 @@ void AfcManager::runPointAnalysis()
 
 					_ulsIdxList.push_back(ulsIdx); // Store the ULS indices that are used in analysis
 
-					double ulsRxHeightAGL  = (segIdx == numPR ? uls->getRxHeightAboveTerrain() : uls->getPR(segIdx).heightAboveTerrain);
-					double ulsRxHeightAMSL = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSL);
+					double ulsRxHeightAGL  = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain()) : uls->getPR(segIdx).heightAboveTerrain);
+					double ulsRxHeightAMSL = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAMSL() : uls->getDiversityHeightAMSL()) : uls->getPR(segIdx).heightAMSL);
 
 					/**************************************************************************************/
 					/* Determine propagation environment of FS segment RX, if needed.                     */
@@ -7506,10 +7620,10 @@ void AfcManager::runPointAnalysis()
 #endif
 														);
 
-												Vector3 ulsAntennaPointing = (segIdx == numPR ? uls->getAntennaPointing() : uls->getPR(segIdx).pointing);
+												Vector3 ulsAntennaPointing = (segIdx == numPR ? (divIdx == 0 ? uls->getAntennaPointing() : uls->getDiversityAntennaPointing()) : uls->getPR(segIdx).pointing);
 												angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
 												if (segIdx == numPR) {
-													rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
+													rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, divIdx);
 												} else {
 													discriminationGain = uls->getPR(segIdx).computeDiscriminationGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
 													rxGainDB = uls->getPR(segIdx).effectiveGain - discriminationGain;
@@ -7614,7 +7728,9 @@ void AfcManager::runPointAnalysis()
 												msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2)
 													<< QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
 													<< QString(ulsRxPropEnv);
-												msg << QString::number(uls->getNumPR() ? 1 : 0);
+												msg << QString::number(uls->getNumPR());
+												msg << QString::number(divIdx);
+												msg << QString::number(segIdx) << QString::number(ulsRxLongitude, 'f', 5) << QString::number(ulsRxLatitude, 'f', 5);
 												msg << QString::number(rlanCoord.longitudeDeg, 'f', 5) << QString::number(rlanCoord.latitudeDeg, 'f', 5);
 												msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2)
 													<< QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource))
@@ -7631,6 +7747,15 @@ void AfcManager::runPointAnalysis()
 													<< QString::number(uls->getStartUseFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopUseFreq() * 1.0e-6, 'f', 2);
 		
 												msg << QString::fromStdString(rxAntennaTypeStr) << QString::fromStdString(rxAntennaCategoryStr) << QString::number(uls->getRxGain(), 'f', 3);
+
+												if (segIdx == numPR) {
+													msg << QString("") << QString("") << QString("");
+												} else {
+													msg << CConst::strPRTypeList->type_to_str(uls->getPR(segIdx).type);
+													msg << QString::number(uls->getPR(segIdx).effectiveGain, 'f', 3);
+													msg << QString::number(discriminationGain, 'f', 3);
+												}
+
 												msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
 												msg << QString::number(_polarizationLossDB, 'f', 3);
 												msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
@@ -7733,6 +7858,7 @@ void AfcManager::runPointAnalysis()
 						LOGGER_DEBUG(logger) << "ID: " << uls->getID() << ", distKm: " << sqrt(distKmSquared) << ", link: " << uls->getLinkDistance() << ",";
 #        		   endif
 				}
+			}
 			}
 		}
 
@@ -8634,7 +8760,7 @@ void AfcManager::runScanAnalysis()
 
 								std::string rxAntennaSubModelStr;
 								double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-								double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
+								double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, 0);
 
 								double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
@@ -9192,7 +9318,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 
 		std::string rxAntennaSubModelStr;
 		double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-		double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
+		double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, 0);
 
 		double rxPowerDBW = (_exclusionZoneRLANEIRPDBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
@@ -9723,7 +9849,7 @@ void AfcManager::runHeatmapAnalysis()
 
 							std::string rxAntennaSubModelStr;
 							double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-							double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr);
+							double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, 0);
 
 							double rxPowerDBW = (rlanEIRP - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
