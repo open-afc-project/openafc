@@ -54,19 +54,19 @@ public:
 	double reflectorHeightLambda;
 	double reflectorWidthLambda;
 
-    // Reflector 3D coordinate system:
+	// Reflector 3D coordinate system:
 	// X: horizontal vector on reflector surface in direction of width
 	// Y: vector on reflector surface in direction of height.  Note that when reflector is tilted, this is not vertical relative to the ground.
 	// X: vector perpendicular to reflector surface
 	// X, Y, Z are orthonormal basis
 	Vector3 reflectorX, reflectorY, reflectorZ;
 
-    // double reflectorThetaIN;  // Inclusion angle between incident and reflected waves at reflector is 2*thetaIN
-    // double reflectorAlphaEL;  // Inclusion angle in elevation plane is 2*alphaEL (relative to reflector orthonormal basis)
-    // double reflectorAlphaAZ;  // Inclusion angle in azimuthal plane is 2*alphaAZ (relative to reflector orthonormal basis)
+	// double reflectorThetaIN;  // Inclusion angle between incident and reflected waves at reflector is 2*thetaIN
+	// double reflectorAlphaEL;  // Inclusion angle in elevation plane is 2*alphaEL (relative to reflector orthonormal basis)
+	// double reflectorAlphaAZ;  // Inclusion angle in azimuthal plane is 2*alphaAZ (relative to reflector orthonormal basis)
 
-    double reflectorSLambda;    // (s/lambda) used in calculation of discrimination gain
-    double reflectorTheta1;     // Theta1 used in calculation of discrimination gain
+	double reflectorSLambda;    // (s/lambda) used in calculation of discrimination gain
+	double reflectorTheta1;     // Theta1 used in calculation of discrimination gain
 };
 /******************************************************************************************/
 
@@ -121,6 +121,9 @@ public:
 	double getNoiseLevelDBW();
 	double getRxGain();
 	double getRxDlambda();
+	double getRxNearFieldAntDiameter();
+	double getRxNearFieldDistLimit();
+	double getRxNearFieldAntEfficiency();
 	CConst::AntennaCategoryEnum getRxAntennaCategory();
 	double getRxAntennaFeederLossDB();
 	double getFadeMarginDB();
@@ -188,6 +191,9 @@ public:
 	void setNoiseLevelDBW(double noiseLevelDBWVal);
 	void setRxGain(double rxGainVal);
 	void setRxDlambda(double rxDlambdaVal);
+	void setRxNearFieldAntDiameter(double rxNearFieldAntDiameterVal);
+	void setRxNearFieldDistLimit(double rxNearFieldDistLimitVal);
+	void setRxNearFieldAntEfficiency(double rxNearFieldAntEfficiencyVal);
 	void setRxAntennaCategory(CConst::AntennaCategoryEnum rxAntennaCategoryVal);
 	void setRxAntennaFeederLossDB(double rxAntennaFeederLossDBVal);
 	void setFadeMarginDB(double fadeMarginDBVal);
@@ -281,6 +287,9 @@ private:
 	bool txTerrainHeightFlag;
 	double noiseLevelDBW;
 	double txGain, rxGain, rxDlambda;
+	double rxNearFieldAntDiameter;
+	double rxNearFieldDistLimit;
+	double rxNearFieldAntEfficiency;
 	CConst::AntennaCategoryEnum rxAntennaCategory;
 	double txEIRP;
 	double linkDistance;

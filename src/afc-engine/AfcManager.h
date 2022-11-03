@@ -41,6 +41,7 @@
 #include "UlsDatabase.h"
 #include "uls.h"
 #include "UlsMeasurementAnalysis.h"
+#include "nfa.h"
 #include "terrain.h"
 #include "CachedGdal.h"
 // Loggers
@@ -405,7 +406,7 @@ class AfcManager
 		double _maxRadius;                      // Max link distance to consider, links longer are ignored
 		double _exclusionDist;                  // Min link distance to consider, links shorter are ignored
 
-		bool _nearFieldLossFlag;                // If set compute near field loss, otherwise near field loss is 0
+		bool _nearFieldAdjFlag;                 // If set compute near field loss, otherwise near field loss is 0
 		double _illuminationEfficiency;         // Illumination Efficiency value to use for near field loss calculation",
 		bool _closeInHgtFlag;                   // Whether or not to force LOS when mobile height above closeInHgtLOS for close in model",
 		double _closeInHgtLOS;                  // RLAN height above which prob of LOS = 100% for close in model",
@@ -497,6 +498,8 @@ class AfcManager
 		RlanRegionClass *_rlanRegion;            // RLAN Uncertainty Region
 
 		ITUDataClass *_ituData;
+		NFAClass *_nfa;
+		std::string _nfaTableFile;               // File containing near field adjustment tabular data described in R2-AIP-17
 		/**************************************************************************************/
 
 		/**************************************************************************************/

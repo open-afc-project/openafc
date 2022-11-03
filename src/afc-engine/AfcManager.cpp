@@ -42,7 +42,7 @@ QString ISO8601TimeUTC(const int &dayStep = 0)
 	ptm = gmtime(&rawtime);
 
 	// "yyyy-mm-ddThh:mm:ssZ"
-	std::string result = 
+	std::string result =
 		padStringFront(std::to_string(ptm->tm_year+1900), '0', 4) + "-" +
 		padStringFront(std::to_string(1 + ptm->tm_mon), '0', 2) + "-" +
 		padStringFront(std::to_string(ptm->tm_mday), '0', 2) + "T" +
@@ -95,7 +95,7 @@ namespace
 	}
 
 	/**
-	 * Encapsulates a XML writer to a file 
+	 * Encapsulates a XML writer to a file
 	 * All fields are NULL if filename parameter in constructor is not a valid path.
 	 */
 	class ZXmlWriter
@@ -249,6 +249,8 @@ AfcManager::AfcManager()
 	_createKmz = false;
 	_createDebugFiles = false;
 	_mapDataGeoJsonFile = "";
+
+	_nfa = (NFAClass *) NULL;
 }
 
 /******************************************************************************************/
@@ -543,6 +545,14 @@ void AfcManager::initializeDatabases()
 	/**************************************************************************************/
 
 	/**************************************************************************************/
+	/* Read Near Field Adjustment table                                                   */
+	/**************************************************************************************/
+	if (_nearFieldAdjFlag) {
+		_nfa = new NFAClass(_nfaTableFile);
+	}
+	/**************************************************************************************/
+
+	/**************************************************************************************/
 	/* Read Population data                                                               */
 	/**************************************************************************************/
 	if (_propagationEnviro.toStdString() == "Population Density Map") {
@@ -621,6 +631,11 @@ void AfcManager::clearData()
 		_heatmapNumPtsLon = 0;
 		_heatmapNumPtsLat = 0;
 	}
+
+	if (_nearFieldAdjFlag) {
+		delete _nfa;
+		_nfa = (NFAClass *) NULL;
+	}
 }
 /******************************************************************************************/
 
@@ -676,7 +691,7 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	}
 
 	// Print entirety of imported JSON file to debug log
-	LOGGER_DEBUG(logger) << "Contents of imported JSON file: " << std::endl << 
+	LOGGER_DEBUG(logger) << "Contents of imported JSON file: " << std::endl <<
 		jsonDoc.toJson().toStdString() << std::endl;
 
 	// Read JSON from file
@@ -1307,9 +1322,9 @@ void AfcManager::importGUIjsonVersion1_3(const QJsonObject &jsonObj)
 				for (const QJsonValue& chanIdx : inquiredChannelsObj["channelCfi"].toArray())
 					chanClass.second.push_back(chanIdx.toInt());
 			}
-			LOGGER_INFO(logger) 
+			LOGGER_INFO(logger)
 				<< (chanClass.second.empty() ? "ALL" : std::to_string(chanClass.second.size()))
-				<< " channels requested in operating class " 
+				<< " channels requested in operating class "
 				<< chanClass.first;
 			// TODO: are we handling the case where they want all?
 
@@ -1320,7 +1335,7 @@ void AfcManager::importGUIjsonVersion1_3(const QJsonObject &jsonObj)
 		for(auto inquiredFrequencyRangeVal : inquiredFrequencyRangeArray) {
 			auto inquiredFrequencyRangeObj = inquiredFrequencyRangeVal.toObject();
 			_inquiredFrquencyRangesMHz.push_back(std::make_pair(
-						inquiredFrequencyRangeObj["lowFrequency"].toInt(), 
+						inquiredFrequencyRangeObj["lowFrequency"].toInt(),
 						inquiredFrequencyRangeObj["highFrequency"].toInt()));
 		}
 		LOGGER_INFO(logger) << inquiredFrequencyRangeArray.size() << " frequency range(s) requested";
@@ -1467,9 +1482,9 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 						chanClass.second.push_back(chanIdx.toInt());
 
 				}
-				LOGGER_INFO(logger) 
+				LOGGER_INFO(logger)
 					<< (chanClass.second.empty() ? "ALL" : std::to_string(chanClass.second.size()))
-					<< " channels requested in operating class " 
+					<< " channels requested in operating class "
 					<< chanClass.first;
 				// TODO: are we handling the case where they want all?
 
@@ -1477,7 +1492,7 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 			}
 			LOGGER_INFO(logger) << _inquiredChannels.size() << " operating class(es) requested";
 			validRequestType = true;
-		} 
+		}
 
 		if (jsonObj.contains("inquiredFrequencyRange") && !jsonObj["inquiredFrequencyRange"].isUndefined())
 		{
@@ -1485,7 +1500,7 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 			{
 				auto freqRange = freqRangeVal.toObject();
 				_inquiredFrquencyRangesMHz.push_back(std::make_pair(
-							freqRange["lowFrequency"].toInt(), 
+							freqRange["lowFrequency"].toInt(),
 							freqRange["highFrequency"].toInt()));
 			}
 			LOGGER_INFO(logger) << _inquiredFrquencyRangesMHz.size() << " frequency range(s) requested";
@@ -1530,7 +1545,7 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 
 		// set defaults for unused values
 		_rlanOrientation_deg = 0.0; // Orientation (deg) of ellipse clockwise from North
-	} 
+	}
 	else if (_analysisType == "HeatmapAnalysis")
 	{
 		_heatmapRLANBWHz = jsonObj["bandwidth"].toDouble() * 1.0e6;
@@ -1544,9 +1559,9 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 
 		// lat (deg), lon (deg), height (m) [height is specified differently]
 		_rlanLLA = std::make_tuple(
-				(_heatmapMaxLat + _heatmapMinLat) / 2, 
-				(_heatmapMaxLon + _heatmapMinLon) / 2, 
-				std::numeric_limits<double>::quiet_NaN()); 
+				(_heatmapMaxLat + _heatmapMinLat) / 2,
+				(_heatmapMaxLon + _heatmapMinLon) / 2,
+				std::numeric_limits<double>::quiet_NaN());
 
 		_heatmapRLANBWHz = jsonObj["bandwidth"].toDouble() * 1.0e6;
 		_heatmapRLANChanIdx = 0;
@@ -1819,7 +1834,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	}
 
 	// ***********************************
-	// 
+	//
 	// ***********************************
 	if (jsonObj.contains("scanPointBelowGroundMethod") && !jsonObj["scanPointBelowGroundMethod"].isUndefined()) {
 		std::string scanPointBelowGroundMethodStr = jsonObj["scanPointBelowGroundMethod"].toString().toStdString();
@@ -1840,7 +1855,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	_itmPolarization = jsonObj["ITMParameters"].toObject()["polarization"].toString().toStdString() == "Vertical";
 
 	// ***********************************
-	// More ITM parameters 
+	// More ITM parameters
 	// ***********************************
 	_itmMinSpacing = jsonObj["ITMParameters"].toObject()["minSpacing"].toDouble();
 	_itmMaxNumPts = jsonObj["ITMParameters"].toObject()["maxPoints"].toInt();
@@ -1908,7 +1923,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 	_rasDataFile = _stateRoot + "/RAS_Database/" + jsonObj["rasDatabase"].toString().toStdString();
 
-    double cfgMinEIRP;
+	double cfgMinEIRP;
 	if (jsonObj.contains("minEIRP") && !jsonObj["minEIRP"].isUndefined()) {
 		cfgMinEIRP = jsonObj["minEIRP"].toDouble();
 	} else {
@@ -1919,7 +1934,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_minEIRP_dBm = cfgMinEIRP;
 	} else if (cfgMinEIRP > _minEIRP_dBm) {
 		_minEIRP_dBm = cfgMinEIRP;
-    }
+	}
 	_maxEIRP_dBm = jsonObj["maxEIRP"].toDouble();
 
 	if (jsonObj.contains("minPSD") && !jsonObj["minPSD"].isUndefined()) {
@@ -1937,7 +1952,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	_propagationEnviro = jsonObj["propagationEnv"].toString();
 
 	// ***********************************
-	// Feeder loss parameters 
+	// Feeder loss parameters
 	// ***********************************
 	_rxFeederLossDBUNII5 = jsonObj["receiverFeederLoss"].toObject()["UNII5"].toDouble();
 	_rxFeederLossDBUNII7 = jsonObj["receiverFeederLoss"].toObject()["UNII7"].toDouble();
@@ -1945,7 +1960,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	// ***********************************
 
 	// ***********************************
-	// Noise Figure parameters 
+	// Noise Figure parameters
 	// ***********************************
 	auto ulsRecieverNoise = jsonObj["fsReceiverNoise"].toObject();
 
@@ -2200,6 +2215,19 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	} else {
 		_allowScanPtsInUncRegFlag = false;
 	}
+
+	// ***********************************
+	// If this flag is set, FS RX antenna will have near field adjustment applied to antenna gain
+	// ***********************************
+	if (jsonObj.contains("nearFieldAdjFlag") && !jsonObj["nearFieldAdjFlag"].isUndefined()) {
+		_nearFieldAdjFlag = jsonObj["nearFieldAdjFlag"].toBool();
+	} else {
+		_nearFieldAdjFlag = true;
+	}
+
+	if (_nearFieldAdjFlag) {
+		_nfaTableFile = SearchPaths::forReading("data", "fbrat/rat_transfer/nfa/nfa_table_data.csv", true).toStdString();
+	}
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -2273,7 +2301,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 	for (auto freqRange : psdFreqRangeList) {
 		for (int i = 0; i < (int) freqRange.psd_dBm_MHzList.size(); i++) {
 			if ( !std::isnan(freqRange.psd_dBm_MHzList.at(i)) ) {
-				spectrumInfos.append(QJsonObject 
+				spectrumInfos.append(QJsonObject
 						{
 						{ "frequencyRange", QJsonObject
 						{
@@ -2381,17 +2409,17 @@ QJsonDocument AfcManager::generateRatAfcJson()
 		availableSpectrumInquiryResponse.insert("availableChannelInfo", channelInfos);
 	}
 	if (spectrumInfos.size()) {
-		availableSpectrumInquiryResponse.insert("availableFrequencyInfo", spectrumInfos); 
+		availableSpectrumInquiryResponse.insert("availableFrequencyInfo", spectrumInfos);
 	}
 	if (_responseCode == CConst::successResponseCode) {
 		availableSpectrumInquiryResponse.insert("availabilityExpireTime", ISO8601TimeUTC(1));
 	}
 	availableSpectrumInquiryResponse.insert("response", responseObj);
 
-	QJsonObject responses { 
+	QJsonObject responses {
 		{ "version", _guiJsonVersion },
-			{ "availableSpectrumInquiryResponses", 
-				QJsonArray 
+			{ "availableSpectrumInquiryResponses",
+				QJsonArray
 				{
 					availableSpectrumInquiryResponse
 				}
@@ -2698,7 +2726,7 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string&
 		// LOGGER_DEBUG(logger) << "PAWS response saved to the following JSON file: " << outputAnalysisFile.fileName().toStdString();
 		// return; // Short circuit since export is complete now
 	}
-	else if (_analysisType == "AP-AFC") 
+	else if (_analysisType == "AP-AFC")
 	{
 		// temporarily return PAWS until we write new generator function
 		//outputDocument = QJsonDocument(jsonSpectrumData(_rlanBWList, _numChan, _channelData, _deviceDesc, _wlanMinFreq));
@@ -2878,7 +2906,7 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 	QJsonDocument geoJsonDoc = QJsonDocument::fromJson(QString::fromStdString(geoJsonCollection).toUtf8());
 	QJsonObject geoJsonObj = geoJsonDoc.object();
 
-	QJsonObject analysisJsonObj = 
+	QJsonObject analysisJsonObj =
 	{
 		{"geoJson", geoJsonObj}
 	};
@@ -2999,7 +3027,7 @@ QJsonObject jsonSpectrumData(const std::vector<ChannelStruct> &channelList, cons
 				break;
 			}
 		}
-		if (!found) 
+		if (!found)
 		{
 			auto newPair = std::make_pair(channel.bandwidth(), std::vector<ChannelStruct> { channel });
 			rlanBWList.push_back(newPair);
@@ -3627,6 +3655,9 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		double txHeightAboveTerrain;
 		double rxGain;
 		double rxAntennaDiameter;
+		double rxNearFieldAntDiameter;
+		double rxNearFieldDistLimit;
+		double rxNearFieldAntEfficiency;
 		CConst::AntennaCategoryEnum rxAntennaCategory;
 		double txGain;
 		double txEIRP;
@@ -3636,7 +3667,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		// double rxSensitivity;
 		int mobileUnit = -1;
 
-        bool hasDiversity;
+		bool hasDiversity;
 		double diversityHeightAboveTerrain;
 		double diversityGain;
 		double diversityAntennaDiameter;
@@ -4322,7 +4353,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/* Passive Repeater Parameters                                            */
 			/**************************************************************************/
 			if ( (!_filterSimRegionOnly) && (!ignoreFlag) ) {
-			    for(prIdx=0; prIdx<numPR; ++prIdx) {
+				for(prIdx=0; prIdx<numPR; ++prIdx) {
 
 					/******************************************************************/
 					/* prLongitudeDeg                                                 */
@@ -4504,6 +4535,24 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					/**************************************************************************/
 
 					/**************************************************************************/
+					/* rxNearFieldAntDiameter;                                                */
+					/**************************************************************************/
+					rxNearFieldAntDiameter = row.rxNearFieldAntDiameter;
+					/**************************************************************************/
+
+					/**************************************************************************/
+					/* rxNearFieldDistLimit;                                                  */
+					/**************************************************************************/
+					rxNearFieldDistLimit = row.rxNearFieldDistLimit;
+					/**************************************************************************/
+
+					/**************************************************************************/
+					/* rxNearFieldAntEfficiency;                                              */
+					/**************************************************************************/
+					rxNearFieldAntEfficiency = row.rxNearFieldAntEfficiency;
+					/**************************************************************************/
+
+					/**************************************************************************/
 					/* rxAntennaCategory                                                      */
 					/**************************************************************************/
 					rxAntennaCategory = row.rxAntennaCategory;
@@ -4566,7 +4615,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								LOGGER_WARN(logger) << "WARNING: ULS data for FSID = " << fsid << ", diversityHeightAboveTerrain = " << diversityHeightAboveTerrain << " is < 3.0";
 							}
 						}
-					    /**********************************************************************/
+						/**********************************************************************/
 
 						/**********************************************************************/
 						/* diversityGain                                                      */
@@ -4780,6 +4829,9 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setTxLongitudeDeg(txLongitudeDeg);
 				uls->setRxGain(rxGain);
 				uls->setRxDlambda(rxDlambda);
+				uls->setRxNearFieldAntDiameter(rxNearFieldAntDiameter);
+				uls->setRxNearFieldDistLimit(rxNearFieldDistLimit);
+				uls->setRxNearFieldAntEfficiency(rxNearFieldAntEfficiency);
 				uls->setRxAntennaModel(row.rxAntennaModel);
 				uls->setRxAntennaType(rxAntennaType);
 				uls->setTxAntennaType(txAntennaType);
@@ -4941,17 +4993,17 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 				if ((!mobileRxFlag) && (!mobileTxFlag)) {
 					if (!randPointingFlag) {
-					    for(prIdx=0; prIdx<=numPR; ++prIdx) {
+						for(prIdx=0; prIdx<=numPR; ++prIdx) {
 							Vector3 segTxPosn = (prIdx == 0 ? txPosition : uls->getPR(prIdx-1).position);
 							Vector3 segRxPosn = (prIdx == numPR ? rxPosition : uls->getPR(prIdx).position);
-                            Vector3 pointing = (segTxPosn - segRxPosn).normalized();
-                            double segDist = (segTxPosn - segRxPosn).len() * 1000.0;
+							Vector3 pointing = (segTxPosn - segRxPosn).normalized();
+							double segDist = (segTxPosn - segRxPosn).len() * 1000.0;
 
 							if (prIdx == numPR) {
 								uls->setAntennaPointing(pointing); // Pointing of Rx antenna
 								uls->setLinkDistance(segDist);
 								if (hasDiversity) {
-                            		pointing = (segTxPosn - diversityPosition).normalized();
+									pointing = (segTxPosn - diversityPosition).normalized();
 									uls->setAntennaPointing(pointing); // Pointing of Rx Diversity antenna
 								}
 							} else {
@@ -4967,16 +5019,16 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 						/*     alphaAZ                                                    */
 						/*     alphaEL                                                    */
 						/******************************************************************/
-					    for(prIdx=numPR-1; prIdx>=0; prIdx--) {
-						    PRClass& pr = uls->getPR(prIdx);
+						for(prIdx=numPR-1; prIdx>=0; prIdx--) {
+							PRClass& pr = uls->getPR(prIdx);
 							double nextSegDist = ((prIdx == numPR-1) ? uls->getLinkDistance() : uls->getPR(prIdx+1).segmentDistance);
 							double nextSegFSPL = 20.0 * log((4 * M_PI * centerFreq * nextSegDist) / CConst::c) / log(10.0);
-                            if (pr.type == CConst::backToBackAntennaPRType) {
-                                pr.pathSegGain = pr.rxGain + pr.txGain - nextSegFSPL;
-                            } else if (pr.type == CConst::billboardReflectorPRType) {
-                                Vector3 pointingA = pr.pointing;
-                                Vector3 pointingB = -(prIdx == numPR-1 ? uls->getAntennaPointing() : uls->getPR(prIdx+1).pointing);
-                                pr.reflectorZ = (pointingA + pointingB).normalized();              // Perpendicular to reflector surface
+							if (pr.type == CConst::backToBackAntennaPRType) {
+								pr.pathSegGain = pr.rxGain + pr.txGain - nextSegFSPL;
+							} else if (pr.type == CConst::billboardReflectorPRType) {
+								Vector3 pointingA = pr.pointing;
+								Vector3 pointingB = -(prIdx == numPR-1 ? uls->getAntennaPointing() : uls->getPR(prIdx+1).pointing);
+								pr.reflectorZ = (pointingA + pointingB).normalized();              // Perpendicular to reflector surface
 								Vector3 upVec = pr.position.normalized();
 								pr.reflectorX = (upVec.cross(pr.reflectorZ)).normalized();         // Horizontal
 								pr.reflectorY = (pr.reflectorZ.cross(pr.reflectorX)).normalized();
@@ -4985,10 +5037,10 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								double Ay = pointingA.dot(pr.reflectorY);
 								double Az = pointingA.dot(pr.reflectorZ);
 
-                                double alphaAZ = (180.0/M_PI)*fabs(atan(Ax/Az));
-                                double alphaEL = (180.0/M_PI)*fabs(atan(Ay/Az));
+								double alphaAZ = (180.0/M_PI)*fabs(atan(Ax/Az));
+								double alphaEL = (180.0/M_PI)*fabs(atan(Ay/Az));
 
-                                double cosThetaIN = pointingA.dot(pr.reflectorZ);
+								double cosThetaIN = pointingA.dot(pr.reflectorZ);
 
 								if (alphaEL <= alphaAZ) {
 									pr.reflectorSLambda = pr.reflectorWidthLambda*cosThetaIN;
@@ -5004,9 +5056,9 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								} else {
 									// Need to calculate alpha_NF
 								}
-                            }
+							}
 							pr.effectiveGain = (prIdx == numPR-1 ? 0 : uls->getPR(prIdx+1).effectiveGain) + pr.pathSegGain;
-                        }
+						}
 						/******************************************************************/
 
 					} else {
@@ -5405,17 +5457,17 @@ void AfcManager::fixFSTerrain()
 			PRClass& pr = uls->getPR(prIdx);
 
 			if (!pr.terrainHeightFlag) {
-			    _terrainDataModel->getTerrainHeight(pr.longitudeDeg, pr.latitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, heightSource);
-			    updateFlag = true;
-			    pr.terrainHeightFlag = true;
+				_terrainDataModel->getTerrainHeight(pr.longitudeDeg, pr.latitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, heightSource);
+				updateFlag = true;
+				pr.terrainHeightFlag = true;
 
-			    double prHeight = pr.heightAboveTerrain + terrainHeight;
-			    Vector3 prPosition = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, prHeight / 1000.0);
-			    pr.position = prPosition;
-			    pr.terrainHeight = terrainHeight;
-			    pr.heightAMSL = prHeight;
-			    pr.heightSource = heightSource;
-		    }
+				double prHeight = pr.heightAboveTerrain + terrainHeight;
+				Vector3 prPosition = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, prHeight / 1000.0);
+				pr.position = prPosition;
+				pr.terrainHeight = terrainHeight;
+				pr.heightAMSL = prHeight;
+				pr.heightSource = heightSource;
+			}
 		}
 
 		if (updateFlag) {
@@ -5599,8 +5651,8 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 						_terrainDataModel->getTerrainHeight(txLongitudeDeg, txLatitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, txHeightSource);
 						_terrainDataModel->getTerrainHeight(rxLongitudeDeg, rxLatitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, rxHeightSource);
 
-						bool reqTx = (_winner2LOSOption == CConst::BldgDataReqTxLOSOption) || (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption);  
-						bool reqRx = (_winner2LOSOption == CConst::BldgDataReqRxLOSOption) || (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption);  
+						bool reqTx = (_winner2LOSOption == CConst::BldgDataReqTxLOSOption) || (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption);
+						bool reqRx = (_winner2LOSOption == CConst::BldgDataReqRxLOSOption) || (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption);
 
 						if (    ((!reqTx) || (txHeightSource == CConst::lidarHeightSource))
 								&& ((!reqRx) || (rxHeightSource == CConst::lidarHeightSource)) ) {
@@ -5653,7 +5705,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 				/******************************************************************************************/
 				double u = _confidenceITM;
 
-				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
+				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
 						true,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
@@ -5674,7 +5726,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 			}
 			double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
 			double u = _confidenceITM;
-			pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
+			pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
 					true,
 					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
@@ -5774,7 +5826,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 				/******************************************************************************************/
 				double u = _confidenceITM;
 
-				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
+				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
@@ -5824,7 +5876,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 			}
 			double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
 			double u = _confidenceITM;
-			pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
+			pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
 					false,
 					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
@@ -5947,7 +5999,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 				}
 				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
 				double u = _confidenceITM;
-				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
+				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
@@ -5989,7 +6041,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 					radioClimate = radioClimateTmp;
 				}
 				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
-				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel, 
+				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
@@ -6763,6 +6815,7 @@ void AfcManager::runPointAnalysis()
 				"PR_EFFECTIVE_GAIN (dB)",
 				"PR_DISCRIMINATION_GAIN (dB)",
 				"FS_ANT_GAIN_TO_RLAN (dB)",
+				"FS_ANT_NEAR_FIELD_OFFSET (dB)",
 				"RX_SPECTRAL_OVERLAP_LOSS (dB)",
 				"POLARIZATION_LOSS (dB)",
 				"FS_RX_FEEDER_LOSS (dB)",
@@ -7422,9 +7475,9 @@ void AfcManager::runPointAnalysis()
 							}
 							double minHeight = height0 - heightUncertainty;
 							double maxHeight = height0 + heightUncertainty;
-                            if ((ulsRxHeightAMSL >= minHeight) && (ulsRxHeightAMSL <= maxHeight)) {
-                                contains3D = true;
-						    }
+							if ((ulsRxHeightAMSL >= minHeight) && (ulsRxHeightAMSL <= maxHeight)) {
+								contains3D = true;
+							}
 						}
 					}
 
@@ -7442,10 +7495,10 @@ void AfcManager::runPointAnalysis()
 								bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
 								if (hasOverlap > 0.0) {
 									double eirpLimit_dBm = -std::numeric_limits<double>::infinity();
-		
+
 									channel->availability = BLACK;
 									channel->eirpLimit_dBm = eirpLimit_dBm;
-		
+
 									if ( (!ulsFlagList[ulsIdx]) || (eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
 										eirpLimitList[ulsIdx] = eirpLimit_dBm;
 										ulsFlagList[ulsIdx] = true;
@@ -7530,7 +7583,6 @@ void AfcManager::runPointAnalysis()
 							}
 #endif
 
-
 							for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx)
 							{
 								Vector3 rlanPosn = rlanPosnList[rlanPosnIdx];
@@ -7596,9 +7648,9 @@ void AfcManager::runPointAnalysis()
 											double I2NDB;
 											double marginDB;
 											double eirpLimit_dBm;
+											double nearFieldOffsetDB;
 
 											double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
-
 
 											// Trying Free Space Path Loss then (if not skipped) - configured Path Loss.
 											bool skip = false;
@@ -7629,14 +7681,33 @@ void AfcManager::runPointAnalysis()
 													rxGainDB = uls->getPR(segIdx).effectiveGain - discriminationGain;
 												}
 
-												rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+												nearFieldOffsetDB = 0.0;
+												if (segIdx == numPR) {
+													if (_nearFieldAdjFlag && (distKm*1000.0 < uls->getRxNearFieldDistLimit()) && (angleOffBoresightDeg < 90.0) ) {
+														bool unii5Flag = computeSpectralOverlapLoss((double *) NULL, uls->getStartUseFreq(), uls->getStopUseFreq(), 5925.0e6, 6425.0e6, false, CConst::psdSpectralAlgorithm);
+														double Fc;
+														if (unii5Flag) {
+															Fc = 6175.0e6;
+														} else {
+															Fc = 6700.0e6;
+														}
+														double eff = uls->getRxNearFieldAntEfficiency();
+														double D = uls->getRxNearFieldAntDiameter();
+
+														double xdb = 10.0*log10(CConst::c*distKm*1000.0/(2*Fc*D*D));
+														double u = (Fc*D*sin(angleOffBoresightDeg*M_PI/180.0)/CConst::c);
+
+														nearFieldOffsetDB = _nfa->computeNFA(xdb, u, eff);
+													}
+												}
+
+												rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
 												I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
 
 												marginDB = _IoverN_threshold_dB - I2NDB;
 
 												eirpLimit_dBm = _maxEIRP_dBm + marginDB;
-
 
 												if (forceFspl) {
 													// Skipping further computation if Free Space path loss
@@ -7647,10 +7718,10 @@ void AfcManager::runPointAnalysis()
 
 													// 1dB allowance to accommodate for amplifying clutters and other artifacts
 													if ((eirpLimit_dBm - 1) < channel->eirpLimit_dBm) {
-														continue;	// Proceed to configured path loss
+														continue;    // Proceed to configured path loss
 													} else {
 														skip = true;
-														break;		// Skipping this scanpoint
+														break;       // Skipping this scanpoint
 													}
 												}
 											}
@@ -7666,8 +7737,8 @@ void AfcManager::runPointAnalysis()
 											} else {
 												// INQUIRED_FREQUENCY
 												double psd = eirpLimit_dBm - 10.0*log((double) channel->bandwidth())/log(10.0);
-                                                if (psd < _minPSD_dBmPerMHz) {
-												    channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
+												if (psd < _minPSD_dBmPerMHz) {
+													channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
 													channel->availability = RED;
 												}
 											}
@@ -7756,13 +7827,13 @@ void AfcManager::runPointAnalysis()
 													msg << QString::number(discriminationGain, 'f', 3);
 												}
 
-												msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
+												msg << QString::number(rxGainDB, 'f', 3) << QString::number(nearFieldOffsetDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
 												msg << QString::number(_polarizationLossDB, 'f', 3);
 												msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
 												msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(I2NDB, 'f', 3) <<  QString::number(eirpLimit_dBm, 'f', 3);
 												msg << QString::number(ulsLinkDistance, 'f', 3) << QString::number(chanCenterFreq, 'f', 3) << QString::number(d2, 'f', 3) << QString::number(pathDifference, 'f', 6);
 												msg << QString::number(ulsWavelength * 1000, 'f', 3) << QString::number(fresnelIndex, 'f', 3);
-		
+
 												fexcthrwifi->writeRow(msg);
 											}
 										}
@@ -7796,7 +7867,7 @@ void AfcManager::runPointAnalysis()
 						);
 					}
 
-#           		if DEBUG_AFC
+#					if DEBUG_AFC
 					time_t t2 = time(NULL);
 					tstr = strdup(ctime(&t2));
 					strtok(tstr, "\n");
@@ -7853,10 +7924,10 @@ void AfcManager::runPointAnalysis()
 				}
 				else
 				{
-# 		          if DEBUG_AFC
+#					if DEBUG_AFC
 						// uls is not included in calculations
 						LOGGER_DEBUG(logger) << "ID: " << uls->getID() << ", distKm: " << sqrt(distKmSquared) << ", link: " << uls->getLinkDistance() << ",";
-#        		   endif
+#					endif
 				}
 			}
 			}
@@ -7938,8 +8009,8 @@ void AfcManager::runPointAnalysis()
 				double ulsTxHeight = uls->getTxHeightAMSL();
 
 				fkml->writeStartElement("Folder");
-				fkml->writeTextElement("name", QString::fromStdString(dbName + "_" + std::to_string(uls->getID())));	
-				// fkml->writeTextElement("name", QString::fromStdString(uls->getCallsign()));	
+				fkml->writeTextElement("name", QString::fromStdString(dbName + "_" + std::to_string(uls->getID())));
+				// fkml->writeTextElement("name", QString::fromStdString(uls->getCallsign()));
 				if (addPlacemarks) {
 					fkml->writeStartElement("Placemark");
 					fkml->writeTextElement("name", QString::asprintf("%s %s_%d", "TX", dbName.c_str(), uls->getID()));
@@ -7955,7 +8026,7 @@ void AfcManager::runPointAnalysis()
 				int numPR = uls->getNumPR();
 				for(int segIdx=0; segIdx<numPR+1; ++segIdx) {
 
-				    Vector3 ulsRxPos = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).position);
+					Vector3 ulsRxPos = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).position);
 					double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
 					double ulsRxLatitude = (segIdx == numPR ? uls->getRxLatitudeDeg() : uls->getPR(segIdx).latitudeDeg);
 					double ulsRxHeight = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSL);
@@ -8867,7 +8938,7 @@ void AfcManager::runExclusionZoneAnalysis()
 	_numChan = (int *)malloc(rlanBWStrList.size() * sizeof(int));
 
 	int bwIdx;
-	for (bwIdx = 0; bwIdx < (int)rlanBWStrList.size(); ++bwIdx) { 
+	for (bwIdx = 0; bwIdx < (int)rlanBWStrList.size(); ++bwIdx) {
 		// Iterate over each bandwidth (not channels yet)
 		char *chptr;
 		double bandwidth = std::strtod(rlanBWStrList[bwIdx].c_str(), &chptr);
@@ -9197,7 +9268,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 	}
 
 	if (rlanHeight - heightUncertainty - rlanTerrainHeight < _minRlanHeightAboveTerrain) {
-		throw std::runtime_error(ErrStream() 
+		throw std::runtime_error(ErrStream()
 				<< std::string("ERROR: ItoN: Invalid RLAN parameter settings.") << std::endl
 				<< std::string("RLAN Height = ") << rlanHeight << std::endl
 				<< std::string("Height Uncertainty = ") << heightUncertainty << std::endl
@@ -9376,7 +9447,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 				<< QString(ulsRxPropEnv);
 			msg << QString::number(uls->getNumPR() ? 1 : 0);
 			msg << QString::number(rlanCoord.longitudeDeg, 'f', 8) << QString::number(rlanCoord.latitudeDeg, 'f', 8);
-			msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) << 
+			msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) <<
 				QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource)) <<
 				CConst::strPropEnvList->type_to_str(rlanPropEnv);
 			msg << QString::number(distKm, 'f', 3) << QString::number(groundDistanceKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
@@ -9906,7 +9977,7 @@ void AfcManager::runHeatmapAnalysis()
 									<< QString(ulsRxPropEnv);
 								msg << QString::number(uls->getNumPR() ? 1 : 0);
 								msg << QString::number(rlanCoord.longitudeDeg, 'f', 5) << QString::number(rlanCoord.latitudeDeg, 'f', 5);
-								msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) << 
+								msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) <<
 									QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource))
 									<<
 									CConst::strPropEnvList->type_to_str(rlanPropEnv);
@@ -10395,7 +10466,7 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 				//     + ", problem at frequency " + std::to_string(prevFreqMHz)
 				// );
 				nextFreqMHz = minNextFreq;
-				minPSD = std::numeric_limits<double>::quiet_NaN(); 
+				minPSD = std::numeric_limits<double>::quiet_NaN();
 			}
 			psdFreqRange.freqMHzList.push_back(nextFreqMHz);
 			psdFreqRange.psd_dBm_MHzList.push_back(minPSD);
@@ -10479,7 +10550,7 @@ void AfcManager::createChannelList()
 	}
 
 	for(auto channelPair : _inquiredChannels) {
-		LOGGER_DEBUG(logger) << "creating channels for operating class " << channelPair.first; 
+		LOGGER_DEBUG(logger) << "creating channels for operating class " << channelPair.first;
 
 		int numChan;
 		numChan = 0;

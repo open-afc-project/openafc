@@ -187,6 +187,15 @@ double ULSClass::getRxGain()        {
 double ULSClass::getRxDlambda()        {
 	return(rxDlambda);
 }
+double ULSClass::getRxNearFieldAntDiameter() {
+	return(rxNearFieldAntDiameter);
+}
+double ULSClass::getRxNearFieldDistLimit() {
+	return(rxNearFieldDistLimit);
+}
+double ULSClass::getRxNearFieldAntEfficiency() {
+	return(rxNearFieldAntEfficiency);
+}
 CConst::AntennaCategoryEnum ULSClass::getRxAntennaCategory()        {
 	return(rxAntennaCategory);
 }
@@ -383,6 +392,18 @@ void ULSClass::setRxGain(double rxGainVal) {
 }
 void ULSClass::setRxDlambda(double rxDlambdaVal) {
 	rxDlambda = rxDlambdaVal;
+	return;
+}
+void ULSClass::setRxNearFieldAntDiameter(double rxNearFieldAntDiameterVal) {
+	rxNearFieldAntDiameter = rxNearFieldAntDiameterVal;
+	return;
+}
+void ULSClass::setRxNearFieldDistLimit(double rxNearFieldDistLimitVal) {
+	rxNearFieldDistLimit = rxNearFieldDistLimitVal;
+	return;
+}
+void ULSClass::setRxNearFieldAntEfficiency(double rxNearFieldAntEfficiencyVal) {
+	rxNearFieldAntEfficiency = rxNearFieldAntEfficiencyVal;
 	return;
 }
 void ULSClass::setRxAntennaCategory(CConst::AntennaCategoryEnum rxAntennaCategoryVal) {
@@ -590,8 +611,8 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value for FSID = " << id);
 	}
 
-    double maxGain = (divIdx == 0 ? rxGain    : diversityGain   );
-    double Dlambda = (divIdx == 0 ? rxDlambda : diversityDlambda);
+	double maxGain = (divIdx == 0 ? rxGain    : diversityGain   );
+	double Dlambda = (divIdx == 0 ? rxDlambda : diversityDlambda);
 
 	if (maxGain < 38) {
 		if (angleOffBoresightDeg < 5) {
@@ -827,13 +848,13 @@ PRClass::~PRClass()
 /******************************************************************************************/
 double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency)
 {
-    double discriminationDB;
+	double discriminationDB;
 
 	switch(type) {
 		case CConst::backToBackAntennaPRType:
 			{
-            	double rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, rxGain, rxDlambda);
-            	discriminationDB = rxGain - rxGainDB;
+				double rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, rxGain, rxDlambda);
+				discriminationDB = rxGain - rxGainDB;
 			}
 			break;
 		case CConst::billboardReflectorPRType:
@@ -843,14 +864,14 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 				double u_over_PI = reflectorSLambda*sin(angleOffBoresightDeg*M_PI/180.0);
 
 				if (angleOffBoresightDeg <= reflectorTheta1) {
-                    D1 = 20*log10(MathHelpers::sinc(u_over_PI));
+					D1 = 20*log10(MathHelpers::sinc(u_over_PI));
 				} else if (angleOffBoresightDeg <= 20.0) {
-                    D1 = -20*log10(fabs(M_PI*u_over_PI));
+					D1 = -20*log10(fabs(M_PI*u_over_PI));
 				} else {
-				    double u1_over_PI = reflectorSLambda*sin(reflectorTheta1*M_PI/180.0);
-                    D1 = 20*log10(MathHelpers::sinc(u1_over_PI)) - 0.4165*(angleOffBoresightDeg - 20.0);
+					double u1_over_PI = reflectorSLambda*sin(reflectorTheta1*M_PI/180.0);
+					D1 = 20*log10(MathHelpers::sinc(u1_over_PI)) - 0.4165*(angleOffBoresightDeg - 20.0);
 				}
-                discriminationDB = std::max(D0, D1);
+				discriminationDB = std::max(D0, D1);
 			}
 			break;
 		default:
@@ -858,6 +879,6 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 			break;
 	}
 
-    return discriminationDB;
+	return discriminationDB;
 }
 /******************************************************************************************/

@@ -7,7 +7,6 @@
 #include <QPointF>
 #include "terrain.h"
 
-
 namespace UlsMeasurementAnalysis {
 	int analyzeMeasurementSites(QString fullCmd, int subArgc, char **subArgv);
 	int analyzeMeasurementBubble(QString fullCmd, int subArgc, char **subArgv);
