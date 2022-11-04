@@ -343,7 +343,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                         elif (prNum == 0) and (float(r[retAntDiameterStr]) != -1) and (r[retGainStrULS].strip() != ''):
                             fwdGainULS = float(r[fwdGainStrULS])
                             retGainULS = float(r[retGainStrULS])
-                            if (abs(fwdGainULS - retGainULS) <= 0.1):
+                            if (abs(fwdGainULS - retGainULS) <= 0.05):
                                 D = float(r[retAntDiameterStr])
                                 Eta = 0.55
                                 Gtypical = 10*math.log10(Eta*(math.pi*Fc_unii*D/c)**2)
@@ -450,7 +450,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
 
                                     fwdGainULS = float(r[fwdGainStrULS])
                                     m_txGainULS = float(m[retGainStrULS])
-                                    if (abs(fwdGainULS - m_txGainULS) <= 0.1):
+                                    if (abs(fwdGainULS - m_txGainULS) <= 0.05):
                                         D = float(m[retAntDiameterStr])
                                         Eta = 0.55
                                         Gtypical = 10*math.log10(Eta*(math.pi*Fc_unii*D/c)**2)
@@ -493,7 +493,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                 diversityHeightStr   = 'Rx Diversity Height to Center RAAT (m)'
 
                 if (r[diversityGainStrULS] != '') and (float(r[diversityGainStrULS]) != 0.0):
-                    if (r[rxGainStrULS] != '') and (r[rxAntModelMatchedStr] != '') and (abs(float(r[rxGainStrULS])-float(r[diversityGainStrULS]) < 0.1)):
+                    if (r[rxGainStrULS] != '') and (r[rxAntModelMatchedStr] != '') and (abs(float(r[rxGainStrULS])-float(r[diversityGainStrULS])) < 0.05):
                         r[diversityGainStr] = r[rxGainStr]
                         r[diversityDiameterStr] = r[rxDiameterStr]
                     else:

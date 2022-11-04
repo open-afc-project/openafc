@@ -407,6 +407,7 @@ class AfcManager
 		double _exclusionDist;                  // Min link distance to consider, links shorter are ignored
 
 		bool _nearFieldAdjFlag;                 // If set compute near field loss, otherwise near field loss is 0
+		bool _passiveRepeaterFlag;              // If set compute passive repeaters, otherwise ignore passive repeaters
 		double _illuminationEfficiency;         // Illumination Efficiency value to use for near field loss calculation",
 		bool _closeInHgtFlag;                   // Whether or not to force LOS when mobile height above closeInHgtLOS for close in model",
 		double _closeInHgtLOS;                  // RLAN height above which prob of LOS = 100% for close in model",

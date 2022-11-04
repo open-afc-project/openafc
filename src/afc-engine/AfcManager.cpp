@@ -2228,6 +2228,17 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (_nearFieldAdjFlag) {
 		_nfaTableFile = SearchPaths::forReading("data", "fbrat/rat_transfer/nfa/nfa_table_data.csv", true).toStdString();
 	}
+	// ***********************************
+
+	// ***********************************
+	// If this flag is set, compute passive repeaters, otherwise ignore passive repeaters
+	// ***********************************
+	if (jsonObj.contains("passiveRepeaterFlag") && !jsonObj["passiveRepeaterFlag"].isUndefined()) {
+		_passiveRepeaterFlag = jsonObj["passiveRepeaterFlag"].toBool();
+	} else {
+		_passiveRepeaterFlag = true;
+	}
+	// ***********************************
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -7401,7 +7412,9 @@ void AfcManager::runPointAnalysis()
 			int numPR = uls->getNumPR();
 			int numDiversity = (uls->getHasDiversity() ? 2 : 1);
 
-			for(int segIdx=0; segIdx<numPR+1; ++segIdx) {
+			int segStart = (_passiveRepeaterFlag ? 0 : numPR);
+
+			for(int segIdx=segStart; segIdx<numPR+1; ++segIdx) {
 			for(int divIdx=0; divIdx<numDiversity; ++divIdx) {
 				Vector3 ulsRxPos = (segIdx == numPR ? (divIdx == 0 ? uls->getRxPosition() : uls->getDiversityPosition()) : uls->getPR(segIdx).position);
 				double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
@@ -7796,7 +7809,8 @@ void AfcManager::runPointAnalysis()
 												QStringList msg;
 												msg << QString::number(uls->getID()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
 												msg << QString::number(uls->getRxLongitudeDeg(), 'f', 5) << QString::number(uls->getRxLatitudeDeg(), 'f', 5);
-												msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2)
+												msg << QString::number((divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain()), 'f', 2)
+													<< QString::number(uls->getRxTerrainHeight(), 'f', 2)
 													<< QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
 													<< QString(ulsRxPropEnv);
 												msg << QString::number(uls->getNumPR());
@@ -7817,7 +7831,8 @@ void AfcManager::runPointAnalysis()
 												msg << QString::number(bandwidth * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
 													<< QString::number(uls->getStartUseFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopUseFreq() * 1.0e-6, 'f', 2);
 		
-												msg << QString::fromStdString(rxAntennaTypeStr) << QString::fromStdString(rxAntennaCategoryStr) << QString::number(uls->getRxGain(), 'f', 3);
+												msg << QString::fromStdString(rxAntennaTypeStr) << QString::fromStdString(rxAntennaCategoryStr)
+													<< QString::number((divIdx == 0 ? uls->getRxGain() : uls->getDiversityGain()), 'f', 3);
 
 												if (segIdx == numPR) {
 													msg << QString("") << QString("") << QString("");
@@ -10173,6 +10188,7 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "P.2108_CONFIDENCE", QString::number(_confidenceClutter2108, 'e', 20) } );
 		fUserInputs->writeRow({ "WINNER_II_USE_GROUND_DISTANCE", (_winner2UseGroundDistanceFlag ? "true" : "false" ) } );
 		fUserInputs->writeRow({ "FSPL_USE_GROUND_DISTANCE", (_fsplUseGroundDistanceFlag ? "true" : "false" ) } );
+		fUserInputs->writeRow({ "PASSIVE_REPEATER_FLAG", (_passiveRepeaterFlag ? "true" : "false" ) } );
 
 		if (_analysisType == "ExclusionZoneAnalysis") {
 			double chanCenterFreq = _wlanMinFreq + (_exclusionZoneRLANChanIdx + 0.5) * _exclusionZoneRLANBWHz;
