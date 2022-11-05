@@ -5015,7 +5015,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								uls->setLinkDistance(segDist);
 								if (hasDiversity) {
 									pointing = (segTxPosn - diversityPosition).normalized();
-									uls->setAntennaPointing(pointing); // Pointing of Rx Diversity antenna
+									uls->setDiversityAntennaPointing(pointing); // Pointing of Rx Diversity antenna
 								}
 							} else {
 								uls->getPR(prIdx).pointing = pointing; // Pointing of Passive Receiver
