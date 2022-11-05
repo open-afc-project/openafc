@@ -6826,6 +6826,9 @@ void AfcManager::runPointAnalysis()
 				"PR_EFFECTIVE_GAIN (dB)",
 				"PR_DISCRIMINATION_GAIN (dB)",
 				"FS_ANT_GAIN_TO_RLAN (dB)",
+				"FS_ANT_NEAR_FIELD_XDB",
+				"FS_ANT_NEAR_FIELD_U",
+				"FS_ANT_NEAR_FIELD_EFF",
 				"FS_ANT_NEAR_FIELD_OFFSET (dB)",
 				"RX_SPECTRAL_OVERLAP_LOSS (dB)",
 				"POLARIZATION_LOSS (dB)",
@@ -7662,6 +7665,9 @@ void AfcManager::runPointAnalysis()
 											double marginDB;
 											double eirpLimit_dBm;
 											double nearFieldOffsetDB;
+											double nearField_xdb;
+											double nearField_u;
+											double nearField_eff;
 
 											double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
@@ -7695,6 +7701,9 @@ void AfcManager::runPointAnalysis()
 												}
 
 												nearFieldOffsetDB = 0.0;
+												nearField_xdb = std::numeric_limits<float>::quiet_NaN();
+												nearField_u = std::numeric_limits<float>::quiet_NaN();
+												nearField_eff = std::numeric_limits<float>::quiet_NaN();
 												if (segIdx == numPR) {
 													if (_nearFieldAdjFlag && (distKm*1000.0 < uls->getRxNearFieldDistLimit()) && (angleOffBoresightDeg < 90.0) ) {
 														bool unii5Flag = computeSpectralOverlapLoss((double *) NULL, uls->getStartUseFreq(), uls->getStopUseFreq(), 5925.0e6, 6425.0e6, false, CConst::psdSpectralAlgorithm);
@@ -7704,13 +7713,13 @@ void AfcManager::runPointAnalysis()
 														} else {
 															Fc = 6700.0e6;
 														}
-														double eff = uls->getRxNearFieldAntEfficiency();
+														nearField_eff = uls->getRxNearFieldAntEfficiency();
 														double D = uls->getRxNearFieldAntDiameter();
 
-														double xdb = 10.0*log10(CConst::c*distKm*1000.0/(2*Fc*D*D));
-														double u = (Fc*D*sin(angleOffBoresightDeg*M_PI/180.0)/CConst::c);
+														nearField_xdb = 10.0*log10(CConst::c*distKm*1000.0/(2*Fc*D*D));
+														nearField_u = (Fc*D*sin(angleOffBoresightDeg*M_PI/180.0)/CConst::c);
 
-														nearFieldOffsetDB = _nfa->computeNFA(xdb, u, eff);
+														nearFieldOffsetDB = _nfa->computeNFA(nearField_xdb, nearField_u, nearField_eff);
 													}
 												}
 
@@ -7842,7 +7851,23 @@ void AfcManager::runPointAnalysis()
 													msg << QString::number(discriminationGain, 'f', 3);
 												}
 
-												msg << QString::number(rxGainDB, 'f', 3) << QString::number(nearFieldOffsetDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
+												msg << QString::number(rxGainDB, 'f', 3);
+												if (std::isnan(nearField_xdb)) {
+													msg << QString("");
+												} else {
+													msg << QString::number(nearField_xdb, 'f', 5);
+												}
+												if (std::isnan(nearField_u)) {
+													msg << QString("");
+												} else {
+													msg << QString::number(nearField_u, 'f', 5);
+												}
+												if (std::isnan(nearField_eff)) {
+													msg << QString("");
+												} else {
+													msg << QString::number(nearField_eff, 'f', 5);
+												}
+                                                msg << QString::number(nearFieldOffsetDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
 												msg << QString::number(_polarizationLossDB, 'f', 3);
 												msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
 												msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(I2NDB, 'f', 3) <<  QString::number(eirpLimit_dBm, 'f', 3);

@@ -526,63 +526,143 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                 nearFieldDistLimitStr  = 'Rx Near Field Dist Limit (m)'
                 nearFieldEfficiencyStr = 'Rx Near Field Ant Efficiency'
 
-                rxGain = float(r[rxGainStr])
-
                 if (r[rxAntModelMatchedStr] != ''):
                     rxNearFieldAntennaDiameter = float(r[rxDiameterStr])
-                    effDB = -2.6
+                    method = 1
+                    if (keyv[1] == 5):
+                        if (abs(rxNearFieldAntennaDiameter - 3.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 32.0
+                            gainRangeMax = 34.5
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 4.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 34.5
+                            gainRangeMax = 37.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 6.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 37.55
+                            gainRangeMax = 40.35
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 8.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 40.35
+                            gainRangeMax = 42.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 10.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 42.55
+                            gainRangeMax = 44.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 12.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 44.55
+                            gainRangeMax = 46.15
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 15.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 46.15
+                            gainRangeMax = 48.0
+                            foundDiameter = True
+                        else:
+                            foundDiameter = False
+                    else:
+                        if (abs(rxNearFieldAntennaDiameter - 3.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 32.0
+                            gainRangeMax = 34.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 4.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 34.55
+                            gainRangeMax = 37.65
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 6.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 37.65
+                            gainRangeMax = 40.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 8.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 40.55
+                            gainRangeMax = 42.75
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 10.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 42.75
+                            gainRangeMax = 44.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 12.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 44.55
+                            gainRangeMax = 46.25
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 15.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 46.25
+                            gainRangeMax = 48.0
+                            foundDiameter = True
+                        else:
+                            foundDiameter = False
+
+                elif (r[rxGainStrULS] == ''):
+                    diameterFt = 6.0
+                    rxNearFieldAntennaDiameter = diameterFt*12.0*2.54*0.01 # convert ft to m
+                    method = 3
                 elif (keyv[1] == 5):
-                    if ( (rxGain >= 32.0) and (rxGain <= 48.0) ):
+                    rxGainULS = float(r[rxGainStrULS])
+                    if ( (rxGainULS >= 32.0) and (rxGainULS <= 48.0) ):
                         #****************************************************************************#
                         #* Table 3: U-NII-5 Antenna Size versus Gain                                *#
                         #****************************************************************************#
-                        if (rxGain <= 34.35):
+                        if (rxGainULS <= 34.35):
                             diameterFt = 3.0
-                        elif (rxGain <= 37.55):
+                        elif (rxGainULS <= 37.55):
                             diameterFt = 4.0
-                        elif (rxGain <= 40.35):
+                        elif (rxGainULS <= 40.35):
                             diameterFt = 6.0
-                        elif (rxGain <= 42.55):
+                        elif (rxGainULS <= 42.55):
                             diameterFt = 8.0
-                        elif (rxGain <= 44.55):
+                        elif (rxGainULS <= 44.55):
                             diameterFt = 10.0
-                        elif (rxGain <= 46.15):
+                        elif (rxGainULS <= 46.15):
                             diameterFt = 12.0
                         else:
                             diameterFt = 15.0
                         #****************************************************************************#
                         rxNearFieldAntennaDiameter = diameterFt*12.0*2.54*0.01 # convert ft to m
-
-                        effDB = rxGain + 20.0*math.log10(c/(math.pi*Fc_unii*rxNearFieldAntennaDiameter))
+                        method = 2
                     else:
                         diameterFt = 6.0
                         rxNearFieldAntennaDiameter = diameterFt*12.0*2.54*0.01 # convert ft to m
-                        effDB = -2.6
+                        method = 3
                 else:
-                    if ( (rxGain >= 32.0) and (rxGain <= 46.2) ):
+                    rxGainULS = float(r[rxGainStrULS])
+                    if ( (rxGainULS >= 32.0) and (rxGainULS <= 48.0) ):
                         #****************************************************************************#
                         #* Table 4: U-NII-7 Antenna Size versus Gain                                *#
                         #****************************************************************************#
-                        if (rxGain <= 34.55):
+                        if (rxGainULS <= 34.55):
                             diameterFt = 3.0
-                        elif (rxGain <= 37.65):
+                        elif (rxGainULS <= 37.65):
                             diameterFt = 4.0
-                        elif (rxGain <= 40.55):
+                        elif (rxGainULS <= 40.55):
                             diameterFt = 6.0
-                        elif (rxGain <= 42.75):
+                        elif (rxGainULS <= 42.75):
                             diameterFt = 8.0
-                        elif (rxGain <= 44.55):
+                        elif (rxGainULS <= 44.55):
                             diameterFt = 10.0
-                        else:
+                        elif (rxGainULS <= 46.25):
                             diameterFt = 12.0
+                        else:
+                            diameterFt = 15.0
                         #****************************************************************************#
                         rxNearFieldAntennaDiameter = diameterFt*12.0*2.54*0.01     # convert ft to m
-
-                        effDB = rxGain + 20.0*math.log10(c/(math.pi*Fc_unii*rxNearFieldAntennaDiameter))
+                        method = 2
                     else:
                         diameterFt = 6.0
                         rxNearFieldAntennaDiameter = diameterFt*12.0*2.54*0.01 # convert ft to m
+                        method = 3
+
+                if (r[rxGainStrULS] == ''):
+                    effDB = -2.6
+                else:
+                    rxGainULS = float(r[rxGainStrULS])
+                    if (method == 1) and (not foundDiameter):
                         effDB = -2.6
+                    elif (method == 1) and ((rxGainULS < gainRangeMin-0.3) or (rxGainULS > gainRangeMax+0.3)):
+                        effDB = -2.6
+                    elif method == 3:
+                        effDB = -2.6
+                    else:
+                        effDB = rxGainULS + 20.0*math.log10(c/(math.pi*Fc_unii*rxNearFieldAntennaDiameter))
 
                 rxNearFieldDistLimit = 2*Fc_unii*rxNearFieldAntennaDiameter*rxNearFieldAntennaDiameter/c
 
