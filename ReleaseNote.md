@@ -1,4 +1,9 @@
 # Release Note
+## **Version and Date**
+|Version|3.4.5.1|
+| :- | :- |
+|**Date**|**11/06/2022**|
+|compiled server's version is TBD |git tag 3.4.5.1|
 
 ## **Version and Date**
 |Version|**OA-153&196&300**|
