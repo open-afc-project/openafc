@@ -59,7 +59,8 @@ export interface AFCConfigFile {
     enableMapInVirtualAp?: boolean,
     channelResponseAlgorithm: ChannelResponseAlgorithm,
     visibilityThreshold?: number,
-    allowScanPtsInUncReg?: boolean
+    allowScanPtsInUncReg?: boolean,
+    passiveRepeaterFlag?: boolean
 }
 
 export type FreqRange = {
