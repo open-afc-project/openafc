@@ -117,8 +117,8 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 	std::string name;
 	AntennaModelClass::CategoryEnum category;
 	AntennaModelClass::TypeEnum type;
-    double diameterM;
-    double midbandGain;
+	double diameterM;
+	double midbandGain;
 	double reflectorWidthM = -1;
 	double reflectorHeightM = -1;
 
@@ -282,10 +282,10 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(midbandGainFieldIdx);
 				if (strval.empty()) {
-                    midbandGain = std::numeric_limits<double>::quiet_NaN();
-                } else {
-                    midbandGain = std::strtod(strval.c_str(), &chptr);
-                }
+					midbandGain = std::numeric_limits<double>::quiet_NaN();
+				} else {
+					midbandGain = std::strtod(strval.c_str(), &chptr);
+				}
 				/**************************************************************************/
 
 				/**************************************************************************/
@@ -293,14 +293,14 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(reflectorWidthMFieldIdx);
 				if (strval.empty()) {
-                    reflectorWidthM = -1.0; // Use -1 for unknown
-                } else {
-                    reflectorWidthM = std::strtod(strval.c_str(), &chptr);
-                    if (reflectorWidthM <= 0.0) {
-					    errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " invalid reflector width: \"" << strval << "\"" << std::endl;
-					    throw std::runtime_error(errStr.str());
-                    }
-                }
+					reflectorWidthM = -1.0; // Use -1 for unknown
+				} else {
+					reflectorWidthM = std::strtod(strval.c_str(), &chptr);
+					if (reflectorWidthM <= 0.0) {
+						errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " invalid reflector width: \"" << strval << "\"" << std::endl;
+						throw std::runtime_error(errStr.str());
+					}
+				}
 				/**************************************************************************/
 
 				/**************************************************************************/
@@ -308,23 +308,23 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(reflectorHeightMFieldIdx);
 				if (strval.empty()) {
-                    reflectorHeightM = -1.0; // Use -1 for unknown
-                } else {
-                    reflectorHeightM = std::strtod(strval.c_str(), &chptr);
-                    if (reflectorHeightM <= 0.0) {
-					    errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " invalid reflector height: \"" << strval << "\"" << std::endl;
-					    throw std::runtime_error(errStr.str());
-                    }
-                }
+					reflectorHeightM = -1.0; // Use -1 for unknown
+				} else {
+					reflectorHeightM = std::strtod(strval.c_str(), &chptr);
+					if (reflectorHeightM <= 0.0) {
+						errStr << "ERROR: Antenna Model List file \"" << filename << "\" line " << linenum << " invalid reflector height: \"" << strval << "\"" << std::endl;
+						throw std::runtime_error(errStr.str());
+					}
+				}
 				/**************************************************************************/
 
 				antennaModel = new AntennaModelClass(name);
-                antennaModel->setCategory(category);
-                antennaModel->setType(type);
-                antennaModel->setDiameterM(diameterM);
-                antennaModel->setMidbandGain(midbandGain);
-                antennaModel->setReflectorWidthM(reflectorWidthM);
-                antennaModel->setReflectorHeightM(reflectorHeightM);
+				antennaModel->setCategory(category);
+				antennaModel->setType(type);
+				antennaModel->setDiameterM(diameterM);
+				antennaModel->setMidbandGain(midbandGain);
+				antennaModel->setReflectorWidthM(reflectorWidthM);
+				antennaModel->setReflectorHeightM(reflectorHeightM);
 
 				antennaModelList.push_back(antennaModel);
 

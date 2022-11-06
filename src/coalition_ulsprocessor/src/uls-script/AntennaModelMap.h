@@ -23,9 +23,9 @@ public:
 
 	AntennaModelClass(std::string nameVal);
 
-    void setType(TypeEnum typeVal) { type = typeVal; }
-    void setCategory(CategoryEnum categoryVal) { category = categoryVal; }
-    void setDiameterM(double diameterMVal) { diameterM = diameterMVal; }
+	void setType(TypeEnum typeVal) { type = typeVal; }
+	void setCategory(CategoryEnum categoryVal) { category = categoryVal; }
+	void setDiameterM(double diameterMVal) { diameterM = diameterMVal; }
 	void setMidbandGain(double midbandGainVal) { midbandGain = midbandGainVal; }
 	void setReflectorWidthM(double reflectorWidthMVal) { reflectorWidthM = reflectorWidthMVal; }
 	void setReflectorHeightM(double reflectorHeightMVal) { reflectorHeightM = reflectorHeightMVal; }

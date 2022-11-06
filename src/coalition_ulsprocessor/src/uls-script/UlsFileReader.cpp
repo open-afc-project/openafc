@@ -427,11 +427,11 @@ void UlsFileReader::readIndividualEntity(FILE *fi) {
       case 6:
         strncpy(current.licenseeId, string, 10);
         break;
-      case 22:
-        strncpy(current.frn, string, 11);
-        break;
       case 7:
         strncpy(current.entityName, string, 201);
+        break;
+      case 22:
+        strncpy(current.frn, string, 11);
         break;
       }
 

@@ -72,6 +72,12 @@ UlsDatabase::UlsDatabase()
 	fieldIdxList.push_back(&rx_gainIdx);
 	columns << "rx_ant_diameter";
 	fieldIdxList.push_back(&rx_antennaDiameterIdx);
+	columns << "rx_near_field_ant_diameter";
+	fieldIdxList.push_back(&rx_near_field_ant_diameterIdx);
+	columns << "rx_near_field_dist_limit";
+	fieldIdxList.push_back(&rx_near_field_dist_limitIdx);
+	columns << "rx_near_field_ant_efficiency";
+	fieldIdxList.push_back(&rx_near_field_ant_efficiencyIdx);
 	columns << "rx_ant_category";
 	fieldIdxList.push_back(&rx_antennaCategoryIdx);
 	columns << "status";
@@ -80,6 +86,14 @@ UlsDatabase::UlsDatabase()
 	fieldIdxList.push_back(&mobileIdx);
 	columns << "rx_ant_model";
 	fieldIdxList.push_back(&rx_ant_modelIdx);
+
+	columns << "rx_diversity_height_to_center_raat_m";
+	fieldIdxList.push_back(&rx_diversity_height_to_center_raat_mIdx);
+	columns << "rx_diversity_gain";
+	fieldIdxList.push_back(&rx_diversity_gainIdx);
+	columns << "rx_diversity_ant_diameter";
+	fieldIdxList.push_back(&rx_diversity_antennaDiameterIdx);
+
 	columns << "p_rp_num";
 	fieldIdxList.push_back(&p_rp_numIdx);
 
@@ -259,6 +273,16 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		target.at(r).rxLineLoss = q.value(rx_line_loss_mIdx).isNull() ? nan : q.value(rx_line_loss_mIdx).toDouble();
 		target.at(r).rxGain = q.value(rx_gainIdx).isNull() ? nan : q.value(rx_gainIdx).toDouble();
 		target.at(r).rxAntennaDiameter = q.value(rx_antennaDiameterIdx).isNull() ? nan : q.value(rx_antennaDiameterIdx).toDouble();
+
+		target.at(r).rxNearFieldAntDiameter = q.value(rx_near_field_ant_diameterIdx).isNull() ? nan : q.value(rx_near_field_ant_diameterIdx).toDouble();
+		target.at(r).rxNearFieldDistLimit = q.value(rx_near_field_dist_limitIdx).isNull() ? nan : q.value(rx_near_field_dist_limitIdx).toDouble();
+		target.at(r).rxNearFieldAntEfficiency = q.value(rx_near_field_ant_efficiencyIdx).isNull() ? nan : q.value(rx_near_field_ant_efficiencyIdx).toDouble();
+
+		target.at(r).hasDiversity = q.value(rx_diversity_gainIdx).isNull() ? false : true;
+		target.at(r).diversityGain = q.value(rx_diversity_gainIdx).isNull() ? nan : q.value(rx_diversity_gainIdx).toDouble();
+		target.at(r).diversityHeightAboveTerrain = q.value(rx_diversity_height_to_center_raat_mIdx).isNull() ? nan : q.value(rx_diversity_height_to_center_raat_mIdx).toDouble();
+		target.at(r).diversityAntennaDiameter = q.value(rx_diversity_antennaDiameterIdx).isNull() ? nan : q.value(rx_diversity_antennaDiameterIdx).toDouble();
+
 		target.at(r).status = q.value(statusIdx).toString().toStdString();
 		target.at(r).mobile = q.value(mobileIdx).toBool();
 		target.at(r).rxAntennaModel = q.value(rx_ant_modelIdx).toString().toStdString();

@@ -41,6 +41,15 @@ struct UlsRecord
 	double rxGain;
 	CConst::AntennaCategoryEnum rxAntennaCategory;
 	double rxAntennaDiameter;
+	double rxNearFieldAntDiameter;
+	double rxNearFieldDistLimit;
+	double rxNearFieldAntEfficiency;
+
+	bool hasDiversity;
+	double diversityGain;
+	double diversityAntennaDiameter;
+	double diversityHeightAboveTerrain;
+
 	std::string status;
 	bool mobile;
 	std::string rxAntennaModel;
@@ -113,11 +122,18 @@ public:
 	int rx_line_loss_mIdx;
 	int rx_gainIdx;
 	int rx_antennaDiameterIdx;
+	int rx_near_field_ant_diameterIdx;
+	int rx_near_field_dist_limitIdx;
+	int rx_near_field_ant_efficiencyIdx;
 	int rx_antennaCategoryIdx;
 	int statusIdx;
 	int mobileIdx;
 	int rx_ant_modelIdx;
 	int p_rp_numIdx;
+
+	int rx_diversity_height_to_center_raat_mIdx;
+	int rx_diversity_gainIdx;
+	int rx_diversity_antennaDiameterIdx;
 
 	int prSeqIdx;
 	int prTypeIdx;
@@ -125,9 +141,9 @@ public:
 	int pr_lon_degIdx;
 	int pr_height_to_center_raat_mIdx;
 
-	int prTxGainIdx;  
+	int prTxGainIdx;
 	int prTxDiameterIdx;
-	int prRxGainIdx;  
+	int prRxGainIdx;
 	int prRxDiameterIdx;
 	int prReflectorHeightIdx;
 	int prReflectorWidthIdx;

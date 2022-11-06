@@ -104,5 +104,4 @@ const StrTypeClass CConst::strPRTypeList[] = {
 	{       CConst::backToBackAntennaPRType, "Ant"           },
 	{      CConst::billboardReflectorPRType, "Ref"           },
 	{                                    -1,  (char *) 0     }
-
 };

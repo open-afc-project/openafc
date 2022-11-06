@@ -140,7 +140,8 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
         "channelResponseAlgorithm": "psd",
         "visibilityThreshold": -6,
         "version": guiConfig.version,
-        "allowScanPtsInUncReg": false
+        "allowScanPtsInUncReg": false,
+        "passiveRepeaterFlag": false
 });
 
 // API Calls

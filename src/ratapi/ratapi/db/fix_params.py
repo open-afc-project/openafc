@@ -5,12 +5,12 @@ from os.path import exists
 
 csmap = {}
 c  = 2.99792458e8
-unii5StartFreqMHz = 5925;
-unii5StopFreqMHz  = 6425;
-unii7StartFreqMHz = 6525;
-unii7StopFreqMHz  = 6875;
-unii8StartFreqMHz = 6875;
-unii8StopFreqMHz  = 7125;
+unii5StartFreqMHz = 5925
+unii5StopFreqMHz  = 6425
+unii7StartFreqMHz = 6525
+unii7StopFreqMHz  = 6875
+unii8StartFreqMHz = 6875
+unii8StopFreqMHz  = 7125
 
 typicalReflectorDimensions = [
     (1.8,2.4),
@@ -48,7 +48,18 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
     file_handle = open(inputPath, 'rb')
     csvreader = csv.DictReader(file_handle)
 
-    fieldnames = csvreader.fieldnames + ['return_FSID', 'Rx Gain (dBi)', 'Tx Gain (dBi)']
+    fieldnames = csvreader.fieldnames + [
+        'return_FSID',
+         'Rx Gain (dBi)',
+         'Rx Height to Center RAAT (m)',
+         'Rx Diversity Gain (dBi)',
+         'Rx Diversity Height to Center RAAT (m)',
+         'Tx Gain (dBi)',
+         'Tx Height to Center RAAT (m)',
+         'Rx Near Field Ant Diameter (m)',
+         'Rx Near Field Dist Limit (m)',
+         'Rx Near Field Ant Efficiency'
+    ]
 
     maxNumPR = 0
     for field in csvreader.fieldnames:
@@ -102,6 +113,10 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             row['return_FSID'] = ''
             row['Rx Gain (dBi)'] = ''
             row['Tx Gain (dBi)'] = ''
+
+            row['Rx Height to Center RAAT (m)']           = row['Rx Height to Center RAAT ULS (m)']
+            row['Rx Diversity Height to Center RAAT (m)'] = row['Rx Diversity Height to Center RAAT ULS (m)']
+            row['Tx Height to Center RAAT (m)']           = row['Tx Height to Center RAAT ULS (m)']
 
             if (freq >= unii5StartFreqMHz) and (freq <= unii5StopFreqMHz):
                 uniiband = 5
@@ -328,7 +343,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                         elif (prNum == 0) and (float(r[retAntDiameterStr]) != -1) and (r[retGainStrULS].strip() != ''):
                             fwdGainULS = float(r[fwdGainStrULS])
                             retGainULS = float(r[retGainStrULS])
-                            if (abs(fwdGainULS - retGainULS) <= 0.1):
+                            if (abs(fwdGainULS - retGainULS) <= 0.05):
                                 D = float(r[retAntDiameterStr])
                                 Eta = 0.55
                                 Gtypical = 10*math.log10(Eta*(math.pi*Fc_unii*D/c)**2)
@@ -387,10 +402,10 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                                 prMatch = False
                                         if prMatch:
                                             if m['return_FSID'].strip() == '':
-                                                foundMatch = True;
+                                                foundMatch = True
                                                 matchi = mi
                                             else:
-                                                foundCandidate = True;
+                                                foundCandidate = True
                                                 candidatei = mi
                             if foundMatch:
                                 m = csmap[keyv][matchi]
@@ -435,7 +450,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
 
                                     fwdGainULS = float(r[fwdGainStrULS])
                                     m_txGainULS = float(m[retGainStrULS])
-                                    if (abs(fwdGainULS - m_txGainULS) <= 0.1):
+                                    if (abs(fwdGainULS - m_txGainULS) <= 0.05):
                                         D = float(m[retAntDiameterStr])
                                         Eta = 0.55
                                         Gtypical = 10*math.log10(Eta*(math.pi*Fc_unii*D/c)**2)
@@ -462,6 +477,205 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
 
                         if (antType == 'Ant'):
                             r[fwdGainStr] = str(fwdGain)
+
+                ####################################################################################
+                # R2-AIP-08 Diversity Antenna Gain and Diameter                                    #
+                # R2-AIP-15 Diversity Antenna Height                                               #
+                ####################################################################################
+                rxDiameterStr = 'Rx Ant Diameter (m)'
+                rxGainStrULS  = 'Rx Gain ULS (dBi)'
+                rxGainStr     = 'Rx Gain (dBi)'
+                diversityDiameterStr = 'Rx Diversity Ant Diameter (m)'
+                diversityGainStrULS  = 'Rx Diversity Gain ULS (dBi)'
+                diversityGainStr     = 'Rx Diversity Gain (dBi)'
+                rxAntModelMatchedStr = 'Rx Ant Model Name Matched'
+                rxHeightStr          = 'Rx Height to Center RAAT (m)'
+                diversityHeightStr   = 'Rx Diversity Height to Center RAAT (m)'
+
+                if (r[diversityGainStrULS] != '') and (float(r[diversityGainStrULS]) != 0.0):
+                    if (r[rxGainStrULS] != '') and (r[rxAntModelMatchedStr] != '') and (abs(float(r[rxGainStrULS])-float(r[diversityGainStrULS])) < 0.05):
+                        r[diversityGainStr] = r[rxGainStr]
+                        r[diversityDiameterStr] = r[rxDiameterStr]
+                    else:
+                        diversityGainULS  = float(r[diversityGainStrULS])
+                        if (diversityGainULS >= 28.0) and (diversityGainULS <= 48.0):
+                            r[diversityGainStr] = r[diversityGainStrULS]
+                        else:
+                            r[diversityGainStr] = r[rxGainStrULS]
+
+                        diversityGain  = float(r[diversityGainStr])
+                        oneOverSqrtEta = 1.0/math.sqrt(0.55)
+                        D = (c/(math.pi*Fc_unii))*(10**((diversityGain)/20))*oneOverSqrtEta
+                        r[diversityDiameterStr] = str(D)
+
+                    if (r[diversityHeightStr] == ''):
+                        rxHeight = float(r[rxHeightStr])
+                        if (rxHeight < 14.0):
+                            r[diversityHeightStr] = str(rxHeight + 11)
+                        else:
+                            r[diversityHeightStr] = str(rxHeight - 11)
+
+                    if (float(r[diversityHeightStr]) < 1.5):
+                        r[diversityHeightStr] = str(1.5)
+                ####################################################################################
+
+                ####################################################################################
+                # R2-AIP-17 Near Field Adjustment                                                  #
+                ####################################################################################
+                nearFieldDiameterStr   = 'Rx Near Field Ant Diameter (m)'
+                nearFieldDistLimitStr  = 'Rx Near Field Dist Limit (m)'
+                nearFieldEfficiencyStr = 'Rx Near Field Ant Efficiency'
+
+                if (r[rxAntModelMatchedStr] != ''):
+                    rxNearFieldAntennaDiameter = float(r[rxDiameterStr])
+                    method = 1
+                    if (keyv[1] == 5):
+                        if (abs(rxNearFieldAntennaDiameter - 3.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 32.0
+                            gainRangeMax = 34.5
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 4.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 34.5
+                            gainRangeMax = 37.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 6.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 37.55
+                            gainRangeMax = 40.35
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 8.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 40.35
+                            gainRangeMax = 42.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 10.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 42.55
+                            gainRangeMax = 44.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 12.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 44.55
+                            gainRangeMax = 46.15
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 15.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 46.15
+                            gainRangeMax = 48.0
+                            foundDiameter = True
+                        else:
+                            foundDiameter = False
+                    else:
+                        if (abs(rxNearFieldAntennaDiameter - 3.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 32.0
+                            gainRangeMax = 34.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 4.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 34.55
+                            gainRangeMax = 37.65
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 6.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 37.65
+                            gainRangeMax = 40.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 8.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 40.55
+                            gainRangeMax = 42.75
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 10.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 42.75
+                            gainRangeMax = 44.55
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 12.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 44.55
+                            gainRangeMax = 46.25
+                            foundDiameter = True
+                        elif (abs(rxNearFieldAntennaDiameter - 15.0*12*2.54*0.01) <= 0.01):
+                            gainRangeMin = 46.25
+                            gainRangeMax = 48.0
+                            foundDiameter = True
+                        else:
+                            foundDiameter = False
+
+                elif (r[rxGainStrULS] == ''):
+                    diameterFt = 6.0
+                    rxNearFieldAntennaDiameter = diameterFt*12.0*2.54*0.01 # convert ft to m
+                    method = 3
+                elif (keyv[1] == 5):
+                    rxGainULS = float(r[rxGainStrULS])
+                    if ( (rxGainULS >= 32.0) and (rxGainULS <= 48.0) ):
+                        #****************************************************************************#
+                        #* Table 3: U-NII-5 Antenna Size versus Gain                                *#
+                        #****************************************************************************#
+                        if (rxGainULS <= 34.35):
+                            diameterFt = 3.0
+                        elif (rxGainULS <= 37.55):
+                            diameterFt = 4.0
+                        elif (rxGainULS <= 40.35):
+                            diameterFt = 6.0
+                        elif (rxGainULS <= 42.55):
+                            diameterFt = 8.0
+                        elif (rxGainULS <= 44.55):
+                            diameterFt = 10.0
+                        elif (rxGainULS <= 46.15):
+                            diameterFt = 12.0
+                        else:
+                            diameterFt = 15.0
+                        #****************************************************************************#
+                        rxNearFieldAntennaDiameter = diameterFt*12.0*2.54*0.01 # convert ft to m
+                        method = 2
+                    else:
+                        diameterFt = 6.0
+                        rxNearFieldAntennaDiameter = diameterFt*12.0*2.54*0.01 # convert ft to m
+                        method = 3
+                else:
+                    rxGainULS = float(r[rxGainStrULS])
+                    if ( (rxGainULS >= 32.0) and (rxGainULS <= 48.0) ):
+                        #****************************************************************************#
+                        #* Table 4: U-NII-7 Antenna Size versus Gain                                *#
+                        #****************************************************************************#
+                        if (rxGainULS <= 34.55):
+                            diameterFt = 3.0
+                        elif (rxGainULS <= 37.65):
+                            diameterFt = 4.0
+                        elif (rxGainULS <= 40.55):
+                            diameterFt = 6.0
+                        elif (rxGainULS <= 42.75):
+                            diameterFt = 8.0
+                        elif (rxGainULS <= 44.55):
+                            diameterFt = 10.0
+                        elif (rxGainULS <= 46.25):
+                            diameterFt = 12.0
+                        else:
+                            diameterFt = 15.0
+                        #****************************************************************************#
+                        rxNearFieldAntennaDiameter = diameterFt*12.0*2.54*0.01     # convert ft to m
+                        method = 2
+                    else:
+                        diameterFt = 6.0
+                        rxNearFieldAntennaDiameter = diameterFt*12.0*2.54*0.01 # convert ft to m
+                        method = 3
+
+                if (r[rxGainStrULS] == ''):
+                    effDB = -2.6
+                else:
+                    rxGainULS = float(r[rxGainStrULS])
+                    if (method == 1) and (not foundDiameter):
+                        effDB = -2.6
+                    elif (method == 1) and ((rxGainULS < gainRangeMin-0.3) or (rxGainULS > gainRangeMax+0.3)):
+                        effDB = -2.6
+                    elif method == 3:
+                        effDB = -2.6
+                    else:
+                        effDB = rxGainULS + 20.0*math.log10(c/(math.pi*Fc_unii*rxNearFieldAntennaDiameter))
+
+                rxNearFieldDistLimit = 2*Fc_unii*rxNearFieldAntennaDiameter*rxNearFieldAntennaDiameter/c
+
+                rxNearFieldAntEfficiency = 10**(effDB/10.0)
+                if (rxNearFieldAntEfficiency < 0.4):
+                    rxNearFieldAntEfficiency = 0.4
+                elif (rxNearFieldAntEfficiency > 0.7):
+                    rxNearFieldAntEfficiency = 0.7
+
+                r[nearFieldDiameterStr]   = str(rxNearFieldAntennaDiameter)
+                r[nearFieldDistLimitStr]  = str(rxNearFieldDistLimit)
+                r[nearFieldEfficiencyStr] = str(rxNearFieldAntEfficiency)
+                ####################################################################################
 
             for r in csmap[keyv]:
                 numPR = int(r['Num Passive Repeater'])

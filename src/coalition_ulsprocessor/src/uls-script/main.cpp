@@ -222,7 +222,7 @@ QStringList getCSVHeader(int numPR)
     header << "Tx Ant Category";
     header << "Tx Ant Diameter (m)";
     header << "Tx Ant Midband Gain (dB)";
-    header << "Tx Height to Center RAAT (m)";
+    header << "Tx Height to Center RAAT ULS (m)";
     header << "Tx Beamwidth";
     header << "Tx Gain ULS (dBi)";
     header << "Rx Location Name";
@@ -238,10 +238,11 @@ QStringList getCSVHeader(int numPR)
     header << "Rx Ant Diameter (m)";
     header << "Rx Ant Midband Gain (dB)";
     header << "Rx Line Loss (dB)";
-    header << "Rx Height to Center RAAT (m)";
+    header << "Rx Height to Center RAAT ULS (m)";
     header << "Rx Gain ULS (dBi)";
-    header << "Rx Diversity Height (m)";
-    header << "Rx Diversity Gain (dBi)";
+    header << "Rx Diversity Height to Center RAAT ULS (m)";
+    header << "Rx Diversity Ant Diameter (m)";
+    header << "Rx Diversity Gain ULS (dBi)";
     header << "Num Passive Repeater";
     for(int prIdx=1; prIdx<=numPR; ++prIdx) {
         header << "Passive Repeater " + QString::number(prIdx) + " Location Name";
@@ -812,6 +813,7 @@ int main(int argc, char **argv)
 
       AntennaModelClass::CategoryEnum rxAntennaCategory;
       double rxAntennaDiameter;
+      double rxDiversityDiameter;
       double rxAntennaMidbandGain;
       std::string rxAntennaModelName;
       if (rxAntModel) {
@@ -819,12 +821,14 @@ int main(int argc, char **argv)
           rxAntennaModelName = rxAntModel->name;
           rxAntennaCategory = rxAntModel->category;
           rxAntennaDiameter = rxAntModel->diameterM;
+          rxDiversityDiameter = rxAntModel->diameterM;
           rxAntennaMidbandGain = rxAntModel->midbandGain;
       } else {
           numAntUnmatch++;
           rxAntennaModelName = "";
           rxAntennaCategory = AntennaModelClass::UnknownCategory;
           rxAntennaDiameter = -1.0;
+          rxDiversityDiameter = -1.0;
           rxAntennaMidbandGain = std::numeric_limits<double>::quiet_NaN();
           fixedReason.append("Rx Antenna Model Unmatched");
       }
@@ -1005,6 +1009,7 @@ int main(int argc, char **argv)
       row << makeNumber(rxAnt.heightToCenterRAAT);  // Rx Height to Center RAAT (m)
       row << makeNumber(rxAnt.gain);            // Rx Gain (dBi)
       row << makeNumber(rxAnt.diversityHeight); // Rx Diveristy Height (m)
+      row << makeNumber(rxDiversityDiameter);   // Rx Diversity Diameter (m)
       row << makeNumber(rxAnt.diversityGain);   // Rx Diversity Gain (dBi)
 
       row << QString::number(prLocList.size());

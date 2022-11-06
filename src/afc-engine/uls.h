@@ -51,9 +51,22 @@ public:
 	double rxGain;
 	double rxDlambda;
 
-	double reflectorHeight;
-	double reflectorWidth;
+	double reflectorHeightLambda;
+	double reflectorWidthLambda;
 
+	// Reflector 3D coordinate system:
+	// X: horizontal vector on reflector surface in direction of width
+	// Y: vector on reflector surface in direction of height.  Note that when reflector is tilted, this is not vertical relative to the ground.
+	// X: vector perpendicular to reflector surface
+	// X, Y, Z are orthonormal basis
+	Vector3 reflectorX, reflectorY, reflectorZ;
+
+	// double reflectorThetaIN;  // Inclusion angle between incident and reflected waves at reflector is 2*thetaIN
+	// double reflectorAlphaEL;  // Inclusion angle in elevation plane is 2*alphaEL (relative to reflector orthonormal basis)
+	// double reflectorAlphaAZ;  // Inclusion angle in azimuthal plane is 2*alphaAZ (relative to reflector orthonormal basis)
+
+	double reflectorSLambda;    // (s/lambda) used in calculation of discrimination gain
+	double reflectorTheta1;     // Theta1 used in calculation of discrimination gain
 };
 /******************************************************************************************/
 
@@ -108,13 +121,16 @@ public:
 	double getNoiseLevelDBW();
 	double getRxGain();
 	double getRxDlambda();
+	double getRxNearFieldAntDiameter();
+	double getRxNearFieldDistLimit();
+	double getRxNearFieldAntEfficiency();
 	CConst::AntennaCategoryEnum getRxAntennaCategory();
 	double getRxAntennaFeederLossDB();
 	double getFadeMarginDB();
 	std::string getStatus();
 	double computeBeamWidth(double attnDB);
-	double computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency, std::string &subModelStr);
-	double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, CConst::AntennaCategoryEnum category, std::string &subModelStr);
+	double computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency, std::string &subModelStr, int divIdx);
+	double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, CConst::AntennaCategoryEnum category, std::string &subModelStr, int divIdx);
 	std::string getRxAntennaModel() { return rxAntennaModel; }
 	CConst::ULSAntennaTypeEnum getRxAntennaType();
 	CConst::ULSAntennaTypeEnum getTxAntennaType();
@@ -134,6 +150,14 @@ public:
 	bool getRxTerrainHeightFlag();
 	bool getTxTerrainHeightFlag();
 	int getNumOutOfBandRLAN();
+
+	bool getHasDiversity() { return hasDiversity; }
+	double getDiversityGain() { return diversityGain; }
+	double getDiversityDlambda() { return diversityDlambda; }
+	double getDiversityHeightAboveTerrain() { return diversityHeightAboveTerrain; }
+	double getDiversityHeightAMSL() { return diversityHeightAMSL; }
+	Vector3 getDiversityPosition() { return diversityPosition; }
+	Vector3 getDiversityAntennaPointing() { return diversityAntennaPointing; }
 
 	void setStartAllocFreq(double f);
 	void setStopAllocFreq(double f);
@@ -167,6 +191,9 @@ public:
 	void setNoiseLevelDBW(double noiseLevelDBWVal);
 	void setRxGain(double rxGainVal);
 	void setRxDlambda(double rxDlambdaVal);
+	void setRxNearFieldAntDiameter(double rxNearFieldAntDiameterVal);
+	void setRxNearFieldDistLimit(double rxNearFieldDistLimitVal);
+	void setRxNearFieldAntEfficiency(double rxNearFieldAntEfficiencyVal);
 	void setRxAntennaCategory(CConst::AntennaCategoryEnum rxAntennaCategoryVal);
 	void setRxAntennaFeederLossDB(double rxAntennaFeederLossDBVal);
 	void setFadeMarginDB(double fadeMarginDBVal);
@@ -197,6 +224,14 @@ public:
 	void setAntennaPointing(Vector3 p);
 	void setType(CConst::ULSTypeEnum typeVal);
 	void setSatellitePositionData(ListClass<Vector3> *spd);
+
+	void setHasDiversity(bool hasDiversityVal) { hasDiversity = hasDiversityVal; }
+	void setDiversityGain(double diversityGainVal) { diversityGain = diversityGainVal; }
+	void setDiversityDlambda(double diversityDlambdaVal) { diversityDlambda = diversityDlambdaVal; }
+	void setDiversityHeightAboveTerrain(double diversityHeightAboveTerrainVal) { diversityHeightAboveTerrain = diversityHeightAboveTerrainVal; }
+	void setDiversityHeightAMSL(double diversityHeightAMSLVal) { diversityHeightAMSL = diversityHeightAMSLVal; }
+	void setDiversityPosition(Vector3 diversityPositionVal) { diversityPosition = diversityPositionVal; }
+	void setDiversityAntennaPointing(Vector3 diversityAntennaPointingVal) { diversityAntennaPointing = diversityAntennaPointingVal; }
 
 	void clearData();
 
@@ -252,6 +287,9 @@ private:
 	bool txTerrainHeightFlag;
 	double noiseLevelDBW;
 	double txGain, rxGain, rxDlambda;
+	double rxNearFieldAntDiameter;
+	double rxNearFieldDistLimit;
+	double rxNearFieldAntEfficiency;
 	CConst::AntennaCategoryEnum rxAntennaCategory;
 	double txEIRP;
 	double linkDistance;
@@ -261,6 +299,15 @@ private:
 	double operatingCenterLongitudeDeg;
 	double operatingCenterLatitudeDeg;
 	double propLoss;
+
+	bool hasDiversity;
+	double diversityGain;
+	double diversityDlambda;
+	double diversityHeightAboveTerrain;
+	double diversityHeightAMSL;
+	Vector3 diversityPosition;
+
+	Vector3 diversityAntennaPointing;
 
 	int numPR;
 	PRClass *prList;

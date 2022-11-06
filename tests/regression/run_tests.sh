@@ -15,6 +15,15 @@ prot=${5:-"https"}
 ap_count=$(docker run --rm ${di_name} --cmd get_nbr_testcases;echo $?)
 
 source $wd/tests/regression/regression.sh
+retval=0
+check_retval() {
+  ret=${1}  # only 0 is OK
+
+  if [ ${ret} -eq 0 ]; then
+    ok "OK"
+    else err "FAIL"; retval=1
+  fi
+}
 
 loop() {
     start=0
@@ -39,7 +48,7 @@ loop() {
         # wait for all pids
         for pid in ${pids[*]}; do
             wait $pid
-            check_ret $?
+            check_retval $?
         done
         unset pids
     done

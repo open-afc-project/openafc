@@ -1,4 +1,30 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-153&196&300**|
+| :- | :- |
+|**Date**|**11/05/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-153: Implement WINNF's inclusion of Diversity antennas
+ * Jira OA-196: Implement WINNF near-field adjustments in antenna pattern
+ * Jira OA-300: Implement Passive Repeaters per R2-AIP-29 thru 32
+
+
+## **Interface Changes**
+ * There are changes in the ULS parser and .sqlite3 file from OA-153, 196 and 300
+ * In afc_config.json, added "passiveRepeaterFlag": false will ignore passive repeaters, true will analyze passive repeaters.
+ * There is a new file (nfa_table_data.csv) that is used for near-field adjustment factor that is placed in the appropriate directory in the docker.
+
+## **Testing Done**
+ * OA-153: Validated that all the ULS data for diversity receivers are populated correctly per R2-AIP-08 - see the ULS attached to this jira ticket.
+ * OA-196: Validated that all the ULS data for near-field adjustment factor are populated correctly per R2-AIP-17 - see the ULS attached to this jira ticket.
+ * Ran WFA test vector FSP1 which contains both Diversity Rx and NearField and validated that all the intermediate parameters and the final parameters were correct (see the exc_thr files attached to OA-153/196).
+
+## **Open Issues** 
+ * None
+
 ## **Version and Date**
 |Version|3.4.4.1|
 | :- | :- |

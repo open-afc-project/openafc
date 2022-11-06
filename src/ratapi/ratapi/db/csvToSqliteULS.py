@@ -143,6 +143,24 @@ class ULS(Base):
     #: Rx Ant Diameter (m)
     rx_ant_diameter = Column(Float)
 
+    #: Rx Near Field Ant Diameter (m)
+    rx_near_field_ant_diameter = Column(Float)
+
+    #: Rx Near Field Dist Limit (m)
+    rx_near_field_dist_limit = Column(Float)
+
+    #: Rx Near Field Ant Efficiency
+    rx_near_field_ant_efficiency = Column(Float)
+
+    #: Rx Diversity Height to Center RAAT (m)
+    rx_diversity_height_to_center_raat_m = Column(Float)
+
+    #: Rx Gain (dBi)
+    rx_diversity_gain = Column(Float)
+
+    #: Rx Ant Diameter (m)
+    rx_diversity_ant_diameter = Column(Float)
+
     p_rp_num = Column(Integer)
 
     path_number = Column(Integer, nullable=False)
@@ -225,7 +243,7 @@ def convertULS(data_file, state_root, logFile):
         errors = []
         uls = None
         pr = None
-        
+
         for count, row in enumerate(data):
             try:
                 numPR = _as_int(row.get('Num Passive Repeater'))
@@ -273,9 +291,9 @@ def convertULS(data_file, state_root, logFile):
                     #: Rx Ground Elevation (m)
                     rx_ground_elev_m=_as_float(row['Rx Ground Elevation (m)']),
                     #: Rx Ant Model
-                    rx_ant_model=str(row['Rx Ant Model']), 
+                    rx_ant_model=str(row['Rx Ant Model']),
                     #: Rx Ant Category
-                    rx_ant_category=str(row['Rx Ant Category']), 
+                    rx_ant_category=str(row['Rx Ant Category']),
                     #: Rx Line Loss (dB)
                     rx_line_loss=_as_float(row['Rx Line Loss (dB)']),
                     #: Rx Height to Center RAAT (m)
@@ -284,10 +302,25 @@ def convertULS(data_file, state_root, logFile):
                     rx_gain=_as_float(row['Rx Gain (dBi)']),
                     #: Rx Ant Diameter (m)
                     rx_ant_diameter=_as_float(row['Rx Ant Diameter (m)']),
+
+                    #: Rx Near Field Ant Diameter (m)
+                    rx_near_field_ant_diameter = _as_float(row['Rx Near Field Ant Diameter (m)']),
+                    #: Rx Near Field Dist Limit (m)
+                    rx_near_field_dist_limit = _as_float(row['Rx Near Field Dist Limit (m)']),
+                    #: Rx Near Field Ant Efficiency
+                    rx_near_field_ant_efficiency = _as_float(row['Rx Near Field Ant Efficiency']),
+
+                    #: Rx Diversity Height to Center RAAT (m)
+                    rx_diversity_height_to_center_raat_m=_as_float(row['Rx Diversity Height to Center RAAT (m)']),
+                    #: Rx Gain (dBi)
+                    rx_diversity_gain=_as_float(row['Rx Diversity Gain (dBi)']),
+                    #: Rx Ant Diameter (m)
+                    rx_diversity_ant_diameter=_as_float(row['Rx Diversity Ant Diameter (m)']),
+
                     #: Number of passive repeaters
                     p_rp_num=numPR,
 
-                    # Path number 
+                    # Path number
                     path_number=int(row['Path Number'])
                 )
 
@@ -312,7 +345,7 @@ def convertULS(data_file, state_root, logFile):
                     )
                     prCount = prCount+1
                     s.add(pr)
-                
+
                 # to_save.append(uls)
             except Exception as e:
                 logFile.write('ERROR: ' + str(e) + '\n')
