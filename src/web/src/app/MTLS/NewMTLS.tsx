@@ -8,7 +8,7 @@ import { hasRole} from "../Lib/User";
 
 /**
  * NewMTLS.tsx: Form for creating a new MTLS certificate
- * author: Sam Smucny
+ * author: Huy Ton
  */
 
 /**
@@ -16,10 +16,6 @@ import { hasRole} from "../Lib/User";
  */
 interface NewMTLSProps {
     userId: number,
-    /**
-     * Used to populate Owner dropdown if user is an admin
-     */
-    users?: UserModel[],
     onAdd: (mtls: MTLSModel) => Promise<RatResponse<string>>
 }
 

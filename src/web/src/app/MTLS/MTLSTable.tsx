@@ -3,8 +3,8 @@ import { headerCol, Table, TableVariant, TableHeader, TableBody } from "@pattern
 import { AccessPointModel, UserModel } from "../Lib/RatApiTypes";
 
 /**
- * MTLS.tsx: Table that displays mtls certs. Shows owner column if admin specifies user list
- * author: Sam Smucny
+ * MTLS.tsx: Table that displays mtls certs. Shows org column if filterId is 0 
+ * author: Huy Ton
  */
 
 /**

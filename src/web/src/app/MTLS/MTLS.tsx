@@ -19,7 +19,6 @@ export interface MTLSProps {
     userId: number, //the one created this certificate
     filterId: number, //the userid to filter
     org: string,
-    users?: UserModel[]
 }
 
 interface MTLSState {
