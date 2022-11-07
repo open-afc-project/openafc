@@ -92,7 +92,7 @@ class ObjIntLocalFS(ObjInt):
         if not os.path.isfile(self._file_name):
             return None
         with open(self._file_name) as hfile:
-            return hfile.read()
+            return bytes(hfile.read(),"utf-8")
 
     def head(self):
         return os.path.exists(self._file_name)
