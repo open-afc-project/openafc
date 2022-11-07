@@ -115,6 +115,7 @@ class GuiConfig(MethodView):
             logout_url=logout_url,
             admin_url=flask.url_for('admin.User', user_id=-1),
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
+            mtls_admin_url=flask.url_for('admin.MTLS', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
             afcconfig_trial=flask.url_for('ratapi-v1.TrialAfcConfigFile'),
             version=serververs,
@@ -687,7 +688,7 @@ class UlsDb(MethodView):
     def post(self, uls_file):
         ''' POST method for ULS Db convert '''
 
-        auth(roles=['Admin'])
+        auth(roles=['Super'])
 
         from ..db.generators import create_uls_db
 
@@ -741,7 +742,7 @@ class UlsParse(MethodView):
     def post(self):
         ''' POST method for manual daily ULS Db parsing '''
 
-        auth(roles=['Admin'])
+        auth(roles=['Super'])
 
         LOGGER.debug('Kicking off daily uls parse')
         try:
@@ -767,7 +768,7 @@ class UlsParse(MethodView):
     def put(self):
         ''' Put method for setting the automatic daily ULS time '''
 
-        auth(roles=['Admin'])
+        auth(roles=['Super'])
         args = json.loads(flask.request.data)
         LOGGER.debug('Recieved arg %s', args)
         hours = args["hours"]

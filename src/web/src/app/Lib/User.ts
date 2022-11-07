@@ -26,6 +26,7 @@ export interface UserState {
     } | {
         loggedIn: true,
         email: string,
+        org: string,
         userId: number,
         roles: Role[],
         firstName?: string,
@@ -37,7 +38,7 @@ export interface UserState {
 /**
  * Sum type of possible roles a user can have
  */
-export type Role = "AP" | "Analysis" | "Admin" | "Trial";
+export type Role = "AP" | "Analysis" | "Admin" | "Super" | "Trial"; 
 
 /**
  * Create React context. This is used to provide a global service so that any component can access user state.
@@ -134,4 +135,4 @@ export const hasRole = (role: Role) => letin(getUser(), u => u.data.loggedIn && 
  * Is the current user an admin?
  * @returns Tells if user is an admin
  */
-export const isAdmin = () => hasRole("Admin")
+export const isAdmin = () => (hasRole("Admin") || hasRole("Super"))

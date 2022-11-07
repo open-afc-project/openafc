@@ -14,6 +14,7 @@
 import os
 from .. import config
 OIDC_LOGIN = config.OIDC_LOGIN
+from sqlalchemy.schema import Sequence
 
 try:
     # priv_config overrides defaults
@@ -31,7 +32,7 @@ else:
 import jwt
 from .base import db, UserDbInfo
 import datetime
-
+import time
 
 class User(db.Model, UserMixin):
     ''' Each user account in the system. '''
@@ -54,6 +55,7 @@ class User(db.Model, UserMixin):
     if UserDbInfo.VER >= 1:
         username = db.Column(db.String(50), nullable=False, unique=True)
         sub = db.Column(db.String(255))
+        org = db.Column(db.String(255), nullable=True)
 
     email = db.Column(db.String(255), nullable=False)
     email_confirmed_at = db.Column(db.DateTime())
@@ -139,6 +141,25 @@ class AccessPoint(db.Model):
         self.certification_id = certification_id
         if user_id:
             self.user_id = user_id
+
+class MTLS(db.Model):
+    ''' entry to designate allowed MTLS's for the PAWS interface '''
+
+    __tablename__ = 'MTLS'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    # 32KB limit of certificate data
+    cert = db.Column(db.String(32768), nullable=False, unique=False)
+    note = db.Column(db.String(128), nullable=True, unique=False)
+    org = db.Column(db.String(64), nullable=False)
+    created = db.Column(db.DateTime())
+
+    def __init__(self, cert, note, org):
+        self.cert = cert
+        self.note = note
+        self.org = org
+        self.created = datetime.datetime.fromtimestamp(time.time())
+
 
 class Limit(db.Model):
     ''' entry for limits '''

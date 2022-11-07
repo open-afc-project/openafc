@@ -72,6 +72,14 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
             <NavLink to="/ap-list" activeClassName="pf-m-current">Access Points</NavLink>
           </NavItem> : <NavItem />}
         </UserContext.Consumer>
+
+        <UserContext.Consumer>{(u: UserState) => isAdmin() ?
+          <NavItem id="mtls-link" itemId="mtls-link">
+            <NavLink to="/mtls" activeClassName="pf-m-current">MTLS</NavLink>
+          </NavItem> : <NavItem />}
+        </UserContext.Consumer>
+
+
         <UserContext.Consumer>{(u: UserState) => isLoggedIn() && !hasRole("Trial") ?
           <NavItem id="import-export-link" itemId="import-export-link">
             <NavLink to="/import-export" activeClassName="pf-m-current">Import/Export</NavLink>

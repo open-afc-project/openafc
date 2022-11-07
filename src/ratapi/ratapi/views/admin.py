@@ -31,18 +31,28 @@ class User(MethodView):
     methods = ['POST', 'GET', 'DELETE']
 
     def get(self, user_id):
-        ''' Get User infor with specific user_id. If none is provided, return list of all users. Query parameters used for params. '''
+        ''' Get User infor with specific user_id. If none is provided,
+            return list of all users. Query parameters used for params. '''
 
-        auth(roles=['Admin'], is_user=(None if user_id == 0 else user_id))
-
+        id = auth(roles=['Admin'], is_user=(None if user_id == 0 else user_id))
         if (user_id == 0):
-            # query users
-            # get query params
-            users = aaa.User.query.all()
+            # check if we limit to org or query all
+            cur_user = aaa.User.query.filter_by(id=id).first()
+            roles = [r.name for r in cur_user.roles]
+
+            LOGGER.debug("USER got user: %s org %s roles %s",
+                         cur_user.email, cur_user.org, str(cur_user.roles))
+            if "Super" in roles:
+                users = aaa.User.query.all()
+            else:
+                org = cur_user.org if cur_user.org else ""
+                users = aaa.User.query.filter_by(org=org).all()
+
             return flask.jsonify(users=[
                 {
                     'id': u.id,
                     'email': u.email,
+                    'org':  u.org if u.org else "",
                     'firstName': u.first_name,
                     'lastName': u.last_name,
                     'active': u.active,
@@ -57,6 +67,7 @@ class User(MethodView):
                 {
                     'id': user.id,
                     'email': user.email,
+                    'org': user.org if user.org else "",
                     'firstName': user.first_name,
                     'lastName': user.last_name,
                     'active': user.active,
@@ -68,10 +79,9 @@ class User(MethodView):
         ''' Update user information. '''
 
         content = flask.request.json
-
-
         user = aaa.User.query.filter_by(id=user_id).first()
         LOGGER.debug("got user: %s", user.email)
+        org = user.org if user.org else ""
 
         if content.has_key('setProps'):
             auth(roles=['Admin'], is_user=user_id)
@@ -95,9 +105,12 @@ class User(MethodView):
             db.session.commit() # pylint: disable=no-member
 
         elif content.has_key('addRole'):
-            auth(roles=['Admin'])
             # just add a single role
             role = content.get('addRole')
+            if role == "Super":
+                auth(roles=['Super'], org=org)
+            else:
+                auth(roles=['Admin'], org=org)
             LOGGER.debug('Adding role: %s', role)
             # check if user already has role
             if not role in [ r.name for r in user.roles ]:
@@ -107,7 +120,7 @@ class User(MethodView):
                 db.session.commit() # pylint: disable=no-member
 
         elif content.has_key('removeRole'):
-            auth(roles=['Admin'])
+            auth(roles=['Admin'], org=org)
             # just remove a single role
             role = content.get('removeRole')
             LOGGER.debug('Removing role: %s', role)
@@ -129,9 +142,9 @@ class User(MethodView):
     def delete(self, user_id):
         ''' Remove a user from the system. '''
 
-        auth(roles=['Admin'])
-
         user = aaa.User.query.filter_by(id=user_id).first()
+        org = user.org if user.org else ""
+        auth(roles=['Admin'], org=org)
         user_ap_list = aaa.AccessPoint.query.filter_by(user_id=user.id).all()
         LOGGER.info("Deleting user: %s", user.email)
 
@@ -152,8 +165,19 @@ class AccessPoint(MethodView):
         ''' Get AP info with specific user_id. '''
 
         if id == 0:
-            auth(roles=['Admin'])
-            access_points = aaa.AccessPoint.query.all()
+            id = auth(roles=['Admin'])
+            user = aaa.User.query.filter_by(id=id).first()
+            roles = [r.name for r in user.roles]
+            if "Super" in roles:
+                # Super user gets all access points
+                access_points = db.session.query(aaa.AccessPoint).all()
+            else:
+                # Admin only user gets all access points within own org
+                org = user.org if user.org else ""
+                access_points = []
+                for user, ap in db.session.query(aaa.User,aaa.AccessPoint).filter(aaa.User.id == aaa.AccessPoint.user_id).filter(aaa.User.org == org).all():
+                    access_points.append(ap)
+
         else:
             auth(roles=['Admin'], is_user=id)
             access_points = aaa.AccessPoint.query.filter_by(user_id=id).all()
@@ -176,8 +200,8 @@ class AccessPoint(MethodView):
 
         content = flask.request.json
 
-        auth(roles=['Admin'], is_user=id)
         user = aaa.User.query.filter_by(id=id).first()
+        auth(roles=['Admin'], is_user=id)
 
         try:
             ap = aaa.AccessPoint(content.get('serialNumber'), content.get('model'), content.get('manufacturer'), content.get('certificationId'))
@@ -232,7 +256,7 @@ class Limits(MethodView):
         ''' set eirp limit '''
 
         content = flask.request.get_json()
-        auth(roles=['Admin'])
+        auth(roles=['Super'])
         try:
             limits = aaa.Limit.query.filter_by(id=0).first()
             #insert case
@@ -312,7 +336,7 @@ class AllowedFreqRanges(MethodView):
     def put(self, filename="allowed_frequencies.json"):
         ''' PUT method for afc config
         '''
-        user_id = auth(roles=['Admin'])
+        user_id = auth(roles=['Super'])
         LOGGER.debug("current user: %s", user_id)
         if filename not in self.ACCEPTABLE_FILES:
             raise werkzeug.exceptions.NotFound()
@@ -324,9 +348,85 @@ class AllowedFreqRanges(MethodView):
             shutil.copyfileobj(flask.request.stream, outfile)
         return flask.make_response('Allowed frequency ranges updated', 204)
 
+class MTLS(MethodView):
+    ''' resources to manage mtls certificates '''
+
+    methods = ['POST', 'GET', 'DELETE']
+
+    def get(self, id):
+        ''' Get MTLS info with specific user_id. '''
+
+        if id == 0:
+            user_id = auth(roles=['Admin'])
+            user = aaa.User.query.filter_by(id=user_id).first()
+            roles = [r.name for r in user.roles]
+            if "Super" in roles:
+                mtls_list = aaa.MTLS.query.all()
+            else:
+                # Admin user gets certificates for his/her own org
+                org = user.org if user.org else ""
+                mtls_list = db.session.query(aaa.MTLS).filter(aaa.MTLS.org == org).all()
+        else:
+            raise werkzeug.exceptions.NotFound()
+
+        return flask.jsonify(mtls=[
+            {
+                'id': mtls.id,
+                'cert': mtls.cert,
+                'note': mtls.note if mtls.note else "",
+                'org': mtls.org if mtls.org else "",
+                'created': str(mtls.created),
+            }
+            for mtls in mtls_list
+        ])
+
+    def post(self, id):
+        ''' add an mtls cert by a user id. '''
+
+        content = flask.request.json
+        org = content.get('org')
+        auth(roles=['Admin'], org=org)
+
+        LOGGER.debug("PUT mtls: %s org: %s", str(id), org)
+
+        try:
+            # check if certificate is already there.
+            cert = content.get('cert')
+            LOGGER.info("PUT mtls: %s org: %s", str(id), org)
+            try:
+                import base64
+                strip_chars = 'base64,'
+                index = cert.index(strip_chars)
+                cert = base64.b64decode(cert[index + len(strip_chars):])
+            except:
+                LOGGER.error("PUT mtls: %s org: %s exception", str(id), org)
+                raise exceptions.BadRequest("Unexpected format of certificate")
+
+            mtls = aaa.MTLS(cert, content.get('note'), org)
+            db.session.add(mtls)
+            db.session.commit() # pylint: disable=no-member
+            return flask.jsonify(id=mtls.id)
+        except IntegrityError:
+            LOGGER.error("PUT mtls: %s org: %s exception", str(id), org)
+            raise exceptions.BadRequest("Unable to add certificate")
+
+
+    def delete(self, id):
+        ''' Remove an mtls cert from the system. Here the id is the mtls cert id instead of the user_id '''
+
+        mtls = aaa.MTLS.query.filter_by(id=id).first()
+        user_id = auth(roles=['Admin'], org=mtls.org)
+        user = aaa.User.query.filter_by(id=user_id).first()
+        LOGGER.info("Deleting mtls: %s", str(mtls.id))
+
+        db.session.delete(mtls) # pylint: disable=no-member
+        db.session.commit() # pylint: disable=no-member
+
+        return flask.make_response()
 
 module.add_url_rule('/user/<int:user_id>', view_func=User.as_view('User'))
 module.add_url_rule('/user/ap/<int:id>', view_func=AccessPoint.as_view('AccessPoint'))
 module.add_url_rule('/user/eirp_min', view_func=Limits.as_view('Eirp'))
 module.add_url_rule('/user/frequency_range', view_func=AllowedFreqRanges.as_view('Frequency'))
 module.add_url_rule('/user/ap/trial', view_func=AccessPoint.as_view('AccessPointTrial'))
+module.add_url_rule('/user/mtls/<int:id>', view_func=MTLS.as_view('MTLS'))

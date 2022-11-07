@@ -186,12 +186,28 @@ const Admin = () => {
 const getAPListModuleAsync = () => {
   return () => import(/* webpackChunkName: "apList" */ "./APList/APList");
 }
+
+const getMTLSModuleAsync = () => {
+  return () => import(/* webpackChunkName: "mtlsList" */ "./MTLS/MTLS");
+}
+
 const APListPage = () => {
   return (
     <DynamicImport load={getAPListModuleAsync()}>
       {(Component: any) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
           : <Component.APListPage />
+      }}
+    </DynamicImport>
+  );
+}
+
+const MTLSPage = () => {
+  return (
+    <DynamicImport load={getMTLSModuleAsync()}>
+      {(Component: any) => {
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
+          : <Component.MTLSPage />
       }}
     </DynamicImport>
   );
@@ -297,6 +313,13 @@ const routes: IAppRoute[] = [
     icon: null,
     label: "Access Points",
     path: "/ap-list"
+  },
+  {
+    component: MTLSPage,
+    exact: true,
+    icon: null,
+    label: "MTLS",
+    path: "/mtls"
   },
   {
     component: UserAccountPage,

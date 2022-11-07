@@ -214,6 +214,66 @@ export const deleteAccessPoint = (id: number) =>
     })
     .catch(err => error("An error was encountered", undefined, err));
 
+/**
+ * Register an access point with a user.
+ * @param mtls cert to add
+ * @param userId owner of new mtls cert
+ */
+export const addMTLS = (mtls: MTLSModel, userId: number) =>
+    fetch(guiConfig.mtls_admin_url.replace("-1", String(userId)), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(mtls)
+    })
+    .then(async res => {
+        if (res.ok) {
+            return success((await res.json()).id as number)
+        } else if (res.status === 400) {
+            return error("Certificate already exists", res.status, res);
+        } else {
+            return error(res.statusText, res.status, res);
+        }
+    })
+    .catch(err => error("An error was encountered", undefined, err));
+
+
+/**
+ * Delete an mtls cert from the system.
+ * @param id mtls cert id
+ */
+export const deleteMTLSCert = (id: number) =>
+    // here the id in the url is the mtls id, not the user id
+    fetch(guiConfig.mtls_admin_url.replace("-1", String(id)), {
+        method: "DELETE",
+    })
+    .then(res => {
+        if (res.ok) {
+            return success(undefined);
+        } else {
+            return error(res.statusText, res.status, res);
+        }
+    })
+    .catch(err => error("An error was encountered", undefined, err));
+
+/**
+ * Get mtls cert. If `userId` is provided then only return access
+ * points owned by the user. If no `userId` is provided then return all
+ * access points (must be `Admin`).
+ * @param userId (optional) user's Id
+ * @returns list of mtls certs if successful, error otherwise
+ */
+export const getMTLS = (userId?: number) =>
+    fetch(guiConfig.mtls_admin_url.replace("-1", String(userId || 0)), {
+        method: "GET",
+    }).then(async res => {
+        if (res.ok) {
+            return success((await res.json()).mtls as MTLSModel[]);
+        } else {
+            return error("Unable to load mtls", res.status, res);
+        }
+    }).catch(err => error("An error was encountered", undefined, err));
+
+
 
 /**
  * Gets the admin supplied allowed frequency ranges. 
