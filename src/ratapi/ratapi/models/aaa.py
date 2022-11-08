@@ -152,7 +152,7 @@ class MTLS(db.Model):
     cert = db.Column(db.String(32768), nullable=False, unique=False)
     note = db.Column(db.String(128), nullable=True, unique=False)
     org = db.Column(db.String(64), nullable=False)
-    created = db.Column(db.DateTime())
+    created = db.Column(db.DateTime(), nullable=False)
 
     def __init__(self, cert, note, org):
         self.cert = cert
