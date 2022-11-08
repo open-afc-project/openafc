@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2021 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
@@ -91,8 +91,8 @@ class ObjIntLocalFS(ObjInt):
     def read(self):
         if not os.path.isfile(self._file_name):
             return None
-        with open(self._file_name) as hfile:
-            return bytes(hfile.read(),"utf-8")
+        with open(self._file_name, "rb") as hfile:
+            return hfile.read()
 
     def head(self):
         return os.path.exists(self._file_name)
@@ -242,9 +242,7 @@ def get(path):
         with objst.open(path) as hobj:
             data = hobj.read()
             if data:
-                return helpers.send_file(
-                    io.BytesIO(data),
-                    mimetype='application/octet-stream')
+                return data
             else:
                 flask.logger.error('{}: File not found'.format(path))
                 abort(404)
