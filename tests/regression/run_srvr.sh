@@ -29,4 +29,4 @@ check_ret $?
 sleep 5
 # set default srvr configuration
 docker-compose exec -T rat_server rat-manage-api db-create
-docker-compose exec -T -u 1003:1003 rat_server rat-manage-api cfg add src=/pipe/export_admin_cfg.json
+docker-compose exec -T rat_server rat-manage-api cfg add src=/pipe/export_admin_cfg.json
