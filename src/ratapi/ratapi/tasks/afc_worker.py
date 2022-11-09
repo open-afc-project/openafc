@@ -33,30 +33,11 @@ LOGGER.info('Celery Broker: %s', APP_CONFIG['BROKER_URL'])
 #: constant celery reference. Configure once flask app is created
 client = Celery(
     'fbrat',
-    # Remove backend when periodic task moved to Jenkins
-    backend=APP_CONFIG['CELERY_RESULT_BACKEND'],
     broker=APP_CONFIG['BROKER_URL'],
-    # Enable the following flags when periodic task moved to Jenkins
-    #task_ignore_result=True,
-    #task_store_errors_even_if_ignored=False
+    task_ignore_result=True,
 )
 
 client.conf.update(APP_CONFIG)
-
-
-@client.on_after_configure.connect
-def setup_periodic_tasks(sender, **kwargs):
-    # Check every minute if the daily parse time has passed
-    sender.add_periodic_task(
-        crontab(),
-        checkParseTime.apply_async(args=[]),
-    )
-    # reset daily flag every day at midnight
-    sender.add_periodic_task(
-        crontab(minute=0, hour=0),
-        resetDailyFlag.apply_async(args=[]),
-    )
-
 
 @client.task(ignore_result=True)
 def run(prot, host, port, state_root,
@@ -190,95 +171,3 @@ def run(prot, host, port, state_root,
         if os.path.exists(tmpdir):
             shutil.rmtree(tmpdir)
         LOGGER.info('Worker resources cleaned up')
-
-
-@client.task(bind=True)
-def parseULS(self, state_path = "/var/lib/fbrat", isManual = False):
-    task_id = str(self.request.id)
-    # only allow one manual at a time
-    if isManual:
-        datapath = state_path + '/daily_uls_parse/data_files/currentManualId.txt'
-        with open(datapath, 'r+') as data_file:
-            id_in_progress = data_file.read()
-            if(id_in_progress == "" or id_in_progress == None or id_in_progress == '\n'):
-                data_file.write(task_id)
-                LOGGER.debug('Setting manual parser to %s', str(task_id))
-            else:
-                LOGGER.error('Manual parse already in progress')
-                self.update_state(state = 'REVOKED')
-                raise Ignore('Manual parse already in progress')
-    self.update_state(state='PROGRESS')
-    result = daily_uls_parse(state_path, False)
-    self.update_state(state='DONE')
-    LOGGER.debug('Freeing up manual parse worker')
-    return result
-
-@client.task(bind=True)
-def checkParseTime(self):
-    print("Starting check parse time")
-    verifyUlsParseFolders(APP_CONFIG["STATE_ROOT_PATH"])
-    datapath = APP_CONFIG["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/nextRun.txt'
-    nextRun = ''
-
-    with open(datapath, 'r') as data_file:
-        # string is stored as "<hours>:<mins>"
-        nextRun = data_file.read().split(':')
-    hours = int(nextRun[0])
-    mins = int(nextRun[1])
-    LOGGER.debug('Checking parse time for hours: ' + str(hours) + ' mins: ' + str(mins))
-    timeNow = datetime.datetime.utcnow()
-    LOGGER.debug('Current time: ' + timeNow.isoformat())
-    timeToParse = datetime.datetime.utcnow().replace(hour=hours, minute=mins)
-    timeDiff = timeNow - timeToParse
-    LOGGER.debug('Desired parse time: ' + timeToParse.isoformat())
-    # if the time now is past the time to parse, start a parse
-    if timeDiff.total_seconds() >= 0:
-        if client.conf["DAILY_ULS_RAN_TODAY"]:
-            LOGGER.debug('Parse already started/complete today')
-            return "ALREADY PARSED"
-        else:
-            # daily uls parse
-            client.conf["DAILY_ULS_RAN_TODAY"] = True
-            LOGGER.debug('Starting automated daily parse')
-            parseULS.apply_async(args=[APP_CONFIG["STATE_ROOT_PATH"]])
-            return "STARTED PARSE"
-
-    else:
-        LOGGER.debug("Time to parse not yet reached")
-        return "TOO SOON TO PARSE"
-
-        
-
-@client.task(bind=True)
-def resetDailyFlag(self):
-    LOGGER.debug('Setting parse flag to false')
-    client.conf["DAILY_ULS_RAN_TODAY"] = False
-
-def verifyUlsParseFolders(rootDir):
-    # verify there is a daily_uls_parse directory
-    dailyParseDir= rootDir + '/daily_uls_parse'
-    dataFilesDir = dailyParseDir+'/data_files'
-    dataFileNames = {
-        dataFilesDir+'/currentManualId.txt':"",
-        dataFilesDir+'/fsid_table.csv':"",
-        dataFilesDir+'/lastFSID.txt':"1",
-        dataFilesDir+'/lastSuccessfulRun.txt':"",
-        dataFilesDir+'/nextRun.txt':"00:00"
-    }
-
-    LOGGER.debug('checking for next run file in '+dailyParseDir)
-
-    if(not os.path.exists(dailyParseDir)):
-        LOGGER.debug('adding '+dailyParseDir)
-        os.makedirs(dailyParseDir)
-
-    if(not os.path.exists(dataFilesDir)):
-        LOGGER.debug('adding '+dataFilesDir)
-        os.makedirs(dataFilesDir)
-
-    for fname in dataFileNames:
-        if not exists(fname):
-            LOGGER.debug('adding '+fname)
-            with open(fname, 'w+') as f:
-                f.write(dataFileNames[fname])
-
