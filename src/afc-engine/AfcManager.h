@@ -42,6 +42,7 @@
 #include "uls.h"
 #include "UlsMeasurementAnalysis.h"
 #include "nfa.h"
+#include "prtable.h"
 #include "terrain.h"
 #include "CachedGdal.h"
 // Loggers
@@ -501,6 +502,8 @@ class AfcManager
 		ITUDataClass *_ituData;
 		NFAClass *_nfa;
 		std::string _nfaTableFile;               // File containing near field adjustment tabular data described in R2-AIP-17
+		PRTABLEClass *_prTable;
+		std::string _prTableFile;               // File containing passive repeater tabular data described in WINNF-TS-1014-V1.2.0-App02
 		/**************************************************************************************/
 
 		/**************************************************************************************/

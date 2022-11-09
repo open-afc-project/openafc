@@ -251,6 +251,7 @@ AfcManager::AfcManager()
 	_mapDataGeoJsonFile = "";
 
 	_nfa = (NFAClass *) NULL;
+	_prTable = (PRTABLEClass *) NULL;
 }
 
 /******************************************************************************************/
@@ -553,6 +554,14 @@ void AfcManager::initializeDatabases()
 	/**************************************************************************************/
 
 	/**************************************************************************************/
+	/* Read Passive Repeater table                                                        */
+	/**************************************************************************************/
+	if (_passiveRepeaterFlag) {
+		_prTable = new PRTABLEClass(_prTableFile);
+	}
+	/**************************************************************************************/
+
+	/**************************************************************************************/
 	/* Read Population data                                                               */
 	/**************************************************************************************/
 	if (_propagationEnviro.toStdString() == "Population Density Map") {
@@ -635,6 +644,11 @@ void AfcManager::clearData()
 	if (_nearFieldAdjFlag) {
 		delete _nfa;
 		_nfa = (NFAClass *) NULL;
+	}
+
+	if (_passiveRepeaterFlag) {
+		delete _prTable;
+		_prTable = (PRTABLEClass *) NULL;
 	}
 }
 /******************************************************************************************/
@@ -2226,6 +2240,9 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 	if (_nearFieldAdjFlag) {
 		_nfaTableFile = SearchPaths::forReading("data", "fbrat/rat_transfer/nfa/nfa_table_data.csv", true).toStdString();
+	}
+	if (_passiveRepeaterFlag) {
+		_prTableFile = SearchPaths::forReading("data", "fbrat/rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv", true).toStdString();
 	}
 	// ***********************************
 
@@ -5033,6 +5050,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 							PRClass& pr = uls->getPR(prIdx);
 							double nextSegDist = ((prIdx == numPR-1) ? uls->getLinkDistance() : uls->getPR(prIdx+1).segmentDistance);
 							double nextSegFSPL = 20.0 * log((4 * M_PI * centerFreq * nextSegDist) / CConst::c) / log(10.0);
+
 							if (pr.type == CConst::backToBackAntennaPRType) {
 								pr.pathSegGain = pr.rxGain + pr.txGain - nextSegFSPL;
 							} else if (pr.type == CConst::billboardReflectorPRType) {
@@ -5061,10 +5079,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								double Ks = 4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN*lambda/(M_PI*nextSegDist);
 								double alpha_n = 20*log10(M_PI*Ks/4);
 
-								if (Ks <= 0.4) {
+								if ( (Ks <= 0.4) || ((prIdx < numPR-1) && (uls->getPR(prIdx+1).type == CConst::billboardReflectorPRType)) ) {
 									pr.pathSegGain = std::min(3.0,alpha_n);
 								} else {
-									// Need to calculate alpha_NF
+									double nextDlambda = ((prIdx == numPR-1) ? uls->getRxDlambda() : uls->getPR(prIdx+1).rxDlambda);
+									double Q = nextDlambda*sqrt(M_PI/(4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN));
+									pr.pathSegGain = _prTable->computePRTABLE(Q, 1.0/Ks);
 								}
 							}
 							pr.effectiveGain = (prIdx == numPR-1 ? 0 : uls->getPR(prIdx+1).effectiveGain) + pr.pathSegGain;
@@ -7866,7 +7886,7 @@ void AfcManager::runPointAnalysis()
 												} else {
 													msg << QString::number(nearField_eff, 'f', 5);
 												}
-                                                msg << QString::number(nearFieldOffsetDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
+												msg << QString::number(nearFieldOffsetDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
 												msg << QString::number(_polarizationLossDB, 'f', 3);
 												msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
 												msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(I2NDB, 'f', 3) <<  QString::number(eirpLimit_dBm, 'f', 3);
@@ -7958,7 +7978,7 @@ void AfcManager::runPointAnalysis()
 								});
 
 					}
-#		           endif
+#					endif
 
 				}
 				else
@@ -9768,9 +9788,9 @@ void AfcManager::runHeatmapAnalysis()
 			double rlanLat = (_heatmapMinLat*(2*_heatmapNumPtsLat-2*latIdx-1) + _heatmapMaxLat*(2*latIdx+1)) / (2*_heatmapNumPtsLat);
 			// LOGGER_DEBUG(logger) << "Heatmap point: (" << lonIdx << ", " << latIdx << ")";
 
-#           if DEBUG_AFC
+#			if DEBUG_AFC
 			auto t1 = std::chrono::high_resolution_clock::now();
-#           endif
+#			endif
 
 			double rlanHeight;
 			double rlanTerrainHeight, bldgHeight;
@@ -10077,12 +10097,12 @@ void AfcManager::runHeatmapAnalysis()
 
 			numProc++;
 
-#           if DEBUG_AFC
+#			if DEBUG_AFC
 			auto t2 = std::chrono::high_resolution_clock::now();
 
 			std::cout << " [" << numProc << " / " <<  totNumProc  << "] " << " Elapsed Time = " << std::setprecision(6) << std::chrono::duration_cast<std::chrono::duration<double>>(t2-t1).count() << std::endl << std::flush;
 
-#           endif
+#			endif
 
 			if (numProc == xN) {
 				if (xN == 1) {
