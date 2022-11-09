@@ -2343,30 +2343,50 @@ QJsonDocument AfcManager::generateRatAfcJson()
 	}
 
 	QJsonArray channelInfos = QJsonArray();
+	QJsonArray blackChannelInfos = QJsonArray();
+	QJsonArray redChannelInfos = QJsonArray();
 	if (_responseCode == CConst::successResponseCode) {
 		for (const auto &group : _inquiredChannels) {
 			auto operatingClass = group.first;
 			auto indexArray = QJsonArray();
+			auto blackIndexArray = QJsonArray();
+			auto redIndexArray = QJsonArray();
 			auto eirpArray = QJsonArray();
 
 			for (const auto &chan : _channelList) {
 				if (    (chan.type == ChannelType::INQUIRED_CHANNEL)
 						&& (chan.operatingClass == operatingClass)
-						&& (chan.availability != BLACK)
-						&& (chan.availability != RED)
 				) {
-					indexArray.append(chan.index);
-					eirpArray.append(chan.eirpLimit_dBm);
+					if (chan.availability == BLACK) {
+						blackIndexArray.append(chan.index);
+					} else if (chan.availability == RED) {
+						redIndexArray.append(chan.index);
+					} else {
+						indexArray.append(chan.index);
+						eirpArray.append(chan.eirpLimit_dBm);
+					}
 				}
 			}
 
 			auto channelGroup = QJsonObject
 			{
 				{ "globalOperatingClass", QJsonValue(operatingClass) },
-					{ "channelCfi", indexArray },
-					{ "maxEirp", eirpArray }
+				{ "channelCfi", indexArray },
+				{ "maxEirp", eirpArray }
+			};
+			auto blackChannelGroup = QJsonObject
+			{
+				{ "globalOperatingClass", QJsonValue(operatingClass) },
+				{ "channelCfi", blackIndexArray }
+			};
+			auto redChannelGroup = QJsonObject
+			{
+				{ "globalOperatingClass", QJsonValue(operatingClass) },
+				{ "channelCfi", redIndexArray }
 			};
 			channelInfos.append(channelGroup);
+			blackChannelInfos.append(blackChannelGroup);
+			redChannelInfos.append(redChannelGroup);
 		}
 	}
 
@@ -2443,14 +2463,28 @@ QJsonDocument AfcManager::generateRatAfcJson()
 	}
 	availableSpectrumInquiryResponse.insert("response", responseObj);
 
+	QJsonObject vendorExtensionResponse;
+	if (blackChannelInfos.size()) {
+		vendorExtensionResponse.insert("blackChannelInfo", blackChannelInfos);
+	}
+	if (redChannelInfos.size()) {
+		vendorExtensionResponse.insert("redChannelInfo", redChannelInfos);
+	}
+
 	QJsonObject responses {
 		{ "version", _guiJsonVersion },
-			{ "availableSpectrumInquiryResponses",
-				QJsonArray
-				{
-					availableSpectrumInquiryResponse
-				}
+		{ "availableSpectrumInquiryResponses",
+			QJsonArray
+			{
+				availableSpectrumInquiryResponse
 			}
+		},
+		{ "vendorExtensions",
+			QJsonArray
+			{
+				vendorExtensionResponse
+			}
+		}
 	};
 
 	return QJsonDocument(responses);
