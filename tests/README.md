@@ -23,6 +23,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Export tests requests and responses in WFA file format](#export-tests-requests-and-responses-in-wfa-file-format)
   - [Compare AFC config records](#compare-afc-config-records)
   - [Reacquisition response records for exist requests](#reacquisition-response-records-for-exist-requests)
+  - [How to run HTTPs access test](#how-to-run-https-access-test)
 - [**Testing setup**](#testing-setup)
 - [**Change testing database manually**](#change-testing-database-manually*)
 
@@ -192,13 +193,13 @@ afc_tests.py --cmd parse_tests --infile "AFC System (SUT) Test Vectors r6.xlsx" 
 Following example exports test vectors and corresponded responses to WFA format files.
 All files created in local directory "wfa_test".
 ```
-afc_tests.py --cmd dump_db --table wfa --addr <ip> --outfile <output file>
+afc_tests.py --cmd dump_db --table wfa --outfile <output file>
 ```
 An example how to use it with docker container, named "test".
 Following sequence creates files at path "`pwd`/data/wfa_test".
 
 ```
-docker -rm -v `pwd`/data:/data test --cmd dump_db --table wfa --addr <ip> --outpath /data
+docker -rm -v `pwd`/data:/data test --cmd dump_db --table wfa --outpath /data
 ```
 
 ## Compare AFC config records
@@ -216,6 +217,16 @@ afc_tests.py --cmd cmp_cfg --infile ../../afc_config.json --idx 1
 Re-run tests from the database and update corresponded responses.
 ```
 afc_tests.py --cmd reacq --addr 1.2.3.4
+```
+
+## How to run HTTPs access test
+
+Follows example how to run HTTPS access test. The test utility only does
+protocol handshake using mutual TLS.
+```
+cd <open-afc path>/tests
+./afc_tests.py --cmd run_cert --addr <ip addr> --port <port> --ca_cert ../nginx/tmp.bundle.pem 
+--cli_key ../nginx/tmp_cli.key.pem --cli_cert ../nginx/tmp_cli.bdl.pem
 ```
 
 <br /><br />

@@ -29,9 +29,9 @@ loop() {
         for i in `seq $((s+1)) ${e}`; do
             # WAR JIRA:OA-362
             if [[ ${i} -ne 73 ]]; then
-              docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} &
+              docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} --skip_verif &
             else
-              docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} --conn_type=async &
+              docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} --conn_type=async --skip_verif &
             fi
             pids+=( $! )
         done

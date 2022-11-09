@@ -122,7 +122,7 @@ class TestCfg(dict):
             data=new_req,
             headers=headers,
             timeout=600,    #10 min
-            verify=self['verif_post'])
+            verify=self['skip_verif'])
         resp = rawresp.json()
 
         tId = resp.get('taskId')
@@ -1086,12 +1086,13 @@ def _run_tests(cfg, reqs, resps, comparator, test_cases):
         if (cfg['cache'] == False):
             params_data['nocache'] = 'True'
 
-        ser_cert=cfg['verif_post']
+        ser_cert=not cfg['skip_verif']
         cli_certs=()
-        if cfg['prot'] == AFC_PROT_NAME:
+        if (cfg['prot'] == AFC_PROT_NAME and
+            cfg['skip_verif'] == False):
             cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
             ser_cert="".join(cfg['ca_cert'])
-            app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
+        app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
         before_ts = time.monotonic()
         rawresp = requests.post(cfg['url_path'],
@@ -1348,10 +1349,11 @@ def parse_run_test_args(cfg):
     app_log.debug(f"{inspect.stack()[0][3]}()")
     if isinstance(cfg['addr'], list):
         # check if provided required certification files
-        if cfg['prot'] == AFC_PROT_NAME:
-            if (isinstance(cfg['ca_cert'], type(None)) or
-                isinstance(cfg['cli_cert'], type(None)) or
-                isinstance(cfg['cli_key'], type(None))):
+        if (cfg['prot'] == AFC_PROT_NAME and
+            cfg['skip_verif'] == False and
+            (isinstance(cfg['ca_cert'], type(None)) or
+             isinstance(cfg['cli_cert'], type(None)) or
+             isinstance(cfg['cli_key'], type(None)))):
                 app_log.error(f"Missing required parameters.\n"
                               f"protocol {cfg['prot']}, port {cfg['port']}, "
                               f"cacert {cfg['ca_cert']}, "
@@ -1419,8 +1421,9 @@ def make_arg_parser():
     args_parser.add_argument('--conn_tm', nargs='?', default=None, type=int,
                          help="<secs> - set timeout for asynchronous "
                               "connection (default=None). \n")
-    args_parser.add_argument('--verif_post', action='store_false',
-                         help="<verif_post> - verify SSL on post request.\n")
+    args_parser.add_argument('--skip_verif', action='store_true',
+                         help="<skip_verif> - skip SSL veryfication "
+                              "on post request.\n")
     args_parser.add_argument('--outfile', nargs=1, type=str,
                          help="<filename> - set filename for test "
                               "results output.\n")
