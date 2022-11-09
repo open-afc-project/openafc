@@ -24,7 +24,7 @@ import urlparse
 from flask.views import MethodView
 import werkzeug.exceptions
 from ..defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
-from ..tasks.afc_worker import run, parseULS
+from ..tasks.afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint
 from .auth import auth
@@ -108,8 +108,6 @@ class GuiConfig(MethodView):
                                            request_type='p_request_type'),
             uls_convert_url=flask.url_for(
                 'ratapi-v1.UlsDb', uls_file='p_uls_file'),
-            uls_daily_url=flask.url_for(
-                'ratapi-v1.UlsParse'),
             status_url=flask.url_for('auth.UserAPI'),
             login_url=login_url,
             logout_url=logout_url,
@@ -713,162 +711,6 @@ class UlsDb(MethodView):
             raise werkzeug.exceptions.InternalServerError(
                 description=err.message)
 
-class UlsParse(MethodView):
-    ''' Resource for daily parse of ULS data '''
-
-    methods = ['GET', 'POST', 'PUT']
-
-    def get(self):
-        ''' GET method for last successful runtime of uls parse
-        '''
-        LOGGER.debug('getting last successful runtime of uls parse')
-        user_id = auth(roles=['Admin'])
-
-        try:
-            datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/lastSuccessfulRun.txt'
-            if not os.path.exists(datapath):
-                raise werkzeug.exceptions.NotFound('last succesful run file not found')
-            lastSuccess = ''
-            with open(datapath, 'r') as data_file:
-                lastSuccess = data_file.read()
-            return flask.jsonify(
-                lastSuccessfulRun=lastSuccess,
-            )
-        except Exception as err:
-            raise werkzeug.exceptions.InternalServerError(
-                description=err.message)
-
-    def post(self):
-        ''' POST method for manual daily ULS Db parsing '''
-
-        auth(roles=['Admin'])
-
-        LOGGER.debug('Kicking off daily uls parse')
-        try:
-            task = parseULS.apply_async(args=[flask.current_app.config["STATE_ROOT_PATH"], True])
-            
-            LOGGER.debug('uls parse started')
-
-            if task.state == 'FAILURE':
-                raise werkzeug.exceptions.InternalServerError(
-                    'Task was unable to be started', dict(id=task.id, info=str(task.info)))
-
-            return flask.jsonify(
-                taskId=task.id,
-                
-                statusUrl=flask.url_for(
-                    'ratapi-v1.DailyULSStatus', task_id=task.id),
-            )
-
-        except Exception as err:
-            raise werkzeug.exceptions.InternalServerError(
-                description=err.message)
-
-    def put(self):
-        ''' Put method for setting the automatic daily ULS time '''
-
-        auth(roles=['Admin'])
-        args = json.loads(flask.request.data)
-        LOGGER.debug('Recieved arg %s', args)
-        hours = args["hours"]
-        mins =  args["mins"]
-        if hours == 0:
-            hours = "00"
-        if mins == 0:
-            mins = "00"
-        timeStr = str(hours) + ":" + str(mins)
-        LOGGER.debug('Updating automated ULS time to ' + timeStr + " UTC")
-        datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/nextRun.txt'
-        if not os.path.exists(datapath):
-            raise werkzeug.exceptions.NotFound('next run file not found')
-        with open(datapath, 'w') as data_file:
-            data_file.write(timeStr)
-        try:
-            return flask.jsonify(
-                newTime=timeStr
-            ), 200
-        except Exception as err:
-            raise werkzeug.exceptions.InternalServerError(
-                description=err.message)
-
-
-class DailyULSStatus(MethodView):
-    ''' Check status of task '''
-
-    methods = ['GET', 'DELETE']
-
-    def resetManualParseFile(self):
-        ''' Overwrites the file for manual task id with a blank string '''
-        datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/currentManualId.txt'
-        with open(datapath, 'w') as data_file:
-            data_file.write("")
-
-    def get(self, task_id):
-        ''' GET method for uls parse Status '''
-        LOGGER.debug("Getting ULS Parse status with task id: " + task_id)
-        task = parseULS.AsyncResult(task_id)
-        # LOGGER.debug('state: %s', task.state)
-
-        if task.state == 'PROGRESS':
-            LOGGER.debug("Found Task in progress")
-            # todo: add percent progress
-            return flask.jsonify(
-                    percent="WIP",
-            ), 202
-        if not task.ready():
-            LOGGER.debug("Found Task pending")
-            return flask.make_response(flask.json.dumps(dict(percent=0, message='Pending...')), 202)
-        if task.state == 'REVOKED':
-            LOGGER.debug("Found task already in progress")
-            # LOGGER.debug("task info %s", task.info)
-            raise werkzeug.exceptions.ServiceUnavailable()
-
-        elif task.failed():
-            LOGGER.debug("Found failed task")
-            self.resetManualParseFile()
-            raise werkzeug.exceptions.InternalServerError(
-                'Task excecution failed')
-
-        if task.successful():
-            self.resetManualParseFile()
-            results = task.result
-            return flask.jsonify(
-                    entriesUpdated=results[0],
-                    entriesAdded=results[1],
-                    finishTime=results[2]
-            ), 200
-
-        else:
-            raise werkzeug.exceptions.NotFound('Task not found')
-
-    def delete(self, task_id):
-        ''' DELETE method for ULS Status '''
-
-        task = parseULS.AsyncResult(task_id)
-
-        if not task.ready():
-            # task is still running, terminate it
-            LOGGER.debug('Terminating %s', task_id)
-            task.revoke(terminate=True)
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
-        if task.failed():
-            task.forget()
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
-
-        if task.successful() and task.result['status'] == 'DONE':
-            auth(is_user=task.result['user_id'])
-            task.forget()
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
-
-        elif task.successful() and task.result['status'] == 'ERROR':
-            auth(is_user=task.result['user_id'])
-            task.forget()
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
-
-        else:
-            raise werkzeug.exceptions.NotFound('Task not found')
-
-
 
 module.add_url_rule('/guiconfig', view_func=GuiConfig.as_view('GuiConfig'))
 module.add_url_rule('/afcconfig/<path:filename>',
@@ -886,9 +728,5 @@ module.add_url_rule('/analysis/kml/p1/<task_id>',
                     view_func=AnalysisKmlResult.as_view('AnalysisKmlResult'))
 module.add_url_rule('/convert/uls/csv/sql/<uls_file>',
                     view_func=UlsDb.as_view('UlsDb'))
-module.add_url_rule('/ulsparse',
-                    view_func=UlsParse.as_view('UlsParse'))
-module.add_url_rule('/ulsparse/<task_id>',
-                    view_func=DailyULSStatus.as_view('DailyULSStatus'))
 module.add_url_rule('/replay',
                     view_func=ReloadAnalysis.as_view('ReloadAnalysis'))
