@@ -106,8 +106,8 @@ build_dev_server() {
   cd ${wd}/rabbitmq && docker_build_and_push Dockerfile ${RMQ_DI}:${tag} ${push}; cd ${wd}
 
   # build afc nginx docker image
-  cd ${wd}/nginx && docker_build_and_push Dockerfile ${NGNX_DI}:${tag} ${push}; cd ${wd}
-  
+  cd docker_build_and_push ./nginx/Dockerfile ${NGNX_DI}:${tag} ${push}
+
   # build afc server docker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV} --build-arg BUILDREV=${BUILDREV}"
   docker_build_and_push ${wd}/Dockerfile ${SRV_DI}:${tag}  ${push} "${EXT_ARGS}"
