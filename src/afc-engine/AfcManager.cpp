@@ -2461,7 +2461,6 @@ QJsonDocument AfcManager::generateRatAfcJson()
 	if (_responseCode == CConst::successResponseCode) {
 		availableSpectrumInquiryResponse.insert("availabilityExpireTime", ISO8601TimeUTC(1));
 	}
-	availableSpectrumInquiryResponse.insert("response", responseObj);
 
 	QJsonObject vendorExtensionResponse;
 	if (blackChannelInfos.size()) {
@@ -2471,18 +2470,16 @@ QJsonDocument AfcManager::generateRatAfcJson()
 		vendorExtensionResponse.insert("redChannelInfo", redChannelInfos);
 	}
 
+	availableSpectrumInquiryResponse.insert("vendorExtensions", vendorExtensionResponse);
+
+	availableSpectrumInquiryResponse.insert("response", responseObj);
+
 	QJsonObject responses {
 		{ "version", _guiJsonVersion },
 		{ "availableSpectrumInquiryResponses",
 			QJsonArray
 			{
 				availableSpectrumInquiryResponse
-			}
-		},
-		{ "vendorExtensions",
-			QJsonArray
-			{
-				vendorExtensionResponse
 			}
 		}
 	};
