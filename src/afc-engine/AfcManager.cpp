@@ -2241,9 +2241,6 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (_nearFieldAdjFlag) {
 		_nfaTableFile = SearchPaths::forReading("data", "fbrat/rat_transfer/nfa/nfa_table_data.csv", true).toStdString();
 	}
-	if (_passiveRepeaterFlag) {
-		_prTableFile = SearchPaths::forReading("data", "fbrat/rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv", true).toStdString();
-	}
 	// ***********************************
 
 	// ***********************************
@@ -2253,6 +2250,10 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_passiveRepeaterFlag = jsonObj["passiveRepeaterFlag"].toBool();
 	} else {
 		_passiveRepeaterFlag = true;
+	}
+
+	if (_passiveRepeaterFlag) {
+		_prTableFile = SearchPaths::forReading("data", "fbrat/rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv", true).toStdString();
 	}
 	// ***********************************
 }
