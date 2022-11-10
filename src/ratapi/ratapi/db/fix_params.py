@@ -206,14 +206,14 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                             r[prHeightULSFixStr] = str(4.88)
                             r[prWidthULSFixStr] = str(6.10)
                         # 2022.11.08: Need to confirm this
-                        elif (float(r[prHeightULSStr]) < 1.83) or (float(r[prWidthULSStr]) < 2.44):
+                        elif (float(r[prHeightULSStr])+0.1 < 1.83) or (float(r[prWidthULSStr])+0.1 < 2.44):
                             r[prHeightULSFixStr] = str(4.88)
                             r[prWidthULSFixStr] = str(6.10)
 
                         prHeightULS = float(r[prHeightULSFixStr])
                         prWidthULS = float(r[prWidthULSFixStr])
                         # R2-AIP-29-b-iii-1
-                        if (prHeightAntennaStr.strip() == '') or (prWidthAntennaStr.strip() == ''):
+                        if (r[prHeightAntennaStr].strip() == '') or (r[prWidthAntennaStr].strip() == ''):
                             prHeight = prHeightULS
                             prWidth = prWidthULS
                         else:
@@ -221,7 +221,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                             prWidthAnt = float(r[prWidthAntennaStr])
 
                             # R2-AIP-29-b-iii-2
-                            if (abs(prHeightAnt-prHeightULS) <= 0.01) and (abs(prWidthAnt-prWidthULS) <= 0.01):
+                            if (abs(prHeightAnt-prHeightULS) <= 0.1) and (abs(prWidthAnt-prWidthULS) <= 0.1):
                                 prHeight = prHeightULS
                                 prWidth = prWidthULS
 
@@ -247,6 +247,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                     prHeight = prHeightAnt
                                     prWidth = prWidthAnt
                                 # R2-AIP-29-b-iv
+                                else:
                                     prHeight = prHeightAnt
                                     prWidth = prWidthAnt
 
