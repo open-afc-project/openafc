@@ -1,13 +1,19 @@
+#
+# Copyright © 2022 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
 FROM nginx:1.21.6
 RUN apt update \
     && apt install -y openssl \
     && apt install -y bash
 RUN mkdir -p /certificates /certificates/servers /certificates/clients
-# server side certificates
+# Server side certificates
 COPY certs/servers/server.cert.pem /certificates/servers/
 COPY certs/servers/server.key.pem /certificates/servers/
 COPY certs/clients/client.bundle.pem /certificates/clients/
-# client side certificates
+# Client side certificates
 COPY certs/servers/server.bundle.pem /certificates/servers/
 COPY certs/clients/client.key.pem /certificates/clients/
 COPY certs/clients/client.bdl.pem /certificates/clients/
