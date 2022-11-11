@@ -249,6 +249,7 @@ AfcManager::AfcManager()
 	_createKmz = false;
 	_createDebugFiles = false;
 	_mapDataGeoJsonFile = "";
+	_buildingType = CConst::noBuildingType;
 
 	_nfa = (NFAClass *) NULL;
 	_prTable = (PRTABLEClass *) NULL;
@@ -2058,6 +2059,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		} else if (buildingLoss["kind"].toString() == "Fixed Value") {
 			_fixedBuildingLossFlag = true;
 			_fixedBuildingLossValue = buildingLoss["value"].toDouble();
+			_buildingType = CConst::noBuildingType;
+			_confidenceBldg2109 = 0.0;
 		} else {
 			throw std::runtime_error("ERROR: Invalid buildingLoss[\"kind\"]");
 		}
@@ -4796,10 +4799,10 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			if (!_filterSimRegionOnly) {
 				if (!ignoreFlag) {
 					for(int segIdx=0; segIdx<numPR+1; ++segIdx) {
-						Vector3 txLon = (segIdx==0     ? txLongitudeDeg : row.prLongitudeDeg[prIdx-1]);
-						Vector3 txLat = (segIdx==0     ? txLatitudeDeg  : row.prLatitudeDeg[prIdx-1]);
-						Vector3 rxLon = (segIdx==numPR ? rxLongitudeDeg : row.prLongitudeDeg[prIdx]);
-						Vector3 rxLat = (segIdx==numPR ? rxLatitudeDeg  : row.prLatitudeDeg[prIdx]);
+						Vector3 txLon = (segIdx==0     ? txLongitudeDeg : row.prLongitudeDeg[segIdx-1]);
+						Vector3 txLat = (segIdx==0     ? txLatitudeDeg  : row.prLatitudeDeg[segIdx-1]);
+						Vector3 rxLon = (segIdx==numPR ? rxLongitudeDeg : row.prLongitudeDeg[segIdx]);
+						Vector3 rxLat = (segIdx==numPR ? rxLatitudeDeg  : row.prLatitudeDeg[segIdx]);
 
 						if ((rxLat == txLat) && (rxLon == txLon)) {
 							reasonIgnored = "Ignored: RX and TX LON/LAT values are identical for segment " + std::to_string(segIdx);
