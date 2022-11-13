@@ -9,6 +9,7 @@
 PRINST_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image" # preinst image name
 D4B_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-build-image"         # dev image name
 SRV_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"     # server image
+MSGHND_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd"     # msghnd image
 OBJST_DI="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"          # object storage
 RMQ_DI="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                   # rabbitmq image
 NGNX_DI="public.ecr.aws/w9v6y1o0/openafc/ngnx-image"                 # ngnx image
@@ -111,6 +112,9 @@ build_dev_server() {
   # build afc server docker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV} --build-arg BUILDREV=${BUILDREV}"
   docker_build_and_push Dockerfile ${SRV_DI}:${tag}  ${push} "${EXT_ARGS}"
+
+   # build afc-msghnd  (flask + gunicorn)
+  docker_build_and_push Dockerfile ${MSGHND_DI}:${tag}  ${push} "${EXT_ARGS} --build-arg AFC_PROD_ENV=final"
 }
 
 # Local Variables:
