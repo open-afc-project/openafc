@@ -1090,8 +1090,12 @@ def _run_tests(cfg, reqs, resps, comparator, test_cases):
         cli_certs=()
         if (cfg['prot'] == AFC_PROT_NAME and
             cfg['skip_verif'] == False):
-            cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
-            ser_cert="".join(cfg['ca_cert'])
+            # add mtls certificates if explicitly provided
+            if not isinstance(cfg['cli_cert'], type(None)):
+                cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
+            # add tls certificates if explicitly provided
+            if not isinstance(cfg['ca_cert'], type(None)):
+                ser_cert="".join(cfg['ca_cert'])
         app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
         before_ts = time.monotonic()
@@ -1349,18 +1353,7 @@ def parse_run_test_args(cfg):
     app_log.debug(f"{inspect.stack()[0][3]}()")
     if isinstance(cfg['addr'], list):
         # check if provided required certification files
-        if (cfg['prot'] == AFC_PROT_NAME and
-            cfg['skip_verif'] == False and
-            (isinstance(cfg['ca_cert'], type(None)) or
-             isinstance(cfg['cli_cert'], type(None)) or
-             isinstance(cfg['cli_key'], type(None)))):
-                app_log.error(f"Missing required parameters.\n"
-                              f"protocol {cfg['prot']}, port {cfg['port']}, "
-                              f"cacert {cfg['ca_cert']}, "
-                              f"client (cert {cfg['cli_cert']}, "
-                              f"key {cfg['cli_key']})")
-                return AFC_ERR
-        else:
+        if (cfg['prot'] != AFC_PROT_NAME):
             # update URL if not the default protocol
             cfg['url_path'] = cfg['prot'] + '://'
 
