@@ -36,12 +36,7 @@ loop() {
         echo "from $s  to $e"
         # run processes and store pids in array
         for i in `seq $((s+1)) ${e}`; do
-            # WAR JIRA:OA-362
-            if [[ ${i} -ne 73 ]]; then
-              docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} &
-            else
-              docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} --conn_type=async &
-            fi
+            docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} &
             pids+=( $! )
         done
         s=$((s + ${step}))
