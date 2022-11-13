@@ -122,7 +122,7 @@ class TestCfg(dict):
             data=new_req,
             headers=headers,
             timeout=600,    #10 min
-            verify=self['verif_post'])
+            verify=self['skip_verif'])
         resp = rawresp.json()
 
         tId = resp.get('taskId')
@@ -1059,8 +1059,8 @@ def _run_tests(cfg, reqs, resps, comparator, test_cases):
     Run tests
     reqs: {testcaseid: [request_json_str]}
     resps: {testcaseid: [response_json_str, response_hash]}
-    test_cases: [testcaseids]
     comparator: reference to object
+    test_cases: [testcaseids]
     """
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() {test_cases} "
                   f"{cfg['url_path']}")
@@ -1085,13 +1085,27 @@ def _run_tests(cfg, reqs, resps, comparator, test_cases):
             }
         if (cfg['cache'] == False):
             params_data['nocache'] = 'True'
+
+        ser_cert=not cfg['skip_verif']
+        cli_certs=()
+        if (cfg['prot'] == AFC_PROT_NAME and
+            cfg['skip_verif'] == False):
+            # add mtls certificates if explicitly provided
+            if not isinstance(cfg['cli_cert'], type(None)):
+                cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
+            # add tls certificates if explicitly provided
+            if not isinstance(cfg['ca_cert'], type(None)):
+                ser_cert="".join(cfg['ca_cert'])
+        app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
+
         before_ts = time.monotonic()
         rawresp = requests.post(cfg['url_path'],
                                 params=params_data,
                                 data=json.dumps(request_data),
                                 headers=headers,
                                 timeout=600,    #10 min
-                                verify=cfg['verif_post'])
+                                cert=cli_certs,
+                                verify=ser_cert)
         resp = rawresp.json()
 
         tId = resp.get('taskId')
@@ -1261,12 +1275,15 @@ def _run_cert_tests(cfg):
 
     test_res = AFC_OK
 
-    before_ts = time.monotonic()
     try:
-        rawresp = requests.get(cfg['url_path'],
-                               cert=("".join(cfg['cli_cert']),
-                                     "".join(cfg['cli_key'])),
-                               verify="".join(cfg['ca_cert']))
+        if isinstance(cfg['cli_cert'], type(None)):
+            rawresp = requests.get(cfg['url_path'],
+                                   verify="".join(cfg['ca_cert']))
+        else:
+            rawresp = requests.get(cfg['url_path'],
+                                   cert=("".join(cfg['cli_cert']),
+                                         "".join(cfg['cli_key'])),
+                                   verify="".join(cfg['ca_cert']))
     except Exception as e:
         app_log.error(f"({os.getpid()}) {inspect.stack()[0][3]}() {e}")
         test_res = AFC_ERR
@@ -1278,10 +1295,6 @@ def _run_cert_tests(cfg):
     else :
         if rawresp.status_code != 200:
             test_res = AFC_ERR
-
-    tm_secs = time.monotonic() - before_ts
-
-    app_log.info('Test done at %.1f secs', tm_secs)
 
     return test_res
 
@@ -1301,6 +1314,7 @@ def run_cert_tests(cfg):
 
     max_nbr_tests = int("".join(cfg['tests2run']))
 
+    before_ts = time.monotonic()
     while (max_nbr_tests != 0):
         # if stress mode execute testcases in parallel and concurrent
         inputs = [(cfg)]
@@ -1309,6 +1323,9 @@ def run_cert_tests(cfg):
         if not any(r == 0 for r in results):
             test_res = AFC_ERR
         max_nbr_tests -= 1
+    tm_secs = time.monotonic() - before_ts
+    app_log.info(f"Tests {max_nbr_tests} done at {tm_secs:.3f} s")
+
     return test_res
 
 
@@ -1335,27 +1352,27 @@ def parse_run_test_args(cfg):
     """Parse arguments for command 'run_test'"""
     app_log.debug(f"{inspect.stack()[0][3]}()")
     if isinstance(cfg['addr'], list):
-        # set URL if protocol is not the default
-        if cfg['prot'] != AFC_PROT_NAME:
+        # check if provided required certification files
+        if (cfg['prot'] != AFC_PROT_NAME):
+            # update URL if not the default protocol
             cfg['url_path'] = cfg['prot'] + '://'
 
         cfg['url_path'] += str(cfg['addr'][0]) + ':' + str(cfg['port']) +\
-                           AFC_URL_SUFFIX +\
-                           '/' + AFC_REQ_NAME
+                           AFC_URL_SUFFIX + AFC_REQ_NAME
+    return AFC_OK
 
 
 def parse_run_cert_args(cfg):
     """Parse arguments for command 'run_cert'"""
     app_log.debug(f"{inspect.stack()[0][3]}()")
     if ((not isinstance(cfg['addr'], list)) or
-        isinstance(cfg['ca_cert'], type(None)) or
-        isinstance(cfg['cli_cert'], type(None)) or
-        isinstance(cfg['cli_key'], type(None))):
+        isinstance(cfg['ca_cert'], type(None))):
         app_log.error(f"{inspect.stack()[0][3]}() Missing arguments")
         return AFC_ERR
 
     cfg['url_path'] = cfg['prot'] + '://' + str(cfg['addr'][0]) +\
                       ':' + str(cfg['port']) + '/'
+    return AFC_OK
 
 
 # available commands to execute in alphabetical order
@@ -1397,8 +1414,9 @@ def make_arg_parser():
     args_parser.add_argument('--conn_tm', nargs='?', default=None, type=int,
                          help="<secs> - set timeout for asynchronous "
                               "connection (default=None). \n")
-    args_parser.add_argument('--verif_post', action='store_false',
-                         help="<verif_post> - verify SSL on post request.\n")
+    args_parser.add_argument('--skip_verif', action='store_true',
+                         help="<skip_verif> - skip SSL veryfication "
+                              "on post request.\n")
     args_parser.add_argument('--outfile', nargs=1, type=str,
                          help="<filename> - set filename for test "
                               "results output.\n")
