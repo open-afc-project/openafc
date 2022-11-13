@@ -85,7 +85,7 @@ class GuiConfig(MethodView):
         if dataif.isFsBackend():
             histurl = u.scheme + "://" + u.netloc + flask.url_for('files.history')
         else:
-            histurl = u.scheme + "://" + u.hostname + ":" + str(os.getenv("HISTORY_EXTERNAL_PORT")) + "/"
+            histurl = u.scheme + "://" + u.netloc + "/dbg"
 
         if flask.current_app.config['OIDC_LOGIN']:
             login_url=flask.url_for('auth.LoginAPI'),
