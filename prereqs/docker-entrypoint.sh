@@ -22,10 +22,15 @@ CELERY_OPTIONS=${CELERY_OPTIONS:="rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_
 CELERY_LOG=${CELERY_LOG:=INFO}
 /bin/celery multi start $CELERY_OPTIONS -A ratapi.tasks.afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=$CELERY_LOG &
 
-# apache
-HTTPD_OPTIONS=${HTTPD_OPTIONS}
-echo "/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND >"
-/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND &
+if [ "$AFC_PROD_ENV" == "final" ]; then
+    # gunicorn
+    gunicorn --config gunicorn.conf.py --log-config gunicorn.logs.conf wsgi:app
+else
+    # apache
+    HTTPD_OPTIONS=${HTTPD_OPTIONS}
+    echo "/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND >"
+    /usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND &
+fi
 
 wait
 
