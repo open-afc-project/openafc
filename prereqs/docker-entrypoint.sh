@@ -21,11 +21,13 @@ fi
 CELERY_OPTIONS=${CELERY_OPTIONS:="rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10"}
 CELERY_LOG=${CELERY_LOG:=INFO}
 /bin/celery multi start $CELERY_OPTIONS -A ratapi.tasks.afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=$CELERY_LOG &
-
+echo 
 if [ "$AFC_PROD_ENV" == "final" ]; then
     # gunicorn
+    echo " DIMA TEST GUNICORN"
     gunicorn --config gunicorn.conf.py --log-config gunicorn.logs.conf wsgi:app
 else
+    echo " DIMA TEST APACHE"
     # apache
     HTTPD_OPTIONS=${HTTPD_OPTIONS}
     echo "/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND >"
