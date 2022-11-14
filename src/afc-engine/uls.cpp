@@ -600,13 +600,13 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 /******************************************************************************************/
 double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, CConst::AntennaCategoryEnum category, std::string &subModelStr, int divIdx)
 {
-	int freqIdx;
+	// int freqIdx;
 	double rxGainDB;
 
 	if ((frequency >= 5925.0e6) && (frequency <= 6425.0e6)) {
-		freqIdx = 0;
+		// freqIdx = 0;
 	} else if ((frequency >= 6525.0e6) && (frequency <= 6875.0e6)) {
-		freqIdx = 1;
+		// freqIdx = 1;
 	} else {
 		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value for FSID = " << id);
 	}
@@ -846,7 +846,8 @@ PRClass::~PRClass()
 /******************************************************************************************/
 /**** FUNCTION: PRClass::computeDiscriminationGain                                     ****/
 /******************************************************************************************/
-double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency)
+double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency,
+	double& reflectorD0, double& reflectorD1)
 {
 	double discriminationDB;
 
@@ -855,6 +856,9 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 			{
 				double rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, rxGain, rxDlambda);
 				discriminationDB = rxGain - rxGainDB;
+
+				reflectorD0 = std::numeric_limits<float>::quiet_NaN();
+				reflectorD1 = std::numeric_limits<float>::quiet_NaN();
 			}
 			break;
 		case CConst::billboardReflectorPRType:
@@ -872,6 +876,9 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 					D1 = 20*log10(MathHelpers::sinc(u1_over_PI)) - 0.4165*(angleOffBoresightDeg - 20.0);
 				}
 				discriminationDB = std::max(D0, D1);
+
+				reflectorD0 = D0;
+				reflectorD1 = D1;
 			}
 			break;
 		default:

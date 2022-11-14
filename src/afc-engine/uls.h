@@ -25,7 +25,8 @@ public:
 	PRClass();
 	~PRClass();
 
-	double computeDiscriminationGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency);
+	double computeDiscriminationGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency,
+		double& reflectorD0, double& reflectorD1);
 
 	// Path segment gain as defined in R2-AIP-31
 	double pathSegGain;
@@ -61,7 +62,9 @@ public:
 	// X, Y, Z are orthonormal basis
 	Vector3 reflectorX, reflectorY, reflectorZ;
 
-	// double reflectorThetaIN;  // Inclusion angle between incident and reflected waves at reflector is 2*thetaIN
+	double reflectorThetaIN;  // Inclusion angle between incident and reflected waves at reflector is 2*thetaIN
+	double reflectorKS;
+	double reflectorQ;
 	// double reflectorAlphaEL;  // Inclusion angle in elevation plane is 2*alphaEL (relative to reflector orthonormal basis)
 	// double reflectorAlphaAZ;  // Inclusion angle in azimuthal plane is 2*alphaAZ (relative to reflector orthonormal basis)
 

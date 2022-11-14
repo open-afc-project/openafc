@@ -161,7 +161,7 @@ void NFAClass::readTable()
 	// loads parse up table data/creates data strucutre each column into 4 vectors xdB, step count, efficiency, and NFA.
 	// Done for unit testing puposes to make sure all the data values are present.
 	// This entire for loop can be removed.
-	for (int row_ind = 0; row_ind < datastore.size(); ++row_ind) {
+	for (int row_ind = 0; row_ind < (int) datastore.size(); ++row_ind) {
 		xdb = datastore[row_ind][0];
 		u = datastore[row_ind][1];
 		eff = datastore[row_ind][2];

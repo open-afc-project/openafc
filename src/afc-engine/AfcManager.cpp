@@ -5110,13 +5110,18 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								double Ks = 4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN*lambda/(M_PI*nextSegDist);
 								double alpha_n = 20*log10(M_PI*Ks/4);
 
+								double Q = -1.0;
 								if ( (Ks <= 0.4) || ((prIdx < numPR-1) && (uls->getPR(prIdx+1).type == CConst::billboardReflectorPRType)) ) {
 									pr.pathSegGain = std::min(3.0,alpha_n);
 								} else {
 									double nextDlambda = ((prIdx == numPR-1) ? uls->getRxDlambda() : uls->getPR(prIdx+1).rxDlambda);
-									double Q = nextDlambda*sqrt(M_PI/(4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN));
+									Q = nextDlambda*sqrt(M_PI/(4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN));
 									pr.pathSegGain = _prTable->computePRTABLE(Q, 1.0/Ks);
 								}
+
+								pr.reflectorThetaIN = acos(cosThetaIN)*180.0/M_PI;
+								pr.reflectorKS = Ks;
+								pr.reflectorQ = Q;
 							}
 							pr.effectiveGain = (prIdx == numPR-1 ? 0 : uls->getPR(prIdx+1).effectiveGain) + pr.pathSegGain;
 						}
@@ -6837,6 +6842,13 @@ void AfcManager::runPointAnalysis()
 				"SEGMENT_IDX",
 				"SEGMENT_RX_LONGITUDE (deg)",
 				"SEGMENT_RX_LATITUDE (deg)",
+
+				"PR_REF_THETA_IN (deg)",
+				"PR_REF_KS",
+				"PR_REF_Q",
+				"PR_REF_D0 (dB)",
+				"PR_REF_D1 (dB)",
+
 				"RLAN_LONGITUDE (deg)",
 				"RLAN_LATITUDE (deg)",
 				"RLAN_HEIGHT_ABOVE_TERRAIN (m)",
@@ -6886,7 +6898,7 @@ void AfcManager::runPointAnalysis()
 				"FS_RX_PWR (dBW)",
 				"FS I/N (dB)",
 				"EIRP_LIMIT (dBm)",
-				"ULS_LINK_DIST (m)",
+				"FS_SEGMENT_DIST (m)",
 				"RLAN_CENTER_FREQ (Hz)",
 				"FS_TX_TO_RLAN_DIST (m)",
 				"PATH_DIFFERENCE (m)",
@@ -7718,6 +7730,8 @@ void AfcManager::runPointAnalysis()
 											double nearField_xdb;
 											double nearField_u;
 											double nearField_eff;
+											double reflectorD0;
+											double reflectorD1;
 
 											double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
@@ -7746,7 +7760,7 @@ void AfcManager::runPointAnalysis()
 												if (segIdx == numPR) {
 													rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, divIdx);
 												} else {
-													discriminationGain = uls->getPR(segIdx).computeDiscriminationGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq);
+													discriminationGain = uls->getPR(segIdx).computeDiscriminationGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, reflectorD0, reflectorD1);
 													rxGainDB = uls->getPR(segIdx).effectiveGain - discriminationGain;
 												}
 
@@ -7797,6 +7811,7 @@ void AfcManager::runPointAnalysis()
 													}
 												}
 											}
+
 											if (skip) {
 												continue;
 											}
@@ -7830,13 +7845,13 @@ void AfcManager::runPointAnalysis()
 												double d2;
 												double pathDifference;
 												double fresnelIndex = -1.0;
-												double ulsLinkDistance = uls->getLinkDistance();
+												double ulsSegmentDistance = (segIdx == numPR ? uls->getLinkDistance() : uls->getPR(segIdx).segmentDistance);
 												double ulsWavelength = CConst::c / ((uls->getStartUseFreq() + uls->getStopUseFreq()) / 2);
-												if (ulsLinkDistance != -1.0) {
+												if (ulsSegmentDistance != -1.0) {
 													const Vector3 ulsTxPos = (segIdx ? uls->getPR(segIdx-1).position : uls->getTxPosition());
 													d1 = (ulsRxPos - rlanPosn).len() * 1000;
 													d2 = (ulsTxPos - rlanPosn).len() * 1000;
-													pathDifference = d1 + d2 - ulsLinkDistance;
+													pathDifference = d1 + d2 - ulsSegmentDistance;
 													fresnelIndex = pathDifference / (ulsWavelength / 2);
 												} else {
 													d1 = (ulsRxPos - rlanPosn).len() * 1000;
@@ -7875,6 +7890,18 @@ void AfcManager::runPointAnalysis()
 												msg << QString::number(uls->getNumPR());
 												msg << QString::number(divIdx);
 												msg << QString::number(segIdx) << QString::number(ulsRxLongitude, 'f', 5) << QString::number(ulsRxLatitude, 'f', 5);
+
+												if ((segIdx < numPR) && (uls->getPR(segIdx).type == CConst::billboardReflectorPRType)) {
+													PRClass& pr = uls->getPR(segIdx);
+													msg << QString::number(pr.reflectorThetaIN, 'f', 5)
+                                                        << QString::number(pr.reflectorKS, 'f', 5)
+                                                        << QString::number(pr.reflectorQ, 'f', 5)
+                                                        << QString::number(reflectorD0, 'f', 5)
+                                                        << QString::number(reflectorD1, 'f', 5);
+												} else {
+													msg << QString("") << QString("") << QString("") << QString("") << QString("");
+												}
+
 												msg << QString::number(rlanCoord.longitudeDeg, 'f', 5) << QString::number(rlanCoord.latitudeDeg, 'f', 5);
 												msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2)
 													<< QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource))
@@ -7921,7 +7948,7 @@ void AfcManager::runPointAnalysis()
 												msg << QString::number(_polarizationLossDB, 'f', 3);
 												msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
 												msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(I2NDB, 'f', 3) <<  QString::number(eirpLimit_dBm, 'f', 3);
-												msg << QString::number(ulsLinkDistance, 'f', 3) << QString::number(chanCenterFreq, 'f', 3) << QString::number(d2, 'f', 3) << QString::number(pathDifference, 'f', 6);
+												msg << QString::number(ulsSegmentDistance, 'f', 3) << QString::number(chanCenterFreq, 'f', 3) << QString::number(d2, 'f', 3) << QString::number(pathDifference, 'f', 6);
 												msg << QString::number(ulsWavelength * 1000, 'f', 3) << QString::number(fresnelIndex, 'f', 3);
 
 												fexcthrwifi->writeRow(msg);
@@ -8306,7 +8333,7 @@ void AfcManager::runScanAnalysis()
 	// List all bandwidths covered by op-classes, merge duplicates
 	for (auto &opClass: _opClass) {
 		int bw = opClass.bandWidth;
-		bw_index_map[opClass.bandWidth] = 0;
+		bw_index_map[bw] = 0;
 	}
 
 	int numBW = 0;
@@ -8853,27 +8880,15 @@ void AfcManager::runScanAnalysis()
 
 				if ((distKmSquared < maxRadiusKmSquared) && (distKmSquared > exclusionDistKmSquared) && (uls->getLinkDistance() > 0.0)) {
 
-					CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
-
 					/**************************************************************************************/
 					/* Determine propagation environment of FS, if needed.                                */
 					/**************************************************************************************/
-					char ulsRxPropEnv;
 					CConst::NLCDLandCatEnum nlcdLandCatRx;
 					CConst::PropEnvEnum fsPropEnv;
 					if ((_applyClutterFSRxFlag) && (uls->getRxHeightAboveTerrain() <= _maxFsAglHeight)) {
 						fsPropEnv = computePropEnv(uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), nlcdLandCatRx);
-						switch(fsPropEnv) {
-							case CConst::urbanPropEnv:    ulsRxPropEnv = 'U'; break;
-							case CConst::suburbanPropEnv: ulsRxPropEnv = 'S'; break;
-							case CConst::ruralPropEnv:    ulsRxPropEnv = 'R'; break;
-							case CConst::barrenPropEnv:   ulsRxPropEnv = 'B'; break;
-							case CConst::unknownPropEnv:  ulsRxPropEnv = 'X'; break;
-							default: CORE_DUMP; break;
-						}
 					} else {
 						fsPropEnv = CConst::unknownPropEnv;
-						ulsRxPropEnv = ' ';
 					}
 					/**************************************************************************************/
 
