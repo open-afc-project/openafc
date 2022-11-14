@@ -88,8 +88,7 @@ build_dev_server() {
   # cd to a work dir
   cd ${wd}
   # get last git commit hash number
-  # BUILDREV=`git rev-parse --short HEAD`
-  BUILDREV=oa435
+  BUILDREV=`git rev-parse --short HEAD`
 
   if [ ${push} -eq 1 ]; then
     docker_login
