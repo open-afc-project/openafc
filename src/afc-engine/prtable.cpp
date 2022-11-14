@@ -146,7 +146,7 @@ void PRTABLEClass::readTable()
 
 				oneOverKsValList[kIdx] = std::stod(fieldList[0]);
 
-				if (fieldList.size() != numQ+1) {
+				if (((int) fieldList.size()) != numQ+1) {
 					errStr << std::string("ERROR: Passive Repeater Table File ") << tableFile << ":" << linenum << " INVALID DATA\n";
 					throw std::runtime_error(errStr.str());
 				}
@@ -159,6 +159,13 @@ void PRTABLEClass::readTable()
 					// std::cout << "FIELD: \"" << field << "\"" << std::endl;
 				}
 				kIdx++;
+				break;
+			case  ignoreLineType:
+			case unknownLineType:
+				// do nothing
+				break;
+			default:
+				CORE_DUMP;
 				break;
 		}
 
@@ -245,5 +252,7 @@ double PRTABLEClass::getIdx(double val, double *valList, int numVal)
 	}
 
 	double idxDbl = (val - v0)/(v1 - v0);
+
+	return(idxDbl);
 }
 /******************************************************************************************/
