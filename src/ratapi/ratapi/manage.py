@@ -792,7 +792,7 @@ class MTLSRemove(Command):
                 mtls = MTLS.query.filter(MTLS.id == id).one()
             except sqlalchemy.orm.exc.NoResultFound:
                 raise RuntimeError(
-                    'No mtls certificate found with id"{0}"'.format(serial))
+                    'No mtls certificate found with id"{0}"'.format(id))
             db.session.delete(mtls)  # pylint: disable=no-member
             db.session.commit()  # pylint: disable=no-member
 
@@ -846,7 +846,7 @@ class MTLSDump(Command):
                 mtls = MTLS.query.filter(MTLS.id == id).one()
             except sqlalchemy.orm.exc.NoResultFound:
                 raise RuntimeError(
-                    'No mtls certificate found with id"{0}"'.format(serial))
+                    'No mtls certificate found with id"{0}"'.format(id))
 
             with open(filename, 'w') as fpout:
                 fpout.write("%s" %(mtls.cert));
