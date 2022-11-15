@@ -5128,7 +5128,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								pr.reflectorKS = Ks;
 								pr.reflectorQ = Q;
 							}
-							pr.effectiveGain = (prIdx == numPR-1 ? 0 : uls->getPR(prIdx+1).effectiveGain) + pr.pathSegGain;
+							pr.effectiveGain = (prIdx == numPR-1 ? uls->getRxGain() : uls->getPR(prIdx+1).effectiveGain) + pr.pathSegGain;
 						}
 						/******************************************************************/
 
