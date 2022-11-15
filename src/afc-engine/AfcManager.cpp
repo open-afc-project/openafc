@@ -2477,7 +2477,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 	}
 
 	QJsonObject vendorExtensionObj;
-	vendorExtensionObj.insert("exensionId", "openAfc.redBlackData");
+	vendorExtensionObj.insert("extensionId", "openAfc.redBlackData");
 	vendorExtensionObj.insert("parameters", extensionParameterObj);
 
 	QJsonArray vendorExtensionArray;

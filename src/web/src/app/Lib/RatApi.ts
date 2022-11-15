@@ -140,7 +140,8 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
         "visibilityThreshold": -6,
         "version": guiConfig.version,
         "allowScanPtsInUncReg": false,
-        "passiveRepeaterFlag": false
+        "passiveRepeaterFlag": false,
+        "printSkippedLinksFlag": false 
 });
 
 // API Calls
