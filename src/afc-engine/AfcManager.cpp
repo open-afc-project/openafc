@@ -4855,17 +4855,22 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					}
 				}
 				double noiseFigureDB;
+				double centerFreq = (startFreq + stopFreq)/2;
+				double uniiCenterFreq;
 				if (unii5Flag && unii7Flag) {
 					noiseFigureDB = std::min(_ulsNoiseFigureDBUNII5, _ulsNoiseFigureDBUNII7);
+					uniiCenterFreq = centerFreq;
 				} else if (unii5Flag) {
 					noiseFigureDB = _ulsNoiseFigureDBUNII5;
+					uniiCenterFreq = (CConst::unii5StartFreqMHz + CConst::unii5StopFreqMHz)*0.5e6;
 				} else if (unii7Flag) {
 					noiseFigureDB = _ulsNoiseFigureDBUNII7;
+					uniiCenterFreq = (CConst::unii7StartFreqMHz + CConst::unii7StopFreqMHz)*0.5e6;
 				} else {
 					noiseFigureDB = _ulsNoiseFigureDBOther;
+					uniiCenterFreq = centerFreq;
 				}
-				double centerFreq = (startFreq + stopFreq)/2;
-				double lambda = CConst::c / centerFreq;
+				double lambda = CConst::c / uniiCenterFreq;
 				double rxDlambda = rxAntennaDiameter / lambda;
 
 				uls = new ULSClass(this, fsid, dbIdx, numPR);
@@ -6925,12 +6930,20 @@ void AfcManager::runPointAnalysis()
 		fprintf(fFSList,   "FSID"
 			",RX_CALLSIGN"
 			",TX_CALLSIGN"
-			",FS_START_FREQ (MHz)"
-			",FS_STOP_FREQ (MHz)"
-			",FS_RX_LONGITUDE (deg)"
-			",FS_RX_LATITUDE (deg)"
-			",FS_RX_HEIGHT_AGL (m)"
-			",FS_RX_RLAN_DIST (m)"
+			",NUM_PASSIVE_REPEATER"
+			",IS_DIVERSITY_LINK"
+			",SEGMENT_IDX"
+			",START_FREQ (MHz)"
+			",STOP_FREQ (MHz)"
+			",SEGMENT_RX_LONGITUDE (deg)"
+			",SEGMENT_RX_LATITUDE (deg)"
+			",SEGMENT_RX_HEIGHT_AGL (m)"
+			",SEGMENT_DISTANCE (m)"
+			",PR_REF_THETA_IN (deg)"
+			",PR_REF_KS"
+			",PR_REF_Q"
+			",PR_PATH_SEGMENT_GAIN (dB)"
+			",PR_EFFECTIVE_GAIN (dB)"
 			"\n");
 	}
 	/**************************************************************************************/
@@ -7504,6 +7517,7 @@ void AfcManager::runPointAnalysis()
 
 					double ulsRxHeightAGL  = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain()) : uls->getPR(segIdx).heightAboveTerrain);
 					double ulsRxHeightAMSL = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAMSL() : uls->getDiversityHeightAMSL()) : uls->getPR(segIdx).heightAMSL);
+					double ulsSegmentDistance = (segIdx == numPR ? uls->getLinkDistance() : uls->getPR(segIdx).segmentDistance);
 
 					/**************************************************************************************/
 					/* Determine propagation environment of FS segment RX, if needed.                     */
@@ -7845,7 +7859,6 @@ void AfcManager::runPointAnalysis()
 												double d2;
 												double pathDifference;
 												double fresnelIndex = -1.0;
-												double ulsSegmentDistance = (segIdx == numPR ? uls->getLinkDistance() : uls->getPR(segIdx).segmentDistance);
 												double ulsWavelength = CConst::c / ((uls->getStartUseFreq() + uls->getStopUseFreq()) / 2);
 												if (ulsSegmentDistance != -1.0) {
 													const Vector3 ulsTxPos = (segIdx ? uls->getPR(segIdx-1).position : uls->getTxPosition());
@@ -7894,10 +7907,10 @@ void AfcManager::runPointAnalysis()
 												if ((segIdx < numPR) && (uls->getPR(segIdx).type == CConst::billboardReflectorPRType)) {
 													PRClass& pr = uls->getPR(segIdx);
 													msg << QString::number(pr.reflectorThetaIN, 'f', 5)
-                                                        << QString::number(pr.reflectorKS, 'f', 5)
-                                                        << QString::number(pr.reflectorQ, 'f', 5)
-                                                        << QString::number(reflectorD0, 'f', 5)
-                                                        << QString::number(reflectorD1, 'f', 5);
+														<< QString::number(pr.reflectorKS, 'f', 5)
+														<< QString::number(pr.reflectorQ, 'f', 5)
+														<< QString::number(reflectorD0, 'f', 5)
+														<< QString::number(reflectorD1, 'f', 5);
 												} else {
 													msg << QString("") << QString("") << QString("") << QString("") << QString("");
 												}
@@ -7971,17 +7984,30 @@ void AfcManager::runPointAnalysis()
 					}
 
 					if (fFSList) {
-						fprintf(fFSList,   "%d,%s,%s,%.1f,%.1f,%.6f,%.6f,%.1f,%.1f\n",
-							uls->getID(),
-							uls->getRxCallsign().c_str(),
-							uls->getCallsign().c_str(),
-							uls->getStartUseFreq()*1.0e-6,
-							uls->getStopUseFreq()*1.0e-6,
-							uls->getRxLongitudeDeg(),
-							uls->getRxLatitudeDeg(),
-							uls->getRxHeightAboveTerrain(),
-							minRLANDist
-						);
+						fprintf(fFSList, "%d", uls->getID());
+						fprintf(fFSList, ",%s,%s", uls->getRxCallsign().c_str(), uls->getCallsign().c_str());
+						fprintf(fFSList, ",%d,%d,%d", numPR, divIdx, segIdx);
+						fprintf(fFSList, ",%.1f,%.1f", uls->getStartUseFreq()*1.0e-6, uls->getStopUseFreq()*1.0e-6);
+						fprintf(fFSList, ",%.6f,%.6f", ulsRxLongitude, ulsRxLatitude);
+						fprintf(fFSList, ",%.1f", ulsRxHeightAGL);
+						fprintf(fFSList, ",%.1f", ulsSegmentDistance);
+
+						if (segIdx < numPR) {
+							PRClass& pr = uls->getPR(segIdx);
+							if (pr.type == CConst::billboardReflectorPRType) {
+								fprintf(fFSList, ",%.5f", pr.reflectorThetaIN);
+								fprintf(fFSList, ",%.5f", pr.reflectorKS);
+								fprintf(fFSList, ",%.5f", pr.reflectorQ);
+							} else {
+								fprintf(fFSList, ",,,");
+							}
+							fprintf(fFSList, ",%.3f", pr.pathSegGain);
+							fprintf(fFSList, ",%.3f", pr.effectiveGain);
+						} else {
+							fprintf(fFSList, ",,,,,");
+						}
+
+						fprintf(fFSList, "\n");
 					}
 
 #					if DEBUG_AFC

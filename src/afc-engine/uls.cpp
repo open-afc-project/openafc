@@ -863,7 +863,7 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 			break;
 		case CConst::billboardReflectorPRType:
 			{
-				double D0 = -10.0*log10(4*M_PI*reflectorWidthLambda*reflectorHeightLambda*cos(angleOffBoresightDeg*M_PI/180.0));
+				double D0 = -10.0*log10(4*M_PI*reflectorWidthLambda*reflectorHeightLambda*cos(reflectorThetaIN*M_PI/180.0));
 				double D1;
 				double u_over_PI = reflectorSLambda*sin(angleOffBoresightDeg*M_PI/180.0);
 
