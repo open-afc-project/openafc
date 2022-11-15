@@ -2224,6 +2224,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_visibilityThreshold = -10000.0;
 	}
 
+	if (jsonObj.contains("printSkippedLinksFlag") && !jsonObj["printSkippedLinksFlag"].isUndefined()) {
+		_printSkippedLinksFlag = jsonObj["printSkippedLinksFlag"].toBool();
+	} else {
+		_printSkippedLinksFlag = false;
+	}
+
 	if (jsonObj.contains("allowScanPtsInUncReg") && !jsonObj["allowScanPtsInUncReg"].isUndefined()) {
 		_allowScanPtsInUncRegFlag = jsonObj["allowScanPtsInUncReg"].toBool();
 	} else {
@@ -7833,31 +7839,36 @@ void AfcManager::runPointAnalysis()
 												}
 											}
 
-											if (skip) {
+											// When compiled with _printSkippedLinksFlag set, links analyzed with FSPL that are skipped are still inserted into the exc_thr file.
+											// This is useful for testing and debugging.  Note that the extra pringing impacts execution speed.  When _printSkippedLinksFlag is
+											// not set, skipped links are no inserted in the exc_thr file, so execution speed is not impacted.
+											if ((!_printSkippedLinksFlag) && (skip)) {
 												continue;
 											}
 
-											if (channel->type == ChannelType::INQUIRED_CHANNEL) {
-												if (eirpLimit_dBm < _minEIRP_dBm) {
-													channel->eirpLimit_dBm = _minEIRP_dBm;
-													channel->availability = RED;
+											if ((_printSkippedLinksFlag)&&(!skip)) {
+												if (channel->type == ChannelType::INQUIRED_CHANNEL) {
+													if (eirpLimit_dBm < _minEIRP_dBm) {
+														channel->eirpLimit_dBm = _minEIRP_dBm;
+														channel->availability = RED;
+													}
+												} else {
+													// INQUIRED_FREQUENCY
+													double psd = eirpLimit_dBm - 10.0*log((double) channel->bandwidth())/log(10.0);
+													if (psd < _minPSD_dBmPerMHz) {
+														channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
+														channel->availability = RED;
+													}
 												}
-											} else {
-												// INQUIRED_FREQUENCY
-												double psd = eirpLimit_dBm - 10.0*log((double) channel->bandwidth())/log(10.0);
-												if (psd < _minPSD_dBmPerMHz) {
-													channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
-													channel->availability = RED;
+
+												if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
+													channel->eirpLimit_dBm = eirpLimit_dBm;
 												}
-											}
 
-											if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
-												channel->eirpLimit_dBm = eirpLimit_dBm;
-											}
-
-											if ( (!ulsFlagList[ulsIdx]) || (channel->eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
-												eirpLimitList[ulsIdx] = channel->eirpLimit_dBm;
-												ulsFlagList[ulsIdx] = true;
+												if ( (!ulsFlagList[ulsIdx]) || (channel->eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+													eirpLimitList[ulsIdx] = channel->eirpLimit_dBm;
+													ulsFlagList[ulsIdx] = true;
+												}
 											}
 
 											if ( fexcthrwifi && (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) )
@@ -7973,6 +7984,11 @@ void AfcManager::runPointAnalysis()
 
 												fexcthrwifi->writeRow(msg);
 											}
+
+											if ((_printSkippedLinksFlag) && (skip)) {
+												continue;
+											}
+
 										}
 									}
 								}
@@ -10343,6 +10359,7 @@ void AfcManager::printUserInputs()
 			fUserInputs->writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT_UNCERTAINTY (m)", QString::number(_heatmapRLANOutdoorHeightUncertainty, 'e', 20) } );
 		}
 		fUserInputs->writeRow({ "VISIBILITY_THRESHOLD", QString::number(_visibilityThreshold, 'e', 20) } );
+		fUserInputs->writeRow({ "PRINT_SKIPPED_LINKS_FLAG", (_printSkippedLinksFlag ? "true" : "false" ) } );
 
 	}
 	LOGGER_DEBUG(logger) << "User inputs written to userInputs.csv";

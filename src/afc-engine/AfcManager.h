@@ -415,6 +415,8 @@ class AfcManager
 		double _closeInDist;                    // Radius in which close in path loss model is used
 		std::string _closeInPathLossModel;      // Close in path loss model is used
 		bool _pathLossClampFSPL;                // If set, when path loss < fspl, clamp to fspl value
+		bool _printSkippedLinksFlag;			// If set, links that are skipped in the analysis because using FSPL does not limit I/N performance are still printed in exc_thr file.  This
+												// is useful for debugging, but depending on visibility threshold setting may impact execution speed.
 
 		int _wlanMinFreqMHz;                    // Min Frequency for WiFi system (integer in MHz)
 		int _wlanMaxFreqMHz;                    // Max Frequency for WiFi system (integer in MHz)
