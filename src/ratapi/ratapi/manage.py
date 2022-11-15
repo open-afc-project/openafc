@@ -377,6 +377,7 @@ class UserCreate(Command):
         Option('--role', type=str, default=[], action='append',
                choices=['Admin', 'Super', 'Analysis', 'AP', 'Trial'],
                help='role to include with the new user'),
+        Option('--org', type=str, help='Organization'),
     )
 
     def _create_user(self, flaskapp, id, username, email, password_in, role,
@@ -484,7 +485,8 @@ hashed, org = None):
     def __call__(self, flaskapp, username, password_in, role, hashed=False,
 org=None):
         # command does not provide email.  Populate email field with username
-        self._create_user(flaskapp, None, username, username, password_in, role, hashed)
+        self._create_user(flaskapp, None, username, username, password_in, role,
+hashed, org)
 
 
 class UserUpdate(Command):
@@ -496,9 +498,10 @@ class UserUpdate(Command):
         Option('--role', type=str, default=[], action='append',
                choices=['Admin', 'Super', 'Analysis', 'AP', 'Trial'],
                help='role to include with the new user'),
+        Option('--org', type=str, help='Organization'),
     )
 
-    def _update_user(self, flaskapp, email, role):
+    def _update_user(self, flaskapp, email, role, org = None):
         ''' Create user in database. '''
         from contextlib import closing
         from .models.aaa import User, Role
@@ -517,6 +520,8 @@ class UserUpdate(Command):
                             user.roles.append(get_or_create(
                                 db.session, Role, name=rolename))
                     user.active = True,
+                    if org:
+                        user.org = org;
                     db.session.commit()  # pylint: disable=no-member
                 else:
                     raise RuntimeError("User update: User not found")
@@ -527,10 +532,11 @@ class UserUpdate(Command):
         if flaskapp and isinstance(user_params, dict):
             self._update_user(flaskapp,
                               user_params['username'],
-                              user_params['rolename'])
+                              user_params['rolename'],
+                              user_params['org'])
 
-    def __call__(self, flaskapp, email, role):
-        self._update_user(flaskapp, email, role)
+    def __call__(self, flaskapp, email, role, org):
+        self._update_user(flaskapp, email, role, org)
 
 
 class UserRemove(Command):
@@ -727,21 +733,22 @@ class MTLSCreate(Command):
     option_list = (
         Option('--note', type=str, default=None,
                help="note"),
-        Option('--cert', type=str, default=None,
+        Option('--src', type=str, default=None,
                help="certificate file"),
         Option('--org', type=str, default="",
                help="email of user assocated with this access point.")
     )
 
-    def _create_mtls(self, flaskapp, note="", org="", cert=None):
+    def _create_mtls(self, flaskapp, note="", org="", src=None):
         from contextlib import closing
         import datetime
         from .models.aaa import MTLS, User
         LOGGER.debug('MTLS._create_mtls() %s %s %s',
-                      note, org, cert)
-        if not cert:
+                      note, org, src)
+        if not src:
             raise RuntimeError('certificate data file required')
 
+        cert = src
         with flaskapp.app_context():
             cert_data = ""
             with open(cert, 'r') as fp_cert:
@@ -755,12 +762,12 @@ class MTLSCreate(Command):
                 db.session.commit()  # pylint: disable=no-member
 
     def __init__(self, flaskapp=None, note="",
-                 org="", cert=None):
+                 org="", src=None):
         if flaskapp and cert:
-            self._create_mtls(flaskapp, note, org, cert)
+            self._create_mtls(flaskapp, note, org, src)
 
-    def __call__(self, flaskapp, note, org, cert):
-        self._create_mtls(flaskapp, note, org, cert)
+    def __call__(self, flaskapp, note, org, src):
+        self._create_mtls(flaskapp, note, org, src)
 
 
 class MTLSRemove(Command):
@@ -768,7 +775,7 @@ class MTLSRemove(Command):
 
     option_list = (
         Option('--id', type=int, default=None,
-               help="note"),
+               help="id"),
     )
 
     def _remove_mtls(self, flaskapp, id=None):
@@ -813,6 +820,44 @@ class MTLSList(Command):
             print(table)
 
 
+class MTLSDump(Command):
+    ''' Remove MTLS certificate by id. '''
+
+    option_list = (
+        Option('--id', type=int, default=None,
+               help="id"),
+        Option('--dst', type=str, default=None,
+               help="output file"),
+    )
+
+    def _dump_mtls(self, flaskapp, id=None, dst=None):
+        from contextlib import closing
+        import datetime
+        from .models.aaa import MTLS, User
+        LOGGER.debug('MTLS._remove_mtls() %d', id)
+        if not id:
+            raise RuntimeError('mtls id required')
+        if not dst:
+            raise RuntimeError('output filename required')
+        filename = dst
+
+        with flaskapp.app_context():
+            try:
+                mtls = MTLS.query.filter(MTLS.id == id).one()
+            except sqlalchemy.orm.exc.NoResultFound:
+                raise RuntimeError(
+                    'No mtls certificate found with id"{0}"'.format(serial))
+
+            with open(filename, 'w') as fpout:
+                fpout.write("%s" %(mtls.cert));
+
+    def __init__(self, flaskapp=None, id=None, dst=None):
+        if flaskapp and id and filename:
+            self._dump_mtls(flaskapp, id, filename)
+
+    def __call__(self, flaskapp, id, dst):
+        self._dump_mtls(flaskapp, id, dst)
+
 class MTLS(Manager):
     '''View and manage Access Points'''
 
@@ -821,6 +866,7 @@ class MTLS(Manager):
         self.add_command("create", MTLSCreate())
         self.add_command("remove", MTLSRemove())
         self.add_command("list", MTLSList())
+        self.add_command("dump", MTLSDump())
 
 
 class CeleryStatus(Command):  # pylint: disable=abstract-method

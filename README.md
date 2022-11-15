@@ -462,6 +462,30 @@ Update user roles with user update command, e.g.:
 ```
 rat-manage-api user update --role Admin --role AP --role Analysis --email "user@mycompany.com"
 ```
+## User roles
+Roles are: Super, admin, AP, Admin, Analysis, Trial
+"Super" is a new role, which allows access rights to all organizations, as opposed to "Admin", which is limited to one organization.  When upgrade from older system without "Super", you will need to decide which users to be assigned role of "Super" and update their roles via the user update command. 
+
+## MTLS
+Besides the GUI, mtls certificates can be managed via CLI.
+To list certificates:
+```
+rat-manage-api mtls list
+```
+
+To add certificates:
+```
+rat-manage-api mtls create --src <certificate file> --org <Organization name> --note <Short Note>
+```
+
+To remove certificates:
+```
+rat-manage-api mtls remove --id <certificate id obtained from list command>
+```
+To dump a certificate to a file:
+```
+rat-manage-api mtls dump --id <certificate id obtained from list command> --dst <file name>
+```
 
 Happy usage!
 

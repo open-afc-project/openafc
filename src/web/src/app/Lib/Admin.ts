@@ -215,9 +215,9 @@ export const deleteAccessPoint = (id: number) =>
     .catch(err => error("An error was encountered", undefined, err));
 
 /**
- * Register an access point with a user.
+ * Register an mtls certificate
  * @param mtls cert to add
- * @param userId owner of new mtls cert
+ * @param userId who creates the new mtls cert
  */
 export const addMTLS = (mtls: MTLSModel, userId: number) =>
     fetch(guiConfig.mtls_admin_url.replace("-1", String(userId)), {
@@ -256,10 +256,11 @@ export const deleteMTLSCert = (id: number) =>
     .catch(err => error("An error was encountered", undefined, err));
 
 /**
- * Get mtls cert. If `userId` is provided then only return access
- * points owned by the user. If no `userId` is provided then return all
- * access points (must be `Admin`).
- * @param userId (optional) user's Id
+ * Get mtls cert.  If `userId` is 0, then return all certificates (super)
+ * or all certificates in the same org as the user (`Admin`).
+ * 'userId' non zero is not currently supported as certificate do not belong
+ * a single user.
+ * @param userId user's Id
  * @returns list of mtls certs if successful, error otherwise
  */
 export const getMTLS = (userId?: number) =>
