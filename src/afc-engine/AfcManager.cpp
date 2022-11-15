@@ -2462,15 +2462,22 @@ QJsonDocument AfcManager::generateRatAfcJson()
 		availableSpectrumInquiryResponse.insert("availabilityExpireTime", ISO8601TimeUTC(1));
 	}
 
-	QJsonObject vendorExtensionResponse;
+	QJsonObject extensionParameterObj;
 	if (blackChannelInfos.size()) {
-		vendorExtensionResponse.insert("blackChannelInfo", blackChannelInfos);
+		extensionParameterObj.insert("blackChannelInfo", blackChannelInfos);
 	}
 	if (redChannelInfos.size()) {
-		vendorExtensionResponse.insert("redChannelInfo", redChannelInfos);
+		extensionParameterObj.insert("redChannelInfo", redChannelInfos);
 	}
 
-	availableSpectrumInquiryResponse.insert("vendorExtensions", vendorExtensionResponse);
+	QJsonObject vendorExtensionObj;
+	vendorExtensionObj.insert("exensionId", "openAfc.redBlackData");
+	vendorExtensionObj.insert("parameters", extensionParameterObj);
+
+	QJsonArray vendorExtensionArray;
+	vendorExtensionArray.append(vendorExtensionObj);
+
+	availableSpectrumInquiryResponse.insert("vendorExtensions", vendorExtensionArray);
 
 	availableSpectrumInquiryResponse.insert("response", responseObj);
 
