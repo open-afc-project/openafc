@@ -79,7 +79,8 @@ class Channel extends React.Component<ChannelProps, { showToolTip: boolean }> {
                 <Text
                     name="tootTipText"
                     fontSize={12}
-                    text={(this.props.name ? ("Channel Index: " + this.props.name + "\n") : "") + "Max. EIRP (dBm): " + (this.props.color !== "grey" ? this.props.maxEIRP : "")}
+                    text={(this.props.name ? ("Channel Index: " + this.props.name + "\n") : "") + "Max. EIRP (dBm): " + 
+                    ((this.props.color !== "grey" &&  this.props.maxEIRP) ? this.props.maxEIRP : "")}
                     x={Math.min(this.props.start + 5, this.props.stageSize.width - 235)}
                     y={this.props.vertical - (this.props.name ? 30 : 20)} /></>
                 : <></>}

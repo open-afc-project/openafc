@@ -121,7 +121,8 @@ const generateChannelData = (channelClasses: AvailableChannelInfo[], minEirp: nu
                 channelGroup.channels.forEach((channel) => {
                     for (let i = 0; i < channelClass.channelCfi.length; i++) {
                         if (channel.name === String(channelClass.channelCfi[i])) {
-                            channel.color = "black"
+                            channel.color = "black";
+                            channel.maxEIRP = undefined;
                         }
                     }
                 })
@@ -136,7 +137,8 @@ const generateChannelData = (channelClasses: AvailableChannelInfo[], minEirp: nu
                 channelGroup.channels.forEach((channel) => {
                     for (let i = 0; i < channelClass.channelCfi.length; i++) {
                         if (channel.name === String(channelClass.channelCfi[i])) {
-                            channel.color = "red"
+                            channel.color = "red";
+                            channel.maxEIRP = undefined;
                         }
                     }
                 })
