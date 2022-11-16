@@ -4,15 +4,32 @@ if(NOT ${CMAKE_VERSION} VERSION_LESS 3.10)
     cmake_policy(SET CMP0071 OLD)
 endif()
 
-# Debug
-# Release
-# DebugWithTest
+# Debug includes RatapiDebug, WebDebug
+# Release includes RatapiRelease, WebRelease
+# DebugWithTest includes RatapiDebug, WebDebug
+# EngineDebug
+# EngineRelease
+# RatapiDebug
+# RatapiRelease
+# WebDebug
+# WebRelease
 set(default_build_type "Debug")
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "${default_build_type}")
 endif()
 
+if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "DebugWithTest")
+    set(OPENAFC_BUILD_TYPE "EngineDebug" "RatapiDebug" "WebDebug")
+elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
+    set(OPENAFC_BUILD_TYPE "EngineRelease" "RatapiRelease" "WebRelease")
+else()
+    set(OPENAFC_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
+endif()
+
+
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
+message(STATUS "OPENAFC_BUILD_TYPE: ${OPENAFC_BUILD_TYPE}")
 
 # External version naming
 file(READ "${CMAKE_SOURCE_DIR}/version.txt" VERSIONFILE)
@@ -137,46 +154,52 @@ set(CMAKE_MODULE_NAME ${PROJECT_NAME})
 set(PKG_INSTALL_CMAKE_CONFIG_DIR "${PKG_INSTALL_LIBDIR}/cmake/${CMAKE_MODULE_NAME}")
 
 
-# External libraries
-find_package(Qt5Core 5.3 REQUIRED)
-find_package(Qt5Concurrent REQUIRED)
-find_package(Qt5Network REQUIRED)
-find_package(Qt5Gui REQUIRED)
-find_package(Qt5Sql REQUIRED)
-find_package(Qt5Test REQUIRED)
-find_package(Qt5Xml REQUIRED)
-find_package(Qt5Widgets REQUIRED)
+# build only engine code
+if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
+    "EngineRelease" IN_LIST OPENAFC_BUILD_TYPE)
+    message(STATUS "++++ find_packages")
 
-find_package(iturp452 REQUIRED)
-find_package(Armadillo REQUIRED)
-find_package(ZLIB REQUIRED)
-find_package(minizip REQUIRED)
+    # External libraries
+    find_package(Qt5Core 5.3 REQUIRED)
+    find_package(Qt5Concurrent REQUIRED)
+    find_package(Qt5Network REQUIRED)
+    find_package(Qt5Gui REQUIRED)
+    find_package(Qt5Sql REQUIRED)
+    find_package(Qt5Test REQUIRED)
+    find_package(Qt5Xml REQUIRED)
+    find_package(Qt5Widgets REQUIRED)
 
-find_package(GDAL REQUIRED)
-if(NOT GDAL_FOUND)
-    message(FATAL_ERROR "Missing GDAL library")
-endif()
-if(GDAL_FOUND AND NOT TARGET GDAL::GDAL)
-  add_library(GDAL::GDAL UNKNOWN IMPORTED)
-  set_target_properties(GDAL::GDAL PROPERTIES
-    IMPORTED_LOCATION "${GDAL_LIBRARY}"
-    INTERFACE_INCLUDE_DIRECTORIES "${GDAL_INCLUDE_DIR}"
-  )
-endif()
+    find_package(iturp452 REQUIRED)
+    find_package(Armadillo REQUIRED)
+    find_package(ZLIB REQUIRED)
+    find_package(minizip REQUIRED)
 
-set(Boost_USE_MULTITHREADED ON)
-set(Boost_USE_STATIC_RUNTIME OFF)
-find_package(Boost 1.54 REQUIRED COMPONENTS log program_options regex system thread)
-add_definitions("-DBOOST_ALL_DYN_LINK")
+    find_package(GDAL REQUIRED)
+    if(NOT GDAL_FOUND)
+        message(FATAL_ERROR "Missing GDAL library")
+    endif()
+    if(GDAL_FOUND AND NOT TARGET GDAL::GDAL)
+      add_library(GDAL::GDAL UNKNOWN IMPORTED)
+      set_target_properties(GDAL::GDAL PROPERTIES
+        IMPORTED_LOCATION "${GDAL_LIBRARY}"
+        INTERFACE_INCLUDE_DIRECTORIES "${GDAL_INCLUDE_DIR}"
+      )
+    endif()
+
+    set(Boost_USE_MULTITHREADED ON)
+    set(Boost_USE_STATIC_RUNTIME OFF)
+    find_package(Boost 1.54 REQUIRED COMPONENTS log program_options regex system thread)
+    add_definitions("-DBOOST_ALL_DYN_LINK")
 
 
-if (CMAKE_BUILD_TYPE STREQUAL "DebugWithTest")
-  find_package(GTest 1.6 REQUIRED)
-  # Run tests with CTest
-  include(CTest)
-  enable_testing()
-  # Alias "check" target for verbose test run
-  add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -C ${CMAKE_BUILD_TYPE} --verbose)
+    if (CMAKE_BUILD_TYPE STREQUAL "DebugWithTest")
+      find_package(GTest 1.6 REQUIRED)
+      # Run tests with CTest
+      include(CTest)
+      enable_testing()
+      # Alias "check" target for verbose test run
+      add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -C ${CMAKE_BUILD_TYPE} --verbose)
+    endif()
 endif()
 
 
