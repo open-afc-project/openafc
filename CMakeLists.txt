@@ -19,14 +19,18 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR
-    "${CMAKE_BUILD_TYPE}" STREQUAL "DebugWithTest")
+    "${CMAKE_BUILD_TYPE}" STREQUAL "DebugWithTest" OR
+    "${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
     set(OPENAFC_BUILD_TYPE "EngineDebug" "RatapiDebug" "WebDebug")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     set(OPENAFC_BUILD_TYPE "EngineRelease" "RatapiRelease" "WebRelease")
+elseif ("EngineRatapiDebug" MATCHES ${CMAKE_BUILD_TYPE})
+    set(OPENAFC_BUILD_TYPE "EngineDebug" "RatapiDebug")
+elseif ("EngineRatapiRelease" MATCHES ${CMAKE_BUILD_TYPE})
+    set(OPENAFC_BUILD_TYPE "EngineRelease" "RatapiRelease")
 else()
     set(OPENAFC_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 endif()
-
 
 message(STATUS "CMAKE_BUILD_TYPE: ${CMAKE_BUILD_TYPE}")
 message(STATUS "OPENAFC_BUILD_TYPE: ${OPENAFC_BUILD_TYPE}")
