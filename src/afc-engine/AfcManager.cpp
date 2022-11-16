@@ -1732,9 +1732,8 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 	if (cmdLineArgs.count("progress-file-path"))
 	{
 		if (AfcManager::_createKmz) {
-			std::string progressPath = cmdLineArgs["progress-file-path"].as<std::string>();
 			AfcManager::_progressFile =
-				QDir(QString::fromStdString(tempDir)).filePath(QString::fromStdString(progressPath)).toStdString();
+				cmdLineArgs["progress-file-path"].as<std::string>();
 		}
 	}
 	else

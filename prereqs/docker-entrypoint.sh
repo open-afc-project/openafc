@@ -23,6 +23,24 @@ CELERY_LOG=${CELERY_LOG:=INFO}
 /bin/celery multi start $CELERY_OPTIONS -A ratapi.tasks.afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=$CELERY_LOG &
 
 # apache
+if [[ ! -z "$HISTORY_HOST" ]]; then
+	printf '<VirtualHost *:80>
+  ServerName %s
+  ProxyPassReverse /dbg http://%s:4999/dbg
+  ProxyPass /dbg http://%s:4999/dbg
+  ProxyPreserveHost On
+  ProxyRequests Off
+</VirtualHost>
+<VirtualHost *:443>
+  ServerName %s
+  ProxyPassReverse /dbg http://%s:4999/dbg
+  ProxyPass /dbg http://%s:4999/dbg
+  ProxyPreserveHost On
+  ProxyRequests Off
+</VirtualHost>\n' $(hostname) $HISTORY_HOST $HISTORY_HOST \
+$(hostname) $HISTORY_HOST $HISTORY_HOST > /etc/httpd/conf.d/10-history-proxy.conf
+fi
+
 HTTPD_OPTIONS=${HTTPD_OPTIONS}
 echo "/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND >"
 /usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND &

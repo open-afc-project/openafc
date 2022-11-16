@@ -3,7 +3,6 @@ import { Gallery, GalleryItem, PageSection, Card, CardHead, CardBody, CardHeader
 import { UserTable } from "./UserList";
 import { Role } from "../Lib/User";
 import { getUsers, addUserRole, deleteUser, removeUserRole, setMinimumEIRP, Limit, updateAllowedRanges, getAllowedRanges } from "../Lib/Admin";
-import {ulsDailyParse, ulsLastRuntime, setUlsParseTime} from "../Lib/RatApi"
 import { logger } from "../Lib/Logger";
 import { APList } from "../APList/APList";
 import { UserAccount } from "../UserAccount/UserAccount";
@@ -97,15 +96,6 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
   cancelTask?: () => void;
 
   init(){
-    if(this.state.ulsLastSuccessRuntime === ""){
-      ulsLastRuntime().then((res) => {
-        if(res.kind == "Success") {
-          this.setState({ulsLastSuccessRuntime: res.result.lastSuccessfulRun});
-        } else {
-          this.setState({messageUlsError: "Unable to fetch last successful run time.", messageUlsSuccess: undefined});
-        }
-      })
-    }
   }
 
   /**
@@ -226,36 +216,6 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
         this.setState({messageSuccess: "Updated allowed frequency", messageError: undefined});
       } else {
         this.setState({messageError: "Unable to get current frequency ranges.", messageSuccess: undefined});
-      }
-    })
-  }
-  
-  private manualDailyParse = async () => {
-    this.setState({parseInProgress: true, messageUls: "Please wait, this may take awhile.", messageUlsError: undefined, messageUlsSuccess: undefined});
-    let taskCanceled = false;
-    this.cancelTask = () => {
-      taskCanceled = true;
-      this.cancelTask = undefined;
-      this.setState({ parseInProgress: false});
-    }
-    await ulsDailyParse(() => taskCanceled).then(res => {
-      if(res.kind == "Success") {
-        this.setState({parseInProgress: false, messageUlsSuccess: "Manual ULS parse complete. Added " + res.result.entriesAdded + " and updated " + res.result.entriesUpdated + " uls files", messageUlsError: undefined, messageUls: undefined, ulsLastSuccessRuntime: res.result.finishTime});
-      } else {
-        this.setState({parseInProgress: false, messageUlsError: "Error while doing manual daily parse: " + res.description , messageUlsSuccess: undefined, messageUls: undefined});
-      }
-    })
-  }
-
-  private updateDailyParseTime = () => {
-    let time = this.state.userEnteredUpdateTime.split(':')
-    let hours = Number(time[0])
-    let mins = Number(time[1])
-    setUlsParseTime(hours, mins).then(res => {
-      if(res.kind == "Success") {
-        this.setState({ messageUlsSuccess: "Automatic ULS time updated to " + hours + ":" + mins + " UTC", messageUlsError: undefined});
-      } else {
-        this.setState({messageUlsError: "Error updating automatic ULS update: " + res.description , messageUlsSuccess: undefined});
       }
     })
   }
@@ -459,76 +419,6 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
         <br/>
           {this.state.users.length && <APList userId={0} users={this.state.users} />}{/* userId=0 means don't scope to user */}
         <br/>
-        <Card>
-          <CardHead><CardHeader>Daily ULS Parse</CardHeader></CardHead>
-           
-            <CardBody>  
-            <div className="pf-u-text-align-center">Last Successful Run Time: {" " + this.state.ulsLastSuccessRuntime}</div>
-            
-            <br></br>
-            <Gallery>
-              <GalleryItem>
-              { this.state.parseInProgress ? false :
-                <FormGroup
-                  label="Manual ULS Parse"
-                  fieldId="parse_setter">
-                        
-                    <Button onClick={() => this.manualDailyParse()} disabled={this.state.parseInProgress}> Start Manual Parse</Button> 
-                  
-                </FormGroup>
-              }
-              </GalleryItem>  
-              <GalleryItem>
-                  <FormGroup
-                  label="Update Automated Parse Time"
-                  fieldId="parse_setter">
-                    {" "}<Tooltip
-                                        position={TooltipPosition.top}
-                                        enableFlip={true}
-                                        className="ULS-parse-tooltip"
-                                        maxWidth="40.0rem"
-                                        content={
-                                            <>
-                                                <p>This will change the automatated daily uls parse task to the time submitted. The time zone used is UTC</p>
-                                            </>
-                                        }>
-                                        <OutlinedQuestionCircleIcon/>
-                          </Tooltip>
-                      
-                        <input type="time" value={this.state.userEnteredUpdateTime} onChange={(e) => this.setState({userEnteredUpdateTime: e.target.value})}/>
-                        {" "}<Button onClick={this.updateDailyParseTime}>Submit Time</Button>
-                  
-                  </FormGroup>
-                  </GalleryItem>
-                </Gallery>
-            </CardBody> 
-            
-            <>
-            {this.state.parseInProgress ? <Alert
-                  variant="info"
-                  title="Manual Uls Parse In Progress"
-                  >{this.state.messageUls} <br></br> 
-                  
-                  <><Timer/> {" "}<Button variant="secondary" onClick={this.cancelTask}>Cancel</Button></>
-                  </Alert>: false} 
-              {this.state.messageUlsError !== undefined && (
-                  <Alert
-                      variant="danger"
-                      title="Error"
-                      action={<AlertActionCloseButton onClose={() => this.setState({ messageUlsError: undefined })} />}
-                  >{this.state.messageUlsError}</Alert>) 
-              }
-            
-              {this.state.messageUlsSuccess !== undefined && (
-                  <Alert
-                      variant="success"
-                      title="Success"
-                      action={<AlertActionCloseButton onClose={() => this.setState({ messageUlsSuccess: undefined })} />}
-                  >{this.state.messageUlsSuccess}</Alert>
-              )}
-            </>
-            
-        </Card>
       </PageSection>
     )
   }

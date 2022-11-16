@@ -52,7 +52,6 @@ RATAPI server accesses file storage according to the following environment varia
 - **FILESTORAGE_HOST** - file storage server host
 - **FILESTORAGE_PORT** - file storage server post
 - **HISTORY_HOST** - history view server host (currently the same as **FILESTORAGE_HOST**)
-- **HISTORY_EXTERNAL_PORT** - the port where **HISTORY_PORT** in HTTP server service of docker-compose.yaml is mapped
 - **FILESTORAGE_SCHEME** - indicate by which scheme the file storage is accessed from RATAPI server. Currently is always **HTTP**.
 
 ## Building HTTP servers docker image
@@ -97,8 +96,6 @@ services:
       - FILESTORAGE_PORT=5000
       #History view server host same as file storage host
       - HISTORY_HOST=objstorage
-      #History view server external port as it mapped in "objstorage:ports"
-      - HISTORY_EXTERNAL_PORT=14999
       #Use HTTP (not HTTPS) to access file storage
       - FILESTORAGE_SCHEME="HTTP"
       links:
@@ -125,9 +122,6 @@ services:
       - GOOGLE_CLOUD_BUCKET=wcc-afc-objstorage
       build:
          context: ./src/objstorage
-      #map 'objstorage:HISTORY_PORT' to 'rat_server:HISTORY_EXTERNAL_PORT'
-      ports:
-      - 14999:4999 #
 ```
 
 The same environment variables are needed for running ready docker images downloaded from AWS.
@@ -162,8 +156,6 @@ services:
       - FILESTORAGE_PORT=5000
       #History view server host same as file storage host
       - HISTORY_HOST=objstorage
-      #History view server external port as it mapped in "objstorage:ports"
-      - HISTORY_EXTERNAL_PORT=14999
       #Use HTTP (not HTTPS) to access file storage
       - FILESTORAGE_SCHEME="HTTP"
       links:
@@ -184,7 +176,4 @@ services:
       - OBJSTORAGE=LocalFS
       #Some folder inside the image for file storing. Ignored when OBJSTORAGE=GoogleCloudBucket
       - FILESTORAGE_DIR=/storage
-      #map 'objstorage:HISTORY_PORT' to 'rat_server:HISTORY_EXTERNAL_PORT'
-      ports:
-      - 14999:4999 #
 ```

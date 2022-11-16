@@ -66,6 +66,7 @@ RUN yum -y clean all && rm -rf /wd/* /repos /etc/yum.repos.d/fbrat-repo.repo && 
 
 COPY prereqs/docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh
+COPY prereqs/proxy.conf /etc/httpd/conf.modules.d/
 
 FROM centos:7
 COPY --from=install_image / /

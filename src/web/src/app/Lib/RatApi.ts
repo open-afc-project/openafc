@@ -22,7 +22,6 @@ export var guiConfig: GuiConfig = Object.freeze({
     google_apikey: "",
     rat_api_analysis: "",
     uls_convert_url: "",
-    uls_daily_url: "",
     allowed_freq_url: "",
     login_url: "",
     admin_url: "",
@@ -455,86 +454,6 @@ function ulsParseContinuation(isCanceled?: () => boolean, status?: (progress: { 
         }
     }
 }
-
-
-/**
- * Kick off a daily uls parse to create a new ULS database for that day.
- * @returns Success: number of ULSs updated and number of entries inserted. E
- *          Error: information on why file could not be converted
- */
-//(params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>>
-export const ulsDailyParse = (isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<{ entriesUpdated: number, entriesAdded: number, finishTime: string }>> =>
-    fetch(guiConfig.uls_daily_url, {
-        method: "POST",
-    }).then(ulsParseContinuation(isCanceled, status))
-        .catch(err => {
-            logger.error(err);
-            return error("Your request was unable to be processed", undefined, err);
-        });
-// async res => {
-//     if (res.ok) {
-//         const data = (await res.json()) as { entriesUpdated: number, entriesAdded: number };
-//         return success(data);
-//     } else {
-//         logger.error(res);
-//         return error(res.statusText, res.status, (await res.json()) as any);
-//     }
-// }
-
-
-
-
-/**
- * Gets the last successful run time of the daily parse.
- * @returns Success: An ISO string containing the last run time.
- *          Error: why it failed
- */
-export const ulsLastRuntime = (): Promise<RatResponse<{ lastSuccessfulRun: string }>> =>
-    fetch(guiConfig.uls_daily_url, {
-        method: "GET",
-        headers: { "Content-Type": "application/json" }
-    }).then(
-        async res => {
-            if (res.ok) {
-                const data = (await res.json()) as { lastSuccessfulRun: string };
-                return success(data);
-            } else {
-                logger.error(res);
-                return error(res.statusText, res.status, (await res.json()) as any);
-            }
-        }
-    ).catch(
-        err => {
-            logger.error(err);
-            return error("Your request was unable to be processed", undefined, err);
-        }
-    )
-
-/**
-* Updates the backend celery task for daily parsing to the given time
-* @returns Success: An ISO string containing the new time.
-*          Error: why it failed
-*/
-export const setUlsParseTime = (hours: number, minutes: number): Promise<RatResponse<{ newTime: string }>> =>
-    fetch(guiConfig.uls_daily_url, {
-        method: "PUT",
-        body: JSON.stringify({ hours: hours, mins: minutes })
-    }).then(
-        async res => {
-            if (res.ok) {
-                const data = (await res.json()) as { newTime: string };
-                return success(data);
-            } else {
-                logger.error(res);
-                return error(res.statusText, res.status, (await res.json()) as any);
-            }
-        }
-    ).catch(
-        err => {
-            logger.error(err);
-            return error("Your request was unable to be processed", undefined, err);
-        }
-    )
 
 /**
  * Cache an item in the global application cache

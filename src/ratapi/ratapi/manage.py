@@ -106,10 +106,8 @@ class CleanTmpFiles(Command):
 
         task_queue = flaskapp.config['TASK_QUEUE']
         # the [7:] removes file:// prefix
-        celery_backend = flaskapp.config['CELERY_RESULT_BACKEND'][7:]
 
-        LOGGER.debug('Removing temp files from "%s", "%s"...',
-                     task_queue, celery_backend)
+        LOGGER.debug('Removing temp files from "%s"...', task_queue)
 
         now = time.time()
         # delete file if older than 14 days
@@ -122,14 +120,6 @@ class CleanTmpFiles(Command):
 
             if c < cutoff:
                 shutil.rmtree(os.path.join(task_queue, record))
-
-        logs = os.listdir(celery_backend)
-        for record in logs:
-            t = os.stat(os.path.join(celery_backend, record))
-            c = t.st_ctime
-
-            if c < cutoff:
-                shutil.rmtree(os.path.join(celery_backend, record))
 
 
 class RasterizeBuildings(Command):
