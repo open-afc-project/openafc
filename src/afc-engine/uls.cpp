@@ -567,18 +567,21 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 	double rxGainDB;
 	subModelStr = "";
 
+	double maxGain = (divIdx == 0 ? rxGain    : diversityGain   );
+	double Dlambda = (divIdx == 0 ? rxDlambda : diversityDlambda);
+
 	switch(rxAntennaType) {
 	case CConst::F1245AntennaType:
-		rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, rxGain, rxDlambda);
+		rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, maxGain, Dlambda);
 		break;
 	case CConst::F699AntennaType:
-		rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda);
+		rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, maxGain, Dlambda);
 		break;
 	case CConst::F1336OmniAntennaType:
-		rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleDeg, rxGain, frequency);
+		rxGainDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleDeg, maxGain, frequency);
 		break;
 	case CConst::R2AIP07AntennaType:
-		rxGainDB = calcR2AIP07Antenna(angleOffBoresightDeg, frequency, rxAntennaCategory, subModelStr, divIdx);
+		rxGainDB = calcR2AIP07Antenna(angleOffBoresightDeg, frequency, rxAntennaModel, rxAntennaCategory, subModelStr, divIdx, maxGain, Dlambda);
 		break;
 	case CConst::OmniAntennaType:
 		rxGainDB = 0.0;
@@ -598,7 +601,8 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 /******************************************************************************************/
 /**** FUNCTION: ULSClass::calcR2AIP07Antenna                                           ****/
 /******************************************************************************************/
-double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, CConst::AntennaCategoryEnum category, std::string &subModelStr, int divIdx)
+double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, std::string antennaModel, CConst::AntennaCategoryEnum category,
+	std::string &subModelStr, int divIdx, double maxGain, double Dlambda)
 {
 	// int freqIdx;
 	double rxGainDB;
@@ -608,11 +612,8 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 	} else if ((frequency >= 6525.0e6) && (frequency <= 6875.0e6)) {
 		// freqIdx = 1;
 	} else {
-		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value for FSID = " << id);
+		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value");
 	}
-
-	double maxGain = (divIdx == 0 ? rxGain    : diversityGain   );
-	double Dlambda = (divIdx == 0 ? rxDlambda : diversityDlambda);
 
 	if (maxGain < 38) {
 		if (angleOffBoresightDeg < 5) {
@@ -662,7 +663,7 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 			subModelStr = ":F.699";
 			rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, maxGain, Dlambda);
 		} else {
-			bool antennaModelBlank = rxAntennaModel.empty();
+			bool antennaModelBlank = antennaModel.empty();
 			bool categoryB1Flag = (category == CConst::B1AntennaCategory);
 			bool knownHighPerformance = (category == CConst::HPAntennaCategory);
 
@@ -854,7 +855,8 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 	switch(type) {
 		case CConst::backToBackAntennaPRType:
 			{
-				double rxGainDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, rxGain, rxDlambda);
+				std::string subModelStr;
+				double rxGainDB = ULSClass::calcR2AIP07Antenna(angleOffBoresightDeg, frequency, antModel, antCategory, subModelStr, 0, rxGain, rxDlambda);
 				discriminationDB = rxGain - rxGainDB;
 
 				reflectorD0 = std::numeric_limits<float>::quiet_NaN();
@@ -872,8 +874,8 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 				} else if (angleOffBoresightDeg <= 20.0) {
 					D1 = -20*log10(fabs(M_PI*u_over_PI));
 				} else {
-					double u1_over_PI = reflectorSLambda*sin(reflectorTheta1*M_PI/180.0);
-					D1 = 20*log10(MathHelpers::sinc(u1_over_PI)) - 0.4165*(angleOffBoresightDeg - 20.0);
+					double u0_over_PI = reflectorSLambda*sin(20.0*M_PI/180.0);
+					D1 = -20*log10(fabs(M_PI*u0_over_PI)) - 0.4165*(angleOffBoresightDeg - 20.0);
 				}
 				discriminationDB = std::max(D0, D1);
 

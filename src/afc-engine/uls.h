@@ -51,6 +51,8 @@ public:
 	double txDlambda;
 	double rxGain;
 	double rxDlambda;
+	CConst::AntennaCategoryEnum antCategory;
+	std::string antModel;
 
 	double reflectorHeightLambda;
 	double reflectorWidthLambda;
@@ -133,7 +135,10 @@ public:
 	std::string getStatus();
 	double computeBeamWidth(double attnDB);
 	double computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg, double frequency, std::string &subModelStr, int divIdx);
-	double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, CConst::AntennaCategoryEnum category, std::string &subModelStr, int divIdx);
+
+	static double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, std::string antennaModel, CConst::AntennaCategoryEnum category,
+		std::string &subModelStr, int divIdx, double maxGain, double Dlambda);
+
 	std::string getRxAntennaModel() { return rxAntennaModel; }
 	CConst::ULSAntennaTypeEnum getRxAntennaType();
 	CConst::ULSAntennaTypeEnum getTxAntennaType();

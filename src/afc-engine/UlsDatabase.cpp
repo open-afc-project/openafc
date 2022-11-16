@@ -107,6 +107,8 @@ UlsDatabase::UlsDatabase()
 	prColumns << "pr_ant_diameter_tx";         prFieldIdxList.push_back(&prTxDiameterIdx);
 	prColumns << "pr_back_to_back_gain_rx";    prFieldIdxList.push_back(&prRxGainIdx);
 	prColumns << "pr_ant_diameter_rx";         prFieldIdxList.push_back(&prRxDiameterIdx);
+	prColumns << "pr_ant_category";            prFieldIdxList.push_back(&prAntCategoryIdx);
+	prColumns << "pr_ant_model";               prFieldIdxList.push_back(&prAntModelIdx);
 	prColumns << "pr_reflector_height_m";      prFieldIdxList.push_back(&prReflectorHeightIdx);
 	prColumns << "pr_reflector_width_m";       prFieldIdxList.push_back(&prReflectorWidthIdx);
 
@@ -311,6 +313,8 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 			target.at(r).prTxAntennaDiameter = std::vector<double>(numPR);
 			target.at(r).prRxGain = std::vector<double>(numPR);
 			target.at(r).prRxAntennaDiameter = std::vector<double>(numPR);
+			target.at(r).prAntCategory = std::vector<CConst::AntennaCategoryEnum>(numPR);
+			target.at(r).prAntModel = std::vector<std::string>(numPR);
 
 			target.at(r).prReflectorHeight = std::vector<double>(numPR);
 			target.at(r).prReflectorWidth = std::vector<double>(numPR);
@@ -353,6 +357,21 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 				target.at(r).prTxAntennaDiameter[prIdx] = prQueryRes.value(prTxDiameterIdx).isNull() ? nan : prQueryRes.value(prTxDiameterIdx).toDouble();
 				target.at(r).prRxGain[prIdx]            = prQueryRes.value(prRxGainIdx    ).isNull() ? nan : prQueryRes.value(prRxGainIdx    ).toDouble();
 				target.at(r).prRxAntennaDiameter[prIdx] = prQueryRes.value(prRxDiameterIdx).isNull() ? nan : prQueryRes.value(prRxDiameterIdx).toDouble();
+
+				std::string prAntCategoryStr = q.value(prAntCategoryIdx).toString().toStdString();
+				CConst::AntennaCategoryEnum prAntCategory;
+				if (prAntCategoryStr == "B1") {
+					prAntCategory = CConst::B1AntennaCategory;
+				} else if (prAntCategoryStr == "HP") {
+					prAntCategory = CConst::HPAntennaCategory;
+				} else if (prAntCategoryStr == "OTHER") {
+					prAntCategory = CConst::OtherAntennaCategory;
+				} else {
+					prAntCategory = CConst::UnknownAntennaCategory;
+				}
+				target.at(r).prAntCategory[prIdx] = prAntCategory;
+
+				target.at(r).prAntModel[prIdx] = q.value(prAntModelIdx).toString().toStdString();
 
 				target.at(r).prReflectorHeight[prIdx]   = prQueryRes.value(prReflectorHeightIdx).isNull() ? nan : prQueryRes.value(prReflectorHeightIdx).toDouble();
 				target.at(r).prReflectorWidth[prIdx]    = prQueryRes.value(prReflectorWidthIdx ).isNull() ? nan : prQueryRes.value(prReflectorWidthIdx ).toDouble();

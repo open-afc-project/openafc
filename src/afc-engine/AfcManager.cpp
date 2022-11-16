@@ -5056,6 +5056,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 							pr.txDlambda = row.prTxAntennaDiameter[prIdx] / lambda;
 							pr.rxGain = row.prRxGain[prIdx];
 							pr.rxDlambda = row.prRxAntennaDiameter[prIdx] / lambda;
+							pr.antCategory = row.prAntCategory[prIdx];
+							pr.antModel = row.prAntModel[prIdx];
 						} else if (row.prType[prIdx] == "Ref") {
 							pr.type = CConst::billboardReflectorPRType;
 							pr.reflectorHeightLambda = row.prReflectorHeight[prIdx] / lambda;
@@ -7898,7 +7900,7 @@ void AfcManager::runPointAnalysis()
 													rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
 												}
 
-												CConst::AntennaCategoryEnum rxAntennaCategory = uls->getRxAntennaCategory();
+												CConst::AntennaCategoryEnum rxAntennaCategory = (segIdx == numPR ? uls->getRxAntennaCategory() : uls->getPR(segIdx).antCategory);
 												std::string rxAntennaCategoryStr = (
 														rxAntennaCategory == CConst::B1AntennaCategory ? "B1" :
 														rxAntennaCategory == CConst::HPAntennaCategory ? "HP" :
