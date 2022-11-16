@@ -27,6 +27,7 @@ if [ "$AFC_PROD_ENV" == "final" ]; then
     gunicorn --config gunicorn.conf.py --log-config gunicorn.logs.conf wsgi:app
 else
   # apache
+  echo "APACHE"
   if [[ ! -z "$HISTORY_HOST" ]]; then
 	  printf '<VirtualHost *:80>
   ServerName %s
@@ -42,9 +43,9 @@ else
   ProxyPreserveHost On
   ProxyRequests Off
 </VirtualHost>\n' $(hostname) $HISTORY_HOST $HISTORY_HOST \
-$(hostname) $HISTORY_HOST $HISTORY_HOST > /etc/httpd/conf.d/10-history-proxy.conf
+$(hostname) $HISTORY_HOST $HISTORY_HOST > /etc/httpd/conf.d/history-proxy.conf
+  chown fbrat:fbrat /etc/httpd/conf.d/history-proxy.conf
 fi
-
 HTTPD_OPTIONS=${HTTPD_OPTIONS}
 echo "/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND >"
 /usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND &
