@@ -46,7 +46,7 @@ if flask.config["OBJSTORAGE"] == "GoogleCloudBucket":
     client = google.cloud.storage.client.Client()
     bucket = client.bucket(flask.config["GOOGLE_CLOUD_BUCKET"])
 
-def generateHtml(baseurl, dirs, files):
+def generateHtml(schema, baseurl, dirs, files):
     flask.logger.debug("generateHtml({}, {}, {})".format(baseurl, dirs, files))
     dirs.sort()
     files.sort()
@@ -59,16 +59,18 @@ def generateHtml(baseurl, dirs, files):
 <body>
 <h1>Directory listing for """
 
+    burl = ""
     baseSplit = baseurl.split("/")
     if len(baseSplit) >= 4:
-        i = 3
-        url = baseSplit[0] + "/" + baseSplit[1] + "/" + baseSplit[2]
+        url = schema + "://" + baseSplit[2] + "/dbg"
+        flask.logger.debug("url {}".format(url))
+        html += "<a href=" + url + ">" + "dbg" + "</a> "
+        i = 4
         while i < len(baseSplit):
             url += "/" + baseSplit[i]
             html += " <a href=" + url + ">" + "/" + baseSplit[i] + "</a> "
-            i+=1
-    else:
-        baseSplit = ""
+            i += 1
+        burl = url
 
 
     html += """</h1><hr>
@@ -76,10 +78,10 @@ def generateHtml(baseurl, dirs, files):
 """
 
     for e in dirs:
-        html += "<li><a href=" + baseurl + "/" + e + "><b>" + e + """/</b></a></li>
+        html += "<li><a href=" + burl + "/" + e + "><b>" + e + """/</b></a></li>
 """
     for e in files:
-        html += "<li><a href=" + baseurl + "/" + e + ">" + e + """</a></li>
+        html += "<li><a href=" + burl + "/" + e + ">" + e + """</a></li>
 """
 
     html += """</ul>
@@ -178,42 +180,41 @@ class Objstorage:
 
 def get_local_path(path):
     prefix = path.split('/')[0]
-    if prefix != "dbg":
+    schema = "http"
+    if prefix == "dbgs":
+        schema = "https"
+    elif prefix != "dbg":
         flask.logger.error('get_local_path: wrong path {}'.format(path))
         abort(403, 'Forbidden')
     path = flask.config["DBG_LOCATION"] + path[len(prefix):]
     flask.logger.debug("get_local_path() {}".format(path))
-    return path
+    return path, schema
 
 
 @flask.route('/'+'<path:path>', methods=['GET'])
 def get(path):
     ''' File download handler. '''
     flask.logger.debug('get method={}, path={}'.format(request.method, path))
-    path = get_local_path(path)
+    path, schema = get_local_path(path)
 
     try:
         objst = Objstorage()
         with objst.open(path) as hobj:
             if hobj.isdir() is True:
                 dirs, files = hobj.list()
-                return generateHtml(request.base_url, dirs, files)
+                return generateHtml(schema, request.base_url, dirs, files)
             else:
                 data = hobj.read()
-                if data:
-                    flask.logger.debug("get data={}".format(data))
-                    return helpers.send_file(
-                        io.BytesIO(data),
-                        mimetype='application/octet-stream')
-                else:
-                    flask.logger.error('{}: File not found'.format(path))
-                    abort(404)
+                return helpers.send_file(
+                    io.BytesIO(data),
+                    download_name=os.path.basename(path))
     except Exception as e:
         flask.logger.error(e)
         return abort(500)
 
 
 if __name__ == '__main__':
+    os.makedirs(flask.config["DBG_LOCATION"], exist_ok=True)
     waitress.serve(flask, host=flask.config["HISTORY_HOST"],
           port=flask.config["HISTORY_PORT"])
 

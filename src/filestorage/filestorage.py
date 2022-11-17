@@ -106,12 +106,7 @@ class ObjIntLocalFS(ObjInt):
 
     def __mkdir_local(self, path):
         flask.logger.debug('__mkdir_local({})'.format(path))
-        try:
-            os.makedirs(path)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                flask.logger.error('mkdir_local: something wrong {}'.format(path))
-                raise
+        os.makedirs(path, exist_ok=True)
 
 
 class ObjIntGoogleCloudBucket(ObjInt):
@@ -253,7 +248,7 @@ def get(path):
 
 if __name__ == '__main__':
     flask.logger.debug("host={} port={} FILE_LOCATION={} OBJSTORAGE={}".format(flask.config['SERVER_HOST'], flask.config['SERVER_PORT'], flask.config['FILE_LOCATION'], flask.config["OBJSTORAGE"]))
-
+    os.makedirs(flask.config['FILE_LOCATION'], exist_ok=True)
     # production env:
     import waitress
     waitress.serve(flask, host=flask.config['SERVER_HOST'],
