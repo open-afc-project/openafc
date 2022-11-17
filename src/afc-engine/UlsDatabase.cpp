@@ -358,7 +358,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 				target.at(r).prRxGain[prIdx]            = prQueryRes.value(prRxGainIdx    ).isNull() ? nan : prQueryRes.value(prRxGainIdx    ).toDouble();
 				target.at(r).prRxAntennaDiameter[prIdx] = prQueryRes.value(prRxDiameterIdx).isNull() ? nan : prQueryRes.value(prRxDiameterIdx).toDouble();
 
-				std::string prAntCategoryStr = q.value(prAntCategoryIdx).toString().toStdString();
+				std::string prAntCategoryStr = prQueryRes.value(prAntCategoryIdx).toString().toStdString();
 				CConst::AntennaCategoryEnum prAntCategory;
 				if (prAntCategoryStr == "B1") {
 					prAntCategory = CConst::B1AntennaCategory;
@@ -371,7 +371,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 				}
 				target.at(r).prAntCategory[prIdx] = prAntCategory;
 
-				target.at(r).prAntModel[prIdx] = q.value(prAntModelIdx).toString().toStdString();
+				target.at(r).prAntModel[prIdx] = prQueryRes.value(prAntModelIdx).toString().toStdString();
 
 				target.at(r).prReflectorHeight[prIdx]   = prQueryRes.value(prReflectorHeightIdx).isNull() ? nan : prQueryRes.value(prReflectorHeightIdx).toDouble();
 				target.at(r).prReflectorWidth[prIdx]    = prQueryRes.value(prReflectorWidthIdx ).isNull() ? nan : prQueryRes.value(prReflectorWidthIdx ).toDouble();

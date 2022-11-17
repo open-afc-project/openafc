@@ -5116,12 +5116,25 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								double Ay = pointingA.dot(pr.reflectorY);
 								double Az = pointingA.dot(pr.reflectorZ);
 
-								double alphaAZ = (180.0/M_PI)*fabs(atan(Ax/Az));
-								double alphaEL = (180.0/M_PI)*fabs(atan(Ay/Az));
-
 								double cosThetaIN = pointingA.dot(pr.reflectorZ);
 
-								if (alphaEL <= alphaAZ) {
+								// Spec was changed from:
+								// s = if ((alphaEL <= alphaAZ)) reflectorWidthLambda*cosThetaIN else pr.reflectorHeightLambda*cosThetaIN
+								// to
+								// s = MAX(reflectorWidthLambda, reflectorHeightLambda)*cosThetaIN
+								
+								bool conditionW;
+								if (0) {
+									// previous spec
+									double alphaAZ = (180.0/M_PI)*fabs(atan(Ax/Az));
+									double alphaEL = (180.0/M_PI)*fabs(atan(Ay/Az));
+									conditionW = (alphaEL <= alphaAZ);
+								} else {
+									// current spec
+									conditionW = (pr.reflectorWidthLambda >= pr.reflectorHeightLambda);
+								}
+
+								if (conditionW) {
 									pr.reflectorSLambda = pr.reflectorWidthLambda*cosThetaIN;
 								} else {
 									pr.reflectorSLambda = pr.reflectorHeightLambda*cosThetaIN;
