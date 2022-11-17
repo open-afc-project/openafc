@@ -21,10 +21,15 @@ fi
 CELERY_OPTIONS=${CELERY_OPTIONS:="rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10"}
 CELERY_LOG=${CELERY_LOG:=INFO}
 /bin/celery multi start $CELERY_OPTIONS -A ratapi.tasks.afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=$CELERY_LOG &
-
-# apache
-if [[ ! -z "$HISTORY_HOST" ]]; then
-	printf '<VirtualHost *:80>
+if [ "$AFC_PROD_ENV" == "final" ]; then
+    # gunicorn
+    echo "GUNICORN"
+    gunicorn --config gunicorn.conf.py --log-config gunicorn.logs.conf wsgi:app
+else
+  # apache
+  echo "APACHE"
+  if [[ ! -z "$HISTORY_HOST" ]]; then
+	  printf '<VirtualHost *:80>
   ServerName %s
   ProxyPassReverse /dbg http://%s:4999/dbg
   ProxyPass /dbg http://%s:4999/dbg
@@ -38,12 +43,13 @@ if [[ ! -z "$HISTORY_HOST" ]]; then
   ProxyPreserveHost On
   ProxyRequests Off
 </VirtualHost>\n' $(hostname) $HISTORY_HOST $HISTORY_HOST \
-$(hostname) $HISTORY_HOST $HISTORY_HOST > /etc/httpd/conf.d/10-history-proxy.conf
+$(hostname) $HISTORY_HOST $HISTORY_HOST > /etc/httpd/conf.d/history-proxy.conf
+  chown fbrat:fbrat /etc/httpd/conf.d/history-proxy.conf
 fi
-
 HTTPD_OPTIONS=${HTTPD_OPTIONS}
 echo "/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND >"
 /usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND &
+fi
 
 wait
 

@@ -81,4 +81,12 @@ ARG CELERY_LOG
 ENV CELERY_LOG=$CELERY_LOG
 ARG HTTPD_OPTIONS
 ENV HTTPD_OPTIONS=$HTTPD_OPTIONS
+ARG AFC_PROD_ENV
+ENV AFC_PROD_ENV ${AFC_PROD_ENV}
+RUN pip install futures
+RUN pip install gunicorn==19.10.0
+COPY gunicorn/wsgi.py /wd/
+COPY gunicorn/gunicorn.conf.py /wd/
+COPY gunicorn/gunicorn.logs.conf /wd/
+RUN mkdir -p /run/gunicorn
 CMD ["/docker-entrypoint.sh"]
