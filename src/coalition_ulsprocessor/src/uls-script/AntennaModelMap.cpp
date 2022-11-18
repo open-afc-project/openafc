@@ -3,6 +3,7 @@
 /******************************************************************************************/
 
 #include <limits>
+#include <algorithm>
 #include "AntennaModelMap.h"
 
 /******************************************************************************************/
@@ -519,7 +520,7 @@ void AntennaModelMapClass::readModelMap(const std::string filename)
 /******************************************************************************************/
 /**** FUNCTION: AntennaModelMapClass::find()                                           ****/
 /******************************************************************************************/
-AntennaModelClass *AntennaModelMapClass::find(const std::string modelName)
+AntennaModelClass *AntennaModelMapClass::find(std::string modelName)
 {
 	bool found = false;
 	int antIdx;
@@ -532,12 +533,20 @@ AntennaModelClass *AntennaModelMapClass::find(const std::string modelName)
 		}
 	}
 
-	AntennaModelClass *antennaModel;
+	AntennaModelClass *antennaModel = (AntennaModelClass *) NULL;
 	if (found) {
 		antennaModel = antennaModelList[antIdx];
 	} else {
-		antennaModel = (AntennaModelClass *) NULL;
-	}
+        std::transform(modelName.begin(), modelName.end(), modelName.begin(), ::toupper);
+
+	    for(i=0; (i<antennaModelList.size())&&(!found); ++i) {
+	        AntennaModelClass *m = antennaModelList[i];
+            if (modelName.compare(0, m->name.size(), m->name) == 0) {
+                found = true;
+                antennaModel = m;
+            }
+        }
+    }
 
 	return(antennaModel);
 }
