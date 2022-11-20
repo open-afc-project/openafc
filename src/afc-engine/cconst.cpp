@@ -32,6 +32,13 @@ const double CConst::geoRadius = 42164.0e3;
 const double CConst::boltzmannConstant = 1.3806488e-23;
 const double CConst::T0                = 290;
 const double CConst::atmPressurehPa    = 1013;
+
+const int CConst::unii5StartFreqMHz = 5925;
+const int CConst::unii5StopFreqMHz  = 6425;
+const int CConst::unii7StartFreqMHz = 6525;
+const int CConst::unii7StopFreqMHz  = 6875;
+const int CConst::unii8StartFreqMHz = 6875;
+const int CConst::unii8StopFreqMHz  = 7125;
 /******************************************************************************************/
 
 /******************************************************************************************/

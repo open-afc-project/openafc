@@ -18,6 +18,12 @@ public:
 	static const double T0;	// Room temperature for noise figure calculations
 	static const double atmPressurehPa;	// Atmospheric pressure value used in P.452
 
+	static const int unii5StartFreqMHz; // UNII-5 Start Freq (MHz)
+	static const int unii5StopFreqMHz;  // UNII-5 Stop  Freq (MHz)
+	static const int unii7StartFreqMHz; // UNII-7 Start Freq (MHz)
+	static const int unii7StopFreqMHz;  // UNII-7 Stop  Freq (MHz)
+	static const int unii8StartFreqMHz; // UNII-8 Start Freq (MHz)
+	static const int unii8StopFreqMHz;  // UNII-8 Stop  Freq (MHz)
 
 
 	/**************************************************************************************/

@@ -549,7 +549,6 @@ int AntennaClass::checkGain(const char *flname, int orient, int numpts)
 {
 	int i;
 	double phase_deg, phase_rad, dx, dy, dz, gain_db;
-	char *chptr;
 	FILE *fp;
 
 	if (numpts <= 0) {

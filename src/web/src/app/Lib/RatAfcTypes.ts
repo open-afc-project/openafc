@@ -115,7 +115,7 @@ export interface InquiryResponse {
 }
 
 export interface VendorExtension {
-    extensionID: string
+    extensionId: string
     parameters: any
 }
 

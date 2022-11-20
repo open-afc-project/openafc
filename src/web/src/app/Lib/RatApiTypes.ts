@@ -59,7 +59,8 @@ export interface AFCConfigFile {
     channelResponseAlgorithm: ChannelResponseAlgorithm,
     visibilityThreshold?: number,
     allowScanPtsInUncReg?: boolean,
-    passiveRepeaterFlag?: boolean
+    passiveRepeaterFlag?: boolean,
+    printSkippedLinksFlag?: false 
 }
 
 export type FreqRange = {
