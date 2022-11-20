@@ -196,7 +196,7 @@ class DataIfBaseV1():
             self._rpath["cfg"] = pref + "cfg"
             self._rpath["dbg"] = pref + "dbg"
         elif self._prot == self.HTTPS and self._host and self._port:
-            pref = "http://" + self._host + ":" + str(self._port) + "/"
+            pref = "https://" + self._host + ":" + str(self._port) + "/"
             self._rpath["pro"] = pref + "pro"
             self._rpath["cfg"] = pref + "cfg"
             self._rpath["dbg"] = pref + "dbg"
