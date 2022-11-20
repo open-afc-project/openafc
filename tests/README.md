@@ -271,10 +271,10 @@ The procedure requires to drop the DB into a SQL file, edit if needed and create
 Open the DB and dump to a SQL file.
 ```
 sqlite3 afc_input.sqlite3
->
-> .output dump.sql
-> .dump
-> .quit
+
+.output dump.sql
+.dump
+.quit
 ```
 Open and edit dump.sql with any editor as it is a text file with not complicated SQL code.
 
@@ -285,9 +285,9 @@ mv ./afc_input.sqlite3 ./afc_input.sqlite3_backup
 Open a new file and create tables in it.
 ```
 sqlite3 ./afc_input.sqlite3
->
-> .read dump.sql
-> .quit
+
+.read dump.sql
+.quit
 ```
 At this stage there is a fixed DB that can be used.
 
