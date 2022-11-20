@@ -29,7 +29,7 @@ else
 	# apache
 	echo "APACHE"
 	if [[ ! -z "$HISTORY_HOST" ]]; then
-		sed "/<\/Directory>/a  ProxyPassReverse \/dbg http:\/\/$HISTORY_HOST:4999\/dbg\n  ProxyPass \/dbg http:\/\/$HISTORY_HOST:4999\/dbg\n  ProxyPreserveHost On\n  ProxyRequests Off" 25-d314311cc155.med.broadcom.net-notls.conf
+		sed -i "/<\/Directory>/a  ProxyPassReverse \/dbg http:\/\/$HISTORY_HOST:4999\/dbg\n  ProxyPass \/dbg http:\/\/$HISTORY_HOST:4999\/dbg\n  ProxyPreserveHost On\n  ProxyRequests Off" $(ls /etc/httpd/conf.d/*-notls.conf)
 	fi
 	HTTPD_OPTIONS=${HTTPD_OPTIONS}
 	echo "/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND >"
