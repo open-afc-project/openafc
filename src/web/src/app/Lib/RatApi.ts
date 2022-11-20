@@ -113,7 +113,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
            "terrainSource": "3DEP (30m)"
         },
         "propagationEnv": "NLCD Point",
-        "ulsDatabase": "CONUS_ULS_2022-09-28T18_24_13.175695_fixedBPS_sorted_param.sqlite3",
+        "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
         "regionStr": "CONUS",
         "rasDatabase": "RASdatabase.csv",
         "APUncertainty": {
