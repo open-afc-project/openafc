@@ -22,7 +22,7 @@ docker run --rm -v `pwd`/pipe:/pipe ${RTEST_DI}:${TAG} --cmd exp_adm_cfg --outfi
 check_ret $?
 # copy regr server config and run srvr
 cp -a ~/template_regrtest/*  .
-mv docker-compose_mtls.yaml docker-compose.yaml
+mv docker-compose_msghnd.yaml docker-compose.yaml
 check_ret $?
 docker-compose down && docker-compose up -d && docker ps -a
 check_ret $?
