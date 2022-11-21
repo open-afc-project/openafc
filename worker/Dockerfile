@@ -5,10 +5,10 @@
 # a copy of which is included with this software program
 #
 # default value of args
-ARG BLD_TAG=3.4.4.1
-ARG PRINST_TAG=1.2.3.4
+ARG BLD_TAG=3.4.5.1
+ARG PRINST_TAG=3.4.5.1
 ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-build-image
-ARG PRINST_NAME=worker_preinstall_img
+ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-worker-preinstall
 
 # Stage Build
 FROM ${BLD_NAME}:${BLD_TAG} as build_image
@@ -24,7 +24,7 @@ RUN mkdir -p -m 777 /wd/build/__install
 RUN ls -l ./ && pwd && cd /wd/build && \
 source /opt/rh/$(scl -l)/enable && \
 cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169 -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -G Ninja /wd && \
-ninja-build -j$(nproc) install 
+ninja-build -j$(nproc) install
 
 
 # Stage Install
