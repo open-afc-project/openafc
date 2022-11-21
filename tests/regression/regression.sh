@@ -101,12 +101,11 @@ build_dev_server() {
   # build regression test docker image
   cd ${wd}/tests && docker_build Dockerfile ${RTEST_DI}:${tag}; cd ${wd}
 
-  docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${PRINST_WRKR_DI}:${tag} ${push}
-  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_WRKR_DI} --build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push ${wd}/worker/Dockerfile ${WRKR_DI}:${tag} ${push} "${EXT_ARGS}"
-
   # build in parallel server docker prereq images (preinstall and docker_for_build)
-  (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push})
+  (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push} & docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${PRINST_WRKR_DI}:${tag} ${push})
+
+  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_WRKR_DI} --build-arg BUILDREV=worker"
+  docker_build_and_push ${wd}/worker/Dockerfile ${WRKR_DI}:${tag} ${push} "${EXT_ARGS}"
 
   # build afc dynamic data storage image
   cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST_DI}:${tag} ${push}; cd ${wd}
