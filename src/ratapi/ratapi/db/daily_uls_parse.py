@@ -64,23 +64,33 @@ def downloadFiles(logFile):
             break
 
 # Downloads antenna files
-def downloadAntFiles(logFile):
-    # download antenna files
-    antURL = 'https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data/'
-    antFileList = [ 'antenna_model_diameter_gain',
+def downloadAFCGitHubFiles(logFile):
+    # download AFC GitHub data files
+    # Manually view at: https://github.com/Wireless-Innovation-Forum/6-GHz-AFC/tree/main/data/common_data
+    dataURL = 'https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data/'
+    dataFileList = [ 'antenna_model_diameter_gain',
                     'billboard_reflector',
                     'category_b1_antennas',
                     'high_performance_antennas',
+                    'fcc_fixed_service_channelization',
                   ]
 
-    for antFile in antFileList:
-        urllib.urlretrieve(antURL + antFile + '.csv', antFile + '_orig.csv')
-        cmd = 'tr -d \'\200-\377\' < ' + antFile + '_orig.csv  | ' \
-            + 'gawk -F "," \'($3 != "") {print}\' | ' \
-            + 'sed \'s/daimeter/diameter/\' ' \
-            + '>| ' + antFile + '.csv'
-        os.system(cmd)
+    for dataFile in dataFileList:
+        urllib.urlretrieve(dataURL + dataFile + '.csv', dataFile + '_orig.csv')
 
+        # Temporary solution: remove control characters, and blank lines.  Fix spelling error.
+        cmd = 'tr -d \'\200-\377\015\' < ' + dataFile + '_orig.csv  | ' \
+            + 'gawk -F "," \'($2 != "") { print }\' | ' \
+            + 'sed \'s/daimeter/diameter/\' ' \
+            + '>| ' + dataFile + '.csv'
+        os.system(cmd)
+        if dataFile == "fcc_fixed_service_channelization":
+            cmd = 'echo -e "5967.4375,30,\n' \
+                        +  '6056.3875,30,\n' \
+                        +  '6189.8275,30,\n' \
+                        +  '6219.4775,30,\n' \
+                        +  '6308.4275,30," >> ' + dataFile + '.csv'
+            os.system(cmd)
 
 # Extracts all the zip files into sub-directories
 def extractZips(logFile):
@@ -351,20 +361,20 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Download antenna model files? (y/n): ")
+            value = raw_input("Download AFC GitHub data files? (y/n): ")
             if value == "y":
                 accepted = True
-                downloadAntFilesFlag = True
+                downloadAFCGitHubFilesFlag = True
             elif value == "n":
                 accepted = True
-                downloadAntFilesFlag = False
+                downloadAFCGitHubFilesFlag = False
             else:
                 print("ERROR: Invalid input: " + value + ", must be y or n")
     else:
-        downloadAntFilesFlag = True
+        downloadAFCGitHubFilesFlag = True
 
-    if downloadAntFilesFlag:
-        downloadAntFiles(logFile)
+    if downloadAFCGitHubFilesFlag:
+        downloadAFCGitHubFiles(logFile)
 
     if interactive:
         accepted = False
@@ -452,7 +462,12 @@ def daily_uls_parse(state_root, interactive):
         # run through the uls processor 
         logFile.write('Running through ULS processor' + '\n')
         try:
-            subprocess.call(['./uls-script', root + temp + '/combined.txt', fullPathCoalitionScriptOutput, root + temp + '/antenna_model_list.csv', root + '/antenna_model_map.csv', mode]) 
+            subprocess.call(['./uls-script', root + temp + '/combined.txt', \
+                                             fullPathCoalitionScriptOutput, \
+                                             root + temp + '/antenna_model_list.csv', \
+                                             root + '/antenna_model_map.csv', \
+                                             root + temp + '/fcc_fixed_service_channelization.csv', \
+                                             mode]) 
         except Exception as e: 
             logFile.write('ERROR: ULS processor error:')
             raise e
