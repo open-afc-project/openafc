@@ -13,19 +13,16 @@ ARG PRINST_NAME=worker_preinstall_img
 # Stage Build
 FROM ${BLD_NAME}:${BLD_TAG} as build_image
 ARG BUILDREV=localbuild
-COPY CMakeLists.txt LICENSE.txt version.txt fbrat.rpmlintrc Doxyfile.in build-rpm.sh /wd/
+COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /wd/
 RUN echo $BUILDREV > /wd/svnrevision.txt
 
 COPY cmake /wd/cmake/
 COPY pkg /wd/pkg/
 COPY selinux /wd/selinux/
 COPY src /wd/src/
-#RUN sh -x /wd/build-rpm.sh
 RUN mkdir -p -m 777 /wd/build/__install
-RUN cd /wd/build && \
+RUN ls -l ./ && pwd && cd /wd/build && \
 source /opt/rh/$(scl -l)/enable && \
-export CC=$(which gcc) && \
-export CXX=$(which g++) && \
 cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169 -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -G Ninja /wd && \
 ninja-build -j$(nproc) install 
 
@@ -35,7 +32,6 @@ FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 COPY prereqs/.bashrc /root/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
-RUN mkdir -p /repos/CentOS/7/7/Packages
 #COPY --from=build_image \
 #    /wd/build/dist/RPMS/x86_64/fbrat* \
 #    /root/rpmbuild/RPMS/noarch/python2-wtforms-2.2.1-6.el7.noarch.rpm \
