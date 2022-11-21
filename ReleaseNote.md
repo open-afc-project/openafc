@@ -1,4 +1,36 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-421&425&430**|
+| :- | :- |
+|**Date**|**11/18/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-421: GUI fixes (fixing channel color plan)
+ * Jira OA-425: Correct extensionID in response json
+ * Jira OA-430: Finish-up Passive Repeater Implementation 
+
+
+## **Interface Changes**
+ * OA-425 was done at API level
+ * There was minor change in the ULS-parser (for OA-430)
+ * There are two new files to use: 1) ULS database on https://drive.google.com/drive/folders/1ZZXQ1ljjgUwR3u3Bb45g08oN_F2btL1E (...2022-11-16T06_25_10.816819.zip) and 
+ * +--2) "WINNF-TS-1014-V1.2.0-App02.csv" in /usr/share/fbrat/rat_transfer/pr
+ * Update of default afc-config.json to contain "printSkippedLinksFlag": false. For debugging, this parameter can be set to true so that the skipped links (per Fedor's optimization) are printed in exc_thr file.
+
+## **Testing Done**
+ * OA-430: In WFA-testvector-ULS, there were 1370 links with at least one passive repeater. 
+ * Validated all the precomputed passive repeater parameters in the ULS, exc_thr and fs_analysis files.
+ * In addition, validated PR calculations for all the currens cases in the ULS: single back-to-back, single reflector, two back-to-backs, 2 single-reflectors and 3 single reflectors.
+ * Example test cases are attached to OA-430 jira ticket.
+ * OA-425: Ran FSP1 and confirmed in response.json in the GUI that extensionId is used.
+ * OA-421: Ran FSP1 and confirmed that 1) there no RED when minEIRP=-100 dBm, 2) for minEIRP=21 dBm, channels with EIRP < minEIRP are colored RED, 
+ * 3) when FSP1 is altered to AP height=40m & height uncertainty=40m, the channels overlapping FS inside AP uncertainty volume are colored BLACK.
+ * 4) for AP inside RAS, chanenls overlapping with RAS band are colored BLACK.
+
+## **Open Issues** 
+ * In R2-AIP-31 for back-to-back, we implemented lambda using actual frequency (rather than UNII-band center freq per the spec) as this is more accurate and it is FSPL equation.
 ## **Version and Date**
 |Version|3.4.5.1|
 | :- | :- |

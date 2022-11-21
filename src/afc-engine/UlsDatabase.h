@@ -63,6 +63,8 @@ struct UlsRecord
 	std::vector<double> prTxAntennaDiameter;
 	std::vector<double> prRxGain;
 	std::vector<double> prRxAntennaDiameter;
+	std::vector<CConst::AntennaCategoryEnum> prAntCategory;
+	std::vector<std::string> prAntModel;
 
 	std::vector<double> prReflectorHeight;
 	std::vector<double> prReflectorWidth;
@@ -145,6 +147,8 @@ public:
 	int prTxDiameterIdx;
 	int prRxGainIdx;
 	int prRxDiameterIdx;
+	int prAntCategoryIdx;
+	int prAntModelIdx;
 	int prReflectorHeightIdx;
 	int prReflectorWidthIdx;
 

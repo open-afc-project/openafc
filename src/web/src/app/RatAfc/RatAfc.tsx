@@ -54,6 +54,8 @@ interface RatAfcState {
     includeMap: boolean,
     clickedMapPoint?: Point,
     fullJsonResponse?: string,
+    redChannels?:AvailableChannelInfo[],
+    blackChannels?:AvailableChannelInfo[]
 }
 
 const mapProps: MapProps = {
@@ -89,7 +91,8 @@ interface MapState {
  * @param minEirp min eirp to use for coloring
  * @param maxEirp maz eirp to use for coloring
  */
-const generateChannelData = (channelClasses: AvailableChannelInfo[], minEirp: number, maxEirp: number): ChannelData[] => {
+const generateChannelData = (channelClasses: AvailableChannelInfo[], minEirp: number, maxEirp: number,
+    blackChannels?: AvailableChannelInfo[], redChannels?: AvailableChannelInfo[]): ChannelData[] => {
     let channelData = clone(emptyChannels);
     channelClasses.forEach((channelClass) =>
         channelData.forEach((channelGroup) =>
@@ -111,6 +114,37 @@ const generateChannelData = (channelClasses: AvailableChannelInfo[], minEirp: nu
                 }
             }))
     );
+
+    if (!!blackChannels) {
+        blackChannels.forEach((channelClass) =>
+            channelData.forEach((channelGroup) =>
+                channelGroup.channels.forEach((channel) => {
+                    for (let i = 0; i < channelClass.channelCfi.length; i++) {
+                        if (channel.name === String(channelClass.channelCfi[i])) {
+                            channel.color = "black";
+                            channel.maxEIRP = undefined;
+                        }
+                    }
+                })
+            )
+        )
+    }
+
+
+    if (!!redChannels) {
+        redChannels.forEach((channelClass) =>
+            channelData.forEach((channelGroup) =>
+                channelGroup.channels.forEach((channel) => {
+                    for (let i = 0; i < channelClass.channelCfi.length; i++) {
+                        if (channel.name === String(channelClass.channelCfi[i])) {
+                            channel.color = "red";
+                            channel.maxEIRP = undefined;
+                        }
+                    }
+                })
+            )
+        )
+    }
 
     return channelData;
 }
@@ -267,16 +301,28 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             minEirp: minEirp,
                             mapCenter: rlanLoc,
                             clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng },
-                            fullJsonResponse: JSON.stringify(resp.result, null, 2)
+                            fullJsonResponse: JSON.stringify(resp.result, null, 2),
+                           
                         });
+
+                        
+                        if (response.vendorExtensions
+                            && response.vendorExtensions.length > 0
+                            && response.vendorExtensions.findIndex(x => x.extensionId == "openAfc.redBlackData") >= 0) {
+                                let extraChannels = response.vendorExtensions.find(x => x.extensionId == "openAfc.redBlackData").parameters;
+                                this.setState({redChannels: extraChannels["redChannelInfo"], blackChannels: extraChannels["blackChannelInfo"]})
+                        }else{
+                            this.setState({redChannels: undefined, blackChannels: undefined})
+                        }
+
 
                         if (this.state.includeMap
                             && response.vendorExtensions
                             && response.vendorExtensions.length > 0
-                            && response.vendorExtensions.findIndex(x => x.extensionID == "openAfc.mapinfo") >= 0) {
+                            && response.vendorExtensions.findIndex(x => x.extensionId == "openAfc.mapinfo") >= 0) {
                             //Get the KML file and load it into the state.kml parameters; get the GeoJson if present
-                            let kml_filename = response.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["kmzFile"];
-                            let geoJson_filename = response.vendorExtensions.find(x => x.extensionID == "openAfc.mapinfo").parameters["geoJsonFile"];
+                            let kml_filename = response.vendorExtensions.find(x => x.extensionId == "openAfc.mapinfo").parameters["kmzFile"];
+                            let geoJson_filename = response.vendorExtensions.find(x => x.extensionId == "openAfc.mapinfo").parameters["geoJsonFile"];
                             this.setKml(atob(kml_filename))
                             let geojson = JSON.parse(geoJson_filename);
                             if (request.location.ellipse && geojson && geojson.geoJson) {
@@ -404,7 +450,12 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             totalWidth={this.state.width - 10}
                             topLeft={{ x: 5, y: 10 }}
                             channelHeight={30}
-                            channels={this.state.response?.availableChannelInfo ? generateChannelData(this.state.response.availableChannelInfo, this.state.minEirp, this.state.maxEirp) : emptyChannels} />
+                            channels={this.state.response?.availableChannelInfo ?
+                                generateChannelData(this.state.response.availableChannelInfo, this.state.minEirp, this.state.maxEirp,
+                                    this.state.blackChannels, this.state.redChannels
+                                ) : emptyChannels}
+
+                        />
                     </div>}
                 </Measure></CardBody></Card>
                 <br />

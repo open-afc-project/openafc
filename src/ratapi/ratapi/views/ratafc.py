@@ -253,13 +253,23 @@ def success_done(t):
             pass
         if kmz_data or map_data:
             resp_json = json.loads(resp_data)
-            resp_json["availableSpectrumInquiryResponses"][0]["vendorExtensions"] = [{
-                "extensionID": "openAfc.mapinfo",
-                "parameters": {
-                    "kmzFile": kmz_data.encode('base64') if kmz_data else None,
-                    "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS) if map_data else None
-                }
-            }]
+            existingExtensions = resp_json["availableSpectrumInquiryResponses"][0].get("vendorExtensions");
+            if(existingExtensions == None):
+                resp_json["availableSpectrumInquiryResponses"][0]["vendorExtensions"] = [{
+                    "extensionId": "openAfc.mapinfo",
+                    "parameters": {
+                        "kmzFile": kmz_data.encode('base64') if kmz_data else None,
+                        "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS) if map_data else None
+                    }
+                }]
+            else:
+                 resp_json["availableSpectrumInquiryResponses"][0]["vendorExtensions"].append({
+                    "extensionId": "openAfc.mapinfo",
+                    "parameters": {
+                        "kmzFile": kmz_data.encode('base64') if kmz_data else None,
+                        "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS) if map_data else None
+                    }
+                })
             resp_data = json.dumps(resp_json)
 
     resp = flask.make_response(resp_data)

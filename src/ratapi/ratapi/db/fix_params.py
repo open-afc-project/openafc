@@ -13,32 +13,32 @@ unii8StartFreqMHz = 6875
 unii8StopFreqMHz  = 7125
 
 typicalReflectorDimensions = [
-    (1.8,2.4),
-    (2.4,3),
-    (2.4,3.7),
-    (3,4.6),
-    (3,4.9),
-    (3,7.3),
-    (3.7,4.9),
-    (4.3,4.9),
-    (4.9,6.1),
-    (4.9,7.3),
-    (6.1,7.3),
-    (6.1,9.1),
-    (6.1,9.8),
-    (7.3,9.1),
-    (9.1,9.8),
-    (9.1,12.2),
-    (9.1,14.6),
-    (12.2,15.2) ]
+    (1.83,2.44),
+    (2.44,3.05),
+    (2.44,3.66),
+    (3.05,4.57),
+    (3.05,4.88),
+    (3.05,7.32),
+    (3.66,4.88),
+    (4.27,4.88),
+    (4.88,6.10),
+    (4.88,7.32),
+    (6.10,7.32),
+    (6.10,9.14),
+    (6.10,9.75),
+    (7.32,9.14),
+    (9.14,9.75),
+    (9.14,12.19),
+    (9.14,14.63),
+    (12.19,15.24) ]
 
 def isTypicalReflectorDimension(height, width):
     found = False
     for refDim in typicalReflectorDimensions:
         typicalHeight = refDim[0]
         typicalWidth = refDim[1]
-        if (abs(typicalHeight - height) <= 0.01) and (abs(typicalWidth - width) <= 0.01):
-            found = False
+        if (abs(typicalHeight - height) <= 0.1) and (abs(typicalWidth - width) <= 0.1):
+            found = True
             break
     return found
 
@@ -201,22 +201,27 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                 r[rxGainULSFixStr] = r[txGainULSStr]
 
                     if (r[prTypeStr] == 'Ref'):
+                        # R2-AIP-30 (b)
                         if (r[prHeightULSStr].strip() == '') or (r[prWidthULSStr].strip() == ''):
-                            r[prHeightULSFixStr] = str(16.0*12*2.54/100)
-                            r[prWidthULSFixStr] = str(20.0*12*2.54/100)
+                            r[prHeightULSFixStr] = str(4.88)
+                            r[prWidthULSFixStr] = str(6.10)
+                        # 2022.11.08: Need to confirm this
+                        elif (float(r[prHeightULSStr])+0.1 < 1.83) or (float(r[prWidthULSStr])+0.1 < 2.44):
+                            r[prHeightULSFixStr] = str(4.88)
+                            r[prWidthULSFixStr] = str(6.10)
 
                         prHeightULS = float(r[prHeightULSFixStr])
                         prWidthULS = float(r[prWidthULSFixStr])
-                        # R2-AIP-29-b-iii-1 and R2-AIP-29-b-iii-2 
-                        if (prHeightAntennaStr.strip() == '') or (prWidthAntennaStr.strip() == ''):
+                        # R2-AIP-29-b-iii-1
+                        if (r[prHeightAntennaStr].strip() == '') or (r[prWidthAntennaStr].strip() == ''):
                             prHeight = prHeightULS
                             prWidth = prWidthULS
                         else:
                             prHeightAnt = float(r[prHeightAntennaStr])
                             prWidthAnt = float(r[prWidthAntennaStr])
 
-                            # R2-AIP-29-b-iii-3
-                            if (abs(prHeightAnt-prHeightULS) <= 0.01) and (abs(prWidthAnt-prWidthULS) <= 0.01):
+                            # R2-AIP-29-b-iii-2
+                            if (abs(prHeightAnt-prHeightULS) <= 0.1) and (abs(prWidthAnt-prWidthULS) <= 0.1):
                                 prHeight = prHeightULS
                                 prWidth = prWidthULS
 
@@ -224,8 +229,8 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                 ulsTypicalFlag = isTypicalReflectorDimension(prHeightULS, prWidthULS)
                                 antTypicalFlag = isTypicalReflectorDimension(prHeightAnt, prWidthAnt)
 
-                                # R2-AIP-29-b-iii-4
-                                # R2-AIP-29-b-iii-6
+                                # R2-AIP-29-b-iii-3
+                                # R2-AIP-29-b-iii-5
                                 if (ulsTypicalFlag == antTypicalFlag):
                                     if (prHeightULS*prWidthULS > prHeightAnt*prWidthAnt):
                                         prHeight = prHeightULS
@@ -234,11 +239,15 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                         prHeight = prHeightAnt
                                         prWidth = prWidthAnt
 
-                                # R2-AIP-29-b-iii-5
+                                # R2-AIP-29-b-iii-4
                                 elif ulsTypicalFlag:
                                     prHeight = prHeightULS
                                     prWidth = prWidthULS
                                 elif antTypicalFlag:
+                                    prHeight = prHeightAnt
+                                    prWidth = prWidthAnt
+                                # R2-AIP-29-b-iv
+                                else:
                                     prHeight = prHeightAnt
                                     prWidth = prWidthAnt
 
