@@ -18,9 +18,12 @@ if [ "$BROKER_TYPE" == "internal" ]; then
 fi
 
 #celery
-CELERY_OPTIONS=${CELERY_OPTIONS:="rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10"}
-CELERY_LOG=${CELERY_LOG:=INFO}
-/bin/celery multi start $CELERY_OPTIONS -A ratapi.tasks.afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=$CELERY_LOG &
+CELERY_TYPE=${CELERY_TYPE:=internal}
+if [ "$CELERY_TYPE" == "internal" ]; then
+	CELERY_OPTIONS=${CELERY_OPTIONS:="rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10"}
+	CELERY_LOG=${CELERY_LOG:=INFO}
+	/bin/celery multi start $CELERY_OPTIONS -A ratapi.tasks.afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=$CELERY_LOG &
+fi
 if [ "$AFC_PROD_ENV" == "final" ]; then
 	# gunicorn
 	echo "GUNICORN"

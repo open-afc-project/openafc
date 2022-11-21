@@ -20,7 +20,11 @@ RUN yum -y install epel-release && \
 	python-tempita \
 	python2-bcrypt \
 	python-jwt \
-	python-blinker
+	python-blinker \
+	minizip \
+	qt5-qtbase qt5-qtbase-gui\
+	gdal-libs \
+	armadillo
 
 RUN yum -y install \
 	/wd/prereqs/repo/iturp452-0.0.0-17626.el7.x86_64.rpm \

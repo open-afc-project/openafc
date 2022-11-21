@@ -26,7 +26,7 @@ RUN cd /wd/build && \
 source /opt/rh/$(scl -l)/enable && \
 export CC=$(which gcc) && \
 export CXX=$(which g++) && \
-cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169 -G Ninja /wd && \
+cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169 -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -G Ninja /wd && \
 ninja-build -j$(nproc) install 
 
 
