@@ -1,6 +1,37 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-442&398&447**|
+| :- | :- |
+|**Date**|**11/21/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-442: Create script to generate antenna_model_list.csv
+ * Jira OA-398: Implement correcting FS Receiver Bandwidth (WINNF R2-AIP-19)
+ * Jira OA-447: EIRP in response set incorrectly when "printSkippedLinksFlag":false [BUG fix]
+
+## **Interface Changes**
+ * OA-442: Added a script (processAntennaCSVs.py) in the ULS parser that loads four files from winnforum's github respository https://github.com/Wireless-Innovation-Forum/6-GHz-AFC/tree/main/data/common_data
+ * The four input files are: antenna_model_diameter_gain.csv, billboard_reflector.csv, cateogry_b1_antennas.csv and high_performance_antennas.csv
+ * And creates antenna_model_list.csv that contains the required data from the four files
+ * antenna_model_list.csv is used by the ULS_parser to set the "Ant Model Name Matched,"Ant Category," "Ant Diameter (m)" and "Ant Midband Gain (dB)" for Tx and Rx, and Passive Repeaters in the ULS.csv as well as "Ant Type" for Passive Repeaters.
+ * Note that only some of final calculated parameters are in .sqlite3 file.
+ * The ULS parser also corrects FS bandwidth (OA-398) in "Bandwidth (MHz)" column.
+ * As such, the latest WFA ULS (WFA_testvector_ULS_2022-11-21T19_57_47.697617) shall be used.
+ 
+
+## **Testing Done**
+ * OA-442: Confirmed that antenna_model_list.csv was created correctly from the 4 input files.
+ * Ran FSP48 and confirmed that TS 5008 was implemented correctly in the updated antenna_model_list.csv (this is attached to OA-442).
+ * OA-447: Ran FSP48 with "printSkippedLinksFlag":false and the response was correct.
+ * OA-398: Confirmed in the WFA ULS (both .sqlite3 and .csv) that the 2 links with missing bandwdith [FS ID: 122730, 122731] were fixed per R2-AIP-19-c, 
+ * and 4 links with bandwidth > 60 MHz (one link with 500 MHz [FS ID: 113535] and 3 with 80 MHz [FS IDs: 105213, 96137, 104045]) were fixed per R2-AIP-19-b.
+
+## **Open Issues** 
+ * 
+
+## **Version and Date**
 |Version|**OA-421&425&430**|
 | :- | :- |
 |**Date**|**11/18/2022**|
