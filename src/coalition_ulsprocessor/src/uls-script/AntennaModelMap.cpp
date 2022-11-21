@@ -517,6 +517,16 @@ void AntennaModelMapClass::readModelMap(const std::string filename)
 }
 /******************************************************************************************/
 
+inline bool isInvalidModelNameChar(char c)
+{
+    // Valid characters are 'A' - 'Z' and '0' - '9'
+    bool isLetter = (c >= 'A') && (c <= 'Z');
+    bool isNum    = (c >= '0') && (c <= '9');
+    bool valid = isLetter || isNum;
+    return(!valid);
+}
+
+
 /******************************************************************************************/
 /**** FUNCTION: AntennaModelMapClass::find()                                           ****/
 /******************************************************************************************/
@@ -537,11 +547,17 @@ AntennaModelClass *AntennaModelMapClass::find(std::string modelName)
 	if (found) {
 		antennaModel = antennaModelList[antIdx];
 	} else {
+        /**********************************************************************************/
+        /* Convert ModelName to uppercase                                                 */
+        /**********************************************************************************/
         std::transform(modelName.begin(), modelName.end(), modelName.begin(), ::toupper);
+        /**********************************************************************************/
+
+        modelName.erase(std::remove_if(modelName.begin(), modelName.end(), isInvalidModelNameChar), modelName.end());
 
 	    for(i=0; (i<antennaModelList.size())&&(!found); ++i) {
 	        AntennaModelClass *m = antennaModelList[i];
-            if (modelName.compare(0, m->name.size(), m->name) == 0) {
+            if (modelName == m->name) {
                 found = true;
                 antennaModel = m;
             }
