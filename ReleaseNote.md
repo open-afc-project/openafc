@@ -1,4 +1,9 @@
 # Release Note
+## **Version and Date**
+|Version|3.4.5.1|
+| :- | :- |
+|**Date**|**11/22/2022**|
+|compiled server's version is TBD |git tag 3.4.6.1|
 
 ## **Version and Date**
 |Version|**OA-442&398&447**|
@@ -28,8 +33,8 @@
  * OA-398: Confirmed in the WFA ULS (both .sqlite3 and .csv) that the 2 links with missing bandwdith [FS ID: 122730, 122731] were fixed per R2-AIP-19-c, 
  * and 4 links with bandwidth > 60 MHz (one link with 500 MHz [FS ID: 113535] and 3 with 80 MHz [FS IDs: 105213, 96137, 104045]) were fixed per R2-AIP-19-b.
 
-## **Open Issues** 
- * 
+## **Open Issues**
+
 
 ## **Version and Date**
 |Version|**OA-421&425&430**|
@@ -40,7 +45,7 @@
 ## **Issues Addressed**
  * Jira OA-421: GUI fixes (fixing channel color plan)
  * Jira OA-425: Correct extensionID in response json
- * Jira OA-430: Finish-up Passive Repeater Implementation 
+ * Jira OA-430: Finish-up Passive Repeater Implementation
 
 
 ## **Interface Changes**
@@ -51,7 +56,7 @@
  * Update of default afc-config.json to contain "printSkippedLinksFlag": false. For debugging, this parameter can be set to true so that the skipped links (per Fedor's optimization) are printed in exc_thr file.
 
 ## **Testing Done**
- * OA-430: In WFA-testvector-ULS, there were 1370 links with at least one passive repeater. 
+ * OA-430: In WFA-testvector-ULS, there were 1370 links with at least one passive repeater.
  * Validated all the precomputed passive repeater parameters in the ULS, exc_thr and fs_analysis files.
  * In addition, validated PR calculations for all the currens cases in the ULS: single back-to-back, single reflector, two back-to-backs, 2 single-reflectors and 3 single reflectors.
  * Example test cases are attached to OA-430 jira ticket.
@@ -60,7 +65,7 @@
  * 3) when FSP1 is altered to AP height=40m & height uncertainty=40m, the channels overlapping FS inside AP uncertainty volume are colored BLACK.
  * 4) for AP inside RAS, chanenls overlapping with RAS band are colored BLACK.
 
-## **Open Issues** 
+## **Open Issues**
  * In R2-AIP-31 for back-to-back, we implemented lambda using actual frequency (rather than UNII-band center freq per the spec) as this is more accurate and it is FSPL equation.
 ## **Version and Date**
 |Version|3.4.5.1|
