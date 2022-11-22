@@ -4,7 +4,7 @@
 import sqlalchemy as sa
 from sqlalchemy import Column, orm
 from sqlalchemy.types import String, Boolean, Integer, Float, Date
-from base import Base
+from .base import Base
 
 
 class ULS(Base):
