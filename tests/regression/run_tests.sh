@@ -37,7 +37,7 @@ loop() {
         echo "from $s  to $e"
         # run processes and store pids in array
         for i in `seq $((s+1)) ${e}`; do
-            docker run --rm ${di_name}  --cache --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} &
+            docker run --rm ${di_name}  --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} &
             pids+=( $! )
         done
         s=$((s + ${step}))
