@@ -12,6 +12,7 @@ di_name=${2}
 addr=${3}
 port=${4:-443}
 prot=${5:-"https"}
+burst=${6:-8}
 ap_count=$(docker run --rm ${di_name} --cmd get_nbr_testcases;echo $?)
 
 source $wd/tests/regression/regression.sh
@@ -36,7 +37,7 @@ loop() {
         echo "from $s  to $e"
         # run processes and store pids in array
         for i in `seq $((s+1)) ${e}`; do
-            docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} &
+            docker run --rm ${di_name}  --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} &
             pids+=( $! )
         done
         s=$((s + ${step}))
@@ -51,7 +52,7 @@ loop() {
 }
 
 cd $wd/tests
-loop $ap_count 8
+loop $ap_count ${burst}
 
 
 # Local Variables:

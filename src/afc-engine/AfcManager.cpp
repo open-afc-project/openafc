@@ -7854,14 +7854,14 @@ void AfcManager::runPointAnalysis()
 												}
 											}
 
-											// When compiled with _printSkippedLinksFlag set, links analyzed with FSPL that are skipped are still inserted into the exc_thr file.
+											// When _printSkippedLinksFlag set, links analyzed with FSPL that are skipped are still inserted into the exc_thr file.
 											// This is useful for testing and debugging.  Note that the extra pringing impacts execution speed.  When _printSkippedLinksFlag is
 											// not set, skipped links are no inserted in the exc_thr file, so execution speed is not impacted.
 											if ((!_printSkippedLinksFlag) && (skip)) {
 												continue;
 											}
 
-											if ((_printSkippedLinksFlag)&&(!skip)) {
+											if (!skip) {
 												if (channel->type == ChannelType::INQUIRED_CHANNEL) {
 													if (eirpLimit_dBm < _minEIRP_dBm) {
 														channel->eirpLimit_dBm = _minEIRP_dBm;
