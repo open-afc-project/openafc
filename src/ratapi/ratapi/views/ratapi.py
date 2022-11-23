@@ -113,6 +113,7 @@ class GuiConfig(MethodView):
             logout_url=logout_url,
             admin_url=flask.url_for('admin.User', user_id=-1),
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
+            mtls_admin_url=flask.url_for('admin.MTLS', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
             afcconfig_trial=flask.url_for('ratapi-v1.TrialAfcConfigFile'),
             version=serververs,
@@ -685,7 +686,7 @@ class UlsDb(MethodView):
     def post(self, uls_file):
         ''' POST method for ULS Db convert '''
 
-        auth(roles=['Admin'])
+        auth(roles=['Super'])
 
         from ..db.generators import create_uls_db
 
@@ -710,6 +711,163 @@ class UlsDb(MethodView):
         except Exception as err:
             raise werkzeug.exceptions.InternalServerError(
                 description=err.message)
+
+
+class UlsParse(MethodView):
+    ''' Resource for daily parse of ULS data '''
+
+    methods = ['GET', 'POST', 'PUT']
+
+    def get(self):
+        ''' GET method for last successful runtime of uls parse
+        '''
+        LOGGER.debug('getting last successful runtime of uls parse')
+        user_id = auth(roles=['Admin'])
+
+        try:
+            datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/lastSuccessfulRun.txt'
+            if not os.path.exists(datapath):
+                raise werkzeug.exceptions.NotFound('last succesful run file not found')
+            lastSuccess = ''
+            with open(datapath, 'r') as data_file:
+                lastSuccess = data_file.read()
+            return flask.jsonify(
+                lastSuccessfulRun=lastSuccess,
+            )
+        except Exception as err:
+            raise werkzeug.exceptions.InternalServerError(
+                description=err.message)
+
+    def post(self):
+        ''' POST method for manual daily ULS Db parsing '''
+
+        auth(roles=['Super'])
+
+        LOGGER.debug('Kicking off daily uls parse')
+        try:
+            task = parseULS.apply_async(args=[flask.current_app.config["STATE_ROOT_PATH"], True])
+            
+            LOGGER.debug('uls parse started')
+
+            if task.state == 'FAILURE':
+                raise werkzeug.exceptions.InternalServerError(
+                    'Task was unable to be started', dict(id=task.id, info=str(task.info)))
+
+            return flask.jsonify(
+                taskId=task.id,
+                
+                statusUrl=flask.url_for(
+                    'ratapi-v1.DailyULSStatus', task_id=task.id),
+            )
+
+        except Exception as err:
+            raise werkzeug.exceptions.InternalServerError(
+                description=err.message)
+
+    def put(self):
+        ''' Put method for setting the automatic daily ULS time '''
+
+        auth(roles=['Super'])
+        args = json.loads(flask.request.data)
+        LOGGER.debug('Recieved arg %s', args)
+        hours = args["hours"]
+        mins =  args["mins"]
+        if hours == 0:
+            hours = "00"
+        if mins == 0:
+            mins = "00"
+        timeStr = str(hours) + ":" + str(mins)
+        LOGGER.debug('Updating automated ULS time to ' + timeStr + " UTC")
+        datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/nextRun.txt'
+        if not os.path.exists(datapath):
+            raise werkzeug.exceptions.NotFound('next run file not found')
+        with open(datapath, 'w') as data_file:
+            data_file.write(timeStr)
+        try:
+            return flask.jsonify(
+                newTime=timeStr
+            ), 200
+        except Exception as err:
+            raise werkzeug.exceptions.InternalServerError(
+                description=err.message)
+
+
+class DailyULSStatus(MethodView):
+    ''' Check status of task '''
+
+    methods = ['GET', 'DELETE']
+
+    def resetManualParseFile(self):
+        ''' Overwrites the file for manual task id with a blank string '''
+        datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/currentManualId.txt'
+        with open(datapath, 'w') as data_file:
+            data_file.write("")
+
+    def get(self, task_id):
+        ''' GET method for uls parse Status '''
+        LOGGER.debug("Getting ULS Parse status with task id: " + task_id)
+        task = parseULS.AsyncResult(task_id)
+        # LOGGER.debug('state: %s', task.state)
+
+        if task.state == 'PROGRESS':
+            LOGGER.debug("Found Task in progress")
+            # todo: add percent progress
+            return flask.jsonify(
+                    percent="WIP",
+            ), 202
+        if not task.ready():
+            LOGGER.debug("Found Task pending")
+            return flask.make_response(flask.json.dumps(dict(percent=0, message='Pending...')), 202)
+        if task.state == 'REVOKED':
+            LOGGER.debug("Found task already in progress")
+            # LOGGER.debug("task info %s", task.info)
+            raise werkzeug.exceptions.ServiceUnavailable()
+
+        elif task.failed():
+            LOGGER.debug("Found failed task")
+            self.resetManualParseFile()
+            raise werkzeug.exceptions.InternalServerError(
+                'Task excecution failed')
+
+        if task.successful():
+            self.resetManualParseFile()
+            results = task.result
+            return flask.jsonify(
+                    entriesUpdated=results[0],
+                    entriesAdded=results[1],
+                    finishTime=results[2]
+            ), 200
+
+        else:
+            raise werkzeug.exceptions.NotFound('Task not found')
+
+    def delete(self, task_id):
+        ''' DELETE method for ULS Status '''
+
+        task = parseULS.AsyncResult(task_id)
+
+        if not task.ready():
+            # task is still running, terminate it
+            LOGGER.debug('Terminating %s', task_id)
+            task.revoke(terminate=True)
+            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+        if task.failed():
+            task.forget()
+            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+
+        if task.successful() and task.result['status'] == 'DONE':
+            auth(is_user=task.result['user_id'])
+            task.forget()
+            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+
+        elif task.successful() and task.result['status'] == 'ERROR':
+            auth(is_user=task.result['user_id'])
+            task.forget()
+            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+
+        else:
+            raise werkzeug.exceptions.NotFound('Task not found')
+
 
 
 module.add_url_rule('/guiconfig', view_func=GuiConfig.as_view('GuiConfig'))

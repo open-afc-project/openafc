@@ -170,12 +170,14 @@ class DbCreate(Command):
         LOGGER.debug('DbCreate.__call__()')
         with flaskapp.app_context():
             from .models.aaa import Role
+            from flask_migrate import stamp
             db.create_all()
             get_or_create(db.session, Role, name='Admin')
+            get_or_create(db.session, Role, name='Super')
             get_or_create(db.session, Role, name='Analysis')
             get_or_create(db.session, Role, name='AP')
             get_or_create(db.session, Role, name='Trial')
-
+            stamp(revision='head')
 
 class DbDrop(Command):
     ''' Create a full new database outside of alembic migrations. '''
@@ -227,6 +229,16 @@ Role.id).all():  # pylint: disable=no-member
                         # if old db has no username field, use email field.
                         user_cfg[key]['username'] = user.email
 
+                    try:
+                        user_cfg[key]['org'] = user.org
+                    except:
+                        # if old db has no org field, derive from email field.
+                        if '@' in user.email:
+                            user_cfg[key]['org'] = user.email[user.email.index('@') + 1:]
+                        else: # dummy user - dummy org
+                            user_cfg[key]['org'] = ""
+
+
             for ap,user in db.session.query(AccessPoint, User).filter(AccessPoint.user_id == User.id).all():
                 key = user.email + ":" + str(user.id)
                 user_cfg[key]['ap'].append( {'model':ap.model,
@@ -235,7 +247,7 @@ Role.id).all():  # pylint: disable=no-member
                                              'certification_id':ap.certification_id})
 
             try:
-                limits = db.session.query(Limit).filter_by(id=0).first()
+                limits = db.session.query(Limit).filter(id=0).first()
                 limit = {'min_eirp':float(limits.min_eirp), 'enforce':bool(limits.enforce)}
 
             except:
@@ -247,6 +259,14 @@ Role.id).all():  # pylint: disable=no-member
                 if limit:
                     fpout.write("%s\n" %json.dumps({'Limit':limit}))
 
+def setUserIdNextVal():
+    # Set nextval for the sequence so that next user record
+    # will not reuse older id.
+    cmd = 'select max(id) from aaa_user'
+    res = db.session.execute(cmd)
+    val = res.fetchone()[0]
+    cmd = 'ALTER SEQUENCE aaa_user_id_seq RESTART WITH ' + str(val+1)
+    db.session.execute(cmd)
 
 class DbImport(Command):
     ''' Import User Database. '''
@@ -255,7 +275,7 @@ class DbImport(Command):
     )
 
     def __init__(self, *args, **kwargs):
-        LOGGER.debug('ConfigAdd.__init__()')
+        LOGGER.debug('DbImport.__init__()')
 
     def __call__(self, flaskapp, src):
         LOGGER.debug('DbImport.__call__() %s', src)
@@ -307,6 +327,33 @@ class DbImport(Command):
                         except:
                             raise RuntimeError("Can't commit DB for EIRP limits")
 
+                setUserIdNextVal()
+
+
+class DbUpgrade(Command):
+    ''' Upgrade User Database. '''
+
+    def __init__(self, *args, **kwargs):
+        LOGGER.debug('DbUpgrade.__init__()')
+
+    def __call__(self, flaskapp):
+        with flaskapp.app_context():
+            from flask_migrate import (upgrade, stamp)
+            setUserIdNextVal()
+            try:
+                from .models.aaa import User
+                user = db.session.query(User).first()  # pylint: disable=no-member
+            except Exception as exception:
+                if 'aaa_user.username does not exist' in str(exception.args):
+                    LOGGER.error("upgrade from preOIDC version")
+                    stamp(revision='4c904e86218d')
+                elif 'aaa_user.org does not exist' in str(exception.args):
+                    LOGGER.error("upgrade from mtls version")
+                    stamp(revision='230b7680b81e')
+
+            upgrade()
+
+
 class UserCreate(Command):
     ''' Create a new user functionality. '''
 
@@ -318,11 +365,13 @@ class UserCreate(Command):
                     'example: rat-manage-api'
                     ' user create email password'),
         Option('--role', type=str, default=[], action='append',
-               choices=['Admin', 'Analysis', 'AP', 'Trial'],
+               choices=['Admin', 'Super', 'Analysis', 'AP', 'Trial'],
                help='role to include with the new user'),
+        Option('--org', type=str, help='Organization'),
     )
 
-    def _create_user(self, flaskapp, id, username, email, password_in, role, hashed):
+    def _create_user(self, flaskapp, id, username, email, password_in, role,
+hashed, org = None):
         ''' Create user in database. '''
         from contextlib import closing
         import datetime
@@ -330,6 +379,8 @@ class UserCreate(Command):
         LOGGER.debug('UserCreate.__create_user() %s %s %s',
                      email, password_in, role)
 
+        if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
+            return
         try:
             if not hashed:
                 # hash password field in non OIDC mode
@@ -359,11 +410,18 @@ class UserCreate(Command):
                     raise RuntimeError(
                         'Existing user found with email "{0}"'.format(email))
 
+                if not org:
+                    try:
+                        org = email[email.index('@') + 1:]
+                    except:
+                        org = ""
+
                 if id:
                     user = User(
                         id=id,
                         username=username,
                         email=email,
+                        org=org,
                         email_confirmed_at=datetime.datetime.now(),
                         password=passhash,
                         active=True,
@@ -372,6 +430,7 @@ class UserCreate(Command):
                     user = User(
                         username=username,
                         email=email,
+                        org=org,
                         email_confirmed_at=datetime.datetime.now(),
                         password=passhash,
                         active=True,
@@ -400,17 +459,24 @@ class UserCreate(Command):
             else:
                 email = user_params['username']
 
+            if 'org' in user_params.keys():
+                org = user_params['org']
+            else:
+                org = None
+
             self._create_user(flaskapp,
                               id,
                               user_params['username'],
                               email,
                               user_params['password'],
                               user_params['rolename'],
-                              hashed)
+                              hashed, org)
 
-    def __call__(self, flaskapp, username, password_in, role, hashed=False):
+    def __call__(self, flaskapp, username, password_in, role, hashed=False,
+org=None):
         # command does not provide email.  Populate email field with username
-        self._create_user(flaskapp, None, username, username, password_in, role, hashed)
+        self._create_user(flaskapp, None, username, username, password_in, role,
+hashed, org)
 
 
 class UserUpdate(Command):
@@ -420,14 +486,18 @@ class UserUpdate(Command):
         Option('--email', type=str,
                help='Email'),
         Option('--role', type=str, default=[], action='append',
-               choices=['Admin', 'Analysis', 'AP', 'Trial'],
+               choices=['Admin', 'Super', 'Analysis', 'AP', 'Trial'],
                help='role to include with the new user'),
+        Option('--org', type=str, help='Organization'),
     )
 
-    def _update_user(self, flaskapp, email, role):
+    def _update_user(self, flaskapp, email, role, org = None):
         ''' Create user in database. '''
         from contextlib import closing
         from .models.aaa import User, Role
+
+        if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
+            return
 
         try:
             with flaskapp.app_context():
@@ -440,6 +510,8 @@ class UserUpdate(Command):
                             user.roles.append(get_or_create(
                                 db.session, Role, name=rolename))
                     user.active = True,
+                    if org:
+                        user.org = org;
                     db.session.commit()  # pylint: disable=no-member
                 else:
                     raise RuntimeError("User update: User not found")
@@ -450,10 +522,11 @@ class UserUpdate(Command):
         if flaskapp and isinstance(user_params, dict):
             self._update_user(flaskapp,
                               user_params['username'],
-                              user_params['rolename'])
+                              user_params['rolename'],
+                              user_params['org'])
 
-    def __call__(self, flaskapp, email, role):
-        self._update_user(flaskapp, email, role)
+    def __call__(self, flaskapp, email, role, org):
+        self._update_user(flaskapp, email, role, org)
 
 
 class UserRemove(Command):
@@ -493,7 +566,10 @@ class UserList(Command):
         LOGGER.debug('UserList.__call__()')
         table = PrettyTable()
         from .models.aaa import User, UserRole, Role
-        table.field_names = ["ID", "UserName", "Email", "Roles"]
+        table.field_names = ["ID", "UserName", "Email", "Org", "Roles"]
+ 
+        if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
+            return
 
         with flaskapp.app_context():
             user_info = {}
@@ -503,7 +579,7 @@ class UserList(Command):
 Role).filter(User.id == UserRole.user_id).filter(UserRole.role_id ==
 Role.id).all():  # pylint: disable=no-member
 
-                key = user.email + ":" + str(user.id) + ":" + user.username
+                key = user.email + ":" + user.org + ":" + str(user.id) + ":" + user.username
 
                 if key in user_info:
                     user_info[key] = user_info[key] + ", " + role.name
@@ -512,12 +588,12 @@ Role.id).all():  # pylint: disable=no-member
 
             # Find all users without roles and show them last
             for user in  db.session.query(User).filter(~User.roles.any()).all():
-                key = user.email + ":" + str(user.id) + ":" + user.username
+                key = user.email + ":" + user.org + ":" + str(user.id) + ":" + user.username
                 user_info[key] = ""
 
             for k, v in user_info.items():
-                email, _id, name = k.split(":")
-                table.add_row([_id, name, email, v])
+                email, org, _id, name = k.split(":")
+                table.add_row([_id, name, email, org, v])
 
             print(table)
 
@@ -534,7 +610,7 @@ class User(Manager):
 
 
 class AccessPointCreate(Command):
-    ''' Create a new user. '''
+    ''' Create a new access point. '''
 
     option_list = (
         Option('serial', type=str,
@@ -640,6 +716,147 @@ class AccessPoints(Manager):
         self.add_command("create", AccessPointCreate())
         self.add_command("remove", AccessPointRemove())
         self.add_command("list", AccessPointList())
+
+class MTLSCreate(Command):
+    ''' Create a new access point. '''
+
+    option_list = (
+        Option('--note', type=str, default=None,
+               help="note"),
+        Option('--src', type=str, default=None,
+               help="certificate file"),
+        Option('--org', type=str, default="",
+               help="email of user assocated with this access point.")
+    )
+
+    def _create_mtls(self, flaskapp, note="", org="", src=None):
+        from contextlib import closing
+        import datetime
+        from .models.aaa import MTLS, User
+        LOGGER.debug('MTLS._create_mtls() %s %s %s',
+                      note, org, src)
+        if not src:
+            raise RuntimeError('certificate data file required')
+
+        cert = src
+        with flaskapp.app_context():
+            cert_data = ""
+            with open(cert, 'r') as fp_cert:
+                while True:
+                    dataline = fp_cert.readline()
+                    if not dataline:
+                        break
+                    cert_data = cert_data + dataline
+                mtls = MTLS(cert_data, note, org)
+                db.session.add(mtls)  # pylint: disable=no-member
+                db.session.commit()  # pylint: disable=no-member
+
+    def __init__(self, flaskapp=None, note="",
+                 org="", src=None):
+        if flaskapp and cert:
+            self._create_mtls(flaskapp, note, org, src)
+
+    def __call__(self, flaskapp, note, org, src):
+        self._create_mtls(flaskapp, note, org, src)
+
+
+class MTLSRemove(Command):
+    ''' Remove MTLS certificate by id. '''
+
+    option_list = (
+        Option('--id', type=int, default=None,
+               help="id"),
+    )
+
+    def _remove_mtls(self, flaskapp, id=None):
+        from contextlib import closing
+        import datetime
+        from .models.aaa import MTLS, User
+        LOGGER.debug('MTLS._remove_mtls() %d', id)
+
+        if not id:
+            raise RuntimeError('mtls id required')
+
+        with flaskapp.app_context():
+            try:
+                mtls = MTLS.query.filter(MTLS.id == id).one()
+            except sqlalchemy.orm.exc.NoResultFound:
+                raise RuntimeError(
+                    'No mtls certificate found with id"{0}"'.format(id))
+            db.session.delete(mtls)  # pylint: disable=no-member
+            db.session.commit()  # pylint: disable=no-member
+
+    def __init__(self, flaskapp=None, id=None):
+        if flaskapp and id:
+            self._remove_mtls(flaskapp, id)
+
+    def __call__(self, flaskapp, id):
+        self._remove_mtls(flaskapp, id)
+
+
+class MTLSList(Command):
+    '''Lists all mtls certificates'''
+
+    def __call__(self, flaskapp):
+        table = PrettyTable()
+        from .models.aaa import MTLS, User
+
+        table.field_names = ["ID", "Note", "Org", "Create"]
+        with flaskapp.app_context():
+            for mtls in db.session.query(MTLS).all():  # pylint: disable=no-member
+                org = mtls.org if mtls.org else ""
+                note = mtls.note if mtls.note else ""
+                table.add_row([mtls.id, mtls.note, mtls.org , str(mtls.created)])
+            print(table)
+
+
+class MTLSDump(Command):
+    ''' Remove MTLS certificate by id. '''
+
+    option_list = (
+        Option('--id', type=int, default=None,
+               help="id"),
+        Option('--dst', type=str, default=None,
+               help="output file"),
+    )
+
+    def _dump_mtls(self, flaskapp, id=None, dst=None):
+        from contextlib import closing
+        import datetime
+        from .models.aaa import MTLS, User
+        LOGGER.debug('MTLS._remove_mtls() %d', id)
+        if not id:
+            raise RuntimeError('mtls id required')
+        if not dst:
+            raise RuntimeError('output filename required')
+        filename = dst
+
+        with flaskapp.app_context():
+            try:
+                mtls = MTLS.query.filter(MTLS.id == id).one()
+            except sqlalchemy.orm.exc.NoResultFound:
+                raise RuntimeError(
+                    'No mtls certificate found with id"{0}"'.format(id))
+
+            with open(filename, 'w') as fpout:
+                fpout.write("%s" %(mtls.cert));
+
+    def __init__(self, flaskapp=None, id=None, dst=None):
+        if flaskapp and id and filename:
+            self._dump_mtls(flaskapp, id, filename)
+
+    def __call__(self, flaskapp, id, dst):
+        self._dump_mtls(flaskapp, id, dst)
+
+class MTLS(Manager):
+    '''View and manage Access Points'''
+
+    def __init__(self, *args, **kwargs):
+        Manager.__init__(self, *args, **kwargs)
+        self.add_command("create", MTLSCreate())
+        self.add_command("remove", MTLSRemove())
+        self.add_command("list", MTLSList())
+        self.add_command("dump", MTLSDump())
 
 
 class CeleryStatus(Command):  # pylint: disable=abstract-method
@@ -953,7 +1170,9 @@ def main():
     manager.add_command('db-drop', DbDrop())
     manager.add_command('db-export', DbExport())
     manager.add_command('db-import', DbImport())
+    manager.add_command('db-upgrade', DbUpgrade())
     manager.add_command('user', User())
+    manager.add_command('mtls', MTLS())
     manager.add_command('data', Data())
     manager.add_command('celery', Celery())
     manager.add_command('ap', AccessPoints())
@@ -961,9 +1180,7 @@ def main():
 
     manager.run()
 
-
 if __name__ == '__main__':
-    import sys
     sys.exit(main())
 
 # Local Variables:

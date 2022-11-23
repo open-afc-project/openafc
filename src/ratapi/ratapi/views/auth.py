@@ -48,7 +48,7 @@ module = flask.Blueprint('auth', __name__)
 PY3 = False  # using Python2
 
 
-def auth(ignore_active=False, roles=None, is_user=None):
+def auth(ignore_active=False, roles=None, is_user=None, org=None):
     ''' Provide application authentication for API methods. Returns the user_id if successful.
 
         :param ignore_active: if True, allows inactive users to access resource
@@ -65,9 +65,14 @@ def auth(ignore_active=False, roles=None, is_user=None):
     '''
     if not current_user.is_authenticated:
         raise werkzeug.exceptions.Unauthorized()
-    (user_id, active, user_roles) = \
+    (user_id, active, user_roles, cur_org) = \
         (current_user.id, current_user.active,
-         [r.name for r in current_user.roles])
+         [r.name for r in current_user.roles],
+         current_user.org if current_user.org else "")
+
+    # Super always has admin roles
+    if "Super" in user_roles and not "Admin" in user_roles:
+        user_roles.append("Admin")
 
     if not isinstance(user_id, str):
         if not active and not ignore_active:
@@ -75,28 +80,37 @@ def auth(ignore_active=False, roles=None, is_user=None):
         if is_user:
             if user_id == is_user:
                 LOGGER.debug("User id matches: %i", user_id)
-                return user_id
-            elif "Admin" in user_roles:
-                LOGGER.debug(
-                    "Admin overrides user_id match. Impersonating: %i", is_user)
-                return is_user  # return impersonating user
-            else:
-                # give 404 to protect privacy
+            elif "Super" in user_roles:
+                return is_user  # return impersonating user. Don't check org
+            elif not "Admin" in user_roles:
                 raise werkzeug.exceptions.NotFound()
-        # ignore roles, only need to be a registered user
-        if roles is None:
-            LOGGER.debug("User %i is authenticated", user_id)
-            return user_id
+        else:
+            if roles:
+                found_role = False
+                for r in roles:
+                    if r in user_roles:
+                        LOGGER.debug(
+                            "User %i is authenticated with role %s", user_id, r)
+                        found_role = True
+                        break
 
-        for r in roles:
-            if r in user_roles:
-                LOGGER.debug(
-                    "User %i is authenticated with role %s", user_id, r)
-                return user_id
-        raise werkzeug.exceptions.Forbidden(
-            "You do not have access to this resource")
+                if not found_role:
+                    raise werkzeug.exceptions.Forbidden(
+                        "You do not have access to this resource")
+
+            is_user = user_id
     else:
         raise werkzeug.exceptions.Unauthorized()
+
+    # done checking roles/userid. now check org
+    if not "Super" in user_roles:
+        target_user = User.get(is_user)
+        target_org = target_user.org if target_user.org else ""
+        if (not cur_org == target_org) or (org and not cur_org == org):
+            raise werkzeug.exceptions.Forbidden(
+                "You do not have access to this resource")
+
+    return is_user
 
 class LoginAPI(MethodView):
     """
@@ -249,16 +263,25 @@ class UserAPI(MethodView):
         if not current_user.is_authenticated:
             return flask.make_response("User not authenticated", 401)
 
+        if not current_user.org:
+            try:
+                current_user.org = current_user.email[current_user.email.index('@') + 1:]
+                user = User.query.filter(User.id == current_user.id).first()
+                user.org = current_user.org
+                db.session.commit()
+            except:
+                current_user.org = ""
+
         data = {
             'userId': current_user.id,
             'email': current_user.email,
+            'org': current_user.org if current_user.org else "",
             'roles': [r.name for r in current_user.roles],
             'email_confirmed_at': current_user.email_confirmed_at,
             'active': current_user.active,
             'firstName': current_user.first_name,
             'lastName': current_user.last_name,
         }
-
 
         if flask.current_app.config['OIDC_LOGIN']:
             data['editCredential'] = False

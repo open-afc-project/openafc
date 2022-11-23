@@ -30,7 +30,8 @@ setuptools.setup(
     package_data = {
         'ratapi': [
             'migrations/alembic.ini',
-            'templates/*',
+            'migrations/script.py.mako',
+            'templates/flask_user_layout.html',
         ]
     },
     entry_points={

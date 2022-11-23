@@ -481,6 +481,7 @@ export interface MobileAPConfig {
 export interface UserModel {
     id: number,
     email: string,
+    org: string,
     active: boolean,
     firstName?: string,
     lastName?: string,
@@ -497,6 +498,17 @@ export interface AccessPointModel {
     manufacturer?: string,
     certificationId?: string,
     ownerId: number
+}
+
+/**
+ * MTLS model modeled on database schema
+ */
+export interface MTLSModel {
+    id: number,
+    cert: string,
+    note: string,
+    org: string,
+    created: string
 }
 
 /**

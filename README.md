@@ -392,7 +392,7 @@ If you do it with the server which is run thru the docker-compose script describ
 docker-compose exec rat_server rat-manage-api db-create
 ```
 
-## Initial Administrator account
+## Initial Super Administrator account
 
 Once done with database and starting the server, you need to create default administrative user to handle your server from WebUI. It is done from the server console using the _rat-manage-api_ utility.
 
@@ -409,7 +409,7 @@ this means you are in.
 By default, the login uses non OIDC login method which manages user accounts locally.  You can use the following command to create an administrator for your OpenAFC server.
 
 ```
-rat-manage-api user create --role Admin --role AP --role Analysis admin "Enter Your Password Here"
+rat-manage-api user create --role Super --role Admin --role AP --role Analysis admin "Enter Your Password Here"
 ```
 
 Once done, you can authorize with this user and password in WebUI.
@@ -419,7 +419,7 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 
 ### Note for an existing user database
 
-Database format has changed over time.  If your user database uses older format, you might find errors indicating missing database fields upon bootup and login. The error message has instructions on how to migrate the database. These steps apply whether you're using OIDC or non OIDC login method.  You have two options:
+Database format has changed over time.  If your user database uses older format, you might find errors indicating missing database fields upon bootup and login. The error message has instructions on how to migrate the database. These steps apply whether you're using OIDC or non OIDC login method.  You have sereral options:
 
 **1. Reinitialize the database without users:**
 
@@ -433,6 +433,12 @@ This will wipe out existing users, e.g. user acounts need to be manually recreat
 **2. Migrate the database with users:**
 
 ```
+rat-manage-api db-upgrade
+```
+
+**2. Export/Import the database with users:**
+In some very rate instances, the old database might be in inconsistent state which prevents the above db-upgrade command to work properly. In such case, you can export the old database to a file, and then import it back.
+```
 RAT_DBVER=0 rat-manage-api db-export --dst data.json
 RAT_DBVER=0 rat-manage-api db-drop
 rat-manage-api db-create
@@ -444,7 +450,42 @@ This migration will maintain all existing user data, including roles. Steps to m
 2. Delete the old version database.
 3. Recreate the database.
 4. Import the json file into the new database.
-## Initial Administrator account
+
+## Managing user account
+Users can be removed. User roles can be added and removed.
+Remove user with user remove command, e.g.:
+```
+rat-manage-api user remove user@mycompany.com
+
+```
+Update user roles with user update command, e.g.:
+```
+rat-manage-api user update --role Admin --role AP --role Analysis --email "user@mycompany.com"
+```
+## User roles
+Roles are: Super, admin, AP, Admin, Analysis, Trial
+"Super" is a new role, which allows access rights to all organizations, as opposed to "Admin", which is limited to one organization.  When upgrade from older system without "Super", you will need to decide which users to be assigned role of "Super" and update their roles via the user update command. 
+
+## MTLS
+Besides the GUI, mtls certificates can be managed via CLI.
+To list certificates:
+```
+rat-manage-api mtls list
+```
+
+To add certificates:
+```
+rat-manage-api mtls create --src <certificate file> --org <Organization name> --note <Short Note>
+```
+
+To remove certificates:
+```
+rat-manage-api mtls remove --id <certificate id obtained from list command>
+```
+To dump a certificate to a file:
+```
+rat-manage-api mtls dump --id <certificate id obtained from list command> --dst <file name>
+```
 
 Happy usage!
 

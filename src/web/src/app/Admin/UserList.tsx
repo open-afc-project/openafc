@@ -37,7 +37,7 @@ interface UserTableProps {
 
 const userToRow = (u: UserModel) => ({
     id: u.id,
-    cells: [ u.email, u.active ? "Y" : "N", u.roles.join(", ")]
+    cells: [ u.email, u.org, u.active ? "Y" : "N", u.roles.join(", ")]
 })
 
 /**
@@ -47,6 +47,7 @@ export class UserTable extends React.Component<UserTableProps, {}> {
 
     private columns = [
         { title: "Email", cellTransforms: [headerCol()] },
+        { title: "Org" },
         { title: "Active" },
         { title: "Roles" }
     ]

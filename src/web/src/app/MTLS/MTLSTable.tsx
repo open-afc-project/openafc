@@ -3,58 +3,64 @@ import { headerCol, Table, TableVariant, TableHeader, TableBody } from "@pattern
 import { AccessPointModel, UserModel } from "../Lib/RatApiTypes";
 
 /**
- * APTable.tsx: Table that displays access points. Shows owner column if admin specifies user list
- * author: Sam Smucny
+ * MTLS.tsx: Table that displays mtls certs. Shows org column if filterId is 0 
+ * author: Huy Ton
  */
 
 /**
- * Interface definition of `APTable` properties
+ * Interface definition of `MTLSTable` properties
  */
-interface APTableProps {
-    accessPoints: AccessPointModel[],
+interface MTLSTableProps {
+    mtlsList: MTLSModel[],
     /**
-     * If `users` is non-empty then the owner column will be displayed (Admin feature)
+     * If `filterId` is 0 then the org column will be displayed (Super admin feature)
      */
-    users?: UserModel[],
+    filterId: number,
     onDelete: (id: number) => void
 }
 
 /**
  * Table component to display a user's access points.
  */
-export class APTable extends React.Component<APTableProps, {}> {
+export class MTLSTable extends React.Component<MTLSTableProps, {}> {
 
     private columns = [
-        { title: "Serial Number", cellTransforms: [headerCol()] },
-        { title: "Certification ID" },
+        { title: "Certificate ID" , cellTransforms: [headerCol()] },
+        { title: "Note" },
+        { title: "Created" },
+       
     ]
 
-    constructor(props: APTableProps) {
+    constructor(props: MTLSTableProps) {
         super(props);
         this.state = {
             rows: []
         };
 
-        if (props.users) {
+        if (props.filterId === 0) {
             this.columns.push({
-                title: "Owner"
+                title: "Org"
             });
         }
     }
 
-    private apToRow = (ap: AccessPointModel) => ({
-        id: ap.id,
-        cells: this.props.users ? [
-            ap.serialNumber,
-            ap.certificationId || "",
-           this.props.users.find(x => x.id === ap.ownerId)?.email || "NO USER"
-        ] : [
-            ap.serialNumber,
-            ap.certificationId || "",
-       ]
+    private mtlsToRow = (mtls: MTLSModel) => ({
+        id: mtls.id,
+        cells: this.props.filterId ?  [
+            mtls.id,
+            mtls.note || "",
+            mtls.created || "",
+        ] :
+        [
+            mtls.id,
+            mtls.note || "",
+            mtls.created || "",
+            mtls.org,
+        ]
     })
 
     actionResolver(data: any, extraData: any) {
+
         return [
             {
                 title: "Remove",
@@ -66,9 +72,9 @@ export class APTable extends React.Component<APTableProps, {}> {
     render() {
         return (
             <Table
-                aria-label="Access Point Table"
+                aria-label="MTLS Table"
                 cells={this.columns as any}
-                rows={this.props.accessPoints.map(this.apToRow)}
+                rows={this.props.mtlsList.map(this.mtlsToRow)}
                 variant={TableVariant.compact}
                 actionResolver={(a, b) => this.actionResolver(a, b)}
             >

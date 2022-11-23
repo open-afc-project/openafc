@@ -358,15 +358,12 @@ def create_app(config_override=None):
             from .models.aaa import User
             user = db.session.query(User).first()  # pylint: disable=no-member
         except Exception as exception:
-            if 'aaa_user.username does not exist' in str(exception.args):
+            if 'aaa_user.username does not exist' in str(exception.args) or 'aaa_user.org does not exist' in str(exception.args):
                 LOGGER.error("""
 DATABASE is in old format.  Upgrade using following command sequence:
-RAT_DBVER=0 rat-manage-api db-export --dst data.json
-RAT_DBVER=0 rat-manage-api db-drop
-rat-manage-api db-create
-rat-manage-api db-import --src data.json
+rat-manage-api db-upgrade
                 """)
-                sys.exit()
+                flaskapp.config['UPGRADE_REQ'] = True
 
     # Actual resources
     flaskapp.add_url_rule(

@@ -12,6 +12,7 @@ import { Timer } from "../Components/Timer";
 import { OutlinedQuestionCircleIcon , TimesCircleIcon} from "@patternfly/react-icons";
 import {Table, TableHeader, TableBody, TableVariant } from "@patternfly/react-table";
 import { FrequencyRangeInput } from "./FrequencyRangeInput";
+import { hasRole} from "../Lib/User";
 
 /**
  * Admin.tsx: Administration page for managing users
@@ -21,6 +22,7 @@ import { FrequencyRangeInput } from "./FrequencyRangeInput";
 /**
  * Possible roles enumerated
  */
+const sroles: Role[] = ["AP", "Analysis", "Admin", "Super", "Trial"];
 const roles: Role[] = ["AP", "Analysis", "Admin", "Trial"];
 
 const cols = ["Name", "Low Frequency (MHz)", "High Frequency (MHz)"]
@@ -353,10 +355,13 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
                   id="new-role"
                   name="new-role"
                 >
-                  <FormSelectOption key={0} value={undefined} label={"Select a role"} />
+                  (<FormSelectOption key={0} value={undefined} label={"Select a role"} />
                   {
+                    hasRole("Super") ?
+                    sroles.map(r => <FormSelectOption key={r} value={r} label={r} />):
                     roles.map(r => <FormSelectOption key={r} value={r} label={r} />)
                   }
+                  )
                 </FormSelect>
               </FormGroup>
             </Modal>
