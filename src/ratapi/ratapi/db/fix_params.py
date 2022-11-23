@@ -68,7 +68,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             n = int(wordList[2])
             if (n > maxNumPR):
                 maxNumPR = n
-    print 'maxNumPR = ' + str(maxNumPR)
+    print('maxNumPR = {}'.format(str(maxNumPR)))
 
     for prIdx in range(maxNumPR):
         prTxGainULSFixStr = 'Passive Repeater ' + str(prIdx+1) + ' ULS Fixed Back-to-Back Gain Tx (dBi)'

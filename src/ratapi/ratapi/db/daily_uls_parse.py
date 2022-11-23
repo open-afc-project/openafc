@@ -1,12 +1,11 @@
 import os, urllib, datetime, zipfile, shutil, subprocess, sys, glob
 from collections import OrderedDict
 import ssl
-from csvToSqliteULS import convertULS
+from .csvToSqliteULS import convertULS
 # from sort_callsigns_all import sortCallsigns
-from sort_callsigns_addfsid import sortCallsignsAddFSID
-from fix_bps import fixBPS
-from fix_params import fixParams
-from processAntennaCSVs import processAntFiles
+from .sort_callsigns_addfsid import sortCallsignsAddFSID
+from .fix_bps import fixBPS
+from .fix_params import fixParams
 
 ssl._create_default_https_context = ssl._create_unverified_context
 

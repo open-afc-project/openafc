@@ -16,7 +16,7 @@ import datetime
 import shutil
 from celery import Celery
 from ..db.daily_uls_parse import daily_uls_parse
-from runcelery import init_config
+from .runcelery import init_config
 from celery.schedules import crontab
 from flask.config import Config
 from celery.utils.log import get_task_logger

@@ -3,7 +3,7 @@
 
 import sqlalchemy as sa
 from sqlalchemy import types
-from base import Base
+from .base import Base
 
 class Population(Base):
     ''' Population density table
