@@ -20,7 +20,6 @@ export interface GuiConfig {
     google_apikey: string,
     rat_api_analysis: string,
     uls_convert_url: string,
-    uls_daily_url: string,
     login_url: string,
     admin_url: string,
     ap_admin_url: string,
@@ -60,7 +59,8 @@ export interface AFCConfigFile {
     channelResponseAlgorithm: ChannelResponseAlgorithm,
     visibilityThreshold?: number,
     allowScanPtsInUncReg?: boolean,
-    passiveRepeaterFlag?: boolean
+    passiveRepeaterFlag?: boolean,
+    printSkippedLinksFlag?: false 
 }
 
 export type FreqRange = {

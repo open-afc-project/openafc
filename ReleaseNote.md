@@ -2,6 +2,74 @@
 ## **Version and Date**
 |Version|3.4.5.1|
 | :- | :- |
+|**Date**|**11/22/2022**|
+|compiled server's version is 8a990ea |git tag 3.4.6.1|
+
+## **Version and Date**
+|Version|**OA-442&398&447**|
+| :- | :- |
+|**Date**|**11/21/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-442: Create script to generate antenna_model_list.csv
+ * Jira OA-398: Implement correcting FS Receiver Bandwidth (WINNF R2-AIP-19)
+ * Jira OA-447: EIRP in response set incorrectly when "printSkippedLinksFlag":false [BUG fix]
+
+## **Interface Changes**
+ * OA-442: Added a script (processAntennaCSVs.py) in the ULS parser that loads four files from winnforum's github respository https://github.com/Wireless-Innovation-Forum/6-GHz-AFC/tree/main/data/common_data
+ * The four input files are: antenna_model_diameter_gain.csv, billboard_reflector.csv, cateogry_b1_antennas.csv and high_performance_antennas.csv
+ * And creates antenna_model_list.csv that contains the required data from the four files
+ * antenna_model_list.csv is used by the ULS_parser to set the "Ant Model Name Matched,"Ant Category," "Ant Diameter (m)" and "Ant Midband Gain (dB)" for Tx and Rx, and Passive Repeaters in the ULS.csv as well as "Ant Type" for Passive Repeaters.
+ * Note that only some of final calculated parameters are in .sqlite3 file.
+ * The ULS parser also corrects FS bandwidth (OA-398) in "Bandwidth (MHz)" column.
+ * As such, the latest WFA ULS (WFA_testvector_ULS_2022-11-21T19_57_47.697617) shall be used.
+ 
+
+## **Testing Done**
+ * OA-442: Confirmed that antenna_model_list.csv was created correctly from the 4 input files.
+ * Ran FSP48 and confirmed that TS 5008 was implemented correctly in the updated antenna_model_list.csv (this is attached to OA-442).
+ * OA-447: Ran FSP48 with "printSkippedLinksFlag":false and the response was correct.
+ * OA-398: Confirmed in the WFA ULS (both .sqlite3 and .csv) that the 2 links with missing bandwdith [FS ID: 122730, 122731] were fixed per R2-AIP-19-c, 
+ * and 4 links with bandwidth > 60 MHz (one link with 500 MHz [FS ID: 113535] and 3 with 80 MHz [FS IDs: 105213, 96137, 104045]) were fixed per R2-AIP-19-b.
+
+## **Open Issues**
+
+
+## **Version and Date**
+|Version|**OA-421&425&430**|
+| :- | :- |
+|**Date**|**11/18/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-421: GUI fixes (fixing channel color plan)
+ * Jira OA-425: Correct extensionID in response json
+ * Jira OA-430: Finish-up Passive Repeater Implementation
+
+
+## **Interface Changes**
+ * OA-425 was done at API level
+ * There was minor change in the ULS-parser (for OA-430)
+ * There are two new files to use: 1) ULS database on https://drive.google.com/drive/folders/1ZZXQ1ljjgUwR3u3Bb45g08oN_F2btL1E (...2022-11-16T06_25_10.816819.zip) and 
+ * +--2) "WINNF-TS-1014-V1.2.0-App02.csv" in /usr/share/fbrat/rat_transfer/pr
+ * Update of default afc-config.json to contain "printSkippedLinksFlag": false. For debugging, this parameter can be set to true so that the skipped links (per Fedor's optimization) are printed in exc_thr file.
+
+## **Testing Done**
+ * OA-430: In WFA-testvector-ULS, there were 1370 links with at least one passive repeater.
+ * Validated all the precomputed passive repeater parameters in the ULS, exc_thr and fs_analysis files.
+ * In addition, validated PR calculations for all the currens cases in the ULS: single back-to-back, single reflector, two back-to-backs, 2 single-reflectors and 3 single reflectors.
+ * Example test cases are attached to OA-430 jira ticket.
+ * OA-425: Ran FSP1 and confirmed in response.json in the GUI that extensionId is used.
+ * OA-421: Ran FSP1 and confirmed that 1) there no RED when minEIRP=-100 dBm, 2) for minEIRP=21 dBm, channels with EIRP < minEIRP are colored RED, 
+ * 3) when FSP1 is altered to AP height=40m & height uncertainty=40m, the channels overlapping FS inside AP uncertainty volume are colored BLACK.
+ * 4) for AP inside RAS, chanenls overlapping with RAS band are colored BLACK.
+
+## **Open Issues**
+ * In R2-AIP-31 for back-to-back, we implemented lambda using actual frequency (rather than UNII-band center freq per the spec) as this is more accurate and it is FSPL equation.
+## **Version and Date**
+|Version|3.4.5.1|
+| :- | :- |
 |**Date**|**11/06/2022**|
 |compiled server's version is 20551e4 |git tag 3.4.5.1|
 

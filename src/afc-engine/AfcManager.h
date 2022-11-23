@@ -42,6 +42,7 @@
 #include "uls.h"
 #include "UlsMeasurementAnalysis.h"
 #include "nfa.h"
+#include "prtable.h"
 #include "terrain.h"
 #include "CachedGdal.h"
 // Loggers
@@ -414,6 +415,8 @@ class AfcManager
 		double _closeInDist;                    // Radius in which close in path loss model is used
 		std::string _closeInPathLossModel;      // Close in path loss model is used
 		bool _pathLossClampFSPL;                // If set, when path loss < fspl, clamp to fspl value
+		bool _printSkippedLinksFlag;			// If set, links that are skipped in the analysis because using FSPL does not limit I/N performance are still printed in exc_thr file.  This
+												// is useful for debugging, but depending on visibility threshold setting may impact execution speed.
 
 		int _wlanMinFreqMHz;                    // Min Frequency for WiFi system (integer in MHz)
 		int _wlanMaxFreqMHz;                    // Max Frequency for WiFi system (integer in MHz)
@@ -501,6 +504,8 @@ class AfcManager
 		ITUDataClass *_ituData;
 		NFAClass *_nfa;
 		std::string _nfaTableFile;               // File containing near field adjustment tabular data described in R2-AIP-17
+		PRTABLEClass *_prTable;
+		std::string _prTableFile;               // File containing passive repeater tabular data described in WINNF-TS-1014-V1.2.0-App02
 		/**************************************************************************************/
 
 		/**************************************************************************************/

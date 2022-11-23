@@ -368,8 +368,6 @@ namespace UlsMeasurementAnalysis {
 
 		hi.resize(numpts);
 
-		int srtmKey = INT_MAX;
-		qint16 *srtmData;
 		for(int i = 0; i < numpts; i++){
 			const QPointF &pt = latlons.at(i);
 

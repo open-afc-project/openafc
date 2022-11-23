@@ -38,6 +38,8 @@ class PR(Base):
     pr_lon_deg = Column(Float)
     pr_height_to_center_raat_m = Column(Float)
     pr_ant_type = Column(String(3), nullable=False)
+    pr_ant_category = Column(String(10))
+    pr_ant_model = Column(CoerceUTF8(64))
     pr_line_loss = Column(Float)
     pr_reflector_width_m = Column(Float)
     pr_reflector_height_m = Column(Float)
@@ -335,6 +337,8 @@ def convertULS(data_file, state_root, logFile):
                         pr_lon_deg = _as_float(                 row['Passive Repeater ' + str(idx) + ' Long Coords']),
                         pr_height_to_center_raat_m = _as_float( row['Passive Repeater ' + str(idx) + ' Height to Center RAAT (m)']),
                         pr_ant_type = str(                      row['Passive Repeater ' + str(idx) + ' Ant Type']),
+                        pr_ant_category = str(                  row['Passive Repeater ' + str(idx) + ' Ant Category']),
+                        pr_ant_model = str(                     row['Passive Repeater ' + str(idx) + ' Ant Model']),
                         pr_line_loss = _as_float(               row['Passive Repeater ' + str(idx) + ' Line Loss (dB)']),
                         pr_reflector_height_m = _as_float(      row['Passive Repeater ' + str(idx) + ' Reflector Height (m)']),
                         pr_reflector_width_m = _as_float(       row['Passive Repeater ' + str(idx) + ' Reflector Width (m)']),

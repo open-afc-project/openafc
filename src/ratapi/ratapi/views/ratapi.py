@@ -24,7 +24,7 @@ import urlparse
 from flask.views import MethodView
 import werkzeug.exceptions
 from ..defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
-from ..tasks.afc_worker import run, parseULS
+from ..tasks.afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint
 from .auth import auth
@@ -85,7 +85,7 @@ class GuiConfig(MethodView):
         if dataif.isFsBackend():
             histurl = u.scheme + "://" + u.netloc + flask.url_for('files.history')
         else:
-            histurl = u.scheme + "://" + u.hostname + ":" + str(os.getenv("HISTORY_EXTERNAL_PORT")) + "/"
+            histurl = u.scheme + "://" + u.netloc + "/dbg"
 
         if flask.current_app.config['OIDC_LOGIN']:
             login_url=flask.url_for('auth.LoginAPI'),
@@ -108,8 +108,6 @@ class GuiConfig(MethodView):
                                            request_type='p_request_type'),
             uls_convert_url=flask.url_for(
                 'ratapi-v1.UlsDb', uls_file='p_uls_file'),
-            uls_daily_url=flask.url_for(
-                'ratapi-v1.UlsParse'),
             status_url=flask.url_for('auth.UserAPI'),
             login_url=login_url,
             logout_url=logout_url,
@@ -714,6 +712,7 @@ class UlsDb(MethodView):
             raise werkzeug.exceptions.InternalServerError(
                 description=err.message)
 
+
 class UlsParse(MethodView):
     ''' Resource for daily parse of ULS data '''
 
@@ -887,9 +886,5 @@ module.add_url_rule('/analysis/kml/p1/<task_id>',
                     view_func=AnalysisKmlResult.as_view('AnalysisKmlResult'))
 module.add_url_rule('/convert/uls/csv/sql/<uls_file>',
                     view_func=UlsDb.as_view('UlsDb'))
-module.add_url_rule('/ulsparse',
-                    view_func=UlsParse.as_view('UlsParse'))
-module.add_url_rule('/ulsparse/<task_id>',
-                    view_func=DailyULSStatus.as_view('DailyULSStatus'))
 module.add_url_rule('/replay',
                     view_func=ReloadAnalysis.as_view('ReloadAnalysis'))

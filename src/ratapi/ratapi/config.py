@@ -57,8 +57,6 @@ HISTORY_DIR = None
 TASK_QUEUE = '/var/spool/fbrat'
 
 # Celery configuration
-#: protocol to use to commuicate with rabbitmq
-CELERY_RESULT_BACKEND = 'file:///var/celery/results'
 #: address of rabbitmq server
 BROKER_DEFAULT_PROT = 'amqp'
 BROKER_DEFAULT_USER = 'celery'

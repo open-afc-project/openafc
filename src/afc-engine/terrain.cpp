@@ -45,6 +45,11 @@ TerrainClass::TerrainClass(QString lidarDir, std::string srtmDir, std::string de
 		maxLidarLongitude = terrainMaxLonBldg;
 		minLidarLatitude  = terrainMinLatBldg;
 		maxLidarLatitude  = terrainMaxLatBldg;
+	} else {
+		minLidarLongitude = 0.0;
+		maxLidarLongitude = -1.0;
+		minLidarLatitude  = 0.0;
+		maxLidarLatitude  = -1.0;
 	}
 
 	if (!depDir.empty())

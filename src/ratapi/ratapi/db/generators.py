@@ -5,9 +5,9 @@ import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 import csv
 from numpy import loadtxt, genfromtxt
-from models.base import Base
-from models.population import Population
-from models.uls import ULS
+from .models.base import Base
+from .models.population import Population
+from .models.uls import ULS
 
 #: LOGGER for this module
 LOGGER = logging.getLogger(__name__)

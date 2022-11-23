@@ -1,11 +1,11 @@
 import os, urllib, datetime, zipfile, shutil, subprocess, sys, glob
 from collections import OrderedDict
 import ssl
-from csvToSqliteULS import convertULS
+from .csvToSqliteULS import convertULS
 # from sort_callsigns_all import sortCallsigns
-from sort_callsigns_addfsid import sortCallsignsAddFSID
-from fix_bps import fixBPS
-from fix_params import fixParams
+from .sort_callsigns_addfsid import sortCallsignsAddFSID
+from .fix_bps import fixBPS
+from .fix_params import fixParams
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -61,6 +61,35 @@ def downloadFiles(logFile):
         # Exit after processing today's file
         if (key == currentWeekday) and (day != 'sun'):
             break
+
+# Downloads antenna files
+def downloadAFCGitHubFiles(logFile):
+    # download AFC GitHub data files
+    # Manually view at: https://github.com/Wireless-Innovation-Forum/6-GHz-AFC/tree/main/data/common_data
+    dataURL = 'https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data/'
+    dataFileList = [ 'antenna_model_diameter_gain',
+                    'billboard_reflector',
+                    'category_b1_antennas',
+                    'high_performance_antennas',
+                    'fcc_fixed_service_channelization',
+                  ]
+
+    for dataFile in dataFileList:
+        urllib.urlretrieve(dataURL + dataFile + '.csv', dataFile + '_orig.csv')
+
+        # Temporary solution: remove control characters, and blank lines.  Fix spelling error.
+        cmd = 'tr -d \'\200-\377\015\' < ' + dataFile + '_orig.csv  | ' \
+            + 'gawk -F "," \'($2 != "") { print }\' | ' \
+            + 'sed \'s/daimeter/diameter/\' ' \
+            + '>| ' + dataFile + '.csv'
+        os.system(cmd)
+        if dataFile == "fcc_fixed_service_channelization":
+            cmd = 'echo -e "5967.4375,30,\n' \
+                        +  '6056.3875,30,\n' \
+                        +  '6189.8275,30,\n' \
+                        +  '6219.4775,30,\n' \
+                        +  '6308.4275,30," >> ' + dataFile + '.csv'
+            os.system(cmd)
 
 # Extracts all the zip files into sub-directories
 def extractZips(logFile):
@@ -329,13 +358,53 @@ def daily_uls_parse(state_root, interactive):
         extractZips(logFile)
 
     if interactive:
-        value = raw_input("Process FCC files and generate file combined.txt to use as input to uls-script? (y/n): ")
-        if value == "y":
-            processFCC = True
-        elif value == "n":
-            processFCC = False
-        else:
-            print("ERROR: Invalid input: " + value + ", must be y or n")
+        accepted = False
+        while not accepted:
+            value = raw_input("Download AFC GitHub data files? (y/n): ")
+            if value == "y":
+                accepted = True
+                downloadAFCGitHubFilesFlag = True
+            elif value == "n":
+                accepted = True
+                downloadAFCGitHubFilesFlag = False
+            else:
+                print("ERROR: Invalid input: " + value + ", must be y or n")
+    else:
+        downloadAFCGitHubFilesFlag = True
+
+    if downloadAFCGitHubFilesFlag:
+        downloadAFCGitHubFiles(logFile)
+
+    if interactive:
+        accepted = False
+        while not accepted:
+            value = raw_input("Process antenna model files to create antenna_model_list.csv? (y/n): ")
+            if value == "y":
+                accepted = True
+                processAntFilesFlag = True
+            elif value == "n":
+                accepted = True
+                processAntFilesFlag = False
+            else:
+                print("ERROR: Invalid input: " + value + ", must be y or n")
+    else:
+        processAntFilesFlag = True
+
+    if processAntFilesFlag:
+        processAntFiles(fullPathTempDir, fullPathTempDir + '/antenna_model_list.csv', logFile)
+
+    if interactive:
+        accepted = False
+        while not accepted:
+            value = raw_input("Process FCC files and generate file combined.txt to use as input to uls-script? (y/n): ")
+            if value == "y":
+                accepted = True
+                processFCC = True
+            elif value == "n":
+                accepted = True
+                processFCC = False
+            else:
+                print("ERROR: Invalid input: " + value + ", must be y or n")
     else:
         processFCC = True
 
@@ -352,13 +421,17 @@ def daily_uls_parse(state_root, interactive):
     coalitionScriptOutputFilename = 'CONUS_ULS_' + nameTime + '.csv'
 
     if interactive:
-        value = raw_input("Run ULS Processor, uls-script? (y/n): ")
-        if value == "y":
-            runULSProcessor = True
-        elif value == "n":
-            runULSProcessor = False
-        else:
-            print("ERROR: Invalid input: " + value + ", must be y or n")
+        accepted = False
+        while not accepted:
+            value = raw_input("Run ULS Processor, uls-script? (y/n): ")
+            if value == "y":
+                accepted = True
+                runULSProcessor = True
+            elif value == "n":
+                accepted = True
+                runULSProcessor = False
+            else:
+                print("ERROR: Invalid input: " + value + ", must be y or n")
 
         if runULSProcessor:
             value = raw_input("Enter ULS Processor output filename to generate (" + coalitionScriptOutputFilename + "): ")
@@ -388,19 +461,28 @@ def daily_uls_parse(state_root, interactive):
         # run through the uls processor 
         logFile.write('Running through ULS processor' + '\n')
         try:
-            subprocess.call(['./uls-script', root + temp + '/combined.txt', fullPathCoalitionScriptOutput, root + '/antenna_model_list.csv', root + '/antenna_model_map.csv', mode]) 
+            subprocess.call(['./uls-script', root + temp + '/combined.txt', \
+                                             fullPathCoalitionScriptOutput, \
+                                             root + temp + '/antenna_model_list.csv', \
+                                             root + '/antenna_model_map.csv', \
+                                             root + temp + '/fcc_fixed_service_channelization.csv', \
+                                             mode]) 
         except Exception as e: 
             logFile.write('ERROR: ULS processor error:')
             raise e
     
     if interactive:
-        value = raw_input("Run fixBPS? (y/n): ")
-        if value == "y":
-            runFixBPS = True
-        elif value == "n":
-            runFixBPS = False
-        else:
-            print("ERROR: Invalid input: " + value + ", must be y or n")
+        accepted = False
+        while not accepted:
+            value = raw_input("Run fixBPS? (y/n): ")
+            if value == "y":
+                accepted = True
+                runFixBPS = True
+            elif value == "n":
+                accepted = True
+                runFixBPS = False
+            else:
+                print("ERROR: Invalid input: " + value + ", must be y or n")
     else:
         runFixBPS = True
 
@@ -412,13 +494,17 @@ def daily_uls_parse(state_root, interactive):
         fixBPS(fullPathCoalitionScriptOutput, bpsScriptOutput)
 
     if interactive:
-        value = raw_input("Run sortCallsignsAddFSID? (y/n): ")
-        if value == "y":
-            runSrtCallsignsAddFSID = True
-        elif value == "n":
-            runSrtCallsignsAddFSID = False
-        else:
-            print("ERROR: Invalid input: " + value + ", must be y or n")
+        accepted = False
+        while not accepted:
+            value = raw_input("Run sortCallsignsAddFSID? (y/n): ")
+            if value == "y":
+                accepted = True
+                runSrtCallsignsAddFSID = True
+            elif value == "n":
+                accepted = True
+                runSrtCallsignsAddFSID = False
+            else:
+                print("ERROR: Invalid input: " + value + ", must be y or n")
     else:
         runSrtCallsignsAddFSID = True
 
@@ -431,13 +517,17 @@ def daily_uls_parse(state_root, interactive):
         sortCallsignsAddFSID(bpsScriptOutput, fsidTableFile, sortedOutput, logFile)
 
     if interactive:
-        value = raw_input("Run fixParams? (y/n): ")
-        if value == "y":
-            runFixParams = True
-        elif value == "n":
-            runFixParams = False
-        else:
-            print("ERROR: Invalid input: " + value + ", must be y or n")
+        accepted = False
+        while not accepted:
+            value = raw_input("Run fixParams? (y/n): ")
+            if value == "y":
+                accepted = True
+                runFixParams = True
+            elif value == "n":
+                accepted = True
+                runFixParams = False
+            else:
+                print("ERROR: Invalid input: " + value + ", must be y or n")
     else:
         runFixParams = True
 
@@ -448,13 +538,17 @@ def daily_uls_parse(state_root, interactive):
         fixParams(sortedOutput, paramOutput, logFile, False)
 
     if interactive:
-        value = raw_input("Run conversion of CSV file to sqlite? (y/n): ")
-        if value == "y":
-            runConvertULS = True
-        elif value == "n":
-            runConvertULS = False
-        else:
-            print("ERROR: Invalid input: " + value + ", must be y or n")
+        accepted = False
+        while not accepted:
+            value = raw_input("Run conversion of CSV file to sqlite? (y/n): ")
+            if value == "y":
+                accepted = True
+                runConvertULS = True
+            elif value == "n":
+                accepted = True
+                runConvertULS = False
+            else:
+                print("ERROR: Invalid input: " + value + ", must be y or n")
     else:
         runConvertULS = True
 

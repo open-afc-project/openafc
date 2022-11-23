@@ -328,7 +328,7 @@ def create_app(config_override=None):
             # Re-raise the BuildError, in context of original traceback.
             exc_type, exc_value, traceback = sys.exc_info()
             if exc_value is error:
-                raise exc_type, exc_value, traceback
+                raise [exc_type, exc_value, traceback]
             else:
                 raise error
         # url_for will use this result, instead of raising BuildError.

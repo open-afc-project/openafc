@@ -5,8 +5,8 @@
 # a copy of which is included with this software program
 #
 # default value of args
-ARG BLD_TAG=3.4.5.1
-ARG PRINST_TAG=3.4.5.1
+ARG BLD_TAG=3.4.6.1
+ARG PRINST_TAG=3.4.6.1
 ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-build-image
 ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image
 
@@ -66,6 +66,7 @@ RUN yum -y clean all && rm -rf /wd/* /repos /etc/yum.repos.d/fbrat-repo.repo && 
 
 COPY prereqs/docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh
+COPY prereqs/proxy.conf /etc/httpd/conf.modules.d/
 
 FROM centos:7
 COPY --from=install_image / /
@@ -80,4 +81,12 @@ ARG CELERY_LOG
 ENV CELERY_LOG=$CELERY_LOG
 ARG HTTPD_OPTIONS
 ENV HTTPD_OPTIONS=$HTTPD_OPTIONS
+ARG AFC_PROD_ENV
+ENV AFC_PROD_ENV ${AFC_PROD_ENV}
+RUN pip install futures
+RUN pip install gunicorn==19.10.0
+COPY gunicorn/wsgi.py /wd/
+COPY gunicorn/gunicorn.conf.py /wd/
+COPY gunicorn/gunicorn.logs.conf /wd/
+RUN mkdir -p /run/gunicorn
 CMD ["/docker-entrypoint.sh"]

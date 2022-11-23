@@ -1,6 +1,7 @@
 #include "CsvWriter.h"
 #include "UlsFileReader.h"
 #include "AntennaModelMap.h"
+#include "FreqAssignment.h"
 #include <QDebug>
 #include <QStringList>
 #include <limits>
@@ -55,7 +56,7 @@ double emissionDesignatorToBandwidth(const QString &emDesig) {
     multi = 1e9;
     unitS = "G";
   } else {
-    return -1;
+    return -1.0;
   }
 
   QString num = frqPart.replace(unitS, ".");
@@ -313,7 +314,7 @@ int main(int argc, char **argv)
   }
   printf("Coalition ULS Processing Tool Version %s\n", VERSION);
   printf("Copyright 2019 (C) RKF Engineering Solutions\n");
-  if (argc != 6) {
+  if (argc != 7) {
     fprintf(stderr, "Syntax: %s [ULS file.csv] [Output File.csv] [AntModelListFile.csv] [AntModelMapFile.csv] [mode]\n", argv[0]);
     return -1;
   }
@@ -330,7 +331,8 @@ int main(int argc, char **argv)
     std::string outputFile = argv[2];
     std::string antModelListFile = argv[3];
     std::string antModelMapFile = argv[4];
-    std::string mode = argv[5];
+    std::string freqAssignmentFile = argv[5];
+    std::string mode = argv[6];
 
     FILE *fwarn;
     std::string warningFile = "warning_uls.txt";
@@ -339,6 +341,8 @@ int main(int argc, char **argv)
     }
 
 	AntennaModelMapClass antennaModelMap(antModelListFile, antModelMapFile);
+
+	FreqAssignmentClass freqAssignment(freqAssignmentFile);
 
     if (mode == "test_antenna_model_map") {
         testAntennaModelMap(antennaModelMap, inputFile, outputFile);
@@ -416,13 +420,13 @@ int main(int argc, char **argv)
         // std::cout << freq.callsign << ": " << allTxEm.size() << " emissions" << std::endl;
         foreach (const UlsEmission &e, allTxEm) {
             bool invalidFlag = false;
-            double bwMhz = std::numeric_limits<double>::quiet_NaN();
+            double bwMHz = std::numeric_limits<double>::quiet_NaN();
             double lowFreq, highFreq;
-            bwMhz = emissionDesignatorToBandwidth(e.desig);
-            if (bwMhz == -1) {
-                invalidFlag = true;
+            bwMHz = emissionDesignatorToBandwidth(e.desig);
+            if ( (bwMHz == -1.0) || (bwMHz > 60.0) || (bwMHz == 0) ) {
+                bwMHz = freqAssignment.getBandwidth(freq.frequencyAssigned);
             }
-            if (bwMhz == 0) {
+            if ( (bwMHz == -1) ) {
                 invalidFlag = true;
             }
 
@@ -432,8 +436,8 @@ int main(int argc, char **argv)
                     highFreq = freq.frequencyUpperBand; // Upper Band (MHz)
                     // Here Frequency Assigned should be low + high / 2
                 } else {
-                    lowFreq  = freq.frequencyAssigned - bwMhz / 2.0; // Lower Band (MHz)
-                    highFreq = freq.frequencyAssigned + bwMhz / 2.0; // Upper Band (MHz)
+                    lowFreq  = freq.frequencyAssigned - bwMHz / 2.0; // Lower Band (MHz)
+                    highFreq = freq.frequencyAssigned + bwMHz / 2.0; // Upper Band (MHz)
                 }
                 // skip if no overlap UNII5 and 7
                 bool overlapUnii5 = (highFreq > unii5StartFreqMHz) && (lowFreq < unii5StopFreqMHz);
@@ -787,15 +791,15 @@ int main(int argc, char **argv)
 
     /// Build the actual output.
     foreach (const UlsEmission &e, allTxEm) {
-      double bwMhz = std::numeric_limits<double>::quiet_NaN();
+      double bwMHz = std::numeric_limits<double>::quiet_NaN();
       double lowFreq, highFreq;
       if (txEmFound) {
-        bwMhz = emissionDesignatorToBandwidth(e.desig);
-        if (bwMhz == -1) {
-          anomalousReason.append("Emission designator contains no or invalid order of magnitude, ");
+        bwMHz = emissionDesignatorToBandwidth(e.desig);
+        if ( (bwMHz == -1.0) || (bwMHz > 60.0) || (bwMHz == 0) ) {
+            bwMHz = freqAssignment.getBandwidth(txFreq.frequencyAssigned);
         }
-        if (bwMhz == 0) {
-          anomalousReason.append("Emission designator contains no or invalid order of magnitude, ");
+        if (bwMHz == -1.0) {
+          anomalousReason.append("Unable to get bandwidth");
         }
       }
       if (txFreq.frequencyUpperBand > txFreq.frequencyAssigned) {
@@ -804,9 +808,9 @@ int main(int argc, char **argv)
         // Here Frequency Assigned should be low + high / 2
       } else {
         lowFreq = txFreq.frequencyAssigned -
-                          bwMhz / 2.0; // Lower Band (MHz)
+                          bwMHz / 2.0; // Lower Band (MHz)
         highFreq = txFreq.frequencyAssigned +
-                          bwMhz / 2.0; // Upper Band (MHz)
+                          bwMHz / 2.0; // Upper Band (MHz)
       }
 
       AntennaModelClass *rxAntModel = antennaModelMap.find(std::string(rxAnt.antennaModel));
@@ -942,7 +946,7 @@ int main(int argc, char **argv)
       
       {
         if (txEmFound) {
-          row << makeNumber(bwMhz); // Bandiwdth (MHz)
+          row << makeNumber(bwMHz); // Bandiwdth (MHz)
         } else {
           row << "";
         }
