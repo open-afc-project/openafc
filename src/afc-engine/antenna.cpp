@@ -149,7 +149,7 @@ int AntennaClass::readFile(const char *filepath, const char *p_filename)
 					} else if (strcmp(str1, "GAIN") == 0) {
 						int n = strlen(str2);
 						if ((n>3) && strcmp(str2+n-3, "dBi") == 0) {
-							str2[n-3] = (char) NULL;
+							str2[n-3] = 0;
 							gain_db = atof(str2);
 						} else {
 							throw std::runtime_error(ErrStream() << "ERROR: invalid antenna file \"" << filename << "(" << linenum << ")\" Gain: \"" << str2 << "\" must be in dBi");
