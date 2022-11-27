@@ -15,8 +15,6 @@ RUN cd /wd/prereqs/repo/ && \
     yum -y install subversion rpm-build python2-devel redhat-rpm-config rpmlint cmake3 lcov \
     ninja-build minizip-devel boost169-devel qt5-qtbase-devel python-nose checkpolicy \
     selinux-policy-devel selinux-policy-targeted yarn which \
-    iturp452-0.0.0-17626.el7.x86_64.rpm iturp452-devel-0.0.0-17626.el7.x86_64.rpm \
-    iturp452-debuginfo-0.0.0-17626.el7.x86_64.rpm && \
     yum -y install centos-release-scl && \
     yum -y install devtoolset-11-gcc*
 

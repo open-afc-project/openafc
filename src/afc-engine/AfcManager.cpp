@@ -5696,7 +5696,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 		double &pathLoss, double &pathClutterTxDB, double &pathClutterRxDB, bool fixedProbFlag,
 		std::string &pathLossModelStr, double &pathLossCDF,
 		std::string &pathClutterTxModelStr, double &pathClutterTxCDF, std::string &pathClutterRxModelStr, double &pathClutterRxCDF,
-		const iturp452::ITURP452 *itu452, std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr
+		std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr
 #if DEBUG_AFC
 		, std::vector<std::string> &ITMHeightType
 #endif
@@ -7791,7 +7791,7 @@ void AfcManager::runPointAnalysis()
 														pathLoss, pathClutterTxDB, pathClutterRxDB, true,
 														pathLossModelStr, pathLossCDF,
 														pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-														(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
+														&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
 #if DEBUG_AFC
 														, uls->ITMHeightType
 #endif
@@ -8992,7 +8992,7 @@ void AfcManager::runScanAnalysis()
 										pathLoss, pathClutterTxDB, pathClutterRxDB, true,
 										pathLossModelStr, pathLossCDF,
 										pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-										(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
+										&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
 #if DEBUG_AFC
 										, uls->ITMHeightType
 #endif
@@ -9550,7 +9550,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 				pathLoss, pathClutterTxDB, pathClutterRxDB, true,
 				pathLossModelStr, pathLossCDF,
 				pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-				(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
+				&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
 #if DEBUG_AFC
 				, uls->ITMHeightType
 #endif
@@ -10081,7 +10081,7 @@ void AfcManager::runHeatmapAnalysis()
 									pathLoss, pathClutterTxDB, pathClutterRxDB, true,
 									pathLossModelStr, pathLossCDF,
 									pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-									(iturp452::ITURP452 *)NULL, &txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
+									&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
 #if DEBUG_AFC
 									, uls->ITMHeightType
 #endif

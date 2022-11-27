@@ -2,7 +2,6 @@
 #define ULS_MEASUREMENT_ANALYSIS_H
 
 #include <QString>
-// #include <iturp452/ITURP452.h>
 #include <ogr_spatialref.h>
 #include <QPointF>
 #include "terrain.h"
@@ -20,9 +19,6 @@ namespace UlsMeasurementAnalysis {
 
 	bool isLOS(const TerrainClass *terrain, QPointF transLocLatLon, double transHt, QPointF receiveLocLatLon,
 			double receiveHt, double lineOfSightDistanceKm, int numpts, double **heightProfilePtr);
-
-	//    iturp452::ClutterCategory computeClutter(double lon, double lat, bool &waterFlag,
-	//        OGRCoordinateTransformation *clutterTrans, const float *pafScanline);
 
 	extern long long numInvalidSRTM;
 	extern long long numSRTM;
