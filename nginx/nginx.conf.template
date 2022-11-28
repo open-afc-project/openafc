@@ -1,0 +1,75 @@
+#
+# Copyright © 2022 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+http {
+    log_format short_fmt '[$time_local] $request_time $upstream_response_time';
+    log_format error_fmt '[$time_local] $remote_addr - $ssl_client_s_dn - $remote_user - $request_uri - $uri';
+    access_log  /dev/stdout  error_fmt;
+    error_log  /dev/stdout debug;
+
+
+    upstream backend {
+        ip_hash;
+        server ${AFC_MSGHND_NAME}:${AFC_MSGHND_PORT};
+    }
+#   server {
+#       listen 80;
+#       listen [::]:80;
+#
+#       location /fbrat/ap-afc/1.1/availableSpectrumInquiry {
+#           proxy_pass http://backend/fbrat/ap-afc/1.1/availableSpectrumInquiry$is_args$args;
+#       }
+#       location / {
+#           proxy_pass http://backend$is_args$args;
+#       }
+#   }
+    server {
+        listen 443 ssl;
+        listen [::]:443 ssl;
+        ssl_protocols TLSv1.2 TLSv1.3;
+        ssl_prefer_server_ciphers on;
+        ssl_certificate /certificates/servers/server.cert.pem;
+	ssl_certificate_key /certificates/servers/server.key.pem;
+
+        ssl_client_certificate /certificates/clients/client.bundle.pem;
+        ssl_verify_client optional;
+        ssl_verify_depth 10;
+
+        location / {
+            root   /wd/nginx/html;
+            index  index.html index.htm;
+            if ($ssl_client_verify != SUCCESS) {
+                return 403;
+            }
+        }
+
+        location /fbrat/ap-afc/1.1/availableSpectrumInquiry {
+           #if ($ssl_client_verify != SUCCESS) {
+           #    return 403;
+           #}
+            proxy_pass http://backend$uri$is_args$args;
+        }
+        # redirect server error pages to the static page /50x.html
+        #
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   /usr/share/nginx/html;
+        }
+
+        #error_page 403 /403.html;
+        #location /403.html {
+        #    access_log /dev/stdout error_fmt;
+        #}
+    }
+    include       /etc/nginx/mime.types;
+    default_type  application/octet-stream;
+
+    sendfile       on;
+    tcp_nopush     on;
+
+    keepalive_timeout  180;
+}
