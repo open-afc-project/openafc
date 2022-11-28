@@ -29,4 +29,4 @@ COPY nginx.conf /etc/nginx/
 COPY nginx.conf.template /etc/nginx/templates/
 
 ENV AFC_MSGHND_NAME=${AFC_MSGHND_NAME:-msghnd}
-ENV AFC_MSGHND_PORT=${AFC_MSGHND_PORT:-80}
+ENV AFC_MSGHND_PORT=${AFC_MSGHND_PORT:-8000}
