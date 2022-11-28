@@ -10,8 +10,6 @@ SRV_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"     # server im
 MSGHND_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd"     # msghnd image
 WRKR_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker"     # msghnd image
 PRINST_WRKR_DI="public.ecr.aws/w9v6y1o0/openafc/centos-worker-preinstall" # worker preinst image name
-
-
 PRINST_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image" # preinst image name
 D4B_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-build-image"         # dev image name
 OBJST_DI="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"          # object storage
@@ -92,7 +90,8 @@ build_dev_server() {
   # cd to a work dir
   cd ${wd}
   # get last git commit hash number
-  BUILDREV=`git rev-parse --short HEAD`
+#  BUILDREV=`git rev-parse --short HEAD`
+  BUILDREV=oa452
 
   if [ ${push} -eq 1 ]; then
     docker_login

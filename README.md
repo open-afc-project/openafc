@@ -341,7 +341,7 @@ services:
       - CELERY_OPTIONS="rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10"
       # RabbitMQ server name:
       - BROKER_TYPE=external
-      - BROKER_FQDN=rat_rmq
+      - BROKER_FQDN=rmq
 ```
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
 Just run in this folder following command and it is done:
