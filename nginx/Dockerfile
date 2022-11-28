@@ -8,8 +8,13 @@ FROM nginx:1.21.6
 RUN apt update \
     && apt install -y openssl \
     && apt install -y bash
-RUN mkdir -p /wd
-RUN mkdir -p /certificates /certificates/servers /certificates/clients
+
+RUN mkdir -p \
+    /wd \
+    /certificates/servers \
+    /certificates/clients \
+    /etc/nginx/templates
+
 # Server side certificates
 COPY certs/servers/server.cert.pem /certificates/servers/
 COPY certs/servers/server.key.pem /certificates/servers/
@@ -18,8 +23,10 @@ COPY certs/clients/client.bundle.pem /certificates/clients/
 COPY certs/servers/server.bundle.pem /certificates/servers/
 COPY certs/clients/client.key.pem /certificates/clients/
 COPY certs/clients/client.bdl.pem /certificates/clients/
+
+# Copy nginx configuration files
 COPY nginx.conf /etc/nginx/
-RUN mkdir -p /etc/nginx/templates
 COPY nginx.conf.template /etc/nginx/templates/
+
 ENV AFC_MSGHND_NAME=${AFC_MSGHND_NAME:-msghnd}
-ENV AFC_MSGHND_PORT=${AFC_MSGHND_POTY:-8000}
+ENV AFC_MSGHND_PORT=${AFC_MSGHND_PORT:-80}
