@@ -10,6 +10,7 @@ SRV_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"     # server im
 MSGHND_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd"     # msghnd image
 WRKR_DI="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker"     # msghnd image
 PRINST_WRKR_DI="public.ecr.aws/w9v6y1o0/openafc/centos-worker-preinstall" # worker preinst image name
+PRINST_MSGHND_DI="public.ecr.aws/w9v6y1o0/openafc/centos-msghnd-preinstall" # msghnd preinstall image name
 PRINST_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image" # preinst image name
 D4B_DEV="public.ecr.aws/w9v6y1o0/openafc/centos-build-image"         # dev image name
 OBJST_DI="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"          # object storage
@@ -101,7 +102,11 @@ build_dev_server() {
   cd ${wd}/tests && docker_build Dockerfile ${RTEST_DI}:${tag}; cd ${wd}
 
   # build in parallel server docker prereq images (preinstall and docker_for_build)
-  (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push} & docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${PRINST_WRKR_DI}:${tag} ${push})
+  (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push} & docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${PRINST_WRKR_DI}:${tag} ${push} & docker_build_and_push ${wd}/msghnd/Dockerfile.preinstall ${PRINST_MSGHND_DI}:${tag} ${push})
+
+  # build msghnd  (flask + gunicorn)
+  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_MSGHND_DI} --build-arg BUILDREV=msghnd"
+  docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND_DI}:${tag} ${push} "${EXT_ARGS}"
 
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_WRKR_DI} --build-arg BUILDREV=worker"
   docker_build_and_push ${wd}/worker/Dockerfile ${WRKR_DI}:${tag} ${push} "${EXT_ARGS}"
@@ -118,9 +123,6 @@ build_dev_server() {
   # build afc server docker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV} --build-arg BUILDREV=${BUILDREV}"
   docker_build_and_push Dockerfile ${SRV_DI}:${tag}  ${push} "${EXT_ARGS}"
-
-   # build afc-msghnd  (flask + gunicorn)
-  docker_build_and_push Dockerfile ${MSGHND_DI}:${tag}  ${push} "${EXT_ARGS} --build-arg AFC_PROD_ENV=final"
 }
 
 # Local Variables:

@@ -204,6 +204,8 @@ Building the docker container images used by the Open AFC service is straitforwa
 ```
 docker build . -t afc_server
 docker build worker -t afc_worker
+docker build nginx -t afc_nginx
+docker build msghnd -t afc_msghnd
 ```
 Once built, docker images are usable as usual docker image.
 
@@ -312,8 +314,8 @@ services:
       # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
-      - FILESTORAGE_HOST=rat_objst
       # Filestorage params:
+      - FILESTORAGE_HOST=objst
       - FILESTORAGE_PORT=5000
       - HISTORY_HOST=objst
       - HISTORY_EXTERNAL_PORT=14999
@@ -328,13 +330,14 @@ services:
       - HISTORY_HOST=0.0.0.0
       - HISTORY_PORT=4999
       - FILESTORAGE_DIR=/storage
+
   worker:
     build:
       context: .
       dockerfile: worker/Dockerfile
     environment:
       # Filestorage params:
-      - FILESTORAGE_HOST=rat_objst
+      - FILESTORAGE_HOST=objst
       - FILESTORAGE_PORT=5000
       - FILESTORAGE_SCHEME="HTTP"
       # worker params
@@ -342,6 +345,23 @@ services:
       # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
+
+  msghnd:
+    build:
+      context: .
+      dockerfile: msghnd/Dockerfile
+    environment:
+      # Filestorage params:
+      - FILESTORAGE_HOST=objst
+      - FILESTORAGE_PORT=5000
+      - FILESTORAGE_SCHEME="HTTP"
+      # RabbitMQ server name:
+      - BROKER_TYPE=external
+      - BROKER_FQDN=rmq
+    links:
+      - ratdb
+      - rmq
+      - objst
 ```
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
 Just run in this folder following command and it is done:
