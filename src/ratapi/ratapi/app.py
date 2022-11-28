@@ -147,9 +147,6 @@ def create_app(config_override=None):
         os.makedirs(os.path.join(state_path, 'responses'))
     if not os.path.exists(os.path.join(state_path, 'frequency_bands')):
         os.makedirs(os.path.join(state_path, 'frequency_bands'))
-    if not os.path.exists(flaskapp.config['AFC_ENGINE']):
-        LOGGER.error('Missing afc-engine executable "%s"',
-                     flaskapp.config['AFC_ENGINE'])
     if not os.path.exists(flaskapp.config['TASK_QUEUE']):
         raise Exception('Missing task directory')
 
@@ -165,9 +162,11 @@ def create_app(config_override=None):
 
         # get static web file location
         webdata_paths = xdg.BaseDirectory.load_data_paths('fbrat', 'www')
-        if not webdata_paths:
-            raise RuntimeError(
-                'Web data directory "fbrat/www" is not available')
+        # Temporary solution, do not raise exception while web module
+        # not installed.
+        #if not webdata_paths:
+            #raise RuntimeError(
+            #    'Web data directory "fbrat/www" is not available')
 
         # get uls database directory
         uls_databases = os.path.join(
@@ -187,12 +186,14 @@ def create_app(config_override=None):
         if not os.path.exists(antenna_patterns):
             os.makedirs(antenna_patterns)
 
-        # List of (URL paths from root URL, absolute local filesystem paths, read-only boolean)
-        dav_trees = (
-            ('/www', next(webdata_paths), True),
-            ('/ratapi/v1/files/uls_db', uls_databases, False),
-            ('/ratapi/v1/files/antenna_pattern', antenna_patterns, False)
-        )
+        # List of (URL paths from root URL, absolute local filesystem paths,
+        # read-only boolean)
+        dav_trees = ()
+        if webdata_paths:
+            dav_trees = dav_trees + (('/www', next(webdata_paths), True),)
+        dav_trees = dav_trees + (('/ratapi/v1/files/uls_db', uls_databases, False),
+                                 ('/ratapi/v1/files/antenna_pattern',
+                                  antenna_patterns, False),)
 
         dataif = data_if.DataIf(
             fsroot=flaskapp.config['STATE_ROOT_PATH'],

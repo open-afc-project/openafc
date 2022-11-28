@@ -1,0 +1,36 @@
+FROM centos:7 as staging
+RUN groupadd -g 1003 fbrat
+RUN useradd -u 1003 -g 1003 -m -b /var/lib -s /sbin/nologin fbrat
+COPY prereqs /wd/prereqs/
+RUN echo "ip_resolve=4" >> /etc/yum.conf
+
+#this list is to be optimized in future
+RUN yum -y install epel-release && \
+	yum -y upgrade && \
+	yum -y install -y \
+	python-flask-script python2-flask-migrate python2-flask-sqlalchemy\
+	python2-celery \
+	python-psycopg2 \
+	python-requests \
+	python2-cryptography \
+	python2-pyxdg \
+	python2-six \
+	python-tempita \
+	python2-bcrypt \
+	python-jwt \
+	python-blinker \
+	python-pip
+
+RUN yum -y install \
+	/wd/prereqs/repo/iturp452-0.0.0-17626.el7.x86_64.rpm \
+	/wd/prereqs/repo/python2-flask-mail-0.9.1-2.el7.noarch.rpm \
+	/wd/prereqs/repo/python2-flask-user-1.0.1.5-1.el7.noarch.rpm \
+	/wd/prereqs/repo/python2-flask_jsonrpc-0.3.1-1.el7.noarch.rpm \
+	/wd/prereqs/repo/python2-jsmin-2.2.2-2.el7.noarch.rpm \
+	/wd/prereqs/repo/python-wsgidav-2.4.1-1.el7.noarch.rpm
+
+RUN yum -y clean all && yum -y fs
+
+FROM centos:7
+COPY --from=staging / /
+LABEL version="openafc-msghnd-preinstall"
