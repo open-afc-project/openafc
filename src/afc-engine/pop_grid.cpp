@@ -1484,7 +1484,7 @@ void PopGridClass::findDeg(double longitudeDeg, double latitudeDeg, int &lonIdx,
          || (latIdx < 0) || (latIdx > numLat-1) ) {
         lonIdx = -1;
         latIdx = -1;
-        propEnvVal = (char) NULL;
+        propEnvVal = 0;
         regionIdx = -1;
     } else {
         propEnvVal = propEnv[lonIdx][latIdx];
