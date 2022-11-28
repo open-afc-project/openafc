@@ -32,14 +32,12 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [docker-compose](#docker-compose)
   - [RabbitMQ settings](#rabbitmq-settings)
   - [PostgreSQL structure](#postgresql-structure)
-  - [Initial Administrator account](#initial-administrator-account)
+  - [Initial Super Administrator account](#initial-super-administrator-account)
+    - [Note for an existing user database](#note-for-an-existing-user-database)
+  - [Managing user account](#managing-user-account)
+  - [User roles](#user-roles)
+  - [MTLS](#mtls)
   - [ULS database update automation](#uls-database-update-automation)
-
-
-- [Database info](/database_readme.md)
-- [Release Notes](/ReleaseNote.md)
-- [Test info](/tests/README.md)
-<br /><br />
 
 # **Introduction**
 
@@ -197,28 +195,17 @@ or for rpm build:
 docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc afc-build /wd/afc/build-rpm.sh
 ```
 
-
-
-
-
-
 # **OpenAFC Engine usage in Docker Environment**
 # AFC Engine build in docker
 
 ## Building Docker Container OpenAFC engine server
 
-Building the docker container with Monolitic OpenAFC is straitforward - in the root folder of the OpenAFC Project run default docker build command:
-
+Building the docker container images used by the Open AFC service is straitforward - in the root folder of the OpenAFC Project run default docker build command:
 ```
-docker build .
+docker build . -t afc_server
+docker build worker -t afc_worker
 ```
-If you want to build image with some special tag just add the -t \<tag\> option
-
-```
-docker build . -t openafc
-```
-
-Once built, docker image is usable as usual docker image.
+Once built, docker images are usable as usual docker image.
 
 ## Prereqs
 Significant to know that the container needs several mappings to work properly:
@@ -298,11 +285,11 @@ services:
       PGDATA: /var/lib/pgsql/data
       POSTGRES_DB: fbrat
 
-  rat_rmq:
+  rmq:
     image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:latest
     restart: always
 
-  rat_server:
+  server:
     build:
       context: .
     ports:
@@ -319,11 +306,42 @@ services:
       - /var/databases/frequency_bands:/var/lib/fbrat/frequency_bands
     links:
       - ratdb
-      - rat_rmq
+      - rmq
+      - objst
     environment:
       # RabbitMQ server name:
-      BROKER_TYPE: external
-      BROKER_FQDN: rat_rmq
+      - BROKER_TYPE=external
+      - BROKER_FQDN=rmq
+      - FILESTORAGE_HOST=rat_objst
+      # Filestorage params:
+      - FILESTORAGE_PORT=5000
+      - HISTORY_HOST=objst
+      - HISTORY_EXTERNAL_PORT=14999
+      # worker params
+      - CELERY_TYPE=external
+
+  objst:
+    image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:?err}
+    environment:
+      - FILESTORAGE_HOST=0.0.0.0
+      - FILESTORAGE_PORT=5000
+      - HISTORY_HOST=0.0.0.0
+      - HISTORY_PORT=4999
+      - FILESTORAGE_DIR=/storage
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    environment:
+      # Filestorage params:
+      - FILESTORAGE_HOST=rat_objst
+      - FILESTORAGE_PORT=5000
+      - FILESTORAGE_SCHEME="HTTP"
+      # worker params
+      - CELERY_OPTIONS="rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10"
+      # RabbitMQ server name:
+      - BROKER_TYPE=external
+      - BROKER_FQDN=rmq
 ```
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
 Just run in this folder following command and it is done:
@@ -372,7 +390,7 @@ BROKER_MNG_PORT = 15672
 ```
 Following the example to use RabbitMQ service in docker-compose.
 ```
-  rat_rmq:
+  rmq:
     image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:latest
     restart: always
 ```
@@ -389,7 +407,7 @@ rat-manage-api db-create
 
 If you do it with the server which is run thru the docker-compose script described above, you can do it using this command:
 ```
-docker-compose exec rat_server rat-manage-api db-create
+docker-compose exec server rat-manage-api db-create
 ```
 
 ## Initial Super Administrator account
@@ -398,13 +416,13 @@ Once done with database and starting the server, you need to create default admi
 
 If you are running from the compose file described above, you first need to get the OpenAFC server console.
 ```
-docker-compose exec rat_server bash
+docker-compose exec server bash
 ```
 it will return something like this:
 ```
 [root@149372a2ac05 wd]#
 ```
-this means you are in. 
+this means you are in.
 
 By default, the login uses non OIDC login method which manages user accounts locally.  You can use the following command to create an administrator for your OpenAFC server.
 
@@ -464,7 +482,7 @@ rat-manage-api user update --role Admin --role AP --role Analysis --email "user@
 ```
 ## User roles
 Roles are: Super, admin, AP, Admin, Analysis, Trial
-"Super" is a new role, which allows access rights to all organizations, as opposed to "Admin", which is limited to one organization.  When upgrade from older system without "Super", you will need to decide which users to be assigned role of "Super" and update their roles via the user update command. 
+"Super" is a new role, which allows access rights to all organizations, as opposed to "Admin", which is limited to one organization.  When upgrade from older system without "Super", you will need to decide which users to be assigned role of "Super" and update their roles via the user update command.
 
 ## MTLS
 Besides the GUI, mtls certificates can be managed via CLI.
@@ -508,7 +526,7 @@ It is essential to do following configuration:
     1. Check option "This project is parameterized".A button "Add parameter" will appear.
     2. Add parameter of type "Credentials Parameter". Give it name "GITHUB_CREDS_ID" (without quotes) and "SSH username with private key" as a Credential type. Check the option "Required" and set as a default value the credential mentioned in prerequisites.
     3. In the same section add another parameter. Now of type "String Parameter" with name "ULS_FOLDER" and default value mentioned in prereqisites (in this example - "/var/databases/ULS_Database")
-    4. In section Pipeline choose option "Pipeline script form SCM". 
+    4. In section Pipeline choose option "Pipeline script form SCM".
         4.1 In SCM Type choose GIT.
         4.2 In repository specify the ssh path to repository (in our case - "git@github.com:Telecominfraproject/open-afc.git"). In credentials Dropdown menu choose the valid credetials to this repository.
         4.3 In "Branches to build" use "*/main" (without quotes)
