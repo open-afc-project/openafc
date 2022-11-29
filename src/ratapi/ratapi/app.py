@@ -176,7 +176,8 @@ def create_app(config_override=None):
 
         # get static uls data path
         flaskapp.config['DEFAULT_ULS_DIR'] = next(
-            xdg.BaseDirectory.load_data_paths('fbrat', 'afc-engine', 'ULS_Database'), None)
+            xdg.BaseDirectory.load_data_paths('fbrat', 'afc-engine',
+                                              'ULS_Database'), None)
         if flaskapp.config['DEFAULT_ULS_DIR'] is None:
             LOGGER.error("No default ULS directory found in path search")
 
@@ -189,8 +190,11 @@ def create_app(config_override=None):
         # List of (URL paths from root URL, absolute local filesystem paths,
         # read-only boolean)
         dav_trees = ()
-        if webdata_paths:
+        try:
             dav_trees = dav_trees + (('/www', next(webdata_paths), True),)
+        except StopIteration:
+            pass
+
         dav_trees = dav_trees + (('/ratapi/v1/files/uls_db', uls_databases, False),
                                  ('/ratapi/v1/files/antenna_pattern',
                                   antenna_patterns, False),)

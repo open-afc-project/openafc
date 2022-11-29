@@ -8,7 +8,7 @@
 ARG BLD_TAG=3.4.6.1
 ARG PRINST_TAG=3.4.6.1
 ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-build-image
-ARG PRINST_NAME=openafc-msghnd-preinstall
+ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/openafc-msghnd-preinstall
 
 # Stage Build
 FROM ${BLD_NAME}:${BLD_TAG} as build_image
@@ -28,12 +28,7 @@ cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DCMA
 ninja-build -j$(nproc) install
 
 # Stage Install
-#FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
-FROM ${PRINST_NAME} as install_image
-COPY prereqs/devel.sh /wd/
-COPY prereqs/.bashrc /root/
-ARG AFC_DEVEL_ENV=production
-ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
+FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 COPY --from=build_image /wd/build/__install /usr
 
 RUN mkdir -m 750 -p /var/lib/fbrat/AntennaPatterns
@@ -62,4 +57,11 @@ COPY gunicorn/gunicorn.conf.py /wd/
 COPY gunicorn/gunicorn.logs.conf /wd/
 RUN mkdir -p /run/gunicorn /etc/xdg/fbrat
 COPY prereqs/ratapi.conf /etc/xdg/fbrat/
+# optional development environment
+# included if AFC_DEVEL_ENV is devel
+COPY msghnd/devel.sh /wd/
+COPY prereqs/.bashrc /root/
+ARG AFC_DEVEL_ENV=production
+ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
+RUN /wd/devel.sh
 CMD ["/docker-entrypoint.sh"]
