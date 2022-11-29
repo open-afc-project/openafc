@@ -46,7 +46,6 @@ class fbrat::devel {
       'python-prettytable',
       'selinux-policy-devel',
       'selinux-policy-targeted',
-      'iturp452-devel',
     ],
     {
       ensure => 'installed',

@@ -28,7 +28,6 @@ BuildRequires: boost169-devel >= 1.54
 %endif
 BuildRequires: armadillo-devel >= 4.300
 BuildRequires: gdal-devel < 2.0
-BuildRequires: iturp452-devel
 BuildRequires: qt5-qtbase-devel >= 5.6
 BuildRequires: gtest-devel >= 1.6
 BuildRequires: systemd
