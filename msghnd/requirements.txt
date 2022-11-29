@@ -7,4 +7,4 @@ numpy==1.7.1
 prettytable==0.7.2
 python2-secrets==1.0.5
 pytz==2016.10
-requests==2.20.0
+requests==2.20.0 
