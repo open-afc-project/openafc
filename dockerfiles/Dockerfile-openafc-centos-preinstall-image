@@ -23,7 +23,6 @@ RUN yum install -y https://yum.puppetlabs.com/puppet7-release-el-7.noarch.rpm ep
 	httpd \
 	httpd-tools \
 	mod_ssl \
-	/wd/prereqs/repo/iturp452* \
 	mailx \
 	python2-celery \
 	python-psycopg2 \

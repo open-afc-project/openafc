@@ -66,8 +66,6 @@
 #include <QTemporaryDir>
 #include <QRectF>
 #include <QtCore>
-// ITU-R P.452
-#include <iturp452/ITURP452.h>
 // Uses OGR from GDAL v1.11
 #include "gdal/ogrsf_frmts.h"
 #include "data_if.h"
@@ -187,7 +185,7 @@ class AfcManager
 				double& pathLoss, double& pathClutterTxDB, double& pathClutterRxDB, bool meanFlag,
 				std::string& pathLossModelStr, double& pathLossCDF,
 				std::string& pathClutterTxModelStr, double& pathClutterTxCDF, std::string& pathClutterRxModelStr, double& pathClutterRxCDF,
-				const iturp452::ITURP452 *itu452, std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr
+				std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr
 #if DEBUG_AFC
 				, std::vector<std::string> &ITMHeightType
 #endif

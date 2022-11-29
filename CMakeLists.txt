@@ -175,7 +175,6 @@ if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
     find_package(Qt5Xml REQUIRED)
     find_package(Qt5Widgets REQUIRED)
 
-    find_package(iturp452 REQUIRED)
     find_package(Armadillo REQUIRED)
     find_package(ZLIB REQUIRED)
     find_package(minizip REQUIRED)
