@@ -24,9 +24,9 @@ if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR
     set(OPENAFC_BUILD_TYPE "EngineDebug" "RatapiDebug" "WebDebug")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
     set(OPENAFC_BUILD_TYPE "EngineRelease" "RatapiRelease" "WebRelease")
-elseif ("EngineRatapiDebug" MATCHES ${CMAKE_BUILD_TYPE})
+elseif (${CMAKE_BUILD_TYPE} MATCHES "EngineRatapiDebug")
     set(OPENAFC_BUILD_TYPE "EngineDebug" "RatapiDebug")
-elseif ("EngineRatapiRelease" MATCHES ${CMAKE_BUILD_TYPE})
+elseif (${CMAKE_BUILD_TYPE} MATCHES "EngineRatapiRelease")
     set(OPENAFC_BUILD_TYPE "EngineRelease" "RatapiRelease")
 else()
     set(OPENAFC_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
@@ -163,8 +163,6 @@ set(PKG_INSTALL_CMAKE_CONFIG_DIR "${PKG_INSTALL_LIBDIR}/cmake/${CMAKE_MODULE_NAM
 # build only engine code
 if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
     "EngineRelease" IN_LIST OPENAFC_BUILD_TYPE)
-    message(STATUS "++++ find_packages")
-
     # External libraries
     find_package(Qt5Core 5.3 REQUIRED)
     find_package(Qt5Concurrent REQUIRED)
