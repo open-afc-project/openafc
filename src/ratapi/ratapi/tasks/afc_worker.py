@@ -13,6 +13,7 @@ import os
 import sys
 import subprocess
 import datetime
+import distutils.spawn
 import shutil
 from celery import Celery
 from ..db.daily_uls_parse import daily_uls_parse
@@ -29,6 +30,8 @@ LOGGER = get_task_logger(__name__)
 
 APP_CONFIG = init_config(Config(root_path=None))
 LOGGER.info('Celery Broker: %s', APP_CONFIG['BROKER_URL'])
+#: AFC Engine executable
+AFC_ENGINE = distutils.spawn.find_executable('afc-engine')
 
 #: constant celery reference. Configure once flask app is created
 client = Celery(
@@ -69,6 +72,11 @@ def run(prot, host, port, state_root,
     """
     LOGGER.debug('run(prot={}, host={}, port={}, state_root={}, task_id={}, hash={}, runtime_opts={})'.
                  format(prot, host, port, state_root, task_id, hash, runtime_opts))
+
+    if isinstance(afc_exe, type(None)):
+        afc_exe = AFC_ENGINE
+        if not os.path.exists(AFC_ENGINE):
+            LOGGER.error('Missing afc-engine executable "%s"', AFC_ENGINE)
 
     tmpdir = os.path.join(state_root, task_id)
     os.makedirs(tmpdir)

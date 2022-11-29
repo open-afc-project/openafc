@@ -4084,7 +4084,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				int latIdx;
 				int regionIdx;
 				popGridVal->findDeg(rxLongitudeDeg, rxLatitudeDeg, lonIdx, latIdx, rxPropEnv, regionIdx);
-				if ((rxPropEnv == (char)NULL) || (rxPropEnv == 'X'))
+				if ((rxPropEnv == 0) || (rxPropEnv == 'X'))
 				{
 					ignoreFlag = true;
 					reasonIgnored = "RX outside SIMULATION REGION";
@@ -4405,7 +4405,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				int latIdx;
 				int regionIdx;
 				popGridVal->findDeg(txLongitudeDeg, txLatitudeDeg, lonIdx, latIdx, txPropEnv, regionIdx);
-				if ((txPropEnv == (char)NULL) || (txPropEnv == 'X'))
+				if ((txPropEnv == 0) || (txPropEnv == 'X'))
 				{
 					ignoreFlag = true;
 					reasonIgnored = "TX outside SIMULATION REGION";

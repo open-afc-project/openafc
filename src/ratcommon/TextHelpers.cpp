@@ -119,7 +119,8 @@ QString TextHelpers::qstrerror(){
     const int errnum = errno;
     const size_t bufLen = 1024;
     char buffer[bufLen];
-    const char *const stat = ::strerror_r(errnum, buffer, bufLen);
+    ::strerror_r(errnum, buffer, bufLen);
+    const char *const stat = buffer;
 #endif
 
     const char *msg;
