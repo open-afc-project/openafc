@@ -91,8 +91,7 @@ build_dev_server() {
   # cd to a work dir
   cd ${wd}
   # get last git commit hash number
-#  BUILDREV=`git rev-parse --short HEAD`
-  BUILDREV=oa452
+  BUILDREV=`git rev-parse --short HEAD`
 
   if [ ${push} -eq 1 ]; then
     docker_login
@@ -102,7 +101,18 @@ build_dev_server() {
   cd ${wd}/tests && docker_build Dockerfile ${RTEST_DI}:${tag}; cd ${wd}
 
   # build in parallel server docker prereq images (preinstall and docker_for_build)
-  (trap 'kill 0' SIGINT; docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} & docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push} & docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${PRINST_WRKR_DI}:${tag} ${push} & docker_build_and_push ${wd}/msghnd/Dockerfile.preinstall ${PRINST_MSGHND_DI}:${tag} ${push})
+  (trap 'kill 0' SIGINT; \
+    docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} & \
+    docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push} & \
+    docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${PRINST_WRKR_DI}:${tag} ${push} & \
+    docker_build_and_push ${wd}/msghnd/Dockerfile.preinstall ${PRINST_MSGHND_DI}:${tag} ${push}
+  )
+
+  # wait for background jobs to be done
+  for job in `jobs -p`
+  do
+    wait $job
+  done
 
   # build msghnd  (flask + gunicorn)
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_MSGHND_DI} --build-arg BUILDREV=msghnd"
