@@ -130,7 +130,7 @@ build_dev_server() {
   cd ${wd}
 
   # build afc nginx docker image
-  cd ${wd}/nginx && docker_build_and_push Dockerfile ${NGNX_DI}:${tag} ${push} & 
+  cd ${wd}/nginx && docker_build_and_push Dockerfile ${NGNX_DI}:${tag} ${push} &
   cd ${wd}
 
   # build afc server docker image
@@ -138,7 +138,9 @@ build_dev_server() {
   docker_build_and_push Dockerfile ${SRV_DI}:${tag}  ${push} "${EXT_ARGS}" &
   msg "wait for prereqs to be built"
 
+  msg "wait for all images to be built"
   wait
+  msg "-done-"
 }
 
 # Local Variables:
