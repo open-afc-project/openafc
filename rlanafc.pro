@@ -12,7 +12,7 @@ QMAKE_CXXFLAGS_WARN_ON += -Werror=format-extra-args
 QMAKE_CXXFLAGS_WARN_ON += -Werror=format
 QMAKE_CXXFLAGS_WARN_ON += -Werror=shadow
 QMAKE_CXXFLAGS += -std=gnu++11 
-QMAKE_LIBS += -lz -lgdal -larmadillo -liturp452
+QMAKE_LIBS += -lz -lgdal -larmadillo
 
 DEFINES += QT_NO_DEBUG_OUTPUT
 

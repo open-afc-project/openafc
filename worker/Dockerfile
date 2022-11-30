@@ -21,7 +21,7 @@ COPY pkg /wd/pkg/
 COPY selinux /wd/selinux/
 COPY src /wd/src/
 RUN mkdir -p -m 777 /wd/build/__install
-RUN ls -l ./ && pwd && cd /wd/build && \
+RUN cd /wd/build && \
 source /opt/rh/$(scl -l)/enable && \
 cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169 -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -G Ninja /wd && \
 ninja-build -j$(nproc) install
@@ -29,27 +29,24 @@ ninja-build -j$(nproc) install
 
 # Stage Install
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
-COPY prereqs/.bashrc /root/
+
+COPY worker/devel.sh /wd/
+COPY prereqs/.bashrc /wd/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
-#COPY --from=build_image \
-#    /wd/build/dist/RPMS/x86_64/fbrat* \
-#    /root/rpmbuild/RPMS/noarch/python2-wtforms-2.2.1-6.el7.noarch.rpm \
-#        /repos/CentOS/7/7/Packages/
+RUN /wd/devel.sh
+RUN rm -f /wd/devel.sh /wd/.bashrc
+
 COPY --from=build_image /wd/build/__install /usr
 
 RUN mkdir -m 750 -p /var/lib/fbrat/AntennaPatterns
 RUN mkdir -m 755 -p /var/spool/fbrat
 RUN mkdir -m 755 -p /var/lib/fbrat
 RUN mkdir -m 755 -p /var/celery
-RUN mkdir -m 755 /var/run/celery
-RUN mkdir -m 755 /var/log/celery
+RUN mkdir -m 755 -p /var/run/celery
+RUN mkdir -m 755 -p /var/log/celery
 
 RUN chown -R fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/celery
-#RUN chown -R celery:celery /var/run/celery /var/log/celery
-
-#RUN yum -y autoremove rpmconf createrepo puppet7-release puppet-agent && yum -y autoremove
-#RUN yum -y clean all && rm -rf /wd/* /repos /etc/yum.repos.d/fbrat-repo.repo && yum -y clean all && rm -rf /var/cache/yum
 
 COPY worker/docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh

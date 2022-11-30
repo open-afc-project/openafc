@@ -101,38 +101,46 @@ build_dev_server() {
   cd ${wd}/tests && docker_build Dockerfile ${RTEST_DI}:${tag}; cd ${wd}
 
   # build in parallel server docker prereq images (preinstall and docker_for_build)
-  (trap 'kill 0' SIGINT; \
-    docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} & \
-    docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push} & \
-    docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${PRINST_WRKR_DI}:${tag} ${push} & \
-    docker_build_and_push ${wd}/msghnd/Dockerfile.preinstall ${PRINST_MSGHND_DI}:${tag} ${push}
-  )
+    docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST_DEV}:${tag} ${push} &
+    docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B_DEV}:${tag} ${push} &
+    docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${PRINST_WRKR_DI}:${tag} ${push} &
+    docker_build_and_push ${wd}/msghnd/Dockerfile.preinstall ${PRINST_MSGHND_DI}:${tag} ${push} &
 
+  msg "wait for prereqs to be built"
   # wait for background jobs to be done
   for job in `jobs -p`
   do
     wait $job
   done
+  msg "prereqs are built"
 
   # build msghnd  (flask + gunicorn)
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_MSGHND_DI} --build-arg BUILDREV=msghnd"
-  docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND_DI}:${tag} ${push} "${EXT_ARGS}"
+  docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND_DI}:${tag} ${push} "${EXT_ARGS}" &
 
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_WRKR_DI} --build-arg BUILDREV=worker"
-  docker_build_and_push ${wd}/worker/Dockerfile ${WRKR_DI}:${tag} ${push} "${EXT_ARGS}"
+  docker_build_and_push ${wd}/worker/Dockerfile ${WRKR_DI}:${tag} ${push} "${EXT_ARGS}" &
 
   # build afc dynamic data storage image
-  cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST_DI}:${tag} ${push}; cd ${wd}
+  cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST_DI}:${tag} ${push}&
+  cd ${wd}
 
   # build afc rabbit MQ docker image
-  cd ${wd}/rabbitmq && docker_build_and_push Dockerfile ${RMQ_DI}:${tag} ${push}; cd ${wd}
+  cd ${wd}/rabbitmq && docker_build_and_push Dockerfile ${RMQ_DI}:${tag} ${push} &
+  cd ${wd}
 
   # build afc nginx docker image
-  cd ${wd}/nginx && docker_build_and_push Dockerfile ${NGNX_DI}:${tag} ${push}; cd ${wd}
+  cd ${wd}/nginx && docker_build_and_push Dockerfile ${NGNX_DI}:${tag} ${push} &
+  cd ${wd}
 
   # build afc server docker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B_DEV} --build-arg PRINST_NAME=${PRINST_DEV} --build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push Dockerfile ${SRV_DI}:${tag}  ${push} "${EXT_ARGS}"
+  docker_build_and_push Dockerfile ${SRV_DI}:${tag}  ${push} "${EXT_ARGS}" &
+  msg "wait for prereqs to be built"
+
+  msg "wait for all images to be built"
+  wait
+  msg "-done-"
 }
 
 # Local Variables:
