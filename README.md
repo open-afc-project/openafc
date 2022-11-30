@@ -473,22 +473,6 @@ This will wipe out existing users, e.g. user acounts need to be manually recreat
 ```
 rat-manage-api db-upgrade
 ```
-
-**2. Export/Import the database with users:**
-In some very rate instances, the old database might be in inconsistent state which prevents the above db-upgrade command to work properly. In such case, you can export the old database to a file, and then import it back.
-```
-RAT_DBVER=0 rat-manage-api db-export --dst data.json
-RAT_DBVER=0 rat-manage-api db-drop
-rat-manage-api db-create
-rat-manage-api db-import --src data.json
-```
-
-This migration will maintain all existing user data, including roles. Steps to migrate above will:
-1. Export the user database to .json file.  Since the database is an older version, use env variable to tell the command the the right schema to use to intepret the database.
-2. Delete the old version database.
-3. Recreate the database.
-4. Import the json file into the new database.
-
 ## Managing user account
 Users can be removed. User roles can be added and removed.
 Remove user with user remove command, e.g.:

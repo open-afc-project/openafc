@@ -45,13 +45,13 @@ client.conf.update(APP_CONFIG)
 @client.task(ignore_result=True)
 def run(prot, host, port, state_root,
         afc_exe, request_type, debug,
-        task_id, hash, user_id, history_dir,
+        task_id, hash, region, history_dir,
         runtime_opts):
     """ Run AFC Engine
 
         The parameters are all serializable so they can be passed through the message queue.
 
-        :param user_id: Id of calling user
+        :param region: region of ap
 
         :param history_dir: history directory suffix
 
@@ -82,7 +82,7 @@ def run(prot, host, port, state_root,
     os.makedirs(tmpdir)
 
     dataif = data_if.DataIf(prot, host, port, state_root)
-    t = task.Task(task_id, dataif, state_root, hash, user_id, history_dir)
+    t = task.Task(task_id, dataif, state_root, hash, region, history_dir)
     t.toJson(task.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
 
     proc = None
@@ -97,7 +97,7 @@ def run(prot, host, port, state_root,
                 "--request-type=" + request_type,
                 "--state-root=" + state_root,
                 "--input-file-path=" + dataif.rname("pro", hash + "/analysisRequest.json"),
-                "--config-file-path=" + dataif.rname("cfg", str(user_id) + "/afc_config.json"),
+                "--config-file-path=" + dataif.rname("cfg", region + "/afc_config.json"),
                 "--output-file-path=" + dataif.rname("pro", hash + "/analysisResponse.json.gz"),
                 "--progress-file-path=" + dataif.rname("pro", task_id + "/progress.txt"),
                 "--temp-dir=" + tmpdir,

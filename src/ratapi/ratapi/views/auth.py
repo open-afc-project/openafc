@@ -84,6 +84,9 @@ def auth(ignore_active=False, roles=None, is_user=None, org=None):
                 return is_user  # return impersonating user. Don't check org
             elif not "Admin" in user_roles:
                 raise werkzeug.exceptions.NotFound()
+            target_user = User.get(is_user)
+            target_org = target_user.org if target_user.org else ""
+
         else:
             if roles:
                 found_role = False
@@ -99,13 +102,12 @@ def auth(ignore_active=False, roles=None, is_user=None, org=None):
                         "You do not have access to this resource")
 
             is_user = user_id
+            target_org = cur_org if cur_org else ""
     else:
         raise werkzeug.exceptions.Unauthorized()
 
     # done checking roles/userid. now check org
     if not "Super" in user_roles:
-        target_user = User.get(is_user)
-        target_org = target_user.org if target_user.org else ""
         if (not cur_org == target_org) or (org and not cur_org == org):
             raise werkzeug.exceptions.Forbidden(
                 "You do not have access to this resource")

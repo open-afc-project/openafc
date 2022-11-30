@@ -117,12 +117,21 @@ class User(MethodView):
                 # add role
                 to_add_role = aaa.Role.query.filter_by(name=role).first()
                 user.roles.append(to_add_role)
+                # When adding Super role, add Admin role too
+                if role=="Super" and not "Admin" in [ r.name for r in user.roles ]:
+                    to_add_role = aaa.Role.query.filter_by(name="Admin").first()
+                    user.roles.append(to_add_role)
                 db.session.commit() # pylint: disable=no-member
 
         elif content.has_key('removeRole'):
-            auth(roles=['Admin'], org=org)
             # just remove a single role
             role = content.get('removeRole')
+            if role=="Super":
+                # only super user can remove someone elses super role
+                auth(roles=['Super'])
+            else:
+                auth(roles=['Admin'], org=org)
+
             LOGGER.debug('Removing role: %s', role)
             # check if user has role
             if role in [ r.name for r in user.roles ]:
@@ -145,12 +154,6 @@ class User(MethodView):
         user = aaa.User.query.filter_by(id=user_id).first()
         org = user.org if user.org else ""
         auth(roles=['Admin'], org=org)
-        user_ap_list = aaa.AccessPoint.query.filter_by(user_id=user.id).all()
-        LOGGER.info("Deleting user: %s", user.email)
-
-        # delete the ap's accociated with a user since cascade doesn't seem to be working
-        for ap in user_ap_list:
-            db.session.delete(ap)
         db.session.delete(user) # pylint: disable=no-member
         db.session.commit() # pylint: disable=no-member
 
@@ -163,25 +166,18 @@ class AccessPoint(MethodView):
 
     def get(self, id):
         ''' Get AP info with specific user_id. '''
-
-        if id == 0:
-            id = auth(roles=['Admin'])
-            user = aaa.User.query.filter_by(id=id).first()
-            roles = [r.name for r in user.roles]
-            if "Super" in roles:
-                # Super user gets all access points
-                access_points = db.session.query(aaa.AccessPoint).all()
-            else:
-                # Admin only user gets all access points within own org
-                org = user.org if user.org else ""
-                access_points = []
-                for user, ap in db.session.query(aaa.User,aaa.AccessPoint).filter(aaa.User.id == aaa.AccessPoint.user_id).filter(aaa.User.org == org).all():
-                    access_points.append(ap)
-
+        id = auth(roles=['Admin', 'AP'])
+        user = aaa.User.query.filter_by(id=id).first()
+        roles = [r.name for r in user.roles]
+        if "Super" in roles:
+            # Super user gets all access points
+            access_points = db.session.query(aaa.AccessPoint).all()
         else:
-            auth(roles=['Admin'], is_user=id)
-            access_points = aaa.AccessPoint.query.filter_by(user_id=id).all()
-
+            # Admin only user gets all access points within own org
+            org = user.org if user.org else ""
+            access_points = []
+            for ap in db.session.query(aaa.AccessPoint).filter(aaa.AccessPoint.org == org).all():
+                access_points.append(ap)
 
         return flask.jsonify(accessPoints=[
             {
@@ -189,8 +185,8 @@ class AccessPoint(MethodView):
                 'serialNumber': ap.serial_number,
                 'model': ap.model,
                 'manufacturer': ap.manufacturer,
-                'ownerId': ap.user_id,
-                'certificationId': ap.certification_id
+                'certificationId': ap.certification_id,
+                'org': ap.org
             }
             for ap in access_points
         ])
@@ -201,12 +197,13 @@ class AccessPoint(MethodView):
         content = flask.request.json
 
         user = aaa.User.query.filter_by(id=id).first()
-        auth(roles=['Admin'], is_user=id)
+        org = content.get('org')
+        auth(roles=['Admin'], org=org)
 
         try:
-            ap = aaa.AccessPoint(content.get('serialNumber'), content.get('model'), content.get('manufacturer'), content.get('certificationId'))
+            ap = aaa.AccessPoint(content.get('serialNumber'), content.get('model'), content.get('manufacturer'), content.get('certificationId'), org)
 
-            user.access_points.append(ap)
+            db.session.add(ap) # pylint: disable=no-member
             db.session.commit() # pylint: disable=no-member
 
             return flask.jsonify(id=ap.id)
@@ -219,9 +216,9 @@ class AccessPoint(MethodView):
 
         ap = aaa.AccessPoint.query.filter_by(id=id).first()
 
-        auth(roles=['Admin'], is_user=ap.user_id)
+        auth(roles=['Admin'], org=ap.org)
 
-        LOGGER.info("Deleting ap: %s", ap.id)
+        LOGGER.info("Deleting ap: %s", id)
 
         db.session.delete(ap) # pylint: disable=no-member
         db.session.commit() # pylint: disable=no-member
@@ -244,7 +241,8 @@ class AccessPointTrial(MethodView):
                 'model': ap.model,
                 'manufacturer': ap.manufacturer,
                 'ownerId': ap.user_id,
-                'certificationId': ap.certification_id
+                'certificationId': ap.certification_id,
+                'org': ap.org
             }
         )
 

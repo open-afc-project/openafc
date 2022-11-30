@@ -9,10 +9,11 @@ import AntennaPatternForm from "./AntennaPatternForm";
 import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
-import { getDefaultAfcConf, guiConfig } from "../Lib/RatApi";
+import { getDefaultAfcConf, guiConfig, getAfcConfigFile } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
 import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
+import {setDefaultRegion} from "../Lib/User";
 
 /**
 * AFCForm.tsx: form for generating afc configuration files to be used to update server
@@ -62,6 +63,7 @@ export class AFCForm extends React.Component<
                 }
             }
         }
+       setDefaultRegion(config.regionStr);
     }
 
     private hasValue = (val: any) => val !== undefined && val !== null;
@@ -74,7 +76,19 @@ export class AFCForm extends React.Component<
     private setThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { threshold: n }) });
     private setMaxLinkDistance = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxLinkDistance: n }) });
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
-    private setUlsRegion = (n: string) => this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
+    private setUlsRegion = (n: string) => {
+       this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
+       setDefaultRegion(n);
+       getAfcConfigFile().then(
+           res => {
+                if (res.kind === "Success") {
+                    this.updateEntireConfigState(res.result);
+                } else {
+                    this.setState({ messageError: res.description, messageSuccess: undefined });
+               }
+           }
+       )
+    }
     private setEnableMapInVirtualAp = (n: boolean) => this.setState({ config: Object.assign(this.state.config, { enableMapInVirtualAp: n }) });
     private setVisiblityThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { visibilityThreshold: n }) });
     private setPropogationEnv = (n: string) => {
@@ -204,6 +218,7 @@ export class AFCForm extends React.Component<
             }
         }
         );
+        setDefaultRegion(config.regionStr);
     }
 
     /**
@@ -252,7 +267,6 @@ export class AFCForm extends React.Component<
     private getConfig = () => JSON.stringify(this.state.config);
 
     render() {
-
         const setPenetrationLoss = (x: PenetrationLossModel) => {
             const conf = this.state.config;
             conf.buildingPenetrationLoss = x;

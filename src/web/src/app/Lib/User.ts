@@ -106,8 +106,7 @@ export const retrieveUserData = async (): Promise<RatResponse<string>> => {
 }
 
 /**
- * Is current user logged in?
- * @returns User login status
+ * Is user credential is editable
  */
 export const isEditCredential = () => getUser().data.editCredential;
 
@@ -123,6 +122,25 @@ export const isLoggedIn = () => getUser().data.loggedIn;
  * @returns status of active status
  */
 export const isActive = () => letin(getUser(), u => u.data.loggedIn && u.data.active);
+
+/**
+ * Default region to display, It's set via afc config page
+ * @returns default region
+ */
+export const getDefaultRegion = () => {
+    const region = getUser().data.region;
+    if (typeof(region)==="undefined") {
+        return "default";
+    } else {
+        return region;
+    }
+}
+
+export const setDefaultRegion = (region:string) => {
+        let newuser = getUser();
+        newuser.data.region = region;
+        setUser(newuser);
+}
 
 /**
  * Does the user have this role?

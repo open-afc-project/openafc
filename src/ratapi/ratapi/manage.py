@@ -239,13 +239,6 @@ Role.id).all():  # pylint: disable=no-member
                             user_cfg[key]['org'] = ""
 
 
-            for ap,user in db.session.query(AccessPoint, User).filter(AccessPoint.user_id == User.id).all():
-                key = user.email + ":" + str(user.id)
-                user_cfg[key]['ap'].append( {'model':ap.model,
-                                             'serial_number':ap.serial_number,
-                                             'manufacturer':ap.manufacturer,
-                                             'certification_id':ap.certification_id})
-
             try:
                 limits = db.session.query(Limit).filter(id=0).first()
                 limit = {'min_eirp':float(limits.min_eirp), 'enforce':bool(limits.enforce)}
@@ -304,10 +297,16 @@ class DbImport(Command):
                             LOGGER.debug('User %s already exists', username[0])
 
                         try:
+                            email = username[0]
+                            if '@' in email:
+                                org = email[email.index('@') + 1:]
+                            else:
+                                org = ""
+
                             ap_list = json_lookup('ap', user_rcrd, None)
                             for ap in ap_list[0]:
                                 AccessPointCreate(flaskapp, ap['serial_number'],
-                                    ap['certification_id'], username[0])
+                                    ap['certification_id'], org)
                         except RuntimeError:
                             LOGGER.debug('AccessPoint %s user %s already exists', ap['serial_number'], username[0])
                     else:
@@ -470,7 +469,8 @@ hashed, org = None):
                               email,
                               user_params['password'],
                               user_params['rolename'],
-                              hashed, org)
+                              hashed,
+                              org)
 
     def __call__(self, flaskapp, username, password_in, role, hashed=False,
 org=None):
@@ -621,46 +621,42 @@ class AccessPointCreate(Command):
                help="model number"),
         Option('--manuf', type=str, default=None,
                help="manufacturer"),
-        Option('email', type=str,
-               help="email of user assocated with this access point.")
+        Option('--org', type=str,
+               help="organization with this access point.")
     )
 
-    def _create_ap(self, flaskapp, serial, cert_id, email,
-                   model=None, manuf=None):
+    def _create_ap(self, flaskapp, serial, cert_id,
+                   model=None, manuf=None, org=None):
         from contextlib import closing
         import datetime
-        from .models.aaa import AccessPoint, User
+        from .models.aaa import AccessPoint
         LOGGER.debug('AccessPointCreate._create_ap() %s %s %s',
-                      serial, cert_id, email)
+                      serial, cert_id, org)
         with flaskapp.app_context():
-            try:
-                # select * from aaa_user where email = ? limit 1
-                user = User.query.filter(User.email == email).one()
-            except sqlalchemy.orm.exc.NoResultFound:
-                raise RuntimeError(
-                    'No user found with email "{0}"'.format(email))
-            # select count(*) from access_point as ap where ap.serial_number = ?
-            if AccessPoint.query.filter(AccessPoint.serial_number == serial).count() > 0:
+            if AccessPoint.query.filter(AccessPoint.serial_number ==
+serial).filter(AccessPoint.certification_id==cert_id).count() > 0:
                 raise RuntimeError(
                     'Existing access point found with serial number "{0}"'.format(serial))
+
+            if not org: org = ""
 
             ap = AccessPoint(
                 serial_number=serial,
                 model=model,
                 manufacturer=manuf,
                 certification_id=cert_id,
-                user_id=user.id
+                org=org
             )
             db.session.add(ap)  # pylint: disable=no-member
             db.session.commit()  # pylint: disable=no-member
 
     def __init__(self, flaskapp=None, serial_id=None,
-                 cert_id=None, username=None):
+                 cert_id=None, org=None):
         if flaskapp and serial_id and username:
-            self._create_ap(flaskapp, str(serial_id), cert_id, username)
+            self._create_ap(flaskapp, str(serial_id), cert_id, org=org)
 
-    def __call__(self, flaskapp, serial, cert_id, email, model, manuf):
-        self._create_ap(flaskapp, serial, cert_id, email, model, manuf)
+    def __call__(self, flaskapp, serial, cert_id, model, manuf, org=None):
+        self._create_ap(flaskapp, serial, cert_id, model, manuf, org)
 
 
 class AccessPointRemove(Command):
@@ -672,7 +668,7 @@ class AccessPointRemove(Command):
     )
 
     def _remove_ap(self, flaskapp, serial):
-        from .models.aaa import AccessPoint, User
+        from .models.aaa import AccessPoint
         LOGGER.debug('AccessPointRemove._remove_ap() %s', serial)
         with flaskapp.app_context():
             try:
@@ -698,13 +694,12 @@ class AccessPointList(Command):
 
     def __call__(self, flaskapp):
         table = PrettyTable()
-        from .models.aaa import AccessPoint, User
+        from .models.aaa import AccessPoint
 
-        table.field_names = ["Serial Number", "Cert ID", "Email"]
+        table.field_names = ["Serial Number", "Cert ID", "Org"]
         with flaskapp.app_context():
-            # select email, serial_number from access_point as ap join aaa_user as au on ap.user_id = au.id;
-            for ap, user in db.session.query(AccessPoint, User).filter(User.id == AccessPoint.user_id).all():  # pylint: disable=no-member
-                table.add_row([ap.serial_number, ap.certification_id, user.email])
+            for ap in db.session.query(AccessPoint).all():  # pylint: disable=no-member
+                table.add_row([ap.serial_number, ap.certification_id, ap.org])
             print(table)
 
 
@@ -718,7 +713,7 @@ class AccessPoints(Manager):
         self.add_command("list", AccessPointList())
 
 class MTLSCreate(Command):
-    ''' Create a new access point. '''
+    ''' Create a new mtls certificate. '''
 
     option_list = (
         Option('--note', type=str, default=None,
@@ -799,7 +794,7 @@ class MTLSList(Command):
 
     def __call__(self, flaskapp):
         table = PrettyTable()
-        from .models.aaa import MTLS, User
+        from .models.aaa import MTLS
 
         table.field_names = ["ID", "Note", "Org", "Create"]
         with flaskapp.app_context():
@@ -976,6 +971,7 @@ class ConfigAdd(Command):
         LOGGER.debug('ConfigAdd.__call__() %s', src)
         from .models.aaa import User
 
+        REGION_MAP = {'CONUS':'fcc'}
         split_items = src.split('=', 1)
         filename = split_items[1].strip()
         if not os.path.exists(filename):
@@ -1006,8 +1002,14 @@ class ConfigAdd(Command):
                     cert_id = json_lookup('certificationId', ap_rcrd, None)
                     for i in range(len(serial_id)):
                         cert_str = cert_id[i][0]['nra'] + ' ' + cert_id[i][0]['id']
+                        email = username[0]
+                        if '@' in email:
+                            org = email[email.index('@') + 1:]
+                        else:
+                            org = ""
+
                         AccessPointCreate(flaskapp, serial_id[i],
-                                          cert_str, username[0])
+                                          cert_str, org)
                         f_str = "AccessPointRemove(flaskapp, '" + serial_id[i] + "')"
                         rollback.insert(0, f_str)
 
@@ -1016,14 +1018,17 @@ class ConfigAdd(Command):
                         LOGGER.debug('New user id %d', user.id)
 
                     cfg_rcrd = json_lookup('afcConfig', new_rcrd, None)
+                    region_rcrd = json_lookup('regionStr', cfg_rcrd, None)
+                    regionStr = REGION_MAP[region_rcrd[0]]
+
                     with flaskapp.app_context():
                         import flask
 
                         dataif = data_if.DataIf(
                             fsroot=flask.current_app.config['STATE_ROOT_PATH'])
-                        with dataif.open("cfg", str(user.id) + "/afc_config.json") as hfile:
+                        with dataif.open("cfg", regionStr + "/afc_config.json") as hfile:
                             LOGGER.debug('Opening config file "%s"',
-                                         dataif.rname("cfg", str(user.id) + "/afc_config.json"))
+                                         dataif.rname("cfg", regionStr + "/afc_config.json"))
                             hfile.write(json.dumps(cfg_rcrd[0]))
                 except Exception as e:
                     LOGGER.error(e)
@@ -1075,15 +1080,6 @@ class ConfigRemove(Command):
                         LOGGER.debug('Found user id %d', user.id)
                         UserRemove(flaskapp, username[0])
 
-                        with flaskapp.app_context():
-                            import flask
-
-                            dataif = data_if.DataIf(
-                                fsroot=flask.current_app.config['STATE_ROOT_PATH'])
-                            with dataif.open("cfg", str(user.id) + "/afc_config.json") as hfile:
-                                LOGGER.debug('Delete config file "%s"',
-                                             dataif.rname("cfg", str(user.id) + "/afc_config.json"))
-                                hfile.delete()
                     except RuntimeError:
                         LOGGER.debug('Delete missing user %s', username[0])
                     except Exception as e:

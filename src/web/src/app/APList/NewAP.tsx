@@ -3,6 +3,7 @@ import { AccessPointModel, RatResponse } from "../Lib/RatApiTypes";
 import { Gallery, GalleryItem, FormGroup, TextInput, Button, Alert, AlertActionCloseButton, FormSelect, FormSelectOption, InputGroup } from "@patternfly/react-core";
 import { PlusCircleIcon } from "@patternfly/react-icons";
 import { UserModel } from "../Lib/RatApiTypes";
+import { hasRole} from "../Lib/User";
 
 /**
  * NewAP.tsx: Form for creating a new access point
@@ -13,11 +14,8 @@ import { UserModel } from "../Lib/RatApiTypes";
  * Interface definition of `NewAP` properties
  */
 interface NewAPProps {
-    ownerId: number,
-    /**
-     * Used to populate Owner dropdown if user is an admin
-     */
-    users?: UserModel[],
+    userId: number,
+    org: string,
     onAdd: (ap: AccessPointModel) => Promise<RatResponse<string>>
 }
 
@@ -29,7 +27,7 @@ interface NewAPState {
     manufacturer?: string,
     messageType?: "danger" | "success",
     messageValue: string,
-    userId?: number
+    org: string,
 }
 
 /**
@@ -46,6 +44,7 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
             manufacturer: undefined,
             certificationIdNra: undefined,
             certificationIdId: undefined,
+            org: this.props.org,
         };
     }
 
@@ -54,8 +53,8 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
             this.setState({ messageType: "danger", messageValue: "Serial number must be specified" });
             return;
         }
-        if (this.props.ownerId === 0 && !this.state.userId) {
-            this.setState({ messageType: "danger", messageValue: "Owner must be specified" });
+        if (!this.state.org === 0) {
+            this.setState({ messageType: "danger", messageValue: "Org must be specified" });
             return;
         }
 
@@ -65,7 +64,7 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
             certificationId: this.state.certificationIdNra + " " + this.state.certificationIdId,
             model: this.state.model,
             manufacturer: this.state.manufacturer,
-            ownerId: this.props.ownerId || this.state.userId // default is owner, but if admin then use the userId from the form
+            org: this.state.org,
         })
             .then(res => {
                 if (res.kind === "Success") {
@@ -85,7 +84,7 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
         const certificationIdIdChange = (s?: string) => this.setState({ certificationIdId: s });
         const modelChange = (s?: string) => this.setState({ model: s });
         const manufacturerChange = (s?: string) => this.setState({ manufacturer: s });
-        const setUserId = (s?: string) => s && this.setState({ userId: Number(s) })
+        const orgChange = (s?: string) => this.setState({ org: s });
 
         return (
             <>{
@@ -147,30 +146,25 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
                         </FormGroup>
                     </GalleryItem>
                   
-                    {this.props.ownerId === 0 && this.props.users &&
-                        <GalleryItem>
+                    {hasRole("Super") &&
+                        (<GalleryItem>
                             <FormGroup
-                                label="Owner"
-                                fieldId="owner-form"
+                                label="Org"
                                 isRequired={true}
+                                fieldId="org-form"
                             >
-                                <InputGroup>
-                                    <FormSelect
-                                        value={this.state.userId}
-                                        onChange={setUserId}
-                                        id="owner-form"
-                                        name="owner-form"
-                                        style={{ textAlign: "right" }}
-                                    >
-                                        <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select an owner" />
-                                        {this.props.users.map((option: UserModel) => (
-                                            <FormSelectOption key={option.id} value={option.id} label={option.email} />
-                                        ))}
-                                    </FormSelect>
-                                </InputGroup>
+                                <TextInput
+                                    type="text"
+                                    id="org-form"
+                                    name="org-form"
+                                    aria-describedby="org-form-helper"
+                                    value={this.state.org}
+                                    onChange={orgChange}
+                                />
                             </FormGroup>
-                        </GalleryItem>
+                        </GalleryItem>)
                     }
+
                     <GalleryItem>
                         <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()}>Add</Button>
                     </GalleryItem>

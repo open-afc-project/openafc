@@ -3,7 +3,7 @@ import { headerCol, Table, TableVariant, TableHeader, TableBody } from "@pattern
 import { AccessPointModel, UserModel } from "../Lib/RatApiTypes";
 
 /**
- * APTable.tsx: Table that displays access points. Shows owner column if admin specifies user list
+ * APTable.tsx: Table that displays access points. Shows org column if admin specifies filterId is 0
  * author: Sam Smucny
  */
 
@@ -13,14 +13,14 @@ import { AccessPointModel, UserModel } from "../Lib/RatApiTypes";
 interface APTableProps {
     accessPoints: AccessPointModel[],
     /**
-     * If `users` is non-empty then the owner column will be displayed (Admin feature)
+     * If `filterId` is 0 then the org column will be displayed (Super admin feature)
      */
-    users?: UserModel[],
+    filterId?: number,
     onDelete: (id: number) => void
 }
 
 /**
- * Table component to display a user's access points.
+ * Table component to display access points.
  */
 export class APTable extends React.Component<APTableProps, {}> {
 
@@ -35,22 +35,22 @@ export class APTable extends React.Component<APTableProps, {}> {
             rows: []
         };
 
-        if (props.users) {
+        if (props.filterId === 0) {
             this.columns.push({
-                title: "Owner"
+                title: "Org"
             });
         }
     }
 
     private apToRow = (ap: AccessPointModel) => ({
         id: ap.id,
-        cells: this.props.users ? [
+        cells: this.props.filterId ? [
             ap.serialNumber,
             ap.certificationId || "",
-           this.props.users.find(x => x.id === ap.ownerId)?.email || "NO USER"
         ] : [
             ap.serialNumber,
             ap.certificationId || "",
+            ap.org,
        ]
     })
 

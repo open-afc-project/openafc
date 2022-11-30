@@ -1,7 +1,7 @@
 import { GuiConfig, AFCConfigFile, PAWSRequest, PAWSResponse, AnalysisResults, RatResponse, ResSuccess, ResError, success, error, AFCEngineException, ExclusionZoneRequest, HeatMapRequest, ExclusionZoneResult, HeatMapResult, FreqRange } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { delay } from "./Utils";
-import { hasRole } from "./User";
+import { hasRole, getDefaultRegion } from "./User";
 
 /**
  * RatApi.ts: member values and functions for utilizing server ratpi services
@@ -175,7 +175,7 @@ export const getDefaultAfcConf = () => defaultAfcConf();
  * @returns this user's current AFC Config or error
  */
 export const getAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => (
-    fetch(guiConfig.afcconfig_defaults, {
+    fetch(guiConfig.afcconfig_defaults.replace("default", getDefaultRegion()), {
         method: "GET",
     }).then(async (res: Response) => {
         if (res.ok) {
@@ -193,7 +193,8 @@ export const getAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => (
         logger.error(err);
         logger.error("could not load afc configuration so falling back to dev default");
         return error("unable to load afc configuration");
-    })
+    }
+    )
 )
 
 /**
@@ -223,7 +224,7 @@ export const getTrialAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => 
  * @returns success message or error
  */
 export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<string>> => (
-    fetch(guiConfig.afcconfig_defaults, {
+    fetch(guiConfig.afcconfig_defaults.replace("default", getDefaultRegion()), {
         method: "PUT",
         headers: {"Content-Type": "application/json" },
         body: JSON.stringify(conf, undefined, 3)
