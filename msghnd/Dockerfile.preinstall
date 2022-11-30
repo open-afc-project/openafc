@@ -22,14 +22,10 @@ RUN yum -y install epel-release && \
 	python-pip
 
 RUN yum -y install \
-        /wd/prereqs/repo/iturp452-0.0.0-17626.el7.x86_64.rpm \
 	/wd/prereqs/repo/python2-flask-mail-0.9.1-2.el7.noarch.rpm \
 	/wd/prereqs/repo/python2-flask-user-1.0.1.5-1.el7.noarch.rpm \
 	/wd/prereqs/repo/python2-flask_jsonrpc-0.3.1-1.el7.noarch.rpm \
-	/wd/prereqs/repo/python2-jsmin-2.2.2-2.el7.noarch.rpm \
-	/wd/prereqs/repo/python-wsgidav-2.4.1-1.el7.noarch.rpm
-
-RUN yum -y clean all && yum -y fs
+        yum -y clean all && yum -y fs
 
 FROM centos:7
 COPY --from=staging / /
