@@ -126,7 +126,7 @@ class AccessPoint(db.Model):
     model = db.Column(db.String(64))
     manufacturer = db.Column(db.String(64))
     certification_id = db.Column(db.String(64))
-    org = db.Column(db.String(64), nullable=False)
+    org = db.Column(db.String(64), nullable=True)
 
     def __init__(self, serial_number, model, manufacturer, certification_id, org=None):
         if not serial_number:

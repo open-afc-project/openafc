@@ -652,7 +652,7 @@ serial).filter(AccessPoint.certification_id==cert_id).count() > 0:
 
     def __init__(self, flaskapp=None, serial_id=None,
                  cert_id=None, org=None):
-        if flaskapp and serial_id and username:
+        if flaskapp and serial_id:
             self._create_ap(flaskapp, str(serial_id), cert_id, org=org)
 
     def __call__(self, flaskapp, serial, cert_id, model, manuf, org=None):
