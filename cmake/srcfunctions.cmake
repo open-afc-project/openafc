@@ -265,9 +265,9 @@ function(add_dist_pythonlibrary)
         message(FATAL_ERROR "add_dist_pythonlibrary missing SOURCEDIR parameter")
     endif()
 
-    find_program(PYTHON_BIN "python2")
+    find_program(PYTHON_BIN "python")
     if(NOT PYTHON_BIN)
-        message(FATAL_ERROR "Missing executable for 'python2'")
+        message(FATAL_ERROR "Missing executable for 'python'")
     endif()
 
     # Setuptools runs on copy of source in the build path

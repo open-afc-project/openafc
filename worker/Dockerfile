@@ -29,17 +29,22 @@ ninja-build -j$(nproc) install
 
 # Stage Install
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
-COPY prereqs/.bashrc /root/
+
+COPY worker/devel.sh /wd/
+COPY prereqs/.bashrc /wd/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
+RUN /wd/devel.sh
+RUN rm -f /wd/devel.sh /wd/.bashrc
+
 COPY --from=build_image /wd/build/__install /usr
 
 RUN mkdir -m 750 -p /var/lib/fbrat/AntennaPatterns
 RUN mkdir -m 755 -p /var/spool/fbrat
 RUN mkdir -m 755 -p /var/lib/fbrat
 RUN mkdir -m 755 -p /var/celery
-RUN mkdir -m 755 /var/run/celery
-RUN mkdir -m 755 /var/log/celery
+RUN mkdir -m 755 -p /var/run/celery
+RUN mkdir -m 755 -p /var/log/celery
 
 RUN chown -R fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/celery
 

@@ -1,5 +1,9 @@
 #!/bin/sh
 
+if [ "$AFC_DEVEL_ENV" == "devel" ]; then
+	source /opt/rh/$(scl -l)/enable
+fi
+
 #celery
 CELERY_OPTIONS=${CELERY_OPTIONS:="rat_1"}
 CELERY_LOG=${CELERY_LOG:=DEBUG}
