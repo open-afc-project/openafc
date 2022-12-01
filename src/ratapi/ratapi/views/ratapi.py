@@ -39,7 +39,7 @@ module = flask.Blueprint('ratapi-v1', 'ratapi')
 
 def build_task(dataif,
         request_type,
-        task_id, hash, user_id, history_dir,
+        task_id, hash, region, history_dir,
         runtime_opts=RNTM_OPT_DBG_GUI):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
@@ -56,7 +56,7 @@ def build_task(dataif,
         flask.current_app.config["DEBUG"],
         task_id,
         hash,
-        user_id,
+        region,
         history_dir,
         runtime_opts
     ])
