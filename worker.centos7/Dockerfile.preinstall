@@ -1,0 +1,41 @@
+FROM centos:7 as staging
+RUN groupadd -g 1003 fbrat
+RUN useradd -u 1003 -g 1003 -m -b /var/lib -s /sbin/nologin fbrat
+COPY prereqs /wd/prereqs/
+RUN echo "ip_resolve=4" >> /etc/yum.conf
+
+#this list is to be optimized in future
+RUN yum -y install epel-release && \
+	yum -y upgrade && \
+	yum -y install -y \
+	gtest \
+	python-flask-script python2-flask-migrate python2-flask-sqlalchemy\
+	boost169 boost169-atomic boost169-chrono boost169-container boost169-context boost169-contract boost169-coroutine boost169-date-time boost169-devel boost169-fiber boost169-filesystem boost169-graph boost169-iostreams boost169-locale boost169-log boost169-math boost169-numpy2 boost169-numpy3 boost169-program-options boost169-python2 boost169-python3 boost169-random boost169-regex boost169-serialization boost169-stacktrace boost169-test boost169-timer boost169-thread boost169-type_erasure boost169-wave \
+	python2-celery \
+	python-psycopg2 \
+	python-requests \
+	python2-cryptography \
+	python2-pyxdg \
+	python2-six \
+	python-tempita \
+	python2-bcrypt \
+	python-jwt \
+	python-blinker \
+	minizip \
+	qt5-qtbase qt5-qtbase-gui\
+	gdal-libs \
+	armadillo
+
+RUN yum -y install \
+	/wd/prereqs/repo/python2-flask-mail-0.9.1-2.el7.noarch.rpm \
+	/wd/prereqs/repo/python2-flask-user-1.0.1.5-1.el7.noarch.rpm \
+	/wd/prereqs/repo/python2-flask_jsonrpc-0.3.1-1.el7.noarch.rpm \
+	/wd/prereqs/repo/python2-jsmin-2.2.2-2.el7.noarch.rpm \
+	/wd/prereqs/repo/python-wsgidav-2.4.1-1.el7.noarch.rpm
+
+RUN yum -y clean all && yum -y fs
+RUN rm -rf /wd/prereqs
+
+FROM centos:7
+COPY --from=staging / /
+LABEL version="openafc-worker-preinstall"

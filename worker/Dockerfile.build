@@ -1,0 +1,31 @@
+FROM alpine:3.17 as staging
+
+COPY worker/docker-entrypoint.sleep.sh /
+RUN chmod +x /docker-entrypoint.sleep.sh
+
+#RUN echo "@stm https://dl-cdn.alpinelinux.org/alpine/latest-stable/main
+#@stc https://dl-cdn.alpinelinux.org/alpine/latest-stable/community" >> /etc/apk/repositories
+
+RUN apk add libgeotiff-dev giflib-dev libjpeg-turbo-dev geos-dev libxml2-dev \
+build-base cmake samurai subversion \
+py3-pip py3-numpy py3-cryptography py3-sqlalchemy py3-requests py3-flask \
+boost-dev python3-dev qt5-qtbase-dev armadillo-dev minizip-dev
+
+RUN pip3 install celery pyxdg
+
+# build antique GDAL
+RUN mkdir -p /root/gdal
+COPY worker/gdal-1.11.4.tar.xz /root/gdal/
+RUN cd /root/gdal && tar xf gdal-1.11.4.tar.xz && rm -f gdal-1.11.4.tar.xz && cd gdal-1.11.4 && mkdir -p external/lib && \
+./configure --prefix=/root/gdal/__install --includedir=/usr/include/gdal --enable-shared --without-bsb --with-ogr --with-armadillo --with-curl --with-cfitsio --with-dods-root= --with-expat --with-freexl --with-geos --with-geotiff=external --with-gif --with-gta --with-jasper --with-hdf5 --with-jpeg --without-jpeg12 --with-liblzma --with-libtiff=yes --with-libz --without-mdb --with-mysql --with-netcdf --with-odbc --with-ogdi --without-msg --with-openjpeg --with-pcraster --with-pg --with-png --with-poppler --with-sqlite3 --with-threads --with-webp --with-xerces --without-perl --without-python --with-png=/usr &&\
+make -j$(nproc) && make install && cd .. && rm -rf gdal-1.11.4 && cp -r __install/* /usr/
+
+RUN addgroup -g 1003 fbrat
+RUN adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat
+
+FROM alpine:3.17
+COPY --from=staging / /
+LABEL version="openafc-alpine-build-image"
+
+# for debug
+CMD ["/docker-entrypoint.sleep.sh"]
