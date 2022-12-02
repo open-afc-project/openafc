@@ -1,3 +1,9 @@
+#
+# Copyright © 2022 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
 FROM alpine:3.17 as staging
 
 COPY worker/docker-entrypoint.sleep.sh /

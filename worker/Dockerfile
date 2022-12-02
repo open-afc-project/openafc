@@ -7,8 +7,8 @@
 # default value of args
 ARG BLD_TAG=3.4.6.1
 ARG PRINST_TAG=3.4.6.1
-ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-build-image
-ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-worker-preinstall
+ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image
+ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall
 
 # Stage Build
 FROM ${BLD_NAME}:${BLD_TAG} as build_image
