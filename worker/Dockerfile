@@ -48,8 +48,8 @@ RUN mkdir -m 755 -p /var/run/celery
 RUN mkdir -m 755 -p /var/log/celery
 RUN chown -R fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/celery
 
-COPY worker/docker-entrypoint.al.sh /
-RUN chmod +x /docker-entrypoint.al.sh
+COPY worker/docker-entrypoint.sh /
+RUN chmod +x /docker-entrypoint.sh
 
 # Size optimization
 
@@ -64,4 +64,4 @@ LABEL revision="afc-worker-al"
 WORKDIR /wd
 EXPOSE 80 443
 ENV PGPORT=5432
-CMD ["/docker-entrypoint.al.sh"]
+CMD ["/docker-entrypoint.sh"]

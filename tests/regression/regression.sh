@@ -124,7 +124,7 @@ build_dev_server() {
 
   # build worker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=worker"
-  docker_build_and_push ${wd}/worker/Dockerfile ${WORKER}:${tag} ${push} "${EXT_ARGS}" &
+  docker_build_and_push ${wd}/   ${WORKER}:${tag} ${push} "${EXT_ARGS}" &
 
   # build afc dynamic data storage image
   cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST}:${tag} ${push}&
