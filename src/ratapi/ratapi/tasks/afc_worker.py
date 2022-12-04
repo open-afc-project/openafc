@@ -16,16 +16,14 @@ import datetime
 import distutils.spawn
 import shutil
 from celery import Celery
-from ..db.daily_uls_parse import daily_uls_parse
-from .runcelery import init_config
 from celery.schedules import crontab
 from flask.config import Config
 from celery.utils.log import get_task_logger
 from celery.exceptions import Ignore
-from .. import config
 from .. import defs
 from .. import data_if
 from .. import task
+from .. import config
 
 LOGGER = get_task_logger(__name__)
 
