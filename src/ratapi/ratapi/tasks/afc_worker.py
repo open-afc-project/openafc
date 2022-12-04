@@ -7,40 +7,40 @@
 # This work is licensed under the OpenAFC Project License, a copy of which
 # is included with this software program.
 #
-from genericpath import exists
-import logging
 import os
-import sys
 import subprocess
-import datetime
 import distutils.spawn
 import shutil
 from celery import Celery
-from ..db.daily_uls_parse import daily_uls_parse
-from .runcelery import init_config
-from celery.schedules import crontab
-from flask.config import Config
 from celery.utils.log import get_task_logger
-from celery.exceptions import Ignore
 from .. import defs
 from .. import data_if
 from .. import task
+from .. import config
 
 LOGGER = get_task_logger(__name__)
 
-APP_CONFIG = init_config(Config(root_path=None))
-LOGGER.info('Celery Broker: %s', APP_CONFIG['BROKER_URL'])
+BROKER_URL=os.getenv('BROKER_PROT', config.BROKER_DEFAULT_PROT) + \
+           "://" + \
+           os.getenv('BROKER_USER', config.BROKER_DEFAULT_USER) + \
+           ":" + \
+           os.getenv('BROKER_PWD', config.BROKER_DEFAULT_PWD) + \
+           "@" + \
+           os.getenv('BROKER_FQDN', config.BROKER_DEFAULT_FQDN) + \
+           ":" + \
+           os.getenv('BROKER_PORT', config.BROKER_DEFAULT_PORT) + \
+           "/fbrat"
+
+LOGGER.info('Celery Broker: %s', BROKER_URL)
 #: AFC Engine executable
 AFC_ENGINE = distutils.spawn.find_executable('afc-engine')
 
 #: constant celery reference. Configure once flask app is created
 client = Celery(
     'fbrat',
-    broker=APP_CONFIG['BROKER_URL'],
+    broker=BROKER_URL,
     task_ignore_result=True,
 )
-
-client.conf.update(APP_CONFIG)
 
 @client.task(ignore_result=True)
 def run(prot, host, port, state_root,
