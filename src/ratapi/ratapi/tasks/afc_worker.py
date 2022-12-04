@@ -7,19 +7,12 @@
 # This work is licensed under the OpenAFC Project License, a copy of which
 # is included with this software program.
 #
-from genericpath import exists
-import logging
 import os
-import sys
 import subprocess
-import datetime
 import distutils.spawn
 import shutil
 from celery import Celery
-from celery.schedules import crontab
-from flask.config import Config
 from celery.utils.log import get_task_logger
-from celery.exceptions import Ignore
 from .. import defs
 from .. import data_if
 from .. import task
@@ -27,15 +20,15 @@ from .. import config
 
 LOGGER = get_task_logger(__name__)
 
-BROKER_URL=os.getenv('BROKER_PROT', BROKER_DEFAULT_PROT) + \
+BROKER_URL=os.getenv('BROKER_PROT', config.BROKER_DEFAULT_PROT) + \
            "://" + \
-           os.getenv('BROKER_USER', BROKER_DEFAULT_USER) + \
+           os.getenv('BROKER_USER', config.BROKER_DEFAULT_USER) + \
            ":" + \
-           os.getenv('BROKER_PWD', BROKER_DEFAULT_PWD) + \
+           os.getenv('BROKER_PWD', config.BROKER_DEFAULT_PWD) + \
            "@" + \
-           os.getenv('BROKER_FQDN', BROKER_DEFAULT_FQDN) + \
+           os.getenv('BROKER_FQDN', config.BROKER_DEFAULT_FQDN) + \
            ":" + \
-           os.getenv('BROKER_PORT', BROKER_DEFAULT_PORT) + \
+           os.getenv('BROKER_PORT', config.BROKER_DEFAULT_PORT) + \
            "/fbrat"
 
 LOGGER.info('Celery Broker: %s', BROKER_URL)
