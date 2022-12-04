@@ -22,25 +22,34 @@ from celery.schedules import crontab
 from flask.config import Config
 from celery.utils.log import get_task_logger
 from celery.exceptions import Ignore
+from .. import config
 from .. import defs
 from .. import data_if
 from .. import task
 
 LOGGER = get_task_logger(__name__)
 
-APP_CONFIG = init_config(Config(root_path=None))
-LOGGER.info('Celery Broker: %s', APP_CONFIG['BROKER_URL'])
+BROKER_URL=os.getenv('BROKER_PROT', BROKER_DEFAULT_PROT) + \
+           "://" + \
+           os.getenv('BROKER_USER', BROKER_DEFAULT_USER) + \
+           ":" + \
+           os.getenv('BROKER_PWD', BROKER_DEFAULT_PWD) + \
+           "@" + \
+           os.getenv('BROKER_FQDN', BROKER_DEFAULT_FQDN) + \
+           ":" + \
+           os.getenv('BROKER_PORT', BROKER_DEFAULT_PORT) + \
+           "/fbrat"
+
+LOGGER.info('Celery Broker: %s', BROKER_URL)
 #: AFC Engine executable
 AFC_ENGINE = distutils.spawn.find_executable('afc-engine')
 
 #: constant celery reference. Configure once flask app is created
 client = Celery(
     'fbrat',
-    broker=APP_CONFIG['BROKER_URL'],
+    broker=BROKER_URL,
     task_ignore_result=True,
 )
-
-client.conf.update(APP_CONFIG)
 
 @client.task(ignore_result=True)
 def run(prot, host, port, state_root,
