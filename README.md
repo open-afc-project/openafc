@@ -229,6 +229,8 @@ Significant to know that the container needs several mappings to work properly:
       - RAS_Database
       - srtm3arcsecondv003
       - ULS_Database
+      - nfa
+      - pr
 
 
 2) LiDAR Databases to /var/lib/fbrat/proc_lidar_2019
@@ -323,7 +325,7 @@ services:
       - CELERY_TYPE=external
 
   objst:
-    image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:?err}
+    image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:latest
     environment:
       - FILESTORAGE_HOST=0.0.0.0
       - FILESTORAGE_PORT=5000
@@ -341,7 +343,7 @@ services:
       - FILESTORAGE_PORT=5000
       - FILESTORAGE_SCHEME="HTTP"
       # worker params
-      - CELERY_OPTIONS="rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10"
+      - CELERY_OPTIONS=rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10
       # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
