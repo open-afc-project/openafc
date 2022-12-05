@@ -11,6 +11,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Building HTTP servers docker image](#building-http-servers-docker-image)
   - [RATAPI setup](#ratapi-setup)
   - [docker-compose examples](#docker-compose-examples)
+  - [Apache configuration](#apache-configuration)
 
 - [Back to main readme](/README.md)
 <br /><br />
@@ -177,3 +178,24 @@ services:
       #Some folder inside the image for file storing. Ignored when OBJSTORAGE=GoogleCloudBucket
       - FILESTORAGE_DIR=/storage
 ```
+
+## Apache configuration
+To enable "Debug Files" link in GUI, the Apache server must forward history HTTP(S) requests to the history server.
+To do this, the Apache proxy module should be configured in the following way:
+```
+<VirtualHost APACHE_HOSTNAME:80>
+  ProxyPassReverse /dbg http://HISTORY_HOSTNAME:4999/dbg
+  ProxyPass /dbg http://HISTORY_HOSTNAME:4999/dbg
+  ProxyPreserveHost On
+  ProxyRequests Off
+</VirtualHost>
+<VirtualHost HOSTNAME:443>
+  ProxyPassReverse /dbg http://HISTORY_HOSTNAME:4999/dbgs
+  ProxyPass /dbg http://HISTORY_HOSTNAME:4999/dbgs
+  ProxyPreserveHost On
+  ProxyRequests Off
+</VirtualHost>
+```
+where APACHE_HOSTNAME is the name of the Apache host and HISTORY_HOSTNAME is the name of the history host.
+
+That is, HTTP accesses to "/dbg" and HTTP accesses to "/dbgs" are forwarded to the history server.
