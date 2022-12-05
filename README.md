@@ -202,10 +202,10 @@ docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --grou
 
 Building the docker container images used by the Open AFC service is straitforward - in the root folder of the OpenAFC Project run default docker build command:
 ```
-docker build . -t afc_server
-docker build worker -t afc_worker
-docker build nginx -t afc_nginx
-docker build msghnd -t afc_msghnd
+docker build . -t server
+docker build worker -t worker
+docker build nginx -t nginx
+docker build msghnd -t msghnd
 ```
 Once built, docker images are usable as usual docker image.
 
@@ -349,6 +349,15 @@ services:
     build:
       context: .
       dockerfile: worker/Dockerfile
+    volumes:
+      - /var/databases:/usr/share/fbrat/rat_transfer
+      - /var/databases/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
+      - /var/databases/RAS_Database:/var/lib/fbrat/RAS_Database
+      - /var/databases/ULS_Database:/var/lib/fbrat/ULS_Database
+      - /var/databases/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
+      - /var/databases/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
+      - /var/afc_config:/var/lib/fbrat/afc_config
+      - /var/databases/frequency_bands:/var/lib/fbrat/frequency_bands
     environment:
       # Filestorage params:
       - FILESTORAGE_HOST=objst
