@@ -1,6 +1,12 @@
 # Release Note
 ## **Version and Date**
-|Version|3.4.5.1|
+|Version|3.4.7.1|
+| :- | :- |
+|**Date**|**11/22/2022**|
+|compiled server's version is TBD|git tag 3.4.7.1|
+
+## **Version and Date**
+|Version|3.4.6.1|
 | :- | :- |
 |**Date**|**11/22/2022**|
 |compiled server's version is 8a990ea |git tag 3.4.6.1|
