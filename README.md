@@ -294,7 +294,6 @@ services:
     restart: always
 
   rat_server:
-    #image: 819698882090.dkr.ecr.us-east-1.amazonaws.com/afc-monolitic:latest
     image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server:latest
     ports:
       - "80:80"
