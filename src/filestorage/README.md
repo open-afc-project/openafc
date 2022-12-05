@@ -189,7 +189,7 @@ To do this, the Apache proxy module should be configured in the following way:
   ProxyPreserveHost On
   ProxyRequests Off
 </VirtualHost>
-<VirtualHost HOSTNAME:443>
+<VirtualHost APACHE_HOSTNAME:443>
   ProxyPassReverse /dbg http://HISTORY_HOSTNAME:4999/dbgs
   ProxyPass /dbg http://HISTORY_HOSTNAME:4999/dbgs
   ProxyPreserveHost On
@@ -198,4 +198,4 @@ To do this, the Apache proxy module should be configured in the following way:
 ```
 where APACHE_HOSTNAME is the name of the Apache host and HISTORY_HOSTNAME is the name of the history host.
 
-That is, HTTP accesses to "/dbg" and HTTP accesses to "/dbgs" are forwarded to the history server.
+That is, HTTP accesses to "/dbg" and HTTPS accesses to "/dbgs" are forwarded to the history server.
