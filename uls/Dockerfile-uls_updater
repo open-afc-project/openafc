@@ -10,9 +10,7 @@ ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-build-image
 
 # Stage Build
 FROM ${BLD_NAME}:${BLD_TAG} as build_image
-ARG BUILDREV=localbuild
 COPY CMakeLists.txt LICENSE.txt version.txt fbrat.rpmlintrc Doxyfile.in /wd/
-RUN echo $BUILDREV > /wd/svnrevision.txt
 
 RUN yum -y install centos-release-scl
 RUN yum -y install devtoolset-7-gcc*
@@ -32,7 +30,7 @@ RUN set -e ; \
     NINJA="ninja-build -j$N_THREADS"; \
     RPMBUILD="rpmbuild -ba --without apidoc $@"; \
     RPMLINT="rpmlint"; \
-    CMAKE="${CMAKE} -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169" ; \
+    CMAKE="${CMAKE} -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169 -DCMAKE_BUILD_TYPE=Ulsprocessor"; \
     BUILDDIR=${ROOTDIR}/build; \
     mkdir -p $BUILDDIR; \
     pushd $BUILDDIR; \

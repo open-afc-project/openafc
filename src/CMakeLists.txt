@@ -33,10 +33,12 @@ if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
     add_subdirectory(ratcommon)
     add_subdirectory(rkflogging)
     add_subdirectory(rkfsql)
-    add_subdirectory(coalition_ulsprocessor)
     if(BUILD_AFCENGINE)
         add_subdirectory(afc-engine)
     endif(BUILD_AFCENGINE)
+endif()
+if ("Ulsprocessor" IN_LIST OPENAFC_BUILD_TYPE)
+    add_subdirectory(coalition_ulsprocessor)
 endif()
 
 # Make visible to project scope

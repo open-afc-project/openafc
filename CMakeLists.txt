@@ -28,6 +28,8 @@ elseif (${CMAKE_BUILD_TYPE} MATCHES "EngineRatapiDebug")
     set(OPENAFC_BUILD_TYPE "EngineDebug" "RatapiDebug")
 elseif (${CMAKE_BUILD_TYPE} MATCHES "EngineRatapiRelease")
     set(OPENAFC_BUILD_TYPE "EngineRelease" "RatapiRelease")
+elseif (${CMAKE_BUILD_TYPE} MATCHES "Ulsprocessor")
+    set(OPENAFC_BUILD_TYPE "Ulsprocessor")
 else()
     set(OPENAFC_BUILD_TYPE "${CMAKE_BUILD_TYPE}")
 endif()
@@ -46,15 +48,6 @@ option(BUILD_AFCENGINE "Build the AFC engine portion of the project" ON)
 
 # Shared library ABI versioning
 set(SOVERSION "${PROJECT_VERSION}")
-
-# Allow retrieving local source revision with cache
-include(svnversion)
-svnversion_info(
-    PREFIX SVN
-    DIR "${CMAKE_SOURCE_DIR}"
-    SAVEFILE "${CMAKE_SOURCE_DIR}/svnrevision.txt"
-)
-message("${CMAKE_SOURCE_DIR} VERS ${SVN_LAST_REVISION}")
 
 # Compiler and linker config
 set(CMAKE_CXX_STANDARD 11)
@@ -159,6 +152,9 @@ set(XDG_APPS_INSTALL_DIR "${CMAKE_INSTALL_DATADIR}/applications")
 set(CMAKE_MODULE_NAME ${PROJECT_NAME})
 set(PKG_INSTALL_CMAKE_CONFIG_DIR "${PKG_INSTALL_LIBDIR}/cmake/${CMAKE_MODULE_NAME}")
 
+if ("Ulsprocessor" IN_LIST OPENAFC_BUILD_TYPE)
+    find_package(Qt5Core 5.3 REQUIRED)
+endif()
 
 # build only engine code
 if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
