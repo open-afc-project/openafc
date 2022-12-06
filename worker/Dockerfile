@@ -15,7 +15,6 @@ FROM ${BLD_NAME}:${BLD_TAG} as build_image
 
 ARG BUILDREV=localbuild
 COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /root/afc/
-RUN echo $BUILDREV > /root/afc/svnrevision.txt
 COPY cmake /root/afc/cmake/
 COPY pkg /root/afc/pkg/
 COPY selinux /root/afc/selinux/

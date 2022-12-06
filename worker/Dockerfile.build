@@ -13,7 +13,7 @@ RUN chmod +x /docker-entrypoint.sleep.sh
 #@stc https://dl-cdn.alpinelinux.org/alpine/latest-stable/community" >> /etc/apk/repositories
 
 RUN apk add libgeotiff-dev giflib-dev libjpeg-turbo-dev geos-dev libxml2-dev \
-build-base cmake samurai subversion \
+build-base cmake samurai \
 py3-pip py3-numpy py3-cryptography py3-sqlalchemy py3-requests py3-flask \
 boost-dev python3-dev qt5-qtbase-dev armadillo-dev minizip-dev
 

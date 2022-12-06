@@ -12,9 +12,7 @@ ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-msghnd-preinstall
 
 # Stage Build
 FROM ${BLD_NAME}:${BLD_TAG} as build_image
-ARG BUILDREV=localbuild
 COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /wd/
-RUN echo $BUILDREV > /wd/svnrevision.txt
 
 COPY cmake /wd/cmake/
 COPY pkg /wd/pkg/
