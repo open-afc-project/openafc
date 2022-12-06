@@ -202,10 +202,10 @@ docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --grou
 
 Building the docker container images used by the Open AFC service is straitforward - in the root folder of the OpenAFC Project run default docker build command:
 ```
-docker build . -t afc_server
-docker build worker -t afc_worker
-docker build nginx -t afc_nginx
-docker build msghnd -t afc_msghnd
+docker build . -t server
+docker build worker -t worker
+docker build nginx -t nginx
+docker build msghnd -t msghnd
 ```
 Once built, docker images are usable as usual docker image.
 
@@ -294,7 +294,8 @@ services:
     restart: always
 
   rat_server:
-    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server:latest
+    build:
+      context: .
     ports:
       - "80:80"
       - "443:443"
