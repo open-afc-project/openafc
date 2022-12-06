@@ -202,10 +202,10 @@ docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --grou
 
 Building the docker container images used by the Open AFC service is straitforward - in the root folder of the OpenAFC Project run default docker build command:
 ```
-docker build . -t afc_server
-docker build worker -t afc_worker
-docker build nginx -t afc_nginx
-docker build msghnd -t afc_msghnd
+docker build . -t server
+docker build worker -t worker
+docker build nginx -t nginx
+docker build msghnd -t msghnd
 ```
 Once built, docker images are usable as usual docker image.
 
@@ -283,60 +283,64 @@ services:
     image: postgres:9
     restart: always
     volumes:
-      - /var/databases/pgdata:/var/lib/pgsql/data
+      - ./pgdata:/var/lib/pgsql/data
     environment:
       POSTGRES_PASSWORD: N3SF0LVKJx1RAhFGx4fcw
       PGDATA: /var/lib/pgsql/data
       POSTGRES_DB: fbrat
 
-  rmq:
+  rat_rmq:
     image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:latest
     restart: always
 
-  server:
+  rat_server:
     build:
       context: .
     ports:
       - "80:80"
       - "443:443"
     volumes:
-      - /var/databases:/usr/share/fbrat/rat_transfer
-      - /var/databases/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
-      - /var/databases/RAS_Database:/var/lib/fbrat/RAS_Database
-      - /var/databases/ULS_Database:/var/lib/fbrat/ULS_Database
-      - /var/databases/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
-      - /var/databases/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
-      - /var/afc_config:/var/lib/fbrat/afc_config
-      - /var/databases/frequency_bands:/var/lib/fbrat/frequency_bands
+      - ./apache-conf:/etc/httpd/conf.d
+      - ./ssl/letsencrypt:/etc/letsencrypt
+      - ./afc_config:/var/lib/fbrat/afc_config
+      - ./frequency_bands:/var/lib/fbrat/frequency_bands
+      - /opt/afc/databases/rat_transfer/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
+      - /opt/afc/databases/rat_transfer/ULS_Database:/usr/share/fbrat/rat_transfer/daily_uls_parse
+      - /opt/afc/databases/rat_transfer/ULS_Database:/var/lib/fbrat/ULS_Database
+      - /opt/afc/databases/rat_transfer:/usr/share/fbrat/rat_transfer
+      - /opt/afc/databases/rat_transfer/RAS_Database:/usr/share/fbrat/rat_transfer/ULS_Database
+      - /opt/afc/databases/rat_transfer/RAS_Database:/var/lib/fbrat/RAS_Database
+      - /opt/afc/databases/rat_transfer/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
+      - /opt/afc/databases/rat_transfer/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
+      - ./pipe:/pipe
     links:
       - ratdb
-      - rmq
+      - rat_rmq
+    environment:
+      # RabbitMQ server name:
       - objst
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
-      - BROKER_FQDN=rmq
-      # Filestorage params:
+      - BROKER_FQDN=rat_rmq
       - FILESTORAGE_HOST=objst
+      # Filestorage params:
       - FILESTORAGE_PORT=5000
       - HISTORY_HOST=objst
       - HISTORY_EXTERNAL_PORT=14999
       # worker params
       - CELERY_TYPE=external
 
-  objst:
-    image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:latest
-    environment:
-      - FILESTORAGE_HOST=0.0.0.0
-      - FILESTORAGE_PORT=5000
-      - HISTORY_HOST=0.0.0.0
-      - HISTORY_PORT=4999
-      - FILESTORAGE_DIR=/storage
-
   worker:
     build:
       context: .
       dockerfile: worker/Dockerfile
+    volumes:
+      - /opt/afc/databases/rat_transfer/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
+      - /opt/afc/databases/rat_transfer/ULS_Database:/var/lib/fbrat/ULS_Database
+      - /opt/afc/databases/rat_transfer/RAS_Database:/var/lib/fbrat/RAS_Database
+      - /opt/afc/databases/rat_transfer/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
+      - /opt/afc/databases/rat_transfer:/usr/share/fbrat/rat_transfer
     environment:
       # Filestorage params:
       - FILESTORAGE_HOST=objst
@@ -346,24 +350,16 @@ services:
       - CELERY_OPTIONS=rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10
       # RabbitMQ server name:
       - BROKER_TYPE=external
-      - BROKER_FQDN=rmq
+      - BROKER_FQDN=rat_rmq
 
-  msghnd:
-    build:
-      context: .
-      dockerfile: msghnd/Dockerfile
+  objst:
+    image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:latest
     environment:
-      # Filestorage params:
-      - FILESTORAGE_HOST=objst
+      - FILESTORAGE_HOST=0.0.0.0
       - FILESTORAGE_PORT=5000
-      - FILESTORAGE_SCHEME="HTTP"
-      # RabbitMQ server name:
-      - BROKER_TYPE=external
-      - BROKER_FQDN=rmq
-    links:
-      - ratdb
-      - rmq
-      - objst
+      - HISTORY_HOST=0.0.0.0
+      - HISTORY_PORT=4999
+      - FILESTORAGE_DIR=/storage
 ```
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
 Just run in this folder following command and it is done:
