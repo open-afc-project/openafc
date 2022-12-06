@@ -15,11 +15,11 @@ import os
 import logging
 
 # LOG_FILE or LOG_STREAM should be None
-LOG_FILE = "/proc/self/fd/2"
+LOG_FILE = os.getenv("OBJST_LOG_FILE", "/proc/self/fd/2")
 LOG_STREAM = None
 
-# use "logging.ERROR" to shut it up
-LOG_LEVEL = logging.DEBUG
+# Relevant are "DEBUG", "INFO" and "ERROR" 
+LOG_LEVEL = os.getenv("OBJST_LOG_LEVEL", "ERROR")
 
 # supported OBJSTORAGE backends are "GoogleCloudBucket" and "LocalFS"
 OBJSTORAGE = os.getenv("OBJSTORAGE", "LocalFS")
