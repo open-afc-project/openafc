@@ -11,7 +11,7 @@ RUN yum -y install epel-release centos-release-scl
 RUN yum -y upgrade
 COPY prereqs /wd/prereqs/
 
-RUN yum -y install subversion rpm-build python2-devel redhat-rpm-config rpmlint cmake3 lcov \
+RUN yum -y install rpm-build python2-devel redhat-rpm-config rpmlint cmake3 lcov \
     ninja-build minizip-devel boost169-devel qt5-qtbase-devel python-nose checkpolicy \
     selinux-policy-devel selinux-policy-targeted yarn which armadillo-devel gdal-devel \
     gtest-devel devtoolset-11-gcc*

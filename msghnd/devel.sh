@@ -14,7 +14,7 @@ if [ "$AFC_DEVEL_ENV" == "devel" ]; then
     yum -y install lcov ninja-build minizip-devel boost169-devel qt5-qtbase-devel python-nose checkpolicy
     curl --silent --location https://dl.yarnpkg.com/rpm/yarn.repo | tee /etc/yum.repos.d/yarn.repo
     rpm --import https://dl.yarnpkg.com/rpm/pubkey.gpg
-    yum -y install cmake3 ninja-build minizip-devel yarn subversion
+    yum -y install cmake3 ninja-build minizip-devel yarn
     yum -y install centos-release-scl
     yum -y install devtoolset-11-toolchain
     rpm -e --nodeps gcc
