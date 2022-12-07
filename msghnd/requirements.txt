@@ -18,4 +18,5 @@ PyYAML==5.4
 python2-secrets==1.0.5
 pytz==2016.10
 requests==2.7.0
+werkzeug==0.16.1
 WsgiDAV==2.4.1

@@ -55,6 +55,7 @@ COPY gunicorn/gunicorn.conf.py /wd/
 COPY gunicorn/gunicorn.logs.conf /wd/
 RUN mkdir -p /run/gunicorn /etc/xdg/fbrat
 COPY prereqs/ratapi.conf /etc/xdg/fbrat/
+RUN echo "AFC_APP_TYPE = 'msghnd'" >> /etc/xdg/fbrat/ratapi.conf
 # optional development environment
 # included if AFC_DEVEL_ENV is devel
 COPY msghnd/devel.sh /wd/

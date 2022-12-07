@@ -19,6 +19,7 @@ import requests
 from ..models.base import db
 from .. import config
 from ..models.aaa import User
+from flask_login import current_user
 
 OIDC_LOGIN = config.OIDC_LOGIN
 try:
@@ -31,12 +32,9 @@ OIDC_LOGIN=(os.getenv('OIDC_LOGIN', str(OIDC_LOGIN)).lower() == "true")
 
 if OIDC_LOGIN:
     from flask_login import (
-        current_user,
         login_user,
         logout_user,
     )
-else:
-    from flask_user import current_user
 
 LOGGER = logging.getLogger(__name__)
 

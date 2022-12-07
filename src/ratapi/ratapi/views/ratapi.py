@@ -20,7 +20,6 @@ import json
 import glob
 import re
 import datetime
-import urlparse
 from flask.views import MethodView
 import werkzeug.exceptions
 from ..defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
@@ -30,6 +29,11 @@ from ..models.aaa import User, AccessPoint
 from .auth import auth
 from ..models import aaa
 from .. import data_if
+
+try:
+    from urlparse import urlparse
+except ImportError:
+    from urllib.parse import urlparse
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -80,8 +84,9 @@ class GuiConfig(MethodView):
         dataif = data_if.DataIf(
             fsroot=flask.current_app.config["STATE_ROOT_PATH"],
             probeHttps=False)
+
         histurl = None
-        u = urlparse.urlparse(flask.request.url)
+        u = urlparse(flask.request.url)
         if dataif.isFsBackend():
             histurl = u.scheme + "://" + u.netloc + flask.url_for('files.history')
         else:

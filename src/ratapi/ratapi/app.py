@@ -14,9 +14,10 @@ import os
 import datetime
 import logging
 import flask
+import requests
+from xdg import BaseDirectory
 from . import config
 from . import data_if
-import requests
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -35,17 +36,16 @@ def create_app(config_override=None):
     '''
     from flask_migrate import Migrate
 
-    import xdg.BaseDirectory
     # Child members
     from . import models, views, util
 
-    flaskapp = flask.Flask(__name__)
+    flaskapp = flask.Flask(__name__.split('.')[0])
     flaskapp.response_class = util.Response
 
     # default config state from module
     flaskapp.config.from_object(config)
     # initial override from system config
-    config_path = xdg.BaseDirectory.load_first_config('fbrat', 'ratapi.conf')
+    config_path = BaseDirectory.load_first_config('fbrat', 'ratapi.conf')
     if config_path:
         flaskapp.config.from_pyfile(config_path)
     # final overrides for this instance
@@ -156,17 +156,18 @@ def create_app(config_override=None):
 
     # Static file dispatchers
     if True:
-        from werkzeug.wsgi import DispatcherMiddleware
+        from werkzeug.middleware.dispatcher import DispatcherMiddleware
         from wsgidav import wsgidav_app
         from wsgidav.fs_dav_provider import FilesystemProvider
 
         # get static web file location
-        webdata_paths = xdg.BaseDirectory.load_data_paths('fbrat', 'www')
-        # Temporary solution, do not raise exception while web module
-        # not installed.
-        #if not webdata_paths:
-            #raise RuntimeError(
-            #    'Web data directory "fbrat/www" is not available')
+        if flaskapp.config['AFC_APP_TYPE'] == 'server':
+            webdata_paths = BaseDirectory.load_data_paths('fbrat', 'www')
+            # Temporary solution, do not raise exception while web module
+            # not installed.
+            if not webdata_paths:
+                raise RuntimeError(
+                    'Web data directory "fbrat/www" is not available')
 
         # get uls database directory
         uls_databases = os.path.join(
@@ -176,7 +177,7 @@ def create_app(config_override=None):
 
         # get static uls data path
         flaskapp.config['DEFAULT_ULS_DIR'] = next(
-            xdg.BaseDirectory.load_data_paths('fbrat', 'afc-engine',
+            BaseDirectory.load_data_paths('fbrat', 'afc-engine',
                                               'ULS_Database'), None)
         if flaskapp.config['DEFAULT_ULS_DIR'] is None:
             LOGGER.error("No default ULS directory found in path search")
@@ -190,12 +191,11 @@ def create_app(config_override=None):
         # List of (URL paths from root URL, absolute local filesystem paths,
         # read-only boolean)
         dav_trees = ()
-        try:
+        if flaskapp.config['AFC_APP_TYPE'] == 'server':
             dav_trees = dav_trees + (('/www', next(webdata_paths), True),)
-        except StopIteration:
-            pass
 
-        dav_trees = dav_trees + (('/ratapi/v1/files/uls_db', uls_databases, False),
+        dav_trees = dav_trees + (('/ratapi/v1/files/uls_db', uls_databases,
+                                  False),
                                  ('/ratapi/v1/files/antenna_pattern',
                                   antenna_patterns, False),)
 
@@ -373,9 +373,10 @@ rat-manage-api db-upgrade
     # Actual resources
     flaskapp.add_url_rule(
         '/', 'root', view_func=redirector('www.index', code=302))
-    views.paws.create_handler(flaskapp, '/paws')
-    flaskapp.add_url_rule('/paws', 'paws.browse',
-                          view_func=redirector('browse.index', code=302))
+    if flaskapp.config['AFC_APP_TYPE'] == 'server':
+        views.paws.create_handler(flaskapp, '/paws')
+        flaskapp.add_url_rule('/paws', 'paws.browse',
+                              view_func=redirector('browse.index', code=302))
     flaskapp.register_blueprint(views.ratapi.module, url_prefix='/ratapi/v1')
     flaskapp.register_blueprint(views.ratafc.module, url_prefix='/ap-afc')
     flaskapp.register_blueprint(views.auth.module, url_prefix='/auth')

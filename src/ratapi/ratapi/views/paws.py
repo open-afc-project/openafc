@@ -12,12 +12,11 @@ from random import gauss, random
 import threading
 from flask_jsonrpc import JSONRPC
 from flask_jsonrpc.exceptions import (
-    InvalidParamsError, InvalidCredentialsError, ServerError)
+    InvalidParamsError, ServerError)
 import flask
 from ..util import TemporaryDirectory, getQueueDirectory
 from ..xml_utils import (datetime_to_xml)
 from ..models.aaa import AccessPoint, User
-from ..tasks.afc_worker import run
 import gzip
 from .ratapi import build_task
 
@@ -83,14 +82,14 @@ def _auth_paws(serial_number, model, manufacturer, rulesets):
     ap = AccessPoint.query.filter_by(serial_number=str(serial_number)).first()
 
     if rulesets is None or len(rulesets) != 1 or rulesets[0] != RULESET:
-        raise InvalidCredentialsError(
+        raise InvalidParamsError(
             'Invalid rulesetIds: ["{}"] expected'.format(RULESET))
     if ap is None:
-        raise InvalidCredentialsError('Invalid serial number')
+        raise InvalidParamsError('Invalid serial number')
     if ap.model is not None and ap.model != model:
-        raise InvalidCredentialsError()
+        raise InvalidParamsError()
     if ap.manufacturer is not None and ap.manufacturer != manufacturer:
-        raise InvalidCredentialsError()
+        raise InvalidParamsError()
 
     return ap.user_id
 
@@ -248,7 +247,7 @@ def create_handler(app, path):
     :return: The :py:cls:`JSONRPC` object created.
     '''
     rpc = JSONRPC(service_url=path, enable_web_browsable_api=True)
-    rpc.method('spectrum.paws.getSpectrum(deviceDesc=object, location=object, antenna=object, capabilities=object, type=str, version=str) -> object')(getSpectrum)
+    rpc.method('spectrum.paws.getSpectrum(deviceDesc=object, location=object, antenna=object, capabilities=object, type=str, version=str) -> object', validate=False)(getSpectrum)
     rpc.init_app(app)
 
     return rpc

@@ -77,14 +77,14 @@ class Task():
     def wait(self, delay=2, timeout=AFC_ENG_TIMEOUT):
         LOGGER.debug("task.wait()")
         stat = None
-        time0 = time.clock()
+        time0 = time.time()
         while True:
             stat = self.get()
             LOGGER.debug("task.wait() status {}".format(stat['status']))
             if (stat['status'] == Task.STAT_SUCCESS or
                     stat['status'] == Task.STAT_FAILURE):
                 return stat
-            if (time.clock() - time0) > timeout:
+            if (time.time() - time0) > timeout:
                 LOGGER.debug("task.wait() timeout")
                 return self.__toDict(Task.STAT_PROGRESS)
             time.sleep(delay)

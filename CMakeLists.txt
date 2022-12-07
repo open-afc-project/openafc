@@ -1,5 +1,6 @@
 cmake_policy(SET CMP0020 NEW)
 cmake_policy(SET CMP0048 NEW)
+cmake_policy(SET CMP0057 NEW)
 if(NOT ${CMAKE_VERSION} VERSION_LESS 3.10)
     cmake_policy(SET CMP0071 OLD)
 endif()
@@ -40,7 +41,13 @@ message(STATUS "OPENAFC_BUILD_TYPE: ${OPENAFC_BUILD_TYPE}")
 # External version naming
 file(READ "${CMAKE_SOURCE_DIR}/version.txt" VERSIONFILE)
 string(STRIP ${VERSIONFILE} VERSIONFILE)
-project(fbrat VERSION ${VERSIONFILE})
+
+if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
+    "EngineRelease" IN_LIST OPENAFC_BUILD_TYPE)
+    project(fbrat VERSION ${VERSIONFILE})
+else()
+    project(fbrat VERSION ${VERSIONFILE} LANGUAGES)
+endif()
 
 cmake_minimum_required(VERSION 3.4)
 set(CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
@@ -49,15 +56,17 @@ option(BUILD_AFCENGINE "Build the AFC engine portion of the project" ON)
 # Shared library ABI versioning
 set(SOVERSION "${PROJECT_VERSION}")
 
-# Compiler and linker config
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-#set(CMAKE_CXX_EXTENSIONS ON) # No GNU/MSVC extensions
-if(UNIX)
+if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
+    "EngineRelease" IN_LIST OPENAFC_BUILD_TYPE)
+  # Compiler and linker config
+  set(CMAKE_CXX_STANDARD 11)
+  set(CMAKE_CXX_STANDARD_REQUIRED ON)
+  #set(CMAKE_CXX_EXTENSIONS ON) # No GNU/MSVC extensions
+  if(UNIX)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
     #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
-endif(UNIX)
-if(WIN32)
+  endif(UNIX)
+  if(WIN32)
     # Fix use of min()/max() in MSVC
     add_definitions("-D_USE_MATH_DEFINES -DNOMINMAX")
     # Attempt use of cmake auto-export
@@ -75,10 +84,10 @@ if(WIN32)
     
     add_definitions("-DARMA_USE_CXX11") # Workaround MSVC lack of __cplusplus
     add_definitions("-DCPL_DISABLE_DLL") # Workaround issue with "dllexport" in "cpl_port.h"
-endif(WIN32)
+  endif(WIN32)
 
-# debug build flags
-if (DEBUG_AFC)
+  # debug build flags
+  if (DEBUG_AFC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DDEBUG_AFC=1")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=format-extra-args")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=format")
@@ -87,10 +96,11 @@ if (DEBUG_AFC)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror=return-type")
     # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
     message(STATUS "Using DEBUG_AFC build mode")
-endif()
+  endif()
 
-message("CMAKE_C_FLAGS ${CMAKE_C_FLAGS}")
-message("CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS}")
+  message("CMAKE_C_FLAGS ${CMAKE_C_FLAGS}")
+  message("CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS}")
+endif()
 
 # Coverage analysis
 include(CheckCoverage)
