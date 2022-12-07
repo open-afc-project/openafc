@@ -26,18 +26,18 @@ class Task():
     STAT_FAILURE = "FAILURE"
 
     def __init__(self, task_id, dataif, fsroot, hash=None,
-                 user_id=None, history_dir=None):
+                 region=None, history_dir=None):
         LOGGER.debug("task.__init__(task_id={})".format(task_id))
         self.__dataif = dataif
         self.__task_id = task_id
         self.__stat = {
             'status': self.STAT_PENDING,
-            'user_id': user_id,
+            'region': region,
             'history_dir': history_dir,
             'hash': hash,
             'runtime_opts': None,
             'exit_code': 0,
-            'state_root': fsroot
+            'state_root': fsroot,
             }
 
     def get(self):
@@ -55,7 +55,7 @@ class Task():
 
         LOGGER.debug("task.get() {}".format(stat))
         if ('status' not in stat or
-                'user_id' not in stat or
+                'region' not in stat or
                 'history_dir' not in stat or
                 'hash' not in stat or
                 'runtime_opts' not in stat or

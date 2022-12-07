@@ -312,8 +312,8 @@ class RatAfc(MethodView):
         if ap.certification_id != certification_id:
             raise DeviceUnallowedException()  # InvalidCredentialsException()
 
-        LOGGER.info('Found AP, certifiying User with Id: %i', ap.user_id)
-        return ap.user_id
+        LOGGER.info('Found AP, certification id %s serial %s', certification_id, serial_number)
+        return ap.org
 
     def get(self):
         ''' GET method for Analysis Status '''
@@ -380,12 +380,12 @@ class RatAfc(MethodView):
                         ' ' + device_desc['certificationId'][0]['id']
                 except:
                     firstCertId = None
+                serial = device_desc.get('serialNumber')
+                org = self._auth_ap(serial,
+                                    firstCertId,
+                                    device_desc.get('rulesetIds'))
 
-                user_id = self._auth_ap(device_desc.get(
-                    'serialNumber'), firstCertId, device_desc.get('rulesetIds'))
-
-                user = User.query.filter_by(id=user_id).first()
-
+                region = (device_desc['certificationId'][0]['nra']).strip().lower()
                 runtime_opts = RNTM_OPT_NODBG_NOGUI
                 debug_opt = flask.request.args.get('debug')
                 if debug_opt == 'True':
@@ -408,7 +408,7 @@ class RatAfc(MethodView):
                 # calculate hash
                 request_json_bytes = json.dumps(request).encode('utf-8')
                 config_bytes = None
-                with dataif.open("cfg", str(user_id) + "/afc_config.json") as hfile:
+                with dataif.open("cfg", region + "/afc_config.json") as hfile:
                     config_bytes = hfile.read()
                 hashlibobj = hashlib.md5()
                 hashlibobj.update(config_bytes)
@@ -444,7 +444,7 @@ class RatAfc(MethodView):
                     hfile.write(request_json_bytes)
                 history_dir = None
                 if runtime_opts & RNTM_OPT_DBG:
-                    history_dir = user.email + "/" + \
+                    history_dir = org + "/" + str(serial) + "/" + \
                         str(datetime.datetime.now().isoformat())
                     with dataif.open("dbg", history_dir + "/analysisRequest.json") as hfile:
                         hfile.write(request_json_bytes)
@@ -453,14 +453,14 @@ class RatAfc(MethodView):
 
                 build_task(dataif,
                         request_type,
-                        task_id, hash, user_id, history_dir,
+                        task_id, hash, region, history_dir,
                         runtime_opts)
 
                 conn_type = flask.request.args.get('conn_type')
                 LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
                 t = task.Task(task_id, dataif,
                               flask.current_app.config['STATE_ROOT_PATH'],
-                              hash, user_id, history_dir)
+                              hash, region, history_dir)
                 if conn_type == 'async':
                     task_stat = t.get()
                     return flask.jsonify(taskId = task_id,

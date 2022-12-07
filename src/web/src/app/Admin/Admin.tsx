@@ -12,7 +12,7 @@ import { Timer } from "../Components/Timer";
 import { OutlinedQuestionCircleIcon , TimesCircleIcon} from "@patternfly/react-icons";
 import {Table, TableHeader, TableBody, TableVariant } from "@patternfly/react-table";
 import { FrequencyRangeInput } from "./FrequencyRangeInput";
-import { hasRole} from "../Lib/User";
+import { UserContext, hasRole} from "../Lib/User";
 
 /**
  * Admin.tsx: Administration page for managing users
@@ -45,7 +45,6 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
   removeRoleModalOpen: boolean,
   removeRole?: Role,
   deleteModalOpen: boolean,
-  apModalOpen: boolean,
   userModalOpen: boolean,
   limit: Limit,
   ulsLastSuccessRuntime: string,
@@ -76,7 +75,6 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
       addRoleModalOpen: false,
       removeRoleModalOpen: false,
       deleteModalOpen: false,
-      apModalOpen: false,
       userModalOpen: false,
       limit: apiLimit,
       parseInProgress: false,
@@ -185,7 +183,6 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
   private handleAddRoleModalToggle = (id?: number) => this.setState(s => ({ userId: id, addRoleModalOpen: !s.addRoleModalOpen }));
   private handleRemoveRoleModalToggle = (id?: number) => this.setState(s => ({ userId: id, removeRoleModalOpen: !s.removeRoleModalOpen }));
   private handleDeleteModalToggle = (id?: number) => this.setState(s => ({ userId: id, deleteModalOpen: !s.deleteModalOpen }));
-  private handleAPModalToggle = (id?: number) => this.setState(s => ({ userId: id, apModalOpen: !s.apModalOpen }));
   private handleUserModalToggle = (id?: number) => this.setState(s => ({ userId: id, userModalOpen: !s.userModalOpen }));
   private handleMinEIRP = (minEIRP: number) => this.setState({ limit: {...this.state.limit, limit: minEIRP} });
   private submitMinEIRP = (limit: number | boolean) => {
@@ -330,7 +327,6 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
               onDelete={this.handleDeleteModalToggle} 
               onRoleAdd={this.handleAddRoleModalToggle} 
               onRoleRemove={this.handleRemoveRoleModalToggle} 
-              onAPEdit={this.handleAPModalToggle}
               onUserEdit={this.handleUserModalToggle}
               />
           </CardBody>
@@ -407,13 +403,6 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
             Are you sure you want to delete {this.state.deleteModalOpen && this.state.users.find(x => x.id === this.state.userId)?.email}?
             </Modal>
             <Modal
-            title="Edit Access Points"
-            isOpen={this.state.apModalOpen}
-            onClose={this.handleAPModalToggle}
-          >
-              <APList userId={this.state.userId!} />
-            </Modal>
-            <Modal
             title="Edit User"
             isOpen={this.state.userModalOpen}
             onClose={this.handleUserModalToggle}
@@ -422,7 +411,9 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>;},
             </Modal>
         </Card>
         <br/>
-          {this.state.users.length && <APList userId={0} users={this.state.users} />}{/* userId=0 means don't scope to user */}
+        <UserContext.Consumer>{(u: UserState) =>
+            <APList filterId={0}  userId={u.data.userId} />}
+        </UserContext.Consumer>
         <br/>
       </PageSection>
     )

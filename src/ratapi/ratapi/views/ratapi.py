@@ -39,7 +39,7 @@ module = flask.Blueprint('ratapi-v1', 'ratapi')
 
 def build_task(dataif,
         request_type,
-        task_id, hash, user_id, history_dir,
+        task_id, hash, region, history_dir,
         runtime_opts=RNTM_OPT_DBG_GUI):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
@@ -56,7 +56,7 @@ def build_task(dataif,
         flask.current_app.config["DEBUG"],
         task_id,
         hash,
-        user_id,
+        region,
         history_dir,
         runtime_opts
     ])
@@ -100,7 +100,7 @@ class GuiConfig(MethodView):
             antenna_url=flask.url_for('files.antenna_pattern'),
             history_url=histurl,
             afcconfig_defaults=flask.url_for(
-                'ratapi-v1.AfcConfigFile', filename='afc_config.json'),
+                'ratapi-v1.AfcConfigFile', filename='default'),
             lidar_bounds=flask.url_for('ratapi-v1.LiDAR_Bounds'),
             ras_bounds=flask.url_for('ratapi-v1.RAS_Bounds'),
             google_apikey=flask.current_app.config['GOOGLE_APIKEY'],
@@ -245,16 +245,25 @@ class AfcConfigFile(MethodView):
     '''
 
     ACCEPTABLE_FILES = {
-        'afc_config.json': dict(
+        'default': dict(
+            alt='fcc',
             content_type='application/json',
-        )
+        ),
+        'fcc': dict(
+            alt='fcc',
+            content_type='application/json',
+        ),
+        'CONUS': dict(
+            alt='fcc',
+            content_type='application/json',
+        ),
     }
 
     def get(self, filename):
         ''' GET method for afc config
         '''
         LOGGER.debug('AfcConfigFile.get({})'.format(filename))
-        user_id = auth(roles=['AP', 'Analysis'])
+        auth(roles=['AP', 'Analysis', 'Super'])
         # ensure that webdav is populated with default files
         require_default_uls()
 
@@ -266,7 +275,7 @@ class AfcConfigFile(MethodView):
         dataif = data_if.DataIf(
             fsroot=flask.current_app.config['STATE_ROOT_PATH'])
         try:
-            with dataif.open("cfg", str(user_id) + "/afc_config.json") as hfile:
+            with dataif.open("cfg", filedesc['alt'] +"/afc_config.json") as hfile:
                 resp.data = hfile.read()
         except:
             raise werkzeug.exceptions.NotFound()
@@ -277,7 +286,7 @@ class AfcConfigFile(MethodView):
         ''' PUT method for afc config
         '''
         LOGGER.debug('AfcConfigFile.put({})'.format(filename))
-        user_id = auth(roles=['AP', 'Analysis'])
+        user_id = auth(roles=['Super'])
         LOGGER.debug("current user: %s", user_id)
         if filename not in self.ACCEPTABLE_FILES:
             raise werkzeug.exceptions.NotFound()
@@ -287,7 +296,7 @@ class AfcConfigFile(MethodView):
 
         dataif = data_if.DataIf(
             fsroot=flask.current_app.config['STATE_ROOT_PATH'])
-        with dataif.open("cfg", str(user_id) + "/afc_config.json") as hfile:
+        with dataif.open("cfg", filedesc['alt'] + "/afc_config.json") as hfile:
             hfile.write(flask.request.stream.read())
         return flask.make_response('AFC configuration file updated', 204)
 
@@ -348,8 +357,7 @@ class TrialAfcConfigFile(MethodView):
         ap = aaa.AccessPoint.query.filter_by(
             serial_number="TestSerialNumber", certification_id="FCC TestCertificationId").first()
         if ap is not None:
-            LOGGER.debug('getting ap for trial user  %s ', ap)
-            user_id = ap.user_id
+            LOGGER.debug('getting ap for trial user  %s ', user_id)
        
             resp = flask.make_response()
             with self._open('afc_config.json', 'rb', user_id) as conf_file:

@@ -68,7 +68,6 @@ class User(db.Model, UserMixin):
 
     # Relationships
     roles = db.relationship('Role', secondary='aaa_user_role')
-    access_points = db.relationship('AccessPoint')
 
     @staticmethod
     def get(user_id):
@@ -127,20 +126,16 @@ class AccessPoint(db.Model):
     model = db.Column(db.String(64))
     manufacturer = db.Column(db.String(64))
     certification_id = db.Column(db.String(64))
+    org = db.Column(db.String(64), nullable=True)
 
-    # owner user
-    user_id = db.Column(db.Integer(), db.ForeignKey(
-        'aaa_user.id', ondelete='CASCADE'))
-
-    def __init__(self, serial_number, model, manufacturer, certification_id, user_id=None):
+    def __init__(self, serial_number, model, manufacturer, certification_id, org=None):
         if not serial_number:
             raise RuntimeError("Serial number cannot be empty")
         self.serial_number = serial_number
         self.model = model
         self.manufacturer = manufacturer
         self.certification_id = certification_id
-        if user_id:
-            self.user_id = user_id
+        self.org = org
 
 class MTLS(db.Model):
     ''' entry to designate allowed MTLS's for the PAWS interface '''

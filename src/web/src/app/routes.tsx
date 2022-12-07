@@ -81,13 +81,15 @@ const VirtualAP = () => {
 const getAfcConfigModuleAsync = () => {
   return () => import(/* webpackChunkName: "afcconfig" */ "./AFCConfig/AFCConfig");
 }
-const afcConfigResolves = async () => ({
+const afcConfigResolves = async () => {
+  return {
   conf: await getAfcConfigFile(),
   ulsFiles: await getUlsFiles(),
   antennaPatterns: await getAntennaPatterns(),
   limit: await getMinimumEIRP(),
   frequencyBands: await getAllowedRanges()
-})
+  }
+}
 const AFCConfig = () => {
   return (
     <DynamicImport load={getAfcConfigModuleAsync()} resolve={afcConfigResolves()}>

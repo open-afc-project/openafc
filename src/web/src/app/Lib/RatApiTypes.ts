@@ -497,7 +497,7 @@ export interface AccessPointModel {
     model?: string,
     manufacturer?: string,
     certificationId?: string,
-    ownerId: number
+    org?: string,
 }
 
 /**

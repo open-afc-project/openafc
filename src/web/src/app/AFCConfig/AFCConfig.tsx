@@ -41,11 +41,10 @@ class AFCConfig extends React.Component<{
     frequencyBands: RatResponse<FreqRange[]>
 }, AFCState> {
 
-    constructor(props: Readonly<{ limit: RatResponse<Limit>; frequencyBands: RatResponse<FreqRange[]>; ulsFiles: RatResponse<string[]>; afcConf: RatResponse<AFCConfigFile>; antennaPatterns: RatResponse<string[]>; }>) {
+    constructor(props: Readonly<{ limit: RatResponse<Limit>; frequencyBands: RatResponse<FreqRange[]>; ulsFiles: RatResponse<string[]>; afcConf: RatResponse<AFCConfigFile>; antennaPatterns: RatResponse<string[]>; regionStr:string}>) {
         super(props);
         //@ts-ignore
         const state: AFCState = { config: getDefaultAfcConf() ,isModalOpen: false, messageValue: "", messageTitle: "" };
-
         if (props.afcConf.kind === "Success") {
             if (props.afcConf.result.version === guiConfig.version) {
                 Object.assign(state, { config: props.afcConf.result });
@@ -97,7 +96,6 @@ class AFCConfig extends React.Component<{
         });
 
     render() {
-
         return (
             <PageSection>
                 <Title size={"lg"}>AFC Configuration</Title>

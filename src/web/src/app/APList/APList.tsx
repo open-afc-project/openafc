@@ -18,7 +18,8 @@ import { UserModel } from "../Lib/RatApiTypes";
  */
 export interface APListProps {
     userId: number,
-    users?: UserModel[]
+    filterId: number,
+    org: string,
 }
 
 interface APListState {
@@ -37,7 +38,7 @@ export class APList extends React.Component<APListProps, APListState> {
             accessPoints: []
         }
 
-        getAccessPoints(props.userId)
+        getAccessPoints(props.filterId)
         .then(res => {
             if (res.kind === "Success") {
                 this.setState({ accessPoints: res.result });
@@ -48,7 +49,7 @@ export class APList extends React.Component<APListProps, APListState> {
     }
 
     private async onAdd(ap: AccessPointModel) {
-        const res = await addAccessPoint(ap, ap.ownerId || this.props.userId);
+        const res = await addAccessPoint(ap, this.props.userId);
         if (res.kind === "Success") {
             const newAPs = await getAccessPoints(this.props.userId);
             if (newAPs.kind === "Success") {
@@ -78,9 +79,11 @@ export class APList extends React.Component<APListProps, APListState> {
             <Card>
                 <CardHead><CardHeader>Access Points</CardHeader></CardHead>
                 <CardBody>
-                    <NewAP onAdd={(ap: AccessPointModel) => this.onAdd(ap)} ownerId={this.props.userId} users={this.props.users} />
+                    {hasRole("Admin") &&
+                    (<NewAP onAdd={(ap: AccessPointModel) => this.onAdd(ap)} userId={this.props.userId} org={this.props.org}/>)
+                    }
                     <br/>
-                    <APTable accessPoints={this.state.accessPoints} onDelete={(id: number) => this.deleteAP(id)} users={this.props.users} />
+                    <APTable accessPoints={this.state.accessPoints} onDelete={(id: number) => this.deleteAP(id)} filterId={this.props.filterId} />
                 </CardBody>
             </Card>
         )
@@ -93,7 +96,7 @@ export class APList extends React.Component<APListProps, APListState> {
 export const APListPage: React.FunctionComponent = () => (
     <PageSection id="ap-list-page">
         <UserContext.Consumer>{(u: UserState) => u.data.loggedIn &&
-            <APList userId={u.data.userId} />}
+            <APList userId={u.data.userId} filterId={0} org={u.data.org}/>}
         </UserContext.Consumer>
     </PageSection>
 );
