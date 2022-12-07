@@ -30,11 +30,6 @@ from .auth import auth
 from ..models import aaa
 from .. import data_if
 
-try:
-    from urlparse import urlparse
-except ImportError:
-    from urllib.parse import urlparse
-
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
 
@@ -85,8 +80,13 @@ class GuiConfig(MethodView):
             fsroot=flask.current_app.config["STATE_ROOT_PATH"],
             probeHttps=False)
 
-        histurl = None
+        if flask.current_app.config['AFC_APP_TYPE'] == 'server':
+            from urlparse import urlparse
+        else:
+            from urllib.parse import urlparse
+
         u = urlparse(flask.request.url)
+        histurl = None
         if dataif.isFsBackend():
             histurl = u.scheme + "://" + u.netloc + flask.url_for('files.history')
         else:

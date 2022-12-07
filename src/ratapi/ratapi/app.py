@@ -15,7 +15,6 @@ import datetime
 import logging
 import flask
 import requests
-from xdg import BaseDirectory
 from . import config
 from . import data_if
 
@@ -35,6 +34,7 @@ def create_app(config_override=None):
     :rtype: :py:cls:`flask.Flask`
     '''
     from flask_migrate import Migrate
+    from xdg import BaseDirectory
 
     # Child members
     from . import models, views, util
