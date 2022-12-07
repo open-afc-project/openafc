@@ -31,7 +31,7 @@ RUN strip --strip-unneeded /root/afc/__install/bin/afc-engine
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 
 COPY --from=build_image /root/afc/__install /usr/
-COPY --from=build_image /root/gdal/__install /usr/
+COPY --from=build_image /root/gdal/__install/lib /usr/lib/
 
 RUN mkdir -m 750 -p /var/lib/fbrat/AntennaPatterns
 RUN mkdir -m 755 -p /var/spool/fbrat

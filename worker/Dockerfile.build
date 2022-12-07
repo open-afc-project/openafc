@@ -23,7 +23,7 @@ RUN pip3 install celery==5.2.7
 # --with-ogr - OGR is used by afc-engine.
 # --with-armadillo - perhaps also used by afc-engine. Anyways, libarmadillo is required by cmake.
 # --disable-* - unused by afc-engine.
-# rm -rf /root/gdal/__install/bin - I don't know how to disable creating unused executables.
+# rm -rf /root/gdal/__install/bin /root/gdal/__install/share - I don't know how to disable installing unused executables.
 
 RUN mkdir -p /root/gdal
 COPY worker/gdal-1.11.4.tar.xz /root/gdal/

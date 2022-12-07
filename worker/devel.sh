@@ -10,7 +10,6 @@ if [ "$AFC_DEVEL_ENV" == "devel" ]; then
 	apk add build-base cmake samurai \
 	boost-dev python3-dev qt5-qtbase-dev armadillo-dev minizip-dev
 else
-	# Size optimization
 	apk del apk-tools libc-utils
 #	rm -rf /usr/include /sbin/apk /etc/apk /usr/share/apk
 fi
