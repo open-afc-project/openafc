@@ -10,9 +10,9 @@ RUN addgroup -g 1003 fbrat
 RUN adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat
 
 RUN apk add py3-six py3-pip py3-numpy py3-cryptography py3-sqlalchemy py3-requests py3-flask \
-qt5-qtbase armadillo boost minizip libxml2 giflib libjpeg geos libgeotiff libpng qt5-qtbase-sqlite
+qt5-qtbase armadillo boost minizip libgeotiff qt5-qtbase-sqlite
 
-RUN pip3 install celery pyxdg
+RUN pip3 install celery==5.2.7
 
 RUN apk del py3-pip
 
