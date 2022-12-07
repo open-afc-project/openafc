@@ -4,63 +4,51 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-# default value of args
-ARG BLD_TAG=3.5.1.1
-ARG PRINST_TAG=3.5.1.1
-ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-build-image
-ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-msghnd-preinstall
-
-# Stage Build
-FROM ${BLD_NAME}:${BLD_TAG} as build_image
+# Install required packages
+#
+FROM alpine:3.17 as preinstall_image
+ENV PYTHONUNBUFFERED=1
+RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
+apk add --update --no-cache py3-six py3-numpy py3-cryptography py3-sqlalchemy py3-requests py3-flask py3-psycopg2 && \
+python3 -m ensurepip && \
+pip3 install --no-cache --upgrade pip setuptools && \
+apk add --update --no-cache cmake ninja
+COPY msghnd/requirements.txt /wd/
+RUN pip install -r /wd/requirements.txt && mkdir -p /run/gunicorn /etc/xdg/fbrat
+COPY gunicorn/wsgi.py gunicorn/gunicorn.conf.py gunicorn/gunicorn.logs.conf /wd/
+COPY prereqs/ratapi.conf /etc/xdg/fbrat/
+RUN echo "AFC_APP_TYPE = 'msghnd'" >> /etc/xdg/fbrat/ratapi.conf
+#
+# Build Message Handler application
+#
+FROM alpine:3.17 as build_image
+COPY --from=preinstall_image / /
 COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /wd/
-
 COPY cmake /wd/cmake/
 COPY pkg /wd/pkg/
-COPY selinux /wd/selinux/
 COPY src /wd/src/
-
-RUN mkdir -p -m 777 /wd/build/__install
+RUN mkdir -p -m 777 /wd/build
 RUN cd /wd/build && \
-source /opt/rh/$(scl -l)/enable && \
-cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiRelease -G Ninja /wd && \
-ninja-build -j$(nproc) install
-
-# Stage Install
-FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
-COPY --from=build_image /wd/build/__install /usr
-
-RUN mkdir -m 750 -p /var/lib/fbrat/AntennaPatterns
-RUN mkdir -m 755 -p /var/spool/fbrat
-RUN mkdir -m 755 -p /var/lib/fbrat
-RUN mkdir -m 755 -p /var/celery
-RUN mkdir -m 755 /var/run/celery
-RUN mkdir -m 755 /var/log/celery
-
-RUN chown fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/celery
-
-COPY msghnd/docker-entrypoint.sh /
-RUN chmod +x /docker-entrypoint.sh
-
-FROM centos:7
-COPY --from=install_image / /
-
+cmake -DCMAKE_INSTALL_PREFIX=/wd/__install -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiRelease -G Ninja /wd && \
+ninja -j$(nproc) install
+#
+# Install Message Handler application
+#
+FROM alpine:3.17 as install_image
+COPY --from=preinstall_image / /
+COPY --from=build_image /wd/__install /usr/
+#
+RUN mkdir -m 750 -p /var/lib/fbrat/AntennaPatterns && \
+mkdir -m 755 -p /var/spool/fbrat /var/lib/fbrat /var/celery /var/run/celery /var/log/celery
+# Add user and group
+RUN addgroup -g 1003 fbrat && \
+adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat && \
+chown fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/celery
+#
 LABEL revision="afc-msghnd"
 WORKDIR /wd
 EXPOSE 8000
 ENV PGPORT=5432
-COPY msghnd/requirements.txt /wd/
-RUN pip install -r /wd/requirements.txt
-COPY gunicorn/wsgi.py /wd/
-COPY gunicorn/gunicorn.conf.py /wd/
-COPY gunicorn/gunicorn.logs.conf /wd/
-RUN mkdir -p /run/gunicorn /etc/xdg/fbrat
-COPY prereqs/ratapi.conf /etc/xdg/fbrat/
-RUN echo "AFC_APP_TYPE = 'msghnd'" >> /etc/xdg/fbrat/ratapi.conf
-# optional development environment
-# included if AFC_DEVEL_ENV is devel
-COPY msghnd/devel.sh /wd/
-COPY prereqs/.bashrc /root/
-ARG AFC_DEVEL_ENV=production
-ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
-RUN /wd/devel.sh
-CMD ["/docker-entrypoint.sh"]
+COPY msghnd/entrypoint.sh /
+RUN chmod +x /entrypoint.sh
+CMD ["/entrypoint.sh"]
