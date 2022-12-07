@@ -3,13 +3,13 @@
 AFC_DEVEL_ENV=${AFC_DEVEL_ENV:=production}
 case "$AFC_DEVEL_ENV" in
   "devel")
-    echo "Debug proile"
+    echo "Debug profile"
     ;;
   "production")
-    echo "Production proile"
+    echo "Production profile"
     ;;
   *)
-    echo "Uknown proile"
+    echo "Uknown profile"
     ;;
 esac
 #
