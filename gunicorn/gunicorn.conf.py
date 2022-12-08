@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 bind = '0.0.0.0:8000'
-workers = 10
+workers = 20
 deamon = True
 pidfile = '/run/gunicorn/openafc_app.pid'
 timeout = 120
