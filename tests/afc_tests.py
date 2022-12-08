@@ -54,7 +54,7 @@ from _afc_errors import *
 from _version import __version__
 from _wfa_tests import *
 
-AFC_URL_SUFFIX = '/fbrat/ap-afc/1.1/'
+AFC_URL_SUFFIX = '/fbrat/ap-afc/1.3/'
 AFC_REQ_NAME = 'availableSpectrumInquiry'
 headers = {'content-type': 'application/json'}
 

@@ -58,6 +58,7 @@ RUN mkdir -p /var/lib/fbrat/daily_uls_parse
 RUN chown fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/lib/fbrat/daily_uls_parse
 RUN chown -R fbrat:fbrat /var/celery
 RUN echo "DEFAULT_ULS_DIR = '/var/lib/fbrat/ULS_Database'" >> /etc/xdg/fbrat/ratapi.conf
+RUN echo "AFC_APP_TYPE = 'server'" >> /etc/xdg/fbrat/ratapi.conf
 
 RUN yum -y autoremove rpmconf createrepo puppet7-release puppet-agent && yum -y autoremove
 RUN yum -y clean all && rm -rf /wd/* /repos /etc/yum.repos.d/fbrat-repo.repo && yum -y clean all && rm -rf /var/cache/yum
@@ -81,6 +82,7 @@ ARG HTTPD_OPTIONS
 ENV HTTPD_OPTIONS=$HTTPD_OPTIONS
 ARG AFC_PROD_ENV
 ENV AFC_PROD_ENV ${AFC_PROD_ENV}
+RUN pip install werkzeug==0.16.1
 RUN pip install futures
 RUN pip install gunicorn==19.10.0
 COPY gunicorn/wsgi.py /wd/

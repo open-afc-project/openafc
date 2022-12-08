@@ -20,7 +20,6 @@ import json
 import glob
 import re
 import datetime
-import urlparse
 from flask.views import MethodView
 import werkzeug.exceptions
 from ..defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
@@ -80,8 +79,14 @@ class GuiConfig(MethodView):
         dataif = data_if.DataIf(
             fsroot=flask.current_app.config["STATE_ROOT_PATH"],
             probeHttps=False)
+
+        if flask.current_app.config['AFC_APP_TYPE'] == 'server':
+            from urlparse import urlparse
+        else:
+            from urllib.parse import urlparse
+
+        u = urlparse(flask.request.url)
         histurl = None
-        u = urlparse.urlparse(flask.request.url)
         if dataif.isFsBackend():
             histurl = u.scheme + "://" + u.netloc + flask.url_for('files.history')
         else:

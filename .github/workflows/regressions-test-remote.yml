@@ -77,13 +77,15 @@ jobs:
 # get dev srvr port num{
     - name: get dev srvr port num
       run: |
-          echo TEST_PORT=`ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "cd ${{ env.WD }}/${{ env.REGRD }} && TAG=${{ env.RAND }} docker-compose port rat_server 443 |sed 's/.*://'"` >> $GITHUB_ENV
+          echo TEST_PORT_1=`ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "cd ${{ env.WD }}/${{ env.REGRD }} && TAG=${{ env.RAND }} docker-compose port rat_server 443 |sed 's/.*://'"` >> $GITHUB_ENV
+          echo TEST_PORT_2=`ssh ${{ secrets.SSH_USERNAME_GITHUB_AUTOMATION }}@${{ secrets.AFC_DEV_SERVER }} "cd ${{ env.WD }}/${{ env.REGRD }} && TAG=${{ env.RAND }} docker-compose port nginx 443 |sed 's/.*://'"` >> $GITHUB_ENV
 # } get dev srvr port num
 
 # open srvr test port {
     - name: Allow Security group rule to connect Github Actions to OpenAFC servers
       run: |
-        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT }} --cidr ${{ steps.ip.outputs.ipv4 }}/24
+        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT_1 }} --cidr ${{ steps.ip.outputs.ipv4 }}/24
+        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT_2 }} --cidr ${{ steps.ip.outputs.ipv4 }}/24
       env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -93,10 +95,12 @@ jobs:
 # run tests {
     - name: Build the regression tests docker image
       run: cd tests && docker build -t afc-regression-test .
-    - name: run regression test
+    - name: run ngnx-msghnd-rmq-worker path tests
       run: |
-        ${{ github.workspace }}/${{ env.LREGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} ${{ env.TEST_PORT }}
-
+        ${{ github.workspace }}/${{ env.LREGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} ${{ env.TEST_PORT_2 }}
+    - name: run apach-rmq-worker path tests
+      run: |
+        ${{ github.workspace }}/${{ env.LREGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} ${{ env.TEST_PORT_1 }} https 20
 # }run tests
 
 # stop dev srvr {
@@ -127,7 +131,8 @@ jobs:
     - name: remove Security group rule that was added for this test
       if: ${{ always() }}
       run: |
-        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT }} --cidr ${{ steps.ip.outputs.ipv4 }}/24
+        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT_1 }} --cidr ${{ steps.ip.outputs.ipv4 }}/24
+        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT_2 }} --cidr ${{ steps.ip.outputs.ipv4 }}/24
       env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
