@@ -1,4 +1,22 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-476**|
+| :- | :- |
+|**Date**|**12/09/2022**|
+
+## **Issues Addressed**
+ * Jira OA-476:Bug in computePRTABLE(), table interpolation is incorrect.
+ 
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Tested FSP1's channel 13 where the near-field value (alpha_NF) was used to compute passive repeater's path segment gain and it was correct. TestCase is attached to the Jira ticket.
+
+## **Open Issues** 
+ * 
+
 ## **Version and Date**
 |Version|3.5.1.1|
 | :- | :- |
