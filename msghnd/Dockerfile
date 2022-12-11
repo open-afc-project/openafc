@@ -14,7 +14,7 @@ python3 -m ensurepip && \
 pip3 install --no-cache --upgrade pip setuptools && \
 apk add --update --no-cache cmake ninja
 COPY msghnd/requirements.txt /wd/
-RUN pip install -r /wd/requirements.txt && mkdir -p /run/gunicorn /etc/xdg/fbrat
+RUN pip3 install -r /wd/requirements.txt && mkdir -p /run/gunicorn /etc/xdg/fbrat
 COPY gunicorn/wsgi.py gunicorn/gunicorn.conf.py gunicorn/gunicorn.logs.conf /wd/
 COPY prereqs/ratapi.conf /etc/xdg/fbrat/
 RUN echo "AFC_APP_TYPE = 'msghnd'" >> /etc/xdg/fbrat/ratapi.conf
