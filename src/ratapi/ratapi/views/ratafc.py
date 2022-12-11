@@ -197,25 +197,11 @@ def in_progress(t):
     # get progress and ETA
     LOGGER.debug('in_progress()')
     task_stat = t.getStat()
-    dataif = t.getDataif()
     if task_stat['runtime_opts'] & RNTM_OPT_GUI:
-        progress = None
-        try:
-            with dataif.open("pro", t.getId() + "/progress.txt") as hfile:
-                progress = dataif.read()
-        except:
-            return flask.jsonify(
-                percent=0,
-                message='Initializing...'
-            ), 202
-        buff = StringIO.StringIO(progress)
-        perc = buff.readline()
-        mess = buff.readline()
-        if perc and mess:
-            return flask.jsonify(
-                percent=float(perc),
-                message=mess,
-            ), 202
+        return flask.jsonify(
+            percent=0,
+            message='In progress...'
+        ), 202
 
     return flask.make_response(
         flask.json.dumps(dict(percent=0, message="Try Again")),
