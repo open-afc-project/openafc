@@ -134,7 +134,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
            "p2108Confidence": 5,
            "maxFsAglHeight": 6
         },
-        "nlcdFile": "federated_nlcd.tif",
+        "nlcdFile": "nlcd_wfa",
         "enableMapInVirtualAp": false,
         "channelResponseAlgorithm": "psd",
         "visibilityThreshold": -6,
