@@ -1,6 +1,7 @@
 // AfcManager.cpp -- Manages I/O and top-level operations for the AFC Engine
 #include "AfcManager.h"
 #include "RlanRegion.h"
+#include <QFileInfo>
 
 // "--runtime_opt" masks
 #define RUNTIME_OPT_ENABLE_DBG 1
@@ -522,12 +523,21 @@ void AfcManager::initializeDatabases()
 	/**************************************************************************************/
 	/* Setup NLCD data                                                                    */
 	/**************************************************************************************/
-	if (!_nlcdFile.empty()) {
-		cgNlcd.reset(new CachedGdal<uint8_t>(_nlcdFile, "nlcd"));
-		cgNlcd->setNoData(0);
-	} else {
+	if (_nlcdFile.empty()) {
 		throw std::runtime_error("AfcManager::initializeDatabases(): _nlcdFile not defined.");
 	}
+	std::string nlcdPattern, nlcdDirectory;
+	auto nlcdFileInfo = QFileInfo(QString::fromStdString(_nlcdFile));
+	if (nlcdFileInfo.isDir()) {
+		nlcdPattern = "*";
+		nlcdDirectory = _nlcdFile;
+	} else {
+		nlcdPattern = nlcdFileInfo.fileName().toStdString();
+		nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
+	}
+	cgNlcd.reset(new CachedGdal<uint8_t>(nlcdDirectory, "nlcd",
+		GdalNameMapperDirect::make_unique(nlcdPattern, nlcdDirectory)));
+	cgNlcd->setNoData(0);
 	/**************************************************************************************/
 
 	/**************************************************************************************/

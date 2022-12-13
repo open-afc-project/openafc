@@ -100,7 +100,7 @@ export class AFCForm extends React.Component<
             delete newConfig.nlcdFile;
         }
         if (n == "NLCD Point" && this.state.config.propagationEnv != 'NLCD Point' && !this.state.config.nlcdFile) {
-            newConfig.nlcdFile = "nlcd_2019_land_cover_l48_20210604_resample.tif";
+            newConfig.nlcdFile = "nlcd_production";
         }
         this.setState({ config: newConfig });
     }
@@ -780,14 +780,14 @@ export class AFCForm extends React.Component<
                                     {this.state.config.propagationEnv == 'NLCD Point' ?
                                         <FormGroup label="NLCD Database" fieldId="nlcd-database">
                                             <FormSelect
-                                                value={this.state.config.nlcdFile ?? "nlcd_2019_land_cover_l48_20210604_resample.tif"}
+                                                value={this.state.config.nlcdFile ?? "nlcd_production"}
                                                 onChange={(x) => this.setNlcdFile(x)}
                                                 id="nlcd-database"
                                                 name="nlcd-database"
                                                 style={{ textAlign: "right" }}
                                             >
-                                                <FormSelectOption key="Production NLCD " value="nlcd_2019_land_cover_l48_20210604_resample.tif" label="Production NLCD" />
-                                                <FormSelectOption key="WFA Test NLCD " value="federated_nlcd.tif" label="WFA Test NLCD" />
+                                                <FormSelectOption key="Production NLCD " value="nlcd_production" label="Production NLCD" />
+                                                <FormSelectOption key="WFA Test NLCD " value="nlcd_wfa" label="WFA Test NLCD" />
                                             </FormSelect>
                                         </FormGroup>
                                         : <></>}
