@@ -123,7 +123,7 @@ namespace
 	{
 		xml_writer.reset();
 		_file.reset();
-		zip_writer.reset();
+		zip_writer.reset();	
 	}
 }; // end namespace
 
@@ -5125,7 +5125,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								// s = if ((alphaEL <= alphaAZ)) reflectorWidthLambda*cosThetaIN else pr.reflectorHeightLambda*cosThetaIN
 								// to
 								// s = MAX(reflectorWidthLambda, reflectorHeightLambda)*cosThetaIN
-
+								
 								bool conditionW;
 								if (0) {
 									// previous spec
@@ -5532,7 +5532,7 @@ void AfcManager::fixFSTerrain()
 		bool updateFlag = false;
 		double bldgHeight, terrainHeight;
 		MultibandRasterClass::HeightResult lidarHeightResult;
-		CConst::HeightSourceEnum heightSource;
+		CConst::HeightSourceEnum heightSource;	
 		if (!uls->getRxTerrainHeightFlag()) {
 			_terrainDataModel->getTerrainHeight(uls->getRxLongitudeDeg(),uls->getRxLatitudeDeg(), terrainHeight,bldgHeight, lidarHeightResult, heightSource);
 			updateFlag = true;
@@ -7960,13 +7960,13 @@ void AfcManager::runPointAnalysis()
 												msg << QString::number(_maxEIRP_dBm, 'f', 3) << QString::number(_bodyLossDB, 'f', 3) << QString::fromStdString(txClutterStr) << QString::fromStdString(rxClutterStr) << QString::fromStdString(bldgTypeStr);
 												msg << QString::number(buildingPenetrationDB, 'f', 3) << QString::fromStdString(buildingPenetrationModelStr) << QString::number(buildingPenetrationCDF, 'f', 8);
 												msg << QString::number(pathLoss, 'f', 3) << QString::fromStdString(pathLossModelStr) << QString::number(pathLossCDF, 'f', 8);
-
+		
 												msg << QString::number(pathClutterTxDB, 'f', 3) << QString::fromStdString(pathClutterTxModelStr) << QString::number(pathClutterTxCDF, 'f', 8);
 												msg << QString::number(pathClutterRxDB, 'f', 3) << QString::fromStdString(pathClutterRxModelStr) << QString::number(pathClutterRxCDF, 'f', 8);
-
+		
 												msg << QString::number(bandwidth * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
 													<< QString::number(uls->getStartUseFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopUseFreq() * 1.0e-6, 'f', 2);
-
+		
 												msg << QString::fromStdString(rxAntennaTypeStr) << QString::fromStdString(rxAntennaCategoryStr)
 													<< QString::number((divIdx == 0 ? uls->getRxGain() : uls->getDiversityGain()), 'f', 3);
 
@@ -8125,8 +8125,7 @@ void AfcManager::runPointAnalysis()
 			if (xN == 1) {
 				tstart = std::chrono::high_resolution_clock::now();
 				pctIdx = 1;
-			}
-			else if (!_progressFile.empty()) {
+			} else if (!_progressFile.empty()) {
 				auto tcurrent = std::chrono::high_resolution_clock::now();
 				double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(tcurrent-tstart).count();
 				double remainingTime = elapsedTime*(totNumProc-numProc)/(numProc-1);
@@ -8155,19 +8154,19 @@ void AfcManager::runPointAnalysis()
 		std::string placemarkStyleStr;
 		std::string polyStyleStr;
 		if (colorIdx == 0) {
-			fkml->writeTextElement("name", "RED");
+			fkml->writeTextElement("name", "RED");	
 			visibilityStr = "1";
 			addPlacemarks = 1;
 			placemarkStyleStr = "#redPlacemark";
 			polyStyleStr = "#redPoly";
 		} else if (colorIdx == 1) {
-			fkml->writeTextElement("name", "YELLOW");
+			fkml->writeTextElement("name", "YELLOW");	
 			visibilityStr = "1";
 			addPlacemarks = 1;
 			placemarkStyleStr = "#yellowPlacemark";
 			polyStyleStr = "#yellowPoly";
 		} else {
-			fkml->writeTextElement("name", "GREEN");
+			fkml->writeTextElement("name", "GREEN");	
 			visibilityStr = "0";
 			addPlacemarks = 0;
 			placemarkStyleStr = "#greenPlacemark";
@@ -8269,7 +8268,7 @@ void AfcManager::runPointAnalysis()
 						fkml->writeTextElement("name", QString::asprintf("p%d", cvgPhiIdx));
 						fkml->writeTextElement("styleUrl", polyStyleStr.c_str());
 						fkml->writeTextElement("visibility", visibilityStr.c_str());
-						fkml->writeStartElement("Polygon");
+						fkml->writeStartElement("Polygon");	
 						fkml->writeTextElement("extrude", "0");
 						fkml->writeTextElement("altitudeMode", "absolute");
 						fkml->writeStartElement("outerBoundaryIs");
@@ -9383,8 +9382,7 @@ void AfcManager::runExclusionZoneAnalysis()
 			if (xN == 1) {
 				tstart = std::chrono::high_resolution_clock::now();
 				pctIdx = 1;
-			}
-			else if (!_progressFile.empty()) {
+			} else if (!_progressFile.empty()) {
 				auto tcurrent = std::chrono::high_resolution_clock::now();
 				double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(tcurrent-tstart).count();
 				double remainingTime = elapsedTime*(totNumProc-numProc)/(numProc-1);
@@ -10231,8 +10229,7 @@ void AfcManager::runHeatmapAnalysis()
 				if (xN == 1) {
 					tstart = std::chrono::high_resolution_clock::now();
 					pctIdx = 1;
-				}
-				else if (!_progressFile.empty()) {
+				} else if (!_progressFile.empty()) {
 					auto tcurrent = std::chrono::high_resolution_clock::now();
 					double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(tcurrent-tstart).count();
 					double remainingTime = elapsedTime*(totNumProc-numProc)/(numProc-1);
@@ -10531,7 +10528,7 @@ double AfcManager::computeClutter452HtEl(double txHeightM, double distKm, double
 /**************************************************************************************/
 /* AfcManager::setConstInputs()                                                       */
 /**************************************************************************************/
-void AfcManager::setConstInputs(const std::string& tempDir)
+void AfcManager::setConstInputs(const std::string& tempDir)	
 {
 	QDir tempBuild = QDir();
 	if (!tempBuild.exists(QString::fromStdString(tempDir))) {

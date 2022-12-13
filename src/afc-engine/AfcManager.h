@@ -92,7 +92,7 @@ namespace OpClass
 
 class AfcManager
 {
-	public:
+	public:  
 		AfcManager();
 		~AfcManager();
 
@@ -100,15 +100,15 @@ class AfcManager
 			double lat, lon, alt, minorUncert, majorUncert, heightUncert;
 			std::tie(lat,lon,alt) = _rlanLLA;
 			std::tie(minorUncert,majorUncert,heightUncert) = _rlanUncerts_m;
-			return (((_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE || _rlanUncertaintyRegionType == RLANBoundary::RADIAL_POLY) && (std::isnan(lat) || std::isnan(lon))) ||
-					(_analysisType != "HeatmapAnalysis" && std::isnan(alt)) ||
+			return (((_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE || _rlanUncertaintyRegionType == RLANBoundary::RADIAL_POLY) && (std::isnan(lat) || std::isnan(lon))) || 
+					(_analysisType != "HeatmapAnalysis" && std::isnan(alt)) || 
 					(_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE && (std::isnan(minorUncert) || std::isnan(majorUncert))) || std::isnan(heightUncert) ||
 					std::isnan(_minEIRP_dBm) || std::isnan(_maxEIRP_dBm) || std::isnan(_IoverN_threshold_dB) ||
 					std::isnan(_bodyLossDB) || std::isnan(_polarizationLossDB) ||
 					(_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE && std::isnan(_rlanOrientation_deg)) ||
 					(_ulsDatabaseList.size() == 0) ||
 					std::isnan((int)_buildingType) || std::isnan(_confidenceBldg2109) ||
-					_pathLossModel==CConst::unknownPathLossModel);// ||
+					_pathLossModel==CConst::unknownPathLossModel);// || 
 			//std::isnan(_confidenceClutter2108) || std::isnan(_confidenceWinner2) || std::isnan(_confidenceITM) || std::isnan(_winner2ProbLOSThr));
 		}
 
@@ -294,7 +294,7 @@ class AfcManager
 		std::vector<std::pair<int, int>> _inquiredFrquencyRangesMHz = std::vector<std::pair<int, int>>(); // list of low-high frequencies in MHz
 
 		// first part of pair is global operating class and the second is a list of the channel indicies for that operating class
-		std::vector<std::pair<int, std::vector<int>>> _inquiredChannels = std::vector<std::pair<int, std::vector<int>>>();
+		std::vector<std::pair<int, std::vector<int>>> _inquiredChannels = std::vector<std::pair<int, std::vector<int>>>(); 
 
 		QString _buildingLossModel;
 		CConst::BuildingTypeEnum _buildingType; // Defaults to traditionalBuildingType
@@ -312,7 +312,7 @@ class AfcManager
 
 		CConst::LOSOptionEnum _winner2LOSOption;  // Method used to determine LOS for Winner2
 		// LOS Unknown, always use _winner2UnknownLOSMethod
-		// BldgDataWinner2LOSOption : use building data
+		// BldgDataWinner2LOSOption : use building data 
 		// ForceLOSWinner2LOSOption : Always use LOS
 		// ForceNLOSWinner2LOSOption : Always use NLOS
 
@@ -477,7 +477,7 @@ class AfcManager
 
 		PopGridClass *_popGrid;                  // Population data stored in here after being read in for a particular city/region
 
-		std::vector<double> _rlanBWList;         // In this case four elements (20MHz, 40MHz, etc.)
+		std::vector<double> _rlanBWList;         // In this case four elements (20MHz, 40MHz, etc.) 
 
 		ListClass<ULSClass *> *_ulsList;         // List of the FS stations that are being used in the analysis
 
