@@ -56,7 +56,7 @@ TerrainClass::TerrainClass(QString lidarDir, std::string srtmDir, std::string de
 	{
 		cgDep.reset(new CachedGdal<float>(depDir, "dep",
 			GdalNameMapperPattern::make_unique(
-			"USGS_1_{latHem:ns}{latDegCeil:02}{lonHem:ew}{lonDegFloor:03}.tif", depDir)));
+			"USGS_1_{latHem:ns}{latDegCeil:02}{lonHem:ew}{lonDegFloor:03}*.tif", depDir)));
 		cgDep->setTransformationModifier(
 			[](GdalTransform *t) {
 				t->roundPpdToMultipleOf(1.);
