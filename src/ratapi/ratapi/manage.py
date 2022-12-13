@@ -337,6 +337,8 @@ class DbUpgrade(Command):
 
     def __call__(self, flaskapp):
         with flaskapp.app_context():
+            import flask
+            from .models.aaa import AFCConfig
             from flask_migrate import (upgrade, stamp)
             setUserIdNextVal()
             try:
@@ -351,6 +353,20 @@ class DbUpgrade(Command):
                     stamp(revision='230b7680b81e')
 
             upgrade()
+
+            # If AFCConfig is empty, copy from fcc config file
+            region = 'fcc'
+            config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext == region).first()
+            if not config:
+                dataif = data_if.DataIf(
+                    fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+                with dataif.open("cfg", region + "/afc_config.json") as hfile:
+                    if hfile.head():
+                        config_bytes = hfile.read()
+                        rcrd = json.loads(config_bytes)
+                        config = AFCConfig(rcrd)
+                        db.session.add(config)
+                        db.session.commit()
 
 
 class UserCreate(Command):

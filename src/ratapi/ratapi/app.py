@@ -370,6 +370,46 @@ rat-manage-api db-upgrade
                 """)
                 flaskapp.config['UPGRADE_REQ'] = True
 
+        try:
+            # update afcConfig files from database
+            from .models.aaa import AFCConfig
+            import json
+            ACCEPTABLE_FILES = {
+                'default': dict(
+                    alt='fcc',
+                    content_type='application/json',
+                ),
+                'fcc': dict(
+                    alt='fcc',
+                    content_type='application/json',
+                ),
+                'CONUS': dict(
+                    alt='fcc',
+                    content_type='application/json',
+                ),
+            }
+
+            configs = db.session.query(AFCConfig).all()
+            for conf in configs:
+                rcrd = conf.config
+                filedesc = ACCEPTABLE_FILES[rcrd["regionStr"]]
+                region = filedesc['alt']
+                hfile = dataif.open("cfg", region + "/afc_config.json")
+                try:
+                    config_bytes = hfile.read()
+                except:
+                    config_bytes = 0
+                master_config = json.dumps(rcrd, sort_keys=True)
+                if not master_config == config_bytes:
+                    hfile.write(master_config)
+
+        except:
+            LOGGER.error("""
+DATABASE is in old format.  Upgrade using following command sequence:
+rat-manage-api db-upgrade
+                """)
+            flaskapp.config['UPGRADE_REQ'] = True
+
     # Actual resources
     flaskapp.add_url_rule(
         '/', 'root', view_func=redirector('www.index', code=302))
