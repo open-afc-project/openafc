@@ -27,7 +27,7 @@ import hashlib
 import uuid
 from flask.views import MethodView
 import werkzeug.exceptions
-import StringIO
+import six
 from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE
 from ..tasks.afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
@@ -482,15 +482,16 @@ class RatAfc(MethodView):
                                 dataAsJson)
 
                     except Exception as e:
-                        LOGGER.error(
-                            'catching and rethrowing exception: %s', e.message)
+                        LOGGER.error('catching and rethrowing exception: %s',
+                                     getattr(e, 'message', repr(e)))
                         raise AP_Exception(-1,
                                            'The task state is invalid. '
                                            'Try again later, and if this issue '
                                            'persists contact support.')
 
             except AP_Exception as e:
-                LOGGER.error('catching exception: %s', e.message)
+                LOGGER.error('catching exception: %s',
+                             getattr(e, 'message', repr(e)))
                 results["availableSpectrumInquiryResponses"].append(
                     {
                         'requestId': request["availableSpectrumInquiryRequests"][0]["requestId"],
@@ -507,8 +508,6 @@ class RatAfc(MethodView):
 
 
 # registration of default runtime options
-module.add_url_rule('/1.1/availableSpectrumInquiry',
-                    view_func=RatAfc.as_view('RatAfc-1.1'))
 module.add_url_rule('/1.3/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))
 

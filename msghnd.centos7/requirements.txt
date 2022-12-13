@@ -4,8 +4,19 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-bind = '0.0.0.0:8000'
-workers = 20
-deamon = True
-pidfile = '/run/gunicorn/openafc_app.pid'
-timeout = 120
+
+Flask-WTF==0.14.2
+futures==3.4.0
+gunicorn==19.10.0
+IPy==0.75
+jsmin==2.2.2
+nose==1.3.7
+numpy==1.7.1
+pathlib==1.0.1
+prettytable==0.7.2
+PyYAML==5.4
+python2-secrets==1.0.5
+pytz==2016.10
+requests==2.7.0
+werkzeug==0.16.1
+WsgiDAV==2.4.1

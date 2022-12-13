@@ -111,7 +111,6 @@ build_dev_server() {
     docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B}:${tag} ${push} &
     docker_build_and_push ${wd}/worker/Dockerfile.build ${WORKER_AL_D4B}:${tag} ${push} &
     docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${WORKER_AL_PRINST}:${tag} ${push} &
-    docker_build_and_push ${wd}/msghnd/Dockerfile.preinstall ${MSGHND_PRINST}:${tag} ${push} &
 
   msg "wait for prereqs to be built"
   # wait for background jobs to be done
@@ -119,8 +118,7 @@ build_dev_server() {
   msg "prereqs are built"
 
   # build msghnd  (flask + gunicorn)
-  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B} --build-arg PRINST_NAME=${MSGHND_PRINST} --build-arg BUILDREV=msghnd"
-  docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND}:${tag} ${push} "${EXT_ARGS}" &
+  docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND}:${tag} ${push} &
 
   # build worker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=worker"

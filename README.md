@@ -1,4 +1,4 @@
-This work is licensed under the OpenAFC Project License, a copy of which is included with this software program.
+This work is licensed under the OpenAFC Project License, a copy of which is included with this software program .
 
 <br />
 <br />
@@ -364,7 +364,7 @@ services:
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
 Just run in this folder following command and it is done:
 ```
-docker-compose up -d
+docker-compose up -d 
 ```
 
 Keep in mind that on the first run it will build and pull all the needed containers and it can take some time (based on your machine power)
