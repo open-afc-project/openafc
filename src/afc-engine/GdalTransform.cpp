@@ -27,6 +27,7 @@ GdalTransform::BoundRect::BoundRect()
 
 bool GdalTransform::BoundRect::contains(double latDeg, double lonDeg) const
 {
+	lonDeg = rebaseLon(lonDeg, lonDegMin);
 	return (latDegMin < latDeg) && (lonDegMin <= lonDeg) &&
 		(latDeg <= latDegMax) && (lonDeg < lonDegMax);
 }
@@ -38,6 +39,18 @@ void GdalTransform::BoundRect::combine(const GdalTransform::BoundRect &other)
 	latDegMax = std::max(latDegMax, other.latDegMax);
 	lonDegMax = std::max(lonDegMax, other.lonDegMax);
 }
+
+double GdalTransform::BoundRect::rebaseLon(double lon, double base)
+{
+	while ((lon - 360) >= base) {
+		lon -= 360;
+	}
+	while (lon < base) {
+		lon += 360;
+	}
+	return lon;
+}
+
 
 ///////////////////////////////////////////////////////////////////////////////
 
@@ -91,6 +104,9 @@ GdalTransform::GdalTransform()
 void GdalTransform::computePixel(double latDeg, double lonDeg,
 	int *latIdx, int *lonIdx) const
 {
+	// Rebasing longitude relative to left side of bounding rectangle
+	lonDeg = BoundRect::rebaseLon(lonDeg, (lonPixMin + margin) / lonPixPerDeg);
+
 	*latIdx = (int)std::floor(latPixMax - latDeg * latPixPerDeg);
 	*lonIdx = (int)std::floor(lonDeg * lonPixPerDeg - lonPixMin);
 
@@ -138,4 +154,3 @@ void GdalTransform::setMarginsOutsideDeg(double deg)
 	// of 0.5
 	margin = std::round(margin * 2) / 2;
 }
-

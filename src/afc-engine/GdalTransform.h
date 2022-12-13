@@ -55,6 +55,9 @@ struct GdalTransform {
 		double lonDegMin;   /*!< Minimum longitude in east-positive degrees */
 		double latDegMax;	/*!< Maximum latitude in north-positive degrees */
 		double lonDegMax;	/*!< Maximum longitude in east-positive degrees */
+
+		/** Rebase longitude value to [base, base+360[ range */
+		static double rebaseLon(double lon, double base);
 	};
 
 
@@ -88,7 +91,12 @@ struct GdalTransform {
 	 */
 	void computePixel(double latDeg, double lonDeg,  int *latIdx, int *lonIdx) const;
 
-	/** Returns GDAL data bounding rectangle from */
+	/** Returns GDAL data bounding rectangle.
+	 * It is guaranteed that latitudes are in [-90, 90] range,
+	 * latDegMin <= latDegMax, lonDegMin, <= lonDegMax. But it is not guaranteed
+	 * that longitudes lie in [-180, 180[ range (out of range case - NLCD for
+	 * Alaska)
+	 */
 	BoundRect makeBoundRect() const;
 
 	/** Round pixels per degree and pixel boundaries to multiple of given value.
