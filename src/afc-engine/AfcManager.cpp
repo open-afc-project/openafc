@@ -7795,7 +7795,7 @@ void AfcManager::runPointAnalysis()
 													rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, divIdx);
 												} else {
 													discriminationGain = uls->getPR(segIdx).computeDiscriminationGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, reflectorD0, reflectorD1);
-													rxGainDB = uls->getPR(segIdx).effectiveGain - discriminationGain;
+													rxGainDB = uls->getPR(segIdx).effectiveGain + discriminationGain;
 												}
 
 												nearFieldOffsetDB = 0.0;
