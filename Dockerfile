@@ -18,6 +18,7 @@ COPY cmake /wd/cmake/
 COPY pkg /wd/pkg/
 COPY selinux /wd/selinux/
 COPY src /wd/src/
+ARG BUILDREV=localbuild
 RUN sh -x /wd/build-rpm.sh
 
 # Stage Install

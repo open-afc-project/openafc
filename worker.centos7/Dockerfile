@@ -24,9 +24,10 @@ COPY pkg /wd/pkg/
 COPY selinux /wd/selinux/
 COPY src /wd/src/
 RUN mkdir -p -m 777 /wd/build/__install
+ARG BUILDREV=localbuild
 RUN cd /wd/build && \
 source /opt/rh/$(scl -l)/enable && \
-cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169 -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -G Ninja /wd && \
+cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169 -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
 ninja-build -j$(nproc) install
 
 

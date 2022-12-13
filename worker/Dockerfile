@@ -21,8 +21,9 @@ COPY selinux /root/afc/selinux/
 COPY src /root/afc/src/
 
 RUN mkdir -p -m 777 /root/afc/build
+ARG BUILDREV=localbuild
 RUN cd /root/afc/build && \
-cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -G Ninja /root/afc && \
+cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /root/afc && \
 ninja -j$(nproc) install
 RUN strip --strip-unneeded /root/afc/__install/bin/afc-engine
 

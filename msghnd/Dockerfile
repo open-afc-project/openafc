@@ -28,8 +28,9 @@ COPY cmake /wd/cmake/
 COPY pkg /wd/pkg/
 COPY src /wd/src/
 RUN mkdir -p -m 777 /wd/build
+ARG BUILDREV=localbuild
 RUN cd /wd/build && \
-cmake -DCMAKE_INSTALL_PREFIX=/wd/__install -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiRelease -G Ninja /wd && \
+cmake -DCMAKE_INSTALL_PREFIX=/wd/__install -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
 ninja -j$(nproc) install
 #
 # Install Message Handler application

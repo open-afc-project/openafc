@@ -110,6 +110,7 @@ Headers and development libraries for the Facebook RLAN AFC Tool.
 pushd build
 
 CMAKEARGS="\
+    -DSVN_LAST_REVISION=%{getenv:BUILDREV}
     -DCMAKE_BUILD_TYPE=RelWithDebInfo \
     -DBUILD_AFCENGINE=%{?with_afcengine:ON}%{!?with_afcengine:OFF} \
     -G Ninja"
