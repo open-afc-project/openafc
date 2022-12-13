@@ -1653,7 +1653,6 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		("input-file-path,i", po::value<std::string>()->default_value("inputFile.json"), "set input-file-path level")
 		("config-file-path,c", po::value<std::string>()->default_value("configFile.json"), "set config-file-path level")
 		("output-file-path,o", po::value<std::string>()->default_value("outputFile.json"), "set output-file-path level")
-		("progress-file-path,p", po::value<std::string>()->default_value("progress.txt"), "set progress file path")
 		("temp-dir,t", po::value<std::string>()->default_value(""), "set temp-dir level")
 		("log-level,l", po::value<std::string>()->default_value("debug"), "set log-level")
 		("runtime_opt,u", po::value<uint32_t>()->default_value(3), "bit 0: create debug files; bit 1: create kmz and progress files; bit 2: interpret file pathes as URLs");
@@ -1742,18 +1741,6 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		}
 		AfcManager::_dataIf = new AfcDataIf(tmp & RUNTIME_OPT_URL);
 	}
-	if (cmdLineArgs.count("progress-file-path"))
-	{
-		if (AfcManager::_createKmz) {
-			AfcManager::_progressFile =
-				cmdLineArgs["progress-file-path"].as<std::string>();
-		}
-	}
-	else
-	{
-		throw std::runtime_error("AfcManager::setCmdLineParams(): progress-file-path(p) command line argument was not set.");
-	}
-
 }
 
 void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std::string &tempDir)
@@ -7495,11 +7482,6 @@ void AfcManager::runPointAnalysis()
 
 	if (numPct > totNumProc) { numPct = totNumProc; }
 
-	int xN = 1;
-
-	int pctIdx;
-	std::chrono::high_resolution_clock::time_point tstart;
-
 	bool cont = true;
 	int numProc = 0;
 	for (ulsIdx = 0; (ulsIdx < _ulsList->getSize())&&(cont); ++ulsIdx)
@@ -8115,30 +8097,6 @@ void AfcManager::runPointAnalysis()
 		}
 
 		numProc++;
-
-		if (numProc == xN) {
-			if (xN == 1) {
-				tstart = std::chrono::high_resolution_clock::now();
-				pctIdx = 1;
-			} else if (!_progressFile.empty()) {
-				auto tcurrent = std::chrono::high_resolution_clock::now();
-				double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(tcurrent-tstart).count();
-				double remainingTime = elapsedTime*(totNumProc-numProc)/(numProc-1);
-				std::ostringstream progress;
-				QByteArray progressBA;
-
-				progress << (int) std::floor(100.0*numProc/totNumProc) << std::endl
-					<< "Elapsed Time: " << (int) std::floor(elapsedTime)
-					<< " s, Remaining: " << (int) std::floor(remainingTime) << " s";
-				progressBA = QByteArray(progress.str().c_str());
-				/* dont throw error */
-				AfcManager::_dataIf->writeFile(QString::fromStdString(_progressFile), progressBA);
-
-				// printf("%f %%  :  Elapsed Time = %f seconds, Remaining %f seconds\n", 100.0*numProc/totNumProc, elapsedTime, remainingTime);
-				pctIdx++;
-			}
-			xN = ((totNumProc-1)*pctIdx + numPct-1)/numPct + 1;
-		}
 	}
 
 	for (int colorIdx=0; (colorIdx<3)&&(fkml); ++colorIdx) {
@@ -9271,11 +9229,6 @@ void AfcManager::runExclusionZoneAnalysis()
 
 	if (numPct > totNumProc) { numPct = totNumProc; }
 
-	int xN = 1;
-
-	int pctIdx;
-	std::chrono::high_resolution_clock::time_point tstart;
-
 	int numProc = 0;
 
 	for(exclPtIdx=0; exclPtIdx<numContourPoints; exclPtIdx++) {
@@ -9369,31 +9322,6 @@ void AfcManager::runExclusionZoneAnalysis()
 		// LOGGER_DEBUG(logger) << std::setprecision(15) << exclusionZonePtLon << " " << exclusionZonePtLat;
 
 		numProc++;
-
-		if (numProc == xN) {
-			if (xN == 1) {
-				tstart = std::chrono::high_resolution_clock::now();
-				pctIdx = 1;
-			} else if (!_progressFile.empty()) {
-				auto tcurrent = std::chrono::high_resolution_clock::now();
-				double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(tcurrent-tstart).count();
-				double remainingTime = elapsedTime*(totNumProc-numProc)/(numProc-1);
-				std::ostringstream progress;
-				QByteArray progressBA;
-
-				progress << (int) std::floor(100.0*numProc/totNumProc) << std::endl
-					<< "Elapsed Time: " << (int) std::floor(elapsedTime)
-					<< " s, Remaining: " << (int) std::floor(remainingTime) << " s";
-				progressBA = QByteArray(progress.str().c_str());
-				/* dont throw error */
-				AfcManager::_dataIf->writeFile(QString::fromStdString(_progressFile), progressBA);
-
-				// printf("%f %%  :  Elapsed Time = %f seconds, Remaining %f seconds\n", 100.0*numProc/totNumProc, elapsedTime, remainingTime);
-				pctIdx++;
-			}
-			xN = ((totNumProc-1)*pctIdx + numPct-1)/numPct + 1;
-		}
-
 	}
 	LOGGER_INFO(logger) << "Done computing exclusion zone";
 
@@ -9884,11 +9812,6 @@ void AfcManager::runHeatmapAnalysis()
 
 	if (numPct > totNumProc) { numPct = totNumProc; }
 
-	int xN = 1;
-
-	int pctIdx;
-	std::chrono::high_resolution_clock::time_point tstart;
-
 	bool initFlag = false;
 	int numInvalid = 0;
 	int numProc = 0;
@@ -10213,30 +10136,6 @@ void AfcManager::runHeatmapAnalysis()
 			std::cout << " [" << numProc << " / " <<  totNumProc  << "] " << " Elapsed Time = " << std::setprecision(6) << std::chrono::duration_cast<std::chrono::duration<double>>(t2-t1).count() << std::endl << std::flush;
 
 #			endif
-
-			if (numProc == xN) {
-				if (xN == 1) {
-					tstart = std::chrono::high_resolution_clock::now();
-					pctIdx = 1;
-				} else if (!_progressFile.empty()) {
-					auto tcurrent = std::chrono::high_resolution_clock::now();
-					double elapsedTime = std::chrono::duration_cast<std::chrono::duration<double>>(tcurrent-tstart).count();
-					double remainingTime = elapsedTime*(totNumProc-numProc)/(numProc-1);
-					std::ostringstream progress;
-					QByteArray progressBA;
-
-					progress << (int) std::floor(100.0*numProc/totNumProc) << std::endl
-						<< "Elapsed Time: " << (int) std::floor(elapsedTime)
-						<< " s, Remaining: " << (int) std::floor(remainingTime) << " s";
-					progressBA = QByteArray(progress.str().c_str());
-					/* dont throw error */
-					AfcManager::_dataIf->writeFile(QString::fromStdString(_progressFile), progressBA);
-
-					// printf("%f %%  :  Elapsed Time = %f seconds, Remaining %f seconds\n", 100.0*numProc/totNumProc, elapsedTime, remainingTime);
-					pctIdx++;
-				}
-				xN = ((totNumProc-1)*pctIdx + numPct-1)/numPct + 1;
-			}
 		}
 	}
 

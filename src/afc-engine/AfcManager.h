@@ -458,7 +458,6 @@ class AfcManager
 		std::string _userInputsFile;             // Generate file containing user inputs
 		std::string _kmlFile;                    // Generate kml file showing simulation results, primarily for debugging
 		std::string _fsAnalysisListFile;         // File containing list of FS used in the analysis
-		std::string _progressFile;               // stores messages to be sent to GUI on progress of execution. line 0: percentage (number), line 1: message (string)
 		int _maxLidarRegionLoadVal;
 		/**************************************************************************************/
 
