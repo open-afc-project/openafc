@@ -289,7 +289,7 @@ services:
       PGDATA: /var/lib/pgsql/data
       POSTGRES_DB: fbrat
 
-  rat_rmq:
+  rmq:
     image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:latest
     restart: always
 
@@ -315,19 +315,19 @@ services:
       - ./pipe:/pipe
     links:
       - ratdb
-      - rat_rmq
+      - rmq
     environment:
       # RabbitMQ server name:
       - objst
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
-      - BROKER_FQDN=rat_rmq
-      - FILESTORAGE_HOST=objst
+      - BROKER_FQDN=rmq
       # Filestorage params:
+      - FILESTORAGE_HOST=objst
       - FILESTORAGE_PORT=5000
+      - FILESTORAGE_SCHEME=HTTP
       - HISTORY_HOST=objst
-      - HISTORY_EXTERNAL_PORT=14999
       # worker params
       - CELERY_TYPE=external
 
@@ -350,16 +350,12 @@ services:
       - CELERY_OPTIONS=rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10
       # RabbitMQ server name:
       - BROKER_TYPE=external
-      - BROKER_FQDN=rat_rmq
+      - BROKER_FQDN=rmq
 
   objst:
     image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:latest
     environment:
-      - FILESTORAGE_HOST=0.0.0.0
       - FILESTORAGE_PORT=5000
-      - HISTORY_HOST=0.0.0.0
-      - HISTORY_PORT=4999
-      - FILESTORAGE_DIR=/storage
 
  msghnd:
     build:
@@ -374,19 +370,14 @@ services:
       - /var/lib/fbrat/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
       - /var/lib/fbrat/afc_config:/var/lib/fbrat/afc_config
       - /var/lib/fbrat/frequency_bands:/var/lib/fbrat/frequency_bands
-      - /var/lib/fbrat/responses:/var/lib/fbrat/responses
      environment:
       # Message broker params: 
-      BROKER_TYPE: external
-      BROKER_PROT: amqp
-      BROKER_USER: celery
-      BROKER_PWD: celery
-      BROKER_PORT: 5672
-      BROKER_FQDN: rat_rmq
-      BROKER_MNG_PORT: 15672
+      - BROKER_TYPE=external
+      - BROKER_FQDN=rmq
       # Filestorage params: 
-      FILESTORAGE_HOST: objst
-      FILESTORAGE_PORT: 5000
+      - FILESTORAGE_HOST=objst
+      - FILESTORAGE_PORT=5000
+      - FILESTORAGE_SCHEME=HTTP
 ```
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
 Just run in this folder following command and it is done:
