@@ -300,19 +300,17 @@ services:
       - "80:80"
       - "443:443"
     volumes:
+      - /rat_transfer:/usr/share/fbrat/rat_transfer
+      - /rat_transfer/ULS_Database:/usr/share/fbrat/rat_transfer/ULS_Database
+      - /rat_transfer/daily_uls_parse:/usr/share/fbrat/rat_transfer/daily_uls_parse
+      - /rat_transfer/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
+      - /rat_transfer/RAS_Database:/var/lib/fbrat/RAS_Database
+      - /rat_transfer/ULS_Database:/var/lib/fbrat/ULS_Database
+      - /rat_transfer/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
+      - /rat_transfer/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
+      - /rat_transfer/frequency_bands:/var/lib/fbrat/frequency_bands
+      - ./ssl:/etc/httpd/certs
       - ./apache-conf:/etc/httpd/conf.d
-      - ./ssl/letsencrypt:/etc/letsencrypt
-      - ./afc_config:/var/lib/fbrat/afc_config
-      - ./frequency_bands:/var/lib/fbrat/frequency_bands
-      - /opt/afc/databases/rat_transfer/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
-      - /opt/afc/databases/rat_transfer/ULS_Database:/usr/share/fbrat/rat_transfer/daily_uls_parse
-      - /opt/afc/databases/rat_transfer/ULS_Database:/var/lib/fbrat/ULS_Database
-      - /opt/afc/databases/rat_transfer:/usr/share/fbrat/rat_transfer
-      - /opt/afc/databases/rat_transfer/RAS_Database:/usr/share/fbrat/rat_transfer/ULS_Database
-      - /opt/afc/databases/rat_transfer/RAS_Database:/var/lib/fbrat/RAS_Database
-      - /opt/afc/databases/rat_transfer/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
-      - /opt/afc/databases/rat_transfer/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
-      - ./pipe:/pipe
     links:
       - ratdb
       - rmq
@@ -357,32 +355,28 @@ services:
     environment:
       - FILESTORAGE_PORT=5000
 
- msghnd:
+  msghnd:
     build:
       context: .
       dockerfile: msghnd/Dockerfile
-    volumes:
-      - /projects/wcc_afc_01/databases/rat_transfer:/usr/share/fbrat/rat_transfer
-      - /projects/wcc_afc_01/databases/rat_transfer/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
-      - /projects/wcc_afc_01/databases/rat_transfer/RAS_Database:/var/lib/fbrat/RAS_Database
-      - /projects/wcc_afc_01/databases/rat_transfer/ULS_Database:/var/lib/fbrat/ULS_Database
-      - /projects/wcc_afc_01/databases/rat_transfer/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
-      - /var/lib/fbrat/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
-      - /var/lib/fbrat/afc_config:/var/lib/fbrat/afc_config
-      - /var/lib/fbrat/frequency_bands:/var/lib/fbrat/frequency_bands
-     environment:
-      # Message broker params: 
+    links:
+      - ratdb
+      - rmq
+      - objst
+    environment:
+      # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
-      # Filestorage params: 
+      # Filestorage params:
       - FILESTORAGE_HOST=objst
       - FILESTORAGE_PORT=5000
       - FILESTORAGE_SCHEME=HTTP
+
 ```
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
 Just run in this folder following command and it is done:
 ```
-docker-compose up -d 
+docker-compose up -d
 ```
 
 Keep in mind that on the first run it will build and pull all the needed containers and it can take some time (based on your machine power)
