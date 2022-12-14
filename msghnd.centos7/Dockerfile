@@ -20,9 +20,10 @@ COPY selinux /wd/selinux/
 COPY src /wd/src/
 
 RUN mkdir -p -m 777 /wd/build/__install
+ARG BUILDREV=localbuild
 RUN cd /wd/build && \
 source /opt/rh/$(scl -l)/enable && \
-cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiRelease -G Ninja /wd && \
+cmake3 -DCMAKE_INSTALL_PREFIX=/wd/build/__install -DCMAKE_PREFIX_PATH=/usr -DCMAKE_BUILD_TYPE=RatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd && \
 ninja-build -j$(nproc) install
 
 # Stage Install

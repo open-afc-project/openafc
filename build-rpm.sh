@@ -5,7 +5,7 @@ set -e
 
 N_THREADS=$(nproc --all --ignore=2)
 ROOTDIR=$(readlink -f $(dirname "${BASH_SOURCE[0]}"))
-CMAKE="cmake3 -G Ninja"
+CMAKE="cmake3 -G Ninja -DSVN_LAST_REVISION=$BUILDREV"
 NINJA="ninja-build -j$N_THREADS"
 RPMBUILD="rpmbuild -ba --without apidoc $@"
 RPMLINT="rpmlint"
