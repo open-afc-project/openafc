@@ -2258,6 +2258,16 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 	_prTableFile = SearchPaths::forReading("data", "fbrat/rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv", true).toStdString();
 	// ***********************************
+
+	// ***********************************
+	// If this flag is set, report an error when all scan points are below _minRlanHeightAboveTerrain
+	// ***********************************
+	if (jsonObj.contains("reportErrorRlanHeightLowFlag") && !jsonObj["reportErrorRlanHeightLowFlag"].isUndefined()) {
+		_reportErrorRlanHeightLowFlag = jsonObj["reportErrorRlanHeightLowFlag"].toBool();
+	} else {
+		_reportErrorRlanHeightLowFlag = false;
+	}
+	// ***********************************
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -7396,7 +7406,7 @@ void AfcManager::runPointAnalysis()
 	const double exclusionDistKmSquared = (_exclusionDist / 1000.0) * (_exclusionDist / 1000.0);
 	const double maxRadiusKmSquared = (_maxRadius / 1000.0) * (_maxRadius / 1000.0);
 
-	if (_rlanRegion->getMaxHeightAGL() < _minRlanHeightAboveTerrain) {
+	if ( (_rlanRegion->getMaxHeightAGL() < _minRlanHeightAboveTerrain) && (_reportErrorRlanHeightLowFlag) ) {
 		LOGGER_WARN(logger) << std::string("ERROR: Point Analysis: Invalid RLAN parameter settings.") << std::endl
 			<< std::string("RLAN uncertainty region has a max AGL height of ") << _rlanRegion->getMaxHeightAGL()
 			<< std::string(", which is < ") << _minRlanHeightAboveTerrain << std::endl;
@@ -7795,7 +7805,7 @@ void AfcManager::runPointAnalysis()
 													rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, divIdx);
 												} else {
 													discriminationGain = uls->getPR(segIdx).computeDiscriminationGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, reflectorD0, reflectorD1);
-													rxGainDB = uls->getPR(segIdx).effectiveGain - discriminationGain;
+													rxGainDB = uls->getPR(segIdx).effectiveGain + discriminationGain;
 												}
 
 												nearFieldOffsetDB = 0.0;

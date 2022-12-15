@@ -1,5 +1,26 @@
 # Release Note
 ## **Version and Date**
+|Version|**OA-479**|
+| :- | :- |
+|**Date**|**12/14/2022**|
+
+
+## **Issues Addressed**
+ * Jira OA-479: Update Passive Repeater I/N calculations
+ * There was a typo in the spec (subraction instead of addition for single reflector) that is corrected here
+ * Jira OA-482: Clamp negative AP heights to min Height (1.5m)
+ 
+## **Interface Changes**
+ * For OA-482, a new flag should be added to afc-config to allow negative heights. This flag is “reportErrorRlanHeightLowFlag” = false. 
+ 
+## **Testing Done**
+ * OA-479: Tested FSP1 (and FSP3 and FSP14) that had incorrect values previously. Corrected FSP1 results are attached to this ticket.
+ * OA-482: Test FSP7 (with negative height). Results are attached to this ticket. Confirmed all RLAN scan points are evaluated at 1.5m. When the flag "reportErrorRlanHeightLowFlag" = true, we get the proper error message. 
+ * Also confirmed that we get same FSP1 results with this flag True or False (and same as before, as expected).
+
+## **Open Issues** 
+ * 
+## **Version and Date**
 |Version|3.5.1.1|
 | :- | :- |
 |**Date**|**12/06/2022**|

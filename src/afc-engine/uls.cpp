@@ -857,7 +857,7 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 			{
 				std::string subModelStr;
 				double rxGainDB = ULSClass::calcR2AIP07Antenna(angleOffBoresightDeg, frequency, antModel, antCategory, subModelStr, 0, rxGain, rxDlambda);
-				discriminationDB = rxGain - rxGainDB;
+				discriminationDB = rxGainDB - rxGain;
 
 				reflectorD0 = std::numeric_limits<float>::quiet_NaN();
 				reflectorD1 = std::numeric_limits<float>::quiet_NaN();

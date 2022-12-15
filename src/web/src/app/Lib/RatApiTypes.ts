@@ -60,7 +60,8 @@ export interface AFCConfigFile {
     visibilityThreshold?: number,
     allowScanPtsInUncReg?: boolean,
     passiveRepeaterFlag?: boolean,
-    printSkippedLinksFlag?: false 
+    printSkippedLinksFlag?: false,
+    reportErrorRlanHeightLowFlag?: false;
 }
 
 export type FreqRange = {
