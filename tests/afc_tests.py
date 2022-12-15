@@ -822,7 +822,12 @@ def get_db_req_resp(cfg):
 
 
 def ins_reqs(cfg):
-    """Insert requests from input file."""
+    """
+    Insert requests from input file to a table in test db.
+    Drop previous table of requests.
+    
+    """
+    app_log.debug(f"{inspect.stack()[0][3]}()")
 
     if isinstance(cfg['infile'], type(None)):
         app_log.error('Missing input file')
@@ -835,13 +840,21 @@ def ins_reqs(cfg):
         app_log.error('Missing raw test data file %s', filename)
         return AFC_ERR
 
-    if not make_db(cfg['db_filename']):
+    if not os.path.isfile(cfg['db_filename']):
+        app_log.error('Unable to find test db file.')
         return AFC_ERR
 
-    # fetch available requests and responses
-    db_reqs_list, db_resp_list = get_db_req_resp(cfg)
-
     con = sqlite3.connect(cfg['db_filename'])
+    # drop existing table of requests and create new one
+    app_log.info(f"Drop table of requests ({TBL_REQS_NAME})")
+    cur = con.cursor()
+    try:
+        cur.execute('DROP TABLE ' + TBL_REQS_NAME)
+    except Exception as OperationalError:
+        app_log.debug('Fail to drop, missing table %s', TBL_REQS_NAME)
+    cur.execute('CREATE TABLE ' + TBL_REQS_NAME + 
+        ' (test_id varchar(50), data json)')
+    con.commit()
     with open(filename, 'r') as fp_test:
         while True:
             dataline = fp_test.readline()
@@ -861,19 +874,8 @@ def ins_reqs(cfg):
                         MANDATORY_METADATA_KEYS - set(metadata_json.keys()))))
                 return AFC_ERR
 
-            # check if the test case already exists in the database test vectors
-            if metadata_json[TESTCASE_ID] in db_reqs_list:
-                app_log.error("Test case: %s already exists in database", 
-                    metadata_json[TESTCASE_ID])
-                break
-
-            # get request id from a request, response not always has it
-            # the request contains test category
-            req_id = json_lookup('requestId', request_json, None)
-
             app_log.info('Insert new request in DB (%s)',
                          metadata_json[TESTCASE_ID])
-            cur = con.cursor()
             cur.execute('INSERT INTO ' + TBL_REQS_NAME + ' VALUES ( ?, ?)',
                         (metadata_json[TESTCASE_ID], 
                         json.dumps(request_json),))
@@ -884,6 +886,7 @@ def ins_reqs(cfg):
 
 def add_reqs(cfg):
     """Prepare DB source files"""
+    app_log.debug(f"{inspect.stack()[0][3]}()")
 
     if isinstance(cfg['infile'], type(None)):
         app_log.error('Missing input file')
