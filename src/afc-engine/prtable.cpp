@@ -186,8 +186,8 @@ void PRTABLEClass::readTable()
 double PRTABLEClass::computePRTABLE(double Q, double oneOverKs)
 {
 
-	int qIdxDbl = getIdx(Q, QValList, numQ);
-	int kIdxDbl = getIdx(Q, oneOverKsValList, numOneOverKs);
+	double qIdxDbl = getIdx(Q, QValList, numQ);
+	double kIdxDbl = getIdx(oneOverKs, oneOverKsValList, numOneOverKs);
 
 	if (qIdxDbl < 0.0) {
 		qIdxDbl = 0.0;
@@ -251,7 +251,7 @@ double PRTABLEClass::getIdx(double val, double *valList, int numVal)
 		}
 	}
 
-	double idxDbl = (val - v0)/(v1 - v0);
+	double idxDbl = i0 + (val - v0)/(v1 - v0);
 
 	return(idxDbl);
 }
