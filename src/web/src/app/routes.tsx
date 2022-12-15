@@ -8,7 +8,6 @@ import { getAfcConfigFile } from "./Lib/RatApi";
 import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv } from "./Lib/FileApi";
 import { UserAccountPage } from "./UserAccount/UserAccount";
 import { getUsers, getMinimumEIRP, Limit, getAllowedRanges } from "./Lib/Admin";
-import { ImportExport } from "./ImportExport/ImportExport";
 import { Replay } from "./Replay/Replay"
 
 /**
@@ -96,23 +95,6 @@ const AFCConfig = () => {
       {(Component: any, resolve) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
           : <Component.AFCConfig limit={resolve.limit} ulsFiles={resolve.ulsFiles} afcConf={resolve.conf} antennaPatterns={resolve.antennaPatterns} frequencyBands={resolve.frequencyBands} />
-      }}
-    </DynamicImport>
-  );
-}
-
-const getImportExportModuleAsync = () => {
-  return () => import(/* webpackChunkName: "importexport" */ "./ImportExport/ImportExport");
-}
-const ImportExportResolves = async () => ({
-  conf: await getAfcConfigFile(),
-})
-const ImportExportPage = () => {
-  return (
-    <DynamicImport load={getImportExportModuleAsync()} resolve={ImportExportResolves()}>
-      {(Component: any, resolve) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
-          : <Component.ImportExport afcConfig={resolve.conf} />
       }}
     </DynamicImport>
   );
@@ -329,13 +311,6 @@ const routes: IAppRoute[] = [
     icon: null,
     label: "Account",
     path: "/account"
-  },
-  {
-    component: ImportExportPage,
-    exact: true,
-    icon: null,
-    label: "Import/Export",
-    path: "/import-export"
   },
 ];
 
