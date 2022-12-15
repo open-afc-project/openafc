@@ -56,9 +56,9 @@ http {
             # response to a request
             proxy_read_timeout ${AFC_PROXY_CONN_TOUT};
             # establish a connection with a proxied server
-            proxy_connect_timeout 300;
+            proxy_connect_timeout 720;
             # transmit a request to a proxied server
-            proxy_send_timeout 300;
+            proxy_send_timeout 720;
             proxy_pass http://backend$uri$is_args$args;
         }
         # redirect server error pages to the static page /50x.html
