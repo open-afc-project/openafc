@@ -199,7 +199,7 @@ An example how to use it with docker container, named "test".
 Following sequence creates files at path "`pwd`/data/wfa_test".
 
 ```
-docker -rm -v `pwd`/data:/data test --cmd dump_db --table wfa --outpath /data
+docker run --rm -v `pwd`/data:/data test --cmd dump_db --table wfa --outpath /data
 ```
 
 ## Compare AFC config records
@@ -275,6 +275,7 @@ sqlite3 afc_input.sqlite3
 .output dump.sql
 .dump
 .quit
+
 ```
 Open and edit dump.sql with any editor as it is a text file with not complicated SQL code.
 
@@ -288,6 +289,7 @@ sqlite3 ./afc_input.sqlite3
 
 .read dump.sql
 .quit
+
 ```
 At this stage there is a fixed DB that can be used.
 
