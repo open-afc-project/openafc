@@ -202,11 +202,14 @@ docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --grou
 
 Building the docker container images used by the Open AFC service is straitforward - in the root folder of the OpenAFC Project run default docker build command:
 ```
-docker build . -t server
-docker build worker -t worker
-docker build nginx -t nginx
-docker build msghnd -t msghnd
+docker build . -t rat_server
+docker build . -t worker -f worker/Dockerfile
+docker build . -t msghnd -f msghnd/Dockerfile
+cd nginx && docker build . -t nginx ; cd ..
+cd rabbitmq/ && docker build . -t rmq ; cd ..
+cd src/filestorage/ && docker build . -t objst; cd ../..
 ```
+
 Once built, docker images are usable as usual docker image.
 
 ## Prereqs
