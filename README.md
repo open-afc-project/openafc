@@ -28,6 +28,9 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 - [**OpenAFC Engine usage in Docker Environment**](#openafc-engine-usage-in-docker-environment)
 - [AFC Engine build in docker](#afc-engine-build-in-docker)
   - [Building Docker Container OpenAFC engine server](#building-docker-container-openafc-engine-server)
+  - [build prereq containers (optional)](#build-prereq-containers-optional)
+    - [rat-server prereq containers:](#rat-server-prereq-containers)
+    - [celery worker prereq containers:](#celery-worker-prereq-containers)
   - [Prereqs](#prereqs)
   - [docker-compose](#docker-compose)
   - [RabbitMQ settings](#rabbitmq-settings)
@@ -203,11 +206,40 @@ docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --grou
 Building the docker container images used by the Open AFC service is straitforward - in the root folder of the OpenAFC Project run default docker build command:
 ```
 docker build . -t rat_server
+
 docker build . -t worker -f worker/Dockerfile
+
 docker build . -t msghnd -f msghnd/Dockerfile
+
 cd nginx && docker build . -t nginx ; cd ..
+
 cd rabbitmq/ && docker build . -t rmq ; cd ..
+
 cd src/filestorage/ && docker build . -t objst; cd ../..
+```
+
+## build prereq containers (optional)
+The rat-server and celery worker containers use pecompiled containers available from public repositories.
+These prereq containes can be built manually.
+### rat-server prereq containers:
+```
+docker build . -t srv-preinst:local -f dockerfiles/Dockerfile-openafc-centos-preinstall-image
+
+docker build . -t srv-build:local   -f dockerfiles/Dockerfile-for-build
+```
+to build the rat-server using local preq containers insted of public:
+```
+docker build . -t rat_server --build-arg PRINST_NAME=srv-preinst --build-arg PRINST_TAG=local --build-arg BLD_NAME=srv-build --build-arg BLD_TAG=local
+```
+### celery worker prereq containers:
+```
+docker build . -t worker-preinst -f worker/Dockerfile.preinstall
+
+docker build . -t worker-build -f worker/Dockerfile.build
+```
+to build the worker using local preq containers insted of public:
+```
+docker build . -t worker -f worker/Dockerfile --build-arg PRINST_NAME=worker-preinst --build-arg PRINST_TAG=local --build-arg BLD_NAME=worker-build  --build-arg BLD_TAG=local
 ```
 
 Once built, docker images are usable as usual docker image.
