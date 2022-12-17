@@ -20,9 +20,11 @@ mkdir pipe
 mkdir afc_config
 docker run --rm -v `pwd`/pipe:/pipe ${RTEST_DI}:${TAG} --cmd exp_adm_cfg --outfile /pipe/export_admin_cfg.json
 check_ret $?
-# copy regr server config and run srvr
-cp -a ~/template_regrtest/*  .
+# copy regr server tls/mtls config (if existing)
+[ -d "~/template_regrtest/apache-conf" ] && cp -a ~/template_regrtest/apache-conf .
+[ -d "~/template_regrtest/ssl" ] && cp -a ~/template_regrtest/ssl .
 check_ret $?
+# run srvr
 docker-compose down && docker-compose up -d && docker ps -a
 check_ret $?
 sleep 5
