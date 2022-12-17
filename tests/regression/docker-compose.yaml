@@ -1,0 +1,105 @@
+version: '3.2'
+services:
+  ratdb:
+    image: postgres:9
+    restart: always
+    environment:
+      - POSTGRES_PASSWORD=N3SF0LVKJx1RAhFGx4fcw
+      - PGDATA=/var/lib/pgsql/data
+      - POSTGRES_DB=fbrat
+
+  rmq:
+    image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:${TAG:?err}
+    restart: always
+
+  nginx:
+    image: public.ecr.aws/w9v6y1o0/openafc/ngnx-image:${TAG:?err}
+    restart: always  
+    ports:
+      - "172.31.11.188:181-281:80"
+      - "172.31.11.188:544-644:443"
+    volumes:
+      - ./ssl/nginx:/certificates/servers
+    links:
+      - msghnd
+    environment:
+      - AFC_MSGHND_NAME=msghnd
+      - AFC_MSGHND_PORT=8000
+
+  rat_server:
+    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server:${TAG:?err}
+      #    build:
+      #      context: .
+    ports:
+      - "172.31.11.188:80-180:80"
+      - "172.31.11.188:443-543:443"
+    volumes:
+      - ${VOL_H_DB}:${VOL_C_DB1}
+      - ${VOL_H_DB}:${VOL_C_DB2}
+      - ./ssl:/etc/httpd/certs
+      - ./apache-conf:/etc/httpd/conf.d
+      - ./afc_config:/var/lib/fbrat/afc_config
+      - ./pipe:/pipe 
+    depends_on:
+      - ratdb
+    links:
+      - ratdb
+      - rmq
+      - objst  
+    environment:
+      # RabbitMQ server name:
+      - BROKER_TYPE=external
+      - BROKER_FQDN=rmq
+      # Filestorage params: 
+      - FILESTORAGE_HOST=objst
+      - FILESTORAGE_PORT=5000
+      - FILESTORAGE_SCHEME="HTTP"
+      - HISTORY_HOST=objst
+      - HISTORY_EXTERNAL_PORT=14999
+      # worker params
+      - CELERY_TYPE=external
+
+  msghnd:
+    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd:${TAG:?err}
+#    ports:
+#      - "172.31.11.188:1382:80"
+#      - "172.31.11.188:13445:443"
+    links:
+      - ratdb
+      - rmq
+      - objst  
+    environment:
+      # RabbitMQ server name:
+      - BROKER_TYPE=external
+      - BROKER_FQDN=rmq
+      # Filestorage params: 
+      - FILESTORAGE_HOST=objst
+      - FILESTORAGE_PORT=5000
+      - FILESTORAGE_SCHEME="HTTP"
+      - HISTORY_HOST=objst
+      - HISTORY_EXTERNAL_PORT=14999
+
+  objst:
+    image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:?err}
+    environment:
+      - FILESTORAGE_HOST=0.0.0.0
+      - FILESTORAGE_PORT=5000
+      - HISTORY_HOST=0.0.0.0
+      - HISTORY_PORT=4999
+      - FILESTORAGE_DIR=/storage
+  worker:
+    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:${TAG:?err}
+    volumes:
+      - ${VOL_H_DB}:${VOL_C_DB1}
+      - ${VOL_H_DB}:${VOL_C_DB2}
+    environment: 
+      # Filestorage params: 
+      - FILESTORAGE_HOST=objst
+      - FILESTORAGE_PORT=5000
+      - FILESTORAGE_SCHEME="HTTP"
+      # worker params
+      - CELERY_OPTIONS=rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10
+      # RabbitMQ server name:
+      - BROKER_TYPE=external
+      - BROKER_FQDN=rmq
+
