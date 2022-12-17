@@ -308,7 +308,8 @@ Default access to the database is described in the puppet files. However you can
 
 ## docker-compose
 
-You would probably like to use docker-compose for setting up everything together - in this case feel free to use following docker-compose.yaml file as reference:
+You would probably like to use docker-compose for setting up everything together - in this case feel free to use following docker-compose.yaml file as reference.
+also check docker-compose.yaml and .env files from tests/regression directory, which are used by OpenAFC CI:
 
 ```
 version: '3.2'

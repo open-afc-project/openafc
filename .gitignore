@@ -20,4 +20,3 @@ src/web/node_modules/*
 CMakeCache.txt
 CMakeFiles/*
 src/ratapi/ratapi/priv_config.py
-docker-compose.yaml
