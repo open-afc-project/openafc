@@ -15,6 +15,7 @@ source $wd/tests/regression/regression.sh
 
 hostname
 # export test dut configuration
+cd $wd/tests && docker build . -t ${RTEST_DI}:${TAG}
 cd $wd/tests/regression_${TAG}
 mkdir pipe
 mkdir afc_config
@@ -23,7 +24,6 @@ check_ret $?
 # copy regr server tls/mtls config (if existing)
 [ -d ~/template_regrtest/apache-conf ] && cp -a ~/template_regrtest/apache-conf .
 [ -d ~/template_regrtest/ssl ] && cp -a ~/template_regrtest/ssl .
-check_ret $?
 # run srvr
 docker-compose down && docker-compose up -d && docker ps -a
 check_ret $?
