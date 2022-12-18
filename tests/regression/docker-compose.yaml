@@ -20,7 +20,7 @@ services:
     ports:
       - "${EXT_IP}:${EXT_MTLS_PORT}:443"
     volumes:
-      - ${VOL_H_NGNX}:${VOL_C_NGNX}
+      - ${VOL_H_NGNX:-/tmp}:${VOL_C_NGNX:-/dummyngnx}
     links:
       - msghnd
     environment:
@@ -51,7 +51,6 @@ services:
       - FILESTORAGE_PORT=5000
       - FILESTORAGE_SCHEME=HTTP
       - HISTORY_HOST=objst
-      - HISTORY_EXTERNAL_PORT=14999
       # worker params
       - CELERY_TYPE=external
 
@@ -67,15 +66,12 @@ services:
       - FILESTORAGE_HOST=objst
       - FILESTORAGE_PORT=5000
       - FILESTORAGE_SCHEME=HTTP
-      - HISTORY_HOST=objst
-      - HISTORY_EXTERNAL_PORT=14999
 
   objst:
     image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:?err}
     environment:
       - FILESTORAGE_HOST=0.0.0.0
       - FILESTORAGE_PORT=5000
-      - HISTORY_HOST=0.0.0.0
       - HISTORY_PORT=4999
       - FILESTORAGE_DIR=/storage
   worker:
@@ -89,7 +85,7 @@ services:
       - FILESTORAGE_PORT=5000
       - FILESTORAGE_SCHEME=HTTP
       # worker params
-      - CELERY_OPTIONS=rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10
+      - CELERY_OPTIONS=rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10 rat_11 rat_12 rat_13 rat_14 rat_15
       # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
