@@ -21,8 +21,6 @@ services:
       - "${EXT_IP}:${EXT_MTLS_PORT}:443"
     volumes:
       - ${VOL_H_NGNX:-/tmp}:${VOL_C_NGNX:-/dummyngnx}
-    links:
-      - msghnd
     environment:
       - AFC_MSGHND_NAME=msghnd
       - AFC_MSGHND_PORT=8000
@@ -57,8 +55,6 @@ services:
 
   msghnd:
     image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd:${TAG:?err}
-    depends_on:
-      - ratdb
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
