@@ -51,6 +51,7 @@ RUN mkdir -m 755 -p /var/run/celery
 RUN mkdir -m 755 -p /var/log/celery
 
 RUN chown -R fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/celery
+RUN ln -s /usr/share/fbrat/rat_transfer/ULS_Database /var/lib/fbrat/ULS_Database
 
 COPY worker/docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh

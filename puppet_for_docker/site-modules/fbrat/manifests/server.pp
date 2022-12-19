@@ -151,12 +151,6 @@ class fbrat::server(
     group  => 'fbrat',
     mode   => '0750',
   }
-  file { '/var/lib/fbrat/ULS_Database':
-    ensure => 'directory',
-    owner  => 'fbrat',
-    group  => 'fbrat',
-    mode   => '0750',
-  }
   file { '/usr/share/fbrat':
     ensure => 'directory',
     owner  => 'fbrat',
