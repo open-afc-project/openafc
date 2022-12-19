@@ -115,6 +115,19 @@ class TestCfg(dict):
             }
         if (self['cache'] == False):
             params_data['nocache'] = 'True'
+
+        ser_cert=not self['skip_verif']
+        cli_certs=()
+        if (self['prot'] == AFC_PROT_NAME and
+            self['skip_verif'] == False):
+            # add mtls certificates if explicitly provided
+            if not isinstance(self['cli_cert'], type(None)):
+                cli_certs=("".join(self['cli_cert']), "".join(self['cli_key']))
+            # add tls certificates if explicitly provided
+            if not isinstance(self['ca_cert'], type(None)):
+                ser_cert="".join(self['ca_cert'])
+        app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
+
         before_ts = time.monotonic()
         rawresp = requests.post(
             self['url_path'],
@@ -385,6 +398,59 @@ def get_md5(fname):
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+
+def _send_recv(cfg, req_data):
+    """Send AFC request and receiver it's response"""
+    app_log.debug(f"_send_recv()")
+
+    new_req_json = json.loads(req_data.encode('utf-8'))
+    new_req = json.dumps(new_req_json, sort_keys=True)
+    params_data = {
+        'conn_type':cfg['conn_type'],
+        'debug':cfg['debug'],
+        'gui':cfg['gui']
+        }
+    if (cfg['cache'] == False):
+        params_data['nocache'] = 'True'
+
+    ser_cert=not cfg['skip_verif']
+    cli_certs=()
+    if (cfg['prot'] == AFC_PROT_NAME and
+        cfg['skip_verif'] == False):
+        # add mtls certificates if explicitly provided
+        if not isinstance(cfg['cli_cert'], type(None)):
+            cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
+        # add tls certificates if explicitly provided
+        if not isinstance(cfg['ca_cert'], type(None)):
+            ser_cert="".join(cfg['ca_cert'])
+    app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
+
+    rawresp = requests.post(
+        cfg['url_path'],
+        params=params_data,
+        data=new_req,
+        headers=headers,
+        timeout=600,    #10 min
+        verify=cfg['skip_verif'])
+    resp = rawresp.json()
+
+    tId = resp.get('taskId')
+    if ((cfg['conn_type'] == 'async') and
+        (not isinstance(tId, type(None)))):
+        tState = resp.get('taskState')
+        params_data['task_id'] = tId
+        while (tState == 'PENDING') or (tState == 'PROGRESS'):
+            app_log.debug('_run_test() state %s, tid %s, status %d',
+                      tState, tId, rawresp.status_code)
+            time.sleep(2)
+            rawresp = requests.get(cfg['url_path'],
+                                   params=params_data)
+            if rawresp.status_code == 200:
+                resp = rawresp.json()
+                break
+
+    return resp
 
 
 def collect_tests2combine(sh, rows, t_ident, t2cmb, cmb_t):
@@ -749,42 +815,56 @@ def start_acquisition(cfg):
     Fetch test vectors from the DB, drop previous response table,
     run tests and fill responses in the DB with hash values
     """
-    app_log.debug('%s()', inspect.stack()[0][3])
+    app_log.debug(f"{inspect.stack()[0][3]}()")
 
-    if not os.path.isfile(cfg['db_filename']):
-        app_log.error('Missing DB file %s', cfg['db_filename'])
-        return AFC_ERR
+    found_reqs, found_resp, ids, test_ids = _convert_reqs_n_resps_to_dict(cfg)
 
+    # check if to make acquisition of all tests
     con = sqlite3.connect(cfg['db_filename'])
     cur = con.cursor()
-    cur.execute('SELECT * FROM %s' % TBL_REQS_NAME)
-    found_reqs = cur.fetchall()
-    try:
-        cur.execute('DROP TABLE ' + TBL_RESPS_NAME)
-    except Exception as OperationalError:
-        app_log.debug('Missing table %s', TBL_RESPS_NAME)
-    cur.execute('CREATE TABLE ' + TBL_RESPS_NAME +
-                ' (test_id varchar(50), data json, hash varchar(255))')
+    # drop response table and create new one if all testcases required
+    # to reacquisition
+    all_resps = False
+    if (len(test_ids) == len(found_reqs)):
+        all_resps = True
+    if all_resps:
+        try:
+            app_log.debug(f"{inspect.stack()[0][3]}() "
+                          f"drop table {TBL_RESPS_NAME}")
+            cur.execute('DROP TABLE ' + TBL_RESPS_NAME)
+        except Exception as OperationalError:
+            # awkward but bearable
+            app_log.debug('Missing table %s', TBL_RESPS_NAME)
+        cur.execute('CREATE TABLE ' + TBL_RESPS_NAME +
+                    ' (test_id varchar(50), data json, hash varchar(255))')
 
-    row_idx = 0
-    found_range = len(found_reqs)
-    if len(found_reqs) == 0:
-        app_log.error('Missing request records')
-        return AFC_ERR
-    app_log.info('Acquisition to number of tests - %d', found_range - row_idx)
-
-    while row_idx < found_range:
-        # Fetch test vector to create request
-        new_req, resp = cfg._send_recv(found_reqs[row_idx][1])
+    app_log.info(f"Number of tests to make acquisition - {len(test_ids)}")
+    for test_id in test_ids:
+        req_id = ids[test_id][0]
+        app_log.debug(f"Request: {req_id}")
+        resp = _send_recv(cfg, json.dumps(found_reqs[test_id][0]))
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
         hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
-        cur.execute('INSERT INTO ' + TBL_RESPS_NAME + ' values ( ?, ?, ?)',
-                    [found_reqs[row_idx][0],
-                     upd_data,
-                     hash_obj.hexdigest()])
-        con.commit()
-        row_idx += 1
+        app_log.debug(f"{inspect.stack()[0][3]}() "
+                      f"{hash_obj.hexdigest()} "
+                      f"{found_resp[test_id][1]}")
+        if all_resps:
+            cur.execute('INSERT INTO ' + TBL_RESPS_NAME + ' values ( ?, ?, ?)',
+                        [req_id,
+                         upd_data,
+                         hash_obj.hexdigest()])
+            con.commit()
+        elif (found_resp[test_id][1] == hash_obj.hexdigest()):
+            app_log.debug(f"Skip to update hash for {req_id}. "
+                          f"Found the same value.")
+            continue
+        else:
+            hash = hash_obj.hexdigest()
+            cur.execute('UPDATE ' + TBL_RESPS_NAME + ' SET ' + 
+                        'data = ?, hash = ? WHERE test_id =?',
+                        (upd_data, hash, ids[test_id][0]))
+            con.commit()
     con.close()
     return AFC_OK
 
@@ -986,13 +1066,12 @@ def dump_table(conn, tbl_name, out_file):
                 TBL_RESPS_NAME: '_Response.txt'
             }
             new_json = json.loads(val[1][1].encode('utf-8'))
-            req_id = json_lookup('requestId', new_json, None)
+            _, name, nbr = val[1][0].split('.')
+            app_log.debug(f"{inspect.stack()[0][3]}() {name} {nbr}")
             # omit URS testcases
-            if (req_id[0].lower().find('urs') != -1 or
-                len(req_id[0]) == 0):
+            if (name.lower().find('urs') != -1):
                 continue
 
-            name, nbr = re.findall(r'(\w+?)(\d+)', req_id[0])[0];
             fp_test = open(f"{out_file['split']}/AFCS_{name}_{nbr}" +\
                            f"{tbl_fname[tbl_name]}", 'a')
             fp_test.write(f"{val[1][1]}\n")
@@ -1129,11 +1208,13 @@ def dry_run_test(cfg):
             # process dataline arguments
             request_json, _ = process_jsonline(dataline)
 
-            new_req, resp = cfg._send_recv(json.dumps(request_json))
+            resp = _send_recv(cfg, json.dumps(request_json))
+         #  new_req, resp = cfg._send_recv(json.dumps(request_json))
 
             # get request id from a request, response not always has it
             # the request contains test category
-            new_req_json = json.loads(new_req.encode('utf-8'))
+            #new_req_json = json.loads(new_req.encode('utf-8'))
+            new_req_json = json.loads(json.dumps(request_json).encode('utf-8'))
             req_id = json_lookup('requestId', new_req_json, None)
 
             resp_res = json_lookup('shortDescription', resp, None)
@@ -1195,7 +1276,7 @@ def test_report(fname, runtimedata, testnumdata, testvectordata,
         file_writer.writerow(data)
 
 
-def _run_tests(cfg, reqs, resps, comparator, test_cases):
+def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
     """
     Run tests
     reqs: {testcaseid: [request_json_str]}
@@ -1210,7 +1291,8 @@ def _run_tests(cfg, reqs, resps, comparator, test_cases):
     accum_secs = 0
 
     for test_case in test_cases:
-        app_log.info(f"Prepare to run test - {test_case}")
+        req_id = ids[test_case][0]
+        app_log.info(f"Prepare to run test - {req_id}")
         if test_case not in reqs:
             app_log.warning(f"The requested test case {test_case} is "
                             f"invalid/not available in database")
@@ -1218,51 +1300,8 @@ def _run_tests(cfg, reqs, resps, comparator, test_cases):
             
         request_data = reqs[test_case][0]
 
-        req_id = json_lookup('requestId', request_data, None)
-        params_data = {
-            'conn_type':cfg['conn_type'],
-            'debug':cfg['debug'],
-            'gui':cfg['gui']
-            }
-        if (cfg['cache'] == False):
-            params_data['nocache'] = 'True'
-
-        ser_cert=not cfg['skip_verif']
-        cli_certs=()
-        if (cfg['prot'] == AFC_PROT_NAME and
-            cfg['skip_verif'] == False):
-            # add mtls certificates if explicitly provided
-            if not isinstance(cfg['cli_cert'], type(None)):
-                cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
-            # add tls certificates if explicitly provided
-            if not isinstance(cfg['ca_cert'], type(None)):
-                ser_cert="".join(cfg['ca_cert'])
-        app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
-
         before_ts = time.monotonic()
-        rawresp = requests.post(cfg['url_path'],
-                                params=params_data,
-                                data=json.dumps(request_data),
-                                headers=headers,
-                                timeout=600,    #10 min
-                                cert=cli_certs,
-                                verify=ser_cert)
-        resp = rawresp.json()
-
-        tId = resp.get('taskId')
-        if (cfg['conn_type'] == 'async') and (not isinstance(tId, type(None))):
-            tState = resp.get('taskState')
-            params_data['task_id'] = tId
-            while (tState == 'PENDING') or (tState == 'PROGRESS'):
-                app_log.debug('_run_test() state %s, tid %s, status %d',
-                          tState, tId, rawresp.status_code)
-                time.sleep(2)
-                rawresp = requests.get(cfg['url_path'],
-                                       params=params_data)
-                if rawresp.status_code == 200:
-                    resp = rawresp.json()
-                    break
-
+        resp = _send_recv(cfg, json.dumps(request_data))
         tm_secs = time.monotonic() - before_ts
 
         json_lookup('availabilityExpireTime', resp, '0')
@@ -1274,9 +1313,9 @@ def _run_tests(cfg, reqs, resps, comparator, test_cases):
                                            result_str=upd_data)
         if (resps[test_case][1] == hash_obj.hexdigest()) \
                 if cfg['precision'] is None else (not diffs):
-            app_log.info(f"Test {req_id[0]} is Ok")
+            app_log.info(f"Test {req_id} is Ok")
         else:
-            app_log.error(f"Test {test_case} ({req_id[0]}) is Fail")
+            app_log.error(f"Test {test_case} ({req_id}) is Fail")
             for line in diffs:
                 app_log.error(f"  Difference: {line}")
             app_log.error(hash_obj.hexdigest())
@@ -1288,7 +1327,7 @@ def _run_tests(cfg, reqs, resps, comparator, test_cases):
         # For saving test results option
         if isinstance(cfg['outfile'], list):
             test_report(cfg['outfile'][0], float(tm_secs),
-                        test_case, req_id[0],
+                        test_case, req_id,
                         ("PASS" if test_res == AFC_OK else "FAIL"),
                         upd_data)
 
@@ -1296,15 +1335,14 @@ def _run_tests(cfg, reqs, resps, comparator, test_cases):
     return test_res
 
 
-def prep_and_run_tests(cfg, reqs, resps, test_cases):
+def prep_and_run_tests(cfg, reqs, resps, ids, test_cases):
     """
     Run tests
     reqs: {testcaseid: [request_json_str]}
     resps: {testcaseid: [response_json_str, response_hash]}
     test_cases: [testcaseids]
     """
-    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() {test_cases} "
-                  f"{cfg['url_path']}")
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
 
     test_res = AFC_OK
     results_comparator = TestResultComparator(precision=cfg['precision'] or 0)
@@ -1316,7 +1354,7 @@ def prep_and_run_tests(cfg, reqs, resps, test_cases):
 
     while (max_nbr_tests != 0):
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() "
-                      f"{max_nbr_tests}")
+                      f"Number of tests to run: {max_nbr_tests}")
         if max_nbr_tests < len(test_cases):
             del test_cases[-(len(test_cases) - max_nbr_tests):]
 
@@ -1332,7 +1370,7 @@ def prep_and_run_tests(cfg, reqs, resps, test_cases):
                 test_res = AFC_ERR
         else:
             res = _run_tests(cfg, reqs, resps,
-                             results_comparator, test_cases)
+                             results_comparator, ids, test_cases)
             if res != AFC_OK:
                 test_res = res
         # when required to run more tests than there are testcases
@@ -1341,10 +1379,13 @@ def prep_and_run_tests(cfg, reqs, resps, test_cases):
     return test_res
 
 
-def run_test(cfg):
-    """Fetch test vectors from the DB and run tests"""
-    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() "
-                  f"{cfg['tests']}, {cfg['url_path']}")
+def _convert_reqs_n_resps_to_dict(cfg):
+    """
+       Fetch test vectors and responses from the DB
+       Convert to dictionaries indexed by id or original index from table
+       Prepare list of new indexes
+    """
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
 
     if not os.path.isfile(cfg['db_filename']):
         app_log.error('Missing DB file %s', cfg['db_filename'])
@@ -1356,18 +1397,11 @@ def run_test(cfg):
     found_reqs = cur.fetchall()
     cur.execute('SELECT * FROM %s' % TBL_RESPS_NAME)
     found_resps = cur.fetchall()
+    con.close()
 
-    if cfg["is_test_by_index"]:
-        # reformat the reqs_dict and resp_dict accordingly
-        reqs_dict = {
-            str(req_index+1): [json.loads(row[1])]
-            for req_index, row in enumerate(found_reqs)
-        }
-        resp_dict = {
-            str(resp_index+1): [row[1], row[2]]
-            for resp_index, row in enumerate(found_resps)
-        }
-    else:
+    # reformat the reqs_dict and resp_dict accordingly
+    if not isinstance(cfg['testcase_ids'], type(None)):
+        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() by id")
         reqs_dict = {
             row[0]: [json.loads(row[1])]
             for row in found_reqs
@@ -1376,24 +1410,56 @@ def run_test(cfg):
             row[0]: [row[1], row[2]]
             for row in found_resps
         }
-
-    con.close()
-
-    if isinstance(cfg['tests'], type(None)):
-        test_cases = 0
+        ids_dict = {
+            row[0]: [row[0], req_index+1]
+            for req_index, row in enumerate(found_reqs)
+        }
+        test_indx = list(map(str.strip, cfg.pop("testcase_ids").split(',')))
+        cfg.pop("testcase_indexes")
     else:
-        test_cases = list(map(str.strip, cfg['tests'].split(',')))
-
-    if test_cases == 0:
-        if cfg["is_test_by_index"]:
-            test_cases = [
+        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() by index")
+        reqs_dict = {
+            str(req_index+1): [json.loads(row[1])]
+            for req_index, row in enumerate(found_reqs)
+        }
+        resp_dict = {
+            str(resp_index+1): [row[1], row[2]]
+            for resp_index, row in enumerate(found_resps)
+        }
+        ids_dict = {
+            str(req_index+1): [row[0], req_index+1]
+            for req_index, row in enumerate(found_reqs)
+        }
+        if not isinstance(cfg['testcase_indexes'], type(None)):
+            test_indx = list(map(str.strip,
+                                  cfg.pop("testcase_indexes").split(',')))
+            cfg.pop("testcase_ids")
+        else:
+            test_indx = [
                 str(item) for item in list(range(1, len(reqs_dict)+1))
             ]
-        else:
-            test_cases = list(reqs_dict.keys())
 
-    # run required test cases
-    return prep_and_run_tests(cfg, reqs_dict, resp_dict, test_cases)
+    # build list of indexes, omitting non-existing elements
+    test_cases = list()
+    for i in range(0, len(test_indx)):
+        if reqs_dict.get(test_indx[i]) is None:
+            app_log.debug(f"Missing value for index {test_indx[i]}")
+            continue
+        app_log.debug(f"{reqs_dict[test_indx[i]]}")
+        test_cases.append(test_indx[i])
+    app_log.debug(f"{inspect.stack()[0][3]}() Final list of indexes. "
+                  f"{test_cases}")
+
+    return reqs_dict, resp_dict, ids_dict, test_cases
+
+
+def run_test(cfg):
+    """Fetch test vectors from the DB and run tests"""
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() "
+                  f"{cfg['tests']}, {cfg['url_path']}")
+
+    reqs_dict, resp_dict, ids, test_cases = _convert_reqs_n_resps_to_dict(cfg)
+    return prep_and_run_tests(cfg, reqs_dict, resp_dict, ids, test_cases)
 
 
 def stress_run(cfg):
@@ -1622,7 +1688,7 @@ def make_arg_parser():
         "dump_db - dump tables from the database.\n"
         "get_nbr_testcases - return number of testcases.\n"
         "parse_tests - parse WFA provided tests into a files.\n"
-        "reqca - reacquision every test from the database and insert new "
+        "reacq - reacquision every test from the database and insert new "
         "responses.\n"
         "cmp_cfg - compare AFC config from the DB to provided from a file.\n"
         "stress - run tests in stress mode.\n"
@@ -1642,14 +1708,6 @@ def prepare_args(parser, cfg):
         app_log.error('Please use either "--testcase_indexes"'
                       ' or "--testcase_ids" but not both')
         return AFC_ERR
-
-    if cfg["testcase_indexes"]:
-        cfg["tests"] = cfg.pop("testcase_indexes")
-        cfg.pop("testcase_ids")
-    elif cfg["testcase_ids"]:
-        cfg["is_test_by_index"] = False
-        cfg["tests"] = cfg.pop("testcase_ids")
-        cfg.pop("testcase_indexes")
 
     return execution_map[cfg['cmd']][1](cfg)
 
