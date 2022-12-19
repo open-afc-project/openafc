@@ -358,7 +358,7 @@ class TestResultComparator:
 
 
 def json_lookup(key, json_obj, val):
-    """Loookup for key in json and change it value if required"""
+    """Lookup for key in json and change it value if required"""
     keepit = []
 
     def lookup(key, json_obj, val, keepit):
@@ -385,6 +385,53 @@ def get_md5(fname):
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+
+def collect_tests2combine(sh, rows, t_ident, t2cmb, cmb_t):
+    """
+       Lookup for combined test vectors,
+       build of required test vectors to combine
+    """
+    app_log.debug('%s()\n', inspect.stack()[0][3])
+    for i in range(1, rows + 1):
+        cell = sh.cell(row = i, column = PURPOSE_CLM)
+        if ((cell.value is None) or
+            (AFC_TEST_IDENT.get(cell.value.lower()) is None) or
+            (cell.value == 'SRI')):
+            continue
+
+        if (t_ident != 'all') and (cell.value.lower() != t_ident):
+            continue
+
+        cell = sh.cell(row = i, column = COMBINED_CLM)
+        if cell.value is not None:
+            raw_list = str(cell.value)
+
+            test_case_id = sh.cell(row = i, column = UNIT_NAME_CLM).value
+            test_case_id += "."
+            test_case_id += sh.cell(row = i, column = PURPOSE_CLM).value
+            test_case_id += "."
+            test_case_id += str(sh.cell(row = i, column = TEST_VEC_CLM).value)
+
+            cmb_t[test_case_id] = []
+            for t in raw_list.split(','):
+                if '-' in t:
+                    # found range of test vectors
+                    left, right = t.split('-')
+                    t2cmb_ident = ''
+                    for r in AFC_TEST_IDENT:
+                        if r in left.lower():
+                            min = int(left.replace(r.upper(),''))
+                            max = int(right.replace(r.upper(),'')) + 1
+                            t2cmb_ident = r.upper()
+                            for cnt in range(min, max):
+                                tcase = t2cmb_ident + str(cnt)
+                                t2cmb[tcase] = ''
+                                cmb_t[test_case_id] += [tcase]
+                else:
+                    # found single test vector
+                    t2cmb[t] = ''
+                    cmb_t[test_case_id] += [t]
 
 
 def parse_tests(cfg):
@@ -420,6 +467,20 @@ def parse_tests(cfg):
     sheet = wb.active
     nbr_rows = sheet.max_row
     app_log.debug('Rows range 1 - %d', nbr_rows + 1)
+
+    # collect tests to combine in next loop
+    tests2combine = dict()
+    # gather combined tests
+    combined_tests = dict()
+    collect_tests2combine(sheet, nbr_rows, test_ident,
+                          tests2combine,
+                          combined_tests)
+    if len(combined_tests):
+        app_log.info('Found combined test vectors: %s',
+                      ' '.join(combined_tests))
+        app_log.info('Found test vectors to combine: %s',
+                      ' '.join(tests2combine))
+
     for i in range(1, nbr_rows + 1):
         cell = sheet.cell(row = i, column = PURPOSE_CLM)
         if ((cell.value is None) or
@@ -430,136 +491,152 @@ def parse_tests(cfg):
         if (test_ident != 'all') and (cell.value.lower() != test_ident):
             continue
 
-        res_str = REQ_HEADER + REQ_INQUIRY_HEADER + REQ_INQ_CHA_HEADER
-        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_90)
-        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
-        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_92)
-        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
-        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_94)
-        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
-        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_96)
-        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
-        cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_98)
-        res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}'
-        res_str += REQ_INQ_CHA_FOOTER + ' '
-
-        cell = sheet.cell(row = i, column = UNIT_NAME_CLM)
-        uut = cell.value
-        cell = sheet.cell(row = i, column = PURPOSE_CLM)
-        purpose = cell.value
-        cell = sheet.cell(row = i, column = TEST_VEC_CLM)
-        test_vec = cell.value
+        uut = sheet.cell(row = i, column = UNIT_NAME_CLM).value
+        purpose = sheet.cell(row = i, column = PURPOSE_CLM).value
+        test_vec = sheet.cell(row = i, column = TEST_VEC_CLM).value
 
         test_case_id = uut + "." + purpose + "." + str(test_vec)
 
-        res_str += REQ_DEV_DESC_HEADER
-        cell = sheet.cell(row = i, column = RULESET_CLM)
-        res_str += REQ_RULESET + '["' + str(cell.value) + '"],'
+        ver = sheet.cell(row = i, column = VERSION_CLM).value
 
-        cell = sheet.cell(row = i, column = SER_NBR_CLM)
-        if isinstance(cell.value, str):
-            serial_id = cell.value
+        # Prepare request header '{"availableSpectrumInquiryRequests": [{'
+        res_str = REQ_INQUIRY_HEADER
+        # check if the test case is combined 
+        cell = sheet.cell(row = i, column = COMBINED_CLM)
+        if cell.value is not None:
+            for item in combined_tests[test_case_id]:
+                res_str += tests2combine[item] + ','
+            res_str = res_str[:-1]
         else:
-            serial_id = ""
-        res_str += REQ_SER_NBR + '"' + serial_id + '",' + REQ_CERT_ID_HEADER
+            res_str += '{' + REQ_INQ_CHA_HEADER
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_90)
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_92)
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_94)
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_96)
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_98)
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}'
+            res_str += REQ_INQ_CHA_FOOTER + ' '
 
-        cell = sheet.cell(row = i, column = NRA_CLM)
-        res_str += REQ_NRA + '"' + cell.value + '",'
+            res_str += REQ_DEV_DESC_HEADER
+            cell = sheet.cell(row = i, column = RULESET_CLM)
+            res_str += REQ_RULESET + '["' + str(cell.value) + '"],'
 
-        cell = sheet.cell(row = i, column = ID_CLM)
-        if isinstance(cell.value, str):
-            cert_id = cell.value
-        else:
-            cert_id = ""
-        res_str += REQ_ID + '"' + cert_id + '"' + REQ_CERT_ID_FOOTER
-        res_str += REQ_DEV_DESC_FOOTER + REQ_INQ_FREQ_RANG_HEADER
+            cell = sheet.cell(row = i, column = SER_NBR_CLM)
+            if isinstance(cell.value, str):
+                serial_id = cell.value
+            else:
+                serial_id = ""
+            res_str += REQ_SER_NBR + '"' + serial_id + '",' + REQ_CERT_ID_HEADER
 
-        freq_range = AfcFreqRange()
-        freq_range.set_range_limit(sheet.cell(row = i, column = LOWFREQUENCY_86), 'low')
-        freq_range.set_range_limit(sheet.cell(row = i, column = HIGHFREQUENCY_87), 'high')
-        try:
-            res_str += freq_range.append_range()
-        except IncompleteFreqRange as e:
-            app_log.debug(e)
-        freq_range = AfcFreqRange()
-        freq_range.set_range_limit(sheet.cell(row = i, column = LOWFREQUENCY_88), 'low')
-        freq_range.set_range_limit(sheet.cell(row = i, column = HIGHFREQUENCY_89), 'high')
-        try:
-            tmp_str = freq_range.append_range()
-            res_str += ', ' + tmp_str
-        except IncompleteFreqRange as e:
-            app_log.debug(e)
+            cell = sheet.cell(row = i, column = NRA_CLM)
+            res_str += REQ_NRA + '"' + cell.value + '",'
 
-        res_str += REQ_INQ_FREQ_RANG_FOOTER
+            cell = sheet.cell(row = i, column = ID_CLM)
+            if isinstance(cell.value, str):
+                cert_id = cell.value
+            else:
+                cert_id = ""
+            res_str += REQ_ID + '"' + cert_id + '"' + REQ_CERT_ID_FOOTER
+            res_str += REQ_DEV_DESC_FOOTER + REQ_INQ_FREQ_RANG_HEADER
 
-        cell = sheet.cell(row = i, column = MINDESIREDPOWER)
-        if (cell.value):
-            res_str += REQ_MIN_DESIRD_PWR + str(cell.value) + ', '
+            freq_range = AfcFreqRange()
+            freq_range.set_range_limit(sheet.cell(row = i, column = LOWFREQUENCY_86), 'low')
+            freq_range.set_range_limit(sheet.cell(row = i, column = HIGHFREQUENCY_87), 'high')
+            try:
+                res_str += freq_range.append_range()
+            except IncompleteFreqRange as e:
+                app_log.debug(e)
+            freq_range = AfcFreqRange()
+            freq_range.set_range_limit(sheet.cell(row = i, column = LOWFREQUENCY_88), 'low')
+            freq_range.set_range_limit(sheet.cell(row = i, column = HIGHFREQUENCY_89), 'high')
+            try:
+                tmp_str = freq_range.append_range()
+                res_str += ', ' + tmp_str
+            except IncompleteFreqRange as e:
+                app_log.debug(e)
 
-        #
-        # Location
-        #
-        res_str += REQ_LOC_HEADER
-        cell = sheet.cell(row = i, column = INDOORDEPLOYMENT)
-        res_str += REQ_LOC_INDOORDEPL + str(cell.value) + ', '
+            res_str += REQ_INQ_FREQ_RANG_FOOTER
 
-        # Location - elevation
-        res_str += REQ_LOC_ELEV_HEADER
-        cell = sheet.cell(row = i, column = VERTICALUNCERTAINTY)
-        if isinstance(cell.value, int):
-            res_str += REQ_LOC_VERT_UNCERT + str(cell.value) + ', '
-        cell = sheet.cell(row = i, column = HEIGHTTYPE)
-        res_str += REQ_LOC_HEIGHT_TYPE + '"' + str(cell.value) + '"'
-        cell = sheet.cell(row = i, column = HEIGHT)
-        if isinstance(cell.value, int) or isinstance(cell.value, float):
-            res_str += ', ' + REQ_LOC_HEIGHT + str(cell.value)
-        res_str += '}, '
+            cell = sheet.cell(row = i, column = MINDESIREDPOWER)
+            if (cell.value):
+                res_str += REQ_MIN_DESIRD_PWR + str(cell.value) + ', '
 
-        # Location - uncertainty
-        is_set = 0
-        res_str += REQ_LOC_ELLIP_HEADER
-        geo_coor = AfcGeoCoordinates()
-        geo_coor.set_coordinates(sheet.cell(row = i, column = LATITUDE_CLM),
-                                 'latitude')
-        geo_coor.set_coordinates(sheet.cell(row = i, column = LONGITUDE_CLM),
-                                 'longitude')
-        try:
-            res_str += geo_coor.append_coordinates()
-            is_set = 1
-        except IncompleteGeoCoordinates as e:
-            app_log.debug(e)
+            #
+            # Location
+            #
+            res_str += REQ_LOC_HEADER
+            cell = sheet.cell(row = i, column = INDOORDEPLOYMENT)
+            res_str += REQ_LOC_INDOORDEPL + str(cell.value) + ', '
 
-        cell = sheet.cell(row = i, column = ORIENTATION_CLM)
-        uncert = ''
-        if isinstance(cell.value, int):
-            if is_set:
-                res_str += ', '
-            is_set = 1
-            uncert = REQ_LOC_ORIENT + str(cell.value)
-        res_str += uncert
+            # Location - elevation
+            res_str += REQ_LOC_ELEV_HEADER
+            cell = sheet.cell(row = i, column = VERTICALUNCERTAINTY)
+            if isinstance(cell.value, int):
+                res_str += REQ_LOC_VERT_UNCERT + str(cell.value) + ', '
+            cell = sheet.cell(row = i, column = HEIGHTTYPE)
+            res_str += REQ_LOC_HEIGHT_TYPE + '"' + str(cell.value) + '"'
+            cell = sheet.cell(row = i, column = HEIGHT)
+            if isinstance(cell.value, int) or isinstance(cell.value, float):
+                res_str += ', ' + REQ_LOC_HEIGHT + str(cell.value)
+            res_str += '}, '
 
-        cell = sheet.cell(row = i, column = MINORAXIS_CLM)
-        if isinstance(cell.value, int):
-            if is_set:
-                res_str += ', '
-            is_set = 1
-            uncert = REQ_LOC_MINOR_AXIS + str(cell.value)
-        res_str += uncert
+            # Location - uncertainty
+            is_set = 0
+            res_str += REQ_LOC_ELLIP_HEADER
+            geo_coor = AfcGeoCoordinates()
+            geo_coor.set_coordinates(sheet.cell(row = i, column = LATITUDE_CLM),
+                                     'latitude')
+            geo_coor.set_coordinates(sheet.cell(row = i, column = LONGITUDE_CLM),
+                                     'longitude')
+            try:
+                res_str += geo_coor.append_coordinates()
+                is_set = 1
+            except IncompleteGeoCoordinates as e:
+                app_log.debug(e)
 
-        cell = sheet.cell(row = i, column = MAJORAXIS_CLM)
-        if isinstance(cell.value, int):
-            if is_set:
-                res_str += ', '
-            uncert = REQ_LOC_MAJOR_AXIS + str(cell.value)
-        res_str += uncert
-        res_str += REQ_LOC_ELLIP_FOOTER + REQ_LOC_FOOTER
-        
-        cell = sheet.cell(row = i, column = REQ_ID_CLM)
-        if isinstance(cell.value, str):
-            req_id = cell.value
-        else:
-            req_id = ""
-        res_str += REQ_REQUEST_ID + '"' + req_id + '"'
+            cell = sheet.cell(row = i, column = ORIENTATION_CLM)
+            uncert = ''
+            if isinstance(cell.value, int):
+                if is_set:
+                    res_str += ', '
+                is_set = 1
+                uncert = REQ_LOC_ORIENT + str(cell.value)
+            res_str += uncert
+
+            cell = sheet.cell(row = i, column = MINORAXIS_CLM)
+            if isinstance(cell.value, int):
+                if is_set:
+                    res_str += ', '
+                is_set = 1
+                uncert = REQ_LOC_MINOR_AXIS + str(cell.value)
+            res_str += uncert
+
+            cell = sheet.cell(row = i, column = MAJORAXIS_CLM)
+            if isinstance(cell.value, int):
+                if is_set:
+                    res_str += ', '
+                uncert = REQ_LOC_MAJOR_AXIS + str(cell.value)
+            res_str += uncert
+            res_str += REQ_LOC_ELLIP_FOOTER + REQ_LOC_FOOTER
+            
+            cell = sheet.cell(row = i, column = REQ_ID_CLM)
+            if isinstance(cell.value, str):
+                req_id = cell.value
+            else:
+                req_id = ""
+            res_str += REQ_REQUEST_ID + '"' + req_id + '"'
+            res_str += '}'
+
+            # collect test vectors required for combining
+            # build test case id in format <purpose><test vector>
+            short_tcid = ''.join(test_case_id.split('.', 1)[1].split('.'))
+            if short_tcid in tests2combine.keys():
+                tests2combine[short_tcid] = res_str.split(REQ_INQUIRY_HEADER)[1] 
+
         res_str += REQ_INQUIRY_FOOTER
         cell = sheet.cell(row = i, column = VERSION_CLM)
         res_str += REQ_VERSION + '"' + str(cell.value) + '"'
@@ -744,8 +821,72 @@ def get_db_req_resp(cfg):
     return db_reqs_list, db_resp_list
 
 
+def ins_reqs(cfg):
+    """
+    Insert requests from input file to a table in test db.
+    Drop previous table of requests.
+    
+    """
+    app_log.debug(f"{inspect.stack()[0][3]}()")
+
+    if isinstance(cfg['infile'], type(None)):
+        app_log.error('Missing input file')
+        return AFC_ERR
+
+    filename = cfg['infile'][0]
+    app_log.debug('%s() %s', inspect.stack()[0][3], filename)
+
+    if not os.path.isfile(filename):
+        app_log.error('Missing raw test data file %s', filename)
+        return AFC_ERR
+
+    if not os.path.isfile(cfg['db_filename']):
+        app_log.error('Unable to find test db file.')
+        return AFC_ERR
+
+    con = sqlite3.connect(cfg['db_filename'])
+    # drop existing table of requests and create new one
+    app_log.info(f"Drop table of requests ({TBL_REQS_NAME})")
+    cur = con.cursor()
+    try:
+        cur.execute('DROP TABLE ' + TBL_REQS_NAME)
+    except Exception as OperationalError:
+        app_log.debug('Fail to drop, missing table %s', TBL_REQS_NAME)
+    cur.execute('CREATE TABLE ' + TBL_REQS_NAME + 
+        ' (test_id varchar(50), data json)')
+    con.commit()
+    with open(filename, 'r') as fp_test:
+        while True:
+            dataline = fp_test.readline()
+            if not dataline:
+                break
+
+            # process dataline arguments
+            request_json, metadata_json = process_jsonline(dataline)
+
+            # reject the request if mandatory metadata arguments are not present
+            if not MANDATORY_METADATA_KEYS.issubset(
+                    set(metadata_json.keys())):
+                # missing mandatory keys in test case input
+                app_log.error("Test case input does not contain required"
+                    " mandatory arguments: %s",
+                    ", ".join(list(
+                        MANDATORY_METADATA_KEYS - set(metadata_json.keys()))))
+                return AFC_ERR
+
+            app_log.info('Insert new request in DB (%s)',
+                         metadata_json[TESTCASE_ID])
+            cur.execute('INSERT INTO ' + TBL_REQS_NAME + ' VALUES ( ?, ?)',
+                        (metadata_json[TESTCASE_ID], 
+                        json.dumps(request_json),))
+            con.commit()
+    con.close()
+    return AFC_OK
+
+
 def add_reqs(cfg):
     """Prepare DB source files"""
+    app_log.debug(f"{inspect.stack()[0][3]}()")
 
     if isinstance(cfg['infile'], type(None)):
         app_log.error('Missing input file')
@@ -1378,6 +1519,7 @@ def parse_run_cert_args(cfg):
 # available commands to execute in alphabetical order
 execution_map = {
     'add_reqs' : [add_reqs, parse_run_test_args],
+    'ins_reqs' : [ins_reqs, parse_run_test_args],
     'cmp_cfg' : [compare_afc_config, parse_run_test_args],
     'dry_run' : [dry_run_test, parse_run_test_args],
     'dump_db': [dump_database, parse_run_test_args],
@@ -1476,6 +1618,7 @@ def make_arg_parser():
         "exp_adm_cfg - export admin config into a file.\n"
         "add_reqs - run test from provided file and insert with response into "
         "the databsse.\n"
+        "ins_reqs - insert tests from provided file into the databsse.\n"
         "dump_db - dump tables from the database.\n"
         "get_nbr_testcases - return number of testcases.\n"
         "parse_tests - parse WFA provided tests into a files.\n"
