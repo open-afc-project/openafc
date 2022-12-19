@@ -86,10 +86,6 @@ services:
       - 1443:443
       volumes:
       - /usr/share/fbrat/rat_transfer:/usr/share/fbrat/rat_transfer
-      - /usr/share/fbrat/rat_transfer/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
-      - /usr/share/fbrat/rat_transfer/RAS_Database:/var/lib/fbrat/RAS_Database
-      - /usr/share/fbrat/rat_transfer/ULS_Database:/var/lib/fbrat/ULS_Database
-      - /usr/share/fbrat/rat_transfer/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
       environment:
       #File storage host is a name of file storage service
       - FILESTORAGE_HOST=objstorage
@@ -146,10 +142,6 @@ services:
       - 1443:443
       volumes:
       - /usr/share/fbrat/rat_transfer:/usr/share/fbrat/rat_transfer
-      - /usr/share/fbrat/rat_transfer/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
-      - /usr/share/fbrat/rat_transfer/RAS_Database:/var/lib/fbrat/RAS_Database
-      - /usr/share/fbrat/rat_transfer/ULS_Database:/var/lib/fbrat/ULS_Database
-      - /usr/share/fbrat/rat_transfer/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
       environment:
       #File storage host is a name of file storage service
       - FILESTORAGE_HOST=objstorage
