@@ -228,7 +228,7 @@ class DataIf(DataIfBaseV1):
         self._fsroot = fsroot
 
         # check args
-        if not self._port.isdigit():
+        if self._port is not None and not self._port.isdigit():
             raise "Invalid port. Try to remove the quotes around AFC_OBJST_PORT value"
         if scheme is not None and scheme != "HTTPS" and scheme != "HTTP":
             raise "Invalid scheme. Try to remove the quotes around AFC_OBJST_SCHEME value"
