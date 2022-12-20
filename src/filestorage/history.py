@@ -34,17 +34,17 @@ flask.config.from_pyfile('filestorage_config.py')
 
 if flask.config['LOG_STREAM']:
     logging.basicConfig(stream=flask.config['LOG_STREAM'],
-                        level=flask.config['LOG_LEVEL'])
-elif flask.config['LOG_FILE']:
-    logging.basicConfig(filename=flask.config['LOG_FILE'],
-                        level=flask.config['LOG_LEVEL'])
+                        level=flask.config['AFC_OBJST_LOG_LVL'])
+elif flask.config['AFC_OBJST_LOG_FILE']:
+    logging.basicConfig(filename=flask.config['AFC_OBJST_LOG_FILE'],
+                        level=flask.config['AFC_OBJST_LOG_LVL'])
 else:
-    logging.basicConfig(level=flask.config['LOG_LEVEL'])
+    logging.basicConfig(level=flask.config['AFC_OBJST_LOG_LVL'])
 
-if flask.config["OBJSTORAGE"] == "GoogleCloudBucket":
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = flask.config["GOOGLE_CLOUD_CREDENTIALS_JSON"]
+if flask.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = flask.config["AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON"]
     client = google.cloud.storage.client.Client()
-    bucket = client.bucket(flask.config["GOOGLE_CLOUD_BUCKET"])
+    bucket = client.bucket(flask.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
 
 def generateHtml(schema, baseurl, dirs, files):
     flask.logger.debug("generateHtml({}, {}, {})".format(baseurl, dirs, files))
@@ -171,11 +171,11 @@ class Objstorage:
     def open(self, name):
         """ Create ObjInt instance """
         flask.logger.debug("Objstorage.open({})".format(name))
-        if flask.config["OBJSTORAGE"] == "GoogleCloudBucket":
+        if flask.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
             return ObjIntGoogleCloudBucket(name)
-        if flask.config["OBJSTORAGE"] == "LocalFS":
+        if flask.config["AFC_OBJST_MEDIA"] == "LocalFS":
             return ObjIntLocalFS(name)
-        raise Exception("Unsupported OBJSTORAGE \"{}\"".format(flask.config["OBJSTORAGE"]))
+        raise Exception("Unsupported AFC_OBJST_MEDIA \"{}\"".format(flask.config["AFC_OBJST_MEDIA"]))
 
 
 def get_local_path(path):
@@ -215,11 +215,11 @@ def get(path):
 
 if __name__ == '__main__':
     os.makedirs(flask.config["DBG_LOCATION"], exist_ok=True)
-    waitress.serve(flask, host=flask.config["HISTORY_HOST"],
-          port=flask.config["HISTORY_PORT"])
+    waitress.serve(flask, host=flask.config["AFC_OBJST_HIST_HOST"],
+          port=flask.config["AFC_OBJST_HIST_PORT"])
 
-    #flask.run(host=flask.config['HISTORY_HOST'],
-    #           port=flask.config['HISTORY_PORT'], debug=True)
+    #flask.run(host=flask.config['AFC_OBJST_HIST_HOST'],
+    #           port=flask.config['AFC_OBJST_HIST_PORT'], debug=True)
 
 
 

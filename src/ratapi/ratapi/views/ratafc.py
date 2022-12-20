@@ -383,8 +383,8 @@ class RatAfc(MethodView):
                 if opt == 'True':
                     runtime_opts |= RNTM_OPT_NOCACHE
                 LOGGER.debug('RatAfc::post() runtime %d', runtime_opts)
-                if ('FILESTORAGE_HOST' in os.environ and
-                        'FILESTORAGE_PORT' in os.environ):
+                if ('AFC_OBJST_HOST' in os.environ and
+                        'AFC_OBJST_PORT' in os.environ):
                     runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
 
                 task_id = str(uuid.uuid4())
@@ -392,7 +392,7 @@ class RatAfc(MethodView):
                     fsroot=flask.current_app.config['STATE_ROOT_PATH'])
 
                 # calculate hash
-                request_json_bytes = json.dumps(request).encode('utf-8')
+                request_json_bytes = json.dumps(request, sort_keys=True).encode('utf-8')
                 config_bytes = None
                 with dataif.open("cfg", region + "/afc_config.json") as hfile:
                     config_bytes = hfile.read()

@@ -45,7 +45,7 @@ def build_task(dataif,
     """
 
     prot, host, port, state_root = dataif.getProtocol()
-    run.apply_async(args=[
+    args=[
         prot,
         host,
         port,
@@ -58,7 +58,9 @@ def build_task(dataif,
         region,
         history_dir,
         runtime_opts
-    ])
+    ]
+    LOGGER.debug("build_task() {}".format(args))
+    run.apply_async(args)
 
 
 class GuiConfig(MethodView):

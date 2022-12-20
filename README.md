@@ -358,10 +358,10 @@ services:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
       # Filestorage params:
-      - FILESTORAGE_HOST=objst
-      - FILESTORAGE_PORT=5000
-      - FILESTORAGE_SCHEME=HTTP
-      - HISTORY_HOST=objst
+      - AFC_OBJST_HOST=objst
+      - AFC_OBJST_PORT=5000
+      - AFC_OBJST_SCHEME=HTTP
+      - AFC_OBJST_HIST_HOST=objst
       # worker params
       - CELERY_TYPE=external
 
@@ -377,9 +377,9 @@ services:
       - /opt/afc/databases/rat_transfer:/usr/share/fbrat/rat_transfer
     environment:
       # Filestorage params:
-      - FILESTORAGE_HOST=objst
-      - FILESTORAGE_PORT=5000
-      - FILESTORAGE_SCHEME="HTTP"
+      - AFC_OBJST_HOST=objst
+      - AFC_OBJST_PORT=5000
+      - AFC_OBJST_SCHEME="HTTP"
       # worker params
       - CELERY_OPTIONS=rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10
       # RabbitMQ server name:
@@ -389,7 +389,7 @@ services:
   objst:
     image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:latest
     environment:
-      - FILESTORAGE_PORT=5000
+      - AFC_OBJST_PORT=5000
 
   msghnd:
     build:
@@ -404,9 +404,9 @@ services:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
       # Filestorage params:
-      - FILESTORAGE_HOST=objst
-      - FILESTORAGE_PORT=5000
-      - FILESTORAGE_SCHEME=HTTP
+      - AFC_OBJST_HOST=objst
+      - AFC_OBJST_PORT=5000
+      - AFC_OBJST_SCHEME=HTTP
 
 ```
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
