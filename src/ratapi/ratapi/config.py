@@ -20,7 +20,7 @@ DEBUG = False
 #: Enable detailed exception stack messages
 PROPAGATE_EXCEPTIONS = False
 #: Root logger filter
-AFC_OBJST_LOG_LVL = logging.WARNING
+LOG_LEVEL = logging.WARNING
 #: Set of log handlers to use for root logger
 LOG_HANDLERS = [
     logging.StreamHandler(),

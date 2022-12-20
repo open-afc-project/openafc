@@ -1145,7 +1145,7 @@ def main():
             DEBUG=(log_level == 'DEBUG'),
             PROPAGATE_EXCEPTIONS=(log_level == 'DEBUG'),
             # converts str log_level to int value
-            AFC_OBJST_LOG_LVL=logging.getLevelName(log_level),
+            LOG_LEVEL=logging.getLevelName(log_level),
             LOG_HANDLERS=[logging.StreamHandler()]
         )
         return create_app(config_override=conf)
