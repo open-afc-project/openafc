@@ -79,6 +79,7 @@ class Task():
         stat = None
         time0 = time.time()
         while True:
+            time.sleep(delay)
             stat = self.get()
             LOGGER.debug("task.wait() status {}".format(stat['status']))
             if (stat['status'] == Task.STAT_SUCCESS or
@@ -87,7 +88,6 @@ class Task():
             if (time.time() - time0) > timeout:
                 LOGGER.debug("task.wait() timeout")
                 return self.__toDict(Task.STAT_PROGRESS)
-            time.sleep(delay)
         LOGGER.debug("task.wait() exit")
 
     def ready(self, stat):

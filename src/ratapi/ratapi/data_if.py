@@ -95,8 +95,7 @@ class DataIntFs(DataInt):
             r = f.read()
         if r is None:
             raise Exception("Cant get file")
-        else:
-            return r
+        return r
 
     def head(self):
         """ is data exist in prot """
@@ -166,14 +165,12 @@ class DataIfBaseV1():
             url = "https://" + host + ":" + str(port) + "/" + "cfg"
             try:
                 requests.head(url, timeout=self.HTTPS_TIMEOUT)
-            except:
-                pass
-#            except requests.exceptions.ConnectionError:  # fall to http
-#                LOGGER.debug("httpsProbe() fall to HTTP")
-#                return False
-            else:  # use https
-                LOGGER.debug("httpsProbe() HTTPS ok")
-                return True
+            except requests.exceptions.ConnectionError:  # fall to http
+                LOGGER.debug("httpsProbe() fall to HTTP")
+                return False
+            # use https
+            LOGGER.debug("httpsProbe() HTTPS ok")
+            return True
 
         if self._prot == self.REMOTE:
             if httpsProbe(self._host, self._port, probeHttps):
@@ -215,31 +212,26 @@ class DataIf(DataIfBaseV1):
     """ Wrappers for RATAPI data operations """
     def __init__(self, prot=DataIfBaseV1.AUTO, host=None, port=None,
                  fsroot=None, probeHttps=None):
-        LOGGER.debug("DataIf.__init__()")
-        # Assign default args
-        self._host = None
-        if host:
-            self._host = host
-        else:
-            if "FILESTORAGE_HOST" in os.environ:
-                self._host = os.environ["FILESTORAGE_HOST"]
-        self._port = None
-        if port:
-            self._port = port
-        else:
-            if "FILESTORAGE_PORT" in os.environ:
-                self._port = os.environ["FILESTORAGE_PORT"]
-        self._prot = prot
+
+        # Assign default args from env vars
+        self._host = host
+        if "AFC_OBJST_HOST" in os.environ and host is None:
+            self._host = os.environ["AFC_OBJST_HOST"]
+        self._port = port
+        if "AFC_OBJST_PORT" in os.environ and port is None:
+            self._port = os.environ["AFC_OBJST_PORT"]
+        scheme = None
+        if "AFC_OBJST_SCHEME" in os.environ:
+            scheme = os.environ["AFC_OBJST_SCHEME"]
+            if probeHttps is None:
+                probeHttps = False
         self._fsroot = fsroot
 
-        scheme = None
-        if "FILESTORAGE_SCHEME" in os.environ:
-            scheme = os.environ["FILESTORAGE_SCHEME"]
-        if probeHttps is None:
-            if scheme == "HTTPS" or scheme == "HTTP":
-                probeHttps = False
-            else:
-                probeHttps = True
+        # check args
+        if not self._port.isdigit():
+            raise "Invalid port. Try to remove the quotes around AFC_OBJST_PORT value"
+        if scheme is not None and scheme != "HTTPS" and scheme != "HTTP":
+            raise "Invalid scheme. Try to remove the quotes around AFC_OBJST_SCHEME value"
 
         # Clarify protocol by env.vars
         if prot == self.AUTO:
@@ -264,6 +256,10 @@ class DataIf(DataIfBaseV1):
             raise Exception("Bad prot arg")
 
         self._prot = prot
+
+        LOGGER.debug("DataIf.__init__: prot={} host={} port={} fsroot={} probeHttps={} scheme={}"
+                     .format(self._prot, self._host, self._port, self._fsroot,
+                             probeHttps, scheme))
 
         DataIfBaseV1.__init__(self, probeHttps)
 

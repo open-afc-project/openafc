@@ -34,13 +34,12 @@ FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 COPY --from=build_image /root/afc/__install /usr/
 COPY --from=build_image /root/gdal/__install/lib /usr/lib/
 
-RUN mkdir -m 750 -p /var/lib/fbrat/AntennaPatterns
 RUN mkdir -m 755 -p /var/spool/fbrat
 RUN mkdir -m 755 -p /var/lib/fbrat
 RUN mkdir -m 755 -p /var/celery
 RUN mkdir -m 755 -p /var/run/celery
 RUN mkdir -m 755 -p /var/log/celery
-RUN chown -R fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/celery
+RUN chown -R fbrat:fbrat /var/spool/fbrat /var/lib/fbrat /var/celery
 RUN ln -s /usr/share/fbrat/rat_transfer/ULS_Database /var/lib/fbrat/ULS_Database
 RUN ln -s /usr/share/fbrat/rat_transfer/RAS_Database /var/lib/fbrat/RAS_Database
 
