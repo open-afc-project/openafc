@@ -16,7 +16,8 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 COPY afc_tests.py /usr/app/afc_tests.py
 COPY _version.py /usr/app/_version.py
 COPY _afc_errors.py /usr/app/_afc_errors.py
-COPY _wfa_tests.py /usr/app/_wfa_tests.py
+COPY _afc_types.py /usr/app/_afc_types.py
+COPY _wfa_types.py /usr/app/_wfa_types.py
 COPY afc_input.sqlite3 /usr/app/afc_input.sqlite3
 
 ENV PYTHONPATH=/usr/app

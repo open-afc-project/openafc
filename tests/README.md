@@ -19,8 +19,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Add AFC Server admin configuration](#add-afc-server-admin-configuration)
   - [Remove AFC Server admin configuration](#remove-afc-server-admin-configuration)
   - [List AFC Server admin configuration](#list-afc-server-admin-configuration)
-  - [Export tests from WFA file to JSON format](#export-tests-from-wfa-file-to-json-format)
-  - [Export tests requests and responses in WFA file format](#export-tests-requests-and-responses-in-wfa-file-format)
+  - [Export tests from WFA excel file to test DB](#export-tests-from-wfa-excel-file-to-test-db)
   - [Compare AFC config records](#compare-afc-config-records)
   - [Reacquisition response records for exist requests](#reacquisition-response-records-for-exist-requests)
   - [How to run HTTPs access test](#how-to-run-https-access-test)
@@ -176,20 +175,26 @@ List internal data from provided admin configuration file
 rat-manage-api cfg list src=./add_admin_cfg.json
 ```
 
-## Export tests from WFA file to JSON format
+## Export tests from WFA excel file to test DB
 
-How to export test vectors from WFA file into JSON format file.
+First to export test vectors from WFA excel file into JSON format file.
 ```
 afc_tests.py --cmd parse_tests --infile <input file> --outfile <output file>
 ```
-For example, export certain WFA test cases
+For example, export all WFA test vectors
 
 ```
-afc_tests.py --cmd parse_tests --infile "AFC System (SUT) Test Vectors r6.xlsx" --outfile abc.txt --test_id srs
+afc_tests.py --cmd parse_tests --infile "AFC System (SUT) Test Vectors r6.xlsx" --outfile abc.txt --test_id all
 ```
-
-## Export tests requests and responses in WFA file format
-
+Next step, to import those test vectors into test DB.
+```
+afc_tests.py --cmd inp_reqs --infile abc.txt
+```
+Next step, to get new AFC responses for test vectors. It requires to make reacquisition.
+The commands sends every test vector, gets relevant response and inserts into test DB.
+```
+afc_tests.py --cmd reacq --addr <ip address> --port <number>
+```
 Following example exports test vectors and corresponded responses to WFA format files.
 All files created in local directory "wfa_test".
 ```
