@@ -13,8 +13,11 @@ http {
 
 
     upstream backend {
-        ip_hash;
+        # use hash algo to capture complete client address
+        hash $binary_remote_addr consistent;
         server ${AFC_MSGHND_NAME}:${AFC_MSGHND_PORT};
+        # idle connections preserved in the cache of each worker
+        keepalive  32;
     }
 #   server {
 #       listen 80;
@@ -60,13 +63,17 @@ http {
             # transmit a request to a proxied server
             proxy_send_timeout 720;
             proxy_pass http://backend$uri$is_args$args;
+            # keep connections open by changing it's header
+            proxy_http_version 1.1;
+            proxy_set_header   "Connection" "";
         }
         # redirect server error pages to the static page /50x.html
         #
-        error_page   500 502 503 504  /50x.html;
-        location = /50x.html {
-            root   /usr/share/nginx/html;
-        }
+        error_page   500 502 503 504;
+        #error_page   500 502 503 504  /50x.html;
+        #location = /50x.html {
+        #    root   /usr/share/nginx/html;
+        #}
 
         #error_page 403 /403.html;
         #location /403.html {
