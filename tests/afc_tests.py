@@ -423,13 +423,20 @@ def _send_recv(cfg, req_data):
             ser_cert="".join(cfg['ca_cert'])
     app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
-    rawresp = requests.post(
-        cfg['url_path'],
-        params=params_data,
-        data=new_req,
-        headers=headers,
-        timeout=600,    #10 min
-        verify=cfg['skip_verif'])
+    try:
+        rawresp = requests.post(
+            cfg['url_path'],
+            params=params_data,
+            data=new_req,
+            headers=headers,
+            timeout=600,    #10 min
+            verify=cfg['skip_verif'])
+        rawresp.raise_for_status()
+    except (requests.exceptions.HTTPError,
+            requests.exceptions.ConnectionError) as err:
+        app_log.error(f"{err}")
+        return
+
     resp = rawresp.json()
 
     tId = resp.get('taskId')
@@ -570,6 +577,10 @@ def start_acquisition(cfg):
         req_id = ids[test_id][0]
         app_log.debug(f"Request: {req_id}")
         resp = _send_recv(cfg, json.dumps(found_reqs[test_id][0]))
+        if isinstance(resp, type(None)):
+            app_log.error(f"Test {test_ids} ({req_id}) is Failed.")
+            continue
+
         json_lookup('availabilityExpireTime', resp, '0')
         upd_data = json.dumps(resp, sort_keys=True)
         hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
@@ -941,7 +952,6 @@ def dry_run_test(cfg):
 
             # get request id from a request, response not always has it
             # the request contains test category
-            #new_req_json = json.loads(new_req.encode('utf-8'))
             new_req_json = json.loads(json.dumps(request_json).encode('utf-8'))
             req_id = json_lookup('requestId', new_req_json, None)
 
@@ -1254,6 +1264,11 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() {test_cases} "
                   f"{cfg['url_path']}")
 
+    if not len(resps):
+        app_log.info(f"Unable to compare response data."
+                     f"Suggest to make acquisition of responses.")
+        return AFC_ERR
+
     test_res = AFC_OK
     accum_secs = 0
 
@@ -1271,22 +1286,27 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         resp = _send_recv(cfg, json.dumps(request_data))
         tm_secs = time.monotonic() - before_ts
 
-        json_lookup('availabilityExpireTime', resp, '0')
-        upd_data = json.dumps(resp, sort_keys=True)
-
-        diffs = []
-        hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
-        diffs = comparator.compare_results(ref_str=resps[test_case][0],
-                                           result_str=upd_data)
-        if (resps[test_case][1] == hash_obj.hexdigest()) \
-                if cfg['precision'] is None else (not diffs):
-            app_log.info(f"Test {req_id} is Ok")
-        else:
-            app_log.error(f"Test {test_case} ({req_id}) is Fail")
-            for line in diffs:
-                app_log.error(f"  Difference: {line}")
-            app_log.error(hash_obj.hexdigest())
+        if isinstance(resp, type(None)):
             test_res = AFC_ERR
+        else:
+            json_lookup('availabilityExpireTime', resp, '0')
+            upd_data = json.dumps(resp, sort_keys=True)
+
+            diffs = []
+            hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
+            diffs = comparator.compare_results(ref_str=resps[test_case][0],
+                                               result_str=upd_data)
+            if (resps[test_case][1] == hash_obj.hexdigest()) \
+                    if cfg['precision'] is None else (not diffs):
+                app_log.info(f"Test {req_id} is Ok")
+            else:
+                for line in diffs:
+                    app_log.error(f"  Difference: {line}")
+                app_log.error(hash_obj.hexdigest())
+                test_res = AFC_ERR
+
+        if test_res == AFC_ERR:
+            app_log.error(f"Test {test_case} ({req_id}) is Fail")
         
         accum_secs += tm_secs
         app_log.info('Test done at %.1f secs', tm_secs)
