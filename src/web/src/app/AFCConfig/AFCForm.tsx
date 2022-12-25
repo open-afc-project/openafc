@@ -1,5 +1,5 @@
 import * as React from "react";
-import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition, Radio } from "@patternfly/react-core";
+import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition, Radio, CardHead, PageSection} from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import BuildlingPenetrationLossForm from "./BuildingPenetrationLossForm";
 import PolarizationMismatchLossForm from "./PolarizationMismatchLossForm";
@@ -9,11 +9,12 @@ import AntennaPatternForm from "./AntennaPatternForm";
 import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
-import { getDefaultAfcConf, guiConfig, getAfcConfigFile } from "../Lib/RatApi";
+import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
 import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
 import {setDefaultRegion} from "../Lib/User";
+import DownloadContents from "../Components/DownloadContents";
 
 /**
 * AFCForm.tsx: form for generating afc configuration files to be used to update server
@@ -265,6 +266,57 @@ export class AFCForm extends React.Component<
     }
 
     private getConfig = () => JSON.stringify(this.state.config);
+
+    private export = () =>
+        new Blob([JSON.stringify(Object.assign(exportCache(), {afcConfig: this.state.config }))], {
+            type: "application/json"
+        });
+
+
+    private import(ev) {
+        // @ts-ignore
+        const file = ev.target.files[0];
+        const reader = new FileReader();
+        try {
+            reader.onload = async () => {
+                try {
+                    const value: any = JSON.parse(reader.result as string);
+                    if (value.afcConfig) {
+                        if (value.afcConfig.version !== guiConfig.version) {
+                            const warning: string = "The imported file is from a different version. It has version '"
+                                + value.afcConfig.version
+                                + "', and you are currently running '"
+                                + guiConfig.version
+                                + "'.";
+                            logger.warn(warning);
+                        }
+                        const putResp = await putAfcConfigFile(value.afcConfig);
+                        if (putResp.kind === "Error") {
+                            this.setState({ messageError: putResp.description, messageSuccess: undefined });
+                            return;
+                        } else {
+                            this.updateEntireConfigState(value.afcConfig);
+                        }
+                    }
+
+                    value.afcConfig = undefined;
+
+                    importCache(value);
+
+                    this.setState({ messageError: undefined, messageSuccess: "Import successful!" });
+                } catch (e) {
+                    this.setState({ messageError: "Unable to import file", messageSuccess: undefined})
+                }
+            }
+
+            reader.readAsText(file);
+
+       } catch (e) {
+            logger.error("Failed to import application state", e);
+            this.setState({ messageError: "Failed to import application state", messageSuccess: undefined });
+        }
+    }
+
 
     render() {
         const setPenetrationLoss = (x: PenetrationLossModel) => {
@@ -990,6 +1042,25 @@ export class AFCForm extends React.Component<
                         <Button variant="secondary" onClick={this.reset}>Reset Form to Default</Button>{" "}
                         <Button key="open-modal" variant="secondary" onClick={() => this.setState({ isModalOpen: true })}>Copy/Paste</Button>
                     </>
+                    <br/>
+                    <br/>
+                     <FormGroup
+                         label="Import Afc Config"
+                         fieldId="import-afc-form"
+                     >
+
+                    <input
+                        // @ts-ignore
+                        type="file"
+                        name="import afc file"
+                        // @ts-ignore
+                        onChange={(ev) => this.import(ev)}
+                        />
+                    </FormGroup>
+                    <br/>
+                    <DownloadContents fileName="Download AFC Config" contents={() => this.export()} />
+                    <br/>
+
                 </CardBody>
             </Card >);
     }
