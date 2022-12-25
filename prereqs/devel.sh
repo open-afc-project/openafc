@@ -13,7 +13,6 @@ if [ "$AFC_DEVEL_ENV" == "devel" ]; then
 	yum -y install cmake3 ninja-build minizip-devel yarn
         yum -y install centos-release-scl
         yum -y install devtoolset-11-toolchain
-        rpm -e --nodeps gcc-gfortran gcc
 fi
 
 # Local Variables:

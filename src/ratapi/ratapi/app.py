@@ -155,19 +155,18 @@ def create_app(config_override=None):
     # celery.conf.update(flaskapp.config)
 
     # Static file dispatchers
-    if True:
+    if flaskapp.config['AFC_APP_TYPE'] == 'server':
         from werkzeug.middleware.dispatcher import DispatcherMiddleware
         from wsgidav import wsgidav_app
         from wsgidav.fs_dav_provider import FilesystemProvider
 
         # get static web file location
-        if flaskapp.config['AFC_APP_TYPE'] == 'server':
-            webdata_paths = BaseDirectory.load_data_paths('fbrat', 'www')
-            # Temporary solution, do not raise exception while web module
-            # not installed.
-            if not webdata_paths:
-                raise RuntimeError(
-                    'Web data directory "fbrat/www" is not available')
+        webdata_paths = BaseDirectory.load_data_paths('fbrat', 'www')
+        # Temporary solution, do not raise exception while web module
+        # not installed.
+        if not webdata_paths:
+            raise RuntimeError(
+                'Web data directory "fbrat/www" is not available')
 
         # get uls database directory
         uls_databases = os.path.join(
@@ -178,7 +177,7 @@ def create_app(config_override=None):
         # get static uls data path
         flaskapp.config['DEFAULT_ULS_DIR'] = next(
             BaseDirectory.load_data_paths('fbrat', 'afc-engine',
-                                              'ULS_Database'), None)
+                                          'ULS_Database'), None)
         if flaskapp.config['DEFAULT_ULS_DIR'] is None:
             LOGGER.error("No default ULS directory found in path search")
 
@@ -191,8 +190,7 @@ def create_app(config_override=None):
         # List of (URL paths from root URL, absolute local filesystem paths,
         # read-only boolean)
         dav_trees = ()
-        if flaskapp.config['AFC_APP_TYPE'] == 'server':
-            dav_trees = dav_trees + (('/www', next(webdata_paths), True),)
+        dav_trees = dav_trees + (('/www', next(webdata_paths), True),)
 
         dav_trees = dav_trees + (('/ratapi/v1/files/uls_db', uls_databases,
                                   False),
@@ -204,8 +202,8 @@ def create_app(config_override=None):
             probeHttps=False)
         if dataif.isFsBackend():
             hist_dir = os.path.join(
-                flaskapp.config['STATE_ROOT_PATH'],
-                data_if.DataIf.LHISTORYDIR)
+        	    flaskapp.config['STATE_ROOT_PATH'],
+        	    data_if.DataIf.LHISTORYDIR)
             if not os.path.exists(hist_dir):
                 os.makedirs(hist_dir)
             tmp = list(dav_trees)
@@ -216,11 +214,11 @@ def create_app(config_override=None):
         for (url_path, fs_path, read_only) in dav_trees:
             if fs_path is None:
                 flaskapp.logger.debug(
-                    'skipping dav export: {0}'.format(url_path))
+        	    'skipping dav export: {0}'.format(url_path))
                 continue
             if not os.path.isdir(fs_path):
                 flaskapp.logger.error(
-                    'Missing DAV export path "{0}"'.format(fs_path))
+        	    'Missing DAV export path "{0}"'.format(fs_path))
                 continue
 
             dav_config = wsgidav_app.DEFAULT_CONFIG.copy()
