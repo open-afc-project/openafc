@@ -1,4 +1,4 @@
-This work is licensed under the OpenAFC Project License, a copy of which is included with this software program .
+This work is licensed under the OpenAFC Project License, a copy of which is included with this software program.
 
 <br />
 <br />
