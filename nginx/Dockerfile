@@ -4,10 +4,7 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-FROM nginx:1.21.6
-RUN apt update \
-    && apt install -y openssl \
-    && apt install -y bash
+FROM nginx:1.22-alpine
 
 RUN mkdir -p \
     /wd \
