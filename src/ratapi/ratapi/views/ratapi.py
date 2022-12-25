@@ -25,7 +25,8 @@ import werkzeug.exceptions
 from ..defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
 from ..tasks.afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from ..models.aaa import User, AccessPoint
+from ..models.aaa import User, AccessPoint, AFCConfig
+from ..models.base import db
 from .auth import auth
 from ..models import aaa
 from .. import data_if
@@ -304,7 +305,24 @@ class AfcConfigFile(MethodView):
         dataif = data_if.DataIf(
             fsroot=flask.current_app.config['STATE_ROOT_PATH'])
         with dataif.open("cfg", filedesc['alt'] + "/afc_config.json") as hfile:
-            hfile.write(flask.request.stream.read())
+            bytes = flask.request.stream.read()
+            rcrd = json.loads(bytes)
+            ordered_bytes = json.dumps(rcrd, sort_keys=True)
+            hfile.write(ordered_bytes)
+            try:
+                filedesc = self.ACCEPTABLE_FILES[rcrd["regionStr"]]
+                config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext == rcrd["regionStr"]).first()
+                if not config:
+                    config = AFCConfig(rcrd)
+                    db.session.add(config)
+                else:
+                    config.config = rcrd
+                    config.created = datetime.datetime.now()
+                db.session.commit()
+
+            except:
+                raise werkzeug.exceptions.NotFound()
+
         return flask.make_response('AFC configuration file updated', 204)
 
 

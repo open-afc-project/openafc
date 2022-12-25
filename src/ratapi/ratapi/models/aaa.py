@@ -15,6 +15,7 @@ import os
 from .. import config
 OIDC_LOGIN = config.OIDC_LOGIN
 from sqlalchemy.schema import Sequence
+from sqlalchemy.dialects.postgresql import JSON
 
 try:
     # priv_config overrides defaults
@@ -174,6 +175,21 @@ class Limit(db.Model):
         self.id = 0
         self.min_eirp = min_eirp
         self.enforce = True
+
+class AFCConfig(db.Model):
+    ''' entry fpr AFC Config '''
+
+    __tablename__ = 'AFCConfig'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    # 4KB limit of afc config json string
+    config = db.Column(JSON)
+    created = db.Column(db.DateTime(), nullable=False)
+
+    def __init__(self, config):
+        self.config = config
+        self.created = datetime.datetime.fromtimestamp(time.time())
+
 
 # Local Variables:
 # mode: Python
