@@ -441,6 +441,24 @@ You can achieve it this way  (mind the real location of these folders on your ho
 chown 999:999 /var/databases/pgdata
 ```
 
+## **Environment variable **
+|Name|Default val|Container|Notes
+| :- | :- | :- | :- |
+| **RabbitMQ settings**||||
+|BROKER_TYPE|`internal`|rat-server,msghnd| whether `internal` or `external` AFC RMQ service used|
+|BROKER_PROT|`amqp` |rat-server,msghnd | what protocol used for AFC RMQ service|
+|BROKER_USER|`celery`|rat-server,msghnd | user used for AFC RMQ service|
+|BROKER_PWD |`celery`|rat-server,msghnd | password used for AFC RMQ service|
+|BROKER_FQDN|`localhost`|rat-server,msghnd | IP/domain name of AFC RMQ service|
+|BROKER_PORT|`5672`|rat-server,msghnd | port of AFC RMQ service|
+| **AFC Object Storage** |||please read [objst README.md](/src/filestorage/README.md)|
+|AFC_OBJST_HOST|`0.0.0.0`|objst|file storage service host domain/IP|
+|AFC_OBJST_PORT|`5000`|objst|file storage service port|
+|AFC_OBJST_MEDIA|`LocalFS`|objst|The media used for storing files by the service.The possible values are `LocalFS` - store files on docker's FS. `GoogleCloudBucket` - store files on Google Store.|
+|AFC_OBJST_LOCAL_DIR|`/storage`|objst|file system path to stored files in file storage container. Used only when `AFC_OBJST_MEDIA` is `LocalFS`|
+|AFC_OBJST_LOG_LVL|`ERROR`|objst|logging level of the file storage. The relevant values are `DEBUG` and `ERROR`.|
+
+
 ## RabbitMQ settings
 
 There is a way to conifugre AFC server to use a RabbitMQ broker from different docker image.

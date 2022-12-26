@@ -153,7 +153,7 @@
 |Version|3.4.4.1|
 | :- | :- |
 |**Date**|**10/27/2022**|
-|compiled server's version is 8cac863 |git tag 3.4.4.1|
+|compiled server's version is 8cac863 | git tag 3.4.4.1|
 
 ## **Version and Date**
 |Version|**OA-426**|
