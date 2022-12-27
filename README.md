@@ -202,9 +202,33 @@ docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --grou
 # AFC Engine build in docker
 
 ## Building Docker Container OpenAFC engine server
+There is a script that builds all container used by the AFC service.
+this script is used by automatic test infrastructure. Please check [tests/regression](/tests/regression/) dir.
 
-Building the docker container images used by the Open AFC service is straitforward - in the root folder of the OpenAFC Project run default docker build command:
+to rebuild all containers usnf etst infra scripts:
 ```
+cd open-afc
+tests/regression/build_imgs.sh `pwd` my_tag 0 
+```
+after the build, check all new containers:
+```
+docker images | grep my_tag
+```
+
+this containes are used by [tests/regression/run_srvr.sh](/tests/regression/run_srvr.sh)
+to run server using test infra scrips, please check and update [.env](/tests/regression/.env) used by [docker-compose.yaml](/tests/regression/docker-compose.yaml)
+1. update path to host's AFC static data directory (where nlcd, 3dep, lidar and other stuff exists)
+2. update port variables values
+3. comment out tls/mtls vars if simple http connection is used 
+
+```
+./tests/regression/run_srvr.sh `pwd` my_tag
+```
+
+to 'manually' build containers:
+```
+cd open-afc
+
 docker build . -t rat_server
 
 docker build . -t worker -f worker/Dockerfile
@@ -413,6 +437,69 @@ services:
       - objst
 
 ```
+`.env` file used with the docker-compose.yaml. please read comments in the file and update it accordingly 
+```
+# --------------------------------------------------- #
+# docker-compose.yaml variables                       #
+# convention: Host volume VOL_H_XXX will be mapped    #
+# as container's volume VOL_C_YYY                     #
+# VOL_H_XXX:VOL_C_YYY                                 #
+# --------------------------------------------------- #
+
+# -= MUST BE defined =-
+
+# Host static DB root dir
+VOL_H_DB=/opt/afc/databases/rat_transfer
+# Container's static DB root dir
+VOL_C_DB=/usr/share/fbrat/rat_transfer
+
+# AFC service external PORTs configuration
+# syntax: 
+# [IP]:<port | portN-portM>
+# like 172.31.11.188:80-180
+# where: 
+#  IP is  172.31.11.188
+#  port range is 80-180
+
+# Here we configuring range of external ports to be used by the service 
+# docker-compose randomly uses one port from the range
+
+# Note 1:
+# The IP arrdess can be skipped if there is only one external 
+# IP address (i.e. 80-180 w/o IP address is acceptable as well)
+
+# Note 2:
+# range of ports can be skipped . and just one port is acceptable as well 
+# all these valuase are acaptable:
+# PORT=172.31.11.188:80-180
+# PORT=172.31.11.188:80
+# PORT=80-180
+# PORT=80
+
+
+# apach https ports range
+EXT_PORT=172.31.11.188:80-180
+
+# apach https host ports range
+EXT_PORT_S=172.31.11.188:443-543
+
+# nginx external (host's) ports range.
+EXT_MTLS_PORT=172.31.11.188:544-644
+
+# -= OPTIONAL =-
+# to work without tls/mtls,remove these variables from here  
+# if you have tls/mtls configuration, keep configuration 
+# files in these host volumes
+VOL_H_SSL=./ssl
+VOL_C_SSL=/etc/httpd/certs
+VOL_H_APACH=./apache-conf
+VOL_C_APACH=/etc/httpd/conf.d
+VOL_H_NGNX=./ssl/nginx
+VOL_C_NGNX=/certificates/servers
+
+```
+
+
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
 Just run in this folder following command and it is done:
 ```
@@ -445,7 +532,7 @@ You can achieve it this way  (mind the real location of these folders on your ho
 chown 999:999 /var/databases/pgdata
 ```
 
-## **Environment variable **
+## **Environment variables**
 |Name|Default val|Container|Notes
 | :- | :- | :- | :- |
 | **RabbitMQ settings**||||
