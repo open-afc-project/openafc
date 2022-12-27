@@ -360,7 +360,8 @@ services:
     environment:
       - AFC_MSGHND_NAME=msghnd
       - AFC_MSGHND_PORT=8000
-
+    depends_on:
+      - msghnd
   rat_server:
     image: rat_server:latest
     build:
@@ -406,7 +407,7 @@ services:
       - ratdb
       - rmq
       - objst
-      - nginx
+
 
   objst:
     image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:-latest}
