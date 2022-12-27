@@ -346,9 +346,11 @@ services:
       - PGDATA=/var/lib/pgsql/data
       - POSTGRES_DB=fbrat
 
+
   rmq:
     image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:latest
     restart: always
+
 
   nginx:
     image: public.ecr.aws/w9v6y1o0/openafc/ngnx-image:latest
@@ -362,6 +364,8 @@ services:
       - AFC_MSGHND_PORT=8000
     depends_on:
       - msghnd
+
+
   rat_server:
     image: rat_server:latest
     build:
@@ -390,6 +394,7 @@ services:
       # worker params
       - CELERY_TYPE=external
 
+
   msghnd:
     image: msghnd
     build:
@@ -415,6 +420,8 @@ services:
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_HIST_PORT=4999
       - AFC_OBJST_LOCAL_DIR=/storage
+
+
   worker:
     image: worker
     build:
@@ -436,7 +443,6 @@ services:
       - ratdb
       - rmq
       - objst
-
 ```
 `.env` file used with the docker-compose.yaml. please read comments in the file and update it accordingly 
 ```
