@@ -15,6 +15,7 @@ import datetime
 import logging
 import flask
 import requests
+from sqlalchemy import exc
 from . import config
 from . import data_if
 
@@ -143,19 +144,16 @@ def create_app(config_override=None):
             os.makedirs(state_path)
         except OSError:
             LOGGER.error('Failed creating state directory "%s"', state_path)
-    if not os.path.exists(os.path.join(state_path, 'responses')):
-        os.makedirs(os.path.join(state_path, 'responses'))
-    if not os.path.exists(os.path.join(state_path, 'frequency_bands')):
-        os.makedirs(os.path.join(state_path, 'frequency_bands'))
     if not os.path.exists(flaskapp.config['TASK_QUEUE']):
         raise Exception('Missing task directory')
 
-    #: configure celery for this instance
-    #configure_celery(flaskapp, celery)
-    # celery.conf.update(flaskapp.config)
-
     # Static file dispatchers
     if flaskapp.config['AFC_APP_TYPE'] == 'server':
+        if not os.path.exists(os.path.join(state_path, 'responses')):
+            os.makedirs(os.path.join(state_path, 'responses'))
+        if not os.path.exists(os.path.join(state_path, 'frequency_bands')):
+            os.makedirs(os.path.join(state_path, 'frequency_bands'))
+
         from werkzeug.middleware.dispatcher import DispatcherMiddleware
         from wsgidav import wsgidav_app
         from wsgidav.fs_dav_provider import FilesystemProvider
@@ -360,53 +358,50 @@ def create_app(config_override=None):
         try:
             from .models.aaa import User
             user = db.session.query(User).first()  # pylint: disable=no-member
-        except Exception as exception:
-            if 'aaa_user.username does not exist' in str(exception.args) or 'aaa_user.org does not exist' in str(exception.args):
-                LOGGER.error("""
-DATABASE is in old format.  Upgrade using following command sequence:
-rat-manage-api db-upgrade
-                """)
+
+        except exc.SQLAlchemyError as e:
+            if 'relation "aaa_user" does not exist' in str(e.args):
+                LOGGER.error("ERROR - Missing users in the database.\n"
+                             "Create using following command sequense:\n"
+                             "    rat-manage-api db-create\n")
+        else:
+            try:
+                # update afcConfig files from database
+                from .models.aaa import AFCConfig
+                import json
+                ACCEPTABLE_FILES = {
+                    'default': dict(
+                        alt='fcc',
+                        content_type='application/json',
+                    ),
+                    'fcc': dict(
+                        alt='fcc',
+                        content_type='application/json',
+                    ),
+                    'CONUS': dict(
+                        alt='fcc',
+                        content_type='application/json',
+                    ),
+                }
+
+                configs = db.session.query(AFCConfig).all()
+                for conf in configs:
+                    rcrd = conf.config
+                    filedesc = ACCEPTABLE_FILES[rcrd["regionStr"]]
+                    region = filedesc['alt']
+                    hfile = dataif.open("cfg", region + "/afc_config.json")
+                    try:
+                        config_bytes = hfile.read()
+                    except:
+                        config_bytes = 0
+                    master_config = json.dumps(rcrd, sort_keys=True)
+                    if not master_config == config_bytes:
+                        hfile.write(master_config)
+            except:
+                LOGGER.error("Database is in old format.\n"
+                             "Upgrade using following command sequence:\n"
+                             "    rat-manage-api db-upgrade")
                 flaskapp.config['UPGRADE_REQ'] = True
-
-        try:
-            # update afcConfig files from database
-            from .models.aaa import AFCConfig
-            import json
-            ACCEPTABLE_FILES = {
-                'default': dict(
-                    alt='fcc',
-                    content_type='application/json',
-                ),
-                'fcc': dict(
-                    alt='fcc',
-                    content_type='application/json',
-                ),
-                'CONUS': dict(
-                    alt='fcc',
-                    content_type='application/json',
-                ),
-            }
-
-            configs = db.session.query(AFCConfig).all()
-            for conf in configs:
-                rcrd = conf.config
-                filedesc = ACCEPTABLE_FILES[rcrd["regionStr"]]
-                region = filedesc['alt']
-                hfile = dataif.open("cfg", region + "/afc_config.json")
-                try:
-                    config_bytes = hfile.read()
-                except:
-                    config_bytes = 0
-                master_config = json.dumps(rcrd, sort_keys=True)
-                if not master_config == config_bytes:
-                    hfile.write(master_config)
-
-        except:
-            LOGGER.error("""
-DATABASE is in old format.  Upgrade using following command sequence:
-rat-manage-api db-upgrade
-                """)
-            flaskapp.config['UPGRADE_REQ'] = True
 
     # Actual resources
     flaskapp.add_url_rule(
