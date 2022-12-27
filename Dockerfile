@@ -59,6 +59,7 @@ RUN mkdir -p /var/lib/fbrat/daily_uls_parse
 RUN chown fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/lib/fbrat/daily_uls_parse
 RUN chown -R fbrat:fbrat /var/celery
 RUN ln -s /usr/share/fbrat/rat_transfer/ULS_Database /var/lib/fbrat/ULS_Database
+RUN ln -s /usr/share/fbrat/rat_transfer/frequency_bands/allowed_frequencies.json /var/lib/fbrat/frequency_bands/allowed_frequencies.json
 RUN echo "DEFAULT_ULS_DIR = '/var/lib/fbrat/ULS_Database'" >> /etc/xdg/fbrat/ratapi.conf
 RUN echo "AFC_APP_TYPE = 'server'" >> /etc/xdg/fbrat/ratapi.conf
 
