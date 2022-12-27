@@ -27,7 +27,7 @@ cd $wd/tests && docker build . -t ${RTEST_DI}:${TAG}
 # whether to use a dir with random name
 tests_dir=$wd/tests/regression
 if [ ${randdir} -eq 1 ]; then
-  test_dir=$wd/tests/regression_${TAG}
+  tests_dir=$wd/tests/regression_${TAG}
 fi
 # go to test dir
 cd $tests_dir
