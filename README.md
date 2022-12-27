@@ -205,7 +205,8 @@ docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --grou
 There is a script that builds all container used by the AFC service.
 this script is used by automatic test infrastructure. Please check [tests/regression](/tests/regression/) dir.
 
-to rebuild all containers usnf etst infra scripts:
+### Using scripts from the code base
+to rebuild all containers use this scripts:
 ```
 cd open-afc
 tests/regression/build_imgs.sh `pwd` my_tag 0 
@@ -214,8 +215,7 @@ after the build, check all new containers:
 ```
 docker images | grep my_tag
 ```
-
-this containes are used by [tests/regression/run_srvr.sh](/tests/regression/run_srvr.sh)
+these containes are used by [tests/regression/run_srvr.sh](/tests/regression/run_srvr.sh)
 to run server using test infra scrips, please check and update [.env](/tests/regression/.env) used by [docker-compose.yaml](/tests/regression/docker-compose.yaml)
 1. update path to host's AFC static data directory (where nlcd, 3dep, lidar and other stuff exists)
 2. update port variables values
@@ -225,7 +225,8 @@ to run server using test infra scrips, please check and update [.env](/tests/reg
 ./tests/regression/run_srvr.sh `pwd` my_tag
 ```
 
-to 'manually' build containers:
+
+### To 'manually' build containers one by one:
 ```
 cd open-afc
 
@@ -243,7 +244,7 @@ cd src/filestorage/ && docker build . -t objst; cd ../..
 ```
 
 ## build prereq containers (optional)
-The rat-server and celery worker containers use pecompiled containers available from public repositories.
+The rat-server and celery worker containers use pre-built containers available from public repositories.
 These prereq containes can be built manually.
 ### rat-server prereq containers:
 ```

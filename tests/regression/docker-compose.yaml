@@ -15,7 +15,7 @@ services:
     restart: always
 
   nginx:
-    image: public.ecr.aws/w9v6y1o0/openafc/ngnx-image:${TAG:?err}
+    image: public.ecr.aws/w9v6y1o0/openafc/ngnx-image:${TAG:-latest}
     restart: always
     ports:
       - "${EXT_MTLS_PORT}:443"
