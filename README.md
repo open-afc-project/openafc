@@ -202,9 +202,34 @@ docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --grou
 # AFC Engine build in docker
 
 ## Building Docker Container OpenAFC engine server
+There is a script that builds all container used by the AFC service.
+this script is used by automatic test infrastructure. Please check [tests/regression](/tests/regression/) dir.
 
-Building the docker container images used by the Open AFC service is straitforward - in the root folder of the OpenAFC Project run default docker build command:
+### Using scripts from the code base
+to rebuild all containers use this scripts:
 ```
+cd open-afc
+tests/regression/build_imgs.sh `pwd` my_tag 0 
+```
+after the build, check all new containers:
+```
+docker images | grep my_tag
+```
+these containes are used by [tests/regression/run_srvr.sh](/tests/regression/run_srvr.sh)
+to run server using test infra scrips, please check and update [.env](/tests/regression/.env) used by [docker-compose.yaml](/tests/regression/docker-compose.yaml)
+1. update path to host's AFC static data directory (where nlcd, 3dep, lidar and other stuff exists)
+2. update port variables values
+3. comment out tls/mtls vars if simple http connection is used 
+
+```
+./tests/regression/run_srvr.sh `pwd` my_tag
+```
+
+
+### To 'manually' build containers one by one:
+```
+cd open-afc
+
 docker build . -t rat_server
 
 docker build . -t worker -f worker/Dockerfile
@@ -219,7 +244,7 @@ cd src/filestorage/ && docker build . -t objst; cd ../..
 ```
 
 ## build prereq containers (optional)
-The rat-server and celery worker containers use pecompiled containers available from public repositories.
+The rat-server and celery worker containers use pre-built containers available from public repositories.
 These prereq containes can be built manually.
 ### rat-server prereq containers:
 ```
@@ -309,49 +334,54 @@ Default access to the database is described in the puppet files. However you can
 ## docker-compose
 
 You would probably like to use docker-compose for setting up everything together - in this case feel free to use following docker-compose.yaml file as reference.
-also check docker-compose.yaml and .env files from tests/regression directory, which are used by OpenAFC CI:
+also check [docker-compose.yaml](/tests/regression/docker-compose.yaml) and [.env](/tests/regression/.env) files from tests/regression directory, which are used by OpenAFC CI  
 
 ```
 version: '3.2'
-
 services:
   ratdb:
     image: postgres:9
     restart: always
-    volumes:
-      - ./pgdata:/var/lib/pgsql/data
     environment:
-      POSTGRES_PASSWORD: N3SF0LVKJx1RAhFGx4fcw
-      PGDATA: /var/lib/pgsql/data
-      POSTGRES_DB: fbrat
+      - POSTGRES_PASSWORD=N3SF0LVKJx1RAhFGx4fcw
+      - PGDATA=/var/lib/pgsql/data
+      - POSTGRES_DB=fbrat
+
 
   rmq:
     image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:latest
     restart: always
 
+
+  nginx:
+    image: public.ecr.aws/w9v6y1o0/openafc/ngnx-image:latest
+    restart: always
+    ports:
+      - "${EXT_MTLS_PORT}:443"
+    volumes:
+      - ${VOL_H_NGNX:-/tmp}:${VOL_C_NGNX:-/dummyngnx}
+    environment:
+      - AFC_MSGHND_NAME=msghnd
+      - AFC_MSGHND_PORT=8000
+    depends_on:
+      - msghnd
+
+
   rat_server:
+    image: rat_server:latest
     build:
       context: .
     ports:
-      - "80:80"
-      - "443:443"
+      - "${EXT_PORT}:80"
+      - "${EXT_PORT_S}:443"
     volumes:
-      - /rat_transfer:/usr/share/fbrat/rat_transfer
-      - /rat_transfer/ULS_Database:/usr/share/fbrat/rat_transfer/ULS_Database
-      - /rat_transfer/daily_uls_parse:/usr/share/fbrat/rat_transfer/daily_uls_parse
-      - /rat_transfer/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
-      - /rat_transfer/RAS_Database:/var/lib/fbrat/RAS_Database
-      - /rat_transfer/ULS_Database:/var/lib/fbrat/ULS_Database
-      - /rat_transfer/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
-      - /rat_transfer/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
-      - /rat_transfer/frequency_bands:/var/lib/fbrat/frequency_bands
-      - ./ssl:/etc/httpd/certs
-      - ./apache-conf:/etc/httpd/conf.d
-    links:
+      - ${VOL_H_DB}:${VOL_C_DB}
+      - ${VOL_H_SSL:-/tmp}:${VOL_C_SSL:-/dummy1}
+      - ${VOL_H_APACH:-/tmp}:${VOL_C_APACH:-/dummy2}
+      - ./pipe:/pipe
+    depends_on:
       - ratdb
       - rmq
-    environment:
-      # RabbitMQ server name:
       - objst
     environment:
       # RabbitMQ server name:
@@ -365,40 +395,12 @@ services:
       # worker params
       - CELERY_TYPE=external
 
-  worker:
-    build:
-      context: .
-      dockerfile: worker/Dockerfile
-    volumes:
-      - /opt/afc/databases/rat_transfer/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
-      - /opt/afc/databases/rat_transfer/ULS_Database:/var/lib/fbrat/ULS_Database
-      - /opt/afc/databases/rat_transfer/RAS_Database:/var/lib/fbrat/RAS_Database
-      - /opt/afc/databases/rat_transfer/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
-      - /opt/afc/databases/rat_transfer:/usr/share/fbrat/rat_transfer
-    environment:
-      # Filestorage params:
-      - AFC_OBJST_HOST=objst
-      - AFC_OBJST_PORT=5000
-      - AFC_OBJST_SCHEME="HTTP"
-      # worker params
-      - CELERY_OPTIONS=rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10
-      # RabbitMQ server name:
-      - BROKER_TYPE=external
-      - BROKER_FQDN=rmq
-
-  objst:
-    image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:latest
-    environment:
-      - AFC_OBJST_PORT=5000
 
   msghnd:
+    image: msghnd
     build:
       context: .
       dockerfile: msghnd/Dockerfile
-    links:
-      - ratdb
-      - rmq
-      - objst
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
@@ -407,8 +409,105 @@ services:
       - AFC_OBJST_HOST=objst
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_SCHEME=HTTP
+    depends_on:
+      - ratdb
+      - rmq
+      - objst
+
+
+  objst:
+    image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:-latest}
+    environment:
+      - AFC_OBJST_PORT=5000
+      - AFC_OBJST_HIST_PORT=4999
+      - AFC_OBJST_LOCAL_DIR=/storage
+
+
+  worker:
+    image: worker
+    build:
+      context: .
+      dockerfile: worker/Dockerfile    
+    volumes:
+      - ${VOL_H_DB}:${VOL_C_DB}
+    environment:
+      # Filestorage params:
+      - AFC_OBJST_HOST=objst
+      - AFC_OBJST_PORT=5000
+      - AFC_OBJST_SCHEME=HTTP
+      # worker params
+      - CELERY_OPTIONS=rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10
+      # RabbitMQ server name:
+      - BROKER_TYPE=external
+      - BROKER_FQDN=rmq
+    depends_on:
+      - ratdb
+      - rmq
+      - objst
+```
+`.env` file used with the docker-compose.yaml. please read comments in the file and update it accordingly 
+```
+# --------------------------------------------------- #
+# docker-compose.yaml variables                       #
+# convention: Host volume VOL_H_XXX will be mapped    #
+# as container's volume VOL_C_YYY                     #
+# VOL_H_XXX:VOL_C_YYY                                 #
+# --------------------------------------------------- #
+
+# -= MUST BE defined =-
+
+# Host static DB root dir
+VOL_H_DB=/opt/afc/databases/rat_transfer
+# Container's static DB root dir
+VOL_C_DB=/usr/share/fbrat/rat_transfer
+
+# AFC service external PORTs configuration
+# syntax: 
+# [IP]:<port | portN-portM>
+# like 172.31.11.188:80-180
+# where: 
+#  IP is  172.31.11.188
+#  port range is 80-180
+
+# Here we configuring range of external ports to be used by the service 
+# docker-compose randomly uses one port from the range
+
+# Note 1:
+# The IP arrdess can be skipped if there is only one external 
+# IP address (i.e. 80-180 w/o IP address is acceptable as well)
+
+# Note 2:
+# range of ports can be skipped . and just one port is acceptable as well 
+# all these valuase are acaptable:
+# PORT=172.31.11.188:80-180
+# PORT=172.31.11.188:80
+# PORT=80-180
+# PORT=80
+
+
+# apach https ports range
+EXT_PORT=172.31.11.188:80-180
+
+# apach https host ports range
+EXT_PORT_S=172.31.11.188:443-543
+
+# nginx external (host's) ports range.
+EXT_MTLS_PORT=172.31.11.188:544-644
+
+# -= OPTIONAL =-
+# to work without tls/mtls,remove these variables from here  
+# if you have tls/mtls configuration, keep configuration 
+# files in these host volumes
+VOL_H_SSL=./ssl
+VOL_C_SSL=/etc/httpd/certs
+VOL_H_APACH=./apache-conf
+VOL_C_APACH=/etc/httpd/conf.d
+VOL_H_NGNX=./ssl/nginx
+VOL_C_NGNX=/certificates/servers
 
 ```
+
+
 Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
 Just run in this folder following command and it is done:
 ```
@@ -440,6 +539,24 @@ You can achieve it this way  (mind the real location of these folders on your ho
 ```
 chown 999:999 /var/databases/pgdata
 ```
+
+## **Environment variables**
+|Name|Default val|Container|Notes
+| :- | :- | :- | :- |
+| **RabbitMQ settings**||||
+|BROKER_TYPE|`internal`|rat-server,msghnd| whether `internal` or `external` AFC RMQ service used|
+|BROKER_PROT|`amqp` |rat-server,msghnd | what protocol used for AFC RMQ service|
+|BROKER_USER|`celery`|rat-server,msghnd | user used for AFC RMQ service|
+|BROKER_PWD |`celery`|rat-server,msghnd | password used for AFC RMQ service|
+|BROKER_FQDN|`localhost`|rat-server,msghnd | IP/domain name of AFC RMQ service|
+|BROKER_PORT|`5672`|rat-server,msghnd | port of AFC RMQ service|
+| **AFC Object Storage** |||please read [objst README.md](/src/filestorage/README.md)|
+|AFC_OBJST_HOST|`0.0.0.0`|objst|file storage service host domain/IP|
+|AFC_OBJST_PORT|`5000`|objst|file storage service port|
+|AFC_OBJST_MEDIA|`LocalFS`|objst|The media used for storing files by the service.The possible values are `LocalFS` - store files on docker's FS. `GoogleCloudBucket` - store files on Google Store.|
+|AFC_OBJST_LOCAL_DIR|`/storage`|objst|file system path to stored files in file storage container. Used only when `AFC_OBJST_MEDIA` is `LocalFS`|
+|AFC_OBJST_LOG_LVL|`ERROR`|objst|logging level of the file storage. The relevant values are `DEBUG` and `ERROR`.|
+
 
 ## RabbitMQ settings
 
