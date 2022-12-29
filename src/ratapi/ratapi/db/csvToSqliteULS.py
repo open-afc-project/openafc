@@ -212,9 +212,8 @@ def load_csv_data(file_name, headers=None):
                     },
                     delimiter=','), None)
 
-def convertULS(data_file, state_root, logFile):
+def convertULS(data_file, state_root, logFile, fileName):
     logFile.write('Converting ULS csv to sqlite' + '\n')
-    fileName = data_file.replace('.csv', '') + '.sqlite3'
 
     logFile.write('Converting CSV file to SQLITE\n')
     logFile.write('CSV: ' + data_file + '\n')
