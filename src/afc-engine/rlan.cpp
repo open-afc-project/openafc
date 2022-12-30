@@ -17,6 +17,7 @@
 #include "global_fn.h"
 #include "spline.h"
 #include "uls.h"
+#include "AfcDefinitions.h"
 
 /******************************************************************************************/
 /**** static members                                                                   ****/
@@ -36,11 +37,23 @@ double RLANClass::noiseLevelDBW = 0.0;
 /******************************************************************************************/
 RLANClass::RLANClass(int idVal)
 {
-    propEnv = CConst::unknownPropEnv;
     id = idVal;
 
+    latitudeDeg = quietNaN;
+    longitudeDeg = quietNaN;
+    height = quietNaN;
+    propEnv = CConst::unknownPropEnv;
+    userType = CConst::unknownUserType;
+    antennaModel = CConst::unknownAntennaModel;
+
+    startFreq = quietNaN;
+    stopFreq = quietNaN;
+    centerFreq = quietNaN;
+    maxEirpDBW = quietNaN;
+    orientPhiRad = quietNaN;
     numFSVisible = 0;
     offTune = true;
+    regionIdx = -1;
 }
 /******************************************************************************************/
 

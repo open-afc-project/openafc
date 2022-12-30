@@ -94,7 +94,6 @@ class TerrainClass
 		static std::atomic_llong numDEP;
 		static std::atomic_llong numGlobal;
 
-		bool useLidarZIPFiles;
 		std::string lidarWorkingDir;
 };
 /******************************************************************************************/

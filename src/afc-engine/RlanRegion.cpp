@@ -12,6 +12,16 @@
 /******************************************************************************************/
 RlanRegionClass::RlanRegionClass()
 {
+    centerLongitude = quietNaN;
+    centerLatitude = quietNaN;
+    centerHeightInput = quietNaN;
+    centerHeightAMSL = quietNaN;
+    centerTerrainHeight = quietNaN;
+    minTerrainHeight = quietNaN;
+    maxTerrainHeight = quietNaN;
+    heightUncertainty = quietNaN;
+
+    fixedHeightAMSL = false;
     configuredFlag = false;
 }
 /******************************************************************************************/
@@ -486,6 +496,7 @@ polygonType(polygonTypeVal)
 /******************************************************************************************/
 PolygonRlanRegionClass::~PolygonRlanRegionClass()
 {
+    delete polygon;
 }
 /******************************************************************************************/
 

@@ -4,6 +4,8 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <iostream>
+#include <sstream>
 
 #include "global_defines.h"
 #include "list.h"
@@ -89,7 +91,7 @@ int SplineClass::makesplinecoeffs(int p_n1, int p_n2, double *xs, double *ys)
     int i,m1,m2, cont;
     double *y;
     double e,f,f2,g,h,p,s;
-    char *chptr, *errmsg;
+    std::ostringstream errStr;
 
     /* the dimensioning of the arrays is from n1-1 to n2+1   */
     double  *r, *r1, *r2, *t, *t1, *u, *v, *dy;
@@ -97,7 +99,29 @@ int SplineClass::makesplinecoeffs(int p_n1, int p_n2, double *xs, double *ys)
     n1 = p_n1;
     n2 = p_n2;
 
-    errmsg = CVECTOR(MAX_LINE_SIZE);
+    if(n1 <= 0) {
+        errStr << std::string("ERROR in routine makesplinecoeffs()") << std::endl
+            << "first data point index must be > 0" << std::endl
+            << "n1 = " << n1 << std::endl;
+        throw std::runtime_error(errStr.str());
+    }
+
+    if ((n1 >= n2)) {
+        errStr << std::string("ERROR in routine makesplinecoeffs()") << std::endl
+            << "n1  >=  n2" << std::endl
+            << "n1 = " << n1 << ", n2 = " << n2 << std::endl;
+        throw std::runtime_error(errStr.str());
+    }
+
+    for (i = n1; i<=n2; i++) {
+        x[i] = xs[i];
+        if ((i > n1) && (x[i] <= x[i-1])) {
+            errStr << std::string("ERROR in routine makesplinecoeffs()") << std::endl
+                << "x var not strictly increasing between indicies = " << i-1 << "," << i << " (" << x[i-1] << ", " << x[i] << std::endl;
+            throw std::runtime_error(errStr.str());
+        }
+    }
+
     y  = DVECTOR(n2+1);
     r  = DVECTOR(n2+2);
     r1 = DVECTOR(n2+2);
@@ -108,47 +132,8 @@ int SplineClass::makesplinecoeffs(int p_n1, int p_n2, double *xs, double *ys)
     v  = DVECTOR(n2+2);
     dy = DVECTOR(n2+2);
 
-    if(n1 <= 0) {
-        chptr = errmsg;
-        chptr += sprintf(chptr, "ERROR in routine makesplinecoeffs()\n");
-        chptr += sprintf(chptr, "first data point index must be > 0\n");
-        chptr += sprintf(chptr, "n1 = %d\n", n1);
-        chptr += sprintf(chptr, "\n");
-#if CDEBUG
-        std::cout << errmsg << std::endl;
-#endif
-        return(0);
-    }
-
-    if ((n1 >= n2)) {
-        chptr = errmsg;
-        chptr += sprintf(chptr, "ERROR in routine makesplinecoeffs()\n");
-        chptr += sprintf(chptr, "n1  >=  n2\n");
-        chptr += sprintf(chptr, "n1, n2 = %d, %d\n", n1,n2 );
-        chptr += sprintf(chptr, "\n");
-#if CDEBUG
-        std::cout << errmsg << std::endl;
-#endif
-        return(0);
-    }
-
     for (i = n1; i<=n2; i++) {
-        x[i] = xs[i];
         y[i] = ys[i];
-    }
-
-    for (i = n1; i<=n2-1; i++) {
-        if(x[i] >= x[i+1]) {
-            chptr = errmsg;
-            chptr += sprintf(chptr, "ERROR in routine makesplinecoeffs()\n");
-            chptr += sprintf(chptr, "x var not strictly increasing between indicies = %d,%d (%5.3f, %5.3f)\n",
-                i,i+1, x[i], x[i+1]);
-            chptr += sprintf(chptr, "\n");
-#if CDEBUG
-            std::cout << errmsg << std::endl;
-#endif
-            return(0);
-        }
     }
 
     s=0.0;
@@ -269,7 +254,6 @@ int SplineClass::makesplinecoeffs(int p_n1, int p_n2, double *xs, double *ys)
     free(u);
     free(v);
     free(dy);
-    free(errmsg);
 
     return(1);
 }

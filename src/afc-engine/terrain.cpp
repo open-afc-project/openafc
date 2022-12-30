@@ -11,6 +11,7 @@
 #include "global_fn.h"
 #include "terrain.h"
 #include "cconst.h"
+#include "AfcDefinitions.h"
 
 #include "rkflogging/ErrStream.h"
 #include "rkflogging/Logging.h"
@@ -166,7 +167,7 @@ void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, dou
 		}
 	} else {
 		lidarHeightResult  = MultibandRasterClass::OUTSIDE_REGION;
-		bldgHeight    = std::numeric_limits<double>::quiet_NaN();
+		bldgHeight    = quietNaN;
 		heightSource = CConst::unknownHeightSource;
 	}
 
@@ -494,7 +495,7 @@ void TerrainClass::readLidarInfo(QDir lidarDir)
 					} else if (strval == "from_raster") {
 						lidarRegion.format = CConst::fromRasterLidarFormat;
 					} else {
-						errStr << "lidarRegion.format not a valid value. Got " << lidarRegion.format << std::endl;
+						errStr << "lidarRegion.format not a valid value. Got " << strval << std::endl;
 						throw std::logic_error(errStr.str());
 					}
 

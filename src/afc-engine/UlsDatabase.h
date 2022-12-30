@@ -77,6 +77,8 @@ public:
 	UlsDatabase();
 	~UlsDatabase();
 
+	void nullInitialize();
+
 	// Loads all FS within lat/lon bounds
 	void loadUlsData(const QString& dbName, std::vector<UlsRecord>& target,
 	                 const double& minLat=-90, const double& maxLat=90, const double& minLon=-180, const double& maxLon=180);
