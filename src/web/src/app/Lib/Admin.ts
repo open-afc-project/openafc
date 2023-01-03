@@ -189,7 +189,7 @@ export const addAccessPoint = (ap: AccessPointModel, userId: number) =>
         if (res.ok) {
             return success((await res.json()).id as number)
         } else if (res.status === 400) {
-            return error("Serial number already exists", res.status, res);
+            return error("Invalid AP data", res.status, res);
         } else {
             return error(res.statusText, res.status, res);
         }
