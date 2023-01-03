@@ -91,7 +91,7 @@ class DataIntFs(DataInt):
         """ read data from prot """
         LOGGER.debug("DataIntFs.read({})".format(self._file_name))
         r = None
-        with open(self._file_name) as f:
+        with open(self._file_name, "rb") as f:
             r = f.read()
         if r is None:
             raise Exception("Cant get file")
