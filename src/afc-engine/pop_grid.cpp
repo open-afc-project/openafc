@@ -28,6 +28,7 @@
 #include "rkflogging/Logging.h"
 #include "rkflogging/ErrStream.h"
 #include "PopulationDatabase.h"
+#include "AfcDefinitions.h"
 
 namespace 
 {
@@ -42,6 +43,14 @@ namespace
 PopGridClass::PopGridClass(double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal) :
 densityThrUrban(densityThrUrbanVal), densityThrSuburban(densityThrSuburbanVal), densityThrRural(densityThrRuralVal)
 {
+    minLonDeg = quietNaN;
+    minLatDeg = quietNaN;
+    deltaLonDeg = quietNaN;
+    deltaLatDeg = quietNaN;
+
+    numLon = 0;
+    numLat = 0;
+
     pop = (double **) NULL;
     propEnv = (char **) NULL;
     region = (int **) NULL;
@@ -1154,10 +1163,10 @@ double PopGridClass::adjustRegion(ListClass<ULSClass *> *ulsList, double maxRadi
     }
 
     bool initFlag = true;
-    int minLonIdx;
-    int maxLonIdx;
-    int minLatIdx;
-    int maxLatIdx;
+    int minLonIdx = -1;
+    int maxLonIdx = -1;
+    int minLatIdx = -1;
+    int maxLatIdx = -1;
     for(lonIdx=0; lonIdx<numLon; lonIdx++) {
         double longitudeDeg = minLonDeg + lonIdx*deltaLonDeg;
         for(latIdx=0; latIdx<numLat; latIdx++) {

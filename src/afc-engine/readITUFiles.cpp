@@ -12,6 +12,21 @@ ITUDataClass::ITUDataClass(std::string t_radioClimatePath, std::string t_surfRef
     readSRFile(t_surfRefracPath);
 }
 
+ITUDataClass::~ITUDataClass()
+{
+    int latIdx;
+
+    for(latIdx=0; latIdx<RCNumLat; ++latIdx) {
+        free(RCData[latIdx]);
+    }
+    free(RCData);
+
+    for(latIdx=0; latIdx<SRNumLat; ++latIdx) {
+        free(SRData[latIdx]);
+    }
+    free(SRData);
+}
+
 void ITUDataClass::readRCFile(std::string RCFile) {
     std::ifstream file(RCFile);
 

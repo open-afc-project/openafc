@@ -8,14 +8,11 @@ double CalcITU699(const double &angleDeg, const double &maxGain, const double &D
 {
 	double cAngleDeg = angleDeg;
 
-	while(cAngleDeg >= 360.0) {
+	while(cAngleDeg > 180.0) {
 		cAngleDeg = cAngleDeg - 360.0;
 	}
 
-	if(cAngleDeg > 180.0) {
-		double gt180 = cAngleDeg - 180;
-		cAngleDeg = cAngleDeg - gt180*2.0;
-	}
+	cAngleDeg = fabs(cAngleDeg);
 
 	// double Dlambda = pow(10, ((maxGain - 7.7)/20));
 	double g1 = 2.0 + 15.0 * log10(Dlambda);
@@ -36,7 +33,7 @@ double CalcITU699(const double &angleDeg, const double &maxGain, const double &D
 		else if (cAngleDeg >= std::max(psiM, psiR) && cAngleDeg < 120.0) {
 			rv = 32.0 - 25.0 * log10(cAngleDeg);
 		}
-		else if (cAngleDeg >= 120.0 && cAngleDeg <= 180.0) {
+		else {
 			rv = -20.0;
 		}
 	}
@@ -51,7 +48,7 @@ double CalcITU699(const double &angleDeg, const double &maxGain, const double &D
 		else if (cAngleDeg >= std::max(psiM,100.0/Dlambda) && cAngleDeg < 48.0) {
 			rv = 52.0 - 10.0 * log10(Dlambda) - 25.0 * log10(cAngleDeg);
 		}
-		else if (cAngleDeg >= 48.0 && cAngleDeg <= 180.0) {
+		else {
 			rv = 10.0 - 10.0 * log10(Dlambda);
 		}
 

@@ -11,6 +11,7 @@
 #include <iomanip>
 #include <cmath>
 #include <limits>
+#include "AfcDefinitions.h"
 
 /******************************************************************************************/
 /**** CONSTRUCTOR: NFAClass::NFAClass()                                                ****/
@@ -19,6 +20,15 @@ NFAClass::NFAClass()
 {
 	tableFile = "";
 	nfaTable = (double ***) NULL;
+    numxdb = -1;
+    numu = -1;
+    numeff = -1;
+    xdbStart = quietNaN;
+    uStart = quietNaN;
+    effStart = quietNaN;
+    xdbStep = quietNaN;
+    uStep = quietNaN;
+    effStep = quietNaN;
 };
 
 NFAClass::NFAClass(std::string tableFileVal) : tableFile(tableFileVal)
@@ -54,12 +64,12 @@ void NFAClass::readTable()
 	uStep = 0.05;
 	effStep = 0.05;
 
-	double minxdb;
-	double maxxdb;
-	double minu;
-	double maxu;
-	double mineff;
-	double maxeff;
+	double minxdb = quietNaN;
+	double maxxdb = quietNaN;
+	double minu   = quietNaN;
+	double maxu   = quietNaN;
+	double mineff = quietNaN;
+	double maxeff = quietNaN;
 
 	ifstream file(tableFile);
 	if (!file.is_open()) {
@@ -151,7 +161,7 @@ void NFAClass::readTable()
 		for(uIdx=0; uIdx<numu; ++uIdx) {
 			nfaTable[xdbIdx][uIdx] = (double *) malloc(numeff*sizeof(double));
 			for(effIdx=0; effIdx<numeff; ++effIdx) {
-				nfaTable[xdbIdx][uIdx][effIdx] = std::numeric_limits<double>::quiet_NaN();
+				nfaTable[xdbIdx][uIdx][effIdx] = quietNaN;
 			}
 		}
 	}
@@ -233,7 +243,7 @@ double NFAClass::computeNFA(double xdb, double u, double eff)
 	if (uIdx0 == numu - 1) { uIdx0 = numu-2; }
 
 	int effIdx0 = (int) floor(effIdxDbl);
-	if (effIdx0 == numeff - 1) { effIdx0 = numxdb-2; }
+	if (effIdx0 == numeff - 1) { effIdx0 = numeff-2; }
 
 	double F000 = nfaTable[xdbIdx0  ][uIdx0  ][effIdx0  ];
 	double F001 = nfaTable[xdbIdx0  ][uIdx0  ][effIdx0+1];

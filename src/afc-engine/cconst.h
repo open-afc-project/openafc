@@ -88,7 +88,8 @@ public:
 		outdoorClientAntennaModel,
 		outdoorDirPtToPtAntennaModel,
 		outdoorOmniPtToMptAntennaModel,
-		outdoorOmniRLANAntennaModel
+		outdoorOmniRLANAntennaModel,
+		unknownAntennaModel
 	};
 	/**************************************************************************************/
 
@@ -136,7 +137,8 @@ public:
 		F1245AntennaType,
 		F699AntennaType,
 		R2AIP07AntennaType,
-		LUTAntennaType
+		LUTAntennaType,
+		UnknownAntennaType
 	};
 	/**************************************************************************************/
 

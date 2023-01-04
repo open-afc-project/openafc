@@ -8,6 +8,7 @@
 class ITUDataClass {
  public:
     ITUDataClass(std::string t_radioClimatePath, std::string t_surfRefracPath);
+    ~ITUDataClass();
 
     int getRadioClimateValue(double latDeg, double lonDeg);
     double getSurfaceRefractivityValue(double latDeg, double lonDeg);

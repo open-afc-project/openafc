@@ -35,21 +35,76 @@ LOGGER_DEFINE_GLOBAL(logger, "ULSClass")
 /******************************************************************************************/
 ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal) : dataSet(dataSetVal), id(idVal), dbIdx(dbIdxVal), numPR(numPRVal)
 {
-	satellitePosnData = (ListClass<Vector3> *) NULL;
-	type = CConst::ESULSType;
-	location = (char *) NULL;
-	mobilePopGrid = (PopGridClass *) NULL;
-	pairIdx = -1;
-	rxLidarRegion = -1;
-	txLidarRegion = -1;
-	rxTerrainHeightFlag = false;
-	txTerrainHeightFlag = false;
-	numOutOfBandRLAN = 0;
+	prList = new PRClass[numPR];
 
+	location = (char *) NULL;
 	ITMHeightProfile = (double *) NULL;
 	isLOSHeightProfile = (double *) NULL;
 
-	prList = new PRClass[numPR];
+	dataSet = (AfcManager *) NULL;
+
+	startAllocFreq = quietNaN;
+	stopAllocFreq = quietNaN;
+	startUseFreq = quietNaN;
+	stopUseFreq = quietNaN;
+	bandwidth = quietNaN;
+	rxAntennaNumber = -1;
+	rxLatitudeDeg = quietNaN;
+	rxLongitudeDeg = quietNaN;
+	rxTerrainHeight = quietNaN;
+	rxHeightAboveTerrain = quietNaN;
+	rxHeightAMSL = quietNaN;
+	rxGroundElevation = quietNaN;
+	rxHeightSource = CConst::unknownHeightSource;
+	rxLidarRegion = -1;
+	rxTerrainHeightFlag = false;
+	txLatitudeDeg = quietNaN;
+	txLongitudeDeg = quietNaN;
+	txGroundElevation = quietNaN;
+	txTerrainHeight = quietNaN;
+	txHeightAboveTerrain = quietNaN;
+	txHeightAMSL = quietNaN;
+	txHeightSource = CConst::unknownHeightSource;
+	txCenterToRAATHeight = quietNaN;
+	txTerrainHeightFlag = false;
+	noiseLevelDBW = quietNaN;
+	txGain = quietNaN;
+	rxGain = quietNaN;
+	rxDlambda = quietNaN;
+	rxNearFieldAntDiameter = quietNaN;
+	rxNearFieldDistLimit = quietNaN;
+	rxNearFieldAntEfficiency = quietNaN;
+	rxAntennaCategory = CConst::UnknownAntennaCategory;
+	txEIRP = quietNaN;
+	linkDistance = quietNaN;
+	operatingRadius = quietNaN;
+	rxSensitivity = quietNaN;
+	mobileUnit = -1;
+	operatingCenterLongitudeDeg = quietNaN;
+	operatingCenterLatitudeDeg = quietNaN;
+	propLoss = quietNaN;
+
+	hasDiversity = false;
+	diversityGain = quietNaN;
+	diversityDlambda = quietNaN;
+	diversityHeightAboveTerrain = quietNaN;
+	diversityHeightAMSL = quietNaN;
+
+	minPathLossDB = quietNaN;
+	maxPathLossDB = quietNaN;
+	antHeight = quietNaN;
+	type = CConst::ESULSType;
+
+	satellitePosnData = (ListClass<Vector3> *) NULL;
+	mobilePopGrid = (PopGridClass *) NULL;
+	rxAntennaType = CConst::UnknownAntennaType;
+	txAntennaType = CConst::UnknownAntennaType;
+	rxAntenna = (AntennaClass *) NULL;
+	txAntenna = (AntennaClass *) NULL;
+	rxAntennaFeederLossDB = quietNaN;
+	fadeMarginDB = quietNaN;
+	pairIdx = -1;
+	numOutOfBandRLAN = 0;
 }
 /******************************************************************************************/
 
@@ -59,6 +114,8 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal
 ULSClass::~ULSClass()
 {
 	clearData();
+
+	delete [] prList;
 }
 /******************************************************************************************/
 
@@ -812,27 +869,44 @@ double ULSClass::computeBeamWidth(double attnDB)
 /******************************************************************************************/
 PRClass::PRClass()
 {
+	pathSegGain = quietNaN;
+	effectiveGain = quietNaN;
+
 	type = CConst::unknownPRType;
 
-	latitudeDeg = -1.0;
-	longitudeDeg = -1.0;
-	terrainHeight = -1.0;
-	heightAboveTerrain = -1.0;
-	heightAMSL = -1.0;
+	latitudeDeg = quietNaN;
+	longitudeDeg = quietNaN;
+	heightAboveTerrain = quietNaN;
+
+	terrainHeight = quietNaN;
+	heightAMSL = quietNaN;
 	heightSource = CConst::unknownHeightSource;
 	lidarRegion = -1;
 	terrainHeightFlag = false;
-	position = Vector3(0.0, 0.0, 0.0);
+	position = Vector3(quietNaN, quietNaN, quietNaN);
+	pointing = Vector3(quietNaN, quietNaN, quietNaN);
+	segmentDistance = quietNaN;
 
-	txGain = -1.0;
-	txDlambda = -1.0;
-	rxGain = -1.0;
-	rxDlambda = -1.0;
+	txGain = quietNaN;
+	txDlambda = quietNaN;
+	rxGain = quietNaN;
+	rxDlambda = quietNaN;
+	antCategory = CConst::UnknownAntennaCategory;
+	antModel = "";
 
-	reflectorHeightLambda = -1.0;
-	reflectorWidthLambda = -1.0;
+	reflectorHeightLambda = quietNaN;
+	reflectorWidthLambda = quietNaN;
 
-	terrainHeightFlag = false;
+	reflectorX = Vector3(quietNaN, quietNaN, quietNaN);
+	reflectorY = Vector3(quietNaN, quietNaN, quietNaN);
+	reflectorZ = Vector3(quietNaN, quietNaN, quietNaN);
+
+	reflectorThetaIN = quietNaN;
+	reflectorKS = quietNaN;
+	reflectorQ = quietNaN;
+
+	reflectorSLambda = quietNaN;
+	reflectorTheta1 = quietNaN;
 }
 /******************************************************************************************/
 
@@ -859,8 +933,8 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 				double rxGainDB = ULSClass::calcR2AIP07Antenna(angleOffBoresightDeg, frequency, antModel, antCategory, subModelStr, 0, rxGain, rxDlambda);
 				discriminationDB = rxGainDB - rxGain;
 
-				reflectorD0 = std::numeric_limits<float>::quiet_NaN();
-				reflectorD1 = std::numeric_limits<float>::quiet_NaN();
+				reflectorD0 = quietNaN;
+				reflectorD1 = quietNaN;
 			}
 			break;
 		case CConst::billboardReflectorPRType:
@@ -884,6 +958,7 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 			}
 			break;
 		default:
+			discriminationDB = quietNaN;
 			CORE_DUMP;
 			break;
 	}

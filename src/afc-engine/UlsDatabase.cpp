@@ -12,6 +12,7 @@
 #include <rkfsql/SqlTransaction.h>
 #include <rkflogging/Logging.h>
 #include "rkflogging/ErrStream.h"
+#include "AfcDefinitions.h"
 
 namespace
 {
@@ -25,6 +26,8 @@ LOGGER_DEFINE_GLOBAL(logger, "UlsDatabase")
 /******************************************************************************************/
 UlsDatabase::UlsDatabase()
 {
+	nullInitialize();
+
 	columns << "fsid";
 	fieldIdxList.push_back(&fsidIdx);
 
@@ -127,6 +130,65 @@ UlsDatabase::UlsDatabase()
 /******************************************************************************************/
 UlsDatabase::~UlsDatabase()
 {
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: UlsDatabase::nullInitialize                                            ****/
+/**** Initialize all indices to -1 so coverity warnings are suppressed.                ****/
+/******************************************************************************************/
+void UlsDatabase::nullInitialize()
+{
+	fsidIdx = -1;
+	callsignIdx = -1;
+	radio_serviceIdx = -1;
+	nameIdx = -1;
+	rx_callsignIdx = -1;
+	rx_antenna_numIdx = -1;
+	freq_assigned_start_mhzIdx = -1;
+	freq_assigned_end_mhzIdx = -1;
+	emissions_desIdx = -1;
+	tx_lat_degIdx = -1;
+	tx_long_degIdx = -1;
+	tx_ground_elev_mIdx = -1;
+	tx_polarizationIdx = -1;
+	tx_gainIdx = -1;
+	tx_eirpIdx = -1;
+	tx_height_to_center_raat_mIdx = -1;
+	rx_lat_degIdx = -1;
+	rx_long_degIdx = -1;
+	rx_ground_elev_mIdx = -1;
+	rx_height_to_center_raat_mIdx = -1;
+	rx_line_loss_mIdx = -1;
+	rx_gainIdx = -1;
+	rx_antennaDiameterIdx = -1;
+	rx_near_field_ant_diameterIdx = -1;
+	rx_near_field_dist_limitIdx = -1;
+	rx_near_field_ant_efficiencyIdx = -1;
+	rx_antennaCategoryIdx = -1;
+	statusIdx = -1;
+	mobileIdx = -1;
+	rx_ant_modelIdx = -1;
+	p_rp_numIdx = -1;
+
+	rx_diversity_height_to_center_raat_mIdx = -1;
+	rx_diversity_gainIdx = -1;
+	rx_diversity_antennaDiameterIdx = -1;
+
+	prSeqIdx = -1;
+	prTypeIdx = -1;
+	pr_lat_degIdx = -1;
+	pr_lon_degIdx = -1;
+	pr_height_to_center_raat_mIdx = -1;
+
+	prTxGainIdx = -1;
+	prTxDiameterIdx = -1;
+	prRxGainIdx = -1;
+	prRxDiameterIdx = -1;
+	prAntCategoryIdx = -1;
+	prAntModelIdx = -1;
+	prReflectorHeightIdx = -1;
+	prReflectorWidthIdx = -1;
 }
 /******************************************************************************************/
 
@@ -245,7 +307,6 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		q.previous();
 	}
 
-	double nan = std::numeric_limits<double>::quiet_NaN();
 	while (q.next())
 	{
 		int r = q.at();
@@ -263,27 +324,27 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		target.at(r).emissionsDesignator = q.value(emissions_desIdx).toString().toStdString();
 		target.at(r).txLatitudeDeg = q.value(tx_lat_degIdx).toDouble();
 		target.at(r).txLongitudeDeg = q.value(tx_long_degIdx).toDouble();
-		target.at(r).txGroundElevation = q.value(tx_ground_elev_mIdx).isNull() ? nan : q.value(tx_ground_elev_mIdx).toDouble();
+		target.at(r).txGroundElevation = q.value(tx_ground_elev_mIdx).isNull() ? quietNaN : q.value(tx_ground_elev_mIdx).toDouble();
 		target.at(r).txPolarization = q.value(tx_polarizationIdx).toString().toStdString();
-		target.at(r).txGain = q.value(tx_gainIdx).isNull() ? nan : q.value(tx_gainIdx).toDouble();
+		target.at(r).txGain = q.value(tx_gainIdx).isNull() ? quietNaN : q.value(tx_gainIdx).toDouble();
 		target.at(r).txEIRP = q.value(tx_eirpIdx).toDouble();
-		target.at(r).txHeightAboveTerrain = q.value(tx_height_to_center_raat_mIdx).isNull() ? nan : q.value(tx_height_to_center_raat_mIdx).toDouble();
+		target.at(r).txHeightAboveTerrain = q.value(tx_height_to_center_raat_mIdx).isNull() ? quietNaN : q.value(tx_height_to_center_raat_mIdx).toDouble();
 		target.at(r).rxLatitudeDeg = q.value(rx_lat_degIdx).toDouble();
 		target.at(r).rxLongitudeDeg = q.value(rx_long_degIdx).toDouble();
-		target.at(r).rxGroundElevation = q.value(rx_ground_elev_mIdx).isNull() ? nan : q.value(rx_ground_elev_mIdx).toDouble();
-		target.at(r).rxHeightAboveTerrain = q.value(rx_height_to_center_raat_mIdx).isNull() ? nan : q.value(rx_height_to_center_raat_mIdx).toDouble();
-		target.at(r).rxLineLoss = q.value(rx_line_loss_mIdx).isNull() ? nan : q.value(rx_line_loss_mIdx).toDouble();
-		target.at(r).rxGain = q.value(rx_gainIdx).isNull() ? nan : q.value(rx_gainIdx).toDouble();
-		target.at(r).rxAntennaDiameter = q.value(rx_antennaDiameterIdx).isNull() ? nan : q.value(rx_antennaDiameterIdx).toDouble();
+		target.at(r).rxGroundElevation = q.value(rx_ground_elev_mIdx).isNull() ? quietNaN : q.value(rx_ground_elev_mIdx).toDouble();
+		target.at(r).rxHeightAboveTerrain = q.value(rx_height_to_center_raat_mIdx).isNull() ? quietNaN : q.value(rx_height_to_center_raat_mIdx).toDouble();
+		target.at(r).rxLineLoss = q.value(rx_line_loss_mIdx).isNull() ? quietNaN : q.value(rx_line_loss_mIdx).toDouble();
+		target.at(r).rxGain = q.value(rx_gainIdx).isNull() ? quietNaN : q.value(rx_gainIdx).toDouble();
+		target.at(r).rxAntennaDiameter = q.value(rx_antennaDiameterIdx).isNull() ? quietNaN : q.value(rx_antennaDiameterIdx).toDouble();
 
-		target.at(r).rxNearFieldAntDiameter = q.value(rx_near_field_ant_diameterIdx).isNull() ? nan : q.value(rx_near_field_ant_diameterIdx).toDouble();
-		target.at(r).rxNearFieldDistLimit = q.value(rx_near_field_dist_limitIdx).isNull() ? nan : q.value(rx_near_field_dist_limitIdx).toDouble();
-		target.at(r).rxNearFieldAntEfficiency = q.value(rx_near_field_ant_efficiencyIdx).isNull() ? nan : q.value(rx_near_field_ant_efficiencyIdx).toDouble();
+		target.at(r).rxNearFieldAntDiameter = q.value(rx_near_field_ant_diameterIdx).isNull() ? quietNaN : q.value(rx_near_field_ant_diameterIdx).toDouble();
+		target.at(r).rxNearFieldDistLimit = q.value(rx_near_field_dist_limitIdx).isNull() ? quietNaN : q.value(rx_near_field_dist_limitIdx).toDouble();
+		target.at(r).rxNearFieldAntEfficiency = q.value(rx_near_field_ant_efficiencyIdx).isNull() ? quietNaN : q.value(rx_near_field_ant_efficiencyIdx).toDouble();
 
 		target.at(r).hasDiversity = q.value(rx_diversity_gainIdx).isNull() ? false : true;
-		target.at(r).diversityGain = q.value(rx_diversity_gainIdx).isNull() ? nan : q.value(rx_diversity_gainIdx).toDouble();
-		target.at(r).diversityHeightAboveTerrain = q.value(rx_diversity_height_to_center_raat_mIdx).isNull() ? nan : q.value(rx_diversity_height_to_center_raat_mIdx).toDouble();
-		target.at(r).diversityAntennaDiameter = q.value(rx_diversity_antennaDiameterIdx).isNull() ? nan : q.value(rx_diversity_antennaDiameterIdx).toDouble();
+		target.at(r).diversityGain = q.value(rx_diversity_gainIdx).isNull() ? quietNaN : q.value(rx_diversity_gainIdx).toDouble();
+		target.at(r).diversityHeightAboveTerrain = q.value(rx_diversity_height_to_center_raat_mIdx).isNull() ? quietNaN : q.value(rx_diversity_height_to_center_raat_mIdx).toDouble();
+		target.at(r).diversityAntennaDiameter = q.value(rx_diversity_antennaDiameterIdx).isNull() ? quietNaN : q.value(rx_diversity_antennaDiameterIdx).toDouble();
 
 		target.at(r).status = q.value(statusIdx).toString().toStdString();
 		target.at(r).mobile = q.value(mobileIdx).toBool();
@@ -349,14 +410,14 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 				int prIdx = prSeq - 1;
 
 				target.at(r).prType[prIdx]  = prQueryRes.value(prTypeIdx).isNull() ? "" : prQueryRes.value(prTypeIdx).toString().toStdString();
-				target.at(r).prLatitudeDeg[prIdx]  = prQueryRes.value(pr_lat_degIdx).isNull() ? nan : prQueryRes.value(pr_lat_degIdx).toDouble();
-				target.at(r).prLongitudeDeg[prIdx] = prQueryRes.value(pr_lon_degIdx).isNull() ? nan : prQueryRes.value(pr_lon_degIdx).toDouble();
-				target.at(r).prHeightAboveTerrain[prIdx] = prQueryRes.value(pr_height_to_center_raat_mIdx).isNull() ? nan : prQueryRes.value(pr_height_to_center_raat_mIdx).toDouble();
+				target.at(r).prLatitudeDeg[prIdx]  = prQueryRes.value(pr_lat_degIdx).isNull() ? quietNaN : prQueryRes.value(pr_lat_degIdx).toDouble();
+				target.at(r).prLongitudeDeg[prIdx] = prQueryRes.value(pr_lon_degIdx).isNull() ? quietNaN : prQueryRes.value(pr_lon_degIdx).toDouble();
+				target.at(r).prHeightAboveTerrain[prIdx] = prQueryRes.value(pr_height_to_center_raat_mIdx).isNull() ? quietNaN : prQueryRes.value(pr_height_to_center_raat_mIdx).toDouble();
 
-				target.at(r).prTxGain[prIdx]            = prQueryRes.value(prTxGainIdx    ).isNull() ? nan : prQueryRes.value(prTxGainIdx    ).toDouble();
-				target.at(r).prTxAntennaDiameter[prIdx] = prQueryRes.value(prTxDiameterIdx).isNull() ? nan : prQueryRes.value(prTxDiameterIdx).toDouble();
-				target.at(r).prRxGain[prIdx]            = prQueryRes.value(prRxGainIdx    ).isNull() ? nan : prQueryRes.value(prRxGainIdx    ).toDouble();
-				target.at(r).prRxAntennaDiameter[prIdx] = prQueryRes.value(prRxDiameterIdx).isNull() ? nan : prQueryRes.value(prRxDiameterIdx).toDouble();
+				target.at(r).prTxGain[prIdx]            = prQueryRes.value(prTxGainIdx    ).isNull() ? quietNaN : prQueryRes.value(prTxGainIdx    ).toDouble();
+				target.at(r).prTxAntennaDiameter[prIdx] = prQueryRes.value(prTxDiameterIdx).isNull() ? quietNaN : prQueryRes.value(prTxDiameterIdx).toDouble();
+				target.at(r).prRxGain[prIdx]            = prQueryRes.value(prRxGainIdx    ).isNull() ? quietNaN : prQueryRes.value(prRxGainIdx    ).toDouble();
+				target.at(r).prRxAntennaDiameter[prIdx] = prQueryRes.value(prRxDiameterIdx).isNull() ? quietNaN : prQueryRes.value(prRxDiameterIdx).toDouble();
 
 				std::string prAntCategoryStr = prQueryRes.value(prAntCategoryIdx).toString().toStdString();
 				CConst::AntennaCategoryEnum prAntCategory;
@@ -373,8 +434,8 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 
 				target.at(r).prAntModel[prIdx] = prQueryRes.value(prAntModelIdx).toString().toStdString();
 
-				target.at(r).prReflectorHeight[prIdx]   = prQueryRes.value(prReflectorHeightIdx).isNull() ? nan : prQueryRes.value(prReflectorHeightIdx).toDouble();
-				target.at(r).prReflectorWidth[prIdx]    = prQueryRes.value(prReflectorWidthIdx ).isNull() ? nan : prQueryRes.value(prReflectorWidthIdx ).toDouble();
+				target.at(r).prReflectorHeight[prIdx]   = prQueryRes.value(prReflectorHeightIdx).isNull() ? quietNaN : prQueryRes.value(prReflectorHeightIdx).toDouble();
+				target.at(r).prReflectorWidth[prIdx]    = prQueryRes.value(prReflectorWidthIdx ).isNull() ? quietNaN : prQueryRes.value(prReflectorWidthIdx ).toDouble();
 			}
 		}
 	}

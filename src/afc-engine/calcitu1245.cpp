@@ -22,14 +22,11 @@ double CalcITU1245(const double &angleDeg, const double &maxGain, const double &
 {
 	double cAngleDeg = angleDeg;
 
-	while(cAngleDeg >= 360.0) {
+	while(cAngleDeg > 180.0) {
 		cAngleDeg = cAngleDeg - 360.0;
 	}
 
-	if(cAngleDeg > 180.0) {
-		double gt180 = cAngleDeg - 180;
-		cAngleDeg = cAngleDeg - gt180*2.0;
-	}
+	cAngleDeg = fabs(cAngleDeg);
 
 	// double Dlambda = pow(10, ((maxGain - 7.7)/20));
 	double g1 = 2.0 + 15.0 * log10(Dlambda);
@@ -50,7 +47,7 @@ double CalcITU1245(const double &angleDeg, const double &maxGain, const double &
 		else if (cAngleDeg >= mymax(psiM, psiR) && cAngleDeg < 48.0) {
 			rv = 29.0 - 25.0 * log10(cAngleDeg);
 		}
-		else if (cAngleDeg >= 48.0 && cAngleDeg <= 180.0) {
+		else {
 			rv = -13.0;
 		}
 	}
@@ -63,7 +60,7 @@ double CalcITU1245(const double &angleDeg, const double &maxGain, const double &
 			rv = 39.0 - 5.0 * log10(Dlambda) - 25.0 * log10(cAngleDeg);
 			//qDebug() << "rv = 39 - 5 * log10(" << Dlambda << ") - 25 * log10(" << cAngleDeg << ") = "<< rv;
 		}
-		else if (cAngleDeg >= 48.0 && cAngleDeg <= 180.0) {
+		else {
 			rv = -3.0 - 5.0 * log10(Dlambda);
 		}
 

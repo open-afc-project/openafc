@@ -20,8 +20,7 @@
 #include "lininterp.h"
 #include "rkflogging/Logging.h"
 #include "rkflogging/ErrStream.h"
-
-#define PRMSG(fff, xxx) fprintf(fff, "%s", xxx)
+#include "AfcDefinitions.h"
 
 // Logger for all instances of class
 LOGGER_DEFINE_GLOBAL(logger, "AntennaClass")
@@ -39,10 +38,17 @@ AntennaClass::AntennaClass(int p_type, const char *p_strid)
 	type = p_type;
 
 	filename = (char *) NULL;
+
+	is_omni = (type == CConst::antennaOmni ? 1 : 0);
+	tilt_rad = quietNaN;
+	gain_fwd_db = quietNaN;
+	gain_back_db = quietNaN;
 	horizGainTable = (LinInterpClass *) NULL;
 	vertGainTable  = (LinInterpClass *) NULL;
-	is_omni = (type == CConst::antennaOmni ? 1 : 0);
+	offBoresightGainTable = (LinInterpClass *) NULL;
+
 	h_width = 360.0;
+	vg0 = quietNaN;
 }
 /******************************************************************************************/
 

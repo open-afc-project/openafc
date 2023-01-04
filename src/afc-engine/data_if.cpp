@@ -160,6 +160,7 @@ bool AfcDataIf::gzipBuffer(QByteArray &input, QByteArray &output)
 	strm.zfree = Z_NULL;
 	strm.opaque = Z_NULL;
 	strm.avail_in = 0;
+	strm.total_in = 0;
 	strm.next_in = Z_NULL;
 
 	int ret = deflateInit2(&strm, ZLIB_COMPRESS_LEVEL, Z_DEFLATED, ZLIB_WINDOW_BITS, ZLIB_MEMORY_LEVEL, Z_DEFAULT_STRATEGY);

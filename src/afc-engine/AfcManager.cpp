@@ -228,32 +228,185 @@ namespace OpClass
 
 AfcManager::AfcManager()
 {
+	_createKmz = false;
+	_createDebugFiles = false;
+
+	_dataIf = (AfcDataIf *) NULL;
+
+	_rlanUncertaintyRegionType = RLANBoundary::NO_BOUNDARY;
+	_rlanLLA = std::make_tuple(quietNaN, quietNaN, quietNaN);
+	_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, quietNaN);
+	_allowScanPtsInUncRegFlag = false;
+
+	_scanRegionMethod = CConst::latLonAlignGridScanRegionMethod;
+
+	_scanres_points_per_degree = -1;
+	_scanres_xy = quietNaN;
+	_scanres_ht = quietNaN;
+	_indoorFixedHeightAMSL = false;
+
+	_scanPointBelowGroundMethod = CConst::TruncateScanPointBelowGroundMethod;
+
+	_minEIRP_dBm = quietNaN;
+	_maxEIRP_dBm = quietNaN;
+	_minPSD_dBmPerMHz = quietNaN;
+
+	_IoverN_threshold_dB = -6.0;
+	_bodyLossIndoorDB = 0.0;               // Indoor body Loss (dB)
+	_bodyLossOutdoorDB = 0.0;              // Outdoor body Loss (dB)
+	_polarizationLossDB = 0.0;             // Polarization Loss (dB)
+	_rlanOrientation_deg = 0.0;            // Orientation (deg) of ellipse clockwise from North in [-90, 90]
+	_rlanType = RLANType::RLAN_OUTDOOR;
+	_rlanHeightType = CConst::AGLHeightType;
+
+	_buildingType = CConst::noBuildingType;
+
+	_fixedBuildingLossFlag = false;
+	_fixedBuildingLossValue = 0.0;
+
+	_confidenceBldg2109 = quietNaN;
+	_confidenceClutter2108 = quietNaN;
+	_confidenceWinner2LOS = quietNaN;
+	_confidenceWinner2NLOS = quietNaN;
+	_confidenceWinner2Combined = quietNaN;
+	_confidenceITM = quietNaN;
+	_reliabilityITM = quietNaN;
+
+	_winner2LOSOption = CConst::UnknownLOSOption;
+
+	_channelResponseAlgorithm = CConst::pwrSpectralAlgorithm;
+
+	_winner2UnknownLOSMethod = CConst::PLOSCombineWinner2UnknownLOSMethod;
+
+	_winner2ProbLOSThr = quietNaN;              // Winner2 prob LOS threshold, if probLOS exceeds threshold, use LOS model, otherwise use NLOS
+
+	_winner2UseGroundDistanceFlag = true;
+	_fsplUseGroundDistanceFlag = false;
+
+	_rxFeederLossDBUNII5 = 0.0;
+	_rxFeederLossDBUNII7 = 0.0;
+	_rxFeederLossDBOther = 0.0;
+
+	_ulsNoiseFigureDBUNII5 = quietNaN;
+	_ulsNoiseFigureDBUNII7 = quietNaN;
+	_ulsNoiseFigureDBOther = quietNaN;
+
+	_itmEpsDielect = quietNaN;
+	_itmSgmConductivity = quietNaN;
+	_itmPolarization = 1;
+	_itmMinSpacing = 5.0;
+	_itmMaxNumPts = 1500;
+
+	_exclusionZoneFSID = 0;
+	_exclusionZoneRLANChanIdx = -1;
+	_exclusionZoneRLANBWHz = quietNaN;
+	_exclusionZoneRLANEIRPDBm = quietNaN;
+
+	_heatmapRLANBWHz = quietNaN;
+	_heatmapRLANChanIdx = -1;
+	_heatmapMinLon = quietNaN;
+	_heatmapMaxLon = quietNaN;
+	_heatmapMinLat = quietNaN;
+	_heatmapMaxLat = quietNaN;
+	_heatmapRLANSpacing = quietNaN;
+
+	_heatmapRLANIndoorEIRPDBm = quietNaN;
+	_heatmapRLANIndoorHeight = quietNaN;
+	_heatmapRLANIndoorHeightUncertainty = quietNaN;
+
+	_heatmapRLANOutdoorEIRPDBm = quietNaN;
+	_heatmapRLANOutdoorHeight = quietNaN;
+	_heatmapRLANOutdoorHeightUncertainty = quietNaN;
+
+	_applyClutterFSRxFlag = false;
+	_fsConfidenceClutter2108 = quietNaN;
+	_maxFsAglHeight = quietNaN;
+
+	_rlanITMTxClutterMethod = CConst::ForceTrueITMClutterMethod;
+
+	_minRlanHeightAboveTerrain = quietNaN;
+
+	_maxRadius = quietNaN;
+	_exclusionDist = quietNaN;
+
+	_nearFieldAdjFlag = true;
+	_passiveRepeaterFlag = true;
+	_reportErrorRlanHeightLowFlag = false;
+	_illuminationEfficiency = quietNaN;
+	_closeInHgtFlag = true;
+	_closeInHgtLOS = quietNaN;
+	_closeInDist = quietNaN;
+	_pathLossClampFSPL = false;
+	_printSkippedLinksFlag = false;
+
+	_wlanMinFreqMHz = -1;
+	_wlanMaxFreqMHz = -1;
+	_wlanMinFreq = quietNaN;
+	_wlanMaxFreq = quietNaN;
+
+	_popDensityResLon = quietNaN;
+	_popDensityResLat = quietNaN;
+	_popDensityMinLon = quietNaN;
+	_popDensityNumLon = -1;
+	_popDensityMinLat = quietNaN;
+	_popDensityNumLat = -1;
+
+	_regionPolygonResolution = quietNaN;
+
+	_densityThrUrban = quietNaN;
+	_densityThrSuburban = quietNaN;
+	_densityThrRural = quietNaN;
+
+	_removeMobile = false;
+
+	_filterSimRegionOnly = false;
+
+	_ulsDefaultAntennaType = CConst::F1245AntennaType;
+
+	_visibilityThreshold = quietNaN;             // I/N threshold to determine whether or not an RLAN is visible to an FS
+	_maxLidarRegionLoadVal = -1;
+
 	_terrainDataModel = (TerrainClass *) NULL;
+
+	_bodyLossDB = 0.0;
+
+	_numRegion = -1;
+
+	_popGrid = (PopGridClass *) NULL;
 
 	_ulsList = new ListClass<ULSClass *>(0);
 
 	_rasList = new ListClass<RASClass *>(0);
 
-	_popGrid = (PopGridClass *) NULL;
+	_pathLossModel = CConst::unknownPathLossModel;
+
+	_zbldg2109 = quietNaN;
+	_zclutter2108 = quietNaN;
+	_fsZclutter2108 = quietNaN;
+	_zwinner2LOS = quietNaN;
+	_zwinner2NLOS = quietNaN;
+	_zwinner2Combined = quietNaN;
 
 	_rlanRegion = (RlanRegionClass *) NULL;
+
+	_ituData = (ITUDataClass *) NULL;
+	_nfa = (NFAClass *) NULL;
+	_prTable = (PRTABLEClass *) NULL;
+
+	_aciFlag = true;
+
+	_exclusionZoneFSTerrainHeight = quietNaN;
+	_exclusionZoneHeightAboveTerrain = quietNaN;
 
 	_heatmapIToNDB = (double **) NULL;
 	_heatmapIsIndoor = (bool **) NULL;
 	_heatmapNumPtsLon = 0;
 	_heatmapNumPtsLat = 0;
+	_heatmapMinIToNDB = quietNaN;
+	_heatmapMaxIToNDB = quietNaN;
+	_heatmapIToNThresholdDB = quietNaN;
 
-	_pathLossModel = CConst::unknownPathLossModel;
 	_responseCode = CConst::successResponseCode;
-	_ulsDefaultAntennaType = CConst::F1245AntennaType;
-	_rlanITMTxClutterMethod = CConst::ForceTrueITMClutterMethod;
-	_createKmz = false;
-	_createDebugFiles = false;
-	_mapDataGeoJsonFile = "";
-	_buildingType = CConst::noBuildingType;
-
-	_nfa = (NFAClass *) NULL;
-	_prTable = (PRTABLEClass *) NULL;
 }
 
 /******************************************************************************************/
@@ -831,7 +984,7 @@ void AfcManager::importGUIjsonVersion1_3(const QJsonObject &jsonObj)
 		if (!optionalParams.contains("minDesiredPower")) {
 			_minEIRP_dBm = requestObj["minDesiredPower"].toDouble();
 		} else {
-			_minEIRP_dBm = std::numeric_limits<double>::quiet_NaN();
+			_minEIRP_dBm = quietNaN;
 		}
 		/**********************************************************************/
 
@@ -1308,7 +1461,7 @@ void AfcManager::importGUIjsonVersion1_3(const QJsonObject &jsonObj)
 			centerLatitude  = sumLat / _rlanLinearPolygon.size();
 
 			_rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
-			_rlanUncerts_m = std::make_tuple(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN(), verticalUncertainty);
+			_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, verticalUncertainty);
 		} else if (hasRadialPolygonFlag) {
 			_rlanUncertaintyRegionType = RLANBoundary::RADIAL_POLY;
 
@@ -1335,7 +1488,7 @@ void AfcManager::importGUIjsonVersion1_3(const QJsonObject &jsonObj)
 			double centerLongitude = centerObj["longitude"].toDouble();
 
 			_rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
-			_rlanUncerts_m = std::make_tuple(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN(), verticalUncertainty);
+			_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, verticalUncertainty);
 		}
 
 		for(auto inquiredChannelsVal : inquiredChannelsArray) {
@@ -1460,8 +1613,8 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 			_rlanLLA = std::make_tuple(centerLatitude,
 					centerLongitude,
 					location["height"].toDouble());
-			_rlanUncerts_m = std::make_tuple(std::numeric_limits<double>::quiet_NaN(),
-					std::numeric_limits<double>::quiet_NaN(),
+			_rlanUncerts_m = std::make_tuple(quietNaN,
+					quietNaN,
 					location["verticalUncertainty"].toDouble());
 		}
 		else if (location.contains("radialPolygon") && !location["radialPolygon"].isUndefined())
@@ -1477,8 +1630,8 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 			_rlanLLA = std::make_tuple(center["latitude"].toDouble(),
 					center["longitude"].toDouble(),
 					location["height"].toDouble());
-			_rlanUncerts_m = std::make_tuple(std::numeric_limits<double>::quiet_NaN(),
-					std::numeric_limits<double>::quiet_NaN(),
+			_rlanUncerts_m = std::make_tuple(quietNaN,
+					quietNaN,
 					location["verticalUncertainty"].toDouble());
 		}
 		else
@@ -1489,7 +1642,7 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 		if (jsonObj.contains("minDesiredPower") && !jsonObj["minDesiredPower"].isUndefined()) {
 			_minEIRP_dBm = jsonObj["minDesiredPower"].toDouble();
 		} else {
-			_minEIRP_dBm = std::numeric_limits<double>::quiet_NaN();
+			_minEIRP_dBm = quietNaN;
 		}
 
 		bool validRequestType = false;
@@ -1562,8 +1715,8 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 			throw std::runtime_error(QString("Invalid height type: %1").arg(rlanHeightType).toStdString());
 		}
 
-		_rlanLLA = std::make_tuple(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN(), jsonObj["height"].toDouble());
-		_rlanUncerts_m = std::make_tuple(std::numeric_limits<double>::quiet_NaN(), std::numeric_limits<double>::quiet_NaN(), jsonObj["heightUncertainty"].toDouble());
+		_rlanLLA = std::make_tuple(quietNaN, quietNaN, jsonObj["height"].toDouble());
+		_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, jsonObj["heightUncertainty"].toDouble());
 		_rlanType = jsonObj["indoorOutdoor"].toString() == "Outdoor" ? RLANType::RLAN_OUTDOOR : RLANType::RLAN_INDOOR;
 
 		// set defaults for unused values
@@ -1584,13 +1737,14 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 		_rlanLLA = std::make_tuple(
 				(_heatmapMaxLat + _heatmapMinLat) / 2,
 				(_heatmapMaxLon + _heatmapMinLon) / 2,
-				std::numeric_limits<double>::quiet_NaN());
+				quietNaN);
 
 		_heatmapRLANBWHz = jsonObj["bandwidth"].toDouble() * 1.0e6;
 		_heatmapRLANChanIdx = 0;
 
 		ChannelStruct channel;
 		channel.availability = ChannelColor::GREEN;
+		channel.type = ChannelType::INQUIRED_CHANNEL;
 		channel.eirpLimit_dBm = 0;
 		channel.startFreqMHz = jsonObj["centerFrequency"].toInt() - jsonObj["bandwidth"].toInt()/2;
 		channel.stopFreqMHz = jsonObj["centerFrequency"].toInt() + jsonObj["bandwidth"].toInt()/2;
@@ -2119,7 +2273,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		case CConst::FCC6GHzReportAndOrderPathLossModel:
 			// FCC_6GHZ_REPORT_AND_ORDER path loss model
 			// GUI gets these values as percentiles from 0-100, convert to probabilities 0-1
-			_winner2ProbLOSThr = std::numeric_limits<double>::quiet_NaN();
+			_winner2ProbLOSThr = quietNaN;
 			_confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
 			_confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
 
@@ -3692,7 +3846,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 	int prIdx;
 	int dbIdx;
-	bool prevGdalDirectMode = _terrainDataModel->setGdalDirectMode(true);
+	bool prevGdalDirectMode = (_terrainDataModel ? _terrainDataModel->setGdalDirectMode(true) : false);
 	for(dbIdx=0; dbIdx<(int) ulsDatabaseList.size(); ++dbIdx) {
 		std::string name = std::get<0>(ulsDatabaseList[dbIdx]);
 		std::string filename = std::get<1>(ulsDatabaseList[dbIdx]);
@@ -5172,7 +5326,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 						Vector3 xvec, yvec, zvec;
 						az = (((double)rand() / (RAND_MAX)) - 0.5) * 2 * M_PI;
 						el = (((double)rand() / (RAND_MAX)) - 0.5) * 10 * M_PI / 180.0;
-						zvec = ((linkDirection == 0) ? rxPosition.normalized() : rxPosition.normalized());
+						zvec = rxPosition.normalized();
 						xvec = (Vector3(zvec.y(), -zvec.x(), 0.0)).normalized();
 						yvec = zvec.cross(xvec);
 						uls->setAntennaPointing(zvec * sin(el) + (xvec * cos(az) + yvec * sin(az)) * cos(el));
@@ -5190,7 +5344,9 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			}
 
 		}
-		_terrainDataModel->setGdalDirectMode(prevGdalDirectMode);
+		if (_terrainDataModel) {
+			_terrainDataModel->setGdalDirectMode(prevGdalDirectMode);
+		}
 
 		LOGGER_INFO(logger) << "TOTAL NUM VALID ULS: " << numValid;
 		LOGGER_INFO(logger) << "TOTAL NUM IGNORE ULS (invalid data):" << numIgnoreInvalid;
@@ -5201,10 +5357,10 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		LOGGER_INFO(logger) << "TOTAL NUM VALID ULS IN SIMULATION (VALID + FIXED): " << _ulsList->getSize();
 		if (linkDirection == 0)
 		{
-			LOGGER_INFO(logger) << "NUM URBAN ULS: " << numUrbanULS << " = " << ((double)numUrbanULS / _ulsList->getSize()) * 100.0 << " \%";
-			LOGGER_INFO(logger) << "NUM SUBURBAN ULS: " << numSuburbanULS << " = " << ((double)numSuburbanULS / _ulsList->getSize()) * 100.0 << " \%";
-			LOGGER_INFO(logger) << "NUM RURAL ULS: " << numRuralULS << " = " << ((double)numRuralULS / _ulsList->getSize()) * 100.0 << " \%";
-			LOGGER_INFO(logger) << "NUM BARREN ULS: " << numBarrenULS << " = " << ((double)numBarrenULS / _ulsList->getSize()) * 100.0 << " \%";
+			LOGGER_INFO(logger) << "NUM URBAN ULS: " << numUrbanULS << " = " << ((double)numUrbanULS / _ulsList->getSize()) * 100.0 << " %";
+			LOGGER_INFO(logger) << "NUM SUBURBAN ULS: " << numSuburbanULS << " = " << ((double)numSuburbanULS / _ulsList->getSize()) * 100.0 << " %";
+			LOGGER_INFO(logger) << "NUM RURAL ULS: " << numRuralULS << " = " << ((double)numRuralULS / _ulsList->getSize()) * 100.0 << " %";
+			LOGGER_INFO(logger) << "NUM BARREN ULS: " << numBarrenULS << " = " << ((double)numBarrenULS / _ulsList->getSize()) * 100.0 << " %";
 		}
 
 		if (_filterSimRegionOnly)
@@ -6184,6 +6340,8 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 							if (txClutterStrPtr) { *txClutterStrPtr = "VILLAGE_CENTER"; }
 							break;
 						default:
+							ha = quietNaN;
+							dk = quietNaN;
 							CORE_DUMP;
 							break;
 					}
@@ -6420,7 +6578,7 @@ double AfcManager::Winner2_C1suburban_NLOS(double distance, double hBS, double /
 /******************************************************************************************/
 double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
 {
-	double retval;
+	double retval = quietNaN;
 
 	if ((losValue == 0) && (_closeInHgtFlag) && (hMS > _closeInHgtLOS)) {
 		losValue = 1;
@@ -6569,7 +6727,7 @@ double AfcManager::Winner2_C2urban_NLOS(double distance, double hBS, double /* h
 /******************************************************************************************/
 double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
 {
-	double retval;
+	double retval = quietNaN;
 
 	if ((losValue == 0) && (_closeInHgtFlag) && (hMS > _closeInHgtLOS)) {
 		losValue = 1;
@@ -6716,7 +6874,7 @@ double AfcManager::Winner2_D1rural_NLOS(double distance, double hBS, double hMS,
 /******************************************************************************************/
 double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
 {
-	double retval;
+	double retval = quietNaN;
 
 	if ((losValue == 0) && (_closeInHgtFlag) && (hMS > _closeInHgtLOS)) {
 		losValue = 1;
@@ -6946,40 +7104,6 @@ void AfcManager::runPointAnalysis()
 				"FRESNEL_INDEX"
 
 		});
-	}
-	/**************************************************************************************/
-
-	/**************************************************************************************/
-	/* Create _fsAnalysisListFile                                                         */
-	/**************************************************************************************/
-	FILE *fFSList;
-	if (_fsAnalysisListFile.empty()) {
-		fFSList = (FILE *) NULL;
-	} else {
-		if ( !(fFSList = fopen(_fsAnalysisListFile.c_str(), "wb")) ) {
-			errStr << std::string("ERROR: Unable to open fsAnalysisListFile \"") + _fsAnalysisListFile + std::string("\"\n");
-			throw std::runtime_error(errStr.str());
-		}
-	}
-	if (fFSList) {
-		fprintf(fFSList,   "FSID"
-			",RX_CALLSIGN"
-			",TX_CALLSIGN"
-			",NUM_PASSIVE_REPEATER"
-			",IS_DIVERSITY_LINK"
-			",SEGMENT_IDX"
-			",START_FREQ (MHz)"
-			",STOP_FREQ (MHz)"
-			",SEGMENT_RX_LONGITUDE (deg)"
-			",SEGMENT_RX_LATITUDE (deg)"
-			",SEGMENT_RX_HEIGHT_AGL (m)"
-			",SEGMENT_DISTANCE (m)"
-			",PR_REF_THETA_IN (deg)"
-			",PR_REF_KS"
-			",PR_REF_Q"
-			",PR_PATH_SEGMENT_GAIN (dB)"
-			",PR_EFFECTIVE_GAIN (dB)"
-			"\n");
 	}
 	/**************************************************************************************/
 
@@ -7489,6 +7613,40 @@ void AfcManager::runPointAnalysis()
 	int traceIdx = 0;
 #   endif
 
+	/**************************************************************************************/
+	/* Create _fsAnalysisListFile                                                         */
+	/**************************************************************************************/
+	FILE *fFSList;
+	if (_fsAnalysisListFile.empty()) {
+		fFSList = (FILE *) NULL;
+	} else {
+		if ( !(fFSList = fopen(_fsAnalysisListFile.c_str(), "wb")) ) {
+			errStr << std::string("ERROR: Unable to open fsAnalysisListFile \"") + _fsAnalysisListFile + std::string("\"\n");
+			throw std::runtime_error(errStr.str());
+		}
+	}
+	if (fFSList) {
+		fprintf(fFSList,   "FSID"
+			",RX_CALLSIGN"
+			",TX_CALLSIGN"
+			",NUM_PASSIVE_REPEATER"
+			",IS_DIVERSITY_LINK"
+			",SEGMENT_IDX"
+			",START_FREQ (MHz)"
+			",STOP_FREQ (MHz)"
+			",SEGMENT_RX_LONGITUDE (deg)"
+			",SEGMENT_RX_LATITUDE (deg)"
+			",SEGMENT_RX_HEIGHT_AGL (m)"
+			",SEGMENT_DISTANCE (m)"
+			",PR_REF_THETA_IN (deg)"
+			",PR_REF_KS"
+			",PR_REF_Q"
+			",PR_PATH_SEGMENT_GAIN (dB)"
+			",PR_EFFECTIVE_GAIN (dB)"
+			"\n");
+	}
+	/**************************************************************************************/
+
 	int ulsIdx;
 	double *eirpLimitList = (double *) malloc(_ulsList->getSize()*sizeof(double));
 	bool *ulsFlagList   = (bool *) malloc(_ulsList->getSize()*sizeof(bool));
@@ -7809,9 +7967,9 @@ void AfcManager::runPointAnalysis()
 												}
 
 												nearFieldOffsetDB = 0.0;
-												nearField_xdb = std::numeric_limits<float>::quiet_NaN();
-												nearField_u = std::numeric_limits<float>::quiet_NaN();
-												nearField_eff = std::numeric_limits<float>::quiet_NaN();
+												nearField_xdb = quietNaN;
+												nearField_u = quietNaN;
+												nearField_eff = quietNaN;
 												if (segIdx == numPR) {
 													if (_nearFieldAdjFlag && (distKm*1000.0 < uls->getRxNearFieldDistLimit()) && (angleOffBoresightDeg < 90.0) ) {
 														bool unii5Flag = computeSpectralOverlapLoss((double *) NULL, uls->getStartUseFreq(), uls->getStopUseFreq(), 5925.0e6, 6425.0e6, false, CConst::psdSpectralAlgorithm);
@@ -8802,8 +8960,8 @@ void AfcManager::runScanAnalysis()
 		fkml->writeEndElement(); // Document
 		fkml->writeEndElement(); // kml
 		fkml->writeEndDocument();
-		delete kml_writer;
 	}
+	delete kml_writer;
 
 
 	/**************************************************************************************/
@@ -10556,7 +10714,7 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 				//     + ", problem at frequency " + std::to_string(prevFreqMHz)
 				// );
 				nextFreqMHz = minNextFreq;
-				minPSD = std::numeric_limits<double>::quiet_NaN();
+				minPSD = quietNaN;
 			}
 			psdFreqRange.freqMHzList.push_back(nextFreqMHz);
 			psdFreqRange.psd_dBm_MHzList.push_back(minPSD);
