@@ -355,7 +355,7 @@ class DbUpgrade(Command):
             upgrade()
 
             # If AFCConfig is empty, copy from fcc config file
-            region = 'fcc'
+            region = 'CONUS'
             config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext == region).first()
             if not config:
                 dataif = data_if.DataIf(
