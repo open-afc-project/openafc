@@ -354,8 +354,10 @@ class RatAfc(MethodView):
 
         results = {"availableSpectrumInquiryResponses": [], "version": ver}
 
-        for request in requests:
-            try:
+        tasks = []
+
+        try:
+            for request in requests:
                 # authenticate
                 LOGGER.debug("Request: %s", request)
                 device_desc = request["availableSpectrumInquiryRequests"][0].get(
@@ -382,10 +384,10 @@ class RatAfc(MethodView):
                 opt = flask.request.args.get('nocache')
                 if opt == 'True':
                     runtime_opts |= RNTM_OPT_NOCACHE
-                LOGGER.debug('RatAfc::post() runtime %d', runtime_opts)
                 if ('AFC_OBJST_HOST' in os.environ and
                         'AFC_OBJST_PORT' in os.environ):
                     runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
+                LOGGER.debug('RatAfc::post() runtime %d', runtime_opts)
 
                 task_id = str(uuid.uuid4())
                 dataif = data_if.DataIf(
@@ -415,16 +417,9 @@ class RatAfc(MethodView):
                         LOGGER.debug("dataAsJson: %s", dataAsJson)
                         actualResult = dataAsJson.get(
                             "availableSpectrumInquiryResponses")
-                        if actualResult is not None:
-                            results["availableSpectrumInquiryResponses"].append(
-                                actualResult[0])
-                        else:
-                            LOGGER.debug("actualResult was None")
-                            results["availableSpectrumInquiryResponses"].append(
-                                dataAsJson)
-                        resp = flask.make_response(flask.json.dumps(results), 200)
-                        resp.content_type = 'application/json'
-                        return resp
+                        results["availableSpectrumInquiryResponses"].append(
+                            actualResult[0])
+                        continue
 
                 with dataif.open("pro", hash + "/analysisRequest.json") as hfile:
                     hfile.write(request_json_bytes)
@@ -448,59 +443,64 @@ class RatAfc(MethodView):
                               flask.current_app.config['STATE_ROOT_PATH'],
                               hash, region, history_dir)
                 if conn_type == 'async':
+                    if len(requests) > 1:
+                        raise AP_Exception(-1, "Unsupported multipart async request")
                     task_stat = t.get()
+                    # async request comes from GUI only, so it can't be multi nor cached
                     return flask.jsonify(taskId = task_id,
                                      taskState = task_stat["status"])
-                else:
-                    # wait for request to finish processing
-                    try:
-                        task_stat = t.wait()
-                        LOGGER.debug("Task complete: %s", task_stat)
-                        if t.successful(task_stat):
-                            taskResponse = response_map[task_stat['status']](t)
-                            # we might be able to clean this up by having the result functions not return a full response object
-                            # need to check everywhere they are called
-                            dataAsJson = json.loads(taskResponse.data)
-                            LOGGER.debug("dataAsJson: %s", dataAsJson)
-                            actualResult = dataAsJson.get(
-                                "availableSpectrumInquiryResponses")
-                            if actualResult is not None:
-                                # LOGGER.debug("actualResult: %s", actualResult)
-                                results["availableSpectrumInquiryResponses"].append(
-                                    actualResult[0])
-                            else:
-                                LOGGER.debug("actualResult was None")
-                                results["availableSpectrumInquiryResponses"].append(
-                                    dataAsJson)
+                tasks.append(t)
+
+            for t in tasks:
+                # wait for requests to finish processing
+                try:
+                    task_stat = t.wait()
+                    LOGGER.debug("Task complete: %s", task_stat)
+                    if t.successful(task_stat):
+                        taskResponse = response_map[task_stat['status']](t)
+                        # we might be able to clean this up by having the result functions not return a full response object
+                        # need to check everywhere they are called
+                        dataAsJson = json.loads(taskResponse.data)
+                        LOGGER.debug("dataAsJson: %s", dataAsJson)
+                        actualResult = dataAsJson.get(
+                            "availableSpectrumInquiryResponses")
+                        if actualResult is not None:
+                            # LOGGER.debug("actualResult: %s", actualResult)
+                            results["availableSpectrumInquiryResponses"].append(
+                                actualResult[0])
                         else:
-                            LOGGER.debug("Task was not successful")
-                            taskResponse = response_map[task_stat['status']](t)
-                            dataAsJson = json.loads(taskResponse.data)
-                            LOGGER.debug(
-                                "Unsuccessful dataAsJson: %s", dataAsJson)
+                            LOGGER.debug("actualResult was None")
                             results["availableSpectrumInquiryResponses"].append(
                                 dataAsJson)
+                    else:
+                        LOGGER.debug("Task was not successful")
+                        taskResponse = response_map[task_stat['status']](t)
+                        dataAsJson = json.loads(taskResponse.data)
+                        LOGGER.debug(
+                            "Unsuccessful dataAsJson: %s", dataAsJson)
+                        results["availableSpectrumInquiryResponses"].append(
+                            dataAsJson)
 
-                    except Exception as e:
-                        LOGGER.error('catching and rethrowing exception: %s',
-                                     getattr(e, 'message', repr(e)))
-                        raise AP_Exception(-1,
-                                           'The task state is invalid. '
-                                           'Try again later, and if this issue '
-                                           'persists contact support.')
+                except Exception as e:
+                    LOGGER.error('catching and rethrowing exception: %s',
+                                 getattr(e, 'message', repr(e)))
+                    raise AP_Exception(-1,
+                                       'The task state is invalid. '
+                                       'Try again later, and if this issue '
+                                       'persists contact support.')
 
-            except AP_Exception as e:
-                LOGGER.error('catching exception: %s',
-                             getattr(e, 'message', repr(e)))
-                results["availableSpectrumInquiryResponses"].append(
-                    {
-                        'requestId': request["availableSpectrumInquiryRequests"][0]["requestId"],
-                        'response': {
-                            'responseCode': e.response_code,
-                            'shortDescription': e.description,
-                            'supplementalInfo': json.dumps(e.supplemental_info) if e.supplemental_info is not None else None
-                        }
-                    })
+        except AP_Exception as e:
+            LOGGER.error('catching exception: %s',
+                         getattr(e, 'message', repr(e)))
+            results["availableSpectrumInquiryResponses"].append(
+                {
+                    'requestId': request["availableSpectrumInquiryRequests"][0]["requestId"],
+                    'response': {
+                        'responseCode': e.response_code,
+                        'shortDescription': e.description,
+                        'supplementalInfo': json.dumps(e.supplemental_info) if e.supplemental_info is not None else None
+                    }
+                })
         LOGGER.error("Final results: %s", str(results))
         resp = flask.make_response(flask.json.dumps(results), 200)
         resp.content_type = 'application/json'
