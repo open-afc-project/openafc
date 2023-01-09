@@ -254,7 +254,8 @@ export class AFCForm extends React.Component<
 
     private setConfig = (newConf: string) => {
         try {
-            const parsed = JSON.parse(newConf) as AFCConfigFile;
+            var escaped = newConf.replace(/\s+/g, ' ')
+            const parsed = JSON.parse(escaped) as AFCConfigFile;
             if (parsed.version == guiConfig.version) {
                 this.updateEntireConfigState(Object.assign(this.state.config, parsed));
             } else {
