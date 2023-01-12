@@ -98,10 +98,10 @@ class ULS(Base):
     emissions_des = Column(String(64), nullable=False)
 
     #: Tx Lat Coords
-    tx_lat_deg = Column(Float, nullable=False)
+    tx_lat_deg = Column(Float)
 
     #: Tx Long Coords
-    tx_long_deg = Column(Float, nullable=False)
+    tx_long_deg = Column(Float)
 
     #: Tx Ground Elevation (m)
     tx_ground_elev_m = Column(Float)
@@ -111,6 +111,12 @@ class ULS(Base):
 
     #: Tx Height to Center RAAT (m)
     tx_height_to_center_raat_m = Column(Float)
+
+    #Azimuth Angle Towards Tx (deg)
+    azimuth_angle_to_tx = Column(Float)
+
+    #Elevation Angle Towards Tx (deg)
+    elevation_angle_to_tx = Column(Float)
 
     #: Tx Beamwidth
     #tx_beamwidth = Column(Float, nullable=False)
@@ -283,6 +289,10 @@ def convertULS(data_file, state_root, logFile, fileName):
                     tx_polarization=str(row['Tx Polarization']),
                     #: Tx Height to Center RAAT (m)
                     tx_height_to_center_raat_m=_as_float(row['Tx Height to Center RAAT (m)']),
+                    # Azimuth Angle Towards Tx (deg)
+                    azimuth_angle_to_tx =  _as_float(row['Azimuth Angle Towards Tx (deg)']),
+                    # Elevation Angle Towards Tx (deg)
+                    elevation_angle_to_tx =  _as_float(row['Elevation Angle Towards Tx (deg)']),
                     #: Tx Gain (dBi)
                     tx_gain=_as_float(row['Tx Gain (dBi)']),
                     #: Rx Lat Coords

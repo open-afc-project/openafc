@@ -553,15 +553,35 @@ AntennaModelClass *AntennaModelMapClass::find(std::string modelName)
         std::transform(modelName.begin(), modelName.end(), modelName.begin(), ::toupper);
         /**********************************************************************************/
 
+        /**********************************************************************************/
+        /* Remove non-alhpanumeric characters                                             */
+        /**********************************************************************************/
         modelName.erase(std::remove_if(modelName.begin(), modelName.end(), isInvalidModelNameChar), modelName.end());
+        /**********************************************************************************/
 
+        /**********************************************************************************/
+        /* Match if an antennaModelList contains a model that is:                         */
+        /*    * B1 or HP model and is a prefix of modelName                               */
+        /*    * not B1 or HP and model equals modelName                                   */
+        /**********************************************************************************/
 	    for(i=0; (i<antennaModelList.size())&&(!found); ++i) {
 	        AntennaModelClass *m = antennaModelList[i];
-            if (modelName == m->name) {
+            bool prefixFlag;
+            if (    (m->type == AntennaModelClass::AntennaType)
+                 && (    (m->category == AntennaModelClass::HPCategory)
+                      || (m->category == AntennaModelClass::B1Category) ) ) {
+                prefixFlag = true;
+            } else {
+                prefixFlag = false;
+            }
+
+            if (    ((prefixFlag) && (modelName.compare(0, m->name.size(), m->name) == 0))
+                 || (m->name == modelName) ) {
                 found = true;
                 antennaModel = m;
             }
         }
+        /**********************************************************************************/
     }
 
 	return(antennaModel);
