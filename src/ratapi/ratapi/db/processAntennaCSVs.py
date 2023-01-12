@@ -12,7 +12,11 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
     outputCsvFilePath = outputFile
 
     # Read in all input CSVs as dictionaries and fetch relevant columns
+
+
+    ############################################################################
     # Billboard Reflector CSV
+    ############################################################################
     billboardReflectorReader = csv.DictReader(open(billboardReflectorCsvFilePath, 'r'))
 
     reflectorAntennaModelList = []
@@ -22,8 +26,11 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
         reflectorAntennaModelList.append(row['antennaModel'])
         reflectorHeightList.append(row['height_m'])
         reflectorWidthList.append(row['width_m'])
+    ############################################################################
 
+    ############################################################################
     # Antenna Model/Diameter/Gain CSV
+    ############################################################################
     antennaModelDiamGainReader = csv.DictReader(open(antennaModelDiamGainCsvFilePath, 'r'))
 
     standardModelList = []
@@ -33,20 +40,29 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
         standardModelList.append(row['standardModel'])
         antennaDiameterList.append(row['diameter_m'])
         antennaGainList.append(row['gain_dBi'])
+    ############################################################################
 
+    ############################################################################
     # Category B1 Antenna CSV
+    ############################################################################
     categoryB1AntennasReader = csv.DictReader(open(categoryB1AntennasCsvFilePath))
     antennaModelPrefixB1List = []
     for row in categoryB1AntennasReader:
         antennaModelPrefixB1List.append(row['antennaModelPrefix'])
+    ############################################################################
 
+    ############################################################################
     # HP Antenna CSV
+    ############################################################################
     highPerformanceAntennasReader = csv.DictReader(open(highPerformanceAntennasCsvFilePath))
     antennaModelPrefixHpList = []
     for row in highPerformanceAntennasReader:
         antennaModelPrefixHpList.append(row['antennaModelPrefix'])
+    ############################################################################
 
+    ############################################################################
     # Antenna Pattern File from ISED (Canada)
+    ############################################################################
     antennaPatternReader = csv.DictReader(open(antennaPatternCsvFilePath))
     antennaPatternModelList = []
     antennaPatternGainList = []
@@ -61,6 +77,7 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
         antennaPatternTypeList.append(row['Pattern Type'])
         antennaPatternAzimuthList.append(row['Pattern Azimuth [deg]'])
         antennaPatternAttenuationList.append(row['Pattern Attenuation [dB]'])
+    ############################################################################
 
     ############################################################################
     # Make sure all antenna model characters are upper-case                    #
@@ -230,6 +247,9 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
         i=0
         while i <= len(antpatternRaw[antennaModel])-2:
             if antpatternRaw[antennaModel][i][0] == antpatternRaw[antennaModel][i+1][0]:
+                if antpatternRaw[antennaModel][i][1] != antpatternRaw[antennaModel][i+1][1]:
+                    logFile.write('WARNING: Antenna model ' + antennaModel
+                        + ' angle off boresight ' + antpatternRaw[antennaModel][i][0] + ' has multiple attenuations specified\n')
                 antpatternRaw[antennaModel][i][1] == min(antpatternRaw[antennaModel][i][1], antpatternRaw[antennaModel][i+1][1])
                 antpatternRaw[antennaModel].pop(i+1)
             else:

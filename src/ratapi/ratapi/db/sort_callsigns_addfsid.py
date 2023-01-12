@@ -187,7 +187,7 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                                 printFlag = 0
                                 r.append(str(0))
                         else:
-                            if recordNum == 1:
+                            if recordNum == len(rate_idx_list):
                                 printFlag = 1
                             else:
                                 printFlag = 0
