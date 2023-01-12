@@ -221,8 +221,8 @@ QStringList UlsFunctionsClass::getCSVHeader(int numPR)
     header << "Tx Long Coords";
     header << "Tx Ground Elevation (m)";
     header << "Tx Polarization";
-    header << "Tx Azimuth Angle (deg)";
-    header << "Tx Elevation Angle (deg)";
+    header << "Azimuth Angle Towards Tx (deg)";
+    header << "Elevation Angle Towards Tx (deg)";
     header << "Tx Ant Manufacturer";
     header << "Tx Ant Model";
     header << "Tx Ant Model Name Matched";

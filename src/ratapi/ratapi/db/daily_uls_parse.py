@@ -50,7 +50,8 @@ monthMap = {
 ###############################################################################
 def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
     regionDataDir = fullPathTempDir + '/' + region
-    os.mkdir(regionDataDir)
+    if (not os.path.isdir(regionDataDir)):
+        os.mkdir(regionDataDir)
     logFile.write('Downloading data fils for ' + region + ' into ' + regionDataDir + '\n')
     if region == 'US':
         # download the latest Weekly Update
@@ -97,7 +98,7 @@ def downloadAFCGitHubFiles(logFile):
             '_orig.csv')
 
         # Temporary solution: remove control characters, and blank lines.  Fix spelling error.
-        cmd = 'tr -d \'\200-\377\015\' < ' + dataFile + '_orig.csv  | ' \
+        cmd = 'tr -d \'\\200-\\377\\015\' < ' + dataFile + '_orig.csv  | ' \
             + 'gawk -F "," \'($2 != "") { print }\' | ' \
             + 'sed \'s/daimeter/diameter/\' ' \
             + '>| ' + dataFile + '.csv'
@@ -299,7 +300,7 @@ def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
 # Generates the combined text file that the coalition processor uses. 
 def generateUlsScriptInputUS(directory, logFile, genFilename):
     logFile.write('Appending US data to ' + genFilename + ' as input for uls script' + '\n')
-    with open(genFilename, 'a') as combined:
+    with open(genFilename, 'a', encoding='utf8') as combined:
         for weeklyFile in os.listdir(directory):
             if "withDaily" in weeklyFile:
                 logFile.write('Adding ' + directory + '/' + weeklyFile + ' to ' + genFilename + '\n')
@@ -309,10 +310,10 @@ def generateUlsScriptInputUS(directory, logFile, genFilename):
 
 def generateUlsScriptInputCA(directory, logFile, genFilename):
     logFile.write('Appending CA data to ' + genFilename + ' as input for uls script' + '\n')
-    with open(genFilename, 'a') as combined:
+    with open(genFilename, 'a', encoding='utf8') as combined:
         for dataFile in os.listdir(directory):
             logFile.write('Adding ' + directory + '/' + dataFile + ' to ' + genFilename + '\n')
-            with open(directory +'/' + dataFile, 'r') as csvfile:
+            with open(directory +'/' + dataFile, 'r', encoding='utf8') as csvfile:
                 code = dataFile.replace('.csv', '')
                 csvreader = csv.reader(csvfile)
                 for row in csvreader:
