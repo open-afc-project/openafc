@@ -47,7 +47,7 @@ def isTypicalReflectorDimension(height, width):
 def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
     logFile.write('Fixing parameters' + '\n')
 
-    file_handle = open(inputPath, 'rb')
+    file_handle = open(inputPath, 'r')
     csvreader = csv.DictReader(file_handle)
 
     fieldnames = csvreader.fieldnames + [
@@ -142,7 +142,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             else:
                 csmap[keyv] = [ row ]
     
-        all_cs = csmap.keys()
+        all_cs = list(csmap.keys())
         for keyv in sorted(all_cs):
             matchmap = {}
             for ri in range(len(csmap[keyv])):

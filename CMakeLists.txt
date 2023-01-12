@@ -43,7 +43,8 @@ file(READ "${CMAKE_SOURCE_DIR}/version.txt" VERSIONFILE)
 string(STRIP ${VERSIONFILE} VERSIONFILE)
 
 if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
-    "EngineRelease" IN_LIST OPENAFC_BUILD_TYPE)
+    "EngineRelease" IN_LIST OPENAFC_BUILD_TYPE OR
+    "Ulsprocessor" IN_LIST OPENAFC_BUILD_TYPE)
     project(fbrat VERSION ${VERSIONFILE})
 else()
     project(fbrat VERSION ${VERSIONFILE} LANGUAGES)
@@ -57,7 +58,8 @@ option(BUILD_AFCENGINE "Build the AFC engine portion of the project" ON)
 set(SOVERSION "${PROJECT_VERSION}")
 
 if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
-    "EngineRelease" IN_LIST OPENAFC_BUILD_TYPE)
+    "EngineRelease" IN_LIST OPENAFC_BUILD_TYPE OR
+    "Ulsprocessor" IN_LIST OPENAFC_BUILD_TYPE)
   # Compiler and linker config
   set(CMAKE_CXX_STANDARD 11)
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -98,9 +100,15 @@ if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
     message(STATUS "Using DEBUG_AFC build mode")
   endif()
 
+  if ("Ulsprocessor" IN_LIST OPENAFC_BUILD_TYPE)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -larmadillo")
+  endif()
+
   message("CMAKE_C_FLAGS ${CMAKE_C_FLAGS}")
   message("CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS}")
 endif()
+
+
 
 # Coverage analysis
 include(CheckCoverage)

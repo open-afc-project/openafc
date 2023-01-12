@@ -39,6 +39,7 @@ if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
 endif()
 if ("Ulsprocessor" IN_LIST OPENAFC_BUILD_TYPE)
     add_subdirectory(coalition_ulsprocessor)
+    add_subdirectory(ratapi)
 endif()
 
 # Make visible to project scope

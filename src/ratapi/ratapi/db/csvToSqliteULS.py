@@ -16,7 +16,7 @@ class CoerceUTF8(TypeDecorator):
     impl = Unicode
 
     def process_bind_param(self, value, dialect):
-        if isinstance(value, str):
+        if isinstance(value, bytes):
             value = value.decode('utf-8')
         return value
 
@@ -200,7 +200,7 @@ def load_csv_data(file_name, headers=None):
         :rtype: (iterable rows, file handle or None)
     '''
     if headers is None:
-        file_handle = open(file_name, 'rb')
+        file_handle = open(file_name, 'r')
         return (csv.DictReader(file_handle), file_handle)
 
     (names, formats) = tuple(zip(*headers))

@@ -22,6 +22,8 @@ RMQ="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                   # rabbitmq ima
 NGNX="public.ecr.aws/w9v6y1o0/openafc/ngnx-image"                 # ngnx image
 RTEST_DI="rtest"                                                  # regression tests image
 
+ULS_UPDATER="110738915961.dkr.ecr.us-east-1.amazonaws.com/uls-updater"    # ULS Updater images
+
 # TODO: deprecated, will be removed in future release
 PRINST_WRKR_DI="public.ecr.aws/w9v6y1o0/openafc/centos-worker-preinstall" # worker preinst image name
 
@@ -111,6 +113,8 @@ build_dev_server() {
     docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B}:${tag} ${push} &
     docker_build_and_push ${wd}/worker/Dockerfile.build ${WORKER_AL_D4B}:${tag} ${push} &
     docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${WORKER_AL_PRINST}:${tag} ${push} &
+  # build of ULS docker
+    docker_build_and_push ${wd}/uls/Dockerfile-uls_updater ${ULS_UPDATER}:${tag}-centos7 ${push} &
 
   msg "wait for prereqs to be built"
   # wait for background jobs to be done

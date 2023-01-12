@@ -1,4 +1,5 @@
-import os, urllib, datetime, zipfile, shutil, subprocess, sys, glob, argparse, csv
+import os, datetime, zipfile, shutil, subprocess, sys, glob, argparse, csv
+import urllib.request, urllib.parse, urllib.error
 from collections import OrderedDict
 import ssl
 from processAntennaCSVs import processAntFiles
@@ -55,7 +56,7 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
         # download the latest Weekly Update
         weeklyURL =  'https://data.fcc.gov/download/pub/uls/complete/l_micro.zip'
         logFile.write('Downloading weekly' + '\n')
-        urllib.urlretrieve(weeklyURL, regionDataDir + '/weekly.zip')
+        urllib.request.urlretrieve(weeklyURL, regionDataDir + '/weekly.zip')
 
         # download all the daily updates starting from Sunday up to that day
         # example: on Wednesday morning, we will download the weekly update PLUS Sun, Mon, Tue and Wed daily updates
@@ -63,16 +64,16 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
             dayStr = day
             dailyURL =  'https://data.fcc.gov/download/pub/uls/daily/l_mw_' + dayStr +'.zip'
             logFile.write('Downloading ' + dayStr + '\n')
-            urllib.urlretrieve(dailyURL, regionDataDir + '/' + dayStr + '.zip')
+            urllib.request.urlretrieve(dailyURL, regionDataDir + '/' + dayStr + '.zip')
             # Exit after processing today's file
             if (key == currentWeekday) and (day != 'sun'):
                 break
     elif region == 'CA':
-        urllib.urlretrieve('https://www.ic.gc.ca/engineering/Stations_Data_Extracts.csv',          regionDataDir + '/SD.csv')
-        urllib.urlretrieve('https://www.ic.gc.ca/engineering/Passive_Repeater_data_extract.csv',   regionDataDir + '/PP.csv')
-        urllib.urlretrieve('https://www.ic.gc.ca/engineering/Passive_Reflectors_Data_Extract.csv', regionDataDir + '/PR.csv')
-        urllib.urlretrieve('https://www.ic.gc.ca/engineering/Antenna_Patterns_6GHz.csv',           regionDataDir + '/AP.csv')
-        urllib.urlretrieve('https://www.ic.gc.ca/engineering/SMS_TAFL_Files/TAFL_LTAF_Fixe.zip',   'TAFL_LTAF_Fixe.zip')
+        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Stations_Data_Extracts.csv',          regionDataDir + '/SD.csv')
+        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Passive_Repeater_data_extract.csv',   regionDataDir + '/PP.csv')
+        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Passive_Reflectors_Data_Extract.csv', regionDataDir + '/PR.csv')
+        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Antenna_Patterns_6GHz.csv',           regionDataDir + '/AP.csv')
+        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/SMS_TAFL_Files/TAFL_LTAF_Fixe.zip',   'TAFL_LTAF_Fixe.zip')
         zip_file = zipfile.ZipFile("TAFL_LTAF_Fixe.zip") # zip object
         zip_file.extractall(regionDataDir) 
         zip_file.close() 
@@ -92,7 +93,8 @@ def downloadAFCGitHubFiles(logFile):
                   ]
 
     for dataFile in dataFileList:
-        urllib.urlretrieve(dataURL + dataFile + '.csv', dataFile + '_orig.csv')
+        urllib.request.urlretrieve(dataURL + dataFile + '.csv', dataFile + \
+            '_orig.csv')
 
         # Temporary solution: remove control characters, and blank lines.  Fix spelling error.
         cmd = 'tr -d \'\200-\377\015\' < ' + dataFile + '_orig.csv  | ' \
@@ -137,7 +139,7 @@ def verifyCountsFile(directory):
         time = dateData[3]
         timeZone = dateData[4]
         year = int(dateData[5])
-        timeData = map(lambda string : int(string)  , time.split(':')) # convert string time to numbers array
+        timeData = [int(string) for string in time.split(':')] # convert string time to numbers array
         hours = timeData[0]
         mins = timeData[1]
         sec = timeData[2]
@@ -179,7 +181,7 @@ def removeFromCombinedFile(fileName, directory, ids_to_remove, day, versionIdx):
                         cols = record.split('|')
                         fileType = cols[0]
                         # Ensure we need this entry
-                        if(fileType + ".dat" in neededFilesUS[versionIdx].keys()):
+                        if(fileType + ".dat" in list(neededFilesUS[versionIdx].keys())):
                             # only write when the id is not in the list of ids 
                             if(not cols[1] in ids_to_remove):
                                 record += "\r\n" # add newline
@@ -266,13 +268,13 @@ def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
         versionIdx = 1
     else:
         versionIdx = 0
-    for file in neededFilesUS[versionIdx].keys():
+    for file in list(neededFilesUS[versionIdx].keys()):
         # removeFromCombinedFile() will fix any formatting in FCC data
         # passing an empty list for second arg means no records will be removed 
         removeFromCombinedFile(file, directory, [], 'weekly', versionIdx) 
 
 
-    for key, day in dayMap.items():
+    for key, day in list(dayMap.items()):
         dayDirectory = directory + '/' + day
 
         # ensure counts file is newer than weekly
@@ -284,7 +286,7 @@ def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
             else:
                 versionIdx = 0
             for dailyFile in os.listdir(dayDirectory):
-                if (dailyFile in neededFilesUS[versionIdx].keys()):
+                if (dailyFile in list(neededFilesUS[versionIdx].keys())):
                     logFile.write('Processing ' + dailyFile + ' for: ' + day + '\n')
                     readEntries(dailyFile, directory, day, versionIdx)
         else:
@@ -332,7 +334,7 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if interactive:
         print("Specify full path for root daily_uls_parse dir")
-        value = raw_input("Enter Directory (" + root + "): ")
+        value = input("Enter Directory (" + root + "): ")
         if (value != ""):
             root = value
         print("daily_uls_parse root directory set to " + root)
@@ -345,9 +347,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if interactive:
         print("Enter Current Weekday for FCC files: ")
-        for key, day in dayMap.items():
+        for key, day in list(dayMap.items()):
             print(str(key) + ": " + day)
-        value = raw_input("Current Weekday (" + str(currentWeekday) + "): ")
+        value = input("Current Weekday (" + str(currentWeekday) + "): ")
         if (value != ""):
             currentWeekday = int(value)
         if (currentWeekday < 0 or currentWeekday > 6):
@@ -363,7 +365,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Remove temp directory: " + fullPathTempDir + " ? (y/n): ")
+            value = input("Remove temp directory: " + fullPathTempDir + " ? (y/n): ")
             if value == "y":
                 accepted = True
                 removeTempDirFlag = True
@@ -414,7 +416,7 @@ def daily_uls_parse(state_root, interactive):
         if interactive:
             accepted = False
             while not accepted:
-                value = raw_input("Download data files for " + region + "? (y/n): ")
+                value = input("Download data files for " + region + "? (y/n): ")
                 if value == "y":
                     accepted = True
                     downloadDataFilesFlag = True
@@ -441,7 +443,7 @@ def daily_uls_parse(state_root, interactive):
             # If interactive, prompt for extraction of files from zip files           #
             ###########################################################################
             if interactive:
-                value = raw_input("Extract FCC files from downloaded zip files? (y/n): ")
+                value = input("Extract FCC files from downloaded zip files? (y/n): ")
                 if value == "y":
                     extractZipFlag = True
                 elif value == "n":
@@ -465,7 +467,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Download AFC GitHub data files? (y/n): ")
+            value = input("Download AFC GitHub data files? (y/n): ")
             if value == "y":
                 accepted = True
                 downloadAFCGitHubFilesFlag = True
@@ -491,7 +493,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Download Antenna Pattern file? (y/n): ")
+            value = input("Download Antenna Pattern file? (y/n): ")
             if value == "y":
                 accepted = True
                 downloadAntennaPatternFileFlag = True
@@ -510,7 +512,7 @@ def daily_uls_parse(state_root, interactive):
     if downloadAntennaPatternFileFlag:
         cmd = 'echo "Antenna Manufacturer,Antenna Model Number,Antenna Gain [dBi],Antenna Diameter,Beamwidth [deg],Last Updated,Pattern Type,Pattern Azimuth [deg],Pattern Attenuation [dB]" >| ' + fullPathTempDir + '/Antenna_Patterns_6GHz.csv'
         os.system(cmd)
-        urllib.urlretrieve('https://www.ic.gc.ca/engineering/Antenna_Patterns_6GHz.csv', fullPathTempDir + '/Antenna_Patterns_6GHz_orig.csv')
+        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Antenna_Patterns_6GHz.csv', fullPathTempDir + '/Antenna_Patterns_6GHz_orig.csv')
         cmd = 'cat ' + fullPathTempDir + '/Antenna_Patterns_6GHz_orig.csv >> ' + fullPathTempDir + '/Antenna_Patterns_6GHz.csv'
         os.system(cmd)
         os.remove(fullPathTempDir + '/Antenna_Patterns_6GHz_orig.csv')
@@ -522,7 +524,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Process antenna model files to create antenna_model_list.csv? (y/n): ")
+            value = input("Process antenna model files to create antenna_model_list.csv? (y/n): ")
             if value == "y":
                 accepted = True
                 processAntFilesFlag = True
@@ -551,7 +553,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Process data files and generate file combined.txt to use as input to uls-script? (y/n): ")
+            value = input("Process FCC files and generate file combined.txt to use as input to uls-script? (y/n): ")
             if value == "y":
                 accepted = True
                 processDownloadFlag = True
@@ -600,7 +602,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Run ULS Processor, uls-script? (y/n): ")
+            value = input("Run ULS Processor, uls-script? (y/n): ")
             if value == "y":
                 accepted = True
                 runULSProcessorFlag = True
@@ -627,7 +629,7 @@ def daily_uls_parse(state_root, interactive):
             if (len(flist)):
                 coalitionScriptOutputFilename = os.path.basename(flist[-1])
 
-        value = raw_input("Enter ULS Processor output filename (" + coalitionScriptOutputFilename + "): ")
+        value = input("Enter ULS Processor output filename (" + coalitionScriptOutputFilename + "): ")
         if (value != ""):
             coalitionScriptOutputFilename = value
     ###########################################################################
@@ -663,7 +665,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Run fixBPS? (y/n): ")
+            value = input("Run fixBPS? (y/n): ")
             if value == "y":
                 accepted = True
                 runFixBPSFlag = True
@@ -693,7 +695,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Run sortCallsignsAddFSID? (y/n): ")
+            value = input("Run sortCallsignsAddFSID? (y/n): ")
             if value == "y":
                 accepted = True
                 runSortCallsignsAddFSIDFlag = True
@@ -725,7 +727,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Run fixParams? (y/n): ")
+            value = input("Run fixParams? (y/n): ")
             if value == "y":
                 accepted = True
                 runFixParamsFlag = True
@@ -755,7 +757,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = raw_input("Run conversion of CSV file to sqlite? (y/n): ")
+            value = input("Run conversion of CSV file to sqlite? (y/n): ")
             if value == "y":
                 accepted = True
                 runConvertULSFlag = True
