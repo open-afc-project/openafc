@@ -1269,10 +1269,13 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
                      f"Suggest to make acquisition of responses.")
         return AFC_ERR
 
-    test_res = AFC_OK
+    all_test_res = AFC_OK
     accum_secs = 0
 
     for test_case in test_cases:
+        # Default reset test_res value
+        test_res = AFC_OK
+
         req_id = ids[test_case][0]
         app_log.info(f"Prepare to run test - {req_id}")
         if test_case not in reqs:
@@ -1307,6 +1310,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
 
         if test_res == AFC_ERR:
             app_log.error(f"Test {test_case} ({req_id}) is Fail")
+            all_test_res = AFC_ERR
         
         accum_secs += tm_secs
         app_log.info('Test done at %.1f secs', tm_secs)
@@ -1319,7 +1323,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
                         upd_data)
 
     app_log.info(f"Total testcases runtime : {round(accum_secs, 1)} secs")
-    return test_res
+    return all_test_res
 
 
 def prep_and_run_tests(cfg, reqs, resps, ids, test_cases):
