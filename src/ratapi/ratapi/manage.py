@@ -260,6 +260,7 @@ def setUserIdNextVal():
     val = res.fetchone()[0]
     cmd = 'ALTER SEQUENCE aaa_user_id_seq RESTART WITH ' + str(val+1)
     db.session.execute(cmd)
+    db.session.commit()
 
 class DbImport(Command):
     ''' Import User Database. '''
@@ -352,15 +353,17 @@ class DbUpgrade(Command):
                     LOGGER.error("upgrade from mtls version")
                     stamp(revision='230b7680b81e')
 
+            db.session.commit()
             upgrade()
 
             # If AFCConfig is empty, copy from fcc config file
-            region = 'CONUS'
-            config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext == region).first()
+            region = ['CONUS', 'fcc']
+            config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext
+== region[0]).first()
             if not config:
                 dataif = data_if.DataIf(
                     fsroot=flask.current_app.config['STATE_ROOT_PATH'])
-                with dataif.open("cfg", region + "/afc_config.json") as hfile:
+                with dataif.open("cfg", region[1] + "/afc_config.json") as hfile:
                     if hfile.head():
                         config_bytes = hfile.read()
                         rcrd = json.loads(config_bytes)
@@ -383,6 +386,7 @@ class UserCreate(Command):
                choices=['Admin', 'Super', 'Analysis', 'AP', 'Trial'],
                help='role to include with the new user'),
         Option('--org', type=str, help='Organization'),
+        Option('--email', type=str, help='User email'),
     )
 
     def _create_user(self, flaskapp, id, username, email, password_in, role,
@@ -489,9 +493,11 @@ hashed, org = None):
                               org)
 
     def __call__(self, flaskapp, username, password_in, role, hashed=False,
-org=None):
-        # command does not provide email.  Populate email field with username
-        self._create_user(flaskapp, None, username, username, password_in, role,
+org=None, email=None):
+        # If command does not provide email.  Populate email field with username
+        if not email:
+           email = username
+        self._create_user(flaskapp, None, username, email, password_in, role,
 hashed, org)
 
 
