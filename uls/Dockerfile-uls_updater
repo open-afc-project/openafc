@@ -50,7 +50,7 @@ RUN set -e ; \
 FROM centos:7 as install_image
 RUN mkdir -p /var/lib/fbrat/daily_uls_parse/{data_files,temp} /var/lib/fbrat/{ULS_Database,Antenna_Patterns} /output_folder /pd
 RUN yum -y install epel-release
-RUN yum -y install qt5-qtbase-devel make openssl11-devel armadillo
+RUN yum -y install qt5-qtbase-devel make openssl11-devel armadillo libbsd
 COPY --from=build_image /pd/Python-3.10.2 /pd/
 
 RUN cd /pd && make install && cd / && rm -rf /pd

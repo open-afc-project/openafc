@@ -35,7 +35,8 @@ RUN yum -y install epel-release && \
 	minizip \
 	qt5-qtbase qt5-qtbase-gui\
 	gdal-libs \
-	armadillo
+	armadillo \
+	libbsd
 
 RUN yum -y install \
 	/wd/prereqs/repo/python2-flask-mail-0.9.1-2.el7.noarch.rpm \
