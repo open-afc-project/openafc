@@ -113,13 +113,14 @@ build_dev_server() {
     docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B}:${tag} ${push} &
     docker_build_and_push ${wd}/worker/Dockerfile.build ${WORKER_AL_D4B}:${tag} ${push} &
     docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${WORKER_AL_PRINST}:${tag} ${push} &
-  # build of ULS docker
-    docker_build_and_push ${wd}/uls/Dockerfile-uls_updater ${ULS_UPDATER}:${tag}-centos7 ${push} &
 
   msg "wait for prereqs to be built"
   # wait for background jobs to be done
   wait
   msg "prereqs are built"
+
+  # build of ULS docker
+  docker_build_and_push ${wd}/uls/Dockerfile-uls_updater ${ULS_UPDATER}:${tag}-centos7 ${push} &
 
   # build msghnd  (flask + gunicorn)
   docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND}:${tag} ${push} &

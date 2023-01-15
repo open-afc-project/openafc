@@ -20,7 +20,7 @@ COPY prereqs /wd/prereqs/
 RUN yum -y install rpm-build python2-devel redhat-rpm-config rpmlint cmake3 lcov \
     ninja-build minizip-devel boost169-devel qt5-qtbase-devel python-nose checkpolicy \
     selinux-policy-devel selinux-policy-targeted yarn which armadillo-devel gdal-devel \
-    gtest-devel devtoolset-11-gcc*
+    gtest-devel devtoolset-11-gcc* libbsd-devel
 
 RUN cd /wd/prereqs/repo/ && rpmbuild --rebuild python-wtforms-2.2.1-6.el7.src.rpm
 RUN cd /wd/prereqs/repo/ && \
