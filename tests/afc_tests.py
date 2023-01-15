@@ -1353,7 +1353,7 @@ def prep_and_run_tests(cfg, reqs, resps, ids, test_cases):
         if cfg['stress'] == 1:
             app_log.debug(f"{inspect.stack()[0][3]}() max {max_nbr_tests}"
                           f" len {len(test_cases)}")
-            inputs = [(cfg, reqs, resps, results_comparator, [test])
+            inputs = [(cfg, reqs, resps, results_comparator, ids, [test])
                       for test in test_cases]
             with Pool(max_nbr_tests) as my_pool:
                 results = my_pool.starmap(_run_tests, inputs)
