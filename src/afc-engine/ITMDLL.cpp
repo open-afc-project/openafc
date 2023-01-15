@@ -16,6 +16,7 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include <bsd/string.h>
 
 #define THIRD  (1.0/3.0)
 #define DllExport
@@ -1085,16 +1086,16 @@ void   point_to_point(double *elev, double tht_m, double rht_m,
 	q = prop.dist - propa.dla;
 	// printf("prop.dist = %.8g, propa.dla = %.8g\n", prop.dist, propa.dla);
 	if(int(q)<0.0)
-		strcpy(strmode,"Line-Of-Sight Mode");
+		strlcpy(strmode, "Line-Of-Sight Mode", sizeof(strmode));
 	else
 	{ if(int(q)==0.0)
-		strcpy(strmode,"Single Horizon");
+		strlcpy(strmode, "Single Horizon", sizeof(strmode));
 		else if(int(q)>0.0)
-			strcpy(strmode,"Double Horizon");
+			strlcpy(strmode, "Double Horizon", sizeof(strmode));
 		if(prop.dist<=propa.dlsa || prop.dist <= propa.dx)
-			strcat(strmode,", Diffraction Dominant");
+			strlcat(strmode,", Diffraction Dominant", sizeof(strmode));
 		else if(prop.dist>propa.dx)
-			strcat(strmode, ", Troposcatter Dominant");
+			strlcat(strmode, ", Troposcatter Dominant", sizeof(strmode));
 	}
 	// printf("fs = %.8g\n", fs);
 	struct avar_statc asc;
@@ -1248,16 +1249,16 @@ void   point_to_pointDH (double elev[], double tht_m, double rht_m,
 	deltaH = prop.dh;
 	q = prop.dist - propa.dla;
 	if(int(q)<0.0)
-		strcpy(strmode,"Line-Of-Sight Mode");
+		strlcpy(strmode, "Line-Of-Sight Mode", sizeof(strmode));
 	else
 	{ if(int(q)==0.0)
-		strcpy(strmode,"Single Horizon");
+		strlcpy(strmode, "Single Horizon", sizeof(strmode));
 		else if(int(q)>0.0)
-			strcpy(strmode,"Double Horizon");
+			strlcpy(strmode, "Double Horizon", sizeof(strmode));
 		if(prop.dist<=propa.dlsa || prop.dist <= propa.dx)
-			strcat(strmode,", Diffraction Dominant");
+			strlcat(strmode, ", Diffraction Dominant", sizeof(strmode));
 		else if(prop.dist>propa.dx)
-			strcat(strmode, ", Troposcatter Dominant");
+			strlcat(strmode, ", Troposcatter Dominant", sizeof(strmode));
 	}
 	struct avar_statc asc;
 	dbloss = avar(zr,0.0,zc,prop,propv,asc) + fs;      //avar(time,location,confidence)

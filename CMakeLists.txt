@@ -65,6 +65,8 @@ if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
   set(CMAKE_CXX_STANDARD_REQUIRED ON)
   #set(CMAKE_CXX_EXTENSIONS ON) # No GNU/MSVC extensions
   if(UNIX)
+    set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} -lbsd")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -lbsd")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
     #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Werror")
   endif(UNIX)

@@ -10,8 +10,8 @@
 # WILL BE REMOVED IN FUTURE RELEASE
 # PLEASE USE DEFAULT WORKER from open-afc/worker
 
-ARG BLD_TAG=3.5.1.1
-ARG PRINST_TAG=3.5.1.1
+ARG BLD_TAG=3.6.0.0
+ARG PRINST_TAG=3.6.0.0
 ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-build-image
 ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-worker-preinstall
 

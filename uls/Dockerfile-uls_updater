@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 # default value of args
-ARG BLD_TAG=latest
+ARG BLD_TAG=3.6.0.0
 ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-build-image
 
 # Stage Build

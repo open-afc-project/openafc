@@ -13,6 +13,7 @@
 #include "UlsEmission.h"
 #include "UlsEntity.h"
 #include "UlsMarketFrequency.h"
+#include <bsd/string.h>
 #include <QList>
 #include <QString>
 
@@ -33,7 +34,7 @@ public:
 		locations = NULL;
 		frequencies = NULL;
         headers = NULL;
-		strcpy(callsignascii, "");
+		strlcpy(callsignascii, "", sizeof(callsignascii));
     }
 };
 

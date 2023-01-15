@@ -3,6 +3,7 @@
 #include <math.h>
 #include <iostream>
 #include <sstream>
+#include <bsd/string.h>
 
 #include "global_fn.h"
 #include "UlsFileReader.h"
@@ -182,7 +183,7 @@ void UlsFileReader::readIndividualPathUS(const std::vector<std::string> &fieldLi
                 current.systemId = atoll(field.c_str());
                 break;
             case 4:
-                strncpy(current.callsign, field.c_str(), 11);
+                strlcpy(current.callsign, field.c_str(), 11);
                 break;
             case 6:
                 current.pathNumber = atoi(field.c_str());
@@ -200,19 +201,19 @@ void UlsFileReader::readIndividualPathUS(const std::vector<std::string> &fieldLi
                 current.rxAntennaNumber = atoi(field.c_str());
                 break;
             case 12:
-                strncpy(current.pathType, field.c_str(), 21);
+                strlcpy(current.pathType, field.c_str(), 21);
                 break;
             case 13:
                 current.passiveReceiver = field.c_str()[0];
                 break;
             case 14:
-                strncpy(current.countryCode, field.c_str(), 4);
+                strlcpy(current.countryCode, field.c_str(), 4);
                 break;
             case 15:
                 current.GSOinterference = field.c_str()[0];
                 break;
             case 16:
-                strncpy(current.rxCallsign, field.c_str(), 11);
+                strlcpy(current.rxCallsign, field.c_str(), 11);
                 break;
             case 17:
                 current.angularSeparation = emptyAtof(field.c_str());
@@ -221,7 +222,7 @@ void UlsFileReader::readIndividualPathUS(const std::vector<std::string> &fieldLi
                 current.statusCode = field.c_str()[0];
                 break;
             case 21:
-                strncpy(current.statusDate, field.c_str(), 11);
+                strlcpy(current.statusDate, field.c_str(), 11);
                 break;
         }
 
@@ -254,7 +255,7 @@ void UlsFileReader::readIndividualPathUS(const std::vector<std::string> &fieldLi
             }
         }
         if (replace == true) {
-            strcpy(current.rxCallsign, current.callsign);
+            strlcpy(current.rxCallsign, current.callsign, sizeof(current.rxCallsign));
         }
     }
 
@@ -279,7 +280,7 @@ void UlsFileReader::readIndividualEmissionUS(const std::vector<std::string> &fie
                 current.systemId = atoll(field.c_str());
                 break;
             case 4:
-                strncpy(current.callsign, field.c_str(), 11);
+                strlcpy(current.callsign, field.c_str(), 11);
                 break;
             case 5:
                 current.locationId = atoi(field.c_str());
@@ -291,13 +292,13 @@ void UlsFileReader::readIndividualEmissionUS(const std::vector<std::string> &fie
                 current.frequency = emptyAtof(field.c_str());
                 break;
             case 9:
-                strncpy(current.desig, field.c_str(), 11);
+                strlcpy(current.desig, field.c_str(), 11);
                 break;
             case 10:
                 current.modRate = emptyAtof(field.c_str());
                 break;
             case 11:
-                strncpy(current.modCode, field.c_str(), 256);
+                strlcpy(current.modCode, field.c_str(), 256);
                 break;
             case 12:
                 current.frequencyId = atoi(field.c_str());
@@ -327,10 +328,10 @@ void UlsFileReader::readIndividualMarketFrequencyUS(const std::vector<std::strin
                 current.systemId = atoll(field.c_str());
                 break;
             case 4:
-                strncpy(current.callsign, field.c_str(), 11);
+                strlcpy(current.callsign, field.c_str(), 11);
                 break;
             case 5:
-                strncpy(current.partitionSeq, field.c_str(), 7);
+                strlcpy(current.partitionSeq, field.c_str(), 7);
                 break;
             case 6:
                 current.lowerFreq = emptyAtof(field.c_str());
@@ -362,19 +363,19 @@ void UlsFileReader::readIndividualEntityUS(const std::vector<std::string> &field
                 current.systemId = atoll(field.c_str());
                 break;
             case 4:
-                strncpy(current.callsign, field.c_str(), 11);
+                strlcpy(current.callsign, field.c_str(), 11);
                 break;
             case 5:
-                strncpy(current.entityType, field.c_str(), 3);
+                strlcpy(current.entityType, field.c_str(), 3);
                 break;
             case 6:
-                strncpy(current.licenseeId, field.c_str(), 10);
+                strlcpy(current.licenseeId, field.c_str(), 10);
                 break;
             case 7:
-                strncpy(current.entityName, field.c_str(), 201);
+                strlcpy(current.entityName, field.c_str(), 201);
                 break;
             case 22:
-                strncpy(current.frn, field.c_str(), 11);
+                strlcpy(current.frn, field.c_str(), 11);
                 break;
         }
     }
@@ -401,7 +402,7 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
                 current.systemId = atoll(field.c_str());
                 break;
             case 4:
-                strncpy(current.callsign, field.c_str(), 11);
+                strlcpy(current.callsign, field.c_str(), 11);
                 break;
 
             case 5:
@@ -423,16 +424,16 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
                 current.correspondingFixedLocation = atoi(field.c_str());
                 break;
             case 11:
-                strncpy(current.locationAddress, field.c_str(), 81);
+                strlcpy(current.locationAddress, field.c_str(), 81);
                 break;
             case 12:
-                strncpy(current.locationCity, field.c_str(), 21);
+                strlcpy(current.locationCity, field.c_str(), 21);
                 break;
             case 13:
-                strncpy(current.locationCounty, field.c_str(), 61);
+                strlcpy(current.locationCounty, field.c_str(), 61);
                 break;
             case 14:
-                strncpy(current.locationState, field.c_str(), 3);
+                strlcpy(current.locationState, field.c_str(), 3);
                 break;
             case 15:
                 current.radius = emptyAtof(field.c_str());
@@ -492,19 +493,19 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
                 current.overallHeight = emptyAtof(field.c_str());
                 break;
             case 40:
-                strncpy(current.structureType, field.c_str(), 7);
+                strlcpy(current.structureType, field.c_str(), 7);
                 break;
             case 41:
-                strncpy(current.airportId, field.c_str(), 5);
+                strlcpy(current.airportId, field.c_str(), 5);
                 break;
             case 42:
-                strncpy(current.locationName, field.c_str(), 21);
+                strlcpy(current.locationName, field.c_str(), 21);
                 break;
             case 48:
                 current.statusCode = field.c_str()[0];
                 break;
             case 49:
-                strncpy(current.statusDate, field.c_str(), 11);
+                strlcpy(current.statusDate, field.c_str(), 11);
                 break;
             case 50:
                 current.earthStationAgreement = field.c_str()[0];
@@ -541,7 +542,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
                 current.systemId = atoll(field.c_str());
                 break;
             case 4:
-                strncpy(current.callsign, field.c_str(), 11);
+                strlcpy(current.callsign, field.c_str(), 11);
                 break;
 
             case 6:
@@ -551,7 +552,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
                 current.locationNumber = atoi(field.c_str());
                 break;
             case 8:
-                strncpy(current.recvZoneCode, field.c_str(), 6);
+                strlcpy(current.recvZoneCode, field.c_str(), 6);
                 break;
             case 9:
                 current.antennaType = field.c_str()[0];
@@ -563,16 +564,16 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
                 current.heightToCenterRAAT = emptyAtof(field.c_str());
                 break;
             case 12:
-                strncpy(current.antennaMake, field.c_str(), 26);
+                strlcpy(current.antennaMake, field.c_str(), 26);
                 break;
             case 13:
-                strncpy(current.antennaModel, field.c_str(), 26);
+                strlcpy(current.antennaModel, field.c_str(), 26);
                 break;
             case 14:
                 current.tilt = emptyAtof(field.c_str());
                 break;
             case 15:
-                strncpy(current.polarizationCode, field.c_str(), 5);
+                strlcpy(current.polarizationCode, field.c_str(), 5);
                 break;
             case 16:
                 current.beamwidth = emptyAtof(field.c_str());
@@ -614,7 +615,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
                 current.backtobackRxGain = emptyAtof(field.c_str());
                 break;
             case 29:
-                strncpy(current.locationName, field.c_str(), 20);
+                strlcpy(current.locationName, field.c_str(), 20);
                 break;
             case 30:
                 current.passiveRepeaterSequenceId = atoi(field.c_str());
@@ -633,7 +634,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
                 current.statusCode = field.c_str()[0];
                 break;
             case 35:
-                strncpy(current.statusDate, field.c_str(), 11);
+                strlcpy(current.statusDate, field.c_str(), 11);
                 break;
         }
     }
@@ -656,7 +657,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
             }
             fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n", antennaModel.c_str());
         }
-        strncpy(current.antennaModel, antennaModel.c_str(), 26);
+        strlcpy(current.antennaModel, antennaModel.c_str(), 26);
     }
 
     allAntennas << current;
@@ -681,7 +682,7 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
                 current.systemId = atoll(field.c_str());
                 break;
             case 4:
-                strncpy(current.callsign, field.c_str(), 11);
+                strlcpy(current.callsign, field.c_str(), 11);
                 break;
 
             case 6:
@@ -692,10 +693,10 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
                 break;
 
             case 8:
-                strncpy(current.classStationCode, field.c_str(), 5);
+                strlcpy(current.classStationCode, field.c_str(), 5);
                 break;
             case 9:
-                strncpy(current.opAltitudeCode, field.c_str(), 3);
+                strlcpy(current.opAltitudeCode, field.c_str(), 3);
                 break;
             case 10:
                 current.frequencyAssigned = emptyAtof(field.c_str());
@@ -731,10 +732,10 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
                 current.EIRP = emptyAtof(field.c_str());
                 break;
             case 21:
-                strncpy(current.transmitterMake, field.c_str(), 26);
+                strlcpy(current.transmitterMake, field.c_str(), 26);
                 break;
             case 22:
-                strncpy(current.transmitterModel, field.c_str(), 26);
+                strlcpy(current.transmitterModel, field.c_str(), 26);
                 break;
             case 23:
                 current.transmitterPowerControl = field.c_str()[0];
@@ -753,7 +754,7 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
                 current.statusCode = field.c_str()[0];
                 break;
             case 28:
-                strncpy(current.statusDate, field.c_str(), 11);
+                strlcpy(current.statusDate, field.c_str(), 11);
                 break;
         }
     }
@@ -776,7 +777,7 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
             }
             fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n", transmitterModel.c_str());
         }
-        strncpy(current.transmitterModel, transmitterModel.c_str(), 26);
+        strlcpy(current.transmitterModel, transmitterModel.c_str(), 26);
     }
 
     //  allFrequencies should now contain all the antenna records in the original
@@ -801,19 +802,19 @@ void UlsFileReader::readIndividualHeaderUS(const std::vector<std::string> &field
                 current.systemId = atoll(field.c_str());
                 break;
             case 4:
-                strncpy(current.callsign, field.c_str(), 11);
+                strlcpy(current.callsign, field.c_str(), 11);
                 break;
             case 5:
                 current.licenseStatus = field.c_str()[0];
                 break;
             case 6:
-                strncpy(current.radioServiceCode, field.c_str(), 3);
+                strlcpy(current.radioServiceCode, field.c_str(), 3);
                 break;
             case 7:
-                strncpy(current.grantDate, field.c_str(), 14);
+                strlcpy(current.grantDate, field.c_str(), 14);
                 break;
             case 8:
-                strncpy(current.expiredDate, field.c_str(), 14);
+                strlcpy(current.expiredDate, field.c_str(), 14);
                 break;
             case 21:
                 current.commonCarrier = field.c_str()[0];
@@ -843,7 +844,7 @@ void UlsFileReader::readIndividualHeaderUS(const std::vector<std::string> &field
                 current.interconnected = field.c_str()[0];
                 break;
             case 42:
-                strncpy(current.effectiveDate, field.c_str(), 14);
+                strlcpy(current.effectiveDate, field.c_str(), 14);
                 break;
         }
     }
@@ -871,7 +872,7 @@ void UlsFileReader::readIndividualControlPointUS(const std::vector<std::string> 
                 current.systemId = atoll(field.c_str());
                 break;
             case 4:
-                strncpy(current.callsign, field.c_str(), 11);
+                strlcpy(current.callsign, field.c_str(), 11);
                 break;
             case 5:
                 current.controlPointActionPerformed = field.c_str()[0];
@@ -880,25 +881,25 @@ void UlsFileReader::readIndividualControlPointUS(const std::vector<std::string> 
                 current.controlPointNumber = atoi(field.c_str());
                 break;
             case 7:
-                strncpy(current.controlPointAddress, field.c_str(), 81);
+                strlcpy(current.controlPointAddress, field.c_str(), 81);
                 break;
             case 8:
-                strncpy(current.controlPointCity, field.c_str(), 21);
+                strlcpy(current.controlPointCity, field.c_str(), 21);
                 break;
             case 9:
-                strncpy(current.controlPointState, field.c_str(), 3);
+                strlcpy(current.controlPointState, field.c_str(), 3);
                 break;
             case 10:
-                strncpy(current.controlPointPhone, field.c_str(), 11);
+                strlcpy(current.controlPointPhone, field.c_str(), 11);
                 break;
             case 11:
-                strncpy(current.controlPointCounty, field.c_str(), 61);
+                strlcpy(current.controlPointCounty, field.c_str(), 61);
                 break;
             case 12:
-                strncpy(current.controlPointStatus, field.c_str(), 1);
+                strlcpy(current.controlPointStatus, field.c_str(), 1);
                 break;
             case 13:
-                strncpy(current.controlPointStatusDate, field.c_str(), 14);
+                strlcpy(current.controlPointStatusDate, field.c_str(), 14);
                 break;
         }
     }
@@ -925,7 +926,7 @@ void UlsFileReader::readIndividualSegmentUS(const std::vector<std::string> &fiel
                 current.systemId = atoll(field.c_str());
                 break;
             case 4:
-                strncpy(current.callsign, field.c_str(), 11);
+                strlcpy(current.callsign, field.c_str(), 11);
                 break;
             case 6:
                 current.pathNumber = atoi(field.c_str());

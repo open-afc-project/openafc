@@ -1,6 +1,62 @@
 # Release Note
 
 ## **Version and Date**
+|Version|3.6.0.0|
+| :- | :- |
+|**Date**|**15/01/2023**|
+
+## **Issues Addr§essed**
+ * OA-524 Fix missing parameters while running stress command (#409)
+ * OA-523 adding libbsd and libbsd-dev(el) to all build and install containers used for binary compiling/usage
+ * OA-521: fix db-upgrade deadlock, Fix afcconfig migration during upgrade (#406)
+ * OA-519 Fixed test_res value still remained issue
+ * OA-477 fix ULS_updater container build and move it to Python3
+ * OA-512 Parallel execution of multipart requests
+ * OA-515 Allow only one config per region (#395)
+ * OA-492 Validate NRA value before adding AP
+ * OA-510 Fix issue Msghnd afc_config hashing issue (Local FS mode) #388 (#389)
+ * OA-508 tools/geo_converters - directory for geospatial data converters
+ * OA-506 docker-compose cleanup, fix nginx tag, add table with all supported by afc services env vars
+ * OA-6 fix import-export test configuration, freq bands link, run_server script
+ * OA-507 Remove msghnd check for unneeded directories (#386)
+ * OA-490 Move Import/Export under Afc Config tab
+ * OA-484 store AFC config in table in postgresql
+ * OA-504 Handle error responses during send receive a request
+ * OA-503 Base nginx image on alpine, rework error messages
+ * OA-505 Remove redundant check for unused files
+ * OA-502 Optimize WFA excel parsing procedure
+ * OA-501 Remove exeption when AFC_OBJST_PORT is epmty
+ * OA-474 Small fixes for objstorage, remove redundant AFC_OBJST_HOST and AFC_OBJST_HIST_HOST from docker-compose
+ * OA-499 Support combined request for testing
+ * OA-496 docker-compose.yaml dependencies fix, Add RAS_Database softlink, Create softlink /var/lib/fbrat/ULS_Database to /usr/share/fbrat/rat_transfer/ULS_Database
+ * OA-495 Set “MaxLinkDistance” to 130 Km (previously 200Km)
+ * OA-489 run nginx test even if apach test failed, run apach tests after that ngnx, Optimize command 'ins_reqs' dropping old table of requests, The test db with only test vectors 18.1, changes to export WFA test vectors 18.1
+ * OA-493 fix regr test docker build params, fix "HTTP" -> HTTP (w/o quotes) in FILESTORAGE_SCHEME
+ * OA-491 update readme with microservices (containers) build info
+ * OA-481 introducing clang format for code formatting, adding examples for clang docker
+ * OA-483 restore ratapi build version
+ * OA-386 use 3DEP files w/o date in the name, alaska-hawaii nlcd terrain
+ * OA-478 Ability to configure Nginx proxy connection timeout and Set default value for it
+ * OA-470 Port msghnd to python3 on Alpine
+ * OA-475 Bump express from 4.17.1 to 4.18.2 in /src/web, pick up dependabot changes
+ * OA-473 Bump qs from 6.5.2 to 6.5.3 in /src/web, pick up dependabot changes
+ * OA-472 Bump decode-uri-component from 0.2.0 to 0.2.2 in /src/web
+ * OA-463 Worker docker dev env and size optimization alpine
+ * OA-455 Remove user id from AP, and replace with the organization field. Fix ap create as part of ConfigAdd.
+ * OA-471 Fix preinstall image version, revert version of request library (#345)
+ * OA-465 Add target Ulsprocessor and remove subversion dependency
+ 
+## **Interface Changes**
+ * Possibly. See changes
+
+## **Testing Done**
+ * Standard regression testing in CI
+
+## **Open Issues** 
+ * 
+
+
+## **Version and Date**
 |Version|**OA-476**|
 | :- | :- |
 |**Date**|**12/09/2022**|
