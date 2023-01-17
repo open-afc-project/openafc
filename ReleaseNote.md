@@ -1,6 +1,26 @@
 # Release Note
 
 ## **Version and Date**
+|Version|3.7.0.0|
+| :- | :- |
+|**Date**|**15/01/2023**|
+
+## **Issues Addr§essed**
+ * OA-525 rel 3.7.0.0
+ * OA-518 Reduce docker image size, fix rat-manage-api
+ * OA-494 move all external and DB mouns into one folder
+ * OA-522 switch afc engine to strlcpy usage, switching all c/cpp files from strcpy/strncpy and strcat/strncat to strlcpy and strlcat accordingly
+ 
+## **Interface Changes**
+ * All static geodata migrated into one folder under /mnt/nfs. See README for details
+
+## **Testing Done**
+ * Standard regression testing in CI
+
+## **Open Issues** 
+ * 
+
+## **Version and Date**
 |Version|3.6.0.0|
 | :- | :- |
 |**Date**|**15/01/2023**|
