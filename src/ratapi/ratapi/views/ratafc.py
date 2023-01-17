@@ -309,9 +309,12 @@ class RatAfc(MethodView):
         LOGGER.debug("RatAfc.get() task_id={}".format(task_id))
 
         dataif = data_if.DataIf(
-            fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+            fsroot=flask.current_app.config['STATE_ROOT_PATH'],
+            mntroot=flask.current_app.config['NFS_MOUNT_PATH']
+            )
         t = task.Task(
-            task_id, dataif, flask.current_app.config['STATE_ROOT_PATH'])
+            task_id, dataif, flask.current_app.config['STATE_ROOT_PATH'],
+            mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
         task_stat = t.get()
 
         if t.ready(task_stat):  # The task is done
@@ -391,7 +394,8 @@ class RatAfc(MethodView):
 
                 task_id = str(uuid.uuid4())
                 dataif = data_if.DataIf(
-                    fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+                    fsroot=flask.current_app.config['STATE_ROOT_PATH'],
+                    mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
 
                 # calculate hash
                 request_json_bytes = json.dumps(request, sort_keys=True).encode('utf-8')
@@ -441,7 +445,8 @@ class RatAfc(MethodView):
                 LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
                 t = task.Task(task_id, dataif,
                               flask.current_app.config['STATE_ROOT_PATH'],
-                              hash, region, history_dir)
+                              hash, region, history_dir,
+                              mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
                 if conn_type == 'async':
                     if len(requests) > 1:
                         raise AP_Exception(-1, "Unsupported multipart async request")

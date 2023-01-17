@@ -183,9 +183,9 @@ class DataIfBaseV1():
             "cfg": None,
             "dbg": None,
             }
-        if self._prot == self.LOCAL and self._fsroot:
-            self._rpath["pro"] = os.path.join(self._fsroot, "responses")
-            self._rpath["cfg"] = os.path.join(self._fsroot, "afc_config")
+        if self._prot == self.LOCAL and self._fsroot and self._mnt_root:
+            self._rpath["pro"] = os.path.join(self._mnt_root, "responses")
+            self._rpath["cfg"] = os.path.join(self._mnt_root, "afc_config")
             self._rpath["dbg"] = os.path.join(self._fsroot, self.LHISTORYDIR)
         elif self._prot == self.HTTP and self._host and self._port:
             pref = "http://" + self._host + ":" + str(self._port) + "/"
@@ -211,7 +211,7 @@ class DataIfBaseV1():
 class DataIf(DataIfBaseV1):
     """ Wrappers for RATAPI data operations """
     def __init__(self, prot=DataIfBaseV1.AUTO, host=None, port=None,
-                 fsroot=None, probeHttps=None):
+                 fsroot=None, probeHttps=None, mntroot=None):
 
         # Assign default args from env vars
         self._host = host
@@ -226,6 +226,7 @@ class DataIf(DataIfBaseV1):
             if probeHttps is None:
                 probeHttps = False
         self._fsroot = fsroot
+        self._mnt_root = mntroot
 
         # check args
         if self._port is not None and not self._port.isdigit():
@@ -249,6 +250,8 @@ class DataIf(DataIfBaseV1):
         if prot == self.LOCAL:
             if not fsroot:
                 raise Exception("Missing fsroot")
+            if not mntroot:
+                raise Exception("Missing mntroot")
         elif prot in (self.HTTP, self.HTTPS, self.REMOTE):
             if not self._host or not self._port:
                 raise Exception("Missing host:port")
@@ -257,9 +260,9 @@ class DataIf(DataIfBaseV1):
 
         self._prot = prot
 
-        LOGGER.debug("DataIf.__init__: prot={} host={} port={} fsroot={} probeHttps={} scheme={}"
+        LOGGER.debug("DataIf.__init__: prot={} host={} port={} fsroot={} probeHttps={} scheme={} mntroot={}"
                      .format(self._prot, self._host, self._port, self._fsroot,
-                             probeHttps, scheme))
+                             probeHttps, scheme, self._mnt_root))
 
         DataIfBaseV1.__init__(self, probeHttps)
 
@@ -275,6 +278,6 @@ class DataIf(DataIfBaseV1):
         return self._prot == self.LOCAL
 
     def getProtocol(self):
-        return self._prot, self._host, self._port, self._fsroot
+        return self._prot, self._host, self._port, self._fsroot, self._mnt_root
 
 # vim: sw=4:et:tw=80:cc=+1

@@ -101,7 +101,7 @@ class fbrat::server(
     owner   => 'fbrat',
     group   => 'fbrat',
     mode    => '0644',
-    require => [File['/var/log/celery'], File['/var/run/celery'], File['/var/celery/results'], File['/var/lib/fbrat/responses']],
+    require => [File['/var/log/celery'], File['/var/run/celery'], File['/var/celery/results'], File['/mnt/nfs/responses']],
   }
   file { '/var/log/celery':
     ensure => 'directory',
@@ -133,13 +133,14 @@ class fbrat::server(
     group  => 'fbrat',
     mode   => '0755',
   }
-  file { '/var/lib/fbrat/responses':
+
+  file { '/mnt/nfs/responses':
     ensure => 'directory',
     owner  => 'fbrat',
     group  => 'fbrat',
     mode   => '0755',
   }
-  file { '/var/lib/fbrat/afc_config':
+  file { '/mnt/nfs/afc_config':
     ensure => 'directory',
     owner  => 'fbrat',
     group  => 'fbrat',

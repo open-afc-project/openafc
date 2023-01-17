@@ -28,7 +28,7 @@ COPY prereqs/.bashrc /root/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
 RUN /wd/devel.sh
-RUN mkdir -p /repos/CentOS/7/7/Packages
+RUN mkdir -p /repos/CentOS/7/7/Packages /mnt/nfs
 COPY --from=build_image \
     /wd/build/dist/RPMS/x86_64/fbrat* \
     /root/rpmbuild/RPMS/noarch/python2-wtforms-2.2.1-6.el7.noarch.rpm \
@@ -56,11 +56,9 @@ RUN rabbitmq-server -detached ; \
     rabbitmqctl stop
 
 RUN mkdir -p /var/lib/fbrat/daily_uls_parse
-RUN chown fbrat:fbrat /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /var/lib/fbrat /var/lib/fbrat/daily_uls_parse
+RUN chown fbrat:fbrat /var/spool/fbrat /var/lib/fbrat /var/lib/fbrat/daily_uls_parse
 RUN chown -R fbrat:fbrat /var/celery
-RUN ln -s /usr/share/fbrat/rat_transfer/ULS_Database /var/lib/fbrat/ULS_Database
-RUN ln -s /usr/share/fbrat/rat_transfer/frequency_bands /var/lib/fbrat/frequency_bands
-RUN echo "DEFAULT_ULS_DIR = '/var/lib/fbrat/ULS_Database'" >> /etc/xdg/fbrat/ratapi.conf
+RUN echo "DEFAULT_ULS_DIR = '/mnt/nfs/rat_transfer/ULS_Database'" >> /etc/xdg/fbrat/ratapi.conf
 RUN echo "AFC_APP_TYPE = 'server'" >> /etc/xdg/fbrat/ratapi.conf
 
 RUN yum -y autoremove rpmconf createrepo puppet7-release puppet-agent && yum -y autoremove
@@ -92,4 +90,5 @@ COPY gunicorn/wsgi.py /wd/
 COPY gunicorn/gunicorn.conf.py /wd/
 COPY gunicorn/gunicorn.logs.conf /wd/
 RUN mkdir -p /run/gunicorn
+ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 CMD ["/docker-entrypoint.sh"]

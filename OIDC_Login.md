@@ -40,10 +40,10 @@ File docker-compose.yaml:
 ```
 rat_server:
         volumes:
-        - /opt/afc/work/mydir/afc_config:/var/lib/fbrat/afc_config
+        - /opt/afc/work/mydir/afc_config:/mnt/nfs/afc_config
 
         environment:
-        - OIDC_ARG=/var/lib/fbrat/afc_config/oidc_env.cfg
+        - OIDC_ARG=/mnt/nfs/afc_config/oidc_env.cfg
         - OIDC_LOGIN=True
 
 ```

@@ -139,6 +139,7 @@ def create_app(config_override=None):
 
     # Check configuration
     state_path = flaskapp.config['STATE_ROOT_PATH']
+    nfs_mount_path = flaskapp.config['NFS_MOUNT_PATH']
     if not os.path.exists(state_path):
         try:
             os.makedirs(state_path)
@@ -149,10 +150,10 @@ def create_app(config_override=None):
 
     # Static file dispatchers
     if flaskapp.config['AFC_APP_TYPE'] == 'server':
-        if not os.path.exists(os.path.join(state_path, 'responses')):
-            os.makedirs(os.path.join(state_path, 'responses'))
-        if not os.path.exists(os.path.join(state_path, 'frequency_bands')):
-            os.makedirs(os.path.join(state_path, 'frequency_bands'))
+        if not os.path.exists(os.path.join(nfs_mount_path, 'responses')):
+            os.makedirs(os.path.join(nfs_mount_path, 'responses'))
+        if not os.path.exists(os.path.join(nfs_mount_path, 'rat_transfer', 'frequency_bands')):
+            os.makedirs(os.path.join(nfs_mount_path, 'rat_transfer', 'frequency_bands'))
 
         from werkzeug.middleware.dispatcher import DispatcherMiddleware
         from wsgidav import wsgidav_app
@@ -168,7 +169,7 @@ def create_app(config_override=None):
 
         # get uls database directory
         uls_databases = os.path.join(
-            flaskapp.config['STATE_ROOT_PATH'], 'ULS_Database')
+            flaskapp.config['NFS_MOUNT_PATH'], 'rat_transfer', 'ULS_Database')
         if not os.path.exists(uls_databases):
             os.makedirs(uls_databases)
 
@@ -197,7 +198,8 @@ def create_app(config_override=None):
 
         dataif = data_if.DataIf(
             fsroot=flaskapp.config['STATE_ROOT_PATH'],
-            probeHttps=False)
+            probeHttps=False,
+            mntroot=flaskapp.config['NFS_MOUNT_PATH'])
         if dataif.isFsBackend():
             hist_dir = os.path.join(
         	    flaskapp.config['STATE_ROOT_PATH'],

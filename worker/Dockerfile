@@ -40,8 +40,6 @@ RUN mkdir -m 755 -p /var/celery
 RUN mkdir -m 755 -p /var/run/celery
 RUN mkdir -m 755 -p /var/log/celery
 RUN chown -R fbrat:fbrat /var/spool/fbrat /var/lib/fbrat /var/celery
-RUN ln -s /usr/share/fbrat/rat_transfer/ULS_Database /var/lib/fbrat/ULS_Database
-RUN ln -s /usr/share/fbrat/rat_transfer/RAS_Database /var/lib/fbrat/RAS_Database
 
 COPY worker/docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh
@@ -61,4 +59,5 @@ LABEL revision="afc-worker-al"
 WORKDIR /wd
 EXPOSE 80 443
 ENV PGPORT=5432
+ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 CMD ["/docker-entrypoint.sh"]

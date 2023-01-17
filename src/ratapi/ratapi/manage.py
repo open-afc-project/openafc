@@ -362,7 +362,8 @@ class DbUpgrade(Command):
 == region[0]).first()
             if not config:
                 dataif = data_if.DataIf(
-                    fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+                    fsroot=flask.current_app.config['STATE_ROOT_PATH'],
+                    mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
                 with dataif.open("cfg", region[1] + "/afc_config.json") as hfile:
                     if hfile.head():
                         config_bytes = hfile.read()
@@ -921,7 +922,7 @@ class TestCelery(Command):  # pylint: disable=abstract-method
                 response_file = os.path.join(
                     temp_dir, request_type + '_response.json')
             if response_dir is None:
-                response_dir = os.path.join(flask.current_app.config['STATE_ROOT_PATH'],
+                response_dir = os.path.join(flask.current_app.config['NFS_MOUNT_PATH'],
                                             'responses')
             if history_dir is None:
                 history_dir = flask.current_app.config['HISTORY_DIR']
@@ -939,6 +940,7 @@ class TestCelery(Command):  # pylint: disable=abstract-method
                 response_file,
                 history_dir,
                 debug,
+                flask.current_app.config['NFS_MOUNT_PATH'],
             ])
 
             if task.state == 'FAILURE':
@@ -1047,7 +1049,8 @@ class ConfigAdd(Command):
                         import flask
 
                         dataif = data_if.DataIf(
-                            fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+                            fsroot=flask.current_app.config['STATE_ROOT_PATH'],
+                            mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
                         with dataif.open("cfg", regionStr + "/afc_config.json") as hfile:
                             LOGGER.debug('Opening config file "%s"',
                                          dataif.rname("cfg", regionStr + "/afc_config.json"))

@@ -615,11 +615,11 @@ void AfcManager::initializeDatabases()
 	_maxLidarRegionLoadVal = 70;
 
 	if (_useBDesignFlag) {
-		_lidarDir = SearchPaths::forReading("data", "fbrat/rat_transfer/Multiband-BDesign3D", true);
+		_lidarDir = SearchPaths::forReading("data", "rat_transfer/Multiband-BDesign3D", true);
 	}
 	else if (_useLiDAR)
 	{
-		_lidarDir = SearchPaths::forReading("data", "fbrat/rat_transfer/proc_lidar_2019", true);
+		_lidarDir = SearchPaths::forReading("data", "rat_transfer/proc_lidar_2019", true);
 
 		// _lidarDir = SearchPaths::forReading("data", "/mnt/s3/rat_transfer/proc_lidar_2019", true);
 	}
@@ -632,7 +632,7 @@ void AfcManager::initializeDatabases()
 	{
 		// 3DEP directory is currently not present so this will fail if called
 		// LOGGER_WARN(logger) << "3DEP loading request is being ignored";
-		_depDir = SearchPaths::forReading("data", "fbrat/rat_transfer/3dep/1_arcsec", true).toStdString();
+		_depDir = SearchPaths::forReading("data", "rat_transfer/3dep/1_arcsec", true).toStdString();
 	}
 	else
 	{
@@ -1814,6 +1814,7 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		("help,h", "Use input-file-path, config-file-path, or output-file-path.")
 		("request-type,r", po::value<std::string>()->default_value("AP-AFC"), "set request-type (AP-AFC, HeatmapAnalysis, ExclusionZoneAnalysis)")
 		("state-root,s", po::value<std::string>()->default_value("/var/lib/fbrat"), "set fbrat state root directory")
+		("mnt-path,s", po::value<std::string>()->default_value("/mnt/nfs"), "set share with GeoData and config data")
 		("input-file-path,i", po::value<std::string>()->default_value("inputFile.json"), "set input-file-path level")
 		("config-file-path,c", po::value<std::string>()->default_value("configFile.json"), "set config-file-path level")
 		("output-file-path,o", po::value<std::string>()->default_value("outputFile.json"), "set output-file-path level")
@@ -1848,6 +1849,15 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 	else // Must be specified
 	{
 		throw std::runtime_error("AfcManager::setCmdLineParams(): state-root(s) command line argument was not set.");
+	}
+	// Check whether "mnt-path(s)" was specified
+	if (cmdLineArgs.count("mnt-path"))
+	{
+		_mntPath = cmdLineArgs["mnt-path"].as<std::string>();
+	}
+	else // Must be specified
+	{
+		throw std::runtime_error("AfcManager::setCmdLineParams(): mnt-path(s) command line argument was not set.");
 	}
 	// Check whether "input-file-path(i)" was specified
 	if (cmdLineArgs.count("input-file-path"))
@@ -1967,17 +1977,17 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	_regionStr = jsonObj["regionStr"].toString().toStdString();
 
 	if (_regionStr == "CONUS") {
-		_regionPolygonFileList = SearchPaths::forReading("data", "fbrat/rat_transfer/population/conus.kml", true).toStdString();
+		_regionPolygonFileList = SearchPaths::forReading("data", "rat_transfer/population/conus.kml", true).toStdString();
 	} else if (_regionStr == "Canada") {
-		_regionPolygonFileList = SearchPaths::forReading("data", "fbrat/rat_transfer/population/Canada.kml", true).toStdString();
+		_regionPolygonFileList = SearchPaths::forReading("data", "rat_transfer/population/Canada.kml", true).toStdString();
 	} else {
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): Invalid regionStr specified.");
 	}
 
 	if (jsonObj.contains("nlcdFile") && !jsonObj["nlcdFile"].isUndefined()) {
-		_nlcdFile = SearchPaths::forReading("data", QString("fbrat/rat_transfer/nlcd/") + jsonObj["nlcdFile"].toString(), true).toStdString();
+		_nlcdFile = SearchPaths::forReading("data", QString("rat_transfer/nlcd/") + jsonObj["nlcdFile"].toString(), true).toStdString();
 	} else {
-		_nlcdFile = SearchPaths::forReading("data", "fbrat/rat_transfer/nlcd/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
+		_nlcdFile = SearchPaths::forReading("data", "rat_transfer/nlcd/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
 	}
 
 	if (jsonObj.contains("fsAnalysisListFile") && !jsonObj["fsAnalysisListFile"].isUndefined()) {
@@ -2076,15 +2086,15 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		for (QJsonValue ulsDatabaseVal : ulsDatabaseArray) {
 			QJsonObject ulsDatabaseObj = ulsDatabaseVal.toObject();
 			std::string name = ulsDatabaseObj["name"].toString().toStdString();
-			std::string dbfile = _stateRoot + "/ULS_Database/" + ulsDatabaseObj["ulsDatabase"].toString().toStdString();
+			std::string dbfile = _mntPath + "/rat_transfer/ULS_Database/" + ulsDatabaseObj["ulsDatabase"].toString().toStdString();
 			_ulsDatabaseList.push_back(std::make_tuple(name, dbfile));
 		}
 	} else {
-		std::string dbfile = _stateRoot + "/ULS_Database/" + jsonObj["ulsDatabase"].toString().toStdString();
+		std::string dbfile = _mntPath + "/rat_transfer/ULS_Database/" + jsonObj["ulsDatabase"].toString().toStdString();
 		_ulsDatabaseList.push_back(std::make_tuple("CONUS", dbfile));
 	}
 
-	_rasDataFile = _stateRoot + "/RAS_Database/" + jsonObj["rasDatabase"].toString().toStdString();
+	_rasDataFile = _mntPath + "/rat_transfer/RAS_Database/" + jsonObj["rasDatabase"].toString().toStdString();
 
 	double cfgMinEIRP;
 	if (jsonObj.contains("minEIRP") && !jsonObj["minEIRP"].isUndefined()) {
@@ -2397,7 +2407,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	}
 
 	if (_nearFieldAdjFlag) {
-		_nfaTableFile = SearchPaths::forReading("data", "fbrat/rat_transfer/nfa/nfa_table_data.csv", true).toStdString();
+		_nfaTableFile = SearchPaths::forReading("data", "rat_transfer/nfa/nfa_table_data.csv", true).toStdString();
 	}
 	// ***********************************
 
@@ -2410,7 +2420,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_passiveRepeaterFlag = true;
 	}
 
-	_prTableFile = SearchPaths::forReading("data", "fbrat/rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv", true).toStdString();
+	_prTableFile = SearchPaths::forReading("data", "rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv", true).toStdString();
 	// ***********************************
 
 	// ***********************************
@@ -10631,16 +10641,16 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_wlanMinFreq = _wlanMinFreqMHz*1.0e6;
 	_wlanMaxFreq = _wlanMaxFreqMHz*1.0e6;
 
-	_srtmDir = SearchPaths::forReading("data", "fbrat/rat_transfer/srtm3arcsecondv003", true).toStdString();
+	_srtmDir = SearchPaths::forReading("data", "rat_transfer/srtm3arcsecondv003", true).toStdString();
 
-	_depDir = SearchPaths::forReading("data", "fbrat/rat_transfer/3dep/1_arcsec", true).toStdString();
+	_depDir = SearchPaths::forReading("data", "rat_transfer/3dep/1_arcsec", true).toStdString();
 
-	_lidarDir = SearchPaths::forReading("data", "fbrat/rat_transfer/proc_lidar_2019", true);
+	_lidarDir = SearchPaths::forReading("data", "rat_transfer/proc_lidar_2019", true);
 
-	_globeDir = SearchPaths::forReading("data", "fbrat/rat_transfer/globe", true);
+	_globeDir = SearchPaths::forReading("data", "rat_transfer/globe", true);
 
 	// _popDensityFile = SearchPaths::forReading("population", "conus_1arcmin.sqlite3", true).toStdString();
-	_popDensityFile = SearchPaths::forReading("data", "fbrat/rat_transfer/population/conus_1arcmin.sqlite3", true).toStdString();
+	_popDensityFile = SearchPaths::forReading("data", "rat_transfer/population/conus_1arcmin.sqlite3", true).toStdString();
 	_popDensityResLon = 1.0 / 60;
 	_popDensityResLat = 1.0 / 60;
 	_popDensityMinLon = -124.7333;
@@ -10656,9 +10666,9 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 
 	// _rlanBWStr = "20.0e6,40.0e6,80.0e6,160.0e6"; // Channel bandwidths in Hz
 
-	_worldPopulationFile = SearchPaths::forReading("data", "fbrat/rat_transfer/population/gpw_v4_population_density_rev11_2020_30_sec.tif", true).toStdString();
-	_radioClimateFile = SearchPaths::forReading("data", "fbrat/rat_transfer/itudata/TropoClim.txt", true).toStdString();
-	_surfRefracFile = SearchPaths::forReading("data", "fbrat/rat_transfer/itudata/N050.TXT", true).toStdString();
+	_worldPopulationFile = SearchPaths::forReading("data", "rat_transfer/population/gpw_v4_population_density_rev11_2020_30_sec.tif", true).toStdString();
+	_radioClimateFile = SearchPaths::forReading("data", "rat_transfer/itudata/TropoClim.txt", true).toStdString();
+	_surfRefracFile = SearchPaths::forReading("data", "rat_transfer/itudata/N050.TXT", true).toStdString();
 	_regionPolygonResolution = 1.0e-5;
 
 	if (AfcManager::_createDebugFiles) {

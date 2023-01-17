@@ -304,7 +304,7 @@ class AllowedFreqRanges(MethodView):
         :rtype: file-like
         '''
 
-        config_path = os.path.join(flask.current_app.config['STATE_ROOT_PATH'], 'frequency_bands')
+        config_path = os.path.join(flask.current_app.config['NFS_MOUNT_PATH'], 'rat_transfer', 'frequency_bands')
         if not os.path.exists(config_path):
             os.makedirs(config_path)
 

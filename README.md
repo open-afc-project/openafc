@@ -272,9 +272,9 @@ Once built, docker images are usable as usual docker image.
 ## Prereqs
 Significant to know that the container needs several mappings to work properly:
 
-1) All databases in one folder - map to /usr/share/fbrat/rat_transfer
+1) All databases in one folder - map to /mnt/nfs/rat_transfer
       ```
-      /var/databases:/usr/share/fbrat/rat_transfer
+      /var/databases:/mnt/nfs/rat_transfer
       ```
       Those databases are:
       - 3dep
@@ -293,29 +293,25 @@ Significant to know that the container needs several mappings to work properly:
       - pr
 
 
-2) LiDAR Databases to /var/lib/fbrat/proc_lidar_2019
+2) LiDAR Databases to /mnt/nfs/rat_transfer/proc_lidar_2019
       ```
-      /var/databases/proc_lidar_2019:/var/lib/fbrat/proc_lidar_2019
+      /var/databases/proc_lidar_2019:/mnt/nfs/rat_transfer/proc_lidar_2019
       ```
-3) RAS database to /var/lib/fbrat/RAS_Database
+3) RAS database to /mnt/nfs/rat_transfer/RAS_Database
       ```
-      /var/databases/RAS_Database:/var/lib/fbrat/RAS_Database
+      /var/databases/RAS_Database:/mnt/nfs/rat_transfer/RAS_Database
       ```
-4) Actual ULS Databases to /var/lib/fbrat/ULS_Database
+4) Actual ULS Databases to /mnt/nfs/rat_transfer/ULS_Database
       ```
-      /var/databases/ULS_Database:/var/lib/fbrat/ULS_Database
+      /var/databases/ULS_Database:/mnt/nfs/rat_transfer/ULS_Database
       ```
-5) Same Actual ULS Databases to /usr/share/fbrat/afc-engine/ULS_Database (temporary requirement, to be removed in next versions)
+5) Folder with daily ULS Parse data /mnt/nfs/rat_transfer/daily_uls_parse
       ```
-      /var/databases/ULS_Database:/usr/share/fbrat/afc-engine/ULS_Database
+      /var/databases/daily_uls_parse:/mnt/nfs/rat_transfer/daily_uls_parse
       ```
-6) Folder with daily ULS Parse data /var/lib/fbrat/daily_uls_parse
+6) Folder with AFC Config data /mnt/nfs/afc_config (now can be moved to Object Storage by default)
       ```
-      /var/databases/daily_uls_parse:/var/lib/fbrat/daily_uls_parse
-      ```
-7) Folder with AFC Config data /var/lib/fbrat/afc_config
-      ```
-      /var/afc_config:/var/lib/fbrat/afc_config
+      /var/afc_config:/mnt/nfs/afc_config
       ```
 **NB: All or almost all files and folders should be owned by user and group 1003 (currently - fbrat)**
 
@@ -344,7 +340,7 @@ services:
     restart: always
     environment:
       - POSTGRES_PASSWORD=N3SF0LVKJx1RAhFGx4fcw
-      - PGDATA=/var/lib/pgsql/data
+      - PGDATA=/mnt/nfs/pgsql/data
       - POSTGRES_DB=fbrat
 
 
@@ -459,7 +455,7 @@ services:
 # Host static DB root dir
 VOL_H_DB=/opt/afc/databases/rat_transfer
 # Container's static DB root dir
-VOL_C_DB=/usr/share/fbrat/rat_transfer
+VOL_C_DB=/mnt/nfs/rat_transfer
 
 # AFC service external PORTs configuration
 # syntax: 
@@ -533,7 +529,7 @@ To force rebuild it completely use _--no-cache_ option:
 docker-compose build --no-cache
 ```
 
-**NB: the postgres:9 container requires the folder /var/lib/pgsql/data to be owned by it's internal user and group _postgres_, which both have id 999.**
+**NB: the postgres:9 container requires the folder /mnt/nfs/pgsql/data to be owned by it's internal user and group _postgres_, which both have id 999.**
 
 You can achieve it this way  (mind the real location of these folders on your host system):
 ```

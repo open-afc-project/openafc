@@ -47,6 +47,8 @@ PERMANENT_SESSION_LIFETIME = datetime.timedelta(seconds=USER_USER_SESSION_EXPIRA
 GOOGLE_APIKEY = None
 #: Dynamic system data (both model data and configuration)
 STATE_ROOT_PATH = '/var/lib/fbrat'
+#: Mount path 
+NFS_MOUNT_PATH = '/mnt/nfs'
 #: AFC Engine executable
 AFC_ENGINE = distutils.spawn.find_executable('afc-engine')
 #: Use random PAWS response flag

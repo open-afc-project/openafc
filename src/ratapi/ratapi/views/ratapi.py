@@ -45,7 +45,7 @@ def build_task(dataif,
     Shared logic between PAWS and All other analysis for constructing and async call to run task
     """
 
-    prot, host, port, state_root = dataif.getProtocol()
+    prot, host, port, state_root, mntroot = dataif.getProtocol()
     args=[
         prot,
         host,
@@ -58,7 +58,8 @@ def build_task(dataif,
         hash,
         region,
         history_dir,
-        runtime_opts
+        runtime_opts,
+        mntroot
     ]
     LOGGER.debug("build_task() {}".format(args))
     run.apply_async(args)
@@ -81,7 +82,8 @@ class GuiConfig(MethodView):
 
         dataif = data_if.DataIf(
             fsroot=flask.current_app.config["STATE_ROOT_PATH"],
-            probeHttps=False)
+            probeHttps=False,
+            mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
 
         if flask.current_app.config['AFC_APP_TYPE'] == 'server':
             from urlparse import urlparse
@@ -281,7 +283,8 @@ class AfcConfigFile(MethodView):
 
         resp = flask.make_response()
         dataif = data_if.DataIf(
-            fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+            fsroot=flask.current_app.config['STATE_ROOT_PATH'],
+            mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
         try:
             with dataif.open("cfg", filedesc['alt'] +"/afc_config.json") as hfile:
                 resp.data = hfile.read()
@@ -303,7 +306,8 @@ class AfcConfigFile(MethodView):
             raise werkzeug.exceptions.UnsupportedMediaType()
 
         dataif = data_if.DataIf(
-            fsroot=flask.current_app.config['STATE_ROOT_PATH'])
+            fsroot=flask.current_app.config['STATE_ROOT_PATH'],
+            mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
         with dataif.open("cfg", filedesc['alt'] + "/afc_config.json") as hfile:
             bytes = flask.request.stream.read()
             rcrd = json.loads(bytes)
@@ -339,18 +343,18 @@ class TrialAfcConfigFile(MethodView):
         :rtype: file-like
         '''
         if mode == 'wb' and user is not None and not \
-                os.path.exists(os.path.join(flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user))):
+                os.path.exists(os.path.join(flask.current_app.config['NFS_MOUNT_PATH'], 'afc_config', str(user))):
             # create scoped user directory so people don't clash over each others config
             os.mkdir(os.path.join(
-                flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user)))
+                flask.current_app.config['NFS_MOUNT_PATH'], 'afc_config', str(user)))
 
         config_path = ''
-        if user is not None and os.path.exists(os.path.join(flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user))):
+        if user is not None and os.path.exists(os.path.join(flask.current_app.config['NFS_MOUNT_PATH'], 'afc_config', str(user))):
             config_path = os.path.join(
-                flask.current_app.config['STATE_ROOT_PATH'], 'afc_config', str(user))
+                flask.current_app.config['NFS_MOUNT_PATH'], 'afc_config', str(user))
         else:
             config_path = os.path.join(
-                flask.current_app.config['STATE_ROOT_PATH'], 'afc_config')
+                flask.current_app.config['NFS_MOUNT_PATH'], 'afc_config')
         if not os.path.exists(config_path):
             os.makedirs(config_path)
 
@@ -724,7 +728,7 @@ class UlsDb(MethodView):
         from ..db.generators import create_uls_db
 
         uls_path = os.path.join(
-            flask.current_app.config['STATE_ROOT_PATH'], 'ULS_Database', uls_file)
+            flask.current_app.config['NFS_MOUNT_PATH'], 'rat_transfer', 'ULS_Database', uls_file)
         if not os.path.exists(uls_path):
             raise werkzeug.exceptions.BadRequest(
                 "File does not exist: " + uls_file)

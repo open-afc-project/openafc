@@ -46,7 +46,7 @@ client = Celery(
 def run(prot, host, port, state_root,
         afc_exe, request_type, debug,
         task_id, hash, region, history_dir,
-        runtime_opts):
+        runtime_opts, mntroot):
     """ Run AFC Engine
 
         The parameters are all serializable so they can be passed through the message queue.
@@ -58,6 +58,8 @@ def run(prot, host, port, state_root,
         :param afc_exe: path to AFC Engine executable
 
         :param state_root: path to directory where fbrat state is held
+        
+        :param mntroot: path to directory where GeoData and config data are stored
 
         :param request_type: request type of analysis
         :type request_type: str
@@ -70,8 +72,8 @@ def run(prot, host, port, state_root,
 
         :param hash: md5 of request and config files
     """
-    LOGGER.debug('run(prot={}, host={}, port={}, state_root={}, task_id={}, hash={}, runtime_opts={})'.
-                 format(prot, host, port, state_root, task_id, hash, runtime_opts))
+    LOGGER.debug('run(prot={}, host={}, port={}, state_root={}, task_id={}, hash={}, runtime_opts={}, mntroot={})'.
+                 format(prot, host, port, state_root, task_id, hash, runtime_opts, mntroot))
 
     if isinstance(afc_exe, type(None)):
         afc_exe = AFC_ENGINE
@@ -80,9 +82,10 @@ def run(prot, host, port, state_root,
 
     tmpdir = os.path.join(state_root, task_id)
     os.makedirs(tmpdir)
+    probeHttps=None
 
-    dataif = data_if.DataIf(prot, host, port, state_root)
-    t = task.Task(task_id, dataif, state_root, hash, region, history_dir)
+    dataif = data_if.DataIf(prot, host, port, state_root, probeHttps, mntroot)
+    t = task.Task(task_id, dataif, state_root, hash, region, history_dir, mntroot)
     t.toJson(task.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
 
     proc = None
@@ -96,6 +99,7 @@ def run(prot, host, port, state_root,
                 afc_exe,
                 "--request-type=" + request_type,
                 "--state-root=" + state_root,
+                "--mnt-path=" + mntroot,
                 "--input-file-path=" + dataif.rname("pro", hash + "/analysisRequest.json"),
                 "--config-file-path=" + dataif.rname("cfg", region + "/afc_config.json"),
                 "--output-file-path=" + dataif.rname("pro", hash + "/analysisResponse.json.gz"),

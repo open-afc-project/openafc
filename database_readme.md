@@ -192,16 +192,16 @@ gdalwarp -te $minLon $minLat $maxLon $maxLat $fin $fout
 ### **Expected location of post-processed database on the AFC server**
 There are three category of databases: Dynamic, Static and ULS.
 1. **Dynamic:**
-* These are assets that are subject to change more frequenty than Static, either by the user interacting with the GUI (AFC Config) uploading files (AntennaPatterns, ULS_Database), or another asset that may change in the future
+* These are assets that are subject to change more frequenty than Static, either by the user interacting with the GUI (AFC Config) uploading files (AntennaPatterns), or another asset that may change in the future
 * Live under /var/lib/fbrat
-* Examples are: ULS_Database, afc_config, AntennaPatterns, RAS_Database, and analysis responses
-* Note that the RAS_Database technically lives as a static asset but the code uses a symlink at /var/lib/fbrat/RAS_Database
+* Examples are: afc_config, AntennaPatterns and analysis responses
+* Note that the were moved to Object storage by default
 
 2. **Static:**
 * These are the assets that are not expected to change for at least a year (and some for many years)
-* Live under /usr/share/fbrat/rat_transfer
+* Live under /mnt/nfs/rat_transfer
 * Examples are: Terrain (3DEP, SRTM, Globe), Building (LiDAR, Multiband-BDesign3D), NLCD, Population Density
-* Below are the database directories under /usr/share/fbrat/rat_transfer
+* Below are the database directories under /mnt/nfs/rat_transfer
   * **ULS_Database:** Fallback (static) ULS_Database in case an active ULS_Database under fbrat is missing
   * **srtm3arcsecondv003**
   * **RAS_Database**
@@ -215,7 +215,7 @@ There are three category of databases: Dynamic, Static and ULS.
 
 3. **ULS (note: WIP):**
 * These are the supporting files for the ULS Script Parser that download, process, and create the new ULS files
-* Live under /var/lib/fbrat/daily_uls_parse/data_files
+* Live under /mnt/nfs/rat_transfer/daily_uls_parse/data_files
   * **WIP:** Functionality built into API
   * Data for yesterdaysDB (used to retain FSID from day to day) and highest known FSID (to avoid collision, FSIDs are not reused currently) are stored here.
 

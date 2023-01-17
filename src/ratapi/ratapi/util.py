@@ -127,13 +127,14 @@ def require_default_uls():
     '''
     # copy default uls database files to var
     for uls_file in os.listdir(flask.current_app.config['DEFAULT_ULS_DIR']):
-        if os.path.exists(os.path.join(flask.current_app.config['STATE_ROOT_PATH'],
-                                       'ULS_Database', uls_file)):
+        if os.path.exists(os.path.join(flask.current_app.config['NFS_MOUNT_PATH'],
+                                       'rat_transfer', 'ULS_Database', uls_file)):
             continue
         os.symlink(
             os.path.join(
                 flask.current_app.config['DEFAULT_ULS_DIR'], uls_file),
-            os.path.join(flask.current_app.config['STATE_ROOT_PATH'], 'ULS_Database', uls_file))
+            os.path.join(flask.current_app.config['NFS_MOUNT_PATH'], 'rat_transfer',
+                         'ULS_Database', uls_file))
 
 
 class PrefixMiddleware(object):
