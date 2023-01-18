@@ -26,12 +26,12 @@ public:
     double latitudeDeg;
     double longitudeDeg;
     double groundElevation;
+    double heightAGLA;
+    double heightAGLB;
 
     PRTypeEnum type;
 
     // Back to Back Antenna Parameters
-    double heightAGLA;
-    double heightAGLB;
     double antennaGainA;
     double antennaGainB;
     std::string antennaModelA;
@@ -46,7 +46,6 @@ public:
     Vector3 pointingVecB;
 
     // Billboard Reflector Parameters
-    double reflectorHeightAGL;
     double reflectorHeight;
     double reflectorWidth;
     Vector3 reflectorPosition;

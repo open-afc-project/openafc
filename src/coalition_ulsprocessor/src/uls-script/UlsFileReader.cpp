@@ -1406,6 +1406,7 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
     int maxNumPassiveRepeater = 0;
     int numMatchedBackToBack = 0;
     double epsLonLat = 1.0e-5;
+    double epsGroundElevation = 0.05;
 
     /**************************************************************************************/
     /* CA database contains 2 entries for each back to back passive repeater, 1 entry for */
@@ -1430,9 +1431,12 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
             iiA = idxList.size()-1;
             const BackToBackPassiveRepeaterCAClass &bbA = bbList[idxList[iiA]];
             bool found = false;
-            for(int iiB=0; (iiB<iiA)&&(!found); --iiB) {
+            for(int iiB=0; (iiB<iiA)&&(!found); ++iiB) {
                 const BackToBackPassiveRepeaterCAClass &bbB = bbList[idxList[iiB]];
-                if ( (fabs(bbA.longitudeDeg - bbB.longitudeDeg) < epsLonLat) && (fabs(bbA.latitudeDeg - bbB.latitudeDeg) < epsLonLat) ) {
+                if (    (fabs(bbA.longitudeDeg - bbB.longitudeDeg) < epsLonLat)
+                     && (fabs(bbA.latitudeDeg - bbB.latitudeDeg) < epsLonLat)
+                     && (fabs(bbA.groundElevation - bbB.groundElevation) < epsGroundElevation)
+                   ) {
                     found = true;
                     iiMatch = iiB;
                 }
@@ -1457,7 +1461,9 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
                 pr.elevationPtgA = bbA.elevationPtg;
                 pr.elevationPtgB = bbA.elevationPtg;
 
-                pr.reflectorHeightAGL = std::numeric_limits<double>::quiet_NaN();
+                pr.positionA = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, (pr.groundElevation + pr.heightAGLA)/ 1000.0);
+                pr.positionB = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, (pr.groundElevation + pr.heightAGLB)/ 1000.0);
+
                 pr.reflectorHeight = std::numeric_limits<double>::quiet_NaN();
                 pr.reflectorWidth = std::numeric_limits<double>::quiet_NaN();
 
@@ -1483,12 +1489,11 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
             pr.longitudeDeg = br.longitudeDeg;
             pr.groundElevation = br.groundElevation;
 
-            pr.reflectorHeightAGL = br.heightAGL;
             pr.reflectorHeight = br.reflectorHeight;
             pr.reflectorWidth = br.reflectorWidth;
 
-            pr.heightAGLA = std::numeric_limits<double>::quiet_NaN();
-            pr.heightAGLB = std::numeric_limits<double>::quiet_NaN();
+            pr.heightAGLA = br.heightAGL;
+            pr.heightAGLB = br.heightAGL;
             pr.antennaGainA = std::numeric_limits<double>::quiet_NaN();
             pr.antennaGainB = std::numeric_limits<double>::quiet_NaN();
             pr.antennaModelA = std::numeric_limits<double>::quiet_NaN();

@@ -21,6 +21,7 @@ struct UlsRecord
 {
 	int fsid;
 
+	std::string region;
 	std::string callsign;
 	std::string radioService;
 	std::string entityName;
@@ -58,7 +59,8 @@ struct UlsRecord
 	int numPR;
 	std::vector<double> prLatitudeDeg;
 	std::vector<double> prLongitudeDeg;
-	std::vector<double> prHeightAboveTerrain;
+	std::vector<double> prHeightAboveTerrainTx;
+	std::vector<double> prHeightAboveTerrainRx;
 	std::vector<std::string> prType;
 
 	std::vector<double> prTxGain;
@@ -106,6 +108,7 @@ public:
 	std::vector<int *> prFieldIdxList;
 
 	int fsidIdx;
+	int regionIdx;
 	int callsignIdx;
 	int radio_serviceIdx;
 	int nameIdx;
@@ -147,7 +150,8 @@ public:
 	int prTypeIdx;
 	int pr_lat_degIdx;
 	int pr_lon_degIdx;
-	int pr_height_to_center_raat_mIdx;
+	int pr_height_to_center_raat_tx_mIdx;
+	int pr_height_to_center_raat_rx_mIdx;
 
 	int prTxGainIdx;
 	int prTxDiameterIdx;

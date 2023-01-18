@@ -737,10 +737,12 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                         row << UlsFunctionsClass::makeNumber(prAntennaReflectorHeight); // Passive Repeater Ant Model Reflector Height
                         row << UlsFunctionsClass::makeNumber(prAntennaReflectorWidth);  // Passive Repeater Ant Model Reflector Width
                         row << UlsFunctionsClass::makeNumber(prAnt.lineLoss);        // Passive Repeater Line Loss
-                        row << UlsFunctionsClass::makeNumber(prAnt.heightToCenterRAAT); // Passive Repeater Height to Center RAAT
+                        row << UlsFunctionsClass::makeNumber(prAnt.heightToCenterRAAT); // Passive Repeater Height to Center RAAT Tx
+                        row << UlsFunctionsClass::makeNumber(prAnt.heightToCenterRAAT); // Passive Repeater Height to Center RAAT Rx
                         row << UlsFunctionsClass::makeNumber(prAnt.beamwidth); // Passive Repeater Beamwidth
                         row << UlsFunctionsClass::makeNumber(segment.segmentLength); // Segment Length (km)
                     } else {
+                        row << "";
                         row << "";
                         row << "";
                         row << "";
@@ -1046,10 +1048,12 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     row << UlsFunctionsClass::makeNumber(prAntennaReflectorHeight); // Passive Repeater Ant Model Reflector Height
                     row << UlsFunctionsClass::makeNumber(prAntennaReflectorWidth);  // Passive Repeater Ant Model Reflector Width
                     row << "";                                                   // Passive Repeater Line Loss
-                    row << UlsFunctionsClass::makeNumber(pr.heightAGLA);         // Passive Repeater Height to Center RAAT
+                    row << UlsFunctionsClass::makeNumber(repFlag ? pr.heightAGLA : pr.heightAGLB); // Passive Repeater Height to Center RAAT Tx
+                    row << UlsFunctionsClass::makeNumber(repFlag ? pr.heightAGLB : pr.heightAGLA); // Passive Repeater Height to Center RAAT Rx
                     row << "";                                             // Passive Repeater Beamwidth
                     row << "";                                                   // Segment Length (km)
                 } else {
+                    row << "";
                     row << "";
                     row << "";
                     row << "";
