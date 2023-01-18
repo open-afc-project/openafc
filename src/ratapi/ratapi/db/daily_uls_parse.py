@@ -157,9 +157,9 @@ def removeFromCombinedFile(fileName, directory, ids_to_remove, day, versionIdx):
 
     if (day == 'weekly'):
         # create file that contains weekly and daily
-        with open(weeklyAndDailyPath, 'w') as withDaily: 
+        with open(weeklyAndDailyPath, 'w', encoding='utf8') as withDaily: 
             # open weekly file
-            with open(directory + '/weekly/' + fileName , 'r' ) as weekly:
+            with open(directory + '/weekly/' + fileName , 'r', encoding='utf8') as weekly:
                 record = '' 
                 symbolCount = 0
                 numExpectedCols = neededFilesUS[versionIdx][fileName]
@@ -195,9 +195,9 @@ def removeFromCombinedFile(fileName, directory, ids_to_remove, day, versionIdx):
                         raise e
     else:
         # open new file that contains weekly and daily
-        with open(weeklyAndDailyPath + '_temp', 'w') as withDaily: 
+        with open(weeklyAndDailyPath + '_temp', 'w', encoding='utf8') as withDaily: 
             # open older file 
-            with open(weeklyAndDailyPath , 'r' ) as weekly:
+            with open(weeklyAndDailyPath , 'r', encoding='utf8') as weekly:
                 for line in weekly: 
                     cols = line.split('|')
                     # only write when the id is not in the list of ids 
@@ -212,7 +212,7 @@ def updateIndividualFile(dayFile, directory, lineBuffer):
     weeklyAndDailyPath = directory + '/weekly/' + dayFile + '_withDaily'
     if(os.path.isfile(weeklyAndDailyPath)):
         # open file that contains weekly and daily
-        with open(weeklyAndDailyPath, 'a') as withDaily:       
+        with open(weeklyAndDailyPath, 'a', encoding='utf8') as withDaily:       
             withDaily.write(lineBuffer)
     else:
         e =  Exception('Combined file ' + weeklyAndDailyPath + ' does not exist')
@@ -304,7 +304,7 @@ def generateUlsScriptInputUS(directory, logFile, genFilename):
         for weeklyFile in os.listdir(directory):
             if "withDaily" in weeklyFile:
                 logFile.write('Adding ' + directory + '/' + weeklyFile + ' to ' + genFilename + '\n')
-                with open(directory +'/' + weeklyFile, 'r') as infile:
+                with open(directory +'/' + weeklyFile, 'r', encoding='utf8') as infile:
                     for line in infile:
                         combined.write('US:' + line)
 
@@ -574,7 +574,7 @@ def daily_uls_parse(state_root, interactive):
     # If processDownloadFlag set, process Download files to create combined.txt         #
     ###########################################################################
     if processDownloadFlag:
-        with open(fullPathCoalitionScriptInput, 'w') as combined:
+        with open(fullPathCoalitionScriptInput, 'w', encoding='utf8') as combined:
             pass # Do nothing, create empty file that will be appended to
 
         for region in regionList:
@@ -834,14 +834,7 @@ if __name__ == '__main__':
     parser.add_argument('-i',  '--interactive', action='store_true')
     parser.add_argument('-u8', '--unii8', action='store_true')
 
-#   2022.12.28 temporarily set default to US only.  CA currently does not work because CA does
-#   not provide TX locations.  Currently working with ISED to see if they will provide TX location 
-#   data.  If TX location data is not provided, these scripts and afc-engine need to be modified
-#   accordingly
-#
-#    parser.add_argument('-r',  '--region', default='US:CA', help='":" separated list of regions')
-
-    parser.add_argument('-r',  '--region', default='US', help='":" separated list of regions')
+    parser.add_argument('-r',  '--region', default='US:CA', help='":" separated list of regions')
 
     args = parser.parse_args()
     interactive = args.interactive

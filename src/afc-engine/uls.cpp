@@ -233,6 +233,12 @@ double                   ULSClass::getTxHeightAMSL()          {
 CConst::HeightSourceEnum ULSClass::getTxHeightSource()        {
 	return(txHeightSource);
 }
+double                   ULSClass::getAzimuthAngleToTx()          {
+	return(azimuthAngleToTx);
+}
+double                   ULSClass::getElevationAngleToTx()          {
+	return(elevationAngleToTx);
+}
 
 
 double ULSClass::getNoiseLevelDBW() {
@@ -438,6 +444,14 @@ void ULSClass::setTxHeightAMSL(double txHeightAMSLVal) {
 }
 void ULSClass::setTxHeightSource(CConst::HeightSourceEnum txHeightSourceVal) {
 	txHeightSource = txHeightSourceVal;
+	return;
+}
+void ULSClass::setAzimuthAngleToTx(double azimuthAngleToTxVal) {
+	azimuthAngleToTx = azimuthAngleToTxVal;
+	return;
+}
+void ULSClass::setElevationAngleToTx(double elevationAngleToTxVal) {
+	elevationAngleToTx = elevationAngleToTxVal;
 	return;
 }
 void ULSClass::setNoiseLevelDBW(double noiseLevelDBWVal) {

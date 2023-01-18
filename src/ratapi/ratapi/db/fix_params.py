@@ -121,8 +121,8 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             highFreq = freq + bandwidth/2;
 
             row['return_FSID'] = ''
-            row['Rx Gain (dBi)'] = ''
-            row['Tx Gain (dBi)'] = ''
+            row['Rx Gain (dBi)'] = row['Rx Gain ULS (dBi)']
+            row['Tx Gain (dBi)'] = row['Tx Gain ULS (dBi)']
 
             row['Rx Height to Center RAAT (m)']           = row['Rx Height to Center RAAT ULS (m)']
             row['Rx Diversity Height to Center RAAT (m)'] = row['Rx Diversity Height to Center RAAT ULS (m)']
