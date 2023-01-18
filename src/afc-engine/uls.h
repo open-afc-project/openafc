@@ -119,6 +119,8 @@ public:
 	double getTxHeightAboveTerrain();
 	double getTxHeightAMSL();
 	CConst::HeightSourceEnum getTxHeightSource();
+	double getAzimuthAngleToTx();
+	double getElevationAngleToTx();
 
 	std::string getTxPolarization();
 	double getTxSrtmHeight();
@@ -194,6 +196,8 @@ public:
 	void setTxHeightAMSL(double txHeightAMSLVal);
 	void setTxHeightSource(CConst::HeightSourceEnum txHeightSourceVal);
 	void setTxPolarization(std::string txPolarizationVal);
+	void setAzimuthAngleToTx(double azimuthAngleToTxVal);
+	void setElevationAngleToTx(double elevationAngleToTxVal);
 
 	void setUseFrequency();
 	void setNoiseLevelDBW(double noiseLevelDBWVal);
@@ -289,6 +293,8 @@ private:
 	double txHeightAboveTerrain;
 	double txHeightAMSL;
 	CConst::HeightSourceEnum txHeightSource;
+	double azimuthAngleToTx;
+	double elevationAngleToTx;
 	std::string txPolarization;
 	double txCenterToRAATHeight;
 	int txLidarRegion;

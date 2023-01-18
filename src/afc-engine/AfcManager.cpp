@@ -3851,7 +3851,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 	auto &fanom = fs_anom_writer.csv_writer;
 
 	if (fanom) {
-		fanom->writeRow({"FSID,DBNAME,CALLSIGN,RX_LATITUDE,RX_LONGITUDE,ANOMALY_DESCRIPTION\n"});
+		fanom->writeRow({"FSID","DBNAME","CALLSIGN","RX_LATITUDE","RX_LONGITUDE","ANOMALY_DESCRIPTION"});
 	}
 
 	int prIdx;
@@ -3895,6 +3895,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		double txGroundElevation;
 		std::string txPolarization;
 		double txHeightAboveTerrain;
+		double azimuthAngleToTx;
+		double elevationAngleToTx;
 		double rxGain;
 		double rxAntennaDiameter;
 		double rxNearFieldAntDiameter;
@@ -3949,17 +3951,23 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		// Distributing FS TX by 1x1 degree squares to minimize GDAL reopening
 		std::sort(rows.begin(), rows.end(),
 			[](const UlsRecord &rl, const UlsRecord &rr) {
-				double latDegL = std::floor(rl.txLatitudeDeg);
-				double latDegR = std::floor(rr.txLatitudeDeg);
-				if (latDegL != latDegR) {
-					return latDegL < latDegR;
+				if (std::isnan(rl.txLatitudeDeg) || std::isnan(rl.txLongitudeDeg)) {
+					return false;
+				} else if (std::isnan(rr.txLatitudeDeg) || std::isnan(rr.txLongitudeDeg)) {
+					return true;
+				} else {
+					double latDegL = std::floor(rl.txLatitudeDeg);
+					double latDegR = std::floor(rr.txLatitudeDeg);
+					if (latDegL != latDegR) {
+						return latDegL < latDegR;
+					}
+					double lonDegL = std::floor(rl.txLongitudeDeg);
+					double lonDegR = std::floor(rr.txLongitudeDeg);
+					if (lonDegL != lonDegR) {
+						return lonDegL < lonDegR;
+					}
+					return false;
 				}
-				double lonDegL = std::floor(rl.txLongitudeDeg);
-				double lonDegR = std::floor(rr.txLongitudeDeg);
-				if (lonDegL != lonDegR) {
-					return lonDegL < lonDegR;
-				}
-				return false;
 			});
 
 		for (UlsRecord row : rows)
@@ -4382,103 +4390,13 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/**************************************************************************/
 			/* txLatCoords => txLatitudeDeg                                           */
 			/**************************************************************************/
-			txLatitudeDeg = 0.0;
-			if (!_filterSimRegionOnly)
-			{
-				if (!ignoreFlag)
-				{
-					txLatitudeDeg = row.txLatitudeDeg;
-
-					if (txLatitudeDeg == 0.0)
-					{
-						if (linkDirection == 0)
-						{
-							// randPointingFlag = true;
-							// fixedStr += "Fixed: Tx Latitude has value 0: using random direction for Rx antenna";
-							// fixedFlag = true;
-
-							reasonIgnored = "Ignored: Tx Latitude has value 0";
-							ignoreFlag = true;
-							numIgnoreInvalid++;
-						}
-						else if ((linkDirection == 1) || (linkDirection == 2))
-						{
-							if (simulationFlag == CConst::FSToFSSimulation)
-							{
-								ignoreFlag = true;
-								reasonIgnored = "TX Latitude has value 0";
-							}
-							else
-							{
-								// randTxPosnFlag = true;
-								// fixedStr += "Fixed: Tx Latitude has value 0: using random posn in SIMULATION REGION for Tx antenna";
-								// fixedFlag = true;
-
-								reasonIgnored = "Ignored: Tx Latitude has value 0";
-								ignoreFlag = true;
-								numIgnoreInvalid++;
-							}
-						}
-						else
-						{
-							throw std::runtime_error(ErrStream() << "ERROR reading ULS data: linkDirection = " << linkDirection << " INVALID value");
-						}
-					}
-				}
-			}
+			txLatitudeDeg = row.txLatitudeDeg;
 			/**************************************************************************/
 
 			/**************************************************************************/
 			/* txLongCoords => txLongitudeDeg                                         */
 			/**************************************************************************/
-			txLongitudeDeg = 0.0;
-			if (!_filterSimRegionOnly)
-			{
-				if ((!randPointingFlag) && (!randTxPosnFlag))
-				{
-
-					if (!ignoreFlag)
-					{
-						txLongitudeDeg = row.txLongitudeDeg;
-
-						if (txLongitudeDeg == 0.0)
-						{
-							if (linkDirection == 0)
-							{
-								// randPointingFlag = true;
-								// fixedStr += "Fixed: Tx Longitude has value 0: using random direction for Rx antenna";
-								// fixedFlag = true;
-
-								reasonIgnored = "Ignored: Tx Longitude has value 0";
-								ignoreFlag = true;
-								numIgnoreInvalid++;
-							}
-							else if ((linkDirection == 1) || (linkDirection == 2))
-							{
-								if (simulationFlag == CConst::FSToFSSimulation)
-								{
-									ignoreFlag = true;
-									reasonIgnored = "TX Longitude has value 0";
-								}
-								else
-								{
-									// randTxPosnFlag = true;
-									// fixedStr += "Fixed: Tx Longitude has value 0: using random posn in SIMULATION REGION for Tx antenna";
-									// fixedFlag = true;
-
-									reasonIgnored = "Ignored: Tx Longitude has value 0";
-									ignoreFlag = true;
-									numIgnoreInvalid++;
-								}
-							}
-							else
-							{
-								throw std::runtime_error(ErrStream() << "ERROR reading ULS data: linkDirection = " << linkDirection << " INVALID value");
-							}
-						}
-					}
-				}
-			}
+			txLongitudeDeg = row.txLongitudeDeg;
 			/**************************************************************************/
 
 			/**************************************************************************/
@@ -4496,81 +4414,20 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/**************************************************************************/
 			/* txHeightAboveTerrain                                                   */
 			/**************************************************************************/
-			if (!_filterSimRegionOnly)
-			{
-				txHeightAboveTerrain = row.txHeightAboveTerrain;
-				if (!ignoreFlag)
-				{
-					if (std::isnan(txHeightAboveTerrain))
-					{
-						bool fixedMissingTxHeight = false;
-						if (fixAnomalousEntries) {
-							if (radioService == "CF")
-							{
-								txHeightAboveTerrain = 38.1;
-								fixedStr += "Fixed: missing Tx Height above Terrain for " + radioService + " set to " + std::to_string(txHeightAboveTerrain);
-								fixedMissingTxHeight = true;
-								fixedFlag = true;
-							}
-							else if (radioService == "MW")
-							{
-								txHeightAboveTerrain = 38.1;
-								fixedStr += "Fixed: missing Tx Height above Terrain for " + radioService + " set to " + std::to_string(txHeightAboveTerrain);
-								fixedMissingTxHeight = true;
-								fixedFlag = true;
-							}
-							else if (radioService == "TI")
-							{
-								txHeightAboveTerrain = 38.1;
-								fixedStr += "Fixed: missing Tx Height above Terrain for " + radioService + " set to " + std::to_string(txHeightAboveTerrain);
-								fixedMissingTxHeight = true;
-								fixedFlag = true;
-							}
-							else if (radioService == "TP")
-							{
-								txHeightAboveTerrain = 6.1;
-								fixedStr += "Fixed: missing Tx Height above Terrain for " + radioService + " set to " + std::to_string(txHeightAboveTerrain);
-								fixedMissingTxHeight = true;
-								fixedFlag = true;
-							}
-							else if (radioService == "TS")
-							{
-								txHeightAboveTerrain = 30.5;
-								fixedStr += "Fixed: missing Tx Height above Terrain for " + radioService + " set to " + std::to_string(txHeightAboveTerrain);
-								fixedMissingTxHeight = true;
-								fixedFlag = true;
-							}
-						}
+			txHeightAboveTerrain = row.txHeightAboveTerrain;
+			/**************************************************************************/
 
-						if (!fixedMissingTxHeight)
-						{
-							ignoreFlag = true;
-							reasonIgnored = "missing Tx Height above Terrain";
-							numIgnoreInvalid++;
-						}
-					}
-				}
-
-				if (!ignoreFlag)
-				{
-					if (txHeightAboveTerrain <= 0.0)
-					{
-						if (fixAnomalousEntries) {
-							txHeightAboveTerrain = 0.1;
-							fixedStr += "Fixed: Tx Height above Terrain <= 0 set to 0.1";
-							fixedFlag = true;
-						} else {
-							LOGGER_WARN(logger) << "WARNING: ULS data for FSID = " << fsid << ", txHeightAboveTerrain = " << txHeightAboveTerrain << " is < 0.0";
-						}
-					}
-				}
-			}
+			/**************************************************************************/
+			/* txLocFlag: true if the TX location is known, and false otherwise.      */
+			/* Note that Cadada does not provode TX location.                         */
+			/**************************************************************************/
+			bool txLocFlag = !(std::isnan(txLongitudeDeg) || std::isnan(txLatitudeDeg) || std::isnan(txHeightAboveTerrain));
 			/**************************************************************************/
 
 			/**************************************************************************/
 			/* Check txLatitude and txLongitude region defined by popGrid (SIMULATION REGION)     */
 			/**************************************************************************/
-			if ((!ignoreFlag) && ((linkDirection == 1) || (linkDirection == 2)) && popGridVal)
+			if (txLocFlag && (!ignoreFlag) && ((linkDirection == 1) || (linkDirection == 2)) && popGridVal)
 			{
 				int lonIdx;
 				int latIdx;
@@ -4582,6 +4439,29 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					reasonIgnored = "TX outside SIMULATION REGION";
 					numIgnoreOutsideSimulationRegion++;
 				}
+			}
+			/**************************************************************************/
+
+			/**************************************************************************/
+			/* azimuthAngleToTx, elevationAngleToTx                                   */
+			/**************************************************************************/
+			azimuthAngleToTx = row.azimuthAngleToTx;
+			elevationAngleToTx = row.elevationAngleToTx;
+			/**************************************************************************/
+
+			/**************************************************************************/
+			/* txPtgFlag: true if pointing to TX location is known, false otherwise.  */
+			/* Note that Cadada specifies these parameters, US does not.              */
+			/**************************************************************************/
+			bool txPtgFlag = !(std::isnan(azimuthAngleToTx) || std::isnan(elevationAngleToTx));
+			/**************************************************************************/
+
+			/**************************************************************************/
+			/* If Tx location not provided and pointing to TX not provided, ignore    */
+			/**************************************************************************/
+			if ((!txLocFlag) && (!txPtgFlag)) {
+				ignoreFlag = true;
+				reasonIgnored = "TX location and pointing both not specified";
 			}
 			/**************************************************************************/
 
@@ -5074,6 +4954,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setTxPolarization(txPolarization);
 				uls->setTxLatitudeDeg(txLatitudeDeg);
 				uls->setTxLongitudeDeg(txLongitudeDeg);
+				uls->setAzimuthAngleToTx(azimuthAngleToTx);
+				uls->setElevationAngleToTx(elevationAngleToTx);
 				uls->setRxGain(rxGain);
 				uls->setRxDlambda(rxDlambda);
 				uls->setRxNearFieldAntDiameter(rxNearFieldAntDiameter);
@@ -5171,26 +5053,35 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 				if ((!mobileTxFlag) && (!randPointingFlag))
 				{
-					if ( (_terrainDataModel))
-					{
-						_terrainDataModel->getTerrainHeight(txLongitudeDeg,txLatitudeDeg, terrainHeight,bldgHeight, lidarHeightResult, txHeightSource);
-						txTerrainHeightFlag = true;
-					}
-					else
-					{
-						txTerrainHeightFlag = false;
-						terrainHeight = 0.0;
-					}
-					double txHeight = txHeightAboveTerrain + terrainHeight;
+					if (txLocFlag) {
+						if ( (_terrainDataModel))
+						{
+							_terrainDataModel->getTerrainHeight(txLongitudeDeg,txLatitudeDeg, terrainHeight,bldgHeight, lidarHeightResult, txHeightSource);
+							txTerrainHeightFlag = true;
+						}
+						else
+						{
+							txTerrainHeightFlag = false;
+							terrainHeight = 0.0;
+						}
+						double txHeight = txHeightAboveTerrain + terrainHeight;
 
-					uls->setTxTerrainHeightFlag(txTerrainHeightFlag);
-					uls->setTxTerrainHeight(terrainHeight);
-					uls->setTxHeightAboveTerrain(txHeightAboveTerrain);
-					uls->setTxHeightSource(txHeightSource);
-					uls->setTxHeightAMSL(txHeight);
+						uls->setTxTerrainHeightFlag(txTerrainHeightFlag);
+						uls->setTxTerrainHeight(terrainHeight);
+						uls->setTxHeightAboveTerrain(txHeightAboveTerrain);
+						uls->setTxHeightSource(txHeightSource);
+						uls->setTxHeightAMSL(txHeight);
 
-					txPosition = EcefModel::geodeticToEcef(txLatitudeDeg, txLongitudeDeg, txHeight / 1000.0);
-					uls->setTxPosition(txPosition);
+						txPosition = EcefModel::geodeticToEcef(txLatitudeDeg, txLongitudeDeg, txHeight / 1000.0);
+						uls->setTxPosition(txPosition);
+					} else {
+						uls->setTxTerrainHeightFlag(true);
+						uls->setTxTerrainHeight(quietNaN);
+						uls->setTxHeightAboveTerrain(quietNaN);
+						uls->setTxHeightSource(CConst::unknownHeightSource);
+						uls->setTxHeightAMSL(quietNaN);
+						uls->setTxPosition(Vector3(quietNaN, quietNaN, quietNaN));
+					}
 				}
 
 				if ((!mobileTxFlag) && (!randPointingFlag))
@@ -5242,13 +5133,31 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 				if ((!mobileRxFlag) && (!mobileTxFlag)) {
 					if (!randPointingFlag) {
-						for(prIdx=0; prIdx<=numPR; ++prIdx) {
-							Vector3 segTxPosn = (prIdx == 0 ? txPosition : uls->getPR(prIdx-1).position);
-							Vector3 segRxPosn = (prIdx == numPR ? rxPosition : uls->getPR(prIdx).position);
-							Vector3 pointing = (segTxPosn - segRxPosn).normalized();
-							double segDist = (segTxPosn - segRxPosn).len() * 1000.0;
+						for(int segIdx=0; segIdx<=numPR; ++segIdx) {
+							Vector3 segTxPosn = (segIdx == 0 ? txPosition : uls->getPR(segIdx-1).position);
+							Vector3 segRxPosn = (segIdx == numPR ? rxPosition : uls->getPR(segIdx).position);
+							Vector3 pointing;
+							double segDist;
 
-							if (prIdx == numPR) {
+							if (txLocFlag || (segIdx > 0)) {
+								pointing = (segTxPosn - segRxPosn).normalized();
+								segDist = (segTxPosn - segRxPosn).len() * 1000.0;
+							} else {
+								Vector3 upVec = segRxPosn.normalized();
+								Vector3 zVec = Vector3(0.0, 0.0, 1.0);
+								Vector3 eastVec = zVec.cross(upVec).normalized();
+								Vector3 northVec = upVec.cross(eastVec);
+
+								double ca = cos(row.azimuthAngleToTx*M_PI/180.0);
+								double sa = sin(row.azimuthAngleToTx*M_PI/180.0);
+								double ce = cos(row.elevationAngleToTx*M_PI/180.0);
+								double se = sin(row.elevationAngleToTx*M_PI/180.0);
+
+								pointing = northVec*ca*ce + eastVec*sa*ce + upVec*se;
+								segDist = -1.0;
+							}
+
+							if (segIdx == numPR) {
 								uls->setAntennaPointing(pointing); // Pointing of Rx antenna
 								uls->setLinkDistance(segDist);
 								if (hasDiversity) {
@@ -5256,8 +5165,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 									uls->setDiversityAntennaPointing(pointing); // Pointing of Rx Diversity antenna
 								}
 							} else {
-								uls->getPR(prIdx).pointing = pointing; // Pointing of Passive Receiver
-								uls->getPR(prIdx).segmentDistance = segDist;
+								uls->getPR(segIdx).pointing = pointing; // Pointing of Passive Receiver
+								uls->getPR(segIdx).segmentDistance = segDist;
 							}
 						}
 
@@ -5347,10 +5256,10 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				double noiseLevelDBW = 10.0 * log(CConst::boltzmannConstant * CConst::T0 * bandwidth) / log(10.0) + noiseFigureDB;
 				uls->setNoiseLevelDBW(noiseLevelDBW);
 				if (fixedFlag && fanom) {
-					fanom->writeRow({QString::asprintf("%d,%s,%s,%.15f,%.15f,%s\n", fsid, name.c_str(), callsign.c_str(), rxLatitudeDeg, rxLongitudeDeg, fixedStr.c_str())});
+					fanom->writeRow({QString::asprintf("%d", fsid), QString::fromStdString(name), QString::fromStdString(callsign), QString::asprintf("%.15f", rxLatitudeDeg), QString::asprintf("%.15f", rxLongitudeDeg), QString::fromStdString(fixedStr)});
 				}
 			} else if (fanom) {
-				fanom->writeRow({QString::asprintf("%d,%s,%s,%.15f,%.15f,%s\n", fsid, name.c_str(), callsign.c_str(), rxLatitudeDeg, rxLongitudeDeg, reasonIgnored.c_str())});
+				fanom->writeRow({QString::asprintf("%d", fsid), QString::fromStdString(name), QString::fromStdString(callsign), QString::asprintf("%.15f", rxLatitudeDeg), QString::asprintf("%.15f", rxLongitudeDeg), QString::fromStdString(reasonIgnored)});
 			}
 
 		}
@@ -5744,18 +5653,41 @@ void AfcManager::fixFSTerrain()
 
 		if (updateFlag) {
 			for(int segIdx=0; segIdx<uls->getNumPR()+1; ++segIdx) {
-				Vector3 txPosition = (segIdx==0 ? uls->getTxPosition() : uls->getPR(segIdx-1).position);
-				Vector3 rxPosition = (segIdx==uls->getNumPR() ? uls->getRxPosition() : uls->getPR(segIdx).position);
+				Vector3 segTxPosn = (segIdx==0 ? uls->getTxPosition() : uls->getPR(segIdx-1).position);
+				Vector3 segRxPosn = (segIdx==uls->getNumPR() ? uls->getRxPosition() : uls->getPR(segIdx).position);
 
-				Vector3 antennaPointing = (txPosition - rxPosition).normalized(); // boresight pointing direction of RX
-				double segmentDistance = (txPosition - rxPosition).len() * 1000.0;
+				Vector3 pointing = (segTxPosn - segRxPosn).normalized(); // boresight pointing direction of RX
+				double segDist = (segTxPosn - segRxPosn).len() * 1000.0;
+
+				bool txLocFlag = (!std::isnan(segTxPosn.x())) && (!std::isnan(segTxPosn.y())) && (!std::isnan(segTxPosn.z()));
+
+				if (txLocFlag) {
+					pointing = (segTxPosn - segRxPosn).normalized();
+					segDist = (segTxPosn - segRxPosn).len() * 1000.0;
+				} else {
+					double azimuthAngleToTx = uls->getAzimuthAngleToTx();
+					double elevationAngleToTx = uls->getElevationAngleToTx();
+
+					Vector3 upVec = segRxPosn.normalized();
+					Vector3 zVec = Vector3(0.0, 0.0, 1.0);
+					Vector3 eastVec = zVec.cross(upVec).normalized();
+					Vector3 northVec = upVec.cross(eastVec);
+
+					double ca = cos(azimuthAngleToTx*M_PI/180.0);
+					double sa = sin(azimuthAngleToTx*M_PI/180.0);
+					double ce = cos(elevationAngleToTx*M_PI/180.0);
+					double se = sin(elevationAngleToTx*M_PI/180.0);
+
+					pointing = northVec*ca*ce + eastVec*sa*ce + upVec*se;
+					segDist = -1.0;
+				}
 
 				if (segIdx==uls->getNumPR()) {
-					uls->setAntennaPointing(antennaPointing); // Pointing of Rx antenna
-					uls->setLinkDistance(segmentDistance);
+					uls->setAntennaPointing(pointing); // Pointing of Rx antenna
+					uls->setLinkDistance(segDist);
 				} else {
-					uls->getPR(segIdx).pointing = antennaPointing;
-					uls->getPR(segIdx).segmentDistance = segmentDistance;
+					uls->getPR(segIdx).pointing = pointing;
+					uls->getPR(segIdx).segmentDistance = segDist;
 				}
 			}
 		}
@@ -7683,7 +7615,7 @@ void AfcManager::runPointAnalysis()
 			std::cout << uls->getID() << std::endl;
 		}
 #endif
-		if (uls->getLinkDistance() > 0.0) {
+		if (true) {
 
 			int numPR = uls->getNumPR();
 			int numDiversity = (uls->getHasDiversity() ? 2 : 1);
@@ -8330,15 +8262,17 @@ void AfcManager::runPointAnalysis()
 				ULSClass *uls = (*_ulsList)[ulsIdx];
 				std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 
-				Vector3 ulsTxPos = uls->getTxPosition();
+				Vector3 ulsTxPosn = uls->getTxPosition();
 				double ulsTxLongitude = uls->getTxLongitudeDeg();
 				double ulsTxLatitude = uls->getTxLatitudeDeg();
 				double ulsTxHeight = uls->getTxHeightAMSL();
 
+				bool txLocFlag = (!std::isnan(ulsTxPosn.x())) && (!std::isnan(ulsTxPosn.y())) && (!std::isnan(ulsTxPosn.z()));
+
 				fkml->writeStartElement("Folder");
 				fkml->writeTextElement("name", QString::fromStdString(dbName + "_" + std::to_string(uls->getID())));
 				// fkml->writeTextElement("name", QString::fromStdString(uls->getCallsign()));
-				if (addPlacemarks) {
+				if ( (addPlacemarks) && (txLocFlag) ) {
 					fkml->writeStartElement("Placemark");
 					fkml->writeTextElement("name", QString::asprintf("%s %s_%d", "TX", dbName.c_str(), uls->getID()));
 					fkml->writeTextElement("visibility", "1");
@@ -8353,19 +8287,18 @@ void AfcManager::runPointAnalysis()
 				int numPR = uls->getNumPR();
 				for(int segIdx=0; segIdx<numPR+1; ++segIdx) {
 
-					Vector3 ulsRxPos = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).position);
+					Vector3 ulsRxPosn = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).position);
 					double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
 					double ulsRxLatitude = (segIdx == numPR ? uls->getRxLatitudeDeg() : uls->getPR(segIdx).latitudeDeg);
 					double ulsRxHeight = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSL);
 
-
 					double beamWidthDeg = uls->computeBeamWidth(3.0);
 					double beamWidthRad = beamWidthDeg*(M_PI/180.0);
 
-					double linkDistKm = (ulsTxPos - ulsRxPos).len();
+					double linkDistKm = (ulsTxPosn - ulsRxPosn).len();
 
 
-					Vector3 zvec = (ulsTxPos-ulsRxPos).normalized();
+					Vector3 zvec = (ulsTxPosn-ulsRxPosn).normalized();
 					Vector3 xvec = (Vector3(zvec.y(), -zvec.x(),0.0)).normalized();
 					Vector3 yvec = zvec.cross(xvec);
 
@@ -8376,7 +8309,7 @@ void AfcManager::runPointAnalysis()
 					int cvgPhiIdx;
 					for(cvgPhiIdx=0; cvgPhiIdx<numCvgPoints; ++cvgPhiIdx) {
 						double cvgPhi = 2*M_PI*cvgPhiIdx / numCvgPoints;
-						Vector3 cvgIntPosn = ulsRxPos + linkDistKm*(zvec*cos(cvgTheta) + (xvec*cos(cvgPhi) + yvec*sin(cvgPhi))*sin(cvgTheta));
+						Vector3 cvgIntPosn = ulsRxPosn + linkDistKm*(zvec*cos(cvgTheta) + (xvec*cos(cvgPhi) + yvec*sin(cvgPhi))*sin(cvgTheta));
 
 						GeodeticCoord cvgIntPosnGeodetic = EcefModel::ecefToGeodetic(cvgIntPosn);
 						ptList.push_back(cvgIntPosnGeodetic);
@@ -8400,39 +8333,41 @@ void AfcManager::runPointAnalysis()
 						fkml->writeEndElement(); // Placemark
 					}
 
-					fkml->writeStartElement("Folder");
-					fkml->writeTextElement("name", QString::asprintf("Beamcone_%d", segIdx+1));
+					if (txLocFlag || segIdx) {
+						fkml->writeStartElement("Folder");
+						fkml->writeTextElement("name", QString::asprintf("Beamcone_%d", segIdx+1));
 
-					for(cvgPhiIdx=0; cvgPhiIdx<numCvgPoints; ++cvgPhiIdx) {
-						fkml->writeStartElement("Placemark");
-						fkml->writeTextElement("name", QString::asprintf("p%d", cvgPhiIdx));
-						fkml->writeTextElement("styleUrl", polyStyleStr.c_str());
-						fkml->writeTextElement("visibility", visibilityStr.c_str());
-						fkml->writeStartElement("Polygon");	
-						fkml->writeTextElement("extrude", "0");
-						fkml->writeTextElement("altitudeMode", "absolute");
-						fkml->writeStartElement("outerBoundaryIs");
-						fkml->writeStartElement("LinearRing");
+						for(cvgPhiIdx=0; cvgPhiIdx<numCvgPoints; ++cvgPhiIdx) {
+							fkml->writeStartElement("Placemark");
+							fkml->writeTextElement("name", QString::asprintf("p%d", cvgPhiIdx));
+							fkml->writeTextElement("styleUrl", polyStyleStr.c_str());
+							fkml->writeTextElement("visibility", visibilityStr.c_str());
+							fkml->writeStartElement("Polygon");	
+							fkml->writeTextElement("extrude", "0");
+							fkml->writeTextElement("altitudeMode", "absolute");
+							fkml->writeStartElement("outerBoundaryIs");
+							fkml->writeStartElement("LinearRing");
 
-						QString more_coords = QString::asprintf("%.10f,%.10f,%.2f\n", ulsRxLongitude, ulsRxLatitude, ulsRxHeight);
+							QString more_coords = QString::asprintf("%.10f,%.10f,%.2f\n", ulsRxLongitude, ulsRxLatitude, ulsRxHeight);
 
-						GeodeticCoord pt = ptList[cvgPhiIdx];
-						more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, pt.heightKm*1000.0));
+							GeodeticCoord pt = ptList[cvgPhiIdx];
+							more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, pt.heightKm*1000.0));
 
-						pt = ptList[(cvgPhiIdx +1) % numCvgPoints];
-						more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, pt.heightKm*1000.0));
+							pt = ptList[(cvgPhiIdx +1) % numCvgPoints];
+							more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, pt.heightKm*1000.0));
 
-						more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", ulsRxLongitude, ulsRxLatitude, ulsRxHeight));
+							more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", ulsRxLongitude, ulsRxLatitude, ulsRxHeight));
 
-						fkml->writeTextElement("coordinates", more_coords);
-						fkml->writeEndElement(); // LinearRing
-						fkml->writeEndElement(); // outerBoundaryIs
-						fkml->writeEndElement(); // Polygon
-						fkml->writeEndElement(); // Placemark
+							fkml->writeTextElement("coordinates", more_coords);
+							fkml->writeEndElement(); // LinearRing
+							fkml->writeEndElement(); // outerBoundaryIs
+							fkml->writeEndElement(); // Polygon
+							fkml->writeEndElement(); // Placemark
+						}
+						fkml->writeEndElement(); // Beamcone
 					}
-					fkml->writeEndElement(); // Beamcone
 
-					ulsTxPos       = ulsRxPos;
+					ulsTxPosn      = ulsRxPosn;
 					ulsTxLongitude = ulsRxLongitude;
 					ulsTxLatitude  = ulsRxLatitude;
 					ulsTxHeight    = ulsRxHeight;
@@ -9088,7 +9023,7 @@ void AfcManager::runScanAnalysis()
 					fsplDistKm = distKm;
 				}
 
-				if ((distKmSquared < maxRadiusKmSquared) && (distKmSquared > exclusionDistKmSquared) && (uls->getLinkDistance() > 0.0)) {
+				if ((distKmSquared < maxRadiusKmSquared) && (distKmSquared > exclusionDistKmSquared)) {
 
 					/**************************************************************************************/
 					/* Determine propagation environment of FS, if needed.                                */
@@ -10097,7 +10032,7 @@ void AfcManager::runHeatmapAnalysis()
 				}
 #endif
 
-				if ((distKmSquared < maxRadiusKmSquared) && (distKmSquared > exclusionDistKmSquared) && (uls->getLinkDistance() > 0.0)) {
+				if ((distKmSquared < maxRadiusKmSquared) && (distKmSquared > exclusionDistKmSquared)) {
 					_ulsIdxList.push_back(ulsIdx); // Store the ULS indices that are used in analysis
 #if 0
 					int ulsLonIdx;
