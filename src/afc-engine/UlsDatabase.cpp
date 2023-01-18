@@ -30,6 +30,8 @@ UlsDatabase::UlsDatabase()
 
 	columns << "fsid";
 	fieldIdxList.push_back(&fsidIdx);
+	columns << "region";
+	fieldIdxList.push_back(&regionIdx);
 
 	columns << "callsign";
 	fieldIdxList.push_back(&callsignIdx);
@@ -104,20 +106,21 @@ UlsDatabase::UlsDatabase()
 	columns << "p_rp_num";
 	fieldIdxList.push_back(&p_rp_numIdx);
 
-	prColumns << "prSeq";                      prFieldIdxList.push_back(&prSeqIdx);
-	prColumns << "pr_ant_type";                prFieldIdxList.push_back(&prTypeIdx);
-	prColumns << "pr_lat_deg";                 prFieldIdxList.push_back(&pr_lat_degIdx);
-	prColumns << "pr_lon_deg";                 prFieldIdxList.push_back(&pr_lon_degIdx);
-	prColumns << "pr_height_to_center_raat_m"; prFieldIdxList.push_back(&pr_height_to_center_raat_mIdx);
+	prColumns << "prSeq";                         prFieldIdxList.push_back(&prSeqIdx);
+	prColumns << "pr_ant_type";                   prFieldIdxList.push_back(&prTypeIdx);
+	prColumns << "pr_lat_deg";                    prFieldIdxList.push_back(&pr_lat_degIdx);
+	prColumns << "pr_lon_deg";                    prFieldIdxList.push_back(&pr_lon_degIdx);
+	prColumns << "pr_height_to_center_raat_tx_m"; prFieldIdxList.push_back(&pr_height_to_center_raat_tx_mIdx);
+	prColumns << "pr_height_to_center_raat_rx_m"; prFieldIdxList.push_back(&pr_height_to_center_raat_rx_mIdx);
 
-	prColumns << "pr_back_to_back_gain_tx";    prFieldIdxList.push_back(&prTxGainIdx);
-	prColumns << "pr_ant_diameter_tx";         prFieldIdxList.push_back(&prTxDiameterIdx);
-	prColumns << "pr_back_to_back_gain_rx";    prFieldIdxList.push_back(&prRxGainIdx);
-	prColumns << "pr_ant_diameter_rx";         prFieldIdxList.push_back(&prRxDiameterIdx);
-	prColumns << "pr_ant_category";            prFieldIdxList.push_back(&prAntCategoryIdx);
-	prColumns << "pr_ant_model";               prFieldIdxList.push_back(&prAntModelIdx);
-	prColumns << "pr_reflector_height_m";      prFieldIdxList.push_back(&prReflectorHeightIdx);
-	prColumns << "pr_reflector_width_m";       prFieldIdxList.push_back(&prReflectorWidthIdx);
+	prColumns << "pr_back_to_back_gain_tx";       prFieldIdxList.push_back(&prTxGainIdx);
+	prColumns << "pr_ant_diameter_tx";            prFieldIdxList.push_back(&prTxDiameterIdx);
+	prColumns << "pr_back_to_back_gain_rx";       prFieldIdxList.push_back(&prRxGainIdx);
+	prColumns << "pr_ant_diameter_rx";            prFieldIdxList.push_back(&prRxDiameterIdx);
+	prColumns << "pr_ant_category";               prFieldIdxList.push_back(&prAntCategoryIdx);
+	prColumns << "pr_ant_model";                  prFieldIdxList.push_back(&prAntModelIdx);
+	prColumns << "pr_reflector_height_m";         prFieldIdxList.push_back(&prReflectorHeightIdx);
+	prColumns << "pr_reflector_width_m";          prFieldIdxList.push_back(&prReflectorWidthIdx);
 
 	int fIdx;
 	for(fIdx=0; fIdx<(int) fieldIdxList.size(); ++fIdx) {
@@ -144,6 +147,7 @@ UlsDatabase::~UlsDatabase()
 void UlsDatabase::nullInitialize()
 {
 	fsidIdx = -1;
+	regionIdx = -1;
 	callsignIdx = -1;
 	radio_serviceIdx = -1;
 	nameIdx = -1;
@@ -185,7 +189,8 @@ void UlsDatabase::nullInitialize()
 	prTypeIdx = -1;
 	pr_lat_degIdx = -1;
 	pr_lon_degIdx = -1;
-	pr_height_to_center_raat_mIdx = -1;
+	pr_height_to_center_raat_rx_mIdx = -1;
+	pr_height_to_center_raat_tx_mIdx = -1;
 
 	prTxGainIdx = -1;
 	prTxDiameterIdx = -1;
@@ -320,6 +325,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		int numPR = q.value(p_rp_numIdx).toInt();
 
 		target.at(r).fsid = fsid;
+		target.at(r).region= q.value(regionIdx).toString().toStdString();
 		target.at(r).callsign = q.value(callsignIdx).toString().toStdString();
 		target.at(r).radioService = q.value(radio_serviceIdx).toString().toStdString();
 		target.at(r).entityName = q.value(nameIdx).toString().toStdString();
@@ -376,7 +382,8 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 			target.at(r).prType = std::vector<std::string>(numPR);
 			target.at(r).prLatitudeDeg = std::vector<double>(numPR);
 			target.at(r).prLongitudeDeg = std::vector<double>(numPR);
-			target.at(r).prHeightAboveTerrain = std::vector<double>(numPR);
+			target.at(r).prHeightAboveTerrainTx = std::vector<double>(numPR);
+			target.at(r).prHeightAboveTerrainRx = std::vector<double>(numPR);
 
 			target.at(r).prTxGain = std::vector<double>(numPR);
 			target.at(r).prTxAntennaDiameter = std::vector<double>(numPR);
@@ -420,7 +427,8 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 				target.at(r).prType[prIdx]  = prQueryRes.value(prTypeIdx).isNull() ? "" : prQueryRes.value(prTypeIdx).toString().toStdString();
 				target.at(r).prLatitudeDeg[prIdx]  = prQueryRes.value(pr_lat_degIdx).isNull() ? quietNaN : prQueryRes.value(pr_lat_degIdx).toDouble();
 				target.at(r).prLongitudeDeg[prIdx] = prQueryRes.value(pr_lon_degIdx).isNull() ? quietNaN : prQueryRes.value(pr_lon_degIdx).toDouble();
-				target.at(r).prHeightAboveTerrain[prIdx] = prQueryRes.value(pr_height_to_center_raat_mIdx).isNull() ? quietNaN : prQueryRes.value(pr_height_to_center_raat_mIdx).toDouble();
+				target.at(r).prHeightAboveTerrainTx[prIdx] = prQueryRes.value(pr_height_to_center_raat_tx_mIdx).isNull() ? quietNaN : prQueryRes.value(pr_height_to_center_raat_tx_mIdx).toDouble();
+				target.at(r).prHeightAboveTerrainRx[prIdx] = prQueryRes.value(pr_height_to_center_raat_rx_mIdx).isNull() ? quietNaN : prQueryRes.value(pr_height_to_center_raat_rx_mIdx).toDouble();
 
 				target.at(r).prTxGain[prIdx]            = prQueryRes.value(prTxGainIdx    ).isNull() ? quietNaN : prQueryRes.value(prTxGainIdx    ).toDouble();
 				target.at(r).prTxAntennaDiameter[prIdx] = prQueryRes.value(prTxDiameterIdx).isNull() ? quietNaN : prQueryRes.value(prTxDiameterIdx).toDouble();

@@ -273,7 +273,8 @@ QStringList UlsFunctionsClass::getCSVHeader(int numPR)
         header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Reflector Height (m)";
         header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Reflector Width (m)";
         header << "Passive Repeater " + QString::number(prIdx) + " Line Loss (dB)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT Tx (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT Rx (m)";
         header << "Passive Repeater " + QString::number(prIdx) + " Beamwidth";
         header << "Segment " + QString::number(prIdx+1) + " Length (Km)";
     }

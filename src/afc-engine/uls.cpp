@@ -33,7 +33,7 @@ LOGGER_DEFINE_GLOBAL(logger, "ULSClass")
 /******************************************************************************************/
 /**** FUNCTION: ULSClass::ULSClass()                                                   ****/
 /******************************************************************************************/
-ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal) : dataSet(dataSetVal), id(idVal), dbIdx(dbIdxVal), numPR(numPRVal)
+ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal, std::string regionVal) : dataSet(dataSetVal), id(idVal), dbIdx(dbIdxVal), numPR(numPRVal), region(regionVal)
 {
 	prList = new PRClass[numPR];
 
@@ -139,6 +139,9 @@ int ULSClass::getID() const {
 }
 int ULSClass::getDBIdx() const {
 	return(dbIdx);
+}
+std::string ULSClass::getRegion() const {
+	return(region);
 }
 Vector3 ULSClass::getRxPosition() {
 	return(rxPosition);
@@ -890,14 +893,17 @@ PRClass::PRClass()
 
 	latitudeDeg = quietNaN;
 	longitudeDeg = quietNaN;
-	heightAboveTerrain = quietNaN;
+	heightAboveTerrainRx = quietNaN;
+	heightAboveTerrainTx = quietNaN;
 
 	terrainHeight = quietNaN;
-	heightAMSL = quietNaN;
+	heightAMSLRx = quietNaN;
+	heightAMSLTx = quietNaN;
 	heightSource = CConst::unknownHeightSource;
 	lidarRegion = -1;
 	terrainHeightFlag = false;
-	position = Vector3(quietNaN, quietNaN, quietNaN);
+	positionRx = Vector3(quietNaN, quietNaN, quietNaN);
+	positionTx = Vector3(quietNaN, quietNaN, quietNaN);
 	pointing = Vector3(quietNaN, quietNaN, quietNaN);
 	segmentDistance = quietNaN;
 

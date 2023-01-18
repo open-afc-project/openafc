@@ -128,6 +128,37 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             row['Rx Diversity Height to Center RAAT (m)'] = row['Rx Diversity Height to Center RAAT ULS (m)']
             row['Tx Height to Center RAAT (m)']           = row['Tx Height to Center RAAT ULS (m)']
 
+            numPR = int(row['Num Passive Repeater'])
+            for prIdx in range(numPR):
+                prNum = prIdx+1
+                prTxGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Tx (dBi)'
+                prRxGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Rx (dBi)'
+                prTxGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Tx (dBi)'
+                prRxGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Rx (dBi)'
+                prRxAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Rx Ant Diameter (m)'
+                prTxAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Tx Ant Diameter (m)'
+                prWidthULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Width (m)'
+                prHeightULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Height (m)'
+                prWidthStr = 'Passive Repeater ' + str(prNum) + ' Reflector Width (m)'
+                prHeightStr = 'Passive Repeater ' + str(prNum) + ' Reflector Height (m)'
+
+                rxGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Rx (dBi)'
+                txGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Tx (dBi)'
+                prHeightULSStr    = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Height (m)'
+                prWidthULSStr     = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Width (m)'
+                prAntModelDiameterStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Diameter (m)'
+
+                row[prTxGainULSFixStr]  = row[txGainULSStr]
+                row[prRxGainULSFixStr]  = row[rxGainULSStr]
+                row[prTxGainStr]        = row[txGainULSStr]
+                row[prRxGainStr]        = row[rxGainULSStr]
+                row[prRxAntDiameterStr] = row[prAntModelDiameterStr]
+                row[prTxAntDiameterStr] = row[prAntModelDiameterStr]
+                row[prWidthULSFixStr]   = row[prWidthULSStr]
+                row[prHeightULSFixStr]  = row[prHeightULSStr]
+                row[prWidthStr]         = row[prWidthULSStr]
+                row[prHeightStr]        = row[prHeightULSStr]
+
             if (highFreq > unii5StartFreqMHz) and (lowFreq < unii5StopFreqMHz):
                 uniiband = 5
             elif (highFreq > unii7StartFreqMHz) and (lowFreq < unii7StopFreqMHz):

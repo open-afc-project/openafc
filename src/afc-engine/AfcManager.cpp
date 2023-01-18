@@ -3976,7 +3976,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			bool ignoreFlag = false;
 			bool fixedFlag = false;
 			bool randPointingFlag = false;
-			bool randTxPosnFlag = false;
 			std::string fixedStr = "";
 			char rxPropEnv, txPropEnv;
 
@@ -4500,19 +4499,34 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					/******************************************************************/
 					/* prHeightAboveTerrain                                           */
 					/******************************************************************/
-					if (std::isnan(row.prHeightAboveTerrain[prIdx])) {
+					if (std::isnan(row.prHeightAboveTerrainRx[prIdx])) {
 						ignoreFlag = true;
 						reasonIgnored = "missing PR Height above Terrain";
 						numIgnoreInvalid++;
 					}
 
 					if (!ignoreFlag) {
-						if (row.prHeightAboveTerrain[prIdx] <= 0.0) {
+						if (row.prHeightAboveTerrainRx[prIdx] <= 0.0) {
 							LOGGER_WARN(logger) << "WARNING: ULS data for FSID = " << fsid
 								<< ", Passive Repeater " << (prIdx+1)
-								<< ", prHeightAboveTerrain = " << row.prHeightAboveTerrain[prIdx] << " is < 0.0";
+								<< ", prHeightAboveTerrainRx = " << row.prHeightAboveTerrainRx[prIdx] << " is < 0.0";
 						}
 					}
+
+					if (std::isnan(row.prHeightAboveTerrainTx[prIdx])) {
+						ignoreFlag = true;
+						reasonIgnored = "missing PR Height above Terrain";
+						numIgnoreInvalid++;
+					}
+
+					if (!ignoreFlag) {
+						if (row.prHeightAboveTerrainTx[prIdx] <= 0.0) {
+							LOGGER_WARN(logger) << "WARNING: ULS data for FSID = " << fsid
+								<< ", Passive Repeater " << (prIdx+1)
+								<< ", prHeightAboveTerrainTx = " << row.prHeightAboveTerrainTx[prIdx] << " is < 0.0";
+						}
+					}
+					/******************************************************************/
 				}
 			}
 			/**************************************************************************/
@@ -4937,7 +4951,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				double lambda = CConst::c / uniiCenterFreq;
 				double rxDlambda = rxAntennaDiameter / lambda;
 
-				uls = new ULSClass(this, fsid, dbIdx, numPR);
+				uls = new ULSClass(this, fsid, dbIdx, numPR, row.region);
 				_ulsList->append(uls);
 				uls->setCallsign(callsign);
 				uls->setRxCallsign(rxCallsign);
@@ -5093,7 +5107,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 						pr.type = (CConst::PRTypeEnum) CConst::strPRTypeList->str_to_type(row.prType[prIdx], validFlag, 1);
 						pr.longitudeDeg = row.prLongitudeDeg[prIdx];
 						pr.latitudeDeg = row.prLatitudeDeg[prIdx];
-						pr.heightAboveTerrain = row.prHeightAboveTerrain[prIdx];
+						pr.heightAboveTerrainRx = row.prHeightAboveTerrainRx[prIdx];
+						pr.heightAboveTerrainTx = row.prHeightAboveTerrainTx[prIdx];
 
 						if ( (_terrainDataModel))
 						{
@@ -5107,10 +5122,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 						}
 
 						pr.terrainHeight = terrainHeight;
-						pr.heightAMSL = pr.heightAboveTerrain + pr.terrainHeight;
+						pr.heightAMSLRx = pr.heightAboveTerrainRx + pr.terrainHeight;
+						pr.heightAMSLTx = pr.heightAboveTerrainTx + pr.terrainHeight;
 						pr.heightSource = prHeightSource;
 
-						pr.position = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, pr.heightAMSL / 1000.0);
+						pr.positionRx = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, pr.heightAMSLRx / 1000.0);
+						pr.positionTx = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, pr.heightAMSLTx / 1000.0);
 
 						if (row.prType[prIdx] == "Ant") {
 							pr.type = CConst::backToBackAntennaPRType;
@@ -5134,8 +5151,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				if ((!mobileRxFlag) && (!mobileTxFlag)) {
 					if (!randPointingFlag) {
 						for(int segIdx=0; segIdx<=numPR; ++segIdx) {
-							Vector3 segTxPosn = (segIdx == 0 ? txPosition : uls->getPR(segIdx-1).position);
-							Vector3 segRxPosn = (segIdx == numPR ? rxPosition : uls->getPR(segIdx).position);
+							Vector3 segTxPosn = (segIdx == 0 ? txPosition : uls->getPR(segIdx-1).positionTx);
+							Vector3 segRxPosn = (segIdx == numPR ? rxPosition : uls->getPR(segIdx).positionRx);
 							Vector3 pointing;
 							double segDist;
 
@@ -5188,7 +5205,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								Vector3 pointingA = pr.pointing;
 								Vector3 pointingB = -(prIdx == numPR-1 ? uls->getAntennaPointing() : uls->getPR(prIdx+1).pointing);
 								pr.reflectorZ = (pointingA + pointingB).normalized();              // Perpendicular to reflector surface
-								Vector3 upVec = pr.position.normalized();
+								Vector3 upVec = pr.positionRx.normalized();
 								pr.reflectorX = (upVec.cross(pr.reflectorZ)).normalized();         // Horizontal
 								pr.reflectorY = (pr.reflectorZ.cross(pr.reflectorX)).normalized();
 
@@ -5642,19 +5659,21 @@ void AfcManager::fixFSTerrain()
 				updateFlag = true;
 				pr.terrainHeightFlag = true;
 
-				double prHeight = pr.heightAboveTerrain + terrainHeight;
-				Vector3 prPosition = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, prHeight / 1000.0);
-				pr.position = prPosition;
+				double prHeightRx = pr.heightAboveTerrainRx + terrainHeight;
+				double prHeightTx = pr.heightAboveTerrainTx + terrainHeight;
+				pr.positionRx = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, prHeightRx / 1000.0);
+				pr.positionTx = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, prHeightTx / 1000.0);
 				pr.terrainHeight = terrainHeight;
-				pr.heightAMSL = prHeight;
+				pr.heightAMSLRx = prHeightRx;
+				pr.heightAMSLTx = prHeightTx;
 				pr.heightSource = heightSource;
 			}
 		}
 
 		if (updateFlag) {
 			for(int segIdx=0; segIdx<uls->getNumPR()+1; ++segIdx) {
-				Vector3 segTxPosn = (segIdx==0 ? uls->getTxPosition() : uls->getPR(segIdx-1).position);
-				Vector3 segRxPosn = (segIdx==uls->getNumPR() ? uls->getRxPosition() : uls->getPR(segIdx).position);
+				Vector3 segTxPosn = (segIdx==0 ? uls->getTxPosition() : uls->getPR(segIdx-1).positionTx);
+				Vector3 segRxPosn = (segIdx==uls->getNumPR() ? uls->getRxPosition() : uls->getPR(segIdx).positionRx);
 
 				Vector3 pointing = (segTxPosn - segRxPosn).normalized(); // boresight pointing direction of RX
 				double segDist = (segTxPosn - segRxPosn).len() * 1000.0;
@@ -6968,7 +6987,7 @@ void AfcManager::runPointAnalysis()
 	auto &fexcthrwifi = excthr_writer.csv_writer;
 
 	if (fexcthrwifi) {
-		fexcthrwifi->writeRow({ "FS_ID", "DBNAME",
+		fexcthrwifi->writeRow({ "FS_ID", "FS_REGION", "DBNAME",
 				"RLAN_POSN_IDX",
 				"CALLSIGN",
 				"FS_RX_LONGITUDE (deg)",
@@ -7624,7 +7643,7 @@ void AfcManager::runPointAnalysis()
 
 			for(int segIdx=segStart; segIdx<numPR+1; ++segIdx) {
 			for(int divIdx=0; divIdx<numDiversity; ++divIdx) {
-				Vector3 ulsRxPos = (segIdx == numPR ? (divIdx == 0 ? uls->getRxPosition() : uls->getDiversityPosition()) : uls->getPR(segIdx).position);
+				Vector3 ulsRxPos = (segIdx == numPR ? (divIdx == 0 ? uls->getRxPosition() : uls->getDiversityPosition()) : uls->getPR(segIdx).positionRx);
 				double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
 				double ulsRxLatitude = (segIdx == numPR ? uls->getRxLatitudeDeg() : uls->getPR(segIdx).latitudeDeg);
 
@@ -7645,8 +7664,8 @@ void AfcManager::runPointAnalysis()
 
 					_ulsIdxList.push_back(ulsIdx); // Store the ULS indices that are used in analysis
 
-					double ulsRxHeightAGL  = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain()) : uls->getPR(segIdx).heightAboveTerrain);
-					double ulsRxHeightAMSL = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAMSL() : uls->getDiversityHeightAMSL()) : uls->getPR(segIdx).heightAMSL);
+					double ulsRxHeightAGL  = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain()) : uls->getPR(segIdx).heightAboveTerrainRx);
+					double ulsRxHeightAMSL = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAMSL() : uls->getDiversityHeightAMSL()) : uls->getPR(segIdx).heightAMSLRx);
 					double ulsSegmentDistance = (segIdx == numPR ? uls->getLinkDistance() : uls->getPR(segIdx).segmentDistance);
 
 					/**************************************************************************************/
@@ -7996,7 +8015,7 @@ void AfcManager::runPointAnalysis()
 												double fresnelIndex = -1.0;
 												double ulsWavelength = CConst::c / ((uls->getStartUseFreq() + uls->getStopUseFreq()) / 2);
 												if (ulsSegmentDistance != -1.0) {
-													const Vector3 ulsTxPos = (segIdx ? uls->getPR(segIdx-1).position : uls->getTxPosition());
+													const Vector3 ulsTxPos = (segIdx ? uls->getPR(segIdx-1).positionTx : uls->getTxPosition());
 													d1 = (ulsRxPos - rlanPosn).len() * 1000;
 													d2 = (ulsTxPos - rlanPosn).len() * 1000;
 													pathDifference = d1 + d2 - ulsSegmentDistance;
@@ -8029,7 +8048,7 @@ void AfcManager::runPointAnalysis()
 												std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 
 												QStringList msg;
-												msg << QString::number(uls->getID()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
+												msg << QString::number(uls->getID()) << QString::fromStdString(uls->getRegion()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
 												msg << QString::number(uls->getRxLongitudeDeg(), 'f', 5) << QString::number(uls->getRxLatitudeDeg(), 'f', 5);
 												msg << QString::number((divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain()), 'f', 2)
 													<< QString::number(uls->getRxTerrainHeight(), 'f', 2)
@@ -8262,41 +8281,48 @@ void AfcManager::runPointAnalysis()
 				ULSClass *uls = (*_ulsList)[ulsIdx];
 				std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 
-				Vector3 ulsTxPosn = uls->getTxPosition();
-				double ulsTxLongitude = uls->getTxLongitudeDeg();
-				double ulsTxLatitude = uls->getTxLatitudeDeg();
-				double ulsTxHeight = uls->getTxHeightAMSL();
-
-				bool txLocFlag = (!std::isnan(ulsTxPosn.x())) && (!std::isnan(ulsTxPosn.y())) && (!std::isnan(ulsTxPosn.z()));
-
 				fkml->writeStartElement("Folder");
 				fkml->writeTextElement("name", QString::fromStdString(dbName + "_" + std::to_string(uls->getID())));
 				// fkml->writeTextElement("name", QString::fromStdString(uls->getCallsign()));
-				if ( (addPlacemarks) && (txLocFlag) ) {
-					fkml->writeStartElement("Placemark");
-					fkml->writeTextElement("name", QString::asprintf("%s %s_%d", "TX", dbName.c_str(), uls->getID()));
-					fkml->writeTextElement("visibility", "1");
-					fkml->writeTextElement("styleUrl", placemarkStyleStr.c_str());
-					fkml->writeStartElement("Point");
-					fkml->writeTextElement("altitudeMode", "absolute");
-					fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", ulsTxLongitude, ulsTxLatitude, ulsTxHeight));
-					fkml->writeEndElement(); // Point
-					fkml->writeEndElement(); // Placemark
-				}
 
 				int numPR = uls->getNumPR();
 				for(int segIdx=0; segIdx<numPR+1; ++segIdx) {
 
-					Vector3 ulsRxPosn = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).position);
+					Vector3 ulsTxPosn = (segIdx == 0 ? uls->getTxPosition() : uls->getPR(segIdx-1).positionTx);
+					double ulsTxLongitude = (segIdx == 0 ? uls->getTxLongitudeDeg() : uls->getPR(segIdx-1).longitudeDeg);
+					double ulsTxLatitude = (segIdx == 0 ? uls->getTxLatitudeDeg() : uls->getPR(segIdx-1).latitudeDeg);
+					double ulsTxHeight = (segIdx == 0 ? uls->getTxHeightAMSL() : uls->getPR(segIdx-1).heightAMSLTx);
+
+					Vector3 ulsRxPosn = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).positionRx);
 					double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
 					double ulsRxLatitude = (segIdx == numPR ? uls->getRxLatitudeDeg() : uls->getPR(segIdx).latitudeDeg);
-					double ulsRxHeight = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSL);
+					double ulsRxHeight = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSLRx);
+
+					bool txLocFlag = (!std::isnan(ulsTxPosn.x())) && (!std::isnan(ulsTxPosn.y())) && (!std::isnan(ulsTxPosn.z()));
+
+					double linkDistKm;
+					if (!txLocFlag) {
+						linkDistKm = 1.0;
+						Vector3 segPointing = (segIdx == numPR ? uls->getAntennaPointing() : uls->getPR(segIdx).pointing);
+						ulsTxPosn = ulsRxPosn + linkDistKm*segPointing;
+					} else {
+						linkDistKm = (ulsTxPosn - ulsRxPosn).len();
+					}
+
+					if ( (segIdx == 0) && (addPlacemarks) && (txLocFlag) ) {
+						fkml->writeStartElement("Placemark");
+						fkml->writeTextElement("name", QString::asprintf("%s %s_%d", "TX", dbName.c_str(), uls->getID()));
+						fkml->writeTextElement("visibility", "1");
+						fkml->writeTextElement("styleUrl", placemarkStyleStr.c_str());
+						fkml->writeStartElement("Point");
+						fkml->writeTextElement("altitudeMode", "absolute");
+						fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", ulsTxLongitude, ulsTxLatitude, ulsTxHeight));
+						fkml->writeEndElement(); // Point
+						fkml->writeEndElement(); // Placemark
+					}
 
 					double beamWidthDeg = uls->computeBeamWidth(3.0);
 					double beamWidthRad = beamWidthDeg*(M_PI/180.0);
-
-					double linkDistKm = (ulsTxPosn - ulsRxPosn).len();
-
 
 					Vector3 zvec = (ulsTxPosn-ulsRxPosn).normalized();
 					Vector3 xvec = (Vector3(zvec.y(), -zvec.x(),0.0)).normalized();
@@ -8333,7 +8359,7 @@ void AfcManager::runPointAnalysis()
 						fkml->writeEndElement(); // Placemark
 					}
 
-					if (txLocFlag || segIdx) {
+					if (true) {
 						fkml->writeStartElement("Folder");
 						fkml->writeTextElement("name", QString::asprintf("Beamcone_%d", segIdx+1));
 
@@ -8366,11 +8392,6 @@ void AfcManager::runPointAnalysis()
 						}
 						fkml->writeEndElement(); // Beamcone
 					}
-
-					ulsTxPosn      = ulsRxPosn;
-					ulsTxLongitude = ulsRxLongitude;
-					ulsTxLatitude  = ulsRxLatitude;
-					ulsTxHeight    = ulsRxHeight;
 				}
 				fkml->writeEndElement(); // Folder
 			}
@@ -9632,7 +9653,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 			if (ulsLinkDistance != -1.0)
 			{
 				int numPR = uls->getNumPR();
-				const Vector3 ulsTxPos = (numPR ? uls->getPR(numPR-1).position : uls->getTxPosition());
+				const Vector3 ulsTxPos = (numPR ? uls->getPR(numPR-1).positionTx : uls->getTxPosition());
 				d1 = (ulsRxPos - rlanPosn).len() * 1000;
 				d2 = (ulsTxPos - rlanPosn).len() * 1000;
 				pathDifference = d1 + d2 - ulsLinkDistance;
@@ -10157,7 +10178,7 @@ void AfcManager::runHeatmapAnalysis()
 								if (ulsLinkDistance != -1.0)
 								{
 									int numPR = uls->getNumPR();
-									const Vector3 ulsTxPos = (numPR ? uls->getPR(numPR-1).position : uls->getTxPosition());
+									const Vector3 ulsTxPos = (numPR ? uls->getPR(numPR-1).positionTx : uls->getTxPosition());
 									d1 = (ulsRxPos - rlanPosn).len() * 1000;
 									d2 = (ulsTxPos - rlanPosn).len() * 1000;
 									pathDifference = d1 + d2 - ulsLinkDistance;

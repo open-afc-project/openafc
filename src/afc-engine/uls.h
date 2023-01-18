@@ -36,14 +36,17 @@ public:
 
 	double latitudeDeg;
 	double longitudeDeg;
-	double heightAboveTerrain;
+	double heightAboveTerrainRx;
+	double heightAboveTerrainTx;
 
 	double terrainHeight;
-	double heightAMSL;
+	double heightAMSLRx;
+	double heightAMSLTx;
 	CConst::HeightSourceEnum heightSource;
 	int lidarRegion;
 	bool terrainHeightFlag;
-	Vector3 position;
+	Vector3 positionRx;
+	Vector3 positionTx;
 	Vector3 pointing;
 	double segmentDistance;
 
@@ -81,11 +84,12 @@ public:
 class ULSClass
 {
 public:
-	ULSClass(AfcManager *dataSetVal, int idVal, int dbIdx, int numPR);
+	ULSClass(AfcManager *dataSetVal, int idVal, int dbIdx, int numPRVal, std::string regionVal);
 	~ULSClass();
 
 	int getID() const;
 	int getDBIdx() const;
+	std::string getRegion() const;
 	CConst::ULSTypeEnum getType();
 	ListClass<Vector3> *getSatellitePositionData();
 	double getStartAllocFreq();
@@ -267,6 +271,8 @@ private:
 
 	int id;
 	int dbIdx;
+	int numPR;
+	std::string region;
 	double startAllocFreq;
 	double stopAllocFreq;
 	double startUseFreq;
@@ -323,7 +329,6 @@ private:
 
 	Vector3 diversityAntennaPointing;
 
-	int numPR;
 	PRClass *prList;
 
 	double minPathLossDB, maxPathLossDB;
