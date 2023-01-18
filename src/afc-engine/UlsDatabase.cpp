@@ -61,6 +61,10 @@ UlsDatabase::UlsDatabase()
 	fieldIdxList.push_back(&tx_eirpIdx);
 	columns << "tx_height_to_center_raat_m";
 	fieldIdxList.push_back(&tx_height_to_center_raat_mIdx);
+	columns << "azimuth_angle_to_tx";
+	fieldIdxList.push_back(&azimuth_angle_to_tx_mIdx);
+	columns << "elevation_angle_to_tx";
+	fieldIdxList.push_back(&elevation_angle_to_tx_mIdx);
 	columns << "rx_lat_deg";
 	fieldIdxList.push_back(&rx_lat_degIdx);
 	columns << "rx_long_deg";
@@ -155,6 +159,8 @@ void UlsDatabase::nullInitialize()
 	tx_gainIdx = -1;
 	tx_eirpIdx = -1;
 	tx_height_to_center_raat_mIdx = -1;
+	azimuth_angle_to_tx_mIdx = -1;
+	elevation_angle_to_tx_mIdx = -1;
 	rx_lat_degIdx = -1;
 	rx_long_degIdx = -1;
 	rx_ground_elev_mIdx = -1;
@@ -322,13 +328,15 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		target.at(r).startFreq = q.value(freq_assigned_start_mhzIdx).toDouble();
 		target.at(r).stopFreq = q.value(freq_assigned_end_mhzIdx).toDouble();
 		target.at(r).emissionsDesignator = q.value(emissions_desIdx).toString().toStdString();
-		target.at(r).txLatitudeDeg = q.value(tx_lat_degIdx).toDouble();
-		target.at(r).txLongitudeDeg = q.value(tx_long_degIdx).toDouble();
+		target.at(r).txLatitudeDeg  = q.value(tx_lat_degIdx).isNull() ? quietNaN : q.value(tx_lat_degIdx).toDouble();
+		target.at(r).txLongitudeDeg = q.value(tx_long_degIdx).isNull() ? quietNaN : q.value(tx_long_degIdx).toDouble();
 		target.at(r).txGroundElevation = q.value(tx_ground_elev_mIdx).isNull() ? quietNaN : q.value(tx_ground_elev_mIdx).toDouble();
 		target.at(r).txPolarization = q.value(tx_polarizationIdx).toString().toStdString();
 		target.at(r).txGain = q.value(tx_gainIdx).isNull() ? quietNaN : q.value(tx_gainIdx).toDouble();
 		target.at(r).txEIRP = q.value(tx_eirpIdx).toDouble();
 		target.at(r).txHeightAboveTerrain = q.value(tx_height_to_center_raat_mIdx).isNull() ? quietNaN : q.value(tx_height_to_center_raat_mIdx).toDouble();
+		target.at(r).azimuthAngleToTx = q.value(azimuth_angle_to_tx_mIdx).isNull() ? quietNaN : q.value(azimuth_angle_to_tx_mIdx).toDouble();
+		target.at(r).elevationAngleToTx = q.value(elevation_angle_to_tx_mIdx).isNull() ? quietNaN : q.value(elevation_angle_to_tx_mIdx).toDouble();
 		target.at(r).rxLatitudeDeg = q.value(rx_lat_degIdx).toDouble();
 		target.at(r).rxLongitudeDeg = q.value(rx_long_degIdx).toDouble();
 		target.at(r).rxGroundElevation = q.value(rx_ground_elev_mIdx).isNull() ? quietNaN : q.value(rx_ground_elev_mIdx).toDouble();
