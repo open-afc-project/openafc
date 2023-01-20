@@ -56,7 +56,8 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                 path = int(row[pathIdx])
                 freq = row[freqIdx]
                 emdeg = row[emdegIdx][0:4]
-                keyv = tuple([cs, path, freq, emdeg])
+                region = 'US'
+                keyv = tuple([region, cs, path, freq, emdeg])
                 fsidmap[keyv] = fsid
                 if firstFSID or fsid > highestFSID:
                     highestFSID = fsid
@@ -66,6 +67,7 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
     logFile.write("Read " + str(entriesRead) + " entries from FSID table file: " + fsidTableFile + ", Max FSID = " + str(highestFSID) + "\n")
 
     entriesAdded = 0
+    count = 0;
     with open(inputPath, 'r') as f:
         with open(outputPath, 'w') as fout:
             with open(fsidTableFile, 'a+') as fsidTable:
@@ -81,6 +83,7 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                         if filterMaxEIRPFlag:
                             row.append("highest_tx_eirp")
                         firstRow = False
+                        regionIdx =  -1
                         callsignIdx =  -1
                         pathIdx =  -1
                         freqIdx =  -1
@@ -89,7 +92,9 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                         txEirpIdx =  -1
                         txGainIdx =  -1
                         for fieldIdx, field in enumerate(row):
-                            if field == "Callsign":
+                            if field == "Region":
+                                regionIdx = fieldIdx
+                            elif field == "Callsign":
                                 callsignIdx = fieldIdx
                             elif field == "Path Number":
                                 pathIdx = fieldIdx
@@ -103,6 +108,8 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                                 txEirpIdx = fieldIdx
                             elif field == "Tx Gain (dBi)":
                                 txGainIdx = fieldIdx
+                        if regionIdx == -1:
+                            sys.exit('ERROR: Region not found')
                         if callsignIdx == -1:
                             sys.exit('ERROR: Callsign not found')
                         if pathIdx == -1:
@@ -121,6 +128,7 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                         row.insert(0, "FSID")
                         csvwriter.writerow(row)
                     else:
+                        region = row[regionIdx]
                         cs = row[callsignIdx]
                         path = int(row[pathIdx])
                         freq = row[freqIdx]
@@ -128,11 +136,17 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                         if remMissTxEIRPGFlag and (row[txEirpIdx].strip() == '' or row[txGainIdx].strip() == ''):
                             logFile.write("Removed entry missing Tx EIRP or Tx Gain")
                         else:
-                            keyv = tuple([cs, path, freq, emdeg])
+                            if region == 'US':
+                                keyv = tuple([region, cs, path, freq, emdeg])
+                            else:
+                                # For CA, dont remove any links, make keys unique for each link
+                                keyv = tuple([region, count])
+
                             if keyv in csmap:
                                 csmap[keyv].append(row)
                             else:
                                 csmap[keyv] = [ row ]
+                    count+=1
     
                 all_cs = csmap.keys()
                 # all_cs.sort()
@@ -193,13 +207,18 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
                                 printFlag = 0
     
                         if printFlag:
-                            if keyv in fsidmap:
-                                fsid = fsidmap[keyv]
+                            region = keyv[0];
+                            if region == 'US':
+                                if keyv in fsidmap:
+                                    fsid = fsidmap[keyv]
+                                else:
+                                    fsid = nextFSID
+                                    nextFSID += 1
+                                    fsidTable.write(str(fsid) + "," + keyv[1] + "," + str(keyv[2]) + "," + keyv[3] + "," + keyv[4] + "\n")
+                                    entriesAdded += 1
                             else:
                                 fsid = nextFSID
                                 nextFSID += 1
-                                fsidTable.write(str(fsid) + "," + keyv[0] + "," + str(keyv[1]) + "," + keyv[2] + "," + keyv[3] + "\n")
-                                entriesAdded += 1
                             r.insert(0, str(fsid))
                             csvwriter.writerow(r)
     

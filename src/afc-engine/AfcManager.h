@@ -152,7 +152,7 @@ class AfcManager
 
 		double computeClutter452HtEl(double txHeightM, double distKm, double elevationAngleRad) const; // Clutter loss from ITU-R p.452
 
-		std::tuple<LatLon, LatLon, LatLon> computeBeamConeLatLon(ULSClass *uls); // Calculates and stores the beam cone coordinates
+		std::tuple<LatLon, LatLon, LatLon> computeBeamConeLatLon(ULSClass *uls, LatLon rxLatLonVal, LatLon txLatLonVal); // Calculates and stores the beam cone coordinates
 
 		// Support command line interface with AFC Engine
 		void setCmdLineParams(std::string &inputFilePath, std::string &configFilePath, std::string &outputFilePath, std::string &tempDir, std::string &logLevel, int argc, char **argv);
@@ -436,6 +436,7 @@ class AfcManager
 		std::string _regionStr;                 // Comma separated list of names of regions in sim, corresp to pop density file
 		std::string _worldPopulationFile;       // GDAL file (tiff) containing population density data
 		std::string _regionPolygonFileList;     // Comma separated list of KML files, one for each region in simulation
+		std::vector<PolygonClass *> _regionPolygonList; // Polygon list, multiple polygons for each region
 		double _regionPolygonResolution;   // Resolution to use for polygon vertices, 1.0e-5 corresp to 1.11m, should not have to change
 		std::string _nlcdFile;                  // GDAL file contining NLCD data
 		std::string _radioClimateFile;           // ITU radio climate data

@@ -18,6 +18,8 @@ class PolygonClass
 		PolygonClass(std::vector<std::tuple<int, int>> *ii_list);
 		PolygonClass(std::string kmlFilename, double resolution);
 		~PolygonClass();
+
+		static std::vector<PolygonClass *> readMultiGeometry(std::string kmlFilename, double resolution);
 		bool in_bdy_area(const int a, const int b, bool *edge = (bool *) NULL);
 		double comp_bdy_area();
 		void comp_bdy_min_max(int &minx, int &maxx, int &miny, int &maxy);
