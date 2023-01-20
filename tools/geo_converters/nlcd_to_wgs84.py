@@ -43,10 +43,15 @@ Usage examples:
         nlcd_2019_land_cover_l48_20210604.img \\
         nlcd_2019_land_cover_l48_20210604_resampled.tif
  - Same for Alaska NLCD:
-    $ ./nlcd_to_wgs84.py --pixels_per_degree 3600 \\
+     $ ./nlcd_to_wgs84.py --pixels_per_degree 3600 \\
+         --format_param COMPRESS=PACKBITS \\
+         NLCD_2016_Land_Cover_AK_20200724.img \\
+         NLCD_2016_Land_Cover_AK_20200724_resampled.tif
+ - Puerto Rico NLCD from NOAA source (NOAA uses different land usage codes):
+     $ /nlcd_to_wgs84.py --pixels_per_degree 3600 --translate noaa \\
         --format_param COMPRESS=PACKBITS \\
-        NLCD_2016_Land_Cover_AK_20200724.img \\
-        NLCD_2016_Land_Cover_AK_20200724_resampled.tif
+        pr_2010_ccap_hr_land_cover20170214.img \\
+        pr_2010_ccap_hr_land_cover20170214_resampled.tif
 """
 
 
@@ -691,6 +696,7 @@ def translate(src: str, dst: str, translation_name: str) -> None:
     ds_dst = \
         driver_gtiff.Create(dst, xsize=band_src.XSize, ysize=band_src.YSize,
                             eType=gdal.GDT_Byte)
+    error_if(ds_dst is None, f"Can't create '{dst}'")
     ds_dst.SetProjection(ds_src.GetProjection())
     ds_dst.SetGeoTransform(ds_src.GetGeoTransform())
     band_dst = ds_dst.GetRasterBand(1)
@@ -732,25 +738,31 @@ def main(argv: List[str]) -> None:
         "May be omitted if source file is in geodetic (latitude/longitude) "
         "format and no resampling required")
     argument_parser.add_argument(
-        "--pixels_per_degree", metavar="NUMBER", type=float,
+        "--pixels_per_degree", "-p", metavar="NUMBER", type=float,
         help="Resulting file resolution in pixels per degree. May be omitted "
         "if source file is in geodetic (latitude/longitude) format and no "
         "resampling required")
     argument_parser.add_argument(
-        "--translate", choices=["noaa"],
+        "--translate", "-t", choices=["noaa"],
         help="Translate land cover codes from given encoding to NLCD "
         "encoding. For now 'noaa' source encoding is supported")
     argument_parser.add_argument(
-        "--format", metavar="GDAL_DRIVER_NAME",
+        "--format", "-f", metavar="GDAL_DRIVER_NAME",
         help="File format expressed as GDAL driver name (see "
         "https://gdal.org/drivers/raster/index.html ). By default derived "
         "from target file extension")
     argument_parser.add_argument(
-        "--format_param", metavar="NAME=VALUE", action="append", default=[],
+        "--format_param", "-P", metavar="NAME=VALUE", action="append",
+        default=[],
         help="Format option (e.g. COMPRESS=PACKBITS)")
     argument_parser.add_argument(
-        "--overwrite", action="store_true",
+        "--overwrite", "-o", action="store_true",
         help="Overwrite target file if it exists")
+    argument_parser.add_argument(
+        "--temp_dir", "-T", metavar="TEMPDIR",
+        help="Directory to create temporary files in. Might be useful if this "
+        "script runs from container that has insufficient internal disk "
+        "space. Default is to use default system temporary directory")
     argument_parser.add_argument("SRC", help="Source file name")
     argument_parser.add_argument("DST", help="Destination file name")
 
@@ -769,7 +781,8 @@ def main(argv: List[str]) -> None:
     boundaries = Boundaries(args.SRC)
     env = gdalwarp_env()
     try:
-        h, temp = tempfile.mkstemp(suffix=os.path.splitext(args.DST)[1])
+        h, temp = tempfile.mkstemp(suffix=os.path.splitext(args.DST)[1],
+                                   dir=args.temp_dir)
         os.close(h)
         print("DETERMINING RASTER SIZE")
         warp(src=args.SRC, dst=temp, env=env, out_format=args.format,
@@ -788,7 +801,8 @@ def main(argv: List[str]) -> None:
              pixels_per_degree=args.pixels_per_degree, out_format=args.format,
              format_params=args.format_param, overwrite=args.overwrite)
     finally:
-        os.unlink(temp)
+        if os.path.isfile(temp):
+            os.unlink(temp)
 
 
 if __name__ == "__main__":
