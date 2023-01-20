@@ -50,99 +50,99 @@ const applicationCache: { [k: string]: any } = {};
  * @returns Default AFC config object
  */
 const defaultAfcConf: () => AFCConfigFile = () => ({
-        "freqBands": [
-           {
-              "name": "UNII-5",
-              "startFreqMHz": 5925,
-              "stopFreqMHz": 6425
-           },
-           {
-              "name": "UNII-7",
-              "startFreqMHz": 6525,
-              "stopFreqMHz": 6875
-           }
-        ],
-        "antennaPattern": {
-           "kind": "None",
-           "value": ""
+    "freqBands": [
+        {
+            "name": "UNII-5",
+            "startFreqMHz": 5925,
+            "stopFreqMHz": 6425
         },
-        "ulsDefaultAntennaType": "WINNF-AIP-07",
-        "scanPointBelowGroundMethod": "truncate",
-        "polarizationMismatchLoss": {
-           "kind": "Fixed Value",
-           "value": 3
-        },
-        "bodyLoss": {
-           "kind": "Fixed Value",
-           "valueIndoor": 0,
-           "valueOutdoor": 0
-        },
-        "buildingPenetrationLoss": {
-           "kind": "Fixed Value",
-           "value": 20.5
-        },
-        "receiverFeederLoss": {
-           "UNII5": 3,
-           "UNII7": 3,
-           "other": 3
-        },
-        "fsReceiverNoise": {
-           "UNII5": -110,
-           "UNII7": -109.5,
-           "other": -109
-        },
-        "threshold": -6,
-        "maxLinkDistance": 130,
-        "maxEIRP": 36,
-        "minEIRP": 21,
-     
-        "minPSD": 8,
-        "propagationModel": {
-           "kind": "FCC 6GHz Report & Order",
-           "win2ConfidenceCombined": 16,
-           "win2ConfidenceLOS": 16,
-           "winner2LOSOption": "BLDG_DATA_REQ_TX",
-           "win2UseGroundDistance": false,
-           "fsplUseGroundDistance": false,
-           "winner2HgtFlag": false,
-           "winner2HgtLOS": 15,
-           "itmConfidence": 5,
-           "itmReliability": 20,
-           "p2108Confidence": 25,
-           "buildingSource": "None",
-           "terrainSource": "3DEP (30m)"
-        },
-        "propagationEnv": "NLCD Point",
-        "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
-        "regionStr": "CONUS",
-        "rasDatabase": "RASdatabase.csv",
-        "APUncertainty": {
-           "horizontal": 30,
-           "height": 5
-        },
-        "ITMParameters": {
-           "polarization": "Vertical",
-           "ground": "Good Ground",
-           "dielectricConst": 25,
-           "conductivity": 0.02,
-           "minSpacing": 30,
-           "maxPoints": 1500
-        },
-        "rlanITMTxClutterMethod": "FORCE_TRUE",
-        "clutterAtFS": true,
-        "fsClutterModel": {
-           "p2108Confidence": 5,
-           "maxFsAglHeight": 6
-        },
-        "nlcdFile": "nlcd_wfa",
-        "enableMapInVirtualAp": false,
-        "channelResponseAlgorithm": "psd",
-        "visibilityThreshold": -6,
-        "version": guiConfig.version,
-        "allowScanPtsInUncReg": false,
-        "passiveRepeaterFlag": false,
-        "printSkippedLinksFlag": false,
-        "reportErrorRlanHeightLowFlag": false 
+        {
+            "name": "UNII-7",
+            "startFreqMHz": 6525,
+            "stopFreqMHz": 6875
+        }
+    ],
+    "antennaPattern": {
+        "kind": "None",
+        "value": ""
+    },
+    "ulsDefaultAntennaType": "WINNF-AIP-07",
+    "scanPointBelowGroundMethod": "truncate",
+    "polarizationMismatchLoss": {
+        "kind": "Fixed Value",
+        "value": 3
+    },
+    "bodyLoss": {
+        "kind": "Fixed Value",
+        "valueIndoor": 0,
+        "valueOutdoor": 0
+    },
+    "buildingPenetrationLoss": {
+        "kind": "Fixed Value",
+        "value": 20.5
+    },
+    "receiverFeederLoss": {
+        "UNII5": 3,
+        "UNII7": 3,
+        "other": 3
+    },
+    "fsReceiverNoise": {
+        "UNII5": -110,
+        "UNII7": -109.5,
+        "other": -109
+    },
+    "threshold": -6,
+    "maxLinkDistance": 130,
+    "maxEIRP": 36,
+    "minEIRP": 21,
+
+    "minPSD": 8,
+    "propagationModel": {
+        "kind": "FCC 6GHz Report & Order",
+        "win2ConfidenceCombined": 16,
+        "win2ConfidenceLOS": 16,
+        "winner2LOSOption": "BLDG_DATA_REQ_TX",
+        "win2UseGroundDistance": false,
+        "fsplUseGroundDistance": false,
+        "winner2HgtFlag": false,
+        "winner2HgtLOS": 15,
+        "itmConfidence": 5,
+        "itmReliability": 20,
+        "p2108Confidence": 25,
+        "buildingSource": "None",
+        "terrainSource": "3DEP (30m)"
+    },
+    "propagationEnv": "NLCD Point",
+    "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
+    "regionStr": "CONUS",
+    "rasDatabase": "RASdatabase.csv",
+    "APUncertainty": {
+        "horizontal": 30,
+        "height": 5
+    },
+    "ITMParameters": {
+        "polarization": "Vertical",
+        "ground": "Good Ground",
+        "dielectricConst": 25,
+        "conductivity": 0.02,
+        "minSpacing": 30,
+        "maxPoints": 1500
+    },
+    "rlanITMTxClutterMethod": "FORCE_TRUE",
+    "clutterAtFS": true,
+    "fsClutterModel": {
+        "p2108Confidence": 5,
+        "maxFsAglHeight": 6
+    },
+    "nlcdFile": "nlcd_wfa",
+    "enableMapInVirtualAp": false,
+    "channelResponseAlgorithm": "psd",
+    "visibilityThreshold": -6,
+    "version": guiConfig.version,
+    "allowScanPtsInUncReg": false,
+    "passiveRepeaterFlag": false,
+    "printSkippedLinksFlag": false,
+    "reportErrorRlanHeightLowFlag": false
 });
 
 // API Calls
@@ -176,7 +176,8 @@ export const getDefaultAfcConf = () => defaultAfcConf();
  * @returns this user's current AFC Config or error
  */
 export const getAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => (
-    fetch(guiConfig.afcconfig_defaults.replace("default", getDefaultRegion()), {
+    // fetch(guiConfig.afcconfig_defaults.replace("default", getDefaultRegion()), {
+    fetch(guiConfig.afcconfig_defaults.replace("default", "CONUS"), {
         method: "GET",
     }).then(async (res: Response) => {
         if (res.ok) {
@@ -225,9 +226,10 @@ export const getTrialAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => 
  * @returns success message or error
  */
 export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<string>> => (
-    fetch(guiConfig.afcconfig_defaults.replace("default", getDefaultRegion()), {
+    // fetch(guiConfig.afcconfig_defaults.replace("default", getDefaultRegion()), {
+    fetch(guiConfig.afcconfig_defaults.replace("default", "CONUS"), {
         method: "PUT",
-        headers: {"Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(conf, undefined, 3)
     }).then(res => {
         if (res.status === 204) {
@@ -340,7 +342,7 @@ function analysisContinuation<T>(isCanceled?: () => boolean, status?: (progress:
 export const phase1Analysis = (params: PAWSRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<AnalysisResults>> => (
     fetch(guiConfig.rat_api_analysis.replace("p_request_type", "PointAnalysis"), {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params)
     }).then(analysisContinuation<AnalysisResults>(isCanceled, status, setKml))
         .catch(
@@ -361,7 +363,7 @@ export const phase1Analysis = (params: PAWSRequest, isCanceled?: () => boolean, 
 export const runExclusionZone = (params: ExclusionZoneRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<ExclusionZoneResult>> =>
     fetch(guiConfig.rat_api_analysis.replace("p_request_type", "ExclusionZoneAnalysis"), {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params)
     })
         .then(analysisContinuation<ExclusionZoneResult>(isCanceled, status, setKml))
@@ -380,7 +382,7 @@ export const runExclusionZone = (params: ExclusionZoneRequest, isCanceled?: () =
 export const runHeatMap = (params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>> =>
     fetch(guiConfig.rat_api_analysis.replace("p_request_type", "HeatmapAnalysis"), {
         method: "POST",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(params)
     })
         .then(analysisContinuation<HeatMapResult>(isCanceled, status))

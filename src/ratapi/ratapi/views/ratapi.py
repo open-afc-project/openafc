@@ -267,6 +267,14 @@ class AfcConfigFile(MethodView):
             alt='fcc',
             content_type='application/json',
         ),
+        'USA': dict(
+            alt='fcc',
+            content_type='application/json',
+        ),
+        'Canada': dict(
+            alt='fcc',
+            content_type='application/json',
+        ),
     }
 
     def get(self, filename):

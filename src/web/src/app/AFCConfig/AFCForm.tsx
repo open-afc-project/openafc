@@ -80,15 +80,15 @@ export class AFCForm extends React.Component<
     private setUlsRegion = (n: string) => {
        this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
        setDefaultRegion(n);
-       getAfcConfigFile().then(
-           res => {
-                if (res.kind === "Success") {
-                    this.updateEntireConfigState(res.result);
-                } else {
-                    this.setState({ messageError: res.description, messageSuccess: undefined });
-               }
-           }
-       )
+    //    getAfcConfigFile().then(
+    //        res => {
+    //             if (res.kind === "Success") {
+    //                 this.updateEntireConfigState(res.result);
+    //             } else {
+    //                 this.setState({ messageError: res.description, messageSuccess: undefined });
+    //            }
+    //        }
+    //   )
     }
     private setEnableMapInVirtualAp = (n: boolean) => this.setState({ config: Object.assign(this.state.config, { enableMapInVirtualAp: n }) });
     private setVisiblityThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { visibilityThreshold: n }) });
