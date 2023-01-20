@@ -19,7 +19,7 @@ import re
 import signal
 import sys
 import threading
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
 
 # For printing statistics
 GIGA = 1024 * 1024 * 1024
@@ -192,7 +192,7 @@ class Md5Computer:
                     if self._progress and (last_name != new_name):
                         print(new_name +
                               (max(0, len(last_name) - len(new_name))) * " ",
-                              end="\r")
+                              end="\r", flush=True)
                         last_name = new_name
 
                     chunk_task_queue.put(chunk)
@@ -262,114 +262,130 @@ class Md5Computer:
 
 
 class JsonUpdater:
-    """ Json file updater
+    """ Json file(s) updater
 
     Private attributes:
-    _filename -- JSON file name
-    _keys     -- Sequence of string/integer (object/list) indices inside
-                 container
-    _prefix   -- Prefix to prepend to value
-    _suffix   -- Suffix to append to value
+    _json_dscs -- List of _JsonDsc objects
     """
-    def __init__(self, json_file_key: str) -> None:
+
+    _JsonDsc = \
+        NamedTuple(
+            "_JsonDsc",
+            [
+             # JSON file name
+             ("filename", str),
+             # Sequence of string/integer (object/list) indices in container
+             ("keys", List[Union[int, str]]),
+             # Prefix to prepend to MD5 value
+             ("prefix", str),
+             # Suffix to append to MD5 value
+             ("suffix", str)])
+
+    def __init__(self, json_file_keys: List[str]) -> None:
         """ Constructor
 
         Arguments:
-        json_file_key -- JSON_FILE:KEY_SEQUENCE
+        json_file_keys -- List of JSON_FILE:KEY_SEQUENCE[:[PREFIX][:SUFFIX]]
+                          descriptors
         """
-        error_if(":" not in json_file_key,
-                 f"--json parameter '{json_file_key}' has no key part")
-        parts = json_file_key.split(":")
-        error_if(not (2 <= len(parts) <= 4),
-                 "Invalid structure --json parameter structure (should "
-                 "contain 2 to 4 parts)")
-        parts += ["", ""]
-        self._filename = parts[0]
-        keys_str = parts[1]
-        self._prefix = parts[2]
-        self._suffix = parts[3]
-        self._keys: List[Union[int, str]] = []
-        while keys_str:
-            if keys_str.startswith("/"):
-                keys_str = keys_str[1:]
-            elif keys_str.startswith("["):
-                m = re.match(r"^\[(\d+)\](.*)$", keys_str)
-                error_if(m is None,
-                         "Invalid list index syntax in JSON key")
-                assert m is not None
-                self._keys.append(int(m.group(1)))
-                keys_str = m.group(2)
-            else:
-                m = re.match(r"^([^\[/]+)(.*)$", keys_str)
-                assert m is not None
-                self._keys.append(m.group(1))
-                keys_str = m.group(2)
-        error_if(not self._keys, "JSON key is empty")
+        self._json_dscs: List["JsonUpdater._JsonDsc"] = []
+        for jfk in json_file_keys:
+            error_if(":" not in jfk,
+                     f"--json parameter '{jfk}' has no key part")
+            parts = jfk.split(":")
+            error_if(not (2 <= len(parts) <= 4),
+                     "Invalid structure --json parameter structure (should "
+                     "contain 2 to 4 parts)")
+            parts += ["", ""]
+            filename = parts[0]
+            keys_str = parts[1]
+            prefix = parts[2]
+            suffix = parts[3]
+            keys: List[Union[int, str]] = []
+            while keys_str:
+                if keys_str.startswith("/"):
+                    keys_str = keys_str[1:]
+                elif keys_str.startswith("["):
+                    m = re.match(r"^\[(\d+)\](.*)$", keys_str)
+                    error_if(m is None,
+                             "Invalid list index syntax in JSON key")
+                    assert m is not None
+                    keys.append(int(m.group(1)))
+                    keys_str = m.group(2)
+                else:
+                    m = re.match(r"^([^\[/]+)(.*)$", keys_str)
+                    assert m is not None
+                    keys.append(m.group(1))
+                    keys_str = m.group(2)
+            error_if(not keys, f"--json parameter '{jfk}' has no keys")
+            self._json_dscs.append(
+                self._JsonDsc(filename=filename, keys=keys, prefix=prefix,
+                              suffix=suffix))
 
     def update(self, md5_str: str) -> None:
         """ Update JSON with MD5
 
         Arguments:
-        md5_str -- MD5 value to put to JSON
+        md5_str -- MD5 value to put to JSONs
         """
-        md5_str = self._prefix + md5_str + self._suffix
-        json_data: Union[Dict[str, Any], List[Any]]
-        if os.path.isfile(self._filename):
-            with open(self._filename, "rb") as f:
-                try:
-                    json_data = json.load(f)
-                except json.JSONDecodeError as ex:
-                    error(f"File '{self._filename}' is an invalid JSON: {ex}")
-        elif isinstance(self._keys[0], int):
-            json_data = []
-        else:
-            assert isinstance(self._keys[0], str)
-            json_data = {}
-        # Container into which is next key
-        container: Union[Dict[str, Any], List[Any]] = json_data
-        # Going deeper and deeper into container hierarchy, on the route
-        # creating missing containers if required and possible
-        for i, key in enumerate(self._keys):
-            last = i == (len(self._keys) - 1)
-            # If we'll need to insert something into current container at
-            # current key - what would it be?
-            insertable: Union[str, Dict[str, Any], List[Any]] = \
-                md5_str if last else \
-                ([] if isinstance(self._keys[i + 1], int) else {})
-            if isinstance(key, int):
-                # Integer key - expecting container to be list
-                error_if(
-                    not isinstance(container, list),
-                    "Attempt to list-index of nonlist subconbtainer in JSON")
-                assert isinstance(container, list)
-                error_if(len(container) < (key - 1),
-                         "JSON list index out of range")
-                if key == len(container):
-                    container.append(insertable)
-                    if not last:
-                        assert not isinstance(insertable, str)
-                        container = insertable
-                elif last:
-                    container[key] = md5_str
-                else:
-                    container = container[key]
+        for jd in self._json_dscs:
+            md5_str = jd.prefix + md5_str + jd.suffix
+            json_data: Union[Dict[str, Any], List[Any]]
+            if os.path.isfile(jd.filename):
+                with open(jd.filename, "rb") as f:
+                    try:
+                        json_data = json.load(f)
+                    except json.JSONDecodeError as ex:
+                        error(f"File '{jd.filename}' is an invalid JSON: {ex}")
+            elif isinstance(jd.keys[0], int):
+                json_data = []
             else:
-                # String key - expecting container to be dictionary
-                assert isinstance(key, str)
-                error_if(
-                    not isinstance(container, dict),
-                    "Attempt to object-index of nonobject subconbtainer in "
-                    "JSON")
-                assert isinstance(container, dict)
-                if (key not in container) or last:
-                    container[key] = insertable
-                    if not last:
-                        assert not isinstance(insertable, str)
-                        container = insertable
+                assert isinstance(jd.keys[0], str)
+                json_data = {}
+            # Container into which is next key
+            container: Union[Dict[str, Any], List[Any]] = json_data
+            # Going deeper and deeper into container hierarchy, on the route
+            # creating missing containers if required and possible
+            for i, key in enumerate(jd.keys):
+                last = i == (len(jd.keys) - 1)
+                # If we'll need to insert something into current container at
+                # current key - what would it be?
+                insertable: Union[str, Dict[str, Any], List[Any]] = \
+                    md5_str if last else \
+                    ([] if isinstance(jd.keys[i + 1], int) else {})
+                if isinstance(key, int):
+                    # Integer key - expecting container to be list
+                    error_if(not isinstance(container, list),
+                             "Attempt to list-index of nonlist subconbtainer "
+                             "in JSON")
+                    assert isinstance(container, list)
+                    error_if(len(container) < (key - 1),
+                             "JSON list index out of range")
+                    if key == len(container):
+                        container.append(insertable)
+                        if not last:
+                            assert not isinstance(insertable, str)
+                            container = insertable
+                    elif last:
+                        container[key] = md5_str
+                    else:
+                        container = container[key]
                 else:
-                    container = container[key]
-        with open(self._filename, "w", encoding="utf-8") as f:
-            json.dump(json_data, f, indent=4)
+                    # String key - expecting container to be dictionary
+                    assert isinstance(key, str)
+                    error_if(not isinstance(container, dict),
+                             "Attempt to object-index of nonobject "
+                             "subconbtainer in JSON")
+                    assert isinstance(container, dict)
+                    if (key not in container) or last:
+                        container[key] = insertable
+                        if not last:
+                            assert not isinstance(insertable, str)
+                            container = insertable
+                    else:
+                        container = container[key]
+            with open(jd.filename, "w", encoding="utf-8") as f:
+                json.dump(json_data, f, indent=4)
 
 
 def get_files(file_dir_name: str, masks: Optional[List[str]],
@@ -449,29 +465,32 @@ def main(argv: List[str]) -> None:
         description="Computes MD5 hash over files in directory",
         formatter_class=argparse.RawDescriptionHelpFormatter)
     argument_parser.add_argument(
-        "--recursive", action="store_true",
+        "--recursive", "-r", action="store_true",
         help="Process files in subdirectories")
     argument_parser.add_argument(
-        "--mask", metavar="WILDCARD", action="append",
+        "--mask", "-m", metavar="WILDCARD", action="append",
         help="Only use given filename pattern (should not include directory). "
         "Wildcard format is fnmatch compatible (?, *, [...]). This switch may "
         "be specified several times. By default all files are used. Don't "
         "forget to quote it on Linux")
     argument_parser.add_argument(
-        "--list", action="store_true",
+        "--list", "-l", action="store_true",
         help="Print list of files - sorted in the same order as MD5 will be "
         "computed. Sorting is lexicographical, first by directory "
         "(if --recursive specified) then by filename. If this switch "
         "specified MD5 not computed")
     argument_parser.add_argument(
-        "--json", metavar="FILE:KEY_PATH[:[PREFIX][:SUFFIX]]",
+        "--json", "-j", metavar="FILE:KEY_PATH[:[PREFIX][:SUFFIX]]",
+        action="append",
         help="Puts resulting MD5 to given JSON file at given key path, "
         "optionally appending given prefix and suffix to it. Key path is a "
-        "sequence of key name list indices - e.g. a/b[1][2]c/d")
+        "sequence of key name list indices - e.g. a/b[1][2]c/d. If file not "
+        "existed - it is created. This switch may be specified several times")
     argument_parser.add_argument(
-        "--progress", action="store_true", help="Print progress information")
+        "--progress", "-p", action="store_true",
+        help="Print progress information")
     argument_parser.add_argument(
-        "--stats", action="store_true", help="Print statistics")
+        "--stats", "-s", action="store_true", help="Print statistics")
     argument_parser.add_argument(
         "--threads", type=int, help=argparse.SUPPRESS)
     argument_parser.add_argument(
