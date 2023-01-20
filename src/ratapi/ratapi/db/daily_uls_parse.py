@@ -618,7 +618,7 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
 
     os.chdir(root) # change back to root of this script
-    coalitionScriptOutputFilename = 'CONUS_ULS_' + nameTime + '.csv'
+    coalitionScriptOutputFilename = 'FS_' + nameTime + '.csv'
 
     ###########################################################################
     # If interactive, prompt to set output file from ULS Processor, note that #
@@ -627,7 +627,7 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if interactive:
         if not runULSProcessorFlag:
-            flist = glob.glob(fullPathTempDir + "/CONUS_ULS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
+            flist = glob.glob(fullPathTempDir + "/FS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
             if (len(flist)):
                 coalitionScriptOutputFilename = os.path.basename(flist[-1])
 
