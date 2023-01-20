@@ -438,6 +438,43 @@ void AfcManager::initializeDatabases()
 		return;
 	}
 
+	/**************************************************************************************/
+	/* Read region polygons and confirm that rlan is inside simulation region             */
+	/**************************************************************************************/
+	std::vector<std::string> regionPolygonFileStrList = split(_regionPolygonFileList, ',');
+	_numRegion = regionPolygonFileStrList.size();
+	std::vector<PolygonClass *> regionPolygonList;
+
+	for(int regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
+	    std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(regionPolygonFileStrList[regionIdx], _regionPolygonResolution);
+		for(int polyIdx=0; polyIdx<polyList.size(); ++polyIdx) {
+			PolygonClass *poly = polyList[polyIdx];
+			std::cout << "REGION: " << poly->name << " AREA: " << poly->comp_bdy_area() << std::endl;
+			_regionPolygonList.push_back(poly);
+		}
+	}
+
+    double rlanLatitude, rlanLongitude, rlanHeightInput;
+	std::tie(rlanLatitude, rlanLongitude, rlanHeightInput) = _rlanLLA;
+	int xIdx = (int) floor(rlanLongitude/_regionPolygonResolution + 0.5);
+	int yIdx = (int) floor(rlanLatitude/_regionPolygonResolution + 0.5);
+
+	bool found = false;
+	for(int polyIdx=0; (polyIdx<_regionPolygonList.size())&&(!found); ++polyIdx) {
+		PolygonClass *poly = _regionPolygonList[polyIdx];
+    
+		if (poly->in_bdy_area(xIdx, yIdx)) {
+			found = true;
+		}
+	}
+	if (!found) {
+		_responseCode = CConst::invalidValueResponseCode;
+		_invalidParams << "latitude";
+		_invalidParams << "longitude";
+		return;
+	}
+	/**************************************************************************************/
+
 	// Following lines are finding the minimum and maximum longitudes and latitudes with the 150km rlan range
 	double minLon, maxLon, minLat, maxLat;
 	double minLonBldg, maxLonBldg, minLatBldg, maxLatBldg;
@@ -1976,12 +2013,10 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	// Input parameters stored in the AfcManager object
 	_regionStr = jsonObj["regionStr"].toString().toStdString();
 
-	if (_regionStr == "CONUS") {
-		_regionPolygonFileList = SearchPaths::forReading("data", "rat_transfer/population/conus.kml", true).toStdString();
-	} else if (_regionStr == "Canada") {
-		_regionPolygonFileList = SearchPaths::forReading("data", "rat_transfer/population/Canada.kml", true).toStdString();
+	if (_regionStr == "USA") {
+		_regionPolygonFileList = SearchPaths::forReading("data", "rat_transfer/population/USA_PRI_VIR.kml", true).toStdString();
 	} else {
-		throw std::runtime_error("AfcManager::importConfigAFCjson(): Invalid regionStr specified.");
+		throw std::runtime_error("AfcManager::importConfigAFCjson(): Invalid regionStr specified: \"" + _regionStr + "\"");
 	}
 
 	if (jsonObj.contains("nlcdFile") && !jsonObj["nlcdFile"].isUndefined()) {
@@ -3048,10 +3083,12 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 	OGRFieldDefn objKind("kind", OFTString);
 	OGRFieldDefn dbNameField("DBNAME", OFTString);
 	OGRFieldDefn fsidField("FSID", OFTInteger);
+	OGRFieldDefn segmentField("SEGMENT", OFTInteger);
 	OGRFieldDefn startFreq("startFreq", OFTReal);
 	OGRFieldDefn stopFreq("stopFreq", OFTReal);
 	objKind.SetWidth(64); /* fsLonField.SetWidth(64); fsLatField.SetWidth(64);*/
 	fsidField.SetWidth(32); /* fsLonField.SetWidth(64); fsLatField.SetWidth(64);*/
+	segmentField.SetWidth(32); /* fsLonField.SetWidth(64); fsLatField.SetWidth(64);*/
 	startFreq.SetWidth(32);
 	stopFreq.SetWidth(32);
 
@@ -3066,6 +3103,10 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 	if (coneLayer->CreateField(&fsidField) != OGRERR_NONE)
 	{
 		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create 'FSID' field in layer of the output data source");
+	}
+	if (coneLayer->CreateField(&segmentField) != OGRERR_NONE)
+	{
+		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create 'SEGMENT' field in layer of the output data source");
 	}
 	if (coneLayer->CreateField(&startFreq) != OGRERR_NONE)
 	{
@@ -3082,56 +3123,89 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 	{
 		ULSClass *uls = (*_ulsList)[ulsIdx];
 
-		// Instantiate cone object
-		std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> coneFeature(OGRFeature::CreateFeature(coneLayer->GetLayerDefn()));
-
 		// Grab FSID for storing with coverage polygon
 		int FSID = uls->getID();
 
 		std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 
-		// Compute the beam coordinates and store into DoublePairs
-		std::tie(FSLatLonVal, posPointLatLon, negPointLatLon) = computeBeamConeLatLon(uls);
+		int numPR = uls->getNumPR();
+		for(int segIdx=0; segIdx<numPR+1; ++segIdx) {
 
-		// Intantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
-		GdalHelpers::GeomUniquePtr<OGRPolygon> beamCone(GdalHelpers::createGeometry<OGRPolygon>()); // Use GdalHelpers.h templates to have unique pointers create these on the heap
-		GdalHelpers::GeomUniquePtr<OGRLinearRing> exteriorOfCone(GdalHelpers::createGeometry<OGRLinearRing>());
+			// Instantiate cone object
+			std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> coneFeature(OGRFeature::CreateFeature(coneLayer->GetLayerDefn()));
 
-		// Create OGRPoints to store the coordinates of the beam triangle
-		// ***IMPORTANT NOTE: Coordinates stored as (Lon,Lat) here, required by geoJSON specifications
-		GdalHelpers::GeomUniquePtr<OGRPoint> FSPoint(GdalHelpers::createGeometry<OGRPoint>());
-		FSPoint->setX(FSLatLonVal.second);
-		FSPoint->setY(FSLatLonVal.first); // Must set points manually since cannot construct while pointing at with unique pointer
-		GdalHelpers::GeomUniquePtr<OGRPoint> posPoint(GdalHelpers::createGeometry<OGRPoint>());
-		posPoint->setX(posPointLatLon.second);
-		posPoint->setY(posPointLatLon.first);
-		GdalHelpers::GeomUniquePtr<OGRPoint> negPoint(GdalHelpers::createGeometry<OGRPoint>());
-		negPoint->setX(negPointLatLon.second);
-		negPoint->setY(negPointLatLon.first);
+			Vector3 ulsTxPosn = (segIdx == 0 ? uls->getTxPosition() : uls->getPR(segIdx-1).positionTx);
+			double ulsTxLongitude = (segIdx == 0 ? uls->getTxLongitudeDeg() : uls->getPR(segIdx-1).longitudeDeg);
+			double ulsTxLatitude = (segIdx == 0 ? uls->getTxLatitudeDeg() : uls->getPR(segIdx-1).latitudeDeg);
+			double ulsTxHeight = (segIdx == 0 ? uls->getTxHeightAMSL() : uls->getPR(segIdx-1).heightAMSLTx);
 
-		// Adding the polygon vertices to a OGRLinearRing object for geoJSON export
-		exteriorOfCone->addPoint(FSPoint.get()); // Using .get() gives access to the pointer without giving up ownership
-		exteriorOfCone->addPoint(posPoint.get());
-		exteriorOfCone->addPoint(negPoint.get());
-		exteriorOfCone->addPoint(FSPoint.get()); // Adds this again just so that the polygon closes where it starts (at FS location)
+			Vector3 ulsRxPosn = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).positionRx);
+			double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
+			double ulsRxLatitude = (segIdx == numPR ? uls->getRxLatitudeDeg() : uls->getPR(segIdx).latitudeDeg);
+			double ulsRxHeight = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSLRx);
 
-		// Add exterior boundary of cone's polygon
-		beamCone->addRingDirectly(exteriorOfCone.release()); // Points unique-pointer to null and gives up ownership of exteriorOfCone to beamCone
+			bool txLocFlag = (!std::isnan(ulsTxPosn.x())) && (!std::isnan(ulsTxPosn.y())) && (!std::isnan(ulsTxPosn.z()));
 
-		// Add properties to the geoJSON features
-		coneFeature->SetField("FSID", FSID);
-		coneFeature->SetField("DBNAME", dbName.c_str());
-		coneFeature->SetField("kind", "FS");
-		coneFeature->SetField("startFreq", uls->getStartAllocFreq() / 1.0e6);
-		coneFeature->SetField("stopFreq", uls->getStopAllocFreq() / 1.0e6);
-		/* coneFeature->SetField("FS Lon", FSLatLonVal.second); coneFeature->SetField("FS lat", FSLatLonVal.first);*/
+			double linkDistKm;
+			if (!txLocFlag) {
+				linkDistKm = 1.0;
+				Vector3 segPointing = (segIdx == numPR ? uls->getAntennaPointing() : uls->getPR(segIdx).pointing);
+				ulsTxPosn = ulsRxPosn + linkDistKm*segPointing;
 
-		// Add geometry to feature
-		coneFeature->SetGeometryDirectly(beamCone.release());
+				GeodeticCoord ulsTxPosnGeodetic = EcefModel::ecefToGeodetic(ulsTxPosn);
+				ulsTxLongitude = ulsTxPosnGeodetic.longitudeDeg;
+				ulsTxLatitude = ulsTxPosnGeodetic.latitudeDeg;
+			} else {
+				linkDistKm = (ulsTxPosn - ulsRxPosn).len();
+			}
 
-		if (coneLayer->CreateFeature(coneFeature.release()) != OGRERR_NONE)
-		{
-			throw std::runtime_error("Could not add cone feature in layer of output data source");
+			LatLon ulsRxLatLonVal = std::make_pair(ulsRxLatitude, ulsRxLongitude);
+			LatLon ulsTxLatLonVal = std::make_pair(ulsTxLatitude, ulsTxLongitude);
+
+			// Compute the beam coordinates and store into DoublePairs
+			std::tie(FSLatLonVal, posPointLatLon, negPointLatLon) = computeBeamConeLatLon(uls, ulsRxLatLonVal, ulsTxLatLonVal);
+
+			// Intantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
+			GdalHelpers::GeomUniquePtr<OGRPolygon> beamCone(GdalHelpers::createGeometry<OGRPolygon>()); // Use GdalHelpers.h templates to have unique pointers create these on the heap
+			GdalHelpers::GeomUniquePtr<OGRLinearRing> exteriorOfCone(GdalHelpers::createGeometry<OGRLinearRing>());
+
+			// Create OGRPoints to store the coordinates of the beam triangle
+			// ***IMPORTANT NOTE: Coordinates stored as (Lon,Lat) here, required by geoJSON specifications
+			GdalHelpers::GeomUniquePtr<OGRPoint> FSPoint(GdalHelpers::createGeometry<OGRPoint>());
+			FSPoint->setX(FSLatLonVal.second);
+			FSPoint->setY(FSLatLonVal.first); // Must set points manually since cannot construct while pointing at with unique pointer
+			GdalHelpers::GeomUniquePtr<OGRPoint> posPoint(GdalHelpers::createGeometry<OGRPoint>());
+			posPoint->setX(posPointLatLon.second);
+			posPoint->setY(posPointLatLon.first);
+			GdalHelpers::GeomUniquePtr<OGRPoint> negPoint(GdalHelpers::createGeometry<OGRPoint>());
+			negPoint->setX(negPointLatLon.second);
+			negPoint->setY(negPointLatLon.first);
+
+			// Adding the polygon vertices to a OGRLinearRing object for geoJSON export
+			exteriorOfCone->addPoint(FSPoint.get()); // Using .get() gives access to the pointer without giving up ownership
+			exteriorOfCone->addPoint(posPoint.get());
+			exteriorOfCone->addPoint(negPoint.get());
+			exteriorOfCone->addPoint(FSPoint.get()); // Adds this again just so that the polygon closes where it starts (at FS location)
+
+			// Add exterior boundary of cone's polygon
+			beamCone->addRingDirectly(exteriorOfCone.release()); // Points unique-pointer to null and gives up ownership of exteriorOfCone to beamCone
+
+			// Add properties to the geoJSON features
+			coneFeature->SetField("FSID", FSID);
+			coneFeature->SetField("SEGMENT", segIdx);
+			coneFeature->SetField("DBNAME", dbName.c_str());
+			coneFeature->SetField("kind", "FS");
+			coneFeature->SetField("startFreq", uls->getStartAllocFreq() / 1.0e6);
+			coneFeature->SetField("stopFreq", uls->getStopAllocFreq() / 1.0e6);
+			/* coneFeature->SetField("FS Lon", FSLatLonVal.second); coneFeature->SetField("FS lat", FSLatLonVal.first);*/
+
+			// Add geometry to feature
+			coneFeature->SetGeometryDirectly(beamCone.release());
+
+			if (coneLayer->CreateFeature(coneFeature.release()) != OGRERR_NONE)
+			{
+				throw std::runtime_error("Could not add cone feature in layer of output data source");
+			}
 		}
 	}
 
@@ -3661,34 +3735,32 @@ ULSClass *AfcManager::findULSID(int ulsID, int dbIdx)
 /**** AfcManager::computeBeamConeLatLon                                                ****/
 /******************************************************************************************/
 // Calculates and stores the beam cone coordinates
-std::tuple<LatLon, LatLon, LatLon> AfcManager::computeBeamConeLatLon(ULSClass *uls)
+std::tuple<LatLon, LatLon, LatLon> AfcManager::computeBeamConeLatLon(ULSClass *uls, LatLon rxLatLonVal, LatLon txLatLonVal)
 {
 	// Store lat/lon from ULS class
-	LatLon FSLatLonVal = std::make_pair(uls->getRxLatitudeDeg(), uls->getRxLongitudeDeg());
+	LatLon FSLatLonVal = rxLatLonVal;
+
+
+std::make_pair(uls->getRxLatitudeDeg(), uls->getRxLongitudeDeg());
 
 	// Obtain the angle in radians for 3 dB attenuation
 	double theta_rad = uls->computeBeamWidth(3.0) * M_PI / 180;
+    double cosTheta = cos(theta_rad);
+    double sinTheta = sin(theta_rad);
 
-	// Create beam cone lat/lons:
-	// Start by grabbing vector connecting ULS Rx and Tx
-	//Vector3 antennaPointing_ecef = uls->getAntennaPointing()*uls->getLinkDistance();
-	Vector3 rxPosn = uls->getRxPosition(), txPosn = uls->getTxPosition();
-	double linkDist_km = (uls->getLinkDistance()) / 1000.0;
-	Vector3 zVec = (txPosn - rxPosn).normalized();   // Pointing vector direction
-	Vector3 upVec = txPosn.normalized();             // ECEF vector pointing "up"
-	Vector3 xVec = (upVec.cross(zVec)).normalized(); // Forces x to lay flat on the Earth's surface
+    double cosVal = cos(rxLatLonVal.first*M_PI/180.0);
+    double deltaX = (txLatLonVal.second - rxLatLonVal.second)*cosVal;
+    double deltaY = txLatLonVal.first  - rxLatLonVal.first;
 
-	// Rotate the vectors in 2D to create beam triangle (add rxPosn back to make ECEF again)
-	Vector3 posPoint_ecef = rxPosn + linkDist_km * (cos(theta_rad) * zVec + sin(theta_rad) * xVec);
-	Vector3 negPoint_ecef = rxPosn + linkDist_km * (cos(theta_rad) * zVec - sin(theta_rad) * xVec);
+    double deltaLon1 = (deltaX*cosTheta + deltaY*sinTheta)/cosVal;
+    double deltaLat1 = (deltaY*cosTheta - deltaX*sinTheta);
 
-	// Convert to lat/lon
-	GeodeticCoord posPoint_lla = EcefModel::ecefToGeodetic(posPoint_ecef);
-	GeodeticCoord negPoint_lla = EcefModel::ecefToGeodetic(negPoint_ecef);
+    double deltaLon2 = (deltaX*cosTheta - deltaY*sinTheta)/cosVal;
+    double deltaLat2 = (deltaY*cosTheta + deltaX*sinTheta);
 
 	// Store in DoublePairs
-	LatLon posPointLatLon = std::make_pair(posPoint_lla.latitudeDeg, posPoint_lla.longitudeDeg);
-	LatLon negPointLatLon = std::make_pair(negPoint_lla.latitudeDeg, negPoint_lla.longitudeDeg);
+	LatLon posPointLatLon = std::make_pair(rxLatLonVal.first + deltaLat1, rxLatLonVal.second + deltaLon1);
+	LatLon negPointLatLon = std::make_pair(rxLatLonVal.first + deltaLat2, rxLatLonVal.second + deltaLon2);
 
 	// Return as a tuple
 	return std::make_tuple(FSLatLonVal, posPointLatLon, negPointLatLon);
@@ -7612,6 +7684,7 @@ void AfcManager::runPointAnalysis()
 	double *eirpLimitList = (double *) malloc(_ulsList->getSize()*sizeof(double));
 	bool *ulsFlagList   = (bool *) malloc(_ulsList->getSize()*sizeof(bool));
 	for (ulsIdx = 0; ulsIdx < _ulsList->getSize(); ++ulsIdx) {
+		eirpLimitList[ulsIdx] = _maxEIRP_dBm;
 		ulsFlagList[ulsIdx] = false;
 	}
 
@@ -7662,7 +7735,7 @@ void AfcManager::runPointAnalysis()
 					}
 #					endif
 
-					_ulsIdxList.push_back(ulsIdx); // Store the ULS indices that are used in analysis
+					ulsFlagList[ulsIdx] = true;
 
 					double ulsRxHeightAGL  = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain()) : uls->getPR(segIdx).heightAboveTerrainRx);
 					double ulsRxHeightAMSL = (segIdx == numPR ? (divIdx == 0 ? uls->getRxHeightAMSL() : uls->getDiversityHeightAMSL()) : uls->getPR(segIdx).heightAMSLRx);
@@ -7740,9 +7813,8 @@ void AfcManager::runPointAnalysis()
 									channel->availability = BLACK;
 									channel->eirpLimit_dBm = eirpLimit_dBm;
 
-									if ( (!ulsFlagList[ulsIdx]) || (eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+									if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
 										eirpLimitList[ulsIdx] = eirpLimit_dBm;
-										ulsFlagList[ulsIdx] = true;
 									}
 								}
 							}
@@ -8001,9 +8073,8 @@ void AfcManager::runPointAnalysis()
 													channel->eirpLimit_dBm = eirpLimit_dBm;
 												}
 
-												if ( (!ulsFlagList[ulsIdx]) || (channel->eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+												if ((channel->eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
 													eirpLimitList[ulsIdx] = channel->eirpLimit_dBm;
-													ulsFlagList[ulsIdx] = true;
 												}
 											}
 
@@ -8397,6 +8468,12 @@ void AfcManager::runPointAnalysis()
 			}
 		}
 		fkml->writeEndElement(); // Folder
+	}
+
+	for (ulsIdx = 0; ulsIdx < _ulsList->getSize(); ulsIdx++) {
+		if(ulsFlagList[ulsIdx]) {
+			_ulsIdxList.push_back(ulsIdx); // Store the ULS indices that are used in analysis
+		}
 	}
 
 	if (fkml) {

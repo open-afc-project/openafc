@@ -361,8 +361,8 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                 retGainStr    = 'Passive Repeater ' + str(numPR+1-prNum) + ' Back-to-Back Gain ' + ret + ' (dBi)'
                                 fwdAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' ' + fwd + ' Ant Diameter (m)'
                                 retAntDiameterStr = 'Passive Repeater ' + str(numPR+1-prNum) + ' ' + ret + ' Ant Diameter (m)'
-                                fwdHeightStr = 'Passive Repeater ' + str(prNum) + ' Height to Center RAAT (m)'
-                                retHeightStr = 'Passive Repeater ' + str(numPR+1-prNum) + ' Height to Center RAAT (m)'
+                                fwdHeightStr = 'Passive Repeater ' + str(prNum) + ' Height to Center RAAT ' + fwd + ' (m)'
+                                retHeightStr = 'Passive Repeater ' + str(numPR+1-prNum) + ' Height to Center RAAT ' + ret + ' (m)'
                                 fwdAntMidbandGain = 'Passive Repeater ' + str(prNum) + ' Ant Model Midband Gain (dB)'
                                 retAntMidbandGain = 'Passive Repeater ' + str(numPR+1-prNum) + ' Ant Model Midband Gain (dB)'
     

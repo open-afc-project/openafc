@@ -255,6 +255,8 @@ PolygonClass::PolygonClass(std::string kmlFilename, double resolution)
 	}
 }
 /******************************************************************************************/
+
+/******************************************************************************************/
 /**** FUNCTION: PolygonClass::~PolygonClass                                            ****/
 /******************************************************************************************/
 PolygonClass::~PolygonClass()
@@ -271,6 +273,282 @@ PolygonClass::~PolygonClass()
 		free(num_bdy_pt);
 	}
 }
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: PolygonClass::readMultiGeometry()                                      ****/
+/******************************************************************************************/
+std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilename, double resolution)
+{
+
+    std::ostringstream errStr;
+    std::string tag;
+    std::string polystr;
+
+    /**************************************************************************************/
+    /* Read entire contents of kml file into sval                                         */
+    /**************************************************************************************/
+    std::ifstream fstr(kmlFilename);
+    std::stringstream istream;
+    istream << fstr.rdbuf();
+    std::string sval = istream.str();
+    /**************************************************************************************/
+
+    std::size_t found;
+
+    /**************************************************************************************/
+    /* Grab contents of <Placemark> ... </Placemark>                                      */
+    /**************************************************************************************/
+    tag = "<Placemark>";
+    found = sval.find(tag); 
+    if (found==std::string::npos) {
+        std::cout << "SVAL: " << sval << std::endl;
+        errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+        throw std::runtime_error(errStr.str());
+    }
+    sval.replace(0, found+tag.size(), "");
+
+    found = sval.find(tag);
+    if (found!=std::string::npos) {
+        std::cout << "SVAL: " << sval << std::endl;
+        errStr << "ERROR: multiple " << tag << "'s found while reading file " << kmlFilename;
+        throw std::runtime_error(errStr.str());
+    }
+
+    tag = "</Placemark>";
+    found = sval.find(tag);
+    if (found==std::string::npos) {
+        std::cout << "SVAL: " << sval << std::endl;
+        errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+        throw std::runtime_error(errStr.str());
+    }
+    sval.replace(found, sval.size()-found, "");
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /* Extract name                                                                       */
+    /**************************************************************************************/
+    tag = "<name>";
+    found = sval.find(tag);
+    if (found==std::string::npos) {
+        std::cout << "SVAL: " << sval << std::endl;
+        errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+        throw std::runtime_error(errStr.str());
+    }
+    std::size_t nameStart = found + tag.size();
+
+    tag = "</name>";
+    found = sval.find(tag);
+    if (found==std::string::npos) {
+        std::cout << "SVAL: " << sval << std::endl;
+        errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+        throw std::runtime_error(errStr.str());
+    }
+    std::size_t nameEnd = found;
+
+    int nameLength = nameEnd - nameStart;
+
+    std::string namePfx;
+    if (nameLength) {
+        namePfx = sval.substr(nameStart, nameLength);
+    } else {
+        namePfx = "P";
+    }
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /* Grab contents of <MultiGeometry> ... </MultiGeometry>                                          */
+    /**************************************************************************************/
+    tag = "<MultiGeometry>";
+
+    found = sval.find(tag);
+    if (found==std::string::npos) {
+        std::cout << "SVAL: " << sval << std::endl;
+        errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+        throw std::runtime_error(errStr.str());
+    }
+    sval.replace(0, found+tag.size(), "");
+
+    found = sval.find(tag);
+    if (found!=std::string::npos) {
+        std::cout << "SVAL: " << sval << std::endl;
+        errStr << "ERROR: multiple " << tag << "'s found";
+        throw std::runtime_error(errStr.str());
+    }
+
+    tag = "</MultiGeometry>";
+    found = sval.find(tag);
+    if (found==std::string::npos) {
+        std::cout << "SVAL: " << sval << std::endl;
+        errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+        throw std::runtime_error(errStr.str());
+    }
+    sval.replace(found, sval.size()-found, "");
+    /**************************************************************************************/
+
+    std::vector<PolygonClass *> polygonList;
+
+    bool cont;
+
+    do {
+    /**************************************************************************************/
+    /* Grab contents of <Polygon> ... </Polygon>                                          */
+    /**************************************************************************************/
+    tag = "<Polygon>";
+    found = sval.find(tag);
+    if (found==std::string::npos) {
+        cont = false;
+    } else {
+        cont = true;
+    }
+    sval.replace(0, found+tag.size(), "");
+
+    if (cont) {
+        tag = "</Polygon>";
+        found = sval.find(tag);
+        if (found==std::string::npos) {
+            std::cout << "SVAL: " << sval << std::endl;
+            errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+            throw std::runtime_error(errStr.str());
+        }
+        polystr = sval.substr(0, found);
+        sval.replace(0, found+tag.size(), "");
+    }
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /* Grab contents of <outerBoundaryIs> ... </outerBoundaryIs>                          */
+    /**************************************************************************************/
+    if (cont) {
+        tag = "<outerBoundaryIs>";
+        found = polystr.find(tag);
+        if (found==std::string::npos) {
+            std::cout << "POLYSTR: " << polystr << std::endl;
+            errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+            throw std::runtime_error(errStr.str());
+        }
+        polystr.replace(0, found+tag.size(), "");
+
+        tag = "</outerBoundaryIs>";
+        found = polystr.find(tag);
+        if (found==std::string::npos) {
+            std::cout << "POLYSTR: " << polystr << std::endl;
+            errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+            throw std::runtime_error(errStr.str());
+        }
+        polystr.replace(found, sval.size()-found, "");
+    }
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /* Grab contents of <coordinates> ... </coordinates>                          */
+    /**************************************************************************************/
+    if (cont) {
+        tag = "<coordinates>";
+        found = polystr.find(tag);
+        if (found==std::string::npos) {
+            std::cout << "POLYSTR: " << polystr << std::endl;
+            errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+            throw std::runtime_error(errStr.str());
+        }
+        polystr.replace(0, found+tag.size(), "");
+
+        tag = "</coordinates>";
+        found = polystr.find(tag);
+        if (found==std::string::npos) {
+            std::cout << "POLYSTR: " << polystr << std::endl;
+            errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
+            throw std::runtime_error(errStr.str());
+        }
+        polystr.replace(found, polystr.size()-found, "");
+    }
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /* Remove whitespace from beginning and end of polystr                                   */
+    /**************************************************************************************/
+    if (cont) {
+        std::size_t start = polystr.find_first_not_of(" \n\t");
+        std::size_t end = polystr.find_last_not_of(" \n\t");
+        if (start == std::string::npos) {
+            polystr.clear();
+        } else {
+            polystr = polystr.substr(start, end-start+1);
+        }
+    }
+    /**************************************************************************************/
+
+    /**************************************************************************************/
+    /* Replace consecutive whitespace characters with a single space                      */
+    /**************************************************************************************/
+    if (cont) {
+        std::size_t posn = 0;
+        bool foundWhitespace = true;
+        do {
+            std::size_t posnA = polystr.find_first_of(" \n\t", posn);
+            if (posnA == std::string::npos) {
+                foundWhitespace = false;
+            } else {
+                std::size_t posnB = polystr.find_first_not_of(" \n\t", posnA);
+                if (posnB - posnA == 1) {
+                    if (polystr[posnA] != ' ') { polystr[posnA] = ' '; }
+                } else {
+                    polystr.replace(posnA, posnB-posnA, " ");
+                }
+                posn = posnA + 1;
+            }
+        } while(foundWhitespace);
+    }
+    /**************************************************************************************/
+
+    if (cont) {
+        std::vector<std::string> clist = split(polystr, ' ');
+
+        /**********************************************************************************/
+        /* Remove duplicate endpoint (in kml polygons are closed with last pt = first pt) */
+        /**********************************************************************************/
+        if ((clist.size() > 1) && (clist[0] == clist[clist.size()-1])) {
+            clist.pop_back();
+        }
+        /**********************************************************************************/
+
+        PolygonClass *poly = new PolygonClass();
+
+        poly->name = namePfx + "_" + std::to_string(polygonList.size());
+
+        poly->num_segment = 1;
+        poly->num_bdy_pt  = IVECTOR(poly->num_segment);
+        poly->num_bdy_pt[0] = clist.size();
+
+        poly->bdy_pt_x    = (int **) malloc(poly->num_segment*sizeof(int *));
+        poly->bdy_pt_y    = (int **) malloc(poly->num_segment*sizeof(int *));
+
+        poly->bdy_pt_x[0] = IVECTOR(poly->num_bdy_pt[0]);
+        poly->bdy_pt_y[0] = IVECTOR(poly->num_bdy_pt[0]);
+
+        int ptIdx;
+        for (ptIdx=0; ptIdx<=poly->num_bdy_pt[0]-1; ptIdx++) {
+            char *chptr;
+
+            std::vector<std::string> lonlatStrList = split(clist[ptIdx], ',');
+            double longitude = std::strtod(lonlatStrList[0].c_str(), &chptr);
+            double latitude  = std::strtod(lonlatStrList[1].c_str(), &chptr);
+
+            int xval = (int) floor(((longitude)/resolution) + 0.5);
+            int yval = (int) floor(((latitude )/resolution) + 0.5);
+
+            poly->bdy_pt_x[0][ptIdx] = xval;
+            poly->bdy_pt_y[0][ptIdx] = yval;
+        }
+        polygonList.push_back(poly);
+    }
+    } while (cont);
+
+    return(polygonList);
+}
+/******************************************************************************************/
+
+
 /******************************************************************************************/
 /**** FUNCTION: PolygonClass::comp_bdy_min_max                                         ****/
 /**** Find minx, maxx, miny, maxy for a list of bdy points.                            ****/

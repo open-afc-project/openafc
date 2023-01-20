@@ -545,6 +545,7 @@ def daily_uls_parse(state_root, interactive):
     if processAntFilesFlag:
         antennaPatternFile = state_root + '/Antenna_Patterns/afc_antenna_patterns.csv'
         processAntFiles(fullPathTempDir, fullPathTempDir + '/antenna_model_list.csv', antennaPatternFile, logFile)
+        subprocess.call(['cp', antennaPatternFile, fullPathTempDir]) 
     ###########################################################################
 
     ###########################################################################
