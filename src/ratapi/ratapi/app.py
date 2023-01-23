@@ -182,7 +182,7 @@ def create_app(config_override=None):
 
         # get static antenna patterns directory
         antenna_patterns = os.path.join(
-            flaskapp.config['STATE_ROOT_PATH'], 'Antenna_Patterns')
+             flaskapp.config['NFS_MOUNT_PATH'], 'rat_transfer', 'Antenna_Patterns')
         if not os.path.exists(antenna_patterns):
             os.makedirs(antenna_patterns)
 

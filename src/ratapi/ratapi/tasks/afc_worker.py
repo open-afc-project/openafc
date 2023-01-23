@@ -98,7 +98,7 @@ def run(prot, host, port, state_root,
             cmd = [
                 afc_exe,
                 "--request-type=" + request_type,
-                "--state-root=" + state_root,
+                "--state-root=" + mntroot+"/rat_transfer",
                 "--mnt-path=" + mntroot,
                 "--input-file-path=" + dataif.rname("pro", hash + "/analysisRequest.json"),
                 "--config-file-path=" + dataif.rname("cfg", region + "/afc_config.json"),
