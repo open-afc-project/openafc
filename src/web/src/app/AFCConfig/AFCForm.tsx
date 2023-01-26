@@ -80,15 +80,15 @@ export class AFCForm extends React.Component<
     private setUlsRegion = (n: string) => {
        this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
        setDefaultRegion(n);
-       getAfcConfigFile().then(
-           res => {
-                if (res.kind === "Success") {
-                    this.updateEntireConfigState(res.result);
-                } else {
-                    this.setState({ messageError: res.description, messageSuccess: undefined });
-               }
-           }
-       )
+    //    getAfcConfigFile().then(
+    //        res => {
+    //             if (res.kind === "Success") {
+    //                 this.updateEntireConfigState(res.result);
+    //             } else {
+    //                 this.setState({ messageError: res.description, messageSuccess: undefined });
+    //            }
+    //        }
+    //   )
     }
     private setEnableMapInVirtualAp = (n: boolean) => this.setState({ config: Object.assign(this.state.config, { enableMapInVirtualAp: n }) });
     private setVisiblityThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { visibilityThreshold: n }) });
@@ -479,13 +479,13 @@ export class AFCForm extends React.Component<
                                     style={{ textAlign: "right" }}
                                 >
                                     <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
-                                    <FormSelectOption key={"CONUS"} value={"CONUS"} label={"CONUS"} />
+                                    <FormSelectOption key={"USA"} value={"USA"} label={"USA"} />
                                     <FormSelectOption key={"Canada"} value={"Canada"} label={"Canada"} />
                                 </FormSelect>
                             </FormGroup>
                         </GalleryItem>
                         <GalleryItem>
-                            <FormGroup label="ULS Database" fieldId="horizontal-form-uls-db">
+                            <FormGroup label="FS Database" fieldId="horizontal-form-uls-db">
                                 {" "}<Tooltip
                                     position={TooltipPosition.top}
                                     enableFlip={true}
@@ -493,7 +493,7 @@ export class AFCForm extends React.Component<
                                     maxWidth="40.0rem"
                                     content={
                                         <>
-                                            <p>CONUS_ULS_LATEST.sqlite3 refers to the latest stable CONUS ULS database .</p>
+                                            <p>CONUS_ULS_LATEST.sqlite3 refers to the latest stable CONUS FS database .</p>
                                         </>
                                     }
                                 >
@@ -507,8 +507,8 @@ export class AFCForm extends React.Component<
                                     isValid={!!this.state.config.ulsDatabase}
                                     style={{ textAlign: "right" }}
                                 >
-                                    <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select a ULS Database" />
-                                    {this.props.ulsFiles.filter((file: string) => file.includes(this.state.config.regionStr)).map((option: string) => (
+                                    <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select an FS Database" />
+                                    {this.props.ulsFiles.map((option: string) => (
                                         <FormSelectOption key={option} value={option} label={option} />
                                     ))}
                                 </FormSelect>
