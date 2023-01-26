@@ -47,8 +47,6 @@ UlsDatabase::UlsDatabase()
 	fieldIdxList.push_back(&freq_assigned_start_mhzIdx);
 	columns << "freq_assigned_end_mhz";
 	fieldIdxList.push_back(&freq_assigned_end_mhzIdx);
-	columns << "emissions_des";
-	fieldIdxList.push_back(&emissions_desIdx);
 	columns << "tx_lat_deg";
 	fieldIdxList.push_back(&tx_lat_degIdx);
 	columns << "tx_long_deg";
@@ -155,7 +153,6 @@ void UlsDatabase::nullInitialize()
 	rx_antenna_numIdx = -1;
 	freq_assigned_start_mhzIdx = -1;
 	freq_assigned_end_mhzIdx = -1;
-	emissions_desIdx = -1;
 	tx_lat_degIdx = -1;
 	tx_long_degIdx = -1;
 	tx_ground_elev_mIdx = -1;
@@ -333,7 +330,6 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		target.at(r).rxAntennaNumber = q.value(rx_antenna_numIdx).toInt();
 		target.at(r).startFreq = q.value(freq_assigned_start_mhzIdx).toDouble();
 		target.at(r).stopFreq = q.value(freq_assigned_end_mhzIdx).toDouble();
-		target.at(r).emissionsDesignator = q.value(emissions_desIdx).toString().toStdString();
 		target.at(r).txLatitudeDeg  = q.value(tx_lat_degIdx).isNull() ? quietNaN : q.value(tx_lat_degIdx).toDouble();
 		target.at(r).txLongitudeDeg = q.value(tx_long_degIdx).isNull() ? quietNaN : q.value(tx_long_degIdx).toDouble();
 		target.at(r).txGroundElevation = q.value(tx_ground_elev_mIdx).isNull() ? quietNaN : q.value(tx_ground_elev_mIdx).toDouble();

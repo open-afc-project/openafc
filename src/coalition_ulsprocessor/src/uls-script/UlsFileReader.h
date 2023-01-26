@@ -30,7 +30,7 @@
 
 class UlsFileReader {
 public:
-    UlsFileReader(const char *filePath, FILE *fwarn);
+    UlsFileReader(const char *filePath, FILE *fwarn, bool alignFederatedFlag, double alignFederatedScale);
 
     const QList<UlsPath> &paths() { return allPaths; }
     const QList<UlsEmission> &emissions() { return allEmissions; }
@@ -110,14 +110,14 @@ private:
     void readIndividualPathUS(const std::vector<std::string> &fieldList);
     void readIndividualAntennaUS(const std::vector<std::string> &fieldList, FILE *fwarn);
     void readIndividualFrequencyUS(const std::vector<std::string> &fieldList, FILE *fwarn);
-    void readIndividualLocationUS(const std::vector<std::string> &fieldList);
+    void readIndividualLocationUS(const std::vector<std::string> &fieldList, bool alignFederatedFlag, double alignFederatedScale);
     void readIndividualEmissionUS(const std::vector<std::string> &fieldList);
     void readIndividualEntityUS(const std::vector<std::string> &fieldList);
     void readIndividualMarketFrequencyUS(const std::vector<std::string> &fieldList);
     void readIndividualControlPointUS(const std::vector<std::string> &fieldList);
     void readIndividualSegmentUS(const std::vector<std::string> &fieldList);
 
-    void readStationDataCA(const std::vector<std::string> &fieldList, FILE *fwarn);
+    void readStationDataCA(const std::vector<std::string> &fieldList, FILE *fwarn, bool alignFederatedFlag, double alignFederatedScale);
     void readBackToBackPassiveRepeaterCA(const std::vector<std::string> &fieldList, FILE *fwarn);
     void readReflectorPassiveRepeaterCA(const std::vector<std::string> &fieldList, FILE *fwarn);
     void readTransmitterCA(const std::vector<std::string> &fieldList, FILE *fwarn);

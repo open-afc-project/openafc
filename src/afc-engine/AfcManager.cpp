@@ -447,7 +447,7 @@ void AfcManager::initializeDatabases()
 
 	for(int regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
 	    std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(regionPolygonFileStrList[regionIdx], _regionPolygonResolution);
-		for(int polyIdx=0; polyIdx<polyList.size(); ++polyIdx) {
+		for(int polyIdx=0; polyIdx<(int) polyList.size(); ++polyIdx) {
 			PolygonClass *poly = polyList[polyIdx];
 			std::cout << "REGION: " << poly->name << " AREA: " << poly->comp_bdy_area() << std::endl;
 			_regionPolygonList.push_back(poly);
@@ -460,7 +460,7 @@ void AfcManager::initializeDatabases()
 	int yIdx = (int) floor(rlanLatitude/_regionPolygonResolution + 0.5);
 
 	bool found = false;
-	for(int polyIdx=0; (polyIdx<_regionPolygonList.size())&&(!found); ++polyIdx) {
+	for(int polyIdx=0; (polyIdx<(int) _regionPolygonList.size())&&(!found); ++polyIdx) {
 		PolygonClass *poly = _regionPolygonList[polyIdx];
     
 		if (poly->in_bdy_area(xIdx, yIdx)) {
@@ -3137,12 +3137,12 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 			Vector3 ulsTxPosn = (segIdx == 0 ? uls->getTxPosition() : uls->getPR(segIdx-1).positionTx);
 			double ulsTxLongitude = (segIdx == 0 ? uls->getTxLongitudeDeg() : uls->getPR(segIdx-1).longitudeDeg);
 			double ulsTxLatitude = (segIdx == 0 ? uls->getTxLatitudeDeg() : uls->getPR(segIdx-1).latitudeDeg);
-			double ulsTxHeight = (segIdx == 0 ? uls->getTxHeightAMSL() : uls->getPR(segIdx-1).heightAMSLTx);
+			// double ulsTxHeight = (segIdx == 0 ? uls->getTxHeightAMSL() : uls->getPR(segIdx-1).heightAMSLTx);
 
 			Vector3 ulsRxPosn = (segIdx == numPR ? uls->getRxPosition() : uls->getPR(segIdx).positionRx);
 			double ulsRxLongitude = (segIdx == numPR ? uls->getRxLongitudeDeg() : uls->getPR(segIdx).longitudeDeg);
 			double ulsRxLatitude = (segIdx == numPR ? uls->getRxLatitudeDeg() : uls->getPR(segIdx).latitudeDeg);
-			double ulsRxHeight = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSLRx);
+			// double ulsRxHeight = (segIdx == numPR ? uls->getRxHeightAMSL() : uls->getPR(segIdx).heightAMSLRx);
 
 			bool txLocFlag = (!std::isnan(ulsTxPosn.x())) && (!std::isnan(ulsTxPosn.y())) && (!std::isnan(ulsTxPosn.z()));
 
@@ -3195,8 +3195,8 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 			coneFeature->SetField("SEGMENT", segIdx);
 			coneFeature->SetField("DBNAME", dbName.c_str());
 			coneFeature->SetField("kind", "FS");
-			coneFeature->SetField("startFreq", uls->getStartAllocFreq() / 1.0e6);
-			coneFeature->SetField("stopFreq", uls->getStopAllocFreq() / 1.0e6);
+			coneFeature->SetField("startFreq", uls->getStartFreq() / 1.0e6);
+			coneFeature->SetField("stopFreq", uls->getStopFreq() / 1.0e6);
 			/* coneFeature->SetField("FS Lon", FSLatLonVal.second); coneFeature->SetField("FS lat", FSLatLonVal.first);*/
 
 			// Add geometry to feature
@@ -3547,44 +3547,6 @@ void AfcManager::readPopulationGrid()
 			delete regionPolygon;
 		}
 	}
-}
-/******************************************************************************************/
-
-/******************************************************************************************/
-/**** FUNCTION: AfcManager::getBandwidth                                               ****/
-/**** Process emissions designator and return bandwidth in Hz.                         ****/
-/******************************************************************************************/
-double AfcManager::getBandwidth(std::string emissionsDesignator)
-{
-	std::size_t strpos;
-	std::string ed = emissionsDesignator.substr(0, emissionsDesignator.size() - 3);
-	bool found = false;
-	std::string chList = "HKMGT";
-	std::size_t chIdx;
-	char *chptr;
-
-	double scale;
-	double sVal = 1.0;
-	for (chIdx = 0; (chIdx < chList.size()) && (!found); chIdx++)
-	{
-		strpos = ed.find(chList.at(chIdx));
-		if (strpos != std::string::npos)
-		{
-			ed.at(strpos) = '.';
-			scale = sVal;
-			found = true;
-		}
-		sVal *= 1000.0;
-	}
-
-	if (!found)
-	{
-		throw std::runtime_error(ErrStream() << "ERROR: Unable to get bandwidth from emissions designator \"" << emissionsDesignator << "\"");
-	}
-
-	double bandwidth = strtod(ed.c_str(), &chptr) * scale;
-
-	return (bandwidth);
 }
 /******************************************************************************************/
 
@@ -3957,9 +3919,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		int rxAntennaNumber;
 		int numPR;
 		std::string frequencyAssigned;
-		std::string emissionsDesignator;
 		double startFreq, stopFreq;
-		double bandwidth;
 		double rxLatitudeDeg, rxLongitudeDeg;
 		double rxGroundElevation;
 		double rxHeightAboveTerrain;
@@ -4063,106 +4023,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/**************************************************************************/
 
 			/**************************************************************************/
-			/* channelBandwidth / emissionsDesignator => bandwidth                    */
-			/**************************************************************************/
-			if (!ignoreFlag)
-			{
-				emissionsDesignator = row.emissionsDesignator;
-
-				if (emissionsDesignator.empty())
-				{
-					if (fixAnomalousEntries) {
-						if (radioService == "CF")
-						{
-							emissionsDesignator = "30MXXXX";
-							fixedStr += "Fixed: missing emissions designator set to " + emissionsDesignator;
-							fixedFlag = true;
-						}
-						else if (radioService == "CT")
-						{
-							emissionsDesignator = "10MXXXX";
-							fixedStr += "Fixed: missing emissions designator set to " + emissionsDesignator;
-							fixedFlag = true;
-						}
-						else if (radioService == "TP")
-						{
-							emissionsDesignator = "25MXXXX";
-							fixedStr += "Fixed: missing emissions designator set to " + emissionsDesignator;
-							fixedFlag = true;
-						}
-						else if (radioService == "TS")
-						{
-							emissionsDesignator = "25MXXXX";
-							fixedStr += "Fixed: missing emissions designator set to " + emissionsDesignator;
-							fixedFlag = true;
-						}
-						else if (radioService == "MW")
-						{
-							emissionsDesignator = "30MXXXX";
-							fixedStr += "Fixed: missing emissions designator set to " + emissionsDesignator;
-							fixedFlag = true;
-						}
-						else
-						{
-							ignoreFlag = true;
-							reasonIgnored = "Ignored: Missing emission designator";
-							numIgnoreInvalid++;
-						}
-					} else {
-						ignoreFlag = true;
-						reasonIgnored = "Ignored: Missing emission designator";
-						numIgnoreInvalid++;
-					}
-				}
-			}
-
-			if (!ignoreFlag)
-			{
-				bandwidth = getBandwidth(emissionsDesignator);
-
-				if (bandwidth == 0.0)
-				{
-					if (fixAnomalousEntries) {
-						if (radioService == "CF")
-						{
-							bandwidth = 30.0e6;
-							fixedStr += "Fixed: emissions designator specifies bandwidth = 0: set to 30 MHz";
-							fixedFlag = true;
-						}
-						else if (radioService == "CT")
-						{
-							bandwidth = 10.0e6;
-							fixedStr += "Fixed: emissions designator specifies bandwidth = 0: set to 10 MHz";
-							fixedFlag = true;
-						}
-						else if (radioService == "TP")
-						{
-							bandwidth = 25.0e6;
-							fixedStr += "Fixed: emissions designator specifies bandwidth = 0: set to 25 MHz";
-							fixedFlag = true;
-						}
-						else if (radioService == "TS")
-						{
-							bandwidth = 25.0e6;
-							fixedStr += "Fixed: emissions designator specifies bandwidth = 0: set to 25 MHz";
-							fixedFlag = true;
-						}
-						else
-						{
-							ignoreFlag = true;
-							reasonIgnored = "Ignored: emission designator specifies bandwidth = 0";
-							numIgnoreInvalid++;
-						}
-					} else {
-						ignoreFlag = true;
-						reasonIgnored = "Ignored: emission designator specifies bandwidth = 0";
-						numIgnoreInvalid++;
-					}
-				}
-			}
-			/**************************************************************************/
-
-			/**************************************************************************/
 			/* callsign, rxCallsign                                                   */
 			/**************************************************************************/
 			callsign = row.callsign;
@@ -4183,54 +4043,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			{
 				if (!ignoreFlag)
 				{
-					if (row.startFreq == row.stopFreq)
-					{
-						double cf = row.startFreq * 1.0e6;
-						startFreq = cf - bandwidth / 2;
-						stopFreq = cf + bandwidth / 2;
-					}
-					else
-					{
-						startFreq = row.startFreq * 1.0e6;
-						stopFreq = row.stopFreq * 1.0e6;
-					}
+					startFreq = row.startFreq * 1.0e6;
+					stopFreq = row.stopFreq * 1.0e6;
 
 					if (stopFreq < startFreq)
 					{
 						throw std::runtime_error(ErrStream() << "ERROR reading ULS data: FSID = " << fsid << ", startFreq = " << startFreq << ", stopFreq = " << stopFreq << ", must have startFreq < stopFreq");
-					}
-
-					if (stopFreq - startFreq < bandwidth - 1.0e-3)
-					{
-						if (fixAnomalousEntries) {
-							if (callsign == "WLF419")
-							{
-								bandwidth = 17.0e6;
-								double cf = (startFreq + stopFreq) / 2;
-								startFreq = cf - bandwidth / 2;
-								stopFreq = cf + bandwidth / 2;
-								fixedStr += "Fixed: frequency assigned less than bandwidth: WLF419 bandwidth set to 17.0 MHz";
-								fixedFlag = true;
-							}
-							else if ((callsign == "WHY789") || (callsign == "WPVI710") || (radioService == "CF"))
-							{
-								double cf = (startFreq + stopFreq) / 2;
-								startFreq = cf - bandwidth / 2;
-								stopFreq = cf + bandwidth / 2;
-								fixedStr += "Fixed: frequency assigned less than bandwidth: " + callsign + " frequency range expanded to accomodate bandwidth";
-								fixedFlag = true;
-							}
-							else
-							{
-								ignoreFlag = true;
-								reasonIgnored = "frequency assigned less than bandwidth";
-								numIgnoreInvalid++;
-							}
-						} else {
-							ignoreFlag = true;
-							reasonIgnored = "frequency assigned less than bandwidth";
-							numIgnoreInvalid++;
-						}
 					}
 				}
 
@@ -5022,6 +4840,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				}
 				double lambda = CConst::c / uniiCenterFreq;
 				double rxDlambda = rxAntennaDiameter / lambda;
+				double noiseBandwidth = stopFreq - startFreq;
 
 				uls = new ULSClass(this, fsid, dbIdx, numPR, row.region);
 				_ulsList->append(uls);
@@ -5030,9 +4849,9 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setRxAntennaNumber(rxAntennaNumber);
 				uls->setRadioService(radioService);
 				uls->setEntityName(entityName);
-				uls->setStartAllocFreq(startFreq);
-				uls->setStopAllocFreq(stopFreq);
-				uls->setBandwidth(bandwidth);
+				uls->setStartFreq(startFreq);
+				uls->setStopFreq(stopFreq);
+				uls->setNoiseBandwidth(noiseBandwidth);
 				uls->setRxGroundElevation(rxGroundElevation);
 				uls->setRxLatitudeDeg(rxLatitudeDeg);
 				uls->setRxLongitudeDeg(rxLongitudeDeg);
@@ -5055,7 +4874,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setRxAntennaCategory(rxAntennaCategory);
 				uls->setTxGain(txGain);
 				uls->setTxEIRP(txEIRP);
-				uls->setUseFrequency();
 				uls->setRxAntennaFeederLossDB(rxAntennaFeederLossDB);
 				uls->setFadeMarginDB(fadeMarginDB);
 				uls->setStatus(status);
@@ -5342,7 +5160,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					}
 				}
 
-				double noiseLevelDBW = 10.0 * log(CConst::boltzmannConstant * CConst::T0 * bandwidth) / log(10.0) + noiseFigureDB;
+				double noiseLevelDBW = 10.0 * log(CConst::boltzmannConstant * CConst::T0 * noiseBandwidth) / log(10.0) + noiseFigureDB;
 				uls->setNoiseLevelDBW(noiseLevelDBW);
 				if (fixedFlag && fanom) {
 					fanom->writeRow({QString::asprintf("%d", fsid), QString::fromStdString(name), QString::fromStdString(callsign), QString::asprintf("%.15f", rxLatitudeDeg), QString::asprintf("%.15f", rxLongitudeDeg), QString::fromStdString(fixedStr)});
@@ -7806,7 +7624,7 @@ void AfcManager::runPointAnalysis()
 							if (channel->availability != BLACK) {
 								double chanStartFreq = channel->startFreqMHz * 1.0e6;
 								double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-								bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
+								bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
 								if (hasOverlap > 0.0) {
 									double eirpLimit_dBm = -std::numeric_limits<double>::infinity();
 
@@ -7933,7 +7751,7 @@ void AfcManager::runPointAnalysis()
 										CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel->type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
 										// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
 										double spectralOverlapLossDB;
-										bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI, spectralAlgorithm);
+										bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), useACI, spectralAlgorithm);
 										if (hasOverlap) {
 											double bandwidth = chanStopFreq - chanStartFreq;
 											double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
@@ -8005,7 +7823,7 @@ void AfcManager::runPointAnalysis()
 												nearField_eff = quietNaN;
 												if (segIdx == numPR) {
 													if (_nearFieldAdjFlag && (distKm*1000.0 < uls->getRxNearFieldDistLimit()) && (angleOffBoresightDeg < 90.0) ) {
-														bool unii5Flag = computeSpectralOverlapLoss((double *) NULL, uls->getStartUseFreq(), uls->getStopUseFreq(), 5925.0e6, 6425.0e6, false, CConst::psdSpectralAlgorithm);
+														bool unii5Flag = computeSpectralOverlapLoss((double *) NULL, uls->getStartFreq(), uls->getStopFreq(), 5925.0e6, 6425.0e6, false, CConst::psdSpectralAlgorithm);
 														double Fc;
 														if (unii5Flag) {
 															Fc = 6175.0e6;
@@ -8084,7 +7902,7 @@ void AfcManager::runPointAnalysis()
 												double d2;
 												double pathDifference;
 												double fresnelIndex = -1.0;
-												double ulsWavelength = CConst::c / ((uls->getStartUseFreq() + uls->getStopUseFreq()) / 2);
+												double ulsWavelength = CConst::c / ((uls->getStartFreq() + uls->getStopFreq()) / 2);
 												if (ulsSegmentDistance != -1.0) {
 													const Vector3 ulsTxPos = (segIdx ? uls->getPR(segIdx-1).positionTx : uls->getTxPosition());
 													d1 = (ulsRxPos - rlanPosn).len() * 1000;
@@ -8153,7 +7971,7 @@ void AfcManager::runPointAnalysis()
 												msg << QString::number(pathClutterRxDB, 'f', 3) << QString::fromStdString(pathClutterRxModelStr) << QString::number(pathClutterRxCDF, 'f', 8);
 		
 												msg << QString::number(bandwidth * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
-													<< QString::number(uls->getStartUseFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopUseFreq() * 1.0e-6, 'f', 2);
+													<< QString::number(uls->getStartFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopFreq() * 1.0e-6, 'f', 2);
 		
 												msg << QString::fromStdString(rxAntennaTypeStr) << QString::fromStdString(rxAntennaCategoryStr)
 													<< QString::number((divIdx == 0 ? uls->getRxGain() : uls->getDiversityGain()), 'f', 3);
@@ -8217,7 +8035,7 @@ void AfcManager::runPointAnalysis()
 						fprintf(fFSList, "%d", uls->getID());
 						fprintf(fFSList, ",%s,%s", uls->getRxCallsign().c_str(), uls->getCallsign().c_str());
 						fprintf(fFSList, ",%d,%d,%d", numPR, divIdx, segIdx);
-						fprintf(fFSList, ",%.1f,%.1f", uls->getStartUseFreq()*1.0e-6, uls->getStopUseFreq()*1.0e-6);
+						fprintf(fFSList, ",%.1f,%.1f", uls->getStartFreq()*1.0e-6, uls->getStopFreq()*1.0e-6);
 						fprintf(fFSList, ",%.6f,%.6f", ulsRxLongitude, ulsRxLatitude);
 						fprintf(fFSList, ",%.1f", ulsRxHeightAGL);
 						fprintf(fFSList, ",%.1f", ulsSegmentDistance);
@@ -9143,7 +8961,7 @@ void AfcManager::runScanAnalysis()
 							CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel.type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
 							// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
 							double spectralOverlapLossDB;
-							bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI, spectralAlgorithm);
+							bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), useACI, spectralAlgorithm);
 
 							if (hasOverlap) {
 								// double bandwidth = chanStopFreq - chanStartFreq;
@@ -9311,12 +9129,12 @@ void AfcManager::runExclusionZoneAnalysis()
 	CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel.type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
 	// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
 	double spectralOverlapLossDB;
-	bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI, spectralAlgorithm);
+	bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), useACI, spectralAlgorithm);
 	double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
 
 	if (!hasOverlap) {
 		throw std::runtime_error(ErrStream() << "ERROR: Specified RLAN spectrum does not overlap FS spectrum. FSID: " << _exclusionZoneFSID
-				<< " goes from " << uls->getStartUseFreq() / 1.0e6 << " MHz to " << uls->getStopUseFreq() / 1.0e6 << " MHz");
+				<< " goes from " << uls->getStartFreq() / 1.0e6 << " MHz to " << uls->getStopFreq() / 1.0e6 << " MHz");
 	}
 	LOGGER_INFO(logger) << "FSID = " << _exclusionZoneFSID << " found";
 	LOGGER_INFO(logger) << "LON: " << uls->getRxLongitudeDeg();
@@ -9726,7 +9544,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 			double pathDifference;
 			double fresnelIndex = -1.0;
 			double ulsLinkDistance = uls->getLinkDistance();
-			double ulsWavelength = CConst::c / ((uls->getStartUseFreq() + uls->getStopUseFreq()) / 2);
+			double ulsWavelength = CConst::c / ((uls->getStartFreq() + uls->getStopFreq()) / 2);
 			if (ulsLinkDistance != -1.0)
 			{
 				int numPR = uls->getNumPR();
@@ -9777,7 +9595,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 			msg << QString::number(pathClutterRxDB, 'f', 3) << QString::fromStdString(pathClutterRxModelStr) << QString::number(pathClutterRxCDF, 'f', 8);
 
 			msg << QString::number(bandwidth * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
-				<< QString::number(uls->getStartUseFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopUseFreq() * 1.0e-6, 'f', 2);
+				<< QString::number(uls->getStartFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopFreq() * 1.0e-6, 'f', 2);
 
 			msg << QString::fromStdString(rxAntennaTypeStr) << QString::number(uls->getRxGain(), 'f', 3);
 			msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
@@ -10154,7 +9972,7 @@ void AfcManager::runHeatmapAnalysis()
 					CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel.type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
 					// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
 					double spectralOverlapLossDB;
-					bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartUseFreq(), uls->getStopUseFreq(), useACI, spectralAlgorithm);
+					bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), useACI, spectralAlgorithm);
 
 					if (hasOverlap > 0.0) {
 						/**************************************************************************************/
@@ -10251,7 +10069,7 @@ void AfcManager::runHeatmapAnalysis()
 								double pathDifference;
 								double fresnelIndex = -1.0;
 								double ulsLinkDistance = uls->getLinkDistance();
-								double ulsWavelength = CConst::c / ((uls->getStartUseFreq() + uls->getStopUseFreq()) / 2);
+								double ulsWavelength = CConst::c / ((uls->getStartFreq() + uls->getStopFreq()) / 2);
 								if (ulsLinkDistance != -1.0)
 								{
 									int numPR = uls->getNumPR();
@@ -10303,7 +10121,7 @@ void AfcManager::runHeatmapAnalysis()
 								msg << QString::number(pathClutterRxDB, 'f', 3) << QString::fromStdString(pathClutterRxModelStr) << QString::number(pathClutterRxCDF, 'f', 8);
 
 								msg << QString::number(_heatmapRLANBWHz * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
-									<< QString::number(uls->getStartUseFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopUseFreq() * 1.0e-6, 'f', 2);
+									<< QString::number(uls->getStartFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopFreq() * 1.0e-6, 'f', 2);
 
 								msg << QString::fromStdString(rxAntennaTypeStr) << QString::number(uls->getRxGain(), 'f', 3);
 								msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);

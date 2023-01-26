@@ -92,11 +92,9 @@ public:
 	std::string getRegion() const;
 	CConst::ULSTypeEnum getType();
 	ListClass<Vector3> *getSatellitePositionData();
-	double getStartAllocFreq();
-	double getStopAllocFreq();
-	double getStartUseFreq();
-	double getStopUseFreq();
-	double getBandwidth();
+	double getStartFreq();
+	double getStopFreq();
+	double getNoiseBandwidth();
 	std::string getRadioService();
 	std::string getEntityName();
 	std::string getCallsign();
@@ -173,11 +171,9 @@ public:
 	Vector3 getDiversityPosition() { return diversityPosition; }
 	Vector3 getDiversityAntennaPointing() { return diversityAntennaPointing; }
 
-	void setStartAllocFreq(double f);
-	void setStopAllocFreq(double f);
-	void setStartUseFreq(double f);
-	void setStopUseFreq(double f);
-	void setBandwidth(double b);
+	void setStartFreq(double f);
+	void setStopFreq(double f);
+	void setNoiseBandwidth(double b);
 	void setRadioService(std::string radioServiceVal);
 	void setEntityName(std::string entityNameVal);
 	void setCallsign(std::string callsignVal);
@@ -203,7 +199,6 @@ public:
 	void setAzimuthAngleToTx(double azimuthAngleToTxVal);
 	void setElevationAngleToTx(double elevationAngleToTxVal);
 
-	void setUseFrequency();
 	void setNoiseLevelDBW(double noiseLevelDBWVal);
 	void setRxGain(double rxGainVal);
 	void setRxDlambda(double rxDlambdaVal);
@@ -273,11 +268,9 @@ private:
 	int dbIdx;
 	int numPR;
 	std::string region;
-	double startAllocFreq;
-	double stopAllocFreq;
-	double startUseFreq;
-	double stopUseFreq;
-	double bandwidth;
+	double startFreq;
+	double stopFreq;
+	double noiseBandwidth;
 	std::string callsign;
 	std::string rxCallsign;
 	int rxAntennaNumber;
