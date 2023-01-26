@@ -98,9 +98,6 @@ class ULS(Base):
     #: TX EIRP (dBm)
     tx_eirp = Column(Float)
 
-    #: Emissions Designator
-    emissions_des = Column(String(64), nullable=False)
-
     #: Tx Lat Coords
     tx_lat_deg = Column(Float)
 
@@ -283,8 +280,6 @@ def convertULS(data_file, state_root, logFile, fileName):
                     freq_assigned_end_mhz=_as_float(row['Upper Band (MHz)']),
                     #: Tx EIRP (dBm)
                     tx_eirp=_as_float(row['Tx EIRP (dBm)']),
-                    #: Emissions Designator
-                    emissions_des=str(row['Emissions Designator']),
                     #: Tx Lat Coords
                     tx_lat_deg=_as_float(row['Tx Lat Coords']),
                     #: Tx Long Coords

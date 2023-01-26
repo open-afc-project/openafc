@@ -170,7 +170,6 @@ class AfcManager
 		void readULSData(const std::vector<std::tuple<std::string, std::string>>& ulsDatabaseList, PopGridClass *popGrid, int linkDirection,
 				double minFreq, double maxFreq, bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
 				const double& minLat=-90, const double& maxLat=90, const double& minLon=-180, const double& maxLon=180); // Reads a database for FS stations information
-		double getBandwidth(std::string emissionsDesignator);
 		double getAngleFromDMS(std::string dmsStr);
 		int findULSAntenna(std::string strval);
 		bool computeSpectralOverlapLoss(double *spectralOverlapLossDBptr, double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq, bool aciFlag, CConst::SpectralAlgorithmEnum spectralAlgorithm) const;

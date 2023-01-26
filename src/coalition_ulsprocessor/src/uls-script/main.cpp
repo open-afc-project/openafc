@@ -14,11 +14,21 @@
 
 bool removeMobile = false;
 bool includeUnii8 = false;
+bool debugFlag    = false;
 
 void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inputFile, std::string outputFile);
 void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn, AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment);
 void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn, AntennaModelMapClass &antennaModelMap);
 void makeLink(const StationDataCAClass &station, const QList<PassiveRepeaterCAClass> &prList, std::vector<int> &idxList, double &azimuthPtg, double &elevationPtg);
+
+/******************************************************************************************/
+/* This flag will adjust longitude/latitude values to be consistent with what             */
+/* Federated/QCOM are doing.  Values will be adjusted as if printed with                  */
+/* numDigit digits, then read back in.                                                    */
+/******************************************************************************************/
+bool alignFederatedFlag = true;
+double alignFederatedScale = 1.0E8; // 10 ^ numDigit
+/******************************************************************************************/
 
 int main(int argc, char **argv)
 {
@@ -71,14 +81,19 @@ int main(int argc, char **argv)
         return 0;
     } else if (mode == "proc_uls") {
         // Do nothing
+    } else if (mode == "proc_uls_debug") {
+        debugFlag = true;
     } else if (mode == "proc_uls_include_unii8") {
         includeUnii8 = true;
+    } else if (mode == "proc_uls_include_unii8_debug") {
+        includeUnii8 = true;
+        debugFlag = true;
     } else {
         fprintf(stderr, "ERROR: Invalid mode: %s\n", mode.c_str());
         return -1;
     }
 
-    UlsFileReader r(inputFile.c_str(), fwarn);
+    UlsFileReader r(inputFile.c_str(), fwarn, alignFederatedFlag, alignFederatedScale);
 
     int maxNumPRUS = r.computeStatisticsUS(fccFreqAssignment, includeUnii8);
     int maxNumPRCA = r.computeStatisticsCA(fwarn);
@@ -156,7 +171,18 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
     int numAntUnmatch = 0;
     int numMissingRxAntHeight = 0;
     int numMissingTxAntHeight = 0;
+    int numFreqAssignedMissing = 0;
+    int numUnableGetBandwidth = 0;
+    int numFreqUpperBandMissing = 0;
+    int numFreqUpperBandPresent = 0;
+    int numFreqInconsistent = 0;
+    int numAssignedStart  = 0; // Number of times frequencyAssigned, frequencyUpperBand consistent with frequencyAssigned being startFreq
+    int numAssignedCenter = 0; // Number of times frequencyAssigned, frequencyUpperBand consistent with frequencyAssigned being centerFreq
+    int numAssignedOther  = 0; // Number of times frequencyAssigned, frequencyUpperBand not consistent with frequencyAssigned being startFreq or centerFreq
 
+    if (debugFlag) {
+        std::cout << "Item,Callsign,frequencyAssigned,frequencyUpperBand" <<  std::endl;
+    }
 
     foreach (const UlsFrequency &freq, r.frequencies()) {
         // qDebug() << "processing frequency " << cnt << "/" << r.frequencies().count()
@@ -373,36 +399,22 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
             }
 
             /// Find the emissions information.
-            UlsEmission txEm;
             bool txEmFound = false;
-            bool hasMultipleTxEm = false;
             QList<UlsEmission> allTxEm;
             foreach (const UlsEmission &e, r.emissionsMap(path.callsign)) {
                 if (strcmp(e.callsign, path.callsign) == 0) {
                     if (e.locationId == txLoc.locationNumber &&
                         e.antennaId == txAnt.antennaNumber &&
                         e.frequencyId == txFreq.frequencyNumber) {
-                        if (txEmFound) {
-                            hasMultipleTxEm = true;
-                            allTxEm << e;
-                            continue;
-                        } else {
-                            allTxEm << e;
-                            txEm = e;
-                            txEmFound = true;
-                        }
-                        // break;
+                        allTxEm << e;
+                        txEmFound = true;
                     }
                 }
             }
             if (!txEmFound) {
+                UlsEmission txEm;
                 allTxEm << txEm; // Make sure at least one emission.
             }
-
-            // if (hasMultipleTxEm) {
-            //   qDebug() << "callsign " << path.callsign
-            //            << " has multiple emission designators.";
-            // }
 
             /// Find the header.
             UlsHeader txHeader;
@@ -454,24 +466,59 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
 
             /// Build the actual output.
             foreach (const UlsEmission &e, allTxEm) {
+                double startFreq  = std::numeric_limits<double>::quiet_NaN();
+                double stopFreq = std::numeric_limits<double>::quiet_NaN();
+                double startFreqBand  = std::numeric_limits<double>::quiet_NaN();
+                double stopFreqBand = std::numeric_limits<double>::quiet_NaN();
                 double bwMHz = std::numeric_limits<double>::quiet_NaN();
-                double lowFreq, highFreq;
-                if (txEmFound) {
-                    bwMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(e.desig);
-                    if ( (bwMHz == -1.0) || (bwMHz > 60.0) || (bwMHz == 0) ) {
+                bool freqInconsistentFlag = false;
+                bool freqUpperBandMissingFlag = false;
+
+                if (isnan(txFreq.frequencyAssigned)) {
+                    numFreqAssignedMissing++;
+                    anomalousReason.append("FrequencyAssigned value missing");
+                } else {
+                    if (txEmFound) {
+                        bwMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(e.desig);
+                    }
+                    if ( (bwMHz == -1.0) || (bwMHz > 60.0) || (bwMHz == 0) || isnan(bwMHz) ) {
                         bwMHz = freqAssignment.getBandwidth(txFreq.frequencyAssigned);
                     }
                     if (bwMHz == -1.0) {
+                        numUnableGetBandwidth++;
                         anomalousReason.append("Unable to get bandwidth");
+                    } else if (isnan(txFreq.frequencyUpperBand)) {
+                        freqUpperBandMissingFlag = true;
+                        startFreq  = txFreq.frequencyAssigned - bwMHz / 2.0; // Lower Band (MHz)
+                        stopFreq = txFreq.frequencyAssigned + bwMHz / 2.0; // Upper Band (MHz)
+                        startFreqBand = startFreq;
+                        stopFreqBand = stopFreq;
+                    } else {
+                        // frequencyAssigned is taken to be center frequency and frequencyUpperBand is ignored as per TS 1014
+                        startFreq  = txFreq.frequencyAssigned - bwMHz / 2.0; // Lower Band (MHz)
+                        stopFreq = txFreq.frequencyAssigned + bwMHz / 2.0; // Upper Band (MHz)
+
+                        // For the purpuse of determining which UNII band the link is in, frequencyAssigned is the start freq
+                        startFreqBand = txFreq.frequencyAssigned;  // Lower Band (MHz)
+                        stopFreqBand = startFreqBand + bwMHz; // Upper Band (MHz)
+
+                        if (fabs(txFreq.frequencyUpperBand - txFreq.frequencyAssigned - bwMHz) > 1.0e-6) {
+                            freqInconsistentFlag = true;
+                            std::stringstream stream;
+                            stream << "frequencyUpperBand = " << txFreq.frequencyUpperBand <<
+                                      " inconsistent with frequencyAssigned and bandwidth ";
+                            fixedReason.append(QString::fromStdString(stream.str()));
+                            stream.str(std::string());
+                        }
+
+                        if (fabs(txFreq.frequencyUpperBand - txFreq.frequencyAssigned - bwMHz) < 1.0e-6) {
+                            numAssignedStart++;
+                        } else if (fabs(txFreq.frequencyUpperBand - txFreq.frequencyAssigned - bwMHz/2) < 1.0e-6) {
+                            numAssignedCenter++;
+                        } else {
+                            numAssignedOther++;
+                        }
                     }
-                }
-                if (txFreq.frequencyUpperBand > txFreq.frequencyAssigned) {
-                    lowFreq = txFreq.frequencyAssigned;  // Lower Band (MHz)
-                    highFreq = txFreq.frequencyUpperBand; // Upper Band (MHz)
-                    // Here Frequency Assigned should be low + high / 2
-                } else {
-                    lowFreq  = txFreq.frequencyAssigned - bwMHz / 2.0; // Lower Band (MHz)
-                    highFreq = txFreq.frequencyAssigned + bwMHz / 2.0; // Upper Band (MHz)
                 }
 
                 AntennaModelClass *rxAntModel = antennaModelMap.find(std::string(rxAnt.antennaModel));
@@ -519,12 +566,12 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     fixedReason.append("Tx Antenna Model Unmatched");
                 }
 
-                if(isnan(lowFreq) || isnan(highFreq)) {
+                if(isnan(startFreq) || isnan(stopFreq)) {
                     anomalousReason.append("NaN frequency value, ");
                 } else {
-                    bool overlapUnii5 = (highFreq > UlsFunctionsClass::unii5StartFreqMHz) && (lowFreq < UlsFunctionsClass::unii5StopFreqMHz);
-                    bool overlapUnii7 = (highFreq > UlsFunctionsClass::unii7StartFreqMHz) && (lowFreq < UlsFunctionsClass::unii7StopFreqMHz);
-                    bool overlapUnii8 = (highFreq > UlsFunctionsClass::unii8StartFreqMHz) && (lowFreq < UlsFunctionsClass::unii8StopFreqMHz);
+                    bool overlapUnii5 = (stopFreqBand > UlsFunctionsClass::unii5StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii5StopFreqMHz);
+                    bool overlapUnii7 = (stopFreqBand > UlsFunctionsClass::unii7StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii7StopFreqMHz);
+                    bool overlapUnii8 = (stopFreqBand > UlsFunctionsClass::unii8StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii8StopFreqMHz);
 
                     if (!(overlapUnii5 || overlapUnii7 || (includeUnii8 && overlapUnii8))) {
                         continue;
@@ -549,6 +596,23 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
 
                 // now that we have everything, ensure that inputs have what we need
                 anomalousReason.append(UlsFunctionsClass::hasNecessaryFields(e, path, rxLoc, txLoc, rxAnt, txAnt, txHeader, prLocList, prAntList, removeMobile));
+
+                if(anomalousReason.length() == 0) {
+                    if (freqInconsistentFlag) {
+                        numFreqInconsistent++;
+                    }
+                    if (freqUpperBandMissingFlag) {
+                        numFreqUpperBandMissing++;
+                    } else {
+                        numFreqUpperBandPresent++;
+                        if (debugFlag) {
+                            std::cout << "Inband link with Frequency Upper Band specified," <<  path.callsign
+                                      << "," << txFreq.frequencyAssigned
+                                      << "," << txFreq.frequencyUpperBand
+                                      << std::endl;
+                        }
+                    }
+                }
 
                 QStringList row;
                 row << "US";                            // Region
@@ -593,26 +657,10 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     row << "";
                 }
 
-                {
-                    QString _freq;
-                    // If this is true, frequencyAssigned IS the lower band
-                    if (txFreq.frequencyUpperBand > txFreq.frequencyAssigned) {
-                        _freq = QString("%1").arg( (txFreq.frequencyAssigned + txFreq.frequencyUpperBand) / 2);
-                    } else {
-                        _freq = QString("%1").arg(txFreq.frequencyAssigned);
-                    }
-                    row << _freq; // Center Frequency (MHz)
-                }
-      
-                {
-                    if (txEmFound) {
-                        row << UlsFunctionsClass::makeNumber(bwMHz); // Bandiwdth (MHz)
-                    } else {
-                        row << "";
-                    }
-                    row << UlsFunctionsClass::makeNumber(lowFreq); // Lower Band (MHz)
-                    row << UlsFunctionsClass::makeNumber(highFreq); // Upper Band (MHz)
-                }
+                row << UlsFunctionsClass::makeNumber((startFreq + stopFreq)/2); // Center Frequency (MHz)
+                row << UlsFunctionsClass::makeNumber(bwMHz); // Bandiwdth (MHz)
+                row << UlsFunctionsClass::makeNumber(startFreq); // Lower Band (MHz)
+                row << UlsFunctionsClass::makeNumber(stopFreq); // Upper Band (MHz)
 
                 row << UlsFunctionsClass::makeNumber(txFreq.tolerance);               // Tolerance (%)
                 row << UlsFunctionsClass::makeNumber(txFreq.EIRP);                    // Tx EIRP (dBm)
@@ -791,6 +839,15 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
     std::cout << "US NUM Missing Rx Antenna Height: " << numMissingRxAntHeight << std::endl;
     std::cout << "US NUM Missing Tx Antenna Height: " << numMissingTxAntHeight << std::endl;
 
+    std::cout << "US Num Frequency Assigned Missing: "   << numFreqAssignedMissing  << std::endl;
+    std::cout << "US Num Unable To Get Bandwidth: "      << numUnableGetBandwidth   << std::endl;
+    std::cout << "US Num Frequency Upper Band Missing: " << numFreqUpperBandMissing << std::endl;
+    std::cout << "US Num Frequency Upper Band Present: " << numFreqUpperBandPresent << std::endl;
+    std::cout << "US Num Frequency Inconsistent: "       << numFreqInconsistent     << std::endl;
+    std::cout << "US Num Frequency Assigned = Start: "   << numAssignedStart        << std::endl;
+    std::cout << "US Num Frequency Assigned = Center: "  << numAssignedCenter       << std::endl;
+    std::cout << "US Num Frequency Assigned = Other: "   << numAssignedOther        << std::endl;
+
     std::cout<<"US Processed " << r.frequencies().count()
              << " frequency records and output to file; a total of " << numRecs
              << " output"<<'\n';
@@ -840,16 +897,16 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     break;
             }
 
-            double lowFreq  = station.centerFreqMHz - station.bandwidthMHz/2; // Lower Band (MHz)
-            double highFreq = station.centerFreqMHz + station.bandwidthMHz/2; // Upper Band (MHz)
+            double startFreq  = station.centerFreqMHz - station.bandwidthMHz/2; // Lower Band (MHz)
+            double stopFreq = station.centerFreqMHz + station.bandwidthMHz/2; // Upper Band (MHz)
 
-            if(isnan(lowFreq) || isnan(highFreq)) {
+            if(isnan(startFreq) || isnan(stopFreq)) {
                 anomalousReason.append("NaN frequency value, ");
             } else {
-                bool overlapUnii5 = (highFreq > UlsFunctionsClass::unii5StartFreqMHz) && (lowFreq < UlsFunctionsClass::unii5StopFreqMHz);
-                bool overlapUnii6 = (highFreq > UlsFunctionsClass::unii6StartFreqMHz) && (lowFreq < UlsFunctionsClass::unii6StopFreqMHz);
-                bool overlapUnii7 = (highFreq > UlsFunctionsClass::unii7StartFreqMHz) && (lowFreq < UlsFunctionsClass::unii7StopFreqMHz);
-                bool overlapUnii8 = (highFreq > UlsFunctionsClass::unii8StartFreqMHz) && (lowFreq < UlsFunctionsClass::unii8StopFreqMHz);
+                bool overlapUnii5 = (stopFreq > UlsFunctionsClass::unii5StartFreqMHz) && (startFreq < UlsFunctionsClass::unii5StopFreqMHz);
+                bool overlapUnii6 = (stopFreq > UlsFunctionsClass::unii6StartFreqMHz) && (startFreq < UlsFunctionsClass::unii6StopFreqMHz);
+                bool overlapUnii7 = (stopFreq > UlsFunctionsClass::unii7StartFreqMHz) && (startFreq < UlsFunctionsClass::unii7StopFreqMHz);
+                bool overlapUnii8 = (stopFreq > UlsFunctionsClass::unii8StartFreqMHz) && (startFreq < UlsFunctionsClass::unii8StopFreqMHz);
 
                 if (!(overlapUnii5 || overlapUnii7 || overlapUnii6 || (includeUnii8 && overlapUnii8))) {
                     anomalousReason.append("Out of band, ");

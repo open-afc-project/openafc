@@ -3,6 +3,7 @@
 #include <math.h>
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 
 #include "UlsFunctions.h"
 
@@ -28,7 +29,9 @@ QString UlsFunctionsClass::makeNumber(const double &d) {
     if (std::isnan(d)) {
         return "";
     } else {
-        return QString::number(d, 'f', 15);
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(15) << d;
+        return QString::fromStdString(stream.str());
     }
 }
 

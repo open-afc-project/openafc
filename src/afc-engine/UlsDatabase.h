@@ -28,7 +28,6 @@ struct UlsRecord
 	std::string rxCallsign;
 	int rxAntennaNumber;
 	double startFreq, stopFreq;
-	std::string emissionsDesignator;
 	double txLatitudeDeg, txLongitudeDeg;
 	double txGroundElevation;
 	std::string txPolarization;
@@ -116,7 +115,6 @@ public:
 	int rx_antenna_numIdx;
 	int freq_assigned_start_mhzIdx;
 	int freq_assigned_end_mhzIdx;
-	int emissions_desIdx;
 	int tx_lat_degIdx;
 	int tx_long_degIdx;
 	int tx_ground_elev_mIdx;

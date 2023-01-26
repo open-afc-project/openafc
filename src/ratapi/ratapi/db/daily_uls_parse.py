@@ -863,4 +863,4 @@ if __name__ == '__main__':
     if not (processUS or processCA):
         raise Exception('ERROR: No regions specified')
 
-    daily_uls_parse("/var/lib/fbrat", interactive)
+    daily_uls_parse("/mnt/nfs/rat_transfer", interactive)
