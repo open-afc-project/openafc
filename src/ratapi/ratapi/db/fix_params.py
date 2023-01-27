@@ -4,6 +4,7 @@ import math
 from os.path import exists
 
 csmap = {}
+fsidmap = {}
 c  = 2.99792458e8
 unii5StartFreqMHz = 5925
 unii5StopFreqMHz  = 6425
@@ -175,6 +176,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                 csmap[keyv].append(row)
             else:
                 csmap[keyv] = [ row ]
+        file_handle.close()
     
         all_cs = list(csmap.keys())
         for keyv in sorted(all_cs):
@@ -731,21 +733,30 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                     r[nearFieldEfficiencyStr] = str(rxNearFieldAntEfficiency)
                     ####################################################################################
 
-            for r in csmap[keyv]:
-                numPR = int(r['Num Passive Repeater'])
-                for prIdx in range(numPR):
-                    prNum = prIdx+1
-                    prType = r['Passive Repeater ' + str(prNum) + ' Ant Type']
-                    if (prType == 'Ant') and False:
-                        rxGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Rx (dBi)'
-                        txGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Tx (dBi)'
-                        rxGain = r[rxGainStr]
-                        txGain = r[txGainStr]
-                        txFlag = False
-                        if txGain != '':
-                            if ((float(txGain) >= 32.0) and (float(txGain) <= 48.0)):
-                                txFlag = True
-                        if not txFlag:
-                            r[txGainStr] = rxGain
-                csvwriter.writerow(r)
-            file_handle.close()
+            for ri,r in enumerate(csmap[keyv]):
+                fsid = int(r['FSID'])
+                if fsid in fsidmap:
+                    sys.exit('ERROR: FSID: ' + str(fsid) + " not unique\n")
+                fsidmap[fsid] = tuple([ri, keyv])
+
+        for fsid in sorted(fsidmap.keys()):
+            ri = fsidmap[fsid][0]
+            keyv = fsidmap[fsid][1]
+            r = csmap[keyv][ri]
+
+            numPR = int(r['Num Passive Repeater'])
+            for prIdx in range(numPR):
+                prNum = prIdx+1
+                prType = r['Passive Repeater ' + str(prNum) + ' Ant Type']
+                if (prType == 'Ant') and False:
+                    rxGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Rx (dBi)'
+                    txGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Tx (dBi)'
+                    rxGain = r[rxGainStr]
+                    txGain = r[txGainStr]
+                    txFlag = False
+                    if txGain != '':
+                        if ((float(txGain) >= 32.0) and (float(txGain) <= 48.0)):
+                            txFlag = True
+                    if not txFlag:
+                        r[txGainStr] = rxGain
+            csvwriter.writerow(r)

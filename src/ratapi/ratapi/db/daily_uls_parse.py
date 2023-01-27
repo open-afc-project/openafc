@@ -713,12 +713,15 @@ def daily_uls_parse(state_root, interactive):
     # output filename from sortCallsignsAddFSID
     # fsidTableFile is a datafile used by sortCallsignsAddFSID
     sortedOutput = bpsScriptOutput.replace(".csv", "_sorted.csv")
-    fsidTableFile =  root + '/data_files/fsid_table.csv'
 
     ###########################################################################
     # If runSortCallsignsAddFSIDFlag set, run sortCallsignsAddFSID            #
     ###########################################################################
     if runSortCallsignsAddFSIDFlag:
+        fsidTableFile =  root + '/data_files/fsid_table.csv'
+        fsidTableBakFile =  root + '/data_files/fsid_table_bak_' + nameTime + '.csv'
+        logFile.write("Backing up FSID table for to: " + fsidTableBakFile + '\n')
+        subprocess.call(['cp', fsidTableFile, fsidTableBakFile]) 
         logFile.write("Running through sort callsigns add FSID script" + '\n')
         sortCallsignsAddFSID(bpsScriptOutput, fsidTableFile, sortedOutput, logFile)
     ###########################################################################
