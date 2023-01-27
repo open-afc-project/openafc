@@ -270,7 +270,6 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                 if (abs(prHeightAnt-prHeightULS) <= 0.1) and (abs(prWidthAnt-prWidthULS) <= 0.1):
                                     prHeight = prHeightULS
                                     prWidth = prWidthULS
-
                                 else:
                                     ulsTypicalFlag = isTypicalReflectorDimension(prHeightULS, prWidthULS)
                                     antTypicalFlag = isTypicalReflectorDimension(prHeightAnt, prWidthAnt)
