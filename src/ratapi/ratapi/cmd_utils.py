@@ -150,7 +150,7 @@ class Command(object):
         self._mixins.append(obj)
         obj.set_command(self)
         
-        for (name,func) in obj.donate_funcs().iteritems():
+        for (name,func) in obj.donate_funcs().items():
             setattr(self, name, func)
     
     def apply_mixin_args(self, parser):

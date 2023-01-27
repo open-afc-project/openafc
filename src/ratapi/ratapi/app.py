@@ -199,9 +199,9 @@ def create_app(config_override=None):
             os.makedirs(uls_databases)
 
         # get static uls data path
-        flaskapp.config['DEFAULT_ULS_DIR'] = next(
-            BaseDirectory.load_data_paths('fbrat', 'afc-engine',
-                                          'ULS_Database'), None)
+        #flaskapp.config['DEFAULT_ULS_DIR'] = next(
+        #    BaseDirectory.load_data_paths('fbrat', 'afc-engine',
+        #                                  'ULS_Database'), None)
         if flaskapp.config['DEFAULT_ULS_DIR'] is None:
             LOGGER.error("No default ULS directory found in path search")
 
@@ -213,13 +213,11 @@ def create_app(config_override=None):
 
         # List of (URL paths from root URL, absolute local filesystem paths,
         # read-only boolean)
-        dav_trees = ()
-        dav_trees = dav_trees + (('/www', next(webdata_paths), True),)
-
-        dav_trees = dav_trees + (('/ratapi/v1/files/uls_db', uls_databases,
-                                  False),
-                                 ('/ratapi/v1/files/antenna_pattern',
-                                  antenna_patterns, False),)
+        dav_trees = (
+            ('/www', next(webdata_paths), True),
+            ('/ratapi/v1/files/uls_db', uls_databases, False),
+            ('/ratapi/v1/files/antenna_pattern', antenna_patterns, False)
+        )
 
         dataif = data_if.DataIf(
             fsroot=flaskapp.config['STATE_ROOT_PATH'],
@@ -356,12 +354,11 @@ def create_app(config_override=None):
             # Re-raise the BuildError, in context of original traceback.
             exc_type, exc_value, traceback = sys.exc_info()
             if exc_value is error:
-                raise [exc_type, exc_value, traceback]
+                raise exc_type(exc_value).with_traceback(traceback)
             else:
                 raise error
         # url_for will use this result, instead of raising BuildError.
         val = flaskapp.config['APPLICATION_ROOT'] + url
-        LOGGER.debug("found endpoint: %s", val)
         return val
 
     flaskapp.url_build_error_handlers.append(external_url_handler)
