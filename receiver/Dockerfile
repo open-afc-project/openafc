@@ -16,6 +16,7 @@ pip3 install --no-cache --upgrade pip setuptools
 COPY receiver/requirements.txt /wd/
 RUN pip3 install -r /wd/requirements.txt && mkdir -p /etc/xdg/fbrat
 COPY prereqs/ratapi.conf /etc/xdg/fbrat/
+RUN echo "DEFAULT_ULS_DIR = '/mnt/nfs/rat_transfer/ULS_Database'" >> /etc/xdg/fbrat/ratapi.conf
 RUN echo "AFC_APP_TYPE = 'server'" >> /etc/xdg/fbrat/ratapi.conf
 #
 # Build Message Handler application
@@ -44,14 +45,11 @@ COPY --from=receiver.preinstall / /
 COPY --from=receiver.build /wd/__install /usr/
 COPY --from=receiver.build /usr/lib/python3.10/site-packages/mod_wsgi /usr/lib/python3.10/site-packages/mod_wsgi
 #
-RUN mkdir -p /var/spool/fbrat /var/lib/fbrat && \
-mkdir -p /var/lib/fbrat/AntennaPatterns
 # Add user and group
 RUN addgroup -g 1003 fbrat && \
 adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat
-RUN chown fbrat:fbrat -R /var/lib/fbrat/AntennaPatterns /var/spool/fbrat /usr/share/fbrat /var/lib/fbrat
-RUN ln -s /usr/share/fbrat/rat_transfer/ULS_Database /var/lib/fbrat/ULS_Database
-RUN ln -s /usr/share/fbrat/rat_transfer/frequency_bands /var/lib/fbrat/frequency_bands
+RUN mkdir -p /var/spool/fbrat /var/lib/fbrat /mnt/nfs /var/lib/fbrat/daily_uls_parse
+RUN chown fbrat:fbrat /var/spool/fbrat /usr/share/fbrat /var/lib/fbrat /var/lib/fbrat/daily_uls_parse
 #
 LABEL revision="afc-receiver"
 WORKDIR /wd
@@ -60,6 +58,7 @@ COPY receiver/httpd.conf /usr/local/apache2/conf/
 COPY receiver/httpd-default.conf receiver/httpd-info.conf receiver/httpd-vhosts.conf receiver/httpd-mpm.conf receiver/httpd-dav.conf /usr/local/apache2/conf/extra/
 COPY receiver/fbrat.wsgi /usr/local/apache2/fbrat.wsgi
 RUN chown fbrat:fbrat /usr/local/apache2/fbrat.wsgi
+ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 # Add debugging env if configured
 ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 COPY receiver/devel.sh receiver/.bashrc /wd/

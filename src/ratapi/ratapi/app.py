@@ -175,8 +175,6 @@ def create_app(config_override=None):
 
     # Static file dispatchers
     if flaskapp.config['AFC_APP_TYPE'] == 'server':
-        if not os.path.exists(os.path.join(nfs_mount_path, 'responses')):
-            os.makedirs(os.path.join(nfs_mount_path, 'responses'))
         if not os.path.exists(os.path.join(nfs_mount_path, 'rat_transfer', 'frequency_bands')):
             os.makedirs(os.path.join(nfs_mount_path, 'rat_transfer', 'frequency_bands'))
 
@@ -199,9 +197,6 @@ def create_app(config_override=None):
             os.makedirs(uls_databases)
 
         # get static uls data path
-        #flaskapp.config['DEFAULT_ULS_DIR'] = next(
-        #    BaseDirectory.load_data_paths('fbrat', 'afc-engine',
-        #                                  'ULS_Database'), None)
         if flaskapp.config['DEFAULT_ULS_DIR'] is None:
             LOGGER.error("No default ULS directory found in path search")
 
@@ -359,6 +354,7 @@ def create_app(config_override=None):
                 raise error
         # url_for will use this result, instead of raising BuildError.
         val = flaskapp.config['APPLICATION_ROOT'] + url
+        LOGGER.debug("found endpoint: %s", val)
         return val
 
     flaskapp.url_build_error_handlers.append(external_url_handler)

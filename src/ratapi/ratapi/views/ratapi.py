@@ -116,7 +116,7 @@ class GuiConfig(MethodView):
             if sys.version_info.major != 3:
                 serververs = pkg_resources.require('ratapi')[0].version
             else:
-                serververs = pkg_resources.get_distribution('ratapi')
+                serververs = pkg_resources.get_distribution('ratapi').version
         except Exception as err:
             LOGGER.error('Failed to fetch server version: {0}'.format(err))
             serververs = 'unknown'
