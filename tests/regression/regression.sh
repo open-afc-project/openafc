@@ -112,8 +112,8 @@ build_dev_server() {
   cd ${wd}/tests && docker_build Dockerfile ${RTEST_DI}:${tag}; cd ${wd}
 
   # build in parallel server docker prereq images (preinstall and docker_for_build)
-    docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST}:${tag} ${push} &
-    docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B}:${tag} ${push} &
+  # docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST}:${tag} ${push} &
+  # docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B}:${tag} ${push} &
     docker_build_and_push ${wd}/worker/Dockerfile.build ${WORKER_AL_D4B}:${tag} ${push} &
     docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${WORKER_AL_PRINST}:${tag} ${push} &
 
@@ -146,7 +146,7 @@ build_dev_server() {
 
   # build afc server docker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B} --build-arg PRINST_NAME=${PRINST} --build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}" &
+  docker_build_and_push ${wd}/rat_server/Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}" &
   msg "wait for prereqs to be built"
 
   # build ALS-related images
