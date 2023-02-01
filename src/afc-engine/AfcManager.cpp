@@ -1783,6 +1783,8 @@ void AfcManager::importGUIjsonVersion1_0(const QJsonObject &jsonObj)
 		channel.availability = ChannelColor::GREEN;
 		channel.type = ChannelType::INQUIRED_CHANNEL;
 		channel.eirpLimit_dBm = 0;
+		channel.index = -1;
+		channel.operatingClass = -1;
 		channel.startFreqMHz = jsonObj["centerFrequency"].toInt() - jsonObj["bandwidth"].toInt()/2;
 		channel.stopFreqMHz = jsonObj["centerFrequency"].toInt() + jsonObj["bandwidth"].toInt()/2;
 		if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
@@ -4984,7 +4986,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 						uls->setTxHeightAboveTerrain(quietNaN);
 						uls->setTxHeightSource(CConst::unknownHeightSource);
 						uls->setTxHeightAMSL(quietNaN);
-						uls->setTxPosition(Vector3(quietNaN, quietNaN, quietNaN));
+						Vector3 nanVector3 = Vector3(quietNaN, quietNaN, quietNaN);
+						uls->setTxPosition(nanVector3);
 					}
 				}
 
@@ -5076,88 +5079,78 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								uls->getPR(segIdx).segmentDistance = segDist;
 							}
 						}
-
-						/******************************************************************/
-						/* Calculate PR parameters:                                       */
-						/*     Orthonormal basis                                          */
-						/*     thetaIN                                                    */
-						/*     alphaAZ                                                    */
-						/*     alphaEL                                                    */
-						/******************************************************************/
-						for(prIdx=numPR-1; prIdx>=0; prIdx--) {
-							PRClass& pr = uls->getPR(prIdx);
-							double nextSegDist = ((prIdx == numPR-1) ? uls->getLinkDistance() : uls->getPR(prIdx+1).segmentDistance);
-							double nextSegFSPL = 20.0 * log((4 * M_PI * centerFreq * nextSegDist) / CConst::c) / log(10.0);
-
-							if (pr.type == CConst::backToBackAntennaPRType) {
-								pr.pathSegGain = pr.rxGain + pr.txGain - nextSegFSPL;
-							} else if (pr.type == CConst::billboardReflectorPRType) {
-								Vector3 pointingA = pr.pointing;
-								Vector3 pointingB = -(prIdx == numPR-1 ? uls->getAntennaPointing() : uls->getPR(prIdx+1).pointing);
-								pr.reflectorZ = (pointingA + pointingB).normalized();              // Perpendicular to reflector surface
-								Vector3 upVec = pr.positionRx.normalized();
-								pr.reflectorX = (upVec.cross(pr.reflectorZ)).normalized();         // Horizontal
-								pr.reflectorY = (pr.reflectorZ.cross(pr.reflectorX)).normalized();
-
-								double Ax = pointingA.dot(pr.reflectorX);
-								double Ay = pointingA.dot(pr.reflectorY);
-								double Az = pointingA.dot(pr.reflectorZ);
-
-								double cosThetaIN = pointingA.dot(pr.reflectorZ);
-
-								// Spec was changed from:
-								// s = if ((alphaEL <= alphaAZ)) reflectorWidthLambda*cosThetaIN else pr.reflectorHeightLambda*cosThetaIN
-								// to
-								// s = MAX(reflectorWidthLambda, reflectorHeightLambda)*cosThetaIN
-								
-								bool conditionW;
-								if (0) {
-									// previous spec
-									double alphaAZ = (180.0/M_PI)*fabs(atan(Ax/Az));
-									double alphaEL = (180.0/M_PI)*fabs(atan(Ay/Az));
-									conditionW = (alphaEL <= alphaAZ);
-								} else {
-									// current spec
-									conditionW = (pr.reflectorWidthLambda >= pr.reflectorHeightLambda);
-								}
-
-								if (conditionW) {
-									pr.reflectorSLambda = pr.reflectorWidthLambda*cosThetaIN;
-								} else {
-									pr.reflectorSLambda = pr.reflectorHeightLambda*cosThetaIN;
-								}
-								pr.reflectorTheta1 = (180.0/M_PI)*asin(1.0/(2*pr.reflectorSLambda));
-								double Ks = 4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN*lambda/(M_PI*nextSegDist);
-								double alpha_n = 20*log10(M_PI*Ks/4);
-
-								double Q = -1.0;
-								if ( (Ks <= 0.4) || ((prIdx < numPR-1) && (uls->getPR(prIdx+1).type == CConst::billboardReflectorPRType)) ) {
-									pr.pathSegGain = std::min(3.0,alpha_n);
-								} else {
-									double nextDlambda = ((prIdx == numPR-1) ? uls->getRxDlambda() : uls->getPR(prIdx+1).rxDlambda);
-									Q = nextDlambda*sqrt(M_PI/(4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN));
-									pr.pathSegGain = _prTable->computePRTABLE(Q, 1.0/Ks);
-								}
-
-								pr.reflectorThetaIN = acos(cosThetaIN)*180.0/M_PI;
-								pr.reflectorKS = Ks;
-								pr.reflectorQ = Q;
-							}
-							pr.effectiveGain = (prIdx == numPR-1 ? uls->getRxGain() : uls->getPR(prIdx+1).effectiveGain) + pr.pathSegGain;
-						}
-						/******************************************************************/
-
-					} else {
-						double az, el;
-						Vector3 xvec, yvec, zvec;
-						az = (((double)rand() / (RAND_MAX)) - 0.5) * 2 * M_PI;
-						el = (((double)rand() / (RAND_MAX)) - 0.5) * 10 * M_PI / 180.0;
-						zvec = rxPosition.normalized();
-						xvec = (Vector3(zvec.y(), -zvec.x(), 0.0)).normalized();
-						yvec = zvec.cross(xvec);
-						uls->setAntennaPointing(zvec * sin(el) + (xvec * cos(az) + yvec * sin(az)) * cos(el));
-						uls->setLinkDistance(-1.0);
 					}
+
+					/******************************************************************/
+					/* Calculate PR parameters:                                       */
+					/*     Orthonormal basis                                          */
+					/*     thetaIN                                                    */
+					/*     alphaAZ                                                    */
+					/*     alphaEL                                                    */
+					/******************************************************************/
+					for(prIdx=numPR-1; prIdx>=0; prIdx--) {
+						PRClass& pr = uls->getPR(prIdx);
+						double nextSegDist = ((prIdx == numPR-1) ? uls->getLinkDistance() : uls->getPR(prIdx+1).segmentDistance);
+						double nextSegFSPL = 20.0 * log((4 * M_PI * centerFreq * nextSegDist) / CConst::c) / log(10.0);
+
+						if (pr.type == CConst::backToBackAntennaPRType) {
+							pr.pathSegGain = pr.rxGain + pr.txGain - nextSegFSPL;
+						} else if (pr.type == CConst::billboardReflectorPRType) {
+							Vector3 pointingA = pr.pointing;
+							Vector3 pointingB = -(prIdx == numPR-1 ? uls->getAntennaPointing() : uls->getPR(prIdx+1).pointing);
+							pr.reflectorZ = (pointingA + pointingB).normalized();              // Perpendicular to reflector surface
+							Vector3 upVec = pr.positionRx.normalized();
+							pr.reflectorX = (upVec.cross(pr.reflectorZ)).normalized();         // Horizontal
+							pr.reflectorY = (pr.reflectorZ.cross(pr.reflectorX)).normalized();
+
+							double Ax = pointingA.dot(pr.reflectorX);
+							double Ay = pointingA.dot(pr.reflectorY);
+							double Az = pointingA.dot(pr.reflectorZ);
+
+							double cosThetaIN = pointingA.dot(pr.reflectorZ);
+
+							// Spec was changed from:
+							// s = if ((alphaEL <= alphaAZ)) reflectorWidthLambda*cosThetaIN else pr.reflectorHeightLambda*cosThetaIN
+							// to
+							// s = MAX(reflectorWidthLambda, reflectorHeightLambda)*cosThetaIN
+							
+							bool conditionW;
+							if (0) {
+								// previous spec
+								double alphaAZ = (180.0/M_PI)*fabs(atan(Ax/Az));
+								double alphaEL = (180.0/M_PI)*fabs(atan(Ay/Az));
+								conditionW = (alphaEL <= alphaAZ);
+							} else {
+								// current spec
+								conditionW = (pr.reflectorWidthLambda >= pr.reflectorHeightLambda);
+							}
+
+							if (conditionW) {
+								pr.reflectorSLambda = pr.reflectorWidthLambda*cosThetaIN;
+							} else {
+								pr.reflectorSLambda = pr.reflectorHeightLambda*cosThetaIN;
+							}
+							pr.reflectorTheta1 = (180.0/M_PI)*asin(1.0/(2*pr.reflectorSLambda));
+							double Ks = 4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN*lambda/(M_PI*nextSegDist);
+							double alpha_n = 20*log10(M_PI*Ks/4);
+
+							double Q = -1.0;
+							if ( (Ks <= 0.4) || ((prIdx < numPR-1) && (uls->getPR(prIdx+1).type == CConst::billboardReflectorPRType)) ) {
+								pr.pathSegGain = std::min(3.0,alpha_n);
+							} else {
+								double nextDlambda = ((prIdx == numPR-1) ? uls->getRxDlambda() : uls->getPR(prIdx+1).rxDlambda);
+								Q = nextDlambda*sqrt(M_PI/(4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN));
+								pr.pathSegGain = _prTable->computePRTABLE(Q, 1.0/Ks);
+							}
+
+							pr.reflectorThetaIN = acos(cosThetaIN)*180.0/M_PI;
+							pr.reflectorKS = Ks;
+							pr.reflectorQ = Q;
+						}
+						pr.effectiveGain = (prIdx == numPR-1 ? uls->getRxGain() : uls->getPR(prIdx+1).effectiveGain) + pr.pathSegGain;
+					}
+					/******************************************************************/
+
 				}
 
 				double noiseLevelDBW = 10.0 * log(CConst::boltzmannConstant * CConst::T0 * noiseBandwidth) / log(10.0) + noiseFigureDB;
@@ -5623,7 +5616,7 @@ double AfcManager::q(double Z) const
 /**** Compute Random Building Penetration according to ITU-R P.[BEL]                   ****/
 /**** Note that a loss value in DB is returned as a negative number.                   ****/
 /******************************************************************************************/
-double AfcManager::computeBuildingPenetration(CConst::BuildingTypeEnum buildingType, double elevationAngleDeg, double frequency, std::string &buildingPenetrationModelStr, double &buildingPenetrationCDF, bool fixedProbFlag) const
+double AfcManager::computeBuildingPenetration(CConst::BuildingTypeEnum buildingType, double elevationAngleDeg, double frequency, std::string &buildingPenetrationModelStr, double &buildingPenetrationCDF) const
 {
 	double r, s, t, u, v, w, x, y, z;
 	double A, B, C;
@@ -5678,14 +5671,7 @@ double AfcManager::computeBuildingPenetration(CConst::BuildingTypeEnum buildingT
 	sB = y + z * logf;
 
 	arma::vec gauss(1);
-	if (fixedProbFlag)
-	{
-		gauss[0] = _zbldg2109;
-	}
-	else
-	{
-		gauss = arma::randn(1);
-	}
+	gauss[0] = _zbldg2109;
 
 	A = gauss[0] * sA + mA;
 	B = gauss[0] * sB + mB;
@@ -5707,7 +5693,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 		double distKm, double fsplDistKm, double win2DistKm, double frequency,
 		double txLongitudeDeg, double txLatitudeDeg, double txHeightM, double elevationAngleTxDeg,
 		double rxLongitudeDeg, double rxLatitudeDeg, double rxHeightM, double elevationAngleRxDeg,
-		double &pathLoss, double &pathClutterTxDB, double &pathClutterRxDB, bool fixedProbFlag,
+		double &pathLoss, double &pathClutterTxDB, double &pathClutterRxDB,
 		std::string &pathLossModelStr, double &pathLossCDF,
 		std::string &pathClutterTxModelStr, double &pathClutterTxCDF, std::string &pathClutterRxModelStr, double &pathClutterRxCDF,
 		std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr
@@ -5716,8 +5702,6 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 #endif
 		) const
 {
-	// If fixedProbFlag is set, compute the path loss at specified confidence.
-
 	double frequencyGHz = frequency * 1.0e-9;
 
 	if (txClutterStrPtr)
@@ -5731,10 +5715,6 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 	}
 
 	pathLossModelStr = "";
-	if (!fixedProbFlag)
-	{
-		pathLossCDF = -1.0;
-	}
 	pathClutterTxModelStr = "";
 	pathClutterTxCDF = -1.0;
 	pathClutterRxModelStr = "";
@@ -5786,12 +5766,12 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 					if (propEnv == CConst::urbanPropEnv)
 					{
 						// Winner2 C2: urban
-						pathLoss = Winner2_C2urban(1000 * win2DistKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+						pathLoss = Winner2_C2urban(1000 * win2DistKm, rxHeightM, txHeightM, frequency, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 					}
 					else if (propEnv == CConst::suburbanPropEnv)
 					{
 						// Winner2 C1: suburban
-						pathLoss = Winner2_C1suburban(1000 * win2DistKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+						pathLoss = Winner2_C1suburban(1000 * win2DistKm, rxHeightM, txHeightM, frequency, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 					}
 				}
 				else
@@ -5905,12 +5885,12 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 					if (propEnv == CConst::urbanPropEnv)
 					{
 						// Winner2 C2: urban
-						pathLoss = Winner2_C2urban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+						pathLoss = Winner2_C2urban(1000 * distKm, rxHeightM, txHeightM, frequency, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 					}
 					else if (propEnv == CConst::suburbanPropEnv)
 					{
 						// Winner2 C1: suburban
-						pathLoss = Winner2_C1suburban(1000 * distKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+						pathLoss = Winner2_C1suburban(1000 * distKm, rxHeightM, txHeightM, frequency, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 					}
 				}
 				else
@@ -5952,14 +5932,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 				double Ls = 32.98 + 23.9 * log(distKm) / log(10.0) + 3.0 * log(frequencyGHz) / log(10.0);
 
 				arma::vec gauss(1);
-				if (fixedProbFlag)
-				{
-					gauss[0] = _zclutter2108;
-				}
-				else
-				{
-					gauss = arma::randn(1);
-				}
+				gauss[0] = _zclutter2108;
 
 				double Lctt = -5.0 * log(exp(-0.2 * Ll * log(10.0)) + exp(-0.2 * Ls * log(10.0))) / log(10.0) + 6.0 * gauss[0];
 				pathClutterTxDB = Lctt;
@@ -6067,13 +6040,13 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 			double sigma, probLOS;
 			if (propEnv == CConst::urbanPropEnv) {
 				// Winner2 C2: urban
-				pathLoss = Winner2_C2urban(1000*win2DistKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+				pathLoss = Winner2_C2urban(1000*win2DistKm, rxHeightM, txHeightM, frequency, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 			} else if (propEnv == CConst::suburbanPropEnv) {
 				// Winner2 C1: suburban
-				pathLoss = Winner2_C1suburban(1000*win2DistKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+				pathLoss = Winner2_C1suburban(1000*win2DistKm, rxHeightM, txHeightM, frequency, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 			} else if ( (propEnv == CConst::ruralPropEnv) || (propEnv == CConst::barrenPropEnv) ) {
 				// Winner2 D1: rural
-				pathLoss = Winner2_D1rural(1000*win2DistKm, rxHeightM, txHeightM, frequency, fixedProbFlag, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+				pathLoss = Winner2_D1rural(1000*win2DistKm, rxHeightM, txHeightM, frequency, sigma, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 			} else {
 				throw std::runtime_error(ErrStream() << "ERROR: propEnv = " << propEnv << " INVALID value");
 			}
@@ -6126,11 +6099,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 					double Ls = 32.98 + 23.9 * log(distKm) / log(10.0) + 3.0 * log(frequencyGHz) / log(10.0);
 
 					arma::vec gauss(1);
-					if (fixedProbFlag) {
-						gauss[0] = _zclutter2108;
-					} else {
-						gauss = arma::randn(1);
-					}
+					gauss[0] = _zclutter2108;
 
 					double Lctt = -5.0 * log(exp(-0.2 * Ll * log(10.0)) + exp(-0.2 * Ls * log(10.0))) / log(10.0) + 6.0 * gauss[0];
 
@@ -6235,14 +6204,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 				double Ls = 32.98 + 23.9 * log(distKm) / log(10.0) + 3.0 * log(frequencyGHz) / log(10.0);
 
 				arma::vec gauss(1);
-				if (fixedProbFlag)
-				{
-					gauss[0] = _fsZclutter2108;
-				}
-				else
-				{
-					gauss = arma::randn(1);
-				}
+				gauss[0] = _fsZclutter2108;
 
 				double Lctt = -5.0 * log(exp(-0.2 * Ll * log(10.0)) + exp(-0.2 * Ls * log(10.0))) / log(10.0) + 6.0 * gauss[0];
 
@@ -6347,7 +6309,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_C1suburban_LOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double &pathLossCDF) const
+double AfcManager::Winner2_C1suburban_LOS(double distance, double hBS, double hMS, double frequency, double zval, double& sigma, double &pathLossCDF) const
 {
 	double retval;
 
@@ -6371,14 +6333,7 @@ double AfcManager::Winner2_C1suburban_LOS(double distance, double hBS, double hM
 	}
 
 	arma::vec gauss(1);
-	if (fixedProbFlag)
-	{
-		gauss[0] = zval;
-	}
-	else
-	{
-		gauss = arma::randn(1);
-	}
+	gauss[0] = zval;
 
 	retval += sigma * (gauss[0]);
 	pathLossCDF = q(-gauss[0]);
@@ -6395,7 +6350,7 @@ double AfcManager::Winner2_C1suburban_LOS(double distance, double hBS, double hM
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_C1suburban_NLOS(double distance, double hBS, double /* hMS */, double frequency, bool fixedProbFlag, double zval, double& sigma, double &pathLossCDF) const
+double AfcManager::Winner2_C1suburban_NLOS(double distance, double hBS, double /* hMS */, double frequency, double zval, double& sigma, double &pathLossCDF) const
 {
 	double retval;
 
@@ -6403,14 +6358,7 @@ double AfcManager::Winner2_C1suburban_NLOS(double distance, double hBS, double /
 	retval = (44.9 - 6.55 * log10(hBS)) * log10(distance) + 31.46 + 5.83 * log10(hBS) + 23.0 * log10(frequency * 1.0e-9 / 5);
 
 	arma::vec gauss(1);
-	if (fixedProbFlag)
-	{
-		gauss[0] = zval;
-	}
-	else
-	{
-		gauss = arma::randn(1);
-	}
+	gauss[0] = zval;
 
 	retval += sigma * (gauss[0]);
 	pathLossCDF = q(-gauss[0]);
@@ -6427,7 +6375,7 @@ double AfcManager::Winner2_C1suburban_NLOS(double distance, double hBS, double /
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
+double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
 {
 	double retval = quietNaN;
 
@@ -6441,20 +6389,13 @@ double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, d
 	if (losValue == 0) {
 		if (_winner2UnknownLOSMethod == CConst::PLOSCombineWinner2UnknownLOSMethod) {
 			double sigmaLOS, sigmaNLOS;
-			double plLOS  = Winner2_C1suburban_LOS( distance, hBS, hMS, frequency, true, 0.0, sigmaLOS, pathLossCDF);
-			double plNLOS = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, true, 0.0, sigmaNLOS, pathLossCDF);
+			double plLOS  = Winner2_C1suburban_LOS( distance, hBS, hMS, frequency, 0.0, sigmaLOS, pathLossCDF);
+			double plNLOS = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, 0.0, sigmaNLOS, pathLossCDF);
 			retval = probLOS*plLOS + (1.0-probLOS)*plNLOS;
 			sigma = sqrt(probLOS*probLOS*sigmaLOS*sigmaLOS + (1.0-probLOS)*(1.0-probLOS)*sigmaNLOS*sigmaNLOS);
 
 			arma::vec gauss(1);
-			if (fixedProbFlag)
-			{
-				gauss[0] = _zwinner2Combined;
-			}
-			else
-			{
-				gauss = arma::randn(1);
-			}
+			gauss[0] = _zwinner2Combined;
 
 			retval += sigma*gauss[0];
 			pathLossCDF = q(-(gauss[0]));
@@ -6463,22 +6404,22 @@ double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, d
 		} else if (_winner2UnknownLOSMethod == CConst::PLOSThresholdWinner2UnknownLOSMethod) {
 			if (probLOS > _winner2ProbLOSThr)
 			{
-				retval = Winner2_C1suburban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
+				retval = Winner2_C1suburban_LOS(distance, hBS, hMS, frequency, _zwinner2LOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2C1_SUBURBAN_LOS";
 			}
 			else
 			{
-				retval = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
+				retval = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, _zwinner2NLOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2C1_SUBURBAN_NLOS";
 			}
 		} else {
 			CORE_DUMP;
 		}
 	} else if (losValue == 1) {
-		retval = Winner2_C1suburban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
+		retval = Winner2_C1suburban_LOS(distance, hBS, hMS, frequency, _zwinner2LOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2C1_SUBURBAN_LOS";
 	} else if (losValue == 2) {
-		retval = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
+		retval = Winner2_C1suburban_NLOS(distance, hBS, hMS, frequency, _zwinner2NLOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2C1_SUBURBAN_NLOS";
 	} else {
 		CORE_DUMP;
@@ -6496,7 +6437,7 @@ double AfcManager::Winner2_C1suburban(double distance, double hBS, double hMS, d
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_C2urban_LOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double &pathLossCDF) const
+double AfcManager::Winner2_C2urban_LOS(double distance, double hBS, double hMS, double frequency, double zval, double& sigma, double &pathLossCDF) const
 {
 	double retval;
 
@@ -6520,14 +6461,7 @@ double AfcManager::Winner2_C2urban_LOS(double distance, double hBS, double hMS, 
 	}
 
 	arma::vec gauss(1);
-	if (fixedProbFlag)
-	{
-		gauss[0] = zval;
-	}
-	else
-	{
-		gauss = arma::randn(1);
-	}
+	gauss[0] = zval;
 
 	retval += sigma * (gauss[0]);
 	pathLossCDF = q(-gauss[0]);
@@ -6544,7 +6478,7 @@ double AfcManager::Winner2_C2urban_LOS(double distance, double hBS, double hMS, 
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_C2urban_NLOS(double distance, double hBS, double /* hMS */, double frequency, bool fixedProbFlag, double zval, double& sigma, double &pathLossCDF) const
+double AfcManager::Winner2_C2urban_NLOS(double distance, double hBS, double /* hMS */, double frequency, double zval, double& sigma, double &pathLossCDF) const
 {
 	double retval;
 
@@ -6552,14 +6486,7 @@ double AfcManager::Winner2_C2urban_NLOS(double distance, double hBS, double /* h
 	retval = (44.9 - 6.55 * log10(hBS)) * log10(distance) + 34.46 + 5.83 * log10(hBS) + 23.0 * log10(frequency * 1.0e-9 / 5);
 
 	arma::vec gauss(1);
-	if (fixedProbFlag)
-	{
-		gauss[0] = zval;
-	}
-	else
-	{
-		gauss = arma::randn(1);
-	}
+	gauss[0] = zval;
 
 	retval += sigma * (gauss[0]);
 	pathLossCDF = q(-gauss[0]);
@@ -6576,7 +6503,7 @@ double AfcManager::Winner2_C2urban_NLOS(double distance, double hBS, double /* h
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
+double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, double frequency, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
 {
 	double retval = quietNaN;
 
@@ -6590,18 +6517,13 @@ double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, doub
 	if (losValue == 0) {
 		if (_winner2UnknownLOSMethod == CConst::PLOSCombineWinner2UnknownLOSMethod) {
 			double sigmaLOS, sigmaNLOS;
-			double plLOS  = Winner2_C2urban_LOS( distance, hBS, hMS, frequency, true, 0.0, sigmaLOS, pathLossCDF);
-			double plNLOS = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, true, 0.0, sigmaNLOS, pathLossCDF);
+			double plLOS  = Winner2_C2urban_LOS( distance, hBS, hMS, frequency, 0.0, sigmaLOS, pathLossCDF);
+			double plNLOS = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, 0.0, sigmaNLOS, pathLossCDF);
 			retval = probLOS*plLOS + (1.0-probLOS)*plNLOS;
 			sigma = sqrt(probLOS*probLOS*sigmaLOS*sigmaLOS + (1.0-probLOS)*(1.0-probLOS)*sigmaNLOS*sigmaNLOS);
 
 			arma::vec gauss(1);
-			if (fixedProbFlag)
-			{
-				gauss[0] = _zwinner2Combined;
-			} else {
-				gauss = arma::randn(1);
-			}
+			gauss[0] = _zwinner2Combined;
 
 			retval += sigma*gauss[0];
 			pathLossCDF = q(-(gauss[0]));
@@ -6610,22 +6532,22 @@ double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, doub
 		} else if (_winner2UnknownLOSMethod == CConst::PLOSThresholdWinner2UnknownLOSMethod) {
 			if (probLOS > _winner2ProbLOSThr)
 			{
-				retval = Winner2_C2urban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
+				retval = Winner2_C2urban_LOS(distance, hBS, hMS, frequency, _zwinner2LOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2C2_URBAN_LOS";
 			}
 			else
 			{
-				retval = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
+				retval = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, _zwinner2NLOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2C2_URBAN_NLOS";
 			}
 		} else {
 			CORE_DUMP;
 		}
 	} else if (losValue == 1) {
-		retval = Winner2_C2urban_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
+		retval = Winner2_C2urban_LOS(distance, hBS, hMS, frequency, _zwinner2LOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2C2_URBAN_LOS";
 	} else if (losValue == 2) {
-		retval = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
+		retval = Winner2_C2urban_NLOS(distance, hBS, hMS, frequency, _zwinner2NLOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2C2_URBAN_NLOS";
 	} else {
 		CORE_DUMP;
@@ -6643,7 +6565,7 @@ double AfcManager::Winner2_C2urban(double distance, double hBS, double hMS, doub
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_D1rural_LOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double &pathLossCDF) const
+double AfcManager::Winner2_D1rural_LOS(double distance, double hBS, double hMS, double frequency, double zval, double& sigma, double &pathLossCDF) const
 {
 	double retval;
 
@@ -6667,14 +6589,7 @@ double AfcManager::Winner2_D1rural_LOS(double distance, double hBS, double hMS, 
 	}
 
 	arma::vec gauss(1);
-	if (fixedProbFlag)
-	{
-		gauss[0] = zval;
-	}
-	else
-	{
-		gauss = arma::randn(1);
-	}
+	gauss[0] = zval;
 
 	retval += sigma * gauss[0];
 	pathLossCDF = q(-gauss[0]);
@@ -6691,7 +6606,7 @@ double AfcManager::Winner2_D1rural_LOS(double distance, double hBS, double hMS, 
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_D1rural_NLOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double &pathLossCDF) const
+double AfcManager::Winner2_D1rural_NLOS(double distance, double hBS, double hMS, double frequency, double zval, double& sigma, double &pathLossCDF) const
 {
 	double retval;
 
@@ -6699,14 +6614,7 @@ double AfcManager::Winner2_D1rural_NLOS(double distance, double hBS, double hMS,
 	retval = 25.1 * log10(distance) + 55.4 - 0.13 * (hBS - 25) * log10(distance / 100) - 0.9 * (hMS - 1.5) + 21.3 * log10(frequency * 1.0e-9 / 5);
 
 	arma::vec gauss(1);
-	if (fixedProbFlag)
-	{
-		gauss[0] = zval;
-	}
-	else
-	{
-		gauss = arma::randn(1);
-	}
+	gauss[0] = zval;
 
 	retval += sigma * gauss[0];
 	pathLossCDF = q(-gauss[0]);
@@ -6723,7 +6631,7 @@ double AfcManager::Winner2_D1rural_NLOS(double distance, double hBS, double hMS,
 /**** hMS = MS antenna height (m)                                                      ****/
 /**** frequency = Frequency (Hz)                                                       ****/
 /******************************************************************************************/
-double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
+double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, double frequency, double& sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS, int losValue) const
 {
 	double retval = quietNaN;
 
@@ -6737,18 +6645,13 @@ double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, doub
 	if (losValue == 0) {
 		if (_winner2UnknownLOSMethod == CConst::PLOSCombineWinner2UnknownLOSMethod) {
 			double sigmaLOS, sigmaNLOS;
-			double plLOS  = Winner2_D1rural_LOS( distance, hBS, hMS, frequency, true, 0.0, sigmaLOS, pathLossCDF);
-			double plNLOS = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, true, 0.0, sigmaNLOS, pathLossCDF);
+			double plLOS  = Winner2_D1rural_LOS( distance, hBS, hMS, frequency, 0.0, sigmaLOS, pathLossCDF);
+			double plNLOS = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, 0.0, sigmaNLOS, pathLossCDF);
 			retval = probLOS*plLOS + (1.0-probLOS)*plNLOS;
 			sigma = sqrt(probLOS*probLOS*sigmaLOS*sigmaLOS + (1.0-probLOS)*(1.0-probLOS)*sigmaNLOS*sigmaNLOS);
 
 			arma::vec gauss(1);
-			if (fixedProbFlag)
-			{
-				gauss[0] = _zwinner2Combined;
-			} else {
-				gauss = arma::randn(1);
-			}
+			gauss[0] = _zwinner2Combined;
 
 			retval += sigma*gauss[0];
 			pathLossCDF = q(-(gauss[0]));
@@ -6758,22 +6661,22 @@ double AfcManager::Winner2_D1rural(double distance, double hBS, double hMS, doub
 
 			if (probLOS > _winner2ProbLOSThr)
 			{
-				retval = Winner2_D1rural_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
+				retval = Winner2_D1rural_LOS(distance, hBS, hMS, frequency, _zwinner2LOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2D1_RURAL_LOS";
 			}
 			else
 			{
-				retval = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
+				retval = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, _zwinner2NLOS, sigma, pathLossCDF);
 				pathLossModelStr = "W2D1_RURAL_NLOS";
 			}
 		} else {
 			CORE_DUMP;
 		}
 	} else if (losValue == 1) {
-		retval = Winner2_D1rural_LOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2LOS, sigma, pathLossCDF);
+		retval = Winner2_D1rural_LOS(distance, hBS, hMS, frequency, _zwinner2LOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2D1_RURAL_LOS";
 	} else if (losValue == 2) {
-		retval = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, fixedProbFlag, _zwinner2NLOS, sigma, pathLossCDF);
+		retval = Winner2_D1rural_NLOS(distance, hBS, hMS, frequency, _zwinner2NLOS, sigma, pathLossCDF);
 		pathLossModelStr = "W2D1_RURAL_NLOS";
 	} else {
 		CORE_DUMP;
@@ -7758,7 +7661,7 @@ void AfcManager::runPointAnalysis()
 
 											std::string buildingPenetrationModelStr;
 											double buildingPenetrationCDF;
-											double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
+											double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF);
 
 											std::string txClutterStr;
 											std::string rxClutterStr;
@@ -7799,7 +7702,7 @@ void AfcManager::runPointAnalysis()
 														nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 														rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 														ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
-														pathLoss, pathClutterTxDB, pathClutterRxDB, true,
+														pathLoss, pathClutterTxDB, pathClutterRxDB,
 														pathLossModelStr, pathLossCDF,
 														pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
 														&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
@@ -8969,7 +8872,7 @@ void AfcManager::runScanAnalysis()
 
 								std::string buildingPenetrationModelStr;
 								double buildingPenetrationCDF;
-								double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
+								double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF);
 
 								std::string txClutterStr;
 								std::string rxClutterStr;
@@ -8986,7 +8889,7 @@ void AfcManager::runScanAnalysis()
 								computePathLoss(_pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 										rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 										uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
-										pathLoss, pathClutterTxDB, pathClutterRxDB, true,
+										pathLoss, pathClutterTxDB, pathClutterRxDB,
 										pathLossModelStr, pathLossCDF,
 										pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
 										&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
@@ -9262,14 +9165,6 @@ void AfcManager::runExclusionZoneAnalysis()
 	double distKm0, distKm1, distKmM;
 	int exclPtIdx;
 
-	int totNumProc = numContourPoints;
-
-	int numPct = 100;
-
-	if (numPct > totNumProc) { numPct = totNumProc; }
-
-	int numProc = 0;
-
 	for(exclPtIdx=0; exclPtIdx<numContourPoints; exclPtIdx++) {
 		LOGGER_DEBUG(logger) << "computing exlPtIdx: " << exclPtIdx << '/' << numContourPoints;
 		double cc = cos(exclPtIdx*2*M_PI/numContourPoints);
@@ -9359,8 +9254,6 @@ void AfcManager::runExclusionZoneAnalysis()
 		_exclusionZone[exclPtIdx] = std::make_pair(rlanLon, rlanLat);
 
 		// LOGGER_DEBUG(logger) << std::setprecision(15) << exclusionZonePtLon << " " << exclusionZonePtLat;
-
-		numProc++;
 	}
 	LOGGER_INFO(logger) << "Done computing exclusion zone";
 
@@ -9495,7 +9388,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 
 		std::string buildingPenetrationModelStr;
 		double buildingPenetrationCDF;
-		double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
+		double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF);
 
 		std::string txClutterStr;
 		std::string rxClutterStr;
@@ -9514,7 +9407,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 		computePathLoss(_pathLossModel, (rlanPropEnv == CConst::unknownPropEnv ? CConst::barrenPropEnv : rlanPropEnv), fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 				rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 				uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
-				pathLoss, pathClutterTxDB, pathClutterRxDB, true,
+				pathLoss, pathClutterTxDB, pathClutterRxDB,
 				pathLossModelStr, pathLossCDF,
 				pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
 				&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
@@ -10021,7 +9914,7 @@ void AfcManager::runHeatmapAnalysis()
 
 							std::string buildingPenetrationModelStr;
 							double buildingPenetrationCDF;
-							double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF, true);
+							double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF);
 
 							std::string txClutterStr;
 							std::string rxClutterStr;
@@ -10040,7 +9933,7 @@ void AfcManager::runHeatmapAnalysis()
 							computePathLoss(_pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 									rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 									uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
-									pathLoss, pathClutterTxDB, pathClutterRxDB, true,
+									pathLoss, pathClutterTxDB, pathClutterRxDB,
 									pathLossModelStr, pathLossCDF,
 									pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
 									&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
@@ -10989,17 +10882,17 @@ void AfcManager::runTestWinner2(std::string inputFile, std::string outputFile)
 				zval = -qerfi(confidence);
 				_zwinner2Combined = zval;
 				if (propEnv == CConst::urbanPropEnv) {
-					plLOS      = Winner2_C2urban_LOS( distance, hb, hm, frequency, true, zval, sigmaLOS, pathLossCDF);
-					plNLOS     = Winner2_C2urban_NLOS(distance, hb, hm, frequency, true, zval, sigmaNLOS, pathLossCDF);
-					plCombined = Winner2_C2urban(     distance, hb, hm, frequency, true, sigmaCombined, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+					plLOS      = Winner2_C2urban_LOS( distance, hb, hm, frequency, zval, sigmaLOS, pathLossCDF);
+					plNLOS     = Winner2_C2urban_NLOS(distance, hb, hm, frequency, zval, sigmaNLOS, pathLossCDF);
+					plCombined = Winner2_C2urban(     distance, hb, hm, frequency, sigmaCombined, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 				} else if (propEnv == CConst::suburbanPropEnv) {
-					plLOS      = Winner2_C1suburban_LOS( distance, hb, hm, frequency, true, zval, sigmaLOS, pathLossCDF);
-					plNLOS     = Winner2_C1suburban_NLOS(distance, hb, hm, frequency, true, zval, sigmaNLOS, pathLossCDF);
-					plCombined = Winner2_C1suburban(     distance, hb, hm, frequency, true, sigmaCombined, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+					plLOS      = Winner2_C1suburban_LOS( distance, hb, hm, frequency, zval, sigmaLOS, pathLossCDF);
+					plNLOS     = Winner2_C1suburban_NLOS(distance, hb, hm, frequency, zval, sigmaNLOS, pathLossCDF);
+					plCombined = Winner2_C1suburban(     distance, hb, hm, frequency, sigmaCombined, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 				} else if (propEnv == CConst::ruralPropEnv) {
-					plLOS      = Winner2_D1rural_LOS( distance, hb, hm, frequency, true, zval, sigmaLOS, pathLossCDF);
-					plNLOS     = Winner2_D1rural_NLOS(distance, hb, hm, frequency, true, zval, sigmaNLOS, pathLossCDF);
-					plCombined = Winner2_D1rural(     distance, hb, hm, frequency, true, sigmaCombined, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
+					plLOS      = Winner2_D1rural_LOS( distance, hb, hm, frequency, zval, sigmaLOS, pathLossCDF);
+					plNLOS     = Winner2_D1rural_NLOS(distance, hb, hm, frequency, zval, sigmaNLOS, pathLossCDF);
+					plCombined = Winner2_D1rural(     distance, hb, hm, frequency, sigmaCombined, pathLossModelStr, pathLossCDF, probLOS, winner2LOSValue);
 				} else {
 					CORE_DUMP;
 				}

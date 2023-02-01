@@ -64,6 +64,7 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal
 	txHeightAMSL = quietNaN;
 	txHeightSource = CConst::unknownHeightSource;
 	txCenterToRAATHeight = quietNaN;
+	txLidarRegion = -1;
 	txTerrainHeightFlag = false;
 	noiseLevelDBW = quietNaN;
 	txGain = quietNaN;
@@ -325,15 +326,15 @@ void ULSClass::setSatellitePositionData(ListClass<Vector3> *spd) {
 	satellitePosnData = spd;
 	return;
 }
-void ULSClass::setRxPosition(Vector3 p) {
+void ULSClass::setRxPosition(Vector3 &p) {
 	rxPosition = p;
 	return;
 }
-void ULSClass::setTxPosition(Vector3 p) {
+void ULSClass::setTxPosition(Vector3 &p) {
 	txPosition = p;
 	return;
 }
-void ULSClass::setAntennaPointing(Vector3 p) {
+void ULSClass::setAntennaPointing(Vector3 &p) {
 	antennaPointing = p;
 	return;
 }

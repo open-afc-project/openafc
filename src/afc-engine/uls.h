@@ -230,9 +230,9 @@ public:
 	void setTxTerrainHeightFlag(bool terrainHeightFlagVal);
 	void setNumOutOfBandRLAN(int numOutOfBandRLANVal);
 
-	void setRxPosition(Vector3 p);
-	void setTxPosition(Vector3 p);
-	void setAntennaPointing(Vector3 p);
+	void setRxPosition(Vector3 &p);
+	void setTxPosition(Vector3 &p);
+	void setAntennaPointing(Vector3 &p);
 	void setType(CConst::ULSTypeEnum typeVal);
 	void setSatellitePositionData(ListClass<Vector3> *spd);
 
@@ -241,8 +241,8 @@ public:
 	void setDiversityDlambda(double diversityDlambdaVal) { diversityDlambda = diversityDlambdaVal; }
 	void setDiversityHeightAboveTerrain(double diversityHeightAboveTerrainVal) { diversityHeightAboveTerrain = diversityHeightAboveTerrainVal; }
 	void setDiversityHeightAMSL(double diversityHeightAMSLVal) { diversityHeightAMSL = diversityHeightAMSLVal; }
-	void setDiversityPosition(Vector3 diversityPositionVal) { diversityPosition = diversityPositionVal; }
-	void setDiversityAntennaPointing(Vector3 diversityAntennaPointingVal) { diversityAntennaPointing = diversityAntennaPointingVal; }
+	void setDiversityPosition(Vector3 &diversityPositionVal) { diversityPosition = diversityPositionVal; }
+	void setDiversityAntennaPointing(Vector3 &diversityAntennaPointingVal) { diversityAntennaPointing = diversityAntennaPointingVal; }
 
 	void clearData();
 
