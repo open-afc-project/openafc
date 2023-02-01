@@ -3943,7 +3943,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		CConst::ULSAntennaTypeEnum txAntennaType;
 		// double operatingRadius;
 		// double rxSensitivity;
-		int mobileUnit = -1;
 
 		bool hasDiversity;
 		double diversityHeightAboveTerrain;
@@ -4009,7 +4008,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			linenum++;
 			bool ignoreFlag = false;
 			bool fixedFlag = false;
-			bool randPointingFlag = false;
 			std::string fixedStr = "";
 			char rxPropEnv, txPropEnv;
 
@@ -4097,10 +4095,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					}
 					else if (linkDirection == 1)
 					{
-						// randPointingFlag = true;
-						// fixedStr += "Fixed: Rx Latitude has value 0: using random direction for Tx antenna";
-						// fixedFlag = true;
-
 						reasonIgnored = "Ignored: Rx Latitude has value 0";
 						ignoreFlag = true;
 						numIgnoreInvalid++;
@@ -4116,31 +4110,24 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/**************************************************************************/
 			/* rxLongCoords => rxLongitudeDeg                                         */
 			/**************************************************************************/
-			if (!randPointingFlag)
+			if (!ignoreFlag)
 			{
-				if (!ignoreFlag)
+				rxLongitudeDeg = row.rxLongitudeDeg;
+
+				if (rxLongitudeDeg == 0.0)
 				{
-					rxLongitudeDeg = row.rxLongitudeDeg;
-
-					if (rxLongitudeDeg == 0.0)
+					if ((linkDirection == 0) || (linkDirection == 2))
 					{
-						if ((linkDirection == 0) || (linkDirection == 2))
-						{
-							ignoreFlag = true;
-							reasonIgnored = "RX Longitude has value 0";
-						}
-						else if (linkDirection == 1)
-						{
-							// randPointingFlag = true;
-							// fixedStr += "Fixed: Rx Longitude has value 0: using random direction for Tx antenna";
-							// fixedFlag = true;
-
-							reasonIgnored = "Ignored: Rx Longitude has value 0";
-							ignoreFlag = true;
-							numIgnoreInvalid++;
-						}
+						ignoreFlag = true;
+						reasonIgnored = "RX Longitude has value 0";
+					}
+					else if (linkDirection == 1)
+					{
+						reasonIgnored = "Ignored: Rx Longitude has value 0";
+						ignoreFlag = true;
 						numIgnoreInvalid++;
 					}
+					numIgnoreInvalid++;
 				}
 			}
 			/**************************************************************************/
@@ -4888,30 +4875,9 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					uls->setDiversityDlambda(diversityDlambda);
 				}
 
-				bool mobileRxFlag = ((simulationFlag == CConst::MobileSimulation) && (mobileUnit == 0));
-				bool mobileTxFlag = ((simulationFlag == CConst::MobileSimulation) && (mobileUnit == 1));
-
 				if (simulationFlag == CConst::MobileSimulation)
 				{
 					throw std::invalid_argument("Mobile simulation not supported");
-#if 0
-					uls->setOperatingRadius(operatingRadius);
-					uls->setRxSensitivity(rxSensitivity);
-					uls->setMobileUnit(mobileUnit);
-					if (mobileRxFlag)
-					{
-						// Mobile RX
-						uls->setOperatingCenterLongitudeDeg(rxLongitudeDeg);
-						uls->setOperatingCenterLatitudeDeg(rxLatitudeDeg);
-					}
-					else if (mobileTxFlag)
-					{
-						// Mobile TX
-						uls->setOperatingCenterLongitudeDeg(txLongitudeDeg);
-						uls->setOperatingCenterLatitudeDeg(txLatitudeDeg);
-					}
-					uls->computeMobilePopGrid(popGridVal);
-#endif
 				}
 
 				bool rxTerrainHeightFlag, txTerrainHeightFlag;
@@ -4922,236 +4888,221 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				CConst::HeightSourceEnum txHeightSource;
 				CConst::HeightSourceEnum prHeightSource;
 				Vector3 rxPosition, txPosition, prPosition, diversityPosition;
-				if (!mobileRxFlag)
+
+				if ((_terrainDataModel))
 				{
-					if ((_terrainDataModel))
+					_terrainDataModel->getTerrainHeight(rxLongitudeDeg,rxLatitudeDeg, terrainHeight,bldgHeight, lidarHeightResult, rxHeightSource);
+					rxTerrainHeightFlag = true;
+				}
+				else
+				{
+					rxTerrainHeightFlag = false;
+					terrainHeight = 0.0;
+				}
+				double rxHeight = rxHeightAboveTerrain + terrainHeight;
+
+				uls->setRxTerrainHeightFlag(rxTerrainHeightFlag);
+				uls->setRxTerrainHeight(terrainHeight);
+				uls->setRxHeightAboveTerrain(rxHeightAboveTerrain);
+				uls->setRxHeightAMSL(rxHeight);
+				uls->setRxHeightSource(rxHeightSource);
+
+				rxPosition = EcefModel::geodeticToEcef(rxLatitudeDeg, rxLongitudeDeg, rxHeight / 1000.0);
+				uls->setRxPosition(rxPosition);
+
+				if (hasDiversity) {
+					double diversityHeight = diversityHeightAboveTerrain + terrainHeight;
+					uls->setDiversityHeightAboveTerrain(diversityHeightAboveTerrain);
+					uls->setDiversityHeightAMSL(diversityHeight);
+
+					diversityPosition = EcefModel::geodeticToEcef(rxLatitudeDeg, rxLongitudeDeg, diversityHeight / 1000.0);
+					uls->setDiversityPosition(diversityPosition);
+				}
+
+				if (txLocFlag) {
+					if ( (_terrainDataModel))
 					{
-						_terrainDataModel->getTerrainHeight(rxLongitudeDeg,rxLatitudeDeg, terrainHeight,bldgHeight, lidarHeightResult, rxHeightSource);
-						rxTerrainHeightFlag = true;
+						_terrainDataModel->getTerrainHeight(txLongitudeDeg,txLatitudeDeg, terrainHeight,bldgHeight, lidarHeightResult, txHeightSource);
+						txTerrainHeightFlag = true;
 					}
 					else
 					{
-						rxTerrainHeightFlag = false;
+						txTerrainHeightFlag = false;
 						terrainHeight = 0.0;
 					}
-					double rxHeight = rxHeightAboveTerrain + terrainHeight;
+					double txHeight = txHeightAboveTerrain + terrainHeight;
 
-					uls->setRxTerrainHeightFlag(rxTerrainHeightFlag);
-					uls->setRxTerrainHeight(terrainHeight);
-					uls->setRxHeightAboveTerrain(rxHeightAboveTerrain);
-					uls->setRxHeightAMSL(rxHeight);
-					uls->setRxHeightSource(rxHeightSource);
+					uls->setTxTerrainHeightFlag(txTerrainHeightFlag);
+					uls->setTxTerrainHeight(terrainHeight);
+					uls->setTxHeightAboveTerrain(txHeightAboveTerrain);
+					uls->setTxHeightSource(txHeightSource);
+					uls->setTxHeightAMSL(txHeight);
 
-					rxPosition = EcefModel::geodeticToEcef(rxLatitudeDeg, rxLongitudeDeg, rxHeight / 1000.0);
-					uls->setRxPosition(rxPosition);
-
-					if (hasDiversity) {
-						double diversityHeight = diversityHeightAboveTerrain + terrainHeight;
-						uls->setDiversityHeightAboveTerrain(diversityHeightAboveTerrain);
-						uls->setDiversityHeightAMSL(diversityHeight);
-
-						diversityPosition = EcefModel::geodeticToEcef(rxLatitudeDeg, rxLongitudeDeg, diversityHeight / 1000.0);
-						uls->setDiversityPosition(diversityPosition);
-
-					}
-
+					txPosition = EcefModel::geodeticToEcef(txLatitudeDeg, txLongitudeDeg, txHeight / 1000.0);
+					uls->setTxPosition(txPosition);
+				} else {
+					uls->setTxTerrainHeightFlag(true);
+					uls->setTxTerrainHeight(quietNaN);
+					uls->setTxHeightAboveTerrain(quietNaN);
+					uls->setTxHeightSource(CConst::unknownHeightSource);
+					uls->setTxHeightAMSL(quietNaN);
+					Vector3 nanVector3 = Vector3(quietNaN, quietNaN, quietNaN);
+					uls->setTxPosition(nanVector3);
 				}
 
-				if ((!mobileTxFlag) && (!randPointingFlag))
-				{
-					if (txLocFlag) {
-						if ( (_terrainDataModel))
-						{
-							_terrainDataModel->getTerrainHeight(txLongitudeDeg,txLatitudeDeg, terrainHeight,bldgHeight, lidarHeightResult, txHeightSource);
-							txTerrainHeightFlag = true;
-						}
-						else
-						{
-							txTerrainHeightFlag = false;
-							terrainHeight = 0.0;
-						}
-						double txHeight = txHeightAboveTerrain + terrainHeight;
+				for(prIdx=0; prIdx<numPR; ++prIdx) {
+					PRClass& pr = uls->getPR(prIdx);
 
-						uls->setTxTerrainHeightFlag(txTerrainHeightFlag);
-						uls->setTxTerrainHeight(terrainHeight);
-						uls->setTxHeightAboveTerrain(txHeightAboveTerrain);
-						uls->setTxHeightSource(txHeightSource);
-						uls->setTxHeightAMSL(txHeight);
+					int validFlag;
+					pr.type = (CConst::PRTypeEnum) CConst::strPRTypeList->str_to_type(row.prType[prIdx], validFlag, 1);
+					pr.longitudeDeg = row.prLongitudeDeg[prIdx];
+					pr.latitudeDeg = row.prLatitudeDeg[prIdx];
+					pr.heightAboveTerrainRx = row.prHeightAboveTerrainRx[prIdx];
+					pr.heightAboveTerrainTx = row.prHeightAboveTerrainTx[prIdx];
 
-						txPosition = EcefModel::geodeticToEcef(txLatitudeDeg, txLongitudeDeg, txHeight / 1000.0);
-						uls->setTxPosition(txPosition);
+					if ( (_terrainDataModel))
+					{
+						_terrainDataModel->getTerrainHeight(pr.longitudeDeg, pr.latitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, prHeightSource);
+						pr.terrainHeightFlag = true;
+					}
+					else
+					{
+						pr.terrainHeightFlag = false;
+						terrainHeight = 0.0;
+					}
+
+					pr.terrainHeight = terrainHeight;
+					pr.heightAMSLRx = pr.heightAboveTerrainRx + pr.terrainHeight;
+					pr.heightAMSLTx = pr.heightAboveTerrainTx + pr.terrainHeight;
+					pr.heightSource = prHeightSource;
+
+					pr.positionRx = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, pr.heightAMSLRx / 1000.0);
+					pr.positionTx = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, pr.heightAMSLTx / 1000.0);
+
+					if (row.prType[prIdx] == "Ant") {
+						pr.type = CConst::backToBackAntennaPRType;
+						pr.txGain = row.prTxGain[prIdx];
+						pr.txDlambda = row.prTxAntennaDiameter[prIdx] / lambda;
+						pr.rxGain = row.prRxGain[prIdx];
+						pr.rxDlambda = row.prRxAntennaDiameter[prIdx] / lambda;
+						pr.antCategory = row.prAntCategory[prIdx];
+						pr.antModel = row.prAntModel[prIdx];
+					} else if (row.prType[prIdx] == "Ref") {
+						pr.type = CConst::billboardReflectorPRType;
+						pr.reflectorHeightLambda = row.prReflectorHeight[prIdx] / lambda;
+						pr.reflectorWidthLambda = row.prReflectorWidth[prIdx] / lambda;
+
 					} else {
-						uls->setTxTerrainHeightFlag(true);
-						uls->setTxTerrainHeight(quietNaN);
-						uls->setTxHeightAboveTerrain(quietNaN);
-						uls->setTxHeightSource(CConst::unknownHeightSource);
-						uls->setTxHeightAMSL(quietNaN);
-						Vector3 nanVector3 = Vector3(quietNaN, quietNaN, quietNaN);
-						uls->setTxPosition(nanVector3);
+						CORE_DUMP;
 					}
 				}
 
-				if ((!mobileTxFlag) && (!randPointingFlag))
-				{
-					for(prIdx=0; prIdx<numPR; ++prIdx) {
-						PRClass& pr = uls->getPR(prIdx);
+				for(int segIdx=0; segIdx<=numPR; ++segIdx) {
+					Vector3 segTxPosn = (segIdx == 0 ? txPosition : uls->getPR(segIdx-1).positionTx);
+					Vector3 segRxPosn = (segIdx == numPR ? rxPosition : uls->getPR(segIdx).positionRx);
+					Vector3 pointing;
+					double segDist;
 
-						int validFlag;
-						pr.type = (CConst::PRTypeEnum) CConst::strPRTypeList->str_to_type(row.prType[prIdx], validFlag, 1);
-						pr.longitudeDeg = row.prLongitudeDeg[prIdx];
-						pr.latitudeDeg = row.prLatitudeDeg[prIdx];
-						pr.heightAboveTerrainRx = row.prHeightAboveTerrainRx[prIdx];
-						pr.heightAboveTerrainTx = row.prHeightAboveTerrainTx[prIdx];
+					if (txLocFlag || (segIdx > 0)) {
+						pointing = (segTxPosn - segRxPosn).normalized();
+						segDist = (segTxPosn - segRxPosn).len() * 1000.0;
+					} else {
+						Vector3 upVec = segRxPosn.normalized();
+						Vector3 zVec = Vector3(0.0, 0.0, 1.0);
+						Vector3 eastVec = zVec.cross(upVec).normalized();
+						Vector3 northVec = upVec.cross(eastVec);
 
-						if ( (_terrainDataModel))
-						{
-							_terrainDataModel->getTerrainHeight(pr.longitudeDeg, pr.latitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, prHeightSource);
-							pr.terrainHeightFlag = true;
+						double ca = cos(row.azimuthAngleToTx*M_PI/180.0);
+						double sa = sin(row.azimuthAngleToTx*M_PI/180.0);
+						double ce = cos(row.elevationAngleToTx*M_PI/180.0);
+						double se = sin(row.elevationAngleToTx*M_PI/180.0);
+
+						pointing = northVec*ca*ce + eastVec*sa*ce + upVec*se;
+						segDist = -1.0;
+					}
+
+					if (segIdx == numPR) {
+						uls->setAntennaPointing(pointing); // Pointing of Rx antenna
+						uls->setLinkDistance(segDist);
+						if (hasDiversity) {
+							pointing = (segTxPosn - diversityPosition).normalized();
+							uls->setDiversityAntennaPointing(pointing); // Pointing of Rx Diversity antenna
 						}
-						else
-						{
-							pr.terrainHeightFlag = false;
-							terrainHeight = 0.0;
-						}
-
-						pr.terrainHeight = terrainHeight;
-						pr.heightAMSLRx = pr.heightAboveTerrainRx + pr.terrainHeight;
-						pr.heightAMSLTx = pr.heightAboveTerrainTx + pr.terrainHeight;
-						pr.heightSource = prHeightSource;
-
-						pr.positionRx = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, pr.heightAMSLRx / 1000.0);
-						pr.positionTx = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, pr.heightAMSLTx / 1000.0);
-
-						if (row.prType[prIdx] == "Ant") {
-							pr.type = CConst::backToBackAntennaPRType;
-							pr.txGain = row.prTxGain[prIdx];
-							pr.txDlambda = row.prTxAntennaDiameter[prIdx] / lambda;
-							pr.rxGain = row.prRxGain[prIdx];
-							pr.rxDlambda = row.prRxAntennaDiameter[prIdx] / lambda;
-							pr.antCategory = row.prAntCategory[prIdx];
-							pr.antModel = row.prAntModel[prIdx];
-						} else if (row.prType[prIdx] == "Ref") {
-							pr.type = CConst::billboardReflectorPRType;
-							pr.reflectorHeightLambda = row.prReflectorHeight[prIdx] / lambda;
-							pr.reflectorWidthLambda = row.prReflectorWidth[prIdx] / lambda;
-
-						} else {
-							CORE_DUMP;
-						}
+					} else {
+						uls->getPR(segIdx).pointing = pointing; // Pointing of Passive Receiver
+						uls->getPR(segIdx).segmentDistance = segDist;
 					}
 				}
 
-				if ((!mobileRxFlag) && (!mobileTxFlag)) {
-					if (!randPointingFlag) {
-						for(int segIdx=0; segIdx<=numPR; ++segIdx) {
-							Vector3 segTxPosn = (segIdx == 0 ? txPosition : uls->getPR(segIdx-1).positionTx);
-							Vector3 segRxPosn = (segIdx == numPR ? rxPosition : uls->getPR(segIdx).positionRx);
-							Vector3 pointing;
-							double segDist;
+				/******************************************************************/
+				/* Calculate PR parameters:                                       */
+				/*     Orthonormal basis                                          */
+				/*     thetaIN                                                    */
+				/*     alphaAZ                                                    */
+				/*     alphaEL                                                    */
+				/******************************************************************/
+				for(prIdx=numPR-1; prIdx>=0; prIdx--) {
+					PRClass& pr = uls->getPR(prIdx);
+					double nextSegDist = ((prIdx == numPR-1) ? uls->getLinkDistance() : uls->getPR(prIdx+1).segmentDistance);
+					double nextSegFSPL = 20.0 * log((4 * M_PI * centerFreq * nextSegDist) / CConst::c) / log(10.0);
 
-							if (txLocFlag || (segIdx > 0)) {
-								pointing = (segTxPosn - segRxPosn).normalized();
-								segDist = (segTxPosn - segRxPosn).len() * 1000.0;
-							} else {
-								Vector3 upVec = segRxPosn.normalized();
-								Vector3 zVec = Vector3(0.0, 0.0, 1.0);
-								Vector3 eastVec = zVec.cross(upVec).normalized();
-								Vector3 northVec = upVec.cross(eastVec);
+					if (pr.type == CConst::backToBackAntennaPRType) {
+						pr.pathSegGain = pr.rxGain + pr.txGain - nextSegFSPL;
+					} else if (pr.type == CConst::billboardReflectorPRType) {
+						Vector3 pointingA = pr.pointing;
+						Vector3 pointingB = -(prIdx == numPR-1 ? uls->getAntennaPointing() : uls->getPR(prIdx+1).pointing);
+						pr.reflectorZ = (pointingA + pointingB).normalized();              // Perpendicular to reflector surface
+						Vector3 upVec = pr.positionRx.normalized();
+						pr.reflectorX = (upVec.cross(pr.reflectorZ)).normalized();         // Horizontal
+						pr.reflectorY = (pr.reflectorZ.cross(pr.reflectorX)).normalized();
 
-								double ca = cos(row.azimuthAngleToTx*M_PI/180.0);
-								double sa = sin(row.azimuthAngleToTx*M_PI/180.0);
-								double ce = cos(row.elevationAngleToTx*M_PI/180.0);
-								double se = sin(row.elevationAngleToTx*M_PI/180.0);
+						double Ax = pointingA.dot(pr.reflectorX);
+						double Ay = pointingA.dot(pr.reflectorY);
+						double Az = pointingA.dot(pr.reflectorZ);
 
-								pointing = northVec*ca*ce + eastVec*sa*ce + upVec*se;
-								segDist = -1.0;
-							}
+						double cosThetaIN = pointingA.dot(pr.reflectorZ);
 
-							if (segIdx == numPR) {
-								uls->setAntennaPointing(pointing); // Pointing of Rx antenna
-								uls->setLinkDistance(segDist);
-								if (hasDiversity) {
-									pointing = (segTxPosn - diversityPosition).normalized();
-									uls->setDiversityAntennaPointing(pointing); // Pointing of Rx Diversity antenna
-								}
-							} else {
-								uls->getPR(segIdx).pointing = pointing; // Pointing of Passive Receiver
-								uls->getPR(segIdx).segmentDistance = segDist;
-							}
-						}
-					}
-
-					/******************************************************************/
-					/* Calculate PR parameters:                                       */
-					/*     Orthonormal basis                                          */
-					/*     thetaIN                                                    */
-					/*     alphaAZ                                                    */
-					/*     alphaEL                                                    */
-					/******************************************************************/
-					for(prIdx=numPR-1; prIdx>=0; prIdx--) {
-						PRClass& pr = uls->getPR(prIdx);
-						double nextSegDist = ((prIdx == numPR-1) ? uls->getLinkDistance() : uls->getPR(prIdx+1).segmentDistance);
-						double nextSegFSPL = 20.0 * log((4 * M_PI * centerFreq * nextSegDist) / CConst::c) / log(10.0);
-
-						if (pr.type == CConst::backToBackAntennaPRType) {
-							pr.pathSegGain = pr.rxGain + pr.txGain - nextSegFSPL;
-						} else if (pr.type == CConst::billboardReflectorPRType) {
-							Vector3 pointingA = pr.pointing;
-							Vector3 pointingB = -(prIdx == numPR-1 ? uls->getAntennaPointing() : uls->getPR(prIdx+1).pointing);
-							pr.reflectorZ = (pointingA + pointingB).normalized();              // Perpendicular to reflector surface
-							Vector3 upVec = pr.positionRx.normalized();
-							pr.reflectorX = (upVec.cross(pr.reflectorZ)).normalized();         // Horizontal
-							pr.reflectorY = (pr.reflectorZ.cross(pr.reflectorX)).normalized();
-
-							double Ax = pointingA.dot(pr.reflectorX);
-							double Ay = pointingA.dot(pr.reflectorY);
-							double Az = pointingA.dot(pr.reflectorZ);
-
-							double cosThetaIN = pointingA.dot(pr.reflectorZ);
-
-							// Spec was changed from:
-							// s = if ((alphaEL <= alphaAZ)) reflectorWidthLambda*cosThetaIN else pr.reflectorHeightLambda*cosThetaIN
-							// to
-							// s = MAX(reflectorWidthLambda, reflectorHeightLambda)*cosThetaIN
+						// Spec was changed from:
+						// s = if ((alphaEL <= alphaAZ)) reflectorWidthLambda*cosThetaIN else pr.reflectorHeightLambda*cosThetaIN
+						// to
+						// s = MAX(reflectorWidthLambda, reflectorHeightLambda)*cosThetaIN
 							
-							bool conditionW;
-							if (0) {
-								// previous spec
-								double alphaAZ = (180.0/M_PI)*fabs(atan(Ax/Az));
-								double alphaEL = (180.0/M_PI)*fabs(atan(Ay/Az));
-								conditionW = (alphaEL <= alphaAZ);
-							} else {
-								// current spec
-								conditionW = (pr.reflectorWidthLambda >= pr.reflectorHeightLambda);
-							}
-
-							if (conditionW) {
-								pr.reflectorSLambda = pr.reflectorWidthLambda*cosThetaIN;
-							} else {
-								pr.reflectorSLambda = pr.reflectorHeightLambda*cosThetaIN;
-							}
-							pr.reflectorTheta1 = (180.0/M_PI)*asin(1.0/(2*pr.reflectorSLambda));
-							double Ks = 4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN*lambda/(M_PI*nextSegDist);
-							double alpha_n = 20*log10(M_PI*Ks/4);
-
-							double Q = -1.0;
-							if ( (Ks <= 0.4) || ((prIdx < numPR-1) && (uls->getPR(prIdx+1).type == CConst::billboardReflectorPRType)) ) {
-								pr.pathSegGain = std::min(3.0,alpha_n);
-							} else {
-								double nextDlambda = ((prIdx == numPR-1) ? uls->getRxDlambda() : uls->getPR(prIdx+1).rxDlambda);
-								Q = nextDlambda*sqrt(M_PI/(4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN));
-								pr.pathSegGain = _prTable->computePRTABLE(Q, 1.0/Ks);
-							}
-
-							pr.reflectorThetaIN = acos(cosThetaIN)*180.0/M_PI;
-							pr.reflectorKS = Ks;
-							pr.reflectorQ = Q;
+						bool conditionW;
+						if (0) {
+							// previous spec
+							double alphaAZ = (180.0/M_PI)*fabs(atan(Ax/Az));
+							double alphaEL = (180.0/M_PI)*fabs(atan(Ay/Az));
+							conditionW = (alphaEL <= alphaAZ);
+						} else {
+							// current spec
+							conditionW = (pr.reflectorWidthLambda >= pr.reflectorHeightLambda);
 						}
-						pr.effectiveGain = (prIdx == numPR-1 ? uls->getRxGain() : uls->getPR(prIdx+1).effectiveGain) + pr.pathSegGain;
-					}
-					/******************************************************************/
 
+						if (conditionW) {
+							pr.reflectorSLambda = pr.reflectorWidthLambda*cosThetaIN;
+						} else {
+							pr.reflectorSLambda = pr.reflectorHeightLambda*cosThetaIN;
+						}
+						pr.reflectorTheta1 = (180.0/M_PI)*asin(1.0/(2*pr.reflectorSLambda));
+						double Ks = 4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN*lambda/(M_PI*nextSegDist);
+						double alpha_n = 20*log10(M_PI*Ks/4);
+
+						double Q = -1.0;
+						if ( (Ks <= 0.4) || ((prIdx < numPR-1) && (uls->getPR(prIdx+1).type == CConst::billboardReflectorPRType)) ) {
+							pr.pathSegGain = std::min(3.0,alpha_n);
+						} else {
+							double nextDlambda = ((prIdx == numPR-1) ? uls->getRxDlambda() : uls->getPR(prIdx+1).rxDlambda);
+							Q = nextDlambda*sqrt(M_PI/(4*pr.reflectorWidthLambda*pr.reflectorHeightLambda*cosThetaIN));
+							pr.pathSegGain = _prTable->computePRTABLE(Q, 1.0/Ks);
+						}
+
+						pr.reflectorThetaIN = acos(cosThetaIN)*180.0/M_PI;
+						pr.reflectorKS = Ks;
+						pr.reflectorQ = Q;
+					}
+					pr.effectiveGain = (prIdx == numPR-1 ? uls->getRxGain() : uls->getPR(prIdx+1).effectiveGain) + pr.pathSegGain;
 				}
+				/******************************************************************/
 
 				double noiseLevelDBW = 10.0 * log(CConst::boltzmannConstant * CConst::T0 * noiseBandwidth) / log(10.0) + noiseFigureDB;
 				uls->setNoiseLevelDBW(noiseLevelDBW);

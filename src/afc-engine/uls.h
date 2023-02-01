@@ -151,10 +151,6 @@ public:
 	double getTxGain();
 	double getTxEIRP();
 	double getLinkDistance();
-	double getOperatingRadius();
-	double getRxSensitivity();
-	double getOperatingCenterLongitudeDeg();
-	double getOperatingCenterLatitudeDeg();
 	double getPropLoss();
 	int getPairIdx();
 	int getRxLidarRegion();
@@ -217,11 +213,6 @@ public:
 	void setTxGain(double txGainVal);
 	void setTxEIRP(double txEIRPVal);
 	void setLinkDistance(double linkDistanceVal);
-	void setOperatingRadius(double operatingRadiusVal);
-	void setRxSensitivity(double rxSensitivityVal);
-	void setMobileUnit(int mobileUnitVal);
-	void setOperatingCenterLongitudeDeg(double operatingCenterLongitudeDegVal);
-	void setOperatingCenterLatitudeDeg(double operatingCenterLatitudeDegVal);
 	void setPropLoss(double propLossVal);
 	void setPairIdx(int pairIdxVal);
 	void setRxLidarRegion(int lidarRegionVal);
@@ -306,11 +297,6 @@ private:
 	CConst::AntennaCategoryEnum rxAntennaCategory;
 	double txEIRP;
 	double linkDistance;
-	double operatingRadius;
-	double rxSensitivity;
-	int mobileUnit; // 0 = RX, 1 = TX
-	double operatingCenterLongitudeDeg;
-	double operatingCenterLatitudeDeg;
 	double propLoss;
 
 	bool hasDiversity;
