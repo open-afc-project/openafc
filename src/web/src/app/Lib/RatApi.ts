@@ -114,7 +114,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     },
     "propagationEnv": "NLCD Point",
     "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
-    "regionStr": "CONUS",
+    "regionStr": "USA",
     "rasDatabase": "RASdatabase.csv",
     "APUncertainty": {
         "horizontal": 30,
