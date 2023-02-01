@@ -1,6 +1,43 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-446**|
+| :- | :- |
+|**Date**|**01/27/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-446: Create a parser for Canada's incumbents database (this includes changes required to allow protection of Canadian FS at the border)
+ * Jira OA-275: Integrate actual antenna patterns (from ISED and WinnForum) in AFC (this is implemented as part of OA-446)
+ * Jira OA-533: Check AP's uncertainty region's center lat/long against country (based on rulsetId) boundaries
+ * Jira OA-259: Align with QCOM/Federated to select same 3DEP/NLCD tile when on Boundary. 
+ * Jira OA-535: Correction of FS bandwidth from Emission Designator vs. upper-lower freq not matching
+ 
+## **Interface Changes**
+ * There has been significant changes to the ULS-parser to read Canada's incumbent database. 
+ * Made changes to AFC Config GUI: changed "CONUS" to "USA" under Country and changed "ULS" to "FS" for database. 
+ * Changed ULS database filename to "FS" in place of "CONUS_ULS," since it now contains both US and Canada.
+ * WFA Test Vector ULS has been updated to "WFA_testvector_ULS_2023-01-27T17_14_43.095504.sqlite3" that can be downloaded from https://drive.google.com/file/d/1UBOqOmWmX44XUj5f0ZFqlkCV9hj9Gs_k/view?usp=share_link
+ * Moved the Antenna_Patterns directory (where there will be afc_antenna_patterns.csv generated daily by the parser from ISED's antenna patterns) to /mnt/nfs/rat_transfer
+ * For OA-533, created a KML file containing USA boundaries (CONUS, Alaska, Hawaii, Puerto-Rico and US Virigin Islands) and put it under /mnt/nfs/rat_transfer/population/USA_PRI_VIR.kml
+ * Above KML was created from the Shape file (cb_2018_us_nation_5m.zip) under https://www.census.gov/geographies/mapping-files/time-series/geo/carto-boundary-file.html.
+ * The county-boundary KML will be used to check whether RLAN's lat/long is inside the US. In future, additional country boundaries will be added to this KML to support Canada and other countries.
+ * The changes for OA-259 are done in ULS Parser.
+ 
+## **Testing Done**
+ * OA-446 and OA-275: Significant validation was done on correct population of CONUS_ULS database with ISED's database. This included confirming generation of afc_antenna_patterns.csv file. 
+ * In exc_thr file, if column FS_ANT_TYPE shows an antenna model, that pattern was used.
+ * Confirmed from fs_analysis_list.csv generated from FSP1 that we get same intermediate/end values for passive reflectors as before.
+ * Confirmed that we get same results as before for FSP77 which tested back-to-back passive repeaters.
+ * OA-533: ran IBP-1 through 4 and confirmed that the border detection is working as expected. If the AP is outside US, Error Code 103 (invalid parameter) is generated.
+ * OA-259: Confirmed from exc_thr of FSP-17 for FS ID 4140 with latitude on 3DEP tile border, that the same 3DEP tile as QCOM/Federated is chosen (by design). 
+ * OA-535: Confirmed in WFA test vector ULS, that the number of US is higher by 99 (expected - fixed a bug) and the 2 US links with incorrect lower/upper freq were fixed.
+
+## **Open Issues** 
+ * We need to discuss the criteria to reject an AP's request with a lat/long outside desired country
+ * Update RAS database daily to include Canada's RAS (OA-534)
+
+## **Version and Date**
 |Version|3.7.0.0|
 | :- | :- |
 |**Date**|**15/01/2023**|

@@ -36,14 +36,17 @@ public:
 
 	double latitudeDeg;
 	double longitudeDeg;
-	double heightAboveTerrain;
+	double heightAboveTerrainRx;
+	double heightAboveTerrainTx;
 
 	double terrainHeight;
-	double heightAMSL;
+	double heightAMSLRx;
+	double heightAMSLTx;
 	CConst::HeightSourceEnum heightSource;
 	int lidarRegion;
 	bool terrainHeightFlag;
-	Vector3 position;
+	Vector3 positionRx;
+	Vector3 positionTx;
 	Vector3 pointing;
 	double segmentDistance;
 
@@ -81,18 +84,17 @@ public:
 class ULSClass
 {
 public:
-	ULSClass(AfcManager *dataSetVal, int idVal, int dbIdx, int numPR);
+	ULSClass(AfcManager *dataSetVal, int idVal, int dbIdx, int numPRVal, std::string regionVal);
 	~ULSClass();
 
 	int getID() const;
 	int getDBIdx() const;
+	std::string getRegion() const;
 	CConst::ULSTypeEnum getType();
 	ListClass<Vector3> *getSatellitePositionData();
-	double getStartAllocFreq();
-	double getStopAllocFreq();
-	double getStartUseFreq();
-	double getStopUseFreq();
-	double getBandwidth();
+	double getStartFreq();
+	double getStopFreq();
+	double getNoiseBandwidth();
 	std::string getRadioService();
 	std::string getEntityName();
 	std::string getCallsign();
@@ -119,6 +121,8 @@ public:
 	double getTxHeightAboveTerrain();
 	double getTxHeightAMSL();
 	CConst::HeightSourceEnum getTxHeightSource();
+	double getAzimuthAngleToTx();
+	double getElevationAngleToTx();
 
 	std::string getTxPolarization();
 	double getTxSrtmHeight();
@@ -167,11 +171,9 @@ public:
 	Vector3 getDiversityPosition() { return diversityPosition; }
 	Vector3 getDiversityAntennaPointing() { return diversityAntennaPointing; }
 
-	void setStartAllocFreq(double f);
-	void setStopAllocFreq(double f);
-	void setStartUseFreq(double f);
-	void setStopUseFreq(double f);
-	void setBandwidth(double b);
+	void setStartFreq(double f);
+	void setStopFreq(double f);
+	void setNoiseBandwidth(double b);
 	void setRadioService(std::string radioServiceVal);
 	void setEntityName(std::string entityNameVal);
 	void setCallsign(std::string callsignVal);
@@ -194,8 +196,9 @@ public:
 	void setTxHeightAMSL(double txHeightAMSLVal);
 	void setTxHeightSource(CConst::HeightSourceEnum txHeightSourceVal);
 	void setTxPolarization(std::string txPolarizationVal);
+	void setAzimuthAngleToTx(double azimuthAngleToTxVal);
+	void setElevationAngleToTx(double elevationAngleToTxVal);
 
-	void setUseFrequency();
 	void setNoiseLevelDBW(double noiseLevelDBWVal);
 	void setRxGain(double rxGainVal);
 	void setRxDlambda(double rxDlambdaVal);
@@ -263,11 +266,11 @@ private:
 
 	int id;
 	int dbIdx;
-	double startAllocFreq;
-	double stopAllocFreq;
-	double startUseFreq;
-	double stopUseFreq;
-	double bandwidth;
+	int numPR;
+	std::string region;
+	double startFreq;
+	double stopFreq;
+	double noiseBandwidth;
 	std::string callsign;
 	std::string rxCallsign;
 	int rxAntennaNumber;
@@ -289,6 +292,8 @@ private:
 	double txHeightAboveTerrain;
 	double txHeightAMSL;
 	CConst::HeightSourceEnum txHeightSource;
+	double azimuthAngleToTx;
+	double elevationAngleToTx;
 	std::string txPolarization;
 	double txCenterToRAATHeight;
 	int txLidarRegion;
@@ -317,7 +322,6 @@ private:
 
 	Vector3 diversityAntennaPointing;
 
-	int numPR;
 	PRClass *prList;
 
 	double minPathLossDB, maxPathLossDB;

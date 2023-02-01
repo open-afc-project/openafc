@@ -33,7 +33,7 @@ LOGGER_DEFINE_GLOBAL(logger, "ULSClass")
 /******************************************************************************************/
 /**** FUNCTION: ULSClass::ULSClass()                                                   ****/
 /******************************************************************************************/
-ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal) : dataSet(dataSetVal), id(idVal), dbIdx(dbIdxVal), numPR(numPRVal)
+ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal, std::string regionVal) : dataSet(dataSetVal), id(idVal), dbIdx(dbIdxVal), numPR(numPRVal), region(regionVal)
 {
 	prList = new PRClass[numPR];
 
@@ -43,11 +43,9 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal
 
 	dataSet = (AfcManager *) NULL;
 
-	startAllocFreq = quietNaN;
-	stopAllocFreq = quietNaN;
-	startUseFreq = quietNaN;
-	stopUseFreq = quietNaN;
-	bandwidth = quietNaN;
+	startFreq = quietNaN;
+	stopFreq = quietNaN;
+	noiseBandwidth = quietNaN;
 	rxAntennaNumber = -1;
 	rxLatitudeDeg = quietNaN;
 	rxLongitudeDeg = quietNaN;
@@ -140,6 +138,9 @@ int ULSClass::getID() const {
 int ULSClass::getDBIdx() const {
 	return(dbIdx);
 }
+std::string ULSClass::getRegion() const {
+	return(region);
+}
 Vector3 ULSClass::getRxPosition() {
 	return(rxPosition);
 }
@@ -155,20 +156,14 @@ CConst::ULSTypeEnum ULSClass::getType() {
 ListClass<Vector3> *ULSClass::getSatellitePositionData() {
 	return(satellitePosnData);
 }
-double ULSClass::getStartAllocFreq() {
-	return(startAllocFreq);
+double ULSClass::getStartFreq() {
+	return(startFreq);
 }
-double ULSClass::getStopAllocFreq() {
-	return(stopAllocFreq);
+double ULSClass::getStopFreq() {
+	return(stopFreq);
 }
-double ULSClass::getStartUseFreq() {
-	return(startUseFreq);
-}
-double ULSClass::getStopUseFreq() {
-	return(stopUseFreq);
-}
-double ULSClass::getBandwidth() {
-	return(bandwidth);
+double ULSClass::getNoiseBandwidth() {
+	return(noiseBandwidth);
 }
 int ULSClass::getNumPR() {
 	return(numPR);
@@ -232,6 +227,12 @@ double                   ULSClass::getTxHeightAMSL()          {
 }
 CConst::HeightSourceEnum ULSClass::getTxHeightSource()        {
 	return(txHeightSource);
+}
+double                   ULSClass::getAzimuthAngleToTx()          {
+	return(azimuthAngleToTx);
+}
+double                   ULSClass::getElevationAngleToTx()          {
+	return(elevationAngleToTx);
 }
 
 
@@ -340,24 +341,16 @@ void ULSClass::setType(CConst::ULSTypeEnum typeVal) {
 	type = typeVal;
 	return;
 }
-void ULSClass::setStartAllocFreq(double f) {
-	startAllocFreq = f;
+void ULSClass::setStartFreq(double f) {
+	startFreq = f;
 	return;
 }
-void ULSClass::setStopAllocFreq(double f) {
-	stopAllocFreq = f;
+void ULSClass::setStopFreq(double f) {
+	stopFreq = f;
 	return;
 }
-void ULSClass::setStartUseFreq(double f) {
-	startUseFreq = f;
-	return;
-}
-void ULSClass::setStopUseFreq(double f) {
-	stopUseFreq = f;
-	return;
-}
-void ULSClass::setBandwidth(double b) {
-	bandwidth = b;
+void ULSClass::setNoiseBandwidth(double b) {
+	noiseBandwidth = b;
 	return;
 }
 void ULSClass::setRadioService(std::string radioServiceVal) {
@@ -438,6 +431,14 @@ void ULSClass::setTxHeightAMSL(double txHeightAMSLVal) {
 }
 void ULSClass::setTxHeightSource(CConst::HeightSourceEnum txHeightSourceVal) {
 	txHeightSource = txHeightSourceVal;
+	return;
+}
+void ULSClass::setAzimuthAngleToTx(double azimuthAngleToTxVal) {
+	azimuthAngleToTx = azimuthAngleToTxVal;
+	return;
+}
+void ULSClass::setElevationAngleToTx(double elevationAngleToTxVal) {
+	elevationAngleToTx = elevationAngleToTxVal;
 	return;
 }
 void ULSClass::setNoiseLevelDBW(double noiseLevelDBWVal) {
@@ -570,48 +571,6 @@ void ULSClass::clearData()
 	if (location) {
 		free(location);
 		location = (char *) NULL;
-	}
-}
-/******************************************************************************************/
-
-/******************************************************************************************/
-/**** FUNCTION: ULSClass::setUseFrequency                                              ****/
-/******************************************************************************************/
-void ULSClass::setUseFrequency()
-{
-	std::ostringstream errStr;
-
-	if (fabs(stopAllocFreq - startAllocFreq - bandwidth) < 1.0e-3) {
-		startUseFreq = startAllocFreq;
-		stopUseFreq = stopAllocFreq;
-	} else if (stopAllocFreq - startAllocFreq > bandwidth) {
-		if (1) {
-			// std::cout << "ALLOC_BW_GT_BW: ID = " << getID() << " radioService = " << getRadioService()
-			//           << " startAllocFreq = " << startAllocFreq << " stopAllocFreq = " << stopAllocFreq << " bandwidth = " << bandwidth << std::endl;
-
-			// Randomly select channel
-			int N = (int) floor((stopAllocFreq - startAllocFreq)/bandwidth);
-			double r = ((double) rand() / (RAND_MAX+1.0));
-			int k = (int) floor(r*N);
-			startUseFreq = startAllocFreq + k*bandwidth;
-			stopUseFreq = startUseFreq + bandwidth;
-		} else if (0) {
-			// Most conservative, aggregate interference over entire alloc band, consider noise only in bandwidth
-			startUseFreq = startAllocFreq;
-			stopUseFreq = stopAllocFreq;
-		} else {
-			// Aggregate interference over entire alloc band, consider noise over entire alloc band
-			startUseFreq = startAllocFreq;
-			stopUseFreq = stopAllocFreq;
-			bandwidth = stopAllocFreq - startAllocFreq;
-		}
-	} else {
-		errStr << "ERROR: Invalid frequency specification for Radio Service = " << radioService
-		       << " startAllocFreq = " << startAllocFreq*1.0e-6
-		       << " stopAllocFreq = "  << stopAllocFreq*1.0e-6
-		       << " bandwidth = "      << bandwidth*1.0e-6
-		       << std::endl;
-		throw std::runtime_error(errStr.str());
 	}
 }
 /******************************************************************************************/
@@ -819,7 +778,7 @@ double ULSClass::computeBeamWidth(double attnDB)
 	}
 
 	double a1 = 0.0;
-	double frequency = (startUseFreq + stopUseFreq)/2;
+	double frequency = (startFreq + stopFreq)/2;
 
 	double a2 = a1;
 	double e2;
@@ -876,14 +835,17 @@ PRClass::PRClass()
 
 	latitudeDeg = quietNaN;
 	longitudeDeg = quietNaN;
-	heightAboveTerrain = quietNaN;
+	heightAboveTerrainRx = quietNaN;
+	heightAboveTerrainTx = quietNaN;
 
 	terrainHeight = quietNaN;
-	heightAMSL = quietNaN;
+	heightAMSLRx = quietNaN;
+	heightAMSLTx = quietNaN;
 	heightSource = CConst::unknownHeightSource;
 	lidarRegion = -1;
 	terrainHeightFlag = false;
-	position = Vector3(quietNaN, quietNaN, quietNaN);
+	positionRx = Vector3(quietNaN, quietNaN, quietNaN);
+	positionTx = Vector3(quietNaN, quietNaN, quietNaN);
 	pointing = Vector3(quietNaN, quietNaN, quietNaN);
 	segmentDistance = quietNaN;
 

@@ -21,19 +21,21 @@ struct UlsRecord
 {
 	int fsid;
 
+	std::string region;
 	std::string callsign;
 	std::string radioService;
 	std::string entityName;
 	std::string rxCallsign;
 	int rxAntennaNumber;
 	double startFreq, stopFreq;
-	std::string emissionsDesignator;
 	double txLatitudeDeg, txLongitudeDeg;
 	double txGroundElevation;
 	std::string txPolarization;
 	double txGain;
 	double txEIRP;
 	double txHeightAboveTerrain;
+	double azimuthAngleToTx;
+	double elevationAngleToTx;
 	double rxLatitudeDeg, rxLongitudeDeg;
 	double rxGroundElevation;
 	double rxHeightAboveTerrain;
@@ -56,7 +58,8 @@ struct UlsRecord
 	int numPR;
 	std::vector<double> prLatitudeDeg;
 	std::vector<double> prLongitudeDeg;
-	std::vector<double> prHeightAboveTerrain;
+	std::vector<double> prHeightAboveTerrainTx;
+	std::vector<double> prHeightAboveTerrainRx;
 	std::vector<std::string> prType;
 
 	std::vector<double> prTxGain;
@@ -104,6 +107,7 @@ public:
 	std::vector<int *> prFieldIdxList;
 
 	int fsidIdx;
+	int regionIdx;
 	int callsignIdx;
 	int radio_serviceIdx;
 	int nameIdx;
@@ -111,7 +115,6 @@ public:
 	int rx_antenna_numIdx;
 	int freq_assigned_start_mhzIdx;
 	int freq_assigned_end_mhzIdx;
-	int emissions_desIdx;
 	int tx_lat_degIdx;
 	int tx_long_degIdx;
 	int tx_ground_elev_mIdx;
@@ -119,6 +122,8 @@ public:
 	int tx_gainIdx;
 	int tx_eirpIdx;
 	int tx_height_to_center_raat_mIdx;
+	int azimuth_angle_to_tx_mIdx;
+	int elevation_angle_to_tx_mIdx;
 	int rx_lat_degIdx;
 	int rx_long_degIdx;
 	int rx_ground_elev_mIdx;
@@ -143,7 +148,8 @@ public:
 	int prTypeIdx;
 	int pr_lat_degIdx;
 	int pr_lon_degIdx;
-	int pr_height_to_center_raat_mIdx;
+	int pr_height_to_center_raat_tx_mIdx;
+	int pr_height_to_center_raat_rx_mIdx;
 
 	int prTxGainIdx;
 	int prTxDiameterIdx;

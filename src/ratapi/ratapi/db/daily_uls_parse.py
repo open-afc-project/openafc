@@ -50,7 +50,8 @@ monthMap = {
 ###############################################################################
 def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
     regionDataDir = fullPathTempDir + '/' + region
-    os.mkdir(regionDataDir)
+    if (not os.path.isdir(regionDataDir)):
+        os.mkdir(regionDataDir)
     logFile.write('Downloading data fils for ' + region + ' into ' + regionDataDir + '\n')
     if region == 'US':
         # download the latest Weekly Update
@@ -97,7 +98,7 @@ def downloadAFCGitHubFiles(logFile):
             '_orig.csv')
 
         # Temporary solution: remove control characters, and blank lines.  Fix spelling error.
-        cmd = 'tr -d \'\200-\377\015\' < ' + dataFile + '_orig.csv  | ' \
+        cmd = 'tr -d \'\\200-\\377\\015\' < ' + dataFile + '_orig.csv  | ' \
             + 'gawk -F "," \'($2 != "") { print }\' | ' \
             + 'sed \'s/daimeter/diameter/\' ' \
             + '>| ' + dataFile + '.csv'
@@ -156,9 +157,9 @@ def removeFromCombinedFile(fileName, directory, ids_to_remove, day, versionIdx):
 
     if (day == 'weekly'):
         # create file that contains weekly and daily
-        with open(weeklyAndDailyPath, 'w') as withDaily: 
+        with open(weeklyAndDailyPath, 'w', encoding='utf8') as withDaily: 
             # open weekly file
-            with open(directory + '/weekly/' + fileName , 'r' ) as weekly:
+            with open(directory + '/weekly/' + fileName , 'r', encoding='utf8') as weekly:
                 record = '' 
                 symbolCount = 0
                 numExpectedCols = neededFilesUS[versionIdx][fileName]
@@ -194,9 +195,9 @@ def removeFromCombinedFile(fileName, directory, ids_to_remove, day, versionIdx):
                         raise e
     else:
         # open new file that contains weekly and daily
-        with open(weeklyAndDailyPath + '_temp', 'w') as withDaily: 
+        with open(weeklyAndDailyPath + '_temp', 'w', encoding='utf8') as withDaily: 
             # open older file 
-            with open(weeklyAndDailyPath , 'r' ) as weekly:
+            with open(weeklyAndDailyPath , 'r', encoding='utf8') as weekly:
                 for line in weekly: 
                     cols = line.split('|')
                     # only write when the id is not in the list of ids 
@@ -211,7 +212,7 @@ def updateIndividualFile(dayFile, directory, lineBuffer):
     weeklyAndDailyPath = directory + '/weekly/' + dayFile + '_withDaily'
     if(os.path.isfile(weeklyAndDailyPath)):
         # open file that contains weekly and daily
-        with open(weeklyAndDailyPath, 'a') as withDaily:       
+        with open(weeklyAndDailyPath, 'a', encoding='utf8') as withDaily:       
             withDaily.write(lineBuffer)
     else:
         e =  Exception('Combined file ' + weeklyAndDailyPath + ' does not exist')
@@ -299,20 +300,20 @@ def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
 # Generates the combined text file that the coalition processor uses. 
 def generateUlsScriptInputUS(directory, logFile, genFilename):
     logFile.write('Appending US data to ' + genFilename + ' as input for uls script' + '\n')
-    with open(genFilename, 'a') as combined:
+    with open(genFilename, 'a', encoding='utf8') as combined:
         for weeklyFile in os.listdir(directory):
             if "withDaily" in weeklyFile:
                 logFile.write('Adding ' + directory + '/' + weeklyFile + ' to ' + genFilename + '\n')
-                with open(directory +'/' + weeklyFile, 'r') as infile:
+                with open(directory +'/' + weeklyFile, 'r', encoding='utf8') as infile:
                     for line in infile:
                         combined.write('US:' + line)
 
 def generateUlsScriptInputCA(directory, logFile, genFilename):
     logFile.write('Appending CA data to ' + genFilename + ' as input for uls script' + '\n')
-    with open(genFilename, 'a') as combined:
+    with open(genFilename, 'a', encoding='utf8') as combined:
         for dataFile in os.listdir(directory):
             logFile.write('Adding ' + directory + '/' + dataFile + ' to ' + genFilename + '\n')
-            with open(directory +'/' + dataFile, 'r') as csvfile:
+            with open(directory +'/' + dataFile, 'r', encoding='utf8') as csvfile:
                 code = dataFile.replace('.csv', '')
                 csvreader = csv.reader(csvfile)
                 for row in csvreader:
@@ -544,6 +545,7 @@ def daily_uls_parse(state_root, interactive):
     if processAntFilesFlag:
         antennaPatternFile = state_root + '/Antenna_Patterns/afc_antenna_patterns.csv'
         processAntFiles(fullPathTempDir, fullPathTempDir + '/antenna_model_list.csv', antennaPatternFile, logFile)
+        subprocess.call(['cp', antennaPatternFile, fullPathTempDir]) 
     ###########################################################################
 
     ###########################################################################
@@ -573,7 +575,7 @@ def daily_uls_parse(state_root, interactive):
     # If processDownloadFlag set, process Download files to create combined.txt         #
     ###########################################################################
     if processDownloadFlag:
-        with open(fullPathCoalitionScriptInput, 'w') as combined:
+        with open(fullPathCoalitionScriptInput, 'w', encoding='utf8') as combined:
             pass # Do nothing, create empty file that will be appended to
 
         for region in regionList:
@@ -616,7 +618,7 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
 
     os.chdir(root) # change back to root of this script
-    coalitionScriptOutputFilename = 'CONUS_ULS_' + nameTime + '.csv'
+    coalitionScriptOutputFilename = 'FS_' + nameTime + '.csv'
 
     ###########################################################################
     # If interactive, prompt to set output file from ULS Processor, note that #
@@ -625,7 +627,7 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if interactive:
         if not runULSProcessorFlag:
-            flist = glob.glob(fullPathTempDir + "/CONUS_ULS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
+            flist = glob.glob(fullPathTempDir + "/FS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
             if (len(flist)):
                 coalitionScriptOutputFilename = os.path.basename(flist[-1])
 
@@ -711,12 +713,15 @@ def daily_uls_parse(state_root, interactive):
     # output filename from sortCallsignsAddFSID
     # fsidTableFile is a datafile used by sortCallsignsAddFSID
     sortedOutput = bpsScriptOutput.replace(".csv", "_sorted.csv")
-    fsidTableFile =  root + '/data_files/fsid_table.csv'
 
     ###########################################################################
     # If runSortCallsignsAddFSIDFlag set, run sortCallsignsAddFSID            #
     ###########################################################################
     if runSortCallsignsAddFSIDFlag:
+        fsidTableFile =  root + '/data_files/fsid_table.csv'
+        fsidTableBakFile =  root + '/data_files/fsid_table_bak_' + nameTime + '.csv'
+        logFile.write("Backing up FSID table for to: " + fsidTableBakFile + '\n')
+        subprocess.call(['cp', fsidTableFile, fsidTableBakFile]) 
         logFile.write("Running through sort callsigns add FSID script" + '\n')
         sortCallsignsAddFSID(bpsScriptOutput, fsidTableFile, sortedOutput, logFile)
     ###########################################################################
@@ -833,14 +838,7 @@ if __name__ == '__main__':
     parser.add_argument('-i',  '--interactive', action='store_true')
     parser.add_argument('-u8', '--unii8', action='store_true')
 
-#   2022.12.28 temporarily set default to US only.  CA currently does not work because CA does
-#   not provide TX locations.  Currently working with ISED to see if they will provide TX location 
-#   data.  If TX location data is not provided, these scripts and afc-engine need to be modified
-#   accordingly
-#
-#    parser.add_argument('-r',  '--region', default='US:CA', help='":" separated list of regions')
-
-    parser.add_argument('-r',  '--region', default='US', help='":" separated list of regions')
+    parser.add_argument('-r',  '--region', default='US:CA', help='":" separated list of regions')
 
     args = parser.parse_args()
     interactive = args.interactive
@@ -868,4 +866,4 @@ if __name__ == '__main__':
     if not (processUS or processCA):
         raise Exception('ERROR: No regions specified')
 
-    daily_uls_parse("/var/lib/fbrat", interactive)
+    daily_uls_parse("/mnt/nfs/rat_transfer", interactive)

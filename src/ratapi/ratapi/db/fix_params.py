@@ -4,6 +4,7 @@ import math
 from os.path import exists
 
 csmap = {}
+fsidmap = {}
 c  = 2.99792458e8
 unii5StartFreqMHz = 5925
 unii5StopFreqMHz  = 6425
@@ -46,6 +47,9 @@ def isTypicalReflectorDimension(height, width):
 
 def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
     logFile.write('Fixing parameters' + '\n')
+    logFile.write('inputPath = ' + inputPath + '\n')
+    logFile.write('outputPath = ' + outputPath + '\n')
+    logFile.write('backwardCompatiblePR = ' + str(backwardCompatiblePR) + '\n')
 
     file_handle = open(inputPath, 'r')
     csvreader = csv.DictReader(file_handle)
@@ -118,12 +122,43 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             highFreq = freq + bandwidth/2;
 
             row['return_FSID'] = ''
-            row['Rx Gain (dBi)'] = ''
-            row['Tx Gain (dBi)'] = ''
+            row['Rx Gain (dBi)'] = row['Rx Gain ULS (dBi)']
+            row['Tx Gain (dBi)'] = row['Tx Gain ULS (dBi)']
 
             row['Rx Height to Center RAAT (m)']           = row['Rx Height to Center RAAT ULS (m)']
             row['Rx Diversity Height to Center RAAT (m)'] = row['Rx Diversity Height to Center RAAT ULS (m)']
             row['Tx Height to Center RAAT (m)']           = row['Tx Height to Center RAAT ULS (m)']
+
+            numPR = int(row['Num Passive Repeater'])
+            for prIdx in range(numPR):
+                prNum = prIdx+1
+                prTxGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Tx (dBi)'
+                prRxGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Rx (dBi)'
+                prTxGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Tx (dBi)'
+                prRxGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Rx (dBi)'
+                prRxAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Rx Ant Diameter (m)'
+                prTxAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Tx Ant Diameter (m)'
+                prWidthULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Width (m)'
+                prHeightULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Height (m)'
+                prWidthStr = 'Passive Repeater ' + str(prNum) + ' Reflector Width (m)'
+                prHeightStr = 'Passive Repeater ' + str(prNum) + ' Reflector Height (m)'
+
+                rxGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Rx (dBi)'
+                txGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Tx (dBi)'
+                prHeightULSStr    = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Height (m)'
+                prWidthULSStr     = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Width (m)'
+                prAntModelDiameterStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Diameter (m)'
+
+                row[prTxGainULSFixStr]  = row[txGainULSStr]
+                row[prRxGainULSFixStr]  = row[rxGainULSStr]
+                row[prTxGainStr]        = row[txGainULSStr]
+                row[prRxGainStr]        = row[rxGainULSStr]
+                row[prRxAntDiameterStr] = row[prAntModelDiameterStr]
+                row[prTxAntDiameterStr] = row[prAntModelDiameterStr]
+                row[prWidthULSFixStr]   = row[prWidthULSStr]
+                row[prHeightULSFixStr]  = row[prHeightULSStr]
+                row[prWidthStr]         = row[prWidthULSStr]
+                row[prHeightStr]        = row[prHeightULSStr]
 
             if (highFreq > unii5StartFreqMHz) and (lowFreq < unii5StopFreqMHz):
                 uniiband = 5
@@ -141,6 +176,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                 csmap[keyv].append(row)
             else:
                 csmap[keyv] = [ row ]
+        file_handle.close()
     
         all_cs = list(csmap.keys())
         for keyv in sorted(all_cs):
@@ -149,119 +185,119 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                 matchmap[ri] = -1
                 r = csmap[keyv][ri]
                 numPR = int(r['Num Passive Repeater'])
-                for prIdx in range(numPR):
-                    prNum = prIdx+1
-                    rxGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Rx (dBi)'
-                    txGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Tx (dBi)'
-                    rxGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Rx (dBi)'
-                    txGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Tx (dBi)'
-                    prAntModelDiameterStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Diameter (m)'
-                    rxAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Rx Ant Diameter (m)'
-                    txAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Tx Ant Diameter (m)'
+                if keyv[0] == 'US':
+                    for prIdx in range(numPR):
+                        prNum = prIdx+1
+                        rxGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Rx (dBi)'
+                        txGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Tx (dBi)'
+                        rxGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Rx (dBi)'
+                        txGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Tx (dBi)'
+                        prAntModelDiameterStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Diameter (m)'
+                        rxAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Rx Ant Diameter (m)'
+                        txAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Tx Ant Diameter (m)'
 
-                    prHeightULSStr    = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Height (m)'
-                    prWidthULSStr     = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Width (m)'
-                    prHeightULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Height (m)'
-                    prWidthULSFixStr  = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Width (m)'
+                        prHeightULSStr    = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Height (m)'
+                        prWidthULSStr     = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Width (m)'
+                        prHeightULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Height (m)'
+                        prWidthULSFixStr  = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Width (m)'
 
-                    prHeightAntennaStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Reflector Height (m)'
-                    prWidthAntennaStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Reflector Width (m)'
+                        prHeightAntennaStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Reflector Height (m)'
+                        prWidthAntennaStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Reflector Width (m)'
 
-                    prHeightStr = 'Passive Repeater ' + str(prNum) + ' Reflector Height (m)'
-                    prWidthStr = 'Passive Repeater ' + str(prNum) + ' Reflector Width (m)'
+                        prHeightStr = 'Passive Repeater ' + str(prNum) + ' Reflector Height (m)'
+                        prWidthStr = 'Passive Repeater ' + str(prNum) + ' Reflector Width (m)'
 
-                    prTypeStr = 'Passive Repeater ' + str(prNum) + ' Ant Type'
+                        prTypeStr = 'Passive Repeater ' + str(prNum) + ' Ant Type'
 
-                    r[rxGainULSFixStr] = r[rxGainULSStr]
-                    r[txGainULSFixStr] = r[txGainULSStr]
-                    r[rxAntDiameterStr] = r[prAntModelDiameterStr]
-                    r[txAntDiameterStr] = r[prAntModelDiameterStr]
-                    r[prHeightULSFixStr] = r[prHeightULSStr]
-                    r[prWidthULSFixStr] = r[prWidthULSStr]
-                    r[prHeightStr] = ''
-                    r[prWidthStr] = ''
+                        r[rxGainULSFixStr] = r[rxGainULSStr]
+                        r[txGainULSFixStr] = r[txGainULSStr]
+                        r[rxAntDiameterStr] = r[prAntModelDiameterStr]
+                        r[txAntDiameterStr] = r[prAntModelDiameterStr]
+                        r[prHeightULSFixStr] = r[prHeightULSStr]
+                        r[prWidthULSFixStr] = r[prWidthULSStr]
+                        r[prHeightStr] = ''
+                        r[prWidthStr] = ''
 
-                    # R2-AIP-30 (a)
-                    if (r[prTypeStr] == 'Ant') or (r[prTypeStr] == 'UNKNOWN'):
-                        rxFlag = False
-                        txFlag = False
-                        rxGainULS = 0.0
-                        txGainULS = 0.0
-                        if (r[rxGainULSStr].strip() != ''):
-                            rxGainULS = float(r[rxGainULSStr])
-                            if ((rxGainULS >= 32.0) and (rxGainULS <= 48.0)):
-                                rxFlag = True
-                        if (r[txGainULSStr].strip() != ''):
-                            txGainULS = float(r[txGainULSStr])
-                            if ((txGainULS >= 32.0) and (txGainULS <= 48.0)):
-                                txFlag = True
-                        if (r[prTypeStr] == 'UNKNOWN'):
-                            if rxFlag or txFlag:
-                                r[prTypeStr] = 'Ant'
-                            else:
-                                r[prTypeStr] = 'Ref'
+                        # R2-AIP-30 (a)
+                        if (r[prTypeStr] == 'Ant') or (r[prTypeStr] == 'UNKNOWN'):
+                            rxFlag = False
+                            txFlag = False
+                            rxGainULS = 0.0
+                            txGainULS = 0.0
+                            if (r[rxGainULSStr].strip() != ''):
+                                rxGainULS = float(r[rxGainULSStr])
+                                if ((rxGainULS >= 32.0) and (rxGainULS <= 48.0)):
+                                    rxFlag = True
+                            if (r[txGainULSStr].strip() != ''):
+                                txGainULS = float(r[txGainULSStr])
+                                if ((txGainULS >= 32.0) and (txGainULS <= 48.0)):
+                                    txFlag = True
+                            if (r[prTypeStr] == 'UNKNOWN'):
+                                if rxFlag or txFlag:
+                                    r[prTypeStr] = 'Ant'
+                                else:
+                                    r[prTypeStr] = 'Ref'
 
-                        if (r[prTypeStr] == 'Ant'):
-                            # R2-AIP-30 (d)
-                            if rxFlag and (not txFlag):
-                                r[txGainULSFixStr] = r[rxGainStrULS]
-                            # R2-AIP-30 (e)
-                            elif txFlag and (not rxFlag):
-                                r[rxGainULSFixStr] = r[txGainULSStr]
+                            if (r[prTypeStr] == 'Ant'):
+                                # R2-AIP-30 (d)
+                                if rxFlag and (not txFlag):
+                                    r[txGainULSFixStr] = r[rxGainStrULS]
+                                # R2-AIP-30 (e)
+                                elif txFlag and (not rxFlag):
+                                    r[rxGainULSFixStr] = r[txGainULSStr]
 
-                    if (r[prTypeStr] == 'Ref'):
-                        # R2-AIP-30 (b)
-                        if (r[prHeightULSStr].strip() == '') or (r[prWidthULSStr].strip() == ''):
-                            r[prHeightULSFixStr] = str(4.88)
-                            r[prWidthULSFixStr] = str(6.10)
-                        # 2022.11.08: Need to confirm this
-                        elif (float(r[prHeightULSStr])+0.1 < 1.83) or (float(r[prWidthULSStr])+0.1 < 2.44):
-                            r[prHeightULSFixStr] = str(4.88)
-                            r[prWidthULSFixStr] = str(6.10)
+                        if (r[prTypeStr] == 'Ref'):
+                            # R2-AIP-30 (b)
+                            if (r[prHeightULSStr].strip() == '') or (r[prWidthULSStr].strip() == ''):
+                                r[prHeightULSFixStr] = str(4.88)
+                                r[prWidthULSFixStr] = str(6.10)
+                            # 2022.11.08: Need to confirm this
+                            elif (float(r[prHeightULSStr])+0.1 < 1.83) or (float(r[prWidthULSStr])+0.1 < 2.44):
+                                r[prHeightULSFixStr] = str(4.88)
+                                r[prWidthULSFixStr] = str(6.10)
 
-                        prHeightULS = float(r[prHeightULSFixStr])
-                        prWidthULS = float(r[prWidthULSFixStr])
-                        # R2-AIP-29-b-iii-1
-                        if (r[prHeightAntennaStr].strip() == '') or (r[prWidthAntennaStr].strip() == ''):
-                            prHeight = prHeightULS
-                            prWidth = prWidthULS
-                        else:
-                            prHeightAnt = float(r[prHeightAntennaStr])
-                            prWidthAnt = float(r[prWidthAntennaStr])
-
-                            # R2-AIP-29-b-iii-2
-                            if (abs(prHeightAnt-prHeightULS) <= 0.1) and (abs(prWidthAnt-prWidthULS) <= 0.1):
+                            prHeightULS = float(r[prHeightULSFixStr])
+                            prWidthULS = float(r[prWidthULSFixStr])
+                            # R2-AIP-29-b-iii-1
+                            if (r[prHeightAntennaStr].strip() == '') or (r[prWidthAntennaStr].strip() == ''):
                                 prHeight = prHeightULS
                                 prWidth = prWidthULS
-
                             else:
-                                ulsTypicalFlag = isTypicalReflectorDimension(prHeightULS, prWidthULS)
-                                antTypicalFlag = isTypicalReflectorDimension(prHeightAnt, prWidthAnt)
+                                prHeightAnt = float(r[prHeightAntennaStr])
+                                prWidthAnt = float(r[prWidthAntennaStr])
 
-                                # R2-AIP-29-b-iii-3
-                                # R2-AIP-29-b-iii-5
-                                if (ulsTypicalFlag == antTypicalFlag):
-                                    if (prHeightULS*prWidthULS > prHeightAnt*prWidthAnt):
+                                # R2-AIP-29-b-iii-2
+                                if (abs(prHeightAnt-prHeightULS) <= 0.1) and (abs(prWidthAnt-prWidthULS) <= 0.1):
+                                    prHeight = prHeightULS
+                                    prWidth = prWidthULS
+                                else:
+                                    ulsTypicalFlag = isTypicalReflectorDimension(prHeightULS, prWidthULS)
+                                    antTypicalFlag = isTypicalReflectorDimension(prHeightAnt, prWidthAnt)
+
+                                    # R2-AIP-29-b-iii-3
+                                    # R2-AIP-29-b-iii-5
+                                    if (ulsTypicalFlag == antTypicalFlag):
+                                        if (prHeightULS*prWidthULS > prHeightAnt*prWidthAnt):
+                                            prHeight = prHeightULS
+                                            prWidth = prWidthULS
+                                        else:
+                                            prHeight = prHeightAnt
+                                            prWidth = prWidthAnt
+
+                                    # R2-AIP-29-b-iii-4
+                                    elif ulsTypicalFlag:
                                         prHeight = prHeightULS
                                         prWidth = prWidthULS
+                                    elif antTypicalFlag:
+                                        prHeight = prHeightAnt
+                                        prWidth = prWidthAnt
+                                    # R2-AIP-29-b-iv
                                     else:
                                         prHeight = prHeightAnt
                                         prWidth = prWidthAnt
 
-                                # R2-AIP-29-b-iii-4
-                                elif ulsTypicalFlag:
-                                    prHeight = prHeightULS
-                                    prWidth = prWidthULS
-                                elif antTypicalFlag:
-                                    prHeight = prHeightAnt
-                                    prWidth = prWidthAnt
-                                # R2-AIP-29-b-iv
-                                else:
-                                    prHeight = prHeightAnt
-                                    prWidth = prWidthAnt
-
-                        r[prHeightStr] = str(prHeight)
-                        r[prWidthStr] = str(prWidth)
+                            r[prHeightStr] = str(prHeight)
+                            r[prWidthStr] = str(prWidth)
 
                 if backwardCompatiblePR:
                     if numPR == 0:
@@ -326,8 +362,8 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                 retGainStr    = 'Passive Repeater ' + str(numPR+1-prNum) + ' Back-to-Back Gain ' + ret + ' (dBi)'
                                 fwdAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' ' + fwd + ' Ant Diameter (m)'
                                 retAntDiameterStr = 'Passive Repeater ' + str(numPR+1-prNum) + ' ' + ret + ' Ant Diameter (m)'
-                                fwdHeightStr = 'Passive Repeater ' + str(prNum) + ' Height to Center RAAT (m)'
-                                retHeightStr = 'Passive Repeater ' + str(numPR+1-prNum) + ' Height to Center RAAT (m)'
+                                fwdHeightStr = 'Passive Repeater ' + str(prNum) + ' Height to Center RAAT ' + fwd + ' (m)'
+                                retHeightStr = 'Passive Repeater ' + str(numPR+1-prNum) + ' Height to Center RAAT ' + ret + ' (m)'
                                 fwdAntMidbandGain = 'Passive Repeater ' + str(prNum) + ' Ant Model Midband Gain (dB)'
                                 retAntMidbandGain = 'Passive Repeater ' + str(numPR+1-prNum) + ' Ant Model Midband Gain (dB)'
     
@@ -696,21 +732,30 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                     r[nearFieldEfficiencyStr] = str(rxNearFieldAntEfficiency)
                     ####################################################################################
 
-            for r in csmap[keyv]:
-                numPR = int(r['Num Passive Repeater'])
-                for prIdx in range(numPR):
-                    prNum = prIdx+1
-                    prType = r['Passive Repeater ' + str(prNum) + ' Ant Type']
-                    if (prType == 'Ant') and False:
-                        rxGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Rx (dBi)'
-                        txGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Tx (dBi)'
-                        rxGain = r[rxGainStr]
-                        txGain = r[txGainStr]
-                        txFlag = False
-                        if txGain != '':
-                            if ((float(txGain) >= 32.0) and (float(txGain) <= 48.0)):
-                                txFlag = True
-                        if not txFlag:
-                            r[txGainStr] = rxGain
-                csvwriter.writerow(r)
-            file_handle.close()
+            for ri,r in enumerate(csmap[keyv]):
+                fsid = int(r['FSID'])
+                if fsid in fsidmap:
+                    sys.exit('ERROR: FSID: ' + str(fsid) + " not unique\n")
+                fsidmap[fsid] = tuple([ri, keyv])
+
+        for fsid in sorted(fsidmap.keys()):
+            ri = fsidmap[fsid][0]
+            keyv = fsidmap[fsid][1]
+            r = csmap[keyv][ri]
+
+            numPR = int(r['Num Passive Repeater'])
+            for prIdx in range(numPR):
+                prNum = prIdx+1
+                prType = r['Passive Repeater ' + str(prNum) + ' Ant Type']
+                if (prType == 'Ant') and False:
+                    rxGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Rx (dBi)'
+                    txGainStr = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain Tx (dBi)'
+                    rxGain = r[rxGainStr]
+                    txGain = r[txGainStr]
+                    txFlag = False
+                    if txGain != '':
+                        if ((float(txGain) >= 32.0) and (float(txGain) <= 48.0)):
+                            txFlag = True
+                    if not txFlag:
+                        r[txGainStr] = rxGain
+            csvwriter.writerow(r)

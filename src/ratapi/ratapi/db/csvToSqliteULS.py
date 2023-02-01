@@ -36,7 +36,8 @@ class PR(Base):
 
     pr_lat_deg = Column(Float)
     pr_lon_deg = Column(Float)
-    pr_height_to_center_raat_m = Column(Float)
+    pr_height_to_center_raat_tx_m = Column(Float)
+    pr_height_to_center_raat_rx_m = Column(Float)
     pr_ant_type = Column(String(3), nullable=False)
     pr_ant_category = Column(String(10))
     pr_ant_model = Column(CoerceUTF8(64))
@@ -59,6 +60,9 @@ class ULS(Base):
 
     #: FSID
     fsid = Column(Integer, nullable=False, index=True, primary_key=True)
+
+    #: Region
+    region = Column(String(16), nullable=False)
 
     #: Callsign
     callsign = Column(String(16), nullable=False)
@@ -94,14 +98,11 @@ class ULS(Base):
     #: TX EIRP (dBm)
     tx_eirp = Column(Float)
 
-    #: Emissions Designator
-    emissions_des = Column(String(64), nullable=False)
-
     #: Tx Lat Coords
-    tx_lat_deg = Column(Float, nullable=False)
+    tx_lat_deg = Column(Float)
 
     #: Tx Long Coords
-    tx_long_deg = Column(Float, nullable=False)
+    tx_long_deg = Column(Float)
 
     #: Tx Ground Elevation (m)
     tx_ground_elev_m = Column(Float)
@@ -111,6 +112,12 @@ class ULS(Base):
 
     #: Tx Height to Center RAAT (m)
     tx_height_to_center_raat_m = Column(Float)
+
+    #Azimuth Angle Towards Tx (deg)
+    azimuth_angle_to_tx = Column(Float)
+
+    #Elevation Angle Towards Tx (deg)
+    elevation_angle_to_tx = Column(Float)
 
     #: Tx Beamwidth
     #tx_beamwidth = Column(Float, nullable=False)
@@ -253,6 +260,8 @@ def convertULS(data_file, state_root, logFile, fileName):
                     #: FSID
                     fsid = fsidVal,
                     #: Callsign
+                    region=str(row['Region']),
+                    #: Callsign
                     callsign=str(row['Callsign']),
                     #: Status
                     status=str(row['Status']),
@@ -271,8 +280,6 @@ def convertULS(data_file, state_root, logFile, fileName):
                     freq_assigned_end_mhz=_as_float(row['Upper Band (MHz)']),
                     #: Tx EIRP (dBm)
                     tx_eirp=_as_float(row['Tx EIRP (dBm)']),
-                    #: Emissions Designator
-                    emissions_des=str(row['Emissions Designator']),
                     #: Tx Lat Coords
                     tx_lat_deg=_as_float(row['Tx Lat Coords']),
                     #: Tx Long Coords
@@ -283,6 +290,10 @@ def convertULS(data_file, state_root, logFile, fileName):
                     tx_polarization=str(row['Tx Polarization']),
                     #: Tx Height to Center RAAT (m)
                     tx_height_to_center_raat_m=_as_float(row['Tx Height to Center RAAT (m)']),
+                    # Azimuth Angle Towards Tx (deg)
+                    azimuth_angle_to_tx =  _as_float(row['Azimuth Angle Towards Tx (deg)']),
+                    # Elevation Angle Towards Tx (deg)
+                    elevation_angle_to_tx =  _as_float(row['Elevation Angle Towards Tx (deg)']),
                     #: Tx Gain (dBi)
                     tx_gain=_as_float(row['Tx Gain (dBi)']),
                     #: Rx Lat Coords
@@ -332,19 +343,20 @@ def convertULS(data_file, state_root, logFile, fileName):
                         id = prCount,
                         fsid = fsidVal,
                         prSeq = idx,
-                        pr_lat_deg = _as_float(                 row['Passive Repeater ' + str(idx) + ' Lat Coords']),
-                        pr_lon_deg = _as_float(                 row['Passive Repeater ' + str(idx) + ' Long Coords']),
-                        pr_height_to_center_raat_m = _as_float( row['Passive Repeater ' + str(idx) + ' Height to Center RAAT (m)']),
-                        pr_ant_type = str(                      row['Passive Repeater ' + str(idx) + ' Ant Type']),
-                        pr_ant_category = str(                  row['Passive Repeater ' + str(idx) + ' Ant Category']),
-                        pr_ant_model = str(                     row['Passive Repeater ' + str(idx) + ' Ant Model']),
-                        pr_line_loss = _as_float(               row['Passive Repeater ' + str(idx) + ' Line Loss (dB)']),
-                        pr_reflector_height_m = _as_float(      row['Passive Repeater ' + str(idx) + ' Reflector Height (m)']),
-                        pr_reflector_width_m = _as_float(       row['Passive Repeater ' + str(idx) + ' Reflector Width (m)']),
-                        pr_back_to_back_gain_tx = _as_float(    row['Passive Repeater ' + str(idx) + ' Back-to-Back Gain Tx (dBi)']),
-                        pr_back_to_back_gain_rx = _as_float(    row['Passive Repeater ' + str(idx) + ' Back-to-Back Gain Rx (dBi)']),
-                        pr_ant_diameter_tx = _as_float(         row['Passive Repeater ' + str(idx) + ' Tx Ant Diameter (m)']),
-                        pr_ant_diameter_rx = _as_float(         row['Passive Repeater ' + str(idx) + ' Rx Ant Diameter (m)'])
+                        pr_lat_deg = _as_float(                    row['Passive Repeater ' + str(idx) + ' Lat Coords']),
+                        pr_lon_deg = _as_float(                    row['Passive Repeater ' + str(idx) + ' Long Coords']),
+                        pr_height_to_center_raat_tx_m = _as_float( row['Passive Repeater ' + str(idx) + ' Height to Center RAAT Tx (m)']),
+                        pr_height_to_center_raat_rx_m = _as_float( row['Passive Repeater ' + str(idx) + ' Height to Center RAAT Rx (m)']),
+                        pr_ant_type = str(                         row['Passive Repeater ' + str(idx) + ' Ant Type']),
+                        pr_ant_category = str(                     row['Passive Repeater ' + str(idx) + ' Ant Category']),
+                        pr_ant_model = str(                        row['Passive Repeater ' + str(idx) + ' Ant Model']),
+                        pr_line_loss = _as_float(                  row['Passive Repeater ' + str(idx) + ' Line Loss (dB)']),
+                        pr_reflector_height_m = _as_float(         row['Passive Repeater ' + str(idx) + ' Reflector Height (m)']),
+                        pr_reflector_width_m = _as_float(          row['Passive Repeater ' + str(idx) + ' Reflector Width (m)']),
+                        pr_back_to_back_gain_tx = _as_float(       row['Passive Repeater ' + str(idx) + ' Back-to-Back Gain Tx (dBi)']),
+                        pr_back_to_back_gain_rx = _as_float(       row['Passive Repeater ' + str(idx) + ' Back-to-Back Gain Rx (dBi)']),
+                        pr_ant_diameter_tx = _as_float(            row['Passive Repeater ' + str(idx) + ' Tx Ant Diameter (m)']),
+                        pr_ant_diameter_rx = _as_float(            row['Passive Repeater ' + str(idx) + ' Rx Ant Diameter (m)'])
                     )
                     prCount = prCount+1
                     s.add(pr)

@@ -3,6 +3,7 @@
 #include <math.h>
 #include <iostream>
 #include <sstream>
+#include <iomanip>
 
 #include "UlsFunctions.h"
 
@@ -28,7 +29,9 @@ QString UlsFunctionsClass::makeNumber(const double &d) {
     if (std::isnan(d)) {
         return "";
     } else {
-        return QString::number(d, 'f', 15);
+        std::stringstream stream;
+        stream << std::fixed << std::setprecision(15) << d;
+        return QString::fromStdString(stream.str());
     }
 }
 
@@ -221,8 +224,8 @@ QStringList UlsFunctionsClass::getCSVHeader(int numPR)
     header << "Tx Long Coords";
     header << "Tx Ground Elevation (m)";
     header << "Tx Polarization";
-    header << "Tx Azimuth Angle (deg)";
-    header << "Tx Elevation Angle (deg)";
+    header << "Azimuth Angle Towards Tx (deg)";
+    header << "Elevation Angle Towards Tx (deg)";
     header << "Tx Ant Manufacturer";
     header << "Tx Ant Model";
     header << "Tx Ant Model Name Matched";
@@ -273,7 +276,8 @@ QStringList UlsFunctionsClass::getCSVHeader(int numPR)
         header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Reflector Height (m)";
         header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Reflector Width (m)";
         header << "Passive Repeater " + QString::number(prIdx) + " Line Loss (dB)";
-        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT Tx (m)";
+        header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT Rx (m)";
         header << "Passive Repeater " + QString::number(prIdx) + " Beamwidth";
         header << "Segment " + QString::number(prIdx+1) + " Length (Km)";
     }
