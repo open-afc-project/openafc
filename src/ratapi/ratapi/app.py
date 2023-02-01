@@ -380,7 +380,7 @@ def create_app(config_override=None):
                         alt='fcc',
                         content_type='application/json',
                     ),
-                    'CONUS': dict(
+                    'USA': dict(
                         alt='fcc',
                         content_type='application/json',
                     ),

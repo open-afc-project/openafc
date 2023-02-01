@@ -357,7 +357,7 @@ class DbUpgrade(Command):
             upgrade()
 
             # If AFCConfig is empty, copy from fcc config file
-            region = ['CONUS', 'fcc']
+            region = ['USA', 'fcc']
             config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext
 == region[0]).first()
             if not config:
@@ -995,7 +995,7 @@ class ConfigAdd(Command):
         LOGGER.debug('ConfigAdd.__call__() %s', src)
         from .models.aaa import User
 
-        REGION_MAP = {'CONUS':'fcc'}
+        REGION_MAP = {'USA':'fcc'}
         split_items = src.split('=', 1)
         filename = split_items[1].strip()
         if not os.path.exists(filename):
