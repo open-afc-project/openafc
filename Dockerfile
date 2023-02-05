@@ -42,6 +42,7 @@ RUN yum -y install python-pip
 # python2-secrets require requests 2.7.0
 RUN pip install /repos/CentOS/7/7/Packages/requests-2.7.0-py2.py3-none-any.whl
 RUN pip install /repos/CentOS/7/7/Packages/python2_secrets-1.0.5-py2.py3-none-any.whl
+RUN pip install python-dateutil kafka-python
 
 RUN yum -y clean all && \
     rm -rf /var/cache/yum && \

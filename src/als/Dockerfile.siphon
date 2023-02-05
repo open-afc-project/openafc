@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-# Dockerfile for Siphon - als_db_tool.py script that takes log records from
+# Dockerfile for Siphon - als_siphon.py script that takes log records from
 # Kafka and puts them to PostgreSQL+PostGIS database (optionally creating
 # necessary database before operation)
 
@@ -17,7 +17,7 @@ COPY requirements.txt /usr/app/
 RUN /usr/local/bin/python3 -m pip install --upgrade pip
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-COPY als_db_tool.py /usr/app
+COPY als_siphon.py /usr/app
 COPY ALS.sql /usr/app
 
 ENV PYTHONPATH=/usr/app
@@ -65,7 +65,7 @@ ENV INIT_IF_EXISTS=skip
 # False/no/0/- to not to. Default is not to print
 ENV SIPHON_PROGRESS=false
 
-ENTRYPOINT /usr/app/als_db_tool.py init_siphon \
+ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_servers=$KAFKA_SERVERS \
     --kafka_client_id=$KAFKA_CLIENT_ID \
     --kafka_security_protocol=$KAFKA_SECURITY_PROTOCOL \
