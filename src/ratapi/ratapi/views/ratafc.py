@@ -36,6 +36,7 @@ from .auth import auth
 from .ratapi import build_task
 from .. import data_if
 from .. import task
+from .. import als
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -169,6 +170,25 @@ def _translate_afc_error(error_msg):
         raise VersionNotSupportedException()
 
 
+def _get_vendor_extension(json_dict, ext_id):
+    """ Retrieves given extension from JSON dictionary
+
+    Arguments:
+    json_dict -- JSON dictionary, presumably containing or eligible to contain
+                 'vendorExtensions' top level field
+    ext_id    -- Extemnsion ID to look for
+    Returns 'parameters' field of extension with given ID. None if extension
+    not found
+    """
+    try:
+        for extension in json_dict.get("vendorExtensions", []):
+            if extension["extensionId"] == ext_id:
+                return extension["parameters"]
+    except (TypeError, ValueError, LookupError):
+        pass
+    return None
+
+
 def fail_done(t):
     LOGGER.debug('fail_done()')
     task_stat = t.getStat()
@@ -273,6 +293,20 @@ response_map = {
 }
 
 
+class AlsConfigInfo:
+    """ Information pertinent to ALS Config record known before request
+    
+    Attributes:
+    req_idx     -- Index of request in request message
+    config_text -- Content of config file for request
+    customer    -- Custmer name for request
+    """
+    def __init__(self, req_idx, config_text, customer):
+        self.config_text = config_text
+        self.customer = customer
+        self.req_idx = req_idx
+
+
 class RatAfc(MethodView):
     ''' RAT AFC resources
     '''
@@ -357,10 +391,16 @@ class RatAfc(MethodView):
 
         results = {"availableSpectrumInquiryResponses": [], "version": ver}
 
+        als_req_id = als.als_afc_req_id()
+        als.als_afc_request(req_id=als_req_id, req=args)
         tasks = []
+        als_config_infos = []
+        uls_id = "Unknown"
+        geo_id = "Unknown"
 
         try:
-            for request in requests:
+
+            for req_idx, request in enumerate(requests):
                 # authenticate
                 LOGGER.debug("Request: %s", request)
                 device_desc = request["availableSpectrumInquiryRequests"][0].get(
@@ -377,6 +417,7 @@ class RatAfc(MethodView):
                                     device_desc.get('rulesetIds'))
 
                 region = (device_desc['certificationId'][0]['nra']).strip().lower()
+                registration_id = (device_desc['certificationId'][0]['id']).strip().lower()
                 runtime_opts = RNTM_OPT_NODBG_NOGUI
                 debug_opt = flask.request.args.get('debug')
                 if debug_opt == 'True':
@@ -455,9 +496,14 @@ class RatAfc(MethodView):
                     return flask.jsonify(taskId = task_id,
                                      taskState = task_stat["status"])
                 tasks.append(t)
+                als_config_infos.append(
+                    AlsConfigInfo(req_idx=req_idx, config_text=config_bytes,
+                                  customer=region))
 
-            for t in tasks:
+            for task_idx, t in enumerate(tasks):
                 # wait for requests to finish processing
+                uls_id = "Unknown"
+                geo_id = "Unknown"
                 try:
                     task_stat = t.wait()
                     LOGGER.debug("Task complete: %s", task_stat)
@@ -467,6 +513,13 @@ class RatAfc(MethodView):
                         # need to check everywhere they are called
                         dataAsJson = json.loads(taskResponse.data)
                         LOGGER.debug("dataAsJson: %s", dataAsJson)
+                        engine_result_ext = \
+                            _get_vendor_extension(dataAsJson,
+                                                  "openAfc.used_data")
+                        uls_id = (engine_result_ext or {}).get("uls_id",
+                                                               uls_id)
+                        geo_id = (engine_result_ext or {}).get("geo_id",
+                                                               geo_id)
                         actualResult = dataAsJson.get(
                             "availableSpectrumInquiryResponses")
                         if actualResult is not None:
@@ -493,6 +546,13 @@ class RatAfc(MethodView):
                                        'The task state is invalid. '
                                        'Try again later, and if this issue '
                                        'persists contact support.')
+                finally:
+                    config_info = als_config_infos[task_idx]
+                    als.als_afc_config(
+                        req_id=als_req_id, config_text=config_info.config_text,
+                        customer=config_info.customer, geo_data_version=geo_id,
+                        uls_id=uls_id, req_indices=[config_info.req_idx])
+                    
 
         except AP_Exception as e:
             LOGGER.error('catching exception: %s',
@@ -506,6 +566,7 @@ class RatAfc(MethodView):
                         'supplementalInfo': json.dumps(e.supplemental_info) if e.supplemental_info is not None else None
                     }
                 })
+        als.als_afc_response(req_id=als_req_id, resp=results)
         LOGGER.error("Final results: %s", str(results))
         resp = flask.make_response(flask.json.dumps(results), 200)
         resp.content_type = 'application/json'

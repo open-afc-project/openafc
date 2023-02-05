@@ -18,6 +18,7 @@ import requests
 from sqlalchemy import exc
 from . import config
 from . import data_if
+from . import als
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -66,6 +67,8 @@ def create_app(config_override=None):
     for handler in flaskapp.config['LOG_HANDLERS']:
         root_logger.addHandler(handler)
     LOGGER.info('Logging at level %s', flaskapp.config['LOG_LEVEL'])
+
+    als.als_initialize()
 
     flaskapp.config.update(
         BROKER_URL=os.getenv('BROKER_PROT',
