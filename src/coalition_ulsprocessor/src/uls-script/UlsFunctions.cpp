@@ -218,7 +218,9 @@ QStringList UlsFunctionsClass::getCSVHeader(int numPR)
     header << "Digital Mod Rate";
     header << "Digital Mod Type";
     header << "Tx Manufacturer";
-    header << "Tx Model";
+    header << "Tx Model ULS";
+    header << "Tx Model Matched";
+    header << "Tx Architecture";
     header << "Tx Location Name";
     header << "Tx Lat Coords";
     header << "Tx Long Coords";

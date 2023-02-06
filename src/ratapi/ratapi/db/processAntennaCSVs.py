@@ -1,13 +1,15 @@
 import csv
 
-def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
+def processAntFiles(inputDir, processCA, outputFile, antennaPatternFile, logFile):
     logFile.write('Processing antenna files' + '\n')
 
     antennaModelDiamGainCsvFilePath    = inputDir + "/antenna_model_diameter_gain.csv"
     billboardReflectorCsvFilePath      = inputDir + "/billboard_reflector.csv"
     categoryB1AntennasCsvFilePath      = inputDir + "/category_b1_antennas.csv"
     highPerformanceAntennasCsvFilePath = inputDir + "/high_performance_antennas.csv"
-    antennaPatternCsvFilePath          = inputDir + "/Antenna_Patterns_6GHz.csv"
+
+    if processCA:
+        antennaPatternCsvFilePath          = inputDir + "/CA/AP.csv"
 
     outputCsvFilePath = outputFile
 
@@ -63,20 +65,21 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
     ############################################################################
     # Antenna Pattern File from ISED (Canada)
     ############################################################################
-    antennaPatternReader = csv.DictReader(open(antennaPatternCsvFilePath))
-    antennaPatternModelList = []
-    antennaPatternGainList = []
-    antennaPatternDiameterList = []
-    antennaPatternTypeList = []
-    antennaPatternAzimuthList = []
-    antennaPatternAttenuationList = []
-    for row in antennaPatternReader:
-        antennaPatternModelList.append(row['Antenna Model Number'])
-        antennaPatternGainList.append(row['Antenna Gain [dBi]'])
-        antennaPatternDiameterList.append(row['Antenna Diameter'])
-        antennaPatternTypeList.append(row['Pattern Type'])
-        antennaPatternAzimuthList.append(row['Pattern Azimuth [deg]'])
-        antennaPatternAttenuationList.append(row['Pattern Attenuation [dB]'])
+    if processCA:
+        antennaPatternReader = csv.DictReader(open(antennaPatternCsvFilePath))
+        antennaPatternModelList = []
+        antennaPatternGainList = []
+        antennaPatternDiameterList = []
+        antennaPatternTypeList = []
+        antennaPatternAzimuthList = []
+        antennaPatternAttenuationList = []
+        for row in antennaPatternReader:
+            antennaPatternModelList.append(row['Antenna Model Number'])
+            antennaPatternGainList.append(row['Antenna Gain [dBi]'])
+            antennaPatternDiameterList.append(row['Antenna Diameter'])
+            antennaPatternTypeList.append(row['Pattern Type'])
+            antennaPatternAzimuthList.append(row['Pattern Azimuth [deg]'])
+            antennaPatternAttenuationList.append(row['Pattern Attenuation [dB]'])
     ############################################################################
 
     ############################################################################
@@ -87,7 +90,6 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
     antennaModelPrefixHpList = [antennaModelPrefix.upper() for antennaModelPrefix in antennaModelPrefixHpList]
     antennaModelPrefixB1List = [antennaModelPrefix.upper() for antennaModelPrefix in antennaModelPrefixB1List]
     antennaPatternModelList = [antennaModel.upper() for antennaModel in antennaPatternModelList]
-
 
     antmap = {}
     antpatternRaw = {}

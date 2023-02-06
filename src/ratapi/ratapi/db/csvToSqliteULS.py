@@ -113,6 +113,9 @@ class ULS(Base):
     #: Tx Height to Center RAAT (m)
     tx_height_to_center_raat_m = Column(Float)
 
+    #: Tx Architecture (IDU, ODU, UNKNOWN)
+    tx_architecture = Column(String(8), nullable=False)
+
     #Azimuth Angle Towards Tx (deg)
     azimuth_angle_to_tx = Column(Float)
 
@@ -290,6 +293,8 @@ def convertULS(data_file, state_root, logFile, fileName):
                     tx_polarization=str(row['Tx Polarization']),
                     #: Tx Height to Center RAAT (m)
                     tx_height_to_center_raat_m=_as_float(row['Tx Height to Center RAAT (m)']),
+                    #: Tx Architecture
+                    tx_architecture=str(row['Tx Architecture']),
                     # Azimuth Angle Towards Tx (deg)
                     azimuth_angle_to_tx =  _as_float(row['Azimuth Angle Towards Tx (deg)']),
                     # Elevation Angle Towards Tx (deg)

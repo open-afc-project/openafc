@@ -2,6 +2,7 @@ import os, datetime, zipfile, shutil, subprocess, sys, glob, argparse, csv
 import urllib.request, urllib.parse, urllib.error
 from collections import OrderedDict
 import ssl
+from urllib.error import URLError
 from processAntennaCSVs import processAntFiles
 from csvToSqliteULS import convertULS
 # from sort_callsigns_all import sortCallsigns
@@ -73,16 +74,22 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
         urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Stations_Data_Extracts.csv',          regionDataDir + '/SD.csv')
         urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Passive_Repeater_data_extract.csv',   regionDataDir + '/PP.csv')
         urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Passive_Reflectors_Data_Extract.csv', regionDataDir + '/PR.csv')
-        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Antenna_Patterns_6GHz.csv',           regionDataDir + '/AP.csv')
         urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/SMS_TAFL_Files/TAFL_LTAF_Fixe.zip',   'TAFL_LTAF_Fixe.zip')
         zip_file = zipfile.ZipFile("TAFL_LTAF_Fixe.zip") # zip object
         zip_file.extractall(regionDataDir) 
         zip_file.close() 
         os.rename(regionDataDir + '/TAFL_LTAF_Fixe.csv', regionDataDir + '/TA.csv')
+
+        cmd = 'echo "Antenna Manufacturer,Antenna Model Number,Antenna Gain [dBi],Antenna Diameter,Beamwidth [deg],Last Updated,Pattern Type,Pattern Azimuth [deg],Pattern Attenuation [dB]" >| ' + regionDataDir + '/AP.csv'
+        os.system(cmd)
+        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Antenna_Patterns_6GHz.csv', regionDataDir + '/Antenna_Patterns_6GHz_orig.csv')
+        cmd = 'cat ' + regionDataDir + '/Antenna_Patterns_6GHz_orig.csv >> ' + regionDataDir + '/AP.csv'
+        os.system(cmd)
+        os.remove(regionDataDir + '/Antenna_Patterns_6GHz_orig.csv')
 ###############################################################################
 
 # Downloads antenna files
-def downloadAFCGitHubFiles(logFile):
+def downloadAFCGitHubFiles(dataDir, logFile):
     # download AFC GitHub data files
     # Manually view at: https://github.com/Wireless-Innovation-Forum/6-GHz-AFC/tree/main/data/common_data
     dataURL = 'https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data/'
@@ -91,17 +98,35 @@ def downloadAFCGitHubFiles(logFile):
                     'category_b1_antennas',
                     'high_performance_antennas',
                     'fcc_fixed_service_channelization',
+                    'transmit_radio_unit_architecture',
                   ]
 
     for dataFile in dataFileList:
-        urllib.request.urlretrieve(dataURL + dataFile + '.csv', dataFile + \
-            '_orig.csv')
 
-        # Temporary solution: remove control characters, and blank lines.  Fix spelling error.
-        cmd = 'tr -d \'\\200-\\377\\015\' < ' + dataFile + '_orig.csv  | ' \
-            + 'gawk -F "," \'($2 != "") { print }\' | ' \
-            + 'sed \'s/daimeter/diameter/\' ' \
-            + '>| ' + dataFile + '.csv'
+        try:
+            (local_filename, headers) = urllib.request.urlretrieve(dataURL + dataFile + '.csv', dataFile + '_orig.csv')
+            downloadFlag = True
+        except URLError as e:
+            logFile.write("Failed to download '{}'. '{}'".format(dataFile, e.reason))
+            downloadFlag = False
+
+        if (not downloadFlag) and (dataFile == 'transmit_radio_unit_architecture'):
+            subprocess.call(['cp', dataDir + "/" + dataFile + ".csv", dataFile + '_orig.csv']) 
+            if os.path.isfile(dataFile + '_orig.csv'):
+                downloadFlag = True
+                logFile.write("Using local copy of {}\n".format(dataFile))
+
+        if (not downloadFlag):
+            raise Exception('ERROR: Failed to download {}'.format(dataFile))
+
+        # Remove control characters.
+        cmd = 'tr -d \'\\200-\\377\\015\' < ' + dataFile + '_orig.csv ' \
+        # Remove blank lines.
+        # cmd += '| gawk -F "," \'($2 != "") { print }\' ' \
+        # Fix spelling error.
+        # cmd += '| sed \'s/daimeter/diameter/\' ' \
+
+        cmd += '>| ' + dataFile + '.csv'
         os.system(cmd)
         if dataFile == "fcc_fixed_service_channelization":
             cmd = 'echo -e "5967.4375,30,\n' \
@@ -485,38 +510,7 @@ def daily_uls_parse(state_root, interactive):
     # If downloadAFCGitHubFilesFlag set, download AFC GitHub data files       #
     ###########################################################################
     if downloadAFCGitHubFilesFlag:
-        downloadAFCGitHubFiles(logFile)
-    ###########################################################################
-
-    ###########################################################################
-    # If interactive, prompt for downloading Antenna Pattern file             #
-    ###########################################################################
-    if interactive:
-        accepted = False
-        while not accepted:
-            value = input("Download Antenna Pattern file? (y/n): ")
-            if value == "y":
-                accepted = True
-                downloadAntennaPatternFileFlag = True
-            elif value == "n":
-                accepted = True
-                downloadAntennaPatternFileFlag = False
-            else:
-                print("ERROR: Invalid input: " + value + ", must be y or n")
-    else:
-        downloadAntennaPatternFileFlag = True
-    ###########################################################################
-
-    ###########################################################################
-    # If downloadAFCGitHubFilesFlag set, download Antenna Pattern file        #
-    ###########################################################################
-    if downloadAntennaPatternFileFlag:
-        cmd = 'echo "Antenna Manufacturer,Antenna Model Number,Antenna Gain [dBi],Antenna Diameter,Beamwidth [deg],Last Updated,Pattern Type,Pattern Azimuth [deg],Pattern Attenuation [dB]" >| ' + fullPathTempDir + '/Antenna_Patterns_6GHz.csv'
-        os.system(cmd)
-        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Antenna_Patterns_6GHz.csv', fullPathTempDir + '/Antenna_Patterns_6GHz_orig.csv')
-        cmd = 'cat ' + fullPathTempDir + '/Antenna_Patterns_6GHz_orig.csv >> ' + fullPathTempDir + '/Antenna_Patterns_6GHz.csv'
-        os.system(cmd)
-        os.remove(fullPathTempDir + '/Antenna_Patterns_6GHz_orig.csv')
+        downloadAFCGitHubFiles(root + '/data_files', logFile)
     ###########################################################################
 
     ###########################################################################
@@ -525,7 +519,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = input("Process antenna model files to create antenna_model_list.csv? (y/n): ")
+            value = input("Process antenna model files to create antenna_model_list.csv and afc_antenna_patterns.csv? (y/n): ")
             if value == "y":
                 accepted = True
                 processAntFilesFlag = True
@@ -544,7 +538,7 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if processAntFilesFlag:
         antennaPatternFile = state_root + '/Antenna_Patterns/afc_antenna_patterns.csv'
-        processAntFiles(fullPathTempDir, fullPathTempDir + '/antenna_model_list.csv', antennaPatternFile, logFile)
+        processAntFiles(fullPathTempDir, processCA, fullPathTempDir + '/antenna_model_list.csv', antennaPatternFile, logFile)
         subprocess.call(['cp', antennaPatternFile, fullPathTempDir]) 
     ###########################################################################
 
@@ -655,6 +649,7 @@ def daily_uls_parse(state_root, interactive):
                                              root + temp + '/antenna_model_list.csv', \
                                              root + '/antenna_model_map.csv', \
                                              root + temp + '/fcc_fixed_service_channelization.csv', \
+                                             root + temp + '/transmit_radio_unit_architecture.csv', \
                                              mode]) 
         except Exception as e: 
             logFile.write('ERROR: ULS processor error:')
@@ -824,7 +819,7 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
 
     ###########################################################################
-    # Record execution time in logfile and close log file                     #
+    # Record execution time in logFile and close log file                     #
     ###########################################################################
     logFile.write('Update finished at: ' + finishTime.isoformat() + '\n')
     timeDiff = finishTime - startTime
