@@ -25,7 +25,6 @@ import logging
 import lz4.frame                                    # type: ignore
 import math
 import os
-import psycopg2
 import re
 import sqlalchemy as sa                             # type: ignore
 import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
@@ -63,6 +62,7 @@ DEFAULT_KAFKA_SERVER = f"localhost:{KAFKA_PORT}"
 
 # Default Kafka client ID
 DEFAULT_KAFKA_CLIENT_ID = "siphon_@"
+
 
 def dp(*args, **kwargs):
     """Print debug message
@@ -403,7 +403,7 @@ class DatabaseBase(ABC):
     @classmethod
     def create_engine(cls, arg_conn_str: Optional[str],
                       arg_password: Optional[str]) -> sa.engine.base.Engine:
-        """ Creates SqlAlchemy enfine
+        """ Creates SqlAlchemy engine
 
         Arguments:
         arg_conn_str -- Connection string from command line or None
@@ -521,7 +521,7 @@ class InitialDatabase(DatabaseBase):
         db_name   -- Name of database to create
         if_exists -- What to do if database already exists
         conn_str  -- Connection string to database being created
-        password  -- Password for connection string to database neing created
+        password  -- Password for connection string to database being created
         template  -- Name of template database to use
         Returns True if database was created, False if it already exists
         """
@@ -1665,7 +1665,7 @@ class TableUpdaterBase(AlsTableBase,
                             reporting purposes
     _data_key_columns    -- List of columns that correspond to data key
                             (usually - primary table key without 'month_idx'
-                            column). Used to collect infomation for
+                            column). Used to collect information for
                             _update_foreign_sources(), empty means not to call
                             _update_foreign_sources()
     """
@@ -1682,7 +1682,7 @@ class TableUpdaterBase(AlsTableBase,
         data_key_column_names -- List of names of columns that correspond to
                                  data key (usually - primary table key without
                                  'month_idx' column). Used to collect
-                                 infomation for _update_foreign_sources(),
+                                 information for _update_foreign_sources(),
                                  None means not to call
                                  _update_foreign_sources()
         """
@@ -3367,10 +3367,6 @@ class Siphon:
                 self._progress_info.log_format_failures += 1
                 logging.error(
                     f"Can't decode log message '{kafka_message.value}'")
-            except LookupError as ex:
-                self._progress_info.log_format_failures += 1
-                logging.error(f"Invaid structure of log message ({ex}) "
-                              f"'{kafka_message.value}'")
         self._kafka_positions.mark_processed(topic=topic)
 
     def _write_als_messages(self) -> bool:
@@ -3657,12 +3653,12 @@ def main(argv: List[str]) -> None:
     switches_init.add_argument(
         "--als_template", metavar="DB_NAME",
         help="Template database (e.g. bearer of required extensions) to use "
-        "for ALS database crteation. E.g. postgis/postgis image strangely "
+        "for ALS database creation. E.g. postgis/postgis image strangely "
         "assigns Postgis extension on 'template_postgis' database instead of "
         "on default 'template0/1'")
     switches_init.add_argument(
         "--log_template", metavar="DB_NAME",
-        help="Template database to use for JSON Logs database crteation")
+        help="Template database to use for JSON Logs database creation")
     switches_init.add_argument(
         "--als_sql", metavar="SQL_FILE",
         help="SQL command file that creates tables, relations, etc. in ALS "
