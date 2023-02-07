@@ -58,7 +58,6 @@ COPY --from=install_image / /
 
 LABEL revision="afc-worker-al"
 WORKDIR /wd
-EXPOSE 80 443
 ENV PGPORT=5432
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 CMD ["/docker-entrypoint.sh"]
