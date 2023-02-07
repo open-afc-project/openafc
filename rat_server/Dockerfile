@@ -55,13 +55,16 @@ LABEL revision="afc-rat_server"
 WORKDIR /wd
 EXPOSE 80 443
 COPY rat_server/httpd.conf /usr/local/apache2/conf/
-COPY rat_server/httpd-default.conf rat_server/httpd-info.conf rat_server/httpd-vhosts.conf rat_server/httpd-mpm.conf rat_server/httpd-dav.conf /usr/local/apache2/conf/extra/
+COPY rat_server/httpd-default.conf rat_server/httpd-info.conf rat_server/httpd-vhosts.conf \
+rat_server/httpd-mpm.conf rat_server/httpd-dav.conf rat_server/httpd-ssl.conf /usr/local/apache2/conf/extra/
 COPY rat_server/fbrat.wsgi /usr/local/apache2/fbrat.wsgi
-RUN chown fbrat:fbrat /usr/local/apache2/fbrat.wsgi
+RUN chown fbrat:fbrat /usr/local/apache2/fbrat.wsgi &&\
+mkdir -p /usr/share/ca-certificates/certs
+COPY rat_server/http.key rat_server/http.crt /usr/share/ca-certificates/certs/
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 # Add debugging env if configured
 ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
-COPY rat_server/devel.sh rat_server/.bashrc /wd/
+COPY rat_server/devel.sh /wd/
 RUN chmod +x /wd/devel.sh
 RUN /wd/devel.sh
 #

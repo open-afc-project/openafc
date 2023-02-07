@@ -39,7 +39,7 @@ cd $tests_dir
 docker run --rm -v `pwd`/pipe:/pipe ${RTEST_DI}:${TAG} --cmd exp_adm_cfg --outfile /pipe/export_admin_cfg.json
 check_ret $?
 # copy regr server tls/mtls config (if existing)
-[ -d ~/template_regrtest/apache-conf ] && cp -a ~/template_regrtest/apache-conf .
+[ -d ~/template_regrtest/rat_server-conf ] && cp -ar ~/template_regrtest/rat_server-conf .
 [ -d ~/template_regrtest/ssl ] && cp -a ~/template_regrtest/ssl .
 
 # run srvr
