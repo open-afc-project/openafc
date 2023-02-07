@@ -450,7 +450,7 @@ class LogsDatabase(DatabaseBase):
     """ Log database handler """
 
     # Log record with data to write to database
-    Record = NamedTuple("Record", [("afc_server", str),
+    Record = NamedTuple("Record", [("source", str),
                                    ("time", datetime.datetime),
                                    ("log", JSON_DATA_TYPE)])
 
@@ -472,17 +472,19 @@ class LogsDatabase(DatabaseBase):
         topic   -- Kafka topic - serves a database table name
         records -- List of records to write
         """
+        if not records:
+            return
         try:
             if topic not in self.metadata.tables:
                 sa.Table(
                     topic, self.metadata,
-                    sa.Column("afc_server", sa.Text(), index=True),
+                    sa.Column("source", sa.Text(), index=True),
                     sa.Column("time", sa.DateTime(timezone=True), index=True),
-                    sa.Column("log", sa_pg.JSON(), index=True),
+                    sa.Column("log", sa_pg.JSON()),
                     keep_existing=True)
                 self.metadata.create_all(self.conn, checkfirst=True)
             ins = sa.insert(self.metadata.tables[topic]).\
-                values([{"afc_server": r.afc_server,
+                values([{"source": r.source,
                          "time": r.time,
                          "log": r.log}
                         for r in records])
@@ -3359,14 +3361,25 @@ class Siphon:
                 log_message = json.loads(kafka_message.value)
                 records.append(
                     LogsDatabase.Record(
-                        afc_server=log_message["afcServer"],
+                        source=log_message["source"],
                         time=datetime.datetime.fromisoformat(
                             log_message["time"]),
                         log=json.loads(log_message["jsonData"])))
-            except (json.JSONDecodeError, LookupError, TypeError, ValueError):
+            except (json.JSONDecodeError, LookupError, TypeError, ValueError) \
+                    as ex:
                 self._progress_info.log_format_failures += 1
                 logging.error(
-                    f"Can't decode log message '{kafka_message.value}'")
+                    f"Can't decode log message '{kafka_message.value}': {ex}")
+        if records:
+            transaction: Optional[Any] = None
+            try:
+                transaction = self._ldb.conn.begin()
+                self._ldb.write_log(topic=topic, records=records)
+                transaction.commit()
+                transaction = None
+            finally:
+                if transaction is not None:
+                    transaction.rollback()
         self._kafka_positions.mark_processed(topic=topic)
 
     def _write_als_messages(self) -> bool:
@@ -3385,14 +3398,19 @@ class Siphon:
             transaction = self._adb.conn.begin()
             self._afc_message_updater.update_db(data_dict, month_idx=month_idx)
             transaction.commit()
+            transaction = None
             self._progress_info.als_written += len(data_dict)
         except JsonFormatError as ex:
             self._progress_info.als_format_failures += 1
             if transaction is not None:
                 transaction.rollback()
+                transaction = None
             self._lookups.reread()
             self._decode_error_writer.write_decode_error(
                 ex.msg, line=ex.code_line, data=ex.data)
+        finally:
+            if transaction is not None:
+                transaction.rollback()
         return True
 
     def _timeout_als_messages(self) -> bool:

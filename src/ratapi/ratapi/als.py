@@ -62,7 +62,7 @@ JSON_LOG_VERSION = "1.0"
 # Version field of JSON log record
 JSON_LOG_FIELD_VERSION = "version"
 # AFC Server ID field of JSON log record
-JSON_LOG_FIELD_SERVER_ID = "afcServer"
+JSON_LOG_FIELD_SERVER_ID = "source"
 # Timetag field of JSON log record
 JSON_LOG_FIELD_TIME = "time"
 # JSON data field of JSON log record
