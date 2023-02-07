@@ -27,12 +27,13 @@ cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUIL
 ninja -j$(nproc) install
 RUN strip --strip-unneeded /root/afc/__install/bin/afc-engine
 
-
 # Stage Install
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 
 COPY --from=build_image /root/afc/__install /usr/
 COPY --from=build_image /root/gdal/__install/lib /usr/lib/
+# For development environment
+COPY --from=build_image /usr/include/gdal /usr/include/gdal/
 
 RUN mkdir -m 755 -p /var/spool/fbrat
 RUN mkdir -m 755 -p /var/lib/fbrat
