@@ -71,12 +71,17 @@ export type FreqRange = {
 }
 
 export type FSReceiverFeederLoss = {
+    IDU: number,
+    ODU: number,
+    UNKNOWN: number
+}
+
+export type FSReceiverNoise = {
     UNII5: number,
     UNII7: number,
     other: number
 }
 
-export type FSReceiverNoise = FSReceiverFeederLoss;
 
 export type PenetrationLossModel = P2109 | FixedValue;
 
