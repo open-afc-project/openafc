@@ -21,6 +21,8 @@ PRTABLEClass::PRTABLEClass()
 {
 	tableFile = "";
 	prTable = (double **) NULL;
+	numQ = -1;
+	numOneOverKs = -1;
 };
 
 PRTABLEClass::PRTABLEClass(std::string tableFileVal) : tableFile(tableFileVal)
@@ -65,7 +67,8 @@ void PRTABLEClass::readTable()
 	LineTypeEnum lineType;
 
 	bool foundLabelLine = false;
-	int kIdx, qIdx, fieldIdx;
+	int kIdx = -1;
+	int qIdx, fieldIdx;
 
 	while (getline(file, line))
 	{

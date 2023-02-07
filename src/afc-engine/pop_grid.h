@@ -39,7 +39,6 @@ class PopGridClass
 				int numLatVal, double deltaLatDeg, double minLatDeg);
 		void setDimensions(int numLonVal, double deltaLonRad, double minLonRad,
 				int numLatVal, double deltaLatRad, double minLatRad);
-		void genRandDeg(double &longitudeDeg, double &latitudeDeg, char &propEnvVal, int &regionIdxVal, int *lonIdxPtr = (int *) NULL, int *latIdxPtr = (int *) NULL);
 		void scale(std::vector<double> urbanPopVal, std::vector<double> suburbanPopVal, std::vector<double> ruralPopVal, std::vector<double> barrenPopVal);
 		int adjustRegion(double centerLongitudeDeg, double centerLatitudeDeg, double radius);
 		double adjustRegion(ListClass<ULSClass *> *ulsList, double maxRadius);

@@ -181,7 +181,7 @@ class AfcManager
 				double distKm, double fsplDistKm, double win2DistKm, double frequency,
 				double txLongitudeDeg, double txLatitudeDeg, double txHeightM, double elevationAngleTxDeg,
 				double rxLongitudeDeg, double rxLatitudeDeg, double rxHeightM, double elevationAngleRxDeg,
-				double& pathLoss, double& pathClutterTxDB, double& pathClutterRxDB, bool meanFlag,
+				double& pathLoss, double& pathClutterTxDB, double& pathClutterRxDB,
 				std::string& pathLossModelStr, double& pathLossCDF,
 				std::string& pathClutterTxModelStr, double& pathClutterTxCDF, std::string& pathClutterRxModelStr, double& pathClutterRxCDF,
 				std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr
@@ -191,21 +191,21 @@ class AfcManager
 				) const;
 
 		double q(double Z) const;
-		double computeBuildingPenetration(CConst::BuildingTypeEnum buildingType, double elevationAngleDeg, double frequency, std::string& buildingPenetrationModelStr, double& buildingPenetrationCDF, bool fixedProbFlag = false) const;
+		double computeBuildingPenetration(CConst::BuildingTypeEnum buildingType, double elevationAngleDeg, double frequency, std::string& buildingPenetrationModelStr, double& buildingPenetrationCDF) const;
 
 		double computeNearFieldLoss(double frequency, double maxGain, double distance) const;
 
 		// Winner II models
-		double Winner2_C1suburban_LOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double& pathLossCDF) const;
-		double Winner2_C1suburban_NLOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double& pathLossCDF) const;
-		double Winner2_C2urban_LOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double& pathLossCDF) const;
-		double Winner2_C2urban_NLOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double& pathLossCDF) const;
-		double Winner2_D1rural_LOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double& pathLossCDF) const;
-		double Winner2_D1rural_NLOS(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double zval, double& sigma, double& pathLossCDF) const;
+		double Winner2_C1suburban_LOS(double distance, double hBS, double hMS, double frequency, double zval, double& sigma, double& pathLossCDF) const;
+		double Winner2_C1suburban_NLOS(double distance, double hBS, double hMS, double frequency, double zval, double& sigma, double& pathLossCDF) const;
+		double Winner2_C2urban_LOS(double distance, double hBS, double hMS, double frequency, double zval, double& sigma, double& pathLossCDF) const;
+		double Winner2_C2urban_NLOS(double distance, double hBS, double hMS, double frequency, double zval, double& sigma, double& pathLossCDF) const;
+		double Winner2_D1rural_LOS(double distance, double hBS, double hMS, double frequency, double zval, double& sigma, double& pathLossCDF) const;
+		double Winner2_D1rural_NLOS(double distance, double hBS, double hMS, double frequency, double zval, double& sigma, double& pathLossCDF) const;
 
-		double Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, double& probLOS, int losValue) const;
-		double Winner2_C2urban(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, double& probLOS, int losValue) const;
-		double Winner2_D1rural(double distance, double hBS, double hMS, double frequency, bool fixedProbFlag, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, double& probLOS, int losValue) const;
+		double Winner2_C1suburban(double distance, double hBS, double hMS, double frequency, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, double& probLOS, int losValue) const;
+		double Winner2_C2urban(double distance, double hBS, double hMS, double frequency, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, double& probLOS, int losValue) const;
+		double Winner2_D1rural(double distance, double hBS, double hMS, double frequency, double& sigma, std::string& pathLossModelStr, double& pathLossCDF, double& probLOS, int losValue) const;
 
 		void computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &psdFreqRangeList); // Compute list of psdSegments for each inquired frequency range
 

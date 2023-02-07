@@ -76,6 +76,7 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
         throw std::invalid_argument("worldPopulationFile is empty");
     }
 
+#if DEBUG_AFC
     FILE *fchk = (FILE *) NULL;
 
 #if 0
@@ -86,6 +87,7 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
     if (fchk) {
         fprintf(fchk, "Latitude (deg),Longitude (deg),Density (people/sq-km)\n");
     }
+#endif
 
     numRegion = regionPolygonList.size();
 
@@ -410,17 +412,21 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
                         totalArea += area;
                         totalPop+=pop[lonIdx][latIdx];
 
+#if DEBUG_AFC
                         if (fchk) {
                             fprintf(fchk, "%.4f,%.4f,%.6f\n", latitudeDeg, longitudeDeg, density*1.0e6);
                         }
+#endif
                     }
                 }
             }
         }
     }
+#if DEBUG_AFC
     if (fchk) {
         fclose(fchk);
     }
+#endif
 
     std::cout << "TOTAL INTEGRATED POPULATION: " << totalPop << std::endl;
     std::cout << "TOTAL INTEGRATED AREA: " << totalArea << std::endl;
@@ -1374,102 +1380,6 @@ void PopGridClass::check(std::string s)
                 std::cout << "CHECK GRID: " << s << " " << lonIdx << " " << latIdx << " POP = " << pop[lonIdx][latIdx] << std::endl;
             }
         }
-    }
-
-    return;
-}
-/******************************************************************************************/
-
-
-/******************************************************************************************/
-/**** FUNCTION: PopGridClass::genRandDeg()                                                ****/
-/**** Generate a random position using the population grid as the PDF.                 ****/
-/******************************************************************************************/
-void PopGridClass::genRandDeg(double &longitudeDeg, double &latitudeDeg, char &propEnvVal, int &regionIdxVal, int *lonIdxPtr, int *latIdxPtr)
-{
-    int lonIdx, latIdx;
-
-    if (!isCumulative) {
-        throw("ERROR in PopGridClass::genRandDeg(), pop grid not cumulative\n");
-    }
-
-    /**************************************************************************************/
-    /**** Generate random longitude index                                              ****/
-    /**************************************************************************************/
-    double r1 = ((double) rand() / (RAND_MAX+1.0))*pop[numLon-1][numLat-1];
-
-    int lonIdxA = -1;
-    int lonIdxB = numLon-1;
-    int lonIdxC;
-
-    double popA = 0.0;
-    double popB = pop[numLon-1][numLat-1];
-    double popC;
-
-    while(lonIdxB > lonIdxA+1) {
-        lonIdxC = (lonIdxA + lonIdxB) / 2;
-        popC = pop[lonIdxC][numLat-1];
-        if (popC <= r1) {
-            lonIdxA = lonIdxC;
-            popA = popC;
-        } else {
-            lonIdxB = lonIdxC;
-            popB = popC;
-        }
-    }
-
-    lonIdx = lonIdxB;
-    /**************************************************************************************/
-
-    /**************************************************************************************/
-    /**** Generate random latitude index                                               ****/
-    /**************************************************************************************/
-    int latIdxA = -1;
-    int latIdxB = numLat-1;
-    int latIdxC;
-
-    popA = (lonIdx == 0 ? 0.0 : pop[lonIdx-1][numLat-1]);
-    popB = pop[lonIdx][numLat-1];
-
-    double r2 = popA + ((double) rand() / (RAND_MAX+1.0))*(popB-popA);
-
-    while(latIdxB > latIdxA+1) {
-        latIdxC = (latIdxA + latIdxB) / 2;
-        popC = pop[lonIdx][latIdxC];
-        if (popC <= r2) {
-            latIdxA = latIdxC;
-            popA = popC;
-        } else {
-            latIdxB = latIdxC;
-            popB = popC;
-        }
-    }
-
-    latIdx = latIdxB;
-    /**************************************************************************************/
-
-    double u;
-
-    u = (((double) rand()) / (RAND_MAX+1.0));
-
-    longitudeDeg = minLonDeg + lonIdx*deltaLonDeg + u*deltaLonDeg;
-
-    u = (((double) rand()) / (RAND_MAX+1.0));
-
-    latitudeDeg = minLatDeg + latIdx*deltaLatDeg + u*deltaLatDeg;
-
-    propEnvVal = propEnv[lonIdx][latIdx];
-    regionIdxVal = region[lonIdx][latIdx];
-
-    if (longitudeDeg > 180.0) {
-        longitudeDeg -= 360.0;
-    }
-
-    if (lonIdxPtr) {
-        *lonIdxPtr = lonIdx;
-    }
-    if (latIdxPtr) {
-        *latIdxPtr = latIdx;
     }
 
     return;

@@ -83,7 +83,7 @@ bool                     RLANClass::getOffTune()       { return(offTune);       
 double                   RLANClass::getNoiseLevelDBW() { return(noiseLevelDBW); }
 
 
-void RLANClass::setPosition(Vector3 p) { position = p; return; }
+void RLANClass::setPosition(Vector3 &p) { position = p; return; }
 void RLANClass::setLatitudeDeg(double latitudeDegVal)   { latitudeDeg = latitudeDegVal; return; }
 void RLANClass::setLongitudeDeg(double longitudeDegVal)   { longitudeDeg = longitudeDegVal; return; }
 void RLANClass::setHeight(double heightVal) { height = heightVal;  return; }

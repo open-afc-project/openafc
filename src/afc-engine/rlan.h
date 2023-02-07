@@ -21,7 +21,7 @@ class RLANClass
 	public:
 		RLANClass(int idVal);
 		~RLANClass();
-		void setPosition(Vector3 p);
+		void setPosition(Vector3 &p);
 		void setLatitudeDeg(double latitudeDegVal);
 		void setLongitudeDeg(double longitudeDegVal);
 		void setHeight(double heightVal);

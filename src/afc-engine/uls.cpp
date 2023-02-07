@@ -64,6 +64,7 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal
 	txHeightAMSL = quietNaN;
 	txHeightSource = CConst::unknownHeightSource;
 	txCenterToRAATHeight = quietNaN;
+	txLidarRegion = -1;
 	txTerrainHeightFlag = false;
 	noiseLevelDBW = quietNaN;
 	txGain = quietNaN;
@@ -75,11 +76,6 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal
 	rxAntennaCategory = CConst::UnknownAntennaCategory;
 	txEIRP = quietNaN;
 	linkDistance = quietNaN;
-	operatingRadius = quietNaN;
-	rxSensitivity = quietNaN;
-	mobileUnit = -1;
-	operatingCenterLongitudeDeg = quietNaN;
-	operatingCenterLatitudeDeg = quietNaN;
 	propLoss = quietNaN;
 
 	hasDiversity = false;
@@ -287,18 +283,6 @@ double ULSClass::getTxEIRP()        {
 double ULSClass::getLinkDistance()  {
 	return(linkDistance);
 }
-double ULSClass::getOperatingRadius()  {
-	return(operatingRadius);
-}
-double ULSClass::getRxSensitivity()  {
-	return(rxSensitivity);
-}
-double ULSClass::getOperatingCenterLongitudeDeg() {
-	return(operatingCenterLongitudeDeg);
-}
-double ULSClass::getOperatingCenterLatitudeDeg() {
-	return(operatingCenterLatitudeDeg);
-}
 double ULSClass::getPropLoss() {
 	return(propLoss);
 }
@@ -325,15 +309,15 @@ void ULSClass::setSatellitePositionData(ListClass<Vector3> *spd) {
 	satellitePosnData = spd;
 	return;
 }
-void ULSClass::setRxPosition(Vector3 p) {
+void ULSClass::setRxPosition(Vector3 &p) {
 	rxPosition = p;
 	return;
 }
-void ULSClass::setTxPosition(Vector3 p) {
+void ULSClass::setTxPosition(Vector3 &p) {
 	txPosition = p;
 	return;
 }
-void ULSClass::setAntennaPointing(Vector3 p) {
+void ULSClass::setAntennaPointing(Vector3 &p) {
 	antennaPointing = p;
 	return;
 }
@@ -506,26 +490,6 @@ void ULSClass::setTxEIRP(double txEIRPVal) {
 }
 void ULSClass::setLinkDistance(double linkDistanceVal) {
 	linkDistance = linkDistanceVal;
-	return;
-}
-void ULSClass::setOperatingRadius(double operatingRadiusVal) {
-	operatingRadius = operatingRadiusVal;
-	return;
-}
-void ULSClass::setRxSensitivity(double rxSensitivityVal) {
-	rxSensitivity = rxSensitivityVal;
-	return;
-}
-void ULSClass::setMobileUnit(int mobileUnitVal) {
-	mobileUnit = mobileUnitVal;
-	return;
-}
-void ULSClass::setOperatingCenterLongitudeDeg(double operatingCenterLongitudeDegVal) {
-	operatingCenterLongitudeDeg = operatingCenterLongitudeDegVal;
-	return;
-}
-void ULSClass::setOperatingCenterLatitudeDeg(double operatingCenterLatitudeDegVal) {
-	operatingCenterLatitudeDeg = operatingCenterLatitudeDegVal;
 	return;
 }
 void ULSClass::setPropLoss(double propLossVal) {
