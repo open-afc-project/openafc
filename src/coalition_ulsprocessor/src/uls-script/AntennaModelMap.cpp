@@ -530,7 +530,7 @@ inline bool isInvalidModelNameChar(char c)
 /******************************************************************************************/
 /**** FUNCTION: AntennaModelMapClass::find()                                           ****/
 /******************************************************************************************/
-AntennaModelClass *AntennaModelMapClass::find(std::string modelName)
+AntennaModelClass *AntennaModelMapClass::find(std::string antPfx, std::string modelName)
 {
 	bool found = false;
 	int antIdx;
@@ -557,6 +557,12 @@ AntennaModelClass *AntennaModelMapClass::find(std::string modelName)
         /* Remove non-alhpanumeric characters                                             */
         /**********************************************************************************/
         modelName.erase(std::remove_if(modelName.begin(), modelName.end(), isInvalidModelNameChar), modelName.end());
+        /**********************************************************************************/
+
+        /**********************************************************************************/
+        /* Prepend model name prefix                                                      */
+        /**********************************************************************************/
+        modelName = antPfx + modelName;
         /**********************************************************************************/
 
         /**********************************************************************************/

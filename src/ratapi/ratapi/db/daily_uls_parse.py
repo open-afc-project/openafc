@@ -538,7 +538,7 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if processAntFilesFlag:
         antennaPatternFile = state_root + '/Antenna_Patterns/afc_antenna_patterns.csv'
-        processAntFiles(fullPathTempDir, processCA, fullPathTempDir + '/antenna_model_list.csv', antennaPatternFile, logFile)
+        processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag, fullPathTempDir + '/antenna_model_list.csv', antennaPatternFile, logFile)
         subprocess.call(['cp', antennaPatternFile, fullPathTempDir]) 
     ###########################################################################
 
@@ -637,10 +637,12 @@ def daily_uls_parse(state_root, interactive):
     # If runULSProcessorFlag set, run ULS processor                           #
     ###########################################################################
     if runULSProcessorFlag:
+        mode = "proc_uls"
         if includeUnii8:
-            mode = "proc_uls_include_unii8"
-        else:
-            mode = "proc_uls"
+            mode += "_include_unii8"
+        if combineAntennaRegionFlag:
+            mode += "_ca"
+
         # run through the uls processor 
         logFile.write('Running through ULS processor' + '\n')
         try:
@@ -832,15 +834,18 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process FS link data for AFC.')
     parser.add_argument('-i',  '--interactive', action='store_true')
     parser.add_argument('-u8', '--unii8', action='store_true')
+    parser.add_argument('-ca', '--combine_antenna_region', action='store_true')
 
     parser.add_argument('-r',  '--region', default='US:CA', help='":" separated list of regions')
 
     args = parser.parse_args()
     interactive = args.interactive
     includeUnii8 = args.unii8
+    combineAntennaRegionFlag = args.combine_antenna_region
 
     print("Interactive = " + str(interactive))
     print("Include UNII-8 = " + str(includeUnii8))
+    print("Combine Antenna Region = " + str(combineAntennaRegionFlag))
     print("Region = " + args.region)
 
     regionList = args.region.split(':')

@@ -171,7 +171,7 @@ void TransmitterModelMapClass::readModelList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(modelNameFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Transmitter Model List file \"" << filename << "\" line " << linenum << " missing model name" << std::endl;
+					errStr << "WARNING: Transmitter Model List file \"" << filename << "\" line " << linenum << " missing model name" << std::endl;
 
 					// throw std::runtime_error(errStr.str());
 

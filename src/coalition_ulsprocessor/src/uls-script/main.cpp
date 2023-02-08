@@ -16,11 +16,14 @@
 bool removeMobile = false;
 bool includeUnii8 = false;
 bool debugFlag    = false;
+bool combineAntennaRegionFlag = false;
 
 void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inputFile, std::string outputFile);
 void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap, std::string inputFile, std::string outputFile);
-void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn, AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment, TransmitterModelMapClass &transmitterModelMap);
-void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn, AntennaModelMapClass &antennaModelMap);
+void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn,
+    AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment, TransmitterModelMapClass &transmitterModelMap);
+void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn,
+    AntennaModelMapClass &antennaModelMap);
 void makeLink(const StationDataCAClass &station, const QList<PassiveRepeaterCAClass> &prList, std::vector<int> &idxList, double &azimuthPtg, double &elevationPtg);
 
 /******************************************************************************************/
@@ -91,8 +94,13 @@ int main(int argc, char **argv)
         // Do nothing
     } else if (mode == "proc_uls_debug") {
         debugFlag = true;
+    } else if (mode == "proc_uls_ca") {
+        combineAntennaRegionFlag = true;
     } else if (mode == "proc_uls_include_unii8") {
         includeUnii8 = true;
+    } else if (mode == "proc_uls_include_unii8_ca") {
+        includeUnii8 = true;
+        combineAntennaRegionFlag = true;
     } else if (mode == "proc_uls_include_unii8_debug") {
         includeUnii8 = true;
         debugFlag = true;
@@ -170,6 +178,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
     AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment, TransmitterModelMapClass &transmitterModelMap)
 {
     int prIdx;
+    std::string antPfx = (combineAntennaRegionFlag ? "" : "US:");
 
     qDebug() << "--- Beginning path processing";
 
@@ -530,7 +539,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     }
                 }
 
-                AntennaModelClass *rxAntModel = antennaModelMap.find(std::string(rxAnt.antennaModel));
+                AntennaModelClass *rxAntModel = antennaModelMap.find(antPfx, rxAnt.antennaModel);
 
                 AntennaModelClass::CategoryEnum rxAntennaCategory;
                 double rxAntennaDiameter;
@@ -554,7 +563,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     fixedReason.append("Rx Antenna Model Unmatched");
                 }
 
-                AntennaModelClass *txAntModel = antennaModelMap.find(std::string(txAnt.antennaModel));
+                AntennaModelClass *txAntModel = antennaModelMap.find(antPfx, txAnt.antennaModel);
 
                 AntennaModelClass::CategoryEnum txAntennaCategory;
                 double txAntennaDiameter;
@@ -713,8 +722,8 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                 row << txAnt.polarizationCode;            // Tx Polarization
                 row << UlsFunctionsClass::makeNumber(txAnt.azimuth);         // Tx Azimuth Angle (deg)
                 row << UlsFunctionsClass::makeNumber(txAnt.tilt);            // Tx Elevation Angle (deg)
-                row << txAnt.antennaMake;                 // Tx Ant Manufacturer
-                row << txAnt.antennaModel;                // Tx Ant Model
+                row << QString::fromStdString(txAnt.antennaMake);            // Tx Ant Manufacturer
+                row << QString::fromStdString(txAnt.antennaModel);           // Tx Ant Model
                 row << txAntennaModelName.c_str();            // Tx Matched antenna model (blank if unmatched)
                 row << AntennaModelClass::categoryStr(txAntennaCategory).c_str(); // Tx Antenna category
                 row << UlsFunctionsClass::makeNumber(txAntennaDiameter);     // Tx Ant Diameter (m)
@@ -734,8 +743,8 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                 row << UlsFunctionsClass::makeNumber(rxLoc.groundElevation); // Rx Ground Elevation (m)
                 row << "";                                // Rx Manufacturer
                 row << "";                                // Rx Model
-                row << rxAnt.antennaMake;                 // Rx Ant Manufacturer
-                row << rxAnt.antennaModel;                // Rx Ant Model
+                row << QString::fromStdString(rxAnt.antennaMake);            // Rx Ant Manufacturer
+                row << QString::fromStdString(rxAnt.antennaModel);           // Rx Ant Model
                 row << rxAntennaModelName.c_str();            // Rx Matched antenna model (blank if unmatched)
                 row << AntennaModelClass::categoryStr(rxAntennaCategory).c_str(); // Rx Antenna category
                 row << UlsFunctionsClass::makeNumber(rxAntennaDiameter);     // Rx Ant Diameter (m)
@@ -756,7 +765,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                         UlsAntenna &prAnt = prAntList[prIdx-1];
                         UlsSegment &segment = segList[prIdx];
 
-			            AntennaModelClass *prAntModel = antennaModelMap.find(std::string(prAnt.antennaModel));
+			            AntennaModelClass *prAntModel = antennaModelMap.find(antPfx, prAnt.antennaModel);
 
                         AntennaModelClass::TypeEnum prAntennaType;
                         AntennaModelClass::CategoryEnum prAntennaCategory;
@@ -794,8 +803,8 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                         row << prAnt.polarizationCode;    // Passive Repeater Polarization
                         row << UlsFunctionsClass::makeNumber(prAnt.azimuth); // Passive Repeater Azimuth Angle
                         row << UlsFunctionsClass::makeNumber(prAnt.tilt);    // Passive Repeater Elevation Angle
-                        row << prAnt.antennaMake;         // Passive Repeater Ant Make
-                        row << prAnt.antennaModel;        // Passive Repeater Ant Model
+                        row << QString::fromStdString(prAnt.antennaMake);    // Passive Repeater Ant Make
+                        row << QString::fromStdString(prAnt.antennaModel);   // Passive Repeater Ant Model
                         row << prAntennaModelName.c_str();        // Passive Repeater antenna model (blank if unmatched)
                         row << AntennaModelClass::typeStr(prAntennaType).c_str(); // Passive Repeater Ant Type
                         row << AntennaModelClass::categoryStr(prAntennaCategory).c_str(); // Passive Repeater Ant Category
@@ -881,9 +890,11 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
 /******************************************************************************************/
 /**** processCA                                                                        ****/
 /******************************************************************************************/
-void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn, AntennaModelMapClass &antennaModelMap)
+void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn,
+    AntennaModelMapClass &antennaModelMap)
 {
     int prIdx;
+    std::string antPfx = (combineAntennaRegionFlag ? "" : "CA:");
 
     qDebug() << "--- Beginning path processing";
 
@@ -942,7 +953,7 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
 
             makeLink(station, prList, idxList, azimuthPtg, elevationPtg);
 
-            AntennaModelClass *rxAntModel = antennaModelMap.find(std::string(station.antennaModel));
+            AntennaModelClass *rxAntModel = antennaModelMap.find(antPfx, station.antennaModel);
 
             AntennaModelClass::CategoryEnum rxAntennaCategory;
             double rxAntennaDiameter;
@@ -1062,7 +1073,7 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
 
                     const PassiveRepeaterCAClass &pr = prList[prIdx];
 
-                    AntennaModelClass *prAntModel = antennaModelMap.find(std::string(pr.antennaModelA));
+                    AntennaModelClass *prAntModel = antennaModelMap.find(antPfx, pr.antennaModelA);
 
                     PassiveRepeaterCAClass::PRTypeEnum prAntennaType;
                     AntennaModelClass::CategoryEnum prAntennaCategory;
@@ -1271,6 +1282,8 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inpu
     std::ostringstream errStr;
     FILE *fin, *fout;
 
+    std::string antPfx = (combineAntennaRegionFlag ? "" : "US:");
+
     if ( !(fin = fopen(inputFile.c_str(), "rb")) ) {
         errStr << std::string("ERROR: Unable to open inputFile: \"") << inputFile << "\"" << std::endl;
         throw std::runtime_error(errStr.str());
@@ -1371,7 +1384,7 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inpu
                 {
                     strval = fieldList.at(antennaModelFieldIdx);
 
-                    AntennaModelClass *antModel = antennaModelMap.find(strval);
+                    AntennaModelClass *antModel = antennaModelMap.find(antPfx, strval);
 
                     std::string matchedModelName;
                     if (antModel) {

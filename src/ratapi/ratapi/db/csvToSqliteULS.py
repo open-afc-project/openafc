@@ -308,7 +308,7 @@ def convertULS(data_file, state_root, logFile, fileName):
                     #: Rx Ground Elevation (m)
                     rx_ground_elev_m=_as_float(row['Rx Ground Elevation (m)']),
                     #: Rx Ant Model
-                    rx_ant_model=str(row['Rx Ant Model']),
+                    rx_ant_model=str(row['Rx Ant Model Name Matched']),
                     #: Rx Ant Category
                     rx_ant_category=str(row['Rx Ant Category']),
                     #: Rx Line Loss (dB)
@@ -354,7 +354,7 @@ def convertULS(data_file, state_root, logFile, fileName):
                         pr_height_to_center_raat_rx_m = _as_float( row['Passive Repeater ' + str(idx) + ' Height to Center RAAT Rx (m)']),
                         pr_ant_type = str(                         row['Passive Repeater ' + str(idx) + ' Ant Type']),
                         pr_ant_category = str(                     row['Passive Repeater ' + str(idx) + ' Ant Category']),
-                        pr_ant_model = str(                        row['Passive Repeater ' + str(idx) + ' Ant Model']),
+                        pr_ant_model = str(                        row['Passive Repeater ' + str(idx) + ' Ant Model Name Matched']),
                         pr_line_loss = _as_float(                  row['Passive Repeater ' + str(idx) + ' Line Loss (dB)']),
                         pr_reflector_height_m = _as_float(         row['Passive Repeater ' + str(idx) + ' Reflector Height (m)']),
                         pr_reflector_width_m = _as_float(          row['Passive Repeater ' + str(idx) + ' Reflector Width (m)']),

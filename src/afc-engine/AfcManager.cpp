@@ -5226,7 +5226,7 @@ void AfcManager::readRASData(std::string filename)
 	double radius;
 	double latCircle, lonCircle;
 	bool horizonDistFlag;
-	bool heightAGL;
+	double heightAGL;
 
 	int fieldIdx;
 
