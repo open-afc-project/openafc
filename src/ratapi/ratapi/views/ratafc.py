@@ -422,9 +422,9 @@ class RatAfc(MethodView):
                     if not hfile.head():
                         # Write afconfig to objst cache.
                         # convert TESTxxx region to xxx in cache to make afc engine sane
-                        if (region[:4] == "TEST"):
+                        if region[:5] == "TEST_" or region[:5] == 'DEMO_':
                             patch_config = config.config
-                            patch_config['regionStr'] =  region[4:]
+                            patch_config['regionStr'] =  region[5:]
                             config_bytes = json.dumps(patch_config, sort_keys=True)
                         hfile.write(config_bytes)
 

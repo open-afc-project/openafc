@@ -165,6 +165,23 @@ export async function getGuiConfig() {
 }
 
 /**
+ * Retrive basic configuration options used across app
+ * and sets the [[guiConfig]] object.
+ */
+export const getRegions = (): Promise<RatResponse<string[]>> => (
+    fetch("../ratapi/v1/regions", {
+        method: "GET"
+    }).then(res => {
+        return  res.text();
+    }).then(name => {
+        return success(name.split(" "));
+    }).catch(err => {
+        logger.error(err)
+    })
+)
+
+
+/**
  * Return a copy of the hard coded afc confic used as the default
  * @returns The default AFC Configuration
  */
@@ -175,7 +192,6 @@ export const getDefaultAfcConf = () => defaultAfcConf();
  * The config will be scoped to the current user
  * @returns this user's current AFC Config or error
  */
-//export const getAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => (
 export const getAfcConfigFile = (region:String): Promise<RatResponse<AFCConfigFile>> => (
     fetch(guiConfig.afcconfig_defaults.replace("default", region), {
         method: "GET",

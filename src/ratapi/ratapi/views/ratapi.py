@@ -37,20 +37,22 @@ LOGGER = logging.getLogger(__name__)
 #: All views under this API blueprint
 module = flask.Blueprint('ratapi-v1', 'ratapi')
 
+def regions():
+    return ['USA', 'CANADA', 'TEST_USA', 'DEMO_USA']
+
 
 def regionStrToNra(region_str):
     """ Input: region_str: regionStr field of the afc config.
         Output: nra
         nra: can match with the NRA field of the AP, e.g. FCC
-        Eg. 'TESTUSA' => 'TESTFCC'
         Eg. 'USA' => 'FCC'
     """
     map = {
        'DEFAULT':'FCC',
        'USA':'FCC',
        'CANADA':'ISED',
-       'TESTUSA':'TESTFCC',
-       'TESTCANADA':'TESTISED'
+       'TEST_USA':'TEST_FCC',
+       'DEMO_USA':'DEMO_FCC'
     }
     region_str = region_str.upper()
     try:
@@ -61,9 +63,9 @@ def regionStrToNra(region_str):
 def nraToRegionStr(nra):
     map = {
         'FCC':'USA',
-        'TESTFCC':'TESTUSA',
+        'TEST_FCC':'TEST_USA',
         'ISED':'CANADA',
-        'TESTISED':'TESTCANADA',
+        'DEMO_FCC':'DEMO_USA',
     }
     nra = nra.upper()
     try:
@@ -340,6 +342,20 @@ class AfcConfigFile(MethodView):
             raise werkzeug.exceptions.NotFound()
 
         return flask.make_response('AFC configuration file updated', 204)
+
+
+class AfcRegions(MethodView):
+    ''' Allow the web UI to manipulate configuration directly.
+    '''
+
+    def get(self):
+        ''' GET method for afc config
+        '''
+        resp = flask.make_response()
+        resp.data = ' '.join(regions())
+        resp.content_type = 'text/plain'
+        return resp
+
 
 
 class LiDAR_Bounds(MethodView):
@@ -868,3 +884,5 @@ module.add_url_rule('/convert/uls/csv/sql/<uls_file>',
                     view_func=UlsDb.as_view('UlsDb'))
 module.add_url_rule('/replay',
                     view_func=ReloadAnalysis.as_view('ReloadAnalysis'))
+module.add_url_rule('/regions',
+                    view_func=AfcRegions.as_view('AfcRegions'))

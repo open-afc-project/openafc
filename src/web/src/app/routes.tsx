@@ -4,8 +4,8 @@ import { DynamicImport } from "./DynamicImport";
 import { NotFound } from "./NotFound/NotFound";
 import { Dashboard } from "./Dashboard/Dashboard";
 import { PageSection, Card, CardHeader } from "@patternfly/react-core";
-import { getAfcConfigFile } from "./Lib/RatApi";
-import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv } from "./Lib/FileApi";
+import { getAfcConfigFile, getRegions } from "./Lib/RatApi";
+import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv} from "./Lib/FileApi";
 import { UserAccountPage } from "./UserAccount/UserAccount";
 import { getUsers, getMinimumEIRP, Limit, getAllowedRanges } from "./Lib/Admin";
 import { Replay } from "./Replay/Replay"
@@ -88,6 +88,7 @@ const afcConfigResolves = async () => {
   conf: await getAfcConfigFile("USA"),
   ulsFiles: await getUlsFiles(),
   antennaPatterns: await getAntennaPatterns(),
+  regions: await getRegions(),
   limit: await getMinimumEIRP(),
   frequencyBands: await getAllowedRanges()
   }
@@ -97,7 +98,7 @@ const AFCConfig = () => {
     <DynamicImport load={getAfcConfigModuleAsync()} resolve={afcConfigResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
-          : <Component.AFCConfig limit={resolve.limit} ulsFiles={resolve.ulsFiles} afcConf={resolve.conf} antennaPatterns={resolve.antennaPatterns} frequencyBands={resolve.frequencyBands} />
+          : <Component.AFCConfig limit={resolve.limit} ulsFiles={resolve.ulsFiles} afcConf={resolve.conf} antennaPatterns={resolve.antennaPatterns} regions={resolve.regions} frequencyBands={resolve.frequencyBands} />
       }}
     </DynamicImport>
   );
