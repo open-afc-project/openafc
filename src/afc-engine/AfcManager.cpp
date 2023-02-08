@@ -283,9 +283,9 @@ AfcManager::AfcManager()
 	_winner2UseGroundDistanceFlag = true;
 	_fsplUseGroundDistanceFlag = false;
 
-	_rxFeederLossDBUNII5 = 0.0;
-	_rxFeederLossDBUNII7 = 0.0;
-	_rxFeederLossDBOther = 0.0;
+	_rxFeederLossDBIDU = quietNaN;
+	_rxFeederLossDBODU = quietNaN;
+	_rxFeederLossDBUnknown = quietNaN;
 
 	_ulsNoiseFigureDBUNII5 = quietNaN;
 	_ulsNoiseFigureDBUNII7 = quietNaN;
@@ -2164,9 +2164,23 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	// ***********************************
 	// Feeder loss parameters
 	// ***********************************
-	_rxFeederLossDBUNII5 = jsonObj["receiverFeederLoss"].toObject()["UNII5"].toDouble();
-	_rxFeederLossDBUNII7 = jsonObj["receiverFeederLoss"].toObject()["UNII7"].toDouble();
-	_rxFeederLossDBOther = jsonObj["receiverFeederLoss"].toObject()["other"].toDouble();
+	QJsonObject receiverFeederLossObj = jsonObj["receiverFeederLoss"].toObject();
+
+	if (receiverFeederLossObj.contains("IDU") && !receiverFeederLossObj["IDU"].isUndefined()) {
+		_rxFeederLossDBIDU = receiverFeederLossObj["IDU"].toDouble();
+	} else {
+		_rxFeederLossDBIDU = 3.0;
+	}
+	if (receiverFeederLossObj.contains("ODU") && !receiverFeederLossObj["ODU"].isUndefined()) {
+		_rxFeederLossDBODU = receiverFeederLossObj["ODU"].toDouble();
+	} else {
+		_rxFeederLossDBODU = 0.0;
+	}
+	if (receiverFeederLossObj.contains("UNKNOWN") && !receiverFeederLossObj["UNKNOWN"].isUndefined()) {
+		_rxFeederLossDBUnknown = receiverFeederLossObj["UNKNOWN"].toDouble();
+	} else {
+		_rxFeederLossDBUnknown = 0.0;
+	}
 	// ***********************************
 
 	// ***********************************
@@ -4801,14 +4815,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 				double rxAntennaFeederLossDB = row.rxLineLoss;
 				if (std::isnan(rxAntennaFeederLossDB)) {
-					if (unii5Flag && unii7Flag) {
-						rxAntennaFeederLossDB = std::min(_rxFeederLossDBUNII5, _rxFeederLossDBUNII7);
-					} else if (unii5Flag) {
-						rxAntennaFeederLossDB = _rxFeederLossDBUNII5;
-					} else if (unii7Flag) {
-						rxAntennaFeederLossDB = _rxFeederLossDBUNII7;
+					if (row.txArchitecture == "IDU") {
+						rxAntennaFeederLossDB = _rxFeederLossDBIDU;
+					} else if (row.txArchitecture == "ODU") {
+						rxAntennaFeederLossDB = _rxFeederLossDBODU;
 					} else {
-						rxAntennaFeederLossDB = _rxFeederLossDBOther;
+						rxAntennaFeederLossDB = _rxFeederLossDBUnknown;
 					}
 				}
 				double noiseFigureDB;
@@ -5214,7 +5226,7 @@ void AfcManager::readRASData(std::string filename)
 	double radius;
 	double latCircle, lonCircle;
 	bool horizonDistFlag;
-	bool heightAGL;
+	double heightAGL;
 
 	int fieldIdx;
 
@@ -10104,7 +10116,7 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "BUILDING_TYPE", QString((_buildingType == CConst::traditionalBuildingType ? "traditional" : _buildingType == CConst::thermallyEfficientBuildingType ? "thermally efficient" : "no building type")) } );
 		fUserInputs->writeRow({ "BUILDING_PENETRATION_CONFIDENCE", QString::number(_confidenceBldg2109, 'e', 20) } );
 		fUserInputs->writeRow({ "BUILDING_PENETRATION_LOSS_FIXED_VALUE (DB)", QString::number(_fixedBuildingLossValue, 'e', 20) } );
-		fUserInputs->writeRow({ "FS_RECEIVER_FEEDER_LOSS (DB)", QString::number(_polarizationLossDB, 'e', 20) } );
+		fUserInputs->writeRow({ "POLARIZATION_LOSS (DB)", QString::number(_polarizationLossDB, 'e', 20) } );
 		fUserInputs->writeRow({ "RLAN_BODY_LOSS_INDOOR (DB)", QString::number(_bodyLossIndoorDB, 'e', 20) } );
 		fUserInputs->writeRow({ "RLAN_BODY_LOSS_OUTDOOR (DB)", QString::number(_bodyLossOutdoorDB, 'e', 20) } );
 		fUserInputs->writeRow({ "I/N_THRESHOLD", QString::number(_IoverN_threshold_dB, 'e', 20) } );
@@ -10125,6 +10137,9 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "WINNER_II_USE_GROUND_DISTANCE", (_winner2UseGroundDistanceFlag ? "true" : "false" ) } );
 		fUserInputs->writeRow({ "FSPL_USE_GROUND_DISTANCE", (_fsplUseGroundDistanceFlag ? "true" : "false" ) } );
 		fUserInputs->writeRow({ "PASSIVE_REPEATER_FLAG", (_passiveRepeaterFlag ? "true" : "false" ) } );
+		fUserInputs->writeRow({ "RX ANTENNA FEEDER LOSS IDU (DB)", QString::number(_rxFeederLossDBIDU, 'e', 20)  } );
+		fUserInputs->writeRow({ "RX ANTENNA FEEDER LOSS ODU (DB)", QString::number(_rxFeederLossDBODU, 'e', 20)  } );
+		fUserInputs->writeRow({ "RX ANTENNA FEEDER LOSS UNKNOWN (DB)", QString::number(_rxFeederLossDBUnknown, 'e', 20)  } );
 
 		if (_analysisType == "ExclusionZoneAnalysis") {
 			double chanCenterFreq = _wlanMinFreq + (_exclusionZoneRLANChanIdx + 0.5) * _exclusionZoneRLANBWHz;

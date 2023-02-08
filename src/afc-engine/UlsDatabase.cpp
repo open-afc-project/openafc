@@ -61,6 +61,8 @@ UlsDatabase::UlsDatabase()
 	fieldIdxList.push_back(&tx_eirpIdx);
 	columns << "tx_height_to_center_raat_m";
 	fieldIdxList.push_back(&tx_height_to_center_raat_mIdx);
+	columns << "tx_architecture";
+	fieldIdxList.push_back(&tx_architecture_mIdx);
 	columns << "azimuth_angle_to_tx";
 	fieldIdxList.push_back(&azimuth_angle_to_tx_mIdx);
 	columns << "elevation_angle_to_tx";
@@ -160,6 +162,7 @@ void UlsDatabase::nullInitialize()
 	tx_gainIdx = -1;
 	tx_eirpIdx = -1;
 	tx_height_to_center_raat_mIdx = -1;
+	tx_architecture_mIdx = -1;
 	azimuth_angle_to_tx_mIdx = -1;
 	elevation_angle_to_tx_mIdx = -1;
 	rx_lat_degIdx = -1;
@@ -337,6 +340,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		target.at(r).txGain = q.value(tx_gainIdx).isNull() ? quietNaN : q.value(tx_gainIdx).toDouble();
 		target.at(r).txEIRP = q.value(tx_eirpIdx).toDouble();
 		target.at(r).txHeightAboveTerrain = q.value(tx_height_to_center_raat_mIdx).isNull() ? quietNaN : q.value(tx_height_to_center_raat_mIdx).toDouble();
+		target.at(r).txArchitecture = q.value(tx_architecture_mIdx).toString().toStdString();
 		target.at(r).azimuthAngleToTx = q.value(azimuth_angle_to_tx_mIdx).isNull() ? quietNaN : q.value(azimuth_angle_to_tx_mIdx).toDouble();
 		target.at(r).elevationAngleToTx = q.value(elevation_angle_to_tx_mIdx).isNull() ? quietNaN : q.value(elevation_angle_to_tx_mIdx).toDouble();
 		target.at(r).rxLatitudeDeg = q.value(rx_lat_degIdx).toDouble();

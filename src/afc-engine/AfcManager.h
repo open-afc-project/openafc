@@ -339,9 +339,10 @@ class AfcManager
 
 		QString _propagationEnviro;             // Propagation environment (e.g. Population Density Map)
 
-		double _rxFeederLossDBUNII5;            // User-inputted ULS receiver feeder loss for UNII-5
-		double _rxFeederLossDBUNII7;            // User-inputted ULS receiver feeder loss for UNII-7
-		double _rxFeederLossDBOther;            // User-inputted ULS receiver feeder loss for others (not UNII-5 or UNII-7)
+
+		double _rxFeederLossDBIDU;                // User-inputted ULS receiver feeder loss for IDU Architecture
+		double _rxFeederLossDBODU;                // User-inputted ULS receiver feeder loss for ODU Architecture
+		double _rxFeederLossDBUnknown;            // User-inputted ULS receiver feeder loss for Unknown Architecture
 
 		double _ulsNoiseFigureDBUNII5;          // Noise Figure for ULS receiver in UNII-5 band;
 		double _ulsNoiseFigureDBUNII7;          // Noise Figure for ULS receiver in UNII-7 band;

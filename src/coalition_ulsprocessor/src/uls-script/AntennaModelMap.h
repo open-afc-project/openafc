@@ -45,7 +45,7 @@ public:
 class AntennaModelMapClass {
 public:
 	AntennaModelMapClass(const std::string antListFile, const std::string antMapFile);
-	AntennaModelClass *find(std::string modelName);
+	AntennaModelClass *find(std::string antPfx, std::string modelName);
 
 private:
 	void readModelList(const std::string filename);

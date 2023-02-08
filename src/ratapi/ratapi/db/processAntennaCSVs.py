@@ -1,18 +1,47 @@
 import csv
 
-def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
+def fixModelName(modelPrefix, modelName):
+    ############################################################################
+    # Convert modelName to uppercase
+    ############################################################################
+    modelName = modelName.upper()
+    ############################################################################
+
+    ############################################################################
+    # Remove non-alhpanumeric characters
+    ############################################################################
+    modelName = ''.join(filter(str.isalnum, modelName))
+    ############################################################################
+
+    ############################################################################
+    # Prepend prefix
+    ############################################################################
+    modelName = modelPrefix + modelName 
+    ############################################################################
+
+    return modelName
+
+def processAntFiles(inputDir, processCA, combineAntennaRegionFlag, outputFile, antennaPatternFile, logFile):
     logFile.write('Processing antenna files' + '\n')
 
     antennaModelDiamGainCsvFilePath    = inputDir + "/antenna_model_diameter_gain.csv"
     billboardReflectorCsvFilePath      = inputDir + "/billboard_reflector.csv"
     categoryB1AntennasCsvFilePath      = inputDir + "/category_b1_antennas.csv"
     highPerformanceAntennasCsvFilePath = inputDir + "/high_performance_antennas.csv"
-    antennaPatternCsvFilePath          = inputDir + "/Antenna_Patterns_6GHz.csv"
+
+    if processCA:
+        antennaPatternCsvFilePath          = inputDir + "/CA/AP.csv"
+
+    if combineAntennaRegionFlag:
+        prefixUS = ""
+        prefixCA = ""
+    else:
+        prefixUS = "US:"
+        prefixCA = "CA:"
 
     outputCsvFilePath = outputFile
 
     # Read in all input CSVs as dictionaries and fetch relevant columns
-
 
     ############################################################################
     # Billboard Reflector CSV
@@ -23,7 +52,7 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
     reflectorHeightList = []
     reflectorWidthList = []
     for row in billboardReflectorReader:
-        reflectorAntennaModelList.append(row['antennaModel'])
+        reflectorAntennaModelList.append(fixModelName(prefixUS, row['antennaModel']))
         reflectorHeightList.append(row['height_m'])
         reflectorWidthList.append(row['width_m'])
     ############################################################################
@@ -37,7 +66,7 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
     antennaDiameterList = []
     antennaGainList = []
     for row in antennaModelDiamGainReader:
-        standardModelList.append(row['standardModel'])
+        standardModelList.append(fixModelName(prefixUS, row['standardModel']))
         antennaDiameterList.append(row['diameter_m'])
         antennaGainList.append(row['gain_dBi'])
     ############################################################################
@@ -48,7 +77,7 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
     categoryB1AntennasReader = csv.DictReader(open(categoryB1AntennasCsvFilePath))
     antennaModelPrefixB1List = []
     for row in categoryB1AntennasReader:
-        antennaModelPrefixB1List.append(row['antennaModelPrefix'])
+        antennaModelPrefixB1List.append(fixModelName(prefixUS, row['antennaModelPrefix']))
     ############################################################################
 
     ############################################################################
@@ -57,37 +86,28 @@ def processAntFiles(inputDir, outputFile, antennaPatternFile, logFile):
     highPerformanceAntennasReader = csv.DictReader(open(highPerformanceAntennasCsvFilePath))
     antennaModelPrefixHpList = []
     for row in highPerformanceAntennasReader:
-        antennaModelPrefixHpList.append(row['antennaModelPrefix'])
+        antennaModelPrefixHpList.append(fixModelName(prefixUS, row['antennaModelPrefix']))
     ############################################################################
 
     ############################################################################
     # Antenna Pattern File from ISED (Canada)
     ############################################################################
-    antennaPatternReader = csv.DictReader(open(antennaPatternCsvFilePath))
     antennaPatternModelList = []
     antennaPatternGainList = []
     antennaPatternDiameterList = []
     antennaPatternTypeList = []
     antennaPatternAzimuthList = []
     antennaPatternAttenuationList = []
-    for row in antennaPatternReader:
-        antennaPatternModelList.append(row['Antenna Model Number'])
-        antennaPatternGainList.append(row['Antenna Gain [dBi]'])
-        antennaPatternDiameterList.append(row['Antenna Diameter'])
-        antennaPatternTypeList.append(row['Pattern Type'])
-        antennaPatternAzimuthList.append(row['Pattern Azimuth [deg]'])
-        antennaPatternAttenuationList.append(row['Pattern Attenuation [dB]'])
+    if processCA:
+        antennaPatternReader = csv.DictReader(open(antennaPatternCsvFilePath))
+        for row in antennaPatternReader:
+            antennaPatternModelList.append(fixModelName(prefixCA, row['Antenna Model Number']))
+            antennaPatternGainList.append(row['Antenna Gain [dBi]'])
+            antennaPatternDiameterList.append(row['Antenna Diameter'])
+            antennaPatternTypeList.append(row['Pattern Type'])
+            antennaPatternAzimuthList.append(row['Pattern Azimuth [deg]'])
+            antennaPatternAttenuationList.append(row['Pattern Attenuation [dB]'])
     ############################################################################
-
-    ############################################################################
-    # Make sure all antenna model characters are upper-case                    #
-    ############################################################################
-    reflectorAntennaModelList = [antennaModel.upper() for antennaModel in reflectorAntennaModelList]
-    standardModelList = [antennaModel.upper() for antennaModel in standardModelList]
-    antennaModelPrefixHpList = [antennaModelPrefix.upper() for antennaModelPrefix in antennaModelPrefixHpList]
-    antennaModelPrefixB1List = [antennaModelPrefix.upper() for antennaModelPrefix in antennaModelPrefixB1List]
-    antennaPatternModelList = [antennaModel.upper() for antennaModel in antennaPatternModelList]
-
 
     antmap = {}
     antpatternRaw = {}

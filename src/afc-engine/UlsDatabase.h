@@ -34,6 +34,7 @@ struct UlsRecord
 	double txGain;
 	double txEIRP;
 	double txHeightAboveTerrain;
+	std::string txArchitecture;
 	double azimuthAngleToTx;
 	double elevationAngleToTx;
 	double rxLatitudeDeg, rxLongitudeDeg;
@@ -122,6 +123,7 @@ public:
 	int tx_gainIdx;
 	int tx_eirpIdx;
 	int tx_height_to_center_raat_mIdx;
+	int tx_architecture_mIdx;
 	int azimuth_angle_to_tx_mIdx;
 	int elevation_angle_to_tx_mIdx;
 	int rx_lat_degIdx;

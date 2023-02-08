@@ -27,12 +27,12 @@ double emptyAtof(const char *str) {
 
 // On AUG 18, 2022 the FCC modified the format of PA records increasing the number of columns from 22 to 24.  The variable maxcol is set to 22, and this function ignores any
 // additional columns after maxcol.
-void SetToNextLine(FILE *fi, char c) {
-  while(c != '\n' && c != EOF) {
-    c = fgetc(fi);
-  }
-
-}
+// void SetToNextLine(FILE *fi, char c) {
+//   while(c != '\n' && c != EOF) {
+//     c = fgetc(fi);
+//   }
+// 
+// }
 }; // namespace
 
 /**************************************************************************/
@@ -175,7 +175,7 @@ void UlsFileReader::readIndividualPathUS(const std::vector<std::string> &fieldLi
 {
     UlsPath current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -272,7 +272,7 @@ void UlsFileReader::readIndividualEmissionUS(const std::vector<std::string> &fie
 {
     UlsEmission current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -320,7 +320,7 @@ void UlsFileReader::readIndividualMarketFrequencyUS(const std::vector<std::strin
 {
     UlsMarketFrequency current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -355,7 +355,7 @@ void UlsFileReader::readIndividualEntityUS(const std::vector<std::string> &field
 {
     UlsEntity current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -395,7 +395,7 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
 {
     UlsLocation current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -540,7 +540,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
 {
     UlsAntenna current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -570,10 +570,10 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
                 current.heightToCenterRAAT = emptyAtof(field.c_str());
                 break;
             case 12:
-                strlcpy(current.antennaMake, field.c_str(), 26);
+                current.antennaMake = field;
                 break;
             case 13:
-                strlcpy(current.antennaModel, field.c_str(), 26);
+                current.antennaModel = field;
                 break;
             case 14:
                 current.tilt = emptyAtof(field.c_str());
@@ -645,7 +645,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
         }
     }
 
-    std::string origAntennaModel = std::string(current.antennaModel);
+    std::string origAntennaModel = current.antennaModel;
     std::string antennaModel = origAntennaModel;
 
     antennaModel.erase(std::remove_if(antennaModel.begin(), antennaModel.end(), isInvalidChar), antennaModel.end());
@@ -653,7 +653,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
     if (antennaModel != origAntennaModel) {
         if (fwarn) {
             fprintf(fwarn, "WARNING: Antenna model \"");
-            for(int i=0; i<origAntennaModel.length(); ++i) {
+            for(int i=0; i<(int) origAntennaModel.length(); ++i) {
                 char  ch = origAntennaModel[i];
                 if (isInvalidChar(ch)) {
                     fprintf(fwarn, "\\x%2X", (unsigned char) ch);
@@ -663,7 +663,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
             }
             fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n", antennaModel.c_str());
         }
-        strlcpy(current.antennaModel, antennaModel.c_str(), 26);
+        current.antennaModel = antennaModel;
     }
 
     allAntennas << current;
@@ -680,7 +680,7 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
 {
     UlsFrequency current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -773,7 +773,7 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
     if (transmitterModel != origTransmitterModel) {
         if (fwarn) {
             fprintf(fwarn, "WARNING: Transmitter model \"");
-            for(int i=0; i<origTransmitterModel.length(); ++i) {
+            for(int i=0; i<(int) origTransmitterModel.length(); ++i) {
                 char  ch = origTransmitterModel[i];
                 if (isInvalidChar(ch)) {
                     fprintf(fwarn, "\\x%2X", (unsigned char) ch);
@@ -800,7 +800,7 @@ void UlsFileReader::readIndividualHeaderUS(const std::vector<std::string> &field
 {
     UlsHeader current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -870,7 +870,7 @@ void UlsFileReader::readIndividualControlPointUS(const std::vector<std::string> 
 {
     UlsControlPoint current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -924,7 +924,7 @@ void UlsFileReader::readIndividualSegmentUS(const std::vector<std::string> &fiel
 {
     UlsSegment current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -972,7 +972,7 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 {
     StationDataCAClass current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -1058,7 +1058,7 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
     if (antennaModel != origAntennaModel) {
         if (fwarn) {
             fprintf(fwarn, "WARNING: Antenna model \"");
-            for(int i=0; i<origAntennaModel.length(); ++i) {
+            for(int i=0; i<(int) origAntennaModel.length(); ++i) {
                 char  ch = origAntennaModel[i];
                 if (isInvalidChar(ch)) {
                     fprintf(fwarn, "\\x%2X", (unsigned char) ch);
@@ -1084,7 +1084,7 @@ void UlsFileReader::readBackToBackPassiveRepeaterCA(const std::vector<std::strin
 {
     BackToBackPassiveRepeaterCAClass current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -1127,7 +1127,7 @@ void UlsFileReader::readBackToBackPassiveRepeaterCA(const std::vector<std::strin
     if (antennaModel != origAntennaModel) {
         if (fwarn) {
             fprintf(fwarn, "WARNING: Antenna model \"");
-            for(int i=0; i<origAntennaModel.length(); ++i) {
+            for(int i=0; i<(int) origAntennaModel.length(); ++i) {
                 char  ch = origAntennaModel[i];
                 if (isInvalidChar(ch)) {
                     fprintf(fwarn, "\\x%2X", (unsigned char) ch);
@@ -1149,11 +1149,11 @@ void UlsFileReader::readBackToBackPassiveRepeaterCA(const std::vector<std::strin
 /**************************************************************************/
 /* UlsFileReader::readReflectorPassiveRepeaterCA()                        */
 /**************************************************************************/
-void UlsFileReader::readReflectorPassiveRepeaterCA(const std::vector<std::string> &fieldList, FILE *fwarn)
+void UlsFileReader::readReflectorPassiveRepeaterCA(const std::vector<std::string> &fieldList, FILE * /* fwarn */)
 {
     ReflectorPassiveRepeaterCAClass current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -1202,7 +1202,7 @@ void UlsFileReader::readTransmitterCA(const std::vector<std::string> &fieldList,
 {
     TransmitterCAClass current;
 
-    for(int fieldIdx=0; fieldIdx<fieldList.size(); ++fieldIdx) {
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
 
         switch (fieldIdx) {
@@ -1266,7 +1266,7 @@ void UlsFileReader::readTransmitterCA(const std::vector<std::string> &fieldList,
     if (antennaModel != origAntennaModel) {
         if (fwarn) {
             fprintf(fwarn, "WARNING: Antenna model \"");
-            for(int i=0; i<origAntennaModel.length(); ++i) {
+            for(int i=0; i<(int) origAntennaModel.length(); ++i) {
                 char  ch = origAntennaModel[i];
                 if (isInvalidChar(ch)) {
                     fprintf(fwarn, "\\x%2X", (unsigned char) ch);
@@ -1522,8 +1522,8 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
             pr.heightAGLB = br.heightAGL;
             pr.antennaGainA = std::numeric_limits<double>::quiet_NaN();
             pr.antennaGainB = std::numeric_limits<double>::quiet_NaN();
-            pr.antennaModelA = std::numeric_limits<double>::quiet_NaN();
-            pr.antennaModelB = std::numeric_limits<double>::quiet_NaN();
+            pr.antennaModelA = "";
+            pr.antennaModelB = "";
             pr.azimuthPtgA = std::numeric_limits<double>::quiet_NaN();
             pr.azimuthPtgB = std::numeric_limits<double>::quiet_NaN();
             pr.elevationPtgA = std::numeric_limits<double>::quiet_NaN();
