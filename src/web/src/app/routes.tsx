@@ -37,9 +37,11 @@ const getRatAfcModuleAsync = () => {
   return () => import(/* webpackChunkName: "ap-afc" */ "./RatAfc/RatAfc");
 }
 const ratAfcResolves = async () => ({
-  conf: await getAfcConfigFile(),
+  conf: await getAfcConfigFile("USA"),
   limit: await getMinimumEIRP()
 })
+
+
 const RatAfc = () => {
   return (
     <DynamicImport load={getRatAfcModuleAsync()} resolve={ratAfcResolves()}>
@@ -80,9 +82,10 @@ const VirtualAP = () => {
 const getAfcConfigModuleAsync = () => {
   return () => import(/* webpackChunkName: "afcconfig" */ "./AFCConfig/AFCConfig");
 }
+
 const afcConfigResolves = async () => {
   return {
-  conf: await getAfcConfigFile(),
+  conf: await getAfcConfigFile("USA"),
   ulsFiles: await getUlsFiles(),
   antennaPatterns: await getAntennaPatterns(),
   limit: await getMinimumEIRP(),

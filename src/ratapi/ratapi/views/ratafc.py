@@ -31,11 +31,13 @@ import six
 from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE
 from ..tasks.afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from ..models.aaa import User, AccessPoint
+from ..models.aaa import User, AccessPoint, AFCConfig
 from .auth import auth
-from .ratapi import build_task
+from .ratapi import build_task, nraToRegionStr
 from .. import data_if
 from .. import task
+from ..models.base import db
+from flask_login import current_user
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -287,6 +289,12 @@ class RatAfc(MethodView):
         if serial_number is None:
             raise MissingParamException(['serialNumber'])
 
+        if serial_number == "TestSerialNumber":
+            if current_user:
+                return "Trial_" + str(current_user.id)
+            else:
+                raise DeviceUnallowedException()  # InvalidCredentialsException()
+
         ap = AccessPoint.query.filter_by(serial_number=serial_number).first()
 
         if rulesets is None or len(rulesets) != 1 or rulesets[0] != RULESET:
@@ -376,7 +384,8 @@ class RatAfc(MethodView):
                                     firstCertId,
                                     device_desc.get('rulesetIds'))
 
-                region = (device_desc['certificationId'][0]['nra']).strip().lower()
+                nra = (device_desc['certificationId'][0]['nra']).strip()
+                region = nraToRegionStr(nra)
                 runtime_opts = RNTM_OPT_NODBG_NOGUI
                 debug_opt = flask.request.args.get('debug')
                 if debug_opt == 'True':
@@ -397,13 +406,30 @@ class RatAfc(MethodView):
                     fsroot=flask.current_app.config['STATE_ROOT_PATH'],
                     mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
 
-                # calculate hash
-                request_json_bytes = json.dumps(request, sort_keys=True).encode('utf-8')
-                config_bytes = None
-                with dataif.open("cfg", region + "/afc_config.json") as hfile:
-                    config_bytes = hfile.read()
+                config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
+                         == region).first()
+
+                config_bytes = json.dumps(config.config, sort_keys=True)
+
+                # calculate hash of config
                 hashlibobj = hashlib.md5()
                 hashlibobj.update(config_bytes)
+                hash1 = hashlibobj.hexdigest()
+
+                config_path = nra + "/" + hash1
+                # check config_path exist
+                with dataif.open("cfg", config_path + "/afc_config.json") as hfile:
+                    if not hfile.head():
+                        # Write afconfig to objst cache.
+                        # convert TESTxxx region to xxx in cache to make afc engine sane
+                        if (region[:4] == "TEST"):
+                            patch_config = config.config
+                            patch_config['regionStr'] =  region[4:]
+                            config_bytes = json.dumps(patch_config, sort_keys=True)
+                        hfile.write(config_bytes)
+
+                # calculate hash of config + request
+                request_json_bytes = json.dumps(request, sort_keys=True).encode('utf-8')
                 hashlibobj.update(request_json_bytes)
                 hash = hashlibobj.hexdigest()
 
@@ -438,14 +464,14 @@ class RatAfc(MethodView):
 
                 build_task(dataif,
                         request_type,
-                        task_id, hash, region, history_dir,
+                        task_id, hash, config_path, history_dir,
                         runtime_opts)
 
                 conn_type = flask.request.args.get('conn_type')
                 LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
                 t = task.Task(task_id, dataif,
                               flask.current_app.config['STATE_ROOT_PATH'],
-                              hash, region, history_dir,
+                              hash, nra, history_dir,
                               mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
                 if conn_type == 'async':
                     if len(requests) > 1:
@@ -459,9 +485,11 @@ class RatAfc(MethodView):
             for t in tasks:
                 # wait for requests to finish processing
                 try:
+                    LOGGER.error("Task waiting: ")
                     task_stat = t.wait()
-                    LOGGER.debug("Task complete: %s", task_stat)
+                    LOGGER.error("Task complete: %s", task_stat)
                     if t.successful(task_stat):
+                        LOGGER.error("Task successful ")
                         taskResponse = response_map[task_stat['status']](t)
                         # we might be able to clean this up by having the result functions not return a full response object
                         # need to check everywhere they are called
@@ -470,18 +498,18 @@ class RatAfc(MethodView):
                         actualResult = dataAsJson.get(
                             "availableSpectrumInquiryResponses")
                         if actualResult is not None:
-                            # LOGGER.debug("actualResult: %s", actualResult)
+                            # LOGGER.error("actualResult: %s", actualResult)
                             results["availableSpectrumInquiryResponses"].append(
                                 actualResult[0])
                         else:
-                            LOGGER.debug("actualResult was None")
+                            LOGGER.error("actualResult was None")
                             results["availableSpectrumInquiryResponses"].append(
                                 dataAsJson)
                     else:
-                        LOGGER.debug("Task was not successful")
+                        LOGGER.error("Task was not successful")
                         taskResponse = response_map[task_stat['status']](t)
                         dataAsJson = json.loads(taskResponse.data)
-                        LOGGER.debug(
+                        LOGGER.error(
                             "Unsuccessful dataAsJson: %s", dataAsJson)
                         results["availableSpectrumInquiryResponses"].append(
                             dataAsJson)

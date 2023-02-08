@@ -13,7 +13,6 @@ import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, impor
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
 import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
-import { setDefaultRegion } from "../Lib/User";
 import DownloadContents from "../Components/DownloadContents";
 
 /**
@@ -64,7 +63,6 @@ export class AFCForm extends React.Component<
                 }
             }
         }
-        setDefaultRegion(config.regionStr);
     }
 
     private hasValue = (val: any) => val !== undefined && val !== null;
@@ -78,17 +76,16 @@ export class AFCForm extends React.Component<
     private setMaxLinkDistance = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxLinkDistance: n }) });
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => {
-        this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
-        setDefaultRegion(n);
-        //    getAfcConfigFile().then(
-        //        res => {
-        //             if (res.kind === "Success") {
-        //                 this.updateEntireConfigState(res.result);
-        //             } else {
-        //                 this.setState({ messageError: res.description, messageSuccess: undefined });
-        //            }
-        //        }
-        //   )
+       this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
+       // region changed by user, reload the coresponding configuration for that region
+       getAfcConfigFile(n).then(
+           res => {
+           if (res.kind === "Success") {
+               this.updateEntireConfigState(res.result);
+           } else {
+               this.setState({ messageError: res.description, messageSuccess: undefined });
+           }
+        })
     }
     private setEnableMapInVirtualAp = (n: boolean) => this.setState({ config: Object.assign(this.state.config, { enableMapInVirtualAp: n }) });
     private setVisiblityThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { visibilityThreshold: n }) });
@@ -219,7 +216,6 @@ export class AFCForm extends React.Component<
             }
         }
         );
-        setDefaultRegion(config.regionStr);
     }
 
     /**
@@ -480,7 +476,8 @@ export class AFCForm extends React.Component<
                                 >
                                     <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
                                     <FormSelectOption key={"USA"} value={"USA"} label={"USA"} />
-                                    <FormSelectOption key={"Canada"} value={"Canada"} label={"Canada"} />
+                                    <FormSelectOption key={"CANADA"} value={"CANADA"} label={"CANADA"} />
+                                    <FormSelectOption key={"TESTUSA"} value={"TESTUSA"} label={"TESTUSA"} />
                                 </FormSelect>
                             </FormGroup>
                         </GalleryItem>

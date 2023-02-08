@@ -253,7 +253,8 @@ class MobileAP extends React.Component<{},
 
       // load AFC Config from server because we need several properties to compute dispaly information
       logger.info("retreiving afc config");
-      const afcConfig = await getAfcConfigFile();
+      //const afcConfig = await getAfcConfigFile();
+      const afcConfig = await getAfcConfigFile("USA");
       if (afcConfig.kind !== "Success") {
         this.setState({
           messageType: "Error",

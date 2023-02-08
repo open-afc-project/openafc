@@ -339,7 +339,6 @@ class DbUpgrade(Command):
     def __call__(self, flaskapp):
         with flaskapp.app_context():
             import flask
-            from .models.aaa import AFCConfig
             from flask_migrate import (upgrade, stamp)
             setUserIdNextVal()
             try:
@@ -355,23 +354,6 @@ class DbUpgrade(Command):
 
             db.session.commit()
             upgrade()
-
-            # If AFCConfig is empty, copy from fcc config file
-            region = ['USA', 'fcc']
-            config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext
-== region[0]).first()
-            if not config:
-                dataif = data_if.DataIf(
-                    fsroot=flask.current_app.config['STATE_ROOT_PATH'],
-                    mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
-                with dataif.open("cfg", region[1] + "/afc_config.json") as hfile:
-                    if hfile.head():
-                        config_bytes = hfile.read()
-                        rcrd = json.loads(config_bytes)
-                        config = AFCConfig(rcrd)
-                        db.session.add(config)
-                        db.session.commit()
-
 
 class UserCreate(Command):
     ''' Create a new user functionality. '''
@@ -994,8 +976,10 @@ class ConfigAdd(Command):
     def __call__(self, flaskapp, src):
         LOGGER.debug('ConfigAdd.__call__() %s', src)
         from .models.aaa import User
+        from .models.aaa import AFCConfig
+        from .views.ratapi import regionStrToNra
+        import datetime
 
-        REGION_MAP = {'USA':'fcc'}
         split_items = src.split('=', 1)
         filename = split_items[1].strip()
         if not os.path.exists(filename):
@@ -1041,20 +1025,22 @@ class ConfigAdd(Command):
                         user = User.query.filter(User.email == username[0]).one()
                         LOGGER.debug('New user id %d', user.id)
 
-                    cfg_rcrd = json_lookup('afcConfig', new_rcrd, None)
-                    region_rcrd = json_lookup('regionStr', cfg_rcrd, None)
-                    regionStr = REGION_MAP[region_rcrd[0]]
+                        cfg_rcrd = json_lookup('afcConfig', new_rcrd, None)
+                        region_rcrd = json_lookup('regionStr', cfg_rcrd, None)
+                        # validate the region string
+                        regionStrToNra(region_rcrd[0])
 
-                    with flaskapp.app_context():
-                        import flask
+                        config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
+                            == region_rcrd[0]).first()
+                        if not config:
+                            config = AFCConfig(cfg_rcrd[0])
+                            config.config['regionStr'] = config.config['regionStr'].upper()
+                            db.session.add(config)
+                        else:
+                            config.config = cfg_rcrd[0]
+                            config.created = datetime.datetime.now()
+                        db.session.commit()
 
-                        dataif = data_if.DataIf(
-                            fsroot=flask.current_app.config['STATE_ROOT_PATH'],
-                            mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
-                        with dataif.open("cfg", regionStr + "/afc_config.json") as hfile:
-                            LOGGER.debug('Opening config file "%s"',
-                                         dataif.rname("cfg", regionStr + "/afc_config.json"))
-                            hfile.write(json.dumps(cfg_rcrd[0]))
                 except Exception as e:
                     LOGGER.error(e)
                     LOGGER.error('Rolling back...')

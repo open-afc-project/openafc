@@ -37,6 +37,41 @@ LOGGER = logging.getLogger(__name__)
 #: All views under this API blueprint
 module = flask.Blueprint('ratapi-v1', 'ratapi')
 
+
+def regionStrToNra(region_str):
+    """ Input: region_str: regionStr field of the afc config.
+        Output: nra
+        nra: can match with the NRA field of the AP, e.g. FCC
+        Eg. 'TESTUSA' => 'TESTFCC'
+        Eg. 'USA' => 'FCC'
+    """
+    map = {
+       'DEFAULT':'FCC',
+       'USA':'FCC',
+       'CANADA':'ISED',
+       'TESTUSA':'TESTFCC',
+       'TESTCANADA':'TESTISED'
+    }
+    region_str = region_str.upper()
+    try:
+        return map[region_str]
+    except:
+        raise werkzeug.exceptions.NotFound('Invalid Region %s' % region_str)
+
+def nraToRegionStr(nra):
+    map = {
+        'FCC':'USA',
+        'TESTFCC':'TESTUSA',
+        'ISED':'CANADA',
+        'TESTISED':'TESTCANADA',
+    }
+    nra = nra.upper()
+    try:
+        return map[nra]
+    except:
+        raise werkzeug.exceptions.NotFound('Invalid NRA %s' % nra)
+
+
 def build_task(dataif,
         request_type,
         task_id, hash, region, history_dir,
@@ -125,7 +160,6 @@ class GuiConfig(MethodView):
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             mtls_admin_url=flask.url_for('admin.MTLS', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
-            afcconfig_trial=flask.url_for('ratapi-v1.TrialAfcConfigFile'),
             version=serververs,
         )
         return resp
@@ -254,156 +288,58 @@ class AfcConfigFile(MethodView):
     ''' Allow the web UI to manipulate configuration directly.
     '''
 
-    ACCEPTABLE_FILES = {
-        'default': dict(
-            alt='fcc',
-            content_type='application/json',
-        ),
-        'fcc': dict(
-            alt='fcc',
-            content_type='application/json',
-        ),
-        'CONUS': dict(
-            alt='fcc',
-            content_type='application/json',
-        ),
-        'USA': dict(
-            alt='fcc',
-            content_type='application/json',
-        ),
-        'Canada': dict(
-            alt='fcc',
-            content_type='application/json',
-        ),
-    }
-
     def get(self, filename):
         ''' GET method for afc config
         '''
+	filename = filename.upper()
         LOGGER.debug('AfcConfigFile.get({})'.format(filename))
-        auth(roles=['AP', 'Analysis', 'Super'])
+        user_id = auth(roles=['AP', 'Analysis', 'Super'])
         # ensure that webdav is populated with default files
         require_default_uls()
 
-        if filename not in self.ACCEPTABLE_FILES:
-            raise werkzeug.exceptions.NotFound()
-        filedesc = self.ACCEPTABLE_FILES[filename]
-
         resp = flask.make_response()
-        dataif = data_if.DataIf(
-            fsroot=flask.current_app.config['STATE_ROOT_PATH'],
-            mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
-        try:
-            with dataif.open("cfg", filedesc['alt'] +"/afc_config.json") as hfile:
-                resp.data = hfile.read()
-        except:
+        config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext == filename).first()
+        if config:
+            resp.data = json.dumps(config.config)
+            resp.content_type = 'application/json'
+            return resp
+        else:
             raise werkzeug.exceptions.NotFound()
-        resp.content_type = filedesc['content_type']
-        return resp
+
 
     def put(self, filename):
         ''' PUT method for afc config
         '''
-        LOGGER.debug('AfcConfigFile.put({})'.format(filename))
         user_id = auth(roles=['Super'])
         LOGGER.debug("current user: %s", user_id)
-        if filename not in self.ACCEPTABLE_FILES:
-            raise werkzeug.exceptions.NotFound()
-        filedesc = self.ACCEPTABLE_FILES[filename]
-        if flask.request.content_type != filedesc['content_type']:
+
+        if flask.request.content_type != 'application/json':
             raise werkzeug.exceptions.UnsupportedMediaType()
 
-        dataif = data_if.DataIf(
-            fsroot=flask.current_app.config['STATE_ROOT_PATH'],
-            mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
-        with dataif.open("cfg", filedesc['alt'] + "/afc_config.json") as hfile:
-            bytes = flask.request.stream.read()
-            rcrd = json.loads(bytes)
-            ordered_bytes = json.dumps(rcrd, sort_keys=True)
-            hfile.write(ordered_bytes)
-            try:
-                filedesc = self.ACCEPTABLE_FILES[rcrd["regionStr"]]
-                config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext == rcrd["regionStr"]).first()
-                if not config:
-                    config = AFCConfig(rcrd)
-                    db.session.add(config)
-                else:
-                    config.config = rcrd
-                    config.created = datetime.datetime.now()
-                db.session.commit()
 
-            except:
-                raise werkzeug.exceptions.NotFound()
+        bytes = flask.request.stream.read()
+        rcrd = json.loads(bytes)
+	filename = rcrd['regionStr'].upper()
+        LOGGER.debug('AfcConfigFile.put({})'.format(filename))
+        # validate the region string
+        regionStrToNra(filename)
+        # make sure the config region string is upper case
+	rcrd['regionStr'] = filename
+        ordered_bytes = json.dumps(rcrd, sort_keys=True)
+        try:
+            config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext == filename).first()
+            if not config:
+                config = AFCConfig(rcrd)
+                db.session.add(config)
+            else:
+                config.config = rcrd
+                config.created = datetime.datetime.now()
+            db.session.commit()
+
+        except:
+            raise werkzeug.exceptions.NotFound()
 
         return flask.make_response('AFC configuration file updated', 204)
-
-
-class TrialAfcConfigFile(MethodView):
-    ''' Allow the web UI to pull the config to be used for Trial users.
-    '''
-
-    def _open(self, rel_path, mode, user=None):
-        ''' Open a configuration file.
-
-        :param rel_path: The specific config name to open.
-        :param mode: The file open mode.
-        :return: The opened file.
-        :rtype: file-like
-        '''
-        if mode == 'wb' and user is not None and not \
-                os.path.exists(os.path.join(flask.current_app.config['NFS_MOUNT_PATH'], 'afc_config', str(user))):
-            # create scoped user directory so people don't clash over each others config
-            os.mkdir(os.path.join(
-                flask.current_app.config['NFS_MOUNT_PATH'], 'afc_config', str(user)))
-
-        config_path = ''
-        if user is not None and os.path.exists(os.path.join(flask.current_app.config['NFS_MOUNT_PATH'], 'afc_config', str(user))):
-            config_path = os.path.join(
-                flask.current_app.config['NFS_MOUNT_PATH'], 'afc_config', str(user))
-        else:
-            config_path = os.path.join(
-                flask.current_app.config['NFS_MOUNT_PATH'], 'afc_config')
-        if not os.path.exists(config_path):
-            os.makedirs(config_path)
-
-        file_path = os.path.join(config_path, rel_path)
-        LOGGER.debug('Opening config file "%s"', file_path)
-        if not os.path.exists(file_path) and mode != 'wb':
-            raise werkzeug.exceptions.NotFound()
-
-        handle = open(file_path, mode)
-
-        if mode == 'wb':
-            os.chmod(file_path, 0o666)
-
-        return handle
-
-    def get(self):
-        ''' GET method for afc config
-        '''
-        filedesc = {
-        'afc_config.json': dict(
-            content_type='application/json',
-        )
-        }
-        LOGGER.debug('getting afc_conf for trial user')
-        user_id = auth(roles=['Trial'])
-        # ensure that webdav is populated with default files
-        require_default_uls()
-
-        ap = aaa.AccessPoint.query.filter_by(
-            serial_number="TestSerialNumber", certification_id="FCC TestCertificationId").first()
-        if ap is not None:
-            LOGGER.debug('getting ap for trial user  %s ', user_id)
-       
-            resp = flask.make_response()
-            with self._open('afc_config.json', 'rb', user_id) as conf_file:
-                resp.data = conf_file.read()
-            resp.content_type = "application/json"
-            return resp
-        else:
-            LOGGER.debug('unable to find AP for trial user')
-            raise werkzeug.exceptions.NotFound()
 
 
 class LiDAR_Bounds(MethodView):
@@ -918,7 +854,6 @@ class DailyULSStatus(MethodView):
 module.add_url_rule('/guiconfig', view_func=GuiConfig.as_view('GuiConfig'))
 module.add_url_rule('/afcconfig/<path:filename>',
                     view_func=AfcConfigFile.as_view('AfcConfigFile'))
-module.add_url_rule('/afcconfig/trial', view_func= TrialAfcConfigFile.as_view('TrialAfcConfigFile'))
 module.add_url_rule('/files/lidar_bounds',
                     view_func=LiDAR_Bounds.as_view('LiDAR_Bounds'))
 module.add_url_rule('/files/ras_bounds', 
