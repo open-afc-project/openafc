@@ -1107,7 +1107,7 @@ def parse_tests(cfg):
         # check if the test case is combined 
         cell = sheet.cell(row = i, column = COMBINED_CLM)
         if cell.value is not None and \
-            cell.value != 'No':
+            cell.value.upper() != 'NO':
             app_log.debug('Value1: %s', cell.value)
             for item in combined_tests[test_case_id]:
                 res_str += tests2combine[item] + ','
