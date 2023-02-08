@@ -41,6 +41,9 @@ services:
       - ratdb
       - rmq
       - objst
+      - als_kafka
+      - als_siphon
+      - als_postgres
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
@@ -73,6 +76,9 @@ services:
       - ratdb
       - rmq
       - objst
+      - als_kafka
+      - als_siphon
+      - als_postgres
 
   objst:
     image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:-latest}
@@ -116,6 +122,9 @@ services:
       - POSTGRES_HOST=als_postgres
       - INIT_IF_EXISTS=drop
       - SIPHON_PROGRESS=true
+    depends_on:
+      - als_kafka
+      - als_postgres
 
   als_postgres:
     image: public.ecr.aws/w9v6y1o0/openafc/als-postgres-image:${TAG:-latest}

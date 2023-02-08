@@ -473,7 +473,8 @@ class Als:
                  (ALS_FIELD_TIME, timetag()),
                  (ALS_FIELD_DATA_TYPE, data_type),
                  (ALS_FIELD_DATA,
-                  data if isinstance(data, str) else json.dumps(data))])
+                  to_str(data) if isinstance(data, (str, bytes))
+                  else json.dumps(data))])
         for k, v in (extra_fields or {}).items():
             json_dict[k] = v
         return to_bytes(json.dumps(json_dict))
