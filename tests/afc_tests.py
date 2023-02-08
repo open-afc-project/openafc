@@ -1006,7 +1006,7 @@ def collect_tests2combine(sh, rows, t_ident, t2cmb, cmb_t):
 
         cell = sh.cell(row = i, column = COMBINED_CLM)
         if cell.value is not None and \
-            cell.value != 'No':
+            cell.value.upper() != 'NO':
             raw_list = str(cell.value)
 
             test_case_id = sh.cell(row = i, column = UNIT_NAME_CLM).value
