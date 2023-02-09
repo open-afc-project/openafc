@@ -4,7 +4,7 @@
 |Version|3.7.1.0|
 | :- | :- |
 |**Date**|**09/02/2023**|
-|compiled server's version is tbd | git tag 3.7.1.0|
+|compiled server's version is 5609349 | git tag 3.7.1.0|
 
 ## **Issues Addressed**
  * OA-561 rel 3.7.1.0
