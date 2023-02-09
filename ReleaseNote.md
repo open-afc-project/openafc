@@ -1,6 +1,24 @@
 # Release Note
 
 ## **Version and Date**
+|Version|3.7.1.0|
+| :- | :- |
+|**Date**|**09/02/2023**|
+|compiled server's version is tbd | git tag 3.7.1.0|
+
+## **Issues Addressed**
+ * OA-561 rel 3.7.1.0
+ * Jira OA-536: Update Feederloss implementation per new agreement b/w WFA and WINNF
+ * Jira OA-539: Make use/not-use of ISED antenna patterns for FS in US configurable
+ * Jira OA-556: Bug fix in calculation of RAS exclusion zone horizon distance
+ * Jira OA-446: Create a parser for Canada's incumbents database (this includes changes required to allow protection of Canadian FS at the border)
+ * Jira OA-275: Integrate actual antenna patterns (from ISED and WinnForum) in AFC (this is implemented as part of OA-446)
+ * Jira OA-533: Check AP's uncertainty region's center lat/long against country (based on rulsetId) boundaries
+ * Jira OA-259: Align with QCOM/Federated to select same 3DEP/NLCD tile when on Boundary. 
+ * Jira OA-535: Correction of FS bandwidth from Emission Designator vs. upper-lower freq not matching
+ 
+
+## **Version and Date**
 |Version|**OA-536**|
 | :- | :- |
 |**Date**|**02/08/2023**|
