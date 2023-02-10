@@ -289,12 +289,6 @@ class RatAfc(MethodView):
         if serial_number is None:
             raise MissingParamException(['serialNumber'])
 
-        if serial_number == "TestSerialNumber":
-            if current_user:
-                return "Trial_" + str(current_user.id)
-            else:
-                raise DeviceUnallowedException()  # InvalidCredentialsException()
-
         ap = AccessPoint.query.filter_by(serial_number=serial_number).first()
 
         if rulesets is None or len(rulesets) != 1 or rulesets[0] != RULESET:
