@@ -337,14 +337,15 @@ def generateUlsScriptInputCA(directory, logFile, genFilename):
     logFile.write('Appending CA data to ' + genFilename + ' as input for uls script' + '\n')
     with open(genFilename, 'a', encoding='utf8') as combined:
         for dataFile in os.listdir(directory):
-            logFile.write('Adding ' + directory + '/' + dataFile + ' to ' + genFilename + '\n')
-            with open(directory +'/' + dataFile, 'r', encoding='utf8') as csvfile:
-                code = dataFile.replace('.csv', '')
-                csvreader = csv.reader(csvfile)
-                for row in csvreader:
-                    for (i,field) in enumerate(row):
-                        row[i] = field.replace('|', ':')
-                    combined.write('CA:' + code + '|' + ('|'.join(row)) + '\n')
+            if dataFile != "AP.csv": # skip antenna pattern file, processed separately
+                logFile.write('Adding ' + directory + '/' + dataFile + ' to ' + genFilename + '\n')
+                with open(directory +'/' + dataFile, 'r', encoding='utf8') as csvfile:
+                    code = dataFile.replace('.csv', '')
+                    csvreader = csv.reader(csvfile)
+                    for row in csvreader:
+                        for (i,field) in enumerate(row):
+                            row[i] = field.replace('|', ':')
+                        combined.write('CA:' + code + '|' + ('|'.join(row)) + '\n')
 
 def daily_uls_parse(state_root, interactive):
     startTime = datetime.datetime.now()
@@ -519,7 +520,7 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = input("Process antenna model files to create antenna_model_list.csv and afc_antenna_patterns.csv? (y/n): ")
+            value = input("Process antenna model files to create antenna_model_list.csv and antennaPatternFile? (y/n): ")
             if value == "y":
                 accepted = True
                 processAntFilesFlag = True
@@ -532,14 +533,34 @@ def daily_uls_parse(state_root, interactive):
         processAntFilesFlag = True
     ###########################################################################
 
+    antennaPatternFileFile = 'afc_antenna_patterns_' + nameTime + '.csv'
+
+    ###########################################################################
+    # If interactive, prompt to set antennaPatternFileFile, note that         #
+    # if processAntFilesFlag is not sete, this file should exist for          #
+    # subsequent processing.                                                  #
+    ###########################################################################
+    if interactive:
+        if not processAntFilesFlag:
+            flist = glob.glob(fullPathTempDir + "/afc_antenna_patterns_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
+            if (len(flist)):
+                antennaPatternFileFile = os.path.basename(flist[-1])
+
+        value = input("Enter Antenna Pattern filename (" + antennaPatternFileFile + "): ")
+        if (value != ""):
+            antennaPatternFileFile = value
+    ###########################################################################
+
+    # output filename from uls-script
+    fullPathAntennaPatternFile = fullPathTempDir + "/" + antennaPatternFileFile
+
     ###########################################################################
     # If processAntFilesFlag set, process data files to create                #
     # antenna_model_list.csv                                                  #
     ###########################################################################
     if processAntFilesFlag:
-        antennaPatternFile = state_root + '/Antenna_Patterns/afc_antenna_patterns.csv'
-        processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag, fullPathTempDir + '/antenna_model_list.csv', antennaPatternFile, logFile)
-        subprocess.call(['cp', antennaPatternFile, fullPathTempDir]) 
+        processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag, fullPathTempDir + '/antenna_model_list.csv', fullPathAntennaPatternFile, logFile)
+        # subprocess.call(['cp', antennaPatternFile, fullPathTempDir]) 
     ###########################################################################
 
     ###########################################################################
@@ -583,6 +604,11 @@ def daily_uls_parse(state_root, interactive):
                 # process the daily files day by day
                 processDailyFiles(weeklyCreation, logFile, regionDataDir, currentWeekday)
 
+                rasDataFileUSSrc =  root + '/data_files/RASdatabase.dat'
+                rasDataFileUSTgt = regionDataDir + '/weekly/RA.dat_withDaily'
+                logFile.write("Copying " + rasDataFileUSSrc + ' to ' + rasDataFileUSTgt + '\n')
+                subprocess.call(['cp', rasDataFileUSSrc, rasDataFileUSTgt]) 
+
                 # generate the combined csv/txt file for the coalition uls processor 
                 generateUlsScriptInputUS(regionDataDir + '/weekly', logFile, fullPathCoalitionScriptInput) 
             elif region == 'CA':
@@ -612,7 +638,8 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
 
     os.chdir(root) # change back to root of this script
-    coalitionScriptOutputFilename = 'FS_' + nameTime + '.csv'
+    coalitionScriptOutputFSFilename = 'FS_' + nameTime + '.csv'
+    coalitionScriptOutputRASFilename = 'RAS_' + nameTime + '.csv'
 
     ###########################################################################
     # If interactive, prompt to set output file from ULS Processor, note that #
@@ -623,15 +650,23 @@ def daily_uls_parse(state_root, interactive):
         if not runULSProcessorFlag:
             flist = glob.glob(fullPathTempDir + "/FS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
             if (len(flist)):
-                coalitionScriptOutputFilename = os.path.basename(flist[-1])
+                coalitionScriptOutputFSFilename = os.path.basename(flist[-1])
+            flist = glob.glob(fullPathTempDir + "/RAS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
+            if (len(flist)):
+                coalitionScriptOutputRASFilename = os.path.basename(flist[-1])
 
-        value = input("Enter ULS Processor output filename (" + coalitionScriptOutputFilename + "): ")
+        value = input("Enter ULS Processor output FS filename (" + coalitionScriptOutputFSFilename + "): ")
         if (value != ""):
-            coalitionScriptOutputFilename = value
+            coalitionScriptOutputFSFilename = value
+
+        value = input("Enter ULS Processor output RAS filename (" + coalitionScriptOutputRASFilename + "): ")
+        if (value != ""):
+            coalitionScriptOutputRASFilename = value
     ###########################################################################
 
     # output filename from uls-script
-    fullPathCoalitionScriptOutput = fullPathTempDir + "/" + coalitionScriptOutputFilename
+    fullPathCoalitionScriptOutput = fullPathTempDir + "/" + coalitionScriptOutputFSFilename
+    fullPathRASDabataseFile = fullPathTempDir + "/" + coalitionScriptOutputRASFilename
 
     ###########################################################################
     # If runULSProcessorFlag set, run ULS processor                           #
@@ -648,6 +683,7 @@ def daily_uls_parse(state_root, interactive):
         try:
             subprocess.call(['./uls-script', root + temp + '/combined.txt', \
                                              fullPathCoalitionScriptOutput, \
+                                             fullPathRASDabataseFile, \
                                              root + temp + '/antenna_model_list.csv', \
                                              root + '/antenna_model_map.csv', \
                                              root + temp + '/fcc_fixed_service_channelization.csv', \
@@ -779,7 +815,7 @@ def daily_uls_parse(state_root, interactive):
     # If runConvertULSFlag set, run convertULS                                #
     ###########################################################################
     if runConvertULSFlag:
-        convertULS(paramOutput, state_root, logFile, outputSQL)
+        convertULS(paramOutput, fullPathRASDabataseFile, fullPathAntennaPatternFile, state_root, logFile, outputSQL)
     ###########################################################################
     
     finishTime = datetime.datetime.now()

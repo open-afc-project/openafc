@@ -10,11 +10,26 @@
 #include "lininterp.h"
 
 /******************************************************************************************/
-/**** CONSTRUCTOR: LinInterpClass::LinInterpClass                                            ****/
+/**** CONSTRUCTOR: LinInterpClass::LinInterpClass                                      ****/
 /******************************************************************************************/
 LinInterpClass::LinInterpClass(ListClass<DblDblClass> *dataList, double xshift, double yshift)
 {
 	n = dataList->getSize();
+
+	a = DVECTOR(n-1);
+	b = DVECTOR(n-1);
+	x = DVECTOR(n);
+
+	makelininterpcoeffs(dataList, xshift, yshift);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** CONSTRUCTOR: LinInterpClass::LinInterpClass                                      ****/
+/******************************************************************************************/
+LinInterpClass::LinInterpClass(std::vector< std::tuple<double, double> > dataList, double xshift, double yshift)
+{
+	n = dataList.size();
 
 	a = DVECTOR(n-1);
 	b = DVECTOR(n-1);
@@ -61,6 +76,36 @@ int LinInterpClass::makelininterpcoeffs(ListClass<DblDblClass> *dataList, double
 
 	return(1);
 }
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: LinInterpClass::makelininterpcoeffs                                    ****/
+/**** Return value: 1 if successfull, 0 if not successful                              ****/
+/******************************************************************************************/
+int LinInterpClass::makelininterpcoeffs(std::vector<std::tuple<double, double>> dataList, double xshift, double yshift)
+{
+	int i;
+	double x0, x1, y0, y1;
+
+	x0 = std::get<0>(dataList[0]) + xshift;
+	y0 = std::get<1>(dataList[0]) + yshift;
+	x[0] = x0;
+	for(i=1; i<=(int) dataList.size()-1; i++) {
+		x1 = std::get<0>(dataList[i]) + xshift;
+		y1 = std::get<1>(dataList[i]) + yshift;
+		x[i] = x1;
+
+		a[i-1] = y0;
+		b[i-1] = (y1-y0)/(x1-x0);
+
+		x0=x1;
+		y0=y1;
+	}
+
+	return(1);
+}
+/******************************************************************************************/
+
 /******************************************************************************************/
 /**** FUNCTION: LinInterpClass::lininterpval                                           ****/
 /**** this evaluates the linear interpolation curve as defined by the last call to     ****/

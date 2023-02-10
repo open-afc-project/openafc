@@ -13,6 +13,8 @@
 #include <rkfsql/SqlScopedConnection.h>
 #include <rkfsql/SqlExceptionDb.h>
 
+#include "ras.h"
+#include "antenna.h"
 #include "cconst.h"
 
 const int maxNumPR = 3;
@@ -55,7 +57,8 @@ struct UlsRecord
 
 	std::string status;
 	bool mobile;
-	std::string rxAntennaModel;
+	std::string rxAntennaModelName;
+	AntennaClass *rxAntenna;
 	int numPR;
 	std::vector<double> prLatitudeDeg;
 	std::vector<double> prLongitudeDeg;
@@ -68,7 +71,8 @@ struct UlsRecord
 	std::vector<double> prRxGain;
 	std::vector<double> prRxAntennaDiameter;
 	std::vector<CConst::AntennaCategoryEnum> prAntCategory;
-	std::vector<std::string> prAntModel;
+	std::vector<std::string> prAntModelName;
+	std::vector<AntennaClass *> prAntenna;
 
 	std::vector<double> prReflectorHeight;
 	std::vector<double> prReflectorWidth;
@@ -84,28 +88,31 @@ public:
 	void nullInitialize();
 
 	// Loads all FS within lat/lon bounds
-	void loadUlsData(const QString& dbName, std::vector<UlsRecord>& target,
+	void loadUlsData(const QString& dbName, std::vector<RASClass *>& rasList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target,
 	                 const double& minLat=-90, const double& maxLat=90, const double& minLon=-180, const double& maxLon=180);
 
 	// Loads a single FS by looking up its Id
-	void loadFSById(const QString& dbName, std::vector<UlsRecord>& target, const int& fsid);
-	UlsRecord getFSById(const QString& dbName, const int& fsid)
+	void loadFSById(const QString& dbName, std::vector<RASClass *>& rasList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target, const int& fsid);
+	UlsRecord getFSById(const QString& dbName, std::vector<RASClass *>& rasList, std::vector<AntennaClass *>& antennaList, const int& fsid)
 	{
 		// list of size 1
 		auto list = std::vector<UlsRecord>();
-		loadFSById(dbName, list, fsid);
+		loadFSById(dbName, rasList, antennaList, list, fsid);
 		if (list.size() != 1)
 			throw std::runtime_error("FS not found");
 		return list.at(0);
 	};
 
-	void fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vector<UlsRecord>& target, QSqlQuery& ulsQueryRes);
+	void fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vector<RASClass *>& rasList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target, QSqlQuery& ulsQueryRes);
+
+	AntennaClass *createAntennaPattern(SqlScopedConnection<SqlExceptionDb>& db, int rxAntennaIdxDB, std::vector<double> antennaAOBList, std::string antennaName);
 
 	QStringList columns;
-	std::vector<int *> fieldIdxList;
-
 	QStringList prColumns;
-	std::vector<int *> prFieldIdxList;
+	QStringList rasColumns;
+	QStringList antnameColumns;
+	QStringList antaobColumns;
+	QStringList antgainColumns;
 
 	int fsidIdx;
 	int regionIdx;
@@ -139,7 +146,8 @@ public:
 	int rx_antennaCategoryIdx;
 	int statusIdx;
 	int mobileIdx;
-	int rx_ant_modelIdx;
+	int rx_ant_modelNameIdx;
+	int rx_ant_model_idxIdx;
 	int p_rp_numIdx;
 
 	int rx_diversity_height_to_center_raat_mIdx;
@@ -158,10 +166,39 @@ public:
 	int prRxGainIdx;
 	int prRxDiameterIdx;
 	int prAntCategoryIdx;
-	int prAntModelIdx;
+	int prAntModelNameIdx;
+	int pr_ant_model_idxIdx;
 	int prReflectorHeightIdx;
 	int prReflectorWidthIdx;
 
+    int antname_ant_idxIdx;
+    int antname_ant_nameIdx;
+
+    int antaob_aob_idxIdx;
+    int antaob_aob_degIdx;
+
+    int antgain_idIdx;
+    int antgain_gainIdx;
+
+    int ras_rasidIdx;
+    int ras_regionIdx;
+    int ras_nameIdx;
+    int ras_locationIdx;
+    int ras_startFreqMHzIdx;
+    int ras_stopFreqMHzIdx;
+    int ras_exclusionZoneIdx;
+    int ras_rect1lat1Idx;
+    int ras_rect1lat2Idx;
+    int ras_rect1lon1Idx;
+    int ras_rect1lon2Idx;
+    int ras_rect2lat1Idx;
+    int ras_rect2lat2Idx;
+    int ras_rect2lon1Idx;
+    int ras_rect2lon2Idx;
+    int ras_radiusKmIdx;
+    int ras_centerLatIdx;
+    int ras_centerLonIdx;
+    int ras_heightAGLIdx;
 };
 
 #endif /* AFCENGINE_ULS_DATABASE_H */
