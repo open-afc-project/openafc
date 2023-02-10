@@ -119,6 +119,8 @@ UlsFileReader::UlsFileReader(const char *fpath, FILE *fwarn, bool alignFederated
                     readIndividualControlPointUS(fieldList);
                 } else if (front == "US:SG") {
                     readIndividualSegmentUS(fieldList);
+                } else if (front == "US:RA") {
+                    readIndividualRASUS(fieldList);
                 /******************************************************************/
 
                 /******************************************************************/
@@ -966,11 +968,87 @@ void UlsFileReader::readIndividualSegmentUS(const std::vector<std::string> &fiel
 /**************************************************************************/
 
 /**************************************************************************/
+/* UlsFileReader::readIndividualRASUS()                                   */
+/**************************************************************************/
+void UlsFileReader::readIndividualRASUS(const std::vector<std::string> &fieldList)
+{
+    RASClass current;
+
+    for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
+        std::string field = fieldList[fieldIdx];
+
+        switch (fieldIdx) {
+            case 1:
+                current.name = field;
+                break;
+            case 2:
+                current.location = field;
+                break;
+            case 3:
+                current.startFreqMHz = emptyAtof(field.c_str());
+                break;
+            case 4:
+                current.stopFreqMHz = emptyAtof(field.c_str());
+                break;
+            case 5:
+                current.exclusionZone = field;
+                break;
+            case 6:
+                current.rect1lat1 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
+                break;
+            case 7:
+                current.rect1lat2 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
+                break;
+            case 8:
+                current.rect1lon1 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
+                break;
+            case 9:
+                current.rect1lon2 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
+                break;
+            case 10:
+                current.rect2lat1 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
+                break;
+            case 11:
+                current.rect2lat2 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
+                break;
+            case 12:
+                current.rect2lon1 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
+                break;
+            case 13:
+                current.rect2lon2 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
+                break;
+
+            case 14:
+                current.radiusKm = emptyAtof(field.c_str());
+                break;
+            case 15:
+                current.centerLat = emptyAtof(field.c_str());
+                break;
+            case 16:
+                current.centerLon = emptyAtof(field.c_str());
+                break;
+            case 17:
+                current.heightAGL = emptyAtof(field.c_str());
+                break;
+        }
+    }
+
+    current.region = "US";
+
+    RASList << current;
+
+    return;
+}
+/**************************************************************************/
+
+/**************************************************************************/
 /* UlsFileReader::readStationDataCA()                                     */
 /**************************************************************************/
 void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList, FILE *fwarn, bool alignFederatedFlag, double alignFederatedScale)
 {
     StationDataCAClass current;
+
+    std::string linceseeName;
 
     for(int fieldIdx=0; fieldIdx<(int) fieldList.size(); ++fieldIdx) {
         std::string field = fieldList[fieldIdx];
@@ -984,6 +1062,9 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
                 break;
             case 3:
                 current.authorizationNumber = field;
+                break;
+            case 4:
+                linceseeName = field;
                 break;
             case 6:
                 current.callsign = field;
@@ -1071,8 +1152,32 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
         current.antennaModel = antennaModel;
     }
 
-    allStations << current;
-    stationMap[current.authorizationNumber.c_str()] << current;
+    if (current.service == 9) {
+        RASClass ras;
+        ras.region = "CA";
+        ras.name = linceseeName;
+        ras.location = current.stationLocation;
+        ras.startFreqMHz = current.centerFreqMHz - current.bandwidthMHz/2;
+        ras.stopFreqMHz = current.centerFreqMHz + current.bandwidthMHz/2;
+        ras.exclusionZone = "Horizon Distance";
+        ras.rect1lat1 = std::numeric_limits<double>::quiet_NaN();
+        ras.rect1lat2 = std::numeric_limits<double>::quiet_NaN();
+        ras.rect1lon1 = std::numeric_limits<double>::quiet_NaN();
+        ras.rect1lon2 = std::numeric_limits<double>::quiet_NaN();
+        ras.rect2lat1 = std::numeric_limits<double>::quiet_NaN();
+        ras.rect2lat2 = std::numeric_limits<double>::quiet_NaN();
+        ras.rect2lon1 = std::numeric_limits<double>::quiet_NaN();
+        ras.rect2lon2 = std::numeric_limits<double>::quiet_NaN();
+        ras.radiusKm = std::numeric_limits<double>::quiet_NaN();
+        ras.centerLat = current.latitudeDeg;
+        ras.centerLon = current.longitudeDeg;
+        ras.heightAGL = current.antennaHeightAGL;
+        RASList << ras;
+    } else {
+        allStations << current;
+        stationMap[current.authorizationNumber.c_str()] << current;
+    }
+
     return;
 }
 /**************************************************************************/

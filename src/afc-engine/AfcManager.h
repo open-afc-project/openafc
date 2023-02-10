@@ -164,7 +164,6 @@ class AfcManager
 
 		void clearData();
 		void clearULSList();
-		void clearRASList();
 
 		void readPopulationGrid();  // Reads the population density
 		void readULSData(const std::vector<std::tuple<std::string, std::string>>& ulsDatabaseList, PopGridClass *popGrid, int linkDirection,
@@ -450,7 +449,6 @@ class AfcManager
 
 		bool _filterSimRegionOnly;              // Filter ULS file only for in/out of simulation region
 
-		std::string _ulsAntennaPatternFile;     // File containing ULS antenna patterns as a function of angle off boresight;
 		CConst::ULSAntennaTypeEnum _ulsDefaultAntennaType; // Default ULS antenna type to use when antenna pattern is not otherwise specified.
 
 		// std::string _rlanBWStr;                 // Comma separated list of RLAN bandwidths (Hz), "b0,b1,b2"
@@ -481,11 +479,11 @@ class AfcManager
 
 		ListClass<ULSClass *> *_ulsList;         // List of the FS stations that are being used in the analysis
 
-		ListClass<RASClass *> *_rasList;         // List of the RAS (Radio Astronomy Stations) that each have exclusion zone.
+		std::vector<RASClass *> _rasList;         // List of the RAS (Radio Astronomy Stations) that each have exclusion zone.
 
 		std::shared_ptr<CachedGdal<uint8_t>> cgNlcd; // NLCD data accessor
 
-		std::vector<AntennaClass *> _ulsAntennaList;
+		std::vector<AntennaClass *> _antennaList;
 
 		CConst::PathLossModelEnum _pathLossModel;
 

@@ -56,6 +56,8 @@ public:
 	double rxDlambda;
 	CConst::AntennaCategoryEnum antCategory;
 	std::string antModel;
+	CConst::ULSAntennaTypeEnum antennaType;
+	AntennaClass *antenna;
 
 	double reflectorHeightLambda;
 	double reflectorWidthLambda;
