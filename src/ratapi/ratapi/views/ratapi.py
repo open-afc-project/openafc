@@ -293,7 +293,7 @@ class AfcConfigFile(MethodView):
     def get(self, filename):
         ''' GET method for afc config
         '''
-	filename = filename.upper()
+        filename = filename.upper()
         LOGGER.debug('AfcConfigFile.get({})'.format(filename))
         user_id = auth(roles=['AP', 'Analysis', 'Super'])
         # ensure that webdav is populated with default files
@@ -321,12 +321,12 @@ class AfcConfigFile(MethodView):
 
         bytes = flask.request.stream.read()
         rcrd = json.loads(bytes)
-	filename = rcrd['regionStr'].upper()
+        filename = rcrd['regionStr'].upper()
         LOGGER.debug('AfcConfigFile.put({})'.format(filename))
         # validate the region string
         regionStrToNra(filename)
         # make sure the config region string is upper case
-	rcrd['regionStr'] = filename
+        rcrd['regionStr'] = filename
         ordered_bytes = json.dumps(rcrd, sort_keys=True)
         try:
             config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext == filename).first()
