@@ -17,10 +17,8 @@ COPY requirements.txt /usr/app/
 RUN /usr/local/bin/python3 -m pip install --upgrade pip
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-COPY als_siphon.py /usr/app
-COPY ALS.sql /usr/app
-
 ENV PYTHONPATH=/usr/app
+ENV PATH=$PATH:/usr/app
 
 # Comma-separated list of Kafka (bootstrap) servers, each having 'host[:port]'
 # form. Port, if not specified, is 9092
@@ -64,6 +62,10 @@ ENV INIT_IF_EXISTS=skip
 # True/yes/1/+ to print siphon progress/heartbeat information to stdout,
 # False/no/0/- to not to. Default is not to print
 ENV SIPHON_PROGRESS=false
+
+COPY als_siphon.py /usr/app
+COPY ALS.sql /usr/app
+COPY als_query.py /usr/app
 
 ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_servers=$KAFKA_SERVERS \
