@@ -19,7 +19,7 @@ import sqlalchemy as sa
 import sqlalchemy.dialects.postgresql as sa_pg
 import subprocess
 import sys
-from typing import Any, List, Optional, Set
+from typing import Any, List, NamedTuple, Optional, Set
 
 try:
     import geoalchemy2 as ga                        # type: ignore
@@ -33,6 +33,32 @@ DEFAULT_PORT = 5432
 
 ALS_DB = "ALS"
 LOG_DB = "AFC_LOGS"
+
+# Environment variables holding parts of database connection string
+DbEnv = \
+    NamedTuple(
+        "DbEnv",
+        [
+         # Host name
+         ("host", str),
+         # Port
+         ("port", str),
+         # Username
+         ("user", str),
+         # Password
+         ("password", str),
+         # Options
+         ("options", str)])
+
+# Environment variable names for ALS and JSON log databases' connection strings
+DB_ENVS = {ALS_DB:
+           DbEnv(host="POSTGRES_HOST", port="POSTGRES_PORT",
+                 user="POSTGRES_ALS_USER", password="POSTGRES_ALS_PASSWORD",
+                 options="POSTGRES_ALS_OPTIONS"),
+           LOG_DB:
+           DbEnv(host="POSTGRES_HOST", port="POSTGRES_PORT",
+                 user="POSTGRES_LOG_USER", password="POSTGRES_LOG_PASSWORD",
+                 options="POSTGRES_LOG_OPTIONS")}
 
 
 def error(msg: str) -> None:
@@ -57,42 +83,56 @@ class DbConn:
     metadata -- Database metadata
     conn     -- Database connection
     """
-    def __init__(self, conn_str: str, password: Optional[str], db_name: str) \
-            -> None:
+    def __init__(self, conn_str: Optional[str], password: Optional[str],
+                 db_name: str) -> None:
         """ Constructor
 
         Arguments:
-        conn_str -- Abbreviated conneftion string, as specified in command line
+        conn_str -- Abbreviated conneftion string, as specified in command
+                    line. None means take from environment variable
         password -- Optional password
         db_name  -- Database name
         """
         self.db_name = db_name
 
-        m = re.match(
-            r"^(?P<user>[^ :\?]+@)?"
-            r"(?P<cont>\^)?(?P<host>[^ :?]+)"
-            r"(:(?P<port>\d+))?"
-            r"(?P<options>\?.+)?$",
-            conn_str)
-        error_if(not m, f"Server string '{conn_str}' has invalid format")
-        assert m is not None
+        if conn_str:
+            m = re.match(
+                r"^(?P<user>[^ :\?]+@)?"
+                r"(?P<cont>\^)?(?P<host>[^ :?]+)"
+                r"(:(?P<port>\d+))?"
+                r"(?P<options>\?.+)?$",
+                conn_str)
+            error_if(not m, f"Server string '{conn_str}' has invalid format")
+            assert m is not None
 
-        user = m.group("user") or DEFAULT_USER
-        host = m.group("host")
-        port = m.group("port") or str(DEFAULT_PORT)
-        options = m.group("options") or ""
-        if m.group("cont"):
-            try:
-                insp_str = subprocess.check_output(["docker", "inspect", host])
-            except (OSError, subprocess.CalledProcessError) as ex:
-                error(f"Failed to inspect container '{host}': {ex}")
-            insp = json.loads(insp_str)
-            try:
-                networks = insp[0]["NetworkSettings"]["Networks"]
-                host = networks[list(networks.keys())[0]]["IPAddress"]
-            except (LookupError, TypeError, ValueError) as ex:
-                error(f"Failed to find server IP address in container "
-                      f"inspection: {ex}")
+            user = m.group("user") or DEFAULT_USER
+            host = m.group("host")
+            port = m.group("port") or str(DEFAULT_PORT)
+            options = m.group("options") or ""
+            if m.group("cont"):
+                try:
+                    insp_str = \
+                        subprocess.check_output(["docker", "inspect", host])
+                except (OSError, subprocess.CalledProcessError) as ex:
+                    error(f"Failed to inspect container '{host}': {ex}")
+                insp = json.loads(insp_str)
+                try:
+                    networks = insp[0]["NetworkSettings"]["Networks"]
+                    host = networks[list(networks.keys())[0]]["IPAddress"]
+                except (LookupError, TypeError, ValueError) as ex:
+                    error(f"Failed to find server IP address in container "
+                          f"inspection: {ex}")
+        else:
+            db_env = DB_ENVS[db_name]
+            error_if(db_env.host not in os.environ,
+                     f"PostgreSQL server neither specified explicitly (via "
+                     f"--server parameter) nor via environment (via "
+                     f"'{db_env.host}' variable and related ones)")
+            host = os.environ[db_env.host]
+            port = os.environ.get(db_env.port, str(DEFAULT_PORT))
+            user = os.environ.get(db_env.user, str(DEFAULT_USER))
+            options = os.environ.get(db_env.options, "")
+            password = password or os.environ.get(db_env.password)
         try:
             full_conn_str = \
                 f"postgresql+psycopg2://{user}" \
@@ -143,7 +183,7 @@ def do_log(args: Any) -> None:
             table_sources = \
                 db_conn.conn.execute(
                     sa.text(f'SELECT DISTINCT source FROM "{topic}"')).\
-                    fetchall()
+                fetchall()
             sources |= {s[0] for s in table_sources}
         for source in sorted(sources):
             print(source)
@@ -201,7 +241,6 @@ def main(argv: List[str]) -> None:
     switches_server = argparse.ArgumentParser(add_help=False)
     switches_server.add_argument(
         "--server", "-s", metavar="[user@]{host|^container}[:port][?options]",
-        required=True,
         help=f"PostgreSQL server connection information. Host part may be a "
         f"hostname, IP address, or container name or ID, preceded by '^' "
         f"(specifying container name would not work if script runs inside the "
@@ -209,10 +248,15 @@ def main(argv: List[str]) -> None:
         f"{DEFAULT_PORT}. Options may specify various (e.g. SSL-related) "
         f"parameters (see "
         f"https://www.postgresql.org/docs/current/libpq-connect.html"
-        f"#LIBPQ-CONNSTRING for details). This parameter is mandatory")
+        f"#LIBPQ-CONNSTRING for details). If omitted, script tries to use "
+        f"data from POSTGRES_HOST, POSTGRES_PORT, POSTGRES_LOG_USER, "
+        f"POSTGRES_LOG_OPTIONS, POSTGRES_ALS_USER, POSTGRES_ALS_OPTIONS "
+        f"environment variables")
     switches_server.add_argument(
         "--password", metavar="PASSWORD",
-        help="Postgres connection password (if required)")
+        help="Postgres connection password (if required). If omitted and "
+        "--server not specified then values from POSTGRES_LOG_PASSWORD and "
+        "POSTGRES_ALS_PASSWORD environment variables are used")
 
     # Top level parser
     argument_parser = argparse.ArgumentParser(

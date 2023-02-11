@@ -43,19 +43,23 @@ ENV KAFKA_SSL_CHECK_HOSTNAME=True
 ENV POSTGRES_HOST=localhost
 # PostgreSQL server port
 ENV POSTGRES_PORT=5432
-# Parameters (name, user, password) of initial database - database to connect
-# to to create other databases
+# Parameters (name, user, password, options) of initial database - database to
+# connect to to create other databases
 ENV POSTGRES_INIT_DB=postgres
 ENV POSTGRES_INIT_USER=postgres
 ENV POSTGRES_INIT_PASSWORD=postgres
-# Parameters (name, user, password) of database for Request/Response/Config logs
+ENV POSTGRES_INIT_OPTIONS=
+# Parameters (name, user, password, options) of database for
+# Request/Response/Config logs
 ENV POSTGRES_ALS_DB=ALS
 ENV POSTGRES_ALS_USER=postgres
 ENV POSTGRES_ALS_PASSWORD=postgres
-# Parameters (name, user, password) of database for JSON logs
+ENV POSTGRES_ALS_OPTIONS=
+# Parameters (name, user, password, options) of database for JSON logs
 ENV POSTGRES_LOG_DB=AFC_LOGS
 ENV POSTGRES_LOG_USER=postgres
 ENV POSTGRES_LOG_PASSWORD=postgres
+ENV POSTGRES_LOG_OPTIONS=
 # What to do if database being created already exists: 'skip', 'drop'. Default
 # is to fail
 ENV INIT_IF_EXISTS=skip
@@ -76,12 +80,12 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_ssl_cafile=$KAFKA_SSL_CAFILE \
     --kafka_ssl_certfile=$KAFKA_SSL_CERTFILE \
     --kafka_ssl_crlfile=$KAFKA_SSL_CRLFILE \
-    --init_postgres=postgresql://${POSTGRES_INIT_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_INIT_DB} \
+    --init_postgres=postgresql://${POSTGRES_INIT_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_INIT_DB}${POSTGRES_INIT_OPTIONS} \
     --init_postgres_password=$POSTGRES_INIT_PASSWORD \
     --if_exists=$INIT_IF_EXISTS \
-    --als_postgres=postgresql://${POSTGRES_ALS_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_ALS_DB} \
+    --als_postgres=postgresql://${POSTGRES_ALS_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_ALS_DB}${POSTGRES_ALS_OPTIONS} \
     --als_postgres_password=$POSTGRES_ALS_PASSWORD \
-    --log_postgres=postgresql://${POSTGRES_LOG_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_LOG_DB} \
+    --log_postgres=postgresql://${POSTGRES_LOG_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_LOG_DB}${POSTGRES_LOG_OPTIONS} \
     --log_postgres_password=$POSTGRES_LOG_PASSWORD \
     --progress=$SIPHON_PROGRESS \
     --if_exists=$INIT_IF_EXISTS \

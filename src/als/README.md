@@ -6,18 +6,17 @@ License, a copy of which is included with this software program.
 # Tools For Working With Log Databases
 
 ## Table of Contents
-- [Tools For Working With Log Databases](#tools-for-working-with-log-databases)
-  - [Table of Contents](#table-of-contents)
-  - [Databases ](#databases-)
-    - [*ALS* Database ](#als-database-)
-    - [*AFC\_LOGS* Database ](#afc_logs-database-)
-    - [Initial Database ](#initial-database-)
-    - [Template Databases ](#template-databases-)
-  - [`als_siphon.py` - Moving Logs From Kafka To Postgres ](#als_siphonpy---moving-logs-from-kafka-to-postgres-)
-  - [`als_query.py` - Querying Logs From Postgres Database ](#als_querypy---querying-logs-from-postgres-database-)
-    - [Installing and running ](#installing-and-running-)
-    - [`log` Command ](#log-command-)
-      - [`log` Command Examples ](#log-command-examples-)
+- [Databases ](#databases)
+  - [*ALS* Database ](#als_database)
+  - [*AFC\_LOGS* Database ](#afc_logs_database)
+  - [Initial Database ](#initial_database)
+  - [Template Databases ](#template_databases)
+- [`als_siphon.py` - Moving Logs From Kafka To Postgres ](#als_siphon_py)
+- [`als_query.py` - Querying Logs From Postgres Database ](#als_query_py)
+  - [Installation](#als_query_install)
+  - [Addressing PostgreSQL](#als_query_server)
+  - [`log` Command ](#als_query_log)
+    - [`log` Command Examples ](#als_query_log_examples)
 
 
 ## Databases <a name="databases">
@@ -88,7 +87,7 @@ This script queries logs, stored in *ALS* and *AFC_LOGS* databases.
 As of time of this writing this script only supports `log` command that reads JSON logs from *AFC_LOGS*
 
 
-### Installing and running <a name="als_query_deploy">
+### Installation <a name="als_query_install">
 
 `als_query.py` requires Python 3 with reasonably recent *sqlalchemy*, *psycopg2*, *geoalchemy2* modules installed (latter is optional - not required for e.g. `log` command). 
 
@@ -98,12 +97,19 @@ Proper installation of these modules requires too much luck to be described here
 
 Here `SIPHON_CONTAINER` is either value from first column of `docker ps` or from last column of `docker-compose ps`.
 
-Another tricky aspect is how to access PostgreSQL database server where logs were placed (`--server` switch of `als_query.py`). Here are following possible cases:
+### Addressing PostgreSQL Server <a name="als_query_server">
+
+Another important aspect is how to access PostgreSQL database server where logs were placed.
+
+#### Explicit specification
+
+Using `--server` (aka `-s`) and `--password` parameters of `als_query.py` command line). Here are most probable cases:
 
 1. `als_query.py` runs inside `als_siphon.py` container, PostgreSQL runs inside the container, named `als_postgres` in *docker-compose.yaml* (that's how it is named as of time of this writing):  
   `$ docker exec SIPHON_CONTAINER als_query.py CMD \ `  
   `--server [USER@]als_postrgres[:PORT][?OPTIONS] [--password PASSWORD] ...`  
-  Here `USER` or `PORT` might be omitted if they are `postgres` and `5432` respectively. `--password PASSWORD` and `OPTIONS` are optional.
+  Here `USER` or `PORT` might be omitted if they are `postgres` and `5432` respectively. `--password PASSWORD` and `OPTIONS` are optional.   
+  Actually, in this case `--server` and `--password` may be omitted - see below on the use of environment variables.
 
 2. User/host/port of PostgreSQL server is known:  
   `$ [docker exec SIPHON_CONTAINER] als_query CMD \ `  
@@ -116,6 +122,20 @@ Another tricky aspect is how to access PostgreSQL database server where logs wer
   Note the `***^***` before `POSTGRES_CONTAINER`. Here, again `POSTGRES_CONTAINER` is either value from first column of `docker ps` or from last column of `docker-compose ps` for container running PostgreSQL
 
 I expect #1 to be the common case for development environment, #2 - for deployment environment, #3 - for illustrations (for sake of brevity) or for some lucky conditions.
+
+#### Environment variables
+
+If `--server` parameter not specified `als_query.py` attempts to use environment variables:
+
+- `POSTGRES_LOG_USER`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_LOG_PASSWORD` for accessing *AFC_LOGS* database
+- `POSTGRES_ALS_USER`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_ALS_PASSWORD` for accessing *ALS* database
+
+These environment variables are passed to container with `als_siphon.py`, so they are quite natural choice when running `als_query` from there (case #1 above). 
+
+Hence for case #1 `als_query.py` command line would actually look like this:  
+`$ docker exec SIPHON_CONTAINER als_query.py CMD ...`  
+Where `...` does not contain `--server`
+
 
 ### `log` Command <a name="als_query_log">
 
@@ -158,34 +178,37 @@ Suppose that:
 }
 ```
 
-- For sake command line brevity suppose that `als_query.py` runs in the wild (not from container) and PostgreSQL is in `als_postgres_1` container (see [Installing and running](#als_query_deploy) case #1 for more realistic scenario).
+- `als_query.py` runs in `regression_als_siphon_1` container (YMMV - see output of `docker-compose ps`). In this case there is no need to pass `--server` parameter, as it will be taken from environment variables.
 
 Now, here are some possible actions:
 
 - List all topics:  
-  `$ als_query.py -s ^als_postgres_1 --topics`
+  `$ docker exec regression_als_siphon_1 als_query.py log --topics`  
+  Note that there is no `--server` parameter here, as `als_query.py` would values, passed over environment variables.
 
 - Print content of *foo* topic (table) in its entirety, using CSV format:  
-  `$ als_query.py -s ^als_postgres_1 "* from foo"`
+  `$ docker exec regression_als_siphon_1 als_query.py log "* from foo"`  
+  This invokes `SELECT * from foo;` on *AFC_LOGS* database of PostgreSQL server.
 
 - Print key names of JSONs of topic *foo*:  
-  `$ als_query.py -s ^als_postgres_1 json_object_keys(log) from foo`  
+  `$ docker exec regression_als_siphon_1 als_query.py log \ `  
+  `json_object_keys(log) from foo`  
   Note that quotes may be omitted here, as there are no special symbols in select statement.
 
 - From topic *foo* print values of *c.d* for all records, using bare (unadorned) format:   
-  `$ als_query.py -s ^als_postgres_1 -f bare "log->'c'->'d' from foo"`  
+  `$ docker exec regression_als_siphon_1 als_query.py log \ `  
+  `-f bare "log->'c'->'d' from foo"`  
   Note the quotes around field names
 
 - From topic *foo* print only values of *b[0]* for all records where *a* field equals *179*:  
-  `$ als_query.py -s ^als_postgres_1 "log->'b'->0 from foo \ `  
-  `where log->'a' = 179"`  
+  `$ docker exec regression_als_siphon_1 als_query.py log \ `  
+  `"log->'b'->0 from foo where log->'a' = 179"`  
   Note the way list indexing is performed (`->0`).
 
 - Print maximum value of column *a* in topic *foo*:  
-  `$ als_query.py -s ^als_postgres_1 "MAX(log->'a') from foo"`  
+  `$ docker exec regression_als_siphon_1 als_query.py log "MAX(log->'a') from foo"`  
 
 - Print log records in given time range:  
-  `$ als_query.py -s ^als_postgres_1 "* from foo " \ `  
-  `"where time > '2023-02-08 23:25:54.484174+00:00'" \ `  
-   `"and time < '2023-02-08 23:28:54.484174+00:00'"`
-
+  `$ docker exec regression_als_siphon_1 als_query.py log \ `  
+  `"* from foo where time > '2023-02-08 23:25:54.484174+00:00'" \ `  
+  `"and time < '2023-02-08 23:28:54.484174+00:00'"`
