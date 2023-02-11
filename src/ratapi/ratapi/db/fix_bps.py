@@ -48,8 +48,8 @@ def getEmdegBW(emdeg):
     bandwidth = float(ba)*scale
     return bandwidth
 
-def fixBPS(inputPath, outputPath): 
-    with open('modcod_bps.csv', 'r') as f:
+def fixBPS(inputPath, modcodFile, outputPath): 
+    with open(modcodFile, 'r') as f:
         for ln in f:
             lns = ln.strip().split(',')
             mc = lns.pop(0) 

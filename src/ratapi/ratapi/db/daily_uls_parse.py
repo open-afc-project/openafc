@@ -372,7 +372,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     # If interactive, prompt for weekday                                      #
     ###########################################################################
-    if interactive:
+    if wfaFlag:
+        currentWeekday = 0
+    elif interactive:
         print("Enter Current Weekday for FCC files: ")
         for key, day in list(dayMap.items()):
             print(str(key) + ": " + day)
@@ -389,7 +391,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     # If interactive, prompt for removal of temp directory                    #
     ###########################################################################
-    if interactive:
+    if wfaFlag:
+        removeTempDirFlag = False
+    elif interactive:
         accepted = False
         while not accepted:
             value = input("Remove temp directory: " + fullPathTempDir + " ? (y/n): ")
@@ -440,7 +444,9 @@ def daily_uls_parse(state_root, interactive):
         ###########################################################################
         # If interactive, prompt for downloading of data files for region         #
         ###########################################################################
-        if interactive:
+        if wfaFlag:
+            downloadDataFilesFlag = False
+        elif interactive:
             accepted = False
             while not accepted:
                 value = input("Download data files for " + region + "? (y/n): ")
@@ -469,7 +475,9 @@ def daily_uls_parse(state_root, interactive):
             ###########################################################################
             # If interactive, prompt for extraction of files from zip files           #
             ###########################################################################
-            if interactive:
+            if wfaFlag:
+                extractZipFlag = True
+            elif interactive:
                 value = input("Extract FCC files from downloaded zip files? (y/n): ")
                 if value == "y":
                     extractZipFlag = True
@@ -491,7 +499,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     # If interactive, prompt for downloading AFC GitHub data files            #
     ###########################################################################
-    if interactive:
+    if wfaFlag:
+        downloadAFCGitHubFilesFlag = False
+    elif interactive:
         accepted = False
         while not accepted:
             value = input("Download AFC GitHub data files? (y/n): ")
@@ -517,7 +527,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     # If interactive, prompt for creating antenna_model_list.csv              #
     ###########################################################################
-    if interactive:
+    if wfaFlag:
+        processAntFilesFlag = True
+    elif interactive:
         accepted = False
         while not accepted:
             value = input("Process antenna model files to create antenna_model_list.csv and antennaPatternFile? (y/n): ")
@@ -621,7 +633,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     # If interactive, prompt for running ULS Processor (uls-script)           #
     ###########################################################################
-    if interactive:
+    if wfaFlag:
+        runULSProcessorFlag = True
+    elif interactive:
         accepted = False
         while not accepted:
             value = input("Run ULS Processor, uls-script? (y/n): ")
@@ -637,7 +651,7 @@ def daily_uls_parse(state_root, interactive):
         runULSProcessorFlag = True
     ###########################################################################
 
-    os.chdir(root) # change back to root of this script
+    # os.chdir(root) # change back to root of this script
     coalitionScriptOutputFSFilename = 'FS_' + nameTime + '.csv'
     coalitionScriptOutputRASFilename = 'RAS_' + nameTime + '.csv'
 
@@ -681,13 +695,13 @@ def daily_uls_parse(state_root, interactive):
         # run through the uls processor 
         logFile.write('Running through ULS processor' + '\n')
         try:
-            subprocess.call(['./uls-script', root + temp + '/combined.txt', \
+            subprocess.call([root + '/uls-script', fullPathTempDir + '/combined.txt', \
                                              fullPathCoalitionScriptOutput, \
                                              fullPathRASDabataseFile, \
-                                             root + temp + '/antenna_model_list.csv', \
+                                             fullPathTempDir + '/antenna_model_list.csv', \
                                              root + '/antenna_model_map.csv', \
-                                             root + temp + '/fcc_fixed_service_channelization.csv', \
-                                             root + temp + '/transmit_radio_unit_architecture.csv', \
+                                             fullPathTempDir + '/fcc_fixed_service_channelization.csv', \
+                                             fullPathTempDir + '/transmit_radio_unit_architecture.csv', \
                                              mode]) 
         except Exception as e: 
             logFile.write('ERROR: ULS processor error:')
@@ -697,7 +711,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     # If interactive, prompt for running fixBPS                               #
     ###########################################################################
-    if interactive:
+    if wfaFlag:
+        runFixBPSFlag = True
+    elif interactive:
         accepted = False
         while not accepted:
             value = input("Run fixBPS? (y/n): ")
@@ -715,19 +731,22 @@ def daily_uls_parse(state_root, interactive):
 
     # output filename from runBPS
     bpsScriptOutput = fullPathCoalitionScriptOutput.replace('.csv', '_fixedBPS.csv')
+    modcodFile = root + "/data_files/modcod_bps.csv"
 
     ###########################################################################
     # If runFixBPSFlag set, run fixBPS                                        #
     ###########################################################################
     if runFixBPSFlag:
         logFile.write("Running through BPS script, cwd = " + os.getcwd() + '\n')
-        fixBPS(fullPathCoalitionScriptOutput, bpsScriptOutput)
+        fixBPS(fullPathCoalitionScriptOutput, modcodFile, bpsScriptOutput)
     ###########################################################################
 
     ###########################################################################
     # If interactive, prompt for running sortCallsignsAddFSID                 #
     ###########################################################################
-    if interactive:
+    if wfaFlag:
+        runSortCallsignsAddFSIDFlag = True
+    elif interactive:
         accepted = False
         while not accepted:
             value = input("Run sortCallsignsAddFSID? (y/n): ")
@@ -762,7 +781,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     # If interactive, prompt for running fixParams                            #
     ###########################################################################
-    if interactive:
+    if wfaFlag:
+        runFixParamsFlag = True
+    elif interactive:
         accepted = False
         while not accepted:
             value = input("Run fixParams? (y/n): ")
@@ -792,7 +813,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     # If interactive, prompt for running convertULS                           #
     ###########################################################################
-    if interactive:
+    if wfaFlag:
+        runConvertULSFlag = True
+    elif interactive:
         accepted = False
         while not accepted:
             value = input("Run conversion of CSV file to sqlite? (y/n): ")
@@ -821,56 +844,71 @@ def daily_uls_parse(state_root, interactive):
     finishTime = datetime.datetime.now()
 
     ###########################################################################
-    # If not interactive:                                                     #
-    # * create zip file containing intermediate file for debugging            #
-    # * copy sqlite file to ULS_Database directory for use by afc-engine      #
-    ###########################################################################
-    if not interactive:
-        logFile.write("Creating and moving debug files")
-        # create debug zip containing final csv, anomalous_uls, and warning_uls and move it to where GUI can see
-        try:
-            dirName = str(nameTime + "_debug")
-            subprocess.call(['mkdir', dirName]) 
-            anomalousPath = root + '/' + 'anomalous_uls.csv'
-            warningPath = root + '/' + 'warning_uls.txt'
-            subprocess.call(['mv', anomalousPath, dirName]) 
-            subprocess.call(['mv', warningPath, dirName]) 
-            subprocess.call(['cp', paramOutput, dirName]) 
-            shutil.make_archive( dirName , 'zip', dirName)
-            zipName = dirName + ".zip"
-            shutil.rmtree(dirName) #delete debug directory
-            subprocess.call(['mv', zipName,  state_root + '/ULS_Database/']) 
-        except Exception as e: 
-            logFile.write('Error moving debug files:' + '\n')
-            raise e
-
-        # copy sqlite to where GUI can see it
-        logFile.write("Copying sqlite file" + '\n')
-        try:
-            subprocess.call(['cp', outputSQL, state_root + '/ULS_Database/']) 
-        except Exception as e: 
-            logFile.write('Error copying ULS sqlite:' + '\n')
-            raise e
-    
-        with open(root + '/data_files/lastSuccessfulRun.txt', 'w') as timeFile:
-            timeFile.write(finishTime.isoformat())
-    ###########################################################################
-
-    ###########################################################################
     # Record execution time in logFile and close log file                     #
     ###########################################################################
     logFile.write('Update finished at: ' + finishTime.isoformat() + '\n')
     timeDiff = finishTime - startTime
     logFile.write('Update took ' + str(timeDiff.total_seconds()) + ' seconds' + '\n')
     logFile.close()
-    return finishTime.isoformat()
     ###########################################################################
+
+    os.chdir(root) # change back to root of this script
+
+    ###########################################################################
+    # If not interactive:                                                     #
+    # * create zip file containing intermediate file for debugging            #
+    # * copy sqlite file to ULS_Database directory for use by afc-engine      #
+    ###########################################################################
+    if not interactive:
+        print("Creating and moving debug files\n")
+        # create debug zip containing final csv, anomalous_uls, and warning_uls and move it to where GUI can see
+        try:
+            if wfaFlag:
+                dirName = "WFA_testvector_FS_" + nameTime
+            else:
+                dirName = str(nameTime + "_debug")
+            subprocess.call(['mkdir', dirName]) 
+
+            # Get all files in temp dir
+            for file in os.listdir(fullPathTempDir):
+                fullPathFile = fullPathTempDir + "/" + file
+                if (not os.path.isdir(fullPathFile)):
+                    subprocess.call(['cp', fullPathFile, dirName]) 
+
+            # anomalousPath = root + '/' + 'anomalous_uls.csv'
+            # warningPath = root + '/' + 'warning_uls.txt'
+            # subprocess.call(['mv', anomalousPath, dirName]) 
+            # subprocess.call(['mv', warningPath, dirName]) 
+            # subprocess.call(['cp', paramOutput, dirName]) 
+
+            shutil.make_archive( dirName , 'zip', root, dirName)
+            zipName = dirName + ".zip"
+            shutil.rmtree(dirName) #delete debug directory
+            subprocess.call(['mv', zipName,  state_root + '/ULS_Database/']) 
+        except Exception as e: 
+            print('Error moving debug files:' + '\n')
+            raise e
+
+        # copy sqlite to where GUI can see it
+        print("Copying sqlite file" + '\n')
+        try:
+            subprocess.call(['cp', outputSQL, state_root + '/ULS_Database/']) 
+        except Exception as e: 
+            print('Error copying ULS sqlite:' + '\n')
+            raise e
+    
+        with open(root + '/data_files/lastSuccessfulRun.txt', 'w') as timeFile:
+            timeFile.write(finishTime.isoformat())
+    ###########################################################################
+
+    return finishTime.isoformat()
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process FS link data for AFC.')
-    parser.add_argument('-i',  '--interactive', action='store_true')
-    parser.add_argument('-u8', '--unii8', action='store_true')
-    parser.add_argument('-ca', '--combine_antenna_region', action='store_true')
+    parser.add_argument('-i',   '--interactive', action='store_true')
+    parser.add_argument('-u8',  '--unii8', action='store_true')
+    parser.add_argument('-ca',  '--combine_antenna_region', action='store_true')
+    parser.add_argument('-wfa', '--wfa', action='store_true')
 
     parser.add_argument('-r',  '--region', default='US:CA', help='":" separated list of regions')
 
@@ -878,11 +916,13 @@ if __name__ == '__main__':
     interactive = args.interactive
     includeUnii8 = args.unii8
     combineAntennaRegionFlag = args.combine_antenna_region
+    wfaFlag = args.wfa
 
     print("Interactive = " + str(interactive))
     print("Include UNII-8 = " + str(includeUnii8))
     print("Combine Antenna Region = " + str(combineAntennaRegionFlag))
     print("Region = " + args.region)
+    print("WFA = " + str(wfaFlag))
 
     regionList = args.region.split(':')
 
