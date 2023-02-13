@@ -587,13 +587,13 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 	// int freqIdx;
 	double rxGainDB;
 
-	if ((frequency >= 5925.0e6) && (frequency <= 6425.0e6)) {
+	// if ((frequency >= 5925.0e6) && (frequency <= 6425.0e6)) {
 		// freqIdx = 0;
-	} else if ((frequency >= 6525.0e6) && (frequency <= 6875.0e6)) {
+	// } else if ((frequency >= 6525.0e6) && (frequency <= 6875.0e6)) {
 		// freqIdx = 1;
-	} else {
-		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value");
-	}
+	// } else {
+		// throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value");
+	// }
 
 	if (maxGain < 38) {
 		if (angleOffBoresightDeg < 5) {
