@@ -407,7 +407,7 @@ class RatAfc(MethodView):
 
                 # calculate hash of config
                 hashlibobj = hashlib.md5()
-                hashlibobj.update(config_bytes)
+                hashlibobj.update(config_bytes.encode('utf-8'))
                 hash1 = hashlibobj.hexdigest()
 
                 config_path = nra + "/" + hash1
@@ -424,7 +424,7 @@ class RatAfc(MethodView):
 
                 # calculate hash of config + request
                 request_json_bytes = json.dumps(request, sort_keys=True).encode('utf-8')
-                hashlibobj.update(request_json_bytes)
+                hashlibobj.update(request_json_bytes.encode('utf-8'))
                 hash = hashlibobj.hexdigest()
 
                 # check cache
