@@ -479,11 +479,9 @@ class RatAfc(MethodView):
             for t in tasks:
                 # wait for requests to finish processing
                 try:
-                    LOGGER.error("Task waiting: ")
                     task_stat = t.wait()
-                    LOGGER.error("Task complete: %s", task_stat)
+                    LOGGER.debug("Task complete: %s", task_stat)
                     if t.successful(task_stat):
-                        LOGGER.error("Task successful ")
                         taskResponse = response_map[task_stat['status']](t)
                         # we might be able to clean this up by having the result functions not return a full response object
                         # need to check everywhere they are called
@@ -492,18 +490,18 @@ class RatAfc(MethodView):
                         actualResult = dataAsJson.get(
                             "availableSpectrumInquiryResponses")
                         if actualResult is not None:
-                            # LOGGER.error("actualResult: %s", actualResult)
+                            # LOGGER.debug("actualResult: %s", actualResult)
                             results["availableSpectrumInquiryResponses"].append(
                                 actualResult[0])
                         else:
-                            LOGGER.error("actualResult was None")
+                            LOGGER.debug("actualResult was None")
                             results["availableSpectrumInquiryResponses"].append(
                                 dataAsJson)
                     else:
-                        LOGGER.error("Task was not successful")
+                        LOGGER.debug("Task was not successful")
                         taskResponse = response_map[task_stat['status']](t)
                         dataAsJson = json.loads(taskResponse.data)
-                        LOGGER.error(
+                        LOGGER.debug(
                             "Unsuccessful dataAsJson: %s", dataAsJson)
                         results["availableSpectrumInquiryResponses"].append(
                             dataAsJson)
