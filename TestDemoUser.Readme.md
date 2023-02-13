@@ -8,4 +8,4 @@ Test user can chose **DEMO_USA** as a region in the AFC Config tab.  The admin n
 
 Log in as the managing user and create a new AP with the NRA: **TEST_FCC** for test user and NRA: **DEMO_FCC** for demo user.
 
-The user may log in to site and run inquiries with the corresponding APs and modify the corresponding AFC Config without impacting the production configuration.
+The user may log in to site and run inquiries with the corresponding APs and modify the corresponding AFC Config without impacting the production 'FCC' configuration.
