@@ -5,8 +5,8 @@
 # a copy of which is included with this software program
 
 # default value of args
-ARG BLD_TAG=3.7.0.0
-ARG PRINST_TAG=3.7.0.0
+ARG BLD_TAG=3.7.1.0
+ARG PRINST_TAG=3.7.1.0
 ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image
 ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall
 
@@ -27,12 +27,13 @@ cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUIL
 ninja -j$(nproc) install
 RUN strip --strip-unneeded /root/afc/__install/bin/afc-engine
 
-
 # Stage Install
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 
 COPY --from=build_image /root/afc/__install /usr/
 COPY --from=build_image /root/gdal/__install/lib /usr/lib/
+# For development environment
+COPY --from=build_image /usr/include/gdal /usr/include/gdal/
 
 RUN mkdir -m 755 -p /var/spool/fbrat
 RUN mkdir -m 755 -p /var/lib/fbrat
@@ -57,7 +58,6 @@ COPY --from=install_image / /
 
 LABEL revision="afc-worker-al"
 WORKDIR /wd
-EXPOSE 80 443
 ENV PGPORT=5432
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 CMD ["/docker-entrypoint.sh"]

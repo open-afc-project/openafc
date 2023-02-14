@@ -7,6 +7,7 @@
 #include "CsvWriter.h"
 #include "UlsFileReader.h"
 #include "AntennaModelMap.h"
+#include "TransmitterModelMap.h"
 #include "FreqAssignment.h"
 #include "UlsFunctions.h"
 
@@ -15,10 +16,14 @@
 bool removeMobile = false;
 bool includeUnii8 = false;
 bool debugFlag    = false;
+bool combineAntennaRegionFlag = false;
 
 void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inputFile, std::string outputFile);
-void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn, AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment);
-void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn, AntennaModelMapClass &antennaModelMap);
+void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap, std::string inputFile, std::string outputFile);
+void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn,
+    AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment, TransmitterModelMapClass &transmitterModelMap);
+void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn,
+    AntennaModelMapClass &antennaModelMap);
 void makeLink(const StationDataCAClass &station, const QList<PassiveRepeaterCAClass> &prList, std::vector<int> &idxList, double &azimuthPtg, double &elevationPtg);
 
 /******************************************************************************************/
@@ -46,8 +51,8 @@ int main(int argc, char **argv)
 
     printf("Coalition ULS Processing Tool Version %s\n", VERSION);
     printf("Copyright 2019 (C) RKF Engineering Solutions\n");
-    if (argc != 7) {
-        fprintf(stderr, "Syntax: %s [ULS file.csv] [Output File.csv] [AntModelListFile.csv] [AntModelMapFile.csv] [mode]\n", argv[0]);
+    if (argc != 8) {
+        fprintf(stderr, "Syntax: %s [ULS file.csv] [Output File.csv] [AntModelListFile.csv] [AntModelMapFile.csv] [freqAssignmentFile] [transmitterModelListFile] [mode]\n", argv[0]);
         return -1;
     }
 
@@ -64,7 +69,8 @@ int main(int argc, char **argv)
     std::string antModelListFile = argv[3];
     std::string antModelMapFile = argv[4];
     std::string freqAssignmentFile = argv[5];
-    std::string mode = argv[6];
+    std::string transmitterModelListFile = argv[6];
+    std::string mode = argv[7];
 
     FILE *fwarn;
     std::string warningFile = "warning_uls.txt";
@@ -74,17 +80,27 @@ int main(int argc, char **argv)
 
 	AntennaModelMapClass antennaModelMap(antModelListFile, antModelMapFile);
 
+	TransmitterModelMapClass transmitterModelMap(transmitterModelListFile);
+
 	FreqAssignmentClass fccFreqAssignment(freqAssignmentFile);
 
     if (mode == "test_antenna_model_map") {
         testAntennaModelMap(antennaModelMap, inputFile, outputFile);
         return 0;
+    } else if (mode == "test_transmitter_model_map") {
+        testTransmitterModelMap(transmitterModelMap, inputFile, outputFile);
+        return 0;
     } else if (mode == "proc_uls") {
         // Do nothing
     } else if (mode == "proc_uls_debug") {
         debugFlag = true;
+    } else if (mode == "proc_uls_ca") {
+        combineAntennaRegionFlag = true;
     } else if (mode == "proc_uls_include_unii8") {
         includeUnii8 = true;
+    } else if (mode == "proc_uls_include_unii8_ca") {
+        includeUnii8 = true;
+        combineAntennaRegionFlag = true;
     } else if (mode == "proc_uls_include_unii8_debug") {
         includeUnii8 = true;
         debugFlag = true;
@@ -117,7 +133,7 @@ int main(int argc, char **argv)
         anomalous.writeRow(header);
     }
 
-    processUS(r, maxNumPassiveRepeater, wt, anomalous, fwarn, antennaModelMap, fccFreqAssignment);
+    processUS(r, maxNumPassiveRepeater, wt, anomalous, fwarn, antennaModelMap, fccFreqAssignment, transmitterModelMap);
 
     processCA(r, maxNumPassiveRepeater, wt, anomalous, fwarn, antennaModelMap);
 
@@ -158,9 +174,11 @@ int main(int argc, char **argv)
 /******************************************************************************************/
 /**** processUS                                                                        ****/
 /******************************************************************************************/
-void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn, AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment)
+void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn,
+    AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment, TransmitterModelMapClass &transmitterModelMap)
 {
     int prIdx;
+    std::string antPfx = (combineAntennaRegionFlag ? "" : "US:");
 
     qDebug() << "--- Beginning path processing";
 
@@ -521,7 +539,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     }
                 }
 
-                AntennaModelClass *rxAntModel = antennaModelMap.find(std::string(rxAnt.antennaModel));
+                AntennaModelClass *rxAntModel = antennaModelMap.find(antPfx, rxAnt.antennaModel);
 
                 AntennaModelClass::CategoryEnum rxAntennaCategory;
                 double rxAntennaDiameter;
@@ -545,7 +563,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     fixedReason.append("Rx Antenna Model Unmatched");
                 }
 
-                AntennaModelClass *txAntModel = antennaModelMap.find(std::string(txAnt.antennaModel));
+                AntennaModelClass *txAntModel = antennaModelMap.find(antPfx, txAnt.antennaModel);
 
                 AntennaModelClass::CategoryEnum txAntennaCategory;
                 double txAntennaDiameter;
@@ -614,6 +632,18 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     }
                 }
 
+                TransmitterModelClass *matchedTransmitterModel = transmitterModelMap.find(std::string(txFreq.transmitterModel));
+
+                std::string matchedTransmitterStr;
+                std::string transmitterArchitectureStr;
+                if (matchedTransmitterModel) {
+                    matchedTransmitterStr = matchedTransmitterModel->name;
+                    transmitterArchitectureStr = TransmitterModelClass::architectureStr(matchedTransmitterModel->architecture);
+                } else {
+                    matchedTransmitterStr = std::string("");
+                    transmitterArchitectureStr = "UNKNOWN";
+                }
+
                 QStringList row;
                 row << "US";                            // Region
                 row << path.callsign;                   // Callsign
@@ -676,7 +706,9 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                 }
 
                 row << txFreq.transmitterMake;  // Tx Manufacturer
-                row << txFreq.transmitterModel; // Tx Model
+                row << txFreq.transmitterModel; // Tx Model ULS
+                row << QString::fromStdString(matchedTransmitterStr);   // Tx Model Matched
+                row << QString::fromStdString(transmitterArchitectureStr);   // Tx Architecture
                 row << txLoc.locationName;      // Tx Location Name
                 row << UlsFunctionsClass::makeNumber(txLoc.latitude);
                 // QString("%1-%2-%3
@@ -690,8 +722,8 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                 row << txAnt.polarizationCode;            // Tx Polarization
                 row << UlsFunctionsClass::makeNumber(txAnt.azimuth);         // Tx Azimuth Angle (deg)
                 row << UlsFunctionsClass::makeNumber(txAnt.tilt);            // Tx Elevation Angle (deg)
-                row << txAnt.antennaMake;                 // Tx Ant Manufacturer
-                row << txAnt.antennaModel;                // Tx Ant Model
+                row << QString::fromStdString(txAnt.antennaMake);            // Tx Ant Manufacturer
+                row << QString::fromStdString(txAnt.antennaModel);           // Tx Ant Model
                 row << txAntennaModelName.c_str();            // Tx Matched antenna model (blank if unmatched)
                 row << AntennaModelClass::categoryStr(txAntennaCategory).c_str(); // Tx Antenna category
                 row << UlsFunctionsClass::makeNumber(txAntennaDiameter);     // Tx Ant Diameter (m)
@@ -711,8 +743,8 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                 row << UlsFunctionsClass::makeNumber(rxLoc.groundElevation); // Rx Ground Elevation (m)
                 row << "";                                // Rx Manufacturer
                 row << "";                                // Rx Model
-                row << rxAnt.antennaMake;                 // Rx Ant Manufacturer
-                row << rxAnt.antennaModel;                // Rx Ant Model
+                row << QString::fromStdString(rxAnt.antennaMake);            // Rx Ant Manufacturer
+                row << QString::fromStdString(rxAnt.antennaModel);           // Rx Ant Model
                 row << rxAntennaModelName.c_str();            // Rx Matched antenna model (blank if unmatched)
                 row << AntennaModelClass::categoryStr(rxAntennaCategory).c_str(); // Rx Antenna category
                 row << UlsFunctionsClass::makeNumber(rxAntennaDiameter);     // Rx Ant Diameter (m)
@@ -733,7 +765,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                         UlsAntenna &prAnt = prAntList[prIdx-1];
                         UlsSegment &segment = segList[prIdx];
 
-			            AntennaModelClass *prAntModel = antennaModelMap.find(std::string(prAnt.antennaModel));
+			            AntennaModelClass *prAntModel = antennaModelMap.find(antPfx, prAnt.antennaModel);
 
                         AntennaModelClass::TypeEnum prAntennaType;
                         AntennaModelClass::CategoryEnum prAntennaCategory;
@@ -771,8 +803,8 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                         row << prAnt.polarizationCode;    // Passive Repeater Polarization
                         row << UlsFunctionsClass::makeNumber(prAnt.azimuth); // Passive Repeater Azimuth Angle
                         row << UlsFunctionsClass::makeNumber(prAnt.tilt);    // Passive Repeater Elevation Angle
-                        row << prAnt.antennaMake;         // Passive Repeater Ant Make
-                        row << prAnt.antennaModel;        // Passive Repeater Ant Model
+                        row << QString::fromStdString(prAnt.antennaMake);    // Passive Repeater Ant Make
+                        row << QString::fromStdString(prAnt.antennaModel);   // Passive Repeater Ant Model
                         row << prAntennaModelName.c_str();        // Passive Repeater antenna model (blank if unmatched)
                         row << AntennaModelClass::typeStr(prAntennaType).c_str(); // Passive Repeater Ant Type
                         row << AntennaModelClass::categoryStr(prAntennaCategory).c_str(); // Passive Repeater Ant Category
@@ -858,9 +890,11 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
 /******************************************************************************************/
 /**** processCA                                                                        ****/
 /******************************************************************************************/
-void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn, AntennaModelMapClass &antennaModelMap)
+void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn,
+    AntennaModelMapClass &antennaModelMap)
 {
     int prIdx;
+    std::string antPfx = (combineAntennaRegionFlag ? "" : "CA:");
 
     qDebug() << "--- Beginning path processing";
 
@@ -919,7 +953,7 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
 
             makeLink(station, prList, idxList, azimuthPtg, elevationPtg);
 
-            AntennaModelClass *rxAntModel = antennaModelMap.find(std::string(station.antennaModel));
+            AntennaModelClass *rxAntModel = antennaModelMap.find(antPfx, station.antennaModel);
 
             AntennaModelClass::CategoryEnum rxAntennaCategory;
             double rxAntennaDiameter;
@@ -989,7 +1023,9 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
             row << station.modulation.c_str();  // Digital Mod Type
 
             row << "";                          // Tx Manufacturer
-            row << "";                          // Tx Model
+            row << "";                          // Tx Model ULS
+            row << "";                          // Tx Model Matched
+            row << "UNKNOWN";                   // Tx Architecture
             row << "";                          // Tx Location Name
             row << "";                          // Tx Latitude
             row << "";                          // Tx Longitude
@@ -1037,7 +1073,7 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
 
                     const PassiveRepeaterCAClass &pr = prList[prIdx];
 
-                    AntennaModelClass *prAntModel = antennaModelMap.find(std::string(pr.antennaModelA));
+                    AntennaModelClass *prAntModel = antennaModelMap.find(antPfx, pr.antennaModelA);
 
                     PassiveRepeaterCAClass::PRTypeEnum prAntennaType;
                     AntennaModelClass::CategoryEnum prAntennaCategory;
@@ -1246,6 +1282,8 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inpu
     std::ostringstream errStr;
     FILE *fin, *fout;
 
+    std::string antPfx = (combineAntennaRegionFlag ? "" : "US:");
+
     if ( !(fin = fopen(inputFile.c_str(), "rb")) ) {
         errStr << std::string("ERROR: Unable to open inputFile: \"") << inputFile << "\"" << std::endl;
         throw std::runtime_error(errStr.str());
@@ -1346,7 +1384,7 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inpu
                 {
                     strval = fieldList.at(antennaModelFieldIdx);
 
-                    AntennaModelClass *antModel = antennaModelMap.find(strval);
+                    AntennaModelClass *antModel = antennaModelMap.find(antPfx, strval);
 
                     std::string matchedModelName;
                     if (antModel) {
@@ -1371,6 +1409,153 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inpu
 
     if (fin) { fclose(fin); }
     if (fout) { fclose(fout); }
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** testTransmitterModelMap                                                          ****/
+/******************************************************************************************/
+void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap, std::string inputFile, std::string outputFile)
+{
+    char *chptr;
+    std::ostringstream errStr;
+    FILE *fin, *fout;
+
+    transmitterModelMap.checkPrefixValues();
+
+    int numTX = 0;
+    int numMatch = 0;
+
+    if ( !(fin = fopen(inputFile.c_str(), "rb")) ) {
+        errStr << std::string("ERROR: Unable to open inputFile: \"") << inputFile << "\"" << std::endl;
+        throw std::runtime_error(errStr.str());
+    }
+
+    if ( !(fout = fopen(outputFile.c_str(), "wb")) ) {
+        errStr << std::string("ERROR: Unable to open outputFile: \"") << outputFile << "\"" << std::endl;
+        throw std::runtime_error(errStr.str());
+    }
+
+    int linenum, fIdx;
+    std::string line, strval;
+
+    int transmitterModelFieldIdx = -1;
+
+    std::vector<int *> fieldIdxList;                       std::vector<std::string> fieldLabelList;
+    fieldIdxList.push_back(&transmitterModelFieldIdx);     fieldLabelList.push_back("transmitterModel");
+
+    int fieldIdx;
+
+    enum LineTypeEnum {
+         labelLineType,
+          dataLineType,
+        ignoreLineType,
+       unknownLineType
+    };
+
+    LineTypeEnum lineType;
+
+    linenum = 0;
+    bool foundLabelLine = false;
+    while (fgetline(fin, line, false)) {
+        linenum++;
+        std::vector<std::string> fieldList = splitCSV(line);
+        std::string fixedStr = "";
+
+        lineType = unknownLineType;
+        /**************************************************************************/
+        /**** Determine line type                                              ****/
+        /**************************************************************************/
+        if (fieldList.size() == 0) {
+            lineType = ignoreLineType;
+        } else {
+            fIdx = fieldList[0].find_first_not_of(' ');
+            if (fIdx == (int) std::string::npos) {
+                if (fieldList.size() == 1) {
+                    lineType = ignoreLineType;
+                }
+            } else {
+                if (fieldList[0].at(fIdx) == '#') {
+                    lineType = ignoreLineType;
+                }
+            }
+        }
+
+        if ((lineType == unknownLineType)&&(!foundLabelLine)) {
+            lineType = labelLineType;
+            foundLabelLine = 1;
+        }
+        if ((lineType == unknownLineType)&&(foundLabelLine)) {
+            lineType = dataLineType;
+        }
+        /**************************************************************************/
+
+        /**************************************************************************/
+        /**** Process Line                                                     ****/
+        /**************************************************************************/
+        bool found;
+        std::string field;
+        int xIdx, yIdx;
+        switch(lineType) {
+            case   labelLineType:
+                for(fieldIdx=0; fieldIdx<(int) fieldList.size(); fieldIdx++) {
+                    field = fieldList.at(fieldIdx);
+
+                    // std::cout << "FIELD: \"" << field << "\"" << std::endl;
+
+                    found = false;
+                    for(fIdx=0; (fIdx < (int) fieldLabelList.size())&&(!found); fIdx++) {
+                        if (field == fieldLabelList.at(fIdx)) {
+                            *fieldIdxList.at(fIdx) = fieldIdx;
+                            found = true;
+                        }
+                    }
+                }
+
+                for(fIdx=0; fIdx < (int) fieldIdxList.size(); fIdx++) {
+                    if (*fieldIdxList.at(fIdx) == -1) {
+                        errStr << "ERROR: Invalid input file \"" << inputFile << "\" label line missing \"" << fieldLabelList.at(fIdx) << "\"" << std::endl;
+                        throw std::runtime_error(errStr.str());
+                    }
+                }
+
+                fprintf(fout, "%s,matchedTransmitterModel\n", line.c_str());
+
+                break;
+            case    dataLineType:
+                {
+                    numTX++;
+                    strval = fieldList.at(transmitterModelFieldIdx);
+
+                    TransmitterModelClass *transmitterModel = transmitterModelMap.find(strval);
+
+                    std::string matchedModelName;
+                    if (transmitterModel) {
+                        matchedModelName = transmitterModel->name;
+                        numMatch++;
+                    } else {
+                        matchedModelName = "";
+                    }
+
+                    fprintf(fout, "%s,%s\n", line.c_str(), matchedModelName.c_str());
+
+                }
+                break;
+            case  ignoreLineType:
+            case unknownLineType:
+                // do nothing
+                break;
+            default:
+                CORE_DUMP;
+                break;
+        }
+    }
+
+    if (fin) { fclose(fin); }
+    if (fout) { fclose(fout); }
+
+    std::cout << "NUM TX: " << numTX << std::endl;
+    std::cout << "NUM MATCH: " << numMatch << std::endl;
 }
 /******************************************************************************************/
 

@@ -22,6 +22,7 @@ interface AFCState {
     config: AFCConfigFile,
     ulsFiles: string[],
     antennaPatterns: string[],
+    regions: string[],
     messageType?: "Warn",
     messageTitle: string,
     messageValue: string
@@ -38,10 +39,11 @@ class AFCConfig extends React.Component<{
     ulsFiles: RatResponse<string[]>,
     afcConf: RatResponse<AFCConfigFile>,
     antennaPatterns: RatResponse<string[]>,
+    regions: RatResponse<string[]>,
     frequencyBands: RatResponse<FreqRange[]>
 }, AFCState> {
 
-    constructor(props: Readonly<{ limit: RatResponse<Limit>; frequencyBands: RatResponse<FreqRange[]>; ulsFiles: RatResponse<string[]>; afcConf: RatResponse<AFCConfigFile>; antennaPatterns: RatResponse<string[]>; regionStr:string}>) {
+    constructor(props: Readonly<{ limit: RatResponse<Limit>; frequencyBands: RatResponse<FreqRange[]>; ulsFiles: RatResponse<string[]>; afcConf: RatResponse<AFCConfigFile>; antennaPatterns: RatResponse<string[]>; regions: RatResponse<string[]>}>) {
         super(props);
         //@ts-ignore
         const state: AFCState = { config: getDefaultAfcConf() ,isModalOpen: false, messageValue: "", messageTitle: "" };
@@ -83,6 +85,16 @@ class AFCConfig extends React.Component<{
             Object.assign(state, { antennaPatterns: [] });
         }
 
+        if (props.regions.kind === "Success") {
+            Object.assign(state, { regions: props.regions.result });
+        } else {
+            logger.error("Could not load regions",
+                "error code: ", props.regions.errorCode,
+                "description: ", props.regions.description)
+            Object.assign(state, { regions: [] });
+        }
+
+
         this.state = state;
     }
 
@@ -105,7 +117,7 @@ class AFCConfig extends React.Component<{
                         <pre>{this.state.messageValue}</pre>
                     </Alert>
                 }
-                <AFCForm frequencyBands={this.props.frequencyBands.kind == "Success" ? this.props.frequencyBands.result : []} limit={this.props.limit.kind == "Success" ? this.props.limit.result : new Limit(false, 0)} config={this.state.config} ulsFiles={this.state.ulsFiles} antennaPatterns={this.state.antennaPatterns} onSubmit={(x) => this.submit(x)} />
+                <AFCForm frequencyBands={this.props.frequencyBands.kind == "Success" ? this.props.frequencyBands.result : []} limit={this.props.limit.kind == "Success" ? this.props.limit.result : new Limit(false, 0)} config={this.state.config} ulsFiles={this.state.ulsFiles} antennaPatterns={this.state.antennaPatterns} regions={this.state.regions} onSubmit={(x) => this.submit(x)} />
             </PageSection>
         );
     }

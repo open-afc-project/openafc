@@ -1005,7 +1005,8 @@ def collect_tests2combine(sh, rows, t_ident, t2cmb, cmb_t):
             continue
 
         cell = sh.cell(row = i, column = COMBINED_CLM)
-        if cell.value is not None:
+        if cell.value is not None and \
+            cell.value.upper() != 'NO':
             raw_list = str(cell.value)
 
             test_case_id = sh.cell(row = i, column = UNIT_NAME_CLM).value
@@ -1092,6 +1093,7 @@ def parse_tests(cfg):
         if (test_ident != 'all') and (cell.value.lower() != test_ident):
             continue
 
+        app_log.debug('Value: %s', cell.value)
         uut = sheet.cell(row = i, column = UNIT_NAME_CLM).value
         purpose = sheet.cell(row = i, column = PURPOSE_CLM).value
         test_vec = sheet.cell(row = i, column = TEST_VEC_CLM).value
@@ -1104,7 +1106,9 @@ def parse_tests(cfg):
         res_str = REQ_INQUIRY_HEADER
         # check if the test case is combined 
         cell = sheet.cell(row = i, column = COMBINED_CLM)
-        if cell.value is not None:
+        if cell.value is not None and \
+            cell.value.upper() != 'NO':
+            app_log.debug('Value1: %s', cell.value)
             for item in combined_tests[test_case_id]:
                 res_str += tests2combine[item] + ','
             res_str = res_str[:-1]
@@ -1725,7 +1729,10 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        sys.exit(1)
 
 
 # Local Variables:

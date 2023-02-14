@@ -31,12 +31,14 @@ import six
 from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE
 from ..tasks.afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from ..models.aaa import User, AccessPoint
+from ..models.aaa import User, AccessPoint, AFCConfig
 from .auth import auth
-from .ratapi import build_task
+from .ratapi import build_task, nraToRegionStr
 from .. import data_if
 from .. import task
 from .. import als
+from ..models.base import db
+from flask_login import current_user
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -416,8 +418,8 @@ class RatAfc(MethodView):
                                     firstCertId,
                                     device_desc.get('rulesetIds'))
 
-                region = (device_desc['certificationId'][0]['nra']).strip().lower()
-                registration_id = (device_desc['certificationId'][0]['id']).strip().lower()
+                nra = (device_desc['certificationId'][0]['nra']).strip()
+                region = nraToRegionStr(nra)
                 runtime_opts = RNTM_OPT_NODBG_NOGUI
                 debug_opt = flask.request.args.get('debug')
                 if debug_opt == 'True':
@@ -438,13 +440,30 @@ class RatAfc(MethodView):
                     fsroot=flask.current_app.config['STATE_ROOT_PATH'],
                     mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
 
-                # calculate hash
-                request_json_bytes = json.dumps(request, sort_keys=True).encode('utf-8')
-                config_bytes = None
-                with dataif.open("cfg", region + "/afc_config.json") as hfile:
-                    config_bytes = hfile.read()
+                config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
+                         == region).first()
+
+                config_bytes = json.dumps(config.config, sort_keys=True)
+
+                # calculate hash of config
                 hashlibobj = hashlib.md5()
-                hashlibobj.update(config_bytes)
+                hashlibobj.update(config_bytes.encode('utf-8'))
+                hash1 = hashlibobj.hexdigest()
+
+                config_path = nra + "/" + hash1
+                # check config_path exist
+                with dataif.open("cfg", config_path + "/afc_config.json") as hfile:
+                    if not hfile.head():
+                        # Write afconfig to objst cache.
+                        # convert TESTxxx region to xxx in cache to make afc engine sane
+                        if region[:5] == "TEST_" or region[:5] == 'DEMO_':
+                            patch_config = config.config
+                            patch_config['regionStr'] =  region[5:]
+                            config_bytes = json.dumps(patch_config, sort_keys=True)
+                        hfile.write(config_bytes)
+
+                # calculate hash of config + request
+                request_json_bytes = json.dumps(request, sort_keys=True).encode('utf-8')
                 hashlibobj.update(request_json_bytes)
                 hash = hashlibobj.hexdigest()
 
@@ -479,14 +498,14 @@ class RatAfc(MethodView):
 
                 build_task(dataif,
                         request_type,
-                        task_id, hash, region, history_dir,
+                        task_id, hash, config_path, history_dir,
                         runtime_opts)
 
                 conn_type = flask.request.args.get('conn_type')
                 LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
                 t = task.Task(task_id, dataif,
                               flask.current_app.config['STATE_ROOT_PATH'],
-                              hash, region, history_dir,
+                              hash, nra, history_dir,
                               mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
                 if conn_type == 'async':
                     if len(requests) > 1:

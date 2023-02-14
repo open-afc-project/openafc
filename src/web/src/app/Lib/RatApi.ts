@@ -1,7 +1,7 @@
 import { GuiConfig, AFCConfigFile, PAWSRequest, PAWSResponse, AnalysisResults, RatResponse, ResSuccess, ResError, success, error, AFCEngineException, ExclusionZoneRequest, HeatMapRequest, ExclusionZoneResult, HeatMapResult, FreqRange } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { delay } from "./Utils";
-import { hasRole, getDefaultRegion } from "./User";
+import { hasRole} from "./User";
 
 /**
  * RatApi.ts: member values and functions for utilizing server ratpi services
@@ -82,9 +82,9 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
         "value": 20.5
     },
     "receiverFeederLoss": {
-        "UNII5": 3,
-        "UNII7": 3,
-        "other": 3
+        "IDU": 3,
+        "ODU": 3,
+        "UNKNOWN": 3
     },
     "fsReceiverNoise": {
         "UNII5": -110,
@@ -165,6 +165,23 @@ export async function getGuiConfig() {
 }
 
 /**
+ * Retrive basic configuration options used across app
+ * and sets the [[guiConfig]] object.
+ */
+export const getRegions = (): Promise<RatResponse<string[]>> => (
+    fetch("../ratapi/v1/regions", {
+        method: "GET"
+    }).then(res => {
+        return  res.text();
+    }).then(name => {
+        return success(name.split(" "));
+    }).catch(err => {
+        logger.error(err)
+    })
+)
+
+
+/**
  * Return a copy of the hard coded afc confic used as the default
  * @returns The default AFC Configuration
  */
@@ -175,21 +192,16 @@ export const getDefaultAfcConf = () => defaultAfcConf();
  * The config will be scoped to the current user
  * @returns this user's current AFC Config or error
  */
-export const getAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => (
-    // fetch(guiConfig.afcconfig_defaults.replace("default", getDefaultRegion()), {
-    fetch(guiConfig.afcconfig_defaults.replace("default", "CONUS"), {
+export const getAfcConfigFile = (region:String): Promise<RatResponse<AFCConfigFile>> => (
+    fetch(guiConfig.afcconfig_defaults.replace("default", region), {
         method: "GET",
     }).then(async (res: Response) => {
         if (res.ok) {
             const config = await (res.json() as Promise<AFCConfigFile>);
             return success(config);
         } else {
-            if (hasRole("Trial")) {
-                return getTrialAfcConfigFile()
-            } else {
-                logger.error("could not load afc configuration so falling back to dev default");
-                return error(res.statusText, res.status, res.body);
-            }
+            logger.error("could not load afc configuration so falling back to dev default");
+            return error(res.statusText, res.status, res.body);
         }
     }).catch((err: any) => {
         logger.error(err);
@@ -200,34 +212,12 @@ export const getAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => (
 )
 
 /**
- * Get the special config file for the Trial users
- */
-export const getTrialAfcConfigFile = (): Promise<RatResponse<AFCConfigFile>> => {
-    return fetch(guiConfig.afcconfig_trial, {
-        method: "GET",
-    }).then(async (res: Response) => {
-        if (res.ok) {
-            const config = await (res.json() as Promise<AFCConfigFile>);
-            return success(config);
-        } else {
-            logger.error("could not load trial afc configuration");
-            return error(res.statusText, res.status, res.body);
-        }
-    }).catch((err: any) => {
-        logger.error(err);
-        logger.error("could not load trial afc configuration");
-        return error("unable to load trial afc configuration");
-    });
-}
-
-/**
  * Update the afc config on the server with the one created by the user
  * @param conf The AFC Config that will overwrite the server
  * @returns success message or error
  */
 export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<string>> => (
-    // fetch(guiConfig.afcconfig_defaults.replace("default", getDefaultRegion()), {
-    fetch(guiConfig.afcconfig_defaults.replace("default", "CONUS"), {
+    fetch(guiConfig.afcconfig_defaults, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(conf, undefined, 3)

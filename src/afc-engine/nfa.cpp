@@ -42,6 +42,15 @@ NFAClass::NFAClass(std::string tableFileVal) : tableFile(tableFileVal)
 /******************************************************************************************/
 NFAClass::~NFAClass()
 {
+	if (nfaTable) {
+		for(int xdbIdx=0; xdbIdx<numxdb; ++xdbIdx) {
+			for(int uIdx=0; uIdx<numu; ++uIdx) {
+				free(nfaTable[xdbIdx][uIdx]);
+			}
+			free(nfaTable[xdbIdx]);
+		}
+		free(nfaTable);
+	}
 };
 /******************************************************************************************/
 

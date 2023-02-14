@@ -19,8 +19,8 @@ public:
 	char antennaType;		   // R or T or P
 	double heightToTip;		   // Presumably in feet.
 	double heightToCenterRAAT; // Likewise.
-	char antennaMake[25];	  // Make/model of antenna.
-	char antennaModel[25];
+	std::string antennaMake;	  // Make/model of antenna.
+	std::string antennaModel;
 	double tilt;
 	char polarizationCode[5]; // Many of these properties are unpopulated.
 	double beamwidth;

@@ -1,5 +1,5 @@
 import * as React from "react";
-import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition, Radio, CardHead, PageSection} from "@patternfly/react-core";
+import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition, Radio, CardHead, PageSection } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import BuildlingPenetrationLossForm from "./BuildingPenetrationLossForm";
 import PolarizationMismatchLossForm from "./PolarizationMismatchLossForm";
@@ -9,11 +9,10 @@ import AntennaPatternForm from "./AntennaPatternForm";
 import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
-import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache } from "../Lib/RatApi";
+import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache, getRegions } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
 import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
-import {setDefaultRegion} from "../Lib/User";
 import DownloadContents from "../Components/DownloadContents";
 
 /**
@@ -31,6 +30,7 @@ export class AFCForm extends React.Component<
         config: AFCConfigFile,
         ulsFiles: string[],
         antennaPatterns: string[],
+        regions: string[],
         onSubmit: (x: AFCConfigFile) => Promise<RatResponse<string>>
     },
     {
@@ -42,7 +42,7 @@ export class AFCForm extends React.Component<
     }
 > {
 
-    constructor(props: Readonly<{ limit: Limit; frequencyBands: FreqRange[]; config: AFCConfigFile; ulsFiles: string[]; antennaPatterns: string[]; onSubmit: (x: AFCConfigFile) => Promise<RatResponse<string>>; }>) {
+    constructor(props: Readonly<{ limit: Limit; frequencyBands: FreqRange[]; config: AFCConfigFile; ulsFiles: string[]; antennaPatterns: string[]; regions: string[]; onSubmit: (x: AFCConfigFile) => Promise<RatResponse<string>>; }>) {
         super(props);
         let config = props.config as AFCConfigFile
         if (props.frequencyBands.length > 0) {
@@ -64,7 +64,6 @@ export class AFCForm extends React.Component<
                 }
             }
         }
-       setDefaultRegion(config.regionStr);
     }
 
     private hasValue = (val: any) => val !== undefined && val !== null;
@@ -79,16 +78,15 @@ export class AFCForm extends React.Component<
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => {
        this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
-       setDefaultRegion(n);
-    //    getAfcConfigFile().then(
-    //        res => {
-    //             if (res.kind === "Success") {
-    //                 this.updateEntireConfigState(res.result);
-    //             } else {
-    //                 this.setState({ messageError: res.description, messageSuccess: undefined });
-    //            }
-    //        }
-    //   )
+       // region changed by user, reload the coresponding configuration for that region
+       getAfcConfigFile(n).then(
+           res => {
+           if (res.kind === "Success") {
+               this.updateEntireConfigState(res.result);
+           } else {
+               this.setState({ messageError: res.description, messageSuccess: undefined });
+           }
+        })
     }
     private setEnableMapInVirtualAp = (n: boolean) => this.setState({ config: Object.assign(this.state.config, { enableMapInVirtualAp: n }) });
     private setVisiblityThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { visibilityThreshold: n }) });
@@ -219,7 +217,6 @@ export class AFCForm extends React.Component<
             }
         }
         );
-        setDefaultRegion(config.regionStr);
     }
 
     /**
@@ -269,7 +266,7 @@ export class AFCForm extends React.Component<
     private getConfig = () => JSON.stringify(this.state.config);
 
     private export = () =>
-        new Blob([JSON.stringify(Object.assign(exportCache(), {afcConfig: this.state.config }))], {
+        new Blob([JSON.stringify(Object.assign(exportCache(), { afcConfig: this.state.config }))], {
             type: "application/json"
         });
 
@@ -306,13 +303,13 @@ export class AFCForm extends React.Component<
 
                     this.setState({ messageError: undefined, messageSuccess: "Import successful!" });
                 } catch (e) {
-                    this.setState({ messageError: "Unable to import file", messageSuccess: undefined})
+                    this.setState({ messageError: "Unable to import file", messageSuccess: undefined })
                 }
             }
 
             reader.readAsText(file);
 
-       } catch (e) {
+        } catch (e) {
             logger.error("Failed to import application state", e);
             this.setState({ messageError: "Failed to import application state", messageSuccess: undefined });
         }
@@ -391,7 +388,7 @@ export class AFCForm extends React.Component<
                 if (x.kind === "FCC 6GHz Report & Order" && x.buildingSource === "None") {
                     delete x.win2ConfidenceNLOS;
                 }
- 
+
                 conf.propagationModel = x;
                 this.setState({ config: conf });
             }
@@ -479,8 +476,9 @@ export class AFCForm extends React.Component<
                                     style={{ textAlign: "right" }}
                                 >
                                     <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
-                                    <FormSelectOption key={"USA"} value={"USA"} label={"USA"} />
-                                    <FormSelectOption key={"Canada"} value={"Canada"} label={"Canada"} />
+                                    {this.props.regions.map((option: string) => (
+                                        <FormSelectOption key={option} value={option} label={option} />
+                                    ))}
                                 </FormSelect>
                             </FormGroup>
                         </GalleryItem>
@@ -585,12 +583,13 @@ export class AFCForm extends React.Component<
                                     maxWidth="40.0rem"
                                     content={
                                         <>
-                                            <p>UNII Range:</p>
-                                            <ul>
-                                                <li> UNII-5: 5,925-6,425 MHz</li>
-                                                <li> UNII-7: 6,525-6,875 MHz</li>
-                                            </ul>
-                                            <p>The <i>Line Loss</i> from the ULS database is used. Else, the values entered here are used.</p>
+                                            <p>Feederloss is set to: </p>
+                                                <ul>
+                                                    <li>
+                                                        the Feederloss in the FS Database (if present)
+                                                    </li>
+                                                    <li>Else, the applicable value below</li>
+                                                </ul>
                                         </>
                                     }
                                 >
@@ -598,40 +597,40 @@ export class AFCForm extends React.Component<
                                 </Tooltip>
                                 <InputGroup>
                                     <TextInput
-                                        id="feeder-5-label"
-                                        name="feeder-5-label"
+                                        id="feeder-idu-label"
+                                        name="feeder-idu-label"
                                         isReadOnly={true}
-                                        value="UNII-5"
+                                        value="IDU"
                                         style={{ textAlign: "left", minWidth: "35%" }}
                                     />
                                     <TextInput
-                                        value={this.state.config.receiverFeederLoss.UNII5}
-                                        onChange={x => this.setFeederLoss({ ...this.state.config.receiverFeederLoss, UNII5: Number(x) })}
+                                        value={this.state.config.receiverFeederLoss.IDU}
+                                        onChange={x => this.setFeederLoss({ ...this.state.config.receiverFeederLoss, IDU: Number(x) })}
                                         type="number"
                                         step="any"
-                                        id="horizontal-form-receiver-feeder-loss-5"
-                                        name="horizontal-form-receiver-feeder-loss-5"
-                                        isValid={this.hasValue(this.state.config.receiverFeederLoss.UNII5)}
+                                        id="horizontal-form-receiver-feeder-loss-idu"
+                                        name="horizontal-form-receiver-feeder-loss-idu"
+                                        isValid={this.hasValue(this.state.config.receiverFeederLoss.IDU)}
                                         style={{ textAlign: "right" }}
                                     />
                                     <InputGroupText>dB</InputGroupText>
                                 </InputGroup>
                                 <InputGroup>
                                     <TextInput
-                                        id="feeder-7-label"
-                                        name="feeder-7-label"
+                                        id="feeder-odu-label"
+                                        name="feeder-odu-label"
                                         isReadOnly={true}
-                                        value="UNII-7"
+                                        value="ODU"
                                         style={{ textAlign: "left", minWidth: "35%" }}
                                     />
                                     <TextInput
-                                        value={this.state.config.receiverFeederLoss.UNII7}
-                                        onChange={x => this.setFeederLoss({ ...this.state.config.receiverFeederLoss, UNII7: Number(x) })}
+                                        value={this.state.config.receiverFeederLoss.ODU}
+                                        onChange={x => this.setFeederLoss({ ...this.state.config.receiverFeederLoss, ODU: Number(x) })}
                                         type="number"
                                         step="any"
                                         id="horizontal-form-receiver-feeder-loss-7"
                                         name="horizontal-form-receiver-feeder-loss-7"
-                                        isValid={this.hasValue(this.state.config.receiverFeederLoss.UNII7)}
+                                        isValid={this.hasValue(this.state.config.receiverFeederLoss.ODU)}
                                         style={{ textAlign: "right" }}
                                     />
                                     <InputGroupText>dB</InputGroupText>
@@ -641,17 +640,17 @@ export class AFCForm extends React.Component<
                                         id="feeder-o-label"
                                         name="feeder-o-label"
                                         isReadOnly={true}
-                                        value="Other"
+                                        value="Unknown"
                                         style={{ textAlign: "left", minWidth: "35%" }}
                                     />
                                     <TextInput
-                                        value={this.state.config.receiverFeederLoss.other}
-                                        onChange={x => this.setFeederLoss({ ...this.state.config.receiverFeederLoss, other: Number(x) })}
+                                        value={this.state.config.receiverFeederLoss.UNKNOWN}
+                                        onChange={x => this.setFeederLoss({ ...this.state.config.receiverFeederLoss, UNKNOWN: Number(x) })}
                                         type="number"
                                         step="any"
                                         id="horizontal-form-receiver-feeder-loss-o"
                                         name="horizontal-form-receiver-feeder-loss-o"
-                                        isValid={this.hasValue(this.state.config.receiverFeederLoss.other)}
+                                        isValid={this.hasValue(this.state.config.receiverFeederLoss.UNKNOWN)}
                                         style={{ textAlign: "right" }}
                                     />
                                     <InputGroupText>dB</InputGroupText>
@@ -687,7 +686,7 @@ export class AFCForm extends React.Component<
                                     />
                                     <TextInput
                                         value={this.state.config.fsReceiverNoise.UNII5}
-                                        onChange={x => this.setReceiverNoise({ ...this.state.config.fsReceiverNoise, UNII5: Number(x) })}
+                                        onChange={x => this.setReceiverNoise({ ...this.state.config.fsReceiverNoise, IDU: Number(x) })}
                                         type="number"
                                         step="any"
                                         id="horizontal-form-noise-5"
@@ -707,7 +706,7 @@ export class AFCForm extends React.Component<
                                     />
                                     <TextInput
                                         value={this.state.config.fsReceiverNoise.UNII7}
-                                        onChange={x => this.setReceiverNoise({ ...this.state.config.fsReceiverNoise, UNII7: Number(x) })}
+                                        onChange={x => this.setReceiverNoise({ ...this.state.config.fsReceiverNoise, ODU: Number(x) })}
                                         type="number"
                                         step="any"
                                         id="horizontal-form-noise-7"
@@ -992,7 +991,7 @@ export class AFCForm extends React.Component<
                                         onChange={(b) => b && setChannelResponseAlgorithm('psd')}
                                         id="horizontal-form-channelResponse-psd"
                                         name="horizontal-form-channelResponse-psd"
-                                        style={{ textAlign: "left"}}
+                                        style={{ textAlign: "left" }}
                                         value='psd'
                                     />
 
@@ -1016,7 +1015,7 @@ export class AFCForm extends React.Component<
                                     <InputGroupText>dB I/N</InputGroupText></InputGroup>
                             </FormGroup>
                         </GalleryItem>
-     
+
                     </Gallery>
                     <br />
                     <>
@@ -1043,24 +1042,24 @@ export class AFCForm extends React.Component<
                         <Button variant="secondary" onClick={this.reset}>Reset Form to Default</Button>{" "}
                         <Button key="open-modal" variant="secondary" onClick={() => this.setState({ isModalOpen: true })}>Copy/Paste</Button>
                     </>
-                    <br/>
-                    <br/>
-                     <FormGroup
-                         label="Import Afc Config"
-                         fieldId="import-afc-form"
-                     >
+                    <br />
+                    <br />
+                    <FormGroup
+                        label="Import Afc Config"
+                        fieldId="import-afc-form"
+                    >
 
-                    <input
-                        // @ts-ignore
-                        type="file"
-                        name="import afc file"
-                        // @ts-ignore
-                        onChange={(ev) => this.import(ev)}
+                        <input
+                            // @ts-ignore
+                            type="file"
+                            name="import afc file"
+                            // @ts-ignore
+                            onChange={(ev) => this.import(ev)}
                         />
                     </FormGroup>
-                    <br/>
+                    <br />
                     <DownloadContents fileName="Download AFC Config" contents={() => this.export()} />
-                    <br/>
+                    <br />
 
                 </CardBody>
             </Card >);

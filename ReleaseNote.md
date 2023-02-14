@@ -1,6 +1,53 @@
 # Release Note
 
 ## **Version and Date**
+|Version|3.7.1.0|
+| :- | :- |
+|**Date**|**09/02/2023**|
+|compiled server's version is 5609349 | git tag 3.7.1.0|
+
+## **Issues Addressed**
+ * OA-561 rel 3.7.1.0
+ * Jira OA-536: Update Feederloss implementation per new agreement b/w WFA and WINNF
+ * Jira OA-539: Make use/not-use of ISED antenna patterns for FS in US configurable
+ * Jira OA-556: Bug fix in calculation of RAS exclusion zone horizon distance
+ * Jira OA-446: Create a parser for Canada's incumbents database (this includes changes required to allow protection of Canadian FS at the border)
+ * Jira OA-275: Integrate actual antenna patterns (from ISED and WinnForum) in AFC (this is implemented as part of OA-446)
+ * Jira OA-533: Check AP's uncertainty region's center lat/long against country (based on rulsetId) boundaries
+ * Jira OA-259: Align with QCOM/Federated to select same 3DEP/NLCD tile when on Boundary. 
+ * Jira OA-535: Correction of FS bandwidth from Emission Designator vs. upper-lower freq not matching
+ 
+
+## **Version and Date**
+|Version|**OA-536**|
+| :- | :- |
+|**Date**|**02/08/2023**|
+
+## **Issues Addressed**
+ * Jira OA-536: Update Feederloss implementation per new agreement b/w WFA and WINNF
+ * Jira OA-539: Make use/not-use of ISED antenna patterns for FS in US configurable
+ * Jira OA-556: Bug fix in calculation of RAS exclusion zone horizon distance
+ 
+## **Interface Changes**
+ * Updated AFC Config GUI to enter feederloss for radio type: IDU(IndoorUnit), ODU(OutdoorUnit) or Unknown separately
+ * Updated ULS parser and the ULS to include the radio architecture that is used by the AFC Engine to use the appropriate feederloss
+ * There is a new WFA test vector ULS that needs to be used is FS_2023-02-07T20_37_35.958370_fixedBPS_sorted_param.sqlite3 which can be downloaded from: https://drive.google.com/file/d/1crjizDwM-aGzfcNFgwbTA2cU4v_XXVr8/view?usp=share_link
+ * There is a new file from WinnForum "transmit_radio_unit_architecture.csv" that is read by the ULS parser. This needs to be placed at: /mnt/nfs/rat_transfer/daily_uls_parse/temp/
+ * For OA-539, there is an updated afc_antenna_patterns.csv file where the ISED antenna models are prefixed with CA and there are no US ones (as agreed). This should be placed at /mnt/nfs/rat_transfer/Antenna_Patterns/
+ 
+## **Testing Done**
+ * OA-536: In the intermediate ULS.csv, the new fields "Tx Model Matched" and "Tx Architecture" are used to validate whether the lookup was done correctly.
+ * In the WFA ULS, out of 106,525 US FS, 62.4% are IDU, 19.9% ODU and the remaining 17.7% are UNKNOWN.
+ * Ran FSP1 and confirmed in exc_thr file that the correct feederloss (IDU vs. ODU) was used for the FS per AFC Config. 
+ * OA-539: Ran FSP1 and confirmed that the correct antenna pattern was used for the US FS. Ran IBP2 and confiremd that the correct antenna pattern was used for the CA and US FS.
+ * FSP1 test results are attached to OA-536.
+ * IBP2 test results are attached to OA-539.
+ * SIP-16 test results are attached to OA-556. 
+
+## **Open Issues** 
+ * If an antenna pattern for Canadian FS is missing and the FS channel is in UNII-6, engine would crash since the default R2-AIP-07 does not currently cover this case.
+
+## **Version and Date**
 |Version|**OA-446**|
 | :- | :- |
 |**Date**|**01/27/2023**|

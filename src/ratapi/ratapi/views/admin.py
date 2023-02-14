@@ -19,6 +19,7 @@ import werkzeug
 from ..models import aaa
 from .auth import auth
 from ..models.base import db
+from .ratapi import nraToRegionStr
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -194,16 +195,14 @@ class AccessPoint(MethodView):
     def put(self, id):
         ''' add an AP. '''
 
-        VALID_NRA = ["fcc"]
         content = flask.request.json
-
         user = aaa.User.query.filter_by(id=id).first()
         org = content.get('org')
         auth(roles=['Admin'], org=org)
         certId = content.get('certificationId')
-        nra = certId.split()[0].lower()
-        if not nra in VALID_NRA:
-            raise exceptions.BadRequest("Invalid NRA")
+        nra = certId.split()[0]
+        # check nra is valid
+        region = nraToRegionStr(nra)
 
         try:
             ap = aaa.AccessPoint(content.get('serialNumber'), content.get('model'), content.get('manufacturer'), content.get('certificationId'), org)

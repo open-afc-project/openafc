@@ -45,7 +45,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 # **Introduction**
 
 This document describes the procedure for submitting the source code changes to the TIP's openAFC github project. Procedure described in this document requires access to TIP's openAFC project and knowledge of the GIT usage. Please contact support@telecominfraproject.com in case you need access to the openAFC project.
-Github.com can be referred for [details of alternate procedures for creating the pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests), developers can use any of these methods but need to include change description as part of pull requests description.
+Github.com can be referred for [details of alternate procedures for creating the pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests), developers can use any of these methods but need to include change description as part of pull requests  description.
 
 
 <br /><br />
@@ -552,6 +552,14 @@ chown 999:999 /var/databases/pgdata
 |AFC_OBJST_MEDIA|`LocalFS`|objst|The media used for storing files by the service.The possible values are `LocalFS` - store files on docker's FS. `GoogleCloudBucket` - store files on Google Store.|
 |AFC_OBJST_LOCAL_DIR|`/storage`|objst|file system path to stored files in file storage container. Used only when `AFC_OBJST_MEDIA` is `LocalFS`|
 |AFC_OBJST_LOG_LVL|`ERROR`|objst|logging level of the file storage. The relevant values are `DEBUG` and `ERROR`.|
+| **MSGHND settings**||||
+|AFC_MSGHND_BIND|`0.0.0.0:8000`|msghnd| the socket to bind. a string of the form: <host>:<port>|
+|AFC_MSGHND_PID|`/run/gunicorn/openafc_app.pid`|msghnd| a filename to use for the PID file|
+|AFC_MSGHND_WORKERS|`20`|msghnd| the number of worker processes for handling requests|
+|AFC_MSGHND_TIMEOUT|`180`|msghnd| workers silent for more than this many seconds are killed and restarted|
+|AFC_MSGHND_ACCESS_LOG|`/proc/self/fd/2`|msghnd| the Access log file to write to|
+|AFC_MSGHND_ERROR_LOG|`/proc/self/fd/2`|msghnd| the Error log file to write to|
+|AFC_MSGHND_LOG_LEVEL|`info`|msghnd| The granularity of Error log outputs (values are 'debug', 'info', 'warning', 'error', 'critical'|
 
 
 ## RabbitMQ settings
