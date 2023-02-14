@@ -334,7 +334,6 @@ class AfcManager
 		// List of tuples where each tuple contains database name and database sqlite file name.
 
 		QString _inputULSDatabaseStr;           // ULS Database being used
-		std::string _rasDataFile;               // File contining RAS data
 
 		QString _propagationEnviro;             // Propagation environment (e.g. Population Density Map)
 

@@ -2105,8 +2105,6 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_ulsDatabaseList.push_back(std::make_tuple("FSDATA", dbfile));
 	}
 
-	_rasDataFile = _mntPath + "/rat_transfer/RAS_Database/" + jsonObj["rasDatabase"].toString().toStdString();
-
 	double cfgMinEIRP;
 	if (jsonObj.contains("minEIRP") && !jsonObj["minEIRP"].isUndefined()) {
 		cfgMinEIRP = jsonObj["minEIRP"].toDouble();
@@ -2202,18 +2200,6 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_rlanITMTxClutterMethod = CConst::ForceTrueITMClutterMethod;
 	}
 	// ***********************************
-
-	QString antennaPattern = jsonObj["antennaPattern"].toObject()["kind"].toString();
-
-
-	// Antenna patterns are now in FS data sqlite3 file
-//	if (antennaPattern == "User Upload") {
-//		//_ulsAntennaPatternFile = SearchPaths::forReading("data", "fbrat/AntennaPatterns/" + jsonObj["antennaPattern"].toObject()["value"].toString(), true).toStdString();
-//		_ulsAntennaPatternFile = _stateRoot + "/Antenna_Patterns/" + jsonObj["antennaPattern"].toObject()["value"].toString().toStdString();
-//		LOGGER_INFO(logger) << "Antenna pattern file set to: " << _ulsAntennaPatternFile;
-//	} else {
-//		_ulsAntennaPatternFile = "";
-//	}
 
 	if (jsonObj.contains("ulsDefaultAntennaType") && !jsonObj["ulsDefaultAntennaType"].isUndefined()) {
 		_ulsDefaultAntennaType = (CConst::ULSAntennaTypeEnum) CConst::strULSAntennaTypeList->str_to_type(jsonObj["ulsDefaultAntennaType"].toString().toStdString(), validFlag, 0);
