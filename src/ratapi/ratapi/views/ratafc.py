@@ -424,7 +424,7 @@ class RatAfc(MethodView):
 
                 # calculate hash of config + request
                 request_json_bytes = json.dumps(request, sort_keys=True).encode('utf-8')
-                hashlibobj.update(request_json_bytes.encode('utf-8'))
+                hashlibobj.update(request_json_bytes)
                 hash = hashlibobj.hexdigest()
 
                 # check cache
