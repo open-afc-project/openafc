@@ -1,0 +1,35 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Dockerfile for Kafka server, used by ALS (AFC Request/Response/Config) logging
+# This dockerfile maps outside config variables to those, used by Bitnami/Kafka 
+
+FROM bitnami/kafka:3.3
+
+# Outside configuration variables
+ENV KAFKA_ADVERTISED_HOST=localhost
+ENV KAFKA_CLIENT_PORT=9092
+ENV KAFKA_BROKER_PORT=9093
+ENV KAFKA_CLIENT_SECURITY_PROTOCOL=PLAINTEXT
+
+# Bitnami Kafka configuration parameters
+ENV KAFKA_ENABLE_KRAFT=yes
+ENV KAFKA_CFG_PROCESS_ROLES=broker,controller
+ENV KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+ENV KAFKA_CFG_BROKER_ID=1
+ENV ALLOW_PLAINTEXT_LISTENER=yes
+ENV KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+ENV KAFKA_CFG_NUM_PARTITIONS=1
+
+# Kafka environment variables, computed from DockerCompose-supplied variables
+# can't be defined in ENV - hence they are moved to ENTRYPOINT
+ENTRYPOINT env \
+           KAFKA_CFG_LISTENERS=PLAINTEXT://:${KAFKA_CLIENT_PORT},CONTROLLER://:${KAFKA_BROKER_PORT} \
+           KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=CONTROLLER:${KAFKA_CLIENT_SECURITY_PROTOCOL},PLAINTEXT:${KAFKA_CLIENT_SECURITY_PROTOCOL} \
+           KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://${KAFKA_ADVERTISED_HOST}:${KAFKA_CLIENT_PORT} \
+           KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@localhost:${KAFKA_BROKER_PORT} \
+           /opt/bitnami/scripts/kafka/entrypoint.sh /opt/bitnami/scripts/kafka/run.sh
