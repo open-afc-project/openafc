@@ -737,7 +737,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 				target.at(r).prReflectorHeight[prIdx]   = prQueryRes.value(prReflectorHeightIdx).isNull() ? quietNaN : prQueryRes.value(prReflectorHeightIdx).toDouble();
 				target.at(r).prReflectorWidth[prIdx]    = prQueryRes.value(prReflectorWidthIdx ).isNull() ? quietNaN : prQueryRes.value(prReflectorWidthIdx ).toDouble();
 
-				int prAntennaIdxDB = q.value(pr_ant_model_idxIdx).toInt();
+				int prAntennaIdxDB = prQueryRes.value(pr_ant_model_idxIdx).toInt();
 
 				antennaPattern = (AntennaClass *) NULL;
 
