@@ -124,25 +124,6 @@ export const isLoggedIn = () => getUser().data.loggedIn;
 export const isActive = () => letin(getUser(), u => u.data.loggedIn && u.data.active);
 
 /**
- * Default region to display, It's set via afc config page
- * @returns default region
- */
-export const getDefaultRegion = () => {
-    const region = getUser().data.region;
-    if (typeof(region)==="undefined") {
-        return "default";
-    } else {
-        return region;
-    }
-}
-
-export const setDefaultRegion = (region:string) => {
-        let newuser = getUser();
-        newuser.data.region = region;
-        setUser(newuser);
-}
-
-/**
  * Does the user have this role?
  * @param role
  * @returns Tells if user has this role

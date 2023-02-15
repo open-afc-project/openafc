@@ -1,0 +1,307 @@
+// Copyright (C) 2022 Broadcom. All rights reserved.
+// The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+// that owns the software below.
+// This work is licensed under the OpenAFC Project License, a copy of which is
+// included with this software program.
+
+// Schemaa of AFC Request/response/config log database
+// This file is a DBML source code for visualizing database scheme in dbdiagram.io
+
+// Table, containing a record for each request messgae/response message/config(s) set
+table afc_message [headercolor: #000000, note: 'AFC Request/Response message pair (contain individual requests/responses)'] {
+  message_id bigserial
+  month_idx smallint
+  afc_server serial
+  rx_time timestamptz
+  tx_time timestamptz
+  rx_envelope_digest uuid [note: 'Envelope of AFC Request message']
+  tx_envelope_digest uuid [note: 'Envelope of AFC Response message']
+  
+  indexes {
+    (message_id, month_idx) [pk]
+    rx_time
+    tx_time
+  }
+}
+
+Ref afc_message_afc_server_ref: afc_message.(afc_server, month_idx) > afc_server.(afc_server_id, month_idx)
+Ref afc_message_rx_envelope_digest_ref: afc_message.(rx_envelope_digest, month_idx) > rx_envelope.(rx_envelope_digest, month_idx)
+Ref afc_message_tx_envelope_digest_ref: afc_message.(tx_envelope_digest, month_idx) > tx_envelope.(tx_envelope_digest, month_idx)
+
+// Outer part of request message
+table rx_envelope [headercolor: #4B82B0, note: 'Envelope (constant part) of AFC Request Message'] {
+  rx_envelope_digest uuid [note: 'MD5 of envelope_json field in UTF8 encoding']
+  month_idx smallint
+  envelope_json json [note: 'AFC Request JSON with empty availableSpectrumInquiryRequests field']
+  
+  indexes {
+    (rx_envelope_digest, month_idx) [pk]
+    rx_envelope_digest [type: hash]
+  }
+}
+
+// Outer part of response message
+table tx_envelope [headercolor: #4B82B0, note: 'Envelope (constant part) of AFC Response Message'] {
+  tx_envelope_digest uuid [note: 'MD5 of envelope_json field in UTF8 encoding']
+  month_idx smallint
+  envelope_json json [note: 'AFC Response JSON with empty availableSpectrumInquiryRequests field']
+  
+  indexes {
+    (tx_envelope_digest, month_idx) [pk]
+    tx_envelope_digest [type: hash]
+  }
+}
+
+// Join table between message table (afc_message) and request/response/config table (request_response)
+// Implement smany-to-many relationship, contains variable part of request/response
+table request_response_in_message [headercolor: #4B82B0, note: 'Associative table for relatonship between AFC Request/Response messages and individual requests/responses. Also encapsulates variable part of requests/responses'] {
+  message_id bigint [note: 'AFC request/response message pair this request/response belongs']
+  request_id text [note: 'ID of request/response within message']
+  month_idx smallint
+  request_response_digest uuid [note: 'Reference to otentially constant part of request/response']
+  expire_time timestamptz [note: 'Response expiration time']
+  
+  indexes {
+    (message_id, request_id, month_idx) [pk]
+    request_id
+    request_response_digest
+    expire_time
+  }
+}
+
+Ref request_response_in_message_message_id_ref: request_response_in_message.(message_id, month_idx) > afc_message.(message_id, month_idx)
+Ref request_response_in_message_request_response_digest_ref: request_response_in_message.(request_response_digest, month_idx) > request_response.(request_response_digest, month_idx)
+
+// Request/response/config - constant part
+table request_response [headercolor: #2D6512, note: 'Potentiially constant part of request/response'] {
+  request_response_digest uuid [note: 'MD5 computed over request/response with requestId and availabilityExpireTime fields set to empty']
+  month_idx smallint
+  afc_config_text_digest uuid [note: 'MD5 over used AFC Config text represnetation']
+  customer_id integer [note: 'AP vendor']
+  uls_data_version_id integer [note: 'Version of used ULS data']
+  geo_data_version_id integer [note: 'Version of used geospatial data']
+  request_json_digest uuid [note: 'MD5 of request JSON with empty requestId']
+  response_json_digest uuid [note: 'MD5 of resaponse JSON with empty requesatId and availabilityExpireTime']
+  device_descriptor_digest uuid [note: 'MD5 of device descriptor (AP) related part of request JSON']
+  location_digest uuid [note: 'MD5 of location-related part of request JSON']
+  response_code int
+  response_description text [note: 'Optional response code short description. Null for success']
+  response_data text [note: 'Optional supplemental failure information. Optional comma-separated list of missing/invalid/unexpected parameters, etc.']
+
+  indexes {
+    (request_response_digest, month_idx) [pk]
+    request_response_digest [type: hash]
+    afc_config_text_digest
+    customer_id
+    device_descriptor_digest
+    location_digest
+    response_code
+    response_description
+    response_data
+  }
+}
+
+Ref request_response_afc_config_text_digest_ref: request_response.(afc_config_text_digest, month_idx) > afc_config.(afc_config_text_digest, month_idx)
+Ref request_response_customer_id_ref: request_response.(customer_id, month_idx) > customer.(customer_id, month_idx)
+Ref request_response_uls_data_version_id_ref: request_response.(uls_data_version_id, month_idx) > uls_data_version.(uls_data_version_id, month_idx)
+Ref request_response_geo_data_version_id_ref: request_response.(geo_data_version_id, month_idx) > geo_data_version.(geo_data_version_id, month_idx)
+Ref request_response_request_json_digest_ref: request_response.(request_json_digest, month_idx) > compressed_json.(compressed_json_digest, month_idx)
+Ref request_response_response_json_digest_ref: request_response.(response_json_digest, month_idx) > compressed_json.(compressed_json_digest, month_idx)
+Ref request_response_device_descriptor_digest_ref: request_response.(device_descriptor_digest, month_idx) > device_descriptor.(device_descriptor_digest, month_idx)
+Ref request_response_location_digest_ref: request_response.(location_digest, month_idx) > location.(location_digest, month_idx)
+
+// AP device descriptor
+table device_descriptor [headercolor: #2D6512, note: 'Information about device (e.g. AP)'] {
+  device_descriptor_digest uuid [note: 'MD5 over parts of requesat JSON pertinent to AP']
+  month_idx smallint
+  serial_number text [note: 'AP serial number']
+  certifications_digest uuid [note: 'Device certifications']
+  regulatory_rules_digest uuid [note: 'Device computation rules']
+
+  indexes {
+    (device_descriptor_digest, month_idx) [pk]
+    device_descriptor_digest [type: hash]
+    serial_number
+    certifications_digest
+    regulatory_rules_digest
+  }  
+}
+
+Ref device_descriptor_certifications_digest_ref: device_descriptor.(certifications_digest, month_idx) <> certification.(certifications_digest, month_idx)
+Ref device_descriptor_regulatory_rules_digest_ref: device_descriptor.(regulatory_rules_digest, month_idx) <> regulatory_rule.(regulatory_rules_digest, month_idx)
+
+// Single certification
+table certification [headercolor: #79AD51, note: 'Element of certifications list'] {
+  certifications_digest uuid [note: 'MD5 of certification list json']
+  certification_index smallint [note: 'Index in certification list']
+  month_idx smallint
+  nra text [note: 'National regulatory authority']
+  certification_id text [note: 'Certification ID']
+  
+  indexes {
+    (certifications_digest, certification_index, month_idx) [pk]
+    certifications_digest [type: hash]
+    nra
+    certification_id
+  }
+}
+
+// Single regulatory rule
+table regulatory_rule [headercolor: #79AD51, note: 'Element of regulatory rules list'] {
+  regulatory_rules_digest uuid [note: 'MD5 of rules list']
+  regulatory_rule_index smallint [note: 'Index in regulatory rules list']
+  month_idx smallint
+  regulatory_rule_name text [note: 'Rule name']
+  
+  indexes {
+    (regulatory_rules_digest, regulatory_rule_index, month_idx) [pk]
+    regulatory_rules_digest [type: hash]
+    regulatory_rule_name
+  }
+}
+
+// Compressed text of constant part of request or response
+table compressed_json [headercolor: #2D6512, note: 'Compressed body of request or response'] {
+  compressed_json_digest uuid [note: 'MD5 hash of compressed data']
+  month_idx smallint
+  compressed_json_data bytea [note: 'Compressed data']
+  
+  indexes {
+    (compressed_json_digest, month_idx) [pk]
+    compressed_json_digest [type: hash]
+  }
+}
+
+// Customer information
+table customer [headercolor: #79AD51, note: 'Customer aka vendor aka user'] {
+  customer_id serial
+  month_idx smallint
+  customer_name text [note: 'Its name']
+  
+  indexes {
+    (customer_id, month_idx) [pk]
+    customer_name
+  }
+}
+
+// AP location information
+table location [headercolor: #2D6512, note: 'AP location'] {
+  location_digest uuid [note: 'MD5 computed over location part of request JSON']
+  month_idx smallint
+  location_wgs84 geography(POINT,4326) [note: 'AP area center (WGS84 coordinates)']
+  location_uncertainty_m real [note: 'Radius of AP uncertainty area in meters']
+  location_type text [note: 'Ellipse/LinearPolygon/RadialPolygon']
+  deployment_type int [note: '0/1/2 for unknown/indoor/outdoor']
+  height_m real [note: 'AP elevation in meters']
+  height_uncertainty_m real [note: 'Elevation uncertainty in meters']
+  height_type text [note: 'Elevation type']
+  
+  indexes {
+    (location_digest, month_idx) [pk]
+    location_digest [type: hash]
+    location_wgs84
+    location_type
+    height_m
+    height_type
+  }
+}
+
+// AFC Config
+table afc_config [headercolor: #79AD51, note: 'AFC Config'] {
+  afc_config_text_digest uuid [note: 'MD5 computed over text representation']
+  month_idx smallint
+  afc_config_text text [note: 'Text representation of AFC Config']
+  afc_config_json json [note: 'JSON representation of AFC Config']
+  
+  indexes {
+    (afc_config_text_digest, month_idx) [pk]
+    afc_config_text_digest [type: hash]
+  }
+}
+
+// Geodetic data version
+table geo_data_version [headercolor: #79AD51, note: 'Version of geospatial data'] {
+  geo_data_version_id serial
+  month_idx smallint
+  geo_data_version text
+  
+  indexes {
+    (geo_data_version_id, month_idx) [pk]
+    (geo_data_version, month_idx) [unique]
+    geo_data_version
+  }
+}
+
+// ULS data version
+table uls_data_version [headercolor: #79AD51, note: "Version of ULS data'"] {
+  uls_data_version_id serial
+  month_idx smallint
+  uls_data_version text
+  
+  indexes {
+    (uls_data_version_id, month_idx) [pk]
+    (uls_data_version, month_idx) [unique]
+    uls_data_version
+  }
+}
+
+// PSD result
+table max_psd [headercolor: #990D0D, note: 'PSD result'] {
+  request_response_digest uuid [note: 'Request this result belongs to']
+  month_idx smallint
+  low_frequency_mhz smallint 
+  high_frequency_mhz smallint
+  max_psd_dbm_mhz real
+  
+  indexes {
+    (request_response_digest, month_idx, low_frequency_mhz, high_frequency_mhz) [pk]
+    request_response_digest [type: hash]
+    low_frequency_mhz
+    high_frequency_mhz
+    max_psd_dbm_mhz
+  }
+}
+
+Ref max_psd_request_response_digest_ref: max_psd.(request_response_digest, month_idx) > request_response.(request_response_digest, month_idx)
+
+// EIRP result
+table max_eirp [headercolor: #990D0D, note: 'EIRP result'] {
+  request_response_digest uuid [note: 'Request this result belongs to']
+  month_idx smallint
+  op_class smallint
+  channel smallint
+  max_eirp_dbm real
+  
+  indexes {
+    (request_response_digest, month_idx, op_class, channel) [pk]
+    request_response_digest [type: hash]
+    op_class
+    channel
+    max_eirp_dbm
+  }
+}
+
+Ref max_eirp_request_response_digest_ref: max_eirp.(request_response_digest, month_idx) > request_response.(request_response_digest, month_idx)
+
+// AFC Server
+table afc_server [headercolor: #4B82B0] {
+  afc_server_id serial
+  month_idx smallint
+  afc_server_name text [unique]
+  
+  indexes {
+    (afc_server_id, month_idx) [pk]
+    (afc_server_name, month_idx) [unique]
+    afc_server_name
+  }
+}
+
+// Message decoding problems
+table decode_error {
+  id bigserial [pk]
+  time timestamptz
+  msg text
+  code_line integer
+  data text
+  month_idx smallint
+}

@@ -21,6 +21,9 @@ OBJST="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"          # object stora
 RMQ="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                   # rabbitmq image
 NGNX="public.ecr.aws/w9v6y1o0/openafc/ngnx-image"                 # ngnx image
 RTEST_DI="rtest"                                                  # regression tests image
+ALS_SIPHON="public.ecr.aws/w9v6y1o0/openafc/als-siphon-image"     # ALS Siphon image
+ALS_KAFKA="public.ecr.aws/w9v6y1o0/openafc/als-kafka-image"       # Kafka for ALS
+ALS_POSTGRES="public.ecr.aws/w9v6y1o0/openafc/als-postgres-image" # PostgreSQL for ALS
 
 ULS_UPDATER="110738915961.dkr.ecr.us-east-1.amazonaws.com/uls-updater"    # ULS Updater images
 
@@ -145,6 +148,12 @@ build_dev_server() {
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B} --build-arg PRINST_NAME=${PRINST} --build-arg BUILDREV=${BUILDREV}"
   docker_build_and_push Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}" &
   msg "wait for prereqs to be built"
+
+  # build ALS-related images
+  cd ${wd}/src/als && docker_build_and_push Dockerfile.siphon ${ALS_SIPHON}:${tag} ${push} &
+  cd ${wd}/src/als && docker_build_and_push Dockerfile.kafka ${ALS_KAFKA}:${tag} ${push} &
+  cd ${wd}/src/als && docker_build_and_push Dockerfile.postgres ${ALS_POSTGRES}:${tag} ${push} &
+  cd ${wd}
 
   msg "wait for all images to be built"
   wait

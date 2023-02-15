@@ -68,7 +68,7 @@ class User(db.Model, UserMixin):
     last_name = db.Column(db.String(50))
 
     # Relationships
-    roles = db.relationship('Role', secondary='aaa_user_role')
+    roles = db.relationship('Role', secondary='aaa_user_role', back_populates='users')
 
     @staticmethod
     def get(user_id):
@@ -97,7 +97,7 @@ class Role(db.Model):
     name = db.Column(db.String(50))
 
     # Relationships
-    users = db.relationship('User', secondary='aaa_user_role')
+    users = db.relationship('User', secondary='aaa_user_role', back_populates='roles')
 
 
 class UserRole(db.Model):

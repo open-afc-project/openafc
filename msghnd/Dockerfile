@@ -14,7 +14,7 @@ py3-requests py3-flask py3-psycopg2 && python3 -m ensurepip && \
 pip3 install --no-cache --upgrade pip setuptools
 COPY msghnd/requirements.txt /wd/
 RUN pip3 install -r /wd/requirements.txt && mkdir -p /run/gunicorn /etc/xdg/fbrat
-COPY gunicorn/wsgi.py gunicorn/gunicorn.conf.py gunicorn/gunicorn.logs.conf /wd/
+COPY gunicorn/wsgi.py /wd/
 COPY prereqs/ratapi.conf /etc/xdg/fbrat/
 RUN echo "AFC_APP_TYPE = 'msghnd'" >> /etc/xdg/fbrat/ratapi.conf
 #

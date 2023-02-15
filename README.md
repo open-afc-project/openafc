@@ -552,6 +552,14 @@ chown 999:999 /var/databases/pgdata
 |AFC_OBJST_MEDIA|`LocalFS`|objst|The media used for storing files by the service.The possible values are `LocalFS` - store files on docker's FS. `GoogleCloudBucket` - store files on Google Store.|
 |AFC_OBJST_LOCAL_DIR|`/storage`|objst|file system path to stored files in file storage container. Used only when `AFC_OBJST_MEDIA` is `LocalFS`|
 |AFC_OBJST_LOG_LVL|`ERROR`|objst|logging level of the file storage. The relevant values are `DEBUG` and `ERROR`.|
+| **MSGHND settings**||||
+|AFC_MSGHND_BIND|`0.0.0.0:8000`|msghnd| the socket to bind. a string of the form: <host>:<port>|
+|AFC_MSGHND_PID|`/run/gunicorn/openafc_app.pid`|msghnd| a filename to use for the PID file|
+|AFC_MSGHND_WORKERS|`20`|msghnd| the number of worker processes for handling requests|
+|AFC_MSGHND_TIMEOUT|`180`|msghnd| workers silent for more than this many seconds are killed and restarted|
+|AFC_MSGHND_ACCESS_LOG|`/proc/self/fd/2`|msghnd| the Access log file to write to|
+|AFC_MSGHND_ERROR_LOG|`/proc/self/fd/2`|msghnd| the Error log file to write to|
+|AFC_MSGHND_LOG_LEVEL|`info`|msghnd| The granularity of Error log outputs (values are 'debug', 'info', 'warning', 'error', 'critical'|
 
 
 ## RabbitMQ settings

@@ -49,11 +49,6 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
     }
 
     private submit() {
-        if (this.state.certificationIdNra.toLowerCase() !== "fcc") {
-            this.setState({ messageType: "danger", messageValue: "Invalid NRA"});
-            return;
-        }
-
         if (!this.state.serialNumber) {
             this.setState({ messageType: "danger", messageValue: "Serial number must be specified" });
             return;

@@ -5,15 +5,13 @@ import BuildlingPenetrationLossForm from "./BuildingPenetrationLossForm";
 import PolarizationMismatchLossForm from "./PolarizationMismatchLossForm";
 import { ITMParametersForm } from "./ITMParametersForm";
 import BodyLossForm from "./BodyLossForm";
-import AntennaPatternForm from "./AntennaPatternForm";
 import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
-import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache } from "../Lib/RatApi";
+import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache, getRegions } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
 import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
-import { setDefaultRegion } from "../Lib/User";
 import DownloadContents from "../Components/DownloadContents";
 
 /**
@@ -31,6 +29,7 @@ export class AFCForm extends React.Component<
         config: AFCConfigFile,
         ulsFiles: string[],
         antennaPatterns: string[],
+        regions: string[],
         onSubmit: (x: AFCConfigFile) => Promise<RatResponse<string>>
     },
     {
@@ -42,7 +41,7 @@ export class AFCForm extends React.Component<
     }
 > {
 
-    constructor(props: Readonly<{ limit: Limit; frequencyBands: FreqRange[]; config: AFCConfigFile; ulsFiles: string[]; antennaPatterns: string[]; onSubmit: (x: AFCConfigFile) => Promise<RatResponse<string>>; }>) {
+    constructor(props: Readonly<{ limit: Limit; frequencyBands: FreqRange[]; config: AFCConfigFile; ulsFiles: string[]; antennaPatterns: string[]; regions: string[]; onSubmit: (x: AFCConfigFile) => Promise<RatResponse<string>>; }>) {
         super(props);
         let config = props.config as AFCConfigFile
         if (props.frequencyBands.length > 0) {
@@ -56,15 +55,7 @@ export class AFCForm extends React.Component<
             messageError: undefined,
             messageSuccess: undefined,
             isModalOpen: false,
-            antennaPatternData: {
-                defaultAntennaPattern: config.ulsDefaultAntennaType,
-                userUpload: {
-                    kind: config.antennaPattern?.kind == "User Upload" ? "User Upload" : "None",
-                    value: config.antennaPattern?.value
-                }
-            }
         }
-        setDefaultRegion(config.regionStr);
     }
 
     private hasValue = (val: any) => val !== undefined && val !== null;
@@ -78,17 +69,16 @@ export class AFCForm extends React.Component<
     private setMaxLinkDistance = (n: number) => this.setState({ config: Object.assign(this.state.config, { maxLinkDistance: n }) });
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => {
-        this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
-        setDefaultRegion(n);
-        //    getAfcConfigFile().then(
-        //        res => {
-        //             if (res.kind === "Success") {
-        //                 this.updateEntireConfigState(res.result);
-        //             } else {
-        //                 this.setState({ messageError: res.description, messageSuccess: undefined });
-        //            }
-        //        }
-        //   )
+       this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
+       // region changed by user, reload the coresponding configuration for that region
+       getAfcConfigFile(n).then(
+           res => {
+           if (res.kind === "Success") {
+               this.updateEntireConfigState(res.result);
+           } else {
+               this.setState({ messageError: res.description, messageSuccess: undefined });
+           }
+        })
     }
     private setEnableMapInVirtualAp = (n: boolean) => this.setState({ config: Object.assign(this.state.config, { enableMapInVirtualAp: n }) });
     private setVisiblityThreshold = (n: number) => this.setState({ config: Object.assign(this.state.config, { visibilityThreshold: n }) });
@@ -210,16 +200,8 @@ export class AFCForm extends React.Component<
     private updateEntireConfigState(config: AFCConfigFile) {
         this.setState({
             config: config,
-            antennaPatternData: {
-                defaultAntennaPattern: config.ulsDefaultAntennaType,
-                userUpload: {
-                    kind: config.antennaPattern?.kind == "User Upload" ? "User Upload" : "None",
-                    value: config.antennaPattern?.value
-                }
-            }
         }
         );
-        setDefaultRegion(config.regionStr);
     }
 
     /**
@@ -336,13 +318,6 @@ export class AFCForm extends React.Component<
             const conf = this.state.config;
             conf.bodyLoss = x;
             this.setState({ config: conf });
-        }
-
-        const setAntennaPattern = (x: AntennaPatternState) => {
-            const conf = this.state.config;
-            conf.ulsDefaultAntennaType = x.defaultAntennaPattern;
-            conf.antennaPattern = x.userUpload?.kind == "User Upload" ? { kind: x.userUpload.kind, value: x.userUpload.value } : { kind: 'None', value: "" }
-            this.setState({ config: conf, antennaPatternData: x });
         }
 
         const setPropogationModel = (x: PropagationModel) => {
@@ -479,8 +454,9 @@ export class AFCForm extends React.Component<
                                     style={{ textAlign: "right" }}
                                 >
                                     <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
-                                    <FormSelectOption key={"USA"} value={"USA"} label={"USA"} />
-                                    <FormSelectOption key={"Canada"} value={"Canada"} label={"Canada"} />
+                                    {this.props.regions.map((option: string) => (
+                                        <FormSelectOption key={option} value={option} label={option} />
+                                    ))}
                                 </FormSelect>
                             </FormGroup>
                         </GalleryItem>
@@ -586,12 +562,12 @@ export class AFCForm extends React.Component<
                                     content={
                                         <>
                                             <p>Feederloss is set to: </p>
-                                                <ul>
-                                                    <li>
-                                                        the Feederloss in the FS Database (if present)
-                                                    </li>
-                                                    <li>Else, the applicable value below</li>
-                                                </ul>
+                                            <ul>
+                                                <li>
+                                                    the Feederloss in the FS Database (if present)
+                                                </li>
+                                                <li>Else, the applicable value below</li>
+                                            </ul>
                                         </>
                                     }
                                 >
@@ -777,12 +753,6 @@ export class AFCForm extends React.Component<
                                     isValid={this.state.config.maxLinkDistance >= 1} />
                                     <InputGroupText>km</InputGroupText></InputGroup>
                             </FormGroup>
-                        </GalleryItem>
-                        <GalleryItem>
-                            <AntennaPatternForm
-                                data={this.state.antennaPatternData}
-                                antennaPatternFiles={this.props.antennaPatterns}
-                                onChange={setAntennaPattern} />
                         </GalleryItem>
                         <GalleryItem>
                             <APUncertaintyForm
