@@ -140,6 +140,24 @@ def create_app(config_override=None):
         from flask_user import UserManager
         user_manager = UserManager(flaskapp, db, models.aaa.User)
 
+        @flaskapp.before_request
+        def log_user_access():
+            if flask.request.endpoint == 'user.logout':
+                from flask_login import current_user
+                try:
+                    LOGGER.debug('user:%s logout ', current_user.username)
+                    als.als_json_log('user_access', {'action':'logout', 'user':current_user.username, 'from':flask.request.remote_addr})
+                except:
+                    LOGGER.debug('user:%s logout ', 'unknown')
+                    als.als_json_log('user_access', {'action':'logout', 'user':'unknown', 'from':flask.request.remote_addr})
+
+        @flaskapp.after_request
+        def log_user_accessed(response):
+            if flask.request.method == 'POST' and flask.request.endpoint == 'user.login':
+                LOGGER.debug('user:%s login status %d', flask.request.form['username'], response.status_code)
+                als.als_json_log('user_access', {'action':'login', 'user':flask.request.form['username'], 'from':flask.request.remote_addr})
+            return response
+
     # Check configuration
     state_path = flaskapp.config['STATE_ROOT_PATH']
     nfs_mount_path = flaskapp.config['NFS_MOUNT_PATH']

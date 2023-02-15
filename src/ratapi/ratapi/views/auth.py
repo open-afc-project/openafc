@@ -20,6 +20,7 @@ from ..models.base import db
 from .. import config
 from ..models.aaa import User
 from flask_login import current_user
+from .. import als
 
 OIDC_LOGIN = config.OIDC_LOGIN
 try:
@@ -237,6 +238,9 @@ class CallbackAPI(MethodView):
                 'An unexpected error occured. Please try again.')
 
         login_user(user)
+
+        LOGGER.debug('user:%s login success', user.username)
+        als.als_json_log('user_access', {'action':'login', 'user':user.username, 'from':flask.request.remote_addr})
         return flask.redirect(flask.url_for("root"))
 
 
@@ -249,6 +253,13 @@ class LogoutAPI(MethodView):
         # store app state and code verifier in session
         if not flask.current_app.config['OIDC_LOGIN']:
             return flask.redirect(flask.url_for('user.logout'))
+
+        try:
+           LOGGER.debug('user:%s logout', current_user.username)
+           als.als_json_log('user_access', {'action':'logout', 'user':current_user.username, 'from':flask.request.remote_addr})
+        except:
+           LOGGER.debug('user:%s logout', 'unknown')
+           als.als_json_log('user_access', {'action':'logout', 'user':'unknown', 'from':flask.request.remote_addr})
 
         logout_user()
         return flask.redirect(flask.url_for("root"))
