@@ -54,7 +54,6 @@ export interface AFCConfigFile {
     clutterAtFS: boolean,
     fsClutterModel?: FSClutterModel,
     regionStr?: string,
-    rasDatabase?: string,
     enableMapInVirtualAp?: boolean,
     channelResponseAlgorithm: ChannelResponseAlgorithm,
     visibilityThreshold?: number,
