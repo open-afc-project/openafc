@@ -155,7 +155,11 @@ def create_app(config_override=None):
         def log_user_accessed(response):
             if flask.request.method == 'POST' and flask.request.endpoint == 'user.login':
                 LOGGER.debug('user:%s login status %d', flask.request.form['username'], response.status_code)
-                als.als_json_log('user_access', {'action':'login', 'user':flask.request.form['username'], 'from':flask.request.remote_addr})
+                if response.status_code != 302:
+                    als.als_json_log('user_access', {'action':'login', 'user':flask.request.form['username'], 'from':flask.request.remote_addr, 'status':response.status_code})
+                else:
+                    als.als_json_log('user_access', {'action':'login', 'user':flask.request.form['username'], 'from':flask.request.remote_addr, 'status':'success'})
+
             return response
 
     # Check configuration
