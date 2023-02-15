@@ -395,12 +395,13 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		{
 			// throw std::runtime_error(ErrStream() << "UlsDatabase.cpp: Failed to get last item. Check that lat/lon are within CONUS : " << q.at());
 			// No FS's within 150 Km, return with empty list
-			return;
+			// return;
+		} else {
+			LOGGER_DEBUG(logger) << target.size() << " to last " << q.at();
+			target.resize(q.at()+1);
+			q.first();
+			q.previous();
 		}
-		LOGGER_DEBUG(logger) << target.size() << " to last " << q.at();
-		target.resize(q.at()+1);
-		q.first();
-		q.previous();
 	}
 
 	/**************************************************************************************/

@@ -1022,10 +1022,10 @@ void UlsFileReader::readIndividualRASUS(const std::vector<std::string> &fieldLis
                 current.radiusKm = emptyAtof(field.c_str());
                 break;
             case 15:
-                current.centerLat = emptyAtof(field.c_str());
+                current.centerLat = UlsFunctionsClass::getAngleFromDMS(field.c_str());
                 break;
             case 16:
-                current.centerLon = emptyAtof(field.c_str());
+                current.centerLon = UlsFunctionsClass::getAngleFromDMS(field.c_str());
                 break;
             case 17:
                 current.heightAGL = emptyAtof(field.c_str());
