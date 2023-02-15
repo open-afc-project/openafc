@@ -42,7 +42,6 @@ export interface AFCConfigFile {
     threshold: number,
     maxLinkDistance: number,
     ulsDefaultAntennaType: DefaultAntennaType,
-    antennaPattern: UserAntennaPattern,
     scanPointBelowGroundMethod: ScanPointBelowGroundMethod
     propagationModel: PropagationModel,
     APUncertainty: APUncertainty,

@@ -62,10 +62,6 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
             "stopFreqMHz": 6875
         }
     ],
-    "antennaPattern": {
-        "kind": "None",
-        "value": ""
-    },
     "ulsDefaultAntennaType": "WINNF-AIP-07",
     "scanPointBelowGroundMethod": "truncate",
     "polarizationMismatchLoss": {
@@ -139,7 +135,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "visibilityThreshold": -6,
     "version": guiConfig.version,
     "allowScanPtsInUncReg": false,
-    "passiveRepeaterFlag": false,
+    "passiveRepeaterFlag": true,
     "printSkippedLinksFlag": false,
     "reportErrorRlanHeightLowFlag": false
 });
