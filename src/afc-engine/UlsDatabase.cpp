@@ -489,7 +489,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
                     /* heightAGL                                                              */
                     /**************************************************************************/
                     double heightAGL = rasQueryRes.value(ras_heightAGLIdx).isNull() ? quietNaN
-                                  : rasQueryRes.value(ras_heightAGLIdx).toDouble()*1.0e3; // Convert km to m
+                                  : rasQueryRes.value(ras_heightAGLIdx).toDouble(); // Height value in m
                     ras->setHeightAGL(heightAGL);
                     /**************************************************************************/
                 }
