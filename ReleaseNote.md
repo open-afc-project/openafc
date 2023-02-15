@@ -1,4 +1,15 @@
 # Release Note
+## **Version and Date**
+|Version|3.7.2.0|
+| :- | :- |
+|**Date**|**15/02/2023**|
+|compiled server's version is tbd | git tag 3.7.2.0|
+## **Issues Addressed**
+ * OA-549 Establish sending logs from AFC server to PostgreSQL/PostGIS database
+ * OA-562 create-new-test-results-using-new-kml-file-from-oa-536
+ * OA-563 Add configurable MSGHND parameters
+ * OA-540 Include hash in path to afcconfig cached object.
+
 
 ## **Version and Date**
 |Version|3.7.1.0|
