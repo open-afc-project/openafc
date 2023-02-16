@@ -5,7 +5,6 @@ import BuildlingPenetrationLossForm from "./BuildingPenetrationLossForm";
 import PolarizationMismatchLossForm from "./PolarizationMismatchLossForm";
 import { ITMParametersForm } from "./ITMParametersForm";
 import BodyLossForm from "./BodyLossForm";
-import AntennaPatternForm from "./AntennaPatternForm";
 import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
@@ -56,13 +55,6 @@ export class AFCForm extends React.Component<
             messageError: undefined,
             messageSuccess: undefined,
             isModalOpen: false,
-            antennaPatternData: {
-                defaultAntennaPattern: config.ulsDefaultAntennaType,
-                userUpload: {
-                    kind: config.antennaPattern?.kind == "User Upload" ? "User Upload" : "None",
-                    value: config.antennaPattern?.value
-                }
-            }
         }
     }
 
@@ -208,13 +200,6 @@ export class AFCForm extends React.Component<
     private updateEntireConfigState(config: AFCConfigFile) {
         this.setState({
             config: config,
-            antennaPatternData: {
-                defaultAntennaPattern: config.ulsDefaultAntennaType,
-                userUpload: {
-                    kind: config.antennaPattern?.kind == "User Upload" ? "User Upload" : "None",
-                    value: config.antennaPattern?.value
-                }
-            }
         }
         );
     }
@@ -333,13 +318,6 @@ export class AFCForm extends React.Component<
             const conf = this.state.config;
             conf.bodyLoss = x;
             this.setState({ config: conf });
-        }
-
-        const setAntennaPattern = (x: AntennaPatternState) => {
-            const conf = this.state.config;
-            conf.ulsDefaultAntennaType = x.defaultAntennaPattern;
-            conf.antennaPattern = x.userUpload?.kind == "User Upload" ? { kind: x.userUpload.kind, value: x.userUpload.value } : { kind: 'None', value: "" }
-            this.setState({ config: conf, antennaPatternData: x });
         }
 
         const setPropogationModel = (x: PropagationModel) => {
@@ -584,12 +562,12 @@ export class AFCForm extends React.Component<
                                     content={
                                         <>
                                             <p>Feederloss is set to: </p>
-                                                <ul>
-                                                    <li>
-                                                        the Feederloss in the FS Database (if present)
-                                                    </li>
-                                                    <li>Else, the applicable value below</li>
-                                                </ul>
+                                            <ul>
+                                                <li>
+                                                    the Feederloss in the FS Database (if present)
+                                                </li>
+                                                <li>Else, the applicable value below</li>
+                                            </ul>
                                         </>
                                     }
                                 >
@@ -775,12 +753,6 @@ export class AFCForm extends React.Component<
                                     isValid={this.state.config.maxLinkDistance >= 1} />
                                     <InputGroupText>km</InputGroupText></InputGroup>
                             </FormGroup>
-                        </GalleryItem>
-                        <GalleryItem>
-                            <AntennaPatternForm
-                                data={this.state.antennaPatternData}
-                                antennaPatternFiles={this.props.antennaPatterns}
-                                onChange={setAntennaPattern} />
                         </GalleryItem>
                         <GalleryItem>
                             <APUncertaintyForm

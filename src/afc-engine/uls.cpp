@@ -587,13 +587,13 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 	// int freqIdx;
 	double rxGainDB;
 
-	if ((frequency >= 5925.0e6) && (frequency <= 6425.0e6)) {
+	// if ((frequency >= 5925.0e6) && (frequency <= 6425.0e6)) {
 		// freqIdx = 0;
-	} else if ((frequency >= 6525.0e6) && (frequency <= 6875.0e6)) {
+	// } else if ((frequency >= 6525.0e6) && (frequency <= 6875.0e6)) {
 		// freqIdx = 1;
-	} else {
-		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value");
-	}
+	// } else {
+		// throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07Antenna: frequency = " << frequency << " INVALID value");
+	// }
 
 	if (maxGain < 38) {
 		if (angleOffBoresightDeg < 5) {
@@ -819,6 +819,8 @@ PRClass::PRClass()
 	rxDlambda = quietNaN;
 	antCategory = CConst::UnknownAntennaCategory;
 	antModel = "";
+    antennaType = CConst::UnknownAntennaType;
+    antenna = (AntennaClass *) NULL;
 
 	reflectorHeightLambda = quietNaN;
 	reflectorWidthLambda = quietNaN;
@@ -856,8 +858,29 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 		case CConst::backToBackAntennaPRType:
 			{
 				std::string subModelStr;
-				double rxGainDB = ULSClass::calcR2AIP07Antenna(angleOffBoresightDeg, frequency, antModel, antCategory, subModelStr, 0, rxGain, rxDlambda);
-				discriminationDB = rxGainDB - rxGain;
+				switch(antennaType) {
+					case CConst::F1245AntennaType:
+						discriminationDB = calcItu1245::CalcITU1245(angleOffBoresightDeg, rxGain, rxDlambda) - rxGain;
+						break;
+					case CConst::F699AntennaType:
+						discriminationDB = calcItu699::CalcITU699(angleOffBoresightDeg, rxGain, rxDlambda) - rxGain;
+						break;
+					case CConst::F1336OmniAntennaType:
+						discriminationDB = calcItu1336_4::CalcITU1336_omni_avg(elevationAngleDeg, rxGain, frequency) - rxGain;
+						break;
+					case CConst::R2AIP07AntennaType:
+						discriminationDB = ULSClass::calcR2AIP07Antenna(angleOffBoresightDeg, frequency, antModel, antCategory, subModelStr, 0, rxGain, rxDlambda) - rxGain;
+						break;
+					case CConst::OmniAntennaType:
+						discriminationDB = 0.0;
+						break;
+					case CConst::LUTAntennaType:
+						discriminationDB = antenna->gainDB(angleOffBoresightDeg*M_PI/180.0);
+						break;
+					default:
+						throw std::runtime_error(ErrStream() << "ERROR in PRClass::computeDiscriminationGain: antennaType = " << antennaType << " INVALID value");
+						break;
+				}
 
 				reflectorD0 = quietNaN;
 				reflectorD1 = quietNaN;

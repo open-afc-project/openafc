@@ -376,8 +376,6 @@ AfcManager::AfcManager()
 
 	_ulsList = new ListClass<ULSClass *>(0);
 
-	_rasList = new ListClass<RASClass *>(0);
-
 	_pathLossModel = CConst::unknownPathLossModel;
 
 	_zbldg2109 = quietNaN;
@@ -419,7 +417,6 @@ AfcManager::~AfcManager()
 		delete AfcManager::_dataIf;
 	}
 	delete _ulsList;
-	delete _rasList;
 }
 /******************************************************************************************/
 
@@ -586,7 +583,7 @@ void AfcManager::initializeDatabases()
 		}
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		readULSData(_ulsDatabaseList, (PopGridClass *) NULL, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, 0.0, 0.0, 0.0, 0.0);
-		readRASData(_rasDataFile);
+		// readRASData(_rasDataFile);
 		if (_ulsList->getSize() == 0) {
 		} else if (_ulsList->getSize() > 1) {
 		}
@@ -738,15 +735,6 @@ void AfcManager::initializeDatabases()
 	/**************************************************************************************/
 
 	/**************************************************************************************/
-	/* Read Antenna Pattern Data if provided // This will be used in phase 2              */
-	/**************************************************************************************/
-	if (!_ulsAntennaPatternFile.empty())
-	{
-		_ulsAntennaList = AntennaClass::readMultipleBoresightAntennas(_ulsAntennaPatternFile);
-	}
-	/**************************************************************************************/
-
-	/**************************************************************************************/
 	/* Read Near Field Adjustment table                                                   */
 	/**************************************************************************************/
 	if (_nearFieldAdjFlag) {
@@ -775,7 +763,7 @@ void AfcManager::initializeDatabases()
 
 	if (_analysisType == "HeatmapAnalysis" || _analysisType == "AP-AFC" || _analysisType == "ScanAnalysis") {
 		readULSData(_ulsDatabaseList, _popGrid, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, minLat, maxLat, minLon, maxLon);
-		readRASData(_rasDataFile);
+		// readRASData(_rasDataFile);
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		fixFSTerrain();
 #if DEBUG_AFC
@@ -808,11 +796,14 @@ void AfcManager::clearData()
 {
 	clearULSList();
 
-	clearRASList();
-
-	for (int antIdx = 0; antIdx < (int)_ulsAntennaList.size(); antIdx++)
+	for (int antIdx = 0; antIdx < (int)_antennaList.size(); antIdx++)
 	{
-		delete _ulsAntennaList[antIdx];
+		delete _antennaList[antIdx];
+	}
+
+	for (int rasIdx = 0; rasIdx < (int)_rasList.size(); rasIdx++)
+	{
+		delete _rasList[rasIdx];
 	}
 
 	if (_popGrid) {
@@ -866,23 +857,6 @@ void AfcManager::clearULSList()
 		delete uls;
 	}
 	_ulsList->reset();
-}
-/******************************************************************************************/
-
-/******************************************************************************************/
-/**** FUNCTION: AfcManager::clearRASList                                               ****/
-/******************************************************************************************/
-void AfcManager::clearRASList()
-{
-	int rasIdx;
-	RASClass *ras;
-
-	for (rasIdx = 0; rasIdx <= _rasList->getSize() - 1; rasIdx++)
-	{
-		ras = (*_rasList)[rasIdx];
-		delete ras;
-	}
-	_rasList->reset();
 }
 /******************************************************************************************/
 
@@ -2128,10 +2102,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		}
 	} else {
 		std::string dbfile = _mntPath + "/rat_transfer/ULS_Database/" + jsonObj["ulsDatabase"].toString().toStdString();
-		_ulsDatabaseList.push_back(std::make_tuple("CONUS", dbfile));
+		_ulsDatabaseList.push_back(std::make_tuple("FSDATA", dbfile));
 	}
-
-	_rasDataFile = _mntPath + "/rat_transfer/RAS_Database/" + jsonObj["rasDatabase"].toString().toStdString();
 
 	double cfgMinEIRP;
 	if (jsonObj.contains("minEIRP") && !jsonObj["minEIRP"].isUndefined()) {
@@ -2228,16 +2200,6 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_rlanITMTxClutterMethod = CConst::ForceTrueITMClutterMethod;
 	}
 	// ***********************************
-
-	QString antennaPattern = jsonObj["antennaPattern"].toObject()["kind"].toString();
-
-	if (antennaPattern == "User Upload") {
-		//_ulsAntennaPatternFile = SearchPaths::forReading("data", "fbrat/AntennaPatterns/" + jsonObj["antennaPattern"].toObject()["value"].toString(), true).toStdString();
-		_ulsAntennaPatternFile = _stateRoot + "/Antenna_Patterns/" + jsonObj["antennaPattern"].toObject()["value"].toString().toStdString();
-		LOGGER_INFO(logger) << "Antenna pattern file set to: " << _ulsAntennaPatternFile;
-	} else {
-		_ulsAntennaPatternFile = "";
-	}
 
 	if (jsonObj.contains("ulsDefaultAntennaType") && !jsonObj["ulsDefaultAntennaType"].isUndefined()) {
 		_ulsDefaultAntennaType = (CConst::ULSAntennaTypeEnum) CConst::strULSAntennaTypeList->str_to_type(jsonObj["ulsDefaultAntennaType"].toString().toStdString(), validFlag, 0);
@@ -3641,9 +3603,9 @@ int AfcManager::findULSAntenna(std::string strval)
 	int antIdx = -1;
 	bool found = false;
 
-	for (int aIdx = 0; (aIdx < (int)_ulsAntennaList.size()) && (!found); aIdx++)
+	for (int aIdx = 0; (aIdx < (int)_antennaList.size()) && (!found); aIdx++)
 	{
-		if (std::string(_ulsAntennaList[aIdx]->get_strid()) == strval)
+		if (std::string(_antennaList[aIdx]->get_strid()) == strval)
 		{
 			found = true;
 			antIdx = aIdx;
@@ -3989,11 +3951,11 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		if (_analysisType == "ExclusionZoneAnalysis")
 		{
 			// can also use UlsDatabase::getFSById(QString, int) to get a single record only by Id
-			ulsDatabase->loadFSById(QString::fromStdString(filename), rows, _exclusionZoneFSID);
+			ulsDatabase->loadFSById(QString::fromStdString(filename), _rasList, _antennaList, rows, _exclusionZoneFSID);
 		}
 		else
 		{
-			ulsDatabase->loadUlsData(QString::fromStdString(filename), rows, minLat, maxLat, minLon, maxLon);
+			ulsDatabase->loadUlsData(QString::fromStdString(filename), _rasList, _antennaList, rows, minLat, maxLat, minLon, maxLon);
 		}
 		// Distributing FS TX by 1x1 degree squares to minimize GDAL reopening
 		std::sort(rows.begin(), rows.end(),
@@ -4591,30 +4553,23 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 					/* rxAntenna                                                              */
 					/**************************************************************************/
 					if (!ignoreFlag) {
-						if ((_ulsAntennaList.size() == 0)||(row.rxAntennaModel.empty())) {
-							rxAntennaType = _ulsDefaultAntennaType;
+						rxAntenna = row.rxAntenna;
+						if (rxAntenna) {
+							LOGGER_DEBUG(logger) << "Antenna Found " << fsid << ": " << rxAntenna->get_strid();
+							rxAntennaType = CConst::LUTAntennaType;
 						} else {
-							std::string strval = row.rxAntennaModel;
+							std::string strval = row.rxAntennaModelName;
+							int validFlag;
+							rxAntennaType = (CConst::ULSAntennaTypeEnum) CConst::strULSAntennaTypeList->str_to_type(strval, validFlag, 0);
+							if (!validFlag) {
+								std::ostringstream errStr;
+								errStr << "Invalid ULS data for FSID = " << fsid
+									<< ", Unknown Rx Antenna \"" << strval
+									<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
+								LOGGER_WARN(logger) << errStr.str();
+								statusMessageList.push_back(errStr.str());
 
-							int ulsAntIdx = findULSAntenna(strval);
-							if (ulsAntIdx != -1) {
-								LOGGER_DEBUG(logger) << "Antenna Found " << fsid << ": " << strval;
-								rxAntennaType = CConst::LUTAntennaType;
-								rxAntenna = _ulsAntennaList[ulsAntIdx];
-							} else {
-								int validFlag;
-								rxAntennaType = (CConst::ULSAntennaTypeEnum) CConst::strULSAntennaTypeList->str_to_type(strval, validFlag, 0);
-								rxAntenna = (AntennaClass *) NULL;
-								if (!validFlag) {
-									std::ostringstream errStr;
-									errStr << "Invalid ULS data for FSID = " << fsid
-										<< ", Unknown Rx Antenna \"" << strval
-										<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
-									LOGGER_WARN(logger) << errStr.str();
-									statusMessageList.push_back(errStr.str());
-
-									rxAntennaType = _ulsDefaultAntennaType;
-								}
+								rxAntennaType = _ulsDefaultAntennaType;
 							}
 						}
 					}
@@ -4867,7 +4822,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls->setRxNearFieldAntDiameter(rxNearFieldAntDiameter);
 				uls->setRxNearFieldDistLimit(rxNearFieldDistLimit);
 				uls->setRxNearFieldAntEfficiency(rxNearFieldAntEfficiency);
-				uls->setRxAntennaModel(row.rxAntennaModel);
+				uls->setRxAntennaModel(row.rxAntennaModelName);
 				uls->setRxAntennaType(rxAntennaType);
 				uls->setTxAntennaType(txAntennaType);
 				uls->setRxAntenna(rxAntenna);
@@ -4998,7 +4953,32 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 						pr.rxGain = row.prRxGain[prIdx];
 						pr.rxDlambda = row.prRxAntennaDiameter[prIdx] / lambda;
 						pr.antCategory = row.prAntCategory[prIdx];
-						pr.antModel = row.prAntModel[prIdx];
+						pr.antModel = row.prAntModelName[prIdx];
+
+						/**************************************************************************/
+						/* Passive Repeater Antenna Pattern                                       */
+						/**************************************************************************/
+						if (!ignoreFlag) {
+							pr.antenna = row.prAntenna[prIdx];
+							if (pr.antenna) {
+								LOGGER_DEBUG(logger) << "Passive Repeater Antenna Found " << fsid << ": " << pr.antenna->get_strid();
+								pr.antennaType = CConst::LUTAntennaType;
+							} else {
+								std::string strval = row.prAntModelName[prIdx];
+								pr.antennaType = (CConst::ULSAntennaTypeEnum) CConst::strULSAntennaTypeList->str_to_type(strval, validFlag, 0);
+								if (!validFlag) {
+									std::ostringstream errStr;
+									errStr << "Invalid ULS data for FSID = " << fsid
+										<< ", Unknown Passive Repeater Antenna \"" << strval
+										<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
+									LOGGER_WARN(logger) << errStr.str();
+									statusMessageList.push_back(errStr.str());
+
+									pr.antennaType = _ulsDefaultAntennaType;
+								}
+							}
+						}
+						/**************************************************************************/
 					} else if (row.prType[prIdx] == "Ref") {
 						pr.type = CConst::billboardReflectorPRType;
 						pr.reflectorHeightLambda = row.prReflectorHeight[prIdx] / lambda;
@@ -5443,7 +5423,7 @@ void AfcManager::readRASData(std::string filename)
 						break;
 				}
 
-				_rasList->append(ras);
+				_rasList.push_back(ras);
 				ras->setStartFreq(startFreq);
 				ras->setStopFreq(stopFreq);
 
@@ -5460,7 +5440,7 @@ void AfcManager::readRASData(std::string filename)
 
 	if (fp) { fclose(fp); }
 
-	LOGGER_INFO(logger) << "TOTAL NUM RAS: " << _rasList->getSize();
+	LOGGER_INFO(logger) << "TOTAL NUM RAS: " << _rasList.size();
 
 	return;
 }
@@ -7129,8 +7109,8 @@ void AfcManager::runPointAnalysis()
 		fkml->writeStartElement("Folder");
 		fkml->writeTextElement("name", "RAS");
 		int rasIdx;
-		for (rasIdx = 0; rasIdx < _rasList->getSize(); ++rasIdx) {
-			RASClass *ras = (*_rasList)[rasIdx];
+		for (rasIdx = 0; rasIdx < (int) _rasList.size(); ++rasIdx) {
+			RASClass *ras = _rasList[rasIdx];
 
 			fkml->writeStartElement("Folder");
 			fkml->writeTextElement("name", QString("RAS_") + QString::number(ras->getID()));
@@ -7271,8 +7251,8 @@ void AfcManager::runPointAnalysis()
 	int rasIdx;
 	double rlanRegionMaxDist = _rlanRegion->getMaxDist();
 	double rlanRegionMaxHeightAGL = _rlanRegion->getMaxHeightAGL();
-	for (rasIdx = 0; rasIdx < _rasList->getSize(); ++rasIdx) {
-		RASClass *ras = (*_rasList)[rasIdx];
+	for (rasIdx = 0; rasIdx < (int) _rasList.size(); ++rasIdx) {
+		RASClass *ras = _rasList[rasIdx];
 		if (ras->intersect(_rlanRegion->getCenterLongitude(), _rlanRegion->getCenterLatitude(), rlanRegionMaxDist, rlanRegionMaxHeightAGL)) {
 			int chanIdx;
 			for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
@@ -7732,7 +7712,7 @@ void AfcManager::runPointAnalysis()
 											}
 
 											// When _printSkippedLinksFlag set, links analyzed with FSPL that are skipped are still inserted into the exc_thr file.
-											// This is useful for testing and debugging.  Note that the extra pringing impacts execution speed.  When _printSkippedLinksFlag is
+											// This is useful for testing and debugging.  Note that the extra printing impacts execution speed.  When _printSkippedLinksFlag is
 											// not set, skipped links are no inserted in the exc_thr file, so execution speed is not impacted.
 											if ((!_printSkippedLinksFlag) && (skip)) {
 												continue;
@@ -7782,11 +7762,24 @@ void AfcManager::runPointAnalysis()
 												}
 
 												std::string rxAntennaTypeStr;
-												CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
-												if (ulsRxAntennaType == CConst::LUTAntennaType) {
-													rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
+												if (segIdx == numPR) {
+													CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
+													if (ulsRxAntennaType == CConst::LUTAntennaType) {
+														rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
+													} else {
+														rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
+													}
 												} else {
-													rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
+													if (uls->getPR(segIdx).type == CConst::backToBackAntennaPRType) {
+														CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getPR(segIdx).antennaType;
+														if (ulsRxAntennaType == CConst::LUTAntennaType) {
+															rxAntennaTypeStr = std::string(uls->getPR(segIdx).antenna->get_strid());
+														} else {
+															rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
+														}
+													} else {
+														rxAntennaTypeStr = "";
+													}
 												}
 
 												CConst::AntennaCategoryEnum rxAntennaCategory = (segIdx == numPR ? uls->getRxAntennaCategory() : uls->getPR(segIdx).antCategory);
@@ -8581,8 +8574,8 @@ void AfcManager::runScanAnalysis()
 		fkml->writeStartElement("Folder");
 		fkml->writeTextElement("name", "RAS");
 		int rasIdx;
-		for (rasIdx = 0; rasIdx < _rasList->getSize(); ++rasIdx) {
-			RASClass *ras = (*_rasList)[rasIdx];
+		for (rasIdx = 0; rasIdx < (int) _rasList.size(); ++rasIdx) {
+			RASClass *ras = _rasList[rasIdx];
 
 			fkml->writeStartElement("Folder");
 			fkml->writeTextElement("name", QString("RAS_") + QString::number(ras->getID()));
@@ -8753,8 +8746,8 @@ void AfcManager::runScanAnalysis()
 			double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
 			int rasIdx;
-			for (rasIdx = 0; rasIdx < _rasList->getSize(); ++rasIdx) {
-				RASClass *ras = (*_rasList)[rasIdx];
+			for (rasIdx = 0; rasIdx < (int) _rasList.size(); ++rasIdx) {
+				RASClass *ras = _rasList[rasIdx];
 				if (ras->intersect(rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, 0.0, rlanHtAboveTerrain)) {
 					for (auto& channel : _channelList) {
 						if (channel.availability != BLACK) {
@@ -10120,7 +10113,6 @@ void AfcManager::printUserInputs()
 		fUserInputs->writeRow({ "RLAN_BODY_LOSS_INDOOR (DB)", QString::number(_bodyLossIndoorDB, 'e', 20) } );
 		fUserInputs->writeRow({ "RLAN_BODY_LOSS_OUTDOOR (DB)", QString::number(_bodyLossOutdoorDB, 'e', 20) } );
 		fUserInputs->writeRow({ "I/N_THRESHOLD", QString::number(_IoverN_threshold_dB, 'e', 20) } );
-		fUserInputs->writeRow({ "FS_RECEIVER_ANTENNA_PATTERN_FILE", QString::fromStdString(_ulsAntennaPatternFile) } );
 		fUserInputs->writeRow({ "FS_RECEIVER_DEFAULT_ANTENNA", QString::fromStdString(CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType )) } );
 		fUserInputs->writeRow({ "RLAN_ITM_TX_CLUTTER_METHOD", QString::fromStdString(CConst::strITMClutterMethodList->type_to_str(_rlanITMTxClutterMethod)) } );
 

@@ -1,4 +1,28 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-559**|
+| :- | :- |
+|**Date**|**02/14/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-559:Integrate afc_antenna_patterns with FS database.sqlite3 file
+ * Jira OA-534:Update RAS Database daily to include Canada RAS
+ 
+## **Interface Changes**
+ * There has been changes to the ULS parser to integrate the RAS database and the afc_antenna_patterns file data with the .sqlite3 since both are processed from the same source as the FS database.
+ * Recommend removing the entire Anteanna_Patterns and RAS_Database directories.
+ * Removed the rasdatabase and antennapatterns in afc-config.json.
+ 
+## **Testing Done**
+ * OA-559: ran FSP1 with ISED patterns used for CA only and got same results as before. (test attached to ticket)
+ * OA-559: ran FSP1 with ISED patterns used for CA & US and got same results as r18 (almost) when this was used. Confirmed in exc_thr that the pattern was used correctly. (test attached to ticket)
+ * OA-534: ran SIP1 and SIP13 with ISED patterns used for CA only and got same results as before. 
+ * OA-559: created a test with back-to-back Passive Repeater (FS ID 546) that uses antenna pattern and it used it correctly. (test attached to ticket)
+ 
+## **Open Issues** 
+
 ## **Version and Date**
 |Version|3.7.2.0|
 | :- | :- |
@@ -28,7 +52,6 @@
  * Jira OA-259: Align with QCOM/Federated to select same 3DEP/NLCD tile when on Boundary. 
  * Jira OA-535: Correction of FS bandwidth from Emission Designator vs. upper-lower freq not matching
  
-
 ## **Version and Date**
 |Version|**OA-536**|
 | :- | :- |

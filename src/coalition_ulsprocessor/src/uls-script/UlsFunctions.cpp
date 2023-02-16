@@ -289,6 +289,37 @@ QStringList UlsFunctionsClass::getCSVHeader(int numPR)
 /******************************************************************************************/
 
 /******************************************************************************************/
+/* UlsFunctionsClass::getRASHeader()                                                      */
+/******************************************************************************************/
+QStringList UlsFunctionsClass::getRASHeader()
+{
+    QStringList header;
+
+    header << "RASID";
+    header << "Region";
+    header << "Name";
+    header << "Location";
+    header << "Start Freq (MHz)";
+    header << "End Freq (MHz)";
+    header << "Exclusion Zone";
+    header << "Rectangle1 Lat 1";
+    header << "Rectangle1 Lat 2";
+    header << "Rectangle1 Lon 1";
+    header << "Rectangle1 Lon 2";
+    header << "Rectangle2 Lat 1";
+    header << "Rectangle2 Lat 2";
+    header << "Rectangle2 Lon 1";
+    header << "Rectangle2 Lon 2";
+    header << "Circle Radius (km)";
+    header << "Circle center Lat";
+    header << "Circle center Lon";
+    header << "Antenna AGL height (m)";
+
+    return header;
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
 /**** UlsFunctionsClass::computeSpectralOverlap()                                      ****/
 /******************************************************************************************/
 double UlsFunctionsClass::computeSpectralOverlap(double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq)
@@ -327,6 +358,70 @@ Vector3 UlsFunctionsClass::computeHPointingVec(Vector3 position, double azimuthP
     ptgVec = northVec*ca*ce + eastVec*sa*ce + upVec*se;
 
     return(ptgVec);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: UlsFunctionsClass::getAngleFromDMS                                     ****/
+/**** Process DMS string and return angle (lat or lon) in deg.                         ****/
+/******************************************************************************************/
+double UlsFunctionsClass::getAngleFromDMS(std::string dmsStr)
+{
+    std::ostringstream errStr;
+    char *chptr;
+    double angleDeg;
+
+    bool error = false;
+
+    std::size_t dashPosn1;
+    std::size_t dashPosn2;
+    std::size_t letterPosn;
+
+    if (dmsStr == "") {
+        return(std::numeric_limits<double>::quiet_NaN());
+    }
+
+    dashPosn1 = dmsStr.find('-');
+    if ( (dashPosn1 == std::string::npos) || (dashPosn1 == 0) ) {
+        // Angle is in decimal format, not DMS
+        angleDeg = strtod(dmsStr.c_str(), &chptr);
+    } else {
+
+        if (!error) {
+            dashPosn2 = dmsStr.find('-', dashPosn1+1);
+            if (dashPosn2 == std::string::npos) {
+                error = true;
+            }
+        }
+
+        double dVal, mVal, sVal;
+        if (!error) {
+            letterPosn = dmsStr.find_first_of("NEWS", dashPosn2+1);
+
+            std::string dStr = dmsStr.substr(0, dashPosn1);
+            std::string mStr = dmsStr.substr(dashPosn1+1, dashPosn2-dashPosn1-1);
+            std::string sStr = ((letterPosn == std::string::npos) ? dmsStr.substr(dashPosn2+1) : dmsStr.substr(dashPosn2+1, letterPosn-dashPosn2-1));
+
+            dVal = strtod(dStr.c_str(), &chptr);
+            mVal = strtod(mStr.c_str(), &chptr);
+            sVal = strtod(sStr.c_str(), &chptr);
+        }
+
+        if (error) {
+            errStr << "ERROR: Unable to convert DMS string to angle, DMS string = \"" << dmsStr << "\"" << std::endl;
+            throw std::runtime_error(errStr.str());
+        }
+
+        angleDeg = dVal + (mVal + sVal/60.0)/60.0;
+
+        if (letterPosn != std::string::npos) {
+            if ((dmsStr.at(letterPosn) == 'W') || (dmsStr.at(letterPosn) == 'S')) {
+                angleDeg *= -1;
+            }
+        }
+    }
+
+    return(angleDeg);
 }
 /******************************************************************************************/
 

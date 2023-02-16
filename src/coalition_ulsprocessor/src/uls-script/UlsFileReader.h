@@ -24,6 +24,8 @@
 #include "PassiveRepeaterCA.h"
 #include "TransmitterCA.h"
 
+#include "RAS.h"
+
 #include <QList>
 #include <QHash>
 #include <QString>
@@ -105,6 +107,8 @@ public:
     int computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool includeUnii8);
     int computeStatisticsCA(FILE *fwarn);
 
+    QList<RASClass> RASList;
+
 private:
     void readIndividualHeaderUS(const std::vector<std::string> &fieldList);
     void readIndividualPathUS(const std::vector<std::string> &fieldList);
@@ -116,6 +120,7 @@ private:
     void readIndividualMarketFrequencyUS(const std::vector<std::string> &fieldList);
     void readIndividualControlPointUS(const std::vector<std::string> &fieldList);
     void readIndividualSegmentUS(const std::vector<std::string> &fieldList);
+    void readIndividualRASUS(const std::vector<std::string> &fieldList);
 
     void readStationDataCA(const std::vector<std::string> &fieldList, FILE *fwarn, bool alignFederatedFlag, double alignFederatedScale);
     void readBackToBackPassiveRepeaterCA(const std::vector<std::string> &fieldList, FILE *fwarn);

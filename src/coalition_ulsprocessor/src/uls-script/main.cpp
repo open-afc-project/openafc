@@ -20,6 +20,7 @@ bool combineAntennaRegionFlag = false;
 
 void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inputFile, std::string outputFile);
 void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap, std::string inputFile, std::string outputFile);
+void writeRAS(UlsFileReader &r, std::string filename);
 void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn,
     AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment, TransmitterModelMapClass &transmitterModelMap);
 void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous, FILE *fwarn,
@@ -51,8 +52,8 @@ int main(int argc, char **argv)
 
     printf("Coalition ULS Processing Tool Version %s\n", VERSION);
     printf("Copyright 2019 (C) RKF Engineering Solutions\n");
-    if (argc != 8) {
-        fprintf(stderr, "Syntax: %s [ULS file.csv] [Output File.csv] [AntModelListFile.csv] [AntModelMapFile.csv] [freqAssignmentFile] [transmitterModelListFile] [mode]\n", argv[0]);
+    if (argc != 9) {
+        fprintf(stderr, "Syntax: %s [ULS file.csv] [Output FS File.csv] [Output RAS File.csv] [AntModelListFile.csv] [AntModelMapFile.csv] [freqAssignmentFile] [transmitterModelListFile] [mode]\n", argv[0]);
         return -1;
     }
 
@@ -65,12 +66,13 @@ int main(int argc, char **argv)
     free(tstr);
 
     std::string inputFile = argv[1];
-    std::string outputFile = argv[2];
-    std::string antModelListFile = argv[3];
-    std::string antModelMapFile = argv[4];
-    std::string freqAssignmentFile = argv[5];
-    std::string transmitterModelListFile = argv[6];
-    std::string mode = argv[7];
+    std::string outputFSFile = argv[2];
+    std::string outputRASFile = argv[3];
+    std::string antModelListFile = argv[4];
+    std::string antModelMapFile = argv[5];
+    std::string freqAssignmentFile = argv[6];
+    std::string transmitterModelListFile = argv[7];
+    std::string mode = argv[8];
 
     FILE *fwarn;
     std::string warningFile = "warning_uls.txt";
@@ -85,10 +87,10 @@ int main(int argc, char **argv)
 	FreqAssignmentClass fccFreqAssignment(freqAssignmentFile);
 
     if (mode == "test_antenna_model_map") {
-        testAntennaModelMap(antennaModelMap, inputFile, outputFile);
+        testAntennaModelMap(antennaModelMap, inputFile, outputFSFile);
         return 0;
     } else if (mode == "test_transmitter_model_map") {
-        testTransmitterModelMap(transmitterModelMap, inputFile, outputFile);
+        testTransmitterModelMap(transmitterModelMap, inputFile, outputFSFile);
         return 0;
     } else if (mode == "proc_uls") {
         // Do nothing
@@ -119,7 +121,7 @@ int main(int argc, char **argv)
     std::cout << "CA Max Num Passive Repeater: " << maxNumPRCA << std::endl;
     std::cout << "Max Num Passive Repeater: "    << maxNumPassiveRepeater << std::endl;
 
-    CsvWriter wt(outputFile.c_str());
+    CsvWriter wt(outputFSFile.c_str());
     {
         QStringList header = UlsFunctionsClass::getCSVHeader(maxNumPassiveRepeater);
         wt.writeRow(header);
@@ -132,6 +134,8 @@ int main(int argc, char **argv)
         header << "Anomalous Reason";
         anomalous.writeRow(header);
     }
+
+    writeRAS(r, outputRASFile);
 
     processUS(r, maxNumPassiveRepeater, wt, anomalous, fwarn, antennaModelMap, fccFreqAssignment, transmitterModelMap);
 
@@ -168,6 +172,48 @@ int main(int argc, char **argv)
     std::cout << elapsedTimeMin  << " min ";
     std::cout << elapsedTimeSec  << " sec";
     std::cout << std::endl;
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** writeRAS                                                                         ****/
+/******************************************************************************************/
+void writeRAS(UlsFileReader &r, std::string filename)
+{
+    int rasid = 0;
+
+    CsvWriter fpRAS(filename.c_str());
+    {
+        QStringList header = UlsFunctionsClass::getRASHeader();
+        fpRAS.writeRow(header);
+    }
+
+
+    foreach (const RASClass &ras, r.RASList) {
+        rasid++;
+        QStringList row;
+        row << UlsFunctionsClass::makeNumber(rasid);
+        row << QString::fromStdString(ras.region);
+        row << QString::fromStdString(ras.name);
+        row << QString::fromStdString(ras.location);
+        row << UlsFunctionsClass::makeNumber(ras.startFreqMHz);
+        row << UlsFunctionsClass::makeNumber(ras.stopFreqMHz);
+        row << QString::fromStdString(ras.exclusionZone);
+        row << UlsFunctionsClass::makeNumber(ras.rect1lat1);
+        row << UlsFunctionsClass::makeNumber(ras.rect1lat2);
+        row << UlsFunctionsClass::makeNumber(ras.rect1lon1);
+        row << UlsFunctionsClass::makeNumber(ras.rect1lon2);
+        row << UlsFunctionsClass::makeNumber(ras.rect2lat1);
+        row << UlsFunctionsClass::makeNumber(ras.rect2lat2);
+        row << UlsFunctionsClass::makeNumber(ras.rect2lon1);
+        row << UlsFunctionsClass::makeNumber(ras.rect2lon2);
+        row << UlsFunctionsClass::makeNumber(ras.radiusKm);
+        row << UlsFunctionsClass::makeNumber(ras.centerLat);
+        row << UlsFunctionsClass::makeNumber(ras.centerLon);
+        row << UlsFunctionsClass::makeNumber(ras.heightAGL);
+
+        fpRAS.writeRow(row);
+    }
 }
 /******************************************************************************************/
 

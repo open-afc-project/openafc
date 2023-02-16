@@ -42,7 +42,6 @@ export interface AFCConfigFile {
     threshold: number,
     maxLinkDistance: number,
     ulsDefaultAntennaType: DefaultAntennaType,
-    antennaPattern: UserAntennaPattern,
     scanPointBelowGroundMethod: ScanPointBelowGroundMethod
     propagationModel: PropagationModel,
     APUncertainty: APUncertainty,
@@ -54,7 +53,6 @@ export interface AFCConfigFile {
     clutterAtFS: boolean,
     fsClutterModel?: FSClutterModel,
     regionStr?: string,
-    rasDatabase?: string,
     enableMapInVirtualAp?: boolean,
     channelResponseAlgorithm: ChannelResponseAlgorithm,
     visibilityThreshold?: number,

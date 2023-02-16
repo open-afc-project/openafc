@@ -13,6 +13,8 @@
 #include <rkflogging/Logging.h>
 #include "rkflogging/ErrStream.h"
 #include "AfcDefinitions.h"
+#include "lininterp.h"
+#include "global_defines.h"
 
 namespace
 {
@@ -27,6 +29,13 @@ LOGGER_DEFINE_GLOBAL(logger, "UlsDatabase")
 UlsDatabase::UlsDatabase()
 {
 	nullInitialize();
+
+	std::vector<int *> fieldIdxList;
+	std::vector<int *> prFieldIdxList;
+	std::vector<int *> antnameFieldIdxList;
+	std::vector<int *> antaobFieldIdxList;
+	std::vector<int *> antgainFieldIdxList;
+	std::vector<int *> rasFieldIdxList;
 
 	columns << "fsid";
 	fieldIdxList.push_back(&fsidIdx);
@@ -94,7 +103,9 @@ UlsDatabase::UlsDatabase()
 	columns << "mobile";
 	fieldIdxList.push_back(&mobileIdx);
 	columns << "rx_ant_model";
-	fieldIdxList.push_back(&rx_ant_modelIdx);
+	fieldIdxList.push_back(&rx_ant_modelNameIdx);
+	columns << "rx_ant_model_idx";
+	fieldIdxList.push_back(&rx_ant_model_idxIdx);
 
 	columns << "rx_diversity_height_to_center_raat_m";
 	fieldIdxList.push_back(&rx_diversity_height_to_center_raat_mIdx);
@@ -118,9 +129,39 @@ UlsDatabase::UlsDatabase()
 	prColumns << "pr_back_to_back_gain_rx";       prFieldIdxList.push_back(&prRxGainIdx);
 	prColumns << "pr_ant_diameter_rx";            prFieldIdxList.push_back(&prRxDiameterIdx);
 	prColumns << "pr_ant_category";               prFieldIdxList.push_back(&prAntCategoryIdx);
-	prColumns << "pr_ant_model";                  prFieldIdxList.push_back(&prAntModelIdx);
+	prColumns << "pr_ant_model";                  prFieldIdxList.push_back(&prAntModelNameIdx);
+	prColumns << "pr_ant_model_idx";              prFieldIdxList.push_back(&pr_ant_model_idxIdx);
 	prColumns << "pr_reflector_height_m";         prFieldIdxList.push_back(&prReflectorHeightIdx);
 	prColumns << "pr_reflector_width_m";          prFieldIdxList.push_back(&prReflectorWidthIdx);
+
+	antnameColumns << "ant_idx";                  antnameFieldIdxList.push_back(&antname_ant_idxIdx);
+	antnameColumns << "ant_name";                 antnameFieldIdxList.push_back(&antname_ant_nameIdx);
+
+	antaobColumns << "aob_idx";                   antaobFieldIdxList.push_back(&antaob_aob_idxIdx);
+	antaobColumns << "aob_deg";                   antaobFieldIdxList.push_back(&antaob_aob_degIdx);
+
+	antgainColumns << "id";                       antgainFieldIdxList.push_back(&antgain_idIdx);
+	antgainColumns << "gain_db";                  antgainFieldIdxList.push_back(&antgain_gainIdx);
+
+    rasColumns << "rasid";                        rasFieldIdxList.push_back(&ras_rasidIdx);
+    rasColumns << "region";                       rasFieldIdxList.push_back(&ras_regionIdx);
+    rasColumns << "name";                         rasFieldIdxList.push_back(&ras_nameIdx);
+    rasColumns << "location";                     rasFieldIdxList.push_back(&ras_locationIdx);
+    rasColumns << "startFreqMHz";                 rasFieldIdxList.push_back(&ras_startFreqMHzIdx);
+    rasColumns << "stopFreqMHz";                  rasFieldIdxList.push_back(&ras_stopFreqMHzIdx);
+    rasColumns << "exclusionZone";                rasFieldIdxList.push_back(&ras_exclusionZoneIdx);
+    rasColumns << "rect1lat1";                    rasFieldIdxList.push_back(&ras_rect1lat1Idx);
+    rasColumns << "rect1lat2";                    rasFieldIdxList.push_back(&ras_rect1lat2Idx);
+    rasColumns << "rect1lon1";                    rasFieldIdxList.push_back(&ras_rect1lon1Idx);
+    rasColumns << "rect1lon2";                    rasFieldIdxList.push_back(&ras_rect1lon2Idx);
+    rasColumns << "rect2lat1";                    rasFieldIdxList.push_back(&ras_rect2lat1Idx);
+    rasColumns << "rect2lat2";                    rasFieldIdxList.push_back(&ras_rect2lat2Idx);
+    rasColumns << "rect2lon1";                    rasFieldIdxList.push_back(&ras_rect2lon1Idx);
+    rasColumns << "rect2lon2";                    rasFieldIdxList.push_back(&ras_rect2lon2Idx);
+    rasColumns << "radiusKm";                     rasFieldIdxList.push_back(&ras_radiusKmIdx);
+    rasColumns << "centerLat";                    rasFieldIdxList.push_back(&ras_centerLatIdx);
+    rasColumns << "centerLon";                    rasFieldIdxList.push_back(&ras_centerLonIdx);
+    rasColumns << "heightAGL";                    rasFieldIdxList.push_back(&ras_heightAGLIdx);
 
 	int fIdx;
 	for(fIdx=0; fIdx<(int) fieldIdxList.size(); ++fIdx) {
@@ -128,6 +169,18 @@ UlsDatabase::UlsDatabase()
 	}
 	for(fIdx=0; fIdx<(int) prFieldIdxList.size(); ++fIdx) {
 		*prFieldIdxList[fIdx] = fIdx;
+	}
+	for(fIdx=0; fIdx<(int) antnameFieldIdxList.size(); ++fIdx) {
+		*antnameFieldIdxList[fIdx] = fIdx;
+	}
+	for(fIdx=0; fIdx<(int) antaobFieldIdxList.size(); ++fIdx) {
+		*antaobFieldIdxList[fIdx] = fIdx;
+	}
+	for(fIdx=0; fIdx<(int) antgainFieldIdxList.size(); ++fIdx) {
+		*antgainFieldIdxList[fIdx] = fIdx;
+	}
+	for(fIdx=0; fIdx<(int) rasFieldIdxList.size(); ++fIdx) {
+		*rasFieldIdxList[fIdx] = fIdx;
 	}
 }
 /******************************************************************************************/
@@ -178,7 +231,8 @@ void UlsDatabase::nullInitialize()
 	rx_antennaCategoryIdx = -1;
 	statusIdx = -1;
 	mobileIdx = -1;
-	rx_ant_modelIdx = -1;
+	rx_ant_modelNameIdx = -1;
+	rx_ant_model_idxIdx = -1;
 	p_rp_numIdx = -1;
 
 	rx_diversity_height_to_center_raat_mIdx = -1;
@@ -197,9 +251,40 @@ void UlsDatabase::nullInitialize()
 	prRxGainIdx = -1;
 	prRxDiameterIdx = -1;
 	prAntCategoryIdx = -1;
-	prAntModelIdx = -1;
+	prAntModelNameIdx = -1;
+	pr_ant_model_idxIdx = -1;
 	prReflectorHeightIdx = -1;
 	prReflectorWidthIdx = -1;
+
+    antname_ant_idxIdx = -1;
+    antname_ant_nameIdx = -1;
+
+    antaob_aob_idxIdx = -1;
+    antaob_aob_degIdx = -1;
+
+    antgain_idIdx = -1;
+    antgain_gainIdx = -1;
+
+    ras_rasidIdx = -1;
+    ras_regionIdx = -1;
+    ras_nameIdx = -1;
+    ras_locationIdx = -1;
+    ras_startFreqMHzIdx = -1;
+    ras_stopFreqMHzIdx = -1;
+    ras_exclusionZoneIdx = -1;
+    ras_rect1lat1Idx = -1;
+    ras_rect1lat2Idx = -1;
+    ras_rect1lon1Idx = -1;
+    ras_rect1lon2Idx = -1;
+    ras_rect2lat1Idx = -1;
+    ras_rect2lat2Idx = -1;
+    ras_rect2lon1Idx = -1;
+    ras_rect2lon2Idx = -1;
+    ras_radiusKmIdx = -1;
+    ras_centerLatIdx = -1;
+    ras_centerLonIdx = -1;
+    ras_heightAGLIdx = -1;
+
 }
 /******************************************************************************************/
 
@@ -219,10 +304,10 @@ void verifyResult(const QSqlQuery& ulsQueryRes)
 
 // construct and run sql query and return result
 QSqlQuery runQueryWithBounds(const SqlScopedConnection<SqlExceptionDb>& db,
-                             const QStringList& columns, const double& minLat, const double& maxLat, const double& minLon, const double& maxLon);
+	const QStringList& columns, const double& minLat, const double& maxLat, const double& minLon, const double& maxLon);
 QSqlQuery runQueryById(const SqlScopedConnection<SqlExceptionDb>& db, const QStringList& columns, const int& fsid);
 
-void UlsDatabase::loadFSById(const QString& dbName, std::vector<UlsRecord>& target, const int& fsid)
+void UlsDatabase::loadFSById(const QString& dbName, std::vector<RASClass *>& rasList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target, const int& fsid)
 {
 	LOGGER_DEBUG(logger) << "FSID: " << fsid;
 
@@ -240,12 +325,12 @@ void UlsDatabase::loadFSById(const QString& dbName, std::vector<UlsRecord>& targ
 
 	verifyResult(ulsQueryRes);
 
-	fillTarget(db, target, ulsQueryRes);
+	fillTarget(db, rasList, antennaList, target, ulsQueryRes);
 
 }
 
-void UlsDatabase::loadUlsData(const QString& dbName, std::vector<UlsRecord>& target,
-                              const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
+void UlsDatabase::loadUlsData(const QString& dbName, std::vector<RASClass *>& rasList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target,
+	const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
 	LOGGER_DEBUG(logger) << "Bounds: " << minLat << ", " << maxLat << "; " << minLon << ", " << maxLon;
 
@@ -263,38 +348,38 @@ void UlsDatabase::loadUlsData(const QString& dbName, std::vector<UlsRecord>& tar
 
 	verifyResult(ulsQueryRes);
 
-	fillTarget(db, target, ulsQueryRes);
+	fillTarget(db, rasList, antennaList, target, ulsQueryRes);
 }
 
 QSqlQuery runQueryWithBounds(const SqlScopedConnection<SqlExceptionDb>& db,
-                             const QStringList& columns, const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
+	const QStringList& columns, const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
 	return SqlSelect(*db, "uls")
-	       .cols(columns)
-	       .where(QString(
-	                  "(rx_lat_deg BETWEEN %1 AND %2)"
-	                  "AND"
-	                  "(rx_long_deg BETWEEN %3 AND %4)"
-	              )
-	              .arg(std::min(minLat, maxLat))
-	              .arg(std::max(minLat, maxLat))
-	              .arg(std::min(minLon, maxLon))
-	              .arg(std::max(minLon, maxLon))
-	             )
-	       .order("fsid")
-	       .run();
+		.cols(columns)
+		.where(QString(
+			"(rx_lat_deg BETWEEN %1 AND %2)"
+			"AND"
+			"(rx_long_deg BETWEEN %3 AND %4)"
+		)
+		.arg(std::min(minLat, maxLat))
+		.arg(std::max(minLat, maxLat))
+		.arg(std::min(minLon, maxLon))
+		.arg(std::max(minLon, maxLon))
+		)
+		.order("fsid")
+		.run();
 }
 
 QSqlQuery runQueryById(const SqlScopedConnection<SqlExceptionDb>& db, const QStringList& columns, const int& fsid)
 {
 	return SqlSelect(*db, "uls")
-	       .cols(columns)
-	       .where(QString("fsid=%1").arg(fsid))
-	       .topmost(1)
-	       .run();
+		.cols(columns)
+		.where(QString("fsid=%1").arg(fsid))
+		.topmost(1)
+		.run();
 }
 
-void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vector<UlsRecord>& target, QSqlQuery& q)
+void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vector<RASClass *>& rasList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target, QSqlQuery& q)
 {
 	// resize vector to fit result
 	if (q.driver()->hasFeature(QSqlDriver::QuerySize))
@@ -310,13 +395,196 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		{
 			// throw std::runtime_error(ErrStream() << "UlsDatabase.cpp: Failed to get last item. Check that lat/lon are within CONUS : " << q.at());
 			// No FS's within 150 Km, return with empty list
-			return;
+			// return;
+		} else {
+			LOGGER_DEBUG(logger) << target.size() << " to last " << q.at();
+			target.resize(q.at()+1);
+			q.first();
+			q.previous();
 		}
-		LOGGER_DEBUG(logger) << target.size() << " to last " << q.at();
-		target.resize(q.at()+1);
-		q.first();
-		q.previous();
 	}
+
+	/**************************************************************************************/
+	/* Read RAS Table                                                                     */
+	/**************************************************************************************/
+	QSqlQuery rasQueryRes = SqlSelect(*db, "ras")
+									.cols(rasColumns)
+									.run();
+	int numRAS;
+	// resize vector to fit result
+	if (rasQueryRes.driver()->hasFeature(QSqlDriver::QuerySize)) {
+		// if the driver supports .size() then use it because is is more efficient
+		numRAS = rasQueryRes.size();
+		rasQueryRes.setForwardOnly(true);
+	} else {
+		if (!rasQueryRes.last()) {
+			numRAS = 0;
+		} else {
+			numRAS = rasQueryRes.at()+1;
+			rasQueryRes.first();
+			rasQueryRes.previous();
+		}
+	}
+
+	while (rasQueryRes.next()) {
+		int rasid = rasQueryRes.value(ras_rasidIdx).toInt();
+		std::string exclusionZoneStr = rasQueryRes.value(ras_exclusionZoneIdx).toString().toStdString();
+		RASClass::RASExclusionZoneTypeEnum exclusionZoneType;
+
+		if (exclusionZoneStr == "One Rectangle") {
+			exclusionZoneType = RASClass::rectRASExclusionZoneType;
+		} else if (exclusionZoneStr == "Two Rectangles") {
+			exclusionZoneType = RASClass::rect2RASExclusionZoneType;
+		} else if (exclusionZoneStr == "Circle") {
+			exclusionZoneType = RASClass::circleRASExclusionZoneType;
+		} else if (exclusionZoneStr == "Horizon Distance") {
+			exclusionZoneType = RASClass::horizonDistRASExclusionZoneType;
+		} else {
+			CORE_DUMP;
+		}
+
+        RASClass *ras;
+        switch(exclusionZoneType) {
+            case RASClass::rectRASExclusionZoneType:
+            case RASClass::rect2RASExclusionZoneType:
+            {
+                ras = (RASClass *) new RectRASClass(rasid);
+
+			    double rect1lat1 = rasQueryRes.value(ras_rect1lat1Idx).toDouble();
+			    double rect1lat2 = rasQueryRes.value(ras_rect1lat2Idx).toDouble();
+			    double rect1lon1 = rasQueryRes.value(ras_rect1lon1Idx).toDouble();
+			    double rect1lon2 = rasQueryRes.value(ras_rect1lon2Idx).toDouble();
+
+                ((RectRASClass *) ras)->addRect(rect1lon1, rect1lon2, rect1lat1, rect1lat2);
+
+                if (exclusionZoneType == RASClass::rect2RASExclusionZoneType) {
+			        double rect2lat1 = rasQueryRes.value(ras_rect2lat1Idx).toDouble();
+			        double rect2lat2 = rasQueryRes.value(ras_rect2lat2Idx).toDouble();
+			        double rect2lon1 = rasQueryRes.value(ras_rect2lon1Idx).toDouble();
+			        double rect2lon2 = rasQueryRes.value(ras_rect2lon2Idx).toDouble();
+
+                    ((RectRASClass *) ras)->addRect(rect2lon1, rect2lon2, rect2lat1, rect2lat2);
+                }
+            }
+                break;
+            case RASClass::circleRASExclusionZoneType:
+            case RASClass::horizonDistRASExclusionZoneType:
+            {
+                double lonCircle = rasQueryRes.value(ras_centerLonIdx).toDouble();
+                double latCircle = rasQueryRes.value(ras_centerLatIdx).toDouble();
+
+                bool horizonDistFlag = (exclusionZoneType == RASClass::horizonDistRASExclusionZoneType);
+
+                ras = (RASClass *) new CircleRASClass(rasid, horizonDistFlag);
+
+                ((CircleRASClass *) ras)->setLongitudeCenter(lonCircle);
+                ((CircleRASClass *) ras)->setLatitudeCenter(latCircle);
+
+                if (!horizonDistFlag) {
+                    double radius = rasQueryRes.value(ras_radiusKmIdx).isNull() ? quietNaN
+                                  : rasQueryRes.value(ras_radiusKmIdx).toDouble()*1.0e3; // Convert km to m
+
+                    ((CircleRASClass *) ras)->setRadius(radius);
+                } else {
+                    /**************************************************************************/
+                    /* heightAGL                                                              */
+                    /**************************************************************************/
+                    double heightAGL = rasQueryRes.value(ras_heightAGLIdx).isNull() ? quietNaN
+                                  : rasQueryRes.value(ras_heightAGLIdx).toDouble(); // Height value in m
+                    ras->setHeightAGL(heightAGL);
+                    /**************************************************************************/
+                }
+            }
+                break;
+            default:
+                CORE_DUMP;
+                break;
+        }
+        double startFreq = rasQueryRes.value(ras_startFreqMHzIdx).isNull() ? quietNaN
+                      : rasQueryRes.value(ras_startFreqMHzIdx).toDouble()*1.0e6; // Convert MHz to Hz
+        double stopFreq = rasQueryRes.value(ras_stopFreqMHzIdx).isNull() ? quietNaN
+                      : rasQueryRes.value(ras_stopFreqMHzIdx).toDouble()*1.0e6; // Convert MHz to Hz
+
+        ras->setStartFreq(startFreq);
+        ras->setStopFreq(stopFreq);
+
+        rasList.push_back(ras);
+	}
+	LOGGER_DEBUG(logger) << "READ " << numRAS << " entries from database ";
+	/**************************************************************************************/
+
+	/**************************************************************************************/
+	/* Get list of antenna names                                                          */
+	/**************************************************************************************/
+	QSqlQuery antnameQueryRes = SqlSelect(*db, "antname")
+									.cols(antnameColumns)
+									.run();
+	int numAntennaDB;
+	// resize vector to fit result
+	if (antnameQueryRes.driver()->hasFeature(QSqlDriver::QuerySize)) {
+		// if the driver supports .size() then use it because is is more efficient
+		numAntennaDB = antnameQueryRes.size();
+		antnameQueryRes.setForwardOnly(true);
+	} else {
+		if (!antnameQueryRes.last()) {
+			numAntennaDB = 0;
+		} else {
+			numAntennaDB = antnameQueryRes.at()+1;
+			antnameQueryRes.first();
+			antnameQueryRes.previous();
+		}
+	}
+
+	std::vector<int> antennaIdxMap;
+	std::vector<std::string> antennaNameList;
+
+	for(int antIdxDB=0; antIdxDB < numAntennaDB; ++antIdxDB) {
+		antennaIdxMap.push_back(-1);
+		antennaNameList.push_back("");
+	}
+
+	while (antnameQueryRes.next()) {
+		int antIdxDB = antnameQueryRes.value(antname_ant_idxIdx).toInt();
+		std::string antennaName = antnameQueryRes.value(antname_ant_nameIdx).toString().toStdString();
+		antennaNameList[antIdxDB] = antennaName;
+	}
+	/**************************************************************************************/
+
+	/**************************************************************************************/
+	/* Get list of antenna aob values                                                     */
+	/**************************************************************************************/
+	std::vector<double> antennaAOBList;
+	if (numAntennaDB) {
+		QSqlQuery antaobQueryRes = SqlSelect(*db, "antaob")
+										.cols(antaobColumns)
+										.run();
+		int numAntennaAOB;
+		// resize vector to fit result
+		if (antaobQueryRes.driver()->hasFeature(QSqlDriver::QuerySize)) {
+			// if the driver supports .size() then use it because is is more efficient
+			numAntennaAOB = antaobQueryRes.size();
+			antaobQueryRes.setForwardOnly(true);
+		} else {
+			if (!antaobQueryRes.last()) {
+				numAntennaAOB = 0;
+			} else {
+				numAntennaAOB = antaobQueryRes.at()+1;
+				antaobQueryRes.first();
+				antaobQueryRes.previous();
+			}
+		}
+
+		for(int aobIdx=0; aobIdx < numAntennaAOB; ++aobIdx) {
+			antennaAOBList.push_back(quietNaN);
+		}
+
+		while (antaobQueryRes.next()) {
+			int aobIdx = antaobQueryRes.value(antaob_aob_idxIdx).toInt();
+			double aobRad = antaobQueryRes.value(antaob_aob_degIdx).toDouble()*M_PI/180.0;
+			antennaAOBList[aobIdx] = aobRad;
+		}
+	}
+	/**************************************************************************************/
 
 	while (q.next())
 	{
@@ -362,7 +630,23 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 
 		target.at(r).status = q.value(statusIdx).toString().toStdString();
 		target.at(r).mobile = q.value(mobileIdx).toBool();
-		target.at(r).rxAntennaModel = q.value(rx_ant_modelIdx).toString().toStdString();
+		target.at(r).rxAntennaModelName = q.value(rx_ant_modelNameIdx).toString().toStdString();
+
+		int rxAntennaIdxDB = q.value(rx_ant_model_idxIdx).toInt();
+
+		AntennaClass *antennaPattern = (AntennaClass *) NULL;
+
+		if (rxAntennaIdxDB != -1) {
+			if (antennaIdxMap[rxAntennaIdxDB] == -1) {
+				antennaPattern = createAntennaPattern(db, rxAntennaIdxDB, antennaAOBList, antennaNameList[rxAntennaIdxDB]);
+				antennaIdxMap[rxAntennaIdxDB] = antennaList.size();
+				antennaList.push_back(antennaPattern);
+			} else {
+				antennaPattern = antennaList[antennaIdxMap[rxAntennaIdxDB]];
+			}
+		}
+		target.at(r).rxAntenna = antennaPattern;
+
 		target.at(r).numPR = numPR;
 
 		std::string rxAntennaCategoryStr = q.value(rx_antennaCategoryIdx).toString().toStdString();
@@ -390,15 +674,16 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 			target.at(r).prRxGain = std::vector<double>(numPR);
 			target.at(r).prRxAntennaDiameter = std::vector<double>(numPR);
 			target.at(r).prAntCategory = std::vector<CConst::AntennaCategoryEnum>(numPR);
-			target.at(r).prAntModel = std::vector<std::string>(numPR);
+			target.at(r).prAntModelName = std::vector<std::string>(numPR);
 
 			target.at(r).prReflectorHeight = std::vector<double>(numPR);
 			target.at(r).prReflectorWidth = std::vector<double>(numPR);
+			target.at(r).prAntenna = std::vector<AntennaClass *>(numPR);
 
 			QSqlQuery prQueryRes = SqlSelect(*db, "pr")
-			                       .cols(prColumns)
-			                       .where(QString("fsid=%1").arg(fsid))
-			                       .run();
+										.cols(prColumns)
+										.where(QString("fsid=%1").arg(fsid))
+										.run();
 
 			int querySize;
 			// resize vector to fit result
@@ -448,12 +733,88 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 				}
 				target.at(r).prAntCategory[prIdx] = prAntCategory;
 
-				target.at(r).prAntModel[prIdx] = prQueryRes.value(prAntModelIdx).toString().toStdString();
+				target.at(r).prAntModelName[prIdx] = prQueryRes.value(prAntModelNameIdx).toString().toStdString();
 
 				target.at(r).prReflectorHeight[prIdx]   = prQueryRes.value(prReflectorHeightIdx).isNull() ? quietNaN : prQueryRes.value(prReflectorHeightIdx).toDouble();
 				target.at(r).prReflectorWidth[prIdx]    = prQueryRes.value(prReflectorWidthIdx ).isNull() ? quietNaN : prQueryRes.value(prReflectorWidthIdx ).toDouble();
+
+				int prAntennaIdxDB = prQueryRes.value(pr_ant_model_idxIdx).toInt();
+
+				antennaPattern = (AntennaClass *) NULL;
+
+				if (prAntennaIdxDB != -1) {
+					if (antennaIdxMap[prAntennaIdxDB] == -1) {
+						antennaPattern = createAntennaPattern(db, prAntennaIdxDB, antennaAOBList, antennaNameList[prAntennaIdxDB]);
+						antennaIdxMap[prAntennaIdxDB] = antennaList.size();
+						antennaList.push_back(antennaPattern);
+					} else {
+						antennaPattern = antennaList[antennaIdxMap[prAntennaIdxDB]];
+					}
+				}
+				target.at(r).prAntenna[prIdx] = antennaPattern;
 			}
 		}
 	}
 	LOGGER_DEBUG(logger) << target.size() << " rows retreived";
+}
+
+AntennaClass *UlsDatabase::createAntennaPattern(SqlScopedConnection<SqlExceptionDb>& db, int rxAntennaIdxDB, std::vector<double> antennaAOBList, std::string antennaName)
+{
+    int numAntennaAOB = antennaAOBList.size();
+    int idmin = numAntennaAOB*rxAntennaIdxDB;
+    int idmax = idmin + numAntennaAOB - 1;
+	QSqlQuery antgainQueryRes = SqlSelect(*db, "antgain")
+		.cols(antgainColumns)
+		.where(QString(
+			"(id BETWEEN %1 AND %2)"
+		)
+		.arg(idmin)
+		.arg(idmax)
+		)
+		.order("id")
+		.run();
+
+	int querySize;
+	// resize vector to fit result
+	if (antgainQueryRes.driver()->hasFeature(QSqlDriver::QuerySize)) {
+		// if the driver supports .size() then use it because is is more efficient
+		querySize = antgainQueryRes.size();
+		antgainQueryRes.setForwardOnly(true);
+	} else {
+		if (!antgainQueryRes.last()) {
+			querySize = 0;
+		} else {
+			querySize = antgainQueryRes.at()+1;
+			antgainQueryRes.first();
+			antgainQueryRes.previous();
+		}
+	}
+
+	if (querySize != numAntennaAOB) {
+	    LOGGER_DEBUG(logger) << "ERROR Creating antenna " << antennaName << ": numAntennaAOB = " << numAntennaAOB << ", querySize = " << querySize;
+	}
+
+    std::vector<std::tuple<double, double>> sampledData;
+
+	std::tuple<double, double> pt;
+	std::get<1>(pt) = quietNaN;
+	for(int aobIdx=0; aobIdx<numAntennaAOB-1; ++aobIdx) {
+        std::get<0>(pt) = antennaAOBList[aobIdx];
+        sampledData.push_back(pt);
+	}
+
+	while (antgainQueryRes.next()) {
+		int id = antgainQueryRes.value(antgain_idIdx).toInt();
+		double gain = antgainQueryRes.value(antgain_gainIdx).toDouble();
+        int aobIdx = id - idmin;
+        std::get<1>(sampledData[aobIdx]) = gain;
+	}
+
+	AntennaClass *antenna = new AntennaClass(CConst::antennaLUT_Boresight, antennaName.c_str());
+
+	LinInterpClass *gainTable = new LinInterpClass(sampledData);
+
+	antenna->setBoresightGainTable(gainTable);
+
+    return(antenna);
 }

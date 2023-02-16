@@ -38,9 +38,13 @@ public:
 
     static QStringList getCSVHeader(int numPR);
 
+    static QStringList getRASHeader();
+
     static double computeSpectralOverlap(double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq);
 
     static Vector3 computeHPointingVec(Vector3 position, double azimuthPtg, double elevationPtg);
+
+    static double getAngleFromDMS(std::string dmsStr);
 };
 
 #endif
