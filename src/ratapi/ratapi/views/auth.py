@@ -20,6 +20,7 @@ from ..models.base import db
 from .. import config
 from ..models.aaa import User
 from flask_login import current_user
+from .. import als
 
 OIDC_LOGIN = config.OIDC_LOGIN
 try:
@@ -163,8 +164,12 @@ class CallbackAPI(MethodView):
         app_state = flask.request.args.get("state")
 
         if app_state != flask.session['app_state']:
+            LOGGER.debug('user:%s login bad state', 'unknown')
+            als.als_json_log('user_access', {'action':'login', 'user':'unknown', 'from':flask.request.remote_addr, 'status':'bad state'})
             return "Unexpected application state", 406
         if not code:
+            LOGGER.debug('user:%s login no code', 'unknown')
+            als.als_json_log('user_access', {'action':'login', 'user':'unknown', 'from':flask.request.remote_addr, 'status':'no code'})
             return "The code was not returned or is not accessible", 406
 
         query_params = {'grant_type': 'authorization_code',
@@ -233,10 +238,15 @@ class CallbackAPI(MethodView):
                 db.session.commit()  # pylint: disable=no-member
 
         except Exception as e:
+            LOGGER.debug('user:%s login unauthorized', user_email)
+            als.als_json_log('user_access', {'action':'login', 'user':user_email, 'from':flask.request.remote_addr, 'status':'unauthorized'})
             raise werkzeug.exceptions.Unauthorized(
                 'An unexpected error occured. Please try again.')
 
         login_user(user)
+
+        LOGGER.debug('user:%s login success', user.username)
+        als.als_json_log('user_access', {'action':'login', 'user':user.username, 'from':flask.request.remote_addr, 'status':'success'})
         return flask.redirect(flask.url_for("root"))
 
 
@@ -249,6 +259,13 @@ class LogoutAPI(MethodView):
         # store app state and code verifier in session
         if not flask.current_app.config['OIDC_LOGIN']:
             return flask.redirect(flask.url_for('user.logout'))
+
+        try:
+           LOGGER.debug('user:%s logout', current_user.username)
+           als.als_json_log('user_access', {'action':'logout', 'user':current_user.username, 'from':flask.request.remote_addr})
+        except:
+           LOGGER.debug('user:%s logout', 'unknown')
+           als.als_json_log('user_access', {'action':'logout', 'user':'unknown', 'from':flask.request.remote_addr})
 
         logout_user()
         return flask.redirect(flask.url_for("root"))
