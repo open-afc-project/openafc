@@ -11,6 +11,7 @@ import datetime
 import json
 import logging
 import os
+import re
 import sys
 import threading
 
@@ -70,6 +71,9 @@ JSON_LOG_FIELD_DATA = "jsonData"
 
 # Delay between connection attempts
 CONNECT_ATTEMPT_INTERVAL = datetime.timedelta(seconds=10)
+
+# Regular expression for topic name check (Postgre requirement to table names)
+TOPIC_NAME_REGEX = re.compile(r"^[_a-zA-Z][0-9a-zA-Z_]{,62}$")
 
 # True for Python 3, False for Python 2
 IS_PY3 = sys.version_info.major == 3
@@ -397,6 +401,7 @@ class Als:
         record -- JSON dictionary with record data
         """
         assert topic != ALS_TOPIC
+        assert TOPIC_NAME_REGEX.match(topic)
         if not self._try_connect():
             return
         json_dict = \
@@ -532,7 +537,6 @@ def als_afc_request(req_id, req):
     req_id -- Unique (on at least server level) request ID string
     req    -- Request message JSON dictionary
     """
-def als_afc_request(req_id, req):
     if (_als_instance is not None) and (req_id is not None):
         _als_instance.afc_request(req_id, req)
 

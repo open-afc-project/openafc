@@ -9,10 +9,12 @@ services:
       - POSTGRES_PASSWORD=N3SF0LVKJx1RAhFGx4fcw
       - PGDATA=/var/lib/pgsql/data
       - POSTGRES_DB=fbrat
+    dns_search: [.]
 
   rmq:
     image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:${TAG:-latest}
     restart: always
+    dns_search: [.]
 
   nginx:
     image: public.ecr.aws/w9v6y1o0/openafc/ngnx-image:${TAG:-latest}
@@ -26,6 +28,7 @@ services:
       - AFC_MSGHND_PORT=8000
     depends_on:
       - msghnd
+    dns_search: [.]
 
   rat_server:
     image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server:${TAG:-latest}
@@ -44,6 +47,7 @@ services:
       - als_kafka
       - als_siphon
       - als_postgres
+    dns_search: [.]
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
@@ -72,6 +76,7 @@ services:
       # ALS params
       - ALS_KAFKA_SERVER_ID=msghnd
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+    dns_search: [.]
     depends_on:
       - ratdb
       - rmq
@@ -86,6 +91,7 @@ services:
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_HIST_PORT=4999
       - AFC_OBJST_LOCAL_DIR=/storage
+    dns_search: [.]
 
   worker:
     image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:${TAG:-latest}
@@ -106,6 +112,7 @@ services:
       - ratdb
       - rmq
       - objst
+    dns_search: [.]
 
   als_kafka:
     image: public.ecr.aws/w9v6y1o0/openafc/als-kafka-image:${TAG:-latest}
@@ -113,6 +120,7 @@ services:
     environment:
       - KAFKA_ADVERTISED_HOST=${ALS_KAFKA_SERVER_}
       - KAFKA_CLIENT_PORT=${ALS_KAFKA_CLIENT_PORT_}
+    dns_search: [.]
 
   als_siphon:
     image: public.ecr.aws/w9v6y1o0/openafc/als-siphon-image:${TAG:-latest}
@@ -120,11 +128,12 @@ services:
     environment:
       - KAFKA_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       - POSTGRES_HOST=als_postgres
-      - INIT_IF_EXISTS=drop
-      - SIPHON_PROGRESS=true
+      - INIT_IF_EXISTS=skip
     depends_on:
       - als_kafka
       - als_postgres
+    dns_search: [.]
 
   als_postgres:
     image: public.ecr.aws/w9v6y1o0/openafc/als-postgres-image:${TAG:-latest}
+    dns_search: [.]
