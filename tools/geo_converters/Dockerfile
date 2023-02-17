@@ -12,10 +12,12 @@
 
 FROM osgeo/gdal:alpine-normal-latest
 
+RUN apk add py3-pip
+RUN pip install pyaml
 WORKDIR /usr/app
-COPY dir_md5.py nlcd_to_wgs84.py /usr/app/
+COPY dir_md5.py nlcd_wgs84.py nlcd_wgs84.yaml /usr/app/
 # If container is created on Windows 'chmod' is necessary. No harm on *nix
-RUN chmod a+x /usr/app/dir_md5.py /usr/app/nlcd_to_wgs84.py
+RUN chmod a+x /usr/app/dir_md5.py /usr/app/nlcd_wgs84.py
 ENV PATH=$PATH:/usr/app
 
 CMD sh

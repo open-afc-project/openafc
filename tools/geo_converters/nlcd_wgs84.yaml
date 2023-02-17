@@ -1,0 +1,233 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# This is a parameter file for nlcd_wgs84.py that specifies land usage code
+# translation parameters
+
+---
+# Target encoding. For now - NLCD
+target:
+    codes:
+        0:
+            description: "Unclassified"
+            color: [0, 0, 0, 0]
+        11:
+            description: "Open Water"
+            color: [70, 107, 159, 255]
+        12:
+            description: "Perennial Ice/Snow"
+            color: [209, 222, 248, 255]
+        21:
+            description: "Developed, Open Space (e.g large-lot single-family housing units, parks, golf courses, and planted vegetation). Impervious surfaces < 20%"
+            color: [222, 197, 197, 255]
+        22:
+            description: "Developed, Low Intensity (e.g single-family housing units). Impervious surfaces 20%-49%"
+            color: [217, 146, 130, 255]
+        23:
+            description: "Developed, Medium Intensity (e.g single-family housing units). Impervious surfaces 50%-79%"
+            color: [235, 0, 0, 255]
+        24:
+            description: "Developed, High Intensity - areas where people reside or work in high numbers (e.g. apartment complexes, row houses and commercial/industrial). Impervious surfaces 80%-100%"
+            color: [171, 0, 0, 255]
+        31:
+            description: "Barren Land (Rock/Sand/Clay). Vegetation < 15% of total cover"
+            color: [179, 172, 159, 255]
+        41:
+            description: "Deciduous Forest (dominated by trees generally > 5m tall, > 20% of total vegetation cover). > 75% shed foliage simultaneously"
+            color: [104, 171, 95, 255]
+        42:
+            description: "Evergreen Forest (dominated by trees generally > 5m tall, > 20% of total vegetation cover). > 75% maintain leaves all year. Canopy always with green foliage"
+            color: [28, 95, 44, 255]
+        43:
+            description: "Mixed Forest (dominated by trees generally > 5m tall, > 20% of total vegetation cover). Neither deciduous nor evergreen > 75% of total tree cover"
+            color: [181, 197, 143, 255]
+        51:
+            description: "Dwarf Scrub (Alaska only, dominated by shrubs < 20 centimeters tall with shrub canopy typically greater than 20% of total vegetation. E.g. grasses, sedges, herbs, and non-vascular vegetation"
+            color: [172, 146, 57, 255]
+        52:
+            description: "Shrub/Scrub (dominated by shrubs < 5m tall, canopy > 20% of total vegetation. E.g. shrubs, young trees, trees stunted from environmental conditions)"
+            color: [204, 184, 121, 255]
+        71:
+            description: "Grassland/Herbaceous (grammanoid or herbaceous vegetation are > 80% of total vegetation). No tilling, but may be grazing"
+            color: [223, 223, 194, 255]
+        72:
+            description: "Sedge/Herbaceous (Alaska only, sedges and forbs are > 80% of total vegetation). Grasses or grass like plants, includes sedge and sedge tussock tundra"
+            color: [209, 209, 130, 255]
+        73:
+            description: "Lichens (Alaska only, fruticose or foliose lichens > 80% of total vegetation)"
+            color: [164, 204, 81, 255]
+        74:
+            description: "Moss (Alaska only, mosses > 80% of total vegetation)"
+            color: [130, 184, 158, 255]
+        81:
+            description: "Pasture/Hay (grasses, legumes, planted for livestock grazing or the production of seed or hay crops, perennial cycle). Pasture/hay vegetation > 20% of total vegetation"
+            color: [220, 217, 57, 255]
+        82:
+            description: "Cultivated Crops. Production of annual crops, such as corn, soybeans, vegetables, tobacco, and cotton, and also perennial woody crops such as orchards and vineyards, actively tilled lands. Crop vegetation > 20% of total vegetation"
+            color: [171, 108, 40, 255]
+        90:
+            description: "Woody Wetlands. Forest or shrub > 20%of vegetative cover. Periodically saturated with or covered with water"
+            color: [184, 217, 235, 255]
+        95:
+            description: "Emergent Herbaceous Wetlands. Perennial herbaceous vegetation > 80% of vegetative cover. Periodically saturated with or covered with water"
+            color: [108, 159, 184, 255]
+    default_code: 0
+    default_color: [0, 0, 0, 255]
+
+# Source encoding
+encodings:
+    noaa:
+        codes:
+            0:
+                description: "Background"
+                target_code: 0
+            1:
+                description: "Unclassified. This class contains no data due to cloud conditions or data voids"
+                target_code: 0
+            2:
+                description: "Impervious Surfaces. Buildings, parking lots and roads of asphalt/concrete or other constructed surfaces which do not allow infiltration from precipitation"
+                target_code: 24
+            3:
+                description: "Medium Intensity Developed"
+                target_code: 23
+            4:
+                description: "Low Intensity Developed"
+                target_code: 22
+            5:
+                description: "Open Spaces Developed. Some constructed materials, but mostly lawn grasses. Impervious < 20% of total cover. E.g. large-lot single-family housing units, parks, golf courses, and planted vegetation"
+                target_code: 21
+            6:
+                description: "Cultivated Land. Cropland) and woody cultivated lands"
+                target_code: 82
+            7:
+                description: "Pasture/Hay. Grasses, legumes or mixtures planted for livestock grazing, production of sees or hay crops"
+                target_code: 81
+            8:
+                description: "Grassland. Dominated by natural grasses and non-grasses (forbs) that are not fertilized, cut, tilled, or planted regularly"
+                target_code: 71
+            9:
+                description: "Deciduous Forest. Woody vegetation un-branched 0.6 to 1m, height > 5m"
+                target_code: 41
+            10:
+                description: "Evergreen Forest. Areas > 67% of the trees remain green. Coniferous and broad-leaved evergreens (> 5m)"
+                target_code: 42
+            11:
+                description: "Mixed Forest. Forested areas with both evergreen and deciduous trees (> 5m) and neither predominate"
+                target_code: 43
+            12:
+                description: "Scrub/Shrub. Dominated by woody vegetation < 5m in height. True shrubs, young trees, and trees or shrubs that are small or stunted because of environmental conditions"
+                target_code: 52
+            13:
+                description: "Palustrine Forested Wetland. Wetlands non-tidal or tidal with ocean-derived salinity < 0.05% dominated by woody vegetation > 5m in height"
+                target_code: 90
+            14:
+                description: "Palustrine Scrub/Shrub Wetland. Wetlands non-tidal or tidal with ocean-derived salinity < 0.05% dominated by woody vegetation < 5m in height"
+                target_code: 90
+            15:
+                description: "Palustrine Emergent Wetland. Wetlands non-tidal or tidal with ocean-derived salinity < 0.05% dominated by trees, shrubs, persistent emergents, emergent mosses, or lichens"
+                target_code: 95
+            16:
+                description: "Estuarine Forest Wetland. Tidal with ocean-derived salinity > 0.05% dominated by woody vegetation > 5m in height"
+                target_code: 90
+            17:
+                description: "Estuarine Scrub/Shrub Wetland. Tidal with ocean-derived salinity > 0.05% dominated by woody vegetation < 5m in height"
+                target_code: 90
+            18:
+                description: "Estuarine Emergent. Erect, rooted, herbaceous hydrophytes (excluding mosses and lichens) that are present for most of the growing season in most years. Perennial plants usually dominate these wetlands. Except sub-tidal and irregularly exposed water regimes"
+                target_code: 95
+            19:
+                description: "Unconsolidated Shore. Substrates lacking vegetation except for pioneering plants. E.g. beaches, bars, and flats"
+                target_code: 31
+            20:
+                description: "Bare Land. Bare soil, rock, sand, silt, gravel. Little or no vegetation"
+                target_code: 31
+            21:
+                description: "Water. Includes all areas with < 30% cover of vegetation"
+                target_code: 11
+            22:
+                description: "Palustrine Aquatic Bed. Wetlands and deepwater habitats dominated by plants that grow on or below the surface of the water"
+                target_code: 11
+            23:
+                description: "Estuarine Aquatic Bed. Widespread and diverse Algal Beds in the Marine and Estuarine Systems on sediment substrates. Both the sub-tidal and inter-tidal and may grow to depths of 30m. Includes kelp forests"
+                target_code: 11
+            24:
+                description: "Tundra. Treeless cover beyond the latitudinal limit of the boreal forest and above boreal forest in high mountains"
+                target_code: 52
+            25:
+                description: "Snow/Ice. Snow and ice that persist for greater portions of the year"
+                target_code: 12
+            26:
+                description: "Dwarf Scrub - Alaska specific"
+                target_code: 51
+            27:
+                description: "Sedge/Herbaceous - Alaska specific"
+                target_code: 72
+            28:
+                description: "Moss - Alaska specific"
+                target_code: 74
+
+    canada:
+        codes:
+            0:
+                description: "Background"
+                target_code: 0
+            1:
+                description: "Temperate or sub-polar needleleaf forest"
+                target_code: 42
+            2:
+                description: "Sub-polar taiga needleleaf forest"
+                target_code: 42
+            3:
+                description: "Tropical or sub-tropical broadleaf evergreen forest"
+                target_code: 42
+            4:
+                description: "Tropical or sub-tropical broadleaf deciduous forest"
+                target_code: 41
+            5:
+                description: "Temperate or sub-polar broadleaf deciduous forest"
+                target_code: 41
+            6:
+                description: "Mixed forest"
+                target_code: 43
+            7:
+                description: "Tropical or sub-tropical shrubland"
+                target_code: 52
+            8:
+                description: "Temperate or sub-polar shrubland"
+                target_code: 52
+            9:
+                description: "Tropical or sub-tropical grassland"
+                target_code: 71
+            10:
+                description: "Temperate or sub-polar grassland"
+                target_code: 71
+            11:
+                description: "Sub-polar or polar shrubland-lichen-moss"
+                target_code: 52
+            12:
+                description: "Sub-polar or polar grassland-lichen-moss"
+                target_code: 71
+            13:
+                description: "Sub-polar or polar barren-lichen-moss"
+                target_code: 31
+            14:
+                description: "Wetland"
+                target_code: 95
+            15:
+                description: "Cropland"
+                target_code: 82
+            16:
+                description: "Barren lands"
+                target_code: 31
+            17:
+                description: "Urban"
+                target_code: 24
+            18:
+                description: "Water"
+                target_code: 11
+            19:
+                description: "Snow and Ice"
+                target_code: 12

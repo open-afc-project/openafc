@@ -155,6 +155,10 @@ Source data for these files released in different forms:
 
 * NOAA files - contain (as of time of this writing) more recent and detailed land usage data for Hawaii, Puerto Rico, Virgin Islands. These files also have not geodetic, but map projection coordinate system, also they have different land usage codes.
 
+* Canada land usage file - covers entire Canada and is also is in map (not geodetic) projection.
+
+There is a *nlcd_to_wgs84.yaml* file that accompanies this script. It define NLCD encoding properties (code meaning and colors) and other encodings (code meaning and translation to NLCD). Presence of this file is mandatory.
+
 `nlcd_to_wgs84.py` script converts NLCD data files from the source format to one, used  by AFC Engine.
 
 `nlcd_to_wgs84.py [options] SOURCE_FILE DEST_FILE`
@@ -165,9 +169,9 @@ Options:
 |------|--------|
 |--pixel_size **DEGREES**|Pixel size of resulting file in degrees|
 |--pixels_per_degree **NUMBER**|Pixel size of resulting file in form of number of pixels per degree. As of time of this writing *3600* recommended for both NLCD and NOAA source data. If pixel size not specified in any way, `gdalwarp` utility will decide - this is not recommended|
-|--translate **ENCODING**|Translate land usage codes from one encoding to other. So far the only supported encoding is *noaa*. Translation process is admittedly slow|
+|--encoding **ENCODING**|Translate land usage codes from one encoding to other. Encodings are defined in *nlcd_to_wgs84.yaml* file, located in the same directory as this script. As of time of this writing *noaa* and *canada* encodings are supported|
 |--format **GDAL_FORMAT**|Format of output file (if can't be derived from file's extension) - see https://gdal.org/drivers/raster/index.html Usually this switch is unnecessary, as output file extension is *.tif*|
-|--format_param **NAME=VALUE**|Output format option. *COMPRESS=PACKBITS* is recommended for TIFF output, as it shrinks size by a factor of 9|
+|--format_param **NAME=VALUE**|Output format option. *COMPRESS=PACKBITS* is recommended for TIFF output, as it shrinks size by a factor of 9. *BIGTIFF=YES* is recommended for really big output files (e.g. Canada or CONUS)|
 |--temp_dir **TEMPDIR**|This script requires a lot of space for intermediate files, that may be unavailable when it runs inside the container. This switch allows to use specified (presumably - outside of container) directory for temporary files|
 |--overwrite|Overwrite output files if already exists|
 
@@ -187,16 +191,28 @@ Some examples:
   Note the use of target directory (`/bar` in container file system) as temporary files' directory. Also note that files in command line use mapped directory names.
 * Convert NOAA file `foo/hi_maui_2005_ccap_hr_land_cover.img` (Hawaii Maui island land usage) to AFC Engine compatible `/bar/hi_maui_2005_ccap_hr_land_cover_resampled.tif`  
   `$ nlcd_to_wgs84.py --pixels_per_degree 3600 --format_param COMPRESS=PACKBITS \ `
-  `--translate noaa \ `  
+  `--encoding noaa \ `  
   `foo/hi_maui_2005_ccap_hr_land_cover.img \ `  
   `bar/hi_maui_2005_ccap_hr_land_cover_resampled.tif`  
-  Note the use of `--translate noaa` for NOAA source file
+  Note the use of `--encoding noaa` for NOAA source file
 * Same, but running script from container named `geo_converters`:  
   ``docker run -v `realpath foo`:/foo -v `realpath bar`:/bar nlcd_to_wgs84.py \ ``  
   `--pixels_per_degree 3600 --format_param COMPRESS=PACKBITS --temp_dir /bar \ `  
-  `--translate noaa \ `  
+  `--encoding noaa \ `  
   `/foo/hi_maui_2005_ccap_hr_land_cover.img \ `  
   `/bar/hi_maui_2005_ccap_hr_land_cover_resampled.tif`  
+* Convert Canada land cover file `foo/landcover-2020-classification.tif` to AFC Engine compatible `/bar/landcover-2020-classification_resampled.tif`  
+  `$ nlcd_to_wgs84.py --pixels_per_degree 3600 --format_param COMPRESS=PACKBITS \ `  
+  `--format_param BIGTIFF=YES --encoding canada \ `  
+  `foo/landcover-2020-classification.tif \ `  
+  `bar/landcover-2020-classification.tif_resampled.tif`  
+  Note the use of `--format_param BIGTIFF=YES` for big output TIFF file
+* Same, but running script from container named `geo_converters`:  
+  ``docker run -v `realpath foo`:/foo -v `realpath bar`:/bar nlcd_to_wgs84.py \ ``  
+  `--pixels_per_degree 3600 --format_param COMPRESS=PACKBITS \  `
+  `--format_param BIGTIFF=YES --temp_dir /bar --encoding canada \ `  
+  `/foo/landcover-2020-classification.img \ `  
+  `/bar/landcover-2020-classification_resampled.tif`  
 
 ## *proc_gdal* - creating LiDAR files <a name="proc_gdal"/>
 This directory contains undigested, but very important files that convert LiDAR files from source format (as downloaded from https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities/ ) to form, compatible with AFC Engine (two-band geodetic raster files and their index .csv files)
