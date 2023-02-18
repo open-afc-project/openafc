@@ -807,6 +807,8 @@ def main(argv: List[str]) -> None:
                      center_lon_180=boundaries.right < boundaries.left,
                      overwrite=True)
                 src = args.SRC
+            boundaries = Boundaries(temp)
+            boundaries.adjust()
             if args.encoding is not None:
                 with Durator("This stage took"):
                     print("TRANSLATING PIXELS TO NLCD ENCODING")
@@ -814,8 +816,6 @@ def main(argv: List[str]) -> None:
                               translation_name=args.encoding)
                     src = temp
             with Durator("This stage took"):
-                boundaries = Boundaries(temp)
-                boundaries.adjust()
                 print("TRANSLATING TO WGS84")
                 warp(src=src, dst=args.DST, env=env, boundaries=boundaries,
                      pixel_size=args.pixel_size,

@@ -224,7 +224,8 @@ encodings:
                 target_code: 31
             17:
                 description: "Urban"
-                target_code: 24
+                # Should be 24. Set to 22 per RKF requirement
+                target_code: 22
             18:
                 description: "Water"
                 target_code: 11
