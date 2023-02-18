@@ -160,18 +160,22 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                 row[prWidthStr]         = row[prWidthULSStr]
                 row[prHeightStr]        = row[prHeightULSStr]
 
-            if (highFreq > unii5StartFreqMHz) and (lowFreq < unii5StopFreqMHz):
-                uniiband = 5
-            elif (highFreq > unii7StartFreqMHz) and (lowFreq < unii7StopFreqMHz):
-                uniiband = 7
-            elif (highFreq > unii6StartFreqMHz) and (lowFreq < unii6StopFreqMHz):
-                uniiband = 6
-            elif (highFreq > unii8StartFreqMHz) and (lowFreq < unii8StopFreqMHz):
-                uniiband = 8
-            else:
-                sys.exit('ERROR in fix_params.py: freq found not in UNII-5, UNII-6, UNII-7, UNII-8')
+            if region == 'US':
+                if (highFreq > unii5StartFreqMHz) and (lowFreq < unii5StopFreqMHz):
+                    uniiband = 5
+                elif (highFreq > unii7StartFreqMHz) and (lowFreq < unii7StopFreqMHz):
+                    uniiband = 7
+                elif (highFreq > unii6StartFreqMHz) and (lowFreq < unii6StopFreqMHz):
+                    uniiband = 6
+                elif (highFreq > unii8StartFreqMHz) and (lowFreq < unii8StopFreqMHz):
+                    uniiband = 8
+                else:
+                    sys.exit('ERROR in fix_params.py: freq found not in UNII-5, UNII-6, UNII-7, UNII-8')
 
-            keyv = tuple([region, FRN, uniiband])
+                keyv = tuple([region, FRN, uniiband])
+            else:
+                keyv = tuple([region, FRN])
+
             if keyv in csmap:
                 csmap[keyv].append(row)
             else:
@@ -313,8 +317,9 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
 
 
             for ri in range(len(csmap[keyv])):
+                r = csmap[keyv][ri]
+                numPR = int(r['Num Passive Repeater'])
                 if keyv[0] == 'US':
-                    r = csmap[keyv][ri]
                     if (keyv[2] == 5):
                         Fc_unii = (unii5StartFreqMHz + unii5StopFreqMHz)*0.5e6
                     elif (keyv[2] == 7):
@@ -323,8 +328,6 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                         Fc_unii = (unii8StartFreqMHz + unii8StopFreqMHz)*0.5e6
                     else:
                         sys.exit('ERROR in fix_params.py: freq found not in UNII-5, UNII-7, UNII-8')
-    
-                    numPR = int(r['Num Passive Repeater'])
     
                     for prNum in range(numPR+1):
     
@@ -731,6 +734,44 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                     r[nearFieldDistLimitStr]  = str(rxNearFieldDistLimit)
                     r[nearFieldEfficiencyStr] = str(rxNearFieldAntEfficiency)
                     ####################################################################################
+
+                elif  keyv[0] == 'CA':
+                    freq = float(r['Center Frequency (MHz)'])
+
+                    for prIdx in range(2*numPR+1):
+                        if prIdx == 0:
+                            prNum = 0
+                            prDir = 0
+                            antType = 'Ant'
+                        else:
+                            prNum = ((prIdx - 1) % numPR) + 1
+                            prDir = (prIdx - 1) // numPR
+                            antType = r['Passive Repeater ' + str(prNum) + ' Ant Type']
+
+                        if prNum == 0:
+                            fwdGainStrULS = 'Rx Gain ULS (dBi)'
+                            fwdGainStr    = 'Rx Gain (dBi)'
+                            fwdHeightStr = 'Rx Height to Center RAAT (m)'
+                        else:
+                            if prDir == 0:
+                                prDirStr = 'Rx'
+                            else:
+                                prDirStr = 'Tx'
+                            fwdGainStrULS = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain ' + prDirStr + ' (dBi)'
+                            fwdGainStr    = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain ' + prDirStr + ' (dBi)'
+                            fwdHeightStr = 'Passive Repeater ' + str(prNum) + ' Height to Center RAAT ' + prDirStr + ' (m)'
+
+                        if (antType == "Ant"):
+                            if r[fwdGainStrULS].strip() == '' or float(r[fwdGainStrULS]) < 0.0:
+                                if (freq <= 5425.0):
+                                    r[fwdGainStr] = '41.7'
+                                else:
+                                    r[fwdGainStr] = '42.1'
+
+                        if r[fwdHeightStr].strip() == '':
+                            r[fwdHeightStr] = '56'
+                        elif float(r[fwdHeightStr]) < 1.5:
+                            r[fwdHeightStr] = '1.5'
 
             for ri,r in enumerate(csmap[keyv]):
                 fsid = int(r['FSID'])

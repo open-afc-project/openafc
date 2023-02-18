@@ -1126,6 +1126,12 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
         current.latitudeDeg  = std::floor(current.latitudeDeg *alignFederatedScale + 0.5)/alignFederatedScale;
     }
 
+    if (isnan(current.antennaHeightAGL)) {
+        current.antennaHeightAGL = 56.0;
+    } else if (current.antennaHeightAGL < 1.5) {
+        current.antennaHeightAGL = 1.5;
+    }
+
     double heightAMSL_km = (current.groundElevation+current.antennaHeightAGL)/1000.0; 
     current.position = EcefModel::geodeticToEcef(current.latitudeDeg, current.longitudeDeg, heightAMSL_km);
 
@@ -1150,6 +1156,29 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
             fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n", antennaModel.c_str());
         }
         current.antennaModel = antennaModel;
+    }
+
+    if (current.bandwidthMHz == std::numeric_limits<double>::quiet_NaN()) {
+        current.bandwidthMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(QString::fromStdString(current.emissionsDesignator));
+    }
+
+    if (current.bandwidthMHz == std::numeric_limits<double>::quiet_NaN()) {
+
+        if (current.centerFreqMHz < 5925.0) {
+            // Do nothing
+        } else if (current.centerFreqMHz < 5955.0) {
+            current.bandwidthMHz = 2*(current.centerFreqMHz - 5925.0);
+        } else if (current.centerFreqMHz < 6395.0) {
+            current.bandwidthMHz = 60;
+        } else if (current.centerFreqMHz < 6425.0) {
+            current.bandwidthMHz = 2*(6425.0 - current.centerFreqMHz);
+        } else if (current.centerFreqMHz < 6440.0) {
+            current.bandwidthMHz = 2*(current.centerFreqMHz - 6425.0);
+        } else if (current.centerFreqMHz < 6860.0) {
+            current.bandwidthMHz = 30;
+        } else if (current.centerFreqMHz < 6875.0) {
+            current.bandwidthMHz = 2*(6875.0 - current.centerFreqMHz);
+        }
     }
 
     if (current.service == 9) {
@@ -1291,6 +1320,11 @@ void UlsFileReader::readReflectorPassiveRepeaterCA(const std::vector<std::string
                 break;
         }
 
+    }
+
+    if ( isnan(current.reflectorHeight) || isnan(current.reflectorWidth) ) {
+        current.reflectorHeight = 7.32;
+        current.reflectorWidth = 9.14;
     }
 
     allReflectorPassiveRepeaters << current;
@@ -1468,7 +1502,7 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool
                 if (txEmFound) {
                     bwMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(e.desig);
                 }
-                if ( (bwMHz == -1.0) || (bwMHz > 60.0) || (bwMHz == 0) || isnan(bwMHz) ) {
+                if ( isnan(bwMHz) || (bwMHz > 60.0) || (bwMHz == 0) ) {
                     bwMHz = freqAssignment.getBandwidth(freq.frequencyAssigned);
                 }
                 if ( (bwMHz == -1) ) {

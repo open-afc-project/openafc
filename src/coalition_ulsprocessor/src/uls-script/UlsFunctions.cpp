@@ -74,7 +74,7 @@ double UlsFunctionsClass::emissionDesignatorToBandwidth(const QString &emDesig)
         multi = 1e9;
         unitS = "G";
     } else {
-        return -1.0;
+        return(std::numeric_limits<double>::quiet_NaN());
     }
 
     QString num = frqPart.replace(unitS, ".");
