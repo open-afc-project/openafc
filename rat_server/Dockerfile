@@ -6,7 +6,7 @@
 #
 # Install required packages
 #
-FROM httpd:2.4.54-alpine as rat_server.preinstall
+FROM httpd:2.4.55-alpine as rat_server.preinstall
 ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
 apk add --update --no-cache py3-six py3-numpy py3-cryptography py3-sqlalchemy \
@@ -57,9 +57,9 @@ EXPOSE 80 443
 COPY rat_server/httpd.conf /usr/local/apache2/conf/
 COPY rat_server/httpd-default.conf rat_server/httpd-info.conf rat_server/httpd-vhosts.conf \
 rat_server/httpd-mpm.conf rat_server/httpd-dav.conf rat_server/httpd-ssl.conf /usr/local/apache2/conf/extra/
+#COPY rat_server/fbrat.wsgi /usr/local/apache2/cgi-bin/fbrat.wsgi
 COPY rat_server/fbrat.wsgi /usr/local/apache2/fbrat.wsgi
-RUN chown fbrat:fbrat /usr/local/apache2/fbrat.wsgi &&\
-mkdir -p /usr/share/ca-certificates/certs
+RUN mkdir -p /usr/share/ca-certificates/certs
 COPY rat_server/http.key rat_server/http.crt /usr/share/ca-certificates/certs/
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 # Add debugging env if configured
