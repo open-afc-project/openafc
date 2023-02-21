@@ -79,7 +79,7 @@ This will create your own copy of our repository.
 ### Step 3: Create a temporary branch
 
 Create a temporary branch for making your changes.
-Keep a separate branch for each issue/feature you want to address.
+Keep a separate branch for each issue/feature you want to address .
 ```
 git checkout -b <JIRA-ID>-branch_name
 ```
