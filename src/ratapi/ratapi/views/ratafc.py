@@ -260,13 +260,18 @@ def success_done(t):
         except:
             pass
         if kmz_data or map_data:
+            # TODO: temporary support python2 where kmz_data is of type str
+            if isinstance(kmz_data, str):
+                kmz_data = kmz_data.encode('base64')
+            if isinstance(kmz_data, bytes):
+                kmz_data = kmz_data.decode('iso-8859-1')
             resp_json = json.loads(resp_data)
             existingExtensions = resp_json["availableSpectrumInquiryResponses"][0].get("vendorExtensions");
             if(existingExtensions == None):
                 resp_json["availableSpectrumInquiryResponses"][0]["vendorExtensions"] = [{
                     "extensionId": "openAfc.mapinfo",
                     "parameters": {
-                        "kmzFile": kmz_data.encode('base64') if kmz_data else None,
+                        "kmzFile": kmz_data if kmz_data else None,
                         "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS) if map_data else None
                     }
                 }]
@@ -274,7 +279,7 @@ def success_done(t):
                  resp_json["availableSpectrumInquiryResponses"][0]["vendorExtensions"].append({
                     "extensionId": "openAfc.mapinfo",
                     "parameters": {
-                        "kmzFile": kmz_data.encode('base64') if kmz_data else None,
+                        "kmzFile": kmz_data if kmz_data else None,
                         "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS) if map_data else None
                     }
                 })

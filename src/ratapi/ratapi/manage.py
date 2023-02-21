@@ -386,7 +386,7 @@ hashed, org = None):
         try:
             if not hashed:
                 # hash password field in non OIDC mode
-                if isinstance(password_in, (str, unicode)):
+                if isinstance(password_in, str):
                     password = password_in.strip()
                 else:
                     with closing(open(password_in)) as pwfile:

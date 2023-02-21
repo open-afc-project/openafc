@@ -1440,7 +1440,6 @@ def _convert_reqs_n_resps_to_dict(cfg):
         if reqs_dict.get(test_indx[i]) is None:
             app_log.debug(f"Missing value for index {test_indx[i]}")
             continue
-        app_log.debug(f"{reqs_dict[test_indx[i]]}")
         test_cases.append(test_indx[i])
     app_log.debug(f"{inspect.stack()[0][3]}() Final list of indexes. "
                   f"{test_cases}")

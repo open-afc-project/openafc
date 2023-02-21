@@ -230,7 +230,7 @@ to run server using test infra scrips, please check and update [.env](/tests/reg
 ```
 cd open-afc
 
-docker build . -t rat_server
+docker build . -t rat_server rat_server/Dockerfile
 
 docker build . -t worker -f worker/Dockerfile
 
@@ -367,6 +367,7 @@ services:
     image: rat_server:latest
     build:
       context: .
+      dockerfile: rat_server/Dockerfile
     ports:
       - "${EXT_PORT}:80"
       - "${EXT_PORT_S}:443"

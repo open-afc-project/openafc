@@ -145,9 +145,8 @@ build_dev_server() {
   cd ${wd}
 
   # build afc server docker image
-  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${D4B} --build-arg PRINST_NAME=${PRINST} --build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}" &
-  msg "wait for prereqs to be built"
+  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BUILDREV=${BUILDREV}"
+  docker_build_and_push ${wd}/rat_server/Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}"
 
   # build ALS-related images
   cd ${wd}/src/als && docker_build_and_push Dockerfile.siphon ${ALS_SIPHON}:${tag} ${push} &

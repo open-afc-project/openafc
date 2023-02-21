@@ -108,7 +108,7 @@ def getSpectrum(**kwargs):
         'version',
     )
 
-    missing_params = frozenset(REQUIRED_PARAMS) - frozenset(kwargs.keys())
+    missing_params = frozenset(REQUIRED_PARAMS) - frozenset(list(kwargs.keys()))
     if missing_params:
         raise InvalidParamsError(
             'Required parameter names: {0}'.format(' '.join(REQUIRED_PARAMS)))

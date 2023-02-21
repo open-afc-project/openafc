@@ -14,6 +14,7 @@ import contextlib
 import logging
 import os
 import shutil
+import sys
 import pkg_resources
 import flask
 import json
@@ -112,7 +113,10 @@ class GuiConfig(MethodView):
 
         # Figure out the current server version
         try:
-            serververs = pkg_resources.require('ratapi')[0].version
+            if sys.version_info.major != 3:
+                serververs = pkg_resources.require('ratapi')[0].version
+            else:
+                serververs = pkg_resources.get_distribution('ratapi').version
         except Exception as err:
             LOGGER.error('Failed to fetch server version: {0}'.format(err))
             serververs = 'unknown'
@@ -122,7 +126,8 @@ class GuiConfig(MethodView):
             probeHttps=False,
             mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
 
-        if flask.current_app.config['AFC_APP_TYPE'] == 'server':
+        # TODO: temporary support python2
+        if sys.version_info.major != 3:
             from urlparse import urlparse
         else:
             from urllib.parse import urlparse
@@ -141,8 +146,13 @@ class GuiConfig(MethodView):
             login_url=flask.url_for('user.login'),
             logout_url=flask.url_for('user.logout'),
 
+        # TODO: temporary support python2
+        if sys.version_info.major != 3:
+            _paws_url=flask.url_for('paws'),
+        else:
+            _paws_url=flask.url_for('urn:app:ratapi:paws'),
         resp = flask.jsonify(
-            paws_url=flask.url_for('paws'),
+            paws_url=_paws_url,
             uls_url=flask.url_for('files.uls_db'),
             antenna_url=flask.url_for('files.antenna_pattern'),
             history_url=histurl,
@@ -382,7 +392,7 @@ class LiDAR_Bounds(MethodView):
     def get(self):
         ''' GET method for LiDAR_Bounds
         '''
-        LOGGER.debug('getting LiDAR bounds')
+        LOGGER.debug("LiDAR_Bounds.get()")
         user_id = auth(roles=['AP', 'Analysis'])
 
         import xdg.BaseDirectory
@@ -425,6 +435,7 @@ class RAS_Bounds(MethodView):
     def get(self):
         ''' GET method for RAS_Bounds
         '''
+        LOGGER.debug("RAS_Bounds.get()")
         LOGGER.debug('getting RAS bounds')
         user_id = auth(roles=['AP', 'Analysis'])
 
