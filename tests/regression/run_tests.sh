@@ -32,13 +32,20 @@ loop() {
     max=${1}
     step=${2:-10}
     s=${start}
+    verify_tls=''
+    if [ "$prot" == "https" ]; then
+        verify_tls='--verif'
+    fi
+
+    echo "verify_tls - $verify_tls"
+
     while [ $s -le $max ]
     do
         e=$(($((s + ${step}))<=${max} ? $((s + ${step})) : ${max}))
         echo "from $s  to $e"
         # run processes and store pids in array
         for i in `seq $((s+1)) ${e}`; do
-            docker run --rm ${di_name}  --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} ${ext_args} &
+            docker run --rm ${di_name}  --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} ${verify_tls} ${ext_args} &
             pids+=( $! )
         done
         s=$((s + ${step}))
@@ -52,7 +59,7 @@ loop() {
     return $retval
 }
 
-cd $wd/tests
+cd $wd
 loop $ap_count ${burst}
 
 

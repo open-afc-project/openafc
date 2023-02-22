@@ -109,7 +109,9 @@ build_dev_server() {
   fi
 
   # build regression test docker image
-  cd ${wd}/tests && docker_build Dockerfile ${RTEST_DI}:${tag}; cd ${wd}
+  cd ${wd}
+  docker_build tests/Dockerfile ${RTEST_DI}:${tag}
+  check_ret $?
 
   # build in parallel server docker prereq images (preinstall and docker_for_build)
     docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST}:${tag} ${push} &
