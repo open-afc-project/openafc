@@ -13,6 +13,7 @@ import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
 import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
 import DownloadContents from "../Components/DownloadContents";
+import AntennaPatternForm from "./AntennaPatternForm";
 
 /**
 * AFCForm.tsx: form for generating afc configuration files to be used to update server
@@ -55,6 +56,10 @@ export class AFCForm extends React.Component<
             messageError: undefined,
             messageSuccess: undefined,
             isModalOpen: false,
+            antennaPatternData: {
+                defaultAntennaPattern: config.ulsDefaultAntennaType,
+            }
+ 
         }
     }
 
@@ -200,6 +205,9 @@ export class AFCForm extends React.Component<
     private updateEntireConfigState(config: AFCConfigFile) {
         this.setState({
             config: config,
+            antennaPatternData: {
+                defaultAntennaPattern: config.ulsDefaultAntennaType,
+            }
         }
         );
     }
@@ -319,7 +327,11 @@ export class AFCForm extends React.Component<
             conf.bodyLoss = x;
             this.setState({ config: conf });
         }
-
+        const setAntennaPattern = (x: AntennaPatternState) => {
+            const conf = this.state.config;
+            conf.ulsDefaultAntennaType = x.defaultAntennaPattern;
+            this.setState({ config: conf, antennaPatternData: x });
+        }
         const setPropogationModel = (x: PropagationModel) => {
             if (x.kind === "Custom") {
                 //rlanITMTxClutterMethod is set in the CustomPropagation but stored at the top level
@@ -753,6 +765,12 @@ export class AFCForm extends React.Component<
                                     isValid={this.state.config.maxLinkDistance >= 1} />
                                     <InputGroupText>km</InputGroupText></InputGroup>
                             </FormGroup>
+                        </GalleryItem>
+                        <GalleryItem>
+                        <AntennaPatternForm
+                                data={this.state.antennaPatternData}
+                                antennaPatternFiles={this.props.antennaPatterns}
+                                onChange={setAntennaPattern} />
                         </GalleryItem>
                         <GalleryItem>
                             <APUncertaintyForm

@@ -61,21 +61,5 @@ export default class AntennaPatternForm extends React.PureComponent<{ data: Ante
                     <FormSelectOption key={option} value={option} label={option} />
                 ))}
             </FormSelect>
-            <FormGroup
-                label="User Upload Antenna Pattern File Name"
-                fieldId="form-user-upload">
-                <FormSelect
-                    id="form-user-upload"
-                    name="form-user-upload"
-                    value={this.props.data.userUpload?.value}
-                    isValid={!!this.props.data.userUpload}
-                    onChange={this.setUserUpload}
-                    style={{ textAlign: "right" }}>
-                    <FormSelectOption isDisabled={false} key='None' value='None' label="Use Default Pattern" />
-                    {this.props.antennaPatternFiles.map((option) => (
-                        <FormSelectOption key={option} value={option} label={option} />
-                    ))}
-                </FormSelect>
-            </FormGroup>
         </FormGroup>
 }
