@@ -1,4 +1,17 @@
 # Release Note
+## **Version and Date**
+|Version|3.7.3.0|
+| :- | :- |
+|**Date**|**22/02/2023**|
+|compiled server's version is TBD | git tag 3.7.2.0|
+## **Issues Addressed**
+ * JIRA OA-573-use-preinstalled-ca-certificates-in-test-utility
+ * JIRA OA-537-create-afc-server-receiver-based-alpine-and-python-3
+ * JIRA OA-571-nlcd_to_wgs84.py_improvements
+ * JIRA OA-566_ALS_logs_improvements
+ * Jira OA-559:Integrate afc_antenna_patterns with FS database.sqlite3 file
+ * Jira OA-534:Update RAS Database daily to include Canada RAS
+
 
 ## **Version and Date**
 |Version|**OA-559**|

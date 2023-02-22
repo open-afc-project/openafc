@@ -6,26 +6,28 @@
 # a copy of which is included with this software program
 #
 
-SRV="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"    # server image
-D4B="public.ecr.aws/w9v6y1o0/openafc/centos-build-image"         # CentOS dev image name
-PRINST="public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image" # preinst image name
 
+# TODO:  centos deprecated D4B="public.ecr.aws/w9v6y1o0/openafc/centos-build-image"         # CentOS dev image name
+# TODO:  centos deprecated PRINST="public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image" # preinst image name
+
+
+# TODO: deprecated MSGHND_PRINST="public.ecr.aws/w9v6y1o0/openafc/centos-msghnd-preinstall" # msghnd preinstall image name
+SRV="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"    # server image
 MSGHND="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd"         # msghnd image
-MSGHND_PRINST="public.ecr.aws/w9v6y1o0/openafc/centos-msghnd-preinstall" # msghnd preinstall image name
+OBJST="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"          # object storage
+RMQ="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                   # rabbitmq image
+NGNX="public.ecr.aws/w9v6y1o0/openafc/ngnx-image"                 # ngnx image
+ALS_SIPHON="public.ecr.aws/w9v6y1o0/openafc/als-siphon-image"     # ALS Siphon image
+ALS_KAFKA="public.ecr.aws/w9v6y1o0/openafc/als-kafka-image"       # Kafka for ALS
+ALS_POSTGRES="public.ecr.aws/w9v6y1o0/openafc/als-postgres-image" # PostgreSQL for ALS
 
 WORKER="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker"        # msghnd image
 WORKER_AL_D4B="public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image"   # Alpine worker build img
 WORKER_AL_PRINST="public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall" # Alpine worker preinst
 
-OBJST="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"          # object storage
-RMQ="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                   # rabbitmq image
-NGNX="public.ecr.aws/w9v6y1o0/openafc/ngnx-image"                 # ngnx image
-RTEST_DI="rtest"                                                  # regression tests image
-ALS_SIPHON="public.ecr.aws/w9v6y1o0/openafc/als-siphon-image"     # ALS Siphon image
-ALS_KAFKA="public.ecr.aws/w9v6y1o0/openafc/als-kafka-image"       # Kafka for ALS
-ALS_POSTGRES="public.ecr.aws/w9v6y1o0/openafc/als-postgres-image" # PostgreSQL for ALS
-
 ULS_UPDATER="110738915961.dkr.ecr.us-east-1.amazonaws.com/uls-updater"    # ULS Updater images
+
+RTEST_DI="rtest"                                                  # regression tests image
 
 # TODO: deprecated, will be removed in future release
 PRINST_WRKR_DI="public.ecr.aws/w9v6y1o0/openafc/centos-worker-preinstall" # worker preinst image name
@@ -114,8 +116,6 @@ build_dev_server() {
   check_ret $?
 
   # build in parallel server docker prereq images (preinstall and docker_for_build)
-    docker_build_and_push ${wd}/dockerfiles/Dockerfile-openafc-centos-preinstall-image ${PRINST}:${tag} ${push} &
-    docker_build_and_push ${wd}/dockerfiles/Dockerfile-for-build ${D4B}:${tag} ${push} &
     docker_build_and_push ${wd}/worker/Dockerfile.build ${WORKER_AL_D4B}:${tag} ${push} &
     docker_build_and_push ${wd}/worker/Dockerfile.preinstall ${WORKER_AL_PRINST}:${tag} ${push} &
 
@@ -147,7 +147,7 @@ build_dev_server() {
   cd ${wd}
 
   # build afc server docker image
-  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BUILDREV=${BUILDREV}"
+  EXT_ARGS="--build-arg BUILDREV=${BUILDREV}"
   docker_build_and_push ${wd}/rat_server/Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}"
 
   # build ALS-related images
