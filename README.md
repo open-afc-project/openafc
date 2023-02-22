@@ -243,15 +243,6 @@ cd rabbitmq/ && docker build . -t rmq ; cd ..
 cd src/filestorage/ && docker build . -t objst; cd ../..
 ```
 
-## build prereq containers (optional)
-The rat-server and celery worker containers use pre-built containers available from public repositories.
-These prereq containes can be built manually.
-### rat-server prereq containers:
-```
-docker build . -t srv-preinst:local -f dockerfiles/Dockerfile-openafc-centos-preinstall-image
-
-docker build . -t srv-build:local   -f dockerfiles/Dockerfile-for-build
-```
 to build the rat-server using local preq containers insted of public:
 ```
 docker build . -t rat_server --build-arg PRINST_NAME=srv-preinst --build-arg PRINST_TAG=local --build-arg BLD_NAME=srv-build --build-arg BLD_TAG=local
