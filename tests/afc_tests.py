@@ -33,6 +33,7 @@ EXAMPLES
 """
 
 import argparse
+import certifi
 import csv
 import datetime
 import hashlib
@@ -113,10 +114,10 @@ class TestCfg(dict):
         if (self['cache'] == False):
             params_data['nocache'] = 'True'
 
-        ser_cert=not self['skip_verif']
+        ser_cert=not self['verif']
         cli_certs=()
         if (self['prot'] == AFC_PROT_NAME and
-            self['skip_verif'] == False):
+            self['verif'] == False):
             # add mtls certificates if explicitly provided
             if not isinstance(self['cli_cert'], type(None)):
                 cli_certs=("".join(self['cli_cert']), "".join(self['cli_key']))
@@ -132,7 +133,7 @@ class TestCfg(dict):
             data=new_req,
             headers=headers,
             timeout=600,    #10 min
-            verify=self['skip_verif'])
+            verify=self['verif'])
         resp = rawresp.json()
 
         tId = resp.get('taskId')
@@ -411,16 +412,30 @@ def _send_recv(cfg, req_data):
     if (cfg['cache'] == False):
         params_data['nocache'] = 'True'
 
-    ser_cert=not cfg['skip_verif']
+    ser_cert=()
     cli_certs=()
-    if (cfg['prot'] == AFC_PROT_NAME and
-        cfg['skip_verif'] == False):
+    app_log.debug(f"--- {cfg['ca_cert']}")
+    if ((cfg['prot'] == AFC_PROT_NAME and
+        cfg['verif'] == True) or (cfg['ca_cert'])):
+
         # add mtls certificates if explicitly provided
         if not isinstance(cfg['cli_cert'], type(None)):
             cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
         # add tls certificates if explicitly provided
         if not isinstance(cfg['ca_cert'], type(None)):
             ser_cert="".join(cfg['ca_cert'])
+            cfg['verif']=True
+        else:
+            os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+            app_log.debug(f"REQUESTS_CA_BUNDLE "
+                f"{os.environ.get('REQUESTS_CA_BUNDLE')}")
+            if "REQUESTS_CA_BUNDLE" in os.environ:
+                ser_cert="".join(os.environ.get('REQUESTS_CA_BUNDLE'))
+                cfg['verif']=True
+            else:
+                app_log.error(f"Missing CA certificate while forced.")
+                return
+        
     app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
     try:
@@ -430,7 +445,7 @@ def _send_recv(cfg, req_data):
             data=new_req,
             headers=headers,
             timeout=600,    #10 min
-            verify=cfg['skip_verif'])
+            verify=ser_cert if cfg['verif'] else False)
         rawresp.raise_for_status()
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as err:
@@ -1440,7 +1455,6 @@ def _convert_reqs_n_resps_to_dict(cfg):
         if reqs_dict.get(test_indx[i]) is None:
             app_log.debug(f"Missing value for index {test_indx[i]}")
             continue
-        app_log.debug(f"{reqs_dict[test_indx[i]]}")
         test_cases.append(test_indx[i])
     app_log.debug(f"{inspect.stack()[0][3]}() Final list of indexes. "
                   f"{test_cases}")
@@ -1617,8 +1631,8 @@ def make_arg_parser():
     args_parser.add_argument('--conn_tm', nargs='?', default=None, type=int,
                          help="<secs> - set timeout for asynchronous "
                               "connection (default=None). \n")
-    args_parser.add_argument('--skip_verif', action='store_true',
-                         help="<skip_verif> - skip SSL veryfication "
+    args_parser.add_argument('--verif', action='store_true',
+                         help="<verif> - skip SSL veryfication "
                               "on post request.\n")
     args_parser.add_argument('--outfile', nargs=1, type=str,
                          help="<filename> - set filename for test "

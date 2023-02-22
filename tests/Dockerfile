@@ -9,16 +9,16 @@ FROM python:3.10-slim
 
 WORKDIR /usr/app
 
-COPY requirements.txt /usr/app/
+COPY tests/requirements.txt /usr/app/
 RUN /usr/local/bin/python3 -m pip install --upgrade pip
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-COPY afc_tests.py /usr/app/afc_tests.py
-COPY _version.py /usr/app/_version.py
-COPY _afc_errors.py /usr/app/_afc_errors.py
-COPY _afc_types.py /usr/app/_afc_types.py
-COPY _wfa_types.py /usr/app/_wfa_types.py
-COPY afc_input.sqlite3 /usr/app/afc_input.sqlite3
+COPY tests/afc_tests.py /usr/app/afc_tests.py
+COPY tests/_version.py /usr/app/_version.py
+COPY tests/_afc_errors.py /usr/app/_afc_errors.py
+COPY tests/_afc_types.py /usr/app/_afc_types.py
+COPY tests/_wfa_types.py /usr/app/_wfa_types.py
+COPY tests/afc_input.sqlite3 /usr/app/afc_input.sqlite3
 
 ENV PYTHONPATH=/usr/app
 
