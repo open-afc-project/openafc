@@ -28,11 +28,12 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 - [**OpenAFC Engine usage in Docker Environment**](#openafc-engine-usage-in-docker-environment)
 - [AFC Engine build in docker](#afc-engine-build-in-docker)
   - [Building Docker Container OpenAFC engine server](#building-docker-container-openafc-engine-server)
-  - [build prereq containers (optional)](#build-prereq-containers-optional)
-    - [rat-server prereq containers:](#rat-server-prereq-containers)
+    - [Using scripts from the code base](#using-scripts-from-the-code-base)
+    - [To 'manually' build containers one by one:](#to-manually-build-containers-one-by-one)
     - [celery worker prereq containers:](#celery-worker-prereq-containers)
   - [Prereqs](#prereqs)
   - [docker-compose](#docker-compose)
+  - [**Environment variables**](#environment-variables)
   - [RabbitMQ settings](#rabbitmq-settings)
   - [PostgreSQL structure](#postgresql-structure)
   - [Initial Super Administrator account](#initial-super-administrator-account)
@@ -243,10 +244,6 @@ cd rabbitmq/ && docker build . -t rmq ; cd ..
 cd src/filestorage/ && docker build . -t objst; cd ../..
 ```
 
-to build the rat-server using local preq containers insted of public:
-```
-docker build . -t rat_server --build-arg PRINST_NAME=srv-preinst --build-arg PRINST_TAG=local --build-arg BLD_NAME=srv-build --build-arg BLD_TAG=local
-```
 ### celery worker prereq containers:
 ```
 docker build . -t worker-preinst -f worker/Dockerfile.preinstall
