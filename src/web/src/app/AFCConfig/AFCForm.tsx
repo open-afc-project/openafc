@@ -1,20 +1,15 @@
 import * as React from "react";
 import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition, Radio, CardHead, PageSection } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
-import BuildlingPenetrationLossForm from "./BuildingPenetrationLossForm";
-import PolarizationMismatchLossForm from "./PolarizationMismatchLossForm";
-import { ITMParametersForm } from "./ITMParametersForm";
-import BodyLossForm from "./BodyLossForm";
-import { APUncertaintyForm } from "./APUncertaintyForm"
-import { PropogationModelForm } from "./PropogationModelForm";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
 import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache, getRegions } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
 import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
 import DownloadContents from "../Components/DownloadContents";
-import AntennaPatternForm from "./AntennaPatternForm";
-import { AFCFormConus } from "./AFCFormConus";
+import { AFCFormUSA } from "./AFCFormUSA";
+import { AFCFormCanada } from "./AFCFormCanada";
+import { AFCFormUSACanada } from "./AFCFormUSACanada";
 
 /**
 * AFCForm.tsx: form for generating afc configuration files to be used to update server
@@ -142,7 +137,7 @@ export class AFCForm extends React.Component<
             case "Custom":
                 if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
                 if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
-                if (propModel.win2ConfidenceCombined < 0 || propModel.win2ConfidenceCombined > 100) return err();
+                if (propModel.win2ConfidenceCombined! < 0 || propModel.win2ConfidenceCombined! > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
                 if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
                 if (propModel.buildingSource !== "None" && propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
@@ -268,6 +263,13 @@ export class AFCForm extends React.Component<
         }
     }
 
+    updateConfigFromComponent(newState: AFCConfigFile) {
+        this.setState({ config: newState });
+    }
+
+    updateAntennaDataFromComponent(newState: AntennaPatternState) {
+        this.setState({ antennaPatternData: newState });
+    }
 
     render() {
 
@@ -330,12 +332,19 @@ export class AFCForm extends React.Component<
                                 </FormSelect>
                             </FormGroup>
                         </GalleryItem>
-
-                        <AFCFormConus
+                        switch (this.state.config.regionStr)
+                        case: "CANADA"
+                        case: "USA"
+                        default:
+                        <AFCFormUSACanada
                             config={this.state.config}
-                            antennaPatterns={this.props.antennaPatterns}
+                            antennaPatterns={this.state.antennaPatternData}
                             frequencyBands={this.props.frequencyBands}
-                            limit={this.props.limit} />
+                            limit={this.props.limit}
+                            updateConfig={(x) => this.updateConfigFromComponent(x)}
+                            updateAntennaData={(x) => this.updateAntennaDataFromComponent(x)} />
+                        break;
+                        {/* Leave this structure in place to support future countries with substantial changes */}
                     </Gallery>
                     <br />
                     <>
