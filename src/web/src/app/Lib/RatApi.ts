@@ -79,7 +79,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     },
     "receiverFeederLoss": {
         "IDU": 3,
-        "ODU": 3,
+        "ODU": 0,
         "UNKNOWN": 3
     },
     "fsReceiverNoise": {
