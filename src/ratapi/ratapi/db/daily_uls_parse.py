@@ -248,7 +248,7 @@ def updateIndividualFile(dayFile, directory, lineBuffer):
 def readEntries(dayFile, directory, day, versionIdx):
     recordBuffer = '' # buffer to limit number of file open() calls
     idsToRemove = []
-    with open(directory + '/' + day + '/' + dayFile) as infile:
+    with open(directory + '/' + day + '/' + dayFile, encoding='utf8') as infile:
         numExpectedCols = neededFilesUS[versionIdx][dayFile]
         record = ''
         symbolCount = 0   

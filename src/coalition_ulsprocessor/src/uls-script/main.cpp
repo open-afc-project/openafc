@@ -545,7 +545,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     if (txEmFound) {
                         bwMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(e.desig);
                     }
-                    if ( (bwMHz == -1.0) || (bwMHz > 60.0) || (bwMHz == 0) || isnan(bwMHz) ) {
+                    if ( isnan(bwMHz) || (bwMHz > 60.0) || (bwMHz == 0) ) {
                         bwMHz = freqAssignment.getBandwidth(txFreq.frequencyAssigned);
                     }
                     if (bwMHz == -1.0) {
