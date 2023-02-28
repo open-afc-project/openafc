@@ -643,11 +643,10 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 			subModelStr = ":F.699";
 			rxGainDB = calcItu699::CalcITU699(angleOffBoresightDeg, maxGain, Dlambda);
 		} else {
-			bool antennaModelBlank = antennaModel.empty();
 			bool categoryB1Flag = (category == CConst::B1AntennaCategory);
 			bool knownHighPerformance = (category == CConst::HPAntennaCategory);
 
-			if (antennaModelBlank || categoryB1Flag) {
+			if (categoryB1Flag) {
 				// Table 2, Category B1
 				double minSuppression;
 				if (angleOffBoresightDeg < 10.0) {

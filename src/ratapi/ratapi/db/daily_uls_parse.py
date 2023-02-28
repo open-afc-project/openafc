@@ -78,7 +78,12 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
         zip_file = zipfile.ZipFile("TAFL_LTAF_Fixe.zip") # zip object
         zip_file.extractall(regionDataDir) 
         zip_file.close() 
-        os.rename(regionDataDir + '/TAFL_LTAF_Fixe.csv', regionDataDir + '/TA.csv')
+        if os.path.isfile(regionDataDir + '/TAFL_LTAF_Fixe.csv'):
+            os.rename(regionDataDir + '/TAFL_LTAF_Fixe.csv', regionDataDir + '/TA.csv')
+        elif os.path.isfile(regionDataDir + '/IC_TAFL_File_fixed.csv'):
+            os.rename(regionDataDir + '/IC_TAFL_File_fixed.csv', regionDataDir + '/TA.csv')
+        else:
+            raise Exception('ERROR: Unable to process CA file {}'.format("TAFL_LTAF_Fixe.zip"))
 
         cmd = 'echo "Antenna Manufacturer,Antenna Model Number,Antenna Gain [dBi],Antenna Diameter,Beamwidth [deg],Last Updated,Pattern Type,Pattern Azimuth [deg],Pattern Attenuation [dB]" >| ' + regionDataDir + '/AP.csv'
         os.system(cmd)
@@ -532,7 +537,7 @@ def daily_uls_parse(state_root, interactive):
     elif interactive:
         accepted = False
         while not accepted:
-            value = input("Process antenna model files to create antenna_model_list.csv and antennaPatternFile? (y/n): ")
+            value = input("Process antenna model files to create antenna_model_list.csv, antenna_prefix_list.csv and antennaPatternFile? (y/n): ")
             if value == "y":
                 accepted = True
                 processAntFilesFlag = True
@@ -549,7 +554,7 @@ def daily_uls_parse(state_root, interactive):
 
     ###########################################################################
     # If interactive, prompt to set antennaPatternFileFile, note that         #
-    # if processAntFilesFlag is not sete, this file should exist for          #
+    # if processAntFilesFlag is not set, this file should exist for           #
     # subsequent processing.                                                  #
     ###########################################################################
     if interactive:
@@ -571,8 +576,10 @@ def daily_uls_parse(state_root, interactive):
     # antenna_model_list.csv                                                  #
     ###########################################################################
     if processAntFilesFlag:
-        processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag, fullPathTempDir + '/antenna_model_list.csv', fullPathAntennaPatternFile, logFile)
-        # subprocess.call(['cp', antennaPatternFile, fullPathTempDir]) 
+        processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag,
+            fullPathTempDir + '/antenna_model_list.csv',
+            fullPathTempDir + '/antenna_prefix_list.csv',
+            fullPathAntennaPatternFile, logFile)
     ###########################################################################
 
     ###########################################################################
@@ -699,6 +706,7 @@ def daily_uls_parse(state_root, interactive):
                                              fullPathCoalitionScriptOutput, \
                                              fullPathRASDabataseFile, \
                                              fullPathTempDir + '/antenna_model_list.csv', \
+                                             fullPathTempDir + '/antenna_prefix_list.csv', \
                                              root + '/antenna_model_map.csv', \
                                              fullPathTempDir + '/fcc_fixed_service_channelization.csv', \
                                              fullPathTempDir + '/transmit_radio_unit_architecture.csv', \
