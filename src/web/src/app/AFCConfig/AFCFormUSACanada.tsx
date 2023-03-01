@@ -9,7 +9,7 @@ import { APUncertaintyForm } from "./APUncertaintyForm"
 import { PropogationModelForm } from "./PropogationModelForm";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm, FSClutterModel } from "../Lib/RatApiTypes";
 import { Limit } from "../Lib/Admin";
-import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
+import { AllowedRangesDisplay } from './AllowedRangesForm'
 import AntennaPatternForm from "./AntennaPatternForm";
 
 /**
@@ -33,9 +33,15 @@ export class AFCFormUSACanada extends React.Component<
     }
 > {
 
-
-
     private hasValue = (val: any) => val !== undefined && val !== null;
+    private hasValueExists = (f: () => any): boolean => {
+        try {
+            return this.hasValue(f());
+        } catch (error) {
+            return false;
+        }
+
+    }
 
     private setMinEIRP = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { minEIRP: n }));
     private setMaxEIRP = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { maxEIRP: n }));
@@ -45,6 +51,7 @@ export class AFCFormUSACanada extends React.Component<
     private setThreshold = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { threshold: n }));
     private setMaxLinkDistance = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { maxLinkDistance: n }));
     private setEnableMapInVirtualAp = (n: boolean) => this.props.updateConfig(Object.assign(this.props.config, { enableMapInVirtualAp: n }));
+    private setNearFieldAdjFlag = (n: boolean) => this.props.updateConfig(Object.assign(this.props.config, { enableMapInVirtualAp: n }));
     private setVisiblityThreshold = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { visibilityThreshold: n }));
     private setPropogationEnv = (n: string) => {
 
@@ -175,7 +182,7 @@ export class AFCFormUSACanada extends React.Component<
     private setFsClutterConfidence = (n: number | string) => {
         const val = Number(n);
         const conf = this.props.config;
-        const newParams:FSClutterModel = { ...conf.fsClutterModel! };
+        const newParams: FSClutterModel = { ...conf.fsClutterModel! };
         newParams.p2108Confidence = val
         conf.fsClutterModel = newParams;
         this.props.updateConfig(conf);
@@ -183,7 +190,7 @@ export class AFCFormUSACanada extends React.Component<
     private setFsClutterMaxHeight = (n: number | string) => {
         const val = Number(n);
         const conf = this.props.config;
-        const newParams:FSClutterModel = { ...conf.fsClutterModel! };
+        const newParams: FSClutterModel = { ...conf.fsClutterModel! };
         newParams.maxFsAglHeight = val;
         conf.fsClutterModel = newParams;
         this.props.updateConfig(conf);
@@ -365,11 +372,7 @@ export class AFCFormUSACanada extends React.Component<
                         maxWidth="40.0rem"
                         content={
                             <>
-                                <p>UNII Range:</p>
-                                <ul>
-                                    <li> UNII-5: 5,925-6,425 MHz</li>
-                                    <li> UNII-7: 6,525-6,875 MHz</li>
-                                </ul>
+                                <p>The FS receiver center frequency is compared against the value shown to choose the proper noise floor</p>
                             </>
                         }
                     >
@@ -377,66 +380,46 @@ export class AFCFormUSACanada extends React.Component<
                     </Tooltip>
                     <InputGroup>
                         <TextInput
-                            id="fs-noise-5-label"
-                            name="fs-noise-5-label"
+                            id="fs-noiseFloor-0-label"
+                            name="fs-noiseFloor-0-label"
                             isReadOnly={true}
-                            value="UNII-5"
+                            value="Freq <= 6425 MHz"
                             style={{ textAlign: "left", minWidth: "35%" }}
                         />
                         <TextInput
-                            value={this.props.config.fsReceiverNoise.UNII5}
-                            onChange={x => this.setReceiverNoise({ ...this.props.config.fsReceiverNoise, UNII5: Number(x) })}
+                            value={this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[0]) ? this.props.config.fsReceiverNoise?.noiseFloorList[0] : -110}
                             type="number"
+                            onChange={x => this.setReceiverNoise({ ...this.props.config.fsReceiverNoise, noiseFloorList: [Number(x), this.props.config.fsReceiverNoise.noiseFloorList[1]] })}
                             step="any"
-                            id="horizontal-form-noise-5"
-                            name="horizontal-form-noise-5"
-                            isValid={this.hasValue(this.props.config.fsReceiverNoise.UNII5)}
+                            id="horizontal-form-noiseFloor-0"
+                            name="horizontal-form-noiseFloor-0"
+                            isValid={this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[0])}
                             style={{ textAlign: "right" }}
                         />
                         <InputGroupText>dBm/MHz</InputGroupText>
                     </InputGroup>
                     <InputGroup>
                         <TextInput
-                            id="fs-noise-7-label"
-                            name="fs-noise-7-label"
+                            id="fs-noiseFloor-1-label"
+                            name="fs-noiseFloor-1-label"
                             isReadOnly={true}
-                            value="UNII-7"
+                            value="Freq > 6425 MHz"
                             style={{ textAlign: "left", minWidth: "35%" }}
                         />
                         <TextInput
-                            value={this.props.config.fsReceiverNoise.UNII7}
-                            onChange={x => this.setReceiverNoise({ ...this.props.config.fsReceiverNoise, UNII7: Number(x) })}
-                            type="number"
+                            value={this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[1]) ? this.props.config.fsReceiverNoise?.noiseFloorList[1] : -109.5}
+                            onChange={x => this.setReceiverNoise({ ...this.props.config.fsReceiverNoise, noiseFloorList: [this.props.config.fsReceiverNoise.noiseFloorList[0], Number(x)] })}
                             step="any"
-                            id="horizontal-form-noise-7"
-                            name="horizontal-form-noise-7"
-                            isValid={this.hasValue(this.props.config.fsReceiverNoise.UNII7)}
+                            type="number"
+                            id="horizontal-form-noiseFloor-1"
+                            name="horizontal-form-noiseFloor-1"
+                            isValid={this.hasValueExists(() => this.props.config.fsReceiverNoise.noiseFloorList[1])}
                             style={{ textAlign: "right" }}
                         />
-                        <InputGroupText>dBm/MHz</InputGroupText>
-                    </InputGroup>
-                    <InputGroup>
-                        <TextInput
-                            id="fs-noise-o-label"
-                            name="fs-noise-o-label"
-                            isReadOnly={true}
-                            value="Other"
-                            style={{ textAlign: "left", minWidth: "35%" }}
-                        />
-                        <TextInput
-                            value={this.props.config.fsReceiverNoise.other}
-                            onChange={x => this.setReceiverNoise({ ...this.props.config.fsReceiverNoise, other: Number(x) })}
-                            type="number"
-                            step="any"
-                            id="horizontal-form-receiver-feeder-loss-o"
-                            name="horizontal-form-receiver-feeder-loss-o"
-                            isValid={this.hasValue(this.props.config.fsReceiverNoise.other)}
-                            style={{ textAlign: "right" }}
-                        />
-                        <InputGroupText>dBm/MHz</InputGroupText>
+                        <InputGroupText size={1}>dBm/MHz</InputGroupText>
                     </InputGroup>
                 </FormGroup>
-            </GalleryItem> 
+            </GalleryItem>
             <GalleryItem>
                 <BodyLossForm
                     data={this.props.config.bodyLoss}
@@ -488,7 +471,8 @@ export class AFCFormUSACanada extends React.Component<
             <GalleryItem>
                 <PropogationModelForm
                     data={this.getPropagationModelForForm()}
-                    onChange={this.setPropogationModel} />
+                    onChange={this.setPropogationModel}
+                    region={this.props.config.regionStr ?? "USA"} />
             </GalleryItem>
             {(this.props.config.propagationModel.kind === "ITM with no building data" || this.props.config.propagationModel.kind == "FCC 6GHz Report & Order") &&
                 <GalleryItem>
@@ -505,8 +489,8 @@ export class AFCFormUSACanada extends React.Component<
                                 <>
                                     <p>AP Propagation Environment:</p>
                                     <ul>
-                                        <li>- "NLCD Point" assigns propagation environment based on single NLCD tile class the RLAN resides in: Urban if NLCD tile = 23 or 24, Suburban if NLCD tile = 22, Rural-D (Deciduous trees) if NLCD tile = 41, 43 or 90, Rural-C (Coniferous trees) if NLCD tile = 42, and Rural-V (Village Center) otherwise. The various Rural types correspond to the P.452 clutter category.</li>
-                                        <li>- If “NLCD Point” is not selected, Village center is assumed for the Rural clutter category.</li>
+                                        <li>- "Land Cover Point" assigns propagation environment based on single Land Cover tile class the RLAN resides in: Urban if Land Cover tile = 23 or 24, Suburban if Land Cover tile = 22, Rural-D (Deciduous trees) if Land Cover tile = 41, 43 or 90, Rural-C (Coniferous trees) if Land Cover tile = 42, and Rural-V (Village Center) otherwise. The various Rural types correspond to the P.452 clutter category.</li>
+                                        <li>- If “Land Cover Point” is not selected, Village center is assumed for the Rural clutter category.</li>
                                     </ul>
                                 </>
                             }
@@ -521,14 +505,14 @@ export class AFCFormUSACanada extends React.Component<
                             name="propogation-env"
                             style={{ textAlign: "right" }}
                             isValid={this.props.config.propagationEnv !== undefined}>
-                            <FormSelectOption key="NLCD Point" value="NLCD Point" label="NLCD Point" />
+                            <FormSelectOption key="NLCD Point" value="NLCD Point" label="Land Cover Point" />
                             <FormSelectOption key="Population Density Map" value="Population Density Map" label="Population Density Map" />
                             <FormSelectOption key="Urban" value="Urban" label="Urban" />
                             <FormSelectOption key="Suburban" value="Suburban" label="Suburban" />
                             <FormSelectOption key="Rural" value="Rural" label="Rural" />
                         </FormSelect>
                         {this.props.config.propagationEnv == 'NLCD Point' ?
-                            <FormGroup label="NLCD Database" fieldId="nlcd-database">
+                            <FormGroup label="Land Cover Database" fieldId="nlcd-database">
                                 <FormSelect
                                     value={this.props.config.nlcdFile ?? "nlcd_production"}
                                     onChange={(x) => this.setNlcdFile(x)}
@@ -536,8 +520,8 @@ export class AFCFormUSACanada extends React.Component<
                                     name="nlcd-database"
                                     style={{ textAlign: "right" }}
                                 >
-                                    <FormSelectOption key="Production NLCD " value="nlcd_production" label="Production NLCD" />
-                                    <FormSelectOption key="WFA Test NLCD " value="nlcd_wfa" label="WFA Test NLCD" />
+                                    <FormSelectOption key="Production NLCD " value="nlcd_production" label="Production Land Cover" />
+                                    <FormSelectOption key="WFA Test NLCD " value="nlcd_wfa" label="WFA Test Land Cover" />
                                 </FormSelect>
                             </FormGroup>
                             : <></>}
@@ -609,7 +593,7 @@ export class AFCFormUSACanada extends React.Component<
                     : <></>}
             </GalleryItem>
             <GalleryItem>
-                <AllowedRangesDisplay data={this.props.frequencyBands} />
+                <AllowedRangesDisplay data={this.props.frequencyBands} region={this.props.config.regionStr ?? "USA"} />
             </GalleryItem>
             <GalleryItem>
                 <FormGroup label="AP Height below Min Allowable AGL Height Behavior"
@@ -712,6 +696,33 @@ export class AFCFormUSACanada extends React.Component<
                         isValid={!!this.props.config.visibilityThreshold || this.props.config.visibilityThreshold === 0} />
                         <InputGroupText>dB I/N</InputGroupText></InputGroup>
                 </FormGroup>
+            </GalleryItem>
+            <GalleryItem>
+                {/* <Tooltip
+                    position={TooltipPosition.top}
+                    enableFlip={true}
+                    //className="prop-env-tooltip"
+                    maxWidth="40.0rem"
+                    content={
+                        <p>If enabled, the Virtual AP page will add map information via the Vendor extension and present a Google Map on the page</p>
+                    }
+                > */}
+                <FormGroup fieldId="horizontal-form-clutter">
+                    <InputGroup label="">
+                        <Checkbox
+                            label="Nearfield Adjustment Factor"
+                            isChecked={this.props.config.nearFieldAdjFlag ?? false}
+                            onChange={this.setNearFieldAdjFlag}
+                            isDisabled={true}
+                            id="horizontal-form-clutter"
+                            name="horizontal-form-clutter"
+                            style={{ textAlign: "right" }}
+                        />
+
+                        {/* <OutlinedQuestionCircleIcon style={{ marginLeft: "5px" }} /> */}
+                    </InputGroup>
+                </FormGroup>
+                {/* </Tooltip> */}
             </GalleryItem>
         </>
 

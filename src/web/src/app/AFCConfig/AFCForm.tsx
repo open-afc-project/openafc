@@ -44,7 +44,7 @@ export class AFCForm extends React.Component<
         if (props.frequencyBands.length > 0) {
             config.freqBands = props.frequencyBands;
         } else {
-            config.freqBands = defaultRanges;
+            config.freqBands = defaultRanges[config.regionStr ?? "USA"];
         }
 
         this.state = {
@@ -332,19 +332,15 @@ export class AFCForm extends React.Component<
                                 </FormSelect>
                             </FormGroup>
                         </GalleryItem>
-                        switch (this.state.config.regionStr)
-                        case: "CANADA"
-                        case: "USA"
-                        default:
-                        <AFCFormUSACanada
-                            config={this.state.config}
-                            antennaPatterns={this.state.antennaPatternData}
-                            frequencyBands={this.props.frequencyBands}
-                            limit={this.props.limit}
-                            updateConfig={(x) => this.updateConfigFromComponent(x)}
-                            updateAntennaData={(x) => this.updateAntennaDataFromComponent(x)} />
-                        break;
-                        {/* Leave this structure in place to support future countries with substantial changes */}
+                        {(this.state.config.regionStr == "CANADA" || this.state.config.regionStr == "USA") &&
+                            <AFCFormUSACanada
+                                config={this.state.config}
+                                antennaPatterns={this.state.antennaPatternData}
+                                frequencyBands={this.props.frequencyBands}
+                                limit={this.props.limit}
+                                updateConfig={(x) => this.updateConfigFromComponent(x)}
+                                updateAntennaData={(x) => this.updateAntennaDataFromComponent(x)} />
+                        }
                     </Gallery>
                     <br />
                     <>

@@ -58,8 +58,9 @@ export interface AFCConfigFile {
     visibilityThreshold?: number,
     allowScanPtsInUncReg?: boolean,
     passiveRepeaterFlag?: boolean,
-    printSkippedLinksFlag?: false,
-    reportErrorRlanHeightLowFlag?: false;
+    printSkippedLinksFlag?: boolean,
+    reportErrorRlanHeightLowFlag?: boolean;
+    nearFieldAdjFlag?: boolean
 }
 
 export type FreqRange = {
@@ -75,9 +76,8 @@ export type FSReceiverFeederLoss = {
 }
 
 export type FSReceiverNoise = {
-    UNII5: number,
-    UNII7: number,
-    other: number
+   freqList: number[],
+   noiseFloorList: number[]
 }
 
 
@@ -139,7 +139,7 @@ export interface UserUpload {
     value: string
 }
 
-export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FCC6GHz | CustomPropagation;
+export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FCC6GHz | CustomPropagation | IsedDbs06;
 
 export type BuildingSourceValues =  "B-Design3D" | "LiDAR" | "None"
 
@@ -183,6 +183,26 @@ export interface FCC6GHz {
     winner2HgtFlag: boolean,
     winner2HgtLOS: number
 }
+
+export interface IsedDbs06 {
+    kind: "ISED DBS-06",
+    win2ConfidenceCombined: number,
+    win2ConfidenceLOS?:number,
+    win2ConfidenceNLOS?:number,
+    itmConfidence: number,
+    itmReliability: number,
+    p2108Confidence: number,
+    buildingSource: BuildingSourceValues,
+    terrainSource: "SRTM (90m)" | "3DEP (30m)"
+    winner2LOSOption: 'UNKNOWN' | 'BLDG_DATA_REQ_TX',
+    win2UseGroundDistance: boolean,
+    fsplUseGroundDistance: boolean,
+    winner2HgtFlag: boolean,
+    winner2HgtLOS: number
+}
+
+
+
 
 export type CustomPropagationLOSOptions =  'UNKNOWN' | 'FORCE_LOS' | 'FORCE_NLOS' | 'BLDG_DATA_REQ_TX'
 

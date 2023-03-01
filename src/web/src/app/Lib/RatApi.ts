@@ -83,9 +83,8 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
         "UNKNOWN": 3
     },
     "fsReceiverNoise": {
-        "UNII5": -110,
-        "UNII7": -109.5,
-        "other": -109
+        "freqList": [6425],
+        "noiseFloorList": [-110, -109.5]
     },
     "threshold": -6,
     "maxLinkDistance": 130,
@@ -137,7 +136,8 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "allowScanPtsInUncReg": false,
     "passiveRepeaterFlag": true,
     "printSkippedLinksFlag": false,
-    "reportErrorRlanHeightLowFlag": false
+    "reportErrorRlanHeightLowFlag": false,
+    "nearFieldAdjFlag": false,
 });
 
 // API Calls
@@ -160,8 +160,7 @@ export async function getGuiConfig() {
 }
 
 /**
- * Retrive basic configuration options used across app
- * and sets the [[guiConfig]] object.
+ * Retrive the known regions for the Country options
  */
 export const getRegions = (): Promise<RatResponse<string[]>> => (
     fetch("../ratapi/v1/regions", {
@@ -187,7 +186,7 @@ export const getDefaultAfcConf = () => defaultAfcConf();
  * The config will be scoped to the current user
  * @returns this user's current AFC Config or error
  */
-export const getAfcConfigFile = (region:String): Promise<RatResponse<AFCConfigFile>> => (
+export const getAfcConfigFile = (region:string): Promise<RatResponse<AFCConfigFile>> => (
     fetch(guiConfig.afcconfig_defaults.replace("default", region), {
         method: "GET",
     }).then(async (res: Response) => {
