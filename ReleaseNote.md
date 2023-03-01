@@ -1,4 +1,27 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-577**|
+| :- | :- |
+|**Date**|**03/01/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-577:Use of incorrect WINNF-R2AIP07 pattern
+ * Jira OA-578:Need to do exact-match to standardModel of antenna_model_diameteter_gain data
+ 
+## **Interface Changes**
+ * There has been changes to the FS parser and as such there's a new FS database. 
+ * The new FS database is "FS_2023-03-01T04_39_37.715373_fixedBPS_sorted_param.sqlite3" which can be downloaded from https://drive.google.com/file/d/1OPBYHZ1iXR_M4NKelVHridK8bVpJSxPQ/view?usp=share_link.
+ 
+## **Testing Done**
+ * OA-578: Examined FS database for FS ID 2989 and confirmed that the correct antenna was matched (and hence correct Gain was used). Also confirmed the reults in FSP41.
+ * OA-577: Confirmed in FS database that when Rx Antenna model is blank, Ant Category is set to B1. Also, ran a test for FS ID 1 and confirmed that the Engine applied Category B1 pattern. See test attached to this ticket.
+ * OA-577: Confirmed in FS database that when Rx Antenna model is not in the antenna model-diameter-gain dataset, Ant Category is set to UNKNOWN (as desired) - in which case Category A is applied. An example is FS ID 76591.
+ * Ran FSP82, FSP41 and FSP48 and confirmed that the previous issues were resolved.
+
+## **Open Issues** 
+
 ## **Version and Date**
 |Version|3.7.3.0|
 | :- | :- |
