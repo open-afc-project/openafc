@@ -807,8 +807,8 @@ AntennaModelClass *AntennaModelMapClass::find(std::string antPfx, std::string mo
         /* If still not found, set category to B1 if modelName is blank                   */
         /**********************************************************************************/
         if (!found) {
-            if (modelName.empty()) {
-                category = AntennaModel::HPCategory;
+            if (modelName == antPfx) {
+                category = AntennaModel::B1Category;
             }
         }
         /**********************************************************************************/

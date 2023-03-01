@@ -1010,7 +1010,7 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
             } else {
                 numAntUnmatch++;
                 rxAntennaModelName = "";
-                rxAntennaCategory = AntennaModel::UnknownCategory;
+                rxAntennaCategory = category;
                 rxAntennaDiameter = -1.0;
                 rxDiversityDiameter = -1.0;
                 rxAntennaMidbandGain = std::numeric_limits<double>::quiet_NaN();
@@ -1134,7 +1134,7 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     } else {
                         numAntUnmatch++;
                         prAntennaModelName = "";
-                        prAntennaCategory = AntennaModel::UnknownCategory;
+                        prAntennaCategory = category;
                         prAntennaDiameter = -1.0;
                         prAntennaMidbandGain = std::numeric_limits<double>::quiet_NaN();
                         prAntennaReflectorWidth = -1.0;
