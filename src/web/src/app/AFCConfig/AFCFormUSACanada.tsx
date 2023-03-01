@@ -378,46 +378,36 @@ export class AFCFormUSACanada extends React.Component<
                     >
                         <OutlinedQuestionCircleIcon />
                     </Tooltip>
-                    <InputGroup>
-                        <TextInput
-                            id="fs-noiseFloor-0-label"
-                            name="fs-noiseFloor-0-label"
-                            isReadOnly={true}
-                            value="Freq <= 6425 MHz"
-                            style={{ textAlign: "left", minWidth: "35%" }}
-                        />
-                        <TextInput
-                            value={this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[0]) ? this.props.config.fsReceiverNoise?.noiseFloorList[0] : -110}
-                            type="number"
-                            onChange={x => this.setReceiverNoise({ ...this.props.config.fsReceiverNoise, noiseFloorList: [Number(x), this.props.config.fsReceiverNoise.noiseFloorList[1]] })}
-                            step="any"
-                            id="horizontal-form-noiseFloor-0"
-                            name="horizontal-form-noiseFloor-0"
-                            isValid={this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[0])}
-                            style={{ textAlign: "right" }}
-                        />
-                        <InputGroupText>dBm/MHz</InputGroupText>
-                    </InputGroup>
-                    <InputGroup>
-                        <TextInput
-                            id="fs-noiseFloor-1-label"
-                            name="fs-noiseFloor-1-label"
-                            isReadOnly={true}
-                            value="Freq > 6425 MHz"
-                            style={{ textAlign: "left", minWidth: "35%" }}
-                        />
-                        <TextInput
-                            value={this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[1]) ? this.props.config.fsReceiverNoise?.noiseFloorList[1] : -109.5}
-                            onChange={x => this.setReceiverNoise({ ...this.props.config.fsReceiverNoise, noiseFloorList: [this.props.config.fsReceiverNoise.noiseFloorList[0], Number(x)] })}
-                            step="any"
-                            type="number"
-                            id="horizontal-form-noiseFloor-1"
-                            name="horizontal-form-noiseFloor-1"
-                            isValid={this.hasValueExists(() => this.props.config.fsReceiverNoise.noiseFloorList[1])}
-                            style={{ textAlign: "right" }}
-                        />
-                        <InputGroupText size={1}>dBm/MHz</InputGroupText>
-                    </InputGroup>
+                    <FormGroup label="FS Freq <= 6425 MHz" fieldId="horizontal-form-noiseFloor-0">
+                        <InputGroup>
+                            <TextInput
+                                value={this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[0]) ? this.props.config.fsReceiverNoise?.noiseFloorList[0] : -110}
+                                type="number"
+                                onChange={x => this.setReceiverNoise({ ...this.props.config.fsReceiverNoise, noiseFloorList: [Number(x), this.props.config.fsReceiverNoise.noiseFloorList[1]] })}
+                                step="any"
+                                id="horizontal-form-noiseFloor-0"
+                                name="horizontal-form-noiseFloor-0"
+                                isValid={this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[0])}
+                                style={{ textAlign: "right" }}
+                            />
+                            <InputGroupText>dBm/MHz</InputGroupText>
+                        </InputGroup>
+                    </FormGroup>
+                    <FormGroup label="FS Freq > 6425 MHz" fieldId="horizontal-form-noiseFloor-1">
+                        <InputGroup>
+                            <TextInput
+                                value={this.hasValueExists(() => this.props.config.fsReceiverNoise?.noiseFloorList[1]) ? this.props.config.fsReceiverNoise?.noiseFloorList[1] : -109.5}
+                                onChange={x => this.setReceiverNoise({ ...this.props.config.fsReceiverNoise, noiseFloorList: [this.props.config.fsReceiverNoise.noiseFloorList[0], Number(x)] })}
+                                step="any"
+                                type="number"
+                                id="horizontal-form-noiseFloor-1"
+                                name="horizontal-form-noiseFloor-1"
+                                isValid={this.hasValueExists(() => this.props.config.fsReceiverNoise.noiseFloorList[1])}
+                                style={{ textAlign: "right" }}
+                            />
+                            <InputGroupText size={1}>dBm/MHz</InputGroupText>
+                        </InputGroup>
+                    </FormGroup>
                 </FormGroup>
             </GalleryItem>
             <GalleryItem>
