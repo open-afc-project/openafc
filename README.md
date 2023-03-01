@@ -231,7 +231,7 @@ to run server using test infra scrips, please check and update [.env](/tests/reg
 ```
 cd open-afc
 
-docker build . -t rat_server rat_server/Dockerfile
+docker build . -t rat_server -f rat_server/Dockerfile
 
 docker build . -t worker -f worker/Dockerfile
 
