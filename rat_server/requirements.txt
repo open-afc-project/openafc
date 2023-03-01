@@ -52,3 +52,5 @@ wcwidth==0.2.5
 Werkzeug==2.0.3
 WsgiDAV==2.4.1
 WTForms==3.0.1
+python_dateutil==2.8.2
+kafka-python==2.0.2
