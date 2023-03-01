@@ -293,7 +293,8 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
             logFile.write('successfully deleted file ' + outputSQL + '\n')
 
     # the new sqlite for the ULS
-    today_engine = sa.create_engine('sqlite:///' + outputSQL, convert_unicode=True)
+    # today_engine = sa.create_engine('sqlite:///' + outputSQL, convert_unicode=True)
+    today_engine = sa.create_engine('sqlite:///' + outputSQL)
     today_session = sessionmaker(bind=today_engine)
     s = today_session()
 

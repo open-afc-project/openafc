@@ -21,7 +21,7 @@ def fixModelName(modelPrefix, modelName):
 
     return modelName
 
-def processAntFiles(inputDir, processCA, combineAntennaRegionFlag, outputFile, antennaPatternFile, logFile):
+def processAntFiles(inputDir, processCA, combineAntennaRegionFlag, antennaListFile, antennaPrefixFile, antennaPatternFile, logFile):
     logFile.write('Processing antenna files' + '\n')
 
     antennaModelDiamGainCsvFilePath    = inputDir + "/antenna_model_diameter_gain.csv"
@@ -39,7 +39,7 @@ def processAntFiles(inputDir, processCA, combineAntennaRegionFlag, outputFile, a
         prefixUS = "US:"
         prefixCA = "CA:"
 
-    outputCsvFilePath = outputFile
+    antennaListFilePath = antennaListFile
 
     # Read in all input CSVs as dictionaries and fetch relevant columns
 
@@ -240,8 +240,10 @@ def processAntFiles(inputDir, processCA, combineAntennaRegionFlag, outputFile, a
             else:
                 antpatternRaw[antennaModel] = [ tuple([aob, attenuation]) ]
 
-    with open(outputCsvFilePath, 'w') as fout:
-        # Open the output CSV
+    ############################################################################
+    # Write antennaListFile (antenna_model_list.csv)                           #
+    ############################################################################
+    with open(antennaListFilePath, 'w') as fout:
         headerList = ['Ant Model','Type','Reflector Height (m)','Reflector Width (m)','Category','Diameter (m)','Midband Gain (dBi)', 'Has Pattern']
 
         csvwriter = csv.writer(fout, delimiter=',')
@@ -251,6 +253,32 @@ def processAntFiles(inputDir, processCA, combineAntennaRegionFlag, outputFile, a
         for antennaModel in sorted(antmap.keys()):
             row = antmap[antennaModel]
             csvwriter.writerow(row)
+    ############################################################################
+
+    ############################################################################
+    # Write antennaPrefixFile (antenna_prefix_list.csv)                        #
+    ############################################################################
+    with open(antennaPrefixFile, 'w') as fout:
+        headerList = ['Prefix','Type','Category']
+
+        csvwriter = csv.writer(fout, delimiter=',')
+        csvwriter = csv.DictWriter(fout, headerList) 
+        csvwriter.writeheader()
+
+        row = {}
+        for prefix in antennaModelPrefixB1List:
+            row['Prefix'] = prefix
+            row['Type'] = 'Ant'
+            row['Category'] = 'B1'
+            csvwriter.writerow(row)
+
+        for prefix in antennaModelPrefixHpList:
+            row['Prefix'] = prefix
+            row['Type'] = 'Ant'
+            row['Category'] = 'HP'
+            csvwriter.writerow(row)
+
+    ############################################################################
 
     aobStep = 0.1
     aobStart = 0.0
