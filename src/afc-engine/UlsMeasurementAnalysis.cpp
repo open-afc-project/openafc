@@ -19,7 +19,7 @@
 extern void point_to_point(double elev[], double tht_m, double rht_m,
 		double eps_dielect, double sgm_conductivity, double eno_ns_surfref,
 		double frq_mhz, int radio_climate, int pol, double conf, double rel,
-		double &dbloss, char *strmode, int &errnum);
+		double &dbloss, std::string &strmode, int &errnum);
 
 namespace {
 	// Logger for all instances of class
@@ -404,7 +404,7 @@ namespace UlsMeasurementAnalysis {
 		(*heightProfilePtr)[1] = 1000 * lineOfSightDistanceKm / numpts;
 
 		double rv;
-		char buf[256];
+		std::string strmode;
 		int errnum;
 
 		if (itmInitFlag) {
@@ -413,8 +413,8 @@ namespace UlsMeasurementAnalysis {
 			LOGGER_INFO(logger) << "ITM Parameter: pol = " << pol;
 			itmInitFlag = false;
 		}
-		point_to_point(*heightProfilePtr, transHt, receiveHt, eps_dielect, sgm_conductivity, eno_ns_surfref, frq_mhz, radio_climate, pol, conf, rel, rv, buf, errnum);
-		//qDebug() << " point_to_point" << rv << buf << errnum;
+		point_to_point(*heightProfilePtr, transHt, receiveHt, eps_dielect, sgm_conductivity, eno_ns_surfref, frq_mhz, radio_climate, pol, conf, rel, rv, strmode, errnum);
+		//qDebug() << " point_to_point" << rv << strmode << errnum;
 
 		if(prefix != NULL){
 			(*heightProfilePtr)[2] += transHt;
