@@ -749,18 +749,46 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 </>
             case "ISED DBS-06":
                 return <>
+                    <FormGroup label="WinnerII LoS Option" fieldId="propogation-model-win-los-option">
+                        {" "}<Tooltip
+                            position={TooltipPosition.top}
+                            enableFlip={true}
+                            className="propogation-model-win-los-option-tooltip"
+                            maxWidth="40.0rem"
+                            content={
+                                <>
+                                    <p>If <strong>LoS/NLoS per building data</strong> is selected, and if the RLAN is in a region where there is building database,
+                                        then terrain plus building database is used to determine whether the path is LoS or not.
+                                        Otherwise, the Combined LoS/NLoS model is used. By the same logic, if the <strong>Building Data Source</strong> is None,
+                                        the Combined LoS/NLoS model is always used. </p>
+                                </>
+                            }
+                        >
+                            <OutlinedQuestionCircleIcon />
+                        </Tooltip>
+                        <FormSelect value={model.winner2LOSOption} onChange={this.setLosOption} id="propogation-model-win-los-option"
+                            name="propogation-model-win-los-option" style={{ textAlign: "right" } }
+                        >
+                            <FormSelectOption key="BLDG_DATA_REQ_TX" value="BLDG_DATA_REQ_TX" label="Los/NLoS per building data" />
+                        </FormSelect>
+                    </FormGroup>
+
                     <FormGroup
-                        label="Winner II Combined Confidence"
-                        fieldId="propogation-model-win-confidence"
-                    ><InputGroup><TextInput
-                        value={model.win2ConfidenceCombined}
-                        type="number"
-                        onChange={this.setWin2ConfidenceCombined}
-                        id="propogation-model-win-confidence"
-                        name="propogation-model-win-confidence"
-                        style={{ textAlign: "right" }}
-                        isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100} />
-                            <InputGroupText>%</InputGroupText></InputGroup>
+                        label="WinnerII Combined Confidence"
+                        fieldId="propogation-model-win-confidence">
+                        <InputGroup>
+                            <TextInput
+                                value={model.win2ConfidenceCombined}
+                                type="number"
+                                onChange={this.setWin2ConfidenceCombined}
+                                id="propogation-model-win-confidence"
+                                name="propogation-model-win-confidence"
+                                style={{
+                                    textAlign: "right"
+                                }}
+                                isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100} />
+                            <InputGroupText>%</InputGroupText>
+                        </InputGroup>
                     </FormGroup>
 
                     <FormGroup
@@ -770,25 +798,46 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         <InputGroup><TextInput
                             value={model.win2ConfidenceLOS}
                             type="number"
-                            onChange={v => { this.setWin2ConfidenceLOS_NLOS(v); }}
+                            onChange={v => { this.setWin2ConfidenceLOS(v); this.setWinConfidenceNLOS(v); }}
                             id="propogation-model-win-los-nlos-confidence"
                             name="propogation-model-win-los-nlos-confidence"
                             style={{ textAlign: "right" }}
                             isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
-                    <FormGroup
-                        label="ITM Confidence"
-                        fieldId="propogation-model-itm-confidence"
-                    ><InputGroup><TextInput
-                        value={model.itmConfidence}
-                        type="number"
-                        onChange={this.setItmConfidence}
-                        id="propogation-model-itm-confidence"
-                        name="propogation-model-itm-confidence"
-                        style={{ textAlign: "right" }}
-                        isValid={model.itmConfidence >= 0 && model.itmConfidence <= 100} />
-                            <InputGroupText>%</InputGroupText></InputGroup>
+                
+                    <FormGroup label="ITM with Tx Clutter Method" fieldId="propogation-model-itm-tx-clutter">
+                        {" "}<Tooltip
+                            position={TooltipPosition.top}
+                            enableFlip={true}
+                            className="propogation-model-itm-tx-clutter-tooltip"
+                            maxWidth="40.0rem"
+                            content={
+                                <>
+                                    <p>If <strong>Clutter/No clutter per building</strong> is selected, the path is determined to be LoS or NLoS based on terrain and/or building database (if available).
+                                        By the same logic, if the <strong>Building Data Source</strong> is None, blockage is determined based solely on terrain database.</p>
+                                </>
+                            }
+                        >
+                            <OutlinedQuestionCircleIcon />
+                        </Tooltip>
+                        <FormSelect value={model.rlanITMTxClutterMethod} onChange={this.setItmClutterMethod} id="propogation-model-itm-tx-clutter"
+                            name="propogation-model-itm-tx-clutter" style={{ textAlign: "right" }}
+                        >
+                            <FormSelectOption key="FORCE_TRUE" value="FORCE_TRUE" label="Always add clutter" />
+                            <FormSelectOption key="FORCE_FALSE" value="FORCE_FALSE" label="Never add clutter" />
+                            <FormSelectOption key="BLDG_DATA" value="BLDG_DATA" label="Clutter/No clutter per building data" />
+                        </FormSelect>
+                    </FormGroup>
+                    <FormGroup label="ITM Confidence" fieldId="propogation-model-itm-confidence">
+                        <InputGroup>
+                            <TextInput value={model.itmConfidence} type="number" onChange={this.setItmConfidence}
+                                id="propogation-model-itm-confidence" name="propogation-model-itm-confidence" style={{
+                                    textAlign: "right"
+                                }} isValid={model.itmConfidence >= 0 && model.itmConfidence
+                                    <= 100} />
+                            <InputGroupText>%</InputGroupText>
+                        </InputGroup>
                     </FormGroup>
                     <FormGroup
                         label="ITM Reliability"
@@ -804,55 +853,62 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             isValid={model.itmReliability >= 0 && model.itmReliability <= 100} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
-                    <FormGroup
-                        label="P.2108 Percentage of Locations"
-                        fieldId="propogation-model-p2108-confidence"
-                    ><InputGroup><TextInput
-                        value={model.p2108Confidence}
-                        type="number"
-                        onChange={this.setP2108Confidence}
-                        id="propogation-model-p2108-confidence"
-                        name="propogation-model-p2108-confidence"
-                        style={{ textAlign: "right" }}
-                        isValid={model.p2108Confidence >= 0 && model.p2108Confidence <= 100} />
-                            <InputGroupText>%</InputGroupText></InputGroup>
+                    <FormGroup label="P.2108 Percentage of Locations" fieldId="propogation-model-p2108-confidence">
+                        <InputGroup>
+                            <TextInput value={model.p2108Confidence} type="number" onChange={this.setP2108Confidence}
+                                id="propogation-model-p2108-confidence" name="propogation-model-p2108-confidence" style={{
+                                    textAlign: "right"
+                                }} isValid={model.p2108Confidence >= 0 && model.p2108Confidence
+                                    <= 100} />
+                            <InputGroupText>%</InputGroupText>
+                        </InputGroup>
                     </FormGroup>
-                    <FormGroup
-                        label="Building Data Source"
-                        fieldId="propogation-model-data-source"
-                    >
-                        <FormSelect
-                            value={model.buildingSource}
-                            onChange={v => this.setBuildingSource(v as BuildingSourceValues)}
-                            id="propogation-model-data-source"
-                            name="propogation-model-data-source"
-                            style={{ textAlign: "right" }}
-                            isValid={model.buildingSource === "LiDAR" || model.buildingSource === "B-Design3D" || model.buildingSource === "None"}>
-                            <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
-                            <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
-                            <FormSelectOption key="None" value="None" label="None" />
-                        </FormSelect>
-                    </FormGroup>
-                    {
-                        model.buildingSource === "None" ?
-                            <FormGroup
-                                label="Terrain Source"
-                                fieldId="terrain-source"
-                            >
+
+                    {model.rlanITMTxClutterMethod === "BLDG_DATA" || model.winner2LOSOption === "BLDG_DATA_REQ_TX" ?
+                        <>
+
+                            <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
                                 <FormSelect
-                                    value={model.terrainSource}
-                                    onChange={this.setTerrainSource}
-                                    id="terrain-source"
-                                    name="terrain-source"
+                                    value={model.buildingSource}
+                                    onChange={v => this.setBuildingSource(v as BuildingSourceValues)}
+                                    id="propogation-model-data-source"
+                                    name="propogation-model-data-source"
                                     style={{ textAlign: "right" }}
-                                    isValid={model.terrainSource === "3DEP (30m)"}>
-                                    <FormSelectOption key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
-                                    <FormSelectOption isDisabled={true} key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
+                                    isValid={model.buildingSource === "LiDAR"
+                                        || model.buildingSource === "B-Design3D" || model.buildingSource === "None"}>
+                                    <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
+                                    <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
+                                    <FormSelectOption key="None" value="None" label="None" />
                                 </FormSelect>
                             </FormGroup>
-                            :
-                            false
-                    }
+
+                            <FormGroup label="Terrain Source" fieldId="terrain-source">
+                                {" "}<Tooltip
+                                    position={TooltipPosition.top}
+                                    enableFlip={true}
+                                    className="fs-feeder-loss-tooltip"
+                                    maxWidth="40.0rem"
+                                    content={
+                                        <>
+                                            <p>The higher terrain height resolution (that goes with the building database)
+                                                is used instead within the first 1 km (when WinnerII building data is chosen)
+                                                and greater than 1 km (when ITM with building data is chosen).</p>
+                                        </>
+                                    }
+                                >
+                                    <OutlinedQuestionCircleIcon />
+                                </Tooltip>
+                                <FormSelect value={model.terrainSource} onChange={this.setTerrainSource} id="terrain-source"
+                                    name="terrain-source" style={{ textAlign: "right" }} >
+                                    <FormSelectOption key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
+                                    <FormSelectOption isDisabled={true} key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
+
+                                </FormSelect>
+                            </FormGroup>
+                        </>
+                        :
+                        false}
+
                 </>
             default: throw "Invalid propogation model";
         }

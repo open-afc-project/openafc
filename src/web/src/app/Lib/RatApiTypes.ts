@@ -186,7 +186,8 @@ export interface FCC6GHz {
 
 export interface IsedDbs06 {
     kind: "ISED DBS-06",
-    win2ConfidenceCombined: number,
+    winner2LOSOption: 'BLDG_DATA_REQ_TX',
+    win2ConfidenceCombined?: number,
     win2ConfidenceLOS?:number,
     win2ConfidenceNLOS?:number,
     itmConfidence: number,
@@ -194,7 +195,7 @@ export interface IsedDbs06 {
     p2108Confidence: number,
     buildingSource: BuildingSourceValues,
     terrainSource: "SRTM (90m)" | "3DEP (30m)"
-    winner2LOSOption: 'UNKNOWN' | 'BLDG_DATA_REQ_TX',
+    rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
     win2UseGroundDistance: boolean,
     fsplUseGroundDistance: boolean,
     winner2HgtFlag: boolean,

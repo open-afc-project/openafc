@@ -68,6 +68,10 @@ export class AFCForm extends React.Component<
                 if (res.kind === "Success") {
                     this.updateEntireConfigState(res.result);
                 } else {
+                    if(res.errorCode == 404){
+                        this.updateEntireConfigState(getDefaultAfcConf(n));
+                        this.setState({messageSuccess:"No config found for this region, using region default"});
+                    }
                     this.setState({ messageError: res.description, messageSuccess: undefined });
                 }
             })
@@ -142,6 +146,14 @@ export class AFCForm extends React.Component<
                 if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
                 if (propModel.buildingSource !== "None" && propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
                 break;
+            case "ISED DBS-06":
+                if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
+                if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
+                if (propModel.win2ConfidenceCombined! < 0 || propModel.win2ConfidenceCombined! > 100) return err();
+                if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
+                if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
+                if (propModel.buildingSource !== "None" && propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
+                break;
             default:
                 return err();
         }
@@ -188,7 +200,7 @@ export class AFCForm extends React.Component<
     }
 
     private reset = () => {
-        let config = getDefaultAfcConf();
+        let config = getDefaultAfcConf(this.state.config.regionStr);
         if (this.props.frequencyBands.length > 0) {
             config.freqBands = this.props.frequencyBands;
         } else {

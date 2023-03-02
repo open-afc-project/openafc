@@ -140,6 +140,93 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "nearFieldAdjFlag": false,
 });
 
+const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
+    "freqBands": [
+        {
+            "name": "Canada",
+            "startFreqMHz": 5925,
+            "stopFreqMHz": 6875
+        },
+    ],
+    "ulsDefaultAntennaType": "WINNF-AIP-07",
+    "scanPointBelowGroundMethod": "truncate",
+    "polarizationMismatchLoss": {
+        "kind": "Fixed Value",
+        "value": 3
+    },
+    "bodyLoss": {
+        "kind": "Fixed Value",
+        "valueIndoor": 0,
+        "valueOutdoor": 0
+    },
+    "buildingPenetrationLoss": {
+        "kind": "Fixed Value",
+        "value": 20.5
+    },
+    "receiverFeederLoss": {
+        "IDU": 3,
+        "ODU": 3,
+        "UNKNOWN": 3
+    },
+    "fsReceiverNoise": {
+        "freqList": [6425],
+        "noiseFloorList": [-110, -109.5]
+    },
+    "threshold": -6,
+    "maxLinkDistance": 130,
+    "maxEIRP": 36,
+    "minEIRP": 21,
+
+    "minPSD": 8,
+    "propagationModel": {
+        "kind": "ISED DBS-06",
+        "win2ConfidenceCombined": 16,
+        "win2ConfidenceLOS": 16,
+        "winner2LOSOption": "BLDG_DATA_REQ_TX",
+        "win2UseGroundDistance": false,
+        "fsplUseGroundDistance": false,
+        "winner2HgtFlag": false,
+        "winner2HgtLOS": 15,
+        "itmConfidence": 5,
+        "itmReliability": 20,
+        "p2108Confidence": 10,
+        "buildingSource": "None",
+        "terrainSource": "3DEP (30m)"
+    },
+    "propagationEnv": "NLCD Point",
+    "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
+    "regionStr": "CANADA",
+    "APUncertainty": {
+        "horizontal": 30,
+        "height": 5
+    },
+    "ITMParameters": {
+        "polarization": "Vertical",
+        "ground": "Average Ground",
+        "dielectricConst": 25,
+        "conductivity": 0.005,
+        "minSpacing": 30,
+        "maxPoints": 1500
+    },
+    "rlanITMTxClutterMethod": "FORCE_TRUE",
+    "clutterAtFS": false,
+    "fsClutterModel": {
+        "p2108Confidence": 5,
+        "maxFsAglHeight": 6
+    },
+    "nlcdFile": "nlcd_wfa",
+    "enableMapInVirtualAp": false,
+    "channelResponseAlgorithm": "psd",
+    "visibilityThreshold": -6,
+    "version": guiConfig.version,
+    "allowScanPtsInUncReg": false,
+    "passiveRepeaterFlag": true,
+    "printSkippedLinksFlag": false,
+    "reportErrorRlanHeightLowFlag": false,
+    "nearFieldAdjFlag": false,
+});
+
+
 // API Calls
 
 /**
@@ -179,7 +266,13 @@ export const getRegions = (): Promise<RatResponse<string[]>> => (
  * Return a copy of the hard coded afc confic used as the default
  * @returns The default AFC Configuration
  */
-export const getDefaultAfcConf = () => defaultAfcConf();
+export const getDefaultAfcConf = (x: string | undefined) => {
+    if(x == "CANADA"){
+        return defaultAfcConfCanada();
+    }else{
+        return defaultAfcConf();
+    }   
+}
 
 /**
  * Return the current afc config that is stored on the server.
@@ -211,7 +304,7 @@ export const getAfcConfigFile = (region:string): Promise<RatResponse<AFCConfigFi
  * @returns success message or error
  */
 export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<string>> => (
-    fetch(guiConfig.afcconfig_defaults, {
+    fetch(guiConfig.afcconfig_defaults.replace("default", conf.regionStr ?? "USA"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(conf, undefined, 3)
