@@ -6684,7 +6684,7 @@ void AfcManager::runPointAnalysis()
 #if DEBUG_AFC
 	// std::vector<int> fsidTraceList{2128, 3198, 82443};
 	// std::vector<int> fsidTraceList{64324};
-	std::vector<int> fsidTraceList{93911};
+	std::vector<int> fsidTraceList{96635};
 	std::string pathTraceFile = "path_trace.csv.gz";
 #endif
 
@@ -7217,7 +7217,7 @@ void AfcManager::runPointAnalysis()
 	/**************************************************************************************/
 	auto path_writer = GzipCsvWriter(pathTraceFile);
 	auto &ftrace = path_writer.csv_writer;
-	ftrace->writeRow({"PT_ID,PT_LON (deg),PT_LAT (deg),HORIZ_DIST (Km),PT_HEIGHT_AMSL (m),BLDG_FLAG"});
+	ftrace->writeRow({"PT_ID","PT_LON (deg)","PT_LAT (deg)","GROUND_DIST (Km)","TERRAIN_HEIGHT_AMSL (m)","LOS_PATH_HEIGHT_AMSL (m)","FSID","DIV_IDX","SEG_IDX","SCAN_PT_IDX","RLAN_HEIGHT_IDX"});
 	/**************************************************************************************/
 #endif
 
@@ -7373,6 +7373,15 @@ void AfcManager::runPointAnalysis()
 #endif
 		if (true) {
 
+#			if DEBUG_AFC
+			bool traceFlag = false;
+			if (traceIdx<(int) fsidTraceList.size()) {
+				if (uls->getID() == fsidTraceList[traceIdx]) {
+					traceFlag = true;
+				}
+			}
+#			endif
+
 			int numPR = uls->getNumPR();
 			int numDiversity = (uls->getHasDiversity() ? 2 : 1);
 
@@ -7390,13 +7399,6 @@ void AfcManager::runPointAnalysis()
 				if (distKmSquared < maxRadiusKmSquared) {
 #					if DEBUG_AFC
 					time_t t1 = time(NULL);
-
-					bool traceFlag = false;
-					if (traceIdx<(int) fsidTraceList.size()) {
-						if (uls->getID() == fsidTraceList[traceIdx]) {
-							traceFlag = true;
-						}
-					}
 #					endif
 
 					ulsFlagList[ulsIdx] = true;
@@ -7511,13 +7513,16 @@ void AfcManager::runPointAnalysis()
 							}
 
 							// Use Haversine formula with average earth radius of 6371 km
-							double lon1Rad = scanPt.second*M_PI/180.0;
-							double lat1Rad = scanPt.first*M_PI/180.0;
-							double lon2Rad = ulsRxLongitude*M_PI/180.0;
-							double lat2Rad = ulsRxLatitude*M_PI/180.0;
-							double slat = sin((lat2Rad-lat1Rad)/2);
-							double slon = sin((lon2Rad-lon1Rad)/2);
-							double groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+							double groundDistanceKm;
+							{
+								double lon1Rad = scanPt.second*M_PI/180.0;
+								double lat1Rad = scanPt.first*M_PI/180.0;
+								double lon2Rad = ulsRxLongitude*M_PI/180.0;
+								double lat2Rad = ulsRxLatitude*M_PI/180.0;
+								double slat = sin((lat2Rad-lat1Rad)/2);
+								double slon = sin((lon2Rad-lon1Rad)/2);
+								groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+							}
 
 							int htIdx;
 							int numRlanPosn = 0;
@@ -7549,16 +7554,6 @@ void AfcManager::runPointAnalysis()
 							}
 
 							int rlanPosnIdx;
-
-#if DEBUG_AFC
-							if (traceFlag) {
-								ftrace->writeRow({ QString::asprintf("BEGIN_%d,,,,,-1\n", uls->getID()) });
-								for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx) {
-									ftrace->writeRow({ QString::asprintf("RLAN_%d,%.10f,%.10f,,%.5f,AMSL\n", rlanPosnIdx,rlanCoordList[rlanPosnIdx].longitudeDeg,rlanCoordList[rlanPosnIdx].latitudeDeg,rlanCoordList[rlanPosnIdx].heightKm*1000.0) } );
-								}
-								ftrace->writeRow({ QString::asprintf("FS_RX,%.10f,%.10f,,%.5f,AMSL\n", ulsRxLongitude, ulsRxLatitude, ulsRxHeightAMSL) } );
-							}
-#endif
 
 							for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx)
 							{
@@ -7876,8 +7871,44 @@ void AfcManager::runPointAnalysis()
 										}
 									}
 								}
-							}
 
+#if DEBUG_AFC
+								if (traceFlag&&(!contains2D)) {
+									if (uls->ITMHeightProfile) {
+										double lon1Rad = rlanCoord.longitudeDeg*M_PI/180.0;
+										double lat1Rad = rlanCoord.latitudeDeg*M_PI/180.0;
+										int N = ((int) uls->ITMHeightProfile[0]) + 1;
+										for(int ptIdx=0; ptIdx<N; ptIdx++) {
+											Vector3 losPathPosn = (((double) (N-1-ptIdx))/(N-1))*rlanPosn + (((double) ptIdx)/(N-1))*ulsRxPos;
+						                	GeodeticCoord losPathPosnGeodetic = EcefModel::ecefToGeodetic(losPathPosn);
+
+                                        	double ptLon = losPathPosnGeodetic.longitudeDeg;
+                                        	double ptLat = losPathPosnGeodetic.latitudeDeg;
+                                        	double losPathHeight = losPathPosnGeodetic.heightKm*1000.0;
+
+											double lon2Rad = ptLon*M_PI/180.0;
+											double lat2Rad = ptLat*M_PI/180.0;
+											double slat = sin((lat2Rad-lat1Rad)/2);
+											double slon = sin((lon2Rad-lon1Rad)/2);
+											double ptDistKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
+											ftrace->writeRow({ QString::asprintf("PT_%d", ptIdx),
+													QString::number(ptLon, 'f', 10),
+													QString::number(ptLat, 'f', 10),
+													QString::number(ptDistKm, 'f', 5),
+													QString::number(uls->ITMHeightProfile[2+ptIdx], 'f', 5),
+													QString::number(losPathHeight, 'f', 5),
+													QString::number(uls->getID()),
+													QString::number(divIdx),
+													QString::number(segIdx),
+													QString::number(scanPtIdx),
+													QString::number(rlanPosnIdx)
+													});
+										}
+									}
+								}
+#endif
+							}
 
 							if (uls->ITMHeightProfile) {
 								free(uls->ITMHeightProfile);
@@ -7922,7 +7953,8 @@ void AfcManager::runPointAnalysis()
 					tstr = strdup(ctime(&t2));
 					strtok(tstr, "\n");
 
-					std::cout << numProc << " [" << ulsIdx+1 << " / " <<  _ulsList->getSize() << "] " << tstr << " Elapsed Time = " << (t2-t1) << std::endl << std::flush;
+					LOGGER_DEBUG(logger) << numProc << " [" << ulsIdx+1 << " / " <<  _ulsList->getSize() << "] FSID = " << uls->getID()
+						<< " DIV_IDX = " << divIdx << " SEG_IDX = " << segIdx << " " << tstr << " Elapsed Time = " << (t2-t1);
 
 					free(tstr);
 
@@ -7930,45 +7962,6 @@ void AfcManager::runPointAnalysis()
 						cont = false;
 					}
 
-					if (traceFlag&&(!contains2D)) {
-						traceIdx++;
-						if (uls->ITMHeightProfile) {
-							double rlanLon = rlanCoordList[0].longitudeDeg;
-							double rlanLat = rlanCoordList[0].latitudeDeg;
-							double fsLon = uls->getRxLongitudeDeg();
-							double fsLat = uls->getRxLatitudeDeg();
-							int N = ((int) uls->ITMHeightProfile[0]) + 1;
-							Vector3 rlanCenterPosn = rlanPosnList[0];
-							lineOfSightVectorKm = ulsRxPos - rlanCenterPosn;
-							Vector3 upVec = rlanCenterPosn.normalized();
-							Vector3 horizVec = (lineOfSightVectorKm - (lineOfSightVectorKm.dot(upVec) * upVec));
-							double horizDistKm = sqrt((horizVec).dot(horizVec));
-							for(int ptIdx=0; ptIdx<N; ptIdx++) {
-								double ptLon = ( rlanLon * (N-1-ptIdx) + fsLon*ptIdx ) / (N-1);
-								double ptLat = ( rlanLat * (N-1-ptIdx) + fsLat*ptIdx ) / (N-1);
-								double ptDistKm = horizDistKm*ptIdx / (N-1);
-
-								ftrace->writeRow({ QString::asprintf("PT_%d", ptIdx),
-										QString::number(ptLon, 'f', 10),
-										QString::number(ptLat, 'f', 10),
-										QString::number(ptDistKm, 'f', 5),
-										QString::number(uls->ITMHeightProfile[2+ptIdx], 'f', 5),
-										});
-
-							}
-						}
-						std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
-						ftrace->writeRow({
-								QString::asprintf("END_%s_%d", dbName.c_str(), uls->getID()),
-								QString(),
-								QString(),
-								QString(),
-								QString(),
-								QString(),
-								QString::number(-1)
-								});
-
-					}
 #					endif
 
 				}
@@ -7976,11 +7969,19 @@ void AfcManager::runPointAnalysis()
 				{
 #					if DEBUG_AFC
 						// uls is not included in calculations
-						LOGGER_DEBUG(logger) << "ID: " << uls->getID() << ", distKm: " << sqrt(distKmSquared) << ", link: " << uls->getLinkDistance() << ",";
+						LOGGER_DEBUG(logger) << "FSID: " << uls->getID()
+							<< " DIV_IDX = " << divIdx << " SEG_IDX = " << segIdx
+							<< ", distKm: " << sqrt(distKmSquared) << ", Outside MAX_RADIUS";
 #					endif
 				}
 			}
 			}
+
+#			if DEBUG_AFC
+			if (traceFlag) {
+				traceIdx++;
+			}
+#			endif
 		}
 
 		numProc++;
