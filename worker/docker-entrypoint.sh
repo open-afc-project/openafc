@@ -6,6 +6,15 @@
 # a copy of which is included with this software program
 #
 
+if [ -n ${AFC_AEP_ENABLE+x} ] && [ -n "$AFC_AEP_REAL_MOUNTPOINT" ]; then
+	if [ -n "$AFC_AEP_FILELIST" ]; then
+		/usr/bin/parse_fs.py "$AFC_AEP_REAL_MOUNTPOINT" "$AFC_AEP_FILELIST"
+	else
+		/usr/bin/parse_fs.py "$AFC_AEP_REAL_MOUNTPOINT" /mnt/nfs/rat_transfer/aep.list
+		export AFC_AEP_FILELIST=/mnt/nfs/rat_transfer/aep.list
+	fi
+fi
+
 #celery
 CELERY_OPTIONS=${CELERY_OPTIONS:="rat_1"}
 CELERY_LOG=${CELERY_LOG:=DEBUG}

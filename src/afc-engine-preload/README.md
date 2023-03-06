@@ -17,7 +17,7 @@ src/afc-engine-preload/parse_fs.py <redirected_dir_path> <file_tree_info_output>
 ```
 
 The library could be configured by the following env vars in the worker docker:
-- **AFC_AEP_ENABLE**=any_value - Enable the library if "True". Default: "False".
+- **AFC_AEP_ENABLE**=any_value - Enable the library if defined. Default: Not defined.
 - **AFC_AEP_FILELIST**=path - Path to file tree info file. Default: /mnt/nfs/rat_transfer/aep.list
 - **AFC_AEP_DEBUG**=number - Log level. 0 - disable, 1 - log time of read operations. Default: 0.
 - **AFC_AEP_LOGFILE**=path - Where to write the log. Default:  /mnt/nfs/rat_transfer/aep.log

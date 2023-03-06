@@ -529,18 +529,21 @@ chown 999:999 /var/databases/pgdata
 |Name|Default val|Container|Notes
 | :- | :- | :- | :- |
 | **RabbitMQ settings**||||
-|BROKER_TYPE|`internal`|rat-server,msghnd| whether `internal` or `external` AFC RMQ service used|
-|BROKER_PROT|`amqp` |rat-server,msghnd | what protocol used for AFC RMQ service|
-|BROKER_USER|`celery`|rat-server,msghnd | user used for AFC RMQ service|
-|BROKER_PWD |`celery`|rat-server,msghnd | password used for AFC RMQ service|
-|BROKER_FQDN|`localhost`|rat-server,msghnd | IP/domain name of AFC RMQ service|
-|BROKER_PORT|`5672`|rat-server,msghnd | port of AFC RMQ service|
+|BROKER_TYPE|`internal`|rat-server,msghnd,worker | whether `internal` or `external` AFC RMQ service used|
+|BROKER_PROT|`amqp` |rat-server,msghnd,worker | what protocol used for AFC RMQ service|
+|BROKER_USER|`celery`|rat-server,msghnd,worker | user used for AFC RMQ service|
+|BROKER_PWD |`celery`|rat-server,msghnd,worker | password used for AFC RMQ service|
+|BROKER_FQDN|`localhost`|rat-server,msghnd,worker | IP/domain name of AFC RMQ service|
+|BROKER_PORT|`5672`|rat-server,msghnd,worker | port of AFC RMQ service|
 | **AFC Object Storage** |||please read [objst README.md](/src/filestorage/README.md)|
-|AFC_OBJST_HOST|`0.0.0.0`|objst|file storage service host domain/IP|
-|AFC_OBJST_PORT|`5000`|objst|file storage service port|
-|AFC_OBJST_MEDIA|`LocalFS`|objst|The media used for storing files by the service.The possible values are `LocalFS` - store files on docker's FS. `GoogleCloudBucket` - store files on Google Store.|
+|AFC_OBJST_HOST|`0.0.0.0`|objst,rat-server,msghnd,worker|file storage service host domain/IP|
+|AFC_OBJST_PORT|`5000`|objst,rat-server,msghnd,worker|file storage service port|
+|AFC_OBJST_SCHEME|'HTTP'|rat-server,msghnd,worker|file storage service scheme. `HTTP` or `HTTPS`|
+|AFC_OBJST_MEDIA|`LocalFS`|objst|The media used for storing files by the service. The possible values are `LocalFS` - store files on docker's FS. `GoogleCloudBucket` - store files on Google Store|
 |AFC_OBJST_LOCAL_DIR|`/storage`|objst|file system path to stored files in file storage container. Used only when `AFC_OBJST_MEDIA` is `LocalFS`|
-|AFC_OBJST_LOG_LVL|`ERROR`|objst|logging level of the file storage. The relevant values are `DEBUG` and `ERROR`.|
+|AFC_OBJST_LOG_LVL|`ERROR`|objst|logging level of the file storage. The relevant values are `DEBUG` and `ERROR`|
+|AFC_OBJST_HIST_HOST|`0.0.0.0`|objst,rat-server,msghnd,worker|history service host domain/IP|
+|AFC_OBJST_HIST_PORT|`4999`|objst,rat-server,msghnd,worker|history service port|
 | **MSGHND settings**||||
 |AFC_MSGHND_BIND|`0.0.0.0:8000`|msghnd| the socket to bind. a string of the form: <host>:<port>|
 |AFC_MSGHND_PID|`/run/gunicorn/openafc_app.pid`|msghnd| a filename to use for the PID file|
@@ -549,6 +552,17 @@ chown 999:999 /var/databases/pgdata
 |AFC_MSGHND_ACCESS_LOG|`/proc/self/fd/2`|msghnd| the Access log file to write to|
 |AFC_MSGHND_ERROR_LOG|`/proc/self/fd/2`|msghnd| the Error log file to write to|
 |AFC_MSGHND_LOG_LEVEL|`info`|msghnd| The granularity of Error log outputs (values are 'debug', 'info', 'warning', 'error', 'critical'|
+| **worker settings**|||please read [afc-engine-preload README.md](/src/afc-engine-preload/README.md)|
+|AFC_AEP_ENABLE|Not defined|worker|Enable the preload library if defined|
+|AFC_AEP_FILELIST|`/mnt/nfs/rat_transfer/aep.list`|worker|Path to file tree info file|
+|AFC_AEP_DEBUG|`0`|worker|Log level. 0 - disable, 1 - log time of read operations|
+|AFC_AEP_LOGFILE|`/mnt/nfs/rat_transfer/aep.log`|worker|Where to write the log|
+|AFC_AEP_CACHE|`/wd/aep_cache`|worker|Where to store the cache|
+|AFC_AEP_CACHE_MAX_FILE_SIZE|`60000000`|worker|Cache files with size less than the value|
+|AFC_AEP_REAL_MOUNTPOINT|`/mnt/nfs/rat_transfer`|worker|Redirect read access to there|
+|AFC_AEP_ENGINE_MOUNTPOINT|value of AFC_AEP_REAL_MOUNTPOINT|worker|Redirect read access from here|
+|CELERY_OPTIONS|`rat_1`|worker|Celery app instance to use|
+|CELERY_LOG|`INFO`|worker|Celery log level. `ERROR` or `INFO` or `DEBUG`|
 
 
 ## RabbitMQ settings
