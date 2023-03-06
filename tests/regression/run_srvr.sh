@@ -47,6 +47,10 @@ docker-compose down && docker-compose up -d && docker ps -a
 check_ret $?
 sleep 5
 
+# Create file list for afc-engine preload lib
+export $(grep -v '^#' .env | xargs)
+docker-compose exec -T worker /usr/bin/parse_fs.py ${VOL_C_DB}/3dep/1_arcsec ${VOL_C_DB}/aep.list
+
 # set default srvr configuration
 docker-compose exec -T rat_server rat-manage-api db-create
 docker-compose exec -T rat_server rat-manage-api cfg add src=/pipe/export_admin_cfg.json
