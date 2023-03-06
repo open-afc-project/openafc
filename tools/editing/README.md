@@ -25,7 +25,7 @@ clang-format -i ./<path>/<file_name>
 ```
 or docker based:
 ```
-docker run --rm -v `pwd`:/open-afc -w /open-afc silkeh/clang:14-stretch clang-format -i ./src/afc-engine/AfcManager.cpp
+docker run --rm --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/open-afc -w /open-afc silkeh/clang:14-stretch clang-format -i ./src/afc-engine/AfcManager.cpp
 ```
 
 How to format git staged changes:
