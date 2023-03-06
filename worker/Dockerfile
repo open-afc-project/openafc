@@ -25,7 +25,9 @@ ARG BUILDREV=localbuild
 RUN cd /root/afc/build && \
 cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /root/afc && \
 ninja -j$(nproc) install
+RUN cd /root/afc/src/afc-engine-preload && make && cp aep.so /root/afc/__install/lib/ && cp parse_fs.py /root/afc/__install/bin/
 RUN strip --strip-unneeded /root/afc/__install/bin/afc-engine
+RUN strip --strip-unneeded /root/afc/__install/lib/*.so
 
 # Stage Install
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
@@ -44,14 +46,15 @@ RUN chown -R fbrat:fbrat /var/spool/fbrat /var/lib/fbrat /var/celery
 
 COPY worker/docker-entrypoint.sh /
 RUN chmod +x /docker-entrypoint.sh
+COPY worker/afc-engine.sh /usr/bin/
+RUN chmod +x /usr/bin/afc-engine.sh
 
-# Development env if ordered
+# Development env
 COPY worker/devel.sh /root/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
 RUN /root/devel.sh
 RUN rm -f /root/devel.sh
-
 
 FROM alpine:3.17
 COPY --from=install_image / /

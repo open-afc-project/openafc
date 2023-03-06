@@ -20,6 +20,8 @@ from .. import config
 
 LOGGER = get_task_logger(__name__)
 
+AFC_AEP_ENABLE = True if "AFC_AEP_ENABLE" in os.environ else False
+
 BROKER_URL=os.getenv('BROKER_PROT', config.BROKER_DEFAULT_PROT) + \
            "://" + \
            os.getenv('BROKER_USER', config.BROKER_DEFAULT_USER) + \
@@ -79,6 +81,8 @@ def run(prot, host, port, state_root,
         afc_exe = AFC_ENGINE
         if not os.path.exists(AFC_ENGINE):
             LOGGER.error('Missing afc-engine executable "%s"', AFC_ENGINE)
+    if AFC_AEP_ENABLE is True:
+        afc_exe = "/usr/bin/afc-engine.sh"
 
     tmpdir = os.path.join(state_root, task_id)
     os.makedirs(tmpdir)
