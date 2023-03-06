@@ -1,3 +1,9 @@
+/* Copyright (C) 2023 Broadcom. All rights reserved.
+* The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+* that owns the software below.
+* This work is licensed under the OpenAFC Project License, a copy of which is
+* included with this software program. */
+
 #define __DEFINED_struct__IO_FILE
 #include <stdlib.h>
 #include <stdio.h>
@@ -359,7 +365,7 @@ static inline DIR* orig_opendir(const char *name)
 	typedef DIR* (*orig_opendir_t)(const char *name);
 	orig_opendir_t orig = (orig_opendir_t)dlsym(RTLD_NEXT, "opendir");
 	DIR *ret;
-	
+
 	ret = (*orig)(name);
 	if(aep_debug && ret) strcpy(data_fds[dirfd(ret)].tpath, name);
 	return ret;
@@ -419,7 +425,7 @@ static fe_t* find_fe(char* tpath)
 				break;
 			}
 		}
-	}	
+	}
 	return cfe;
 }
 
@@ -485,7 +491,7 @@ static size_t read_data(void * destv, size_t size, data_fd_t *data_fd)
 			}
 		if (!data_fd->is_cached && data_fd->fe->size <= max_cached_file_size) {
 			if (!download_file(data_fd, fakepath)) {
-				data_fd->is_cached = true;	
+				data_fd->is_cached = true;
 			}
 		}
 	}
@@ -520,7 +526,7 @@ static size_t read_data(void * destv, size_t size, data_fd_t *data_fd)
 	return ret;
 }
 
-/* create fake file descriptor, FILE* and DIR*. Returns like open() */ 
+/* create fake file descriptor, FILE* and DIR*. Returns like open() */
 static int fd_add(char *tpath)
 {
 	int fd;
@@ -730,7 +736,7 @@ void __attribute__ ((constructor)) aep_init(void)
 	stack[0] = &tree;
 	tree.name = (char*)"root"; //debug
 	cstack = stack[0];
-	
+
 	/* fill file tree */
 	while (fl < filelist_end) {
 		uint8_t tab = 0;
@@ -745,7 +751,7 @@ void __attribute__ ((constructor)) aep_init(void)
 		}
 		name = (char*)(fl);
 		fl += strlen(name) + 1;
-		
+
 		size = *((uint64_t*)fl);
 		fl += sizeof(uint64_t);
 		//dbg("%p tab %d name %s size %lu", fl, tab, name, size);
@@ -774,7 +780,7 @@ void __attribute__ ((constructor)) aep_init(void)
 		cfe->size = size;
 	}
 	free(stack);
-	
+
 	/* if (aep_debug) prn_tree(&tree, 0); *//* testing */
 
 	tmp = getenv("AFC_AEP_CACHE");
@@ -1067,7 +1073,7 @@ long int syscall(long int __sysno, ...)
 		ret = __builtin_apply((void (*)()) (orig), argsb, 512);
 #endif
 		__builtin_return(ret);
-	}	
+	}
 }
 
 int fcntl(int fd, int cmd, ...)
@@ -1131,7 +1137,7 @@ struct dirent *readdir(DIR *dir)
 
 	if (fd_is_remote(dirfd(dir))) {
 		data_fd_t *data_fd = fd_get_data_fd(dirfd(dir));
-		
+
 		if (!data_fd->readdir_p) {
 			data_fd->readdir_p = data_fd->fe->down;
 		} else {
@@ -1141,7 +1147,7 @@ struct dirent *readdir(DIR *dir)
 			dbgd("readdir(%s) NULL", fd_get_name(dirfd(dir)));
 			return NULL;
 		}
-		
+
 		data_fd->dirent.d_type = data_fd->readdir_p->size ? DT_REG : DT_DIR;
 		strcpy(data_fd->dirent.d_name, data_fd->readdir_p->name);
 		dbgd("readdir(%s) %s", fd_get_name(dirfd(dir)), data_fd->dirent.d_name);
