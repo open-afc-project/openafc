@@ -936,7 +936,8 @@ double d1thx(double pfl[], const double &x1, const double &x2)
 	n=10*ka-5;
 	kb=n-ka+1;
 	sn=n-1;
-	assert( (s = new double[n+2]) != 0 );
+	s = new double[n+2];
+	assert( s != (double *) NULL );
 	s[0]=sn;
 	s[1]=1.0;
 	xb=(xb-xa)/sn;
