@@ -5,69 +5,39 @@
 # a copy of which is included with this software program
 #
 # default value of args
-ARG BLD_TAG=3.7.0.0
-ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/centos-build-image
+ARG BLD_TAG=3.7.3.0
+ARG PRINST_TAG=3.7.3.0
+ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image
+ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall
 
 # Stage Build
 FROM ${BLD_NAME}:${BLD_TAG} as build_image
+ARG BUILDREV=localbuild
+COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /root/afc/
+COPY cmake /root/afc/cmake/
+COPY pkg /root/afc/pkg/
+COPY selinux /root/afc/selinux/
+COPY src /root/afc/src/
 
-RUN yum -y clean all
-RUN yum -y install openssl11-devel bzip2-devel libffi-devel wget libsqlite3x-devel
+RUN mkdir -p -m 777 /root/afc/build
+RUN cd /root/afc/build && \
+cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_BUILD_TYPE=Ulsprocessor -DSVN_LAST_REVISION=$BUILDREV -G Ninja /root/afc && \
+ninja -j$(nproc --all --ignore=2) install
 
-RUN echo "source /opt/rh/devtoolset-11/enable" >> /etc/bashrc
-SHELL ["/bin/bash", "--login", "-c"]
+FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
+RUN mkdir -p /mnt/nfs/rat_transfer/daily_uls_parse/data_files \
+            /mnt/nfs/rat_transfer/daily_uls_parse/temp \
+            /mnt/nfs/rat_transfer/ULS_Database \
+            /mnt/nfs/rat_transfer/Antenna_Patterns \
+            /output_folder
 
-RUN mkdir -p /pd && cd /pd && wget https://www.python.org/ftp/python/3.10.2/Python-3.10.2.tgz && tar -xzvf Python-3.10.2.tgz
-RUN cd /pd/Python-3.10.2 && sed -i 's/PKG_CONFIG openssl /PKG_CONFIG openssl11 /g' configure && ./configure --enable-optimizations --enable-loadable-sqlite-extensions
-RUN cd /pd/Python-3.10.2 && N_THREADS=$(nproc --all --ignore=2); make -j$N_THREADS
-
-COPY CMakeLists.txt LICENSE.txt version.txt fbrat.rpmlintrc Doxyfile.in /wd/
-RUN echo $BUILDREV > /wd/svnrevision.txt
-
-COPY cmake /wd/cmake/
-COPY pkg /wd/pkg/
-COPY selinux /wd/selinux/
-COPY src /wd/src/
-
-RUN set -e ; \
-    N_THREADS=$(nproc --all --ignore=2); \
-    ROOTDIR=$(readlink -f $(dirname "${BASH_SOURCE[0]}")); \
-    CMAKE="cmake3 -G Ninja"; \
-    NINJA="ninja-build -j$N_THREADS"; \
-    RPMBUILD="rpmbuild -ba --without apidoc $@"; \
-    RPMLINT="rpmlint"; \
-    source /opt/rh/$(scl -l)/enable ; \
-    export CC=$(which gcc) ; \
-    export CXX=$(which g++) ; \
-    CMAKE="${CMAKE} -DCMAKE_BUILD_TYPE=Ulsprocessor"; \
-    BUILDDIR=${ROOTDIR}/build; \
-    mkdir -p $BUILDDIR; \
-    pushd $BUILDDIR; \
-    ${CMAKE} .. ; \
-    rm -rf dist; \
-    ${NINJA}
-
-FROM centos:7 as install_image
-RUN mkdir -p /var/lib/fbrat/daily_uls_parse/{data_files,temp} /var/lib/fbrat/{ULS_Database,Antenna_Patterns} /output_folder /pd
-RUN yum -y install epel-release
-RUN yum -y install qt5-qtbase-devel make openssl11-devel armadillo libbsd
-COPY --from=build_image /pd/Python-3.10.2 /pd/
-
-RUN cd /pd && make install && cd / && rm -rf /pd
-
-RUN yum -y erase make && yum -y autoremove
-RUN yum -y clean all
-
-RUN python3 -m pip install --upgrade pip
-RUN pip3 install --no-cache sqlalchemy numpy
-COPY prereqs/antenna_model/antenna_model_map.csv prereqs/antenna_model/antenna_model_list.csv /var/lib/fbrat/daily_uls_parse/
-
-COPY --from=build_image /wd/build/src/coalition_ulsprocessor/src/uls-script/uls-script /var/lib/fbrat/daily_uls_parse/
-COPY --from=build_image /wd/build/src/ratapi/pkg/ratapi/db /var/lib/fbrat/daily_uls_parse/
+COPY prereqs/antenna_model/antenna_model_map.csv prereqs/antenna_model/antenna_model_list.csv /mnt/nfs/rat_transfer/daily_uls_parse/
+COPY --from=build_image /root/afc/__install/bin /mnt/nfs/rat_transfer/daily_uls_parse/
+COPY --from=build_image /root/afc/build/src/ratapi/pkg/ratapi/db/ /mnt/nfs/rat_transfer/daily_uls_parse/
 COPY uls/uls-docker-entrypoint.sh /wd/
 RUN chmod +x /wd/uls-docker-entrypoint.sh
 
-FROM centos:7
+FROM alpine:3.17
 COPY --from=install_image / /
 
 WORKDIR /wd
