@@ -101,6 +101,8 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   const antenna: any = <a target="_blank" href={guiConfig.antenna_url}>Antenna Patterns</a>;
   // @ts-ignore
   const history: any = <a target="_blank" href={guiConfig.history_url}>Debug Files</a>;
+  // @ts-ignore
+  const about: any = <a href={guiConfig.about_url}>About</a>;
 
   const Navigation = (<UserContext.Consumer>{user =>
     <Nav id="nav-primary-simple">
@@ -181,6 +183,13 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
             itemId="history-link-item">
             {history}
           </NavItem>}
+        {!isLoggedIn() &&
+          <NavItem
+            id="about-link"
+            itemId="about-link-item">
+            {about}
+          </NavItem>}
+
       </NavList>
     </Nav>}
   </UserContext.Consumer>);
