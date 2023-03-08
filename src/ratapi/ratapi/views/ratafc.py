@@ -499,7 +499,7 @@ class RatAfc(MethodView):
                     with dataif.open("dbg", history_dir + "/analysisRequest.json") as hfile:
                         hfile.write(request_json_bytes)
                     with dataif.open("dbg", history_dir + "/afc_config.json") as hfile:
-                        hfile.write(config_bytes)
+                        hfile.write(config_bytes.encode('utf-8'))
 
                 build_task(dataif,
                         request_type,
