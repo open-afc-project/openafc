@@ -1,4 +1,4 @@
 #!/bin/sh
-cd /var/lib/fbrat/daily_uls_parse
+cd /mnt/nfs/rat_transfer/daily_uls_parse
 python3 daily_uls_parse.py
-cp /var/lib/fbrat/ULS_Database/*.sqlite3 /output_folder/
+cp /mnt/nfs/rat_transfer/ULS_Database/*.sqlite3 /output_folder/

@@ -105,7 +105,7 @@ if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
   endif()
 
   if ("Ulsprocessor" IN_LIST OPENAFC_BUILD_TYPE)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -larmadillo")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -larmadillo")
   endif()
 
   message("CMAKE_C_FLAGS ${CMAKE_C_FLAGS}")
