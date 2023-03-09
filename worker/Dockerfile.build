@@ -33,9 +33,6 @@ RUN cd /root/gdal && tar xf gdal-1.11.4.tar.xz && rm -f gdal-1.11.4.tar.xz && cd
 make -j$(nproc) && make install && cd .. && rm -rf gdal-1.11.4 && rm -rf /root/gdal/__install/bin && \
 strip --strip-unneeded /root/gdal/__install/lib/libgdal.so && cp -r __install/* /usr/
 
-RUN addgroup -g 1003 fbrat
-RUN adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat
-
 FROM alpine:3.17
 COPY --from=staging / /
 LABEL version="openafc-alpine-build-image"

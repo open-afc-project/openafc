@@ -50,11 +50,11 @@ COPY worker/afc-engine.sh /usr/bin/
 RUN chmod +x /usr/bin/afc-engine.sh
 
 # Development env
-COPY worker/devel.sh /root/
+COPY worker/devel.sh /wd/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
-RUN /root/devel.sh
-RUN rm -f /root/devel.sh
+RUN /wd/devel.sh
+RUN rm -f /wd/devel.sh
 
 FROM alpine:3.17
 COPY --from=install_image / /
