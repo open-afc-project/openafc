@@ -554,10 +554,10 @@ chown 999:999 /var/databases/pgdata
 |AFC_MSGHND_LOG_LEVEL|`info`|msghnd| The granularity of Error log outputs (values are 'debug', 'info', 'warning', 'error', 'critical'|
 | **worker settings**|||please read [afc-engine-preload README.md](/src/afc-engine-preload/README.md)|
 |AFC_AEP_ENABLE|Not defined|worker|Enable the preload library if defined|
-|AFC_AEP_FILELIST|`/mnt/nfs/rat_transfer/aep.list`|worker|Path to file tree info file|
+|AFC_AEP_FILELIST|`/aep/list/aep.list`|worker|Path to file tree info file|
 |AFC_AEP_DEBUG|`0`|worker|Log level. 0 - disable, 1 - log time of read operations|
-|AFC_AEP_LOGFILE|`/mnt/nfs/rat_transfer/aep.log`|worker|Where to write the log|
-|AFC_AEP_CACHE|`/wd/aep_cache`|worker|Where to store the cache|
+|AFC_AEP_LOGFILE|`/aep/log/aep.log`|worker|Where to write the log|
+|AFC_AEP_CACHE|`/aep/cache`|worker|Where to store the cache|
 |AFC_AEP_CACHE_MAX_FILE_SIZE|`60000000`|worker|Cache files with size less than the value|
 |AFC_AEP_REAL_MOUNTPOINT|`/mnt/nfs/rat_transfer`|worker|Redirect read access to there|
 |AFC_AEP_ENGINE_MOUNTPOINT|value of AFC_AEP_REAL_MOUNTPOINT|worker|Redirect read access from here|
