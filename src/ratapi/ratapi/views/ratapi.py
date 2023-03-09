@@ -322,6 +322,9 @@ class AfcConfigFile(MethodView):
     def put(self, filename):
         ''' PUT method for afc config
         '''
+        from .. import als
+        from flask_login import current_user
+
         user_id = auth(roles=['Super'])
         LOGGER.debug("current user: %s", user_id)
 
@@ -343,9 +346,11 @@ class AfcConfigFile(MethodView):
             if not config:
                 config = AFCConfig(rcrd)
                 db.session.add(config)
+                als.als_json_log('afc_config', {'action':'create', 'user':current_user.username, 'region':filename, 'from':flask.request.remote_addr, 'content':ordered_bytes})
             else:
                 config.config = rcrd
                 config.created = datetime.datetime.now()
+                als.als_json_log('afc_config', {'action':'update', 'user':current_user.username, 'region':filename, 'from':flask.request.remote_addr, 'content':ordered_bytes})
             db.session.commit()
 
         except:
