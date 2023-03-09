@@ -30,15 +30,13 @@
 
 #define AEP_PATH_MAX PATH_MAX
 #define AEP_FILENAME_MAX FILENAME_MAX
-#define AFC_AEP_CACHE_DEFAULT "/wd/aep_cache"
-#define AFC_AEP_CACHE_MAX_FILE_SIZE_DEFAULT 60000000
-#define AFC_AEP_REAL_MOUNTPOINT_DEFAULT "/mnt/nfs/rat_transfer"
-#define AFC_AEP_FILELIST_DEFAULT "/mnt/nfs/rat_transfer/aep.list"
-#define AFC_AEP_LOGFILE_DEFAULT "/mnt/nfs/rat_transfer/aep.log"
 
 #define aep_assert(cond, format, ...) \
 	if (!(cond)) { \
-		dprintf(logfile, format " Abort!\n", ##__VA_ARGS__); \
+		fprintf(stderr, format " Abort!\n", ##__VA_ARGS__); \
+		if (aep_debug) { \
+			dprintf(logfile, format " Abort!\n", ##__VA_ARGS__); \
+		} \
 		abort(); \
 	}
 #define dbg(format, ...) \
@@ -46,6 +44,7 @@
 		dprintf(logfile, format "\n", ##__VA_ARGS__); \
 	}
 #define dbge(format, ...) \
+	fprintf(stderr, format " Error!\n", ##__VA_ARGS__); \
 	if (aep_debug) { \
 		dprintf(logfile, format " Error!\n", ##__VA_ARGS__); \
 	}
@@ -680,28 +679,31 @@ void __attribute__((constructor)) aep_init(void)
 	char *filelist_path;
 	char *tmp;
 
+	/* check env vars */
 	tmp = getenv("AFC_AEP_DEBUG");
 	aep_debug = tmp ? atoi(tmp) : 0;
 	if (aep_debug) {
 		char *logname;
 
-		tmp = getenv("AFC_AEP_LOGFILE");
-		logname = tmp ? tmp : (char *)AFC_AEP_LOGFILE_DEFAULT;
-		logfile = orig_open(logname, O_CREAT | O_RDWR | O_APPEND);
-		if (logfile < 0) {
+		logname = getenv("AFC_AEP_LOGFILE");
+		if (!logname) {
+			dbge("AFC_AEP_LOGFILE env var is not defined, log disabled");
 			aep_debug = 0;
+		} else {
+			logfile = orig_open(logname, O_CREAT | O_RDWR | O_APPEND);
+			if (logfile < 0) {
+				dbge("Can not open %s, log disabled", logname);
+				aep_debug = 0;
+			}
 		}
 	}
-
-	dbg("aep_init");
-
-	tmp = getenv("AFC_AEP_REAL_MOUNTPOINT");
-	real_mountpoint = tmp ? tmp : (char *)AFC_AEP_REAL_MOUNTPOINT_DEFAULT;
+	real_mountpoint = getenv("AFC_AEP_REAL_MOUNTPOINT");
+	aep_assert(real_mountpoint, "AFC_AEP_REAL_MOUNTPOINT env var is not defined");
 	if (real_mountpoint[strlen(real_mountpoint) - 1] == '/') {
 		real_mountpoint[strlen(real_mountpoint) - 1] = '\0';
 	}
-	tmp = getenv("AFC_AEP_ENGINE_MOUNTPOINT");
-	ae_mountpoint = tmp ? tmp : real_mountpoint;
+	ae_mountpoint = getenv("AFC_AEP_ENGINE_MOUNTPOINT");
+	aep_assert(ae_mountpoint, "AFC_AEP_ENGINE_MOUNTPOINT env var is not defined");
 	if (ae_mountpoint[strlen(ae_mountpoint) - 1] == '/') {
 		ae_mountpoint[strlen(ae_mountpoint) - 1] = '\0';
 	}
@@ -709,8 +711,14 @@ void __attribute__((constructor)) aep_init(void)
 		aep_use_gs = true;
 		init_gs();
 	}
-	tmp = getenv("AFC_AEP_FILELIST");
-	filelist_path = tmp ? tmp : (char *)AFC_AEP_FILELIST_DEFAULT;
+	filelist_path = getenv("AFC_AEP_FILELIST");
+	aep_assert(filelist_path, "AFC_AEP_FILELIST env var is not defined");
+	tmp = getenv("AFC_AEP_CACHE_MAX_FILE_SIZE");
+	aep_assert(tmp, "AFC_AEP_CACHE_MAX_FILE_SIZE env var is not defined");
+	max_cached_file_size = atoll(tmp);
+	cache_path = getenv("AFC_AEP_CACHE");
+	aep_assert(cache_path, "AFC_AEP_CACHE env var is not defined");
+
 	/* read filelist */
 	ret = orig_stat(filelist_path, &statbuf);
 	if (ret) {
@@ -799,11 +807,6 @@ void __attribute__((constructor)) aep_init(void)
 		cfe->size = size;
 	}
 	free(stack);
-
-	tmp = getenv("AFC_AEP_CACHE");
-	cache_path = tmp ? tmp : (char *)AFC_AEP_CACHE_DEFAULT;
-	tmp = getenv("AFC_AEP_CACHE_MAX_FILE_SIZE");
-	max_cached_file_size = tmp ? atoll(tmp) : AFC_AEP_CACHE_MAX_FILE_SIZE_DEFAULT;
 }
 
 FILE *fopen(const char *path, const char *mode)

@@ -7,12 +7,30 @@
 #
 
 if [ -n ${AFC_AEP_ENABLE+x} ]; then
+	if [ -z "$AFC_AEP_DEBUG" ]; then
+		export AFC_AEP_DEBUG=0
+		if [ -z "$AFC_AEP_LOGFILE" ]; then
+			export AFC_AEP_LOGFILE=/aep/log/aep.log
+		fi
+		mkdir -p $(dirname "$AFC_AEP_LOGFILE")
+	fi
 	if [ -z "$AFC_AEP_REAL_MOUNTPOINT" ]; then
 		export AFC_AEP_REAL_MOUNTPOINT=/mnt/nfs/rat_transfer
 	fi
-	if [ -z "$AFC_AEP_FILELIST" ]; then
-		export AFC_AEP_FILELIST=/mnt/nfs/rat_transfer/aep.list
+	if [ -z "$AFC_AEP_ENGINE_MOUNTPOINT" ]; then
+		export AFC_AEP_ENGINE_MOUNTPOINT=$AFC_AEP_REAL_MOUNTPOINT
 	fi
+	if [ -z "$AFC_AEP_FILELIST" ]; then
+		export AFC_AEP_FILELIST=/aep/list/aep.list
+	fi
+	mkdir -p $(dirname "$AFC_AEP_FILELIST")
+	if [ -z "$AFC_AEP_CACHE_MAX_FILE_SIZE" ]; then
+		export AFC_AEP_CACHE_MAX_FILE_SIZE=60000000
+	fi
+	if [ -z "$AFC_AEP_CACHE" ]; then
+		export AFC_AEP_CACHE=/aep/cache
+	fi
+	mkdir -p $AFC_AEP_CACHE
 	/usr/bin/parse_fs.py "$AFC_AEP_REAL_MOUNTPOINT" "$AFC_AEP_FILELIST"
 fi
 
