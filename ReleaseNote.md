@@ -1,6 +1,25 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-585**|
+| :- | :- |
+|**Date**|**03/09/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-585: Fixes required in ITM
+ 
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Ran FSP1, FSP41, FSP82, SIP10, IBP1 and IBP3 and resutls were as expected. The package is attached to this Jira ticket.
+
+## **Open Issues** 
+
+
+
+## **Version and Date**
 |Version|**OA-577**|
 | :- | :- |
 |**Date**|**03/01/2023**|
