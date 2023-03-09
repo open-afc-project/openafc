@@ -10,3 +10,5 @@ The configuration in src/ratapi/ratapi/priv_config.py sets the email alias where
 REGISTRATION_DEST_EMAIL = 'afc-admin@broadcom.com'
 REGISTRATION_SRC_EMAIL = 'do_not_reply@afc.broadcom.com'
 ```
+
+Alternative, the values above can be set as environment variables in the rat_server container

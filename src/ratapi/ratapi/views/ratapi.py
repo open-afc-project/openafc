@@ -385,13 +385,21 @@ class About(MethodView):
         ''' POST method for About
         '''
 
+        from flask import request
+        from flask_mail import Mail, Message
+
         try:
             from .. import priv_config
-            from flask import request
-            from flask_mail import Mail, Message
-
             dest_email = priv_config.REGISTRATION_DEST_EMAIL
             src_email = priv_config.REGISTRATION_SRC_EMAIL
+        except:
+            dest_email = os.getenv('REGISTRATION_DEST_EMAIL')
+            src_email = os.getenv('REGISTRATION_SRC_EMAIL')
+
+            if not dest_email or not src_email:
+                raise werkzeug.exceptions.NotFound()
+
+        try:
             name = request.form.get("name")
             email = request.form.get("email")
             org = request.form.get("org")
