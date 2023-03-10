@@ -216,6 +216,29 @@ export class AFCFormUSACanada extends React.Component<
         this.props.updateConfig(Object.assign(this.props.config, { channelResponseAlgorithm: v }));
     }
 
+    private getLandCoverOptions = () => {
+        if (this.props.config.regionStr == "USA") {
+            return <>
+                <FormSelectOption key="Production NLCD " value="rat_transfer/landcover/us/nlcd_production" label="Production NLCD" />
+                <FormSelectOption key="WFA Test NLCD " value="rat_transfer/landcover/us/nlcd_wfa" label="WFA Test NLCD" />
+            </>
+        } else if (this.props.config.regionStr == "CANADA") {
+            return <>
+                <FormSelectOption key="2022 Land Cover " value="rat_transfer/landcover/ca/2022landcoverofcanada" label="2022 Land Cover of Canada" />
+            </>
+        }
+    }
+
+    private getDefaultLandCoverDatabase = () => {
+        switch (this.props.config.regionStr) {
+            case "CANADA":
+                return 'rat_transfer/landcover/ca/2022landcoverofcanada';
+            case "USA":
+            default:
+                return 'rat_transfer/landcover/us/nlcd_production';
+        }
+    }
+
     render = () =>
         <>
             <GalleryItem>
@@ -464,7 +487,7 @@ export class AFCFormUSACanada extends React.Component<
                     onChange={this.setPropogationModel}
                     region={this.props.config.regionStr ?? "USA"} />
             </GalleryItem>
-            {(this.props.config.propagationModel.kind === "ITM with no building data" || this.props.config.propagationModel.kind == "FCC 6GHz Report & Order") &&
+            {(this.props.config.propagationModel.kind === "ITM with no building data" || this.props.config.propagationModel.kind == "FCC 6GHz Report & Order" || this.props.config.propagationModel.kind == "ISED DBS-06") &&
                 <GalleryItem>
                     <FormGroup
                         label="AP Propagation Environment"
@@ -504,14 +527,13 @@ export class AFCFormUSACanada extends React.Component<
                         {this.props.config.propagationEnv == 'NLCD Point' ?
                             <FormGroup label="Land Cover Database" fieldId="nlcd-database">
                                 <FormSelect
-                                    value={this.props.config.nlcdFile ?? "nlcd_production"}
+                                    value={this.props.config.nlcdFile ?? this.getDefaultLandCoverDatabase()}
                                     onChange={(x) => this.setNlcdFile(x)}
                                     id="nlcd-database"
                                     name="nlcd-database"
                                     style={{ textAlign: "right" }}
                                 >
-                                    <FormSelectOption key="Production NLCD " value="nlcd_production" label="Production Land Cover" />
-                                    <FormSelectOption key="WFA Test NLCD " value="nlcd_wfa" label="WFA Test Land Cover" />
+                                    {this.getLandCoverOptions()}
                                 </FormSelect>
                             </FormGroup>
                             : <></>}
@@ -583,7 +605,7 @@ export class AFCFormUSACanada extends React.Component<
                     : <></>}
             </GalleryItem>
             <GalleryItem>
-                <AllowedRangesDisplay data={this.props.frequencyBands} region={this.props.config.regionStr ?? "USA"} />
+                <AllowedRangesDisplay data={this.props.config.freqBands} region={this.props.config.regionStr ?? "USA"} />
             </GalleryItem>
             <GalleryItem>
                 <FormGroup label="AP Height below Min Allowable AGL Height Behavior"

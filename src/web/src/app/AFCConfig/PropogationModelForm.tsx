@@ -78,7 +78,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 this.props.onChange({
                     kind: s, winner2LOSOption: "BLDG_DATA_REQ_TX", win2ConfidenceCombined: 50,
                     itmConfidence: 50, win2ConfidenceLOS: 50, win2ConfidenceNLOS: 50, itmReliability: 50, p2108Confidence: 10,
-                    buildingSource: "LiDAR", terrainSource: "3DEP (30m)", win2UseGroundDistance: false,
+                    buildingSource: "LiDAR", terrainSource: "3DEP (30m)", win2UseGroundDistance: false, rlanITMTxClutterMethod: "FORCE_TRUE",
                     fsplUseGroundDistance: false,
                     winner2HgtFlag: false,
                     winner2HgtLOS: 15,
@@ -825,9 +825,9 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             name="propogation-model-itm-tx-clutter" style={{ textAlign: "right" }}
                         >
                             <FormSelectOption key="FORCE_TRUE" value="FORCE_TRUE" label="Always add clutter" />
-                            <FormSelectOption key="FORCE_FALSE" value="FORCE_FALSE" label="Never add clutter" />
-                            <FormSelectOption key="BLDG_DATA" value="BLDG_DATA" label="Clutter/No clutter per building data" />
-                        </FormSelect>
+                            {/* <FormSelectOption key="FORCE_FALSE" value="FORCE_FALSE" label="Never add clutter" />
+                            <FormSelectOption key="BLDG_DATA" value="BLDG_DATA" label="Clutter/No clutter per building data" /> */}
+                        </FormSelect> 
                     </FormGroup>
                     <FormGroup label="ITM Confidence" fieldId="propogation-model-itm-confidence">
                         <InputGroup>

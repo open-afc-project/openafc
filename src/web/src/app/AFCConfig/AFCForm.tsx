@@ -7,8 +7,6 @@ import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
 import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
 import DownloadContents from "../Components/DownloadContents";
-import { AFCFormUSA } from "./AFCFormUSA";
-import { AFCFormCanada } from "./AFCFormCanada";
 import { AFCFormUSACanada } from "./AFCFormUSACanada";
 
 /**
@@ -61,7 +59,7 @@ export class AFCForm extends React.Component<
 
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => {
-        this.setState({ config: Object.assign(this.state.config, { regionStr: n, ulsDatabase: "" }) });
+        this.setState({ config: Object.assign(this.state.config, { regionStr: n}) });
         // region changed by user, reload the coresponding configuration for that region
         getAfcConfigFile(n).then(
             res => {
@@ -201,11 +199,14 @@ export class AFCForm extends React.Component<
 
     private reset = () => {
         let config = getDefaultAfcConf(this.state.config.regionStr);
-        if (this.props.frequencyBands.length > 0) {
-            config.freqBands = this.props.frequencyBands;
-        } else {
-            config.freqBands = defaultRanges;
-        }
+        // TODO: work out how to handle allowed frequency band per country or access point
+        // if (this.props.frequencyBands.length > 0) {
+        //     config.freqBands = this.props.frequencyBands;
+        // } else {
+        //     config.freqBands = defaultRanges[config.regionStr ?? "USA"];
+        // }
+        config.freqBands = defaultRanges[config.regionStr ?? "USA"];
+
         this.updateEntireConfigState(config);
     }
 

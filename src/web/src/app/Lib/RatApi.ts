@@ -137,7 +137,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "passiveRepeaterFlag": true,
     "printSkippedLinksFlag": false,
     "reportErrorRlanHeightLowFlag": false,
-    "nearFieldAdjFlag": false,
+    "nearFieldAdjFlag": true,
 });
 
 const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
@@ -165,7 +165,7 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
     },
     "receiverFeederLoss": {
         "IDU": 3,
-        "ODU": 3,
+        "ODU": 0,
         "UNKNOWN": 3
     },
     "fsReceiverNoise": {
@@ -181,7 +181,8 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
     "propagationModel": {
         "kind": "ISED DBS-06",
         "win2ConfidenceCombined": 16,
-        "win2ConfidenceLOS": 16,
+        "win2ConfidenceLOS": 50,
+        "win2ConfidenceNLOS": 50,
         "winner2LOSOption": "BLDG_DATA_REQ_TX",
         "win2UseGroundDistance": false,
         "fsplUseGroundDistance": false,
@@ -191,7 +192,8 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
         "itmReliability": 20,
         "p2108Confidence": 10,
         "buildingSource": "None",
-        "terrainSource": "3DEP (30m)"
+        "terrainSource": "3DEP (30m)",
+        "rlanITMTxClutterMethod": "FORCE_TRUE",
     },
     "propagationEnv": "NLCD Point",
     "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
