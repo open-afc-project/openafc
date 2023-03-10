@@ -189,30 +189,30 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                 matchmap[ri] = -1
                 r = csmap[keyv][ri]
                 numPR = int(r['Num Passive Repeater'])
-                if keyv[0] == 'US':
-                    for prIdx in range(numPR):
-                        prNum = prIdx+1
-                        rxGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Rx (dBi)'
-                        txGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Tx (dBi)'
-                        rxGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Rx (dBi)'
-                        txGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Tx (dBi)'
-                        prAntModelDiameterStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Diameter (m)'
-                        rxAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Rx Ant Diameter (m)'
-                        txAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Tx Ant Diameter (m)'
+                for prIdx in range(numPR):
+                    prNum = prIdx+1
+                    rxGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Rx (dBi)'
+                    txGainULSStr = 'Passive Repeater ' + str(prNum) + ' ULS Back-to-Back Gain Tx (dBi)'
+                    rxGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Rx (dBi)'
+                    txGainULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Back-to-Back Gain Tx (dBi)'
+                    prAntModelDiameterStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Diameter (m)'
+                    rxAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Rx Ant Diameter (m)'
+                    txAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' Tx Ant Diameter (m)'
 
-                        prHeightULSStr    = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Height (m)'
-                        prWidthULSStr     = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Width (m)'
-                        prHeightULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Height (m)'
-                        prWidthULSFixStr  = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Width (m)'
+                    prHeightULSStr    = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Height (m)'
+                    prWidthULSStr     = 'Passive Repeater ' + str(prNum) + ' ULS Reflector Width (m)'
+                    prHeightULSFixStr = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Height (m)'
+                    prWidthULSFixStr  = 'Passive Repeater ' + str(prNum) + ' ULS Fixed Reflector Width (m)'
 
-                        prHeightAntennaStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Reflector Height (m)'
-                        prWidthAntennaStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Reflector Width (m)'
+                    prHeightAntennaStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Reflector Height (m)'
+                    prWidthAntennaStr = 'Passive Repeater ' + str(prNum) + ' Ant Model Reflector Width (m)'
 
-                        prHeightStr = 'Passive Repeater ' + str(prNum) + ' Reflector Height (m)'
-                        prWidthStr = 'Passive Repeater ' + str(prNum) + ' Reflector Width (m)'
+                    prHeightStr = 'Passive Repeater ' + str(prNum) + ' Reflector Height (m)'
+                    prWidthStr = 'Passive Repeater ' + str(prNum) + ' Reflector Width (m)'
 
-                        prTypeStr = 'Passive Repeater ' + str(prNum) + ' Ant Type'
+                    prTypeStr = 'Passive Repeater ' + str(prNum) + ' Ant Type'
 
+                    if keyv[0] == 'US':
                         r[rxGainULSFixStr] = r[rxGainULSStr]
                         r[txGainULSFixStr] = r[txGainULSStr]
                         r[rxAntDiameterStr] = r[prAntModelDiameterStr]
@@ -302,6 +302,12 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
 
                             r[prHeightStr] = str(prHeight)
                             r[prWidthStr] = str(prWidth)
+                    elif keyv[0] == 'CA':
+                        if (r[prTypeStr] == 'Ref'):
+                            # R2-AIP-29-CAN-a
+                            if (r[prHeightStr].strip() == '') or (r[prWidthStr].strip() == ''):
+                                r[prHeightStr] = str(7.32)
+                                r[prWidthStr] = str(9.14)
 
                 if backwardCompatiblePR:
                     if numPR == 0:
@@ -761,13 +767,17 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                             fwdGainStr    = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain ' + prDirStr + ' (dBi)'
                             fwdHeightStr = 'Passive Repeater ' + str(prNum) + ' Height to Center RAAT ' + prDirStr + ' (m)'
 
+                        #R2-AIP-05-CAN
+                        #R2-AIP-39-CAN
                         if (antType == "Ant"):
                             if r[fwdGainStrULS].strip() == '' or float(r[fwdGainStrULS]) < 0.0:
-                                if (freq <= 5425.0):
+                                if (freq <= 6425.0):
                                     r[fwdGainStr] = '41.7'
                                 else:
                                     r[fwdGainStr] = '42.1'
 
+                        #R2-AIP-14-CAN
+                        #R2-AIP-XX-CAN
                         if r[fwdHeightStr].strip() == '':
                             r[fwdHeightStr] = '56'
                         elif float(r[fwdHeightStr]) < 1.5:

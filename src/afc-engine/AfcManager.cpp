@@ -4774,6 +4774,8 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 				double rxAntennaFeederLossDB = row.rxLineLoss;
 				if (std::isnan(rxAntennaFeederLossDB)) {
+					// R2-AIP-10: set feeder loss according to txArchitecture
+					// R2-AIP-10-CAN: for canada sim, set _rxFeederLossDBIDU = _rxFeederLossDBODU = _rxFeederLossDBUnknown = 0.0
 					if (row.txArchitecture == "IDU") {
 						rxAntennaFeederLossDB = _rxFeederLossDBIDU;
 					} else if (row.txArchitecture == "ODU") {

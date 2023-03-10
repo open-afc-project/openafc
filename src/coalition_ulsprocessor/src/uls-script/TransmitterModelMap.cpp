@@ -203,7 +203,6 @@ void TransmitterModelMapClass::readModelList(const std::string filename)
 					    architecture = TransmitterModelClass::ODUArchitecture;
 				    } else if ( (strval == "Unknown") || (strval == "UNKNOWN") ) {
 					    architecture = TransmitterModelClass::UnknownArchitecture;
-                        ignoreFlag = true;
 				    } else {
 					    errStr << "ERROR: Transmitter Model List file \"" << filename << "\" line " << linenum << " invalid architecture: " << strval << std::endl;
 
@@ -281,13 +280,18 @@ TransmitterModelClass *TransmitterModelMapClass::find(std::string modelName)
     /**********************************************************************************/
     /* Match if an transmitterModelList contains a model that is:                     */
     /*    * prefix of modelName                                                       */
+    /* If multiple prefices are found, select the longest one                         */
     /**********************************************************************************/
-    for(i=0; (i<transmitterModelList.size())&&(!found); ++i) {
+    for(i=0; i<transmitterModelList.size(); ++i) {
         TransmitterModelClass *m = transmitterModelList[i];
 
         if (modelName.compare(0, m->name.size(), m->name) == 0) {
-            found = true;
-            transmitterModel = m;
+            if (!found) {
+                found = true;
+                transmitterModel = m;
+            } else if (m->name.size() > transmitterModel->name.size()) {
+                transmitterModel = m;
+            }
         }
     }
     /**********************************************************************************/

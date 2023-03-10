@@ -144,6 +144,8 @@ public:
 
 	static double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency, std::string antennaModel, CConst::AntennaCategoryEnum category,
 		std::string &subModelStr, int divIdx, double maxGain, double Dlambda);
+	static double calcR2AIP07CANAntenna(double angleOffBoresightDeg, double frequency, std::string antennaModel, CConst::AntennaCategoryEnum category,
+		std::string &subModelStr, int divIdx, double maxGain, double Dlambda);
 
 	std::string getRxAntennaModel() { return rxAntennaModel; }
 	CConst::ULSAntennaTypeEnum getRxAntennaType();
