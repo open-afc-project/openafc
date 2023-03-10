@@ -1158,6 +1158,7 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
         current.antennaModel = antennaModel;
     }
 
+    // R1-AIP-19-CAN
     if (current.bandwidthMHz == std::numeric_limits<double>::quiet_NaN()) {
         current.bandwidthMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(QString::fromStdString(current.emissionsDesignator));
     }
