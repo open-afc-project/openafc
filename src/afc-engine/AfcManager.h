@@ -537,6 +537,7 @@ class AfcManager
 		//bool _configChange = false;
 
 #if DEBUG_AFC
+		void runTestITM(std::string inputFile);
 		void runTestWinner2(std::string inputFile, std::string outputFile);
 		void runAnalyzeNLCD();
 #endif

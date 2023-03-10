@@ -520,7 +520,7 @@ void AfcManager::initializeDatabases()
 
 	/**************************************************************************************/
 
-	if (_analysisType == "AP-AFC" ||  _analysisType == "ScanAnalysis") {
+	if (_analysisType == "AP-AFC" ||  _analysisType == "ScanAnalysis" || _analysisType == "test_itm" ) {
 		bool fixedHeightAMSL;
 		if (_rlanType ==  RLANType::RLAN_INDOOR) {
 			fixedHeightAMSL = _indoorFixedHeightAMSL;
@@ -767,6 +767,8 @@ void AfcManager::initializeDatabases()
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		fixFSTerrain();
 #if DEBUG_AFC
+	} else if (_analysisType == "test_itm") {
+		// Do nothing
 	} else if (_analysisType == "test_winner2") {
 		// Do nothing
 #endif
@@ -915,7 +917,7 @@ void AfcManager::importGUIjsonVersion1_3(const QJsonObject &jsonObj)
 {
 	QString errMsg;
 
-	if ( (_analysisType == "AP-AFC") || (_analysisType == "ScanAnalysis") ) {
+	if ( (_analysisType == "AP-AFC") || (_analysisType == "ScanAnalysis") || (_analysisType == "test_itm") ) {
 		QStringList requiredParams;
 		QStringList optionalParams;
 
@@ -3003,6 +3005,8 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string&
 	{
 		outputDocument = QJsonDocument();
 #if DEBUG_AFC
+	} else if (_analysisType == "test_itm") {
+		// Do nothing
 	} else if (_analysisType == "test_winner2") {
 		// Do nothing
 #endif
@@ -6651,6 +6655,9 @@ void AfcManager::compute()
 	} else if (_analysisType == "HeatmapAnalysis") {
 		runHeatmapAnalysis();
 #if DEBUG_AFC
+	} else if (_analysisType == "test_itm") {
+		runTestITM("path_trace_rkf.csv");
+		runTestITM("path_trace_qcom.csv");
 	} else if (_analysisType == "test_winner2") {
 		runTestWinner2("w2_alignment.csv", "w2_alignment_afc.csv");
 	} else if (_analysisType == "test_aciFn") {
@@ -6684,7 +6691,7 @@ void AfcManager::runPointAnalysis()
 #if DEBUG_AFC
 	// std::vector<int> fsidTraceList{2128, 3198, 82443};
 	// std::vector<int> fsidTraceList{64324};
-	std::vector<int> fsidTraceList{93911};
+	std::vector<int> fsidTraceList{96635};
 	std::string pathTraceFile = "path_trace.csv.gz";
 #endif
 
@@ -7217,7 +7224,7 @@ void AfcManager::runPointAnalysis()
 	/**************************************************************************************/
 	auto path_writer = GzipCsvWriter(pathTraceFile);
 	auto &ftrace = path_writer.csv_writer;
-	ftrace->writeRow({"PT_ID,PT_LON (deg),PT_LAT (deg),HORIZ_DIST (Km),PT_HEIGHT_AMSL (m),BLDG_FLAG"});
+	ftrace->writeRow({"PT_ID","PT_LON (deg)","PT_LAT (deg)","GROUND_DIST (Km)","TERRAIN_HEIGHT_AMSL (m)","LOS_PATH_HEIGHT_AMSL (m)","FSID","DIV_IDX","SEG_IDX","SCAN_PT_IDX","RLAN_HEIGHT_IDX"});
 	/**************************************************************************************/
 #endif
 
@@ -7373,6 +7380,15 @@ void AfcManager::runPointAnalysis()
 #endif
 		if (true) {
 
+#			if DEBUG_AFC
+			bool traceFlag = false;
+			if (traceIdx<(int) fsidTraceList.size()) {
+				if (uls->getID() == fsidTraceList[traceIdx]) {
+					traceFlag = true;
+				}
+			}
+#			endif
+
 			int numPR = uls->getNumPR();
 			int numDiversity = (uls->getHasDiversity() ? 2 : 1);
 
@@ -7390,13 +7406,6 @@ void AfcManager::runPointAnalysis()
 				if (distKmSquared < maxRadiusKmSquared) {
 #					if DEBUG_AFC
 					time_t t1 = time(NULL);
-
-					bool traceFlag = false;
-					if (traceIdx<(int) fsidTraceList.size()) {
-						if (uls->getID() == fsidTraceList[traceIdx]) {
-							traceFlag = true;
-						}
-					}
 #					endif
 
 					ulsFlagList[ulsIdx] = true;
@@ -7511,13 +7520,16 @@ void AfcManager::runPointAnalysis()
 							}
 
 							// Use Haversine formula with average earth radius of 6371 km
-							double lon1Rad = scanPt.second*M_PI/180.0;
-							double lat1Rad = scanPt.first*M_PI/180.0;
-							double lon2Rad = ulsRxLongitude*M_PI/180.0;
-							double lat2Rad = ulsRxLatitude*M_PI/180.0;
-							double slat = sin((lat2Rad-lat1Rad)/2);
-							double slon = sin((lon2Rad-lon1Rad)/2);
-							double groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+							double groundDistanceKm;
+							{
+								double lon1Rad = scanPt.second*M_PI/180.0;
+								double lat1Rad = scanPt.first*M_PI/180.0;
+								double lon2Rad = ulsRxLongitude*M_PI/180.0;
+								double lat2Rad = ulsRxLatitude*M_PI/180.0;
+								double slat = sin((lat2Rad-lat1Rad)/2);
+								double slon = sin((lon2Rad-lon1Rad)/2);
+								groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+							}
 
 							int htIdx;
 							int numRlanPosn = 0;
@@ -7549,16 +7561,6 @@ void AfcManager::runPointAnalysis()
 							}
 
 							int rlanPosnIdx;
-
-#if DEBUG_AFC
-							if (traceFlag) {
-								ftrace->writeRow({ QString::asprintf("BEGIN_%d,,,,,-1\n", uls->getID()) });
-								for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx) {
-									ftrace->writeRow({ QString::asprintf("RLAN_%d,%.10f,%.10f,,%.5f,AMSL\n", rlanPosnIdx,rlanCoordList[rlanPosnIdx].longitudeDeg,rlanCoordList[rlanPosnIdx].latitudeDeg,rlanCoordList[rlanPosnIdx].heightKm*1000.0) } );
-								}
-								ftrace->writeRow({ QString::asprintf("FS_RX,%.10f,%.10f,,%.5f,AMSL\n", ulsRxLongitude, ulsRxLatitude, ulsRxHeightAMSL) } );
-							}
-#endif
 
 							for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx)
 							{
@@ -7876,8 +7878,44 @@ void AfcManager::runPointAnalysis()
 										}
 									}
 								}
-							}
 
+#if DEBUG_AFC
+								if (traceFlag&&(!contains2D)) {
+									if (uls->ITMHeightProfile) {
+										double lon1Rad = rlanCoord.longitudeDeg*M_PI/180.0;
+										double lat1Rad = rlanCoord.latitudeDeg*M_PI/180.0;
+										int N = ((int) uls->ITMHeightProfile[0]) + 1;
+										for(int ptIdx=0; ptIdx<N; ptIdx++) {
+											Vector3 losPathPosn = (((double) (N-1-ptIdx))/(N-1))*rlanPosn + (((double) ptIdx)/(N-1))*ulsRxPos;
+						                	GeodeticCoord losPathPosnGeodetic = EcefModel::ecefToGeodetic(losPathPosn);
+
+                                        	double ptLon = losPathPosnGeodetic.longitudeDeg;
+                                        	double ptLat = losPathPosnGeodetic.latitudeDeg;
+                                        	double losPathHeight = losPathPosnGeodetic.heightKm*1000.0;
+
+											double lon2Rad = ptLon*M_PI/180.0;
+											double lat2Rad = ptLat*M_PI/180.0;
+											double slat = sin((lat2Rad-lat1Rad)/2);
+											double slon = sin((lon2Rad-lon1Rad)/2);
+											double ptDistKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
+											ftrace->writeRow({ QString::asprintf("PT_%d", ptIdx),
+													QString::number(ptLon, 'f', 10),
+													QString::number(ptLat, 'f', 10),
+													QString::number(ptDistKm, 'f', 5),
+													QString::number(uls->ITMHeightProfile[2+ptIdx], 'f', 20),
+													QString::number(losPathHeight, 'f', 5),
+													QString::number(uls->getID()),
+													QString::number(divIdx),
+													QString::number(segIdx),
+													QString::number(scanPtIdx),
+													QString::number(rlanPosnIdx)
+													});
+										}
+									}
+								}
+#endif
+							}
 
 							if (uls->ITMHeightProfile) {
 								free(uls->ITMHeightProfile);
@@ -7922,7 +7960,8 @@ void AfcManager::runPointAnalysis()
 					tstr = strdup(ctime(&t2));
 					strtok(tstr, "\n");
 
-					std::cout << numProc << " [" << ulsIdx+1 << " / " <<  _ulsList->getSize() << "] " << tstr << " Elapsed Time = " << (t2-t1) << std::endl << std::flush;
+					LOGGER_DEBUG(logger) << numProc << " [" << ulsIdx+1 << " / " <<  _ulsList->getSize() << "] FSID = " << uls->getID()
+						<< " DIV_IDX = " << divIdx << " SEG_IDX = " << segIdx << " " << tstr << " Elapsed Time = " << (t2-t1);
 
 					free(tstr);
 
@@ -7930,45 +7969,6 @@ void AfcManager::runPointAnalysis()
 						cont = false;
 					}
 
-					if (traceFlag&&(!contains2D)) {
-						traceIdx++;
-						if (uls->ITMHeightProfile) {
-							double rlanLon = rlanCoordList[0].longitudeDeg;
-							double rlanLat = rlanCoordList[0].latitudeDeg;
-							double fsLon = uls->getRxLongitudeDeg();
-							double fsLat = uls->getRxLatitudeDeg();
-							int N = ((int) uls->ITMHeightProfile[0]) + 1;
-							Vector3 rlanCenterPosn = rlanPosnList[0];
-							lineOfSightVectorKm = ulsRxPos - rlanCenterPosn;
-							Vector3 upVec = rlanCenterPosn.normalized();
-							Vector3 horizVec = (lineOfSightVectorKm - (lineOfSightVectorKm.dot(upVec) * upVec));
-							double horizDistKm = sqrt((horizVec).dot(horizVec));
-							for(int ptIdx=0; ptIdx<N; ptIdx++) {
-								double ptLon = ( rlanLon * (N-1-ptIdx) + fsLon*ptIdx ) / (N-1);
-								double ptLat = ( rlanLat * (N-1-ptIdx) + fsLat*ptIdx ) / (N-1);
-								double ptDistKm = horizDistKm*ptIdx / (N-1);
-
-								ftrace->writeRow({ QString::asprintf("PT_%d", ptIdx),
-										QString::number(ptLon, 'f', 10),
-										QString::number(ptLat, 'f', 10),
-										QString::number(ptDistKm, 'f', 5),
-										QString::number(uls->ITMHeightProfile[2+ptIdx], 'f', 5),
-										});
-
-							}
-						}
-						std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
-						ftrace->writeRow({
-								QString::asprintf("END_%s_%d", dbName.c_str(), uls->getID()),
-								QString(),
-								QString(),
-								QString(),
-								QString(),
-								QString(),
-								QString::number(-1)
-								});
-
-					}
 #					endif
 
 				}
@@ -7976,11 +7976,19 @@ void AfcManager::runPointAnalysis()
 				{
 #					if DEBUG_AFC
 						// uls is not included in calculations
-						LOGGER_DEBUG(logger) << "ID: " << uls->getID() << ", distKm: " << sqrt(distKmSquared) << ", link: " << uls->getLinkDistance() << ",";
+						LOGGER_DEBUG(logger) << "FSID: " << uls->getID()
+							<< " DIV_IDX = " << divIdx << " SEG_IDX = " << segIdx
+							<< ", distKm: " << sqrt(distKmSquared) << ", Outside MAX_RADIUS";
 #					endif
 				}
 			}
 			}
+
+#			if DEBUG_AFC
+			if (traceFlag) {
+				traceIdx++;
+			}
+#			endif
 		}
 
 		numProc++;
@@ -10623,6 +10631,260 @@ bool AfcManager::containsChannel(const std::vector<FreqBandClass>& freqBandList,
 	return(containsFlag);
 }
 /**************************************************************************************/
+
+#if DEBUG_AFC
+/******************************************************************************************/
+/* AfcManager::runTestITM(std::string inputFile)                                          */
+/******************************************************************************************/
+void AfcManager::runTestITM(std::string inputFile)
+{
+	LOGGER_INFO(logger) << "Executing AfcManager::runTestITM()";
+
+#if 1
+    extern void point_to_point(double elev[], double tht_m, double rht_m,
+        double eps_dielect, double sgm_conductivity, double eno_ns_surfref,
+        double frq_mhz, int radio_climate, int pol, double conf, double rel,
+        double &dbloss, std::string &strmode, int &errnum);
+#endif
+
+
+	int linenum, fIdx, validFlag;
+	std::string line, strval;
+	char *chptr;
+	std::string str;
+	std::string reasonIgnored;
+	std::ostringstream errStr;
+
+    double rlanLon = -91.43291667;
+    double rlanLat = 41.4848611111;
+
+    double fsLon = -91.74102778;
+    double fsLat = 41.96444444;
+    double fsHeightAGL = 108.5;
+
+    double frequencyMHz = 6175.0;
+
+	double groundDistanceKm;
+	{
+		double lon1Rad = rlanLon*M_PI/180.0;
+		double lat1Rad = rlanLat*M_PI/180.0;
+		double lon2Rad = fsLon*M_PI/180.0;
+		double lat2Rad = fsLat*M_PI/180.0;
+
+		double slat = sin((lat2Rad-lat1Rad)/2);
+		double slon = sin((lon2Rad-lon1Rad)/2);
+		groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+	}
+
+	int terrainHeightFieldIdx = -1;
+
+	std::vector<int *> fieldIdxList;                       std::vector<std::string> fieldLabelList;
+	fieldIdxList.push_back(&terrainHeightFieldIdx);        fieldLabelList.push_back("Terrain Height (m)");
+	fieldIdxList.push_back(&terrainHeightFieldIdx);        fieldLabelList.push_back("TERRAIN_HEIGHT_AMSL (m)");
+
+	double terrainHeight;
+
+    std::vector<double> heightList;
+
+	int fieldIdx;
+
+	if (inputFile.empty()) {
+		throw std::runtime_error("ERROR: No ITM Test File specified");
+	}
+
+	LOGGER_INFO(logger) << "Reading Winner2 Test File: " << inputFile;
+
+	FILE *fin;
+	if ( !(fin = fopen(inputFile.c_str(), "rb")) ) {
+		str = std::string("ERROR: Unable to open ITM Test File \"") + inputFile + std::string("\"\n");
+		throw std::runtime_error(str);
+	}
+
+	enum LineTypeEnum {
+		labelLineType,
+		dataLineType,
+		ignoreLineType,
+		unknownLineType
+	};
+
+	LineTypeEnum lineType;
+
+	linenum = 0;
+	bool foundLabelLine = false;
+	while (fgetline(fin, line, false)) {
+		linenum++;
+		std::vector<std::string> fieldList = splitCSV(line);
+
+		lineType = unknownLineType;
+		/**************************************************************************/
+		/**** Determine line type                                              ****/
+		/**************************************************************************/
+		if (fieldList.size() == 0) {
+			lineType = ignoreLineType;
+		} else {
+			fIdx = fieldList[0].find_first_not_of(' ');
+			if (fIdx == (int) std::string::npos) {
+				if (fieldList.size() == 1) {
+					lineType = ignoreLineType;
+				}
+			} else {
+				if (fieldList[0].at(fIdx) == '#') {
+					lineType = ignoreLineType;
+				}
+			}
+		}
+
+		if ((lineType == unknownLineType)&&(!foundLabelLine)) {
+			lineType = labelLineType;
+			foundLabelLine = 1;
+		}
+		if ((lineType == unknownLineType)&&(foundLabelLine)) {
+			lineType = dataLineType;
+		}
+		/**************************************************************************/
+
+		/**************************************************************************/
+		/**** Process Line                                                     ****/
+		/**************************************************************************/
+		bool found;
+		std::string field;
+		switch(lineType) {
+			case   labelLineType:
+				for(fieldIdx=0; fieldIdx<(int) fieldList.size(); fieldIdx++) {
+					field = fieldList.at(fieldIdx);
+
+					// std::cout << "FIELD: \"" << field << "\"" << std::endl;
+
+					found = false;
+					for(fIdx=0; (fIdx < (int) fieldLabelList.size())&&(!found); fIdx++) {
+						if (field == fieldLabelList.at(fIdx)) {
+							*fieldIdxList.at(fIdx) = fieldIdx;
+							found = true;
+						}
+					}
+				}
+
+				for(fIdx=0; fIdx < (int) fieldIdxList.size(); fIdx++) {
+					if (*fieldIdxList.at(fIdx) == -1) {
+						errStr << "ERROR: Invalid Winner2 Test Input file \"" << inputFile << "\" label line missing \"" << fieldLabelList.at(fIdx) << "\"" << std::endl;
+						throw std::runtime_error(errStr.str());
+					}
+				}
+
+				break;
+			case    dataLineType:
+				/**************************************************************************/
+				/* terrainHeight                                                          */
+				/**************************************************************************/
+				strval = fieldList.at(terrainHeightFieldIdx);
+				if (strval.empty()) {
+					errStr << "ERROR: Invalid ITM Test Input file \"" << inputFile << "\" line " << linenum << " missing Terrain Height (m)" << std::endl;
+					throw std::runtime_error(errStr.str());
+				}
+				terrainHeight = std::strtod(strval.c_str(), &chptr);
+				/**************************************************************************/
+
+                heightList.push_back(terrainHeight);
+
+				break;
+			case  ignoreLineType:
+			case unknownLineType:
+				// do nothing
+				break;
+			default:
+				CORE_DUMP;
+				break;
+		}
+	}
+
+    int numpts = heightList.size();
+    double *heightProfile = (double *)calloc(sizeof(double), numpts + 2);
+
+    heightProfile[0] = numpts - 1;
+    heightProfile[1] = (groundDistanceKm / (numpts-1)) * 1000.0;
+
+    double eps_dielect = _itmEpsDielect;
+    double sgm_conductivity = _itmSgmConductivity;
+    double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((rlanLat+fsLat)/2, (rlanLon+fsLon)/2);
+
+    int radioClimate    = _ituData->getRadioClimateValue(rlanLat, rlanLon);
+    int radioClimateTmp = _ituData->getRadioClimateValue(fsLat, fsLon);
+    if (radioClimateTmp < radioClimate) {
+        radioClimate = radioClimateTmp;
+    }
+
+    int pol = _itmPolarization;
+    double conf = _confidenceITM;
+    double rel = _reliabilityITM;
+
+    int errnum;
+    double pathLoss;
+    std::string strmode;
+    // char strmode[50];
+
+    std::cout << "PATH_PROFILE: " << inputFile << std::endl;
+    std::cout << "GROUND DISTANCE (Km): " << groundDistanceKm << std::endl;
+    std::cout << "NUMPTS: " << numpts << std::endl;
+    std::cout << "DELTA (m): " << heightProfile[1] << std::endl;
+
+    std::cout << "RLAN LON (deg): " << rlanLon << std::endl;
+    std::cout << "RLAN LAT (deg): " << rlanLat << std::endl;
+    std::cout << "FS   LON (deg): " << fsLon << std::endl;
+    std::cout << "FS   LAT (deg): " << fsLat << std::endl;
+    std::cout << "FS   HEIGHT AGL (m) : " << fsHeightAGL << std::endl;
+
+    std::cout << "eps_dielect: " << eps_dielect << std::endl;
+    std::cout << "sgm_conductivity: " << sgm_conductivity << std::endl;
+    std::cout << "surfaceRefractivity: " << surfaceRefractivity << std::endl;
+    std::cout << "frequencyMHz: " << frequencyMHz << std::endl;
+    std::cout << "radioClimate: " << radioClimate << std::endl;
+    std::cout << "pol: " << pol << std::endl;
+    std::cout << "conf: " << conf << std::endl;
+    std::cout << "rel: " << rel << std::endl;
+
+    std::cout << std::endl;
+
+    int numRlanHeight = 2;
+    double rlanHeightAGLStart = 10.0;
+    double rlanHeightAGLStop = 11.0;
+    double ver0, ver1;
+
+    for (bool reverseFlag : {false}) {
+        for(int rlanHeightIdx=0; rlanHeightIdx<numRlanHeight; ++rlanHeightIdx) {
+            double rlanHeightAGL = (rlanHeightAGLStart*(numRlanHeight-1-rlanHeightIdx) + rlanHeightAGLStop*rlanHeightIdx) / (numRlanHeight-1);
+            std::cout << "RLAN HEIGHT AGL (m) : " << rlanHeightAGL << std::endl;
+
+            for(int i=0; i<numpts; ++i) {
+                heightProfile[2+i] = heightList[reverseFlag ? numpts-1-i : i];
+            }
+
+            double txHeightAGL;
+            double rxHeightAGL;
+
+            if (reverseFlag) {
+                txHeightAGL = fsHeightAGL;
+                rxHeightAGL = rlanHeightAGL;
+            } else {
+                txHeightAGL = rlanHeightAGL;
+                rxHeightAGL = fsHeightAGL;
+            }
+
+
+            point_to_point(heightProfile, txHeightAGL, rxHeightAGL, eps_dielect, sgm_conductivity, surfaceRefractivity, frequencyMHz, radioClimate, pol, conf, rel, pathLoss, strmode, errnum);
+
+            std::cout << "REVERSE_FLAG: " << reverseFlag << std::endl;
+            std::cout << "MODE: " << strmode << std::endl;
+            std::cout << "ERRNUM: " << errnum << std::endl;
+            std::cout << "PATH_LOSS (DB): " << pathLoss << std::endl;
+            std::cout << "PT," << inputFile << "," << rlanHeightAGL << "," << pathLoss << std::endl;
+        }
+        std::cout << "PT,,," << std::endl;
+    }
+
+	return;
+}
+/******************************************************************************************/
+#endif
 
 #if DEBUG_AFC
 /******************************************************************************************/
