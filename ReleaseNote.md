@@ -1,4 +1,26 @@
-# Release Note
+ # Release Note
+
+## **Version and Date**
+|Version|3.7.4.0|
+| :- | :- |
+|**Date**|**02/12/2023**|
+|compiled server's version is TBD | git tag 3.7.4.0|
+## **Issues Addressed**
+ * JIRA OA-542-support-of-unii-6-in-afc-engine
+ * JIRA OA-577 new golden resp with new FS/ULS database  which can be downloaded from https://drive.google.com/file/d/1OPBYHZ1iXR_M4NKelVHridK8bVpJSxPQ/view?usp=share_link.
+ * JIRA OA-588-remove-outdated-centos-7-worker
+ * JIRA OA-509 whitespace and copyright header update
+ * JIRA OA-589 Fix request with mTLS option
+ * JIRA OA-568 fixing paths for ULS canada based changes and switching updater to Alpine base
+ * JIRA OA-593 About Page for new user registration
+ * JIRA OA-596 Fix aep env var defaults
+ * JIRA OA-597 decrease-num-of-celery-proc to N=2
+ * JIRA OA-594_log_afc_config
+ * JIRA [dependabot] Bump werkzeug from 2.0.3 to 2.2.3 in /rat_server (#441)
+ * JIRA [dependabot] Bump wsgidav from 3.1.1 to 4.1.0 in /msghnd (#351)
+ * JIRA [dependabot] Bump werkzeug from 2.0.3 to 2.2.3 in /msghnd (#436)
+ * JIRA OA-585 new golden resp with FS_2023-03-10T03_32_19.614444_fixedBPS_sorted_param.sqlite3) from here https://drive.google.com/file/d/1Bfb7Hy2lPbtIJMdalUIEfsH0AWXq_Etj/view
+ * JIRA OA-585-fixes-required-in-itm
 
 ## **Version and Date**
 |Version|**OA-585**|
