@@ -4,7 +4,7 @@
 |Version|3.7.4.0|
 | :- | :- |
 |**Date**|**02/12/2023**|
-|compiled server's version is TBD | git tag 3.7.4.0|
+|compiled server's version is b72f6f6 | git tag 3.7.4.0|
 ## **Issues Addressed**
  * JIRA OA-542-support-of-unii-6-in-afc-engine
  * JIRA OA-577 new golden resp with new FS/ULS database  which can be downloaded from https://drive.google.com/file/d/1OPBYHZ1iXR_M4NKelVHridK8bVpJSxPQ/view?usp=share_link.
