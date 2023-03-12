@@ -32,6 +32,7 @@ setuptools.setup(
             'migrations/alembic.ini',
             'migrations/script.py.mako',
             'templates/flask_user_layout.html',
+            'templates/about.html',
         ]
     },
     entry_points={

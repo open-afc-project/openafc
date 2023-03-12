@@ -1,0 +1,56 @@
+
+<head>
+    <title>About</title>
+    <style>
+        hr { border-color: #cccccc; margin: 0; }
+        .no-margins { margin: 0px; }
+        .with-margins { margin: 10px; }
+        .col-centered { float: none; margin: 0 auto; }
+        h1 {color: rgb(18, 134, 223)}
+        body { background-color: rgb(234, 241, 243); }
+    </style>
+</head>
+
+<body>
+    <div id="header-div" class="clearfix with-margins">
+        <div class="pull-left"><h1 class="no-margins">{{ app_name }}</h1>
+        </div>
+    </div>
+
+    <hr class="no-margins"/>
+
+    <div id="main-div" class="with-margins">
+
+    <p>The Federal Communications Commission (FCC) established Automated Frequency Coordination (AFC), a system to coordinate the 6 GHz band use in unlicensed Wi-Fi 7 (aka 802.11be) devices to play nice with existing licensed devices using the same 6 GHz band, such as incumbent fixed service stations. This website is used by Broadcom OEMs to manage Wi-Fi 7 access points containing Broadcom chips.</p>
+
+    <p>Login on this site is done via single sign-on (SSO) at the Broadcom Support website.</p>
+
+    <p>Process for Broadcom OEMs to request access to this Broadcom AFC website:</p>
+
+    <li>If your organization does not have federated access to the Broadcom Support website: Visit the Broadcom Support website and register in case you don't have an account</li>
+    <li>Fill out the form below </li>
+    <li>Upon approval you will get an email with instructions on how to get onboard</li>
+    </p>
+    </div>
+
+{%block request_form %} 
+<form class="row g-3" action="{{url_for('ratapi-v1.About')}}" method="POST">
+    <div class="col-auto">
+        <input type="text" class="form-control" id="name" name='name' placeholder="Full name">
+      </div>
+
+    <div class="col-auto">
+      <input type="text" class="form-control" id="staticEmail2" name='email' placeholder="email@example.com">
+    </div>
+
+    <div class="col-auto">
+        <input type="text" class="form-control" id="org" name='org' placeholder="Organization">
+      </div>
+
+    <div class="col-auto">
+      <button type="submit" class="btn btn-primary mb-3">Request Access</button>
+    </div>
+  </form>
+{%endblock%}
+
+</body>

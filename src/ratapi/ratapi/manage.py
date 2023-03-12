@@ -514,7 +514,7 @@ class UserUpdate(Command):
                         if not rolename in user.roles:
                             user.roles.append(get_or_create(
                                 db.session, Role, name=rolename))
-                    user.active = True,
+                    user.active = True
                     if org:
                         user.org = org;
                     db.session.commit()  # pylint: disable=no-member

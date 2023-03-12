@@ -10,7 +10,7 @@ FROM httpd:2.4.55-alpine as rat_server.preinstall
 ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
 apk add --update --no-cache py3-six py3-numpy py3-cryptography py3-sqlalchemy \
-py3-requests py3-flask py3-psycopg2 && \
+py3-requests py3-flask py3-psycopg2 postfix && \
 python3 -m ensurepip && \
 pip3 install --no-cache --upgrade pip setuptools
 COPY rat_server/requirements.txt /wd/
@@ -67,4 +67,7 @@ ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 COPY rat_server/devel.sh /wd/
 RUN chmod +x /wd/devel.sh
 RUN /wd/devel.sh
+COPY rat_server/entrypoint.sh /
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
 #
