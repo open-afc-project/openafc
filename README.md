@@ -607,7 +607,13 @@ When PostgreSQL is upgraded the pgdata should be converted to be compatible with
 ```
 tools/db_tools/update_db.sh [pgdata_dir] [postgres_password] [old_postgres_version] [new_postgres_version]
 ```
-This script makes a backup of [pgdata_dir] to [pgdata_dir].back' and puts the converted db in [pgdata_dir].
+This script makes a backup of [pgdata_dir] to [pgdata_dir].back and puts the converted db in [pgdata_dir].
+This command should be run under root permissions, i.e. 'sudo tools/db_tools/update_db.sh ...'
+
+Example: convert db which was created by PostgreSQL version 9.6 to be used by PostgreSQL version 14.7:
+```
+sudo tools/db_tools/update_db.sh ./pgdata qwerty 9.6 14.7
+```
 
 ## Initial Super Administrator account
 
