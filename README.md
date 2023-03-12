@@ -173,33 +173,45 @@ docker build . -t afc-build -f dockerfiles/Dockerfile-for-build
 
 Not available currently. Possibly will be added later.
 
-## Building OpenAFC engine server
+## Building OpenAFC engine 
 
-Building and installing the OpenAFC with ninja-build is seamless - if you run the container without special command - it will execute the script from the CMD directive in Dockerfile.
+Building and runnig building and running afc-engine as standalone application.
 
 **NB:** "-v" option maps the folder of the real machine into the insides of the docker container.
 
 &quot;-v /tmp/work/open-afc:/wd/afc&quot; means that contents of &quot;/tmp/work/open-afc&quot; folder will be available inside of container in /wd/afc/
 
-```
-docker run --rm -it -v `pwd`:/wd/afc afc-build
-```
-If you want to build the rpm you will need to run it with Docker:
 
+goto the project dir
 ```
-docker run --rm -it -v `pwd`:/wd/afc afc-build /wd/afc/build-rpm.sh
+cd open-afc
 ```
 
-To run docker with your host's user you can use --user flag like:
+run shell of alpine docker-for-build shell
 ```
-docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc afc-build
-```
-or for rpm build:
-```
-docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc afc-build /wd/afc/build-rpm.sh
+docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image:my_tag ash
 ```
 
-# **OpenAFC Engine usage in Docker Environment**
+inside the container's shell, execute:
+```
+mkdir -p -m 777 /wd/afc/build && BUILDREV=offlinebuild && cd /wd/afc/build && cmake -DCMAKE_INSTALL_PREFIX=/wd/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd/afc && ninja -j$(nproc) install
+```
+Now the afc-engine is built: 
+```
+[@wcc-afc-01 work/dimar/open-afc] > ls -l build/src/afc-engine/afc-engine
+-rwxr-xr-x. 1 dr942120 dr942120 4073528 Mar  8 04:03 build/src/afc-engine/afc-engine
+```
+run it from the default worker container:
+```
+docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc -v /opt/afc/databases/rat_transfer:/mnt/nfs/rat_transfer 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:my_tag sh
+```
+inside the worker container execute the afc-engine app
+```
+./afc/build/src/afc-engine/afc-engine
+```
+
+
+# **OpenAFC Engine Server usage in Docker Environment**
 # AFC Engine build in docker
 
 ## Building Docker Container OpenAFC engine server
@@ -421,7 +433,7 @@ services:
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_SCHEME=HTTP
       # worker params
-      - CELERY_OPTIONS=rat_1 rat_2 rat_3 rat_4 rat_5 rat_6 rat_7 rat_8 rat_9 rat_10
+      - CELERY_OPTIONS=rat_1 rat_2
       # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
