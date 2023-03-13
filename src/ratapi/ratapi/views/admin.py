@@ -84,15 +84,15 @@ class User(MethodView):
         LOGGER.debug("got user: %s", user.email)
         org = user.org if user.org else ""
 
-        if content.has_key('setProps'):
+        if 'setProps' in content:
             auth(roles=['Admin'], is_user=user_id)
             # update all user props
             user_props = content
             user.email = user_props.get('email', user.email)
-            if user_props.has_key('email'):
+            if 'email' in user_props:
                 user.email_confirmed_at = datetime.datetime.now()
             user.active = user_props.get('active', user.active)
-            if user_props.has_key('password'):
+            if 'password' in user_props:
                 if flask.current_app.config['OIDC_LOGIN']:
                     # OIDC, password is never stored locally
                     # Still we hash it so that if we switch back
@@ -105,7 +105,7 @@ class User(MethodView):
                 user.password = pass_hash
             db.session.commit() # pylint: disable=no-member
 
-        elif content.has_key('addRole'):
+        elif 'addRole' in content:
             # just add a single role
             role = content.get('addRole')
             if role == "Super":
@@ -124,7 +124,7 @@ class User(MethodView):
                     user.roles.append(to_add_role)
                 db.session.commit() # pylint: disable=no-member
 
-        elif content.has_key('removeRole'):
+        elif 'removeRole' in content:
             # just remove a single role
             role = content.get('removeRole')
             if role=="Super":
