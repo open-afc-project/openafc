@@ -224,7 +224,7 @@ export class AFCFormUSACanada extends React.Component<
             </>
         } else if (this.props.config.regionStr == "CANADA") {
             return <>
-                <FormSelectOption key="2022 Land Cover " value="rat_transfer/landcover/ca/2022landcoverofcanada" label="2022 Land Cover of Canada" />
+                <FormSelectOption key="2022 Land Cover " value="rat_transfer/landcover/ca/2020landcoverofcanada" label="2020 Land Cover of Canada" />
             </>
         }
     }
@@ -232,7 +232,7 @@ export class AFCFormUSACanada extends React.Component<
     private getDefaultLandCoverDatabase = () => {
         switch (this.props.config.regionStr) {
             case "CANADA":
-                return 'rat_transfer/landcover/ca/2022landcoverofcanada';
+                return 'rat_transfer/landcover/ca/2020/landcoverofcanada';
             case "USA":
             default:
                 return 'rat_transfer/landcover/us/nlcd_production';
