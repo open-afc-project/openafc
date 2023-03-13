@@ -104,6 +104,8 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   // @ts-ignore
   const about: any = <a href={guiConfig.about_url}>About</a>;
 
+  const showAbout = () => guiConfig.about_url;
+
   const Navigation = (<UserContext.Consumer>{user =>
     <Nav id="nav-primary-simple">
       <NavList id="nav-list-simple" variant={NavVariants.simple}>
@@ -183,7 +185,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
             itemId="history-link-item">
             {history}
           </NavItem>}
-        {!isLoggedIn() &&
+        {!isLoggedIn() && showAbout() &&
           <NavItem
             id="about-link"
             itemId="about-link-item">

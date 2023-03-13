@@ -172,7 +172,8 @@ class GuiConfig(MethodView):
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             mtls_admin_url=flask.url_for('admin.MTLS', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
-            about_url=flask.url_for('ratapi-v1.About'),
+            about_url=flask.url_for('ratapi-v1.About') \
+                      if flask.current_app.config['OIDC_LOGIN'] else None,
             version=serververs,
         )
         return resp
@@ -397,9 +398,11 @@ class About(MethodView):
             from .. import priv_config
             dest_email = priv_config.REGISTRATION_DEST_EMAIL
             src_email = priv_config.REGISTRATION_SRC_EMAIL
+            approve_link = priv_config.REGISTRATION_APPROVE_LINK
         except:
             dest_email = os.getenv('REGISTRATION_DEST_EMAIL')
             src_email = os.getenv('REGISTRATION_SRC_EMAIL')
+            approve_link = os.getenv('REGISTRATION_APPROVE_LINK')
 
             if not dest_email or not src_email:
                 raise werkzeug.exceptions.NotFound()
@@ -409,12 +412,13 @@ class About(MethodView):
             email = request.form.get("email")
             org = request.form.get("org")
             mail = Mail(flask.current_app)
-            msg = Message('Afc Registration',
-                          sender = src_email,
-                          recipients = [dest_email])
-            msg.body = f"Name:{name} Email:{email} Org:{org}"
+            msg = Message(f"Afc Access Request by {email}",
+                          sender=src_email,
+                          recipients=[dest_email])
+            msg.body = f'''Name:{name}\nEmail:{email}\nOrg:{org}
+Approve request at: {approve_link}'''
             mail.send(msg)
-            return f"Thank you {name}. A registration request for {email} has been submitted"
+            return f"Thank you {name}. An access request for {email} has been submitted"
         except:
             raise werkzeug.exceptions.NotFound()
 
