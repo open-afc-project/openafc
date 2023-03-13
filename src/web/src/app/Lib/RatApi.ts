@@ -161,7 +161,7 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
     },
     "buildingPenetrationLoss": {
         "kind": "Fixed Value",
-        "value": 20.5
+        "value": 0
     },
     "receiverFeederLoss": {
         "IDU": 3,
@@ -173,7 +173,7 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
         "noiseFloorList": [-110, -109.5]
     },
     "threshold": -6,
-    "maxLinkDistance": 130,
+    "maxLinkDistance": 150,
     "maxEIRP": 36,
     "minEIRP": 21,
 
