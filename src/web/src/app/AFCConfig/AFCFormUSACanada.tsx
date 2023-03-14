@@ -219,12 +219,12 @@ export class AFCFormUSACanada extends React.Component<
     private getLandCoverOptions = () => {
         if (this.props.config.regionStr == "USA") {
             return <>
-                <FormSelectOption key="Production NLCD " value="rat_transfer/landcover/us/nlcd_production" label="Production NLCD" />
-                <FormSelectOption key="WFA Test NLCD " value="rat_transfer/landcover/us/nlcd_wfa" label="WFA Test NLCD" />
+                <FormSelectOption key="Production NLCD " value="rat_transfer/nlcd/nlcd_production" label="Production NLCD" />
+                <FormSelectOption key="WFA Test NLCD " value="rat_transfer/nlcd/nlcd_wfa" label="WFA Test NLCD" />
             </>
         } else if (this.props.config.regionStr == "CANADA") {
             return <>
-                <FormSelectOption key="2022 Land Cover " value="rat_transfer/landcover/ca/2020landcoverofcanada" label="2020 Land Cover of Canada" />
+                <FormSelectOption key="2020 Land Cover " value="rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif" label="Land Cover of Canada" />
             </>
         }
     }
@@ -232,7 +232,7 @@ export class AFCFormUSACanada extends React.Component<
     private getDefaultLandCoverDatabase = () => {
         switch (this.props.config.regionStr) {
             case "CANADA":
-                return 'rat_transfer/landcover/ca/2020/landcoverofcanada';
+                return 'rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif';
             case "USA":
             default:
                 return 'rat_transfer/landcover/us/nlcd_production';
