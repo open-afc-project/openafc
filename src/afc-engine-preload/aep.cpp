@@ -43,7 +43,7 @@
 	}
 #define dbg(format, ...) \
 	if (aep_debug & 2) { \
-		dprintf(logfile, format "\n", ##__VA_ARGS__); \
+		dprintf(logfile, "%d: " format "\n", getpid(), ##__VA_ARGS__); \
 	}
 #define dbge(format, ...) \
 	fprintf(stderr, format " Error!\n", ##__VA_ARGS__); \
@@ -496,7 +496,7 @@ static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typ
 	if (typeflag == FTW_F) {
 		sem_t *sem;
 
-		dbg("%d: Remove %s", getpid(), (char *)fpath + strlen(cache_path));
+		dbg("Remove %s", (char *)fpath + strlen(cache_path));
 		sem = sem_open((char *)fpath + strlen(cache_path), O_CREAT, 0666, 1);
 		aep_assert(sem, "sem_open");
 		sem_wait(sem);
@@ -543,16 +543,20 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 			is_cached = true;
 		}
 		if (!is_cached && data_fd->fe->size <= max_cached_file_size) {
+			dbg("reduce_cache");
 			sem_wait(cache_size_sem);
 			reduce_cache(data_fd->fe->size);
 			sem_post(cache_size_sem);
-			dbg("%d: download %s", getpid(), data_fd->tpath);
+			dbg("reduce_cache done");
+			dbg("download %s", data_fd->tpath);
 			if (!download_file(data_fd, fakepath)) {
 				sem_wait(cache_size_sem);
 				*cache_size += data_fd->fe->size;
 				sem_post(cache_size_sem);
+				dbg("download %s done", data_fd->tpath);
 				is_cached = true;
 			}
+			dbg("download %s failed", data_fd->tpath);
 		}
 	}
 
@@ -1431,7 +1435,6 @@ static int download_file_nfs(data_fd_t *data_fd, char *dest)
 	aepst.read_write++;
 	aepst.read_write_size += data_fd->fe->size;
 	aepst.read_write_time += us;
-	dbg("download_file_nfs(%s) done", data_fd->tpath);
 	return res == (int)data_fd->fe->size ? 0 : -1;
 }
 
