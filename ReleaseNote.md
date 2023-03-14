@@ -15,8 +15,12 @@
  * There was a change in the ULS parser which resulted in a new FS database:
  * This new FS database can be downloaded from: https://drive.google.com/file/d/1ogV5MESr0Ml2EE78C6KR03hAOPxvG_cE/view
 
+ * There are AFC Config GUI changes (for FS Noise Floor, use of Land Cover instead of NLCD when referring to this database generically).
+ * There are 2 other changes in afc-config.json for US: 1) "fsReceiverNoise": {"freqList": [6425], "noiseFloorList": [-110, -109.5]} 2) "nearFieldAdjFlag": true
+
 ## **Testing Done**
  * Ran FSP1, FSP41, SIP10 and IBP3 and got same results as last time. 
+ * Manually validated that OA-603 was implemented correctly in the FS database (US).
 
 ## **Open Issues** 
 * We have yet to validate the following Canada tickets: OA-570, OA-572, OA-545, oA-546 and OA-543
