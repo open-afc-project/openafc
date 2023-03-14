@@ -553,8 +553,8 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     } else {
                         bool unii5Flag = (txFreq.frequencyAssigned >= UlsFunctionsClass::unii5StartFreqMHz)
                                       && (txFreq.frequencyAssigned <= UlsFunctionsClass::unii5StopFreqMHz);
-                        bool unii7Flag = (txFreq.frequencyAssigned >= UlsFunctionsClass::unii5StartFreqMHz)
-                                      && (txFreq.frequencyAssigned <= UlsFunctionsClass::unii5StopFreqMHz);
+                        bool unii7Flag = (txFreq.frequencyAssigned >= UlsFunctionsClass::unii7StartFreqMHz)
+                                      && (txFreq.frequencyAssigned <= UlsFunctionsClass::unii7StopFreqMHz);
                         const std::vector<double> *fccBWList = (std::vector<double> *) NULL;
                         if (unii5Flag) {
                             fccBWList = &bwMHzListUnii5;
@@ -564,7 +564,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                         if (fccBWList) {
                             bool found = false;
                             double fccBW;
-                            for(int i=0; (i<fccBWList->size()) &&(!found); ++i) {
+                            for(int i=0; (i<(int) fccBWList->size()) &&(!found); ++i) {
                                 if (fccBWList->at(i) >= bwMHz) {
                                     found = true;
                                     fccBW = fccBWList->at(i);

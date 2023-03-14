@@ -57,7 +57,6 @@ void TransmitterModelMapClass::readModelList(const std::string filename)
 {
 	int linenum, fIdx;
 	std::string line, strval;
-	char *chptr;
 	FILE *fp = (FILE *) NULL;
 	std::string str;
 	std::string reasonIgnored;
@@ -282,7 +281,7 @@ TransmitterModelClass *TransmitterModelMapClass::find(std::string modelName)
     /*    * prefix of modelName                                                       */
     /* If multiple prefices are found, select the longest one                         */
     /**********************************************************************************/
-    for(i=0; i<transmitterModelList.size(); ++i) {
+    for(i=0; i<(int) transmitterModelList.size(); ++i) {
         TransmitterModelClass *m = transmitterModelList[i];
 
         if (modelName.compare(0, m->name.size(), m->name) == 0) {
@@ -308,9 +307,9 @@ int TransmitterModelMapClass::checkPrefixValues()
     int ia, ib;
     int numError = 0;
 
-    for(ia=0; ia<transmitterModelList.size(); ++ia) {
+    for(ia=0; ia<(int) transmitterModelList.size(); ++ia) {
         TransmitterModelClass *ma = transmitterModelList[ia];
-        for(ib=0; ib<transmitterModelList.size(); ++ib) {
+        for(ib=0; ib<(int) transmitterModelList.size(); ++ib) {
             if (ib != ia) {
                 TransmitterModelClass *mb = transmitterModelList[ib];
                 if ((ma->architecture != TransmitterModelClass::UnknownArchitecture) && (mb->name.compare(0, ma->name.size(), ma->name) == 0)) {
