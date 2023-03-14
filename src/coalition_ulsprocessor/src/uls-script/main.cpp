@@ -229,6 +229,14 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
 
     qDebug() << "--- Beginning path processing";
 
+    const std::vector<double> bwMHzListUnii5 = {
+        0.4, 0.8, 1.25, 2.5, 3.75, 5.0, 10.0, 30.0, 60.0
+    };
+
+    const std::vector<double> bwMHzListUnii7 = {
+        0.4, 0.8, 1.25, 2.5, 3.75, 5.0, 10.0, 30.0
+    };
+
     int cnt = 0;
     int numRecs = 0;
 
@@ -542,7 +550,33 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     }
                     if ( isnan(bwMHz) || (bwMHz > 60.0) || (bwMHz == 0) ) {
                         bwMHz = freqAssignment.getBandwidth(txFreq.frequencyAssigned);
+                    } else {
+                        bool unii5Flag = (txFreq.frequencyAssigned >= UlsFunctionsClass::unii5StartFreqMHz)
+                                      && (txFreq.frequencyAssigned <= UlsFunctionsClass::unii5StopFreqMHz);
+                        bool unii7Flag = (txFreq.frequencyAssigned >= UlsFunctionsClass::unii5StartFreqMHz)
+                                      && (txFreq.frequencyAssigned <= UlsFunctionsClass::unii5StopFreqMHz);
+                        const std::vector<double> *fccBWList = (std::vector<double> *) NULL;
+                        if (unii5Flag) {
+                            fccBWList = &bwMHzListUnii5;
+                        } else if (unii7Flag) {
+                            fccBWList = &bwMHzListUnii7;
+                        }
+                        if (fccBWList) {
+                            bool found = false;
+                            double fccBW;
+                            for(int i=0; (i<fccBWList->size()) &&(!found); ++i) {
+                                if (fccBWList->at(i) >= bwMHz) {
+                                    found = true;
+                                    fccBW = fccBWList->at(i);
+                                }
+                            }
+                            if (found) {
+                                bwMHz = std::min(fccBW, bwMHz*1.1);
+                            }
+                        }
                     }
+
+
                     if (bwMHz == -1.0) {
                         numUnableGetBandwidth++;
                         anomalousReason.append("Unable to get bandwidth");

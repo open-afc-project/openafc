@@ -342,9 +342,8 @@ class AfcManager
 		double _rxFeederLossDBODU;                // User-inputted ULS receiver feeder loss for ODU Architecture
 		double _rxFeederLossDBUnknown;            // User-inputted ULS receiver feeder loss for Unknown Architecture
 
-		double _ulsNoiseFigureDBUNII5;          // Noise Figure for ULS receiver in UNII-5 band;
-		double _ulsNoiseFigureDBUNII7;          // Noise Figure for ULS receiver in UNII-7 band;
-		double _ulsNoiseFigureDBOther;          // Noise Figure for ULS receiver in Other band;
+		std::vector<double> _noisePSDFreqList;    // Freq list for specification of noise PSD (Hz)
+		std::vector<double> _noisePSDList;        // Noise PSD for each band determined by _noisePSDFreqList (dBW/Hz)
 
 		double _itmEpsDielect;
 		double _itmSgmConductivity;

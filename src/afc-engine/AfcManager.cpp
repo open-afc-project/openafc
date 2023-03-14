@@ -13,11 +13,6 @@ extern double qerfi(double q);
 QJsonArray jsonChannelData(const std::vector<ChannelStruct> &channelList);
 QJsonObject jsonSpectrumData(const std::vector<ChannelStruct> &channelList, const QJsonObject &deviceDesc, const double &startFreq);
 
-double noiseFloorToNoiseFigure(double noiseFloor) {
-	const double B = CConst::boltzmannConstant;
-	return noiseFloor - 30.0 - 10.0 * log10(290.0 * B * pow(10.0, 6.0));
-}
-
 std::string padStringFront(const std::string& s, const char& padder, const int& amount)
 {
 	std::string r = s;
@@ -286,10 +281,6 @@ AfcManager::AfcManager()
 	_rxFeederLossDBIDU = quietNaN;
 	_rxFeederLossDBODU = quietNaN;
 	_rxFeederLossDBUnknown = quietNaN;
-
-	_ulsNoiseFigureDBUNII5 = quietNaN;
-	_ulsNoiseFigureDBUNII7 = quietNaN;
-	_ulsNoiseFigureDBOther = quietNaN;
 
 	_itmEpsDielect = quietNaN;
 	_itmSgmConductivity = quietNaN;
@@ -1998,7 +1989,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	}
 
 	if (jsonObj.contains("nlcdFile") && !jsonObj["nlcdFile"].isUndefined()) {
-		_nlcdFile = SearchPaths::forReading("data", QString("rat_transfer/nlcd/") + jsonObj["nlcdFile"].toString(), true).toStdString();
+		_nlcdFile = SearchPaths::forReading("data", jsonObj["nlcdFile"].toString(), true).toStdString();
 	} else {
 		_nlcdFile = SearchPaths::forReading("data", "rat_transfer/nlcd/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
 	}
@@ -2162,9 +2153,27 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	// ***********************************
 	auto ulsRecieverNoise = jsonObj["fsReceiverNoise"].toObject();
 
-	_ulsNoiseFigureDBUNII5 = noiseFloorToNoiseFigure(ulsRecieverNoise["UNII5"].toDouble());
-	_ulsNoiseFigureDBUNII7 = noiseFloorToNoiseFigure(ulsRecieverNoise["UNII7"].toDouble());
-	_ulsNoiseFigureDBOther = noiseFloorToNoiseFigure(ulsRecieverNoise["other"].toDouble());
+	QJsonArray freqList = ulsRecieverNoise["freqList"].toArray();
+	for (QJsonValue freqVal : freqList) {
+		double freqValHz = freqVal.toDouble()*1.0e6; // Convert MHz to Hz
+		_noisePSDFreqList.push_back(freqValHz);
+	}
+
+	QJsonArray noisePSDList = ulsRecieverNoise["noiseFloorList"].toArray();
+	for (QJsonValue noisePSDVal : noisePSDList) {
+		double noisePSDValdBWPerHz = noisePSDVal.toDouble() - 90.0; // Convert dbM/MHz to dBW/Hz
+		_noisePSDList.push_back(noisePSDValdBWPerHz);
+	}
+
+	if (_noisePSDList.size() != _noisePSDFreqList.size()+1) {
+		throw std::runtime_error("AfcManager::importConfigAFCjson(): Invalid fsReceiverNoise specification.");
+		for(int i=1; i<(int) _noisePSDFreqList.size(); ++i) {
+			if (!(_noisePSDFreqList[i] > _noisePSDFreqList[i-1])) {
+				throw std::runtime_error("AfcManager::importConfigAFCjson(): fsReceiverNoise freqList not monotonically increasing.");
+			}
+		}
+	}
+
 	// ***********************************
 
 	// ***********************************
@@ -2260,7 +2269,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		throw std::runtime_error("ERROR: Invalid propagationModel[\"kind\"]");
 	}
 
-	if (_pathLossModel == CConst::CustomPathLossModel) {
+	if (    (_pathLossModel == CConst::CustomPathLossModel)
+	     || (_pathLossModel == CConst::ISEDDBS06PathLossModel) ) {
 		_pathLossModel = CConst::FCC6GHzReportAndOrderPathLossModel;
 	}
 
@@ -4784,23 +4794,33 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 						rxAntennaFeederLossDB = _rxFeederLossDBUnknown;
 					}
 				}
-				double noiseFigureDB;
+				double noisePSD;
 				double centerFreq = (startFreq + stopFreq)/2;
-				double uniiCenterFreq;
-				if (unii5Flag && unii7Flag) {
-					noiseFigureDB = std::min(_ulsNoiseFigureDBUNII5, _ulsNoiseFigureDBUNII7);
-					uniiCenterFreq = centerFreq;
-				} else if (unii5Flag) {
-					noiseFigureDB = _ulsNoiseFigureDBUNII5;
-					uniiCenterFreq = (CConst::unii5StartFreqMHz + CConst::unii5StopFreqMHz)*0.5e6;
-				} else if (unii7Flag) {
-					noiseFigureDB = _ulsNoiseFigureDBUNII7;
-					uniiCenterFreq = (CConst::unii7StartFreqMHz + CConst::unii7StopFreqMHz)*0.5e6;
-				} else {
-					noiseFigureDB = _ulsNoiseFigureDBOther;
-					uniiCenterFreq = centerFreq;
+				bool found = false;
+				for(int i=0; (i<(int) _noisePSDFreqList.size())&&(!found); ++i) {
+					if (centerFreq <= _noisePSDFreqList[i]) {
+						noisePSD = _noisePSDList[i];
+						found = true;
+					}
 				}
-				double lambda = CConst::c / uniiCenterFreq;
+				if (!found) {
+					noisePSD = _noisePSDList[_noisePSDFreqList.size()];
+				}
+				double antennaCenterFreq;
+				if (row.region == "US") {
+					if (unii5Flag && unii7Flag) {
+						antennaCenterFreq = centerFreq;
+					} else if (unii5Flag) {
+						antennaCenterFreq = (CConst::unii5StartFreqMHz + CConst::unii5StopFreqMHz)*0.5e6;
+					} else if (unii7Flag) {
+						antennaCenterFreq = (CConst::unii7StartFreqMHz + CConst::unii7StopFreqMHz)*0.5e6;
+					} else {
+						antennaCenterFreq = centerFreq;
+					}
+				} else {
+					antennaCenterFreq = centerFreq;
+				}
+				double lambda = CConst::c / antennaCenterFreq;
 				double rxDlambda = rxAntennaDiameter / lambda;
 				double noiseBandwidth = stopFreq - startFreq;
 
@@ -5102,7 +5122,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				}
 				/******************************************************************/
 
-				double noiseLevelDBW = 10.0 * log(CConst::boltzmannConstant * CConst::T0 * noiseBandwidth) / log(10.0) + noiseFigureDB;
+				double noiseLevelDBW = noisePSD + 10.0*log10(noiseBandwidth);
 				uls->setNoiseLevelDBW(noiseLevelDBW);
 				if (fixedFlag && fanom) {
 					fanom->writeRow({QString::asprintf("%d", fsid), QString::fromStdString(name), QString::fromStdString(callsign), QString::asprintf("%.15f", rxLatitudeDeg), QString::asprintf("%.15f", rxLongitudeDeg), QString::fromStdString(fixedStr)});
@@ -10650,7 +10670,7 @@ void AfcManager::runTestITM(std::string inputFile)
 #endif
 
 
-	int linenum, fIdx, validFlag;
+	int linenum, fIdx;
 	std::string line, strval;
 	char *chptr;
 	std::string str;
@@ -10849,7 +10869,6 @@ void AfcManager::runTestITM(std::string inputFile)
     int numRlanHeight = 2;
     double rlanHeightAGLStart = 10.0;
     double rlanHeightAGLStop = 11.0;
-    double ver0, ver1;
 
     for (bool reverseFlag : {false}) {
         for(int rlanHeightIdx=0; rlanHeightIdx<numRlanHeight; ++rlanHeightIdx) {

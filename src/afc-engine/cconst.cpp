@@ -50,6 +50,7 @@ const StrTypeClass CConst::strPathLossModelList[] = {
 	{               CConst::ITMBldgPathLossModel, "ITM with building data"    },
 	{ CConst::FCC6GHzReportAndOrderPathLossModel, "FCC 6GHz Report & Order"   },
 	{                CConst::CustomPathLossModel, "Custom"                    },
+	{             CConst::ISEDDBS06PathLossModel, "ISED DBS-06"               },
 	{         CConst::CoalitionOpt6PathLossModel, "ITM with no building data" },
 
 	{                                    -1,  (char *) 0                      }

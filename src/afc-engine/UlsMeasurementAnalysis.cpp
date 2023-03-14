@@ -227,8 +227,6 @@ namespace UlsMeasurementAnalysis {
 		double slon = sin((lon2Rad-lon1Rad)/2);
 		*tdist = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
 
-		double earthRadKm = CConst::averageEarthRadius / 1000.0;
-
 		Vector3 posn1 = Vector3(cos(lat1Rad)*cos(lon1Rad), cos(lat1Rad)*sin(lon1Rad), sin(lat1Rad));
 		Vector3 posn2 = Vector3(cos(lat2Rad)*cos(lon2Rad), cos(lat2Rad)*sin(lon2Rad), sin(lat2Rad));
 
@@ -457,7 +455,6 @@ namespace UlsMeasurementAnalysis {
 		std::string strmode;
 		// char strmode[50];
 		int errnum;
-		double ver0, ver1;
 
 		if (itmInitFlag) {
 			LOGGER_INFO(logger) << "ITM Parameter: eps_dielect = " << eps_dielect;
