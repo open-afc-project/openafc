@@ -235,7 +235,7 @@ export class AFCFormUSACanada extends React.Component<
                 return 'rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif';
             case "USA":
             default:
-                return 'rat_transfer/landcover/us/nlcd_production';
+                return 'rat_transfer/nlcd/nlcd_production';
         }
     }
 
