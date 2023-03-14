@@ -10,6 +10,7 @@
 #include <stdarg.h>
 #include <dlfcn.h>
 #include <fcntl.h>
+#include <ftw.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
@@ -24,6 +25,7 @@
 #include <sys/stat.h>
 #include <sys/sendfile.h>
 #include <sys/time.h>
+#include <sys/mman.h>
 
 /* max number of simultaneously open files */
 #define AEP_NO_FILES 30
@@ -62,21 +64,6 @@
 	}
 
 typedef int (*orig_fcntl_t)(int, int, ...);
-
-static void starttime(struct timeval *tv)
-{
-	gettimeofday(tv, NULL);
-}
-
-static unsigned int stoptime(struct timeval *tv)
-{
-	struct timeval tv1;
-	int us;
-
-	gettimeofday(&tv1, NULL);
-	us = (tv1.tv_sec - tv->tv_sec) * 1000000 + tv1.tv_usec - tv->tv_usec;
-	return (unsigned int)us;
-}
 
 /* from musl-1.2.3/src/dirent/__dirent.h */
 struct __dirstream {
@@ -213,7 +200,6 @@ typedef struct {
 		char tpath[AEP_PATH_MAX];
 		struct dirent dirent;
 		fe_t *readdir_p;
-		bool is_cached;
 } data_fd_t;
 
 static fe_t tree = {}; /* the root "/" entry of file tree */
@@ -228,11 +214,14 @@ static aep_statistic_t aepst = {};
 /* configuration from getenv() */
 static char *cache_path;
 static uint64_t max_cached_file_size;
+static uint64_t max_cached_size;
 static uint32_t aep_debug = 0;
 static char *ae_mountpoint; /* The path in which afc-engine seeking for static data */
 static char *real_mountpoint; /* The path in which static data really is */
 static bool aep_use_gs = false;
-int logfile = -1;
+static int logfile = -1;
+static uint64_t *cache_size;
+static sem_t *cache_size_sem;
 
 static data_fd_t *fd_get_data_fd(int fd);
 static char *fd_get_name(int fd);
@@ -242,6 +231,21 @@ static ssize_t read_remote_data_nfs(void *destv, size_t size, char *tpath, off_t
 static int download_file_gs(data_fd_t *data_fd, char *dest);
 static ssize_t read_remote_data_gs(void *destv, size_t size, char *tpath, off_t off);
 static int init_gs();
+
+static void starttime(struct timeval *tv)
+{
+	gettimeofday(tv, NULL);
+}
+
+static unsigned int stoptime(struct timeval *tv)
+{
+	struct timeval tv1;
+	int us;
+
+	gettimeofday(&tv1, NULL);
+	us = (tv1.tv_sec - tv->tv_sec) * 1000000 + tv1.tv_usec - tv->tv_usec;
+	return (unsigned int)us;
+}
 
 static inline FILE *orig_fopen(const char *path, const char *mode)
 {
@@ -479,13 +483,37 @@ static off_t f_seek(FILE *f, off_t off, int whence)
 	return off;
 }
 /* never used */
-int f_close(FILE *f)
+static int f_close(FILE *f)
 {
 	dbgd("FILE->close(%d(%s))", fileno(f), fd_get_name(fileno(f)));
 	fd_rm(fileno(f));
 	return 0;
 }
 #endif
+
+static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typeflag)
+{
+	if (typeflag == FTW_F) {
+		sem_t *sem;
+
+		sem = sem_open((char *)fpath + strlen(cache_path), O_CREAT, 0666, 1);
+		aep_assert(sem, "sem_open");
+		sem_wait(sem);
+		unlink(fpath);
+		sem_post(sem);
+		*cache_size -= sb->st_size;
+	}
+	return *cache_size < max_cached_size ? -1 : 0;
+}
+
+/* remove files in the cache until the cache have <size> free space */
+static void reduce_cache(uint64_t size)
+{
+	if (*cache_size + size > max_cached_size) {
+		*cache_size += size;
+		ftw(cache_path, ftw_remove_callback, 100);
+	}
+}
 
 static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 {
@@ -498,33 +526,35 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	download_file = aep_use_gs ? download_file_gs : download_file_nfs;
 	struct stat stat;
 	sem_t *sem;
+	bool is_cached = false;
 
 	strcpy(fakepath, cache_path);
 	strcat(fakepath, data_fd->tpath);
 
 	sem = sem_open(data_fd->tpath, O_CREAT, 0666, 1);
-	if (sem) {
-		sem_wait(sem);
-	}
+	aep_assert(sem, "sem_open");
+	sem_wait(sem);
+
 	/* download whole file to cache if possible */
-	if (!data_fd->is_cached) {
-		if (!orig_stat(fakepath, &stat)) {
-			if (data_fd->fe->size == (uint64_t)stat.st_size) {
-				data_fd->is_cached = true;
-			}
-			if (!data_fd->is_cached && data_fd->fe->size <= max_cached_file_size) {
-				if (!download_file(data_fd, fakepath)) {
-					data_fd->is_cached = true;
-				}
+	if (!orig_stat(fakepath, &stat)) {
+		
+		if (data_fd->fe->size == (uint64_t)stat.st_size) {
+			is_cached = true;
+		}
+		if (!is_cached && data_fd->fe->size <= max_cached_file_size) {
+			sem_wait(cache_size_sem);
+			reduce_cache(data_fd->fe->size);
+			sem_post(cache_size_sem);
+			if (!download_file(data_fd, fakepath)) {
+				sem_wait(cache_size_sem);
+				*cache_size += data_fd->fe->size;
+				sem_post(cache_size_sem);
+				is_cached = true;
 			}
 		}
 	}
-	if (sem) {
-		sem_post(sem);
-		sem_close(sem);
-	}
 
-	if (data_fd->is_cached) {
+	if (is_cached) {
 		int fd;
 		struct timeval tv;
 		unsigned int us;
@@ -537,11 +567,15 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 		aep_assert(ret >= 0, "read_data(%s) read", fakepath);
 		orig_close(fd);
 		us = stoptime(&tv);
-		dbgl("read cached file %s size %zu time %u us", data_fd->tpath, ret, us);
+		sem_post(sem);
+		sem_close(sem);
+		dbgl("read cached file %s size %zu time %u us cache %zu", data_fd->tpath, ret, us, *cache_size);
 		aepst.read_cached++;
 		aepst.read_cached_size += ret;
 		aepst.read_cached_time += us;
 	} else {
+		sem_post(sem);
+		sem_close(sem);
 		ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
 		aep_assert(ret >= 0, "read_data(%s) read_remote_data", fakepath)
 	}
@@ -590,7 +624,6 @@ static int fd_add(char *tpath)
 	aep_assert(fd >= 0, "fd_add(%s) open()", tpath);
 	memset(data_fds + fd, 0, sizeof(data_fd_t));
 	aep_assert(!orig_fstat(fd, &statbuf), "fd_add(%s) fstat", tpath);
-	data_fds[fd].is_cached = false;
 	data_fds[fd].fe = fe;
 	data_fds[fd].off = 0;
 #ifndef __GLIBC__
@@ -645,8 +678,9 @@ static bool is_remote_file(const char *path, char **tpath)
 	return false;
 }
 
+#if 0
 /* for testing */
-void prn_tree(fe_t *fe, uint8_t tab)
+static void prn_tree(fe_t *fe, uint8_t tab)
 {
 	fe_t *tmp = fe;
 	int i;
@@ -661,6 +695,13 @@ void prn_tree(fe_t *fe, uint8_t tab)
 		}
 		tmp = tmp->next;
 	}
+}
+#endif
+
+static int ftw_callback(const char *fpath, const struct stat *sb, int typeflag)
+{
+	*cache_size += sb->st_size;
+	return 0;
 }
 
 /* This library entrypoint */
@@ -678,6 +719,7 @@ void __attribute__((constructor)) aep_init(void)
 	uint32_t entries_size;
 	char *filelist_path;
 	char *tmp;
+	int shm_fd;
 
 	/* check env vars */
 	tmp = getenv("AFC_AEP_DEBUG");
@@ -716,6 +758,12 @@ void __attribute__((constructor)) aep_init(void)
 	tmp = getenv("AFC_AEP_CACHE_MAX_FILE_SIZE");
 	aep_assert(tmp, "AFC_AEP_CACHE_MAX_FILE_SIZE env var is not defined");
 	max_cached_file_size = atoll(tmp);
+	tmp = getenv("AFC_AEP_CACHE_MAX_SIZE");
+	aep_assert(tmp, "AFC_AEP_CACHE_MAX_SIZE env var is not defined");
+	max_cached_size = atoll(tmp);
+	if (max_cached_file_size > max_cached_size) {
+		max_cached_file_size = max_cached_size;
+	}
 	cache_path = getenv("AFC_AEP_CACHE");
 	aep_assert(cache_path, "AFC_AEP_CACHE env var is not defined");
 
@@ -764,7 +812,7 @@ void __attribute__((constructor)) aep_init(void)
 	}
 	fl += sizeof(uint8_t);
 	stack[0] = &tree;
-	tree.name = (char *)"root"; // debug
+	tree.name = (char *)"root"; /* debug */
 	cstack = stack[0];
 
 	/* fill file tree */
@@ -807,6 +855,26 @@ void __attribute__((constructor)) aep_init(void)
 		cfe->size = size;
 	}
 	free(stack);
+
+	/* share cache size */
+	cache_size_sem = sem_open("aep_shmem_sem", O_CREAT, 0666, 1);
+	aep_assert(cache_size_sem, "sem_open");
+	sem_wait(cache_size_sem);
+	shm_fd = shm_open("aep_shmem", O_RDWR | O_CREAT | O_EXCL, 0666);
+	if (shm_fd < 0) {
+		/* O_CREAT | O_EXCL failed, so shared memory object already was initialized */
+		shm_fd = shm_open("aep_shmem", O_RDWR, 0666);
+		aep_assert(shm_fd >= 0, "shm_open");
+		cache_size = (uint64_t *)mmap(NULL, sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+		aep_assert(cache_size, "mmap");
+	} else {
+		ftruncate(shm_fd, sizeof(uint64_t));
+		cache_size = (uint64_t *)mmap(NULL, sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+		aep_assert(cache_size, "mmap");
+		/* count existing cache size */
+		ftw(cache_path, ftw_callback, 100);
+	}
+	sem_post(cache_size_sem);
 }
 
 FILE *fopen(const char *path, const char *mode)
@@ -1304,10 +1372,6 @@ static int download_file_gs(data_fd_t *data_fd, char *dest)
 
 	if ((output = orig_open(dest, O_CREAT | O_WRONLY)) < 0) {
 		return -1;
-	}
-	if (data_fd->is_cached) {
-		orig_close(output);
-		return 0;
 	}
 
 	google::cloud::Status status = client.DownloadToFile(bucket_name, data_fd->tpath, dest);

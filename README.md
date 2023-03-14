@@ -571,6 +571,7 @@ chown 999:999 /var/databases/pgdata
 |AFC_AEP_LOGFILE|`/aep/log/aep.log`|worker|Where to write the log|
 |AFC_AEP_CACHE|`/aep/cache`|worker|Where to store the cache|
 |AFC_AEP_CACHE_MAX_FILE_SIZE|`60000000`|worker|Cache files with size less than the value|
+|AFC_AEP_CACHE_MAX_SIZE|`1000000000`|worker|Max cache size|
 |AFC_AEP_REAL_MOUNTPOINT|`/mnt/nfs/rat_transfer`|worker|Redirect read access to there|
 |AFC_AEP_ENGINE_MOUNTPOINT|value of AFC_AEP_REAL_MOUNTPOINT|worker|Redirect read access from here|
 |CELERY_OPTIONS|`rat_1`|worker|Celery app instance to use|

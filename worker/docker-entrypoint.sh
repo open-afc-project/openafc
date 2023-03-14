@@ -25,7 +25,12 @@ if [ -n ${AFC_AEP_ENABLE+x} ]; then
 	fi
 	mkdir -p $(dirname "$AFC_AEP_FILELIST")
 	if [ -z "$AFC_AEP_CACHE_MAX_FILE_SIZE" ]; then
+		#60M
 		export AFC_AEP_CACHE_MAX_FILE_SIZE=60000000
+	fi
+	if [ -z "$AFC_AEP_CACHE_MAX_SIZE" ]; then
+		#1G
+		export AFC_AEP_CACHE_MAX_SIZE=1000000000
 	fi
 	if [ -z "$AFC_AEP_CACHE" ]; then
 		export AFC_AEP_CACHE=/aep/cache
