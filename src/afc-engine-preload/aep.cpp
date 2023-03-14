@@ -503,6 +503,7 @@ static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typ
 		unlink(fpath);
 		sem_post(sem);
 		*cache_size -= sb->st_size;
+		dbg("Remove %s done", (char *)fpath + strlen(cache_path));
 	}
 	return *cache_size < max_cached_size ? -1 : 0;
 }
@@ -555,8 +556,9 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 				sem_post(cache_size_sem);
 				dbg("download %s done", data_fd->tpath);
 				is_cached = true;
+			} else {
+				dbg("download %s failed", data_fd->tpath);
 			}
-			dbg("download %s failed", data_fd->tpath);
 		}
 	}
 
