@@ -97,6 +97,7 @@ services:
     image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
+      - $/opt/afc/work/yd889380/aep:/aep
       - ./pipe:/pipe
     environment:
       # Filestorage params:
@@ -111,7 +112,8 @@ services:
       # afc-engine preload lib params
       - AFC_AEP_ENABLE=1
       - AFC_AEP_DEBUG=2
-      - AFC_AEP_LOGFILE=/mnt/nfs/rat_transfer/aep.log
+      - AFC_AEP_LOGFILE=/aep/aep.log
+      - AFC_AEP_CACHE=/aep/cache
       - AFC_AEP_REAL_MOUNTPOINT=${VOL_C_DB}/3dep/1_arcsec
     depends_on:
       - ratdb
