@@ -54,8 +54,8 @@ interface RatAfcState {
     includeMap: boolean,
     clickedMapPoint?: Point,
     fullJsonResponse?: string,
-    redChannels?:AvailableChannelInfo[],
-    blackChannels?:AvailableChannelInfo[]
+    redChannels?: AvailableChannelInfo[],
+    blackChannels?: AvailableChannelInfo[]
 }
 
 const mapProps: MapProps = {
@@ -301,18 +301,18 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             minEirp: minEirp,
                             mapCenter: rlanLoc,
                             clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng },
-                            fullJsonResponse: JSON.stringify(resp.result, null, 2),
-                           
+                            fullJsonResponse: JSON.stringify(resp.result, (k, v) => (k == "kmzFile") ? "Removed binary data" : v, 2),
+
                         });
 
-                        
+
                         if (response.vendorExtensions
                             && response.vendorExtensions.length > 0
                             && response.vendorExtensions.findIndex(x => x.extensionId == "openAfc.redBlackData") >= 0) {
-                                let extraChannels = response.vendorExtensions.find(x => x.extensionId == "openAfc.redBlackData").parameters;
-                                this.setState({redChannels: extraChannels["redChannelInfo"], blackChannels: extraChannels["blackChannelInfo"]})
-                        }else{
-                            this.setState({redChannels: undefined, blackChannels: undefined})
+                            let extraChannels = response.vendorExtensions.find(x => x.extensionId == "openAfc.redBlackData").parameters;
+                            this.setState({ redChannels: extraChannels["redChannelInfo"], blackChannels: extraChannels["blackChannelInfo"] })
+                        } else {
+                            this.setState({ redChannels: undefined, blackChannels: undefined })
                         }
 
 
@@ -323,7 +323,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             //Get the KML file and load it into the state.kml parameters; get the GeoJson if present
                             let kml_filename = response.vendorExtensions.find(x => x.extensionId == "openAfc.mapinfo").parameters["kmzFile"];
                             let geoJson_filename = response.vendorExtensions.find(x => x.extensionId == "openAfc.mapinfo").parameters["geoJsonFile"];
-                            this.setKml(atob(kml_filename))
+                            this.setKml(kml_filename)
                             let geojson = JSON.parse(geoJson_filename);
                             if (request.location.ellipse && geojson && geojson.geoJson) {
 
@@ -436,7 +436,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                         </div>
                         {
                             (this.state.response?.response && this.state.kml) &&
-                            <DownloadContents contents={() => this.state.kml} fileName="results.kmz" />
+                            <DownloadContents contents={() => this.state.kml!} fileName="results.kmz" />
                         }
                     </CardBody></Card>
                     <br />
