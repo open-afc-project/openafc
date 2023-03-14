@@ -496,6 +496,7 @@ static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typ
 	if (typeflag == FTW_F) {
 		sem_t *sem;
 
+		dbg("%d: Remove %s", getpid(), (char *)fpath + strlen(cache_path));
 		sem = sem_open((char *)fpath + strlen(cache_path), O_CREAT, 0666, 1);
 		aep_assert(sem, "sem_open");
 		sem_wait(sem);
@@ -545,6 +546,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 			sem_wait(cache_size_sem);
 			reduce_cache(data_fd->fe->size);
 			sem_post(cache_size_sem);
+			dbg("%d: download %s", getpid(), data_fd->tpath);
 			if (!download_file(data_fd, fakepath)) {
 				sem_wait(cache_size_sem);
 				*cache_size += data_fd->fe->size;
