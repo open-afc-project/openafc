@@ -222,6 +222,7 @@ static bool aep_use_gs = false;
 static int logfile = -1;
 static volatile uint64_t *cache_size;
 static sem_t *cache_size_sem;
+static uint64_t cache_size_add;
 
 static data_fd_t *fd_get_data_fd(int fd);
 static char *fd_get_name(int fd);
@@ -505,16 +506,18 @@ static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typ
 		*cache_size -= sb->st_size;
 		dbg("Remove %s done, cs %lu", (char *)fpath + strlen(cache_path), *cache_size);
 	}
-	return *cache_size < max_cached_size ? -1 : 0;
+	return *cache_size + cache_size_add < max_cached_size ? -1 : 0;
 }
 
 /* remove files in the cache until the cache have <size> free space */
 static void reduce_cache(uint64_t size)
 {
+	sem_wait(cache_size_sem);
 	if (*cache_size + size > max_cached_size) {
-		*cache_size += size;
+		cache_size_add = size;
 		ftw(cache_path, ftw_remove_callback, 100);
 	}
+	sem_post(cache_size_sem);
 }
 
 static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
@@ -545,9 +548,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 		}
 		if (!is_cached && data_fd->fe->size <= max_cached_file_size) {
 			dbg("reduce_cache cs %lu", *cache_size);
-			sem_wait(cache_size_sem);
 			reduce_cache(data_fd->fe->size);
-			sem_post(cache_size_sem);
 			dbg("reduce_cache done cs %lu", *cache_size);
 			dbg("download %s", data_fd->tpath);
 			if (!download_file(data_fd, fakepath)) {
@@ -576,14 +577,14 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 		orig_close(fd);
 		us = stoptime(&tv);
 		sem_post(sem);
-		sem_close(sem);
+//		sem_close(sem);
 		dbgl("read cached file %s size %zu time %u us cache %zu", data_fd->tpath, ret, us, *cache_size);
 		aepst.read_cached++;
 		aepst.read_cached_size += ret;
 		aepst.read_cached_time += us;
 	} else {
 		sem_post(sem);
-		sem_close(sem);
+//		sem_close(sem);
 		ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
 		aep_assert(ret >= 0, "read_data(%s) read_remote_data", fakepath)
 	}
