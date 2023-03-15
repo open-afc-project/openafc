@@ -59,16 +59,17 @@ export class AFCForm extends React.Component<
 
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => {
-        this.setState({ config: Object.assign(this.state.config, { regionStr: n}) });
+        this.setState({ config: Object.assign(this.state.config, { regionStr: n }) });
         // region changed by user, reload the coresponding configuration for that region
         getAfcConfigFile(n).then(
             res => {
                 if (res.kind === "Success") {
                     this.updateEntireConfigState(res.result);
+                    document.cookie = `afc-config-last-region=${n};max-age=2592000;path='/';SameSite=strict`
                 } else {
-                    if(res.errorCode == 404){
+                    if (res.errorCode == 404) {
                         this.updateEntireConfigState(getDefaultAfcConf(n));
-                        this.setState({messageSuccess:"No config found for this region, using region default"});
+                        this.setState({ messageSuccess: "No config found for this region, using region default" });
                     }
                     this.setState({ messageError: res.description, messageSuccess: undefined });
                 }

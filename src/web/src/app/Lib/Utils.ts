@@ -156,3 +156,19 @@ export const bearing = (p1: { lat: number, lon: number }, p2: { lat: number, lon
     const brng = (θ*180/Math.PI + 360) % 360; // bearing in degrees
     return brng;
 }
+
+export const getLastUsedRegionFromCookie = () => {
+
+    var lastRegFromCookie: string | undefined = undefined;
+    if (document.cookie.indexOf("afc-config-last-region=") >=0) {
+        lastRegFromCookie = document.cookie
+            .split("; ")
+            .find((row) => row.startsWith("afc-config-last-region="))
+            ?.split("=")[1];
+    }
+    else {
+        lastRegFromCookie = "USA"
+    }
+
+    return lastRegFromCookie!;
+}
