@@ -1,6 +1,31 @@
  # Release Note
 
 ## **Version and Date**
+|Version|**OA-570**|
+| :- | :- |
+|**Date**|**03/14/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-570: Fixing Canada FS parameters
+ * Jira OA-603: Bandwidth Issue Resolution
+ * This branch includes the following tasks for Canada AFC: OA-570, OA-545 (Generate a new Propagation model for Canada), OA-572 (FS Noise Figure), OA-546 (Setup AFC Config to be able to switch to Canada's configuration), OA-543 (Generate a new defaulg AFC Config for Canada). However, most the Canada tickets have not been tested and we are doing this PR as an emergency for getting OA-603 in. After this, we will start validating the Canada tickets and if we find a bug, we will open a new ticket. In addition, some of this tickets (e.g. OA-572) resulted in a change for US as well. As such all US changes have been validated as part of this PR.
+
+## **Interface Changes**
+ * There was a change in the ULS parser which resulted in a new FS database:
+ * This new FS database can be downloaded from: https://drive.google.com/file/d/1ogV5MESr0Ml2EE78C6KR03hAOPxvG_cE/view
+
+ * There are AFC Config GUI changes (for FS Noise Floor, use of Land Cover instead of NLCD when referring to this database generically).
+ * There are 2 other changes in afc-config.json for US: 1) "fsReceiverNoise": {"freqList": [6425], "noiseFloorList": [-110, -109.5]} 2) "nearFieldAdjFlag": true
+
+## **Testing Done**
+ * Ran FSP1, FSP41, SIP10 and IBP3 and got same results as last time. 
+ * Manually validated that OA-603 was implemented correctly in the FS database (US).
+
+## **Open Issues** 
+* We have yet to validate the following Canada tickets: OA-570, OA-572, OA-545, oA-546 and OA-543
+
+## **Version and Date**
 |Version|3.7.4.0|
 | :- | :- |
 |**Date**|**02/12/2023**|

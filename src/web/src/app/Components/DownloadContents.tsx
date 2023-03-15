@@ -13,7 +13,8 @@ class DownloadContents extends React.Component<{ contents: () => Blob, fileName:
     }
 
     downloadFile = () => {
-        const url = window.URL.createObjectURL(this.props.contents());
+        var data = this.props.contents();
+        const url = window.URL.createObjectURL(new Blob([data], {type: "application/vnd"}))
         const a = document.createElement("a");
         a.href = url;
         a.download = this.props.fileName;
