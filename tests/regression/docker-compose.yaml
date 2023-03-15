@@ -92,9 +92,6 @@ services:
       - AFC_OBJST_HIST_PORT=4999
       - AFC_OBJST_LOCAL_DIR=/storage
     dns_search: [.]
-    user: "${UID}:${GID}"
-    volumes:
-      - ./storage:/storage
   worker:
     image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:${TAG:-latest}
     volumes:
