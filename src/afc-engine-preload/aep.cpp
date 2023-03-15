@@ -220,7 +220,7 @@ static char *ae_mountpoint; /* The path in which afc-engine seeking for static d
 static char *real_mountpoint; /* The path in which static data really is */
 static bool aep_use_gs = false;
 static int logfile = -1;
-static uint64_t *cache_size;
+static volatile uint64_t *cache_size;
 static sem_t *cache_size_sem;
 
 static data_fd_t *fd_get_data_fd(int fd);
@@ -493,7 +493,7 @@ static int f_close(FILE *f)
 
 static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typeflag)
 {
-	if (typeflag == FTW_F) {
+	if (typeflag == FTW_F && sb->st_size) {
 		sem_t *sem;
 
 		dbg("Remove %s", (char *)fpath + strlen(cache_path));
@@ -600,6 +600,7 @@ static int fd_add(char *tpath)
 	char fakepath[AEP_PATH_MAX];
 	char *p = fakepath;
 	struct stat statbuf;
+	sem_t *sem;
 
 	fe = find_fe(tpath);
 	if (!fe) {
@@ -609,6 +610,8 @@ static int fd_add(char *tpath)
 	strcat(fakepath, tpath);
 
 	/* create cache file */
+	sem = sem_open(tpath, O_CREAT, 0666, 1);
+	sem_wait(sem);
 	if (orig_stat(fakepath, &statbuf)) {
 		for (p = fakepath; *p; p++) {
 			if (*p == '/') {
@@ -627,6 +630,7 @@ static int fd_add(char *tpath)
 			mkdir(fakepath, 0777);
 		}
 	}
+	sem_post(sem);
 
 	fd = orig_open(fakepath, O_RDONLY);
 	aep_assert(fd >= 0, "fd_add(%s) open()", tpath);
