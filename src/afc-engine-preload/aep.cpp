@@ -223,6 +223,8 @@ static int logfile = -1;
 static volatile int64_t *cache_size;
 static sem_t *cache_size_sem;
 static uint64_t cache_size_add;
+static const struct timespec sem_timeout = {1, 0};
+#define sem_wait(s) if (sem_timedwait(s, &sem_timeout)) {dbg("sem_timedwait error");}
 
 static data_fd_t *fd_get_data_fd(int fd);
 static char *fd_get_name(int fd);
