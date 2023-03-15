@@ -92,6 +92,7 @@ services:
       - AFC_OBJST_HIST_PORT=4999
       - AFC_OBJST_LOCAL_DIR=/storage
     dns_search: [.]
+    user: "${UID}:${GID}"
     volumes:
       - ./storage:/storage
   worker:
