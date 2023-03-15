@@ -867,8 +867,9 @@ void __attribute__((constructor)) aep_init(void)
 	/* share cache size */
 	cache_size_sem = sem_open("aep_shmem_sem", O_CREAT, 0666, 1);
 	aep_assert(cache_size_sem, "sem_open");
-	sem_wait(cache_size_sem);
 	shm_fd = shm_open("aep_shmem", O_RDWR | O_CREAT | O_EXCL, 0666);
+	dbg("aep_init");
+	sem_wait(cache_size_sem);
 	if (shm_fd < 0) {
 		/* O_CREAT | O_EXCL failed, so shared memory object already was initialized */
 		shm_fd = shm_open("aep_shmem", O_RDWR, 0666);
@@ -876,6 +877,7 @@ void __attribute__((constructor)) aep_init(void)
 		cache_size = (uint64_t *)mmap(NULL, sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
 	} else {
+		dbg("aep_init recount cache");
 		ftruncate(shm_fd, sizeof(uint64_t));
 		cache_size = (uint64_t *)mmap(NULL, sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
@@ -883,6 +885,7 @@ void __attribute__((constructor)) aep_init(void)
 		ftw(cache_path, ftw_callback, 100);
 	}
 	sem_post(cache_size_sem);
+	dbg("aep_init done");
 }
 
 FILE *fopen(const char *path, const char *mode)
