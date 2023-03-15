@@ -220,7 +220,7 @@ static char *ae_mountpoint; /* The path in which afc-engine seeking for static d
 static char *real_mountpoint; /* The path in which static data really is */
 static bool aep_use_gs = false;
 static int logfile = -1;
-static volatile uint64_t *cache_size;
+static volatile int64_t *cache_size;
 static sem_t *cache_size_sem;
 static uint64_t cache_size_add;
 
@@ -492,6 +492,22 @@ static int f_close(FILE *f)
 }
 #endif
 
+static inline void cache_size_set(int64_t size)
+{
+	sem_wait(cache_size_sem);
+	*cache_size += size;
+	sem_post(cache_size_sem);
+}
+
+static inline int64_t cache_size_get()
+{
+	int64_t tmp;
+	sem_wait(cache_size_sem);
+	tmp = *cache_size;
+	sem_post(cache_size_sem);
+	return tmp;
+}
+
 static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typeflag)
 {
 	if (typeflag == FTW_F && sb->st_size) {
@@ -505,7 +521,7 @@ static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typ
 		ret = unlink(fpath);
 		sem_post(sem);
 		if (!ret) {
-			*cache_size -= sb->st_size;
+			cache_size_set(-sb->st_size);
 		}
 		dbg("Remove %s done, cs %lu", (char *)fpath + strlen(cache_path), *cache_size);
 	}
@@ -515,12 +531,10 @@ static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typ
 /* remove files in the cache until the cache have <size> free space */
 static void reduce_cache(uint64_t size)
 {
-	sem_wait(cache_size_sem);
-	if (*cache_size + size > max_cached_size) {
+	if (cache_size_get() + size > max_cached_size) {
 		cache_size_add = size;
 		ftw(cache_path, ftw_remove_callback, 100);
 	}
-	sem_post(cache_size_sem);
 }
 
 static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
@@ -555,9 +569,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 			dbg("reduce_cache done cs %lu", *cache_size);
 			dbg("download %s", data_fd->tpath);
 			if (!download_file(data_fd, fakepath)) {
-				sem_wait(cache_size_sem);
-				*cache_size += data_fd->fe->size;
-				sem_post(cache_size_sem);
+				cache_size_set(data_fd->fe->size);
 				dbg("download %s done, cs %lu", data_fd->tpath, *cache_size);
 				is_cached = true;
 			} else {
@@ -640,6 +652,7 @@ static int fd_add(char *tpath)
 	if (fe->size) {
 		sem_post(sem);
 		sem_close(sem);
+		dbg("fd_add(%s) done", tpath);
 	}
 
 	fd = orig_open(fakepath, O_RDONLY);
@@ -888,12 +901,12 @@ void __attribute__((constructor)) aep_init(void)
 		/* O_CREAT | O_EXCL failed, so shared memory object already was initialized */
 		shm_fd = shm_open("aep_shmem", O_RDWR, 0666);
 		aep_assert(shm_fd >= 0, "shm_open");
-		cache_size = (uint64_t *)mmap(NULL, sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+		cache_size = (int64_t *)mmap(NULL, sizeof(int64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
 	} else {
 		dbg("aep_init recount cache");
 		ftruncate(shm_fd, sizeof(uint64_t));
-		cache_size = (uint64_t *)mmap(NULL, sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+		cache_size = (int64_t *)mmap(NULL, sizeof(int64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		*cache_size = 0;
 		aep_assert(cache_size, "mmap");
 		/* count existing cache size */
