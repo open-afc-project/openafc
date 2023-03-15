@@ -496,14 +496,14 @@ static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typ
 	if (typeflag == FTW_F && sb->st_size) {
 		sem_t *sem;
 
-		dbg("Remove %s", (char *)fpath + strlen(cache_path));
+		dbg("Remove %s, cs %lu", (char *)fpath + strlen(cache_path), *cache_size);
 		sem = sem_open((char *)fpath + strlen(cache_path), O_CREAT, 0666, 1);
 		aep_assert(sem, "sem_open");
 		sem_wait(sem);
 		unlink(fpath);
 		sem_post(sem);
 		*cache_size -= sb->st_size;
-		dbg("Remove %s done", (char *)fpath + strlen(cache_path));
+		dbg("Remove %s done, cs %lu", (char *)fpath + strlen(cache_path), *cache_size);
 	}
 	return *cache_size < max_cached_size ? -1 : 0;
 }
@@ -544,20 +544,20 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 			is_cached = true;
 		}
 		if (!is_cached && data_fd->fe->size <= max_cached_file_size) {
-			dbg("reduce_cache");
+			dbg("reduce_cache cs %lu", *cache_size);
 			sem_wait(cache_size_sem);
 			reduce_cache(data_fd->fe->size);
 			sem_post(cache_size_sem);
-			dbg("reduce_cache done");
+			dbg("reduce_cache done cs %lu", *cache_size);
 			dbg("download %s", data_fd->tpath);
 			if (!download_file(data_fd, fakepath)) {
 				sem_wait(cache_size_sem);
 				*cache_size += data_fd->fe->size;
 				sem_post(cache_size_sem);
-				dbg("download %s done", data_fd->tpath);
+				dbg("download %s done, cs %lu", data_fd->tpath, *cache_size);
 				is_cached = true;
 			} else {
-				dbg("download %s failed", data_fd->tpath);
+				dbg("download %s failed, cs %lu", data_fd->tpath, *cache_size);
 			}
 		}
 	}
@@ -600,7 +600,7 @@ static int fd_add(char *tpath)
 	char fakepath[AEP_PATH_MAX];
 	char *p = fakepath;
 	struct stat statbuf;
-	sem_t *sem;
+//	sem_t *sem;
 
 	fe = find_fe(tpath);
 	if (!fe) {
@@ -610,8 +610,9 @@ static int fd_add(char *tpath)
 	strcat(fakepath, tpath);
 
 	/* create cache file */
-	sem = sem_open(tpath, O_CREAT, 0666, 1);
-	sem_wait(sem);
+	dbg("fd_add(%s)", tpath);
+//	sem = sem_open(tpath, O_CREAT, 0666, 1);
+//	sem_wait(sem);
 	if (orig_stat(fakepath, &statbuf)) {
 		for (p = fakepath; *p; p++) {
 			if (*p == '/') {
@@ -630,7 +631,8 @@ static int fd_add(char *tpath)
 			mkdir(fakepath, 0777);
 		}
 	}
-	sem_post(sem);
+//	sem_post(sem);
+//	sem_close(sem);
 
 	fd = orig_open(fakepath, O_RDONLY);
 	aep_assert(fd >= 0, "fd_add(%s) open()", tpath);
@@ -884,12 +886,13 @@ void __attribute__((constructor)) aep_init(void)
 		dbg("aep_init recount cache");
 		ftruncate(shm_fd, sizeof(uint64_t));
 		cache_size = (uint64_t *)mmap(NULL, sizeof(uint64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+		*cache_size = 0;
 		aep_assert(cache_size, "mmap");
 		/* count existing cache size */
 		ftw(cache_path, ftw_callback, 100);
 	}
 	sem_post(cache_size_sem);
-	dbg("aep_init done");
+	dbg("aep_init done cs %lu", *cache_size);
 }
 
 FILE *fopen(const char *path, const char *mode)
