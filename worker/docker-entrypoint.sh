@@ -9,11 +9,11 @@
 if [ -n ${AFC_AEP_ENABLE+x} ]; then
 	if [ -z "$AFC_AEP_DEBUG" ]; then
 		export AFC_AEP_DEBUG=0
-		if [ -z "$AFC_AEP_LOGFILE" ]; then
-			export AFC_AEP_LOGFILE=/aep/log/aep.log
-		fi
-		mkdir -p $(dirname "$AFC_AEP_LOGFILE")
 	fi
+	if [ -z "$AFC_AEP_LOGFILE" ]; then
+		export AFC_AEP_LOGFILE=/aep/log/aep.log
+	fi
+	mkdir -p $(dirname "$AFC_AEP_LOGFILE")
 	if [ -z "$AFC_AEP_REAL_MOUNTPOINT" ]; then
 		export AFC_AEP_REAL_MOUNTPOINT=/mnt/nfs/rat_transfer
 	fi
