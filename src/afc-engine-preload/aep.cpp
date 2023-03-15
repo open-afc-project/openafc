@@ -496,14 +496,17 @@ static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typ
 {
 	if (typeflag == FTW_F && sb->st_size) {
 		sem_t *sem;
+		int ret;
 
-		dbg("Remove %s, cs %lu", (char *)fpath + strlen(cache_path), *cache_size);
+		dbg("Remove %s size=%ld cs=%lu", (char *)fpath + strlen(cache_path), sb->st_size, *cache_size);
 		sem = sem_open((char *)fpath + strlen(cache_path), O_CREAT, 0666, 1);
 		aep_assert(sem, "sem_open");
 		sem_wait(sem);
-		unlink(fpath);
+		ret = unlink(fpath);
 		sem_post(sem);
-		*cache_size -= sb->st_size;
+		if (!ret) {
+			*cache_size -= sb->st_size;
+		}
 		dbg("Remove %s done, cs %lu", (char *)fpath + strlen(cache_path), *cache_size);
 	}
 	return *cache_size + cache_size_add < max_cached_size ? -1 : 0;
@@ -577,14 +580,14 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 		orig_close(fd);
 		us = stoptime(&tv);
 		sem_post(sem);
-//		sem_close(sem);
+		sem_close(sem);
 		dbgl("read cached file %s size %zu time %u us cache %zu", data_fd->tpath, ret, us, *cache_size);
 		aepst.read_cached++;
 		aepst.read_cached_size += ret;
 		aepst.read_cached_time += us;
 	} else {
 		sem_post(sem);
-//		sem_close(sem);
+		sem_close(sem);
 		ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
 		aep_assert(ret >= 0, "read_data(%s) read_remote_data", fakepath)
 	}
@@ -601,7 +604,7 @@ static int fd_add(char *tpath)
 	char fakepath[AEP_PATH_MAX];
 	char *p = fakepath;
 	struct stat statbuf;
-//	sem_t *sem;
+	sem_t *sem;
 
 	fe = find_fe(tpath);
 	if (!fe) {
@@ -611,9 +614,11 @@ static int fd_add(char *tpath)
 	strcat(fakepath, tpath);
 
 	/* create cache file */
-	dbg("fd_add(%s)", tpath);
-//	sem = sem_open(tpath, O_CREAT, 0666, 1);
-//	sem_wait(sem);
+	if (fe->size) {
+		dbg("fd_add(%s)", tpath);
+		sem = sem_open(tpath, O_CREAT, 0666, 1);
+		sem_wait(sem);
+	}
 	if (orig_stat(fakepath, &statbuf)) {
 		for (p = fakepath; *p; p++) {
 			if (*p == '/') {
@@ -632,8 +637,10 @@ static int fd_add(char *tpath)
 			mkdir(fakepath, 0777);
 		}
 	}
-//	sem_post(sem);
-//	sem_close(sem);
+	if (fe->size) {
+		sem_post(sem);
+		sem_close(sem);
+	}
 
 	fd = orig_open(fakepath, O_RDONLY);
 	aep_assert(fd >= 0, "fd_add(%s) open()", tpath);
