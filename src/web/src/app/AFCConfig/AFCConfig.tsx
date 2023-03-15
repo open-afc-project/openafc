@@ -9,6 +9,7 @@ import { AFCConfigFile, FreqRange, RatResponse } from "../Lib/RatApiTypes";
 import { getDefaultAfcConf, putAfcConfigFile, guiConfig } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit } from "../Lib/Admin";
+import {getLastUsedRegionFromCookie} from "../Lib/Utils"
 
 /**
 * AFCConfic.tsx: main component for afc config page
@@ -24,8 +25,9 @@ interface AFCState {
     antennaPatterns: string[],
     regions: string[],
     messageType?: "Warn",
-    messageTitle: string,
-    messageValue: string
+    messageTitle?: string,
+    messageValue?: string,
+    isModalOpen?: boolean
 }
 
 /**
@@ -46,7 +48,14 @@ class AFCConfig extends React.Component<{
     constructor(props: Readonly<{ limit: RatResponse<Limit>; frequencyBands: RatResponse<FreqRange[]>; ulsFiles: RatResponse<string[]>; afcConf: RatResponse<AFCConfigFile>; antennaPatterns: RatResponse<string[]>; regions: RatResponse<string[]>}>) {
         super(props);
         //@ts-ignore
-        const state: AFCState = { config: getDefaultAfcConf() ,isModalOpen: false, messageValue: "", messageTitle: "" };
+       var lastRegFromCookie = getLastUsedRegionFromCookie();
+
+        const state: AFCState = {
+            config: getDefaultAfcConf(lastRegFromCookie), isModalOpen: false, messageValue: "", messageTitle: "",
+            ulsFiles: [],
+            antennaPatterns: [],
+            regions: []
+        };
         if (props.afcConf.kind === "Success") {
             if (props.afcConf.result.version === guiConfig.version) {
                 Object.assign(state, { config: props.afcConf.result });
@@ -54,7 +63,7 @@ class AFCConfig extends React.Component<{
                 logger.error("Could not load most recent AFC Config Defaults.",
                     "Expected version " + guiConfig.version + ", but got " + props.afcConf.result.version);
                 Object.assign(state, { 
-                    config: getDefaultAfcConf(), 
+                    config: getDefaultAfcConf(lastRegFromCookie), 
                     messageType: "Warn",
                     messageTitle: "Invalid Config Version",
                     messageValue: "The current version (" + guiConfig.version + ") is not compatible with the loaded configuration. The loaded configuration was created for version " + props.afcConf.result.version + ". The default configuration has been loaded instead. To resolve this AFC Config will need to be updated below.",
@@ -64,7 +73,7 @@ class AFCConfig extends React.Component<{
             logger.error("Could not load most recent AFC Config Defaults.",
                 "error code: ", props.afcConf.errorCode,
                 "description: ", props.afcConf.description)
-            Object.assign(state, { config: getDefaultAfcConf() });
+            Object.assign(state, { config: getDefaultAfcConf(lastRegFromCookie) });
         }
 
         if (props.ulsFiles.kind === "Success") {
