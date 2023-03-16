@@ -167,8 +167,21 @@ export const getLastUsedRegionFromCookie = () => {
             ?.split("=")[1];
     }
     else {
-        lastRegFromCookie = "USA"
+        lastRegFromCookie = "US"
     }
 
     return lastRegFromCookie!;
+}
+
+export const mapRegionCodeToName = (code:string)=>{
+    switch (code){
+        case 'US':
+            return 'USA';
+            break;
+        case 'CA':
+            return 'Canada';
+            break;
+        default:
+            return code;
+    }
 }

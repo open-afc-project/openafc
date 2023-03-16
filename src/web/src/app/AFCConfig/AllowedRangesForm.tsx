@@ -8,7 +8,7 @@ import { FreqRange } from "../Lib/RatApiTypes";
  */
 
 
-export const defaultRanges = { "USA": [           
+export const defaultRanges = { "US": [           
     {       
         name : "UNII-5",
         startFreqMHz : 5925,
@@ -20,7 +20,7 @@ export const defaultRanges = { "USA": [
         stopFreqMHz : 6875
     }               
 ],
-    "CANADA":[
+    "CA":[
         {
             name: "Canada",
             startFreqMHz : 5925,

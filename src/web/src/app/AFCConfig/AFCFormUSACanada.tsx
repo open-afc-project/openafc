@@ -217,12 +217,12 @@ export class AFCFormUSACanada extends React.Component<
     }
 
     private getLandCoverOptions = () => {
-        if (this.props.config.regionStr == "USA") {
+        if (this.props.config.regionStr == "US") {
             return <>
                 <FormSelectOption key="Production NLCD " value="rat_transfer/nlcd/nlcd_production" label="Production NLCD" />
                 <FormSelectOption key="WFA Test NLCD " value="rat_transfer/nlcd/nlcd_wfa" label="WFA Test NLCD" />
             </>
-        } else if (this.props.config.regionStr == "CANADA") {
+        } else if (this.props.config.regionStr == "CA") {
             return <>
                 <FormSelectOption key="2020 Land Cover " value="rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif" label="Land Cover of Canada" />
             </>
@@ -231,9 +231,9 @@ export class AFCFormUSACanada extends React.Component<
 
     private getDefaultLandCoverDatabase = () => {
         switch (this.props.config.regionStr) {
-            case "CANADA":
+            case "CA":
                 return 'rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif';
-            case "USA":
+            case "US":
             default:
                 return 'rat_transfer/nlcd/nlcd_production';
         }
@@ -485,7 +485,7 @@ export class AFCFormUSACanada extends React.Component<
                 <PropogationModelForm
                     data={this.getPropagationModelForForm()}
                     onChange={this.setPropogationModel}
-                    region={this.props.config.regionStr ?? "USA"} />
+                    region={this.props.config.regionStr ?? "US"} />
             </GalleryItem>
             {(this.props.config.propagationModel.kind === "ITM with no building data" || this.props.config.propagationModel.kind == "FCC 6GHz Report & Order" || this.props.config.propagationModel.kind == "ISED DBS-06") &&
                 <GalleryItem>
@@ -605,7 +605,7 @@ export class AFCFormUSACanada extends React.Component<
                     : <></>}
             </GalleryItem>
             <GalleryItem>
-                <AllowedRangesDisplay data={this.props.config.freqBands} region={this.props.config.regionStr ?? "USA"} />
+                <AllowedRangesDisplay data={this.props.config.freqBands} region={this.props.config.regionStr ?? "US"} />
             </GalleryItem>
             <GalleryItem>
                 <FormGroup label="AP Height below Min Allowable AGL Height Behavior"
