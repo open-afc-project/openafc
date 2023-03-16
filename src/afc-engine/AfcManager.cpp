@@ -1,5 +1,6 @@
 // AfcManager.cpp -- Manages I/O and top-level operations for the AFC Engine
 #include "AfcManager.h"
+#include "ratcommon/GzipCsv.h"
 #include "RlanRegion.h"
 #include <QFileInfo>
 
@@ -225,6 +226,77 @@ namespace OpClass
 	};
 
 }
+
+/** GZIP CSV for EIRP computation */
+class EirpGzipCsv : public GzipCsv {
+public:
+	ColStr callsign;					// ULS Path Callsign
+	ColInt pathNum;						// ULS Path number
+	ColInt ulsId;						// ULS Path ID from DB
+	ColInt segIdx;						// Segment index
+	ColInt divIdx;						// Diversity index
+	ColDouble scanLat;					// Scanpoint latitude
+	ColDouble scanLon;					// Scanpoint longitude
+	ColDouble scanAgl;					// Scanpoint elevation above ground
+	ColDouble scanAmsl;					// Scanpoint elevation above terrain
+	ColInt scanPtIdx;					// Scanpoint index
+	ColDouble distKm;					// Distance from scanpoint to FS RX
+	ColDouble elevationAngleTx;			// Elevation from scanpoint to FS RX
+	ColInt channel;						// Channel number
+	ColDouble chanStartMhz;				// Channel start MHz
+	ColDouble chanEndMhz;				// Channel end MHz
+	ColDouble chanBwMhz;				// Channel bandwidth MHz
+	ColEnum chanType;					// Request type (by freq/by number)
+	ColDouble eirpLimit;				// Resulting EIRP limit dB
+	ColBool fspl;						// Freespace (trial) pathLoss computation
+	ColDouble pathLossDb;				// Path loss dB
+	ColDouble buildingPenetrationDb;	// Building penetration loss dB
+	ColDouble offBoresight;				// Angle beween RX beam and direction to scanpoint
+	ColDouble rxGainDb;					// RX Gain DB (loss due to antenna diagram)
+	ColDouble pathClutterTxDb;			// Path clutter TX dB
+	ColDouble pathClutterRxDb;			// Path Clutter RX dB
+	ColDouble nearFieldOffsetDb;		// Near field offset dB
+	ColDouble spectralOverlapLossDb;	// Spectral overlap loss dB
+	ColDouble ulsAntennaFeederLossDb;	// FS Antenna feeder loss dB
+	ColDouble rxPowerDbW;				// Intermediate aggregated loss
+	ColDouble ulsNoiseLevelDbW;			// FS Noise level dB
+
+
+	EirpGzipCsv(const std::string &filename) :
+		GzipCsv(filename),
+		callsign(this, "CallSign"),
+		pathNum(this, "PathNumber"),
+		ulsId(this, "UlsId"),
+		segIdx(this, "SegIdx"),
+		divIdx(this, "DivIdx"),
+		scanLat(this, "ScanLat"),
+		scanLon(this, "ScanLon"),
+		scanAgl(this, "ScanAGL"),
+		scanAmsl(this, "ScanAMSL"),
+		scanPtIdx(this, "ScanIdx"),
+		distKm(this, "DistKm"),
+		elevationAngleTx(this, "ElevationAngleTx"),
+		channel(this, "Channel"),
+		chanStartMhz(this, "ChanStartMhz"),
+		chanEndMhz(this, "ChanEndMhz"),
+		chanBwMhz(this, "ChanBwMhz"),
+		chanType(this, "ChanType",
+			{{INQUIRED_FREQUENCY, "ByFreq"}, {INQUIRED_CHANNEL, "ByNumber"}}),
+		eirpLimit(this, "EIRP"),
+		fspl(this, "FreeSpace"),
+		pathLossDb(this, "PathLossDb"),
+		buildingPenetrationDb(this, "BuildingPenetrationDb"),
+		offBoresight(this, "OffBoresightDeg"),
+		rxGainDb(this, "RxGainDb"),
+		pathClutterTxDb(this, "PathClutterTxDb"),
+		pathClutterRxDb(this, "PathClutterRxDb"),
+		nearFieldOffsetDb(this, "NearFieldOffsetDb"),
+		spectralOverlapLossDb(this, "SpectralOverlapLossDb"),
+		ulsAntennaFeederLossDb(this, "UlsAntennaFeederLossDb"),
+		rxPowerDbW(this, "RxPowerDbW"),
+		ulsNoiseLevelDbW(this, "UlsNoiseLevel")
+	{}
+};
 
 AfcManager::AfcManager()
 {
@@ -6802,6 +6874,8 @@ void AfcManager::runPointAnalysis()
 
 		});
 	}
+
+	EirpGzipCsv eirpGc(_eirpGcFile);
 	/**************************************************************************************/
 
 	/**************************************************************************************/
@@ -7693,6 +7767,40 @@ void AfcManager::runPointAnalysis()
 												marginDB = _IoverN_threshold_dB - I2NDB;
 
 												eirpLimit_dBm = _maxEIRP_dBm + marginDB;
+
+												if (eirpGc) {
+													eirpGc.callsign = uls->getCallsign();
+													eirpGc.pathNum = uls->getPathNumber();
+													eirpGc.ulsId = uls->getID();
+													eirpGc.segIdx = segIdx;
+													eirpGc.divIdx = divIdx;
+													eirpGc.scanLat = rlanCoord.latitudeDeg;
+													eirpGc.scanLon = rlanCoord.longitudeDeg;
+													eirpGc.scanAgl = rlanHtAboveTerrain;
+													eirpGc.scanAmsl = rlanCoord.heightKm * 1000.0;
+													eirpGc.scanPtIdx = scanPtIdx;
+													eirpGc.distKm = distKm;
+													eirpGc.elevationAngleTx = elevationAngleTxDeg;
+													eirpGc.channel = channel->index;
+													eirpGc.chanStartMhz = channel->startFreqMHz;
+													eirpGc.chanEndMhz = channel->stopFreqMHz;
+													eirpGc.chanBwMhz = channel->stopFreqMHz - channel->startFreqMHz;
+													eirpGc.chanType = channel->type;
+													eirpGc.eirpLimit = eirpLimit_dBm;
+													eirpGc.fspl = forceFspl;
+													eirpGc.pathLossDb = pathLoss;
+													eirpGc.buildingPenetrationDb = buildingPenetrationDB;
+													eirpGc.offBoresight = angleOffBoresightDeg;
+													eirpGc.rxGainDb = rxGainDB;
+													eirpGc.pathClutterTxDb = pathClutterTxDB;
+													eirpGc.pathClutterRxDb = pathClutterRxDB;
+													eirpGc.nearFieldOffsetDb = nearFieldOffsetDB;
+													eirpGc.spectralOverlapLossDb = spectralOverlapLossDB;
+													eirpGc.ulsAntennaFeederLossDb =  uls->getRxAntennaFeederLossDB();
+													eirpGc.rxPowerDbW = rxPowerDBW;
+													eirpGc.ulsNoiseLevelDbW = uls->getNoiseLevelDBW();
+													eirpGc.writeRow();
+												}
 
 												if (forceFspl) {
 													// Skipping further computation if Free Space path loss
@@ -10375,6 +10483,7 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 
 	if (AfcManager::_createDebugFiles) {
 		_excThrFile = QDir(QString::fromStdString(tempDir)).filePath("exc_thr.csv.gz").toStdString();
+		_eirpGcFile = QDir(QString::fromStdString(tempDir)).filePath("eirp.csv.gz").toStdString();
 		_fsAnomFile = QDir(QString::fromStdString(tempDir)).filePath("fs_anom.csv.gz").toStdString();
 		_userInputsFile = QDir(QString::fromStdString(tempDir)).filePath("userInputs.csv.gz").toStdString();
 	}

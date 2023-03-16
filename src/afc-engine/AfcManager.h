@@ -454,6 +454,7 @@ class AfcManager
 
 		double _visibilityThreshold;             // I/N threshold to determine whether or not an RLAN is visible to an FS
 		std::string _excThrFile;                 // Generate file containing data for wifi devices where single entry I/N > visibility Threshold
+		std::string _eirpGcFile;                 // Generate file containing data for EIRP computation
 		std::string _fsAnomFile;                 // Generate file containing anomalous FS entries
 		std::string _userInputsFile;             // Generate file containing user inputs
 		std::string _kmlFile;                    // Generate kml file showing simulation results, primarily for debugging
