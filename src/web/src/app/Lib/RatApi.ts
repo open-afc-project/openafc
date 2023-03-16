@@ -216,7 +216,7 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
         "p2108Confidence": 5,
         "maxFsAglHeight": 6
     },
-    "nlcdFile": "nlcd_wfa",
+    "nlcdFile": "rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif",
     "enableMapInVirtualAp": false,
     "channelResponseAlgorithm": "psd",
     "visibilityThreshold": -6,
