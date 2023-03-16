@@ -173,6 +173,9 @@ std::string ULSClass::getEntityName() {
 std::string ULSClass::getCallsign() {
 	return(callsign);
 }
+int ULSClass::getPathNumber() {
+	return(pathNumber);
+}
 std::string ULSClass::getRxCallsign() {
 	return(rxCallsign);
 }
@@ -347,6 +350,10 @@ void ULSClass::setEntityName(std::string entityNameVal) {
 }
 void ULSClass::setCallsign(std::string callsignVal) {
 	callsign = callsignVal;
+	return;
+}
+void ULSClass::setPathNumber(int pathNumberVal) {
+	pathNumber = pathNumberVal;
 	return;
 }
 void ULSClass::setRxCallsign(std::string rxCallsignVal) {
