@@ -8,7 +8,7 @@ import { FreqRange } from "../Lib/RatApiTypes";
  */
 
 
-export const defaultRanges =   [           
+export const defaultRanges = { "USA": [           
     {       
         name : "UNII-5",
         startFreqMHz : 5925,
@@ -19,8 +19,15 @@ export const defaultRanges =   [
         startFreqMHz : 6525,
         stopFreqMHz : 6875
     }               
-]
-
+],
+    "CANADA":[
+        {
+            name: "Canada",
+            startFreqMHz : 5925,
+            stopFreqMHz : 6875
+        },      
+    ]
+}
 const cols = ["Name", "Low Frequency", "High Frequency"]
 
 
@@ -32,7 +39,7 @@ const freqBandToRow = (f: FreqRange, index) => ({
 /**
  * Sub form component for allowed freq ranges
  */
-export class AllowedRangesDisplay extends React.PureComponent<{data: FreqRange[]}, {showWarn: boolean}> {
+export class AllowedRangesDisplay extends React.PureComponent<{data: FreqRange[], region:string}, {showWarn: boolean}> {
 
     constructor(props) {
         super(props)
@@ -52,7 +59,7 @@ export class AllowedRangesDisplay extends React.PureComponent<{data: FreqRange[]
     }
 
     render() {
-        let dataSource = !this.props.data || this.props.data.length === 0 ? defaultRanges : this.props.data
+        let dataSource = !this.props.data || this.props.data.length === 0 ? defaultRanges[this.props.region] : this.props.data
         return (<>
             {this.state.showWarn ? <Alert title={'Error Fetching Allowed Frequency Ranges'} variant="warning" action={<AlertActionCloseButton onClose={() => this.setState({ showWarn: false, })}/> }>
                 <pre>Falling back to default UNII-5 and UNII-7 ranges</pre>

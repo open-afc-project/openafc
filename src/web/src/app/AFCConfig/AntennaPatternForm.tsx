@@ -21,7 +21,7 @@ const antennaPatterns = [
 /**
  * Sub form component for Antenna patterns
  */
-export default class AntennaPatternForm extends React.PureComponent<{ data: AntennaPatternState, antennaPatternFiles: string[], onChange: (x: AntennaPatternState) => void }> {
+export default class AntennaPatternForm extends React.PureComponent<{ data: AntennaPatternState, onChange: (x: AntennaPatternState) => void }> {
 
     private setKind = (s: string) => {
         switch (s) {

@@ -19,7 +19,7 @@
 extern void point_to_point(double elev[], double tht_m, double rht_m,
 		double eps_dielect, double sgm_conductivity, double eno_ns_surfref,
 		double frq_mhz, int radio_climate, int pol, double conf, double rel,
-		double &dbloss, char *strmode, int &errnum);
+		double &dbloss, std::string &strmode, int &errnum);
 
 namespace {
 	// Logger for all instances of class
@@ -47,9 +47,17 @@ namespace UlsMeasurementAnalysis {
 
 		// And distance.
 		if(tdist != NULL){
-			Vector3 fvec = EcefModel::geodeticToEcef(from.x(), from.y(), 0);
-			Vector3 tvec = EcefModel::geodeticToEcef(to.x(), to.y(), 0);
-			*tdist = (fvec - tvec).len();
+			// Vector3 fvec = EcefModel::geodeticToEcef(from.x(), from.y(), 0);
+			// Vector3 tvec = EcefModel::geodeticToEcef(to.x(), to.y(), 0);
+			// *tdist = (fvec - tvec).len();
+
+			double lon1Rad = from.y()*M_PI/180.0;
+			double lat1Rad = from.x()*M_PI/180.0;
+			double lon2Rad = to.y()*M_PI/180.0;
+			double lat2Rad = to.x()*M_PI/180.0;
+			double slat = sin((lat2Rad-lat1Rad)/2);
+			double slon = sin((lon2Rad-lon1Rad)/2);
+			*tdist = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
 		}
 
 		return latlons;
@@ -59,7 +67,7 @@ namespace UlsMeasurementAnalysis {
 		//  We're going to do what the fortran program does. It's kinda stupid, though.
 
 		//  Please excuse fortran style variable names. I have decrypted them where possible.
-		double earthRad = 6370.0;
+		double earthRad = CConst::averageEarthRadius / 1000.0;
 
 		// double fLonRad, tLonRad;
 		double fLatRad;
@@ -155,7 +163,7 @@ namespace UlsMeasurementAnalysis {
 		latlons.fill(QPointF(0, 0), numpts);
 		latlons[0] = from;
 
-		double delta = greatCircleDistance / numpts;
+		double delta = greatCircleDistance / (numpts-1);
 
 		double coLat = M_PI / 2.0 - fLatRad;
 		double cosco, sinco;
@@ -209,6 +217,46 @@ namespace UlsMeasurementAnalysis {
 		return latlons;
 	}
 
+	QVector<QPointF> computeGreatCircleLineMM(const QPointF &from, const QPointF &to, int numpts, double *tdist){
+
+		double lon1Rad = from.y()*M_PI/180.0;
+		double lat1Rad = from.x()*M_PI/180.0;
+		double lon2Rad = to.y()*M_PI/180.0;
+		double lat2Rad = to.x()*M_PI/180.0;
+		double slat = sin((lat2Rad-lat1Rad)/2);
+		double slon = sin((lon2Rad-lon1Rad)/2);
+		*tdist = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
+		Vector3 posn1 = Vector3(cos(lat1Rad)*cos(lon1Rad), cos(lat1Rad)*sin(lon1Rad), sin(lat1Rad));
+		Vector3 posn2 = Vector3(cos(lat2Rad)*cos(lon2Rad), cos(lat2Rad)*sin(lon2Rad), sin(lat2Rad));
+
+		double dotprod = posn1.dot(posn2);
+		if (dotprod > 1.0) {
+			dotprod = 1.0;
+		} else if (dotprod < - 1.0) {
+			dotprod = -1.0;
+		}
+
+		double greatCircleAngle = acos(dotprod);
+
+		Vector3 uVec = (posn1 + posn2).normalized();
+		Vector3 wVec = posn1.cross(posn2).normalized();
+		Vector3 vVec = wVec.cross(uVec);
+
+		QVector<QPointF> latlons(numpts);
+
+		for(int ptIdx=0; ptIdx<numpts; ++ptIdx) {
+			double theta_i = (greatCircleAngle*(2*ptIdx - (numpts-1)))/(2*(numpts-1));
+			Vector3 posn_i = uVec*cos(theta_i) + vVec*sin(theta_i);
+			double lon_i = atan2(posn_i.y(), posn_i.x());
+			double lat_i = atan2(posn_i.z(), posn_i.x()*cos(lon_i)+posn_i.y()*sin(lon_i));
+
+			latlons[ptIdx] = QPointF(lat_i*180.0/M_PI, lon_i*180.0/M_PI);
+		}
+
+		return latlons;
+	}
+
 	QVector<QPointF> computePartialGreatCircleLine(const QPointF &from, const QPointF &to, int numptsTotal, int numptsPartial, double *tdist){
 		QVector<QPointF> latlonGc = computeGreatCircleLine(from, to, numptsPartial + 1, tdist);
 
@@ -248,7 +296,8 @@ namespace UlsMeasurementAnalysis {
 		MultibandRasterClass::HeightResult lidarHeightResult;
 		CConst::HeightSourceEnum heightSource;
 
-		QVector<QPointF> latlons = computeApproximateGreatCircleLine(from, to, numpts, &tdist);
+		// QVector<QPointF> latlons = computeApproximateGreatCircleLine(from, to, numpts, &tdist);
+		QVector<QPointF> latlons = computeGreatCircleLineMM(from, to, numpts, &tdist);
 
 		double bldgDistRes = 1.0; // 1 meter
 		int maxBldgStep = std::min(100, (int) floor(tdist*1000/bldgDistRes));
@@ -342,7 +391,7 @@ namespace UlsMeasurementAnalysis {
 		double lon1rad = deg2rad(lon1); 
 		double lat2rad = deg2rad(lat2);
 		double lon2rad = deg2rad(lon2);
-		//    double deltalat = lat2rad - lat1rad;
+		// double deltalat = lat2rad - lat1rad;
 		double deltalon = lon2rad - lon1rad;
 
 		// law of cosines
@@ -364,7 +413,7 @@ namespace UlsMeasurementAnalysis {
 		double tdist;
 		QVector<QPointF> latlons = computeApproximateGreatCircleLine(from, to, numpts, &tdist);
 
-		// printf("Returned %d points instead of %d.\n", latlons.count(), numpts);           
+		// printf("Returned %d points instead of %d.\n", latlons.count(), numpts);
 
 		hi.resize(numpts);
 
@@ -401,10 +450,10 @@ namespace UlsMeasurementAnalysis {
 		if (!(*heightProfilePtr)) {
 			*heightProfilePtr = computeElevationVector(terrain, includeBldg, transLocLatLon, receiveLocLatLon, numpts);
 		}
-		(*heightProfilePtr)[1] = 1000 * lineOfSightDistanceKm / numpts;
 
 		double rv;
-		char buf[256];
+		std::string strmode;
+		// char strmode[50];
 		int errnum;
 
 		if (itmInitFlag) {
@@ -413,14 +462,11 @@ namespace UlsMeasurementAnalysis {
 			LOGGER_INFO(logger) << "ITM Parameter: pol = " << pol;
 			itmInitFlag = false;
 		}
-		point_to_point(*heightProfilePtr, transHt, receiveHt, eps_dielect, sgm_conductivity, eno_ns_surfref, frq_mhz, radio_climate, pol, conf, rel, rv, buf, errnum);
-		//qDebug() << " point_to_point" << rv << buf << errnum;
+		point_to_point(*heightProfilePtr, transHt, receiveHt, eps_dielect, sgm_conductivity, eno_ns_surfref, frq_mhz, radio_climate, pol, conf, rel, rv, strmode, errnum);
+		//qDebug() << " point_to_point" << rv << strmode << errnum;
 
 		if(prefix != NULL){
-			(*heightProfilePtr)[2] += transHt;
 			dumpHeightProfile(prefix, *heightProfilePtr);
-			int i = (int)(*heightProfilePtr)[0];
-			(*heightProfilePtr)[2 + i - 1] += receiveHt;
 		}
 
 		return rv;
@@ -431,7 +477,6 @@ namespace UlsMeasurementAnalysis {
 		if (!(*heightProfilePtr)) {
 			*heightProfilePtr = computeElevationVector(terrain, true, transLocLatLon, receiveLocLatLon, numpts);
 		}
-		(*heightProfilePtr)[1] = 1000 * lineOfSightDistanceKm / numpts;
 
 		double txHeightAMSL = (*heightProfilePtr)[2] + transHt;
 		double rxHeightAMSL = (*heightProfilePtr)[2+numpts-1] + receiveHt;

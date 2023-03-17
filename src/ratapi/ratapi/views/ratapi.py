@@ -172,6 +172,8 @@ class GuiConfig(MethodView):
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             mtls_admin_url=flask.url_for('admin.MTLS', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
+            about_url=flask.url_for('ratapi-v1.About') \
+                      if flask.current_app.config['OIDC_LOGIN'] else None,
             version=serververs,
         )
         return resp
@@ -322,6 +324,9 @@ class AfcConfigFile(MethodView):
     def put(self, filename):
         ''' PUT method for afc config
         '''
+        from .. import als
+        from flask_login import current_user
+
         user_id = auth(roles=['Super'])
         LOGGER.debug("current user: %s", user_id)
 
@@ -343,9 +348,11 @@ class AfcConfigFile(MethodView):
             if not config:
                 config = AFCConfig(rcrd)
                 db.session.add(config)
+                als.als_json_log('afc_config', {'action':'create', 'user':current_user.username, 'region':filename, 'from':flask.request.remote_addr, 'content':ordered_bytes})
             else:
                 config.config = rcrd
                 config.created = datetime.datetime.now()
+                als.als_json_log('afc_config', {'action':'update', 'user':current_user.username, 'region':filename, 'from':flask.request.remote_addr, 'content':ordered_bytes})
             db.session.commit()
 
         except:
@@ -366,6 +373,54 @@ class AfcRegions(MethodView):
         resp.content_type = 'text/plain'
         return resp
 
+
+class About(MethodView):
+    ''' Allow the web UI to manipulate configuration directly.
+    '''
+
+    def get(self):
+        ''' GET method for About
+        '''
+
+        resp = flask.make_response()
+        resp.data = flask.render_template("about.html", app_name="RLAN AFC")
+        resp.content_type = 'text/html'
+        return resp
+
+    def post(self):
+        ''' POST method for About
+        '''
+
+        from flask import request
+        from flask_mail import Mail, Message
+
+        try:
+            from .. import priv_config
+            dest_email = priv_config.REGISTRATION_DEST_EMAIL
+            src_email = priv_config.REGISTRATION_SRC_EMAIL
+            approve_link = priv_config.REGISTRATION_APPROVE_LINK
+        except:
+            dest_email = os.getenv('REGISTRATION_DEST_EMAIL')
+            src_email = os.getenv('REGISTRATION_SRC_EMAIL')
+            approve_link = os.getenv('REGISTRATION_APPROVE_LINK')
+
+            if not dest_email or not src_email:
+                raise werkzeug.exceptions.NotFound()
+
+        try:
+            name = request.form.get("name")
+            email = request.form.get("email")
+            org = request.form.get("org")
+            mail = Mail(flask.current_app)
+            msg = Message(f"Afc Access Request by {email}",
+                          sender=src_email,
+                          recipients=[dest_email])
+            msg.body = f'''Name:{name}\nEmail:{email}\nOrg:{org}
+Approve request at: {approve_link}'''
+            mail.send(msg)
+            return f"Thank you {name}. An access request for {email} has been submitted"
+        except:
+            raise werkzeug.exceptions.NotFound()
 
 
 class LiDAR_Bounds(MethodView):
@@ -897,3 +952,5 @@ module.add_url_rule('/replay',
                     view_func=ReloadAnalysis.as_view('ReloadAnalysis'))
 module.add_url_rule('/regions',
                     view_func=AfcRegions.as_view('AfcRegions'))
+module.add_url_rule('/about',
+                    view_func=About.as_view('About'))

@@ -413,7 +413,7 @@ def _send_recv(cfg, req_data):
         params_data['nocache'] = 'True'
 
     ser_cert=()
-    cli_certs=()
+    cli_certs=None
     app_log.debug(f"--- {cfg['ca_cert']}")
     if ((cfg['prot'] == AFC_PROT_NAME and
         cfg['verif'] == True) or (cfg['ca_cert'])):
@@ -421,6 +421,7 @@ def _send_recv(cfg, req_data):
         # add mtls certificates if explicitly provided
         if not isinstance(cfg['cli_cert'], type(None)):
             cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
+
         # add tls certificates if explicitly provided
         if not isinstance(cfg['ca_cert'], type(None)):
             ser_cert="".join(cfg['ca_cert'])
@@ -445,6 +446,7 @@ def _send_recv(cfg, req_data):
             data=new_req,
             headers=headers,
             timeout=600,    #10 min
+            cert=cli_certs,
             verify=ser_cert if cfg['verif'] else False)
         rawresp.raise_for_status()
     except (requests.exceptions.HTTPError,

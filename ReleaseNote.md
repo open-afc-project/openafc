@@ -1,4 +1,70 @@
-# Release Note
+ # Release Note
+
+## **Version and Date**
+|Version|**OA-570**|
+| :- | :- |
+|**Date**|**03/14/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-570: Fixing Canada FS parameters
+ * Jira OA-603: Bandwidth Issue Resolution
+ * This branch includes the following tasks for Canada AFC: OA-570, OA-545 (Generate a new Propagation model for Canada), OA-572 (FS Noise Figure), OA-546 (Setup AFC Config to be able to switch to Canada's configuration), OA-543 (Generate a new defaulg AFC Config for Canada). However, most the Canada tickets have not been tested and we are doing this PR as an emergency for getting OA-603 in. After this, we will start validating the Canada tickets and if we find a bug, we will open a new ticket. In addition, some of this tickets (e.g. OA-572) resulted in a change for US as well. As such all US changes have been validated as part of this PR.
+
+## **Interface Changes**
+ * There was a change in the ULS parser which resulted in a new FS database:
+ * This new FS database can be downloaded from: https://drive.google.com/file/d/1ogV5MESr0Ml2EE78C6KR03hAOPxvG_cE/view
+
+ * There are AFC Config GUI changes (for FS Noise Floor, use of Land Cover instead of NLCD when referring to this database generically).
+ * There are 2 other changes in afc-config.json for US: 1) "fsReceiverNoise": {"freqList": [6425], "noiseFloorList": [-110, -109.5]} 2) "nearFieldAdjFlag": true
+
+## **Testing Done**
+ * Ran FSP1, FSP41, SIP10 and IBP3 and got same results as last time. 
+ * Manually validated that OA-603 was implemented correctly in the FS database (US).
+
+## **Open Issues** 
+* We have yet to validate the following Canada tickets: OA-570, OA-572, OA-545, oA-546 and OA-543
+
+## **Version and Date**
+|Version|3.7.4.0|
+| :- | :- |
+|**Date**|**02/12/2023**|
+|compiled server's version is b72f6f6 | git tag 3.7.4.0|
+## **Issues Addressed**
+ * JIRA OA-542-support-of-unii-6-in-afc-engine
+ * JIRA OA-577 new golden resp with new FS/ULS database  which can be downloaded from https://drive.google.com/file/d/1OPBYHZ1iXR_M4NKelVHridK8bVpJSxPQ/view?usp=share_link.
+ * JIRA OA-588-remove-outdated-centos-7-worker
+ * JIRA OA-509 whitespace and copyright header update
+ * JIRA OA-589 Fix request with mTLS option
+ * JIRA OA-568 fixing paths for ULS canada based changes and switching updater to Alpine base
+ * JIRA OA-593 About Page for new user registration
+ * JIRA OA-596 Fix aep env var defaults
+ * JIRA OA-597 decrease-num-of-celery-proc to N=2
+ * JIRA OA-594_log_afc_config
+ * JIRA [dependabot] Bump werkzeug from 2.0.3 to 2.2.3 in /rat_server (#441)
+ * JIRA [dependabot] Bump wsgidav from 3.1.1 to 4.1.0 in /msghnd (#351)
+ * JIRA [dependabot] Bump werkzeug from 2.0.3 to 2.2.3 in /msghnd (#436)
+ * JIRA OA-585 new golden resp with FS_2023-03-10T03_32_19.614444_fixedBPS_sorted_param.sqlite3) from here https://drive.google.com/file/d/1Bfb7Hy2lPbtIJMdalUIEfsH0AWXq_Etj/view
+ * JIRA OA-585-fixes-required-in-itm
+
+## **Version and Date**
+|Version|**OA-585**|
+| :- | :- |
+|**Date**|**03/09/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-585: Fixes required in ITM
+ 
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Ran FSP1, FSP41, FSP82, SIP10, IBP1 and IBP3 and resutls were as expected. The package is attached to this Jira ticket.
+
+## **Open Issues** 
+
+
 
 ## **Version and Date**
 |Version|**OA-577**|

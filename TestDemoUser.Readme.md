@@ -2,7 +2,7 @@
 Test user can chose **TEST_USA** as a region in the AFC Config tab.  The admin needs to create AP with NRA of **TEST_FCC** for the test user to use in the query.
 
 # DEMO user configuration
-Test user can chose **DEMO_USA** as a region in the AFC Config tab.  The admin needs to create AP with NRA of **DEMO_FCC** for the test user to use in the query.
+Test user can chose **DEMO_USA** as a region in the AFC Config tab for Demo purposes or **TEST_USA** for testing purposes.  The admin needs to create AP with NRA of **DEMO_FCC** or **TEST_FCC** for these users to use in the query.
 
 ### Set up the demo and test AP and configuration
 

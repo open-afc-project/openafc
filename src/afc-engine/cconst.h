@@ -137,6 +137,7 @@ public:
 		F1245AntennaType,
 		F699AntennaType,
 		R2AIP07AntennaType,
+		R2AIP07CANAntennaType,
 		LUTAntennaType,
 		UnknownAntennaType
 	};
@@ -152,6 +153,7 @@ public:
 		CoalitionOpt6PathLossModel,
 		FCC6GHzReportAndOrderPathLossModel,
 		CustomPathLossModel,
+		ISEDDBS06PathLossModel,
 		FSPLPathLossModel
 	};
 	/**************************************************************************************/

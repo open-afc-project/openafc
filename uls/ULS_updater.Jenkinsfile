@@ -33,7 +33,7 @@ timestamps {
 
         stage ('ULS_Update - run') {
             sh """
-            docker run -t -v $ULS_FOLDER:/output_folder --rm uls_updater:$BUILD_ID
+            docker run -t -v $ULS_FOLDER:/output_folder -v $FS_DATA_FILES:/mnt/nfs/rat_transfer/daily_uls_parse/data_files --rm uls_updater:$BUILD_ID
             """
         }
     }

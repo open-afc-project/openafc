@@ -125,7 +125,7 @@ build_dev_server() {
   msg "prereqs are built"
 
   # build of ULS docker
-  docker_build_and_push ${wd}/uls/Dockerfile-uls_updater ${ULS_UPDATER}:${tag}-centos7 ${push} &
+  docker_build_and_push ${wd}/uls/Dockerfile-uls_updater ${ULS_UPDATER}:${tag} ${push} &
 
   # build msghnd  (flask + gunicorn)
   docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND}:${tag} ${push} &

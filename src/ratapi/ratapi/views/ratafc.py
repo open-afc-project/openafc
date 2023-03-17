@@ -272,7 +272,7 @@ def success_done(t):
                     "extensionId": "openAfc.mapinfo",
                     "parameters": {
                         "kmzFile": kmz_data if kmz_data else None,
-                        "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS) if map_data else None
+                        "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None
                     }
                 }]
             else:
@@ -280,7 +280,7 @@ def success_done(t):
                     "extensionId": "openAfc.mapinfo",
                     "parameters": {
                         "kmzFile": kmz_data if kmz_data else None,
-                        "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS) if map_data else None
+                        "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None
                     }
                 })
             resp_data = json.dumps(resp_json)
@@ -499,7 +499,7 @@ class RatAfc(MethodView):
                     with dataif.open("dbg", history_dir + "/analysisRequest.json") as hfile:
                         hfile.write(request_json_bytes)
                     with dataif.open("dbg", history_dir + "/afc_config.json") as hfile:
-                        hfile.write(config_bytes)
+                        hfile.write(config_bytes.encode('utf-8'))
 
                 build_task(dataif,
                         request_type,

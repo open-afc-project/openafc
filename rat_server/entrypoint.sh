@@ -5,9 +5,10 @@
 #	sed -i "/<\/VirtualHost>/i  ProxyPassReverse \/dbg http:\/\/$HISTORY_HOST:4999\/dbgs\n  ProxyPass \/dbg http:\/\/$HISTORY_HOST:4999\/dbgs\n  ProxyPreserveHost On\n  ProxyRequests Off" $(ls /etc/httpd/conf.d/*-tls.conf)
 #fi
 #HTTPD_OPTIONS=${HTTPD_OPTIONS}
-#echo "/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND >"
-#/usr/sbin/httpd $HTTPD_OPTIONS -DFOREGROUND &
+echo "httpd $HTTPD_OPTIONS -DFOREGROUND >"
+httpd $HTTPD_OPTIONS -DFOREGROUND &
 #
+postfix start
 sleep infinity
 
 exit $?

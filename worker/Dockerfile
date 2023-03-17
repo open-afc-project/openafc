@@ -5,8 +5,8 @@
 # a copy of which is included with this software program
 
 # default value of args
-ARG BLD_TAG=3.7.3.0
-ARG PRINST_TAG=3.7.3.0
+ARG BLD_TAG=3.7.4.0
+ARG PRINST_TAG=3.7.4.0
 ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image
 ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall
 
@@ -50,11 +50,11 @@ COPY worker/afc-engine.sh /usr/bin/
 RUN chmod +x /usr/bin/afc-engine.sh
 
 # Development env
-COPY worker/devel.sh /root/
+COPY worker/devel.sh /wd/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
-RUN /root/devel.sh
-RUN rm -f /root/devel.sh
+RUN /wd/devel.sh
+RUN rm -f /wd/devel.sh
 
 FROM alpine:3.17
 COPY --from=install_image / /

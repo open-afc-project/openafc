@@ -50,6 +50,7 @@ const StrTypeClass CConst::strPathLossModelList[] = {
 	{               CConst::ITMBldgPathLossModel, "ITM with building data"    },
 	{ CConst::FCC6GHzReportAndOrderPathLossModel, "FCC 6GHz Report & Order"   },
 	{                CConst::CustomPathLossModel, "Custom"                    },
+	{             CConst::ISEDDBS06PathLossModel, "ISED DBS-06"               },
 	{         CConst::CoalitionOpt6PathLossModel, "ITM with no building data" },
 
 	{                                    -1,  (char *) 0                      }
@@ -85,11 +86,12 @@ const StrTypeClass CConst::strPropEnvList[] = {
 };
 
 const StrTypeClass CConst::strULSAntennaTypeList[] = {
-	{      CConst::F1336OmniAntennaType, "F.1336 Omni"  },
-	{          CConst::F1245AntennaType, "F.1245"       },
-	{           CConst::F699AntennaType, "F.699"        },
-	{        CConst::R2AIP07AntennaType, "WINNF-AIP-07" },
-	{                                -1,  (char *) 0    }
+	{      CConst::F1336OmniAntennaType, "F.1336 Omni"       },
+	{          CConst::F1245AntennaType, "F.1245"            },
+	{           CConst::F699AntennaType, "F.699"             },
+	{        CConst::R2AIP07AntennaType, "WINNF-AIP-07"      },
+	{     CConst::R2AIP07CANAntennaType, "WINNF-AIP-07-CAN"  },
+	{                                -1,  (char *) 0         }
 };
 
 const StrTypeClass CConst::strHeightSourceList[] = {

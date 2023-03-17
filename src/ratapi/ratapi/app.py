@@ -107,7 +107,7 @@ def create_app(config_override=None):
        os.getenv('OIDC_LOGIN', str(flaskapp.config['OIDC_LOGIN'])).lower() == "true")
 
     if flaskapp.config['OIDC_LOGIN']:
-        from models.aaa import User
+        from .models.aaa import User
         from flask_login import  LoginManager
         login_manager = LoginManager()
         login_manager.init_app(flaskapp)

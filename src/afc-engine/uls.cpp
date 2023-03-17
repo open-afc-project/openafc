@@ -570,6 +570,9 @@ double ULSClass::computeRxGain(double angleOffBoresightDeg, double elevationAngl
 	case CConst::R2AIP07AntennaType:
 		rxGainDB = calcR2AIP07Antenna(angleOffBoresightDeg, frequency, rxAntennaModel, rxAntennaCategory, subModelStr, divIdx, maxGain, Dlambda);
 		break;
+	case CConst::R2AIP07CANAntennaType:
+		rxGainDB = calcR2AIP07CANAntenna(angleOffBoresightDeg, frequency, rxAntennaModel, rxAntennaCategory, subModelStr, divIdx, maxGain, Dlambda);
+		break;
 	case CConst::OmniAntennaType:
 		rxGainDB = 0.0;
 		break;
@@ -730,6 +733,78 @@ double ULSClass::calcR2AIP07Antenna(double angleOffBoresightDeg, double frequenc
 /******************************************************************************************/
 
 /******************************************************************************************/
+/**** FUNCTION: ULSClass::calcR2AIP07CANAntenna                                        ****/
+/******************************************************************************************/
+double ULSClass::calcR2AIP07CANAntenna(double angleOffBoresightDeg, double frequency, std::string antennaModel, CConst::AntennaCategoryEnum category,
+	std::string &subModelStr, int divIdx, double maxGain, double Dlambda)
+{
+	int freqIdx;
+	double rxGainDB;
+
+	if ((frequency >= 5925.0e6) && (frequency <= 6425.0e6)) {
+		freqIdx = 0;
+	} else if ((frequency >= 6425.0e6) && (frequency <= 6930.0e6)) {
+		freqIdx = 1;
+	} else {
+		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07CANAntenna: frequency = " << frequency << " INVALID value");
+	}
+
+	double minSuppression;
+	if (freqIdx == 0) {
+		if (angleOffBoresightDeg < 1.7) {
+			minSuppression = 0.0;
+		} else if (angleOffBoresightDeg < 5.8) {
+			minSuppression = 2.6;
+		} else if (angleOffBoresightDeg < 8.0) {
+			minSuppression = 17.0;
+		} else if (angleOffBoresightDeg < 11.0) {
+			minSuppression = 21.0;
+		} else if (angleOffBoresightDeg < 15.0) {
+			minSuppression = 23.0;
+		} else if (angleOffBoresightDeg < 20.0) {
+			minSuppression = 28.0;
+		} else if (angleOffBoresightDeg < 30.0) {
+			minSuppression = 30.0;
+		} else if (angleOffBoresightDeg < 35.0) {
+			minSuppression = 33.0;
+		} else if (angleOffBoresightDeg < 100.0) {
+			minSuppression = 35.0;
+		} else if (angleOffBoresightDeg < 140.0) {
+			minSuppression = 39.0;
+		} else {
+			minSuppression = 45.0;
+		}
+	} else if (freqIdx == 1) {
+		if (angleOffBoresightDeg < 1.1) {
+			minSuppression = 0.0;
+		} else if (angleOffBoresightDeg < 5.0) {
+			minSuppression = 3.0;
+		} else if (angleOffBoresightDeg < 10.0) {
+			minSuppression = 21.0;
+		} else if (angleOffBoresightDeg < 15.0) {
+			minSuppression = 25.0;
+		} else if (angleOffBoresightDeg < 20.0) {
+			minSuppression = 29.0;
+		} else if (angleOffBoresightDeg < 30.0) {
+			minSuppression = 32.0;
+		} else if (angleOffBoresightDeg < 100.0) {
+			minSuppression = 35.0;
+		} else if (angleOffBoresightDeg < 140.0) {
+			minSuppression = 39.0;
+		} else {
+			minSuppression = 45.0;
+		}
+	} else {
+		CORE_DUMP;
+	}
+
+	rxGainDB = maxGain - minSuppression;
+
+	return(rxGainDB);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
 /**** FUNCTION: ULSClass::computeBeamWidth                                             ****/
 /******************************************************************************************/
 double ULSClass::computeBeamWidth(double attnDB)
@@ -876,6 +951,9 @@ double PRClass::computeDiscriminationGain(double angleOffBoresightDeg, double el
 						break;
 					case CConst::R2AIP07AntennaType:
 						discriminationDB = ULSClass::calcR2AIP07Antenna(angleOffBoresightDeg, frequency, antModel, antCategory, subModelStr, 0, rxGain, rxDlambda) - rxGain;
+						break;
+					case CConst::R2AIP07CANAntennaType:
+						discriminationDB = ULSClass::calcR2AIP07CANAntenna(angleOffBoresightDeg, frequency, antModel, antCategory, subModelStr, 0, rxGain, rxDlambda) - rxGain;
 						break;
 					case CConst::OmniAntennaType:
 						discriminationDB = 0.0;
