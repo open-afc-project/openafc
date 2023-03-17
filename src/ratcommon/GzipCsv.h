@@ -185,6 +185,7 @@ public:
 
 		/** Setting field value */
 		ColStr &operator = (const std::string &value) {markSet(); _value = value; return *this;}
+		ColStr &operator = (char value) {markSet(); _value = value; return *this;}
 
 		/** Returning field value (assert if not set) */
 		const std::string &value() const {checkSet(); return _value;}
@@ -286,8 +287,13 @@ public:
 	/** Marks all columns as not set */
 	void clearRow();
 
-	/** Writes row with currently set values, marks all columns as not set */
-	void writeRow();
+	/** Writes currently set column values as CSV row, marks all columns as not
+	 * set
+	 */
+	void completeRow();
+
+	/** Writes sequence of strings as CSV row */
+	void writeRow(const std::vector<std::string> &columns);
 
 private:
 	friend class ColBase;

@@ -35,7 +35,7 @@ void GzipCsv::clearRow()
 	}
 }
 
-void GzipCsv::writeRow()
+void GzipCsv::completeRow()
 {
 	if (!*this) {
 		return;
@@ -53,6 +53,15 @@ void GzipCsv::writeRow()
 	clearRow();
 	_csvWriter->writeEndRow();
 }
+
+void GzipCsv::writeRow(const std::vector<std::string> &columns)
+{
+	for (const auto &col: columns) {
+		_csvWriter->writeRecord(QString::fromStdString(col));
+	}
+	_csvWriter->writeEndRow();
+}
+
 
 void GzipCsv::addColumn(ColBase *column)
 {
@@ -151,5 +160,5 @@ QString GzipCsv::ColEnum::formatValue() const
 		return QString();
 	}
 	const auto &it = _items.find(_value);
-	return (it == _items.end()) ? _defName : it->second;
+	return (it == _items.end()) ? (_defName + QString::asprintf(" (%d)", _value)) : it->second;
 }
