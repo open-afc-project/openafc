@@ -1,6 +1,34 @@
  # Release Note
 
 ## **Version and Date**
+|Version|**OA-574**|
+| :- | :- |
+|**Date**|**03/17/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-574: Add Country Boundary for Canada
+ * This includes a few bug fixes found in OA-570 ("Fixing Canada FS parameters") upon validation
+ * There is a new FS Database with a bug fix of matching Canada's Passive Site with Rx.
+ * The new FS database can be downloaded from: https://drive.google.com/file/d/1Xv1i1r0StIvmuXyO5d5BcY8yDkmrU5l9/view?usp=share_link
+ * This FS database is: FS_2023-03-17T18_37_00.293116_fixedBPS_sorted_param.sqlite3
+
+## **Interface Changes**
+ * Changed the way the country boundary is used. The engine now uses the regionStr in afc-config.json that is set to country's 2-letter code (e.g. US, CA) and uses the kml filename that matches that country's code (e.g. US.kml or CA.kml). These files are stored under rat_transfer/population.
+
+
+
+## **Testing Done**
+ * OA-574: Ran FSP1 but for ISED-certified AP and confirmed that AP in US would get rejected since it's outside of Canadian boundary CA.kml. 
+ * Confirmed that when running FCC-certified APs, US AFC is used and when runnig ISED-certified APs, CA AFC is used. See test attached to this ticket.
+ * OA-570: Created Canada links with missing parameters (Rx bandwidth, emissionDesignator, Rx gain, Rx antenna model, Rx height, Passive repeater/reflector height, passive reflector horizontal and/or vertical dimension) and confirmed in .sqlite3 FS database that they were set correctly. This file (the .csv version) is attached to this ticket for reference on what was validated.
+ * OA-570: For missing feederloss and antenna pattern, confirmed in exc_thr file that 0 dB feederloss and the SRSP antenna pattern was used. See test attached to this ticket.
+ * OA-572: Confirmed in exc_thr file that the correct Noise Floor was used
+
+## **Open Issues** 
+* We have yet to test Canada's propagation model with Canada's Digital Surface Model Database
+
+## **Version and Date**
 |Version|**OA-570**|
 | :- | :- |
 |**Date**|**03/14/2023**|
