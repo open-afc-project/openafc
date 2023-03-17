@@ -174,9 +174,9 @@ void FreqAssignmentClass::readFreqAssignment(const std::string filename)
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: FreqAssignmentClass::getBandwidth                                      ****/
+/**** FUNCTION: FreqAssignmentClass::getBandwidthUS                                    ****/
 /******************************************************************************************/
-double FreqAssignmentClass::getBandwidth(double freqMHz)
+double FreqAssignmentClass::getBandwidthUS(double freqMHz)
 {
 	bool found = false;
     double bandwidth;
@@ -202,6 +202,8 @@ double FreqAssignmentClass::getBandwidth(double freqMHz)
             bandwidth = 60.0;
         } else if (freqMHz < 6425.0) {
             bandwidth = 2*(6425.0 - freqMHz);
+        } else if (freqMHz < 6525.0) {
+            bandwidth = -1.0;  // UNII-6 not allowed for US
         } else if (freqMHz < 6540.0) {
             bandwidth = 2*(freqMHz - 6525.0);
         } else if (freqMHz < 6860.0) {

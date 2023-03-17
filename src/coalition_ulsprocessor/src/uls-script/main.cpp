@@ -549,7 +549,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                         bwMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(e.desig);
                     }
                     if ( isnan(bwMHz) || (bwMHz > 60.0) || (bwMHz == 0) ) {
-                        bwMHz = freqAssignment.getBandwidth(txFreq.frequencyAssigned);
+                        bwMHz = freqAssignment.getBandwidthUS(txFreq.frequencyAssigned);
                     } else {
                         bool unii5Flag = (txFreq.frequencyAssigned >= UlsFunctionsClass::unii5StartFreqMHz)
                                       && (txFreq.frequencyAssigned <= UlsFunctionsClass::unii5StopFreqMHz);
@@ -575,7 +575,6 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                             }
                         }
                     }
-
 
                     if (bwMHz == -1.0) {
                         numUnableGetBandwidth++;
@@ -615,7 +614,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                 }
 
                 AntennaModel::CategoryEnum category;
-                AntennaModelClass *rxAntModel = antennaModelMap.find(antPfx, rxAnt.antennaModel, category);
+                AntennaModelClass *rxAntModel = antennaModelMap.find(antPfx, rxAnt.antennaModel, category, AntennaModel::B1Category);
 
                 AntennaModel::CategoryEnum rxAntennaCategory;
                 double rxAntennaDiameter;
@@ -639,7 +638,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     fixedReason.append("Rx Antenna Model Unmatched");
                 }
 
-                AntennaModelClass *txAntModel = antennaModelMap.find(antPfx, txAnt.antennaModel, category);
+                AntennaModelClass *txAntModel = antennaModelMap.find(antPfx, txAnt.antennaModel, category, AntennaModel::B1Category);
 
                 AntennaModel::CategoryEnum txAntennaCategory;
                 double txAntennaDiameter;
@@ -841,7 +840,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                         UlsAntenna &prAnt = prAntList[prIdx-1];
                         UlsSegment &segment = segList[prIdx];
 
-			            AntennaModelClass *prAntModel = antennaModelMap.find(antPfx, prAnt.antennaModel, category);
+			            AntennaModelClass *prAntModel = antennaModelMap.find(antPfx, prAnt.antennaModel, category, AntennaModel::B1Category);
 
                         AntennaModel::TypeEnum prAntennaType;
                         AntennaModel::CategoryEnum prAntennaCategory;
@@ -1027,7 +1026,7 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
             makeLink(station, prList, idxList, azimuthPtg, elevationPtg);
 
             AntennaModel::CategoryEnum category;
-            AntennaModelClass *rxAntModel = antennaModelMap.find(antPfx, station.antennaModel, category);
+            AntennaModelClass *rxAntModel = antennaModelMap.find(antPfx, station.antennaModel, category, AntennaModel::UnknownCategory);
 
             AntennaModel::CategoryEnum rxAntennaCategory;
             double rxAntennaDiameter;
@@ -1147,7 +1146,7 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
 
                     const PassiveRepeaterCAClass &pr = prList[prIdx];
 
-                    AntennaModelClass *prAntModel = antennaModelMap.find(antPfx, pr.antennaModelA, category);
+                    AntennaModelClass *prAntModel = antennaModelMap.find(antPfx, pr.antennaModelA, category, AntennaModel::UnknownCategory);
 
                     PassiveRepeaterCAClass::PRTypeEnum prAntennaType;
                     AntennaModel::CategoryEnum prAntennaCategory;
@@ -1457,7 +1456,7 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap, std::string inpu
                     strval = fieldList.at(antennaModelFieldIdx);
 
                     AntennaModel::CategoryEnum category;
-                    AntennaModelClass *antModel = antennaModelMap.find(antPfx, strval, category);
+                    AntennaModelClass *antModel = antennaModelMap.find(antPfx, strval, category, AntennaModel::UnknownCategory);
 
                     std::string matchedModelName;
                     if (antModel) {

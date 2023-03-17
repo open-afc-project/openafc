@@ -1159,11 +1159,11 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
     }
 
     // R1-AIP-19-CAN
-    if (current.bandwidthMHz == std::numeric_limits<double>::quiet_NaN()) {
+    if ( (isnan(current.bandwidthMHz)) || (current.bandwidthMHz == 0.0) ) {
         current.bandwidthMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(QString::fromStdString(current.emissionsDesignator));
     }
 
-    if (current.bandwidthMHz == std::numeric_limits<double>::quiet_NaN()) {
+    if (isnan(current.bandwidthMHz)) {
 
         if (current.centerFreqMHz < 5925.0) {
             // Do nothing
@@ -1434,6 +1434,14 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool
     int maxNumSegment;
     std::string maxNumSegmentCallsign = "";
 
+    const std::vector<double> bwMHzListUnii5 = {
+        0.4, 0.8, 1.25, 2.5, 3.75, 5.0, 10.0, 30.0, 60.0
+    };
+
+    const std::vector<double> bwMHzListUnii7 = {
+        0.4, 0.8, 1.25, 2.5, 3.75, 5.0, 10.0, 30.0
+    };
+
     foreach (const UlsFrequency &freq, frequencies()) {
 
         UlsPath path;
@@ -1504,8 +1512,33 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool
                     bwMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(e.desig);
                 }
                 if ( isnan(bwMHz) || (bwMHz > 60.0) || (bwMHz == 0) ) {
-                    bwMHz = freqAssignment.getBandwidth(freq.frequencyAssigned);
+                    bwMHz = freqAssignment.getBandwidthUS(freq.frequencyAssigned);
+                } else {
+                    bool unii5Flag = (freq.frequencyAssigned >= UlsFunctionsClass::unii5StartFreqMHz)
+                                  && (freq.frequencyAssigned <= UlsFunctionsClass::unii5StopFreqMHz);
+                    bool unii7Flag = (freq.frequencyAssigned >= UlsFunctionsClass::unii7StartFreqMHz)
+                                  && (freq.frequencyAssigned <= UlsFunctionsClass::unii7StopFreqMHz);
+                    const std::vector<double> *fccBWList = (std::vector<double> *) NULL;
+                    if (unii5Flag) {
+                        fccBWList = &bwMHzListUnii5;
+                    } else if (unii7Flag) {
+                        fccBWList = &bwMHzListUnii7;
+                    }
+                    if (fccBWList) {
+                        bool found = false;
+                        double fccBW;
+                        for(int i=0; (i<(int) fccBWList->size()) &&(!found); ++i) {
+                            if (fccBWList->at(i) >= bwMHz) {
+                                found = true;
+                                fccBW = fccBWList->at(i);
+                            }
+                        }
+                        if (found) {
+                            bwMHz = std::min(fccBW, bwMHz*1.1);
+                        }
+                    }
                 }
+
                 if ( (bwMHz == -1) ) {
                     invalidFlag = true;
                 } else if (isnan(freq.frequencyUpperBand)) {
@@ -1668,6 +1701,8 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
             pr.azimuthPtgB = std::numeric_limits<double>::quiet_NaN();
             pr.elevationPtgA = std::numeric_limits<double>::quiet_NaN();
             pr.elevationPtgB = std::numeric_limits<double>::quiet_NaN();
+
+            pr.reflectorPosition = EcefModel::geodeticToEcef(pr.latitudeDeg, pr.longitudeDeg, (pr.groundElevation + pr.heightAGLA)/ 1000.0);
 
             passiveRepeaterMap[authorizationNumber.c_str()] << pr;
         }
