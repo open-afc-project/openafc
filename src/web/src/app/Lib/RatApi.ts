@@ -148,7 +148,7 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
             "stopFreqMHz": 6875
         },
     ],
-    "ulsDefaultAntennaType": "WINNF-AIP-07",
+    "ulsDefaultAntennaType": "WINNF-AIP-07-CAN",
     "scanPointBelowGroundMethod": "truncate",
     "polarizationMismatchLoss": {
         "kind": "Fixed Value",
@@ -164,9 +164,9 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
         "value": 0
     },
     "receiverFeederLoss": {
-        "IDU": 3,
+        "IDU": 0,
         "ODU": 0,
-        "UNKNOWN": 3
+        "UNKNOWN": 0
     },
     "fsReceiverNoise": {
         "freqList": [6425],

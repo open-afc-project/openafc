@@ -474,7 +474,8 @@ export class AFCFormUSACanada extends React.Component<
             <GalleryItem>
                 <AntennaPatternForm
                     data={this.props.antennaPatterns}
-                    onChange={this.setAntennaPattern} />
+                    onChange={this.setAntennaPattern}
+                    region={this.props.config.regionStr ?? "US"} />
             </GalleryItem>
             <GalleryItem>
                 <APUncertaintyForm
