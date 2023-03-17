@@ -8,6 +8,7 @@ import { Limit } from "../Lib/Admin";
 import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
 import DownloadContents from "../Components/DownloadContents";
 import { AFCFormUSACanada } from "./AFCFormUSACanada";
+import { mapRegionCodeToName } from "../Lib/Utils";
 
 /**
 * AFCForm.tsx: form for generating afc configuration files to be used to update server
@@ -42,7 +43,7 @@ export class AFCForm extends React.Component<
         if (props.frequencyBands.length > 0) {
             config.freqBands = props.frequencyBands;
         } else {
-            config.freqBands = defaultRanges[config.regionStr ?? "USA"];
+            config.freqBands = defaultRanges[config.regionStr ?? "US"];
         }
 
         this.state = {
@@ -204,9 +205,9 @@ export class AFCForm extends React.Component<
         // if (this.props.frequencyBands.length > 0) {
         //     config.freqBands = this.props.frequencyBands;
         // } else {
-        //     config.freqBands = defaultRanges[config.regionStr ?? "USA"];
+        //     config.freqBands = defaultRanges[config.regionStr ?? "US"];
         // }
-        config.freqBands = defaultRanges[config.regionStr ?? "USA"];
+        config.freqBands = defaultRanges[config.regionStr ?? "US"];
 
         this.updateEntireConfigState(config);
     }
@@ -311,7 +312,7 @@ export class AFCForm extends React.Component<
                                 >
                                     <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
                                     {this.props.regions.map((option: string) => (
-                                        <FormSelectOption key={option} value={option} label={option} />
+                                        <FormSelectOption key={option} value={option} label={mapRegionCodeToName(option)} />
                                     ))}
                                 </FormSelect>
                             </FormGroup>
@@ -346,7 +347,7 @@ export class AFCForm extends React.Component<
                                 </FormSelect>
                             </FormGroup>
                         </GalleryItem>
-                        {(this.state.config.regionStr == "CANADA" || this.state.config.regionStr == "USA") &&
+                        {(this.state.config.regionStr == "CA" || this.state.config.regionStr == "US") &&
                             <AFCFormUSACanada
                                 config={this.state.config}
                                 antennaPatterns={this.state.antennaPatternData}

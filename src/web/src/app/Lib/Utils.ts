@@ -157,6 +157,8 @@ export const bearing = (p1: { lat: number, lon: number }, p2: { lat: number, lon
     return brng;
 }
 
+// Gets the last used region from the afc config page value to use in presenting the correct 
+// config on the config page and looking up the last used config for showing/hiding the map on the AFC page 
 export const getLastUsedRegionFromCookie = () => {
 
     var lastRegFromCookie: string | undefined = undefined;
@@ -167,8 +169,34 @@ export const getLastUsedRegionFromCookie = () => {
             ?.split("=")[1];
     }
     else {
-        lastRegFromCookie = "USA"
+        lastRegFromCookie = "US"
+    }
+
+    // Update when region names change
+    switch (lastRegFromCookie) {
+        case "USA":
+            lastRegFromCookie = "US"
+            break;
+        case "CANADA":
+            lastRegFromCookie = "CA"
+            break;
+        default:
+            break;
     }
 
     return lastRegFromCookie!;
+}
+
+// Converts the region codes to human readable text
+export const mapRegionCodeToName = (code:string)=>{
+    switch (code){
+        case 'US':
+            return 'USA';
+            break;
+        case 'CA':
+            return 'Canada';
+            break;
+        default:
+            return code;
+    }
 }

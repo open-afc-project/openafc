@@ -12,7 +12,7 @@ import { BuildingSourceValues, CustomPropagation, CustomPropagationLOSOptions, F
  * Enumeration of propogation models
  */
 const propogationModels = {
-    "USA": [
+    "US": [
         "FSPL",
         "ITM with building data",
         //"ITM with no building data",
@@ -20,7 +20,7 @@ const propogationModels = {
         "Ray Tracing",
         "Custom"
     ],
-    "CANADA": [
+    "CA": [
         "FSPL",
         "ITM with building data",
         //"ITM with no building data",

@@ -109,7 +109,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     },
     "propagationEnv": "NLCD Point",
     "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
-    "regionStr": "USA",
+    "regionStr": "US",
     "APUncertainty": {
         "horizontal": 30,
         "height": 5
@@ -197,7 +197,7 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
     },
     "propagationEnv": "NLCD Point",
     "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
-    "regionStr": "CANADA",
+    "regionStr": "CA",
     "APUncertainty": {
         "horizontal": 30,
         "height": 5
@@ -216,7 +216,7 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
         "p2108Confidence": 5,
         "maxFsAglHeight": 6
     },
-    "nlcdFile": "nlcd_wfa",
+    "nlcdFile": "rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif",
     "enableMapInVirtualAp": false,
     "channelResponseAlgorithm": "psd",
     "visibilityThreshold": -6,
@@ -269,7 +269,7 @@ export const getRegions = (): Promise<RatResponse<string[]>> => (
  * @returns The default AFC Configuration
  */
 export const getDefaultAfcConf = (x: string | undefined) => {
-    if(x == "CANADA"){
+    if(x == "CA"){
         return defaultAfcConfCanada();
     }else{
         return defaultAfcConf();
@@ -306,7 +306,7 @@ export const getAfcConfigFile = (region:string): Promise<RatResponse<AFCConfigFi
  * @returns success message or error
  */
 export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<string>> => (
-    fetch(guiConfig.afcconfig_defaults.replace("default", conf.regionStr ?? "USA"), {
+    fetch(guiConfig.afcconfig_defaults.replace("default", conf.regionStr ?? "US"), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(conf, undefined, 3)

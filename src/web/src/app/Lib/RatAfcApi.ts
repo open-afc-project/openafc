@@ -85,7 +85,7 @@ export const sampleRequestObject: AvailableSpectrumInquiryRequest = {
     minDesiredPower: 15,
     vendorExtensions: [{
         extensionId: "RAT v1.3 AFC Config",
-        parameters: getDefaultAfcConf("USA")
+        parameters: getDefaultAfcConf("US")
     }],
     inquiredChannels: [
         {
