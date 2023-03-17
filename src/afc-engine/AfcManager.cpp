@@ -464,12 +464,19 @@ public:
 	ColDouble lat;
 	ColDouble dist;
 	ColDouble amsl;
-	ColStr flag;
+	ColDouble losAmsl;
+	ColInt fsid;
+	ColInt divIdx;
+	ColInt segIdx;
+	ColInt scanPtIdx;
+	ColInt rlanHtIdx;
 
 	TraceGzipCsv(std::string filename) :
 		GzipCsv(filename),
 		ptId(this, "PT_ID"), lon(this, "PT_LON (deg)"), lat(this, "PT_LAT (deg)"),
-		dist(this, "HORIZ_DIST (Km)"), amsl(this, "PT_HEIGHT_AMSL (m)"), flag(this, "BLDG_FLAG")
+		dist(this, "GROUND_DIST (Km)"), amsl(this, "TERRAIN_HEIGHT_AMSL (m)"),
+		losAmsl(this, "LOS_PATH_HEIGHT_AMSL (m)"), fsid(this, "FSID"), divIdx(this, "DIV_IDX"),
+		segIdx(this, "SEG_IDX"), scanPtIdx(this, "SCAN_PT_IDX"), rlanHtIdx(this, "RLAN_HEIGHT_IDX")
 	{}
 };
 
@@ -7725,30 +7732,6 @@ void AfcManager::runPointAnalysis()
 
 							int rlanPosnIdx;
 
-#if DEBUG_AFC
-							if (traceFlag) {
-								pathTraceGc.ptId = boost::format("BEGIN_%d") % uls->getID();
-								pathTraceGc.flag = "-1";
-								pathTraceGc.completeRow();
-
-								for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx) {
-									pathTraceGc.ptId = boost::format("RLAN_%d") % rlanPosnIdx;
-									pathTraceGc.lon = rlanCoordList[rlanPosnIdx].longitudeDeg;
-									pathTraceGc.lat = rlanCoordList[rlanPosnIdx].latitudeDeg;
-									pathTraceGc.amsl = rlanCoordList[rlanPosnIdx].heightKm*1000.0;
-									pathTraceGc.flag = "AMSL";
-									pathTraceGc.completeRow();
-								}
-								pathTraceGc.ptId = "FS_RX";
-								pathTraceGc.lon = ulsRxLongitude;
-								pathTraceGc.lat = ulsRxLatitude;
-								pathTraceGc.amsl = ulsRxLatitude;
-								pathTraceGc.amsl = ulsRxHeightAMSL;
-								pathTraceGc.flag = "AMSL";
-								pathTraceGc.completeRow();
-							}
-#endif
-
 							for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx)
 							{
 								Vector3 rlanPosn = rlanPosnList[rlanPosnIdx];
@@ -8106,6 +8089,42 @@ void AfcManager::runPointAnalysis()
 										}
 									}
 								}
+#if DEBUG_AFC
+								if (traceFlag&&(!contains2D)) {
+									if (uls->ITMHeightProfile) {
+										double lon1Rad = rlanCoord.longitudeDeg*M_PI/180.0;
+										double lat1Rad = rlanCoord.latitudeDeg*M_PI/180.0;
+										int N = ((int) uls->ITMHeightProfile[0]) + 1;
+										for(int ptIdx=0; ptIdx<N; ptIdx++) {
+											Vector3 losPathPosn = (((double) (N-1-ptIdx))/(N-1))*rlanPosn + (((double) ptIdx)/(N-1))*ulsRxPos;
+						                	GeodeticCoord losPathPosnGeodetic = EcefModel::ecefToGeodetic(losPathPosn);
+
+                                        	double ptLon = losPathPosnGeodetic.longitudeDeg;
+                                        	double ptLat = losPathPosnGeodetic.latitudeDeg;
+                                        	double losPathHeight = losPathPosnGeodetic.heightKm*1000.0;
+
+											double lon2Rad = ptLon*M_PI/180.0;
+											double lat2Rad = ptLat*M_PI/180.0;
+											double slat = sin((lat2Rad-lat1Rad)/2);
+											double slon = sin((lon2Rad-lon1Rad)/2);
+											double ptDistKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
+
+											traceGc.ptId = boost::format("PT_%d") % ptIdx;
+											traceGc.lon = losPathPosnGeodetic.longitudeDeg;
+											traceGc.lat = losPathPosnGeodetic.latitudeDeg;
+											traceGc.dist = ptDistKm;
+											traceGc.amsl = uls->ITMHeightProfile[2+ptIdx];
+											traceGc.losAmsl = losPathHeight;
+											traceGc.fsid = uls->getID();
+											traceGc.divIdx = divIdx;
+											traceGc.segIdx = segIdx;
+											traceGc.scanPtIdx = scanPtIdx;
+											traceGc.rlanHtIdx = rlanPosnIdx;
+											traceGc.completeRow();
+										}
+									}
+								}
+#endif
 							}
 
 
@@ -8160,33 +8179,6 @@ void AfcManager::runPointAnalysis()
 						cont = false;
 					}
 
-					if (traceFlag&&(!contains2D)) {
-						traceIdx++;
-						if (uls->ITMHeightProfile) {
-							double rlanLon = rlanCoordList[0].longitudeDeg;
-							double rlanLat = rlanCoordList[0].latitudeDeg;
-							double fsLon = uls->getRxLongitudeDeg();
-							double fsLat = uls->getRxLatitudeDeg();
-							int N = ((int) uls->ITMHeightProfile[0]) + 1;
-							Vector3 rlanCenterPosn = rlanPosnList[0];
-							lineOfSightVectorKm = ulsRxPos - rlanCenterPosn;
-							Vector3 upVec = rlanCenterPosn.normalized();
-							Vector3 horizVec = (lineOfSightVectorKm - (lineOfSightVectorKm.dot(upVec) * upVec));
-							double horizDistKm = sqrt((horizVec).dot(horizVec));
-							for(int ptIdx=0; ptIdx<N; ptIdx++) {
-								pathTraceGc.ptId = boost::format("PT_%d") % ptIdx;
-								pathTraceGc.lon = ( rlanLon * (N-1-ptIdx) + fsLon*ptIdx ) / (N-1);
-								pathTraceGc.lat = ( rlanLat * (N-1-ptIdx) + fsLat*ptIdx ) / (N-1);
-								pathTraceGc.dist = horizDistKm*ptIdx / (N-1);
-								pathTraceGc.amsl = uls->ITMHeightProfile[2+ptIdx];
-								pathTraceGc.completeRow();
-							}
-						}
-						std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
-						pathTraceGc.ptId = boost::format("END_%s_%d") % dbName.c_str() % uls->getID();
-						pathTraceGc.flag = ("-1");
-						pathTraceGc.completeRow();
-					}
 #					endif
 
 				}
