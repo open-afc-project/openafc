@@ -22,7 +22,7 @@ source $wd/tests/regression/regression.sh
 
 hostname
 # export test dut configuration
-cd $wd/tests && docker build . -t ${RTEST_DI}:${TAG}
+cd $wd && docker build . -t ${RTEST_DI}:${TAG} -f tests/Dockerfile
 
 # whether to use a dir with random name
 tests_dir=$wd/tests/regression
