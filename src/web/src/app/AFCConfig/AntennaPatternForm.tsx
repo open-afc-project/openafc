@@ -12,16 +12,23 @@ import { AntennaPatternState } from "../Lib/RatApiTypes";
 /**
  * Enumeration of antenna pattern types
  */
-const antennaPatterns = [
-    'WINNF-AIP-07',
-    "F.699",
-    "F.1245"
-];
+const antennaPatterns = {
+    "US": [
+        'WINNF-AIP-07',
+        "F.699",
+        "F.1245"
+    ],
+    "CA": [
+        'WINNF-AIP-07-CAN',
+        "F.699",
+        "F.1245"
+    ]
+};
 
 /**
  * Sub form component for Antenna patterns
  */
-export default class AntennaPatternForm extends React.PureComponent<{ data: AntennaPatternState, onChange: (x: AntennaPatternState) => void }> {
+export default class AntennaPatternForm extends React.PureComponent<{ data: AntennaPatternState, region: string, onChange: (x: AntennaPatternState) => void }> {
 
     private setKind = (s: string) => {
         switch (s) {
@@ -33,6 +40,9 @@ export default class AntennaPatternForm extends React.PureComponent<{ data: Ante
                 break;
             case 'WINNF-AIP-07':
                 this.props.onChange({ defaultAntennaPattern: 'WINNF-AIP-07', userUpload: this.props.data.userUpload });
+                break;
+            case 'WINNF-AIP-07-CAN':
+                this.props.onChange({ defaultAntennaPattern: 'WINNF-AIP-07-CAN', userUpload: this.props.data.userUpload });
                 break;
 
             default:
@@ -57,7 +67,7 @@ export default class AntennaPatternForm extends React.PureComponent<{ data: Ante
                 isValid={this.props.data.defaultAntennaPattern !== undefined}
                 style={{ textAlign: "right" }}
             >
-                {antennaPatterns.map((option) => (
+                {antennaPatterns[this.props.region].map((option) => (
                     <FormSelectOption key={option} value={option} label={option} />
                 ))}
             </FormSelect>

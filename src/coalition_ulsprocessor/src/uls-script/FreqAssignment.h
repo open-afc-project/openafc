@@ -10,7 +10,7 @@
 class FreqAssignmentClass {
 public:
 	FreqAssignmentClass(const std::string freqAssignmentFile);
-	double getBandwidth(double freqMHz);
+	double getBandwidthUS(double freqMHz);
 
 private:
 	void readFreqAssignment(const std::string filename);

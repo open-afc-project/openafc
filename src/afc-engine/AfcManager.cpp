@@ -1982,11 +1982,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	// Input parameters stored in the AfcManager object
 	_regionStr = jsonObj["regionStr"].toString().toStdString();
 
-	if (_regionStr == "USA") {
-		_regionPolygonFileList = SearchPaths::forReading("data", "rat_transfer/population/USA_PRI_VIR.kml", true).toStdString();
-	} else {
-		throw std::runtime_error("AfcManager::importConfigAFCjson(): Invalid regionStr specified: \"" + _regionStr + "\"");
-	}
+	_regionPolygonFileList = SearchPaths::forReading("data", "rat_transfer/population/" + QString::fromStdString(_regionStr) + ".kml", true).toStdString();
 
 	if (jsonObj.contains("nlcdFile") && !jsonObj["nlcdFile"].isUndefined()) {
 		_nlcdFile = SearchPaths::forReading("data", jsonObj["nlcdFile"].toString(), true).toStdString();

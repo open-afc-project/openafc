@@ -5,10 +5,11 @@ import { NotFound } from "./NotFound/NotFound";
 import { Dashboard } from "./Dashboard/Dashboard";
 import { PageSection, Card, CardHeader } from "@patternfly/react-core";
 import { getAfcConfigFile, getRegions } from "./Lib/RatApi";
-import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv} from "./Lib/FileApi";
+import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv } from "./Lib/FileApi";
 import { UserAccountPage } from "./UserAccount/UserAccount";
 import { getUsers, getMinimumEIRP, Limit, getAllowedRanges } from "./Lib/Admin";
 import { Replay } from "./Replay/Replay"
+import { getLastUsedRegionFromCookie } from "./Lib/Utils";
 
 /**
  * routes.tsx: definition of app routes
@@ -37,7 +38,7 @@ const getRatAfcModuleAsync = () => {
   return () => import(/* webpackChunkName: "ap-afc" */ "./RatAfc/RatAfc");
 }
 const ratAfcResolves = async () => ({
-  conf: await getAfcConfigFile("USA"),
+  conf: await getAfcConfigFile(getLastUsedRegionFromCookie()),
   limit: await getMinimumEIRP()
 })
 
@@ -84,13 +85,15 @@ const getAfcConfigModuleAsync = () => {
 }
 
 const afcConfigResolves = async () => {
+  var lastRegFromCookie = getLastUsedRegionFromCookie();
+
   return {
-  conf: await getAfcConfigFile("USA"),
-  ulsFiles: await getUlsFiles(),
-  antennaPatterns: await getAntennaPatterns(),
-  regions: await getRegions(),
-  limit: await getMinimumEIRP(),
-  frequencyBands: await getAllowedRanges()
+    conf: await getAfcConfigFile(lastRegFromCookie!),
+    ulsFiles: await getUlsFiles(),
+    antennaPatterns: await getAntennaPatterns(),
+    regions: await getRegions(),
+    limit: await getMinimumEIRP(),
+    frequencyBands: await getAllowedRanges()
   }
 }
 const AFCConfig = () => {

@@ -350,7 +350,7 @@ def generateUlsScriptInputCA(directory, logFile, genFilename):
                     for row in csvreader:
                         for (i,field) in enumerate(row):
                             row[i] = field.replace('|', ':')
-                        combined.write('CA:' + code + '|' + ('|'.join(row)) + '\n')
+                        combined.write('CA:' + code + '|' + ('|'.join(row)) + '|\n')
 
 def daily_uls_parse(state_root, interactive):
     startTime = datetime.datetime.now()

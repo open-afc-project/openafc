@@ -725,7 +725,8 @@ inline bool isInvalidModelNameChar(char c)
 /******************************************************************************************/
 /**** FUNCTION: AntennaModelMapClass::find()                                           ****/
 /******************************************************************************************/
-AntennaModelClass *AntennaModelMapClass::find(std::string antPfx, std::string modelName, AntennaModel::CategoryEnum &category)
+AntennaModelClass *AntennaModelMapClass::find(std::string antPfx, std::string modelName, AntennaModel::CategoryEnum &category,
+AntennaModel::CategoryEnum modelNameBlankCategory)
 {
 	bool found = false;
 	int antIdx;
@@ -808,7 +809,7 @@ AntennaModelClass *AntennaModelMapClass::find(std::string antPfx, std::string mo
         /**********************************************************************************/
         if (!found) {
             if (modelName == antPfx) {
-                category = AntennaModel::B1Category;
+                category = modelNameBlankCategory;
             }
         }
         /**********************************************************************************/
