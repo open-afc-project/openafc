@@ -222,11 +222,6 @@ static bool aep_use_gs = false;
 static int logfile = -1;
 static volatile int64_t *cache_size;
 static sem_t *cache_size_sem;
-#if 0
-static uint64_t cache_size_add;
-#endif
-static const struct timespec sem_timeout = {.tv_sec = 30, .tv_nsec = 0,};
-#define sem_wait(s, i) if (sem_timedwait(s, &sem_timeout)) {dbg("sem_timedwait error %s", i);}
 
 static data_fd_t *fd_get_data_fd(int fd);
 static char *fd_get_name(int fd);
@@ -498,7 +493,7 @@ static int f_close(FILE *f)
 
 static inline void cache_size_set(int64_t size)
 {
-	sem_wait(cache_size_sem, "cache_size_sem");
+	sem_wait(cache_size_sem);
 	*cache_size += size;
 	sem_post(cache_size_sem);
 }
@@ -506,44 +501,11 @@ static inline void cache_size_set(int64_t size)
 static inline int64_t cache_size_get()
 {
 	int64_t tmp;
-	sem_wait(cache_size_sem, "cache_size_sem");
+	sem_wait(cache_size_sem);
 	tmp = *cache_size;
 	sem_post(cache_size_sem);
 	return tmp;
 }
-
-#if 0
-static int ftw_remove_callback(const char *fpath, const struct stat *sb, int typeflag)
-{
-	if (typeflag == FTW_F && sb->st_size) {
-		sem_t *sem;
-		int ret;
-
-		dbg("Remove %s size=%ld cs=%lu", (char *)fpath + strlen(cache_path), sb->st_size, *cache_size);
-		sem = sem_open((char *)fpath + strlen(cache_path), O_CREAT, 0666, 1);
-		aep_assert(sem, "sem_open");
-		sem_wait(sem, (char *)fpath + strlen(cache_path));
-		ret = unlink(fpath);
-		sem_post(sem);
-		if (!ret) {
-			cache_size_set(-sb->st_size);
-		}
-		dbg("Remove %s done, cs %lu", (char *)fpath + strlen(cache_path), *cache_size);
-	}
-	return *cache_size + cache_size_add < max_cached_size ? -1 : 0;
-}
-
-/* remove files in the cache until the cache have <size> free space */
-static void reduce_cache(uint64_t size)
-{
-	dbg("reduce_cache cs %lu", *cache_size);
-	if (cache_size_get() + size > max_cached_size) {
-		cache_size_add = size;
-		ftw(cache_path, ftw_remove_callback, 100);
-	}
-	dbg("reduce_cache done cs %lu", *cache_size);
-}
-#endif
 
 static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 {
@@ -563,7 +525,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 
 	sem = sem_open(data_fd->tpath, O_CREAT, 0666, 1);
 	aep_assert(sem, "sem_open");
-	sem_wait(sem, data_fd->tpath);
+	sem_wait(sem);
 
 	/* download whole file to cache if possible */
 	if (!orig_stat(fakepath, &stat)) {
@@ -634,7 +596,7 @@ static int fd_add(char *tpath)
 	if (fe->size) {
 		dbg("fd_add(%s)", tpath);
 		sem = sem_open(tpath, O_CREAT, 0666, 1);
-		sem_wait(sem, tpath);
+		sem_wait(sem);
 	}
 	if (orig_stat(fakepath, &statbuf)) {
 		for (p = fakepath; *p; p++) {
@@ -698,7 +660,7 @@ static void fd_rm(int fd)
 		struct stat stat;
 
 		sem = sem_open(data_fd->tpath + strlen(cache_path), O_CREAT, 0666, 1);
-		sem_wait(sem, data_fd->tpath);
+		sem_wait(sem);
 		if (!fstat(fd, &stat)) {
 			if (stat.st_size) {
 				ftruncate(fd, 0);
@@ -919,7 +881,7 @@ void __attribute__((constructor)) aep_init(void)
 	aep_assert(cache_size_sem, "sem_open");
 	shm_fd = shm_open("aep_shmem", O_RDWR | O_CREAT | O_EXCL, 0666);
 	dbg("aep_init");
-	sem_wait(cache_size_sem, "cache_size_sem");
+	sem_wait(cache_size_sem);
 	if (shm_fd < 0) {
 		/* O_CREAT | O_EXCL failed, so shared memory object already was initialized */
 		shm_fd = shm_open("aep_shmem", O_RDWR, 0666);
