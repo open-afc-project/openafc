@@ -535,19 +535,6 @@ static uint8_t files_open_set(const char *name, int val)
 	return ret;
 }
 
-#if 0
-static uint8_t files_open_get(const char *name)
-{
-	uint16_t fno = hash_fname(name);
-	uint8_t ret;
-
-	sem_wait(shmem_sem);
-	ret = open_files[fno];
-	sem_post(shmem_sem);
-	return ret;
-}
-#endif
-
 static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 {
 	char fakepath[AEP_PATH_MAX];
@@ -966,7 +953,7 @@ void __attribute__((constructor)) aep_init(void)
 	sem_wait(shmem_sem);
 	if (shm_fd < 0)
 	{
-		dbg("aep_init cache already inited");
+		dbg("aep_init cache skip");
 		/* O_CREAT | O_EXCL failed, so shared memory object already was initialized */
 		shm_fd = shm_open("aep_shmem", O_RDWR, 0666);
 		aep_assert(shm_fd >= 0, "shm_open");
