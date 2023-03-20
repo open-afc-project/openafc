@@ -33,6 +33,8 @@
 #define AEP_PATH_MAX PATH_MAX
 #define AEP_FILENAME_MAX FILENAME_MAX
 
+#define HASH_SIZE	USHRT_MAX
+
 #define aep_assert(cond, format, ...) \
 	if (!(cond)) { \
 		fprintf(stderr, format " Abort!\n", ##__VA_ARGS__); \
@@ -221,7 +223,8 @@ static char *real_mountpoint; /* The path in which static data really is */
 static bool aep_use_gs = false;
 static int logfile = -1;
 static volatile int64_t *cache_size;
-static sem_t *cache_size_sem;
+static volatile int8_t *open_files;
+static sem_t *shmem_sem;
 
 static data_fd_t *fd_get_data_fd(int fd);
 static char *fd_get_name(int fd);
@@ -493,19 +496,63 @@ static int f_close(FILE *f)
 
 static inline void cache_size_set(int64_t size)
 {
-	sem_wait(cache_size_sem);
+	sem_wait(shmem_sem);
 	*cache_size += size;
-	sem_post(cache_size_sem);
+	sem_post(shmem_sem);
 }
 
 static inline int64_t cache_size_get()
 {
 	int64_t tmp;
-	sem_wait(cache_size_sem);
+	sem_wait(shmem_sem);
 	tmp = *cache_size;
-	sem_post(cache_size_sem);
+	sem_post(shmem_sem);
 	return tmp;
 }
+
+/* 16 bits hash */
+static uint16_t hash_fname(const char *str)
+{
+	uint8_t cor = 0; /* to do USGS_1_n32w099 and USGS_1_n33w098 differ */
+
+	uint16_t hash = 0x5555;
+	str++; /* skip '/' */
+	while (*str) {
+		hash ^= *((uint16_t *)str) + cor;
+		str += 2;
+		cor ++;
+	}
+	return hash;
+}
+
+static uint8_t files_open_set(const char *name, int val)
+{
+	uint16_t fno = hash_fname(name);
+	uint8_t ret;
+
+	sem_wait(shmem_sem);
+	open_files[fno] += val;
+	if (open_files[fno] < 0) {
+		open_files[fno] = 0;
+	}
+	ret = open_files[fno];
+	sem_post(shmem_sem);
+	dbg("files_open_set(%s, %d) %x %u", name, val, fno, open_files[fno]);
+	return ret;
+}
+
+#if 0
+static uint8_t files_open_get(const char *name)
+{
+	uint16_t fno = hash_fname(name);
+	uint8_t ret;
+
+	sem_wait(shmem_sem);
+	ret = open_files[fno];
+	sem_post(shmem_sem);
+	return ret;
+}
+#endif
 
 static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 {
@@ -583,7 +630,6 @@ static int fd_add(char *tpath)
 	char fakepath[AEP_PATH_MAX];
 	char *p = fakepath;
 	struct stat statbuf;
-	sem_t *sem;
 
 	fe = find_fe(tpath);
 	if (!fe) {
@@ -592,12 +638,8 @@ static int fd_add(char *tpath)
 	strcpy(fakepath, cache_path);
 	strcat(fakepath, tpath);
 
+	dbg("fd_add(%s)", tpath);
 	/* create cache file */
-	if (fe->size) {
-		dbg("fd_add(%s)", tpath);
-		sem = sem_open(tpath, O_CREAT, 0666, 1);
-		sem_wait(sem);
-	}
 	if (orig_stat(fakepath, &statbuf)) {
 		for (p = fakepath; *p; p++) {
 			if (*p == '/') {
@@ -616,12 +658,10 @@ static int fd_add(char *tpath)
 			mkdir(fakepath, 0777);
 		}
 	}
-	if (fe->size) {
-		sem_post(sem);
-		sem_close(sem);
-		dbg("fd_add(%s) done", tpath);
-	}
 
+	if (fe->size) {
+		files_open_set(tpath, 1);
+	}
 	fd = orig_open(fakepath, O_RDONLY);
 	aep_assert(fd >= 0, "fd_add(%s) open()", tpath);
 	memset(data_fds + fd, 0, sizeof(data_fd_t));
@@ -638,7 +678,7 @@ static int fd_add(char *tpath)
 	data_fds[fd].readdir_p = NULL;
 	data_fds[fd].dir.fd = fd;
 	strcpy(data_fds[fd].tpath, tpath);
-	dbgd("fd_add(%s) %d", tpath, fd);
+	dbg("fd_add(%s) done", tpath, fd);
 	return fd;
 }
 
@@ -654,23 +694,27 @@ static void fd_rm(int fd)
 	if (!data_fd->fe) {
 		return;
 	}
+	dbg("fd_rm(%s)", data_fd->tpath);
+	if (data_fd->fe->size) {
+		uint8_t lock = files_open_set(data_fd->tpath, -1);
+		if (cache_size_get() > (int64_t)max_cached_size && !lock) {
+			sem_t *sem;
+			struct stat stat;
 
-	if (data_fd->fe->size && cache_size_get() > (int64_t)max_cached_size) {
-		sem_t *sem;
-		struct stat stat;
-
-		sem = sem_open(data_fd->tpath + strlen(cache_path), O_CREAT, 0666, 1);
-		sem_wait(sem);
-		if (!fstat(fd, &stat)) {
-			if (stat.st_size) {
-				ftruncate(fd, 0);
-				cache_size_set(-stat.st_size);
+			sem = sem_open(data_fd->tpath + strlen(cache_path), O_CREAT, 0666, 1);
+			sem_wait(sem);
+			if (!fstat(fd, &stat)) {
+				if (stat.st_size) {
+					ftruncate(fd, 0);
+					cache_size_set(-stat.st_size);
+				}
 			}
+			sem_post(sem);
 		}
-		sem_post(sem);
 	}
 	orig_close(fd);
 	data_fd->fe = NULL;
+	dbg("fd_rm(%s) done", data_fd->tpath);
 }
 
 static inline data_fd_t *fd_get_data_fd(int fd)
@@ -877,27 +921,28 @@ void __attribute__((constructor)) aep_init(void)
 	free(stack);
 
 	/* share cache size */
-	cache_size_sem = sem_open("aep_shmem_sem", O_CREAT, 0666, 1);
-	aep_assert(cache_size_sem, "sem_open");
+	shmem_sem = sem_open("aep_shmem_sem", O_CREAT, 0666, 1);
+	aep_assert(shmem_sem, "sem_open");
 	shm_fd = shm_open("aep_shmem", O_RDWR | O_CREAT | O_EXCL, 0666);
 	dbg("aep_init");
-	sem_wait(cache_size_sem);
+	sem_wait(shmem_sem);
 	if (shm_fd < 0) {
 		/* O_CREAT | O_EXCL failed, so shared memory object already was initialized */
 		shm_fd = shm_open("aep_shmem", O_RDWR, 0666);
 		aep_assert(shm_fd >= 0, "shm_open");
-		cache_size = (int64_t *)mmap(NULL, sizeof(int64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+		cache_size = (int64_t *)mmap(NULL, sizeof(int64_t) + HASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
 	} else {
 		dbg("aep_init recount cache");
-		ftruncate(shm_fd, sizeof(uint64_t));
-		cache_size = (int64_t *)mmap(NULL, sizeof(int64_t), PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
-		*cache_size = 0;
+		ftruncate(shm_fd, sizeof(uint64_t) + HASH_SIZE);
+		cache_size = (int64_t *)mmap(NULL, sizeof(int64_t) + HASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
+		open_files = (int8_t *)(cache_size + 1);
+		memset((void *)open_files, 0, sizeof(int64_t) + HASH_SIZE);
 		/* count existing cache size */
 		ftw(cache_path, ftw_callback, 100);
 	}
-	sem_post(cache_size_sem);
+	sem_post(shmem_sem);
 	dbg("aep_init done cs %lu", *cache_size);
 }
 
