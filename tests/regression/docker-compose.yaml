@@ -97,6 +97,7 @@ services:
     image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
+      - /opt/afc/work/yd889380/aep/log:/aep/log
       - ./pipe:/pipe
     environment:
       # Filestorage params:
@@ -110,7 +111,7 @@ services:
       - BROKER_FQDN=rmq
       # afc-engine preload lib params
       - AFC_AEP_ENABLE=1
-      - AFC_AEP_DEBUG=1
+      - AFC_AEP_DEBUG=2
       - AFC_AEP_REAL_MOUNTPOINT=${VOL_C_DB}/3dep/1_arcsec
     depends_on:
       - ratdb

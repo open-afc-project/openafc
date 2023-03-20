@@ -496,17 +496,22 @@ static int f_close(FILE *f)
 
 static inline void cache_size_set(int64_t size)
 {
+	dbg("cache_size_set");
 	sem_wait(shmem_sem);
 	*cache_size += size;
 	sem_post(shmem_sem);
+	dbg("cache_size_set done");
 }
 
 static inline int64_t cache_size_get()
 {
 	int64_t tmp;
+
+	dbg("cache_size_get");
 	sem_wait(shmem_sem);
 	tmp = *cache_size;
 	sem_post(shmem_sem);
+	dbg("cache_size_get done");
 	return tmp;
 }
 
@@ -530,6 +535,7 @@ static uint8_t files_open_set(const char *name, int val)
 	uint16_t fno = hash_fname(name);
 	uint8_t ret;
 
+	dbg("files_open_set(%s)", name);
 	sem_wait(shmem_sem);
 	open_files[fno] += val;
 	if (open_files[fno] < 0) {
@@ -537,7 +543,7 @@ static uint8_t files_open_set(const char *name, int val)
 	}
 	ret = open_files[fno];
 	sem_post(shmem_sem);
-	dbg("files_open_set(%s, %d) %x %u", name, val, fno, open_files[fno]);
+	dbg("files_open_set(%s, %d) done %x %u", name, val, fno, open_files[fno]);
 	return ret;
 }
 
@@ -572,6 +578,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 
 	sem = sem_open(data_fd->tpath, O_CREAT, 0666, 1);
 	aep_assert(sem, "sem_open");
+	dbg("read_data %s", data_fd->tpath);
 	sem_wait(sem);
 
 	/* download whole file to cache if possible */
@@ -617,6 +624,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 		ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
 		aep_assert(ret >= 0, "read_data(%s) read_remote_data", fakepath)
 	}
+	dbg("read_data %s done", data_fd->tpath);
 	data_fd->off += ret;
 	dbgd("read_data(%s, %zu) %zd", data_fd->tpath, size, ret);
 	return ret;
@@ -648,7 +656,7 @@ static int fd_add(char *tpath)
 				*p = '/';
 			}
 		}
-		if (fe->size) { /* is file */
+		if (fe->size) { /* it's a file, touch it */
 			int fd;
 
 			fd = orig_open(fakepath, O_CREAT | O_RDWR);
@@ -694,13 +702,13 @@ static void fd_rm(int fd)
 	if (!data_fd->fe) {
 		return;
 	}
-	dbg("fd_rm(%s)", data_fd->tpath);
 	if (data_fd->fe->size) {
 		uint8_t lock = files_open_set(data_fd->tpath, -1);
 		if (cache_size_get() > (int64_t)max_cached_size && !lock) {
 			sem_t *sem;
 			struct stat stat;
 
+			dbg("fd_rm(%s)", data_fd->tpath);
 			sem = sem_open(data_fd->tpath + strlen(cache_path), O_CREAT, 0666, 1);
 			sem_wait(sem);
 			if (!fstat(fd, &stat)) {
@@ -710,11 +718,11 @@ static void fd_rm(int fd)
 				}
 			}
 			sem_post(sem);
+			dbg("fd_rm(%s) done", data_fd->tpath);
 		}
 	}
 	orig_close(fd);
 	data_fd->fe = NULL;
-	dbg("fd_rm(%s) done", data_fd->tpath);
 }
 
 static inline data_fd_t *fd_get_data_fd(int fd)
