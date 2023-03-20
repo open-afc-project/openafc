@@ -68,140 +68,120 @@
 typedef int (*orig_fcntl_t)(int, int, ...);
 
 /* from musl-1.2.3/src/dirent/__dirent.h */
-struct __dirstream {
-		off_t tell;
-		int fd;
-		int buf_pos;
-		int buf_end;
-		volatile int lock[1];
-		/* Any changes to this struct must preserve the property:
-		 * offsetof(struct __dirent, buf) % sizeof(off_t) == 0 */
-		char buf[2048];
+struct __dirstream
+{
+	off_t tell;
+	int fd;
+	int buf_pos;
+	int buf_end;
+	volatile int lock[1];
+	/* Any changes to this struct must preserve the property:
+	 * offsetof(struct __dirent, buf) % sizeof(off_t) == 0 */
+	char buf[2048];
 };
 
 #ifndef __GLIBC__
 /* from musl-1.2.3/src/stat/fstatat.c */
-struct statx {
-		uint32_t stx_mask;
-		uint32_t stx_blksize;
-		uint64_t stx_attributes;
-		uint32_t stx_nlink;
-		uint32_t stx_uid;
-		uint32_t stx_gid;
-		uint16_t stx_mode;
-		uint16_t pad1;
-		uint64_t stx_ino;
-		uint64_t stx_size;
-		uint64_t stx_blocks;
-		uint64_t stx_attributes_mask;
-		struct {
-				int64_t tv_sec;
-				uint32_t tv_nsec;
-				int32_t pad;
-		} stx_atime, stx_btime, stx_ctime, stx_mtime;
-		uint32_t stx_rdev_major;
-		uint32_t stx_rdev_minor;
-		uint32_t stx_dev_major;
-		uint32_t stx_dev_minor;
-		uint64_t spare[14];
+struct statx
+{
+	uint32_t stx_mask;
+	uint32_t stx_blksize;
+	uint64_t stx_attributes;
+	uint32_t stx_nlink;
+	uint32_t stx_uid;
+	uint32_t stx_gid;
+	uint16_t stx_mode;
+	uint16_t pad1;
+	uint64_t stx_ino;
+	uint64_t stx_size;
+	uint64_t stx_blocks;
+	uint64_t stx_attributes_mask;
+	struct
+	{
+		int64_t tv_sec;
+		uint32_t tv_nsec;
+		int32_t pad;
+	} stx_atime, stx_btime, stx_ctime, stx_mtime;
+	uint32_t stx_rdev_major;
+	uint32_t stx_rdev_minor;
+	uint32_t stx_dev_major;
+	uint32_t stx_dev_minor;
+	uint64_t spare[14];
 };
 
 /* from musl-1.2.3/src/internal/stdio_impl.h */
-struct _IO_FILE {
-		unsigned flags;
-		unsigned char *rpos, *rend;
-		int (*close)(FILE *);
-		unsigned char *wend, *wpos;
-		unsigned char *mustbezero_1;
-		unsigned char *wbase;
-		size_t (*read)(FILE *, unsigned char *, size_t);
-		size_t (*write)(FILE *, const unsigned char *, size_t);
-		off_t (*seek)(FILE *, off_t, int);
-		unsigned char *buf;
-		size_t buf_size;
-		FILE *prev, *next;
-		int fd;
-		int pipe_pid;
-		long lockcount;
-		int mode;
-		volatile int lock;
-		int lbf;
-		void *cookie;
-		off_t off;
-		char *getln_buf;
-		void *mustbezero_2;
-		unsigned char *shend;
-		off_t shlim, shcnt;
-		FILE *prev_locked, *next_locked;
-		struct __locale_struct *locale;
+struct _IO_FILE
+{
+	unsigned flags;
+	unsigned char *rpos, *rend;
+	int (*close)(FILE*);
+	unsigned char *wend, *wpos;
+	unsigned char *mustbezero_1;
+	unsigned char *wbase;
+	size_t (*read)(FILE*, unsigned char*, size_t);
+	size_t (*write)(FILE*, const unsigned char*, size_t);
+	off_t (*seek)(FILE*, off_t, int);
+	unsigned char *buf;
+	size_t buf_size;
+	FILE *prev, *next;
+	int fd;
+	int pipe_pid;
+	long lockcount;
+	int mode;
+	volatile int lock;
+	int lbf;
+	void *cookie;
+	off_t off;
+	char *getln_buf;
+	void *mustbezero_2;
+	unsigned char *shend;
+	off_t shlim, shcnt;
+	FILE *prev_locked, *next_locked;
+	struct __locale_struct *locale;
 };
 #endif /* __GLIBC__ */
 
-typedef struct {
-		unsigned int read_remote_size;
-		unsigned int read_remote;
-		unsigned int read_remote_time;
-		unsigned int read_cached_size;
-		unsigned int read_cached;
-		unsigned int read_cached_time;
-		unsigned int read_write_size;
-		unsigned int read_write;
-		unsigned int read_write_time;
+typedef struct
+{
+	unsigned int read_remote_size;
+	unsigned int read_remote;
+	unsigned int read_remote_time;
+	unsigned int read_cached_size;
+	unsigned int read_cached;
+	unsigned int read_cached_time;
+	unsigned int read_write_size;
+	unsigned int read_write;
+	unsigned int read_write_time;
 } aep_statistic_t;
 
-static struct stat def_stat = {.st_dev = 0x72,
-			       .st_ino = 0x6ea7ca04,
-			       .st_nlink = 0x1,
-			       .st_mode = 0, /*  S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO - directory,
-					       | S_IFREG | S_IRUSR | S_IRGRP | S_IROTH - file */
-			       .st_uid = 0x4466,
-			       .st_gid = 0x592,
-			       .st_rdev = 0,
-			       .st_size = 0,
-			       .st_blksize = 0x80000,
-			       .st_blocks = 0, /* st_size / 512 rounded up */
-			       .st_atim = {0x63b45b04, 0},
-			       .st_mtim = {0x63b45b04, 0},
-			       .st_ctim = {0x63b45b04, 0}};
+static struct stat def_stat = { .st_dev = 0x72, .st_ino = 0x6ea7ca04, .st_nlink = 0x1, .st_mode = 0, /*  S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO - directory,
+ | S_IFREG | S_IRUSR | S_IRGRP | S_IROTH - file */
+.st_uid = 0x4466, .st_gid = 0x592, .st_rdev = 0, .st_size = 0, .st_blksize = 0x80000, .st_blocks = 0, /* st_size / 512 rounded up */
+.st_atim = { 0x63b45b04, 0 }, .st_mtim = { 0x63b45b04, 0 }, .st_ctim = { 0x63b45b04, 0 } };
 
-static struct statx def_statx = {
-	.stx_mask = 0x17ff,
-	.stx_blksize = 0x80000,
-	.stx_attributes = 0,
-	.stx_nlink = 1,
-	.stx_uid = 0x4466,
-	.stx_gid = 0x592,
-	.stx_mode = 0, /*  S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO - directory,
-			| S_IFREG | S_IRUSR | S_IRGRP | S_IROTH - file */
-	.stx_ino = 0x6ea7ca04,
-	.stx_size = 0,
-	.stx_blocks = 0, /* stx_size/512 rounded up */
-	.stx_attributes_mask = 0x203000,
-	.stx_atime = {0x63b45b04, 0},
-	.stx_btime = {0x63b45b04, 0},
-	.stx_ctime = {0x63b45b04, 0},
-	.stx_mtime = {0x63b45b04, 0},
-	.stx_rdev_major = 0,
-	.stx_rdev_minor = 0,
-	.stx_dev_major = 0,
-	.stx_dev_minor = 0x72};
+static struct statx def_statx = { .stx_mask = 0x17ff, .stx_blksize = 0x80000, .stx_attributes = 0, .stx_nlink = 1, .stx_uid = 0x4466, .stx_gid = 0x592, .stx_mode = 0, /*  S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO - directory,
+ | S_IFREG | S_IRUSR | S_IRGRP | S_IROTH - file */
+.stx_ino = 0x6ea7ca04, .stx_size = 0, .stx_blocks = 0, /* stx_size/512 rounded up */
+.stx_attributes_mask = 0x203000, .stx_atime = { 0x63b45b04, 0 }, .stx_btime = { 0x63b45b04, 0 }, .stx_ctime = { 0x63b45b04, 0 }, .stx_mtime = { 0x63b45b04, 0 }, .stx_rdev_major = 0, .stx_rdev_minor = 0, .stx_dev_major = 0, .stx_dev_minor = 0x72 };
 
 typedef struct fe_t fe_t;
 
-typedef struct fe_t {
-		fe_t *next, *down;
-		char *name;
-		uint64_t size;
+typedef struct fe_t
+{
+	fe_t *next, *down;
+	char *name;
+	uint64_t size;
 } fe_t;
 
-typedef struct {
-		fe_t *fe;
-		FILE file;
-		DIR dir;
-		off_t off;
-		char tpath[AEP_PATH_MAX];
-		struct dirent dirent;
-		fe_t *readdir_p;
+typedef struct
+{
+	fe_t *fe;
+	FILE file;
+	DIR dir;
+	off_t off;
+	char tpath[AEP_PATH_MAX];
+	struct dirent dirent;
+	fe_t *readdir_p;
 } data_fd_t;
 
 static fe_t tree = {}; /* the root "/" entry of file tree */
@@ -226,8 +206,8 @@ static volatile int64_t *cache_size;
 static volatile int8_t *open_files;
 static sem_t *shmem_sem;
 
-static data_fd_t *fd_get_data_fd(int fd);
-static char *fd_get_name(int fd);
+static data_fd_t* fd_get_data_fd(int fd);
+static char* fd_get_name(int fd);
 static void fd_rm(int fd);
 static int download_file_nfs(data_fd_t *data_fd, char *dest);
 static ssize_t read_remote_data_nfs(void *destv, size_t size, char *tpath, off_t off);
@@ -247,17 +227,18 @@ static unsigned int stoptime(struct timeval *tv)
 
 	gettimeofday(&tv1, NULL);
 	us = (tv1.tv_sec - tv->tv_sec) * 1000000 + tv1.tv_usec - tv->tv_usec;
-	return (unsigned int)us;
+	return (unsigned int) us;
 }
 
-static inline FILE *orig_fopen(const char *path, const char *mode)
+static inline FILE* orig_fopen(const char *path, const char *mode)
 {
-	typedef FILE *(*orig_fopen_t)(const char *, const char *);
-	orig_fopen_t orig = (orig_fopen_t)dlsym(RTLD_NEXT, "fopen");
+	typedef FILE* (*orig_fopen_t)(const char*, const char*);
+	orig_fopen_t orig = (orig_fopen_t) dlsym(RTLD_NEXT, "fopen");
 	FILE *ret;
 
 	ret = (*orig)(path, mode);
-	if (aep_debug && ret) {
+	if (aep_debug && ret)
+	{
 		strcpy(data_fds[fileno(ret)].tpath, path);
 	}
 	return ret;
@@ -265,8 +246,8 @@ static inline FILE *orig_fopen(const char *path, const char *mode)
 
 static inline size_t orig_fread(void *destv, size_t size, size_t nmemb, FILE *f)
 {
-	typedef size_t (*orig_fread_t)(void *, size_t, size_t, FILE *);
-	orig_fread_t orig = (orig_fread_t)dlsym(RTLD_NEXT, "fread");
+	typedef size_t (*orig_fread_t)(void*, size_t, size_t, FILE*);
+	orig_fread_t orig = (orig_fread_t) dlsym(RTLD_NEXT, "fread");
 	size_t ret;
 
 	ret = (*orig)(destv, size, nmemb, f);
@@ -275,20 +256,21 @@ static inline size_t orig_fread(void *destv, size_t size, size_t nmemb, FILE *f)
 
 static inline int orig_fclose(FILE *f)
 {
-	typedef int (*orig_fclose_t)(FILE *);
-	orig_fclose_t orig = (orig_fclose_t)dlsym(RTLD_NEXT, "fclose");
+	typedef int (*orig_fclose_t)(FILE*);
+	orig_fclose_t orig = (orig_fclose_t) dlsym(RTLD_NEXT, "fclose");
 
 	return (*orig)(f);
 }
 
 static inline int orig_open(const char *pathname, int flags, ...)
 {
-	typedef int (*orig_open_t)(const char *, int, ...);
+	typedef int (*orig_open_t)(const char*, int, ...);
 	int fd;
-	orig_open_t orig = (orig_open_t)dlsym(RTLD_NEXT, "open");
+	orig_open_t orig = (orig_open_t) dlsym(RTLD_NEXT, "open");
 
 	fd = (*orig)(pathname, flags, 0666);
-	if (aep_debug && fd >= 0) {
+	if (aep_debug && fd >= 0)
+	{
 		strcpy(data_fds[fd].tpath, pathname);
 	}
 	return fd;
@@ -296,12 +278,13 @@ static inline int orig_open(const char *pathname, int flags, ...)
 
 static inline int orig_openat(int dirfd, const char *pathname, int flags, ...)
 {
-	typedef int (*orig_openat_t)(int, const char *, int);
-	orig_openat_t orig = (orig_openat_t)dlsym(RTLD_NEXT, "openat");
+	typedef int (*orig_openat_t)(int, const char*, int);
+	orig_openat_t orig = (orig_openat_t) dlsym(RTLD_NEXT, "openat");
 	int fd;
 
 	fd = (*orig)(dirfd, pathname, flags);
-	if (aep_debug && fd >= 0) {
+	if (aep_debug && fd >= 0)
+	{
 		strcpy(data_fds[fd].tpath, pathname);
 	}
 	return fd;
@@ -310,24 +293,24 @@ static inline int orig_openat(int dirfd, const char *pathname, int flags, ...)
 static inline int orig_close(int fd)
 {
 	typedef int (*orig_close_t)(int);
-	orig_close_t orig = (orig_close_t)dlsym(RTLD_NEXT, "close");
+	orig_close_t orig = (orig_close_t) dlsym(RTLD_NEXT, "close");
 
 	return (*orig)(fd);
 }
 
 static inline int orig_stat(const char *pathname, struct stat *statbuf)
 {
-	typedef int (*orig_stat_t)(const char *, struct stat *);
-	orig_stat_t orig = (orig_stat_t)dlsym(RTLD_NEXT, "stat");
+	typedef int (*orig_stat_t)(const char*, struct stat*);
+	orig_stat_t orig = (orig_stat_t) dlsym(RTLD_NEXT, "stat");
 
 	return (*orig)(pathname, statbuf);
 }
 
 static inline ssize_t orig_read(int fd, void *buf, size_t count)
 {
-	typedef ssize_t (*orig_read_t)(int, void *, size_t);
+	typedef ssize_t (*orig_read_t)(int, void*, size_t);
 	ssize_t ret;
-	orig_read_t orig = (orig_read_t)dlsym(RTLD_NEXT, "read");
+	orig_read_t orig = (orig_read_t) dlsym(RTLD_NEXT, "read");
 
 	ret = (*orig)(fd, buf, count);
 	dbgo("orig_read(%d, %zu) %zd", fd, count, ret);
@@ -337,39 +320,39 @@ static inline ssize_t orig_read(int fd, void *buf, size_t count)
 static inline off_t orig_lseek(int fd, off_t offset, int whence)
 {
 	typedef off_t (*orig_lseek_t)(int, off_t, int);
-	orig_lseek_t orig = (orig_lseek_t)dlsym(RTLD_NEXT, "lseek");
+	orig_lseek_t orig = (orig_lseek_t) dlsym(RTLD_NEXT, "lseek");
 
 	return (*orig)(fd, offset, whence);
 }
 
-static inline struct dirent *orig_readdir(DIR *dir)
+static inline struct dirent* orig_readdir(DIR *dir)
 {
-	typedef struct dirent *(*orig_readdir_t)(DIR * dir);
-	orig_readdir_t orig = (orig_readdir_t)dlsym(RTLD_NEXT, "readdir");
+	typedef struct dirent* (*orig_readdir_t)(DIR *dir);
+	orig_readdir_t orig = (orig_readdir_t) dlsym(RTLD_NEXT, "readdir");
 
 	return (*orig)(dir);
 }
 
 static inline int orig_fstat(int fd, struct stat *statbuf)
 {
-	typedef int (*orig_fstat_t)(int, struct stat *);
-	orig_fstat_t orig = (orig_fstat_t)dlsym(RTLD_NEXT, "fstat");
+	typedef int (*orig_fstat_t)(int, struct stat*);
+	orig_fstat_t orig = (orig_fstat_t) dlsym(RTLD_NEXT, "fstat");
 
 	return (*orig)(fd, statbuf);
 }
 
 static inline int orig_lstat(const char *pathname, struct stat *statbuf)
 {
-	typedef int (*orig_lstat_t)(const char *, struct stat *);
-	orig_lstat_t orig = (orig_lstat_t)dlsym(RTLD_NEXT, "lstat");
+	typedef int (*orig_lstat_t)(const char*, struct stat*);
+	orig_lstat_t orig = (orig_lstat_t) dlsym(RTLD_NEXT, "lstat");
 
 	return (*orig)(pathname, statbuf);
 }
 
 static inline int orig_access(const char *pathname, int mode)
 {
-	typedef int (*orig_access_t)(const char *, int);
-	orig_access_t orig = (orig_access_t)dlsym(RTLD_NEXT, "access");
+	typedef int (*orig_access_t)(const char*, int);
+	orig_access_t orig = (orig_access_t) dlsym(RTLD_NEXT, "access");
 	int ret;
 
 	ret = (*orig)(pathname, mode);
@@ -378,20 +361,21 @@ static inline int orig_access(const char *pathname, int mode)
 
 static inline void orig_rewind(FILE *stream)
 {
-	typedef int (*orig_rewind_t)(FILE *);
-	orig_rewind_t orig = (orig_rewind_t)dlsym(RTLD_NEXT, "rewind");
+	typedef int (*orig_rewind_t)(FILE*);
+	orig_rewind_t orig = (orig_rewind_t) dlsym(RTLD_NEXT, "rewind");
 
 	(*orig)(stream);
 }
 
-static inline DIR *orig_opendir(const char *name)
+static inline DIR* orig_opendir(const char *name)
 {
-	typedef DIR *(*orig_opendir_t)(const char *name);
-	orig_opendir_t orig = (orig_opendir_t)dlsym(RTLD_NEXT, "opendir");
+	typedef DIR* (*orig_opendir_t)(const char *name);
+	orig_opendir_t orig = (orig_opendir_t) dlsym(RTLD_NEXT, "opendir");
 	DIR *ret;
 
 	ret = (*orig)(name);
-	if (aep_debug && ret) {
+	if (aep_debug && ret)
+	{
 		strcpy(data_fds[dirfd(ret)].tpath, name);
 	}
 	return ret;
@@ -399,39 +383,41 @@ static inline DIR *orig_opendir(const char *name)
 
 static inline int orig_closedir(DIR *dirp)
 {
-	typedef int (*orig_closedir_t)(DIR *);
-	orig_closedir_t orig = (orig_closedir_t)dlsym(RTLD_NEXT, "closedir");
+	typedef int (*orig_closedir_t)(DIR*);
+	orig_closedir_t orig = (orig_closedir_t) dlsym(RTLD_NEXT, "closedir");
 
 	return (*orig)(dirp);
 }
 
-static inline DIR *orig_fdopendir(int fd)
+static inline DIR* orig_fdopendir(int fd)
 {
-	typedef DIR *(*orig_fdopendir_t)(int);
-	orig_fdopendir_t orig = (orig_fdopendir_t)dlsym(RTLD_NEXT, "fdopendir");
+	typedef DIR* (*orig_fdopendir_t)(int);
+	orig_fdopendir_t orig = (orig_fdopendir_t) dlsym(RTLD_NEXT, "fdopendir");
 
 	return (*orig)(fd);
 }
 
 static inline int orig_fgetc(FILE *stream)
 {
-	typedef int (*orig_fgetc_t)(FILE *);
-	orig_fgetc_t orig = (orig_fgetc_t)dlsym(RTLD_NEXT, "fgetc");
+	typedef int (*orig_fgetc_t)(FILE*);
+	orig_fgetc_t orig = (orig_fgetc_t) dlsym(RTLD_NEXT, "fgetc");
 
 	return (*orig)(stream);
 }
 
 /* find file in file tree by name. Return file entry pointer or NULL  */
-static fe_t *find_fe(char *tpath)
+static fe_t* find_fe(char *tpath)
 {
 	char *c = tpath + 1; /* skip first / */
 	fe_t *cfe = &tree;
 
-	while (c < tpath + strlen(tpath)) {
+	while (c < tpath + strlen(tpath))
+	{
 		char name[AEP_FILENAME_MAX] = {};
 		int name_off = 0;
 
-		while (*c && *c != '/') {
+		while (*c && *c != '/')
+		{
 			name[name_off] = *c;
 			name_off++;
 			c++;
@@ -439,13 +425,17 @@ static fe_t *find_fe(char *tpath)
 		c++; /* skip final / */
 		name[name_off] = 0;
 		cfe = cfe->down;
-		while (cfe) {
-			if (strcmp(cfe->name, name)) {
+		while (cfe)
+		{
+			if (strcmp(cfe->name, name))
+			{
 				cfe = cfe->next;
-				if (!cfe) {
+				if (!cfe)
+				{
 					return NULL;
 				}
-			} else {
+			} else
+			{
 				break;
 			}
 		}
@@ -471,16 +461,12 @@ static size_t f_write(FILE *f, const unsigned char *buff, size_t size)
 
 static off_t f_seek(FILE *f, off_t off, int whence)
 {
-	if (whence == SEEK_CUR && off == 0) {
+	if (whence == SEEK_CUR && off == 0)
+	{
 		/* ignore */
 		return fd_get_data_fd(fileno(f))->off;
 	}
-	aep_assert(whence == SEEK_SET,
-		   "f_seek(%d(%s), %ld, %d) unsupported whence",
-		   fileno(f),
-		   fd_get_name(fileno(f)),
-		   off,
-		   whence);
+	aep_assert(whence == SEEK_SET, "f_seek(%d(%s), %ld, %d) unsupported whence", fileno(f), fd_get_name(fileno(f)), off, whence);
 	dbgd("FILE->seek(%d(%s), %jd, %d)", fileno(f), fd_get_name(fileno(f)), off, whence);
 	fd_get_data_fd(fileno(f))->off = off;
 	return off;
@@ -522,10 +508,11 @@ static uint16_t hash_fname(const char *str)
 
 	uint16_t hash = 0x5555;
 	str++; /* skip '/' */
-	while (*str) {
-		hash ^= *((uint16_t *)str) + cor;
+	while (*str)
+	{
+		hash ^= *((uint16_t*) str) + cor;
 		str += 2;
-		cor ++;
+		cor++;
 	}
 	return hash;
 }
@@ -538,7 +525,8 @@ static uint8_t files_open_set(const char *name, int val)
 	dbg("files_open_set(%s)", name);
 	sem_wait(shmem_sem);
 	open_files[fno] += val;
-	if (open_files[fno] < 0) {
+	if (open_files[fno] < 0)
+	{
 		open_files[fno] = 0;
 	}
 	ret = open_files[fno];
@@ -565,9 +553,9 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	char fakepath[AEP_PATH_MAX];
 	ssize_t ret;
 	ssize_t (*read_remote_data)(void *destv, size_t size, char *tpath, off_t off) =
-		aep_use_gs ? read_remote_data_gs : read_remote_data_nfs;
+	aep_use_gs ? read_remote_data_gs : read_remote_data_nfs;
 	/* define pointer to download file func */
-	int (*download_file)(data_fd_t * data_fd, char *dest);
+	int (*download_file)(data_fd_t *data_fd, char *dest);
 	download_file = aep_use_gs ? download_file_gs : download_file_nfs;
 	struct stat stat;
 	sem_t *sem;
@@ -582,24 +570,29 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	sem_wait(sem);
 
 	/* download whole file to cache if possible */
-	if (!orig_stat(fakepath, &stat)) {
-		
-		if (data_fd->fe->size == (uint64_t)stat.st_size) {
+	if (!orig_stat(fakepath, &stat))
+	{
+		if (data_fd->fe->size == (uint64_t) stat.st_size)
+		{
 			is_cached = true;
 		}
-		if (!is_cached && data_fd->fe->size <= max_cached_file_size) {
+		if (!is_cached && data_fd->fe->size <= max_cached_file_size)
+		{
 			dbg("download %s", data_fd->tpath);
-			if (!download_file(data_fd, fakepath)) {
+			if (!download_file(data_fd, fakepath))
+			{
 				cache_size_set(data_fd->fe->size);
 				dbg("download %s done, cs %lu", data_fd->tpath, *cache_size);
 				is_cached = true;
-			} else {
+			} else
+			{
 				dbg("download %s failed, cs %lu", data_fd->tpath, *cache_size);
 			}
 		}
 	}
 
-	if (is_cached) {
+	if (is_cached)
+	{
 		int fd;
 		struct timeval tv;
 		unsigned int us;
@@ -618,7 +611,8 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 		aepst.read_cached++;
 		aepst.read_cached_size += ret;
 		aepst.read_cached_time += us;
-	} else {
+	} else
+	{
 		sem_post(sem);
 		sem_close(sem);
 		ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
@@ -640,7 +634,8 @@ static int fd_add(char *tpath)
 	struct stat statbuf;
 
 	fe = find_fe(tpath);
-	if (!fe) {
+	if (!fe)
+	{
 		return -1;
 	}
 	strcpy(fakepath, cache_path);
@@ -648,26 +643,32 @@ static int fd_add(char *tpath)
 
 	dbg("fd_add(%s)", tpath);
 	/* create cache file */
-	if (orig_stat(fakepath, &statbuf)) {
-		for (p = fakepath; *p; p++) {
-			if (*p == '/') {
+	if (orig_stat(fakepath, &statbuf))
+	{
+		for (p = fakepath; *p; p++)
+		{
+			if (*p == '/')
+			{
 				*p = '\0';
 				mkdir(fakepath, 0777);
 				*p = '/';
 			}
 		}
-		if (fe->size) { /* it's a file, touch it */
+		if (fe->size)
+		{ /* it's a file, touch it */
 			int fd;
 
 			fd = orig_open(fakepath, O_CREAT | O_RDWR);
 			aep_assert(fd >= 0, "fd_add(%s) touch errno %d", fakepath, errno);
 			orig_close(fd);
-		} else { /* is dir */
+		} else
+		{ /* is dir */
 			mkdir(fakepath, 0777);
 		}
 	}
 
-	if (fe->size) {
+	if (fe->size)
+	{
 		files_open_set(tpath, 1);
 	}
 	fd = orig_open(fakepath, O_RDONLY);
@@ -699,20 +700,25 @@ static void fd_rm(int fd)
 {
 	data_fd_t *data_fd = data_fds + fd;
 
-	if (!data_fd->fe) {
+	if (!data_fd->fe)
+	{
 		return;
 	}
-	if (data_fd->fe->size) {
+	if (data_fd->fe->size)
+	{
 		uint8_t lock = files_open_set(data_fd->tpath, -1);
-		if (cache_size_get() > (int64_t)max_cached_size && !lock) {
+		if (cache_size_get() > (int64_t) max_cached_size && !lock)
+		{
 			sem_t *sem;
 			struct stat stat;
 
 			dbg("fd_rm(%s)", data_fd->tpath);
 			sem = sem_open(data_fd->tpath + strlen(cache_path), O_CREAT, 0666, 1);
 			sem_wait(sem);
-			if (!fstat(fd, &stat)) {
-				if (stat.st_size) {
+			if (!fstat(fd, &stat))
+			{
+				if (stat.st_size)
+				{
 					ftruncate(fd, 0);
 					cache_size_set(-stat.st_size);
 				}
@@ -725,28 +731,30 @@ static void fd_rm(int fd)
 	data_fd->fe = NULL;
 }
 
-static inline data_fd_t *fd_get_data_fd(int fd)
+static inline data_fd_t* fd_get_data_fd(int fd)
 {
 	return data_fds + fd;
 }
 
-static inline char *fd_get_name(int fd)
+static inline char* fd_get_name(int fd)
 {
 	return data_fds[fd].tpath;
 }
 
 static bool is_remote_file(const char *path, char **tpath)
 {
-	if (!path) {
-		*tpath = (char *)path;
+	if (!path)
+	{
+		*tpath = (char*) path;
 		return false;
 	}
 
-	if (strncmp(path, ae_mountpoint, strlen(ae_mountpoint)) == 0) {
-		*tpath = (char *)path + strlen(ae_mountpoint);
+	if (strncmp(path, ae_mountpoint, strlen(ae_mountpoint)) == 0)
+	{
+		*tpath = (char*) path + strlen(ae_mountpoint);
 		return true;
 	}
-	*tpath = (char *)path;
+	*tpath = (char*) path;
 	return false;
 }
 
@@ -796,16 +804,20 @@ void __attribute__((constructor)) aep_init(void)
 	/* check env vars */
 	tmp = getenv("AFC_AEP_DEBUG");
 	aep_debug = tmp ? atoi(tmp) : 0;
-	if (aep_debug) {
+	if (aep_debug)
+	{
 		char *logname;
 
 		logname = getenv("AFC_AEP_LOGFILE");
-		if (!logname) {
+		if (!logname)
+		{
 			dbge("AFC_AEP_LOGFILE env var is not defined, log disabled");
 			aep_debug = 0;
-		} else {
+		} else
+		{
 			logfile = orig_open(logname, O_CREAT | O_RDWR | O_APPEND);
-			if (logfile < 0) {
+			if (logfile < 0)
+			{
 				dbge("Can not open %s, log disabled", logname);
 				aep_debug = 0;
 			}
@@ -813,15 +825,18 @@ void __attribute__((constructor)) aep_init(void)
 	}
 	real_mountpoint = getenv("AFC_AEP_REAL_MOUNTPOINT");
 	aep_assert(real_mountpoint, "AFC_AEP_REAL_MOUNTPOINT env var is not defined");
-	if (real_mountpoint[strlen(real_mountpoint) - 1] == '/') {
+	if (real_mountpoint[strlen(real_mountpoint) - 1] == '/')
+	{
 		real_mountpoint[strlen(real_mountpoint) - 1] = '\0';
 	}
 	ae_mountpoint = getenv("AFC_AEP_ENGINE_MOUNTPOINT");
 	aep_assert(ae_mountpoint, "AFC_AEP_ENGINE_MOUNTPOINT env var is not defined");
-	if (ae_mountpoint[strlen(ae_mountpoint) - 1] == '/') {
+	if (ae_mountpoint[strlen(ae_mountpoint) - 1] == '/')
+	{
 		ae_mountpoint[strlen(ae_mountpoint) - 1] = '\0';
 	}
-	if (getenv("AFC_AEP_GS")) {
+	if (getenv("AFC_AEP_GS"))
+	{
 		aep_use_gs = true;
 		init_gs();
 	}
@@ -833,7 +848,8 @@ void __attribute__((constructor)) aep_init(void)
 	tmp = getenv("AFC_AEP_CACHE_MAX_SIZE");
 	aep_assert(tmp, "AFC_AEP_CACHE_MAX_SIZE env var is not defined");
 	max_cached_size = atoll(tmp);
-	if (max_cached_file_size > max_cached_size) {
+	if (max_cached_file_size > max_cached_size)
+	{
 		max_cached_file_size = max_cached_size;
 	}
 	cache_path = getenv("AFC_AEP_CACHE");
@@ -841,21 +857,25 @@ void __attribute__((constructor)) aep_init(void)
 
 	/* read filelist */
 	ret = orig_stat(filelist_path, &statbuf);
-	if (ret) {
+	if (ret)
+	{
 		dbge("Filelist is not found");
 		exit(ret);
 	}
-	filelist = (uint8_t *)malloc(statbuf.st_size);
-	if (!filelist) {
+	filelist = (uint8_t*) malloc(statbuf.st_size);
+	if (!filelist)
+	{
 		dbge("Memory allocation");
 		exit(-ENOMEM);
 	}
 	fd = orig_open(filelist_path, O_RDONLY);
-	if (fd < 0) {
+	if (fd < 0)
+	{
 		dbge("File IO");
 		exit(-EIO);
 	}
-	if (orig_read(fd, filelist, statbuf.st_size) != statbuf.st_size) {
+	if (orig_read(fd, filelist, statbuf.st_size) != statbuf.st_size)
+	{
 		dbge("File IO");
 		exit(-EIO);
 	}
@@ -865,60 +885,70 @@ void __attribute__((constructor)) aep_init(void)
 	filelist_end = filelist + statbuf.st_size;
 
 	/* alloc file tree entries */
-	entries_size = *((uint32_t *)fl);
+	entries_size = *((uint32_t*) fl);
 	fl += sizeof(uint32_t);
-	entries_size += *((uint32_t *)fl);
+	entries_size += *((uint32_t*) fl);
 	fl += sizeof(uint32_t);
 	entries_size *= sizeof(fe_t);
-	fes = (fe_t *)calloc(1, entries_size);
-	if (!fes) {
+	fes = (fe_t*) calloc(1, entries_size);
+	if (!fes)
+	{
 		dbge("Memory allocation");
 		exit(-ENOMEM);
 	}
 	free_fes = fes;
 
-	stack = (fe_t **)calloc(1, (*((uint8_t *)fl) + 1) * sizeof(fe_t *));
-	if (!(stack)) {
+	stack = (fe_t**) calloc(1, (*((uint8_t*) fl) + 1) * sizeof(fe_t*));
+	if (!(stack))
+	{
 		dbge("Memory allocation");
 		exit(-ENOMEM);
 	}
 	fl += sizeof(uint8_t);
 	stack[0] = &tree;
-	tree.name = (char *)"root"; /* debug */
+	tree.name = (char*) "root"; /* debug */
 	cstack = stack[0];
 
 	/* fill file tree */
-	while (fl < filelist_end) {
+	while (fl < filelist_end)
+	{
 		uint8_t tab = 0;
 		char *name;
 		uint64_t size;
 
 		/* read next line */
-		while (*fl == '\t') {
+		while (*fl == '\t')
+		{
 			tab++;
 			(fl)++;
 		}
-		name = (char *)(fl);
+		name = (char*) (fl);
 		fl += strlen(name) + 1;
 
-		size = *((uint64_t *)fl);
+		size = *((uint64_t*) fl);
 		fl += sizeof(uint64_t);
-		if (tab != tab_prev) {
-			if (tab < tab_prev) {
+		if (tab != tab_prev)
+		{
+			if (tab < tab_prev)
+			{
 				cstack = stack[tab];
 				cfe = cstack->down;
-				while (cfe && cfe->next) {
+				while (cfe && cfe->next)
+				{
 					cfe = cfe->next;
 				}
-			} else {
+			} else
+			{
 				stack[tab] = cfe;
 				cstack = stack[tab];
 			}
 			tab_prev = tab;
 		}
-		if (!cstack->down) {
+		if (!cstack->down)
+		{
 			cstack->down = free_fes;
-		} else {
+		} else
+		{
 			cfe->next = free_fes;
 		}
 		cfe = free_fes;
@@ -934,19 +964,23 @@ void __attribute__((constructor)) aep_init(void)
 	shm_fd = shm_open("aep_shmem", O_RDWR | O_CREAT | O_EXCL, 0666);
 	dbg("aep_init");
 	sem_wait(shmem_sem);
-	if (shm_fd < 0) {
+	if (shm_fd < 0)
+	{
+		dbg("aep_init cache already inited");
 		/* O_CREAT | O_EXCL failed, so shared memory object already was initialized */
 		shm_fd = shm_open("aep_shmem", O_RDWR, 0666);
 		aep_assert(shm_fd >= 0, "shm_open");
-		cache_size = (int64_t *)mmap(NULL, sizeof(int64_t) + HASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+		cache_size = (int64_t*) mmap(NULL, sizeof(int64_t) + HASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
-	} else {
+		open_files = (int8_t*) (cache_size + 1);
+	} else
+	{
 		dbg("aep_init recount cache");
 		ftruncate(shm_fd, sizeof(uint64_t) + HASH_SIZE);
-		cache_size = (int64_t *)mmap(NULL, sizeof(int64_t) + HASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
+		cache_size = (int64_t*) mmap(NULL, sizeof(int64_t) + HASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
-		open_files = (int8_t *)(cache_size + 1);
-		memset((void *)open_files, 0, sizeof(int64_t) + HASH_SIZE);
+		open_files = (int8_t*) (cache_size + 1);
+		memset((void*) cache_size, 0, sizeof(int64_t) + HASH_SIZE);
 		/* count existing cache size */
 		ftw(cache_path, ftw_callback, 100);
 	}
@@ -954,26 +988,31 @@ void __attribute__((constructor)) aep_init(void)
 	dbg("aep_init done cs %lu", *cache_size);
 }
 
-FILE *fopen(const char *path, const char *mode)
+FILE* fopen(const char *path, const char *mode)
 {
 	FILE *ret;
 	char *tpath;
 
-	if (is_remote_file(path, &tpath)) {
+	if (is_remote_file(path, &tpath))
+	{
 		int fd;
 
 		fd = fd_add(tpath);
-		if (fd < 0) {
+		if (fd < 0)
+		{
 			return NULL;
 		}
 		ret = &(fd_get_data_fd(fd)->file);
 		dbgd("fopen(%s, %s) %d", tpath, mode, fd);
-	} else {
+	} else
+	{
 		ret = orig_fopen(path, mode);
-		if (ret) {
+		if (ret)
+		{
 			dbgo("fopen(%s, %s) %d", path, mode, fileno(ret));
 			fd_rm(fileno(ret));
-		} else {
+		} else
+		{
 			dbgo("fopen(%s, %s) -1", path, mode);
 		}
 	}
@@ -984,18 +1023,15 @@ size_t fread(void *destv, size_t size, size_t nmemb, FILE *f)
 {
 	size_t ret;
 
-	if (fd_is_remote(fileno(f))) {
+	if (fd_is_remote(fileno(f)))
+	{
 		data_fd_t *data_fd = fd_get_data_fd(fileno(f));
 
 		ret = read_data(destv, size * nmemb, data_fd);
 		ret /= size;
-		dbgd("fread(%d(%s), %zu * %zu) %zu",
-		     fileno(f),
-		     fd_get_name(fileno(f)),
-		     size,
-		     nmemb,
-		     ret);
-	} else {
+		dbgd("fread(%d(%s), %zu * %zu) %zu", fileno(f), fd_get_name(fileno(f)), size, nmemb, ret);
+	} else
+	{
 		ret = orig_fread(destv, size, nmemb, f);
 		dbgo("fread(%d, %zu * %zu) %zu", fileno(f), size, nmemb, ret);
 	}
@@ -1006,22 +1042,14 @@ int fclose(FILE *f)
 {
 	int ret;
 
-	if (fd_is_remote(fileno(f))) {
+	if (fd_is_remote(fileno(f)))
+	{
 		dbgd("fclose(%d(%s))", fileno(f), fd_get_name(fileno(f)));
 		fd_rm(fileno(f));
 		ret = 0;
-		dbgl("statistics: remote %u/%u/%u cached %u/%u/%u cache %u/%u/%u cache size %lu",
-		     aepst.read_remote,
-		     aepst.read_remote_size,
-		     aepst.read_remote_time,
-		     aepst.read_cached,
-		     aepst.read_cached_size,
-		     aepst.read_cached_time,
-		     aepst.read_write,
-		     aepst.read_write_size,
-		     aepst.read_write_time,
-		     *cache_size);
-	} else {
+		dbgl("statistics: remote %u/%u/%u cached %u/%u/%u cache %u/%u/%u cache size %lu", aepst.read_remote, aepst.read_remote_size, aepst.read_remote_time, aepst.read_cached, aepst.read_cached_size, aepst.read_cached_time, aepst.read_write, aepst.read_write_size, aepst.read_write_time, *cache_size);
+	} else
+	{
 		dbgo("fclose(%d)", fileno(f));
 		ret = orig_fclose(f);
 	}
@@ -1033,10 +1061,12 @@ int open(const char *pathname, int flags, ...)
 	int ret;
 	char *tpath;
 
-	if (is_remote_file(pathname, &tpath)) {
+	if (is_remote_file(pathname, &tpath))
+	{
 		ret = fd_add(tpath);
 		dbgd("open(%s, %x) %d", tpath, flags, ret);
-	} else {
+	} else
+	{
 		ret = orig_open(pathname, flags);
 		dbgo("open(%s, %x) %d", tpath, flags, ret);
 	}
@@ -1048,10 +1078,12 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 	int ret;
 	char *tpath;
 
-	if (is_remote_file(pathname, &tpath)) {
+	if (is_remote_file(pathname, &tpath))
+	{
 		ret = fd_add(tpath);
 		dbgd("openat(%s, %x) %d", tpath, flags, ret);
-	} else {
+	} else
+	{
 		ret = orig_openat(dirfd, pathname, flags);
 		dbgo("openat(%d, %s, %x) %d", dirfd, tpath, flags, ret);
 	}
@@ -1062,10 +1094,12 @@ int close(int fd)
 {
 	int ret = 0;
 
-	if (fd_is_remote(fd)) {
+	if (fd_is_remote(fd))
+	{
 		dbgd("close(%d(%s))", fd, fd_get_name(fd));
 		fd_rm(fd);
-	} else {
+	} else
+	{
 		ret = orig_close(fd);
 		dbgo("close(%d(%s))=%d", fd, fd_get_name(fd), ret);
 	}
@@ -1077,25 +1111,30 @@ int stat(const char *pathname, struct stat *statbuf)
 	char *tpath;
 	int ret;
 
-	if (is_remote_file(pathname, &tpath)) {
+	if (is_remote_file(pathname, &tpath))
+	{
 		fe_t *fe;
 
 		fe = find_fe(tpath);
-		if (!fe) {
+		if (!fe)
+		{
 			return -1;
 		}
 
 		memcpy(statbuf, &def_stat, sizeof(struct stat));
-		if (fe->size) {
+		if (fe->size)
+		{
 			statbuf->st_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
-		} else {
+		} else
+		{
 			statbuf->st_mode = S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO;
 		}
 		statbuf->st_size = fe->size;
 		statbuf->st_blocks = (statbuf->st_size >> 9) + (statbuf->st_size & 0x1ff) ? 1 : 0;
 		ret = 0;
 		dbgd("stat(%s, 0x%lx, %s) %d", tpath, fe->size, fe->size ? "file" : "dir", ret);
-	} else {
+	} else
+	{
 		ret = orig_stat(pathname, statbuf);
 		dbgo("stat(%s) %d", tpath, ret);
 	}
@@ -1106,27 +1145,27 @@ int fstat(int fd, struct stat *statbuf)
 {
 	int ret;
 
-	if (fd_is_remote(fd)) {
+	if (fd_is_remote(fd))
+	{
 		data_fd_t *data_fd;
 		data_fd = fd_get_data_fd(fd);
 
 		dbgd("fstat(%d(%s))", fd, fd_get_name(fd));
 
 		memcpy(statbuf, &def_stat, sizeof(struct stat));
-		if (data_fd->fe->size) {
+		if (data_fd->fe->size)
+		{
 			statbuf->st_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
-		} else {
+		} else
+		{
 			statbuf->st_mode = S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO;
 		}
 		statbuf->st_size = data_fd->fe->size;
 		statbuf->st_blocks = (statbuf->st_size >> 9) + (statbuf->st_size & 0x1ff) ? 1 : 0;
 		ret = 0;
-		dbgd("fstat(%s, 0x%lx, %s) %d",
-		     fd_get_name(fd),
-		     data_fd->fe->size,
-		     data_fd->fe->size ? "file" : "dir",
-		     ret);
-	} else {
+		dbgd("fstat(%s, 0x%lx, %s) %d", fd_get_name(fd), data_fd->fe->size, data_fd->fe->size ? "file" : "dir", ret);
+	} else
+	{
 		ret = orig_fstat(fd, statbuf);
 		dbgo("fstat(%d) %d", fd, ret);
 	}
@@ -1138,25 +1177,30 @@ int lstat(const char *pathname, struct stat *statbuf)
 	int ret;
 	char *tpath;
 
-	if (is_remote_file(pathname, &tpath) && 0) {
+	if (is_remote_file(pathname, &tpath) && 0)
+	{
 		fe_t *fe;
 
 		fe = find_fe(tpath);
-		if (!fe) {
+		if (!fe)
+		{
 			return -1;
 		}
 
 		memcpy(statbuf, &def_stat, sizeof(struct stat));
-		if (fe->size) {
+		if (fe->size)
+		{
 			statbuf->st_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
-		} else {
+		} else
+		{
 			statbuf->st_mode = S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO;
 		}
 		statbuf->st_size = fe->size;
 		statbuf->st_blocks = (statbuf->st_size >> 9) + (statbuf->st_size & 0x1ff) ? 1 : 0;
 		ret = 0;
 		dbgd("lstat(%s, 0x%lx, %s) %d", tpath, fe->size, fe->size ? "file" : "dir", ret);
-	} else {
+	} else
+	{
 		ret = orig_lstat(pathname, statbuf);
 	}
 	return ret;
@@ -1167,13 +1211,15 @@ int access(const char *pathname, int mode)
 	int ret;
 	char *tpath;
 
-	if (is_remote_file(pathname, &tpath)) {
+	if (is_remote_file(pathname, &tpath))
+	{
 		fe_t *fe;
 
 		fe = find_fe(tpath);
 		ret = fe ? 0 : -1;
 		dbgd("access(%s, %d) %d", tpath, mode, ret);
-	} else {
+	} else
+	{
 		ret = orig_access(pathname, mode);
 		dbgo("access(%s, %d) %d", pathname, mode, ret);
 	}
@@ -1186,7 +1232,8 @@ long int syscall(long int __sysno, ...)
 	typedef int (*orig_syscall_t)(long int, ...);
 	void *ret;
 
-	if (__sysno == SYS_statx) {
+	if (__sysno == SYS_statx)
+	{
 		/* __syscall(SYS_statx, fd, path, flag, 0x7ff, &stx); */
 		va_list args;
 		char *path;
@@ -1198,55 +1245,58 @@ long int syscall(long int __sysno, ...)
 
 		va_start(args, __sysno);
 		dirfd = va_arg(args, int);
-		(void)dirfd;
-		path = va_arg(args, char *);
+		(void) dirfd;
+		path = va_arg(args, char*);
 		flags = va_arg(args, int);
-		(void)flags;
+		(void) flags;
 		mask = va_arg(args, unsigned int);
-		(void)mask;
-		st = va_arg(args, struct statx *);
+		(void) mask;
+		st = va_arg(args, struct statx*);
 		va_end(args);
-		if (is_remote_file(path, &tpath)) {
+		if (is_remote_file(path, &tpath))
+		{
 			fe_t *fe;
 
 			fe = find_fe(tpath);
-			if (!fe) {
+			if (!fe)
+			{
 				dbgd("SYS_statx(%s) -1", tpath);
 				return -1;
 			}
 
-			dbgd("SYS_statx(%s, 0x%lx, %s) 0",
-			     tpath,
-			     fe->size,
-			     fe->size ? "file" : "dir");
+			dbgd("SYS_statx(%s, 0x%lx, %s) 0", tpath, fe->size, fe->size ? "file" : "dir");
 			memcpy(st, &def_statx, sizeof(struct statx));
-			if (fe->size) {
+			if (fe->size)
+			{
 				st->stx_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
 				st->stx_size = fe->size;
 				st->stx_blocks = (fe->size >> 9) + (fe->size & 0x1ff) ? 1 : 0;
-			} else {
+			} else
+			{
 				st->stx_mode = S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO;
 			}
 			return 0;
-		} else {
-			orig_syscall_t orig = (orig_syscall_t)dlsym(RTLD_NEXT, "syscall");
+		} else
+		{
+			orig_syscall_t orig = (orig_syscall_t) dlsym(RTLD_NEXT, "syscall");
 			void *argsb = __builtin_apply_args();
 
 			dbgo("SYS_statx(%d, %s)", dirfd, path);
 #if __cplusplus
-			ret = __builtin_apply((void (*)(...))(orig), argsb, 512);
+			ret = __builtin_apply((void (*)(...)) (orig), argsb, 512);
 #else
 			ret = __builtin_apply((void (*)())(orig), argsb, 512);
 #endif
 			__builtin_return(ret);
 		}
-	} else {
-		orig_syscall_t orig = (orig_syscall_t)dlsym(RTLD_NEXT, "syscall");
+	} else
+	{
+		orig_syscall_t orig = (orig_syscall_t) dlsym(RTLD_NEXT, "syscall");
 		void *argsb = __builtin_apply_args();
 
 		dbgo("syscall(unsupported %ld)", __sysno);
 #if __cplusplus
-		ret = __builtin_apply((void (*)(...))(orig), argsb, 512);
+		ret = __builtin_apply((void (*)(...)) (orig), argsb, 512);
 #else
 		ret = __builtin_apply((void (*)())(orig), argsb, 512);
 #endif
@@ -1256,18 +1306,20 @@ long int syscall(long int __sysno, ...)
 
 int fcntl(int fd, int cmd, ...)
 {
-	if (fd_is_remote(fd)) {
+	if (fd_is_remote(fd))
+	{
 		aep_assert(cmd == F_SETLK, "fcntl(unsupported cmd=%d)", cmd);
 		dbgd("fcntl(%s, %d)", fd_get_name(fd), cmd);
 		return 0;
-	} else {
+	} else
+	{
 		void *args = __builtin_apply_args();
 		void *ret;
-		orig_fcntl_t orig = (orig_fcntl_t)dlsym(RTLD_NEXT, "fcntl");
+		orig_fcntl_t orig = (orig_fcntl_t) dlsym(RTLD_NEXT, "fcntl");
 
 		dbgo("fcntl(%d, %d)", fd, cmd);
 #if __cplusplus
-		ret = __builtin_apply((void (*)(...))(*orig), args, 512);
+		ret = __builtin_apply((void (*)(...)) (*orig), args, 512);
 #else
 		ret = __builtin_apply((void (*)())(*orig), args, 512);
 #endif
@@ -1279,12 +1331,14 @@ ssize_t read(int fd, void *buf, size_t count)
 {
 	ssize_t ret;
 
-	if (fd_is_remote(fd)) {
+	if (fd_is_remote(fd))
+	{
 		data_fd_t *data_fd = fd_get_data_fd(fd);
 
 		ret = read_data(buf, count, data_fd);
 		dbgd("read(%d(%s), %zu) %zd", fd, fd_get_name(fd), count, ret);
-	} else {
+	} else
+	{
 		ret = orig_read(fd, buf, count);
 		dbgo("read(%d(%s), %zu) %zd", fd, fd_get_name(fd), count, ret);
 	}
@@ -1295,37 +1349,39 @@ off_t lseek(int fd, off_t offset, int whence)
 {
 	off_t ret;
 
-	if (fd_is_remote(fd)) {
+	if (fd_is_remote(fd))
+	{
 		data_fd_t *data_fd = fd_get_data_fd(fd);
 
-		aep_assert(whence == SEEK_SET,
-			   "lseek(%s, %ld, %d) unsupported whence",
-			   fd_get_name(fd),
-			   offset,
-			   whence);
+		aep_assert(whence == SEEK_SET, "lseek(%s, %ld, %d) unsupported whence", fd_get_name(fd), offset, whence);
 		data_fd->off = offset;
 		ret = 0;
 		dbgd("lseek(%d(%s), %ld, %d) %ld", fd, fd_get_name(fd), offset, whence, ret);
-	} else {
+	} else
+	{
 		ret = orig_lseek(fd, offset, whence);
 		dbgo("lseek(%d(%s), %ld, %d) %ld", fd, fd_get_name(fd), offset, whence, ret);
 	}
 	return ret;
 }
 
-struct dirent *readdir(DIR *dir)
+struct dirent* readdir(DIR *dir)
 {
 	struct dirent *ret;
 
-	if (fd_is_remote(dirfd(dir))) {
+	if (fd_is_remote(dirfd(dir)))
+	{
 		data_fd_t *data_fd = fd_get_data_fd(dirfd(dir));
 
-		if (!data_fd->readdir_p) {
+		if (!data_fd->readdir_p)
+		{
 			data_fd->readdir_p = data_fd->fe->down;
-		} else {
+		} else
+		{
 			data_fd->readdir_p = data_fd->readdir_p->next;
 		}
-		if (!data_fd->readdir_p) {
+		if (!data_fd->readdir_p)
+		{
 			dbgd("readdir(%s) NULL", fd_get_name(dirfd(dir)));
 			return NULL;
 		}
@@ -1334,11 +1390,14 @@ struct dirent *readdir(DIR *dir)
 		strcpy(data_fd->dirent.d_name, data_fd->readdir_p->name);
 		dbgd("readdir(%s) %s", fd_get_name(dirfd(dir)), data_fd->dirent.d_name);
 		return &data_fd->dirent;
-	} else {
+	} else
+	{
 		ret = orig_readdir(dir);
-		if (ret) {
+		if (ret)
+		{
 			dbgo("readdir(%d) %s", dirfd(dir), ret->d_name);
-		} else {
+		} else
+		{
 			dbgo("readdir(%d) NULL", dirfd(dir));
 		}
 	}
@@ -1347,7 +1406,8 @@ struct dirent *readdir(DIR *dir)
 
 void rewind(FILE *stream)
 {
-	if (fd_is_remote(fileno(stream))) {
+	if (fd_is_remote(fileno(stream)))
+	{
 		dbgd("rewind(%d(%s))", fileno(stream), fd_get_name(fileno(stream)));
 		data_fd_t *data_fd = fd_get_data_fd(fileno(stream));
 		data_fd->off = 0;
@@ -1356,37 +1416,42 @@ void rewind(FILE *stream)
 		data_fd->file.wpos = data_fd->file.wbase = data_fd->file.wend = 0;
 		data_fd->file.rpos = data_fd->file.rend = 0;
 #endif
-	} else {
+	} else
+	{
 		orig_rewind(stream);
 	}
 }
 
-DIR *opendir(const char *name)
+DIR* opendir(const char *name)
 {
 	DIR *ret;
 	char *tpath;
 
-	if (is_remote_file(name, &tpath)) {
+	if (is_remote_file(name, &tpath))
+	{
 		int fd;
 
 		fd = fd_add(tpath);
 		ret = &(fd_get_data_fd(fd)->dir);
 		dbgd("opendir(%s) %d", tpath, fd);
-	} else {
+	} else
+	{
 		ret = orig_opendir(name);
 		dbgo("opendir(%s) %d", name, dirfd(ret));
 	}
 	return ret;
 }
 
-DIR *fdopendir(int fd)
+DIR* fdopendir(int fd)
 {
 	DIR *ret;
 
-	if (fd_is_remote(fd)) {
+	if (fd_is_remote(fd))
+	{
 		ret = &(fd_get_data_fd(fd)->dir);
 		dbgd("fdopendir(%d(%s))", fd, fd_get_data_fd(fd)->tpath);
-	} else {
+	} else
+	{
 		ret = orig_fdopendir(fd);
 		dbgo("fdopendir(%d)", fd);
 	}
@@ -1395,11 +1460,13 @@ DIR *fdopendir(int fd)
 
 int closedir(DIR *dirp)
 {
-	if (fd_is_remote(dirfd(dirp))) {
+	if (fd_is_remote(dirfd(dirp)))
+	{
 		dbgd("closedir(%d(%s))", dirfd(dirp), fd_get_name(dirfd(dirp)));
 		fd_rm(dirfd(dirp));
 		return 0;
-	} else {
+	} else
+	{
 		dbgo("closedir(%d)", dirfd(dirp));
 		return orig_closedir(dirp);
 	}
@@ -1409,17 +1476,21 @@ int fgetc(FILE *stream)
 {
 	int ret;
 
-	if (fd_is_remote(fileno(stream))) {
+	if (fd_is_remote(fileno(stream)))
+	{
 		data_fd_t *data_fd = fd_get_data_fd(fileno(stream));
 		char c;
 
-		if (read_data(&c, 1, data_fd) != 1) {
+		if (read_data(&c, 1, data_fd) != 1)
+		{
 			ret = EOF;
-		} else {
+		} else
+		{
 			ret = c;
 		}
 		dbgd("fgetc(%d(%s)) %d", fileno(stream), fd_get_name(fileno(stream)), ret);
-	} else {
+	} else
+	{
 		ret = orig_fgetc(stream);
 		dbgo("fgetc(%d(%s)) %d", fileno(stream), fd_get_name(fileno(stream)), ret);
 	}
@@ -1428,7 +1499,7 @@ int fgetc(FILE *stream)
 
 /* Google storage static data interface */
 #ifndef NO_GOOGLE_LINK
-	#include <google/cloud/storage/client.h>
+#include <google/cloud/storage/client.h>
 namespace gcs = ::google::cloud::storage;
 static gcs::Client client;
 static char *bucket_name;
@@ -1448,7 +1519,8 @@ static int download_file_gs(data_fd_t *data_fd, char *dest)
 #ifndef NO_GOOGLE_LINK
 	int output;
 
-	if ((output = orig_open(dest, O_CREAT | O_WRONLY)) < 0) {
+	if ((output = orig_open(dest, O_CREAT | O_WRONLY)) < 0)
+	{
 		return -1;
 	}
 
@@ -1465,10 +1537,8 @@ static ssize_t read_remote_data_gs(void *destv, size_t size, char *tpath, off_t 
 {
 #ifndef NO_GOOGLE_LINK
 	// ObjectReadStream is std::basic_istream<char>
-	gcs::ObjectReadStream stream = client.ReadObject(bucket_name,
-							 tpath,
-							 gcs::ReadRange(off, off + size));
-	stream.read((char *)destv, size);
+	gcs::ObjectReadStream stream = client.ReadObject(bucket_name, tpath, gcs::ReadRange(off, off + size));
+	stream.read((char*) destv, size);
 	return stream.tellg();
 #else
 	return 0;
@@ -1488,11 +1558,13 @@ static int download_file_nfs(data_fd_t *data_fd, char *dest)
 	strcat(realpath, data_fd->tpath);
 
 	starttime(&tv);
-	if ((output = orig_open(dest, O_CREAT | O_RDWR)) < 0) {
+	if ((output = orig_open(dest, O_CREAT | O_RDWR)) < 0)
+	{
 		return -1;
 	}
 
-	if ((input = orig_open(realpath, O_RDONLY)) < 0) {
+	if ((input = orig_open(realpath, O_RDONLY)) < 0)
+	{
 		return -1;
 	}
 	res = sendfile(output, input, &copied, data_fd->fe->size);
@@ -1507,7 +1579,7 @@ static int download_file_nfs(data_fd_t *data_fd, char *dest)
 	aepst.read_write++;
 	aepst.read_write_size += data_fd->fe->size;
 	aepst.read_write_time += us;
-	return res == (int)data_fd->fe->size ? 0 : -1;
+	return res == (int) data_fd->fe->size ? 0 : -1;
 }
 
 static ssize_t read_remote_data_nfs(void *destv, size_t size, char *tpath, off_t off)
