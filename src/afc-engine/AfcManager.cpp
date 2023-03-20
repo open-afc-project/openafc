@@ -8140,18 +8140,18 @@ void AfcManager::runPointAnalysis()
 											double slon = sin((lon2Rad-lon1Rad)/2);
 											double ptDistKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
 
-											ftrace->writeRow({ QString::asprintf("PT_%d", ptIdx),
-													QString::number(ptLon, 'f', 10),
-													QString::number(ptLat, 'f', 10),
-													QString::number(ptDistKm, 'f', 5),
-													QString::number(uls->ITMHeightProfile[2+ptIdx], 'f', 20),
-													QString::number(losPathHeight, 'f', 5),
-													QString::number(uls->getID()),
-													QString::number(divIdx),
-													QString::number(segIdx),
-													QString::number(scanPtIdx),
-													QString::number(rlanPosnIdx)
-													});
+											pathTraceGc.ptid = boost::format("PT_%d") % ptIdx;
+											pathTraceGc.lon = ptLon;
+											pathTraceGc.lat = ptLat;
+											pathTraceGc.dist = ptDistKm;
+											pathTraceGc.amsl = uls->ITMHeightProfile[2+ptIdx];
+											pathTraceGc.losAmsl = losPathHeight;
+											pathTraceGc.fsid = uls->getID();
+											pathTraceGc.divIdx = divIdx;
+											pathTraceGc.segIdx = segIdx;
+											pathTraceGc.scanPtIdx = scanPtIdx;
+											pathTraceGc.rlanHtIdx = rlanPosnIdx;
+											pathTraceGc.completeRow();
 										}
 									}
 								}
