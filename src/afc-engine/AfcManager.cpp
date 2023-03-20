@@ -1,5 +1,6 @@
 // AfcManager.cpp -- Manages I/O and top-level operations for the AFC Engine
 #include "AfcManager.h"
+#include <boost/format.hpp>
 #include "RlanRegion.h"
 #include <QFileInfo>
 
@@ -62,35 +63,8 @@ namespace
 		// const int fixedPolarization = 1;
 		// const double fixedConfidence = 0.5;
 		// const double fixedRelevance = 0.5;
-	/**
-	 * Encapsulates a CSV writer to a file gzip'd
-	 * All fields are NULL if filename parameter in constructor is not a valid path.
-	 */
-	class GzipCsvWriter
-	{
-		public:
-			std::unique_ptr<CsvWriter> csv_writer;
-			std::unique_ptr<QFile> file_writer;
-			std::unique_ptr<GzipStream> gzip_writer;
 
-			GzipCsvWriter(std::string &filename);
-	};
-
-	GzipCsvWriter::GzipCsvWriter(std::string &filename)
-	{
-		if (!filename.empty())
-		{
-			file_writer = FileHelpers::open(QString::fromStdString(filename), QIODevice::WriteOnly);
-			gzip_writer.reset(new GzipStream(file_writer.get()));
-			if (!gzip_writer->open(QIODevice::WriteOnly))
-			{
-				throw std::runtime_error("Gzip failed to open.");
-			}
-			csv_writer.reset(new CsvWriter(*gzip_writer));
-		}
-	}
-
-	/**
+		/**
 	 * Encapsulates a XML writer to a file
 	 * All fields are NULL if filename parameter in constructor is not a valid path.
 	 */
@@ -220,6 +194,286 @@ namespace OpClass
 	};
 
 }
+
+/** GZIP CSV for EIRP computation */
+class EirpGzipCsv : public GzipCsv {
+public:
+	ColStr callsign;					// ULS Path Callsign
+	ColInt pathNum;						// ULS Path number
+	ColInt ulsId;						// ULS Path ID from DB
+	ColInt segIdx;						// Segment index
+	ColInt divIdx;						// Diversity index
+	ColDouble scanLat;					// Scanpoint latitude
+	ColDouble scanLon;					// Scanpoint longitude
+	ColDouble scanAgl;					// Scanpoint elevation above ground
+	ColDouble scanAmsl;					// Scanpoint elevation above terrain
+	ColInt scanPtIdx;					// Scanpoint index
+	ColDouble distKm;					// Distance from scanpoint to FS RX
+	ColDouble elevationAngleTx;			// Elevation from scanpoint to FS RX
+	ColInt channel;						// Channel number
+	ColDouble chanStartMhz;				// Channel start MHz
+	ColDouble chanEndMhz;				// Channel end MHz
+	ColDouble chanBwMhz;				// Channel bandwidth MHz
+	ColEnum chanType;					// Request type (by freq/by number)
+	ColDouble eirpLimit;				// Resulting EIRP limit dB
+	ColBool fspl;						// Freespace (trial) pathLoss computation
+	ColDouble pathLossDb;				// Path loss dB
+	ColDouble buildingPenetrationDb;	// Building penetration loss dB
+	ColDouble offBoresight;				// Angle beween RX beam and direction to scanpoint
+	ColDouble rxGainDb;					// RX Gain DB (loss due to antenna diagram)
+	ColDouble pathClutterTxDb;			// Path clutter TX dB
+	ColDouble pathClutterRxDb;			// Path Clutter RX dB
+	ColDouble nearFieldOffsetDb;		// Near field offset dB
+	ColDouble spectralOverlapLossDb;	// Spectral overlap loss dB
+	ColDouble ulsAntennaFeederLossDb;	// FS Antenna feeder loss dB
+	ColDouble rxPowerDbW;				// Intermediate aggregated loss
+	ColDouble ulsNoiseLevelDbW;			// FS Noise level dB
+
+
+	EirpGzipCsv(const std::string &filename) :
+		GzipCsv(filename),
+		callsign(this, "CallSign"),
+		pathNum(this, "PathNumber"),
+		ulsId(this, "UlsId"),
+		segIdx(this, "SegIdx"),
+		divIdx(this, "DivIdx"),
+		scanLat(this, "ScanLat"),
+		scanLon(this, "ScanLon"),
+		scanAgl(this, "ScanAGL"),
+		scanAmsl(this, "ScanAMSL"),
+		scanPtIdx(this, "ScanIdx"),
+		distKm(this, "DistKm"),
+		elevationAngleTx(this, "ElevationAngleTx"),
+		channel(this, "Channel"),
+		chanStartMhz(this, "ChanStartMhz"),
+		chanEndMhz(this, "ChanEndMhz"),
+		chanBwMhz(this, "ChanBwMhz"),
+		chanType(this, "ChanType",
+			{{INQUIRED_FREQUENCY, "ByFreq"}, {INQUIRED_CHANNEL, "ByNumber"}}),
+		eirpLimit(this, "EIRP"),
+		fspl(this, "FreeSpace"),
+		pathLossDb(this, "PathLossDb"),
+		buildingPenetrationDb(this, "BuildingPenetrationDb"),
+		offBoresight(this, "OffBoresightDeg"),
+		rxGainDb(this, "RxGainDb"),
+		pathClutterTxDb(this, "PathClutterTxDb"),
+		pathClutterRxDb(this, "PathClutterRxDb"),
+		nearFieldOffsetDb(this, "NearFieldOffsetDb"),
+		spectralOverlapLossDb(this, "SpectralOverlapLossDb"),
+		ulsAntennaFeederLossDb(this, "UlsAntennaFeederLossDb"),
+		rxPowerDbW(this, "RxPowerDbW"),
+		ulsNoiseLevelDbW(this, "UlsNoiseLevel")
+	{}
+};
+
+/** GZIP CSV for anomaly writer */
+class AnomalyGzipCsv : public GzipCsv {
+public:
+	ColInt fsid;
+	ColStr dbName;
+	ColStr callsign;
+	ColDouble rxLatitudeDeg;
+	ColDouble rxLongitudeDeg;
+	ColStr anomaly;
+
+	AnomalyGzipCsv(const std::string &filename) :
+		GzipCsv(filename), fsid(this, "FSID"), dbName(this, "DBNAME"), callsign(this, "CALLSIGN"),
+		rxLatitudeDeg(this, "RX_LATITUDE"), rxLongitudeDeg(this, "RX_LONGITUDE"),
+		anomaly(this, "ANOMALY_DESCRIPTION")
+	{}
+};
+
+/** GZIP CSV for excThr */
+class ExThrGzipCsv : public GzipCsv {
+public:
+	ColInt fsid;
+	ColStr region;
+	ColStr dbName;
+	ColInt rlanPosnIdx;
+	ColStr callsign;
+	ColDouble fsLon;
+	ColDouble fsLat;
+	ColDouble fsAgl;
+	ColDouble fsTerrainHeight;
+	ColStr fsTerrainSource;
+	ColStr fsPropEnv;
+	ColInt numPr;
+	ColInt divIdx;
+	ColInt segIdx;
+	ColDouble segRxLon;
+	ColDouble segRxLat;
+	ColDouble refThetaIn;
+	ColDouble refKs;
+	ColDouble refQ;
+	ColDouble refD0;
+	ColDouble refD1;
+	ColDouble rlanLon;
+	ColDouble rlanLat;
+	ColDouble rlanAgl;
+	ColDouble rlanTerrainHeight;
+	ColStr rlanTerrainSource;
+	ColStr rlanPropEnv;
+	ColDouble rlanFsDist;
+	ColDouble rlanFsGroundDist;
+	ColDouble rlanElevAngle;
+	ColDouble boresightAngle;
+	ColDouble rlanTxEirp;
+	ColDouble bodyLoss;
+	ColStr rlanClutterCategory;
+	ColStr fsClutterCategory;
+	ColStr buildingType;
+	ColDouble buildingPenetration;
+	ColStr buildingPenetrationModel;
+	ColDouble buildingPenetrationCdf;
+	ColDouble pathLoss;
+	ColStr pathLossModel;
+	ColDouble pathLossCdf;
+	ColDouble pathClutterTx;
+	ColStr pathClutterTxMode;
+	ColDouble pathClutterTxCdf;
+	ColDouble pathClutterRx;
+	ColStr pathClutterRxMode;
+	ColDouble pathClutterRxCdf;
+	ColDouble rlanBandwidth;
+	ColDouble rlanStartFreq;
+	ColDouble rlanStopFreq;
+	ColDouble ulsStartFreq;
+	ColDouble ulsStopFreq;
+	ColStr antType;
+	ColEnum antCategory;
+	ColDouble antGainPeak;
+	ColStr prType;
+	ColDouble prEffectiveGain;
+	ColDouble prDiscrinminationGain;
+	ColDouble fsGainToRlan;
+	ColDouble fsNearFieldXdb;
+	ColDouble fsNearFieldU;
+	ColDouble fsNearFieldEff;
+	ColDouble fsNearFieldOffset;
+	ColDouble spectralOverlapLoss;
+	ColDouble polarizationLoss;
+	ColDouble fsRxFeederLoss;
+	ColDouble fsRxPwr;
+	ColDouble fsIN;
+	ColDouble eirpLimit;
+	ColDouble fsSegDist;
+	ColDouble ulsLinkDist;	// Field from runExclusionZoneAnalysis() and runHeatMapAnalysis()
+	ColDouble rlanCenterFreq;
+	ColDouble fsTxToRlanDist;
+	ColDouble pathDifference;
+	ColDouble ulsWavelength;
+	ColDouble fresnelIndex;
+	ColStr comment;			// Field from runExclusionZoneAnalysis()
+
+	ExThrGzipCsv(const std::string filename) :
+		GzipCsv(filename),
+		fsid(this,                      "FS_ID"),
+		region(this, 					"FS_REGION"),
+		dbName(this, 					"DBNAME"),
+		rlanPosnIdx(this, 				"RLAN_POSN_IDX"),
+		callsign(this, 					"CALLSIGN"),
+		fsLon(this, 					"FS_RX_LONGITUDE (deg)"),
+		fsLat(this, 					"FS_RX_LATITUDE (deg)"),
+		fsAgl(this, 					"FS_RX_HEIGHT_ABOVE_TERRAIN (m)"),
+		fsTerrainHeight(this, 			"FS_RX_TERRAIN_HEIGHT (m)"),
+		fsTerrainSource(this, 			"FS_RX_TERRAIN_SOURCE"),
+		fsPropEnv(this, 				"FS_RX_PROP_ENV"),
+		numPr(this, 					"NUM_PASSIVE_REPEATER"),
+		divIdx(this, 					"IS_DIVERSITY_LINK"),											   
+		segIdx(this,					"SEGMENT_IDX"),
+		segRxLon(this, 					"SEGMENT_RX_LONGITUDE (deg)"),
+		segRxLat(this, 					"SEGMENT_RX_LATITUDE (deg)"),
+		refThetaIn(this, 				"PR_REF_THETA_IN (deg)"),
+		refKs(this, 					"PR_REF_KS"),
+		refQ(this, 						"PR_REF_Q"),
+		refD0(this, 					"PR_REF_D0 (dB)"),
+		refD1(this, 					"PR_REF_D1 (dB)"),
+		rlanLon(this, 					"RLAN_LONGITUDE (deg)"),
+		rlanLat(this, 					"RLAN_LATITUDE (deg)"),
+		rlanAgl(this, 					"RLAN_HEIGHT_ABOVE_TERRAIN (m)"),
+		rlanTerrainHeight(this, 		"RLAN_TERRAIN_HEIGHT (m)"),
+		rlanTerrainSource(this, 		"RLAN_TERRAIN_SOURCE"),
+		rlanPropEnv(this, 				"RLAN_PROP_ENV"),
+		rlanFsDist(this, 				"RLAN_FS_RX_DIST (km)"),
+		rlanFsGroundDist(this, 			"RLAN_FS_RX_GROUND_DIST (km)"),
+		rlanElevAngle(this, 			"RLAN_FS_RX_ELEVATION_ANGLE (deg)"),
+		boresightAngle(this, 			"FS_RX_ANGLE_OFF_BORESIGHT (deg)"),
+		rlanTxEirp(this, 				"RLAN_TX_EIRP (dBm)"),
+		bodyLoss(this, 					"BODY_LOSS (dB)"),
+		rlanClutterCategory(this, 		"RLAN_CLUTTER_CATEGORY"),
+		fsClutterCategory(this, 		"FS_CLUTTER_CATEGORY"),
+		buildingType(this, 				"BUILDING TYPE"),
+		buildingPenetration(this, 		"RLAN_FS_RX_BUILDING_PENETRATION (dB)"),
+		buildingPenetrationModel(this, 	"BUILDING_PENETRATION_MODEL"),
+		buildingPenetrationCdf(this, 	"BUILDING_PENETRATION_CDF"),
+		pathLoss(this, 					"PATH_LOSS (dB)"),
+		pathLossModel(this, 			"PATH_LOSS_MODEL"),
+		pathLossCdf(this, 				"PATH_LOSS_CDF"),
+		pathClutterTx(this, 			"PATH_CLUTTER_TX (DB)"),
+		pathClutterTxMode(this, 		"PATH_CLUTTER_TX_MODEL"),
+		pathClutterTxCdf(this, 			"PATH_CLUTTER_TX_CDF"),
+		pathClutterRx(this, 			"PATH_CLUTTER_RX (DB)"),
+		pathClutterRxMode(this, 		"PATH_CLUTTER_RX_MODEL"),
+		pathClutterRxCdf(this, 			"PATH_CLUTTER_RX_CDF"),
+		rlanBandwidth(this, 			"RLAN BANDWIDTH (MHz)"),
+		rlanStartFreq(this, 			"RLAN CHANNEL START FREQ (MHz)"),
+		rlanStopFreq(this, 				"RLAN CHANNEL STOP FREQ (MHz)"),
+		ulsStartFreq(this, 				"ULS START FREQ (MHz)"),
+		ulsStopFreq(this, 				"ULS STOP FREQ (MHz)"),
+		antType(this, 					"FS_ANT_TYPE"),
+		antCategory(this, 				"FS_ANT_CATEGORY",
+										{{CConst::B1AntennaCategory, "B1"},
+										{CConst::HPAntennaCategory, "HP"}},
+										"UNKNOWN"),
+		antGainPeak(this, 				"FS_ANT_GAIN_PEAK (dB)"),
+		prType(this, 					"PR_TYPE (dB)"),
+		prEffectiveGain(this, 			"PR_EFFECTIVE_GAIN (dB)"),
+		prDiscrinminationGain(this, 	"PR_DISCRIMINATION_GAIN (dB)"),
+		fsGainToRlan(this, 				"FS_ANT_GAIN_TO_RLAN (dB)"),
+		fsNearFieldXdb(this, 			"FS_ANT_NEAR_FIELD_XDB"),
+		fsNearFieldU(this, 				"FS_ANT_NEAR_FIELD_U"),
+		fsNearFieldEff(this, 			"FS_ANT_NEAR_FIELD_EFF"),
+		fsNearFieldOffset(this, 		"FS_ANT_NEAR_FIELD_OFFSET (dB)"),
+		spectralOverlapLoss(this, 		"RX_SPECTRAL_OVERLAP_LOSS (dB)"),
+		polarizationLoss(this, 			"POLARIZATION_LOSS (dB)"),
+		fsRxFeederLoss(this, 			"FS_RX_FEEDER_LOSS (dB)"),
+		fsRxPwr(this, 					"FS_RX_PWR (dBW)"),
+		fsIN(this, 						"FS I/N (dB)"),
+		eirpLimit(this, 				"EIRP_LIMIT (dBm)"),
+		fsSegDist(this, 				"FS_SEGMENT_DIST (m)"),
+		ulsLinkDist(this,				"ULS_LINK_DIST (m)"),
+		rlanCenterFreq(this, 			"RLAN_CENTER_FREQ (Hz)"),
+		fsTxToRlanDist(this, 			"FS_TX_TO_RLAN_DIST (m)"),
+		pathDifference(this, 			"PATH_DIFFERENCE (m)"),
+		ulsWavelength(this, 			"ULS_WAVELENGTH (mm)"),
+		fresnelIndex(this, 				"FRESNEL_INDEX"),
+		comment(this,					"COMMENT")
+	{}
+};
+
+/** GZIP CSV for traces */
+class TraceGzipCsv : public GzipCsv {
+public:
+	ColStr ptId;
+	ColDouble lon;
+	ColDouble lat;
+	ColDouble dist;
+	ColDouble amsl;
+	ColDouble losAmsl;
+	ColInt fsid;
+	ColInt divIdx;
+	ColInt segIdx;
+	ColInt scanPtIdx;
+	ColInt rlanHtIdx;
+
+	TraceGzipCsv(std::string filename) :
+		GzipCsv(filename),
+		ptId(this, "PT_ID"), lon(this, "PT_LON (deg)"), lat(this, "PT_LAT (deg)"),
+		dist(this, "GROUND_DIST (Km)"), amsl(this, "TERRAIN_HEIGHT_AMSL (m)"),
+		losAmsl(this, "LOS_PATH_HEIGHT_AMSL (m)"), fsid(this, "FSID"), divIdx(this, "DIV_IDX"),
+		segIdx(this, "SEG_IDX"), scanPtIdx(this, "SCAN_PT_IDX"), rlanHtIdx(this, "RLAN_HEIGHT_IDX")
+	{}
+};
 
 AfcManager::AfcManager()
 {
@@ -3869,12 +4123,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 	const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
 
-	auto fs_anom_writer = GzipCsvWriter(_fsAnomFile);
-	auto &fanom = fs_anom_writer.csv_writer;
-
-	if (fanom) {
-		fanom->writeRow({"FSID","DBNAME","CALLSIGN","RX_LATITUDE","RX_LONGITUDE","ANOMALY_DESCRIPTION"});
-	}
+	AnomalyGzipCsv anomGc(_fsAnomFile);
 
 	int prIdx;
 	int dbIdx;
@@ -3901,6 +4150,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 		int fsid = -1;
 		std::string callsign;
+		int pathNumber;
 		std::string radioService;
 		std::string entityName;
 		std::string rxCallsign;
@@ -4013,6 +4263,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			/**************************************************************************/
 			callsign = row.callsign;
 			rxCallsign = row.rxCallsign;
+			pathNumber = row.pathNumber;
 			/**************************************************************************/
 
 			/**************************************************************************/
@@ -4823,6 +5074,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 				uls = new ULSClass(this, fsid, dbIdx, numPR, row.region);
 				_ulsList->append(uls);
 				uls->setCallsign(callsign);
+				uls->setPathNumber(pathNumber);
 				uls->setRxCallsign(rxCallsign);
 				uls->setRxAntennaNumber(rxAntennaNumber);
 				uls->setRadioService(radioService);
@@ -5120,11 +5372,23 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 				double noiseLevelDBW = noisePSD + 10.0*log10(noiseBandwidth);
 				uls->setNoiseLevelDBW(noiseLevelDBW);
-				if (fixedFlag && fanom) {
-					fanom->writeRow({QString::asprintf("%d", fsid), QString::fromStdString(name), QString::fromStdString(callsign), QString::asprintf("%.15f", rxLatitudeDeg), QString::asprintf("%.15f", rxLongitudeDeg), QString::fromStdString(fixedStr)});
+				if (fixedFlag && anomGc) {
+					anomGc.fsid = fsid;
+					anomGc.dbName = name;
+					anomGc.callsign = callsign;
+					anomGc.rxLatitudeDeg = rxLatitudeDeg;
+					anomGc.rxLongitudeDeg = rxLongitudeDeg;
+					anomGc.anomaly = fixedStr;
+					anomGc.completeRow();
 				}
-			} else if (fanom) {
-				fanom->writeRow({QString::asprintf("%d", fsid), QString::fromStdString(name), QString::fromStdString(callsign), QString::asprintf("%.15f", rxLatitudeDeg), QString::asprintf("%.15f", rxLongitudeDeg), QString::fromStdString(reasonIgnored)});
+			} else if (anomGc) {
+				anomGc.fsid = fsid;
+				anomGc.dbName = name;
+				anomGc.callsign = callsign;
+				anomGc.rxLatitudeDeg = rxLatitudeDeg;
+				anomGc.rxLongitudeDeg = rxLongitudeDeg;
+				anomGc.anomaly = reasonIgnored;
+				anomGc.completeRow();
 			}
 
 		}
@@ -6744,89 +7008,9 @@ void AfcManager::runPointAnalysis()
 	/**************************************************************************************/
 	/* Create excThrFile, useful for debugging                                            */
 	/**************************************************************************************/
-	auto excthr_writer = GzipCsvWriter(_excThrFile);
-	auto &fexcthrwifi = excthr_writer.csv_writer;
+	ExThrGzipCsv excthrGc(_excThrFile);
 
-	if (fexcthrwifi) {
-		fexcthrwifi->writeRow({ "FS_ID", "FS_REGION", "DBNAME",
-				"RLAN_POSN_IDX",
-				"CALLSIGN",
-				"FS_RX_LONGITUDE (deg)",
-				"FS_RX_LATITUDE (deg)",
-				"FS_RX_HEIGHT_ABOVE_TERRAIN (m)",
-				"FS_RX_TERRAIN_HEIGHT (m)",
-				"FS_RX_TERRAIN_SOURCE",
-				"FS_RX_PROP_ENV",
-				"NUM_PASSIVE_REPEATER",
-				"IS_DIVERSITY_LINK",
-				"SEGMENT_IDX",
-				"SEGMENT_RX_LONGITUDE (deg)",
-				"SEGMENT_RX_LATITUDE (deg)",
-
-				"PR_REF_THETA_IN (deg)",
-				"PR_REF_KS",
-				"PR_REF_Q",
-				"PR_REF_D0 (dB)",
-				"PR_REF_D1 (dB)",
-
-				"RLAN_LONGITUDE (deg)",
-				"RLAN_LATITUDE (deg)",
-				"RLAN_HEIGHT_ABOVE_TERRAIN (m)",
-				"RLAN_TERRAIN_HEIGHT (m)",
-				"RLAN_TERRAIN_SOURCE",
-				"RLAN_PROP_ENV",
-				"RLAN_FS_RX_DIST (km)",
-				"RLAN_FS_RX_GROUND_DIST (km)",
-				"RLAN_FS_RX_ELEVATION_ANGLE (deg)",
-				"FS_RX_ANGLE_OFF_BORESIGHT (deg)",
-				"RLAN_TX_EIRP (dBm)",
-				"BODY_LOSS (dB)",
-				"RLAN_CLUTTER_CATEGORY",
-				"FS_CLUTTER_CATEGORY",
-				"BUILDING TYPE",
-				"RLAN_FS_RX_BUILDING_PENETRATION (dB)",
-				"BUILDING_PENETRATION_MODEL",
-				"BUILDING_PENETRATION_CDF",
-				"PATH_LOSS (dB)",
-				"PATH_LOSS_MODEL",
-				"PATH_LOSS_CDF",
-				"PATH_CLUTTER_TX (DB)",
-				"PATH_CLUTTER_TX_MODEL",
-				"PATH_CLUTTER_TX_CDF",
-				"PATH_CLUTTER_RX (DB)",
-				"PATH_CLUTTER_RX_MODEL",
-				"PATH_CLUTTER_RX_CDF",
-				"RLAN BANDWIDTH (MHz)",
-				"RLAN CHANNEL START FREQ (MHz)",
-				"RLAN CHANNEL STOP FREQ (MHz)",
-				"ULS START FREQ (MHz)",
-				"ULS STOP FREQ (MHz)",
-				"FS_ANT_TYPE",
-				"FS_ANT_CATEGORY",
-				"FS_ANT_GAIN_PEAK (dB)",
-				"PR_TYPE (dB)",
-				"PR_EFFECTIVE_GAIN (dB)",
-				"PR_DISCRIMINATION_GAIN (dB)",
-				"FS_ANT_GAIN_TO_RLAN (dB)",
-				"FS_ANT_NEAR_FIELD_XDB",
-				"FS_ANT_NEAR_FIELD_U",
-				"FS_ANT_NEAR_FIELD_EFF",
-				"FS_ANT_NEAR_FIELD_OFFSET (dB)",
-				"RX_SPECTRAL_OVERLAP_LOSS (dB)",
-				"POLARIZATION_LOSS (dB)",
-				"FS_RX_FEEDER_LOSS (dB)",
-				"FS_RX_PWR (dBW)",
-				"FS I/N (dB)",
-				"EIRP_LIMIT (dBm)",
-				"FS_SEGMENT_DIST (m)",
-				"RLAN_CENTER_FREQ (Hz)",
-				"FS_TX_TO_RLAN_DIST (m)",
-				"PATH_DIFFERENCE (m)",
-				"ULS_WAVELENGTH (mm)",
-				"FRESNEL_INDEX"
-
-		});
-	}
+	EirpGzipCsv eirpGc(_eirpGcFile);
 	/**************************************************************************************/
 
 	/**************************************************************************************/
@@ -7240,9 +7424,7 @@ void AfcManager::runPointAnalysis()
 	/**************************************************************************************/
 	/* Create pathTraceFile, for debugging                                                */
 	/**************************************************************************************/
-	auto path_writer = GzipCsvWriter(pathTraceFile);
-	auto &ftrace = path_writer.csv_writer;
-	ftrace->writeRow({"PT_ID","PT_LON (deg)","PT_LAT (deg)","GROUND_DIST (Km)","TERRAIN_HEIGHT_AMSL (m)","LOS_PATH_HEIGHT_AMSL (m)","FSID","DIV_IDX","SEG_IDX","SCAN_PT_IDX","RLAN_HEIGHT_IDX"});
+	TraceGzipCsv pathTraceGc(pathTraceFile);
 	/**************************************************************************************/
 #endif
 
@@ -7714,6 +7896,40 @@ void AfcManager::runPointAnalysis()
 
 												eirpLimit_dBm = _maxEIRP_dBm + marginDB;
 
+												if (eirpGc) {
+													eirpGc.callsign = uls->getCallsign();
+													eirpGc.pathNum = uls->getPathNumber();
+													eirpGc.ulsId = uls->getID();
+													eirpGc.segIdx = segIdx;
+													eirpGc.divIdx = divIdx;
+													eirpGc.scanLat = rlanCoord.latitudeDeg;
+													eirpGc.scanLon = rlanCoord.longitudeDeg;
+													eirpGc.scanAgl = rlanHtAboveTerrain;
+													eirpGc.scanAmsl = rlanCoord.heightKm * 1000.0;
+													eirpGc.scanPtIdx = scanPtIdx;
+													eirpGc.distKm = distKm;
+													eirpGc.elevationAngleTx = elevationAngleTxDeg;
+													eirpGc.channel = channel->index;
+													eirpGc.chanStartMhz = channel->startFreqMHz;
+													eirpGc.chanEndMhz = channel->stopFreqMHz;
+													eirpGc.chanBwMhz = channel->stopFreqMHz - channel->startFreqMHz;
+													eirpGc.chanType = channel->type;
+													eirpGc.eirpLimit = eirpLimit_dBm;
+													eirpGc.fspl = forceFspl;
+													eirpGc.pathLossDb = pathLoss;
+													eirpGc.buildingPenetrationDb = buildingPenetrationDB;
+													eirpGc.offBoresight = angleOffBoresightDeg;
+													eirpGc.rxGainDb = rxGainDB;
+													eirpGc.pathClutterTxDb = pathClutterTxDB;
+													eirpGc.pathClutterRxDb = pathClutterRxDB;
+													eirpGc.nearFieldOffsetDb = nearFieldOffsetDB;
+													eirpGc.spectralOverlapLossDb = spectralOverlapLossDB;
+													eirpGc.ulsAntennaFeederLossDb =  uls->getRxAntennaFeederLossDB();
+													eirpGc.rxPowerDbW = rxPowerDBW;
+													eirpGc.ulsNoiseLevelDbW = uls->getNoiseLevelDBW();
+													eirpGc.completeRow();
+												}
+
 												if (forceFspl) {
 													// Skipping further computation if Free Space path loss
 													// EIRP is larger than already established (hence
@@ -7762,7 +7978,7 @@ void AfcManager::runPointAnalysis()
 												}
 											}
 
-											if ( fexcthrwifi && (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) )
+											if ( excthrGc && (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) )
 											{
 												double d1;
 												double d2;
@@ -7802,91 +8018,98 @@ void AfcManager::runPointAnalysis()
 													}
 												}
 
-												CConst::AntennaCategoryEnum rxAntennaCategory = (segIdx == numPR ? uls->getRxAntennaCategory() : uls->getPR(segIdx).antCategory);
-												std::string rxAntennaCategoryStr = (
-														rxAntennaCategory == CConst::B1AntennaCategory ? "B1" :
-														rxAntennaCategory == CConst::HPAntennaCategory ? "HP" :
-														"UNKNOWN");
-
 												std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
 														_buildingType == CConst::noBuildingType ? "OUTDOOR" :
 														_buildingType == CConst::traditionalBuildingType ?  "TRADITIONAL" :
 														"THERMALLY_EFFICIENT");
 
-												std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
-
-												QStringList msg;
-												msg << QString::number(uls->getID()) << QString::fromStdString(uls->getRegion()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
-												msg << QString::number(uls->getRxLongitudeDeg(), 'f', 5) << QString::number(uls->getRxLatitudeDeg(), 'f', 5);
-												msg << QString::number((divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain()), 'f', 2)
-													<< QString::number(uls->getRxTerrainHeight(), 'f', 2)
-													<< QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
-													<< QString(ulsRxPropEnv);
-												msg << QString::number(uls->getNumPR());
-												msg << QString::number(divIdx);
-												msg << QString::number(segIdx) << QString::number(ulsRxLongitude, 'f', 5) << QString::number(ulsRxLatitude, 'f', 5);
+												excthrGc.fsid = uls->getID();
+												excthrGc.region = uls->getRegion();
+												excthrGc.dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+												excthrGc.rlanPosnIdx = rlanPosnIdx;
+												excthrGc.callsign = uls->getCallsign();
+												excthrGc.fsLon = uls->getRxLongitudeDeg();
+												excthrGc.fsLat = uls->getRxLatitudeDeg();
+												excthrGc.fsAgl = divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain();
+												excthrGc.fsTerrainHeight = uls->getRxTerrainHeight();
+												excthrGc.fsTerrainSource = _terrainDataModel->getSourceName(uls->getRxHeightSource());
+												excthrGc.fsPropEnv = ulsRxPropEnv;
+												excthrGc.numPr = uls->getNumPR();
+												excthrGc.divIdx = divIdx;
+												excthrGc.segIdx = segIdx;
+												excthrGc.segRxLon = ulsRxLongitude;
+												excthrGc.segRxLat = ulsRxLatitude;
 
 												if ((segIdx < numPR) && (uls->getPR(segIdx).type == CConst::billboardReflectorPRType)) {
 													PRClass& pr = uls->getPR(segIdx);
-													msg << QString::number(pr.reflectorThetaIN, 'f', 5)
-														<< QString::number(pr.reflectorKS, 'f', 5)
-														<< QString::number(pr.reflectorQ, 'f', 5)
-														<< QString::number(reflectorD0, 'f', 5)
-														<< QString::number(reflectorD1, 'f', 5);
-												} else {
-													msg << QString("") << QString("") << QString("") << QString("") << QString("");
+													excthrGc.refThetaIn = pr.reflectorThetaIN;
+													excthrGc.refKs = pr.reflectorKS;
+													excthrGc.refQ = pr.reflectorQ;
+													excthrGc.refD0 = reflectorD0;
+													excthrGc.refD1 = reflectorD1;
 												}
 
-												msg << QString::number(rlanCoord.longitudeDeg, 'f', 5) << QString::number(rlanCoord.latitudeDeg, 'f', 5);
-												msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2)
-													<< QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource))
-													<< CConst::strPropEnvList->type_to_str(rlanPropEnv);
-												msg << QString::number(distKm, 'f', 3) << QString::number(groundDistanceKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
-												msg << QString::number(_maxEIRP_dBm, 'f', 3) << QString::number(_bodyLossDB, 'f', 3) << QString::fromStdString(txClutterStr) << QString::fromStdString(rxClutterStr) << QString::fromStdString(bldgTypeStr);
-												msg << QString::number(buildingPenetrationDB, 'f', 3) << QString::fromStdString(buildingPenetrationModelStr) << QString::number(buildingPenetrationCDF, 'f', 8);
-												msg << QString::number(pathLoss, 'f', 3) << QString::fromStdString(pathLossModelStr) << QString::number(pathLossCDF, 'f', 8);
-		
-												msg << QString::number(pathClutterTxDB, 'f', 3) << QString::fromStdString(pathClutterTxModelStr) << QString::number(pathClutterTxCDF, 'f', 8);
-												msg << QString::number(pathClutterRxDB, 'f', 3) << QString::fromStdString(pathClutterRxModelStr) << QString::number(pathClutterRxCDF, 'f', 8);
-		
-												msg << QString::number(bandwidth * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
-													<< QString::number(uls->getStartFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopFreq() * 1.0e-6, 'f', 2);
-		
-												msg << QString::fromStdString(rxAntennaTypeStr) << QString::fromStdString(rxAntennaCategoryStr)
-													<< QString::number((divIdx == 0 ? uls->getRxGain() : uls->getDiversityGain()), 'f', 3);
+												excthrGc.rlanLon = rlanCoord.longitudeDeg;
+												excthrGc.rlanLat = rlanCoord.latitudeDeg;
+												excthrGc.rlanAgl =rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
+												excthrGc.rlanTerrainHeight = rlanTerrainHeight;
+												excthrGc.rlanTerrainSource = _terrainDataModel->getSourceName(rlanHeightSource);
+												excthrGc.rlanPropEnv = CConst::strPropEnvList->type_to_str(rlanPropEnv);
+												excthrGc.rlanFsDist = distKm;
+												excthrGc.rlanFsGroundDist = groundDistanceKm;
+												excthrGc.rlanElevAngle = elevationAngleTxDeg;
+												excthrGc.boresightAngle = angleOffBoresightDeg;
+												excthrGc.rlanTxEirp = _maxEIRP_dBm;
+												excthrGc.bodyLoss = _bodyLossDB;
+												excthrGc.rlanClutterCategory = txClutterStr;
+												excthrGc.fsClutterCategory = rxClutterStr;
+												excthrGc.buildingType = bldgTypeStr;
+												excthrGc.buildingPenetration = buildingPenetrationDB;
+												excthrGc.buildingPenetrationModel = buildingPenetrationModelStr;
+												excthrGc.buildingPenetrationCdf = buildingPenetrationCDF;
+												excthrGc.pathLoss = pathLoss;
+												excthrGc.pathLossModel = pathLossModelStr;
+												excthrGc.pathLossCdf = pathLossCDF;
+												excthrGc.pathClutterTx = pathClutterTxDB;
+												excthrGc.pathClutterTxMode =  pathClutterTxModelStr;
+												excthrGc.pathClutterTxCdf = pathClutterTxCDF;
+												excthrGc.pathClutterRx = pathClutterRxDB;
+												excthrGc.pathClutterRxMode = pathClutterRxModelStr;
+												excthrGc.pathClutterRxCdf = pathClutterRxCDF;
+												excthrGc.rlanBandwidth = bandwidth * 1.0e-6;
+												excthrGc.rlanStartFreq = chanStartFreq * 1.0e-6;
+												excthrGc.rlanStopFreq = chanStopFreq * 1.0e-6;
+												excthrGc.ulsStartFreq = uls->getStartFreq() * 1.0e-6;
+												excthrGc.ulsStopFreq = uls->getStopFreq() * 1.0e-6;
+												excthrGc.antType = rxAntennaTypeStr;
+												excthrGc.antCategory = segIdx == numPR ? uls->getRxAntennaCategory() : uls->getPR(segIdx).antCategory;
+												excthrGc.antGainPeak = divIdx == 0 ? uls->getRxGain() : uls->getDiversityGain();
 
-												if (segIdx == numPR) {
-													msg << QString("") << QString("") << QString("");
-												} else {
-													msg << CConst::strPRTypeList->type_to_str(uls->getPR(segIdx).type);
-													msg << QString::number(uls->getPR(segIdx).effectiveGain, 'f', 3);
-													msg << QString::number(discriminationGain, 'f', 3);
+												if (segIdx != numPR) {
+													excthrGc.prType = CConst::strPRTypeList->type_to_str(uls->getPR(segIdx).type);
+													excthrGc.prEffectiveGain = uls->getPR(segIdx).effectiveGain;
+													excthrGc.prDiscrinminationGain = discriminationGain;
 												}
 
-												msg << QString::number(rxGainDB, 'f', 3);
-												if (std::isnan(nearField_xdb)) {
-													msg << QString("");
-												} else {
-													msg << QString::number(nearField_xdb, 'f', 5);
-												}
-												if (std::isnan(nearField_u)) {
-													msg << QString("");
-												} else {
-													msg << QString::number(nearField_u, 'f', 5);
-												}
-												if (std::isnan(nearField_eff)) {
-													msg << QString("");
-												} else {
-													msg << QString::number(nearField_eff, 'f', 5);
-												}
-												msg << QString::number(nearFieldOffsetDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
-												msg << QString::number(_polarizationLossDB, 'f', 3);
-												msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
-												msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(I2NDB, 'f', 3) <<  QString::number(eirpLimit_dBm, 'f', 3);
-												msg << QString::number(ulsSegmentDistance, 'f', 3) << QString::number(chanCenterFreq, 'f', 3) << QString::number(d2, 'f', 3) << QString::number(pathDifference, 'f', 6);
-												msg << QString::number(ulsWavelength * 1000, 'f', 3) << QString::number(fresnelIndex, 'f', 3);
+												excthrGc.fsGainToRlan = rxGainDB;
+												excthrGc.fsNearFieldXdb = nearField_xdb;
+												excthrGc.fsNearFieldU = nearField_u;
+												excthrGc.fsNearFieldEff = nearField_eff;
+												excthrGc.fsNearFieldOffset = nearFieldOffsetDB;
+												excthrGc.spectralOverlapLoss = spectralOverlapLossDB;
+												excthrGc.polarizationLoss = _polarizationLossDB;
+												excthrGc.fsRxFeederLoss = uls->getRxAntennaFeederLossDB();
+												excthrGc.fsRxPwr = rxPowerDBW;
+												excthrGc.fsIN = I2NDB;
+												excthrGc.eirpLimit = eirpLimit_dBm;
+												excthrGc.fsSegDist = ulsSegmentDistance;
+												excthrGc.rlanCenterFreq = chanCenterFreq;
+												excthrGc.fsTxToRlanDist = d2;
+												excthrGc.pathDifference = pathDifference;
+												excthrGc.ulsWavelength = ulsWavelength * 1000;
+												excthrGc.fresnelIndex = fresnelIndex;
 
-												fexcthrwifi->writeRow(msg);
+												excthrGc.completeRow();
 											}
 
 											if ((_printSkippedLinksFlag) && (skip)) {
@@ -9029,84 +9252,15 @@ void AfcManager::runExclusionZoneAnalysis()
 	/**************************************************************************************/
 	/* Create excThrFile, useful for debugging                                            */
 	/**************************************************************************************/
-	auto exc_writer = GzipCsvWriter(_excThrFile);
-	auto &fexcthrwifi = exc_writer.csv_writer;
+	ExThrGzipCsv excthrGc(_excThrFile);
 
-	if (fexcthrwifi) {
-		fexcthrwifi->writeRow({ "FS_ID",
-				"RLAN_POSN_IDX",
-				"CALLSIGN",
-				"FS_RX_LONGITUDE (deg)",
-				"FS_RX_LATITUDE (deg)",
-				"FS_RX_HEIGHT_ABOVE_TERRAIN (m)",
-				"FS_RX_TERRAIN_HEIGHT (m)",
-				"FS_RX_TERRAIN_SOURCE",
-				"FS_RX_PROP_ENV",
-				"FS_HAS_PASSIVE_REPEATER",
-				"RLAN_LONGITUDE (deg)",
-				"RLAN_LATITUDE (deg)",
-				"RLAN_HEIGHT_ABOVE_TERRAIN (m)",
-				"RLAN_TERRAIN_HEIGHT (m)",
-				"RLAN_TERRAIN_SOURCE",
-				"LAN_PROP_ENV",
-				"RLAN_FS_RX_DIST (km)",
-				"RLAN_FS_RX_GROUND_DIST (km)",
-				"RLAN_FS_RX_ELEVATION_ANGLE (deg)",
-				"FS_RX_ANGLE_OFF_BORESIGHT (deg)",
-				"RLAN_TX_EIRP (dBm)",
-				"BODY_LOSS (dB)",
-				"RLAN_CLUTTER_CATEGORY",
-				"FS_CLUTTER_CATEGORY",
-				"BUILDING TYPE",
-				"RLAN_FS_RX_BUILDING_PENETRATION (dB)",
-				"BUILDING_PENETRATION_MODEL",
-				"BUILDING_PENETRATION_CDF",
-				"PATH_LOSS (dB)",
-				"PATH_LOSS_MODEL",
-				"PATH_LOSS_CDF",
-				"PATH_CLUTTER_TX (DB)",
-				"PATH_CLUTTER_TX_MODEL",
-				"PATH_CLUTTER_TX_CDF",
-				"PATH_CLUTTER_RX (DB)",
-				"PATH_CLUTTER_RX_MODEL",
-				"PATH_CLUTTER_RX_CDF",
-				"RLAN BANDWIDTH (MHz)",
-				"RLAN CHANNEL START FREQ (MHz)",
-				"RLAN CHANNEL STOP FREQ (MHz)",
-				"ULS START FREQ (MHz)",
-				"ULS STOP FREQ (MHz)",
-				"FS_ANT_TYPE",
-				"FS_ANT_GAIN_PEAK (dB)",
-				"FS_ANT_GAIN_TO_RLAN (dB)",
-				"RX_SPECTRAL_OVERLAP_LOSS (dB)",
-				"POLARIZATION_LOSS (dB)",
-				"FS_RX_FEEDER_LOSS (dB)",
-				"FS_RX_PWR (dBW)",
-				"FS I/N (dB)",
-				"ULS_LINK_DIST (m)",
-				"RLAN_CENTER_FREQ (Hz)",
-				"FS_TX_TO_RLAN_DIST (m)",
-				"PATH_DIFFERENCE (m)",
-				"ULS_WAVELENGTH (mm)",
-				"FRESNEL_INDEX",
-				"COMMENT"
-		});
-
-	}
 	/**************************************************************************************/
 
 #if DEBUG_AFC
 	/**************************************************************************************/
 	/* Create pathTraceFile, for debugging                                                */
 	/**************************************************************************************/
-	auto path_writer = GzipCsvWriter(pathTraceFile);
-	auto &ftrace = path_writer.csv_writer;
-
-	ftrace->writeRow({ "PT_ID",
-			"PT_LON (deg)",
-			"PT_LAT (deg)",
-			"PT_HEIGHT_AMSL (m)",
-			"BLDG_FLAG"});
+	TraceGzipCsv pathTraceGc(pathTraceFile);
 	/**************************************************************************************/
 #endif
 
@@ -9225,9 +9379,9 @@ void AfcManager::runExclusionZoneAnalysis()
 		}
 
 		margin1 = computeIToNMargin(d1, cc, ss, uls, chanCenterFreq, bandwidth,
-				chanStartFreq, chanStopFreq, spectralOverlapLossDB, ulsRxPropEnv, distKm1, "Above Thr", fexcthrwifi.get());
+				chanStartFreq, chanStopFreq, spectralOverlapLossDB, ulsRxPropEnv, distKm1, "Above Thr", &excthrGc);
 		margin0 = computeIToNMargin(d0, cc, ss, uls, chanCenterFreq, bandwidth,
-				chanStartFreq, chanStopFreq, spectralOverlapLossDB, ulsRxPropEnv, distKm0, "Below Thr", fexcthrwifi.get());
+				chanStartFreq, chanStopFreq, spectralOverlapLossDB, ulsRxPropEnv, distKm0, "Below Thr", &excthrGc);
 
 
 		double rlanLon = uls->getRxLongitudeDeg() + d0*cc;
@@ -9251,7 +9405,7 @@ void AfcManager::runExclusionZoneAnalysis()
 /******************************************************************************************/
 /* AfcManager::computeIToNMargin()                                                        */
 /******************************************************************************************/
-double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *uls, double chanCenterFreq, double bandwidth, double chanStartFreq, double chanStopFreq, double spectralOverlapLossDB, char ulsRxPropEnv, double& distKmM, std::string comment, CsvWriter *fexcthrwifi)
+double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *uls, double chanCenterFreq, double bandwidth, double chanStartFreq, double chanStopFreq, double spectralOverlapLossDB, char ulsRxPropEnv, double& distKmM, std::string comment, ExThrGzipCsv *excthrGc)
 {
 	Vector3 rlanPosnList[3];
 	GeodeticCoord rlanCoordList[3];
@@ -9413,7 +9567,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 			distKmM     = distKm;
 		}
 
-		if ( fexcthrwifi ) {
+		if ( excthrGc && *excthrGc ) {
 			double d1;
 			double d2;
 			double pathDifference;
@@ -9448,40 +9602,66 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 					_buildingType == CConst::traditionalBuildingType ?  "TRADITIONAL" :
 					"THERMALLY_EFFICIENT");
 
-			std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+			excthrGc->fsid = uls->getID();
+			excthrGc->dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+			excthrGc->rlanPosnIdx = rlanPosnIdx;
+			excthrGc->callsign = uls->getCallsign();
+			excthrGc->fsLon = uls->getRxLongitudeDeg();
+			excthrGc->fsLat = uls->getRxLatitudeDeg();
+			excthrGc->fsAgl = uls->getRxHeightAboveTerrain();
+			excthrGc->fsTerrainHeight = uls->getRxTerrainHeight();
+			excthrGc->fsTerrainSource = _terrainDataModel->getSourceName(uls->getRxHeightSource());
+			excthrGc->fsPropEnv = ulsRxPropEnv;
+			excthrGc->numPr = uls->getNumPR();
+			excthrGc->rlanLon = rlanCoord.longitudeDeg;
+			excthrGc->rlanLat = rlanCoord.latitudeDeg;
+			excthrGc->rlanAgl = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
+			excthrGc->rlanTerrainHeight = rlanTerrainHeight;
+			excthrGc->rlanTerrainSource = _terrainDataModel->getSourceName(rlanHeightSource);
+			excthrGc->rlanPropEnv = CConst::strPropEnvList->type_to_str(rlanPropEnv);
+			excthrGc->rlanFsDist = distKm;
+			excthrGc->rlanFsGroundDist = groundDistanceKm;
+			excthrGc->rlanElevAngle = elevationAngleTxDeg;
+			excthrGc->boresightAngle = angleOffBoresightDeg;
+			excthrGc->rlanTxEirp = _exclusionZoneRLANEIRPDBm;
+			excthrGc->bodyLoss = _bodyLossDB;
+			excthrGc->rlanClutterCategory = txClutterStr;
+			excthrGc->fsClutterCategory = rxClutterStr;
+			excthrGc->buildingType = bldgTypeStr;
+			excthrGc->buildingPenetration = buildingPenetrationDB;
+			excthrGc->buildingPenetrationModel = buildingPenetrationModelStr;
+			excthrGc->buildingPenetrationCdf = buildingPenetrationCDF;
+			excthrGc->pathLoss = pathLoss;
+			excthrGc->pathLossModel = pathLossModelStr;
+			excthrGc->pathLossCdf = pathLossCDF;
+			excthrGc->pathClutterTx = pathClutterTxDB;
+			excthrGc->pathClutterTxMode = pathClutterTxModelStr;
+			excthrGc->pathClutterTxCdf = pathClutterTxCDF;
+			excthrGc->pathClutterRx = pathClutterRxDB;
+			excthrGc->pathClutterRxMode = pathClutterRxModelStr;
+			excthrGc->pathClutterRxCdf = pathClutterRxCDF;
+			excthrGc->rlanBandwidth = bandwidth * 1.0e-6;
+			excthrGc->rlanStartFreq = chanStartFreq * 1.0e-6;
+			excthrGc->rlanStopFreq = chanStopFreq * 1.0e-6;
+			excthrGc->ulsStartFreq = uls->getStartFreq() * 1.0e-6;
+			excthrGc->ulsStopFreq = uls->getStopFreq() * 1.0e-6;
+			excthrGc->antType = rxAntennaTypeStr;
+			excthrGc->antGainPeak = uls->getRxGain();
+			excthrGc->fsGainToRlan = rxGainDB;
+			excthrGc->spectralOverlapLoss = spectralOverlapLossDB;
+			excthrGc->polarizationLoss = _polarizationLossDB;
+			excthrGc->fsRxFeederLoss = uls->getRxAntennaFeederLossDB();
+			excthrGc->fsRxPwr = rxPowerDBW;
+			excthrGc->fsIN = rxPowerDBW - uls->getNoiseLevelDBW();
+			excthrGc->ulsLinkDist = ulsLinkDistance;
+			excthrGc->rlanCenterFreq = chanCenterFreq;
+			excthrGc->fsTxToRlanDist = d2;
+			excthrGc->pathDifference = pathDifference;
+			excthrGc->ulsWavelength = ulsWavelength * 1000;
+			excthrGc->fresnelIndex = fresnelIndex;
+			excthrGc->comment = comment;
 
-			QStringList msg;
-			msg << QString::number(uls->getID()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
-			msg << QString::number(uls->getRxLongitudeDeg(), 'f', 8) << QString::number(uls->getRxLatitudeDeg(), 'f', 8);
-			msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2) <<
-				QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
-				<< QString(ulsRxPropEnv);
-			msg << QString::number(uls->getNumPR() ? 1 : 0);
-			msg << QString::number(rlanCoord.longitudeDeg, 'f', 8) << QString::number(rlanCoord.latitudeDeg, 'f', 8);
-			msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) <<
-				QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource)) <<
-				CConst::strPropEnvList->type_to_str(rlanPropEnv);
-			msg << QString::number(distKm, 'f', 3) << QString::number(groundDistanceKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
-			msg << QString::number(_exclusionZoneRLANEIRPDBm, 'f', 3) << QString::number(_bodyLossDB, 'f', 3) << QString::fromStdString(txClutterStr) << QString::fromStdString(rxClutterStr) << QString::fromStdString(bldgTypeStr);
-			msg << QString::number(buildingPenetrationDB, 'f', 3) << QString::fromStdString(buildingPenetrationModelStr) << QString::number(buildingPenetrationCDF, 'f', 8);
-			msg << QString::number(pathLoss, 'f', 3) << QString::fromStdString(pathLossModelStr) << QString::number(pathLossCDF, 'f', 8);
-
-			msg << QString::number(pathClutterTxDB, 'f', 3) << QString::fromStdString(pathClutterTxModelStr) << QString::number(pathClutterTxCDF, 'f', 8);
-			msg << QString::number(pathClutterRxDB, 'f', 3) << QString::fromStdString(pathClutterRxModelStr) << QString::number(pathClutterRxCDF, 'f', 8);
-
-			msg << QString::number(bandwidth * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
-				<< QString::number(uls->getStartFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopFreq() * 1.0e-6, 'f', 2);
-
-			msg << QString::fromStdString(rxAntennaTypeStr) << QString::number(uls->getRxGain(), 'f', 3);
-			msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
-			msg << QString::number(_polarizationLossDB, 'f', 3);
-			msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
-			msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(rxPowerDBW - uls->getNoiseLevelDBW(), 'f', 3);
-			msg << QString::number(ulsLinkDistance, 'f', 3) << QString::number(chanCenterFreq, 'f', 3) << QString::number(d2, 'f', 3) << QString::number(pathDifference, 'f', 6);
-			msg << QString::number(ulsWavelength * 1000, 'f', 3) << QString::number(fresnelIndex, 'f', 3);
-			msg << QString::fromStdString(comment);
-
-			fexcthrwifi->writeRow(msg);
+			excthrGc->completeRow();
 		}
 	}
 
@@ -9633,71 +9813,8 @@ void AfcManager::runHeatmapAnalysis()
 	/**************************************************************************************/
 	/* Create excThrFile, useful for debugging                                            */
 	/**************************************************************************************/
-	auto exc_thr_writer = GzipCsvWriter(_excThrFile);
-	auto &fexcthrwifi = exc_thr_writer.csv_writer;
+	ExThrGzipCsv excthrGc(_excThrFile);
 
-	if (fexcthrwifi)
-	{
-		fexcthrwifi->writeRow({ "FS_ID",
-				"DBNAME",
-				"RLAN_POSN_IDX",
-				"CALLSIGN",
-				"FS_RX_LONGITUDE (deg)",
-				"FS_RX_LATITUDE (deg)",
-				"FS_RX_HEIGHT_ABOVE_TERRAIN (m)",
-				"FS_RX_TERRAIN_HEIGHT (m)",
-				"FS_RX_TERRAIN_SOURCE",
-				"FS_RX_PROP_ENV",
-				"FS_HAS_PASSIVE_REPEATER",
-				"RLAN_LONGITUDE (deg)",
-				"RLAN_LATITUDE (deg)",
-				"RLAN_HEIGHT_ABOVE_TERRAIN (m)",
-				"RLAN_TERRAIN_HEIGHT (m)",
-				"RLAN_TERRAIN_SOURCE",
-				"RLAN_PROP_ENV",
-				"RLAN_FS_RX_DIST (km)",
-				"RLAN_FS_RX_GROUND_DIST (km)",
-				"RLAN_FS_RX_ELEVATION_ANGLE (deg)",
-				"FS_RX_ANGLE_OFF_BORESIGHT (deg)",
-				"RLAN_TX_EIRP (dBm)",
-				"BODY_LOSS (dB)",
-				"RLAN_CLUTTER_CATEGORY",
-				"FS_CLUTTER_CATEGORY",
-				"BUILDING TYPE",
-				"RLAN_FS_RX_BUILDING_PENETRATION (dB)",
-				"BUILDING_PENETRATION_MODEL",
-				"BUILDING_PENETRATION_CDF",
-				"PATH_LOSS (dB)",
-				"PATH_LOSS_MODEL",
-				"PATH_LOSS_CDF",
-				"PATH_CLUTTER_TX (DB)",
-				"PATH_CLUTTER_TX_MODEL",
-				"PATH_CLUTTER_TX_CDF",
-				"PATH_CLUTTER_RX (DB)",
-				"PATH_CLUTTER_RX_MODEL",
-				"PATH_CLUTTER_RX_CDF",
-				"RLAN BANDWIDTH (MHz)",
-				"RLAN CHANNEL START FREQ (MHz)",
-				"RLAN CHANNEL STOP FREQ (MHz)",
-				"ULS START FREQ (MHz)",
-				"ULS STOP FREQ (MHz)",
-				"FS_ANT_TYPE",
-				"FS_ANT_GAIN_PEAK (dB)",
-				"FS_ANT_GAIN_TO_RLAN (dB)",
-				"RX_SPECTRAL_OVERLAP_LOSS (dB)",
-				"POLARIZATION_LOSS (dB)",
-				"FS_RX_FEEDER_LOSS (dB)",
-				"FS_RX_PWR (dBW)",
-				"FS I/N (dB)",
-				"ULS_LINK_DIST (m)",
-				"RLAN_CENTER_FREQ (Hz)",
-				"FS_TX_TO_RLAN_DIST (m)",
-				"PATH_DIFFERENCE (m)",
-				"ULS_WAVELENGTH (mm)",
-				"FRESNEL_INDEX"
-		});
-
-	}
 	/**************************************************************************************/
 
 	/**************************************************************************************/
@@ -9937,7 +10054,7 @@ void AfcManager::runHeatmapAnalysis()
 								_heatmapIsIndoor[lonIdx][latIdx] = (_buildingType == CConst::noBuildingType ? false : true);
 							}
 
-							if ( fexcthrwifi && (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) )
+							if ( excthrGc && (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) )
 							{
 								double d1;
 								double d2;
@@ -9975,38 +10092,65 @@ void AfcManager::runHeatmapAnalysis()
 
 								std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 
-								QStringList msg;
-								msg << QString::number(uls->getID()) << QString::fromStdString(dbName) << QString::number(rlanPosnIdx) << QString::fromStdString(uls->getCallsign());
-								msg << QString::number(uls->getRxLongitudeDeg(), 'f', 5) << QString::number(uls->getRxLatitudeDeg(), 'f', 5);
-								msg << QString::number(uls->getRxHeightAboveTerrain(), 'f', 2) << QString::number(uls->getRxTerrainHeight(), 'f', 2) <<
-									QString::fromStdString(_terrainDataModel->getSourceName(uls->getRxHeightSource()))
-									<< QString(ulsRxPropEnv);
-								msg << QString::number(uls->getNumPR() ? 1 : 0);
-								msg << QString::number(rlanCoord.longitudeDeg, 'f', 5) << QString::number(rlanCoord.latitudeDeg, 'f', 5);
-								msg << QString::number(rlanCoord.heightKm * 1000.0 - rlanTerrainHeight, 'f', 2) << QString::number(rlanTerrainHeight, 'f', 2) <<
-									QString::fromStdString(_terrainDataModel->getSourceName(rlanHeightSource))
-									<<
-									CConst::strPropEnvList->type_to_str(rlanPropEnv);
-								msg << QString::number(distKm, 'f', 3) << QString::number(groundDistanceKm, 'f', 3) << QString::number(elevationAngleTxDeg, 'f', 3) << QString::number(angleOffBoresightDeg);
-								msg << QString::number(rlanEIRP, 'f', 3) << QString::number(_bodyLossDB, 'f', 3) << QString::fromStdString(txClutterStr) << QString::fromStdString(rxClutterStr) << QString::fromStdString(bldgTypeStr);
-								msg << QString::number(buildingPenetrationDB, 'f', 3) << QString::fromStdString(buildingPenetrationModelStr) << QString::number(buildingPenetrationCDF, 'f', 8);
-								msg << QString::number(pathLoss, 'f', 3) << QString::fromStdString(pathLossModelStr) << QString::number(pathLossCDF, 'f', 8);
+								excthrGc.fsid = uls->getID();
+								excthrGc.dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+								excthrGc.rlanPosnIdx = rlanPosnIdx;
+								excthrGc.callsign = uls->getCallsign();
+								excthrGc.fsLon = uls->getRxLongitudeDeg();
+								excthrGc.fsLat = uls->getRxLatitudeDeg();
+								excthrGc.fsAgl = uls->getRxHeightAboveTerrain();
+								excthrGc.fsTerrainHeight = uls->getRxTerrainHeight();
+								excthrGc.fsTerrainSource = _terrainDataModel->getSourceName(uls->getRxHeightSource());
+								excthrGc.fsPropEnv = ulsRxPropEnv;
+								excthrGc.numPr = uls->getNumPR();
+								excthrGc.rlanLon = rlanCoord.longitudeDeg;
+								excthrGc.rlanLat = rlanCoord.latitudeDeg;
+								excthrGc.rlanAgl = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
+								excthrGc.rlanTerrainHeight = rlanTerrainHeight;
+								excthrGc.rlanTerrainSource = _terrainDataModel->getSourceName(rlanHeightSource);
+								excthrGc.rlanPropEnv = CConst::strPropEnvList->type_to_str(rlanPropEnv);
+								excthrGc.rlanFsDist = distKm;
+								excthrGc.rlanFsGroundDist = groundDistanceKm;
+								excthrGc.rlanElevAngle = elevationAngleTxDeg;
+								excthrGc.boresightAngle = angleOffBoresightDeg;
+								excthrGc.rlanTxEirp = rlanEIRP;
+								excthrGc.bodyLoss = _bodyLossDB;
+								excthrGc.rlanClutterCategory = txClutterStr;
+								excthrGc.fsClutterCategory = rxClutterStr;
+								excthrGc.buildingType = bldgTypeStr;
+								excthrGc.buildingPenetration = buildingPenetrationDB;
+								excthrGc.buildingPenetrationModel = buildingPenetrationModelStr;
+								excthrGc.buildingPenetrationCdf = buildingPenetrationCDF;
+								excthrGc.pathLoss = pathLoss;
+								excthrGc.pathLossModel = pathLossModelStr;
+								excthrGc.pathLossCdf = pathLossCDF;
+								excthrGc.pathClutterTx = pathClutterTxDB;
+								excthrGc.pathClutterTxMode = pathClutterTxModelStr;
+								excthrGc.pathClutterTxCdf = pathClutterTxCDF;
+								excthrGc.pathClutterRx = pathClutterRxDB;
+								excthrGc.pathClutterRxMode = pathClutterRxModelStr;
+								excthrGc.pathClutterRxCdf = pathClutterRxCDF;
+								excthrGc.rlanBandwidth = _heatmapRLANBWHz * 1.0e-6;
+								excthrGc.rlanStartFreq = chanStartFreq * 1.0e-6;
+								excthrGc.rlanStopFreq = chanStopFreq * 1.0e-6;
+								excthrGc.ulsStartFreq = uls->getStartFreq() * 1.0e-6;
+								excthrGc.ulsStopFreq = uls->getStopFreq() * 1.0e-6;
+								excthrGc.antType = rxAntennaTypeStr;
+								excthrGc.antGainPeak = uls->getRxGain();
+								excthrGc.fsGainToRlan = rxGainDB;
+								excthrGc.spectralOverlapLoss = spectralOverlapLossDB;
+								excthrGc.polarizationLoss = _polarizationLossDB;
+								excthrGc.fsRxFeederLoss = uls->getRxAntennaFeederLossDB();
+								excthrGc.fsRxPwr = rxPowerDBW;
+								excthrGc.fsIN = rxPowerDBW - uls->getNoiseLevelDBW();
+								excthrGc.ulsLinkDist = ulsLinkDistance;
+								excthrGc.rlanCenterFreq = chanCenterFreq;
+								excthrGc.fsTxToRlanDist = d2;
+								excthrGc.pathDifference = pathDifference;
+								excthrGc.ulsWavelength = ulsWavelength * 1000;
+								excthrGc.fresnelIndex = fresnelIndex;
 
-								msg << QString::number(pathClutterTxDB, 'f', 3) << QString::fromStdString(pathClutterTxModelStr) << QString::number(pathClutterTxCDF, 'f', 8);
-								msg << QString::number(pathClutterRxDB, 'f', 3) << QString::fromStdString(pathClutterRxModelStr) << QString::number(pathClutterRxCDF, 'f', 8);
-
-								msg << QString::number(_heatmapRLANBWHz * 1.0e-6, 'f', 0) << QString::number(chanStartFreq * 1.0e-6, 'f', 0) << QString::number(chanStopFreq * 1.0e-6, 'f', 0)
-									<< QString::number(uls->getStartFreq() * 1.0e-6, 'f', 2) << QString::number(uls->getStopFreq() * 1.0e-6, 'f', 2);
-
-								msg << QString::fromStdString(rxAntennaTypeStr) << QString::number(uls->getRxGain(), 'f', 3);
-								msg << QString::number(rxGainDB, 'f', 3) << QString::number(spectralOverlapLossDB, 'f', 3);
-								msg << QString::number(_polarizationLossDB, 'f', 3);
-								msg << QString::number(uls->getRxAntennaFeederLossDB(), 'f', 3);
-								msg << QString::number(rxPowerDBW, 'f', 3) << QString::number(rxPowerDBW - uls->getNoiseLevelDBW(), 'f', 3);
-								msg << QString::number(ulsLinkDistance, 'f', 3) << QString::number(chanCenterFreq, 'f', 3) << QString::number(d2, 'f', 3) << QString::number(pathDifference, 'f', 6);
-								msg << QString::number(ulsWavelength * 1000, 'f', 3) << QString::number(fresnelIndex, 'f', 3);
-
-								fexcthrwifi->writeRow(msg);
+								excthrGc.completeRow();
 							}
 						}
 
@@ -10104,92 +10248,93 @@ void AfcManager::printUserInputs()
 	QStringList msg;
 
 	LOGGER_INFO(logger) << "printing user inputs " << _userInputsFile;
-	auto inputs_writer = GzipCsvWriter(_userInputsFile);
-	auto &fUserInputs = inputs_writer.csv_writer;
+	GzipCsv inputGc(_userInputsFile);
 
 	double lat, lon, alt, minor, major, height_uncert;
 	std::tie(lat, lon, alt) = _rlanLLA;
 	std::tie(minor, major, height_uncert) = _rlanUncerts_m;
 
-	if (fUserInputs) {
-		fUserInputs->writeRow({ "ANALYSIS_TYPE", QString::fromStdString(_analysisType) });
-		fUserInputs->writeRow({ "SERIAL_NUMBER", QString(_serialNumber) } );
-		fUserInputs->writeRow({ "LATITUDE (DEG)", QString::number(lat, 'e', 20) } );
-		fUserInputs->writeRow({ "LONGITUDE (DEG)", QString::number(lon, 'e', 20) } );
-		fUserInputs->writeRow({ "ANTENNA_HEIGHT (M)", QString::number(alt, 'e', 20) } );
-		fUserInputs->writeRow({ "SEMI-MAJOR_AXIS (M)", QString::number(major, 'e', 20) } );
-		fUserInputs->writeRow({ "SEMI-MINOR_AXIS (M)", QString::number(minor, 'e', 20) } );
-		fUserInputs->writeRow({ "HEIGHT_UNCERTAINTY (M)", QString::number(height_uncert, 'e', 20) } );
-		fUserInputs->writeRow({ "ORIENTATION (DEG)", QString::number(_rlanOrientation_deg, 'e', 20) } );
-		fUserInputs->writeRow({ "HEIGHT_TYPE", (_rlanHeightType == CConst::AMSLHeightType ? "AMSL" : _rlanHeightType == CConst::AGLHeightType ? "AGL" : "INVALID") } );
-		fUserInputs->writeRow({ "ALLOW_SCAN_PTS_IN_UNC_REG", (_allowScanPtsInUncRegFlag ? "true" : "false" ) } );
-		fUserInputs->writeRow({ "INDOOR/OUTDOOR", (_rlanType == RLAN_INDOOR ? "indoor" : _rlanType == RLAN_OUTDOOR ? "outdoor" : "error") } );
-		fUserInputs->writeRow({ "CHANNEL_RESPONSE_ALGORITHM", QString::fromStdString(CConst::strSpectralAlgorithmList->type_to_str(_channelResponseAlgorithm)) } );
+	auto f2s = [](double f) {return boost::lexical_cast<std::string>(f);};
 
-		// fUserInputs->writeRow({ "ULS_DATABASE", QString(_inputULSDatabaseStr) } );
-		fUserInputs->writeRow({ "AP/CLIENT_PROPAGATION_ENVIRO", QString(_propagationEnviro) } );
-		fUserInputs->writeRow({ "AP/CLIENT_MIN_EIRP (DBM)", QString::number(_minEIRP_dBm, 'e', 20) } );
-		fUserInputs->writeRow({ "AP/CLIENT_MAX_EIRP (DBM)", QString::number(_maxEIRP_dBm, 'e', 20) } );
+	if (inputGc) {
+		inputGc.writeRow({ "ANALYSIS_TYPE", _analysisType } );
+		inputGc.writeRow({ "SERIAL_NUMBER", _serialNumber.toStdString() });
+		inputGc.writeRow({ "LATITUDE (DEG)", f2s(lat) } );
+		inputGc.writeRow({ "LONGITUDE (DEG)", f2s(lon) } );
+		inputGc.writeRow({ "ANTENNA_HEIGHT (M)", f2s(alt) } );
+		inputGc.writeRow({ "SEMI-MAJOR_AXIS (M)", f2s(major) } );
+		inputGc.writeRow({ "SEMI-MINOR_AXIS (M)", f2s(minor) } );
+		inputGc.writeRow({ "HEIGHT_UNCERTAINTY (M)", f2s(height_uncert) } );
+		inputGc.writeRow({ "ORIENTATION (DEG)", f2s(_rlanOrientation_deg) } );
+		inputGc.writeRow({ "HEIGHT_TYPE", (_rlanHeightType == CConst::AMSLHeightType ? "AMSL" : _rlanHeightType == CConst::AGLHeightType ? "AGL" : "INVALID") } );
+		inputGc.writeRow({ "ALLOW_SCAN_PTS_IN_UNC_REG", (_allowScanPtsInUncRegFlag ? "true" : "false" ) } );
+		inputGc.writeRow({ "INDOOR/OUTDOOR", (_rlanType == RLAN_INDOOR ? "indoor" : _rlanType == RLAN_OUTDOOR ? "outdoor" : "error") } );
+		inputGc.writeRow({ "CHANNEL_RESPONSE_ALGORITHM", CConst::strSpectralAlgorithmList->type_to_str(_channelResponseAlgorithm) } );
 
-		fUserInputs->writeRow({ "BUILDING_PENETRATION_LOSS_MODEL", QString(_buildingLossModel) } );
-		fUserInputs->writeRow({ "BUILDING_TYPE", QString((_buildingType == CConst::traditionalBuildingType ? "traditional" : _buildingType == CConst::thermallyEfficientBuildingType ? "thermally efficient" : "no building type")) } );
-		fUserInputs->writeRow({ "BUILDING_PENETRATION_CONFIDENCE", QString::number(_confidenceBldg2109, 'e', 20) } );
-		fUserInputs->writeRow({ "BUILDING_PENETRATION_LOSS_FIXED_VALUE (DB)", QString::number(_fixedBuildingLossValue, 'e', 20) } );
-		fUserInputs->writeRow({ "POLARIZATION_LOSS (DB)", QString::number(_polarizationLossDB, 'e', 20) } );
-		fUserInputs->writeRow({ "RLAN_BODY_LOSS_INDOOR (DB)", QString::number(_bodyLossIndoorDB, 'e', 20) } );
-		fUserInputs->writeRow({ "RLAN_BODY_LOSS_OUTDOOR (DB)", QString::number(_bodyLossOutdoorDB, 'e', 20) } );
-		fUserInputs->writeRow({ "I/N_THRESHOLD", QString::number(_IoverN_threshold_dB, 'e', 20) } );
-		fUserInputs->writeRow({ "FS_RECEIVER_DEFAULT_ANTENNA", QString::fromStdString(CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType )) } );
-		fUserInputs->writeRow({ "RLAN_ITM_TX_CLUTTER_METHOD", QString::fromStdString(CConst::strITMClutterMethodList->type_to_str(_rlanITMTxClutterMethod)) } );
+		// inputGc.writeRow({ "ULS_DATABASE", _inputULSDatabaseStr } );
+		inputGc.writeRow({ "AP/CLIENT_PROPAGATION_ENVIRO", _propagationEnviro.toStdString() });
+		inputGc.writeRow({ "AP/CLIENT_MIN_EIRP (DBM)", f2s(_minEIRP_dBm) } );
+		inputGc.writeRow({ "AP/CLIENT_MAX_EIRP (DBM)", f2s(_maxEIRP_dBm) } );
 
-		fUserInputs->writeRow({ "PROPAGATION_MODEL", QString::fromStdString(CConst::strPathLossModelList->type_to_str(_pathLossModel)) } );
-		fUserInputs->writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", QString::number(_winner2ProbLOSThr, 'e', 20) } );
-		fUserInputs->writeRow({ "WINNER_II_LOS_CONFIDENCE", QString::number(_confidenceWinner2LOS, 'e', 20) } );
-		fUserInputs->writeRow({ "WINNER_II_NLOS_CONFIDENCE", QString::number(_confidenceWinner2NLOS, 'e', 20) } );
-		fUserInputs->writeRow({ "WINNER_II_COMBINED_CONFIDENCE", QString::number(_confidenceWinner2Combined, 'e', 20) } );
-		fUserInputs->writeRow({ "WINNER_II_HGT_FLAG", (_closeInHgtFlag ? "true" : "false" ) } );
-		fUserInputs->writeRow({ "WINNER_II_HGT_LOS", QString::number(_closeInHgtLOS, 'e', 20) } );
-		fUserInputs->writeRow({ "ITM_CONFIDENCE", QString::number(_confidenceITM, 'e', 20) } );
-		fUserInputs->writeRow({ "ITM_RELIABILITY", QString::number(_reliabilityITM, 'e', 20) } );
-		fUserInputs->writeRow({ "P.2108_CONFIDENCE", QString::number(_confidenceClutter2108, 'e', 20) } );
-		fUserInputs->writeRow({ "WINNER_II_USE_GROUND_DISTANCE", (_winner2UseGroundDistanceFlag ? "true" : "false" ) } );
-		fUserInputs->writeRow({ "FSPL_USE_GROUND_DISTANCE", (_fsplUseGroundDistanceFlag ? "true" : "false" ) } );
-		fUserInputs->writeRow({ "PASSIVE_REPEATER_FLAG", (_passiveRepeaterFlag ? "true" : "false" ) } );
-		fUserInputs->writeRow({ "RX ANTENNA FEEDER LOSS IDU (DB)", QString::number(_rxFeederLossDBIDU, 'e', 20)  } );
-		fUserInputs->writeRow({ "RX ANTENNA FEEDER LOSS ODU (DB)", QString::number(_rxFeederLossDBODU, 'e', 20)  } );
-		fUserInputs->writeRow({ "RX ANTENNA FEEDER LOSS UNKNOWN (DB)", QString::number(_rxFeederLossDBUnknown, 'e', 20)  } );
+		inputGc.writeRow({ "BUILDING_PENETRATION_LOSS_MODEL", _buildingLossModel.toStdString() });
+		inputGc.writeRow({ "BUILDING_TYPE", (_buildingType == CConst::traditionalBuildingType ? "traditional" : _buildingType == CConst::thermallyEfficientBuildingType ? "thermally efficient" : "no building type") } );
+		inputGc.writeRow({ "BUILDING_PENETRATION_CONFIDENCE", f2s(_confidenceBldg2109) } );
+		inputGc.writeRow({ "BUILDING_PENETRATION_LOSS_FIXED_VALUE (DB)", f2s(_fixedBuildingLossValue) } );
+		inputGc.writeRow({ "POLARIZATION_LOSS (DB)", f2s(_polarizationLossDB) } );
+		inputGc.writeRow({ "RLAN_BODY_LOSS_INDOOR (DB)", f2s(_bodyLossIndoorDB) } );
+		inputGc.writeRow({ "RLAN_BODY_LOSS_OUTDOOR (DB)", f2s(_bodyLossOutdoorDB) } );
+		inputGc.writeRow({ "I/N_THRESHOLD", f2s(_IoverN_threshold_dB) } );
+		inputGc.writeRow({ "FS_RECEIVER_DEFAULT_ANTENNA", CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType ) } );
+		inputGc.writeRow({ "RLAN_ITM_TX_CLUTTER_METHOD", CConst::strITMClutterMethodList->type_to_str(_rlanITMTxClutterMethod) } );
+
+		inputGc.writeRow({ "PROPAGATION_MODEL", CConst::strPathLossModelList->type_to_str(_pathLossModel) } );
+		inputGc.writeRow({ "WINNER_II_PROB_LOS_THRESHOLD", f2s(_winner2ProbLOSThr) } );
+		inputGc.writeRow({ "WINNER_II_LOS_CONFIDENCE", f2s(_confidenceWinner2LOS) } );
+		inputGc.writeRow({ "WINNER_II_NLOS_CONFIDENCE", f2s(_confidenceWinner2NLOS) } );
+		inputGc.writeRow({ "WINNER_II_COMBINED_CONFIDENCE", f2s(_confidenceWinner2Combined) } );
+		inputGc.writeRow({ "WINNER_II_HGT_FLAG", (_closeInHgtFlag ? "true" : "false" ) } );
+		inputGc.writeRow({ "WINNER_II_HGT_LOS", f2s(_closeInHgtLOS) } );
+		inputGc.writeRow({ "ITM_CONFIDENCE", f2s(_confidenceITM) } );
+		inputGc.writeRow({ "ITM_RELIABILITY", f2s(_reliabilityITM) } );
+		inputGc.writeRow({ "P.2108_CONFIDENCE", f2s(_confidenceClutter2108) } );
+		inputGc.writeRow({ "WINNER_II_USE_GROUND_DISTANCE", (_winner2UseGroundDistanceFlag ? "true" : "false" ) } );
+		inputGc.writeRow({ "FSPL_USE_GROUND_DISTANCE", (_fsplUseGroundDistanceFlag ? "true" : "false" ) } );
+		inputGc.writeRow({ "PASSIVE_REPEATER_FLAG", (_passiveRepeaterFlag ? "true" : "false" ) } );
+		inputGc.writeRow({ "RX ANTENNA FEEDER LOSS IDU (DB)", f2s(_rxFeederLossDBIDU)  } );
+		inputGc.writeRow({ "RX ANTENNA FEEDER LOSS ODU (DB)", f2s(_rxFeederLossDBODU)  } );
+		inputGc.writeRow({ "RX ANTENNA FEEDER LOSS UNKNOWN (DB)", f2s(_rxFeederLossDBUnknown)  } );
 
 		if (_analysisType == "ExclusionZoneAnalysis") {
 			double chanCenterFreq = _wlanMinFreq + (_exclusionZoneRLANChanIdx + 0.5) * _exclusionZoneRLANBWHz;
 
-			fUserInputs->writeRow({ "EXCLUSION_ZONE_FSID", QString::number(_exclusionZoneFSID) });
-			fUserInputs->writeRow({ "EXCLUSION_ZONE_RLAN_BW (Hz)", QString::number(_exclusionZoneRLANBWHz, 'e', 20) } );
-			fUserInputs->writeRow({ "EXCLUSION_ZONE_RLAN_CENTER_FREQ (Hz)", QString::number(chanCenterFreq, 'e', 20) } );
-			fUserInputs->writeRow({ "EXCLUSION_ZONE_RLAN_EIRP (dBm)", QString::number(_exclusionZoneRLANEIRPDBm, 'e', 20) } );
+			inputGc.writeRow({ "EXCLUSION_ZONE_FSID", f2s(_exclusionZoneFSID) });
+			inputGc.writeRow({ "EXCLUSION_ZONE_RLAN_BW (Hz)", f2s(_exclusionZoneRLANBWHz) } );
+			inputGc.writeRow({ "EXCLUSION_ZONE_RLAN_CENTER_FREQ (Hz)", f2s(chanCenterFreq) } );
+			inputGc.writeRow({ "EXCLUSION_ZONE_RLAN_EIRP (dBm)", f2s(_exclusionZoneRLANEIRPDBm) } );
 
 		} else if (_analysisType == "HeatmapAnalysis") {
 			double chanCenterFreq = _wlanMinFreq + (_heatmapRLANChanIdx + 0.5) * _heatmapRLANBWHz;
 
-			fUserInputs->writeRow({ "HEATMAP_RLAN_BW (Hz)", QString::number(_heatmapRLANBWHz, 'e', 20) } );
-			fUserInputs->writeRow({ "HEATMAP_RLAN_CENTER_FREQ (Hz)", QString::number(chanCenterFreq, 'e', 20) } );
-			fUserInputs->writeRow({ "HEATMAP_MIN_LON (DEG)", QString::number(_heatmapMinLon, 'e', 20) } );
-			fUserInputs->writeRow({ "HEATMAP_MIN_LAT (DEG)", QString::number(_heatmapMaxLon, 'e', 20) } );
-			fUserInputs->writeRow({ "HEATMAP_RLAN_SPACING (m)", QString::number(_heatmapRLANSpacing, 'e', 20) } );
-			fUserInputs->writeRow({ "HEATMAP_INDOOR_OUTDOOR_STR", QString::fromStdString(_heatmapIndoorOutdoorStr) } );
+			inputGc.writeRow({ "HEATMAP_RLAN_BW (Hz)", f2s(_heatmapRLANBWHz) } );
+			inputGc.writeRow({ "HEATMAP_RLAN_CENTER_FREQ (Hz)", f2s(chanCenterFreq) } );
+			inputGc.writeRow({ "HEATMAP_MIN_LON (DEG)", f2s(_heatmapMinLon) } );
+			inputGc.writeRow({ "HEATMAP_MIN_LAT (DEG)", f2s(_heatmapMaxLon) } );
+			inputGc.writeRow({ "HEATMAP_RLAN_SPACING (m)", f2s(_heatmapRLANSpacing) } );
+			inputGc.writeRow({ "HEATMAP_INDOOR_OUTDOOR_STR", _heatmapIndoorOutdoorStr } );
 
 
-			fUserInputs->writeRow({ "HEATMAP_RLAN_INDOOR_EIRP (dBm)", QString::number(_heatmapRLANIndoorEIRPDBm, 'e', 20) } );
-			fUserInputs->writeRow({ "HEATMAP_RLAN_INDOOR_HEIGHT_TYPE", QString(_heatmapRLANIndoorHeightType) } );
-			fUserInputs->writeRow({ "HEATMAP_RLAN_INDOOR_HEIGHT (m)", QString::number(_heatmapRLANIndoorHeight, 'e', 20) } );
-			fUserInputs->writeRow({ "HEATMAP_RLAN_INDOOR_HEIGHT_UNCERTAINTY (m)", QString::number(_heatmapRLANIndoorHeightUncertainty, 'e', 20) } );
+			inputGc.writeRow({ "HEATMAP_RLAN_INDOOR_EIRP (dBm)", f2s(_heatmapRLANIndoorEIRPDBm) } );
+			inputGc.writeRow({ "HEATMAP_RLAN_INDOOR_HEIGHT_TYPE", _heatmapRLANIndoorHeightType.toStdString() });
+			inputGc.writeRow({ "HEATMAP_RLAN_INDOOR_HEIGHT (m)", f2s(_heatmapRLANIndoorHeight) } );
+			inputGc.writeRow({ "HEATMAP_RLAN_INDOOR_HEIGHT_UNCERTAINTY (m)", f2s(_heatmapRLANIndoorHeightUncertainty) } );
 
-			fUserInputs->writeRow({ "HEATMAP_RLAN_OUTDOOR_EIRP (dBm)", QString::number(_heatmapRLANOutdoorEIRPDBm, 'e', 20) } );
-			fUserInputs->writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT_TYPE", QString(_heatmapRLANOutdoorHeightType) } );
-			fUserInputs->writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT (m)", QString::number(_heatmapRLANOutdoorHeight, 'e', 20) } );
-			fUserInputs->writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT_UNCERTAINTY (m)", QString::number(_heatmapRLANOutdoorHeightUncertainty, 'e', 20) } );
+			inputGc.writeRow({ "HEATMAP_RLAN_OUTDOOR_EIRP (dBm)", f2s(_heatmapRLANOutdoorEIRPDBm) } );
+			inputGc.writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT_TYPE", _heatmapRLANOutdoorHeightType.toStdString() });
+			inputGc.writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT (m)", f2s(_heatmapRLANOutdoorHeight) } );
+			inputGc.writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT_UNCERTAINTY (m)", f2s(_heatmapRLANOutdoorHeightUncertainty) } );
 		}
-		fUserInputs->writeRow({ "VISIBILITY_THRESHOLD", QString::number(_visibilityThreshold, 'e', 20) } );
-		fUserInputs->writeRow({ "PRINT_SKIPPED_LINKS_FLAG", (_printSkippedLinksFlag ? "true" : "false" ) } );
+		inputGc.writeRow({ "VISIBILITY_THRESHOLD", f2s(_visibilityThreshold) } );
+		inputGc.writeRow({ "PRINT_SKIPPED_LINKS_FLAG", (_printSkippedLinksFlag ? "true" : "false" ) } );
 
 	}
 	LOGGER_DEBUG(logger) << "User inputs written to userInputs.csv";
@@ -10401,6 +10546,7 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 
 	if (AfcManager::_createDebugFiles) {
 		_excThrFile = QDir(QString::fromStdString(tempDir)).filePath("exc_thr.csv.gz").toStdString();
+		_eirpGcFile = QDir(QString::fromStdString(tempDir)).filePath("eirp.csv.gz").toStdString();
 		_fsAnomFile = QDir(QString::fromStdString(tempDir)).filePath("fs_anom.csv.gz").toStdString();
 		_userInputsFile = QDir(QString::fromStdString(tempDir)).filePath("userInputs.csv.gz").toStdString();
 	}

@@ -100,6 +100,7 @@ public:
 	std::string getRadioService();
 	std::string getEntityName();
 	std::string getCallsign();
+	int getPathNumber();
 	std::string getRxCallsign();
 	int getRxAntennaNumber();
 	int getNumPR();
@@ -177,6 +178,7 @@ public:
 	void setRadioService(std::string radioServiceVal);
 	void setEntityName(std::string entityNameVal);
 	void setCallsign(std::string callsignVal);
+	void setPathNumber(int pathNumberVal);
 
 	void setRxCallsign(std::string rxCallsignVal);
 	void setRxAntennaNumber(int rxAntennaNumberVal);
@@ -267,6 +269,7 @@ private:
 	double stopFreq;
 	double noiseBandwidth;
 	std::string callsign;
+	int pathNumber;
 	std::string rxCallsign;
 	int rxAntennaNumber;
 	std::string radioService;

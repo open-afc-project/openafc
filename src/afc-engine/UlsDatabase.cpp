@@ -44,6 +44,8 @@ UlsDatabase::UlsDatabase()
 
 	columns << "callsign";
 	fieldIdxList.push_back(&callsignIdx);
+	columns << "path_number";
+	fieldIdxList.push_back(&pathNumberIdx);
 	columns << "radio_service";
 	fieldIdxList.push_back(&radio_serviceIdx);
 	columns << "name";
@@ -202,6 +204,7 @@ void UlsDatabase::nullInitialize()
 	fsidIdx = -1;
 	regionIdx = -1;
 	callsignIdx = -1;
+	pathNumberIdx = -1;
 	radio_serviceIdx = -1;
 	nameIdx = -1;
 	rx_callsignIdx = -1;
@@ -595,6 +598,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 		target.at(r).fsid = fsid;
 		target.at(r).region= q.value(regionIdx).toString().toStdString();
 		target.at(r).callsign = q.value(callsignIdx).toString().toStdString();
+		target.at(r).pathNumber = q.value(pathNumberIdx).toInt();
 		target.at(r).radioService = q.value(radio_serviceIdx).toString().toStdString();
 		target.at(r).entityName = q.value(nameIdx).toString().toStdString();
 		target.at(r).rxCallsign = q.value(rx_callsignIdx).toString().toStdString();

@@ -55,6 +55,7 @@
 #include "ratcommon/FileHelpers.h"
 #include "ratcommon/GzipStream.h"
 #include "ratcommon/ZipWriter.h"
+#include "ratcommon/GzipCsv.h"
 // Qt
 #include <QFile>
 #include <QDir>
@@ -77,6 +78,7 @@ class ULSClass;
 class PopGridClass;
 class AntennaClass;
 class RlanRegionClass;
+class ExThrGzipCsv;
 
 namespace OpClass
 {
@@ -243,7 +245,7 @@ class AfcManager
 
 		void fixFSTerrain();
 		CConst::PropEnvEnum computePropEnv(double lonDeg, double latDeg, CConst::NLCDLandCatEnum &nlcdLandCat, bool errorFlag = true) const;
-		double computeIToNMargin(double d, double cc, double ss, ULSClass *uls, double chanCenterFreq, double bandwidth, double chanStartFreq, double chanStopFreq, double spectralOverlapLossDB, char ulsRxPropEnv, double& distKmM, std::string comment, CsvWriter *fexcthrwifi);
+		double computeIToNMargin(double d, double cc, double ss, ULSClass *uls, double chanCenterFreq, double bandwidth, double chanStartFreq, double chanStopFreq, double spectralOverlapLossDB, char ulsRxPropEnv, double& distKmM, std::string comment, ExThrGzipCsv *excthrGc);
 
 		/**************************************************************************************/
 		/* Input Parameters                                                                   */
@@ -453,6 +455,7 @@ class AfcManager
 
 		double _visibilityThreshold;             // I/N threshold to determine whether or not an RLAN is visible to an FS
 		std::string _excThrFile;                 // Generate file containing data for wifi devices where single entry I/N > visibility Threshold
+		std::string _eirpGcFile;                 // Generate file containing data for EIRP computation
 		std::string _fsAnomFile;                 // Generate file containing anomalous FS entries
 		std::string _userInputsFile;             // Generate file containing user inputs
 		std::string _kmlFile;                    // Generate kml file showing simulation results, primarily for debugging

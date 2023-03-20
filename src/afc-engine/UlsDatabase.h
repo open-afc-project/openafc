@@ -25,6 +25,7 @@ struct UlsRecord
 
 	std::string region;
 	std::string callsign;
+	int pathNumber;
 	std::string radioService;
 	std::string entityName;
 	std::string rxCallsign;
@@ -117,6 +118,7 @@ public:
 	int fsidIdx;
 	int regionIdx;
 	int callsignIdx;
+	int pathNumberIdx;
 	int radio_serviceIdx;
 	int nameIdx;
 	int rx_callsignIdx;
