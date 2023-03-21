@@ -205,6 +205,7 @@ static int logfile = -1;
 static volatile int64_t *cache_size;
 static volatile int8_t *open_files;
 static sem_t *shmem_sem;
+static int64_t claimed_size;
 
 static data_fd_t* fd_get_data_fd(int fd);
 static char* fd_get_name(int fd);
@@ -214,6 +215,7 @@ static ssize_t read_remote_data_nfs(void *destv, size_t size, char *tpath, off_t
 static int download_file_gs(data_fd_t *data_fd, char *dest);
 static ssize_t read_remote_data_gs(void *destv, size_t size, char *tpath, off_t off);
 static int init_gs();
+static void reduce_cache(uint64_t size);
 
 static void starttime(struct timeval *tv)
 {
@@ -482,22 +484,22 @@ static int f_close(FILE *f)
 
 static inline void cache_size_set(int64_t size)
 {
-	dbg("cache_size_set");
+//	dbg("cache_size_set");
 	sem_wait(shmem_sem);
 	*cache_size += size;
 	sem_post(shmem_sem);
-	dbg("cache_size_set done");
+//	dbg("cache_size_set done");
 }
 
 static inline int64_t cache_size_get()
 {
 	int64_t tmp;
 
-	dbg("cache_size_get");
+//	dbg("cache_size_get");
 	sem_wait(shmem_sem);
 	tmp = *cache_size;
 	sem_post(shmem_sem);
-	dbg("cache_size_get done");
+//	dbg("cache_size_get done");
 	return tmp;
 }
 
@@ -522,7 +524,7 @@ static uint8_t files_open_set(const char *name, int val)
 	uint16_t fno = hash_fname(name);
 	uint8_t ret;
 
-	dbg("files_open_set(%s)", name);
+//	dbg("files_open_set(%s)", name);
 	sem_wait(shmem_sem);
 	open_files[fno] += val;
 	if (open_files[fno] < 0)
@@ -531,7 +533,20 @@ static uint8_t files_open_set(const char *name, int val)
 	}
 	ret = open_files[fno];
 	sem_post(shmem_sem);
-	dbg("files_open_set(%s, %d) done %x %u", name, val, fno, open_files[fno]);
+//	dbg("files_open_set(%s, %d) done %x %u", name, val, fno, open_files[fno]);
+	return ret;
+}
+
+static uint8_t files_open_get(const char *name)
+{
+	uint16_t fno = hash_fname(name);
+	uint8_t ret;
+
+//	dbg("files_open_get(%s)", name);
+	sem_wait(shmem_sem);
+	ret = open_files[fno];
+	sem_post(shmem_sem);
+//	dbg("files_open_get(%s) done %x %u", name, fno, open_files[fno]);
 	return ret;
 }
 
@@ -553,7 +568,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 
 	sem = sem_open(data_fd->tpath, O_CREAT, 0666, 1);
 	aep_assert(sem, "sem_open");
-	dbg("read_data %s", data_fd->tpath);
+	//dbg("read_data %s", data_fd->tpath);
 	sem_wait(sem);
 
 	/* download whole file to cache if possible */
@@ -565,15 +580,22 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 		}
 		if (!is_cached && data_fd->fe->size <= max_cached_file_size)
 		{
-			dbg("download %s", data_fd->tpath);
-			if (!download_file(data_fd, fakepath))
-			{
-				cache_size_set(data_fd->fe->size);
-				dbg("download %s done, cs %lu", data_fd->tpath, *cache_size);
-				is_cached = true;
-			} else
-			{
-				dbg("download %s failed, cs %lu", data_fd->tpath, *cache_size);
+			if (data_fd->fe->size + cache_size_get() > max_cached_size) {
+				reduce_cache(data_fd->fe->size);
+			}
+			if (data_fd->fe->size + cache_size_get() < max_cached_size) {
+				dbg("download %s", data_fd->tpath);
+				if (!download_file(data_fd, fakepath))
+				{
+					cache_size_set(data_fd->fe->size);
+					dbg("download %s done, cs %ld", data_fd->tpath, *cache_size);
+					is_cached = true;
+				} else
+				{
+					dbg("download %s failed, cs %ld", data_fd->tpath, *cache_size);
+				}
+			} else {
+				dbgl("Can't cache %s %lu cs %ld", data_fd->tpath, data_fd->fe->size, *cache_size);
 			}
 		}
 	}
@@ -605,7 +627,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 		ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
 		aep_assert(ret >= 0, "read_data(%s) read_remote_data", fakepath)
 	}
-	dbg("read_data %s done", data_fd->tpath);
+	//dbg("read_data %s done", data_fd->tpath);
 	data_fd->off += ret;
 	dbgd("read_data(%s, %zu) %zd", data_fd->tpath, size, ret);
 	return ret;
@@ -628,7 +650,7 @@ static int fd_add(char *tpath)
 	strcpy(fakepath, cache_path);
 	strcat(fakepath, tpath);
 
-	dbg("fd_add(%s)", tpath);
+	//dbg("fd_add(%s)", tpath);
 	/* create cache file */
 	if (orig_stat(fakepath, &statbuf))
 	{
@@ -674,7 +696,7 @@ static int fd_add(char *tpath)
 	data_fds[fd].readdir_p = NULL;
 	data_fds[fd].dir.fd = fd;
 	strcpy(data_fds[fd].tpath, tpath);
-	dbg("fd_add(%s) done", tpath, fd);
+	//dbg("fd_add(%s) done", tpath, fd);
 	return fd;
 }
 
@@ -693,26 +715,7 @@ static void fd_rm(int fd)
 	}
 	if (data_fd->fe->size)
 	{
-		uint8_t lock = files_open_set(data_fd->tpath, -1);
-		if (cache_size_get() > (int64_t) max_cached_size && !lock)
-		{
-			sem_t *sem;
-			struct stat stat;
-
-			dbg("fd_rm(%s)", data_fd->tpath);
-			sem = sem_open(data_fd->tpath + strlen(cache_path), O_CREAT, 0666, 1);
-			sem_wait(sem);
-			if (!fstat(fd, &stat))
-			{
-				if (stat.st_size)
-				{
-					ftruncate(fd, 0);
-					cache_size_set(-stat.st_size);
-				}
-			}
-			sem_post(sem);
-			dbg("fd_rm(%s) done", data_fd->tpath);
-		}
+		files_open_set(data_fd->tpath, -1);
 	}
 	orig_close(fd);
 	data_fd->fe = NULL;
@@ -743,6 +746,34 @@ static bool is_remote_file(const char *path, char **tpath)
 	}
 	*tpath = (char*) path;
 	return false;
+}
+
+static int ftw_reduce_callback(const char *fpath, const struct stat *sb, int typeflag)
+{
+	if (typeflag == FTW_F && sb->st_size) {
+		char *tpath = (char*)fpath + strlen(cache_path);
+		if (!files_open_get(tpath)) {
+			sem_t *sem;
+			sem = sem_open(tpath, O_CREAT, 0666, 1);
+			sem_wait(sem);
+			truncate(fpath, 0);
+			sem_post(sem);
+			cache_size_set(-sb->st_size);
+			if (cache_size_get() + claimed_size <= (int64_t) max_cached_size) {
+				return -1;
+			}
+			dbg("truncate(%s)", tpath);
+		}
+	}
+	return 0;
+}
+
+static void reduce_cache(uint64_t size)
+{
+	dbg("reduce_cache(%lu)", size);
+	claimed_size = (int64_t)size;
+	ftw(cache_path, ftw_reduce_callback, 100);
+	dbg("reduce_cache(%lu) done", size);
 }
 
 #if 0
@@ -949,11 +980,11 @@ void __attribute__((constructor)) aep_init(void)
 	shmem_sem = sem_open("aep_shmem_sem", O_CREAT, 0666, 1);
 	aep_assert(shmem_sem, "sem_open");
 	shm_fd = shm_open("aep_shmem", O_RDWR | O_CREAT | O_EXCL, 0666);
-	dbg("aep_init");
+	//dbg("aep_init");
 	sem_wait(shmem_sem);
 	if (shm_fd < 0)
 	{
-		dbg("aep_init cache skip");
+		//dbg("aep_init cache skip");
 		/* O_CREAT | O_EXCL failed, so shared memory object already was initialized */
 		shm_fd = shm_open("aep_shmem", O_RDWR, 0666);
 		aep_assert(shm_fd >= 0, "shm_open");
@@ -962,7 +993,7 @@ void __attribute__((constructor)) aep_init(void)
 		open_files = (int8_t*) (cache_size + 1);
 	} else
 	{
-		dbg("aep_init recount cache");
+		//dbg("aep_init recount cache");
 		ftruncate(shm_fd, sizeof(uint64_t) + HASH_SIZE);
 		cache_size = (int64_t*) mmap(NULL, sizeof(int64_t) + HASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
@@ -972,7 +1003,7 @@ void __attribute__((constructor)) aep_init(void)
 		ftw(cache_path, ftw_callback, 100);
 	}
 	sem_post(shmem_sem);
-	dbg("aep_init done cs %lu", *cache_size);
+	//dbg("aep_init done cs %lu", *cache_size);
 }
 
 FILE* fopen(const char *path, const char *mode)

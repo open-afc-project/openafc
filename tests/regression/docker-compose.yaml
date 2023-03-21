@@ -98,6 +98,7 @@ services:
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       - ./pipe:/pipe
+      - /opt/afc/work/yd889380/aep:/aep
     environment:
       # Filestorage params:
       - AFC_OBJST_HOST=objst
@@ -110,7 +111,8 @@ services:
       - BROKER_FQDN=rmq
       # afc-engine preload lib params
       - AFC_AEP_ENABLE=1
-      - AFC_AEP_DEBUG=1
+      - AFC_AEP_DEBUG=2
+      - AFC_AEP_CACHE_MAX_FILE_SIZE=50000000
       - AFC_AEP_REAL_MOUNTPOINT=${VOL_C_DB}/3dep/1_arcsec
     depends_on:
       - ratdb
