@@ -217,6 +217,19 @@ static ssize_t read_remote_data_gs(void *destv, size_t size, char *tpath, off_t 
 static int init_gs();
 static void reduce_cache(uint64_t size);
 
+static inline void prn_statistic()
+{
+	if (!(aep_debug & 3)) {
+		return;
+	}
+	dprintf(logfile,
+		"statistics: remoteIO %u/%u/%u cachedIO %u/%u/%u dl %u/%u/%u cs %lu",
+		aepst.read_remote, aepst.read_remote_size, aepst.read_remote_time,
+		aepst.read_cached, aepst.read_cached_size, aepst.read_cached_time,
+		aepst.read_write, aepst.read_write_size, aepst.read_write_time,
+		*cache_size);
+}
+
 static void starttime(struct timeval *tv)
 {
 	gettimeofday(tv, NULL);
@@ -584,7 +597,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 				reduce_cache(data_fd->fe->size);
 			}
 			if (data_fd->fe->size + cache_size_get() < max_cached_size) {
-				dbg("download %s", data_fd->tpath);
+				//dbg("download %s", data_fd->tpath);
 				if (!download_file(data_fd, fakepath))
 				{
 					cache_size_set(data_fd->fe->size);
@@ -596,6 +609,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 				}
 			} else {
 				dbgl("Can't cache %s %lu cs %ld", data_fd->tpath, data_fd->fe->size, *cache_size);
+				dbg("Can't cache %s %lu cs %ld", data_fd->tpath, data_fd->fe->size, *cache_size);
 			}
 		}
 	}
@@ -762,7 +776,7 @@ static int ftw_reduce_callback(const char *fpath, const struct stat *sb, int typ
 			if (cache_size_get() + claimed_size <= (int64_t) max_cached_size) {
 				return -1;
 			}
-			dbg("truncate(%s)", tpath);
+			dbg("truncate(%s) cs %ld", tpath, *cache_size);
 		}
 	}
 	return 0;
@@ -770,31 +784,11 @@ static int ftw_reduce_callback(const char *fpath, const struct stat *sb, int typ
 
 static void reduce_cache(uint64_t size)
 {
-	dbg("reduce_cache(%lu)", size);
+	//dbg("reduce_cache(%lu)", size);
 	claimed_size = (int64_t)size;
 	ftw(cache_path, ftw_reduce_callback, 100);
-	dbg("reduce_cache(%lu) done", size);
+	//dbg("reduce_cache(%lu) done", size);
 }
-
-#if 0
-/* for testing */
-static void prn_tree(fe_t *fe, uint8_t tab)
-{
-	fe_t *tmp = fe;
-	int i;
-	char str[10] = {};
-	for (i = 0; i < tab; i++) {
-		str[i] = '\t';
-	}
-	while (tmp) {
-		printf("%s%s\n", str, tmp->name);
-		if (tmp->down) {
-			prn_tree(tmp->down, tab + 1);
-		}
-		tmp = tmp->next;
-	}
-}
-#endif
 
 static int ftw_callback(const char *fpath, const struct stat *sb, int typeflag)
 {
@@ -1065,7 +1059,7 @@ int fclose(FILE *f)
 		dbgd("fclose(%d(%s))", fileno(f), fd_get_name(fileno(f)));
 		fd_rm(fileno(f));
 		ret = 0;
-		dbgl("statistics: remote %u/%u/%u cached %u/%u/%u cache %u/%u/%u cache size %lu", aepst.read_remote, aepst.read_remote_size, aepst.read_remote_time, aepst.read_cached, aepst.read_cached_size, aepst.read_cached_time, aepst.read_write, aepst.read_write_size, aepst.read_write_time, *cache_size);
+		prn_statistic();
 	} else
 	{
 		dbgo("fclose(%d)", fileno(f));
