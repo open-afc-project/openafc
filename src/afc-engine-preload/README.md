@@ -22,6 +22,7 @@ The library could be configured by the following env vars in the worker docker:
 - **AFC_AEP_DEBUG**=number - Log level. 0 - disable, 1 - log time of read operations. Default: 0
 - **AFC_AEP_LOGFILE**=path - Where to write the log. Default:  /aep/log/aep.log
 - **AFC_AEP_CACHE**=path - Where to store the cache. Default:  /aep/cache
-- **AFC_AEP_CACHE_MAX_FILE_SIZE**=`size`- Cache files with size less than `size`. Default: 60000000 bytes
+- **AFC_AEP_CACHE_MAX_FILE_SIZE**=`size`- Cache files with size less than `size`. Default: 50.000.000 bytes
+- **AFC_AEP_CACHE_MAX_SIZE**=`size`- Max cache size. Default: 1.000.000.000 bytes
 - **AFC_AEP_REAL_MOUNTPOINT**=path - Redirect read access to there. Default: /mnt/nfs/rat_transfer
 - **AFC_AEP_ENGINE_MOUNTPOINT**=path - Redirect read access from here. Default: the value of **AFC_AEP_REAL_MOUNTPOINT** var

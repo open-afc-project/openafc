@@ -6,7 +6,8 @@
 
 all: aep.so
 
-CXXFLAGS=-Wall -D_GNU_SOURCE -fPIC -DNO_GOOGLE_LINK -O2 #-g
+CXXFLAGS=-Wall -D_GNU_SOURCE -fPIC -DNO_GOOGLE_LINK -O2
+#CXXFLAGS=-Wall -D_GNU_SOURCE -fPIC -DNO_GOOGLE_LINK -O0 -g
 
 aep.so: aep.o
 	g++ -rdynamic -shared -o $@ $^ #-lgoogle_cloud_cpp_storage
