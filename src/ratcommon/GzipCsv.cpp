@@ -160,5 +160,5 @@ QString GzipCsv::ColEnum::formatValue() const
 		return QString();
 	}
 	const auto &it = _items.find(_value);
-	return (it == _items.end()) ? (_defName + QString::asprintf(" (%d)", _value)) : it->second;
+	return ((it == _items.end()) ? _defName : it->second) + QString::asprintf(" (%d)", _value);
 }

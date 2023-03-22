@@ -195,6 +195,54 @@ namespace OpClass
 
 }
 
+static const std::map<int, std::string> nlcdCodeNames = {
+	{0, "Unclassified"},
+	{11, "Open Water"},
+	{12, "Ice/Snow"},
+	{21, "Developed, Open Space"},
+	{22, "Developed, Low Intensity"},
+	{23, "Developed, Medium Intensity"},
+	{24, "Developed, High Intensity"},
+	{31, "Barren Land"},
+	{41, "Deciduous Forest"},
+	{42, "Evergreen Forest"},
+	{43, "Mixed Forest"},
+	{51, "Alaska Dwarf Scrub"},
+	{52, "Shrub/Scrub"},
+	{71, "Grassland/Herbaceous"},
+	{72, "Alaska Sedge/Herbaceous"},
+	{73, "Alaska Lichens"},
+	{74, "Alaska Moss"},
+	{81, "Pasture/Hay"},
+	{82, "Cultivated Crops"},
+	{90, "Woody Wetlands"},
+	{95, "Emergent Herbaceous Wetlands"},
+	};
+static const std::map<int, std::string> nlcdLandCatNames = {
+	{CConst::deciduousTreesNLCDLandCat, "deciduousTreesNLCDLandCat"},
+	{CConst::coniferousTreesNLCDLandCat, "coniferousTreesNLCDLandCat"},
+	{CConst::highCropFieldsNLCDLandCat, "highCropFieldsNLCDLandCat"},
+	{CConst::noClutterNLCDLandCat, "noClutterNLCDLandCat"},
+	{CConst::villageCenterNLCDLandCat, "villageCenterNLCDLandCat"},
+	{CConst::unknownNLCDLandCat, "unknownNLCDLandCat"},
+};
+static const std::map<int, std::string> pathLossModelNames = {
+	{CConst::unknownPathLossModel, "unknownPathLossModel"},
+	{CConst::ITMBldgPathLossModel, "ITMBldgPathLossModel"},
+	{CConst::CoalitionOpt6PathLossModel, "CoalitionOpt6PathLossModel"},
+	{CConst::FCC6GHzReportAndOrderPathLossModel, "FCC6GHzReportAndOrderPathLossModel"},
+	{CConst::CustomPathLossModel, "CustomPathLossModel"},
+	{CConst::ISEDDBS06PathLossModel, "ISEDDBS06PathLossModel"},
+	{CConst::FSPLPathLossModel, "FSPLPathLossModel"}
+};
+static const std::map<int, std::string> propEnvNames = {
+	{CConst::unknownPropEnv, "unknownPropEnv"},
+	{CConst::urbanPropEnv, "urbanPropEnv"},
+	{CConst::suburbanPropEnv, "suburbanPropEnv"},
+	{CConst::ruralPropEnv, "ruralPropEnv"},
+	{CConst::barrenPropEnv, "barrenPropEnv"}
+};
+
 /** GZIP CSV for EIRP computation */
 class EirpGzipCsv : public GzipCsv {
 public:
@@ -218,11 +266,21 @@ public:
 	ColDouble eirpLimit;				// Resulting EIRP limit dB
 	ColBool fspl;						// Freespace (trial) pathLoss computation
 	ColDouble pathLossDb;				// Path loss dB
+	ColEnum configPathLossModel;		// Configured path loss model
+	ColStr resultedPathLossModel;		// Resulted path poss model
 	ColDouble buildingPenetrationDb;	// Building penetration loss dB
 	ColDouble offBoresight;				// Angle beween RX beam and direction to scanpoint
 	ColDouble rxGainDb;					// RX Gain DB (loss due to antenna diagram)
+	ColEnum txPropEnv;					// TX Propagation environment
+	ColEnum nlcdTx;						// Land use at RLAN
+	ColStr pathClutterTxModel;			// Path Clutter TX model
 	ColDouble pathClutterTxDb;			// Path clutter TX dB
+	ColStr txClutter;                   // TX Clutter
+	ColEnum rxPropEnv;					// RX Propagation environment
+	ColEnum nlcdRx;						// Land use at FS
+	ColStr pathClutterRxModel;			// Path Clutter RX model
 	ColDouble pathClutterRxDb;			// Path Clutter RX dB
+	ColStr rxClutter;                   // RX Clutter
 	ColDouble nearFieldOffsetDb;		// Near field offset dB
 	ColDouble spectralOverlapLossDb;	// Spectral overlap loss dB
 	ColDouble ulsAntennaFeederLossDb;	// FS Antenna feeder loss dB
@@ -253,16 +311,27 @@ public:
 		eirpLimit(this, "EIRP"),
 		fspl(this, "FreeSpace"),
 		pathLossDb(this, "PathLossDb"),
+		configPathLossModel(this, "ConfigPathLossModel", pathLossModelNames),
+		resultedPathLossModel(this, "ResultedPathLossModel"),
 		buildingPenetrationDb(this, "BuildingPenetrationDb"),
 		offBoresight(this, "OffBoresightDeg"),
 		rxGainDb(this, "RxGainDb"),
+		txPropEnv(this, "TxPropEnv", propEnvNames),
+		nlcdTx(this, "TxLandUse", nlcdLandCatNames),
+		pathClutterTxModel(this, "TxClutterModel"),
 		pathClutterTxDb(this, "PathClutterTxDb"),
+		txClutter(this, "TxClutter"),
+		rxPropEnv(this, "RxPropEnv", propEnvNames),
+		nlcdRx(this, "RxLandUse", nlcdLandCatNames),
+		pathClutterRxModel(this, "RxClutterModel"),
 		pathClutterRxDb(this, "PathClutterRxDb"),
+		rxClutter(this, "RxClutter"),
 		nearFieldOffsetDb(this, "NearFieldOffsetDb"),
 		spectralOverlapLossDb(this, "SpectralOverlapLossDb"),
 		ulsAntennaFeederLossDb(this, "UlsAntennaFeederLossDb"),
 		rxPowerDbW(this, "RxPowerDbW"),
 		ulsNoiseLevelDbW(this, "UlsNoiseLevel")
+
 	{}
 };
 
@@ -7917,11 +7986,21 @@ void AfcManager::runPointAnalysis()
 													eirpGc.eirpLimit = eirpLimit_dBm;
 													eirpGc.fspl = forceFspl;
 													eirpGc.pathLossDb = pathLoss;
+													eirpGc.configPathLossModel = _pathLossModel;
+													eirpGc.resultedPathLossModel = pathLossModelStr;
 													eirpGc.buildingPenetrationDb = buildingPenetrationDB;
 													eirpGc.offBoresight = angleOffBoresightDeg;
 													eirpGc.rxGainDb = rxGainDB;
+													eirpGc.txPropEnv = rlanPropEnv;
+													eirpGc.nlcdTx = nlcdLandCatTx;
+													eirpGc.pathClutterTxModel = pathClutterTxModelStr;
 													eirpGc.pathClutterTxDb = pathClutterTxDB;
+													eirpGc.txClutter = txClutterStr;
+													eirpGc.rxPropEnv = fsPropEnv;
+													eirpGc.nlcdRx = nlcdLandCatRx;
+													eirpGc.pathClutterRxModel = pathClutterRxModelStr;
 													eirpGc.pathClutterRxDb = pathClutterRxDB;
+													eirpGc.rxClutter = rxClutterStr;
 													eirpGc.nearFieldOffsetDb = nearFieldOffsetDB;
 													eirpGc.spectralOverlapLossDb = spectralOverlapLossDB;
 													eirpGc.ulsAntennaFeederLossDb =  uls->getRxAntennaFeederLossDB();
