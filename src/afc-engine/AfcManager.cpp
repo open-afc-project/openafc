@@ -5,10 +5,12 @@
 #include <QFileInfo>
 
 // "--runtime_opt" masks
+// These bits corresponds to RNTM_OPT_... bits in src/ratapi/ratapi/defs.py
+// Please keep all these definitions synchronous
 #define RUNTIME_OPT_ENABLE_DBG 1
 #define RUNTIME_OPT_ENABLE_GUI 2
 #define RUNTIME_OPT_URL 4
-#define RUNTIME_OPT_ENABLE_SLOW_DBG 8
+#define RUNTIME_OPT_ENABLE_SLOW_DBG 16
 
 extern double qerfi(double q);
 
@@ -2082,7 +2084,7 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		("output-file-path,o", po::value<std::string>()->default_value("outputFile.json"), "set output-file-path level")
 		("temp-dir,t", po::value<std::string>()->default_value(""), "set temp-dir level")
 		("log-level,l", po::value<std::string>()->default_value("debug"), "set log-level")
-		("runtime_opt,u", po::value<uint32_t>()->default_value(3), "bit 0: create 'fast' debug files; bit 1: create kmz and progress files; bit 2: interpret file pathes as URLs; bit 3: create 'slow' debug files");
+		("runtime_opt,u", po::value<uint32_t>()->default_value(3), "bit 0: create 'fast' debug files; bit 1: create kmz and progress files; bit 2: interpret file pathes as URLs; bit 4: create 'slow' debug files");
 
 	po::variables_map cmdLineArgs;
 	po::store(po::parse_command_line(argc, argv, optDescript), cmdLineArgs); // ac and av are parameters passed into main
