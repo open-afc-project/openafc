@@ -255,6 +255,7 @@ class AfcManager
 		std::string _mntPath;                   // Parsed path to share with GeoData and config data"
 		bool _createKmz;
 		bool _createDebugFiles;
+		bool _createSlowDebugFiles;
 
 		AfcDataIf* _dataIf;
 
