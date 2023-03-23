@@ -5,9 +5,12 @@
 #include <QFileInfo>
 
 // "--runtime_opt" masks
+// These bits corresponds to RNTM_OPT_... bits in src/ratapi/ratapi/defs.py
+// Please keep all these definitions synchronous
 #define RUNTIME_OPT_ENABLE_DBG 1
 #define RUNTIME_OPT_ENABLE_GUI 2
 #define RUNTIME_OPT_URL 4
+#define RUNTIME_OPT_ENABLE_SLOW_DBG 16
 
 extern double qerfi(double q);
 
@@ -548,6 +551,7 @@ AfcManager::AfcManager()
 {
 	_createKmz = false;
 	_createDebugFiles = false;
+	_createSlowDebugFiles = false;
 
 	_dataIf = (AfcDataIf *) NULL;
 
@@ -2149,7 +2153,7 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		("output-file-path,o", po::value<std::string>()->default_value("outputFile.json"), "set output-file-path level")
 		("temp-dir,t", po::value<std::string>()->default_value(""), "set temp-dir level")
 		("log-level,l", po::value<std::string>()->default_value("debug"), "set log-level")
-		("runtime_opt,u", po::value<uint32_t>()->default_value(3), "bit 0: create debug files; bit 1: create kmz and progress files; bit 2: interpret file pathes as URLs");
+		("runtime_opt,u", po::value<uint32_t>()->default_value(3), "bit 0: create 'fast' debug files; bit 1: create kmz and progress files; bit 2: interpret file pathes as URLs; bit 4: create 'slow' debug files");
 
 	po::variables_map cmdLineArgs;
 	po::store(po::parse_command_line(argc, argv, optDescript), cmdLineArgs); // ac and av are parameters passed into main
@@ -2243,6 +2247,9 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 			AfcManager::_createKmz = true;
 		}
 		AfcManager::_dataIf = new AfcDataIf(tmp & RUNTIME_OPT_URL);
+		if (tmp & RUNTIME_OPT_ENABLE_SLOW_DBG) {
+			AfcManager::_createSlowDebugFiles = true;
+		}
 	}
 }
 
@@ -10625,9 +10632,11 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 
 	if (AfcManager::_createDebugFiles) {
 		_excThrFile = QDir(QString::fromStdString(tempDir)).filePath("exc_thr.csv.gz").toStdString();
-		_eirpGcFile = QDir(QString::fromStdString(tempDir)).filePath("eirp.csv.gz").toStdString();
 		_fsAnomFile = QDir(QString::fromStdString(tempDir)).filePath("fs_anom.csv.gz").toStdString();
 		_userInputsFile = QDir(QString::fromStdString(tempDir)).filePath("userInputs.csv.gz").toStdString();
+	}
+	if (AfcManager::_createSlowDebugFiles) {
+		_eirpGcFile = QDir(QString::fromStdString(tempDir)).filePath("eirp.csv.gz").toStdString();
 	}
 	if (AfcManager::_createKmz) {
 		_kmlFile = QDir(QString::fromStdString(tempDir)).filePath("results.kmz").toStdString();

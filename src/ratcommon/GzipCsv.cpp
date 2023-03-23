@@ -10,13 +10,21 @@
 #include "GzipCsv.h"
 #include "FileHelpers.h"
 #include <boost/lexical_cast.hpp>
+#include <rkflogging/Logging.h>
 #include <stdexcept>
+
+namespace {
+	// Logger for all instances of class
+	LOGGER_DEFINE_GLOBAL(logger, "GzipCsv")
+
+} // end namespace
 
 GzipCsv::GzipCsv(const std::string &filename)
 {
 	if (filename.empty()) {
 		return;
 	}
+	LOGGER_INFO(logger) << "Opening '" << QString::fromStdString(filename) << "'";
 	QString qfilename = QString::fromStdString(filename);
 	_fileWriter = FileHelpers::open(qfilename, QIODevice::WriteOnly);
 	_gzipWriter.reset(new GzipStream(_fileWriter.get()));
@@ -26,6 +34,11 @@ GzipCsv::GzipCsv(const std::string &filename)
 			QString("Gzip \"%1\" failed to open").arg(qfilename).toStdString());
 	}
 	_csvWriter.reset(new CsvWriter(*_gzipWriter));
+}
+
+GzipCsv::operator bool() const
+{
+	return (bool)_fileWriter;
 }
 
 void GzipCsv::clearRow()

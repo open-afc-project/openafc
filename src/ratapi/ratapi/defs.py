@@ -5,10 +5,13 @@
 # a copy of which is included with this software program
 #
 
+# These individual bits corresponds to RUNTIME_OPT_... bits in AfcManager.cpp
+# Please keep definitions synchronous
 RNTM_OPT_DBG = 1
 RNTM_OPT_GUI = 2
 RNTM_OPT_AFCENGINE_HTTP_IO = 4
 RNTM_OPT_NOCACHE = 8
+RNTM_OPT_SLOW_DBG = 16
 
 RNTM_OPT_NODBG_NOGUI = 0
 RNTM_OPT_DBG_NOGUI = RNTM_OPT_DBG

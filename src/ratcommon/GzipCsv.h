@@ -282,7 +282,7 @@ public:
 	virtual ~GzipCsv() = default;
 
 	/** True if writer was active (initialized with nonempty file name */
-	operator bool() const {return (bool)_fileWriter;}
+	operator bool() const;
 
 	/** Marks all columns as not set */
 	void clearRow();
