@@ -5,7 +5,7 @@
 |Version|3.7.5.0|
 | :- | :- |
 |**Date**|**03/25/2023**|
-|compiled server's version is TBD | git tag 3.7.5.0|
+|compiled server's version is edce4c9 | git tag 3.7.5.0|
 ## **Issues Addressed**
  * JIRA OA-592-upgrade-postgres
  * JIRA OA-612-runtime_opt-bit-for-heavy-logs
