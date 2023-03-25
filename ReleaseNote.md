@@ -1,5 +1,25 @@
  # Release Note
 
+
+## **Version and Date**
+|Version|3.7.5.0|
+| :- | :- |
+|**Date**|**03/25/2023**|
+|compiled server's version is TBD | git tag 3.7.5.0|
+## **Issues Addressed**
+ * JIRA OA-592-upgrade-postgres
+ * JIRA OA-612-runtime_opt-bit-for-heavy-logs
+ * JIRA OA-600-size-limit-of-afc-engine-file-cache
+ * JIRA OA-610-GzipCsv-merge-fix
+ * JIRA OA-465-rat-server-objst-service-discovery-issue
+ * JIRA OA-590-engine-computation-comparison-log
+ * JIRA OA-574-add-country-boundary-for-canada
+ * JIRA OA-606-update-fs-file-in-afc-config
+ * JIRA OA-570-fixing-canada-fs-parameters
+ * JIRA OA-604_about_fix
+ * JIRA OA-602_user_account
+
+
 ## **Version and Date**
 |Version|**OA-574**|
 | :- | :- |
