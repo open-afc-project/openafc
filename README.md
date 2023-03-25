@@ -36,6 +36,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [**Environment variables**](#environment-variables)
   - [RabbitMQ settings](#rabbitmq-settings)
   - [PostgreSQL structure](#postgresql-structure)
+    - [Upgrade PostgreSQL](#upgrade-postgresql)
   - [Initial Super Administrator account](#initial-super-administrator-account)
     - [Note for an existing user database](#note-for-an-existing-user-database)
   - [Managing user account](#managing-user-account)
@@ -611,6 +612,20 @@ rat-manage-api db-create
 If you do it with the server which is run thru the docker-compose script described above, you can do it using this command:
 ```
 docker-compose exec server rat-manage-api db-create
+```
+
+### Upgrade PostgreSQL
+
+When PostgreSQL is upgraded the pgdata should be converted to be compatible with the new PostgreSQL version. It can be done by tools/db_tools/update_db.sh script.
+```
+tools/db_tools/update_db.sh [pgdata_dir] [postgres_password] [old_postgres_version] [new_postgres_version]
+```
+This script makes a backup of [pgdata_dir] to [pgdata_dir].back and puts the converted db in [pgdata_dir].
+This command should be run under root permissions, i.e. 'sudo tools/db_tools/update_db.sh ...'
+
+Example: convert db which was created by PostgreSQL version 9.6 to be used by PostgreSQL version 14.7:
+```
+sudo tools/db_tools/update_db.sh ./pgdata qwerty 9.6 14.7
 ```
 
 ## Initial Super Administrator account
