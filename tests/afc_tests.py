@@ -109,6 +109,7 @@ class TestCfg(dict):
         params_data = {
             'conn_type':self['conn_type'],
             'debug':self['debug'],
+            'edebug':cfg['elaborated_debug'],
             'gui':self['gui']
             }
         if (self['cache'] == False):
@@ -407,6 +408,7 @@ def _send_recv(cfg, req_data):
     params_data = {
         'conn_type':cfg['conn_type'],
         'debug':cfg['debug'],
+        'edebug':cfg['elaborated_debug'],
         'gui':cfg['gui']
         }
     if (cfg['cache'] == False):
@@ -1648,6 +1650,9 @@ def make_arg_parser():
     args_parser.add_argument('--debug', action='store_true',
                          help="during a request make files "
                               "with details for debugging.\n")
+    args_parser.add_argument('--elaborated_debug', action='store_true',
+                         help="during a request make files "
+                              "with even more details for debugging.\n")
     args_parser.add_argument('--gui', action='store_true',
                          help="during a request make files "
                               "with details for debugging.\n")

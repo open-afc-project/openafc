@@ -429,6 +429,9 @@ class RatAfc(MethodView):
                 debug_opt = flask.request.args.get('debug')
                 if debug_opt == 'True':
                     runtime_opts |= RNTM_OPT_DBG
+                edebug_opt = flask.request.args.get('edebug')
+                if edebug_opt == 'True':
+                    runtime_opts |= RNTM_OPT_SLOW_DBG
                 gui_opt = flask.request.args.get('gui')
                 if gui_opt == 'True':
                     runtime_opts |= RNTM_OPT_GUI
