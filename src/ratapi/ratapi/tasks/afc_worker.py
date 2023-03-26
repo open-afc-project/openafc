@@ -60,7 +60,7 @@ def run(prot, host, port, state_root,
         :param afc_exe: path to AFC Engine executable
 
         :param state_root: path to directory where fbrat state is held
-        
+
         :param mntroot: path to directory where GeoData and config data are stored
 
         :param request_type: request type of analysis
@@ -136,6 +136,11 @@ def run(prot, host, port, state_root,
                         with dataif.open("dbg", history_dir + "/" + fname) as hfile:
                             with open(os.path.join(tmpdir, fname), "rb") as infile:
                                 hfile.write(infile.read())
+            elif runtime_opts & defs.RNTM_OPT_SLOW_DBG:
+                if os.path.exists(os.path.join(tmpdir, "eirp.csv.gz")):
+                    with dataif.open("dbg", history_dir + "/eirp.csv.gz") as hfile:
+                        with open(os.path.join(tmpdir, "eirp.csv.gz"), "rb") as infile:
+                            hfile.write(infile.read())
 
             t.toJson(task.Task.STAT_FAILURE, runtime_opts=runtime_opts, exit_code=error.returncode)
             return
@@ -168,6 +173,11 @@ def run(prot, host, port, state_root,
                     with dataif.open("dbg", history_dir + "/" + fname) as hfile:
                         with open(os.path.join(tmpdir, fname), "rb") as infile:
                             hfile.write(infile.read())
+        elif runtime_opts & defs.RNTM_OPT_SLOW_DBG:
+            if os.path.exists(os.path.join(tmpdir, "eirp.csv.gz")):
+                with dataif.open("dbg", history_dir + "/eirp.csv.gz") as hfile:
+                    with open(os.path.join(tmpdir, "eirp.csv.gz"), "rb") as infile:
+                        hfile.write(infile.read())
 
         LOGGER.debug('task completed')
         t.toJson(task.Task.STAT_SUCCESS, runtime_opts=runtime_opts)

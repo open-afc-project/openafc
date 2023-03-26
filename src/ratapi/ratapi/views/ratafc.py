@@ -28,7 +28,7 @@ import uuid
 from flask.views import MethodView
 import werkzeug.exceptions
 import six
-from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE
+from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG
 from ..tasks.afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint, AFCConfig
@@ -496,9 +496,10 @@ class RatAfc(MethodView):
                 with dataif.open("pro", hash + "/analysisRequest.json") as hfile:
                     hfile.write(request_json_bytes)
                 history_dir = None
-                if runtime_opts & RNTM_OPT_DBG:
+                if runtime_opts & (RNTM_OPT_DBG | RNTM_OPT_SLOW_DBG):
                     history_dir = org + "/" + str(serial) + "/" + \
                         str(datetime.datetime.now().isoformat())
+                if runtime_opts & RNTM_OPT_DBG:
                     with dataif.open("dbg", history_dir + "/analysisRequest.json") as hfile:
                         hfile.write(request_json_bytes)
                     with dataif.open("dbg", history_dir + "/afc_config.json") as hfile:
