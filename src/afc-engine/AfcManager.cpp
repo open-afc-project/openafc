@@ -901,7 +901,7 @@ void AfcManager::initializeDatabases()
 		}
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		readULSData(_ulsDatabaseList, (PopGridClass *) NULL, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, 0.0, 0.0, 0.0, 0.0);
-		// readRASData(_rasDataFile);
+		readRASData(_deniedRegionFile);
 		if (_ulsList->getSize() == 0) {
 		} else if (_ulsList->getSize() > 1) {
 		}
@@ -1081,7 +1081,7 @@ void AfcManager::initializeDatabases()
 
 	if (_analysisType == "HeatmapAnalysis" || _analysisType == "AP-AFC" || _analysisType == "ScanAnalysis") {
 		readULSData(_ulsDatabaseList, _popGrid, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, minLat, maxLat, minLon, maxLon);
-		// readRASData(_rasDataFile);
+		readRASData(_deniedRegionFile);
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		fixFSTerrain();
 #if DEBUG_AFC
@@ -2783,6 +2783,10 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_reportErrorRlanHeightLowFlag = false;
 	}
 	// ***********************************
+
+	if (jsonObj.contains("deniedRegionFile") && !jsonObj["deniedRegionFile"].isUndefined()) {
+        _deniedRegionFile = SearchPaths::forReading("data", jsonObj["deniedRegionFile"].toString(), true).toStdString();
+	}
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -5504,7 +5508,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 /******************************************************************************************/
 void AfcManager::readRASData(std::string filename)
 {
-	LOGGER_INFO(logger) << "Reading RAS Data: " << filename;
+
+	if (filename.empty()) {
+		throw std::runtime_error("ERROR: No RAS data file specified");
+	    LOGGER_INFO(logger) << "No denied region file specified";
+        return;
+	}
 
 	int linenum, fIdx;
 	std::string line, strval;
@@ -5572,11 +5581,7 @@ void AfcManager::readRASData(std::string filename)
 
 	int fieldIdx;
 
-	if (filename.empty()) {
-		throw std::runtime_error("ERROR: No RAS data file specified");
-	}
-
-	LOGGER_INFO(logger) << "Reading RAS Datafile: " << filename;
+	LOGGER_INFO(logger) << "Reading denied region Datafile: " << filename;
 
 	if ( !(fp = fopen(filename.c_str(), "rb")) ) {
 		str = std::string("ERROR: Unable to open RAS Data File \"") + filename + std::string("\"\n");

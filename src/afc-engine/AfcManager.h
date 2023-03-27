@@ -388,6 +388,7 @@ class AfcManager
 
 		std::vector<FreqBandClass> _allowableFreqBandList; // List of allowable freq bands.  For USA, correspond to UNII-5 and UNII-7
 		std::string _mapDataGeoJsonFile;               // File to write map data geojson
+		std::string _deniedRegionFile;                 // File containing data on denied geographic regions
 		/**************************************************************************************/
 
 		/**************************************************************************************/
