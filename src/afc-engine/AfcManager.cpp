@@ -8226,7 +8226,7 @@ void AfcManager::runPointAnalysis()
 											double slon = sin((lon2Rad-lon1Rad)/2);
 											double ptDistKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
 
-											pathTraceGc.ptid = boost::format("PT_%d") % ptIdx;
+											pathTraceGc.ptId = (boost::format("PT_%d") % ptIdx).str();
 											pathTraceGc.lon = ptLon;
 											pathTraceGc.lat = ptLat;
 											pathTraceGc.dist = ptDistKm;
