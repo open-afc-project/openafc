@@ -53,7 +53,7 @@ enum ChannelColor
 	YELLOW,
 	GREEN,
 
-	BLACK  // In RAS protection zone
+	BLACK  // In Denied Region
 };
 
 enum ChannelType

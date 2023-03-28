@@ -1,5 +1,5 @@
 /******************************************************************************************/
-/**** FILE : ras.cpp                                                                   ****/
+/**** FILE : denied_region.cpp                                                         ****/
 /******************************************************************************************/
 
 #include <iostream>
@@ -11,7 +11,7 @@
 
 #include <QPointF>
 
-#include "ras.h"
+#include "denied_region.h"
 
 #include "rkflogging/ErrStream.h"
 #include "rkflogging/Logging.h"
@@ -20,13 +20,13 @@
 namespace
 {
     // Logger for all instances of class
-    LOGGER_DEFINE_GLOBAL(logger, "RASClass")
+    LOGGER_DEFINE_GLOBAL(logger, "DeniedRegionClass")
 }
 
 /******************************************************************************************/
-/**** FUNCTION: RASClass::RASClass()                                                   ****/
+/**** FUNCTION: DeniedRegionClass::DeniedRegionClass()                                 ****/
 /******************************************************************************************/
-RASClass::RASClass(int idVal) : id(idVal)
+DeniedRegionClass::DeniedRegionClass(int idVal) : id(idVal)
 {
     startFreq = -1.0;
     stopFreq = -1.0;
@@ -35,34 +35,34 @@ RASClass::RASClass(int idVal) : id(idVal)
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: RASClass::~RASClass()                                                  ****/
+/**** FUNCTION: DeniedRegionClass::~DeniedRegionClass()                                ****/
 /******************************************************************************************/
-RASClass::~RASClass()
+DeniedRegionClass::~DeniedRegionClass()
 {
 }
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: RectRASClass::RectRASClass()                                           ****/
+/**** FUNCTION: RectDeniedRegionClass::RectDeniedRegionClass()                         ****/
 /******************************************************************************************/
-RectRASClass::RectRASClass(int idVal) : RASClass(idVal)
+RectDeniedRegionClass::RectDeniedRegionClass(int idVal) : DeniedRegionClass(idVal)
 {
     rectList = std::vector<std::tuple<double, double, double, double> >(0);
 }
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: RectRASClass::~RectRASClass()                                          ****/
+/**** FUNCTION: RectDeniedRegionClass::~RectDeniedRegionClass()                        ****/
 /******************************************************************************************/
-RectRASClass::~RectRASClass()
+RectDeniedRegionClass::~RectDeniedRegionClass()
 {
 }
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: RectRASClass::RectRASClass()                                           ****/
+/**** FUNCTION: RectDeniedRegionClass::RectDeniedRegionClass()                         ****/
 /******************************************************************************************/
-void RectRASClass::addRect(double lon1, double lon2, double lat1, double lat2)
+void RectDeniedRegionClass::addRect(double lon1, double lon2, double lat1, double lat2)
 {
     double lonStart = std::min(lon1, lon2);
     double lonStop  = std::max(lon1, lon2);
@@ -73,9 +73,9 @@ void RectRASClass::addRect(double lon1, double lon2, double lat1, double lat2)
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: RectRASClass::intersect()                                            ****/
+/**** FUNCTION: RectDeniedRegionClass::intersect()                                   ****/
 /******************************************************************************************/
-bool RectRASClass::intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const
+bool RectDeniedRegionClass::intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const
 {
     int rectIdx, deltaLon, deltaLat, dist;
     bool intersectFlag = false;
@@ -115,9 +115,9 @@ bool RectRASClass::intersect(double longitude, double latitude, double maxDist, 
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: CircleRASClass::CircleRASClass()                                       ****/
+/**** FUNCTION: CircleDeniedRegionClass::CircleDeniedRegionClass()                     ****/
 /******************************************************************************************/
-CircleRASClass::CircleRASClass(int idVal, bool horizonDistFlagVal) : RASClass(idVal), horizonDistFlag(horizonDistFlagVal)
+CircleDeniedRegionClass::CircleDeniedRegionClass(int idVal, bool horizonDistFlagVal) : DeniedRegionClass(idVal), horizonDistFlag(horizonDistFlagVal)
 {
     longitudeCenter = 0.0;
     latitudeCenter  = 0.0;
@@ -126,17 +126,17 @@ CircleRASClass::CircleRASClass(int idVal, bool horizonDistFlagVal) : RASClass(id
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: CircleRASClass::~CircleRASClass()                                      ****/
+/**** FUNCTION: CircleDeniedRegionClass::~CircleDeniedRegionClass()                    ****/
 /******************************************************************************************/
-CircleRASClass::~CircleRASClass()
+CircleDeniedRegionClass::~CircleDeniedRegionClass()
 {
 }
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: CircleRASClass::computeRadius()                                        ****/
+/**** FUNCTION: CircleDeniedRegionClass::computeRadius()                               ****/
 /******************************************************************************************/
-double CircleRASClass::computeRadius(double txHeightAGL) const
+double CircleDeniedRegionClass::computeRadius(double txHeightAGL) const
 {
     double returnVal;
 
@@ -151,11 +151,11 @@ double CircleRASClass::computeRadius(double txHeightAGL) const
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** FUNCTION: CircleRASClass::intersect()                                            ****/
+/**** FUNCTION: CircleDeniedRegionClass::intersect()                                   ****/
 /******************************************************************************************/
-bool CircleRASClass::intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const
+bool CircleDeniedRegionClass::intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const
 {
-    double rasRadius = computeRadius(txHeightAGL);
+    double drRadius = computeRadius(txHeightAGL);
 
     double deltaLon = longitudeCenter - longitude;
     double deltaLat = latitudeCenter - latitude;
@@ -164,7 +164,7 @@ bool CircleRASClass::intersect(double longitude, double latitude, double maxDist
 
     double dist = CConst::earthRadius*M_PI/180.0*( sqrt(deltaLat*deltaLat + deltaLon*deltaLon*cosSq) );
 
-    bool retval = (dist <= rasRadius + maxDist);
+    bool retval = (dist <= drRadius + maxDist);
 
     return(retval);
 }

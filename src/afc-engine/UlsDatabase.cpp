@@ -310,7 +310,7 @@ QSqlQuery runQueryWithBounds(const SqlScopedConnection<SqlExceptionDb>& db,
 	const QStringList& columns, const double& minLat, const double& maxLat, const double& minLon, const double& maxLon);
 QSqlQuery runQueryById(const SqlScopedConnection<SqlExceptionDb>& db, const QStringList& columns, const int& fsid);
 
-void UlsDatabase::loadFSById(const QString& dbName, std::vector<RASClass *>& rasList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target, const int& fsid)
+void UlsDatabase::loadFSById(const QString& dbName, std::vector<DeniedRegionClass *>& deniedRegionList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target, const int& fsid)
 {
 	LOGGER_DEBUG(logger) << "FSID: " << fsid;
 
@@ -328,11 +328,11 @@ void UlsDatabase::loadFSById(const QString& dbName, std::vector<RASClass *>& ras
 
 	verifyResult(ulsQueryRes);
 
-	fillTarget(db, rasList, antennaList, target, ulsQueryRes);
+	fillTarget(db, deniedRegionList, antennaList, target, ulsQueryRes);
 
 }
 
-void UlsDatabase::loadUlsData(const QString& dbName, std::vector<RASClass *>& rasList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target,
+void UlsDatabase::loadUlsData(const QString& dbName, std::vector<DeniedRegionClass *>& deniedRegionList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target,
 	const double& minLat, const double& maxLat, const double& minLon, const double& maxLon)
 {
 	LOGGER_DEBUG(logger) << "Bounds: " << minLat << ", " << maxLat << "; " << minLon << ", " << maxLon;
@@ -351,7 +351,7 @@ void UlsDatabase::loadUlsData(const QString& dbName, std::vector<RASClass *>& ra
 
 	verifyResult(ulsQueryRes);
 
-	fillTarget(db, rasList, antennaList, target, ulsQueryRes);
+	fillTarget(db, deniedRegionList, antennaList, target, ulsQueryRes);
 }
 
 QSqlQuery runQueryWithBounds(const SqlScopedConnection<SqlExceptionDb>& db,
@@ -382,7 +382,7 @@ QSqlQuery runQueryById(const SqlScopedConnection<SqlExceptionDb>& db, const QStr
 		.run();
 }
 
-void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vector<RASClass *>& rasList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target, QSqlQuery& q)
+void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vector<DeniedRegionClass *>& deniedRegionList, std::vector<AntennaClass *>& antennaList, std::vector<UlsRecord>& target, QSqlQuery& q)
 {
 	// resize vector to fit result
 	if (q.driver()->hasFeature(QSqlDriver::QuerySize))
@@ -432,62 +432,62 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 	while (rasQueryRes.next()) {
 		int rasid = rasQueryRes.value(ras_rasidIdx).toInt();
 		std::string exclusionZoneStr = rasQueryRes.value(ras_exclusionZoneIdx).toString().toStdString();
-		RASClass::RASExclusionZoneTypeEnum exclusionZoneType;
+		DeniedRegionClass::DeniedRegionGeometryEnum exclusionZoneType;
 
 		if (exclusionZoneStr == "One Rectangle") {
-			exclusionZoneType = RASClass::rectRASExclusionZoneType;
+			exclusionZoneType = DeniedRegionClass::rectDeniedRegionGeometry;
 		} else if (exclusionZoneStr == "Two Rectangles") {
-			exclusionZoneType = RASClass::rect2RASExclusionZoneType;
+			exclusionZoneType = DeniedRegionClass::rect2DeniedRegionGeometry;
 		} else if (exclusionZoneStr == "Circle") {
-			exclusionZoneType = RASClass::circleRASExclusionZoneType;
+			exclusionZoneType = DeniedRegionClass::circleDeniedRegionGeometry;
 		} else if (exclusionZoneStr == "Horizon Distance") {
-			exclusionZoneType = RASClass::horizonDistRASExclusionZoneType;
+			exclusionZoneType = DeniedRegionClass::horizonDistDeniedRegionGeometry;
 		} else {
 			CORE_DUMP;
 		}
 
-        RASClass *ras;
+        DeniedRegionClass *ras;
         switch(exclusionZoneType) {
-            case RASClass::rectRASExclusionZoneType:
-            case RASClass::rect2RASExclusionZoneType:
+            case DeniedRegionClass::rectDeniedRegionGeometry:
+            case DeniedRegionClass::rect2DeniedRegionGeometry:
             {
-                ras = (RASClass *) new RectRASClass(rasid);
+                ras = (DeniedRegionClass *) new RectDeniedRegionClass(rasid);
 
 			    double rect1lat1 = rasQueryRes.value(ras_rect1lat1Idx).toDouble();
 			    double rect1lat2 = rasQueryRes.value(ras_rect1lat2Idx).toDouble();
 			    double rect1lon1 = rasQueryRes.value(ras_rect1lon1Idx).toDouble();
 			    double rect1lon2 = rasQueryRes.value(ras_rect1lon2Idx).toDouble();
 
-                ((RectRASClass *) ras)->addRect(rect1lon1, rect1lon2, rect1lat1, rect1lat2);
+                ((RectDeniedRegionClass *) ras)->addRect(rect1lon1, rect1lon2, rect1lat1, rect1lat2);
 
-                if (exclusionZoneType == RASClass::rect2RASExclusionZoneType) {
+                if (exclusionZoneType == DeniedRegionClass::rect2DeniedRegionGeometry) {
 			        double rect2lat1 = rasQueryRes.value(ras_rect2lat1Idx).toDouble();
 			        double rect2lat2 = rasQueryRes.value(ras_rect2lat2Idx).toDouble();
 			        double rect2lon1 = rasQueryRes.value(ras_rect2lon1Idx).toDouble();
 			        double rect2lon2 = rasQueryRes.value(ras_rect2lon2Idx).toDouble();
 
-                    ((RectRASClass *) ras)->addRect(rect2lon1, rect2lon2, rect2lat1, rect2lat2);
+                    ((RectDeniedRegionClass *) ras)->addRect(rect2lon1, rect2lon2, rect2lat1, rect2lat2);
                 }
             }
                 break;
-            case RASClass::circleRASExclusionZoneType:
-            case RASClass::horizonDistRASExclusionZoneType:
+            case DeniedRegionClass::circleDeniedRegionGeometry:
+            case DeniedRegionClass::horizonDistDeniedRegionGeometry:
             {
                 double lonCircle = rasQueryRes.value(ras_centerLonIdx).toDouble();
                 double latCircle = rasQueryRes.value(ras_centerLatIdx).toDouble();
 
-                bool horizonDistFlag = (exclusionZoneType == RASClass::horizonDistRASExclusionZoneType);
+                bool horizonDistFlag = (exclusionZoneType == DeniedRegionClass::horizonDistDeniedRegionGeometry);
 
-                ras = (RASClass *) new CircleRASClass(rasid, horizonDistFlag);
+                ras = (DeniedRegionClass *) new CircleDeniedRegionClass(rasid, horizonDistFlag);
 
-                ((CircleRASClass *) ras)->setLongitudeCenter(lonCircle);
-                ((CircleRASClass *) ras)->setLatitudeCenter(latCircle);
+                ((CircleDeniedRegionClass *) ras)->setLongitudeCenter(lonCircle);
+                ((CircleDeniedRegionClass *) ras)->setLatitudeCenter(latCircle);
 
                 if (!horizonDistFlag) {
                     double radius = rasQueryRes.value(ras_radiusKmIdx).isNull() ? quietNaN
                                   : rasQueryRes.value(ras_radiusKmIdx).toDouble()*1.0e3; // Convert km to m
 
-                    ((CircleRASClass *) ras)->setRadius(radius);
+                    ((CircleDeniedRegionClass *) ras)->setRadius(radius);
                 } else {
                     /**************************************************************************/
                     /* heightAGL                                                              */
@@ -511,7 +511,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
         ras->setStartFreq(startFreq);
         ras->setStopFreq(stopFreq);
 
-        rasList.push_back(ras);
+        deniedRegionList.push_back(ras);
 	}
 	LOGGER_DEBUG(logger) << "READ " << numRAS << " entries from database ";
 	/**************************************************************************************/

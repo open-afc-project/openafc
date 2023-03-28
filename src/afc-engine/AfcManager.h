@@ -35,7 +35,7 @@
 #include "freq_band.h"
 #include "global_fn.h"
 #include "GdalHelpers.h"
-#include "ras.h"
+#include "denied_region.h"
 #include "readITUFiles.hpp"
 #include "str_type.h"
 #include "UlsDatabase.h"
@@ -175,7 +175,7 @@ class AfcManager
 		int findULSAntenna(std::string strval);
 		bool computeSpectralOverlapLoss(double *spectralOverlapLossDBptr, double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq, bool aciFlag, CConst::SpectralAlgorithmEnum spectralAlgorithm) const;
 
-		void readRASData(std::string filename);
+		void readDeniedRegionData(std::string filename);
 
 		void computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx,
 				CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
@@ -482,7 +482,8 @@ class AfcManager
 
 		ListClass<ULSClass *> *_ulsList;         // List of the FS stations that are being used in the analysis
 
-		std::vector<RASClass *> _rasList;         // List of the RAS (Radio Astronomy Stations) that each have exclusion zone.
+		std::vector<DeniedRegionClass *> _deniedRegionList;         // List of the denied regions.  This includes RAS (Radio Astronomy Stations) 
+                                                           // and other regions for which channels are denied.
 
 		std::shared_ptr<CachedGdal<uint8_t>> cgNlcd; // NLCD data accessor
 
