@@ -4,10 +4,10 @@ import { DynamicImport } from "./DynamicImport";
 import { NotFound } from "./NotFound/NotFound";
 import { Dashboard } from "./Dashboard/Dashboard";
 import { PageSection, Card, CardHeader } from "@patternfly/react-core";
-import { getAfcConfigFile, getRegions } from "./Lib/RatApi";
+import { getAfcConfigFile, getAllowedRanges, getRegions } from "./Lib/RatApi";
 import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv } from "./Lib/FileApi";
 import { UserAccountPage } from "./UserAccount/UserAccount";
-import { getUsers, getMinimumEIRP, Limit, getAllowedRanges } from "./Lib/Admin";
+import { getUsers, getMinimumEIRP, Limit,  } from "./Lib/Admin";
 import { Replay } from "./Replay/Replay"
 import { getLastUsedRegionFromCookie } from "./Lib/Utils";
 
@@ -87,6 +87,7 @@ const getAfcConfigModuleAsync = () => {
 const afcConfigResolves = async () => {
   var lastRegFromCookie = getLastUsedRegionFromCookie();
 
+
   return {
     conf: await getAfcConfigFile(lastRegFromCookie!),
     ulsFiles: await getUlsFiles(),
@@ -161,14 +162,15 @@ const getAdminModuleAsync = () => {
 const adminResolves = async () => ({
   users: await getUsers(),
   limit: await getMinimumEIRP(),
-  frequencyBands: await getAllowedRanges()
+  frequencyBands: await getAllowedRanges(),
+  regions: await getRegions()
 })
 const Admin = () => {
   return (
     <DynamicImport load={getAdminModuleAsync()} resolve={adminResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
-          : <Component.Admin users={resolve.users} limit={resolve.limit} frequencyBands={resolve.frequencyBands} />
+          : <Component.Admin users={resolve.users} limit={resolve.limit} frequencyBands={resolve.frequencyBands} regions={resolve.regions} />
       }}
     </DynamicImport>
   );

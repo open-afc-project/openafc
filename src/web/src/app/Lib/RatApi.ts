@@ -1,7 +1,8 @@
-import { GuiConfig, AFCConfigFile, PAWSRequest, PAWSResponse, AnalysisResults, RatResponse, ResSuccess, ResError, success, error, AFCEngineException, ExclusionZoneRequest, HeatMapRequest, ExclusionZoneResult, HeatMapResult, FreqRange } from "./RatApiTypes";
+import { GuiConfig, AFCConfigFile, PAWSRequest, PAWSResponse, AnalysisResults, RatResponse, ResSuccess, ResError, success, error, AFCEngineException, ExclusionZoneRequest, HeatMapRequest, ExclusionZoneResult, HeatMapResult, FreqRange, AllRegionsFreqRange, AllRegionsFreqRanges } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { delay } from "./Utils";
-import { hasRole} from "./User";
+import { hasRole } from "./User";
+import { resolve } from "path";
 
 /**
  * RatApi.ts: member values and functions for utilizing server ratpi services
@@ -52,11 +53,13 @@ const applicationCache: { [k: string]: any } = {};
 const defaultAfcConf: () => AFCConfigFile = () => ({
     "freqBands": [
         {
+            "region": "US",
             "name": "UNII-5",
             "startFreqMHz": 5925,
             "stopFreqMHz": 6425
         },
         {
+            "region": "US",
             "name": "UNII-7",
             "startFreqMHz": 6525,
             "stopFreqMHz": 6875
@@ -142,9 +145,10 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
 
 });
 
-const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
+const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "freqBands": [
         {
+            "region": "CA",
             "name": "Canada",
             "startFreqMHz": 5925,
             "stopFreqMHz": 6875
@@ -231,7 +235,34 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
     "deniedRegionFile": "",
 });
 
-
+const defaultAllRegionFreqRanges: () => AllRegionsFreqRanges = () => ({
+    version: guiConfig.version,
+    ranges: new Map<string, FreqRange[]>([
+        ["US", [
+            {
+                "region": "US",
+                "name": "UNII-5",
+                "startFreqMHz": 5925,
+                "stopFreqMHz": 6425
+            },
+            {
+                "region": "US",
+                "name": "UNII-7",
+                "startFreqMHz": 6525,
+                "stopFreqMHz": 6875
+            }
+        ]],
+        ["CA", [
+            {
+                "region": "CA",
+                "name": "Canada",
+                "startFreqMHz": 5925,
+                "stopFreqMHz": 6875
+            }
+        ]
+        ]
+    ])
+});
 // API Calls
 
 /**
@@ -258,7 +289,7 @@ export const getRegions = (): Promise<RatResponse<string[]>> => (
     fetch("../ratapi/v1/regions", {
         method: "GET"
     }).then(res => {
-        return  res.text();
+        return res.text();
     }).then(name => {
         return success(name.split(" "));
     }).catch(err => {
@@ -272,11 +303,11 @@ export const getRegions = (): Promise<RatResponse<string[]>> => (
  * @returns The default AFC Configuration
  */
 export const getDefaultAfcConf = (x: string | undefined) => {
-    if(x == "CA"){
+    if (x == "CA") {
         return defaultAfcConfCanada();
-    }else{
+    } else {
         return defaultAfcConf();
-    }   
+    }
 }
 
 /**
@@ -284,7 +315,7 @@ export const getDefaultAfcConf = (x: string | undefined) => {
  * The config will be scoped to the current user
  * @returns this user's current AFC Config or error
  */
-export const getAfcConfigFile = (region:string): Promise<RatResponse<AFCConfigFile>> => (
+export const getAfcConfigFile = (region: string): Promise<RatResponse<AFCConfigFile>> => (
     fetch(guiConfig.afcconfig_defaults.replace("default", region), {
         method: "GET",
     }).then(async (res: Response) => {
@@ -325,6 +356,113 @@ export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<strin
         return error("Unable to update configuration");
     })
 );
+
+/**
+ * Gets the admin supplied allowed frequency ranges for all regions. 
+ * @returns Success: An array of FreqBand indicating the admin approved ranges.  
+ *          Error: why it failed
+ */
+export const getAllowedRanges = () =>
+    fetch(guiConfig.admin_url.replace('-1', "frequency_range"), {
+        method: "GET",
+        headers: { "Content-Type": "application/json" }
+    }).then(
+        async res => {
+            if (res.ok) {
+                const data = await (res.json() as Promise<AllRegionsFreqRanges>);
+                // If the version is not the same, check that all the regions are present
+                if (data.version != guiConfig.version) {
+                    let defaults = defaultAllRegionFreqRanges();
+                    defaults.ranges.forEach((value: FreqRange[], key: string) => {
+                        // Add the default for missing regions
+                        if (!data.ranges.has(key)) {
+                            data.ranges.set(key, value);
+                        }
+                    });
+                }
+                return success(data);
+            } else if (res.status == 404) {
+                return success(defaultAllRegionFreqRanges())
+            }
+            else {
+                logger.error(res);
+                return error(res.statusText, res.status, (await res.json()) as any);
+            }
+        }
+    ).catch(
+        err => {
+            if (err instanceof TypeError) {
+                logger.error("Unable to read allowedFrequencies.json, substituting defaults")
+                return success(defaultAllRegionFreqRanges())
+            } else {
+                logger.error(err);
+                return error("Your request was unable to be processed", undefined, err);
+            }
+        }
+    )
+
+    function replacer(key, value) {
+        if(value instanceof Map) {
+          return {
+            dataType: 'Map',
+            value: Array.from(value.entries()), // or with spread: value: [...value]
+          };
+        } else {
+          return value;
+        }
+      }
+
+
+export const updateAllAllowedRanges = (allRanges: AllRegionsFreqRanges) => (
+    fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(allRanges, replacer)
+    }).then(res => {
+        if (res.status === 204) {
+            return success("Frequency Range(s) updated.");
+        }
+        else {
+            return error(res.statusText, res.status);
+        }
+    }).catch(err => {
+        logger.error(err);
+        return error("Unable to update frequency ranges.");
+    })
+);
+
+export const updateAllowedRanges = (regionStr: string, conf: FreqRange[]) => (
+    getAllowedRanges().then((res) => {
+        let allRanges: AllRegionsFreqRanges;
+        if (res.kind == "Success") {
+            allRanges = res.result;
+        } else {
+            allRanges = defaultAllRegionFreqRanges();
+        }
+        allRanges.ranges.set(regionStr, conf);
+        Promise.resolve(allRanges);
+    }).then((newData) => {
+        fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(newData)
+        }).then(res => {
+            if (res.status === 204) {
+                return success("Frequency Range(s) updated.");
+            }
+            else {
+                return error(res.statusText, res.status);
+            }
+        }).catch(err => {
+            logger.error(err);
+            return error("Unable to update frequency ranges.");
+        })
+    })
+);
+
+
+
+
 
 /**
  * Helper method in request polling

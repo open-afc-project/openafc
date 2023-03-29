@@ -68,7 +68,14 @@ export interface AFCConfigFile {
 export type FreqRange = {
     name: string,
     startFreqMHz: number,
-    stopFreqMHz: number
+    stopFreqMHz: number,
+    region?:string
+}
+
+export type AllRegionsFreqRanges = {
+    version: string,
+    // Map by regionStr into ranges
+    ranges: Map<string,FreqRange[]>
 }
 
 export type FSReceiverFeederLoss = {
