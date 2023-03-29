@@ -138,6 +138,8 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "printSkippedLinksFlag": false,
     "reportErrorRlanHeightLowFlag": false,
     "nearFieldAdjFlag": true,
+    "deniedRegionFile": "",
+
 });
 
 const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
@@ -226,6 +228,7 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
     "printSkippedLinksFlag": false,
     "reportErrorRlanHeightLowFlag": false,
     "nearFieldAdjFlag": false,
+    "deniedRegionFile": "rat_transfer/denied_region/denied_region_test.csv",
 });
 
 
