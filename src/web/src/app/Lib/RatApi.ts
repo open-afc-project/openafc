@@ -228,7 +228,7 @@ const defaultAfcConfCanada:  () => AFCConfigFile = () => ({
     "printSkippedLinksFlag": false,
     "reportErrorRlanHeightLowFlag": false,
     "nearFieldAdjFlag": false,
-    "deniedRegionFile": "rat_transfer/denied_region/denied_region_test.csv",
+    "deniedRegionFile": "",
 });
 
 
