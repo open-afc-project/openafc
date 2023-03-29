@@ -77,7 +77,8 @@ void RectDeniedRegionClass::addRect(double lon1, double lon2, double lat1, doubl
 /******************************************************************************************/
 bool RectDeniedRegionClass::intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const
 {
-    int rectIdx, deltaLon, deltaLat, dist;
+    int rectIdx;
+	double deltaLon, deltaLat, dist;
     bool intersectFlag = false;
     for(rectIdx=0; (rectIdx<(int) rectList.size())&&(!intersectFlag); ++rectIdx) {
         double rectLonStart, rectLonStop, rectLatStart, rectLatStop;

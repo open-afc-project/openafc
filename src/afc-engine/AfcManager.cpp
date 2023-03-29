@@ -762,11 +762,13 @@ void AfcManager::initializeDatabases()
 
 	for(int regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
 	    std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(regionPolygonFileStrList[regionIdx], _regionPolygonResolution);
+		double regionArea = 0.0;
 		for(int polyIdx=0; polyIdx<(int) polyList.size(); ++polyIdx) {
 			PolygonClass *poly = polyList[polyIdx];
-			std::cout << "REGION: " << poly->name << " AREA: " << poly->comp_bdy_area() << std::endl;
+            regionArea += poly->comp_bdy_area();
 			_regionPolygonList.push_back(poly);
 		}
+		LOGGER_INFO(logger) << "REGION: " << regionPolygonFileStrList[regionIdx] << " AREA: " << regionArea;
 	}
 
     double rlanLatitude, rlanLongitude, rlanHeightInput;
@@ -4903,12 +4905,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 							int validFlag;
 							rxAntennaType = (CConst::ULSAntennaTypeEnum) CConst::strULSAntennaTypeList->str_to_type(strval, validFlag, 0);
 							if (!validFlag) {
-								std::ostringstream errStr;
-								errStr << "Invalid ULS data for FSID = " << fsid
-									<< ", Unknown Rx Antenna \"" << strval
-									<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
-								LOGGER_WARN(logger) << errStr.str();
-								statusMessageList.push_back(errStr.str());
+								// std::ostringstream errStr;
+								// errStr << "Invalid ULS data for FSID = " << fsid
+								// 	<< ", Unknown Rx Antenna \"" << strval
+								// 	<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
+								// LOGGER_WARN(logger) << errStr.str();
+								// statusMessageList.push_back(errStr.str());
 
 								rxAntennaType = _ulsDefaultAntennaType;
 							}
@@ -5321,12 +5323,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								std::string strval = row.prAntModelName[prIdx];
 								pr.antennaType = (CConst::ULSAntennaTypeEnum) CConst::strULSAntennaTypeList->str_to_type(strval, validFlag, 0);
 								if (!validFlag) {
-									std::ostringstream errStr;
-									errStr << "Invalid ULS data for FSID = " << fsid
-										<< ", Unknown Passive Repeater Antenna \"" << strval
-										<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
-									LOGGER_WARN(logger) << errStr.str();
-									statusMessageList.push_back(errStr.str());
+									// std::ostringstream errStr;
+									// errStr << "Invalid ULS data for FSID = " << fsid
+									// 	<< ", Unknown Passive Repeater Antenna \"" << strval
+									// 	<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
+									// LOGGER_WARN(logger) << errStr.str();
+									// statusMessageList.push_back(errStr.str());
 
 									pr.antennaType = _ulsDefaultAntennaType;
 								}
@@ -7055,15 +7057,69 @@ void AfcManager::runPointAnalysis()
 				(latDistR * latDistR + lonDistR * lonDistR * cosLatSq);
 		});
 
-	double heightUncertainty = _rlanRegion->getHeightUncertainty();
-	int NHt = (int) ceil(heightUncertainty / _scanres_ht);
-	Vector3 rlanPosnList[2*NHt+1];
-	GeodeticCoord rlanCoordList[2*NHt+1];
-
 	/**************************************************************************************/
 	/* Get Uncertainty Region Scan Points                                                 */
+	/* scanPointList: scan points in horizontal plane (lon/lat)                           */
+	/* For scan point scanPtIdx, numRlanHt[scanPtIdx] heights are considered.             */
 	/**************************************************************************************/
 	std::vector<LatLon> scanPointList = _rlanRegion->getScan(_scanRegionMethod, _scanres_xy, _scanres_points_per_degree);
+
+	double heightUncertainty = _rlanRegion->getHeightUncertainty();
+	int NHt = (int) ceil(heightUncertainty / _scanres_ht);
+	Vector3 rlanPosnList[scanPointList.size()][2*NHt+1];
+	GeodeticCoord rlanCoordList[scanPointList.size()][2*NHt+1];
+	int numRlanHt[scanPointList.size()];
+	double rlanTerrainHeight[scanPointList.size()];
+	CConst::HeightSourceEnum rlanHeightSource[scanPointList.size()];
+	CConst::PropEnvEnum rlanPropEnv[scanPointList.size()];
+	CConst::NLCDLandCatEnum rlanNlcdLandCat[scanPointList.size()];
+
+	int scanPtIdx, rlanHtIdx;
+	for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
+		LatLon scanPt = scanPointList[scanPtIdx];
+
+		double bldgHeight;
+		MultibandRasterClass::HeightResult lidarHeightResult;
+		_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight[scanPtIdx], bldgHeight, lidarHeightResult, rlanHeightSource[scanPtIdx]);
+
+		double height0;
+		if (_rlanRegion->getFixedHeightAMSL()) {
+			height0 = _rlanRegion->getCenterHeightAMSL();
+		} else {
+			height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight[scanPtIdx];
+		}
+
+		int htIdx;
+		numRlanHt[scanPtIdx] = 0;
+		bool lowHeightFlag = false;
+		for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
+			double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
+			double heightAGL  = heightAMSL - rlanTerrainHeight[scanPtIdx];
+			bool useFlag;
+			if (heightAGL < _minRlanHeightAboveTerrain) {
+				switch(_scanPointBelowGroundMethod) {
+					case CConst::DiscardScanPointBelowGroundMethod:
+						useFlag = false;
+						break;
+					case CConst::TruncateScanPointBelowGroundMethod:
+						heightAMSL = rlanTerrainHeight[scanPtIdx] + _minRlanHeightAboveTerrain;
+						useFlag = true;
+						break;
+					default: CORE_DUMP; break;
+				}
+				lowHeightFlag = true;
+			} else {
+				useFlag = true;
+			}
+			if (useFlag) {
+				rlanCoordList[scanPtIdx][htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, heightAMSL/1000.0);
+				rlanPosnList[scanPtIdx][htIdx] = EcefModel::fromGeodetic(rlanCoordList[scanPtIdx][htIdx]);
+				numRlanHt[scanPtIdx]++;
+			}
+		}
+
+		rlanPropEnv[scanPtIdx] = computePropEnv(scanPt.second, scanPt.first, rlanNlcdLandCat[scanPtIdx]);
+	}
 	/**************************************************************************************/
 
 	/**************************************************************************************/
@@ -7320,54 +7376,21 @@ void AfcManager::runPointAnalysis()
 		fkml->writeStartElement("Folder");
 		fkml->writeTextElement("name", "SCAN POINTS");
 
-		for(ptIdx=0; ptIdx<(int) scanPointList.size(); ptIdx++) {
-			LatLon scanPt = scanPointList[ptIdx];
+		for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
+			LatLon scanPt = scanPointList[scanPtIdx];
 
-			double rlanTerrainHeight, bldgHeight;
-			MultibandRasterClass::HeightResult lidarHeightResult;
-			CConst::HeightSourceEnum rlanHeightSource;
-			_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight,bldgHeight, lidarHeightResult, rlanHeightSource);
+			for (rlanHtIdx = 0; rlanHtIdx < numRlanHt[scanPtIdx]; ++rlanHtIdx) {
+				double heightAMSL = rlanCoordList[scanPtIdx][rlanHtIdx].heightKm * 1000;
 
-			double height0;
-			if (_rlanRegion->getFixedHeightAMSL()) {
-				height0 = _rlanRegion->getCenterHeightAMSL();
-			} else {
-				height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
-			}
-
-			int htIdx;
-			bool lowHeightFlag = false;
-			for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-				double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
-				double heightAGL  = heightAMSL - rlanTerrainHeight;
-				bool useFlag;
-				if (heightAGL < _minRlanHeightAboveTerrain) {
-					switch(_scanPointBelowGroundMethod) {
-						case CConst::DiscardScanPointBelowGroundMethod:
-							useFlag = false;
-							break;
-						case CConst::TruncateScanPointBelowGroundMethod:
-							heightAMSL = rlanTerrainHeight + _minRlanHeightAboveTerrain;
-							useFlag = true;
-							break;
-						default: CORE_DUMP; break;
-					}
-					lowHeightFlag = true;
-				} else {
-					useFlag = true;
-				}
-
-				if (useFlag) {
-					fkml->writeStartElement("Placemark");
-					fkml->writeTextElement("name", QString::asprintf("SCAN_POINT_%d_%d", ptIdx, htIdx));
-					fkml->writeTextElement("visibility", "1");
-					fkml->writeTextElement("styleUrl", "#dotStyle");
-					fkml->writeStartElement("Point");
-					fkml->writeTextElement("altitudeMode", "absolute");
-					fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", scanPt.second, scanPt.first, heightAMSL));
-					fkml->writeEndElement(); // Point
-					fkml->writeEndElement(); // Placemark
-				}
+				fkml->writeStartElement("Placemark");
+				fkml->writeTextElement("name", QString::asprintf("SCAN_POINT_%d_%d", scanPtIdx, rlanHtIdx));
+				fkml->writeTextElement("visibility", "1");
+				fkml->writeTextElement("styleUrl", "#dotStyle");
+				fkml->writeStartElement("Point");
+				fkml->writeTextElement("altitudeMode", "absolute");
+				fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", scanPt.second, scanPt.first, heightAMSL));
+				fkml->writeEndElement(); // Point
+				fkml->writeEndElement(); // Placemark
 			}
 		}
 
@@ -7517,22 +7540,31 @@ void AfcManager::runPointAnalysis()
 #   endif
 
 	int drIdx;
-	double rlanRegionMaxDist = _rlanRegion->getMaxDist();
-	double rlanRegionMaxHeightAGL = _rlanRegion->getMaxHeightAGL();
 	for (drIdx = 0; drIdx < (int) _deniedRegionList.size(); ++drIdx) {
 		DeniedRegionClass *dr = _deniedRegionList[drIdx];
-		if (dr->intersect(_rlanRegion->getCenterLongitude(), _rlanRegion->getCenterLatitude(), rlanRegionMaxDist, rlanRegionMaxHeightAGL)) {
-			int chanIdx;
-			for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
-				ChannelStruct *channel = &(_channelList[chanIdx]);
-				if (channel->availability != BLACK) {
-					double chanStartFreq = channel->startFreqMHz * 1.0e6;
-					double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-					bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, dr->getStartFreq(), dr->getStopFreq(), false, CConst::psdSpectralAlgorithm);
-					if (hasOverlap) {
-						channel->availability = BLACK;
-						channel->eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+		bool foundScanPointInDR = false;
+		for(scanPtIdx=0; (scanPtIdx<(int) scanPointList.size())&&(!foundScanPointInDR); scanPtIdx++) {
+			if (numRlanHt[scanPtIdx]) {
+				rlanHtIdx = 0;
+
+				GeodeticCoord rlanCoord = rlanCoordList[scanPtIdx][rlanHtIdx];
+				double rlanHeightAGL = (rlanCoord.heightKm * 1000) - rlanTerrainHeight[scanPtIdx];
+
+				if (dr->intersect(rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, 0.0, rlanHeightAGL)) {
+					int chanIdx;
+					for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
+						ChannelStruct *channel = &(_channelList[chanIdx]);
+						if (channel->availability != BLACK) {
+							double chanStartFreq = channel->startFreqMHz * 1.0e6;
+							double chanStopFreq = channel->stopFreqMHz * 1.0e6;
+							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, dr->getStartFreq(), dr->getStopFreq(), false, CConst::psdSpectralAlgorithm);
+							if (hasOverlap) {
+								channel->availability = BLACK;
+								channel->eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+							}
+						}
 					}
+					foundScanPointInDR = true;
 				}
 			}
 		}
@@ -7706,25 +7738,13 @@ void AfcManager::runPointAnalysis()
 
 					contains3D = false;
 					if (contains2D) {
-						int scanPtIdx;
 						for(scanPtIdx=0; (scanPtIdx<(int) scanPointList.size())&&(!contains3D); scanPtIdx++) {
-							LatLon scanPt = scanPointList[scanPtIdx];
-
-							double rlanTerrainHeight, bldgHeight;
-							MultibandRasterClass::HeightResult lidarHeightResult;
-							CConst::HeightSourceEnum rlanHeightSource;
-							_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
-
-							double height0;
-							if (_rlanRegion->getFixedHeightAMSL()) {
-								height0 = _rlanRegion->getCenterHeightAMSL();
-							} else {
-								height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
-							}
-							double minHeight = height0 - heightUncertainty;
-							double maxHeight = height0 + heightUncertainty;
-							if ((ulsRxHeightAMSL >= minHeight) && (ulsRxHeightAMSL <= maxHeight)) {
-								contains3D = true;
+							if (numRlanHt[scanPtIdx]) {
+								double minHeight = rlanCoordList[scanPtIdx][numRlanHt[scanPtIdx]-1].heightKm * 1000;
+								double maxHeight = rlanCoordList[scanPtIdx][0].heightKm * 1000;
+								if ((ulsRxHeightAMSL >= minHeight) && (ulsRxHeightAMSL <= maxHeight)) {
+									contains3D = true;
+								}
 							}
 						}
 					}
@@ -7757,28 +7777,8 @@ void AfcManager::runPointAnalysis()
 						minRLANDist = 0.0;
 					} else {
 
-						int scanPtIdx;
 						for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
 							LatLon scanPt = scanPointList[scanPtIdx];
-
-							/**************************************************************************************/
-							/* Determine propagation environment of RLAN using scan point                         */
-							/**************************************************************************************/
-							CConst::NLCDLandCatEnum nlcdLandCatTx;
-							CConst::PropEnvEnum rlanPropEnv = computePropEnv(scanPt.second, scanPt.first, nlcdLandCatTx);
-							/**************************************************************************************/
-
-							double rlanTerrainHeight, bldgHeight;
-							MultibandRasterClass::HeightResult lidarHeightResult;
-							CConst::HeightSourceEnum rlanHeightSource;
-							_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
-
-							double height0;
-							if (_rlanRegion->getFixedHeightAMSL()) {
-								height0 = _rlanRegion->getCenterHeightAMSL();
-							} else {
-								height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
-							}
 
 							// Use Haversine formula with average earth radius of 6371 km
 							double groundDistanceKm;
@@ -7792,41 +7792,10 @@ void AfcManager::runPointAnalysis()
 								groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
 							}
 
-							int htIdx;
-							int numRlanPosn = 0;
-							bool lowHeightFlag = false;
-							for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-								double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
-								double heightAGL  = heightAMSL - rlanTerrainHeight;
-								bool useFlag;
-								if (heightAGL < _minRlanHeightAboveTerrain) {
-									switch(_scanPointBelowGroundMethod) {
-										case CConst::DiscardScanPointBelowGroundMethod:
-											useFlag = false;
-											break;
-										case CConst::TruncateScanPointBelowGroundMethod:
-											heightAMSL = rlanTerrainHeight + _minRlanHeightAboveTerrain;
-											useFlag = true;
-											break;
-										default: CORE_DUMP; break;
-									}
-									lowHeightFlag = true;
-								} else {
-									useFlag = true;
-								}
-								if (useFlag) {
-									rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, heightAMSL/1000.0);
-									rlanPosnList[htIdx] = EcefModel::fromGeodetic(rlanCoordList[htIdx]);
-									numRlanPosn++;
-								}
-							}
-
-							int rlanPosnIdx;
-
-							for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx)
+							for (rlanHtIdx = 0; rlanHtIdx < numRlanHt[scanPtIdx]; ++rlanHtIdx)
 							{
-								Vector3 rlanPosn = rlanPosnList[rlanPosnIdx];
-								GeodeticCoord rlanCoord = rlanCoordList[rlanPosnIdx];
+								Vector3 rlanPosn = rlanPosnList[scanPtIdx][rlanHtIdx];
+								GeodeticCoord rlanCoord = rlanCoordList[scanPtIdx][rlanHtIdx];
 								lineOfSightVectorKm = ulsRxPos - rlanPosn;
 								double distKm = lineOfSightVectorKm.len();
 								double win2DistKm;
@@ -7895,7 +7864,7 @@ void AfcManager::runPointAnalysis()
 											double reflectorD0;
 											double reflectorD1;
 
-											double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
+											double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight[scanPtIdx];
 
 											// Trying Free Space Path Loss then (if not skipped) - configured Path Loss.
 											bool skip = false;
@@ -7904,7 +7873,7 @@ void AfcManager::runPointAnalysis()
 													// Possible if FSPL distance is horizontal. This should be extremely rare
 													continue;
 												}
-												computePathLoss((forceFspl || contains2D) ? CConst::FSPLPathLossModel : _pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx,
+												computePathLoss((forceFspl || contains2D) ? CConst::FSPLPathLossModel : _pathLossModel, rlanPropEnv[scanPtIdx], fsPropEnv, rlanNlcdLandCat[scanPtIdx],
 														nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 														rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 														ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
@@ -7983,8 +7952,8 @@ void AfcManager::runPointAnalysis()
 													eirpGc.buildingPenetrationDb = buildingPenetrationDB;
 													eirpGc.offBoresight = angleOffBoresightDeg;
 													eirpGc.rxGainDb = rxGainDB;
-													eirpGc.txPropEnv = rlanPropEnv;
-													eirpGc.nlcdTx = nlcdLandCatTx;
+													eirpGc.txPropEnv = rlanPropEnv[scanPtIdx];
+													eirpGc.nlcdTx = rlanNlcdLandCat[scanPtIdx];
 													eirpGc.pathClutterTxModel = pathClutterTxModelStr;
 													eirpGc.pathClutterTxDb = pathClutterTxDB;
 													eirpGc.txClutter = txClutterStr;
@@ -8097,7 +8066,7 @@ void AfcManager::runPointAnalysis()
 												excthrGc.fsid = uls->getID();
 												excthrGc.region = uls->getRegion();
 												excthrGc.dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
-												excthrGc.rlanPosnIdx = rlanPosnIdx;
+												excthrGc.rlanPosnIdx = rlanHtIdx;
 												excthrGc.callsign = uls->getCallsign();
 												excthrGc.fsLon = uls->getRxLongitudeDeg();
 												excthrGc.fsLat = uls->getRxLatitudeDeg();
@@ -8122,10 +8091,10 @@ void AfcManager::runPointAnalysis()
 
 												excthrGc.rlanLon = rlanCoord.longitudeDeg;
 												excthrGc.rlanLat = rlanCoord.latitudeDeg;
-												excthrGc.rlanAgl =rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
-												excthrGc.rlanTerrainHeight = rlanTerrainHeight;
-												excthrGc.rlanTerrainSource = _terrainDataModel->getSourceName(rlanHeightSource);
-												excthrGc.rlanPropEnv = CConst::strPropEnvList->type_to_str(rlanPropEnv);
+												excthrGc.rlanAgl =rlanCoord.heightKm * 1000.0 - rlanTerrainHeight[scanPtIdx];
+												excthrGc.rlanTerrainHeight = rlanTerrainHeight[scanPtIdx];
+												excthrGc.rlanTerrainSource = _terrainDataModel->getSourceName(rlanHeightSource[scanPtIdx]);
+												excthrGc.rlanPropEnv = CConst::strPropEnvList->type_to_str(rlanPropEnv[scanPtIdx]);
 												excthrGc.rlanFsDist = distKm;
 												excthrGc.rlanFsGroundDist = groundDistanceKm;
 												excthrGc.rlanElevAngle = elevationAngleTxDeg;
@@ -8221,7 +8190,7 @@ void AfcManager::runPointAnalysis()
 											pathTraceGc.divIdx = divIdx;
 											pathTraceGc.segIdx = segIdx;
 											pathTraceGc.scanPtIdx = scanPtIdx;
-											pathTraceGc.rlanHtIdx = rlanPosnIdx;
+											pathTraceGc.rlanHtIdx = rlanHtIdx;
 											pathTraceGc.completeRow();
 										}
 									}
