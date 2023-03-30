@@ -5568,7 +5568,7 @@ void AfcManager::readDeniedRegionData(std::string filename)
 
 	int drid;
 	double startFreq, stopFreq;
-	DeniedRegionClass::DeniedRegionGeometryEnum exclusionZoneType;
+	DeniedRegionClass::GeometryEnum exclusionZoneType;
 	double lat1Rect1, lat2Rect1, lon1Rect1, lon2Rect1;
 	double lat1Rect2, lat2Rect2, lon1Rect2, lon2Rect2;
 	double radius;
@@ -5688,13 +5688,13 @@ void AfcManager::readDeniedRegionData(std::string filename)
 				strval = fieldList.at(exclusionZoneTypeFieldIdx);
 
 				if (strval == "One Rectangle") {
-					exclusionZoneType = DeniedRegionClass::rectDeniedRegionGeometry;
+					exclusionZoneType = DeniedRegionClass::rectGeometry;
 				} else if (strval == "Two Rectangles") {
-					exclusionZoneType = DeniedRegionClass::rect2DeniedRegionGeometry;
+					exclusionZoneType = DeniedRegionClass::rect2Geometry;
 				} else if (strval == "Circle") {
-					exclusionZoneType = DeniedRegionClass::circleDeniedRegionGeometry;
+					exclusionZoneType = DeniedRegionClass::circleGeometry;
 				} else if (strval == "Horizon Distance") {
-					exclusionZoneType = DeniedRegionClass::horizonDistDeniedRegionGeometry;
+					exclusionZoneType = DeniedRegionClass::horizonDistGeometry;
 				} else {
 					errStr << "ERROR: Invalid Denied Region Data file \"" << filename << "\" line " << linenum << " exclusion zone set to unrecognized value " << strval << std::endl;
 					throw std::runtime_error(errStr.str());
@@ -5704,8 +5704,8 @@ void AfcManager::readDeniedRegionData(std::string filename)
 				drid = (_deniedRegionList.size() ? _deniedRegionList[_deniedRegionList.size()-1]->getID() + 1 : 0);
 
 				switch(exclusionZoneType) {
-					case DeniedRegionClass::rectDeniedRegionGeometry:
-					case DeniedRegionClass::rect2DeniedRegionGeometry:
+					case DeniedRegionClass::rectGeometry:
+					case DeniedRegionClass::rect2Geometry:
 						dr = (DeniedRegionClass *) new RectDeniedRegionClass(drid);
 
 						strval = fieldList.at(lat1Rect1FieldIdx);
@@ -5718,7 +5718,7 @@ void AfcManager::readDeniedRegionData(std::string filename)
 						lon2Rect1 = getAngleFromDMS(strval);
 						((RectDeniedRegionClass *) dr)->addRect(lon1Rect1, lon2Rect1, lat1Rect1, lat2Rect1);
 
-						if (exclusionZoneType == DeniedRegionClass::rect2DeniedRegionGeometry) {
+						if (exclusionZoneType == DeniedRegionClass::rect2Geometry) {
 							strval = fieldList.at(lat1Rect2FieldIdx);
 							lat1Rect2 = getAngleFromDMS(strval);
 							strval = fieldList.at(lat2Rect2FieldIdx);
@@ -5730,14 +5730,14 @@ void AfcManager::readDeniedRegionData(std::string filename)
 							((RectDeniedRegionClass *) dr)->addRect(lon1Rect2, lon2Rect2, lat1Rect2, lat2Rect2);
 						}
 						break;
-					case DeniedRegionClass::circleDeniedRegionGeometry:
-					case DeniedRegionClass::horizonDistDeniedRegionGeometry:
+					case DeniedRegionClass::circleGeometry:
+					case DeniedRegionClass::horizonDistGeometry:
 						strval = fieldList.at(lonCircleFieldIdx);
 						lonCircle = getAngleFromDMS(strval);
 						strval = fieldList.at(latCircleFieldIdx);
 						latCircle = getAngleFromDMS(strval);
 
-						horizonDistFlag = (exclusionZoneType == DeniedRegionClass::horizonDistDeniedRegionGeometry);
+						horizonDistFlag = (exclusionZoneType == DeniedRegionClass::horizonDistGeometry);
 
 						dr = (DeniedRegionClass *) new CircleDeniedRegionClass(drid, horizonDistFlag);
 
@@ -5772,9 +5772,10 @@ void AfcManager::readDeniedRegionData(std::string filename)
 						break;
 				}
 
-				_deniedRegionList.push_back(dr);
 				dr->setStartFreq(startFreq);
 				dr->setStopFreq(stopFreq);
+				dr->setType(DeniedRegionClass::userSpecifiedType);
+				_deniedRegionList.push_back(dr);
 
 				break;
 			case  ignoreLineType:
@@ -7404,9 +7405,22 @@ void AfcManager::runPointAnalysis()
 		int drIdx;
 		for (drIdx = 0; drIdx < (int) _deniedRegionList.size(); ++drIdx) {
 			DeniedRegionClass *dr = _deniedRegionList[drIdx];
+			DeniedRegionClass::TypeEnum drType = dr->getType();
+			std::string pfx;
+			switch(drType) {
+				case DeniedRegionClass::RASType:
+					pfx = "RAS_";
+					break;
+				case DeniedRegionClass::userSpecifiedType:
+					pfx = "USER_SPEC_";
+					break;
+				default:
+					CORE_DUMP;
+					break;
+			}
 
 			fkml->writeStartElement("Folder");
-			fkml->writeTextElement("name", QString("DR_") + QString::number(dr->getID()));
+			fkml->writeTextElement("name", QString::fromStdString(pfx) + QString::number(dr->getID()));
 
 			int numPtsCircle = 32;
 			int rectIdx, numRect;
@@ -7420,10 +7434,10 @@ void AfcManager::runPointAnalysis()
 			QString dr_coords;
 			MultibandRasterClass::HeightResult drLidarHeightResult;
 			CConst::HeightSourceEnum drHeightSource;
-			DeniedRegionClass::DeniedRegionGeometryEnum drType = dr->type();
-			switch(drType) {
-				case DeniedRegionClass::rectDeniedRegionGeometry:
-				case DeniedRegionClass::rect2DeniedRegionGeometry:
+			DeniedRegionClass::GeometryEnum drGeometry = dr->getGeometry();
+			switch(drGeometry) {
+				case DeniedRegionClass::rectGeometry:
+				case DeniedRegionClass::rect2Geometry:
 					numRect = ((RectDeniedRegionClass *) dr)->getNumRect();
 					for(rectIdx=0; rectIdx<numRect; rectIdx++) {
 						std::tie(rectLonStart, rectLonStop, rectLatStart, rectLatStop) = ((RectDeniedRegionClass *) dr)->getRect(rectIdx);
@@ -7453,8 +7467,8 @@ void AfcManager::runPointAnalysis()
 						fkml->writeEndElement(); // Placemark
 					}
 					break;
-				case DeniedRegionClass::circleDeniedRegionGeometry:
-				case DeniedRegionClass::horizonDistDeniedRegionGeometry:
+				case DeniedRegionClass::circleGeometry:
+				case DeniedRegionClass::horizonDistGeometry:
 					circleRadius = ((CircleDeniedRegionClass *) dr)->computeRadius(_rlanRegion->getMaxHeightAGL());
 					longitudeCenter = ((CircleDeniedRegionClass *) dr)->getLongitudeCenter();
 					latitudeCenter = ((CircleDeniedRegionClass *) dr)->getLatitudeCenter();
@@ -7467,7 +7481,7 @@ void AfcManager::runPointAnalysis()
 					drNorthVec = drUpVec.cross(drEastVec);
 
 					fkml->writeStartElement("Placemark");
-					fkml->writeTextElement("name", QString("RECT_") + QString::number(rectIdx));
+					fkml->writeTextElement("name", QString("CIRCLE"));
 					fkml->writeTextElement("visibility", "1");
 					fkml->writeTextElement("styleUrl", "#transBluePoly");
 					fkml->writeStartElement("Polygon");
@@ -8881,10 +8895,10 @@ void AfcManager::runScanAnalysis()
 			QString dr_coords;
 			MultibandRasterClass::HeightResult drLidarHeightResult;
 			CConst::HeightSourceEnum drHeightSource;
-			DeniedRegionClass::DeniedRegionGeometryEnum drType = dr->type();
-			switch(drType) {
-				case DeniedRegionClass::rectDeniedRegionGeometry:
-				case DeniedRegionClass::rect2DeniedRegionGeometry:
+			DeniedRegionClass::GeometryEnum drGeometry = dr->getGeometry();
+			switch(drGeometry) {
+				case DeniedRegionClass::rectGeometry:
+				case DeniedRegionClass::rect2Geometry:
 					numRect = ((RectDeniedRegionClass *) dr)->getNumRect();
 					for(rectIdx=0; rectIdx<numRect; rectIdx++) {
 						std::tie(rectLonStart, rectLonStop, rectLatStart, rectLatStop) = ((RectDeniedRegionClass *) dr)->getRect(rectIdx);
@@ -8914,8 +8928,8 @@ void AfcManager::runScanAnalysis()
 						fkml->writeEndElement(); // Placemark
 					}
 					break;
-				case DeniedRegionClass::circleDeniedRegionGeometry:
-				case DeniedRegionClass::horizonDistDeniedRegionGeometry:
+				case DeniedRegionClass::circleGeometry:
+				case DeniedRegionClass::horizonDistGeometry:
 					circleRadius = ((CircleDeniedRegionClass *) dr)->computeRadius(_rlanRegion->getMaxHeightAGL());
 					longitudeCenter = ((CircleDeniedRegionClass *) dr)->getLongitudeCenter();
 					latitudeCenter = ((CircleDeniedRegionClass *) dr)->getLatitudeCenter();

@@ -28,6 +28,7 @@ namespace
 /******************************************************************************************/
 DeniedRegionClass::DeniedRegionClass(int idVal) : id(idVal)
 {
+	type = nullType;
     startFreq = -1.0;
     stopFreq = -1.0;
     heightAGL = -1.0;

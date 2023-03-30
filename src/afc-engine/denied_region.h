@@ -26,24 +26,37 @@ class DeniedRegionClass
 		virtual ~DeniedRegionClass();
 
 		/**************************************************************************************/
-		/**** DeniedRegionGeometry                                                         ****/
+		/**** Geometry                                                                     ****/
 		/**************************************************************************************/
-		enum DeniedRegionGeometryEnum {
-			nullDeniedRegionGeometry,
-			rectDeniedRegionGeometry,
-			rect2DeniedRegionGeometry,
-			circleDeniedRegionGeometry,
-			horizonDistDeniedRegionGeometry
+		enum GeometryEnum {
+			nullGeometry,
+			rectGeometry,
+			rect2Geometry,
+			circleGeometry,
+			horizonDistGeometry
 		};
 		/**************************************************************************************/
 
-		virtual DeniedRegionGeometryEnum type() const = 0;
+		/**************************************************************************************/
+		/**** Type                                                                         ****/
+		/**************************************************************************************/
+		enum TypeEnum {
+			nullType,
+			RASType,
+			userSpecifiedType
+		};
+		/**************************************************************************************/
+
+		virtual GeometryEnum getGeometry() const = 0;
 
 		virtual bool intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const = 0;
 
 		int getID() const {
 			return id;
 		}
+
+		TypeEnum getType() const { return(type); }
+        void setType(TypeEnum typeVal) { type = typeVal; }
 
 		void setStartFreq(double startFreqVal) { startFreq = startFreqVal; return; }
 		void setStopFreq (double  stopFreqVal) { stopFreq  =  stopFreqVal; return; }
@@ -55,6 +68,7 @@ class DeniedRegionClass
 
 	protected:
 		int id;
+		TypeEnum type;
 
 		double startFreq;
 		double stopFreq;
@@ -72,13 +86,13 @@ class RectDeniedRegionClass : public DeniedRegionClass
 		RectDeniedRegionClass(int idVal);
 		~RectDeniedRegionClass();
 
-		DeniedRegionGeometryEnum type() const {
+		GeometryEnum getGeometry() const {
 			if (rectList.size() == 1) {
-				return rectDeniedRegionGeometry;
+				return rectGeometry;
 			} else if (rectList.size() == 2) {
-				return rect2DeniedRegionGeometry;
+				return rect2Geometry;
 			} else {
-				return nullDeniedRegionGeometry;
+				return nullGeometry;
 			}
 		}
 
@@ -103,11 +117,11 @@ class CircleDeniedRegionClass : public DeniedRegionClass
 		CircleDeniedRegionClass(int idVal, bool horizonDistFlagVal);
 		~CircleDeniedRegionClass();
 
-		DeniedRegionGeometryEnum type() const {
+		GeometryEnum getGeometry() const {
 			if (!horizonDistFlag) {
-				return circleDeniedRegionGeometry;
+				return circleGeometry;
 			} else {
-				return horizonDistDeniedRegionGeometry;
+				return horizonDistGeometry;
 			}
 		}
 

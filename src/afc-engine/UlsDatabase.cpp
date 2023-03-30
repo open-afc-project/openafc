@@ -432,24 +432,24 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 	while (rasQueryRes.next()) {
 		int rasid = rasQueryRes.value(ras_rasidIdx).toInt();
 		std::string exclusionZoneStr = rasQueryRes.value(ras_exclusionZoneIdx).toString().toStdString();
-		DeniedRegionClass::DeniedRegionGeometryEnum exclusionZoneType;
+		DeniedRegionClass::GeometryEnum exclusionZoneType;
 
 		if (exclusionZoneStr == "One Rectangle") {
-			exclusionZoneType = DeniedRegionClass::rectDeniedRegionGeometry;
+			exclusionZoneType = DeniedRegionClass::rectGeometry;
 		} else if (exclusionZoneStr == "Two Rectangles") {
-			exclusionZoneType = DeniedRegionClass::rect2DeniedRegionGeometry;
+			exclusionZoneType = DeniedRegionClass::rect2Geometry;
 		} else if (exclusionZoneStr == "Circle") {
-			exclusionZoneType = DeniedRegionClass::circleDeniedRegionGeometry;
+			exclusionZoneType = DeniedRegionClass::circleGeometry;
 		} else if (exclusionZoneStr == "Horizon Distance") {
-			exclusionZoneType = DeniedRegionClass::horizonDistDeniedRegionGeometry;
+			exclusionZoneType = DeniedRegionClass::horizonDistGeometry;
 		} else {
 			CORE_DUMP;
 		}
 
         DeniedRegionClass *ras;
         switch(exclusionZoneType) {
-            case DeniedRegionClass::rectDeniedRegionGeometry:
-            case DeniedRegionClass::rect2DeniedRegionGeometry:
+            case DeniedRegionClass::rectGeometry:
+            case DeniedRegionClass::rect2Geometry:
             {
                 ras = (DeniedRegionClass *) new RectDeniedRegionClass(rasid);
 
@@ -460,7 +460,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 
                 ((RectDeniedRegionClass *) ras)->addRect(rect1lon1, rect1lon2, rect1lat1, rect1lat2);
 
-                if (exclusionZoneType == DeniedRegionClass::rect2DeniedRegionGeometry) {
+                if (exclusionZoneType == DeniedRegionClass::rect2Geometry) {
 			        double rect2lat1 = rasQueryRes.value(ras_rect2lat1Idx).toDouble();
 			        double rect2lat2 = rasQueryRes.value(ras_rect2lat2Idx).toDouble();
 			        double rect2lon1 = rasQueryRes.value(ras_rect2lon1Idx).toDouble();
@@ -470,13 +470,13 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
                 }
             }
                 break;
-            case DeniedRegionClass::circleDeniedRegionGeometry:
-            case DeniedRegionClass::horizonDistDeniedRegionGeometry:
+            case DeniedRegionClass::circleGeometry:
+            case DeniedRegionClass::horizonDistGeometry:
             {
                 double lonCircle = rasQueryRes.value(ras_centerLonIdx).toDouble();
                 double latCircle = rasQueryRes.value(ras_centerLatIdx).toDouble();
 
-                bool horizonDistFlag = (exclusionZoneType == DeniedRegionClass::horizonDistDeniedRegionGeometry);
+                bool horizonDistFlag = (exclusionZoneType == DeniedRegionClass::horizonDistGeometry);
 
                 ras = (DeniedRegionClass *) new CircleDeniedRegionClass(rasid, horizonDistFlag);
 
@@ -510,6 +510,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 
         ras->setStartFreq(startFreq);
         ras->setStopFreq(stopFreq);
+		ras->setType(DeniedRegionClass::RASType);
 
         deniedRegionList.push_back(ras);
 	}
