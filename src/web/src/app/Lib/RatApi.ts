@@ -1,4 +1,6 @@
-import { GuiConfig, AFCConfigFile, PAWSRequest, PAWSResponse, AnalysisResults, RatResponse, ResSuccess, ResError, success, error, AFCEngineException, ExclusionZoneRequest, HeatMapRequest, ExclusionZoneResult, HeatMapResult, FreqRange, AllRegionsFreqRange, AllRegionsFreqRanges } from "./RatApiTypes";
+import {
+    GuiConfig, AFCConfigFile, PAWSRequest, PAWSResponse, AnalysisResults, RatResponse, ResSuccess, ResError, success, error, AFCEngineException, ExclusionZoneRequest, HeatMapRequest, ExclusionZoneResult, HeatMapResult, FreqRange,
+} from "./RatApiTypes";
 import { logger } from "./Logger";
 import { delay } from "./Utils";
 import { hasRole } from "./User";
@@ -235,34 +237,28 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "deniedRegionFile": "",
 });
 
-const defaultAllRegionFreqRanges: () => AllRegionsFreqRanges = () => ({
-    version: guiConfig.version,
-    ranges: new Map<string, FreqRange[]>([
-        ["US", [
-            {
-                "region": "US",
-                "name": "UNII-5",
-                "startFreqMHz": 5925,
-                "stopFreqMHz": 6425
-            },
-            {
-                "region": "US",
-                "name": "UNII-7",
-                "startFreqMHz": 6525,
-                "stopFreqMHz": 6875
-            }
-        ]],
-        ["CA", [
-            {
-                "region": "CA",
-                "name": "Canada",
-                "startFreqMHz": 5925,
-                "stopFreqMHz": 6875
-            }
-        ]
-        ]
-    ])
-});
+const defaultAllRegionFreqRanges: () => FreqRange[] = () => (
+    [
+        {
+            "region": "US",
+            "name": "UNII-5",
+            "startFreqMHz": 5925,
+            "stopFreqMHz": 6425
+        },
+        {
+            "region": "US",
+            "name": "UNII-7",
+            "startFreqMHz": 6525,
+            "stopFreqMHz": 6875
+        },
+        {
+            "region": "CA",
+            "name": "Canada",
+            "startFreqMHz": 5925,
+            "stopFreqMHz": 6875
+        }
+
+    ]);
 // API Calls
 
 /**
@@ -369,17 +365,7 @@ export const getAllowedRanges = () =>
     }).then(
         async res => {
             if (res.ok) {
-                const data = await (res.json() as Promise<AllRegionsFreqRanges>);
-                // If the version is not the same, check that all the regions are present
-                if (data.version != guiConfig.version) {
-                    let defaults = defaultAllRegionFreqRanges();
-                    defaults.ranges.forEach((value: FreqRange[], key: string) => {
-                        // Add the default for missing regions
-                        if (!data.ranges.has(key)) {
-                            data.ranges.set(key, value);
-                        }
-                    });
-                }
+                const data = await (res.json() as Promise<FreqRange[]>);
                 return success(data);
             } else if (res.status == 404) {
                 return success(defaultAllRegionFreqRanges())
@@ -401,23 +387,12 @@ export const getAllowedRanges = () =>
         }
     )
 
-    function replacer(key, value) {
-        if(value instanceof Map) {
-          return {
-            dataType: 'Map',
-            value: Array.from(value.entries()), // or with spread: value: [...value]
-          };
-        } else {
-          return value;
-        }
-      }
-
-
-export const updateAllAllowedRanges = (allRanges: AllRegionsFreqRanges) => (
+// Update all the frequency ranges to a new set
+export const updateAllAllowedRanges = (allRanges: FreqRange[]) => (
     fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(allRanges, replacer)
+        body: JSON.stringify(allRanges)
     }).then(res => {
         if (res.status === 204) {
             return success("Frequency Range(s) updated.");
@@ -431,16 +406,17 @@ export const updateAllAllowedRanges = (allRanges: AllRegionsFreqRanges) => (
     })
 );
 
+//Update all the ranges for a single region
 export const updateAllowedRanges = (regionStr: string, conf: FreqRange[]) => (
     getAllowedRanges().then((res) => {
-        let allRanges: AllRegionsFreqRanges;
+        let allRanges: FreqRange[];
         if (res.kind == "Success") {
             allRanges = res.result;
         } else {
             allRanges = defaultAllRegionFreqRanges();
         }
-        allRanges.ranges.set(regionStr, conf);
-        Promise.resolve(allRanges);
+        let updated = allRanges.filter((s)=> s.region != regionStr).concat(conf);
+        Promise.resolve(updated);
     }).then((newData) => {
         fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
             method: "PUT",

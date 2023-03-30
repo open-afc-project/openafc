@@ -201,13 +201,8 @@ export class AFCForm extends React.Component<
 
     private reset = () => {
         let config = getDefaultAfcConf(this.state.config.regionStr);
-        // TODO: work out how to handle allowed frequency band per country or access point
-        // if (this.props.frequencyBands.length > 0) {
-        //     config.freqBands = this.props.frequencyBands;
-        // } else {
-        //     config.freqBands = defaultRanges[config.regionStr ?? "US"];
-        // }
-        config.freqBands = defaultRanges[config.regionStr ?? "US"];
+       
+        config.freqBands = this.props.frequencyBands.filter((x)=> x.region == this.state.config.regionStr)
 
         this.updateEntireConfigState(config);
     }
@@ -351,7 +346,7 @@ export class AFCForm extends React.Component<
                             <AFCFormUSACanada
                                 config={this.state.config}
                                 antennaPatterns={this.state.antennaPatternData}
-                                frequencyBands={this.props.frequencyBands}
+                                frequencyBands={this.props.frequencyBands.filter((x)=>x.region == this.state.config.regionStr)}
                                 limit={this.props.limit}
                                 updateConfig={(x) => this.updateConfigFromComponent(x)}
                                 updateAntennaData={(x) => this.updateAntennaDataFromComponent(x)} />

@@ -1,16 +1,16 @@
 import * as React from "react";
-import { Gallery, GalleryItem, PageSection, Card, CardHead, CardBody, CardHeader, Title, Modal, InputGroupText, Button, FormGroup, FormSelect, FormSelectOption, Alert, Tooltip, AlertActionCloseButton, TooltipPosition, InputGroup, TextInput } from "@patternfly/react-core";
+import { PageSection, Card, CardHead, CardBody, CardHeader, Modal, Button, FormGroup, FormSelect, FormSelectOption, Alert, AlertActionCloseButton, InputGroup } from "@patternfly/react-core";
 import { UserTable } from "./UserList";
 import { Role, UserState } from "../Lib/User";
 import { getUsers, addUserRole, deleteUser, removeUserRole, setMinimumEIRP, Limit } from "../Lib/Admin";
 import { logger } from "../Lib/Logger";
 import { APList } from "../APList/APList";
 import { UserAccount } from "../UserAccount/UserAccount";
-import { UserModel, RatResponse, FreqRange, AllRegionsFreqRanges } from "../Lib/RatApiTypes";
+import { UserModel, RatResponse, FreqRange } from "../Lib/RatApiTypes";
 import { Table, TableHeader, TableBody, TableVariant } from "@patternfly/react-table";
 import { FrequencyRangeInput } from "./FrequencyRangeInput";
 import { UserContext, hasRole } from "../Lib/User";
-import { updateAllowedRanges, updateAllAllowedRanges } from "../Lib/RatApi";
+import { updateAllAllowedRanges } from "../Lib/RatApi";
 
 /**
  * Admin.tsx: Administration page for managing users
@@ -57,10 +57,9 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
     messageUls?: string,
     userEnteredUpdateTime?: string,
     regionsList: string[],
-    frequencyBandsVersion: string,
     frequencyBandsNeedSaving: boolean
   }> {
-  constructor(props: Readonly<{ users: RatResponse<UserModel[]>; limit: RatResponse<Limit>; frequencyBands: RatResponse<AllRegionsFreqRanges>; regions: RatResponse<string[]> }>) {
+  constructor(props: Readonly<{ users: RatResponse<UserModel[]>; limit: RatResponse<Limit>; frequencyBands: RatResponse<FreqRange[]>; regions: RatResponse<string[]> }>) {
     super(props);
 
     if (props.users.kind === "Error")
@@ -68,7 +67,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
 
     const userList = props.users.kind === "Success" ? props.users.result : [];
     const apiLimit = props.limit.kind === "Success" ? props.limit.result : new Limit(false, 18);
-    const apiFreqBands = props.frequencyBands.kind === "Success" ? props.frequencyBands.result : { version: "", ranges: new Map<string, FreqRange[]>() }
+    const apiFreqBands = props.frequencyBands.kind === "Success" ? props.frequencyBands.result : [];
     const regionsList = props.regions.kind === "Success" ? props.regions.result : ["US"];
 
     this.state = {
@@ -85,8 +84,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
       userEnteredUpdateTime: "00:00",
       editingFrequency: false,
       frequencyEditIndex: undefined,
-      frequencyBands: Array.from(apiFreqBands.ranges.values()).flatMap((value) => value),
-      frequencyBandsVersion: apiFreqBands.version,
+      frequencyBands: apiFreqBands,
       regionsList: regionsList,
       frequencyBandsNeedSaving: false
     };
@@ -223,10 +221,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
 
 
   private putFrequencyBands = () => {
-    updateAllAllowedRanges({
-      version: this.state.frequencyBandsVersion,
-      ranges: this.mapBandsToAllAllowedRanges(this.state.frequencyBands)
-    })
+    updateAllAllowedRanges(this.state.frequencyBands)
       .then((res) => {
         if (res.kind == "Success") {
           this.setState({ messageSuccess: "Updated allowed frequency", messageError: undefined, frequencyBandsNeedSaving: false });
@@ -260,7 +255,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
     return (
       <Table aria-label="freq-table" actionResolver={(a, b) => this.actionResolver(a, b)}
         variant={TableVariant.compact} cells={cols as any}
-        rows={this.state.frequencyBands.map((band, index) => freqBandToRow(band, index))}
+        rows={this.state.frequencyBands.map((fr, idx)=> freqBandToRow(fr,idx))}
 
       >
         <TableHeader />
@@ -307,7 +302,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
                 <Button variant="secondary" onClick={this.addNewBand}>Add Another Range</Button>
 
                 <Button onClick={this.putFrequencyBands}
-                 isDisabled={!this.state.frequencyBandsNeedSaving}>Submit Frequency Ranges</Button>
+                  isDisabled={!this.state.frequencyBandsNeedSaving}>Submit Frequency Ranges</Button>
               </InputGroup>
             </FormGroup>
 

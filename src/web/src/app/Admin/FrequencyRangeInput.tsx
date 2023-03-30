@@ -79,7 +79,7 @@ export class FrequencyRangeInput extends React.Component<FrequencyRangeProps, Fr
                         <FormSelect
                             id={"band-region-" }
                             name={"band-region-" }
-                            value={this.state.frequencyRange.name} 
+                            value={this.state.frequencyRange.region} 
                             style={{ textAlign: "right" }} 
                             isValid={!!this.state.frequencyRange.region && this.state.frequencyRange.region!.length > 0}
                             onChange={(data) => this.updateField(data, 'region')}

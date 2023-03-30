@@ -72,11 +72,7 @@ export type FreqRange = {
     region?:string
 }
 
-export type AllRegionsFreqRanges = {
-    version: string,
-    // Map by regionStr into ranges
-    ranges: Map<string,FreqRange[]>
-}
+
 
 export type FSReceiverFeederLoss = {
     IDU: number,
