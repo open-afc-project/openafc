@@ -762,11 +762,13 @@ void AfcManager::initializeDatabases()
 
 	for(int regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
 	    std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(regionPolygonFileStrList[regionIdx], _regionPolygonResolution);
+		double regionArea = 0.0;
 		for(int polyIdx=0; polyIdx<(int) polyList.size(); ++polyIdx) {
 			PolygonClass *poly = polyList[polyIdx];
-			std::cout << "REGION: " << poly->name << " AREA: " << poly->comp_bdy_area() << std::endl;
+            regionArea += poly->comp_bdy_area();
 			_regionPolygonList.push_back(poly);
 		}
+		LOGGER_INFO(logger) << "REGION: " << regionPolygonFileStrList[regionIdx] << " AREA: " << regionArea;
 	}
 
     double rlanLatitude, rlanLongitude, rlanHeightInput;
@@ -901,7 +903,7 @@ void AfcManager::initializeDatabases()
 		}
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		readULSData(_ulsDatabaseList, (PopGridClass *) NULL, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, 0.0, 0.0, 0.0, 0.0);
-		// readRASData(_rasDataFile);
+		readDeniedRegionData(_deniedRegionFile);
 		if (_ulsList->getSize() == 0) {
 		} else if (_ulsList->getSize() > 1) {
 		}
@@ -1081,7 +1083,7 @@ void AfcManager::initializeDatabases()
 
 	if (_analysisType == "HeatmapAnalysis" || _analysisType == "AP-AFC" || _analysisType == "ScanAnalysis") {
 		readULSData(_ulsDatabaseList, _popGrid, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, minLat, maxLat, minLon, maxLon);
-		// readRASData(_rasDataFile);
+		readDeniedRegionData(_deniedRegionFile);
 	} else if (_analysisType == "ExclusionZoneAnalysis") {
 		fixFSTerrain();
 #if DEBUG_AFC
@@ -1121,9 +1123,9 @@ void AfcManager::clearData()
 		delete _antennaList[antIdx];
 	}
 
-	for (int rasIdx = 0; rasIdx < (int)_rasList.size(); rasIdx++)
+	for (int drIdx = 0; drIdx < (int)_deniedRegionList.size(); drIdx++)
 	{
-		delete _rasList[rasIdx];
+		delete _deniedRegionList[drIdx];
 	}
 
 	if (_popGrid) {
@@ -2783,6 +2785,10 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_reportErrorRlanHeightLowFlag = false;
 	}
 	// ***********************************
+
+	if (jsonObj.contains("deniedRegionFile") && !jsonObj["deniedRegionFile"].isUndefined()) {
+        _deniedRegionFile = SearchPaths::forReading("data", jsonObj["deniedRegionFile"].toString(), true).toStdString();
+	}
 }
 
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
@@ -4287,11 +4293,11 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 		if (_analysisType == "ExclusionZoneAnalysis")
 		{
 			// can also use UlsDatabase::getFSById(QString, int) to get a single record only by Id
-			ulsDatabase->loadFSById(QString::fromStdString(filename), _rasList, _antennaList, rows, _exclusionZoneFSID);
+			ulsDatabase->loadFSById(QString::fromStdString(filename), _deniedRegionList, _antennaList, rows, _exclusionZoneFSID);
 		}
 		else
 		{
-			ulsDatabase->loadUlsData(QString::fromStdString(filename), _rasList, _antennaList, rows, minLat, maxLat, minLon, maxLon);
+			ulsDatabase->loadUlsData(QString::fromStdString(filename), _deniedRegionList, _antennaList, rows, minLat, maxLat, minLon, maxLon);
 		}
 		// Distributing FS TX by 1x1 degree squares to minimize GDAL reopening
 		std::sort(rows.begin(), rows.end(),
@@ -4899,12 +4905,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 							int validFlag;
 							rxAntennaType = (CConst::ULSAntennaTypeEnum) CConst::strULSAntennaTypeList->str_to_type(strval, validFlag, 0);
 							if (!validFlag) {
-								std::ostringstream errStr;
-								errStr << "Invalid ULS data for FSID = " << fsid
-									<< ", Unknown Rx Antenna \"" << strval
-									<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
-								LOGGER_WARN(logger) << errStr.str();
-								statusMessageList.push_back(errStr.str());
+								// std::ostringstream errStr;
+								// errStr << "Invalid ULS data for FSID = " << fsid
+								// 	<< ", Unknown Rx Antenna \"" << strval
+								// 	<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
+								// LOGGER_WARN(logger) << errStr.str();
+								// statusMessageList.push_back(errStr.str());
 
 								rxAntennaType = _ulsDefaultAntennaType;
 							}
@@ -5317,12 +5323,12 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 								std::string strval = row.prAntModelName[prIdx];
 								pr.antennaType = (CConst::ULSAntennaTypeEnum) CConst::strULSAntennaTypeList->str_to_type(strval, validFlag, 0);
 								if (!validFlag) {
-									std::ostringstream errStr;
-									errStr << "Invalid ULS data for FSID = " << fsid
-										<< ", Unknown Passive Repeater Antenna \"" << strval
-										<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
-									LOGGER_WARN(logger) << errStr.str();
-									statusMessageList.push_back(errStr.str());
+									// std::ostringstream errStr;
+									// errStr << "Invalid ULS data for FSID = " << fsid
+									// 	<< ", Unknown Passive Repeater Antenna \"" << strval
+									// 	<< "\" using " << CConst::strULSAntennaTypeList->type_to_str(_ulsDefaultAntennaType);
+									// LOGGER_WARN(logger) << errStr.str();
+									// statusMessageList.push_back(errStr.str());
 
 									pr.antennaType = _ulsDefaultAntennaType;
 								}
@@ -5500,11 +5506,15 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** AfcManager::readRASData()                                                        ****/
+/**** AfcManager::readDeniedRegionData()                                               ****/
 /******************************************************************************************/
-void AfcManager::readRASData(std::string filename)
+void AfcManager::readDeniedRegionData(std::string filename)
 {
-	LOGGER_INFO(logger) << "Reading RAS Data: " << filename;
+
+	if (filename.empty()) {
+	    LOGGER_INFO(logger) << "No denied region file specified";
+        return;
+	}
 
 	int linenum, fIdx;
 	std::string line, strval;
@@ -5514,7 +5524,6 @@ void AfcManager::readRASData(std::string filename)
 	std::string reasonIgnored;
 	std::ostringstream errStr;
 
-	int rasidFieldIdx = -1;
 	int startFreqFieldIdx = -1;
 	int stopFreqFieldIdx = -1;
 	int exclusionZoneTypeFieldIdx = -1;
@@ -5536,8 +5545,6 @@ void AfcManager::readRASData(std::string filename)
 	int heightAGLFieldIdx;
 
 	std::vector<int *> fieldIdxList;                       std::vector<std::string> fieldLabelList;
-	fieldIdxList.push_back(&rasidFieldIdx);                fieldLabelList.push_back("RAS ID");
-	fieldIdxList.push_back(&rasidFieldIdx);                fieldLabelList.push_back("RASID");
 	fieldIdxList.push_back(&startFreqFieldIdx);            fieldLabelList.push_back("Start Freq (MHz)");
 	fieldIdxList.push_back(&stopFreqFieldIdx);             fieldLabelList.push_back("Stop Freq (MHz)");
 	fieldIdxList.push_back(&stopFreqFieldIdx);             fieldLabelList.push_back("End Freq (MHz)");
@@ -5559,10 +5566,9 @@ void AfcManager::readRASData(std::string filename)
 
 	fieldIdxList.push_back(&heightAGLFieldIdx);            fieldLabelList.push_back("Antenna AGL height (m)");
 
-	int prev_rasid;
-	int rasid = -1;
+	int drid;
 	double startFreq, stopFreq;
-	RASClass::RASExclusionZoneTypeEnum exclusionZoneType;
+	DeniedRegionClass::GeometryEnum exclusionZoneType;
 	double lat1Rect1, lat2Rect1, lon1Rect1, lon2Rect1;
 	double lat1Rect2, lat2Rect2, lon1Rect2, lon2Rect2;
 	double radius;
@@ -5572,14 +5578,10 @@ void AfcManager::readRASData(std::string filename)
 
 	int fieldIdx;
 
-	if (filename.empty()) {
-		throw std::runtime_error("ERROR: No RAS data file specified");
-	}
-
-	LOGGER_INFO(logger) << "Reading RAS Datafile: " << filename;
+	LOGGER_INFO(logger) << "Reading denied region Datafile: " << filename;
 
 	if ( !(fp = fopen(filename.c_str(), "rb")) ) {
-		str = std::string("ERROR: Unable to open RAS Data File \"") + filename + std::string("\"\n");
+		str = std::string("ERROR: Unable to open Denied Region Data File \"") + filename + std::string("\"\n");
 		throw std::runtime_error(str);
 	}
 
@@ -5592,7 +5594,7 @@ void AfcManager::readRASData(std::string filename)
 
 	LineTypeEnum lineType;
 
-	RASClass *ras;
+	DeniedRegionClass *dr;
 
 	linenum = 0;
 	bool foundLabelLine = false;
@@ -5651,7 +5653,7 @@ void AfcManager::readRASData(std::string filename)
 
 				for(fIdx=0; fIdx < (int) fieldIdxList.size(); fIdx++) {
 					if (*fieldIdxList.at(fIdx) == -1) {
-						errStr << "ERROR: Invalid RAS Data file \"" << filename << "\" label line missing \"" << fieldLabelList.at(fIdx) << "\"" << std::endl;
+						errStr << "ERROR: Invalid Denied Region Data file \"" << filename << "\" label line missing \"" << fieldLabelList.at(fIdx) << "\"" << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -5659,28 +5661,11 @@ void AfcManager::readRASData(std::string filename)
 				break;
 			case    dataLineType:
 				/**************************************************************************/
-				/* RASID                                                                   */
-				/**************************************************************************/
-				prev_rasid = rasid;
-				strval = fieldList.at(rasidFieldIdx);
-				if (strval.empty()) {
-					errStr << "ERROR: Invalid RAS Data file \"" << filename << "\" line " << linenum << " missing RASID" << std::endl;
-					throw std::runtime_error(errStr.str());
-				}
-
-				rasid = std::stoi(strval);
-				if (rasid <= prev_rasid) {
-					errStr << "ERROR: Invalid RAS Data file \"" << filename << "\" line " << linenum << " RASID values not monitonically increasing" << std::endl;
-					throw std::runtime_error(errStr.str());
-				}
-				/**************************************************************************/
-
-				/**************************************************************************/
 				/* startFreq                                                              */
 				/**************************************************************************/
 				strval = fieldList.at(startFreqFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Invalid RAS Data file \"" << filename << "\" line " << linenum << " missing Start Freq" << std::endl;
+					errStr << "ERROR: Invalid Denied Region Data file \"" << filename << "\" line " << linenum << " missing Start Freq" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 				startFreq = std::strtod(strval.c_str(), &chptr)*1.0e6; // Convert MHz to Hz
@@ -5691,7 +5676,7 @@ void AfcManager::readRASData(std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(stopFreqFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Invalid RAS Data file \"" << filename << "\" line " << linenum << " missing Stop Freq" << std::endl;
+					errStr << "ERROR: Invalid Denied Region Data file \"" << filename << "\" line " << linenum << " missing Stop Freq" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 				stopFreq = std::strtod(strval.c_str(), &chptr)*1.0e6; // Convert MHz to Hz
@@ -5703,23 +5688,25 @@ void AfcManager::readRASData(std::string filename)
 				strval = fieldList.at(exclusionZoneTypeFieldIdx);
 
 				if (strval == "One Rectangle") {
-					exclusionZoneType = RASClass::rectRASExclusionZoneType;
+					exclusionZoneType = DeniedRegionClass::rectGeometry;
 				} else if (strval == "Two Rectangles") {
-					exclusionZoneType = RASClass::rect2RASExclusionZoneType;
+					exclusionZoneType = DeniedRegionClass::rect2Geometry;
 				} else if (strval == "Circle") {
-					exclusionZoneType = RASClass::circleRASExclusionZoneType;
+					exclusionZoneType = DeniedRegionClass::circleGeometry;
 				} else if (strval == "Horizon Distance") {
-					exclusionZoneType = RASClass::horizonDistRASExclusionZoneType;
+					exclusionZoneType = DeniedRegionClass::horizonDistGeometry;
 				} else {
-					errStr << "ERROR: Invalid RAS Data file \"" << filename << "\" line " << linenum << " exclusion zone set to unrecognized value " << strval << std::endl;
+					errStr << "ERROR: Invalid Denied Region Data file \"" << filename << "\" line " << linenum << " exclusion zone set to unrecognized value " << strval << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 				/**************************************************************************/
 
+				drid = (_deniedRegionList.size() ? _deniedRegionList[_deniedRegionList.size()-1]->getID() + 1 : 0);
+
 				switch(exclusionZoneType) {
-					case RASClass::rectRASExclusionZoneType:
-					case RASClass::rect2RASExclusionZoneType:
-						ras = (RASClass *) new RectRASClass(rasid);
+					case DeniedRegionClass::rectGeometry:
+					case DeniedRegionClass::rect2Geometry:
+						dr = (DeniedRegionClass *) new RectDeniedRegionClass(drid);
 
 						strval = fieldList.at(lat1Rect1FieldIdx);
 						lat1Rect1 = getAngleFromDMS(strval);
@@ -5729,9 +5716,9 @@ void AfcManager::readRASData(std::string filename)
 						lon1Rect1 = getAngleFromDMS(strval);
 						strval = fieldList.at(lon2Rect1FieldIdx);
 						lon2Rect1 = getAngleFromDMS(strval);
-						((RectRASClass *) ras)->addRect(lon1Rect1, lon2Rect1, lat1Rect1, lat2Rect1);
+						((RectDeniedRegionClass *) dr)->addRect(lon1Rect1, lon2Rect1, lat1Rect1, lat2Rect1);
 
-						if (exclusionZoneType == RASClass::rect2RASExclusionZoneType) {
+						if (exclusionZoneType == DeniedRegionClass::rect2Geometry) {
 							strval = fieldList.at(lat1Rect2FieldIdx);
 							lat1Rect2 = getAngleFromDMS(strval);
 							strval = fieldList.at(lat2Rect2FieldIdx);
@@ -5740,42 +5727,42 @@ void AfcManager::readRASData(std::string filename)
 							lon1Rect2 = getAngleFromDMS(strval);
 							strval = fieldList.at(lon2Rect2FieldIdx);
 							lon2Rect2 = getAngleFromDMS(strval);
-							((RectRASClass *) ras)->addRect(lon1Rect2, lon2Rect2, lat1Rect2, lat2Rect2);
+							((RectDeniedRegionClass *) dr)->addRect(lon1Rect2, lon2Rect2, lat1Rect2, lat2Rect2);
 						}
 						break;
-					case RASClass::circleRASExclusionZoneType:
-					case RASClass::horizonDistRASExclusionZoneType:
+					case DeniedRegionClass::circleGeometry:
+					case DeniedRegionClass::horizonDistGeometry:
 						strval = fieldList.at(lonCircleFieldIdx);
 						lonCircle = getAngleFromDMS(strval);
 						strval = fieldList.at(latCircleFieldIdx);
 						latCircle = getAngleFromDMS(strval);
 
-						horizonDistFlag = (exclusionZoneType == RASClass::horizonDistRASExclusionZoneType);
+						horizonDistFlag = (exclusionZoneType == DeniedRegionClass::horizonDistGeometry);
 
-						ras = (RASClass *) new CircleRASClass(rasid, horizonDistFlag);
+						dr = (DeniedRegionClass *) new CircleDeniedRegionClass(drid, horizonDistFlag);
 
-						((CircleRASClass *) ras)->setLongitudeCenter(lonCircle);
-						((CircleRASClass *) ras)->setLatitudeCenter(latCircle);
+						((CircleDeniedRegionClass *) dr)->setLongitudeCenter(lonCircle);
+						((CircleDeniedRegionClass *) dr)->setLatitudeCenter(latCircle);
 
 						if (!horizonDistFlag) {
 							strval = fieldList.at(radiusFieldIdx);
 							if (strval.empty()) {
-								errStr << "ERROR: Invalid RAS Data file \"" << filename << "\" line " << linenum << " missing Circle Radius" << std::endl;
+								errStr << "ERROR: Invalid Denied Region Data file \"" << filename << "\" line " << linenum << " missing Circle Radius" << std::endl;
 								throw std::runtime_error(errStr.str());
 							}
 							radius = std::strtod(strval.c_str(), &chptr)*1.0e3; // Convert km to m
-							((CircleRASClass *) ras)->setRadius(radius);
+							((CircleDeniedRegionClass *) dr)->setRadius(radius);
 						} else {
 							/**************************************************************************/
 							/* heightAGL                                                              */
 							/**************************************************************************/
 							strval = fieldList.at(heightAGLFieldIdx);
 							if (strval.empty()) {
-								errStr << "ERROR: Invalid RAS Data file \"" << filename << "\" line " << linenum << " missing Antenna AGL Height" << std::endl;
+								errStr << "ERROR: Invalid Denied Region Data file \"" << filename << "\" line " << linenum << " missing Antenna AGL Height" << std::endl;
 								throw std::runtime_error(errStr.str());
 							}
 							heightAGL = std::strtod(strval.c_str(), &chptr);
-							ras->setHeightAGL(heightAGL);
+							dr->setHeightAGL(heightAGL);
 							/**************************************************************************/
 						}
 
@@ -5785,9 +5772,10 @@ void AfcManager::readRASData(std::string filename)
 						break;
 				}
 
-				_rasList.push_back(ras);
-				ras->setStartFreq(startFreq);
-				ras->setStopFreq(stopFreq);
+				dr->setStartFreq(startFreq);
+				dr->setStopFreq(stopFreq);
+				dr->setType(DeniedRegionClass::userSpecifiedType);
+				_deniedRegionList.push_back(dr);
 
 				break;
 			case  ignoreLineType:
@@ -5802,7 +5790,7 @@ void AfcManager::readRASData(std::string filename)
 
 	if (fp) { fclose(fp); }
 
-	LOGGER_INFO(logger) << "TOTAL NUM RAS: " << _rasList.size();
+	LOGGER_INFO(logger) << "TOTAL NUM DENIED REGION: " << _deniedRegionList.size();
 
 	return;
 }
@@ -7070,15 +7058,69 @@ void AfcManager::runPointAnalysis()
 				(latDistR * latDistR + lonDistR * lonDistR * cosLatSq);
 		});
 
-	double heightUncertainty = _rlanRegion->getHeightUncertainty();
-	int NHt = (int) ceil(heightUncertainty / _scanres_ht);
-	Vector3 rlanPosnList[2*NHt+1];
-	GeodeticCoord rlanCoordList[2*NHt+1];
-
 	/**************************************************************************************/
 	/* Get Uncertainty Region Scan Points                                                 */
+	/* scanPointList: scan points in horizontal plane (lon/lat)                           */
+	/* For scan point scanPtIdx, numRlanHt[scanPtIdx] heights are considered.             */
 	/**************************************************************************************/
 	std::vector<LatLon> scanPointList = _rlanRegion->getScan(_scanRegionMethod, _scanres_xy, _scanres_points_per_degree);
+
+	double heightUncertainty = _rlanRegion->getHeightUncertainty();
+	int NHt = (int) ceil(heightUncertainty / _scanres_ht);
+	Vector3 rlanPosnList[scanPointList.size()][2*NHt+1];
+	GeodeticCoord rlanCoordList[scanPointList.size()][2*NHt+1];
+	int numRlanHt[scanPointList.size()];
+	double rlanTerrainHeight[scanPointList.size()];
+	CConst::HeightSourceEnum rlanHeightSource[scanPointList.size()];
+	CConst::PropEnvEnum rlanPropEnv[scanPointList.size()];
+	CConst::NLCDLandCatEnum rlanNlcdLandCat[scanPointList.size()];
+
+	int scanPtIdx, rlanHtIdx;
+	for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
+		LatLon scanPt = scanPointList[scanPtIdx];
+
+		double bldgHeight;
+		MultibandRasterClass::HeightResult lidarHeightResult;
+		_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight[scanPtIdx], bldgHeight, lidarHeightResult, rlanHeightSource[scanPtIdx]);
+
+		double height0;
+		if (_rlanRegion->getFixedHeightAMSL()) {
+			height0 = _rlanRegion->getCenterHeightAMSL();
+		} else {
+			height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight[scanPtIdx];
+		}
+
+		int htIdx;
+		numRlanHt[scanPtIdx] = 0;
+		bool lowHeightFlag = false;
+		for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
+			double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
+			double heightAGL  = heightAMSL - rlanTerrainHeight[scanPtIdx];
+			bool useFlag;
+			if (heightAGL < _minRlanHeightAboveTerrain) {
+				switch(_scanPointBelowGroundMethod) {
+					case CConst::DiscardScanPointBelowGroundMethod:
+						useFlag = false;
+						break;
+					case CConst::TruncateScanPointBelowGroundMethod:
+						heightAMSL = rlanTerrainHeight[scanPtIdx] + _minRlanHeightAboveTerrain;
+						useFlag = true;
+						break;
+					default: CORE_DUMP; break;
+				}
+				lowHeightFlag = true;
+			} else {
+				useFlag = true;
+			}
+			if (useFlag) {
+				rlanCoordList[scanPtIdx][htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, heightAMSL/1000.0);
+				rlanPosnList[scanPtIdx][htIdx] = EcefModel::fromGeodetic(rlanCoordList[scanPtIdx][htIdx]);
+				numRlanHt[scanPtIdx]++;
+			}
+		}
+
+		rlanPropEnv[scanPtIdx] = computePropEnv(scanPt.second, scanPt.first, rlanNlcdLandCat[scanPtIdx]);
+	}
 	/**************************************************************************************/
 
 	/**************************************************************************************/
@@ -7335,54 +7377,21 @@ void AfcManager::runPointAnalysis()
 		fkml->writeStartElement("Folder");
 		fkml->writeTextElement("name", "SCAN POINTS");
 
-		for(ptIdx=0; ptIdx<(int) scanPointList.size(); ptIdx++) {
-			LatLon scanPt = scanPointList[ptIdx];
+		for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
+			LatLon scanPt = scanPointList[scanPtIdx];
 
-			double rlanTerrainHeight, bldgHeight;
-			MultibandRasterClass::HeightResult lidarHeightResult;
-			CConst::HeightSourceEnum rlanHeightSource;
-			_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight,bldgHeight, lidarHeightResult, rlanHeightSource);
+			for (rlanHtIdx = 0; rlanHtIdx < numRlanHt[scanPtIdx]; ++rlanHtIdx) {
+				double heightAMSL = rlanCoordList[scanPtIdx][rlanHtIdx].heightKm * 1000;
 
-			double height0;
-			if (_rlanRegion->getFixedHeightAMSL()) {
-				height0 = _rlanRegion->getCenterHeightAMSL();
-			} else {
-				height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
-			}
-
-			int htIdx;
-			bool lowHeightFlag = false;
-			for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-				double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
-				double heightAGL  = heightAMSL - rlanTerrainHeight;
-				bool useFlag;
-				if (heightAGL < _minRlanHeightAboveTerrain) {
-					switch(_scanPointBelowGroundMethod) {
-						case CConst::DiscardScanPointBelowGroundMethod:
-							useFlag = false;
-							break;
-						case CConst::TruncateScanPointBelowGroundMethod:
-							heightAMSL = rlanTerrainHeight + _minRlanHeightAboveTerrain;
-							useFlag = true;
-							break;
-						default: CORE_DUMP; break;
-					}
-					lowHeightFlag = true;
-				} else {
-					useFlag = true;
-				}
-
-				if (useFlag) {
-					fkml->writeStartElement("Placemark");
-					fkml->writeTextElement("name", QString::asprintf("SCAN_POINT_%d_%d", ptIdx, htIdx));
-					fkml->writeTextElement("visibility", "1");
-					fkml->writeTextElement("styleUrl", "#dotStyle");
-					fkml->writeStartElement("Point");
-					fkml->writeTextElement("altitudeMode", "absolute");
-					fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", scanPt.second, scanPt.first, heightAMSL));
-					fkml->writeEndElement(); // Point
-					fkml->writeEndElement(); // Placemark
-				}
+				fkml->writeStartElement("Placemark");
+				fkml->writeTextElement("name", QString::asprintf("SCAN_POINT_%d_%d", scanPtIdx, rlanHtIdx));
+				fkml->writeTextElement("visibility", "1");
+				fkml->writeTextElement("styleUrl", "#dotStyle");
+				fkml->writeStartElement("Point");
+				fkml->writeTextElement("altitudeMode", "absolute");
+				fkml->writeTextElement("coordinates", QString::asprintf("%.10f,%.10f,%.2f", scanPt.second, scanPt.first, heightAMSL));
+				fkml->writeEndElement(); // Point
+				fkml->writeEndElement(); // Placemark
 			}
 		}
 
@@ -7392,33 +7401,46 @@ void AfcManager::runPointAnalysis()
 		fkml->writeEndElement(); // Folder
 
 		fkml->writeStartElement("Folder");
-		fkml->writeTextElement("name", "RAS");
-		int rasIdx;
-		for (rasIdx = 0; rasIdx < (int) _rasList.size(); ++rasIdx) {
-			RASClass *ras = _rasList[rasIdx];
+		fkml->writeTextElement("name", "Denied Region");
+		int drIdx;
+		for (drIdx = 0; drIdx < (int) _deniedRegionList.size(); ++drIdx) {
+			DeniedRegionClass *dr = _deniedRegionList[drIdx];
+			DeniedRegionClass::TypeEnum drType = dr->getType();
+			std::string pfx;
+			switch(drType) {
+				case DeniedRegionClass::RASType:
+					pfx = "RAS_";
+					break;
+				case DeniedRegionClass::userSpecifiedType:
+					pfx = "USER_SPEC_";
+					break;
+				default:
+					CORE_DUMP;
+					break;
+			}
 
 			fkml->writeStartElement("Folder");
-			fkml->writeTextElement("name", QString("RAS_") + QString::number(ras->getID()));
+			fkml->writeTextElement("name", QString::fromStdString(pfx) + QString::number(dr->getID()));
 
 			int numPtsCircle = 32;
 			int rectIdx, numRect;
 			double rectLonStart, rectLonStop, rectLatStart, rectLatStop;
 			double circleRadius, longitudeCenter, latitudeCenter;
-			double rasTerrainHeight, rasBldgHeight, rasHeightAGL;
-			Vector3 rasCenterPosn;
-			Vector3 rasUpVec;
-			Vector3 rasEastVec;
-			Vector3 rasNorthVec;
-			QString ras_coords;
-			MultibandRasterClass::HeightResult rasLidarHeightResult;
-			CConst::HeightSourceEnum rasHeightSource;
-			RASClass::RASExclusionZoneTypeEnum rasType = ras->type();
-			switch(rasType) {
-				case RASClass::rectRASExclusionZoneType:
-				case RASClass::rect2RASExclusionZoneType:
-					numRect = ((RectRASClass *) ras)->getNumRect();
+			double drTerrainHeight, drBldgHeight, drHeightAGL;
+			Vector3 drCenterPosn;
+			Vector3 drUpVec;
+			Vector3 drEastVec;
+			Vector3 drNorthVec;
+			QString dr_coords;
+			MultibandRasterClass::HeightResult drLidarHeightResult;
+			CConst::HeightSourceEnum drHeightSource;
+			DeniedRegionClass::GeometryEnum drGeometry = dr->getGeometry();
+			switch(drGeometry) {
+				case DeniedRegionClass::rectGeometry:
+				case DeniedRegionClass::rect2Geometry:
+					numRect = ((RectDeniedRegionClass *) dr)->getNumRect();
 					for(rectIdx=0; rectIdx<numRect; rectIdx++) {
-						std::tie(rectLonStart, rectLonStop, rectLatStart, rectLatStop) = ((RectRASClass *) ras)->getRect(rectIdx);
+						std::tie(rectLonStart, rectLonStop, rectLatStart, rectLatStop) = ((RectDeniedRegionClass *) dr)->getRect(rectIdx);
 
 						fkml->writeStartElement("Placemark");
 						fkml->writeTextElement("name", QString("RECT_") + QString::number(rectIdx));
@@ -7431,35 +7453,35 @@ void AfcManager::runPointAnalysis()
 						fkml->writeStartElement("outerBoundaryIs");
 						fkml->writeStartElement("LinearRing");
 
-						ras_coords = QString();
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStart, 0.0));
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStop,  rectLatStart, 0.0));
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStop,  rectLatStop,  0.0));
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStop,  0.0));
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStart, 0.0));
+						dr_coords = QString();
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStart, 0.0));
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStop,  rectLatStart, 0.0));
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStop,  rectLatStop,  0.0));
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStop,  0.0));
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStart, 0.0));
 
-						fkml->writeTextElement("coordinates", ras_coords);
+						fkml->writeTextElement("coordinates", dr_coords);
 						fkml->writeEndElement(); // LinearRing
 						fkml->writeEndElement(); // outerBoundaryIs
 						fkml->writeEndElement(); // Polygon
 						fkml->writeEndElement(); // Placemark
 					}
 					break;
-				case RASClass::circleRASExclusionZoneType:
-				case RASClass::horizonDistRASExclusionZoneType:
-					circleRadius = ((CircleRASClass *) ras)->computeRadius(_rlanRegion->getMaxHeightAGL());
-					longitudeCenter = ((CircleRASClass *) ras)->getLongitudeCenter();
-					latitudeCenter = ((CircleRASClass *) ras)->getLatitudeCenter();
-					rasHeightAGL = ras->getHeightAGL();
-					_terrainDataModel->getTerrainHeight(longitudeCenter, latitudeCenter, rasTerrainHeight, rasBldgHeight, rasLidarHeightResult, rasHeightSource);
+				case DeniedRegionClass::circleGeometry:
+				case DeniedRegionClass::horizonDistGeometry:
+					circleRadius = ((CircleDeniedRegionClass *) dr)->computeRadius(_rlanRegion->getMaxHeightAGL());
+					longitudeCenter = ((CircleDeniedRegionClass *) dr)->getLongitudeCenter();
+					latitudeCenter = ((CircleDeniedRegionClass *) dr)->getLatitudeCenter();
+					drHeightAGL = dr->getHeightAGL();
+					_terrainDataModel->getTerrainHeight(longitudeCenter, latitudeCenter, drTerrainHeight, drBldgHeight, drLidarHeightResult, drHeightSource);
 
-					rasCenterPosn = EcefModel::geodeticToEcef(latitudeCenter, longitudeCenter, (rasTerrainHeight + rasHeightAGL)/ 1000.0);
-					rasUpVec = rasCenterPosn.normalized();
-					rasEastVec = (Vector3(-rasUpVec.y(), rasUpVec.x(), 0.0)).normalized();
-					rasNorthVec = rasUpVec.cross(rasEastVec);
+					drCenterPosn = EcefModel::geodeticToEcef(latitudeCenter, longitudeCenter, (drTerrainHeight + drHeightAGL)/ 1000.0);
+					drUpVec = drCenterPosn.normalized();
+					drEastVec = (Vector3(-drUpVec.y(), drUpVec.x(), 0.0)).normalized();
+					drNorthVec = drUpVec.cross(drEastVec);
 
 					fkml->writeStartElement("Placemark");
-					fkml->writeTextElement("name", QString("RECT_") + QString::number(rectIdx));
+					fkml->writeTextElement("name", QString("CIRCLE"));
 					fkml->writeTextElement("visibility", "1");
 					fkml->writeTextElement("styleUrl", "#transBluePoly");
 					fkml->writeStartElement("Polygon");
@@ -7469,17 +7491,17 @@ void AfcManager::runPointAnalysis()
 					fkml->writeStartElement("outerBoundaryIs");
 					fkml->writeStartElement("LinearRing");
 
-					ras_coords = QString();
+					dr_coords = QString();
 					for(ptIdx=0; ptIdx<=numPtsCircle; ++ptIdx) {
 						double phi = 2*M_PI*ptIdx / numPtsCircle;
-						Vector3 circlePtPosn = rasCenterPosn + (circleRadius/1000)*(rasEastVec*cos(phi) + rasNorthVec*sin(phi));
+						Vector3 circlePtPosn = drCenterPosn + (circleRadius/1000)*(drEastVec*cos(phi) + drNorthVec*sin(phi));
 
 						GeodeticCoord circlePtPosnGeodetic = EcefModel::ecefToGeodetic(circlePtPosn);
 
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", circlePtPosnGeodetic.longitudeDeg, circlePtPosnGeodetic.latitudeDeg, 0.0));
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", circlePtPosnGeodetic.longitudeDeg, circlePtPosnGeodetic.latitudeDeg, 0.0));
 					}
 
-					fkml->writeTextElement("coordinates", ras_coords);
+					fkml->writeTextElement("coordinates", dr_coords);
 					fkml->writeEndElement(); // LinearRing
 					fkml->writeEndElement(); // outerBoundaryIs
 					fkml->writeEndElement(); // Polygon
@@ -7522,59 +7544,68 @@ void AfcManager::runPointAnalysis()
 #   if DEBUG_AFC
 	char *tstr;
 
-	time_t tStartRAS = time(NULL);
-	tstr = strdup(ctime(&tStartRAS));
+	time_t tStartDR = time(NULL);
+	tstr = strdup(ctime(&tStartDR));
 	strtok(tstr, "\n");
 
-	std::cout << "Begin Processing RAS's " << tstr << std::endl << std::flush;
+	std::cout << "Begin Processing Denied Regions " << tstr << std::endl << std::flush;
 
 	free(tstr);
 #   endif
 
-	int rasIdx;
-	double rlanRegionMaxDist = _rlanRegion->getMaxDist();
-	double rlanRegionMaxHeightAGL = _rlanRegion->getMaxHeightAGL();
-	for (rasIdx = 0; rasIdx < (int) _rasList.size(); ++rasIdx) {
-		RASClass *ras = _rasList[rasIdx];
-		if (ras->intersect(_rlanRegion->getCenterLongitude(), _rlanRegion->getCenterLatitude(), rlanRegionMaxDist, rlanRegionMaxHeightAGL)) {
-			int chanIdx;
-			for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
-				ChannelStruct *channel = &(_channelList[chanIdx]);
-				if (channel->availability != BLACK) {
-					double chanStartFreq = channel->startFreqMHz * 1.0e6;
-					double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-					bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, ras->getStartFreq(), ras->getStopFreq(), false, CConst::psdSpectralAlgorithm);
-					if (hasOverlap) {
-						channel->availability = BLACK;
-						channel->eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+	int drIdx;
+	for (drIdx = 0; drIdx < (int) _deniedRegionList.size(); ++drIdx) {
+		DeniedRegionClass *dr = _deniedRegionList[drIdx];
+		bool foundScanPointInDR = false;
+		for(scanPtIdx=0; (scanPtIdx<(int) scanPointList.size())&&(!foundScanPointInDR); scanPtIdx++) {
+			if (numRlanHt[scanPtIdx]) {
+				rlanHtIdx = 0;
+
+				GeodeticCoord rlanCoord = rlanCoordList[scanPtIdx][rlanHtIdx];
+				double rlanHeightAGL = (rlanCoord.heightKm * 1000) - rlanTerrainHeight[scanPtIdx];
+
+				if (dr->intersect(rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, 0.0, rlanHeightAGL)) {
+					int chanIdx;
+					for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
+						ChannelStruct *channel = &(_channelList[chanIdx]);
+						if (channel->availability != BLACK) {
+							double chanStartFreq = channel->startFreqMHz * 1.0e6;
+							double chanStopFreq = channel->stopFreqMHz * 1.0e6;
+							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, dr->getStartFreq(), dr->getStopFreq(), false, CConst::psdSpectralAlgorithm);
+							if (hasOverlap) {
+								channel->availability = BLACK;
+								channel->eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+							}
+						}
 					}
+					foundScanPointInDR = true;
 				}
 			}
 		}
 	}
 
 #   if DEBUG_AFC
-	time_t tEndRAS = time(NULL);
-	tstr = strdup(ctime(&tEndRAS));
+	time_t tEndDR = time(NULL);
+	tstr = strdup(ctime(&tEndDR));
 	strtok(tstr, "\n");
 
-	int elapsedTimeRAS = (int) (tEndRAS-tStartRAS);
+	int elapsedTimeDR = (int) (tEndDR-tStartDR);
 
-	int etRAS = elapsedTimeRAS;
-	int elapsedTimeRASSec = etRAS % 60;
-	etRAS = etRAS / 60;
-	int elapsedTimeRASMin = etRAS % 60;
-	etRAS = etRAS / 60;
-	int elapsedTimeRASHour = etRAS % 24;
-	etRAS = etRAS / 24;
-	int elapsedTimeRASDay = etRAS;
+	int etDR = elapsedTimeDR;
+	int elapsedTimeDRSec = etDR % 60;
+	etDR = etDR / 60;
+	int elapsedTimeDRMin = etDR % 60;
+	etDR = etDR / 60;
+	int elapsedTimeDRHour = etDR % 24;
+	etDR = etDR / 24;
+	int elapsedTimeDRDay = etDR;
 
-	std::cout << "End Processing RAS's " << tstr
-		<< " Elapsed time = " << (tEndRAS-tStartRAS) << " sec = "
-		<< elapsedTimeRASDay  << " days "
-		<< elapsedTimeRASHour << " hours "
-		<< elapsedTimeRASMin  << " min "
-		<< elapsedTimeRASSec  << " sec."
+	std::cout << "End Processing Denied Regions " << tstr
+		<< " Elapsed time = " << (tEndDR-tStartDR) << " sec = "
+		<< elapsedTimeDRDay  << " days "
+		<< elapsedTimeDRHour << " hours "
+		<< elapsedTimeDRMin  << " min "
+		<< elapsedTimeDRSec  << " sec."
 		<< std::endl << std::flush;
 
 	free(tstr);
@@ -7721,25 +7752,13 @@ void AfcManager::runPointAnalysis()
 
 					contains3D = false;
 					if (contains2D) {
-						int scanPtIdx;
 						for(scanPtIdx=0; (scanPtIdx<(int) scanPointList.size())&&(!contains3D); scanPtIdx++) {
-							LatLon scanPt = scanPointList[scanPtIdx];
-
-							double rlanTerrainHeight, bldgHeight;
-							MultibandRasterClass::HeightResult lidarHeightResult;
-							CConst::HeightSourceEnum rlanHeightSource;
-							_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
-
-							double height0;
-							if (_rlanRegion->getFixedHeightAMSL()) {
-								height0 = _rlanRegion->getCenterHeightAMSL();
-							} else {
-								height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
-							}
-							double minHeight = height0 - heightUncertainty;
-							double maxHeight = height0 + heightUncertainty;
-							if ((ulsRxHeightAMSL >= minHeight) && (ulsRxHeightAMSL <= maxHeight)) {
-								contains3D = true;
+							if (numRlanHt[scanPtIdx]) {
+								double minHeight = rlanCoordList[scanPtIdx][numRlanHt[scanPtIdx]-1].heightKm * 1000;
+								double maxHeight = rlanCoordList[scanPtIdx][0].heightKm * 1000;
+								if ((ulsRxHeightAMSL >= minHeight) && (ulsRxHeightAMSL <= maxHeight)) {
+									contains3D = true;
+								}
 							}
 						}
 					}
@@ -7772,28 +7791,8 @@ void AfcManager::runPointAnalysis()
 						minRLANDist = 0.0;
 					} else {
 
-						int scanPtIdx;
 						for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
 							LatLon scanPt = scanPointList[scanPtIdx];
-
-							/**************************************************************************************/
-							/* Determine propagation environment of RLAN using scan point                         */
-							/**************************************************************************************/
-							CConst::NLCDLandCatEnum nlcdLandCatTx;
-							CConst::PropEnvEnum rlanPropEnv = computePropEnv(scanPt.second, scanPt.first, nlcdLandCatTx);
-							/**************************************************************************************/
-
-							double rlanTerrainHeight, bldgHeight;
-							MultibandRasterClass::HeightResult lidarHeightResult;
-							CConst::HeightSourceEnum rlanHeightSource;
-							_terrainDataModel->getTerrainHeight(scanPt.second, scanPt.first, rlanTerrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
-
-							double height0;
-							if (_rlanRegion->getFixedHeightAMSL()) {
-								height0 = _rlanRegion->getCenterHeightAMSL();
-							} else {
-								height0 = _rlanRegion->getCenterHeightAMSL() - _rlanRegion->getCenterTerrainHeight() + rlanTerrainHeight;
-							}
 
 							// Use Haversine formula with average earth radius of 6371 km
 							double groundDistanceKm;
@@ -7807,41 +7806,10 @@ void AfcManager::runPointAnalysis()
 								groundDistanceKm = 2*CConst::averageEarthRadius*asin(sqrt(slat*slat+cos(lat1Rad)*cos(lat2Rad)*slon*slon))*1.0e-3;
 							}
 
-							int htIdx;
-							int numRlanPosn = 0;
-							bool lowHeightFlag = false;
-							for(htIdx=0; (htIdx<=2*NHt)&&(!lowHeightFlag); ++htIdx) {
-								double heightAMSL = height0 + (NHt ? (NHt - htIdx)*heightUncertainty/NHt : 0.0); // scan from top down
-								double heightAGL  = heightAMSL - rlanTerrainHeight;
-								bool useFlag;
-								if (heightAGL < _minRlanHeightAboveTerrain) {
-									switch(_scanPointBelowGroundMethod) {
-										case CConst::DiscardScanPointBelowGroundMethod:
-											useFlag = false;
-											break;
-										case CConst::TruncateScanPointBelowGroundMethod:
-											heightAMSL = rlanTerrainHeight + _minRlanHeightAboveTerrain;
-											useFlag = true;
-											break;
-										default: CORE_DUMP; break;
-									}
-									lowHeightFlag = true;
-								} else {
-									useFlag = true;
-								}
-								if (useFlag) {
-									rlanCoordList[htIdx] = GeodeticCoord::fromLatLon(scanPt.first, scanPt.second, heightAMSL/1000.0);
-									rlanPosnList[htIdx] = EcefModel::fromGeodetic(rlanCoordList[htIdx]);
-									numRlanPosn++;
-								}
-							}
-
-							int rlanPosnIdx;
-
-							for (rlanPosnIdx = 0; rlanPosnIdx < numRlanPosn; ++rlanPosnIdx)
+							for (rlanHtIdx = 0; rlanHtIdx < numRlanHt[scanPtIdx]; ++rlanHtIdx)
 							{
-								Vector3 rlanPosn = rlanPosnList[rlanPosnIdx];
-								GeodeticCoord rlanCoord = rlanCoordList[rlanPosnIdx];
+								Vector3 rlanPosn = rlanPosnList[scanPtIdx][rlanHtIdx];
+								GeodeticCoord rlanCoord = rlanCoordList[scanPtIdx][rlanHtIdx];
 								lineOfSightVectorKm = ulsRxPos - rlanPosn;
 								double distKm = lineOfSightVectorKm.len();
 								double win2DistKm;
@@ -7910,7 +7878,7 @@ void AfcManager::runPointAnalysis()
 											double reflectorD0;
 											double reflectorD1;
 
-											double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
+											double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight[scanPtIdx];
 
 											// Trying Free Space Path Loss then (if not skipped) - configured Path Loss.
 											bool skip = false;
@@ -7919,7 +7887,7 @@ void AfcManager::runPointAnalysis()
 													// Possible if FSPL distance is horizontal. This should be extremely rare
 													continue;
 												}
-												computePathLoss((forceFspl || contains2D) ? CConst::FSPLPathLossModel : _pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx,
+												computePathLoss((forceFspl || contains2D) ? CConst::FSPLPathLossModel : _pathLossModel, rlanPropEnv[scanPtIdx], fsPropEnv, rlanNlcdLandCat[scanPtIdx],
 														nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 														rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 														ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
@@ -7998,8 +7966,8 @@ void AfcManager::runPointAnalysis()
 													eirpGc.buildingPenetrationDb = buildingPenetrationDB;
 													eirpGc.offBoresight = angleOffBoresightDeg;
 													eirpGc.rxGainDb = rxGainDB;
-													eirpGc.txPropEnv = rlanPropEnv;
-													eirpGc.nlcdTx = nlcdLandCatTx;
+													eirpGc.txPropEnv = rlanPropEnv[scanPtIdx];
+													eirpGc.nlcdTx = rlanNlcdLandCat[scanPtIdx];
 													eirpGc.pathClutterTxModel = pathClutterTxModelStr;
 													eirpGc.pathClutterTxDb = pathClutterTxDB;
 													eirpGc.txClutter = txClutterStr;
@@ -8112,7 +8080,7 @@ void AfcManager::runPointAnalysis()
 												excthrGc.fsid = uls->getID();
 												excthrGc.region = uls->getRegion();
 												excthrGc.dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
-												excthrGc.rlanPosnIdx = rlanPosnIdx;
+												excthrGc.rlanPosnIdx = rlanHtIdx;
 												excthrGc.callsign = uls->getCallsign();
 												excthrGc.fsLon = uls->getRxLongitudeDeg();
 												excthrGc.fsLat = uls->getRxLatitudeDeg();
@@ -8137,10 +8105,10 @@ void AfcManager::runPointAnalysis()
 
 												excthrGc.rlanLon = rlanCoord.longitudeDeg;
 												excthrGc.rlanLat = rlanCoord.latitudeDeg;
-												excthrGc.rlanAgl =rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
-												excthrGc.rlanTerrainHeight = rlanTerrainHeight;
-												excthrGc.rlanTerrainSource = _terrainDataModel->getSourceName(rlanHeightSource);
-												excthrGc.rlanPropEnv = CConst::strPropEnvList->type_to_str(rlanPropEnv);
+												excthrGc.rlanAgl =rlanCoord.heightKm * 1000.0 - rlanTerrainHeight[scanPtIdx];
+												excthrGc.rlanTerrainHeight = rlanTerrainHeight[scanPtIdx];
+												excthrGc.rlanTerrainSource = _terrainDataModel->getSourceName(rlanHeightSource[scanPtIdx]);
+												excthrGc.rlanPropEnv = CConst::strPropEnvList->type_to_str(rlanPropEnv[scanPtIdx]);
 												excthrGc.rlanFsDist = distKm;
 												excthrGc.rlanFsGroundDist = groundDistanceKm;
 												excthrGc.rlanElevAngle = elevationAngleTxDeg;
@@ -8236,7 +8204,7 @@ void AfcManager::runPointAnalysis()
 											pathTraceGc.divIdx = divIdx;
 											pathTraceGc.segIdx = segIdx;
 											pathTraceGc.scanPtIdx = scanPtIdx;
-											pathTraceGc.rlanHtIdx = rlanPosnIdx;
+											pathTraceGc.rlanHtIdx = rlanHtIdx;
 											pathTraceGc.completeRow();
 										}
 									}
@@ -8907,33 +8875,33 @@ void AfcManager::runScanAnalysis()
 		fkml->writeEndElement(); // Folder
 
 		fkml->writeStartElement("Folder");
-		fkml->writeTextElement("name", "RAS");
-		int rasIdx;
-		for (rasIdx = 0; rasIdx < (int) _rasList.size(); ++rasIdx) {
-			RASClass *ras = _rasList[rasIdx];
+		fkml->writeTextElement("name", "Denied Region");
+		int drIdx;
+		for (drIdx = 0; drIdx < (int) _deniedRegionList.size(); ++drIdx) {
+			DeniedRegionClass *dr = _deniedRegionList[drIdx];
 
 			fkml->writeStartElement("Folder");
-			fkml->writeTextElement("name", QString("RAS_") + QString::number(ras->getID()));
+			fkml->writeTextElement("name", QString("DR_") + QString::number(dr->getID()));
 
 			int numPtsCircle = 32;
 			int rectIdx, numRect;
 			double rectLonStart, rectLonStop, rectLatStart, rectLatStop;
 			double circleRadius, longitudeCenter, latitudeCenter;
-			double rasTerrainHeight, rasBldgHeight, rasHeightAGL;
-			Vector3 rasCenterPosn;
-			Vector3 rasUpVec;
-			Vector3 rasEastVec;
-			Vector3 rasNorthVec;
-			QString ras_coords;
-			MultibandRasterClass::HeightResult rasLidarHeightResult;
-			CConst::HeightSourceEnum rasHeightSource;
-			RASClass::RASExclusionZoneTypeEnum rasType = ras->type();
-			switch(rasType) {
-				case RASClass::rectRASExclusionZoneType:
-				case RASClass::rect2RASExclusionZoneType:
-					numRect = ((RectRASClass *) ras)->getNumRect();
+			double drTerrainHeight, drBldgHeight, drHeightAGL;
+			Vector3 drCenterPosn;
+			Vector3 drUpVec;
+			Vector3 drEastVec;
+			Vector3 drNorthVec;
+			QString dr_coords;
+			MultibandRasterClass::HeightResult drLidarHeightResult;
+			CConst::HeightSourceEnum drHeightSource;
+			DeniedRegionClass::GeometryEnum drGeometry = dr->getGeometry();
+			switch(drGeometry) {
+				case DeniedRegionClass::rectGeometry:
+				case DeniedRegionClass::rect2Geometry:
+					numRect = ((RectDeniedRegionClass *) dr)->getNumRect();
 					for(rectIdx=0; rectIdx<numRect; rectIdx++) {
-						std::tie(rectLonStart, rectLonStop, rectLatStart, rectLatStop) = ((RectRASClass *) ras)->getRect(rectIdx);
+						std::tie(rectLonStart, rectLonStop, rectLatStart, rectLatStop) = ((RectDeniedRegionClass *) dr)->getRect(rectIdx);
 
 						fkml->writeStartElement("Placemark");
 						fkml->writeTextElement("name", QString("RECT_") + QString::number(rectIdx));
@@ -8946,32 +8914,32 @@ void AfcManager::runScanAnalysis()
 						fkml->writeStartElement("outerBoundaryIs");
 						fkml->writeStartElement("LinearRing");
 
-						ras_coords = QString();
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStart, 0.0));
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStop,  rectLatStart, 0.0));
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStop,  rectLatStop,  0.0));
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStop,  0.0));
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStart, 0.0));
+						dr_coords = QString();
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStart, 0.0));
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStop,  rectLatStart, 0.0));
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStop,  rectLatStop,  0.0));
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStop,  0.0));
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", rectLonStart, rectLatStart, 0.0));
 
-						fkml->writeTextElement("coordinates", ras_coords);
+						fkml->writeTextElement("coordinates", dr_coords);
 						fkml->writeEndElement(); // LinearRing
 						fkml->writeEndElement(); // outerBoundaryIs
 						fkml->writeEndElement(); // Polygon
 						fkml->writeEndElement(); // Placemark
 					}
 					break;
-				case RASClass::circleRASExclusionZoneType:
-				case RASClass::horizonDistRASExclusionZoneType:
-					circleRadius = ((CircleRASClass *) ras)->computeRadius(_rlanRegion->getMaxHeightAGL());
-					longitudeCenter = ((CircleRASClass *) ras)->getLongitudeCenter();
-					latitudeCenter = ((CircleRASClass *) ras)->getLatitudeCenter();
-					rasHeightAGL = ras->getHeightAGL();
-					_terrainDataModel->getTerrainHeight(longitudeCenter, latitudeCenter, rasTerrainHeight, rasBldgHeight, rasLidarHeightResult, rasHeightSource);
+				case DeniedRegionClass::circleGeometry:
+				case DeniedRegionClass::horizonDistGeometry:
+					circleRadius = ((CircleDeniedRegionClass *) dr)->computeRadius(_rlanRegion->getMaxHeightAGL());
+					longitudeCenter = ((CircleDeniedRegionClass *) dr)->getLongitudeCenter();
+					latitudeCenter = ((CircleDeniedRegionClass *) dr)->getLatitudeCenter();
+					drHeightAGL = dr->getHeightAGL();
+					_terrainDataModel->getTerrainHeight(longitudeCenter, latitudeCenter, drTerrainHeight, drBldgHeight, drLidarHeightResult, drHeightSource);
 
-					rasCenterPosn = EcefModel::geodeticToEcef(latitudeCenter, longitudeCenter, (rasTerrainHeight + rasHeightAGL)/ 1000.0);
-					rasUpVec = rasCenterPosn.normalized();
-					rasEastVec = (Vector3(-rasUpVec.y(), rasUpVec.x(), 0.0)).normalized();
-					rasNorthVec = rasUpVec.cross(rasEastVec);
+					drCenterPosn = EcefModel::geodeticToEcef(latitudeCenter, longitudeCenter, (drTerrainHeight + drHeightAGL)/ 1000.0);
+					drUpVec = drCenterPosn.normalized();
+					drEastVec = (Vector3(-drUpVec.y(), drUpVec.x(), 0.0)).normalized();
+					drNorthVec = drUpVec.cross(drEastVec);
 
 					fkml->writeStartElement("Placemark");
 					fkml->writeTextElement("name", QString("RECT_") + QString::number(rectIdx));
@@ -8984,17 +8952,17 @@ void AfcManager::runScanAnalysis()
 					fkml->writeStartElement("outerBoundaryIs");
 					fkml->writeStartElement("LinearRing");
 
-					ras_coords = QString();
+					dr_coords = QString();
 					for(ptIdx=0; ptIdx<=numPtsCircle; ++ptIdx) {
 						double phi = 2*M_PI*ptIdx / numPtsCircle;
-						Vector3 circlePtPosn = rasCenterPosn + (circleRadius/1000)*(rasEastVec*cos(phi) + rasNorthVec*sin(phi));
+						Vector3 circlePtPosn = drCenterPosn + (circleRadius/1000)*(drEastVec*cos(phi) + drNorthVec*sin(phi));
 
 						GeodeticCoord circlePtPosnGeodetic = EcefModel::ecefToGeodetic(circlePtPosn);
 
-						ras_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", circlePtPosnGeodetic.longitudeDeg, circlePtPosnGeodetic.latitudeDeg, 0.0));
+						dr_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", circlePtPosnGeodetic.longitudeDeg, circlePtPosnGeodetic.latitudeDeg, 0.0));
 					}
 
-					fkml->writeTextElement("coordinates", ras_coords);
+					fkml->writeTextElement("coordinates", dr_coords);
 					fkml->writeEndElement(); // LinearRing
 					fkml->writeEndElement(); // outerBoundaryIs
 					fkml->writeEndElement(); // Polygon
@@ -9080,15 +9048,15 @@ void AfcManager::runScanAnalysis()
 
 			double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-			int rasIdx;
-			for (rasIdx = 0; rasIdx < (int) _rasList.size(); ++rasIdx) {
-				RASClass *ras = _rasList[rasIdx];
-				if (ras->intersect(rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, 0.0, rlanHtAboveTerrain)) {
+			int drIdx;
+			for (drIdx = 0; drIdx < (int) _deniedRegionList.size(); ++drIdx) {
+				DeniedRegionClass *dr = _deniedRegionList[drIdx];
+				if (dr->intersect(rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, 0.0, rlanHtAboveTerrain)) {
 					for (auto& channel : _channelList) {
 						if (channel.availability != BLACK) {
 							double chanStartFreq = channel.startFreqMHz * 1.0e6;
 							double chanStopFreq = channel.stopFreqMHz * 1.0e6;
-							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, ras->getStartFreq(), ras->getStopFreq(), false, CConst::psdSpectralAlgorithm);
+							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, dr->getStartFreq(), dr->getStopFreq(), false, CConst::psdSpectralAlgorithm);
 							if (hasOverlap) {
 								channel.availability = BLACK;
 								channel.eirpLimit_dBm = -std::numeric_limits<double>::infinity();

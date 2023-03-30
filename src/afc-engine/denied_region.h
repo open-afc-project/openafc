@@ -1,9 +1,9 @@
 /******************************************************************************************/
-/**** FILE : ras.h                                                                     ****/
+/**** FILE : denied_region.h                                                           ****/
 /******************************************************************************************/
 
-#ifndef RAS_H
-#define RAS_H
+#ifndef DENIED_REGION_H
+#define DENIED_REGION_H
 
 #include "Vector3.h"
 #include "cconst.h"
@@ -17,33 +17,46 @@ class AntennaClass;
 template<class T> class ListClass;
 
 /******************************************************************************************/
-/**** CLASS: RASClass                                                                  ****/
+/**** CLASS: DeniedRegionClass                                                         ****/
 /******************************************************************************************/
-class RASClass
+class DeniedRegionClass
 {
 	public:
-		RASClass(int idVal);
-		virtual ~RASClass();
+		DeniedRegionClass(int idVal);
+		virtual ~DeniedRegionClass();
 
 		/**************************************************************************************/
-		/**** RASExclusionZoneType                                                     ****/
+		/**** Geometry                                                                     ****/
 		/**************************************************************************************/
-		enum RASExclusionZoneTypeEnum {
-			nullRASExclusionZoneType,
-			rectRASExclusionZoneType,
-			rect2RASExclusionZoneType,
-			circleRASExclusionZoneType,
-			horizonDistRASExclusionZoneType
+		enum GeometryEnum {
+			nullGeometry,
+			rectGeometry,
+			rect2Geometry,
+			circleGeometry,
+			horizonDistGeometry
 		};
 		/**************************************************************************************/
 
-		virtual RASExclusionZoneTypeEnum type() const = 0;
+		/**************************************************************************************/
+		/**** Type                                                                         ****/
+		/**************************************************************************************/
+		enum TypeEnum {
+			nullType,
+			RASType,
+			userSpecifiedType
+		};
+		/**************************************************************************************/
+
+		virtual GeometryEnum getGeometry() const = 0;
 
 		virtual bool intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const = 0;
 
 		int getID() const {
 			return id;
 		}
+
+		TypeEnum getType() const { return(type); }
+        void setType(TypeEnum typeVal) { type = typeVal; }
 
 		void setStartFreq(double startFreqVal) { startFreq = startFreqVal; return; }
 		void setStopFreq (double  stopFreqVal) { stopFreq  =  stopFreqVal; return; }
@@ -55,6 +68,7 @@ class RASClass
 
 	protected:
 		int id;
+		TypeEnum type;
 
 		double startFreq;
 		double stopFreq;
@@ -64,21 +78,21 @@ class RASClass
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** CLASS: RectRASClass                                                              ****/
+/**** CLASS: RectDeniedRegionClass                                                     ****/
 /******************************************************************************************/
-class RectRASClass : public RASClass
+class RectDeniedRegionClass : public DeniedRegionClass
 {
 	public:
-		RectRASClass(int idVal);
-		~RectRASClass();
+		RectDeniedRegionClass(int idVal);
+		~RectDeniedRegionClass();
 
-		RASExclusionZoneTypeEnum type() const {
+		GeometryEnum getGeometry() const {
 			if (rectList.size() == 1) {
-				return rectRASExclusionZoneType;
+				return rectGeometry;
 			} else if (rectList.size() == 2) {
-				return rect2RASExclusionZoneType;
+				return rect2Geometry;
 			} else {
-				return nullRASExclusionZoneType;
+				return nullGeometry;
 			}
 		}
 
@@ -95,19 +109,19 @@ class RectRASClass : public RASClass
 /******************************************************************************************/
 
 /******************************************************************************************/
-/**** CLASS: CircleRASClass                                                            ****/
+/**** CLASS: CircleDeniedRegionClass                                                   ****/
 /******************************************************************************************/
-class CircleRASClass : public RASClass
+class CircleDeniedRegionClass : public DeniedRegionClass
 {
 	public:
-		CircleRASClass(int idVal, bool horizonDistFlagVal);
-		~CircleRASClass();
+		CircleDeniedRegionClass(int idVal, bool horizonDistFlagVal);
+		~CircleDeniedRegionClass();
 
-		RASExclusionZoneTypeEnum type() const {
+		GeometryEnum getGeometry() const {
 			if (!horizonDistFlag) {
-				return circleRASExclusionZoneType;
+				return circleGeometry;
 			} else {
-				return horizonDistRASExclusionZoneType;
+				return horizonDistGeometry;
 			}
 		}
 

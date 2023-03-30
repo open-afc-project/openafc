@@ -60,7 +60,9 @@ export interface AFCConfigFile {
     passiveRepeaterFlag?: boolean,
     printSkippedLinksFlag?: boolean,
     reportErrorRlanHeightLowFlag?: boolean;
-    nearFieldAdjFlag?: boolean
+    nearFieldAdjFlag?: boolean,
+    deniedRegionFile?: string,
+
 }
 
 export type FreqRange = {
