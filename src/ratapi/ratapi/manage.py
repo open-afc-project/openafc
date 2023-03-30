@@ -24,7 +24,6 @@ from .db.generators import shp_to_spatialite, spatialite_to_raster
 from prettytable import PrettyTable
 from flask_script import Manager, Command, Option, commands
 from . import cmd_utils
-from . import data_if
 
 LOGGER = logging.getLogger(__name__)
 

@@ -1,7 +1,7 @@
 #
 # This Python file uses the following encoding: utf-8
 #
-# Portions copyright © 2021 Broadcom.
+# Portions copyright (C) 2021 Broadcom.
 # All rights reserved. The term “Broadcom” refers solely
 # to the Broadcom Inc. corporate affiliate that owns the software below.
 # This work is licensed under the OpenAFC Project License, a copy of which
@@ -14,7 +14,7 @@ import shutil
 from celery import Celery
 from celery.utils.log import get_task_logger
 from .. import defs
-from .. import data_if
+from fst import DataIf
 from .. import task
 from .. import config
 
@@ -88,7 +88,7 @@ def run(prot, host, port, state_root,
     os.makedirs(tmpdir)
     probeHttps=None
 
-    dataif = data_if.DataIf(prot, host, port, state_root, probeHttps, mntroot)
+    dataif = DataIf(prot, host, port, state_root, probeHttps, mntroot)
     t = task.Task(task_id, dataif, state_root, hash, region, history_dir, mntroot)
     t.toJson(task.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
 

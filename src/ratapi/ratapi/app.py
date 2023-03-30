@@ -17,7 +17,7 @@ import flask
 import requests
 from sqlalchemy import exc
 from . import config
-from . import data_if
+from fst import DataIf
 from . import als
 
 #: Logger for this module
@@ -214,14 +214,14 @@ def create_app(config_override=None):
             ('/ratapi/v1/files/antenna_pattern', antenna_patterns, False)
         )
 
-        dataif = data_if.DataIf(
+        dataif = DataIf(
             fsroot=flaskapp.config['STATE_ROOT_PATH'],
             probeHttps=False,
             mntroot=flaskapp.config['NFS_MOUNT_PATH'])
         if dataif.isFsBackend():
             hist_dir = os.path.join(
         	    flaskapp.config['STATE_ROOT_PATH'],
-        	    data_if.DataIf.LHISTORYDIR)
+        	    DataIf.LHISTORYDIR)
             if not os.path.exists(hist_dir):
                 os.makedirs(hist_dir)
             tmp = list(dav_trees)

@@ -24,8 +24,11 @@ RUN echo "AFC_APP_TYPE = 'server'" >> /etc/xdg/fbrat/ratapi.conf
 FROM httpd:2.4.54-alpine as rat_server.build
 COPY --from=rat_server.preinstall / /
 # Development env
-RUN apk add --update --no-cache build-base cmake ninja yarn apr-util-dev python3-dev
-RUN pip3 install --no-cache --upgrade mod_wsgi && mod_wsgi-express install-module
+RUN apk add --update --no-cache build-base cmake ninja yarn \
+    apr-util-dev python3-dev
+RUN pip3 install --no-cache --upgrade mod_wsgi \
+    && mod_wsgi-express install-module
+#
 #
 COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /wd/
 COPY cmake /wd/cmake/
@@ -44,6 +47,11 @@ FROM httpd:2.4.54-alpine as install_image
 COPY --from=rat_server.preinstall / /
 COPY --from=rat_server.build /wd/__install /usr/
 COPY --from=rat_server.build /usr/lib/python3.10/site-packages/mod_wsgi /usr/lib/python3.10/site-packages/mod_wsgi
+#
+COPY src/afc-packages /wd/afc-packages
+RUN pip3 install --use-pep517 --root-user-action=ignore \
+        /wd/afc-packages/fstorage \
+    && rm -rf /wd/afc-packages
 #
 # Add user and group
 RUN addgroup -g 1003 fbrat && \

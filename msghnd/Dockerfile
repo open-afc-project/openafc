@@ -41,6 +41,11 @@ FROM alpine:3.17 as msghnd.install
 COPY --from=msghnd.preinstall / /
 COPY --from=msghnd.build /wd/__install /usr/
 #
+COPY src/afc-packages /wd/afc-packages
+RUN pip3 install --use-pep517 --root-user-action=ignore \
+        /wd/afc-packages/fstorage \
+    && rm -rf /wd/afc-packages
+#
 RUN mkdir -m 750 -p /var/lib/fbrat/AntennaPatterns && \
 mkdir -m 755 -p /var/spool/fbrat /var/lib/fbrat /var/celery /var/run/celery /var/log/celery
 # Add user and group

@@ -1,7 +1,7 @@
 #
 # This Python file uses the following encoding: utf-8
 #
-# Portions copyright © 2021 Broadcom.
+# Portions copyright (C) 2021 Broadcom.
 # All rights reserved. The term “Broadcom” refers solely
 # to the Broadcom Inc. corporate affiliate that owns the software below.
 # This work is licensed under the OpenAFC Project License, a copy of which
@@ -34,7 +34,7 @@ from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint, AFCConfig
 from .auth import auth
 from .ratapi import build_task, nraToRegionStr
-from .. import data_if
+from fst import DataIf
 from .. import task
 from .. import als
 from ..models.base import db
@@ -349,7 +349,7 @@ class RatAfc(MethodView):
         task_id = flask.request.args['task_id']
         LOGGER.debug("RatAfc.get() task_id={}".format(task_id))
 
-        dataif = data_if.DataIf(
+        dataif = DataIf(
             fsroot=flask.current_app.config['STATE_ROOT_PATH'],
             mntroot=flask.current_app.config['NFS_MOUNT_PATH']
             )
@@ -444,7 +444,7 @@ class RatAfc(MethodView):
                 LOGGER.debug('RatAfc::post() runtime %d', runtime_opts)
 
                 task_id = str(uuid.uuid4())
-                dataif = data_if.DataIf(
+                dataif = DataIf(
                     fsroot=flask.current_app.config['STATE_ROOT_PATH'],
                     mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
 

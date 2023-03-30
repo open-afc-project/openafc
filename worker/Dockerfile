@@ -28,15 +28,23 @@ ninja -j$(nproc) install
 RUN cd /root/afc/src/afc-engine-preload && make && cp aep.so /root/afc/__install/lib/ && cp parse_fs.py /root/afc/__install/bin/
 RUN strip --strip-unneeded /root/afc/__install/bin/afc-engine
 RUN strip --strip-unneeded /root/afc/__install/lib/*.so
-
+#
 # Stage Install
+#
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 
 COPY --from=build_image /root/afc/__install /usr/
 COPY --from=build_image /root/gdal/__install/lib /usr/lib/
 # For development environment
 COPY --from=build_image /usr/include/gdal /usr/include/gdal/
-
+#
+RUN python3 -m ensurepip \
+    && pip3 install --no-cache --upgrade pip setuptools
+COPY src/afc-packages /wd/afc-packages
+RUN pip3 install --use-pep517 --root-user-action=ignore \
+        /wd/afc-packages/fstorage \
+    && rm -rf /wd/afc-packages
+#
 RUN mkdir -m 755 -p /var/spool/fbrat
 RUN mkdir -m 755 -p /var/lib/fbrat
 RUN mkdir -m 755 -p /var/celery
