@@ -1,5 +1,33 @@
  # Release Note
 
+## **Version and Date**
+|Version|**OA-580**|
+| :- | :- |
+|**Date**|**03/30/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-580: List of denied geographic areas
+
+ * Jira OA-617: Update US RAS Database
+ * The only change was the RAS database for the US in the FS database.sqlite3 file. 
+ * Please download the updated file from: https://drive.google.com/file/d/1rldFtY89-33q8xBYlKth8AaLp2fYzOMp/view?usp=share_linkusp=share_link
+ * This FS database is: FS_2023-03-28T02_12_59.301827_fixedBPS_sorted_param.sqlite3
+
+ * Jira OA-622: RAS exclusion not handled properly
+
+## **Interface Changes**
+ * OA-580: A new parameter has been added to afc-config.json. This parameter is "deniedRegionFile":"" which is currently pointing to a blank file since we don't have a denied geographic region. If we do have one, we would have "deniedRegionFile": "rat_transfer/denied_region/filename.csv"
+ * In other words, a new directory called "denied_region" needs to be added under rat_transfer and the denied_region file would be placed there. Note that this was a requirement for Canada AFC but it can be used for US AFC as well if desired.
+
+
+## **Testing Done**
+ * OA-617: confirmed in .sqlite3 that the RAS database was updated correctly.
+ * OA-622: Confirmed that the WFA TVs that previously had incorrect responses were corrected. These are FSP77 through FSP84.
+ * OA-580: Tested a denied region and confirmed that if RLAN lands in that region, the channels overlapping the range per the denied_region_file will be blocked.
+
+## **Open Issues** 
+
 
 ## **Version and Date**
 |Version|3.7.5.0|
