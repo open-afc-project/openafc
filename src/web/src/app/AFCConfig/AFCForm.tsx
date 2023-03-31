@@ -41,7 +41,7 @@ export class AFCForm extends React.Component<
         super(props);
         let config = props.config as AFCConfigFile
         if (props.frequencyBands.length > 0) {
-            config.freqBands = props.frequencyBands;
+            config.freqBands = props.frequencyBands.filter((x)=> (x.region == config.regionStr) || (!x.region && config.regionStr == 'US'));
         } else {
             config.freqBands = defaultRanges[config.regionStr ?? "US"];
         }
@@ -202,7 +202,7 @@ export class AFCForm extends React.Component<
     private reset = () => {
         let config = getDefaultAfcConf(this.state.config.regionStr);
        
-        config.freqBands = this.props.frequencyBands.filter((x)=> x.region == this.state.config.regionStr)
+        config.freqBands = this.props.frequencyBands.filter((x)=> (x.region == this.state.config.regionStr)  || (!x.region && this.state.config.regionStr == 'US'))
 
         this.updateEntireConfigState(config);
     }
