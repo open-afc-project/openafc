@@ -14,8 +14,6 @@ import abc
 import os
 import inspect
 import logging
-import shutil
-import errno
 import requests
 
 
@@ -52,67 +50,6 @@ class DataInt:
         pass
 
 
-class DataIntFs(DataInt):
-    """ Data prot operations for the local FS prot """
-
-    def __mkdir(self, path):
-        try:
-            os.makedirs(path, 0o777)
-        except OSError as e:
-            if e.errno != errno.EEXIST:
-                raise e
-        else:
-            app_log.debug("__mkBaseDir({})".format(path))
-        self.__fixMod(path)
-
-    def __fixMod(self, path):
-        # ratapi, workers, and user console are run under root and fbrat users.
-        # In the future, all those processes will be executed
-        # under "fbrat" 1003:1003,
-        # and this function will be removed.
-        try:
-            os.chown(path, 1003, 1003)
-            mode = os.stat(path).st_mode
-            if mode & 0o111:
-                mode |= 0o111
-            mode |= 0o666
-            os.chmod(path, mode)
-        except OSError:
-            pass
-
-    def write(self, data):
-        """ write data to prot """
-        app_log.debug("DataIntFs.write() {}".format(self._file_name))
-        self.__mkdir(os.path.dirname(self._file_name))
-        with open(self._file_name, "wb") as f:
-            f.write(data)
-        self.__fixMod(self._file_name)
-
-    def read(self):
-        """ read data from prot """
-        app_log.debug("DataIntFs.read({})".format(self._file_name))
-        r = None
-        with open(self._file_name, "rb") as f:
-            r = f.read()
-        if r is None:
-            raise Exception("Cant get file")
-        return r
-
-    def head(self):
-        """ is data exist in prot """
-        app_log.debug("DataIntFs.exists({})".format(self._file_name))
-        return os.path.exists(self._file_name)
-
-    def delete(self):
-        """ remove data from prot """
-        app_log.debug("DataIntFs.delete({})".format(self._file_name))
-        if os.path.exists(self._file_name):
-            if os.path.isdir(self._file_name):
-                shutil.rmtree(self._file_name, ignore_errors=True)
-            else:
-                os.remove(self._file_name)
-
-
 class DataIntHttp(DataInt):
     """ Data prot operations for the HTTP server prot """
 
@@ -147,8 +84,6 @@ class DataIntHttp(DataInt):
 class DataIfBaseV1():
     """ Object storage access """
     AUTO = "auto"
-    REMOTE = "remote"
-    LOCAL = "local"
     HTTP = "http"
     HTTPS = "https"
 
@@ -173,7 +108,7 @@ class DataIfBaseV1():
             app_log.debug("httpsProbe() HTTPS ok")
             return True
 
-        if self._prot == self.REMOTE:
+        if self._prot == self.AUTO:
             if httpsProbe(self._host, self._port, probeHttps):
                 self._prot = self.HTTPS
             else:
@@ -185,11 +120,7 @@ class DataIfBaseV1():
             "dbg": None,
             "cert": None,
             }
-        if self._prot == self.LOCAL and self._fsroot and self._mnt_root:
-            self._rpath["pro"] = os.path.join(self._mnt_root, "responses")
-            self._rpath["cfg"] = os.path.join(self._mnt_root, "afc_config")
-            self._rpath["dbg"] = os.path.join(self._fsroot, self.LHISTORYDIR)
-        elif self._prot == self.HTTP and self._host and self._port:
+        if self._prot == self.HTTP and self._host and self._port:
             pref = "http://" + self._host + ":" + str(self._port) + "/"
             self._rpath["pro"] = pref + "pro"
             self._rpath["cfg"] = pref + "cfg"
@@ -205,17 +136,12 @@ class DataIfBaseV1():
         """ Create FileInt instance """
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         app_log.debug("DataIfBaseV1.open({})".format(r_name))
-        if self._prot == self.LOCAL:
-            return DataIntFs(r_name)
-        if self._prot in (self.HTTP, self.HTTPS):
-            return DataIntHttp(r_name)
-        raise Exception("Undeclared backend")
+        return DataIntHttp(r_name)
 
 
 class DataIf(DataIfBaseV1):
     """ Wrappers for RATAPI data operations """
-    def __init__(self, prot=DataIfBaseV1.AUTO, host=None, port=None,
-                 fsroot=None, probeHttps=None, mntroot=None):
+    def __init__(self, prot=DataIfBaseV1.AUTO, host=None, port=None, probeHttps=None):
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         # Assign default args from env vars
         self._host = host
@@ -227,10 +153,8 @@ class DataIf(DataIfBaseV1):
         scheme = None
         if "AFC_OBJST_SCHEME" in os.environ:
             scheme = os.environ["AFC_OBJST_SCHEME"]
-            if probeHttps is None:
-                probeHttps = False
-        self._fsroot = fsroot
-        self._mnt_root = mntroot
+        if probeHttps is None:
+            probeHttps = False
 
         # check args
         if self._port is not None and not self._port.isdigit():
@@ -240,23 +164,13 @@ class DataIf(DataIfBaseV1):
 
         # Clarify protocol by env.vars
         if prot == self.AUTO:
-            if self._host and self._port:
-                prot = self.REMOTE
-            else:
-                prot = self.LOCAL
-        if prot == self.REMOTE:
             if scheme == "HTTPS":
                 prot = self.HTTPS
             if scheme == "HTTP":
                 prot = self.HTTP
 
         # Check protocol
-        if prot == self.LOCAL:
-            if not fsroot:
-                raise Exception("Missing fsroot")
-            if not mntroot:
-                raise Exception("Missing mntroot")
-        elif prot in (self.HTTP, self.HTTPS, self.REMOTE):
+        if prot in (self.HTTP, self.HTTPS, self.AUTO):
             if not self._host or not self._port:
                 raise Exception("Missing host:port")
         else:
@@ -266,7 +180,8 @@ class DataIf(DataIfBaseV1):
 
         DataIfBaseV1.__init__(self, probeHttps)
 
-        app_log.debug("DataIf.__init__: prot={} host={} port={} fsroot={} probeHttps={} scheme={} mntroot={} _rpath={}".format(self._prot, self._host, self._port, self._fsroot, probeHttps, scheme, self._mnt_root, self._rpath))
+        app_log.debug("DataIf.__init__: prot={} host={} port={} probeHttps={} scheme={} _rpath={}"
+                      .format(self._prot, self._host, self._port, probeHttps, scheme, self._rpath))
 
     def rname(self, type, baseName):
         """ Return remote file name by basename """
@@ -278,11 +193,8 @@ class DataIf(DataIfBaseV1):
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         return DataIfBaseV1.open(self, self.rname(type, baseName))
 
-    def isFsBackend(self):
-        return self._prot == self.LOCAL
-
     def getProtocol(self):
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
-        return self._prot, self._host, self._port, self._fsroot, self._mnt_root
+        return self._prot, self._host, self._port
 
 # vim: sw=4:et:tw=80:cc=+1

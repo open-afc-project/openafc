@@ -86,10 +86,9 @@ def run(prot, host, port, state_root,
 
     tmpdir = os.path.join(state_root, task_id)
     os.makedirs(tmpdir)
-    probeHttps=None
 
-    dataif = DataIf(prot, host, port, state_root, probeHttps, mntroot)
-    t = task.Task(task_id, dataif, state_root, hash, region, history_dir, mntroot)
+    dataif = DataIf(prot, host, port)
+    t = task.Task(task_id, dataif, hash, region, history_dir)
     t.toJson(task.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
 
     proc = None

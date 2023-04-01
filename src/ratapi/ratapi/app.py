@@ -214,20 +214,6 @@ def create_app(config_override=None):
             ('/ratapi/v1/files/antenna_pattern', antenna_patterns, False)
         )
 
-        dataif = DataIf(
-            fsroot=flaskapp.config['STATE_ROOT_PATH'],
-            probeHttps=False,
-            mntroot=flaskapp.config['NFS_MOUNT_PATH'])
-        if dataif.isFsBackend():
-            hist_dir = os.path.join(
-        	    flaskapp.config['STATE_ROOT_PATH'],
-        	    DataIf.LHISTORYDIR)
-            if not os.path.exists(hist_dir):
-                os.makedirs(hist_dir)
-            tmp = list(dav_trees)
-            tmp.append(('/ratapi/v1/files/history', hist_dir, False))
-            dav_trees = tuple(tmp)
-
         dav_wsgi_apps = {}
         for (url_path, fs_path, read_only) in dav_trees:
             if fs_path is None:

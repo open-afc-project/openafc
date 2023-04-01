@@ -25,8 +25,7 @@ class Task():
     STAT_SUCCESS = "SUCCESS"
     STAT_FAILURE = "FAILURE"
 
-    def __init__(self, task_id, dataif, fsroot, hash=None,
-                 region=None, history_dir=None, mntroot=None):
+    def __init__(self, task_id, dataif, hash=None, region=None, history_dir=None):
         LOGGER.debug("task.__init__(task_id={})".format(task_id))
         self.__dataif = dataif
         self.__task_id = task_id
@@ -36,9 +35,7 @@ class Task():
             'history_dir': history_dir,
             'hash': hash,
             'runtime_opts': None,
-            'exit_code': 0,
-            'state_root': fsroot,
-            'mnt_path': mntroot,
+            'exit_code': 0
             }
 
     def get(self):
@@ -60,9 +57,7 @@ class Task():
                 'history_dir' not in stat or
                 'hash' not in stat or
                 'runtime_opts' not in stat or
-                'exit_code' not in stat or
-                'state_root' not in stat or
-                'mnt_path' not in stat):
+                'exit_code' not in stat):
             LOGGER.error("task.get() bad {}/status.json: {}".
                          format(self.__dataif.rname("pro", self.__task_id), stat))
             raise Exception("Bad status.json")

@@ -83,12 +83,12 @@ def build_task(dataif,
     Shared logic between PAWS and All other analysis for constructing and async call to run task
     """
 
-    prot, host, port, state_root, mntroot = dataif.getProtocol()
+    prot, host, port = dataif.getProtocol()
     args=[
         prot,
         host,
         port,
-        state_root,
+        flask.current_app.config['STATE_ROOT_PATH'],
         flask.current_app.config["AFC_ENGINE"],
         request_type,
         flask.current_app.config["DEBUG"],
@@ -97,11 +97,10 @@ def build_task(dataif,
         region,
         history_dir,
         runtime_opts,
-        mntroot
+        flask.current_app.config['NFS_MOUNT_PATH']
     ]
     LOGGER.debug("build_task() {}".format(args))
     run.apply_async(args)
-
 
 class GuiConfig(MethodView):
     ''' Allow the web UI to obtain configuration, including resolved URLs.
@@ -121,11 +120,6 @@ class GuiConfig(MethodView):
             LOGGER.error('Failed to fetch server version: {0}'.format(err))
             serververs = 'unknown'
 
-        dataif = DataIf(
-            fsroot=flask.current_app.config["STATE_ROOT_PATH"],
-            probeHttps=False,
-            mntroot=flask.current_app.config['NFS_MOUNT_PATH'])
-
         # TODO: temporary support python2
         if sys.version_info.major != 3:
             from urlparse import urlparse
@@ -133,11 +127,7 @@ class GuiConfig(MethodView):
             from urllib.parse import urlparse
 
         u = urlparse(flask.request.url)
-        histurl = None
-        if dataif.isFsBackend():
-            histurl = u.scheme + "://" + u.netloc + flask.url_for('files.history')
-        else:
-            histurl = u.scheme + "://" + u.netloc + "/dbg"
+        histurl = u.scheme + "://" + u.netloc + "/dbg"
 
         if flask.current_app.config['OIDC_LOGIN']:
             login_url=flask.url_for('auth.LoginAPI'),
