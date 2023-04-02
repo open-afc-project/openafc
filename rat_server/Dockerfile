@@ -15,7 +15,7 @@ python3 -m ensurepip && \
 pip3 install --no-cache --upgrade pip setuptools
 COPY rat_server/requirements.txt /wd/
 RUN pip3 install -r /wd/requirements.txt && mkdir -p /etc/xdg/fbrat
-COPY prereqs/ratapi.conf /etc/xdg/fbrat/
+COPY config/ratapi.conf /etc/xdg/fbrat/
 RUN echo "DEFAULT_ULS_DIR = '/mnt/nfs/rat_transfer/ULS_Database'" >> /etc/xdg/fbrat/ratapi.conf
 RUN echo "AFC_APP_TYPE = 'server'" >> /etc/xdg/fbrat/ratapi.conf
 #
