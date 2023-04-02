@@ -196,20 +196,17 @@ def fail_done(t):
     task_stat = t.getStat()
     dataif = t.getDataif()
     error_data = None
-    with dataif.open("pro", task_stat['hash'] + "/analysisRequest.json") as hfile:
-        hfile.delete()
-    try:
-        with dataif.open("pro", t.getId() + "/engine-error.txt") as hfile:
+    with dataif.open(os.path.join("/responses", t.getId(), "engine-error.txt")) as hfile:
+        try:
             error_data = hfile.read()
-    except:
-        return flask.make_response(
-            flask.json.dumps(dict(message='Resource already deleted')),
-            410)
-    LOGGER.debug("Error data: %s", error_data)
-    _translate_afc_error(error_data)
-    with dataif.open("pro", task_stat['hash']) as hfile:
+        except:
+            LOGGER.debug("engine-error.txt not found")
+        else:
+            LOGGER.debug("Error data: %s", error_data)
+            _translate_afc_error(error_data)
+    with dataif.open(os.path.join("/responses", task_stat['hash'])) as hfile:
         hfile.delete()
-    with dataif.open("pro", t.getId()) as hfile:
+    with dataif.open(os.path.join("/responses", t.getId())) as hfile:
         hfile.delete()
     # raise for internal AFC E2yyngine error
     raise AP_Exception(-1, error_data)
@@ -234,13 +231,14 @@ def success_done(t):
     LOGGER.debug('success_done()')
     task_stat = t.getStat()
     dataif = t.getDataif()
-    hash = task_stat['hash']
+    hash_val = task_stat['hash']
 
     resp_data = None
-    with dataif.open("pro", hash + "/analysisResponse.json.gz") as hfile:
+    with dataif.open(os.path.join("/responses", hash_val, "analysisResponse.json.gz")) as hfile:
         resp_data = hfile.read()
     if task_stat['runtime_opts'] & RNTM_OPT_DBG:
-        with dataif.open("dbg", task_stat['history_dir'] + "/analysisResponse.json.gz") as hfile:
+        with dataif.open(os.path.join(task_stat['history_dir'],
+                                      "/analysisResponse.json.gz")) as hfile:
             hfile.write(resp_data)
     LOGGER.debug('resp_data size={}'.format(sys.getsizeof(resp_data)))
     resp_data = zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
@@ -249,13 +247,13 @@ def success_done(t):
         # Add the map data file (if it is generated) into a vendor extension
         kmz_data = None
         try:
-            with dataif.open("pro", t.getId() + "/results.kmz") as hfile:
+            with dataif.open(os.path.join("/responses", t.getId(), "results.kmz")) as hfile:
                 kmz_data = hfile.read()
         except:
             pass
         map_data = None
         try:
-            with dataif.open("pro", t.getId() + "/mapData.json.gz") as hfile:
+            with dataif.open(os.path.join("/responses", t.getId(), "mapData.json.gz")) as hfile:
                 map_data = hfile.read()
         except:
             pass
@@ -288,7 +286,7 @@ def success_done(t):
     resp = flask.make_response(resp_data)
     resp.content_type = 'application/json'
     LOGGER.debug("returning data: %s", resp.data)
-    with dataif.open("pro", t.getId()) as hfile:
+    with dataif.open(os.path.join("/responses", t.getId())) as hfile:
         hfile.delete()
     return resp
 
@@ -433,9 +431,7 @@ class RatAfc(MethodView):
                 opt = flask.request.args.get('nocache')
                 if opt == 'True':
                     runtime_opts |= RNTM_OPT_NOCACHE
-                if ('AFC_OBJST_HOST' in os.environ and
-                        'AFC_OBJST_PORT' in os.environ):
-                    runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
+                runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
                 LOGGER.debug('RatAfc::post() runtime %d', runtime_opts)
 
                 task_id = str(uuid.uuid4())
@@ -451,9 +447,9 @@ class RatAfc(MethodView):
                 hashlibobj.update(config_bytes.encode('utf-8'))
                 hash1 = hashlibobj.hexdigest()
 
-                config_path = nra + "/" + hash1
+                config_path = os.path.join("/afc_config", nra, hash1, "afc_config.json")
                 # check config_path exist
-                with dataif.open("cfg", config_path + "/afc_config.json") as hfile:
+                with dataif.open(config_path) as hfile:
                     if not hfile.head():
                         # Write afconfig to objst cache.
                         # convert TESTxxx region to xxx in cache to make afc engine sane
@@ -466,13 +462,13 @@ class RatAfc(MethodView):
                 # calculate hash of config + request
                 request_json_bytes = json.dumps(request, sort_keys=True).encode('utf-8')
                 hashlibobj.update(request_json_bytes)
-                hash = hashlibobj.hexdigest()
+                hash_val = hashlibobj.hexdigest()
 
                 # check cache
                 if not runtime_opts & (RNTM_OPT_GUI | RNTM_OPT_NOCACHE):
                     try:
-                        with dataif.open(
-                            "pro", hash + "/analysisResponse.json.gz") as hfile:
+                        with dataif.open(os.path.join(
+                            "/responses", hash_val, "analysisResponse.json.gz")) as hfile:
                             resp_data = hfile.read()
                     except:
                         pass
@@ -486,26 +482,26 @@ class RatAfc(MethodView):
                             actualResult[0])
                         continue
 
-                with dataif.open("pro", hash + "/analysisRequest.json") as hfile:
+                with dataif.open(os.path.join("/responses", hash_val, "analysisRequest.json")) as hfile:
                     hfile.write(request_json_bytes)
                 history_dir = None
                 if runtime_opts & (RNTM_OPT_DBG | RNTM_OPT_SLOW_DBG):
-                    history_dir = org + "/" + str(serial) + "/" + \
-                        str(datetime.datetime.now().isoformat())
+                    history_dir = os.path.join("/history", org, str(serial),
+                                               str(datetime.datetime.now().isoformat()))
                 if runtime_opts & RNTM_OPT_DBG:
-                    with dataif.open("dbg", history_dir + "/analysisRequest.json") as hfile:
+                    with dataif.open(os.path.join(history_dir, "analysisRequest.json")) as hfile:
                         hfile.write(request_json_bytes)
-                    with dataif.open("dbg", history_dir + "/afc_config.json") as hfile:
+                    with dataif.open(os.path.join(history_dir, "afc_config.json")) as hfile:
                         hfile.write(config_bytes.encode('utf-8'))
 
                 build_task(dataif,
                         request_type,
-                        task_id, hash, config_path, history_dir,
+                        task_id, hash_val, config_path, history_dir,
                         runtime_opts)
 
                 conn_type = flask.request.args.get('conn_type')
                 LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
-                t = task.Task(task_id, dataif,hash, nra, history_dir)
+                t = task.Task(task_id, dataif, hash_val, history_dir)
                 if conn_type == 'async':
                     if len(requests) > 1:
                         raise AP_Exception(-1, "Unsupported multipart async request")

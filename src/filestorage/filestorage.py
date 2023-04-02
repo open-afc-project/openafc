@@ -40,12 +40,6 @@ if flask.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
     client = google.cloud.storage.client.Client()
     bucket = client.bucket(flask.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
 
-loc = {
-    "pro": flask.config['PRO_LOCATION'],
-    "cfg": flask.config['CFG_LOCATION'],
-    "dbg": flask.config['DBG_LOCATION']
-}
-
 #pattern = re.compile(flask.config['FILE_LOCATION']+"/"+"^[0-9a-fA-F]{32}/.*")
 #def check_path(path):
 #    path = os.path.join(flask.config['FILE_LOCATION'], path)
@@ -152,11 +146,7 @@ class Objstorage:
 
 
 def get_local_path(path):
-    prefix = path.split('/')[0]
-    if prefix not in loc:
-        flask.logger.error('get_local_path: wrong path {}'.format(path))
-        abort(403, 'Forbidden')
-    path = loc[prefix] + path[len(prefix):]
+    path = os.path.join(flask.config["FILE_LOCATION"], path)
     return path
 
 
@@ -203,11 +193,12 @@ def delete(path):
             hobj.delete()
     except Exception as e:
         flask.logger.error(e)
-        return abort(500)
+        return make_response('File not found', 404)
 
     return make_response('OK', 204)
 
 
+@flask.route('/', defaults={'path': ''}, methods=['HEAD'])
 @flask.route('/'+'<path:path>', methods=['HEAD'])  # handle URL with filename
 def head(path):
     ''' Is file exist handler. '''
@@ -220,7 +211,7 @@ def head(path):
             if hobj.head():
                 return make_response('OK', 200)
             else:
-                abort(404)
+                return make_response('File not found', 404)
     except Exception as e:
         flask.logger.error(e)
         return abort(500)
@@ -240,7 +231,7 @@ def get(path):
                 return data
             else:
                 flask.logger.error('{}: File not found'.format(path))
-                abort(404)
+                return make_response('File not found', 404)
     except Exception as e:
         flask.logger.error(e)
         return abort(500)

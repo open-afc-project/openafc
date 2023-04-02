@@ -175,7 +175,8 @@ class Objstorage:
             return ObjIntGoogleCloudBucket(name)
         if flask.config["AFC_OBJST_MEDIA"] == "LocalFS":
             return ObjIntLocalFS(name)
-        raise Exception("Unsupported AFC_OBJST_MEDIA \"{}\"".format(flask.config["AFC_OBJST_MEDIA"]))
+        raise Exception("Unsupported AFC_OBJST_MEDIA \"{}\"".
+                        format(flask.config["AFC_OBJST_MEDIA"]))
 
 
 def get_local_path(path):
@@ -186,7 +187,7 @@ def get_local_path(path):
     elif prefix != "dbg":
         flask.logger.error('get_local_path: wrong path {}'.format(path))
         abort(403, 'Forbidden')
-    path = flask.config["DBG_LOCATION"] + path[len(prefix):]
+    path = os.path.join(flask.config["FILE_LOCATION"], "history", path[len(prefix)+1:])
     flask.logger.debug("get_local_path() {}".format(path))
     return path, schema
 
@@ -214,7 +215,7 @@ def get(path):
 
 
 if __name__ == '__main__':
-    os.makedirs(flask.config["DBG_LOCATION"], exist_ok=True)
+    os.makedirs(os.path.join(flask.config["FILE_LOCATION"], "history"), exist_ok=True)
     waitress.serve(flask, host=flask.config["AFC_OBJST_HIST_HOST"],
           port=flask.config["AFC_OBJST_HIST_PORT"])
 

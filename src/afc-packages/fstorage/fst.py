@@ -90,15 +90,13 @@ class DataIfBaseV1():
     # HTTPS connection timeout before falling to HTTP
     HTTPS_TIMEOUT = 0.5
 
-    LHISTORYDIR = "history"
-
     def __init__(self, probeHttps):
         def httpsProbe(host, port, probeHttps):
             if probeHttps is False:
                 return False
             if not host or not port:
                 raise Exception("Missing host:port")
-            url = "https://" + host + ":" + str(port) + "/" + "cfg"
+            url = "https://" + host + ":" + str(port) + "/"
             try:
                 requests.head(url, timeout=self.HTTPS_TIMEOUT)
             except requests.exceptions.ConnectionError:  # fall to http
@@ -114,23 +112,11 @@ class DataIfBaseV1():
             else:
                 self._prot = self.HTTP
 
-        self._rpath = {
-            "pro": None,
-            "cfg": None,
-            "dbg": None,
-            "cert": None,
-            }
-        if self._prot == self.HTTP and self._host and self._port:
-            pref = "http://" + self._host + ":" + str(self._port) + "/"
-            self._rpath["pro"] = pref + "pro"
-            self._rpath["cfg"] = pref + "cfg"
-            self._rpath["dbg"] = pref + "dbg"
-            self._rpath["cert"] = pref + "cert"
-        elif self._prot == self.HTTPS and self._host and self._port:
-            pref = "https://" + self._host + ":" + str(self._port) + "/"
-            self._rpath["pro"] = pref + "pro"
-            self._rpath["cfg"] = pref + "cfg"
-            self._rpath["dbg"] = pref + "dbg"
+        self._pref = None
+        if self._prot == self.HTTP:
+            self._pref = "http://" + self._host + ":" + str(self._port) + "/"
+        elif self._prot == self.HTTPS:
+            self._pref = "https://" + self._host + ":" + str(self._port) + "/"
 
     def open(self, r_name):
         """ Create FileInt instance """
@@ -180,18 +166,18 @@ class DataIf(DataIfBaseV1):
 
         DataIfBaseV1.__init__(self, probeHttps)
 
-        app_log.debug("DataIf.__init__: prot={} host={} port={} probeHttps={} scheme={} _rpath={}"
-                      .format(self._prot, self._host, self._port, probeHttps, scheme, self._rpath))
+        app_log.debug("DataIf.__init__: prot={} host={} port={} probeHttps={} scheme={} _pref={}"
+                      .format(self._prot, self._host, self._port, probeHttps, scheme, self._pref))
 
-    def rname(self, type, baseName):
+    def rname(self, baseName):
         """ Return remote file name by basename """
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
-        return self._rpath[type] + "/" + baseName
+        return self._pref + baseName
 
-    def open(self, type, baseName):
+    def open(self, baseName):
         """ Create FileInt instance """
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
-        return DataIfBaseV1.open(self, self.rname(type, baseName))
+        return DataIfBaseV1.open(self, self.rname(baseName))
 
     def getProtocol(self):
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")

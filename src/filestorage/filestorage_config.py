@@ -27,10 +27,6 @@ AFC_OBJST_MEDIA = os.getenv("AFC_OBJST_MEDIA", "LocalFS")
 # file download/upload location on the server in case of AFC_OBJST_MEDIA=LocalFS
 FILE_LOCATION = os.getenv("AFC_OBJST_LOCAL_DIR", "/storage")
 
-PRO_LOCATION = FILE_LOCATION + "/responses"
-CFG_LOCATION = FILE_LOCATION + "/afc_config"
-DBG_LOCATION = FILE_LOCATION + "/history"
-
 # where the server is listening
 AFC_OBJST_HOST = os.getenv("AFC_OBJST_HOST", "0.0.0.0")
 # The Dockerfile does "EXPOSE 5000"

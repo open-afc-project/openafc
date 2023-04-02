@@ -77,7 +77,7 @@ def nraToRegionStr(nra):
 
 def build_task(dataif,
         request_type,
-        task_id, hash, region, history_dir,
+        task_id, hash_val, config_path, history_dir,
         runtime_opts=RNTM_OPT_DBG_GUI):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
@@ -93,8 +93,8 @@ def build_task(dataif,
         request_type,
         flask.current_app.config["DEBUG"],
         task_id,
-        hash,
-        region,
+        hash_val,
+        config_path,
         history_dir,
         runtime_opts,
         flask.current_app.config['NFS_MOUNT_PATH']
@@ -607,8 +607,7 @@ class AnalysisKmlResult(MethodView):
             resp.content_type = 'application/octet-stream'
             return resp
 
-        else:
-            raise werkzeug.exceptions.NotFound('KML not found')
+        raise werkzeug.exceptions.NotFound('KML not found')
 
 class AnalysisStatus(MethodView):
     ''' Check status of task '''

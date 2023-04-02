@@ -13,14 +13,14 @@ import distutils.spawn
 import shutil
 from celery import Celery
 from celery.utils.log import get_task_logger
-from .. import defs
 from fst import DataIf
+from .. import defs
 from .. import task
 from .. import config
 
 LOGGER = get_task_logger(__name__)
 
-AFC_AEP_ENABLE = True if "AFC_AEP_ENABLE" in os.environ else False
+AFC_AEP_ENABLE = "AFC_AEP_ENABLE" in os.environ
 
 BROKER_URL=os.getenv('BROKER_PROT', config.BROKER_DEFAULT_PROT) + \
            "://" + \
@@ -47,15 +47,15 @@ client = Celery(
 @client.task(ignore_result=True)
 def run(prot, host, port, state_root,
         afc_exe, request_type, debug,
-        task_id, hash, region, history_dir,
+        task_id, hash_val, config_path, history_dir,
         runtime_opts, mntroot):
     """ Run AFC Engine
 
         The parameters are all serializable so they can be passed through the message queue.
 
-        :param region: region of ap
+        :param config_path: afc_config.json path
 
-        :param history_dir: history directory suffix
+        :param history_dir: history path
 
         :param afc_exe: path to AFC Engine executable
 
@@ -72,10 +72,11 @@ def run(prot, host, port, state_root,
 
         :param debug: log level of afc-engine
 
-        :param hash: md5 of request and config files
+        :param hash_val: md5 of request and config files
     """
-    LOGGER.debug('run(prot={}, host={}, port={}, state_root={}, task_id={}, hash={}, runtime_opts={}, mntroot={})'.
-                 format(prot, host, port, state_root, task_id, hash, runtime_opts, mntroot))
+    LOGGER.debug(
+        "run(prot={}, host={}, port={}, root={}, task_id={}, hash={}, opts={}, mntroot={})".
+                 format(prot, host, port, state_root, task_id, hash_val, runtime_opts, mntroot))
 
     if isinstance(afc_exe, type(None)):
         afc_exe = AFC_ENGINE
@@ -84,16 +85,22 @@ def run(prot, host, port, state_root,
     if AFC_AEP_ENABLE is True:
         afc_exe = "/usr/bin/afc-engine.sh"
 
+    # local pathes
     tmpdir = os.path.join(state_root, task_id)
     os.makedirs(tmpdir)
 
     dataif = DataIf(prot, host, port)
-    t = task.Task(task_id, dataif, hash, region, history_dir)
-    t.toJson(task.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
+    tsk = task.Task(task_id, dataif, hash_val, history_dir)
+    tsk.toJson(task.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
 
     proc = None
     err_file = open(os.path.join(tmpdir, "engine-error.txt"), "wb")
     log_file = open(os.path.join(tmpdir, "engine-log.txt"), "wb")
+
+    # pathes in objstorage
+    analysis_request = os.path.join("/responses", hash_val, "analysisRequest.json")
+    analysis_response = os.path.join("/responses", hash_val, "analysisResponse.json.gz")
+    tmp_dir = os.path.join("/responses", task_id)
 
     try:
         # run the AFC Engine
@@ -103,9 +110,9 @@ def run(prot, host, port, state_root,
                 "--request-type=" + request_type,
                 "--state-root=" + mntroot+"/rat_transfer",
                 "--mnt-path=" + mntroot,
-                "--input-file-path=" + dataif.rname("pro", hash + "/analysisRequest.json"),
-                "--config-file-path=" + dataif.rname("cfg", region + "/afc_config.json"),
-                "--output-file-path=" + dataif.rname("pro", hash + "/analysisResponse.json.gz"),
+                "--input-file-path=" + dataif.rname(analysis_request),
+                "--config-file-path=" + dataif.rname(config_path),
+                "--output-file-path=" + dataif.rname(analysis_response),
                 "--temp-dir=" + tmpdir,
                 "--log-level=" + ("debug" if debug else "info"),
                 "--runtime_opt=" + str(runtime_opts),
@@ -123,7 +130,7 @@ def run(prot, host, port, state_root,
             err_file.close()  # close the file just in case it is still open from writing
             log_file.close()
 
-            with dataif.open("pro", task_id + "/engine-error.txt") as hfile:
+            with dataif.open(os.path.join(tmp_dir, "engine-error.txt")) as hfile:
                 with open(os.path.join(tmpdir, "engine-error.txt"), "rb") as infile:
                     hfile.write(infile.read())
 
@@ -131,17 +138,18 @@ def run(prot, host, port, state_root,
             if runtime_opts & defs.RNTM_OPT_DBG:
                 for fname in os.listdir(tmpdir):
                     # request, responce and config are archived from ratapi
-                    if (fname != "analysisRequest.json" and fname != "afc_config.json"):
-                        with dataif.open("dbg", history_dir + "/" + fname) as hfile:
+                    if fname not in ("analysisRequest.json", "afc_config.json"):
+                        with dataif.open(os.path.join(history_dir, fname)) as hfile:
                             with open(os.path.join(tmpdir, fname), "rb") as infile:
                                 hfile.write(infile.read())
             elif runtime_opts & defs.RNTM_OPT_SLOW_DBG:
                 if os.path.exists(os.path.join(tmpdir, "eirp.csv.gz")):
-                    with dataif.open("dbg", history_dir + "/eirp.csv.gz") as hfile:
+                    with dataif.open(os.path.join(history_dir, "eirp.csv.gz")) as hfile:
                         with open(os.path.join(tmpdir, "eirp.csv.gz"), "rb") as infile:
                             hfile.write(infile.read())
 
-            t.toJson(task.Task.STAT_FAILURE, runtime_opts=runtime_opts, exit_code=error.returncode)
+            tsk.toJson(task.Task.STAT_FAILURE, runtime_opts=runtime_opts,
+                       exit_code=error.returncode)
             return
 
         LOGGER.info('finished with task computation')
@@ -152,12 +160,12 @@ def run(prot, host, port, state_root,
         if runtime_opts & defs.RNTM_OPT_GUI:
             # copy kml result if it was produced by AFC Engine
             if os.path.exists(os.path.join(tmpdir, "results.kmz")):
-                with dataif.open("pro", task_id + "/results.kmz") as hfile:
+                with dataif.open(os.path.join(tmp_dir, "results.kmz")) as hfile:
                     with open(os.path.join(tmpdir, "results.kmz"), "rb") as infile:
                         hfile.write(infile.read())
             # copy geoJson file if generated
             if os.path.exists(os.path.join(tmpdir, "mapData.json.gz")):
-                with dataif.open("pro", task_id + "/mapData.json.gz") as hfile:
+                with dataif.open(os.path.join(tmp_dir, "mapData.json.gz")) as hfile:
                     with open(os.path.join(tmpdir, "mapData.json.gz"), "rb") as infile:
                         hfile.write(infile.read())
 
@@ -167,22 +175,22 @@ def run(prot, host, port, state_root,
             # remove error file since we completed successfully
             for fname in os.listdir(tmpdir):
                 # request, response and config are archived from ratapi
-                if (fname != "analysisRequest.json" and fname != "afc_config.json"
-                    and fname != "analysisResponse.json.gz"):
-                    with dataif.open("dbg", history_dir + "/" + fname) as hfile:
+                if fname not in ("analysisRequest.json", "afc_config.json",
+                                 "analysisResponse.json.gz"):
+                    with dataif.open(os.path.join(history_dir, fname)) as hfile:
                         with open(os.path.join(tmpdir, fname), "rb") as infile:
                             hfile.write(infile.read())
         elif runtime_opts & defs.RNTM_OPT_SLOW_DBG:
             if os.path.exists(os.path.join(tmpdir, "eirp.csv.gz")):
-                with dataif.open("dbg", history_dir + "/eirp.csv.gz") as hfile:
+                with dataif.open(os.path.join(history_dir, "eirp.csv.gz")) as hfile:
                     with open(os.path.join(tmpdir, "eirp.csv.gz"), "rb") as infile:
                         hfile.write(infile.read())
 
         LOGGER.debug('task completed')
-        t.toJson(task.Task.STAT_SUCCESS, runtime_opts=runtime_opts)
+        tsk.toJson(task.Task.STAT_SUCCESS, runtime_opts=runtime_opts)
 
-    except Exception as e:
-        raise e
+    except Exception as exc:
+        raise exc
 
     finally:
         LOGGER.info('Terminating worker')

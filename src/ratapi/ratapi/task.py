@@ -13,6 +13,7 @@ Provides replacement for AsyncResult routines
 import logging
 import json
 import time
+import os
 
 LOGGER = logging.getLogger(__name__)
 AFC_ENG_TIMEOUT = 600
@@ -25,15 +26,14 @@ class Task():
     STAT_SUCCESS = "SUCCESS"
     STAT_FAILURE = "FAILURE"
 
-    def __init__(self, task_id, dataif, hash=None, region=None, history_dir=None):
+    def __init__(self, task_id, dataif, hash_val=None, history_dir=None):
         LOGGER.debug("task.__init__(task_id={})".format(task_id))
         self.__dataif = dataif
         self.__task_id = task_id
         self.__stat = {
             'status': self.STAT_PENDING,
-            'region': region,
             'history_dir': history_dir,
-            'hash': hash,
+            'hash': hash_val,
             'runtime_opts': None,
             'exit_code': 0
             }
@@ -41,32 +41,27 @@ class Task():
     def get(self):
         LOGGER.debug("Task.get()")
         data = None
+        fstatus = os.path.join("/responses", self.__task_id, "status.json")
         try:
-            with self.__dataif.open("pro", self.__task_id +
-                                  "/status.json") as hfile:
+            with self.__dataif.open(fstatus) as hfile:
                 data = hfile.read()
         except:
-            LOGGER.debug("task.get() no {}/status.json".
-                         format(self.__dataif.rname("pro", self.__task_id)))
+            LOGGER.debug("task.get() no {}".format(self.__dataif.rname(fstatus)))
             return self.__toDict(self.STAT_PENDING)
         stat = json.loads(data)
 
         LOGGER.debug("task.get() {}".format(stat))
         if ('status' not in stat or
-                'region' not in stat or
                 'history_dir' not in stat or
                 'hash' not in stat or
                 'runtime_opts' not in stat or
                 'exit_code' not in stat):
-            LOGGER.error("task.get() bad {}/status.json: {}".
-                         format(self.__dataif.rname("pro", self.__task_id), stat))
+            LOGGER.error("task.get() bad status.json: {}".format(stat))
             raise Exception("Bad status.json")
         if (stat['status'] != self.STAT_PROGRESS and
                 stat['status'] != self.STAT_SUCCESS and
                 stat['status'] != self.STAT_FAILURE):
-            LOGGER.error("task.get() bad status {} in {}/status.json".
-                         format(stat['status'],
-                                self.__dataif.rname("pro", self.__task_id)))
+            LOGGER.error("task.get() bad status {} in status.json".format(stat['status']))
             raise Exception("Bad status in status.json")
         self.__stat = stat
         return self.__stat
@@ -103,12 +98,14 @@ class Task():
     def toJson(self, status, runtime_opts=None, exit_code=0):
         LOGGER.debug("toJson({})".format(status))
         data = json.dumps(self.__toDict(status, runtime_opts, exit_code))
-        with self.__dataif.open("pro", self.__task_id + "/status.json") as hfile:
+        fstatus = os.path.join("/responses", self.__task_id, "status.json")
+        with self.__dataif.open(fstatus) as hfile:
             LOGGER.debug("toJson() write {}".format(data))
             hfile.write(data)
 
     def forget(self):
-        with self.__dataif.open("pro", self.__task_id + "/status.json") as hfile:
+        fstatus = os.path.join("/responses", self.__task_id, "status.json")
+        with self.__dataif.open(fstatus) as hfile:
             hfile.delete()
 
     def getStat(self):
