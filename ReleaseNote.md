@@ -12,6 +12,7 @@
 
 ## **Interface Changes**
  * Under the Administoration tab, the admin would need to define the "allowed frequency ranges" (that's used by AFC Config) for each region (i.e. country) separately. The AFC Config then pulls the correct for a given region.
+ * added an optional property region to records in the rat_transfer/frequency_bands/allowed_frequencies.json file that specifies the region for the given frequency range.  If not provided, the system defaults to US
 
 
 ## **Testing Done**
