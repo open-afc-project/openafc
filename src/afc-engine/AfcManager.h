@@ -68,7 +68,7 @@
 #include <QRectF>
 #include <QtCore>
 // Uses OGR from GDAL v1.11
-#include "gdal/ogrsf_frmts.h"
+#include "ogrsf_frmts.h"
 #include "data_if.h"
 
 #include "AfcDefinitions.h"

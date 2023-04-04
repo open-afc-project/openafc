@@ -11,8 +11,8 @@
 #include <iomanip>
 #include <ogr_spatialref.h>
 
-#include "gdal/gdal_priv.h"
-#include "gdal/ogr_spatialref.h"
+#include "gdal_priv.h"
+#include "ogr_spatialref.h"
 
 #include "cconst.h"
 #include "pop_grid.h"

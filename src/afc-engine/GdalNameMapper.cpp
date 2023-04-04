@@ -9,7 +9,7 @@
 #include "GdalNameMapper.h"
 #include <boost/filesystem.hpp>
 #include <fnmatch.h>
-#include <gdal/gdal_priv.h>
+#include <gdal_priv.h>
 #include <boost/regex.hpp>
 #include <sstream>
 #include <stdexcept>

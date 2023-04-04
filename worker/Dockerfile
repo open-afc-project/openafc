@@ -34,10 +34,7 @@ RUN strip --strip-unneeded /root/afc/__install/lib/*.so
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 
 COPY --from=build_image /root/afc/__install /usr/
-COPY --from=build_image /root/gdal/__install/lib /usr/lib/
-# For development environment
-COPY --from=build_image /usr/include/gdal /usr/include/gdal/
-#
+
 RUN python3 -m ensurepip \
     && pip3 install --no-cache --upgrade pip setuptools
 COPY src/afc-packages /wd/afc-packages

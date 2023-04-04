@@ -12,7 +12,7 @@
 #include "GdalHelpers.h"
 
 // Uses OGR from GDAL v1.11 to read in .shp files
-#include "gdal/ogrsf_frmts.h"
+#include "ogrsf_frmts.h"
 
 class GdalDataModel
 {

@@ -150,7 +150,7 @@
 #include <functional>
 #include "GdalNameMapper.h"
 #include "GdalTransform.h"
-#include <gdal/gdal_priv.h>
+#include <gdal_priv.h>
 #include "LruValueCache.h"
 #include <map>
 #include <memory>

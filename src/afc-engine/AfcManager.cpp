@@ -3034,7 +3034,7 @@ QJsonDocument AfcManager::generateExclusionZoneJson()
 	const std::string gdalDriverName = "GeoJSON";
 	OGRRegisterAll();
 
-	OGRSFDriver* ptrDriver = OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
+	OGRSFDriver* ptrDriver = (OGRSFDriver*)OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
 	// This is the same as !(unique_ptr.get() != nullptr)
 	if (ptrDriver == nullptr)
 	{
@@ -3172,7 +3172,7 @@ QJsonDocument AfcManager::generateHeatmap()
 	const std::string gdalDriverName = "GeoJSON";
 	OGRRegisterAll();
 
-	OGRSFDriver* ptrDriver = OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
+	OGRSFDriver* ptrDriver = (OGRSFDriver*)OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
 	// This is the same as !(unique_ptr.get() != nullptr)
 	if (ptrDriver == nullptr)
 	{
@@ -3374,7 +3374,7 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 	const std::string gdalDriverName = "GeoJSON";
 	OGRRegisterAll();
 
-	OGRSFDriver* ptrDriver = OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
+	OGRSFDriver* ptrDriver = (OGRSFDriver*)OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
 	// This is the same as !(unique_ptr.get() != nullptr)
 	if (ptrDriver == nullptr)
 	{
