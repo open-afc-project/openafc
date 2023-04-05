@@ -1,11 +1,12 @@
 # This Python file uses the following encoding: utf-8
 #
-# Portions copyright © 2022 Broadcom. All rights reserved.
+# Portions copyright (C) 2022 Broadcom. All rights reserved.
 # The term "Broadcom" refers solely to the Broadcom Inc. corporate
 # affiliate that owns the software below.
 # This work is licensed under the OpenAFC Project License, a copy
 # of which is included with this software program.
 #
+import appcfg
 import os
 import logging
 import datetime
@@ -17,12 +18,11 @@ import flask
 from flask.views import MethodView
 import requests
 from ..models.base import db
-from .. import config
 from ..models.aaa import User
 from flask_login import current_user
 from .. import als
 
-OIDC_LOGIN = config.OIDC_LOGIN
+OIDC_LOGIN = appcfg.OIDC_LOGIN
 try:
     from .. import priv_config
     OIDC_LOGIN = priv_config.OIDC_LOGIN

@@ -7,6 +7,7 @@
 # This work is licensed under the OpenAFC Project License, a copy of which
 # is included with this software program.
 #
+import appcfg
 import os
 import subprocess
 import distutils.spawn
@@ -16,21 +17,20 @@ from celery.utils.log import get_task_logger
 from fst import DataIf
 from .. import defs
 from .. import task
-from .. import config
 
 LOGGER = get_task_logger(__name__)
 
 AFC_AEP_ENABLE = "AFC_AEP_ENABLE" in os.environ
 
-BROKER_URL=os.getenv('BROKER_PROT', config.BROKER_DEFAULT_PROT) + \
+BROKER_URL=os.getenv('BROKER_PROT', appcfg.BROKER_DEFAULT_PROT) + \
            "://" + \
-           os.getenv('BROKER_USER', config.BROKER_DEFAULT_USER) + \
+           os.getenv('BROKER_USER', appcfg.BROKER_DEFAULT_USER) + \
            ":" + \
-           os.getenv('BROKER_PWD', config.BROKER_DEFAULT_PWD) + \
+           os.getenv('BROKER_PWD', appcfg.BROKER_DEFAULT_PWD) + \
            "@" + \
-           os.getenv('BROKER_FQDN', config.BROKER_DEFAULT_FQDN) + \
+           os.getenv('BROKER_FQDN', appcfg.BROKER_DEFAULT_FQDN) + \
            ":" + \
-           os.getenv('BROKER_PORT', config.BROKER_DEFAULT_PORT) + \
+           os.getenv('BROKER_PORT', appcfg.BROKER_DEFAULT_PORT) + \
            "/fbrat"
 
 LOGGER.info('Celery Broker: %s', BROKER_URL)

@@ -39,7 +39,7 @@ RUN python3 -m ensurepip \
     && pip3 install --no-cache --upgrade pip setuptools
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
-        /wd/afc-packages/fstorage \
+        -r /wd/afc-packages/pkgs.worker \
     && rm -rf /wd/afc-packages
 #
 RUN mkdir -m 755 -p /var/spool/fbrat
