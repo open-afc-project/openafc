@@ -50,7 +50,7 @@ COPY --from=rat_server.build /usr/lib/python3.10/site-packages/mod_wsgi /usr/lib
 #
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
-        /wd/afc-packages/fstorage \
+        -r /wd/afc-packages/pkgs.rat_server \
     && rm -rf /wd/afc-packages
 #
 # Add user and group
