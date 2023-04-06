@@ -2332,7 +2332,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	// If this flag is set, indoor rlan's have a fixed AMSL height over the uncertainty region (with no height uncertainty).
 	// By default, this flag is false in which case the AGL height is fixed over the uncertainty region (with no height uncertainty).
 	// ***********************************
-	if (jsonObj.contains("removeMobile") && !jsonObj["removeMobile"].isUndefined()) {
+	if (jsonObj.contains("indoorFixedHeightAMSL") && !jsonObj["indoorFixedHeightAMSL"].isUndefined()) {
 		_indoorFixedHeightAMSL = jsonObj["indoorFixedHeightAMSL"].toBool();
 	} else {
 		_indoorFixedHeightAMSL = false;
