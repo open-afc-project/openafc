@@ -39,6 +39,7 @@ from .. import task
 from .. import als
 from ..models.base import db
 from flask_login import current_user
+import traceback
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -198,7 +199,7 @@ def fail_done(t):
     error_data = None
     with dataif.open(os.path.join("/responses", t.getId(), "engine-error.txt")) as hfile:
         try:
-            error_data = hfile.read()
+            error_data = str(hfile.read())
         except:
             LOGGER.debug("engine-error.txt not found")
         else:
@@ -493,7 +494,6 @@ class RatAfc(MethodView):
                         hfile.write(request_json_bytes)
                     with dataif.open(os.path.join(history_dir, "afc_config.json")) as hfile:
                         hfile.write(config_bytes.encode('utf-8'))
-
                 build_task(dataif,
                         request_type,
                         task_id, hash_val, config_path, history_dir,
@@ -556,6 +556,7 @@ class RatAfc(MethodView):
                 except Exception as e:
                     LOGGER.error('catching and rethrowing exception: %s',
                                  getattr(e, 'message', repr(e)))
+                    LOGGER.debug(''.join(traceback.format_exception(None, e, e.__traceback__)))
                     raise AP_Exception(-1,
                                        'The task state is invalid. '
                                        'Try again later, and if this issue '
