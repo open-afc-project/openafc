@@ -1,5 +1,23 @@
  # Release Note
+## **Version and Date**
+|Version|**OA-632**|
+| :- | :- |
+|**Date**|**04/10/2023**|
 
+
+## **Issues Addressed**
+ * Jira OA-632: Fix bug when "indoorFixedHeightAMSL" is set to TRUE
+
+
+## **Interface Changes**
+ * Added a new parameter (it was available to AFC Engine before but not in AFC Config) to afc-config.json: “indoorFixedHeightAMSL”:false (by default this will be set to false)
+
+
+## **Testing Done**
+ * Performed tests with “indoorFixedHeightAMSL”:false and “indoorFixedHeightAMSL”:true and confirmed in exc_thr file that different or same terrain heights are used for RLAN scan points. See test attached to this ticket for when this is set to True.
+
+## **Open Issues** 
+* 
 ## **Version and Date**
 |Version|**OA-601**|
 | :- | :- |
