@@ -1,7 +1,7 @@
  # Release Note
 
 ## **Version and Date**
-|Version|**OA-632**|
+|Version|**OA-631**|
 | :- | :- |
 |**Date**|**04/10/2023**|
 
