@@ -1,6 +1,25 @@
  # Release Note
 
 ## **Version and Date**
+|Version|**OA-632**|
+| :- | :- |
+|**Date**|**04/10/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-631: Issue with the latest default afc-config
+
+
+## **Interface Changes**
+ * OA-631: fixed the bug at the interface.
+
+## **Testing Done**
+ * When doing 'reset to default' of AFC Config, confirmed that this parameter is set properly: "nlcdFile":"rat_transfer/nlcd/nlcd_wfa"
+
+## **Open Issues** 
+* None
+
+## **Version and Date**
 |Version|**OA-580**|
 | :- | :- |
 |**Date**|**03/30/2023**|
