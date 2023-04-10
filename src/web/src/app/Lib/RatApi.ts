@@ -133,7 +133,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
         "p2108Confidence": 5,
         "maxFsAglHeight": 6
     },
-    "nlcdFile": "nlcd_wfa",
+    "nlcdFile": "rat_transfer/nlcd/nlcd_wfa",
     "enableMapInVirtualAp": false,
     "channelResponseAlgorithm": "psd",
     "visibilityThreshold": -6,

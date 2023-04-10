@@ -9,6 +9,7 @@
 
 ''' Flask application generation.
 '''
+import appcfg
 import sys
 import os
 import datetime
@@ -16,7 +17,6 @@ import logging
 import flask
 import requests
 from sqlalchemy import exc
-from . import config
 from fst import DataIf
 from . import als
 
@@ -45,7 +45,7 @@ def create_app(config_override=None):
     flaskapp.response_class = util.Response
 
     # default config state from module
-    flaskapp.config.from_object(config)
+    flaskapp.config.from_object(appcfg)
     # initial override from system config
     config_path = BaseDirectory.load_first_config('fbrat', 'ratapi.conf')
     if config_path:

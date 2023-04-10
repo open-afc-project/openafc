@@ -10,10 +10,9 @@
 # pylint: disable=no-member
 ''' Authentication, authorization, and accounting classes.
 '''
-
+import appcfg
 import os
-from .. import config
-OIDC_LOGIN = config.OIDC_LOGIN
+OIDC_LOGIN = appcfg.OIDC_LOGIN
 from sqlalchemy.schema import Sequence
 from sqlalchemy.dialects.postgresql import JSON
 
