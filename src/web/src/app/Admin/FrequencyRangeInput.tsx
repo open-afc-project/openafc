@@ -14,15 +14,19 @@ import {
     AlertActionCloseButton,
     InputGroupText,
     InputGroup,
-    Checkbox
+    Checkbox,
+    FormSelect,
+    FormSelectOption
   } from "@patternfly/react-core";
 import { FreqRange } from "../Lib/RatApiTypes";
+import { mapRegionCodeToName } from "../Lib/Utils";
 
 // FrequencyRangeInput.tsx: Page where frequency bands can be modified
 
 interface FrequencyRangeProps {
     frequencyRange: FreqRange,
-    onSuccess?: (freq :FreqRange) => void
+    regions: string[],
+    onSuccess: (freq :FreqRange) => void
 }
 
 interface FrequencyRangeState {
@@ -34,14 +38,14 @@ export class FrequencyRangeInput extends React.Component<FrequencyRangeProps, Fr
         super(props);
 
         this.state = {
-            frequencyRange: {... props.frequencyRange}
+            frequencyRange: {... props.frequencyRange }
         }
     }
 
     
     private updateField = (newData: string, fieldToUpdate :string) => {
         let freq = {... this.state.frequencyRange}
-        if(fieldToUpdate == 'name') {
+        if(fieldToUpdate == 'name' || fieldToUpdate == "region" ) {
             freq[fieldToUpdate] = newData;
         } else {
             // the only other fields are all numbers
@@ -64,6 +68,28 @@ export class FrequencyRangeInput extends React.Component<FrequencyRangeProps, Fr
     render() {
         return (<Card><CardBody>
             <FormGroup label="Update Frequency Range" fieldId="band-name-label" > 
+            <InputGroup>
+                        <TextInput
+                            id={"band-region-label"}
+                            name={"band-region-label" }
+                            value={"region"} 
+                            style={{ textAlign: "left", minWidth: "50%"}} 
+                            isReadOnly
+                        />
+                        <FormSelect
+                            id={"band-region-" }
+                            name={"band-region-" }
+                            value={this.state.frequencyRange.region} 
+                            style={{ textAlign: "right" }} 
+                            isValid={!!this.state.frequencyRange.region && this.state.frequencyRange.region!.length > 0}
+                            onChange={(data) => this.updateField(data, 'region')}
+                        >
+                            {this.props.regions.map((option: string) => (
+                                        <FormSelectOption key={option} value={option} label={mapRegionCodeToName(option)} />
+                                    ))}
+                        </FormSelect>
+                    </InputGroup>
+
                 <InputGroup>
                         <TextInput
                             id={"band-name-label"}

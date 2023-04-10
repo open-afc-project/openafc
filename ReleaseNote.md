@@ -1,6 +1,27 @@
  # Release Note
 
 ## **Version and Date**
+|Version|**OA-601**|
+| :- | :- |
+|**Date**|**03/31/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-601: Setup Country-specific Allowed Freq Ranges in Admin page
+
+
+## **Interface Changes**
+ * Under the Administoration tab, the admin would need to define the "allowed frequency ranges" (that's used by AFC Config) for each region (i.e. country) separately. The AFC Config then pulls the correct for a given region.
+ * added an optional property region to records in the rat_transfer/frequency_bands/allowed_frequencies.json file that specifies the region for the given frequency range.  If not provided, the system defaults to US
+
+
+## **Testing Done**
+ * OA-601: Confirmed after defining the allowed frequency ranges under Admin, the AFC Config shows the correct one for US vs. Canada. Also, when doing an AP request, the correct allowed frequency range is used.
+
+## **Open Issues** 
+* 
+
+
 |Version|**OA-631**|
 | :- | :- |
 |**Date**|**04/10/2023**|
@@ -18,6 +39,7 @@
 
 ## **Open Issues** 
 * None
+
 
 ## **Version and Date**
 |Version|**OA-580**|

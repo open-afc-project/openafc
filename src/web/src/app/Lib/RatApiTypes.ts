@@ -68,8 +68,11 @@ export interface AFCConfigFile {
 export type FreqRange = {
     name: string,
     startFreqMHz: number,
-    stopFreqMHz: number
+    stopFreqMHz: number,
+    region?:string
 }
+
+
 
 export type FSReceiverFeederLoss = {
     IDU: number,
