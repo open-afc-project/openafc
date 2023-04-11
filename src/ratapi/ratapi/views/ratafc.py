@@ -238,7 +238,7 @@ def success_done(t):
         resp_data = hfile.read()
     if task_stat['runtime_opts'] & RNTM_OPT_DBG:
         with dataif.open(os.path.join(task_stat['history_dir'],
-                                      "/analysisResponse.json.gz")) as hfile:
+                                      "analysisResponse.json.gz")) as hfile:
             hfile.write(resp_data)
     LOGGER.debug('resp_data size={}'.format(sys.getsizeof(resp_data)))
     resp_data = zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
