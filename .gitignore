@@ -20,3 +20,4 @@ src/web/node_modules/*
 CMakeCache.txt
 CMakeFiles/*
 src/ratapi/ratapi/priv_config.py
+src/ratapi/ratapi/templates/priv_about.html

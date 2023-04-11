@@ -73,3 +73,26 @@ OIDC_LOGIN = False
 OIDC_CLIENT_ID = ""
 OIDC_CLIENT_SECRET = ""
 OIDC_DISCOVERY_URL = ""
+
+
+# CAPTCHA FOR USER REGISTRATION
+USE_CAPTCHA=False
+CAPTCHA_SECRET=''
+CAPTCHA_SITEKEY=''
+CAPTCHA_VERIFY=''
+
+# EMAIL FOR USER REGISTRATION
+# MAIL SERVER Config.  If MAIL_SERVER is set, all MAIL SERVER config needs to be set.
+# If MAIL_SERVER is NOT set, local mail server is used, do not set any of of the MAIL configs below.
+#MAIL_SERVER= ''
+#MAIL_PORT= 465
+#MAIL_USE_TLS = False
+#MAIL_USE_SSL = True
+#MAIL_USERNAME= ''
+#MAIL_PASSWORD = ''
+
+# EMAIL configurations not related to MAIL SERVER. Control contents of the registration email 
+REGISTRATION_DEST_EMAIL = ''
+REGISTRATION_SRC_EMAIL = ""
+REGISTRATION_APPROVE_LINK=''
+ABOUT_CONTENT=''

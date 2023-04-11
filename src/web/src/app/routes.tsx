@@ -4,8 +4,9 @@ import { DynamicImport } from "./DynamicImport";
 import { NotFound } from "./NotFound/NotFound";
 import { Dashboard } from "./Dashboard/Dashboard";
 import { PageSection, Card, CardHeader } from "@patternfly/react-core";
-import { getAfcConfigFile, getAllowedRanges, getRegions } from "./Lib/RatApi";
+import { getAfcConfigFile, getAllowedRanges, getRegions, getAboutAfc, getAboutSiteKey } from "./Lib/RatApi";
 import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv } from "./Lib/FileApi";
+import AppLoginPage from "./AppLayout/AppLogin";
 import { UserAccountPage } from "./UserAccount/UserAccount";
 import { getUsers, getMinimumEIRP, Limit,  } from "./Lib/Admin";
 import { Replay } from "./Replay/Replay"
@@ -49,6 +50,26 @@ const RatAfc = () => {
       {(Component: any, resolve) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
           : <Component.RatAfc afcConfig={resolve.conf} limit={resolve.limit} />
+      }}
+    </DynamicImport>
+  );
+}
+
+const getAboutAfcModuleAsync = () => {
+  return () => import(/* webpackChunkName: "about" */ "./About/About");
+}
+
+const ratAboutAfcResolves = async () => ({
+  content: await getAboutAfc(),
+  sitekey: getAboutSiteKey()
+})
+
+const About = () => {
+  return (
+    <DynamicImport load={getAboutAfcModuleAsync()} resolve={ratAboutAfcResolves()} >
+      {(Component: any, resolve) => {
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
+          : <Component.About content={resolve.content} sitekey={resolve.sitekey}/>
       }}
     </DynamicImport>
   );
@@ -238,6 +259,13 @@ const routes: IAppRoute[] = [
     path: "/dashboard"
   },
   {
+    component: AppLoginPage, // Currently empty
+    exact: true,
+    icon: null,
+    label: "Login",
+    path: "/login"
+  },
+  {
     component: Support, // currently empty
     exact: true,
     icon: null,
@@ -320,6 +348,13 @@ const routes: IAppRoute[] = [
     icon: null,
     label: "Account",
     path: "/account"
+  },
+  {
+    component: About,
+    exact: true,
+    icon: null,
+    label: "About AFC",
+    path: "/about"
   },
 ];
 

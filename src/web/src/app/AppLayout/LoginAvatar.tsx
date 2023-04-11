@@ -17,11 +17,26 @@ import { guiConfig } from "../Lib/RatApi";
  */
 export class LoginAvatar extends React.Component {
 
-    render() {
-        const showLogin = <a href={guiConfig.login_url} >
+    private LoginUrl = ()  => {
+        if (!guiConfig.about_url) {
+            return <a href={guiConfig.login_url} >
             <button className='button-blue' type="button"> Login <UserIcon />
             </button>
             </a>
+        } else {
+            return <Route render={
+            ({ history }) => (
+                <Button variant="plain" onClick={() => { history.push("/login") }}>
+                    <UnknownIcon />{" Login"}
+                </Button>
+            )
+            }
+            />;
+        }
+    }
+
+    render() {
+        const showLogin = this.LoginUrl();
 
         const showLogout = <a href={guiConfig.logout_url} >
             <button className='button-blue' type="button"> Logout <UserIcon />

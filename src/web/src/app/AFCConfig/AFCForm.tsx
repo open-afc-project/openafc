@@ -393,7 +393,7 @@ export class AFCForm extends React.Component<
                         />
                     </FormGroup>
                     <br />
-                    <DownloadContents fileName="Download AFC Config" contents={() => this.export()} />
+                    <DownloadContents fileName="AFC Config" contents={() => this.export()} />
                     <br />
 
                 </CardBody>

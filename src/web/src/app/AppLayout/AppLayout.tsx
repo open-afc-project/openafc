@@ -102,7 +102,6 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
   // @ts-ignore
   const history: any = <a target="_blank" href={guiConfig.history_url}>Debug Files</a>;
   // @ts-ignore
-  const about: any = <a href={guiConfig.about_url}>About</a>;
 
   const showAbout = () => guiConfig.about_url;
 
@@ -189,9 +188,10 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
           <NavItem
             id="about-link"
             itemId="about-link-item">
-            {about}
+            <NavLink
+              to="/about"
+              activeClassName="pf-m-current">About</NavLink>
           </NavItem>}
-
       </NavList>
     </Nav>}
   </UserContext.Consumer>);
