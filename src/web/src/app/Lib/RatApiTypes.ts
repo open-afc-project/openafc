@@ -62,6 +62,7 @@ export interface AFCConfigFile {
     reportErrorRlanHeightLowFlag?: boolean;
     nearFieldAdjFlag?: boolean,
     deniedRegionFile?: string,
+    indoorFixedHeightAMSL?: boolean,
 
 }
 

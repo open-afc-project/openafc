@@ -144,7 +144,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "reportErrorRlanHeightLowFlag": false,
     "nearFieldAdjFlag": true,
     "deniedRegionFile": "",
-
+    "indoorFixedHeightAMSL":false,
 });
 
 const defaultAfcConfCanada: () => AFCConfigFile = () => ({
@@ -235,6 +235,7 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "reportErrorRlanHeightLowFlag": false,
     "nearFieldAdjFlag": false,
     "deniedRegionFile": "",
+    "indoorFixedHeightAMSL":false,
 });
 
 const defaultAllRegionFreqRanges: () => FreqRange[] = () => (
@@ -289,7 +290,8 @@ export const getRegions = (): Promise<RatResponse<string[]>> => (
     }).then(name => {
         return success(name.split(" "));
     }).catch(err => {
-        logger.error(err)
+        logger.error(err);
+        return err(err);
     })
 )
 
