@@ -9,21 +9,6 @@ import { AntennaPatternState } from "../Lib/RatApiTypes";
  */
 
 
-/**
- * Enumeration of antenna pattern types
- */
-const antennaPatterns = {
-    "US": [
-        'WINNF-AIP-07',
-        "F.699",
-        "F.1245"
-    ],
-    "CA": [
-        'WINNF-AIP-07-CAN',
-        "F.699",
-        "F.1245"
-    ]
-};
 
 /**
  * Sub form component for Antenna patterns
@@ -55,6 +40,26 @@ export default class AntennaPatternForm extends React.PureComponent<{ data: Ante
         userUpload: s != 'None' ? { kind: "User Upload", value: s } : { kind: s, value: '' }
     });
 
+    /**
+ * Enumeration of antenna pattern types
+ */
+    private getPatternOptionsByRegion = (region: string) => {
+
+        if (region.endsWith("CA")) {
+            return [
+                'WINNF-AIP-07-CAN',
+                "F.699",
+                "F.1245"
+            ]
+        } else {
+            return [
+                'WINNF-AIP-07',
+                "F.699",
+                "F.1245"
+            ]
+        }
+    }
+
 
     render = () =>
         <FormGroup label="Default FS Receiver Antenna Pattern" fieldId="horizontal-form-antenna">
@@ -67,7 +72,7 @@ export default class AntennaPatternForm extends React.PureComponent<{ data: Ante
                 isValid={this.props.data.defaultAntennaPattern !== undefined}
                 style={{ textAlign: "right" }}
             >
-                {antennaPatterns[this.props.region].map((option) => (
+                {this.getPatternOptionsByRegion(this.props.region).map((option) => (
                     <FormSelectOption key={option} value={option} label={option} />
                 ))}
             </FormSelect>

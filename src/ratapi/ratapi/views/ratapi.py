@@ -39,7 +39,7 @@ LOGGER = logging.getLogger(__name__)
 module = flask.Blueprint('ratapi-v1', 'ratapi')
 
 def regions():
-    return ['US', 'CA', 'TEST_USA', 'DEMO_USA']
+    return ['US', 'CA', 'TEST_US', 'DEMO_US']
 
 
 def regionStrToNra(region_str):
@@ -52,8 +52,8 @@ def regionStrToNra(region_str):
        'DEFAULT':'FCC',
        'US':'FCC',
        'CA':'ISED',
-       'TEST_USA':'TEST_FCC',
-       'DEMO_USA':'DEMO_FCC'
+       'TEST_US':'TEST_FCC',
+       'DEMO_US':'DEMO_FCC'
     }
     region_str = region_str.upper()
     try:
@@ -64,9 +64,9 @@ def regionStrToNra(region_str):
 def nraToRegionStr(nra):
     map = {
         'FCC':'US',
-        'TEST_FCC':'TEST_USA',
+        'TEST_FCC':'TEST_US',
         'ISED':'CA',
-        'DEMO_FCC':'DEMO_USA',
+        'DEMO_FCC':'DEMO_US',
     }
     nra = nra.upper()
     try:
