@@ -102,9 +102,23 @@ def create_app(config_override=None):
     except:
         pass
 
-    # override config with environment variables
-    flaskapp.config['OIDC_LOGIN']=(
-       os.getenv('OIDC_LOGIN', str(flaskapp.config['OIDC_LOGIN'])).lower() == "true")
+    # override boolean config with environment variables
+    for k in ["OIDC_LOGIN", "MAIL_USE_TLS", "MAIL_USE_SSL", "USE_CAPTCHA", "SEND_MAIL"]:
+        if os.getenv(k):
+            flaskapp.config[k]=(os.getenv(k).lower() == "true")
+
+    # override string config with environment variables
+    for k in ["REGISTRATION_APPROVE_LINK", "REGISTRATION_DEST_EMAIL",
+              "REGISTRATION_DEST_PDL_EMAIL", "REGISTRATION_SRC_EMAIL",
+              "MAIL_PASSWORD", "MAIL_USERNAME", "MAIL_SERVER", "CAPTCHA_SECRET",
+              "CAPTCHA_SITEKEY", "CAPTCHA_VERIFY"]:
+        if os.getenv(k):
+            flaskapp.config[k] = os.getenv(k)
+
+    # override int config
+    for k in ["MAIL_PORT"]:
+        if os.getenv(k):
+            flaskapp.config[k] = int(os.getenv(k))
 
     if flaskapp.config['OIDC_LOGIN']:
         from .models.aaa import User

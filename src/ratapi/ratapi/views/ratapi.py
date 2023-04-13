@@ -129,12 +129,21 @@ class GuiConfig(MethodView):
         u = urlparse(flask.request.url)
         histurl = u.scheme + "://" + u.netloc + "/dbg"
 
+        if flask.current_app.config['USE_CAPTCHA']:
+            about_sitekey=flask.current_app.config['CAPTCHA_SITEKEY']
+        else:
+            about_sitekey=None
+
         if flask.current_app.config['OIDC_LOGIN']:
-            login_url=flask.url_for('auth.LoginAPI'),
-            logout_url=flask.url_for('auth.LogoutAPI'),
+            login_url=flask.url_for('auth.LoginAPI')
+            logout_url=flask.url_for('auth.LogoutAPI')
+            about_url=flask.url_for('ratapi-v1.About')
+            about_login_url=flask.url_for('auth.AboutLoginAPI')
         else:
             login_url=flask.url_for('user.login'),
             logout_url=flask.url_for('user.logout'),
+            about_url=None
+            about_login_url=None
 
         # TODO: temporary support python2
         if sys.version_info.major != 3:
@@ -162,8 +171,9 @@ class GuiConfig(MethodView):
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             mtls_admin_url=flask.url_for('admin.MTLS', id=-1),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
-            about_url=flask.url_for('ratapi-v1.About') \
-                      if flask.current_app.config['OIDC_LOGIN'] else None,
+            about_url=about_url,
+            about_login_url=about_login_url,
+            about_sitekey=about_sitekey if about_sitekey else None,
             version=serververs,
         )
         return resp
@@ -373,7 +383,12 @@ class About(MethodView):
         '''
 
         resp = flask.make_response()
-        resp.data = flask.render_template("about.html", app_name="RLAN AFC")
+        try:
+            about_content = flask.current_app.config['ABOUT_CONTENT']
+        except:
+            about_content = "about.html"
+
+        resp.data = flask.render_template(about_content)
         resp.content_type = 'text/html'
         return resp
 
@@ -383,32 +398,51 @@ class About(MethodView):
 
         from flask import request
         from flask_mail import Mail, Message
+        import requests
 
         try:
-            from .. import priv_config
-            dest_email = priv_config.REGISTRATION_DEST_EMAIL
-            src_email = priv_config.REGISTRATION_SRC_EMAIL
-            approve_link = priv_config.REGISTRATION_APPROVE_LINK
-        except:
-            dest_email = os.getenv('REGISTRATION_DEST_EMAIL')
-            src_email = os.getenv('REGISTRATION_SRC_EMAIL')
-            approve_link = os.getenv('REGISTRATION_APPROVE_LINK')
+            dest_email = flask.current_app.config['REGISTRATION_DEST_EMAIL']
+            dest_pdl_email = flask.current_app.config['REGISTRATION_DEST_PDL_EMAIL']
+            src_email = flask.current_app.config['REGISTRATION_SRC_EMAIL']
+            approve_link = flask.current_app.config['REGISTRATION_APPROVE_LINK']
 
-            if not dest_email or not src_email:
-                raise werkzeug.exceptions.NotFound()
+            if flask.current_app.config['USE_CAPTCHA']:
+                captcha_secret = flask.current_app.config['CAPTCHA_SECRET']
+                captcha_verify = flask.current_app.config['CAPTCHA_VERIFY']
+            else:
+                captcha_secret = None
 
-        try:
-            name = request.form.get("name")
-            email = request.form.get("email")
-            org = request.form.get("org")
+            bytes = flask.request.stream.read()
+            rcrd = json.loads(bytes)
+            name = rcrd['name']
+            email = rcrd['email']
+            org = rcrd['org']
+
+            # verify captcha
+            if captcha_secret:
+                token = rcrd['token']
+                dictToSend = {'secret': captcha_secret,
+                              'response': token}
+                res = requests.post(captcha_verify, data=dictToSend)
+
+                LOGGER.debug("Got verify response " + str(res.json()["success"]))
+
+                if not res.json()["success"]:
+                     return flask.make_response("No valid captcha", 400)
+
+            recipients=[dest_email]
+            if dest_pdl_email:
+                recipients.append(dest_pdl_email)
+ 
             mail = Mail(flask.current_app)
             msg = Message(f"Afc Access Request by {email}",
                           sender=src_email,
-                          recipients=[dest_email])
-            msg.body = f'''Name:{name}\nEmail:{email}\nOrg:{org}
+                          recipients=recipients)
+
+            msg.body = f'''Name: {name}\nEmail: {email}\nOrg: {org}
 Approve request at: {approve_link}'''
             mail.send(msg)
-            return f"Thank you {name}. An access request for {email} has been submitted"
+            return flask.make_response(f"Thank you {name}. An access request for {email} has been submitted", 204)
         except:
             raise werkzeug.exceptions.NotFound()
 

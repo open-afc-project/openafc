@@ -294,6 +294,65 @@ export const getRegions = (): Promise<RatResponse<string[]>> => (
 )
 
 
+
+export const getAboutLoginAfc = (): Promiss<RatResponse<string>> => (
+    fetch(guiConfig.about_login_url, {
+        method: "GET",
+    }).then(async (res: Response) => {
+        if (res.ok) {
+            const content = await (res.text() as Promise<string>);
+            logger.info("success loaded about login page" + content);
+            return success(content);
+        } else {
+            logger.error("could not load about login page");
+            return error(res.statusText, res.status, res.body);
+        }
+    }).catch((err: any) => {
+        logger.error(err);
+        logger.error("could not load about login page");
+        return error("could not load about login page");
+    })
+)
+
+export const getAboutSiteKey = () => (guiConfig.about_sitekey)
+
+export const getAboutAfc = (): Promiss<RatResponse<string>> => (
+    fetch(guiConfig.about_url, {
+        method: "GET",
+    }).then(async (res: Response) => {
+        if (res.ok) {
+            const content = await (res.text() as Promise<string>);
+            logger.info("success loaded about page" + content);
+            return success(content);
+        } else {
+            logger.error("could not load about page");
+            return error(res.statusText, res.status, res.body);
+        }
+    }).catch((err: any) => {
+        logger.error(err);
+        logger.error("could not load about page");
+        return error("could not load about page");
+    })
+)
+
+export const setAboutAfc = (name: string, email: string, org:string, token:string ): Promise<RatResponse<string>> => (
+    fetch(guiConfig.about_url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({name:name, email:email, org:org, token:token}, undefined, 3)
+    }).then(res => {
+        if (res.status === 204) {
+            return success("Access request submitted");
+        }
+        else {
+            return error(res.statusText, res.status);
+        }
+    }).catch(err => {
+        logger.error(err);
+        return error("Unable to submit access request");
+    })
+);
+
 /**
  * Return a copy of the hard coded afc confic used as the default
  * @returns The default AFC Configuration
@@ -326,9 +385,9 @@ export const getAfcConfigFile = (region: string): Promise<RatResponse<AFCConfigF
         logger.error(err);
         logger.error("could not load afc configuration so falling back to dev default");
         return error("unable to load afc configuration");
-    }
-    )
+    })
 )
+
 
 /**
  * Update the afc config on the server with the one created by the user

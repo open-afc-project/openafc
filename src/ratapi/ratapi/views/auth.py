@@ -113,6 +113,22 @@ def auth(ignore_active=False, roles=None, is_user=None, org=None):
 
     return is_user
 
+
+class AboutLoginAPI(MethodView):
+    ''' Allow the web UI to manipulate configuration directly.
+    '''
+
+    def get(self):
+        ''' GET method for About
+        '''
+
+        resp = flask.make_response()
+
+        resp.data = flask.render_template("about_login.html")
+        resp.content_type = 'text/html'
+        return resp
+
+
 class LoginAPI(MethodView):
     """
     User Login Resource
@@ -317,6 +333,7 @@ class UserAPI(MethodView):
 user_view = UserAPI.as_view('UserAPI')
 logout_view = LogoutAPI.as_view('LogoutAPI')
 login_view = LoginAPI.as_view('LoginAPI')
+about_login_view = AboutLoginAPI.as_view('AboutLoginAPI')
 callback_view = CallbackAPI.as_view('CallbackAPI')
 
 # add Rules for API Endpoints
@@ -333,6 +350,11 @@ module.add_url_rule(
 module.add_url_rule(
     '/login',
     view_func=login_view,
+    methods=['GET']
+)
+module.add_url_rule(
+    '/about_login',
+    view_func=about_login_view,
     methods=['GET']
 )
 module.add_url_rule(
