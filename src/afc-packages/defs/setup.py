@@ -7,7 +7,7 @@ class InstallCmdWrapper(install):
         install.run(self)
 
 setup(
-    name='afcdefs',
+    name='defs',
     # Label compatible with PEP 440
     version='0.1.0',
     description='AFC packages',
