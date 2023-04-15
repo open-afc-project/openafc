@@ -23,8 +23,8 @@ import re
 import datetime
 from flask.views import MethodView
 import werkzeug.exceptions
-from ..defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
-from ..tasks.afc_worker import run
+from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
+from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint, AFCConfig
 from ..models.base import db

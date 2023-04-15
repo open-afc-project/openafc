@@ -1,2 +1,5 @@
 /wd/afc-packages/fstorage
 /wd/afc-packages/appconfig
+/wd/afc-packages/afctask
+/wd/afc-packages/afcdefs
+/wd/afc-packages/afcworker

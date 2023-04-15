@@ -891,7 +891,7 @@ class TestCelery(Command):  # pylint: disable=abstract-method
     def __call__(self, flaskapp, request_type, request_file, afc_config, response_file,
                  afc_engine, user_id, username, response_dir, temp_dir, history_dir, debug):
         with flaskapp.app_context():
-            from ratapi.tasks.afc_worker import run
+            from afc_worker import run
             import flask
 
             if not os.path.exists(temp_dir):
