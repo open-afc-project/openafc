@@ -125,7 +125,8 @@ build_dev_server() {
   msg "prereqs are built"
 
   # build of ULS docker
-  docker_build_and_push ${wd}/uls/Dockerfile-uls_updater ${ULS_UPDATER}:${tag} ${push} &
+  EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=${BUILDREV}"
+  docker_build_and_push ${wd}/uls/Dockerfile-uls_updater ${ULS_UPDATER}:${tag} ${push} "${EXT_ARGS}" &
 
   # build msghnd  (flask + gunicorn)
   docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND}:${tag} ${push} &
