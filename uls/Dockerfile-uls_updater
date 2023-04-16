@@ -19,6 +19,8 @@ COPY pkg /root/afc/pkg/
 COPY selinux /root/afc/selinux/
 COPY src /root/afc/src/
 
+RUN apk add py3-setuptools
+
 RUN mkdir -p -m 777 /root/afc/build
 RUN cd /root/afc/build && \
 cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_BUILD_TYPE=Ulsprocessor -DSVN_LAST_REVISION=$BUILDREV -G Ninja /root/afc && \
