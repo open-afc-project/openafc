@@ -15,8 +15,8 @@ import shutil
 from celery import Celery
 from celery.utils.log import get_task_logger
 from fst import DataIf
-from .. import defs
-from .. import task
+import defs
+import afctask
 
 LOGGER = get_task_logger(__name__)
 
@@ -90,8 +90,8 @@ def run(prot, host, port, state_root,
     os.makedirs(tmpdir)
 
     dataif = DataIf(prot, host, port)
-    tsk = task.Task(task_id, dataif, hash_val, history_dir)
-    tsk.toJson(task.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
+    tsk = afctask.Task(task_id, dataif, hash_val, history_dir)
+    tsk.toJson(afctask.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
 
     proc = None
     err_file = open(os.path.join(tmpdir, "engine-error.txt"), "wb")
@@ -148,7 +148,7 @@ def run(prot, host, port, state_root,
                         with open(os.path.join(tmpdir, "eirp.csv.gz"), "rb") as infile:
                             hfile.write(infile.read())
 
-            tsk.toJson(task.Task.STAT_FAILURE, runtime_opts=runtime_opts,
+            tsk.toJson(afctask.Task.STAT_FAILURE, runtime_opts=runtime_opts,
                        exit_code=error.returncode)
             return
 
@@ -187,7 +187,7 @@ def run(prot, host, port, state_root,
                         hfile.write(infile.read())
 
         LOGGER.debug('task completed')
-        tsk.toJson(task.Task.STAT_SUCCESS, runtime_opts=runtime_opts)
+        tsk.toJson(afctask.Task.STAT_SUCCESS, runtime_opts=runtime_opts)
 
     except Exception as exc:
         raise exc

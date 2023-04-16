@@ -28,14 +28,14 @@ import uuid
 from flask.views import MethodView
 import werkzeug.exceptions
 import six
-from ..defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG
-from ..tasks.afc_worker import run
+from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG
+from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint, AFCConfig
 from .auth import auth
 from .ratapi import build_task, nraToRegionStr
 from fst import DataIf
-from .. import task
+import afctask
 from .. import als
 from ..models.base import db
 from flask_login import current_user
@@ -293,9 +293,9 @@ def success_done(t):
 
 
 response_map = {
-    task.Task.STAT_SUCCESS: success_done,
-    task.Task.STAT_FAILURE: fail_done,
-    task.Task.STAT_PROGRESS: in_progress
+    afctask.Task.STAT_SUCCESS: success_done,
+    afctask.Task.STAT_FAILURE: fail_done,
+    afctask.Task.STAT_PROGRESS: in_progress
 }
 
 
@@ -349,7 +349,7 @@ class RatAfc(MethodView):
         LOGGER.debug("RatAfc.get() task_id={}".format(task_id))
 
         dataif = DataIf()
-        t = task.Task(task_id, dataif)
+        t = afctask.Task(task_id, dataif)
         task_stat = t.get()
 
         if t.ready(task_stat):  # The task is done
@@ -359,9 +359,9 @@ class RatAfc(MethodView):
                 raise werkzeug.exceptions.InternalServerError(
                     'Task execution failed')
         else:  # The task in progress or pending
-            if task_stat['status'] == task.Task.STAT_PROGRESS:  # The task in progress
+            if task_stat['status'] == afctask.Task.STAT_PROGRESS:  # The task in progress
                 # 'PROGRESS' is task.state value, not task.result['status']
-                return response_map[task.Task.STAT_PROGRESS](t)
+                return response_map[afctask.Task.STAT_PROGRESS](t)
             else:  # The task yet not started
                 LOGGER.debug('RatAfc::get() not ready state: %s',
                              task_stat['status'])
@@ -501,7 +501,7 @@ class RatAfc(MethodView):
 
                 conn_type = flask.request.args.get('conn_type')
                 LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
-                t = task.Task(task_id, dataif, hash_val, history_dir)
+                t = afctask.Task(task_id, dataif, hash_val, history_dir)
                 if conn_type == 'async':
                     if len(requests) > 1:
                         raise AP_Exception(-1, "Unsupported multipart async request")

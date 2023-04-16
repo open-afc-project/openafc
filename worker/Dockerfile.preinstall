@@ -9,14 +9,13 @@ FROM alpine:3.17 as staging
 RUN addgroup -g 1003 fbrat
 RUN adduser -g '' -D -u 1003 -G fbrat -h /var/lib/fbrat -s /sbin/nologin fbrat
 
-RUN apk add py3-six py3-pip py3-numpy py3-cryptography py3-sqlalchemy py3-requests py3-flask \
-py3-click py3-click-plugins py3-wcwidth \
+RUN apk add py3-pip py3-requests \
 boost1.80-program_options boost1.80-log boost1.80-filesystem boost1.80-thread \
-qt5-qtbase armadillo minizip libgeotiff qt5-qtbase-sqlite libbsd gdal
+qt5-qtbase armadillo minizip libgeotiff qt5-qtbase-sqlite libbsd gdal \
+# celery deps:
+py3-click py3-click-plugins py3-wcwidth py3-six
 
-RUN pip3 install celery==5.2.7
-
-RUN apk del py3-pip
+RUN pip3 install --root-user-action=ignore celery==5.2.7
 
 FROM alpine:3.17
 COPY --from=staging / /

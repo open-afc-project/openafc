@@ -7,11 +7,10 @@
 #
 
 if [ "$AFC_DEVEL_ENV" == "devel" ]; then
-	apk add build-base cmake samurai py3-setuptools gdal-dev \
-	boost-dev python3-dev qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev
+	apk add build-base cmake samurai gdal-dev \
+	boost-dev qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev
 else
-	apk del apk-tools libc-utils
-	rm -rf /usr/include/gdal
+	apk del apk-tools libc-utils py3-pip
 #	rm -rf /usr/include /sbin/apk /etc/apk /usr/share/apk
 fi
 

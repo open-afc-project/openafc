@@ -9,15 +9,9 @@ FROM alpine:3.17 as staging
 COPY worker/docker-entrypoint.sleep.sh /
 RUN chmod +x /docker-entrypoint.sleep.sh
 
-RUN apk add build-base cmake samurai \
-py3-pip py3-numpy py3-cryptography py3-sqlalchemy py3-requests py3-flask \
-boost-dev python3-dev qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev gdal-dev
-
-RUN pip3 install celery==5.2.7
+RUN apk add build-base cmake samurai boost-dev \
+qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev gdal-dev
 
 FROM alpine:3.17
 COPY --from=staging / /
 LABEL version="openafc-alpine-build-image"
-
-# for debug
-CMD ["/docker-entrypoint.sleep.sh"]

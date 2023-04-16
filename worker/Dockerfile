@@ -23,7 +23,7 @@ COPY src /root/afc/src/
 RUN mkdir -p -m 777 /root/afc/build
 ARG BUILDREV=localbuild
 RUN cd /root/afc/build && \
-cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /root/afc && \
+cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /root/afc && \
 ninja -j$(nproc) install
 RUN cd /root/afc/src/afc-engine-preload && make && cp aep.so /root/afc/__install/lib/ && cp parse_fs.py /root/afc/__install/bin/
 RUN strip --strip-unneeded /root/afc/__install/bin/afc-engine
@@ -35,13 +35,11 @@ FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
 
 COPY --from=build_image /root/afc/__install /usr/
 
-RUN python3 -m ensurepip \
-    && pip3 install --no-cache --upgrade pip setuptools
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
         -r /wd/afc-packages/pkgs.worker \
     && rm -rf /wd/afc-packages
-#
+
 RUN mkdir -m 755 -p /var/spool/fbrat
 RUN mkdir -m 755 -p /var/lib/fbrat
 RUN mkdir -m 755 -p /var/celery
