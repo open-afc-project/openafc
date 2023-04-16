@@ -22,25 +22,16 @@ LOGGER = get_task_logger(__name__)
 
 AFC_AEP_ENABLE = "AFC_AEP_ENABLE" in os.environ
 
-BROKER_URL=os.getenv('BROKER_PROT', appcfg.BROKER_DEFAULT_PROT) + \
-           "://" + \
-           os.getenv('BROKER_USER', appcfg.BROKER_DEFAULT_USER) + \
-           ":" + \
-           os.getenv('BROKER_PWD', appcfg.BROKER_DEFAULT_PWD) + \
-           "@" + \
-           os.getenv('BROKER_FQDN', appcfg.BROKER_DEFAULT_FQDN) + \
-           ":" + \
-           os.getenv('BROKER_PORT', appcfg.BROKER_DEFAULT_PORT) + \
-           "/fbrat"
+worker_cfg = appcfg.BrokerConfigurator()
 
-LOGGER.info('Celery Broker: %s', BROKER_URL)
+LOGGER.info('Celery Broker: %s', worker_cfg.BROKER_URL)
 #: AFC Engine executable
 AFC_ENGINE = distutils.spawn.find_executable('afc-engine')
 
 #: constant celery reference. Configure once flask app is created
 client = Celery(
     'fbrat',
-    broker=BROKER_URL,
+    broker=worker_cfg.BROKER_URL,
     task_ignore_result=True,
 )
 
