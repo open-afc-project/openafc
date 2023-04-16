@@ -1,4 +1,23 @@
  # Release Note
+
+## **Version and Date**
+|Version|3.7.6.0|
+| :- | :- |
+|**Date**|**04/16/2023**|
+|compiled server's version is TBD | git tag 3.7.6.0|
+## **Issues Addressed**
+ * JIRA OA-647-update-regression-tests
+ * JIRA OA-643-worker-log-redirection-to-docker-log
+ * JIRA OA-591-separate-worker-python-module
+ * JIRA OA-632-fix-bug-when-indoor-fixed-height-amsl-is-set-to-true
+ * JIRA OA-623_AboutPageUpdates
+ * JIRA OA-635-missing-response-file-from-history-directory
+ * JIRA OA-601-setup-country-specific-allowed-freq-ranges-in-admin-page
+ * JIRA OA-631-issue-with-the-latest-default-afc-config
+ * JIRA OA-630-prepare-application-configuration-as-independent-module
+ * JIRA OA-580-list-of-denied-geographic-areas
+ * JIRA OA-613-DEBUG_AFC-bugfix
+
 ## **Version and Date**
 |Version|**OA-632**|
 | :- | :- |
