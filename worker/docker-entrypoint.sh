@@ -6,7 +6,7 @@
 # a copy of which is included with this software program
 #
 
-if [ -n ${AFC_AEP_ENABLE+x} ]; then
+if [ ! -z ${AFC_AEP_ENABLE+x} ]; then
 	if [ -z "$AFC_AEP_DEBUG" ]; then
 		export AFC_AEP_DEBUG=0
 	fi
@@ -42,6 +42,6 @@ fi
 #celery
 CELERY_OPTIONS=${CELERY_OPTIONS:="rat_1"}
 CELERY_LOG=${CELERY_LOG:=DEBUG}
-celery multi start $CELERY_OPTIONS -A afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/self/fd/2 --loglevel=$CELERY_LOG &
+celery multi start $CELERY_OPTIONS -A afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$CELERY_LOG &
 
 sleep infinity
