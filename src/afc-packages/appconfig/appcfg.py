@@ -9,6 +9,7 @@
 
 ''' Application configuration data.
 '''
+import os
 import distutils.spawn
 import logging
 import datetime
@@ -58,13 +59,6 @@ HISTORY_DIR = None
 #: Task queue directory
 TASK_QUEUE = '/var/spool/fbrat'
 
-# Celery configuration
-#: address of rabbitmq server
-BROKER_DEFAULT_PROT = 'amqp'
-BROKER_DEFAULT_USER = 'celery'
-BROKER_DEFAULT_PWD = 'celery'
-BROKER_DEFAULT_FQDN = 'localhost'
-BROKER_DEFAULT_PORT = '5672'
 #: Tracks if the daily uls parser ran today. Overwritten by the tasks that use it.
 DAILY_ULS_RAN_TODAY = False 
 
@@ -96,3 +90,38 @@ REGISTRATION_DEST_EMAIL = ''
 REGISTRATION_SRC_EMAIL = ""
 REGISTRATION_APPROVE_LINK=''
 ABOUT_CONTENT=''
+
+class BrokerConfigurator(object):
+    """Keep configuration for a broker"""
+    BROKER_DEFAULT_PROT = 'amqp'
+    BROKER_DEFAULT_USER = 'celery'
+    BROKER_DEFAULT_PWD  = 'celery'
+    BROKER_DEFAULT_FQDN = 'rmq'
+    BROKER_DEFAULT_PORT = '5672'
+    BROKER_DEFAULT_VHOST = 'fbrat'
+
+    def __init__(self) -> None:
+        self.BROKER_PROT = os.getenv('BROKER_PROT',
+                                BrokerConfigurator.BROKER_DEFAULT_PROT)
+        self.BROKER_USER = os.getenv('BROKER_USER',
+                                BrokerConfigurator.BROKER_DEFAULT_USER)
+        self.BROKER_PWD  = os.getenv('BROKER_PWD',
+                                BrokerConfigurator.BROKER_DEFAULT_PWD)
+        self.BROKER_FQDN = os.getenv('BROKER_FQDN',
+                                BrokerConfigurator.BROKER_DEFAULT_FQDN)
+        self.BROKER_PORT = os.getenv('BROKER_PORT',
+                                BrokerConfigurator.BROKER_DEFAULT_PORT)
+        self.BROKER_VHOST = os.getenv('BROKER_VHOST',
+                                BrokerConfigurator.BROKER_DEFAULT_VHOST)
+        self.BROKER_URL = self.BROKER_PROT +\
+                          "://" +\
+                          self.BROKER_USER +\
+                          ":" +\
+                          self.BROKER_PWD +\
+                          "@" +\
+                          self.BROKER_FQDN +\
+                          ":" +\
+                          self.BROKER_PORT +\
+                          "/" +\
+                          self.BROKER_VHOST
+

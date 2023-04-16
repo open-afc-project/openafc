@@ -46,6 +46,8 @@ def create_app(config_override=None):
 
     # default config state from module
     flaskapp.config.from_object(appcfg)
+    flaskapp.config.from_object(appcfg.BrokerConfigurator())
+
     # initial override from system config
     config_path = BaseDirectory.load_first_config('fbrat', 'ratapi.conf')
     if config_path:
@@ -70,24 +72,8 @@ def create_app(config_override=None):
 
     als.als_initialize()
 
-    flaskapp.config.update(
-        BROKER_URL=os.getenv('BROKER_PROT',
-                             flaskapp.config['BROKER_DEFAULT_PROT']) +
-                   "://" +
-                   os.getenv('BROKER_USER',
-                             flaskapp.config['BROKER_DEFAULT_USER']) +
-                   ":" +
-                   os.getenv('BROKER_PWD',
-                             flaskapp.config['BROKER_DEFAULT_PWD']) +
-                   "@" +
-                   os.getenv('BROKER_FQDN',
-                             flaskapp.config['BROKER_DEFAULT_FQDN']) +
-                   ":" +
-                   os.getenv('BROKER_PORT',
-                             flaskapp.config['BROKER_DEFAULT_PORT']) +
-                   "/fbrat"
-    )
     LOGGER.debug('BROKER_URL %s', flaskapp.config['BROKER_URL'])
+
     # DB and AAA setup
     db = models.base.db
 
