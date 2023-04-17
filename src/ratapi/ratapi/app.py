@@ -64,11 +64,11 @@ def create_app(config_override=None):
     # Logging just after config
     root_logger = logging.getLogger()
     # Root logging level
-    root_logger.setLevel(flaskapp.config['LOG_LEVEL'])
+    root_logger.setLevel(flaskapp.config['AFC_RATAPI_LOG_LEVEL'])
     # Apply handlers to logger
     for handler in flaskapp.config['LOG_HANDLERS']:
         root_logger.addHandler(handler)
-    LOGGER.info('Logging at level %s', flaskapp.config['LOG_LEVEL'])
+    LOGGER.info('Logging at level %s', flaskapp.config['AFC_RATAPI_LOG_LEVEL'])
 
     als.als_initialize()
 

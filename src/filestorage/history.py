@@ -204,7 +204,7 @@ def get(path):
 
 if __name__ == '__main__':
     os.makedirs(os.path.join(flask.config["AFC_OBJST_FILE_LOCATION"], "history"), exist_ok=True)
-    waitress.serve(flask, port=flask.config["AFC_OBJST_HIST_PORT"])
+    waitress.serve(flask, port=flask.config["AFC_OBJST_HIST_PORT"], host="0.0.0.0")
 
-    #flask.run(port=flask.config['AFC_OBJST_HIST_PORT'], debug=True)
+    #flask.run(port=flask.config['AFC_OBJST_HIST_PORT'], host="0.0.0.0", debug=True)
 

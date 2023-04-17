@@ -14,6 +14,7 @@ import os
 import logging
 import shutil
 import abc
+import waitress
 from flask import Flask, request, abort, make_response
 from appcfg import ObjstConfigInternal
 import google.cloud.storage
@@ -22,8 +23,6 @@ NET_TIMEOUT = 600 # The amount of time, in seconds, to wait for the server respo
 
 flask = Flask(__name__)
 flask.config.from_object(ObjstConfigInternal())
-
-print(flask.config)
 
 if flask.config['AFC_OBJST_LOG_FILE']:
     logging.basicConfig(filename=flask.config['AFC_OBJST_LOG_FILE'],
@@ -232,10 +231,9 @@ if __name__ == '__main__':
                               flask.config["AFC_OBJST_MEDIA"]))
     os.makedirs(flask.config['AFC_OBJST_FILE_LOCATION'], exist_ok=True)
     # production env:
-    import waitress
-    waitress.serve(flask, port=flask.config['AFC_OBJST_PORT'])
+    waitress.serve(flask, port=flask.config['AFC_OBJST_PORT'], host="0.0.0.0")
     # Development env:
-    #flask.run(port=flask.config['AFC_OBJST_PORT'], debug=True)
+    #flask.run(port=flask.config['AFC_OBJST_PORT'], host="0.0.0.0", debug=True)
 
 # Local Variables:
 # mode: Python
