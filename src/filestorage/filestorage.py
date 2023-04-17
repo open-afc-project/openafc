@@ -21,7 +21,9 @@ import google.cloud.storage
 NET_TIMEOUT = 600 # The amount of time, in seconds, to wait for the server response
 
 flask = Flask(__name__)
-flask.config.from_object(ObjstConfigInternal)
+flask.config.from_object(ObjstConfigInternal())
+
+print(flask.config)
 
 if flask.config['AFC_OBJST_LOG_FILE']:
     logging.basicConfig(filename=flask.config['AFC_OBJST_LOG_FILE'],

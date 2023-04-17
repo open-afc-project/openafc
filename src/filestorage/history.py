@@ -22,7 +22,7 @@ from appcfg import ObjstConfigInternal
 NET_TIMEOUT = 60 # The amount of time, in seconds, to wait for the server response
 
 flask = Flask(__name__)
-flask.config.from_object(ObjstConfigInternal)
+flask.config.from_object(ObjstConfigInternal())
 
 if flask.config['AFC_OBJST_LOG_FILE']:
     logging.basicConfig(filename=flask.config['AFC_OBJST_LOG_FILE'],
