@@ -36,6 +36,7 @@ RUN mkdir -p /mnt/nfs/rat_transfer/daily_uls_parse/data_files \
 COPY uls/antenna_model/antenna_model_map.csv uls/antenna_model/antenna_model_list.csv /mnt/nfs/rat_transfer/daily_uls_parse/
 COPY --from=build_image /root/afc/__install/bin /mnt/nfs/rat_transfer/daily_uls_parse/
 COPY --from=build_image /root/afc/build/src/ratapi/pkg/ratapi/db/ /mnt/nfs/rat_transfer/daily_uls_parse/
+RUN apk add py3-sqlalchemy py3-numpy
 COPY uls/uls-docker-entrypoint.sh /wd/
 RUN chmod +x /wd/uls-docker-entrypoint.sh
 
