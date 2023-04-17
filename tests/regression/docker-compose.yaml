@@ -16,8 +16,8 @@ services:
     restart: always
     dns_search: [.]
 
-  nginx:
-    image: public.ecr.aws/w9v6y1o0/openafc/ngnx-image:${TAG:-latest}
+  dispatcher:
+    image: public.ecr.aws/w9v6y1o0/openafc/dispatcher-image:${TAG:-latest}
     restart: always
     ports:
       - "${EXT_MTLS_PORT}:443"
