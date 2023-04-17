@@ -6,18 +6,22 @@
 
 # This Dockerfile contains various scripts that use GDAL library and utilities.
 # It might be useful in environments where DDAL can't be properly installed,
-# otherwise there are no reasoins to run those scripts outside the container.
+# otherwise there are no reasons to run those scripts outside the container.
 
 
 
 FROM osgeo/gdal:alpine-normal-latest
 
 RUN apk add py3-pip
-RUN pip install pyaml
+RUN pip install pyaml jsonschema
 WORKDIR /usr/app
-COPY dir_md5.py nlcd_wgs84.py nlcd_wgs84.yaml /usr/app/
+COPY geoutils.py /usr/app/
+COPY dir_md5.py g8l_info_schema.json /usr/app/
+COPY nlcd_wgs84.py nlcd_wgs84.yaml /usr/app/
+COPY tiler.py to_wgs84.py lidar_merge.py to_png.py /usr/app/
+
 # If container is created on Windows 'chmod' is necessary. No harm on *nix
-RUN chmod a+x /usr/app/dir_md5.py /usr/app/nlcd_wgs84.py
+RUN chmod a+x /usr/app/*.py
 ENV PATH=$PATH:/usr/app
 
 CMD sh
