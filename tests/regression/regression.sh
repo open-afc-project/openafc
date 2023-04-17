@@ -16,7 +16,7 @@ SRV="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"    # server image
 MSGHND="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd"         # msghnd image
 OBJST="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"          # object storage
 RMQ="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                   # rabbitmq image
-NGNX="public.ecr.aws/w9v6y1o0/openafc/ngnx-image"                 # ngnx image
+DISPATCHER="public.ecr.aws/w9v6y1o0/openafc/dispatcher-image"                 # dispatcher image
 ALS_SIPHON="public.ecr.aws/w9v6y1o0/openafc/als-siphon-image"     # ALS Siphon image
 ALS_KAFKA="public.ecr.aws/w9v6y1o0/openafc/als-kafka-image"       # Kafka for ALS
 ALS_POSTGRES="public.ecr.aws/w9v6y1o0/openafc/als-postgres-image" # PostgreSQL for ALS
@@ -143,9 +143,8 @@ build_dev_server() {
   cd ${wd}/rabbitmq && docker_build_and_push Dockerfile ${RMQ}:${tag} ${push} &
   cd ${wd}
 
-  # build afc nginx docker image
-  cd ${wd}/nginx && docker_build_and_push Dockerfile ${NGNX}:${tag} ${push} &
-  cd ${wd}
+  # build afc dispatcher docker image
+  docker_build_and_push ${wd}/dispatcher/Dockerfile ${DISPATCHER}:${tag} ${push} &
 
   # build afc server docker image
   EXT_ARGS="--build-arg BUILDREV=${BUILDREV}"

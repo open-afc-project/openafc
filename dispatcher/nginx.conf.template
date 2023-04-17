@@ -43,7 +43,7 @@ http {
         ssl_verify_depth 10;
 
         location / {
-            root   /wd/nginx/html;
+            root   /usr/share/nginx/html;
             index  index.html index.htm;
             if ($ssl_client_verify != SUCCESS) {
                 return 403;

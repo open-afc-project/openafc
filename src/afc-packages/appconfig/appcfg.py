@@ -115,6 +115,7 @@ class BrokerConfigurator(object):
                           self.BROKER_PORT +\
                           "/" +\
                           self.BROKER_VHOST
+        self.BROKER_EXCH_DISPAT = os.getenv('BROKER_EXCH_DISPAT', 'dispatcher_bcast')
 
 
 class ObjstConfig():
