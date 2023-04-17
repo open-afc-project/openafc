@@ -889,7 +889,7 @@ class TestCelery(Command):  # pylint: disable=abstract-method
     )
 
     def __call__(self, flaskapp, request_type, request_file, afc_config, response_file,
-                 afc_engine, user_id, username, response_dir, temp_dir, history_dir, debug):
+                 user_id, username, response_dir, temp_dir, history_dir):
         with flaskapp.app_context():
             from afc_worker import run
             import flask
@@ -897,8 +897,6 @@ class TestCelery(Command):  # pylint: disable=abstract-method
             if not os.path.exists(temp_dir):
                 os.makedirs(temp_dir)
 
-            if afc_engine is None:
-                afc_engine = flask.current_app.config['AFC_ENGINE']
             if response_file is None:
                 response_file = os.path.join(
                     temp_dir, request_type + '_response.json')
@@ -912,7 +910,6 @@ class TestCelery(Command):  # pylint: disable=abstract-method
             task = run.apply_async(args=[
                 user_id,
                 username,
-                afc_engine,
                 flask.current_app.config['STATE_ROOT_PATH'],
                 temp_dir,
                 request_type,
@@ -920,7 +917,6 @@ class TestCelery(Command):  # pylint: disable=abstract-method
                 afc_config,
                 response_file,
                 history_dir,
-                debug,
                 flask.current_app.config['NFS_MOUNT_PATH'],
             ])
 

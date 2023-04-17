@@ -577,6 +577,7 @@ chown 999:999 /var/databases/pgdata
 |AFC_AEP_ENGINE_MOUNTPOINT|value of AFC_AEP_REAL_MOUNTPOINT|worker|Redirect read access from here|
 |CELERY_OPTIONS|`rat_1`|worker|Celery app instance to use|
 |CELERY_LOG|`INFO`|worker|Celery log level. `ERROR` or `INFO` or `DEBUG`|
+|AFC_ENGINE_LOG_LVL|'info'|worker|afc-engine log level|
 
 
 ## RabbitMQ settings

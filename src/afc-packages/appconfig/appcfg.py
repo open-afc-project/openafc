@@ -10,7 +10,6 @@
 ''' Application configuration data.
 '''
 import os
-import distutils.spawn
 import logging
 import datetime
 
@@ -48,10 +47,8 @@ PERMANENT_SESSION_LIFETIME = datetime.timedelta(seconds=USER_USER_SESSION_EXPIRA
 GOOGLE_APIKEY = None
 #: Dynamic system data (both model data and configuration)
 STATE_ROOT_PATH = '/var/lib/fbrat'
-#: Mount path 
+#: Mount path
 NFS_MOUNT_PATH = '/mnt/nfs'
-#: AFC Engine executable
-AFC_ENGINE = distutils.spawn.find_executable('afc-engine')
 #: Use random PAWS response flag
 PAWS_RANDOM = False
 #: History directory for log file storage
@@ -60,7 +57,7 @@ HISTORY_DIR = None
 TASK_QUEUE = '/var/spool/fbrat'
 
 #: Tracks if the daily uls parser ran today. Overwritten by the tasks that use it.
-DAILY_ULS_RAN_TODAY = False 
+DAILY_ULS_RAN_TODAY = False
 
 # OIDC default configurations
 OIDC_LOGIN = False
@@ -85,34 +82,28 @@ CAPTCHA_VERIFY=''
 #MAIL_USERNAME= ''
 #MAIL_PASSWORD = ''
 
-# EMAIL configurations not related to MAIL SERVER. Control contents of the registration email 
+# EMAIL configurations not related to MAIL SERVER. Control contents of the registration email
 REGISTRATION_DEST_EMAIL = ''
 REGISTRATION_SRC_EMAIL = ""
 REGISTRATION_APPROVE_LINK=''
 ABOUT_CONTENT=''
 
+
+class InvalidEnvVar(Exception):
+    """Wrong/missing env var exception""" 
+    pass
+
+
 class BrokerConfigurator(object):
     """Keep configuration for a broker"""
-    BROKER_DEFAULT_PROT = 'amqp'
-    BROKER_DEFAULT_USER = 'celery'
-    BROKER_DEFAULT_PWD  = 'celery'
-    BROKER_DEFAULT_FQDN = 'rmq'
-    BROKER_DEFAULT_PORT = '5672'
-    BROKER_DEFAULT_VHOST = 'fbrat'
 
     def __init__(self) -> None:
-        self.BROKER_PROT = os.getenv('BROKER_PROT',
-                                BrokerConfigurator.BROKER_DEFAULT_PROT)
-        self.BROKER_USER = os.getenv('BROKER_USER',
-                                BrokerConfigurator.BROKER_DEFAULT_USER)
-        self.BROKER_PWD  = os.getenv('BROKER_PWD',
-                                BrokerConfigurator.BROKER_DEFAULT_PWD)
-        self.BROKER_FQDN = os.getenv('BROKER_FQDN',
-                                BrokerConfigurator.BROKER_DEFAULT_FQDN)
-        self.BROKER_PORT = os.getenv('BROKER_PORT',
-                                BrokerConfigurator.BROKER_DEFAULT_PORT)
-        self.BROKER_VHOST = os.getenv('BROKER_VHOST',
-                                BrokerConfigurator.BROKER_DEFAULT_VHOST)
+        self.BROKER_PROT = os.getenv('BROKER_PROT', 'amqp')
+        self.BROKER_USER = os.getenv('BROKER_USER', 'celery')
+        self.BROKER_PWD  = os.getenv('BROKER_PWD', 'celery')
+        self.BROKER_FQDN = os.getenv('BROKER_FQDN', 'rmq')
+        self.BROKER_PORT = os.getenv('BROKER_PORT', '5672')
+        self.BROKER_VHOST = os.getenv('BROKER_VHOST','fbrat')
         self.BROKER_URL = self.BROKER_PROT +\
                           "://" +\
                           self.BROKER_USER +\
@@ -125,3 +116,53 @@ class BrokerConfigurator(object):
                           "/" +\
                           self.BROKER_VHOST
 
+
+class ObjstConfig():
+    """Parent of configuration for filestorage"""
+    def __init__(self):
+        self.AFC_OBJST_PORT = os.getenv("AFC_OBJST_PORT", "5000")
+        if not self.AFC_OBJST_PORT.isdigit():
+            raise InvalidEnvVar("Invalid AFC_OBJST_PORT env var.")
+        self.AFC_OBJST_HIST_PORT = os.getenv("AFC_OBJST_HIST_PORT", "4999")
+        if not self.AFC_OBJST_HIST_PORT.isdigit():
+            raise InvalidEnvVar("Invalid AFC_OBJST_HIST_PORT env var.")
+
+
+class ObjstConfigInternal(ObjstConfig):
+    """Filestorage internal config"""
+    def __init__(self):
+        ObjstConfig.__init__(self)
+        self.AFC_OBJST_LOG_FILE = os.getenv("AFC_OBJST_LOG_FILE", "/proc/self/fd/2")
+        self.AFC_OBJST_LOG_LVL = os.getenv("AFC_OBJST_LOG_LVL", "ERROR")
+        # supported AFC_OBJST_MEDIA backends are "GoogleCloudBucket" and "LocalFS"
+        self.AFC_OBJST_MEDIA = os.getenv("AFC_OBJST_MEDIA", "LocalFS")
+        if self.AFC_OBJST_MEDIA not in ("GoogleCloudBucket", "LocalFS"):
+            raise InvalidEnvVar("Invalid AFC_OBJST_MEDIA env var.")
+        if self.AFC_OBJST_MEDIA == "LocalFS":
+            # file download/upload location on the server in case of AFC_OBJST_MEDIA=LocalFS
+            self.AFC_OBJST_FILE_LOCATION = os.getenv("AFC_OBJST_LOCAL_DIR", "/storage")
+        else:
+            self.AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON = os.getenv("AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON")
+            self.AFC_OBJST_GOOGLE_CLOUD_BUCKET = os.getenv("AFC_OBJST_GOOGLE_CLOUD_BUCKET")
+
+
+class ObjstConfigExternal(ObjstConfig):
+    """Filestorage external config"""
+    def __init__(self):
+        ObjstConfig.__init__(self)
+        self.AFC_OBJST_HOST = os.getenv("AFC_OBJST_HOST")
+        self.AFC_OBJST_HIST_HOST = os.getenv("AFC_OBJST_HIST_HOST")
+
+        self.AFC_OBJST_SCHEME = None
+        if "AFC_OBJST_SCHEME" in os.environ:
+            self.AFC_OBJST_SCHEME = os.environ["AFC_OBJST_SCHEME"]
+            if self.AFC_OBJST_SCHEME not in ("HTTPS", "HTTP"):
+                raise InvalidEnvVar("Invalid AFC_OBJST_SCHEME env var.")
+
+
+class WorkerConfig(BrokerConfigurator):
+    """Worker internal config"""
+    def __init__(self):
+        BrokerConfigurator.__init__(self)
+        self.AFC_ENGINE = os.getenv("AFC_ENGINE")
+        self.AFC_ENGINE_LOG_LVL = os.getenv("AFC_ENGINE_LOG_LVL", "info")

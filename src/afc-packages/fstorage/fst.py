@@ -15,10 +15,10 @@ import os
 import inspect
 import logging
 import requests
-
+from appcfg import ObjstConfigExternal
 
 app_log = logging.getLogger(__name__)
-
+conf = ObjstConfigExternal()
 
 class DataInt:
     """ Abstract class for data prot operations """
@@ -131,22 +131,14 @@ class DataIf(DataIfBaseV1):
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         # Assign default args from env vars
         self._host = host
-        if "AFC_OBJST_HOST" in os.environ and host is None:
-            self._host = os.environ["AFC_OBJST_HOST"]
+        if host is None:
+            self._host =conf.AFC_OBJST_HOST
         self._port = port
-        if "AFC_OBJST_PORT" in os.environ and port is None:
-            self._port = os.environ["AFC_OBJST_PORT"]
-        scheme = None
-        if "AFC_OBJST_SCHEME" in os.environ:
-            scheme = os.environ["AFC_OBJST_SCHEME"]
+        if port is None:
+            self._port = conf.AFC_OBJST_PORT
+        scheme = conf.AFC_OBJST_SCHEME
         if probeHttps is None:
             probeHttps = False
-
-        # check args
-        if self._port is not None and not self._port.isdigit():
-            raise "Invalid port. Try to remove the quotes around AFC_OBJST_PORT value"
-        if scheme is not None and scheme != "HTTPS" and scheme != "HTTP":
-            raise "Invalid scheme. Try to remove the quotes around AFC_OBJST_SCHEME value"
 
         # Clarify protocol by env.vars
         if prot == self.AUTO:
@@ -156,10 +148,7 @@ class DataIf(DataIfBaseV1):
                 prot = self.HTTP
 
         # Check protocol
-        if prot in (self.HTTP, self.HTTPS, self.AUTO):
-            if not self._host or not self._port:
-                raise Exception("Missing host:port")
-        else:
+        if prot not in (self.HTTP, self.HTTPS, self.AUTO):
             raise Exception("Bad prot arg")
 
         self._prot = prot

@@ -32,10 +32,7 @@ NET_TIMEOUT = 60 # The amount of time, in seconds, to wait for the server respon
 flask = Flask(__name__)
 flask.config.from_pyfile('filestorage_config.py')
 
-if flask.config['LOG_STREAM']:
-    logging.basicConfig(stream=flask.config['LOG_STREAM'],
-                        level=flask.config['AFC_OBJST_LOG_LVL'])
-elif flask.config['AFC_OBJST_LOG_FILE']:
+if flask.config['AFC_OBJST_LOG_FILE']:
     logging.basicConfig(filename=flask.config['AFC_OBJST_LOG_FILE'],
                         level=flask.config['AFC_OBJST_LOG_LVL'])
 else:
@@ -187,7 +184,7 @@ def get_local_path(path):
     elif prefix != "dbg":
         flask.logger.error('get_local_path: wrong path {}'.format(path))
         abort(403, 'Forbidden')
-    path = os.path.join(flask.config["FILE_LOCATION"], "history", path[len(prefix)+1:])
+    path = os.path.join(flask.config["AFC_OBJST_FILE_LOCATION"], "history", path[len(prefix)+1:])
     flask.logger.debug("get_local_path() {}".format(path))
     return path, schema
 
@@ -215,12 +212,10 @@ def get(path):
 
 
 if __name__ == '__main__':
-    os.makedirs(os.path.join(flask.config["FILE_LOCATION"], "history"), exist_ok=True)
-    waitress.serve(flask, host=flask.config["AFC_OBJST_HIST_HOST"],
-          port=flask.config["AFC_OBJST_HIST_PORT"])
+    os.makedirs(os.path.join(flask.config["AFC_OBJST_FILE_LOCATION"], "history"), exist_ok=True)
+    waitress.serve(flask, port=flask.config["AFC_OBJST_HIST_PORT"])
 
-    #flask.run(host=flask.config['AFC_OBJST_HIST_HOST'],
-    #           port=flask.config['AFC_OBJST_HIST_PORT'], debug=True)
+    #flask.run(port=flask.config['AFC_OBJST_HIST_PORT'], debug=True)
 
 
 
