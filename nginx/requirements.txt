@@ -1,0 +1,4 @@
+amqp==5.1.1
+kombu==5.2.4
+requests
+vine==5.0.0

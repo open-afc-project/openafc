@@ -1,6 +1,6 @@
 # This Python file uses the following encoding: utf-8
 #
-# Portions copyright © 2022 Broadcom. All rights reserved.
+# Portions copyright (C) 2022 Broadcom. All rights reserved.
 # The term "Broadcom" refers solely to the Broadcom Inc. corporate
 # affiliate that owns the software below.
 # This work is licensed under the OpenAFC Project License, a copy
@@ -8,11 +8,14 @@
 #
 
 import logging, os
+import inspect
 import contextlib
 import shutil
 import flask
 import datetime
 from flask.views import MethodView
+from fst import DataIf
+from ncli import MsgPublisher
 from werkzeug import exceptions
 from sqlalchemy.exc import IntegrityError
 import werkzeug
@@ -26,6 +29,8 @@ LOGGER = logging.getLogger(__name__)
 
 #: All views under this API blueprint
 module = flask.Blueprint('admin', 'admin')
+
+dbg_msg = "inspect.getframeinfo(inspect.currentframe().f_back)[2]"
 
 class User(MethodView):
     ''' Administration resources for managing users. '''
@@ -160,6 +165,7 @@ class User(MethodView):
 
         return flask.make_response()
 
+
 class AccessPoint(MethodView):
     ''' resources to manage access points'''
 
@@ -214,7 +220,6 @@ class AccessPoint(MethodView):
         except IntegrityError:
             raise exceptions.BadRequest("Serial number must be unique")
 
-
     def delete(self, id):
         ''' Remove an AP from the system. Here the id is the AP id instead of the user_id '''
 
@@ -228,6 +233,7 @@ class AccessPoint(MethodView):
         db.session.commit() # pylint: disable=no-member
 
         return flask.make_response()
+
 
 class AccessPointTrial(MethodView):
     ''' resource to get the access point for getting trial configuration'''
@@ -249,7 +255,6 @@ class AccessPointTrial(MethodView):
                 'org': ap.org
             }
         )
-
 
 
 class Limits(MethodView):
@@ -285,8 +290,11 @@ class Limits(MethodView):
         except IntegrityError:
             raise exceptions.BadRequest("DB Error")
 
+
 class AllowedFreqRanges(MethodView):
-    ''' Allows an admin to update the JSON containing the allowed frequency bands and allow any user to view but not edit the file '''
+    ''' Allows an admin to update the JSON containing the allowed 
+        frequency bands and allow any user to view but not edit the file 
+    '''
     methods = ['PUT', 'GET']
     ACCEPTABLE_FILES = {
         'allowed_frequencies.json': dict(
@@ -350,6 +358,7 @@ class AllowedFreqRanges(MethodView):
             shutil.copyfileobj(flask.request.stream, outfile)
         return flask.make_response('Allowed frequency ranges updated', 204)
 
+
 class MTLS(MethodView):
     ''' resources to manage mtls certificates '''
 
@@ -357,6 +366,7 @@ class MTLS(MethodView):
 
     def get(self, id):
         ''' Get MTLS info with specific user_id. '''
+        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() ")
 
         if id == 0:
             user_id = auth(roles=['Admin'])
@@ -383,38 +393,69 @@ class MTLS(MethodView):
         ])
 
     def post(self, id):
-        ''' add an mtls cert by a user id. '''
-
+        """Insert an mtls certificate by a user id to a database table,
+           fetch all certificates from the table and create a new
+           certificate bundle. Copy the bundle to a predefined place
+           and send command to correspondent clients.
+        """
         content = flask.request.json
         org = content.get('org')
         auth(roles=['Admin'], org=org)
+        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() "
+                     f"mtls: {str(id)} org: {org}")
 
-        LOGGER.debug("PUT mtls: %s org: %s", str(id), org)
+        # check if certificate is already there.
+        cert = content.get('cert')
+        try:
+            import base64
+            strip_chars = 'base64,'
+            index = cert.index(strip_chars)
+            cert = base64.b64decode(cert[index + len(strip_chars):])
+            cert = str(cert, 'UTF-8').replace('\\n', '\n')
+        except:
+            LOGGER.error(f"PUT mtls: {str(id)} org: {org} exception")
+            raise exceptions.BadRequest("Unexpected certificate format")
 
         try:
-            # check if certificate is already there.
-            cert = content.get('cert')
-            LOGGER.info("PUT mtls: %s org: %s", str(id), org)
-            try:
-                import base64
-                strip_chars = 'base64,'
-                index = cert.index(strip_chars)
-                cert = base64.b64decode(cert[index + len(strip_chars):])
-            except:
-                LOGGER.error("PUT mtls: %s org: %s exception", str(id), org)
-                raise exceptions.BadRequest("Unexpected format of certificate")
-
             mtls = aaa.MTLS(cert, content.get('note'), org)
             db.session.add(mtls)
-            db.session.commit() # pylint: disable=no-member
-            return flask.jsonify(id=mtls.id)
-        except IntegrityError:
-            LOGGER.error("PUT mtls: %s org: %s exception", str(id), org)
-            raise exceptions.BadRequest("Unable to add certificate")
+            db.session.flush() # pylint: disable=no-member
+        except Exception as e:
+            LOGGER.error(f"Failed to insert new cert into table "
+                         f"({type(e)} {e})")
+            raise exceptions.BadRequest("Failed to insert new cert into table")
 
+        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() "
+                     f"Added cert id: {str(mtls.id)} org: {org}")
+
+        try:
+            bundle_data = ''
+            for certs in db.session.query(aaa.MTLS).all():
+                LOGGER.info(f"{certs.id}")
+                bundle_data += certs.cert
+            db.session.commit() # pylint: disable=no-member
+            with DataIf().open("certificate/client.bundle.pem") as hfile:
+                hfile.write(bundle_data)
+            LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() "
+                         f"{flask.current_app.config['BROKER_URL']}")
+            publisher = MsgPublisher(
+                            flask.current_app.config['BROKER_URL'],
+                            flask.current_app.config['BROKER_EXCH_DISPAT'])
+            publisher.publish('cmd_restart')
+            publisher.close()
+        except Exception as e:
+            LOGGER.error(f"Failed to prepare new bundle with mtls: "
+                         f"{str(mtls.id)}, ({type(e)} {e})")
+            self.delete(mtls.id)
+            raise exceptions.BadRequest("Failed to prepare new bundle file")
+
+        return flask.jsonify(id=mtls.id)
 
     def delete(self, id):
-        ''' Remove an mtls cert from the system. Here the id is the mtls cert id instead of the user_id '''
+        """Remove an mtls cert from the system.
+           Here the id is the mtls cert id instead of the user_id
+        """
+        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() ")
 
         mtls = aaa.MTLS.query.filter_by(id=id).first()
         user_id = auth(roles=['Admin'], org=mtls.org)
@@ -425,6 +466,7 @@ class MTLS(MethodView):
         db.session.commit() # pylint: disable=no-member
 
         return flask.make_response()
+
 
 module.add_url_rule('/user/<int:user_id>', view_func=User.as_view('User'))
 module.add_url_rule('/user/ap/<int:id>', view_func=AccessPoint.as_view('AccessPoint'))

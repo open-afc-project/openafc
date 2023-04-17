@@ -99,6 +99,7 @@ class BrokerConfigurator(object):
     BROKER_DEFAULT_FQDN = 'rmq'
     BROKER_DEFAULT_PORT = '5672'
     BROKER_DEFAULT_VHOST = 'fbrat'
+    BROKER_DEFAULT_EXCH_DISPAT = 'dispatcher_bcast'
 
     def __init__(self) -> None:
         self.BROKER_PROT = os.getenv('BROKER_PROT',
@@ -124,4 +125,5 @@ class BrokerConfigurator(object):
                           self.BROKER_PORT +\
                           "/" +\
                           self.BROKER_VHOST
-
+        self.BROKER_EXCH_DISPAT = os.getenv('BROKER_EXCH_DISPAT',
+                                  BrokerConfigurator.BROKER_DEFAULT_EXCH_DISPAT)

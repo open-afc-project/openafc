@@ -229,7 +229,7 @@ export const addMTLS = (mtls: MTLSModel, userId: number) =>
         if (res.ok) {
             return success((await res.json()).id as number)
         } else if (res.status === 400) {
-            return error("Certificate already exists", res.status, res);
+            return error("Unable to add new certificate", res.status, res);
         } else {
             return error(res.statusText, res.status, res);
         }
