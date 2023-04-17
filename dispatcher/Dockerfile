@@ -16,7 +16,7 @@ RUN pip3 install --no-cache --upgrade \
 #
 WORKDIR /wd
 # copy list of external packages
-COPY nginx/requirements.txt /wd
+COPY dispatcher/requirements.txt /wd
 # copy internal packages
 COPY src/afc-packages ./afc-packages
 # install
@@ -24,7 +24,7 @@ RUN set -x \
     && pip3 install --no-cache --root-user-action=ignore \
      -r /wd/requirements.txt \
     && pip3 install --use-pep517 --root-user-action=ignore \
-        -r /wd/afc-packages/pkgs.nginx \
+        -r /wd/afc-packages/pkgs.dispatcher \
     && rm -rf /wd/afc-packages \
     && pip3 uninstall -y setuptools pip \
 # create certificate directories
@@ -34,25 +34,25 @@ RUN set -x \
     /etc/nginx/templates
 
 # Server side certificates
-COPY nginx/certs/servers/server.cert.pem /certificates/servers/
-COPY nginx/certs/servers/server.key.pem /certificates/servers/
-COPY nginx/certs/clients/client.bundle.pem /certificates/clients/
+COPY dispatcher/certs/servers/server.cert.pem /certificates/servers/
+COPY dispatcher/certs/servers/server.key.pem /certificates/servers/
+COPY dispatcher/certs/clients/client.bundle.pem /certificates/clients/
 # Client side certificates
-COPY nginx/certs/servers/server.bundle.pem /certificates/servers/
-COPY nginx/certs/clients/client.key.pem /certificates/clients/
-COPY nginx/certs/clients/client.bdl.pem /certificates/clients/
+COPY dispatcher/certs/servers/server.bundle.pem /certificates/servers/
+COPY dispatcher/certs/clients/client.key.pem /certificates/clients/
+COPY dispatcher/certs/clients/client.bdl.pem /certificates/clients/
 
 # Copy nginx configuration files
-COPY nginx/nginx.conf /etc/nginx/
-COPY nginx/nginx.conf.template /etc/nginx/templates/
+COPY dispatcher/nginx.conf /etc/nginx/
+COPY dispatcher/nginx.conf.template /etc/nginx/templates/
 
-COPY nginx/acceptor.py /wd/
+COPY dispatcher/acceptor.py /wd/
 
 ENV AFC_MSGHND_NAME=${AFC_MSGHND_NAME:-msghnd}
 ENV AFC_MSGHND_PORT=${AFC_MSGHND_PORT:-8000}
 ENV AFC_PROXY_CONN_TOUT=${AFC_PROXY_CONN_TOUT:-720}
 #
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
-COPY nginx/entrypoint.sh /
+COPY dispatcher/entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]
