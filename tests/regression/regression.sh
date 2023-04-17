@@ -144,7 +144,7 @@ build_dev_server() {
   cd ${wd}
 
   # build afc nginx docker image
-  docker_build_and_push ${wd}/nginx/Dockerfile ${NGNX}:${tag} ${push} &
+  docker_build_and_push ${wd}/dispatcher/Dockerfile ${NGNX}:${tag} ${push} &
 
   # build afc server docker image
   EXT_ARGS="--build-arg BUILDREV=${BUILDREV}"
