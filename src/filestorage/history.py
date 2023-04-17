@@ -11,26 +11,18 @@ Provides HTTP server for getting history.
 """
 
 import os
-import errno
-import re
 import logging
-import waitress
-import os
-import errno
-import re
 import io
-from flask import Flask, request, helpers, abort, make_response
-import logging
-import shutil
-from werkzeug.utils import secure_filename
 import abc
+import waitress
+from flask import Flask, request, helpers, abort
 import google.cloud.storage
-import filestorage_config
+from appcfg import ObjstConfigInternal
 
 NET_TIMEOUT = 60 # The amount of time, in seconds, to wait for the server response
 
 flask = Flask(__name__)
-flask.config.from_pyfile('filestorage_config.py')
+flask.config.from_object(ObjstConfigInternal)
 
 if flask.config['AFC_OBJST_LOG_FILE']:
     logging.basicConfig(filename=flask.config['AFC_OBJST_LOG_FILE'],
@@ -201,11 +193,10 @@ def get(path):
             if hobj.isdir() is True:
                 dirs, files = hobj.list()
                 return generateHtml(schema, request.base_url, dirs, files)
-            else:
-                data = hobj.read()
-                return helpers.send_file(
-                    io.BytesIO(data),
-                    download_name=os.path.basename(path))
+            data = hobj.read()
+            return helpers.send_file(
+                io.BytesIO(data),
+                download_name=os.path.basename(path))
     except Exception as e:
         flask.logger.error(e)
         return abort(500)
@@ -216,6 +207,4 @@ if __name__ == '__main__':
     waitress.serve(flask, port=flask.config["AFC_OBJST_HIST_PORT"])
 
     #flask.run(port=flask.config['AFC_OBJST_HIST_PORT'], debug=True)
-
-
 
