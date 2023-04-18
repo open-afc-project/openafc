@@ -37,6 +37,9 @@ if [ ! -z ${AFC_AEP_ENABLE+x} ]; then
 	fi
 	mkdir -p $AFC_AEP_CACHE
 	/usr/bin/parse_fs.py "$AFC_AEP_REAL_MOUNTPOINT" "$AFC_AEP_FILELIST"
+	export AFC_ENGINE="/usr/bin/afc-engine.sh"
+else
+	export AFC_ENGINE="/usr/bin/afc-engine"
 fi
 
 #celery

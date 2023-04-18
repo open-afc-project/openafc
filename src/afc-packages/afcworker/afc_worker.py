@@ -7,39 +7,39 @@
 # This work is licensed under the OpenAFC Project License, a copy of which
 # is included with this software program.
 #
-import appcfg
 import os
 import subprocess
-import distutils.spawn
 import shutil
 from celery import Celery
 from celery.utils.log import get_task_logger
+from appcfg import BrokerConfigurator
 from fst import DataIf
 import defs
 import afctask
 
 LOGGER = get_task_logger(__name__)
 
-AFC_AEP_ENABLE = "AFC_AEP_ENABLE" in os.environ
+class WorkerConfig(BrokerConfigurator):
+    """Worker internal config"""
+    def __init__(self):
+        BrokerConfigurator.__init__(self)
+        self.AFC_ENGINE = os.getenv("AFC_ENGINE")
+        self.AFC_ENGINE_LOG_LVL = os.getenv("AFC_ENGINE_LOG_LVL", "info")
 
-worker_cfg = appcfg.BrokerConfigurator()
+conf = WorkerConfig()
 
-LOGGER.info('Celery Broker: %s', worker_cfg.BROKER_URL)
-#: AFC Engine executable
-AFC_ENGINE = distutils.spawn.find_executable('afc-engine')
+LOGGER.info('Celery Broker: %s', conf.BROKER_URL)
 
 #: constant celery reference. Configure once flask app is created
 client = Celery(
     'fbrat',
-    broker=worker_cfg.BROKER_URL,
+    broker=conf.BROKER_URL,
     task_ignore_result=True,
 )
 
 @client.task(ignore_result=True)
-def run(prot, host, port, state_root,
-        afc_exe, request_type, debug,
-        task_id, hash_val, config_path, history_dir,
-        runtime_opts, mntroot):
+def run(prot, host, port, state_root, request_type, task_id, hash_val,
+        config_path, history_dir, runtime_opts, mntroot):
     """ Run AFC Engine
 
         The parameters are all serializable so they can be passed through the message queue.
@@ -47,8 +47,6 @@ def run(prot, host, port, state_root,
         :param config_path: afc_config.json path
 
         :param history_dir: history path
-
-        :param afc_exe: path to AFC Engine executable
 
         :param state_root: path to directory where fbrat state is held
 
@@ -61,20 +59,11 @@ def run(prot, host, port, state_root,
          (uses INFO otherwise) or prepare GUI options
         :type runtime_opts: int
 
-        :param debug: log level of afc-engine
-
         :param hash_val: md5 of request and config files
     """
     LOGGER.debug(
         "run(prot={}, host={}, port={}, root={}, task_id={}, hash={}, opts={}, mntroot={})".
                  format(prot, host, port, state_root, task_id, hash_val, runtime_opts, mntroot))
-
-    if isinstance(afc_exe, type(None)):
-        afc_exe = AFC_ENGINE
-        if not os.path.exists(AFC_ENGINE):
-            LOGGER.error('Missing afc-engine executable "%s"', AFC_ENGINE)
-    if AFC_AEP_ENABLE is True:
-        afc_exe = "/usr/bin/afc-engine.sh"
 
     # local pathes
     tmpdir = os.path.join(state_root, task_id)
@@ -97,15 +86,15 @@ def run(prot, host, port, state_root,
         # run the AFC Engine
         try:
             cmd = [
-                afc_exe,
+                conf.AFC_ENGINE,
                 "--request-type=" + request_type,
-                "--state-root=" + mntroot+"/rat_transfer",
+                "--state-root=" + mntroot + "/rat_transfer",
                 "--mnt-path=" + mntroot,
                 "--input-file-path=" + dataif.rname(analysis_request),
                 "--config-file-path=" + dataif.rname(config_path),
                 "--output-file-path=" + dataif.rname(analysis_response),
                 "--temp-dir=" + tmpdir,
-                "--log-level=" + ("debug" if debug else "info"),
+                "--log-level=" + conf.AFC_ENGINE_LOG_LVL,
                 "--runtime_opt=" + str(runtime_opts),
             ]
             LOGGER.debug(cmd)

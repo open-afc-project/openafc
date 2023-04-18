@@ -9,15 +9,20 @@ FROM python:3.10-slim
 
 WORKDIR /usr/app
 
-COPY requirements.txt /usr/app/
+COPY src/filestorage/requirements.txt /usr/app/
 RUN /usr/local/bin/python -m pip install --upgrade pip
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
 EXPOSE 4999 5000
 
-COPY filestorage_config.py filestorage.py history.py /usr/app/
-COPY docker-entrypoint.sh /docker-entrypoint.sh
+COPY src/filestorage/*.py /usr/app/
+COPY src/filestorage/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /usr/app/filestorage.py /usr/app/history.py /docker-entrypoint.sh
+
+COPY src/afc-packages /wd/afc-packages
+RUN pip3 install --use-pep517 --root-user-action=ignore \
+        -r /wd/afc-packages/pkgs.filestorage \
+    && rm -rf /wd/afc-packages
 
 ENV PYTHONPATH=/usr/app
 

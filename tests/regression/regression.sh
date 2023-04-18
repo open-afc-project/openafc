@@ -136,7 +136,7 @@ build_dev_server() {
   docker_build_and_push ${wd}/worker/Dockerfile   ${WORKER}:${tag} ${push} "${EXT_ARGS}" &
 
   # build afc dynamic data storage image
-  cd ${wd}/src/filestorage && docker_build_and_push Dockerfile ${OBJST}:${tag} ${push}&
+  docker_build_and_push ${wd}/src/filestorage/Dockerfile ${OBJST}:${tag} ${push}&
   cd ${wd}
 
   # build afc rabbit MQ docker image

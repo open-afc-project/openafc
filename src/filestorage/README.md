@@ -70,12 +70,8 @@ services:
    objst:
       image: http_servers
       environment:
-      # Run on local host
-      - AFC_OBJST_HOST=0.0.0.0
       # Object storage port
       - AFC_OBJST_PORT=5000
-      # Run on local host
-      - AFC_OBJST_HIST_HOST=0.0.0.0
       # History view server port
       - AFC_OBJST_HIST_PORT=4999
       # Use docker FS to store files

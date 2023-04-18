@@ -11,25 +11,20 @@ Provides HTTP server for file exchange between Celery clients and workers.
 """
 
 import os
-import errno
-import re
-import io
-from flask import Flask, request, helpers, abort, make_response
 import logging
 import shutil
-from werkzeug.utils import secure_filename
 import abc
+import waitress
+from flask import Flask, request, abort, make_response
 import google.cloud.storage
+from objstconf import ObjstConfigInternal
 
 NET_TIMEOUT = 600 # The amount of time, in seconds, to wait for the server response
 
 flask = Flask(__name__)
-flask.config.from_pyfile('filestorage_config.py')
+flask.config.from_object(ObjstConfigInternal())
 
-if flask.config['LOG_STREAM']:
-    logging.basicConfig(stream=flask.config['LOG_STREAM'],
-                        level=flask.config['AFC_OBJST_LOG_LVL'])
-elif flask.config['AFC_OBJST_LOG_FILE']:
+if flask.config['AFC_OBJST_LOG_FILE']:
     logging.basicConfig(filename=flask.config['AFC_OBJST_LOG_FILE'],
                         level=flask.config['AFC_OBJST_LOG_LVL'])
 else:
@@ -39,12 +34,6 @@ if flask.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = flask.config["AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON"]
     client = google.cloud.storage.client.Client()
     bucket = client.bucket(flask.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
-
-#pattern = re.compile(flask.config['FILE_LOCATION']+"/"+"^[0-9a-fA-F]{32}/.*")
-#def check_path(path):
-#    path = os.path.join(flask.config['FILE_LOCATION'], path)
-#    path = os.path.abspath(path)
-#    return pattern.match(path)
 
 class ObjInt:
     """ Abstract class for data prot operations """
@@ -142,11 +131,10 @@ class Objstorage:
             return ObjIntGoogleCloudBucket(name)
         if flask.config["AFC_OBJST_MEDIA"] == "LocalFS":
             return ObjIntLocalFS(name)
-        raise Exception("Unsupported AFC_OBJST_MEDIA \"{}\"".format(flask.config["AFC_OBJST_MEDIA"]))
 
 
 def get_local_path(path):
-    path = os.path.join(flask.config["FILE_LOCATION"], path)
+    path = os.path.join(flask.config["AFC_OBJST_FILE_LOCATION"], path)
     return path
 
 
@@ -229,24 +217,23 @@ def get(path):
             data = hobj.read()
             if data:
                 return data
-            else:
-                flask.logger.error('{}: File not found'.format(path))
-                return make_response('File not found', 404)
+            flask.logger.error('{}: File not found'.format(path))
+            return make_response('File not found', 404)
     except Exception as e:
         flask.logger.error(e)
         return abort(500)
 
 
 if __name__ == '__main__':
-    flask.logger.debug("host={} port={} FILE_LOCATION={} AFC_OBJST_MEDIA={}".format(flask.config['AFC_OBJST_HOST'], flask.config['AFC_OBJST_PORT'], flask.config['FILE_LOCATION'], flask.config["AFC_OBJST_MEDIA"]))
-    os.makedirs(flask.config['FILE_LOCATION'], exist_ok=True)
+    flask.logger.debug("port={} AFC_OBJST_FILE_LOCATION={} AFC_OBJST_MEDIA={}".
+                       format(flask.config['AFC_OBJST_PORT'],
+                              flask.config['AFC_OBJST_FILE_LOCATION'],
+                              flask.config["AFC_OBJST_MEDIA"]))
+    os.makedirs(flask.config['AFC_OBJST_FILE_LOCATION'], exist_ok=True)
     # production env:
-    import waitress
-    waitress.serve(flask, host=flask.config['AFC_OBJST_HOST'],
-          port=flask.config['AFC_OBJST_PORT'])
+    waitress.serve(flask, port=flask.config['AFC_OBJST_PORT'], host="0.0.0.0")
     # Development env:
-    #flask.run(host=flask.config['AFC_OBJST_HOST'],
-    #           port=flask.config['AFC_OBJST_PORT'], debug=True)
+    #flask.run(port=flask.config['AFC_OBJST_PORT'], host="0.0.0.0", debug=True)
 
 # Local Variables:
 # mode: Python
