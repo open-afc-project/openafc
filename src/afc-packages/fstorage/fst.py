@@ -15,10 +15,10 @@ import os
 import inspect
 import logging
 import requests
-from appcfg import ObjstConfigExternal
+from appcfg import ObjstConfig
 
 app_log = logging.getLogger(__name__)
-conf = ObjstConfigExternal()
+conf = ObjstConfig()
 
 class DataInt:
     """ Abstract class for data prot operations """
