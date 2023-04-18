@@ -1,0 +1,67 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://afc.broadcom.com/g8l_info_schema.json",
+  "description": "AFC Geospatial data release(s) descriptor",
+  "type": "object",
+  "properties": {
+    "data_releases": {
+      "description": "Geospatial data releases contained in current directory or its subdirectories, indexed by 'region_type' designators",
+      "type": "object",
+      "property_names": {
+        "type": "string",
+        "pattern": "^[:word:]{3}_[:word:]{2}$"
+      },
+      "additionalProperties": {
+        "description": "Files of single type related to single region",
+        "type": "object",
+        "properties": {
+          "md5": {
+            "description": "MD5 of pertinent files",
+            "anyOf": [
+              { "type": "string", "maxLength": 0 },
+              { "type": "string", "pattern": "^[0-9a-fA-F]{32}$" }
+            ]
+          },
+          "files": {
+            "description": "List of fbmatch-compatible filename patterns that constitute set of geospatial files. May include subdirectories",
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" }
+          },
+          "version": {
+            "description": "Data version",
+            "type": "string"
+          },
+          "origin": {
+            "description": "Brief description of what is the source data",
+            "type": "string"
+          },
+          "origin_date": {
+            "description": "Download date in YYYY-MM-DD format",
+            "type": "string",
+            "format": "date"
+          },
+          "geoid": {
+            "description": "Geoid name used for data transformation",
+            "type": "string"
+          },
+          "translation": {
+            "description": "Description of source to final data transformation e.g. in a form of gdal command sequence. String with \\n separators and/or array of strings",
+            "anyOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          },
+          "description": {
+            "description": "Gory details on data provenance and intended use. String with \\n separators and/or array of strings",
+            "anyOf": [
+              { "type": "string" },
+              { "type": "array", "items": { "type": "string" } }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
+

@@ -7,11 +7,18 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
+# pylint: disable=unused-wildcard-import, invalid-name, too-few-public-methods
+# pylint: disable=too-many-statements, too-many-locals, too-many-arguments
+# pylint: disable=wildcard-import
 import argparse
 import datetime
 import fnmatch
 import hashlib
 import json
+try:
+    import jsonschema
+except ImportError:
+    pass
 import multiprocessing
 import os
 import queue
@@ -21,21 +28,41 @@ import sys
 import threading
 from typing import Any, Dict, List, NamedTuple, Optional, Tuple, Union
 
+from geoutils import *
+
 # For printing statistics
 GIGA = 1024 * 1024 * 1024
 
+# Name of schema file for version information JSON files
+SCHEMA_FILE_NAME = "g8l_info_schema.json"
 
-def error(errmsg: str) -> None:
-    """Print given error message and exit"""
-    print(f"{os.path.basename(__file__)}: Error: {errmsg}",
-          file=sys.stderr)
-    sys.exit(1)
+# Root of geospatial data definitions in JSON file
+FILESETS_KEY = "data_releases"
 
+# Structure of dataset key
+FILESET_KEY_PATTERN = r"^\w{3}_\w{2}_\w{3}$"
 
-def error_if(condition: Any, errmsg: str) -> None:
-    """If given condition met - print given error message and exit"""
-    if condition:
-        error(errmsg)
+# Key of filemask list witin dataset
+FILESET_MASKS_KEY = "files"
+
+# Key of MD5 list witin dataset
+FILESET_MD5_KEY = "md5"
+
+_EPILOG = """ This script benefits from `jsonschema` Python module installed,
+but may leave without it. Hence it may easily be used outside of container.
+Some examples:
+- List subcommands:
+    $ dir_md5.py
+- Print help on `compute` subcommand:
+    $ dir_md5.py help compute
+- List LiDAR files (in proc_lidar_2019 directory) to be included into MD5
+  computation:
+    $ dir_md5.py list --mask '*.csv' --mask '*.tif' --recursive proc_lidar_2019
+- Compute MD5 over SRTM files in srtm3arcsecondv003 directory:
+    $ dir_md5.py compute --mask '*.hgt'  srtm3arcsecondv003
+- Update MD5 for USA geoids, per by usa_ge_prd/usa_ge_prd_version_info.json
+    $ dir_md5.py update --json usa_ge_prd/usa_ge_prd_version_info.json
+"""
 
 
 class FileInfo:
@@ -107,26 +134,24 @@ class Md5Computer:
     _chunk_size    -- Size of chunk in bytes
     _max_in_flight -- Maximum number of retrieved but not processed chunks
     _progress      -- Print progress information
-
-    Public attributes:
-    cpu_bound     -- True if last operation was CPU-bound, False if IO-bound
     """
     def __init__(self, num_threads: Optional[int], chunk_size: int,
-                 max_in_flight: int, progress: bool) -> None:
+                 max_in_flight: int, progress: bool, stats: bool) -> None:
         """ Constructor
 
         Arguments:
-        num_threads   -- Number of threads (None to 2XCPUs)
+        num_threads   -- Number of threads (None for 2*CPUs)
         chunk_size    -- Size of chunk in bytes
         max_in_flight -- Maximum number of retrieved but not processed chunks
         progress      -- Print progress information
+        stats         -- Print performance statistics
         """
         self._num_threads: int = \
             num_threads or (2 * multiprocessing.cpu_count())
         self._chunk_size = chunk_size
         self._max_in_flight = max_in_flight
         self._progress = progress
-        self.cpu_bound = True
+        self._stats = stats
 
     def calculate(self, fileinfos: List[FileInfo]) -> str:
         """ Calculate MD5
@@ -135,6 +160,7 @@ class Md5Computer:
         fileinfos -- List of FileInfo objects on files to use
         Return MD5 in string representation
         """
+        start_time = datetime.datetime.now()
         md5 = hashlib.md5()
         # Worker threads that read chunks' data
         threads: List[threading.Thread] = []
@@ -219,9 +245,19 @@ class Md5Computer:
 
         if self._progress:
             print(len(last_name) * " ", end="\r")
-        self.cpu_bound = \
-            (task_queue_lens / (task_queue_samples or 1)) < \
-            (self._max_in_flight / 2)
+
+        if self._stats:
+            seconds = (datetime.datetime.now() - start_time).total_seconds()
+            total_size = sum(fi.size for fi in fileinfos)
+            cpu_bound = \
+                (task_queue_lens / (task_queue_samples or 1)) < \
+                (self._max_in_flight / 2)
+            print(f"Duration: {int(seconds) // 3600}h "
+                  f"{(int(seconds) // 60) % 60}m {seconds % 60:.2f}s")
+            print(f"Data length: {total_size / GIGA:.3f} GB")
+            print(f"Performance: {total_size / seconds / GIGA:.2f} GB/s")
+            print(
+                f"Operation was {'CPU(MD5)' if cpu_bound else 'IO'}-bound")
 
         return "".join(f"{b:02X}" for b in md5.digest())
 
@@ -261,131 +297,103 @@ class Md5Computer:
                 result_queue.put(chunk)
 
 
-class JsonUpdater:
-    """ Json file(s) updater
+class VersionJson:
+    """ Handler of version information JSON
 
     Private attributes:
-    _json_dscs -- List of _JsonDsc objects
+    _filename  -- JSON file name
+    _json_dict -- JSON file content as dictionary
+
+    Public attributes:
+    directory -- Directory where JSON file is located
     """
-
-    _JsonDsc = \
+    # Information about fileset, stored in JSON
+    FilesetInfo = \
         NamedTuple(
-            "_JsonDsc",
-            [
-             # JSON file name
-             ("filename", str),
-             # Sequence of string/integer (object/list) indices in container
-             ("keys", List[Union[int, str]]),
-             # Prefix to prepend to MD5 value
-             ("prefix", str),
-             # Suffix to append to MD5 value
-             ("suffix", str)])
+            "FilesetInfo", [
+                # Fileset type (region_filetype)
+                ("fileset_type", str),
+                # List of masks
+                ("masks", List[str])])
 
-    def __init__(self, json_file_keys: List[str]) -> None:
+    def __init__(self, filename: str) -> None:
         """ Constructor
 
         Arguments:
-        json_file_keys -- List of JSON_FILE:KEY_SEQUENCE[:[PREFIX][:SUFFIX]]
-                          descriptors
+        filename -- JSON file name
         """
-        self._json_dscs: List["JsonUpdater._JsonDsc"] = []
-        for jfk in json_file_keys:
-            error_if(":" not in jfk,
-                     f"--json parameter '{jfk}' has no key part")
-            parts = jfk.split(":")
-            error_if(not (2 <= len(parts) <= 4),
-                     "Invalid structure --json parameter structure (should "
-                     "contain 2 to 4 parts)")
-            parts += ["", ""]
-            filename = parts[0]
-            keys_str = parts[1]
-            prefix = parts[2]
-            suffix = parts[3]
-            keys: List[Union[int, str]] = []
-            while keys_str:
-                if keys_str.startswith("/"):
-                    keys_str = keys_str[1:]
-                elif keys_str.startswith("["):
-                    m = re.match(r"^\[(\d+)\](.*)$", keys_str)
-                    error_if(m is None,
-                             "Invalid list index syntax in JSON key")
-                    assert m is not None
-                    keys.append(int(m.group(1)))
-                    keys_str = m.group(2)
-                else:
-                    m = re.match(r"^([^\[/]+)(.*)$", keys_str)
-                    assert m is not None
-                    keys.append(m.group(1))
-                    keys_str = m.group(2)
-            error_if(not keys, f"--json parameter '{jfk}' has no keys")
-            self._json_dscs.append(
-                self._JsonDsc(filename=filename, keys=keys, prefix=prefix,
-                              suffix=suffix))
+        self._filename = filename
+        error_if(not os.path.isfile(self._filename),
+                 f"File '{self._filename}' not found")
+        try:
+            with open(self._filename, mode="rb") as f:
+                self._json_dict = json.load(f)
+        except json.JSONDecodeError as ex:
+            error(f"Invalid JSON syntax in '{self._filename}': {ex}")
+        self.directory = os.path.dirname(self._filename) or "."
 
-    def update(self, md5_str: str) -> None:
-        """ Update JSON with MD5
-
-        Arguments:
-        md5_str -- MD5 value to put to JSONs
-        """
-        for jd in self._json_dscs:
-            md5_str = jd.prefix + md5_str + jd.suffix
-            json_data: Union[Dict[str, Any], List[Any]]
-            if os.path.isfile(jd.filename):
-                with open(jd.filename, "rb") as f:
+        schema_filename = \
+            os.path.join(os.path.dirname(__file__) or ".", SCHEMA_FILE_NAME)
+        if os.path.isfile(schema_filename):
+            if "jsonschema" in sys.modules:
+                try:
+                    with open(schema_filename, mode="rb") as f:
+                        json_schema_dict = json.load(f)
                     try:
-                        json_data = json.load(f)
-                    except json.JSONDecodeError as ex:
-                        error(f"File '{jd.filename}' is an invalid JSON: {ex}")
-            elif isinstance(jd.keys[0], int):
-                json_data = []
+                        jsonschema.validate(instance=self._json_dict,
+                                            schema=json_schema_dict)
+                    except jsonschema.ValidationError as ex:
+                        warning(f"File '{self._filename}' doesn't match "
+                                f"schema: {ex}")
+                except json.JSONDecodeError as ex:
+                    warning(f"Invalid JSON syntax in '{schema_filename}': "
+                            f"{ex}, hence correctness of '{self._filename}' "
+                            f"schema not checked")
             else:
-                assert isinstance(jd.keys[0], str)
-                json_data = {}
-            # Container into which is next key
-            container: Union[Dict[str, Any], List[Any]] = json_data
-            # Going deeper and deeper into container hierarchy, on the route
-            # creating missing containers if required and possible
-            for i, key in enumerate(jd.keys):
-                last = i == (len(jd.keys) - 1)
-                # If we'll need to insert something into current container at
-                # current key - what would it be?
-                insertable: Union[str, Dict[str, Any], List[Any]] = \
-                    md5_str if last else \
-                    ([] if isinstance(jd.keys[i + 1], int) else {})
-                if isinstance(key, int):
-                    # Integer key - expecting container to be list
-                    error_if(not isinstance(container, list),
-                             "Attempt to list-index of nonlist subconbtainer "
-                             "in JSON")
-                    assert isinstance(container, list)
-                    error_if(len(container) < (key - 1),
-                             "JSON list index out of range")
-                    if key == len(container):
-                        container.append(insertable)
-                        if not last:
-                            assert not isinstance(insertable, str)
-                            container = insertable
-                    elif last:
-                        container[key] = md5_str
-                    else:
-                        container = container[key]
-                else:
-                    # String key - expecting container to be dictionary
-                    assert isinstance(key, str)
-                    error_if(not isinstance(container, dict),
-                             "Attempt to object-index of nonobject "
-                             "subconbtainer in JSON")
-                    assert isinstance(container, dict)
-                    if (key not in container) or last:
-                        container[key] = insertable
-                        if not last:
-                            assert not isinstance(insertable, str)
-                            container = insertable
-                    else:
-                        container = container[key]
-            with open(jd.filename, "w", encoding="utf-8") as f:
-                json.dump(json_data, f, indent=4)
+                warning(f"'jsonschema' module not installed in Python, hence "
+                        f"correctness of '{self._filename}' schema not "
+                        f"checked")
+        else:
+            warning(f"Version info schema file ({schema_filename}) was not "
+                    f"found, hence correctness of '{self._filename}' schema "
+                    f"not checked")
+        error_if(not (isinstance(self._json_dict, dict) and
+                 (FILESETS_KEY in self._json_dict) and
+                 isinstance(self._json_dict[FILESETS_KEY], dict) and
+                 all(re.match(FILESET_KEY_PATTERN, k)
+                     for k in self._json_dict[FILESETS_KEY])),
+                 f"Unsupported structure of '{self._filename}'")
+
+    def get_filesets(self) -> List["VersionJson.FilesetInfo"]:
+        """ Returns information about filesets contained in the file """
+        ret: List["VersionJson.FilesetInfo"] = []
+        for fs_type, fs_dict in self._json_dict[FILESETS_KEY].items():
+            error_if(not(isinstance(fs_dict, dict) and
+                         (FILESET_MASKS_KEY in fs_dict) and
+                         isinstance(fs_dict[FILESET_MASKS_KEY], list) and
+                         all(isinstance(v, str)
+                             for v in fs_dict[FILESET_MASKS_KEY])),
+                     f"'{fs_type}' fileset descriptor in "
+                     f"'{FILESET_KEY_PATTERN}' of '{self._filename}' has "
+                     f"invalid structure")
+            ret.append(
+                self.__class__.FilesetInfo(
+                    fileset_type=fs_type, masks=fs_dict[FILESET_MASKS_KEY]))
+        return ret
+
+    def get_md5(self, fs_type: str) -> Optional[str]:
+        """ Returns MD5 stored for given fileset type. None if there is none
+        """
+        return self._json_dict[FILESETS_KEY][fs_type].get(FILESET_MD5_KEY)
+
+    def update_md5(self, fs_type: str, md5_str: str) -> None:
+        """ Updates MD5 for given fileset type """
+        self._json_dict[FILESETS_KEY][fs_type][FILESET_MD5_KEY] = md5_str
+        try:
+            with open(self._filename, mode="w", encoding="utf-8") as f:
+                json.dump(self._json_dict, f, indent=2)
+        except OSError as ex:
+            error(f"Error writing '{self._filename}': {ex}")
 
 
 def get_files(file_dir_name: str, masks: Optional[List[str]],
@@ -434,25 +442,177 @@ def get_files(file_dir_name: str, masks: Optional[List[str]],
     return ret
 
 
-def sort_files(fileinfos: List[FileInfo], with_path: bool) -> None:
-    """ Sorts given FileInfo list, checks for duplicates
+def get_filelists(
+        json_filename: Optional[str], json_required: bool = False,
+        files_and_dirs: Optional[List[str]] = None, recursive: bool = False,
+        masks: Optional[List[str]] = None) \
+        -> Tuple[Optional[VersionJson],
+                 List[Tuple[Optional[str], List[FileInfo]]]]:
+    """ Returns filelists, indexed by fileset types
 
     Arguments:
-    fileinfos -- List to sort
-    recursive -- True to use (rel_path, basename) as keys, False to use
-                 basenames
+    json_filename  -- Optional name of version info JSAON file
+    json_required  -- True if version info JSAON file must be specified
+    files_and_dirs -- List of files and directories for which to compute MD5.
+                      If empty and JSOIN file not specified - all files in the\
+                      current directory
+    recursive      -- True to recurse into subdirectories
+    masks          -- fnmatch masks of files to include into MD5 computation
     """
-    def sort_key(fi: FileInfo) -> Union[str, Tuple[str, str]]:
-        return fi.sort_key(with_path=with_path)
+    error_if(json_required and (json_filename is None),
+             "Version info JSON file (--json switch) not provided")
+    error_if(
+        (json_filename is not None) and files_and_dirs,
+        "Files/directories should not be provided if --json is provided")
+    ret: List[Tuple[Optional[str], List[FileInfo]]] = []
+    vj: Optional[VersionJson] = None
+    if json_filename is not None:
+        vj = VersionJson(json_filename)
+        for fs in vj.get_filesets():
+            ret.append(
+                (fs.fileset_type, get_files(vj.directory, masks=fs.masks,
+                                            recursive=False)))
+        recursive = False
+    else:
+        fileinfos: List[FileInfo] = []
+        for file_or_dir in files_and_dirs or ["."]:
+            fileinfos += get_files(file_dir_name=file_or_dir, masks=masks,
+                                   recursive=recursive)
+        ret.append((None, fileinfos))
+        if (len(fileinfos) == 1) and \
+                (os.path.splitext(fileinfos[0].basename)[1] == ".json"):
+            warning("Didn't you forget to provide '--json' switch? Without it "
+                    "MD5 will be computed only over JSON file itself")
 
-    fileinfos.sort(key=sort_key)
-    for i in range(len(fileinfos) - 1):
-        error_if(
-            sort_key(fileinfos[i]) == sort_key(fileinfos[i + 1]),
-            f"Files '{fileinfos[i].full_path}' and "
-            f"'{fileinfos[i + 1].full_path}' have same sort name of "
-            f"'sort_key(fileinfos[i])', which makes MD5 undefined (as it is "
-            f"file order dependent)")
+    def sort_key(fi: FileInfo) -> Union[str, Tuple[str, str]]:
+        return fi.sort_key(with_path=recursive)
+
+    for _, fileinfos in ret:
+        fileinfos.sort(key=sort_key)
+        for i in range(len(fileinfos) - 1):
+            error_if(
+                sort_key(fileinfos[i]) == sort_key(fileinfos[i + 1]),
+                f"Files '{fileinfos[i].full_path}' and "
+                f"'{fileinfos[i + 1].full_path}' have same sort name of "
+                f"'sort_key(fileinfos[i])', which makes MD5 undefined (as it "
+                f"is file order dependent)")
+    return (vj, ret)
+
+
+def do_list(args: Any) -> None:
+    """Execute "list" command.
+
+    Arguments:
+    args -- Parsed command line arguments
+    """
+    _, filelists = \
+        get_filelists(
+            json_filename=args.json, files_and_dirs=args.FILES_AND_DIRS,
+            recursive=args.recursive, masks=args.mask)
+    for fs_type, fileinfos in filelists:
+        if len(filelists) != 1:
+            print(f"Fileset: {fs_type}")
+        for fileinfo in fileinfos:
+            print(fileinfo.rel_path if (args.recursive and not args.json)
+                  else fileinfo.basename)
+        if args.stats:
+            print("")
+            total_size = sum(fi.size for fi in fileinfos)
+            print(f"Data length: {total_size / GIGA:.3f} GB")
+        if len(filelists) != 1:
+            print("")
+
+
+def do_compute(args: Any) -> None:
+    """Execute "compute" command.
+
+    Arguments:
+    args -- Parsed command line arguments
+    """
+    if args.nice:
+        nice()
+    _, filelists = \
+        get_filelists(
+            json_filename=args.json, files_and_dirs=args.FILES_AND_DIRS,
+            recursive=args.recursive, masks=args.mask)
+    for fs_type, fileinfos in filelists:
+        if len(filelists) != 1:
+            print(f"Fileset: {fs_type}")
+        md5_computer = Md5Computer(num_threads=threads_arg(args.threads),
+                                   chunk_size=args.chunk,
+                                   max_in_flight=args.max_in_flight,
+                                   progress=args.progress, stats=args.stats)
+        print(md5_computer.calculate(fileinfos))
+        if len(filelists) != 1:
+            print("")
+
+
+def do_verify(args: Any) -> None:
+    """Execute "verify" command.
+
+    Arguments:
+    args -- Parsed command line arguments
+    """
+    if args.nice:
+        nice()
+    version_json, filelists = \
+        get_filelists(json_filename=args.json, json_required=True)
+    assert version_json is not None
+    mismatches: List[str] = []
+    for fs_type, fileinfos in filelists:
+        assert fs_type is not None
+        if len(filelists) != 1:
+            print(f"Fileset: {fs_type}")
+        md5_computer = Md5Computer(num_threads=threads_arg(args.threads),
+                                   chunk_size=args.chunk,
+                                   max_in_flight=args.max_in_flight,
+                                   progress=args.progress, stats=args.stats)
+        computed_md5 = md5_computer.calculate(fileinfos)
+        json_md5 = version_json.get_md5(fs_type)
+        if computed_md5 != json_md5:
+            print(f"MD5 mismatch. Computed: {computed_md5}, in '{args.json}': "
+                  f"{json_md5}'")
+            print("")
+            mismatches.append(fs_type)
+    error_if(mismatches, f"MD5 mismatches found in: {', '.join(mismatches)}")
+
+
+def do_update(args: Any) -> None:
+    """Execute "update" command.
+
+    Arguments:
+    args -- Parsed command line arguments
+    """
+    if args.nice:
+        nice()
+    version_json, filelists = \
+        get_filelists(json_filename=args.json, json_required=True)
+    assert version_json is not None
+    for fs_type, fileinfos in filelists:
+        assert fs_type is not None
+        if len(filelists) != 1:
+            print(f"Fileset: {fs_type}")
+        md5_computer = Md5Computer(num_threads=threads_arg(args.threads),
+                                   chunk_size=args.chunk,
+                                   max_in_flight=args.max_in_flight,
+                                   progress=args.progress, stats=args.stats)
+        computed_md5 = md5_computer.calculate(fileinfos)
+        json_md5 = version_json.get_md5(fs_type)
+        if computed_md5 != json_md5:
+            version_json.update_md5(fs_type, computed_md5)
+
+
+def do_help(args: Any) -> None:
+    """Execute "help" command.
+
+    Arguments:
+    args -- Parsed command line arguments (also contains 'argument_parser' and
+            'subparsers' fields)
+    """
+    if args.subcommand is None:
+        args.argument_parser.print_help()
+    else:
+        args.subparsers.choices[args.subcommand].print_help()
 
 
 def main(argv: List[str]) -> None:
@@ -461,88 +621,119 @@ def main(argv: List[str]) -> None:
     Arguments:
     argv -- Program arguments
     """
-    argument_parser = argparse.ArgumentParser(
-        description="Computes MD5 hash over files in directory",
-        formatter_class=argparse.RawDescriptionHelpFormatter)
-    argument_parser.add_argument(
-        "--recursive", "-r", action="store_true",
+    # Switches for explicitly specified sets of files
+    switches_explicit = argparse.ArgumentParser(add_help=False)
+    switches_explicit.add_argument(
+        "--recursive", action="store_true",
         help="Process files in subdirectories")
-    argument_parser.add_argument(
-        "--mask", "-m", metavar="WILDCARD", action="append",
+    switches_explicit.add_argument(
+        "--mask", metavar="WILDCARD", action="append",
         help="Only use given filename pattern (should not include directory). "
         "Wildcard format is fnmatch compatible (?, *, [...]). This switch may "
         "be specified several times. By default all files are used. Don't "
         "forget to quote it on Linux")
-    argument_parser.add_argument(
-        "--list", "-l", action="store_true",
-        help="Print list of files - sorted in the same order as MD5 will be "
-        "computed. Sorting is lexicographical, first by directory "
-        "(if --recursive specified) then by filename. If this switch "
-        "specified MD5 not computed")
-    argument_parser.add_argument(
-        "--json", "-j", metavar="FILE:KEY_PATH[:[PREFIX][:SUFFIX]]",
-        action="append",
-        help="Puts resulting MD5 to given JSON file at given key path, "
-        "optionally appending given prefix and suffix to it. Key path is a "
-        "sequence of key name list indices - e.g. a/b[1][2]c/d. If file not "
-        "existed - it is created. This switch may be specified several times")
-    argument_parser.add_argument(
-        "--progress", "-p", action="store_true",
-        help="Print progress information")
-    argument_parser.add_argument(
-        "--stats", "-s", action="store_true", help="Print statistics")
-    argument_parser.add_argument(
-        "--threads", type=int, help=argparse.SUPPRESS)
-    argument_parser.add_argument(
-        "--chunk", type=int, default=16*1024*1024, help=argparse.SUPPRESS)
-    argument_parser.add_argument(
-        "--max_in_flight", type=int, default=50, help=argparse.SUPPRESS)
-    argument_parser.add_argument(
+    switches_explicit.add_argument(
         "FILES_AND_DIRS", nargs="*",
         help="Files and directories. Default is current directory. Yet if no "
         "arguments specified - help will be printed, so, say, '.' or '*' "
         "might be used")
+
+    # Switches for MD5 computation
+    switches_computation = argparse.ArgumentParser(add_help=False)
+    switches_computation.add_argument(
+        "--progress", action="store_true",
+        help="Print progress information")
+    switches_computation.add_argument(
+        "--threads", metavar="COUNT_OR_PERCENT%",
+        help="Number of threads to use. If positive - number of threads, if "
+        "negative - number of CPU cores NOT to use, if followed by `%%` - "
+        "percent of CPU cores. Default is total number of CPU cores")
+    switches_computation.add_argument(
+        "--nice", action="store_true",
+        help="Lower priority of this process and its subprocesses")
+    switches_computation.add_argument(
+        "--chunk", type=int, default=16*1024*1024, help=argparse.SUPPRESS)
+    switches_computation.add_argument(
+        "--max_in_flight", type=int, default=50, help=argparse.SUPPRESS)
+
+    # Switches for statistics
+    switches_stats = argparse.ArgumentParser(add_help=False)
+    switches_stats.add_argument(
+        "--stats", action="store_true", help="Print statistics")
+
+    # Switches for version info JSON
+    switches_optional_json = argparse.ArgumentParser(add_help=False)
+    switches_optional_json.add_argument(
+        "--json", metavar="VERSION_INFO_JSON",
+        help="Name of ...version_info.json file that describes fileset(s) to "
+        "compute MD5 for")
+
+    # Switches for version info JSON
+    switches_required_json = argparse.ArgumentParser(add_help=False)
+    switches_required_json.add_argument(
+        "--json", metavar="VERSION_INFO_JSON", required=True,
+        help="Name of ...version_info.json file that describes fileset(s) to "
+        "compute MD5 for. This parameter is mandatory")
+
+    argument_parser = argparse.ArgumentParser(
+        description="Computes MD5 hash over files in directory",
+        formatter_class=argparse.RawDescriptionHelpFormatter, epilog=_EPILOG)
+    subparsers = argument_parser.add_subparsers(dest="subcommand",
+                                                metavar="SUBCOMMAND")
+
+    # Subparser for "list" subcommand
+    parser_list = subparsers.add_parser(
+        "list",
+        parents=[switches_explicit, switches_optional_json, switches_stats],
+        help="Print list of files (no MD5 computed) - sorted in the same "
+        "order as MD5 would have been be computed. Sorting is first by "
+        "directory  (if --recursive specified) then by filename")
+    parser_list.set_defaults(func=do_list)
+
+    # Subparser for "compute" subcommand
+    parser_compute = subparsers.add_parser(
+        "compute",
+        parents=[switches_explicit, switches_optional_json,
+                 switches_computation, switches_stats],
+        help="Compute MD5")
+    parser_compute.set_defaults(func=do_compute)
+
+    # Subparser for "verify" subcommand
+    parser_verify = subparsers.add_parser(
+        "verify",
+        parents=[switches_required_json, switches_computation, switches_stats],
+        help="Computes MD5 and checks if it matches one in "
+        "...version_info.json file")
+    parser_verify.set_defaults(func=do_verify)
+
+    # Subparser for "update" subcommand
+    parser_update = subparsers.add_parser(
+        "update",
+        parents=[switches_required_json, switches_computation, switches_stats],
+        help="Computes MD5 and updates ...version_info.json file with it")
+    parser_update.set_defaults(func=do_update)
+
+    # Subparser for 'help' command
+    parser_help = subparsers.add_parser(
+        "help", add_help=False,
+        help="Prints help on given subcommand")
+    parser_help.add_argument(
+        "subcommand", metavar="SUBCOMMAND", nargs="?",
+        choices=subparsers.choices,
+        help="Name of subcommand to print help about (use " +
+        "\"%(prog)s --help\" to get list of all subcommands)")
+    parser_help.set_defaults(func=do_help, subparsers=subparsers,
+                             argument_parser=argument_parser)
+    parser_help.set_defaults(supports_unknown_args=False)
 
     if not argv:
         argument_parser.print_help()
         sys.exit(1)
     args = argument_parser.parse_args(argv)
 
-    json_updater = JsonUpdater(args.json) if args.json else None
+    setup_logging()
 
-    start = datetime.datetime.now()
-    fileinfos: List[FileInfo] = []
-    for file_or_dir in (args.FILES_AND_DIRS or "."):
-        fileinfos += get_files(file_dir_name=file_or_dir, masks=args.mask,
-                               recursive=args.recursive)
-    sort_files(fileinfos, with_path=args.recursive)
-    total_size = sum(fi.size for fi in fileinfos)
-
-    if args.list:
-        for fileinfo in fileinfos:
-            print(fileinfo.rel_path if args.recursive else fileinfo.basename)
-        if args.stats:
-            print("")
-            print(f"Data length: {total_size / GIGA:.3f} GB")
-        return
-    md5_computer = Md5Computer(num_threads=args.threads, chunk_size=args.chunk,
-                               max_in_flight=args.max_in_flight,
-                               progress=args.progress)
-    md5_str = md5_computer.calculate(fileinfos)
-    duration = datetime.datetime.now() - start
-    if json_updater is not None:
-        json_updater.update(md5_str)
-    else:
-        print(md5_str)
-    if args.stats:
-        seconds = duration.total_seconds()
-        print(f"Duration: {int(seconds) // 3600}h "
-              f"{(int(seconds) // 60) % 60}m {seconds % 60:.2f}s")
-        print(f"Data length: {total_size / GIGA:.3f} GB")
-        print(f"Performance: {total_size / seconds / GIGA:.2f} GB/s")
-        print(
-            f"Operation was "
-            f"{'CPU(MD5)' if md5_computer.cpu_bound else 'IO'}-bound")
+    args.func(args)
 
 
 if __name__ == "__main__":
