@@ -17,12 +17,12 @@ import abc
 import waitress
 from flask import Flask, request, helpers, abort
 import google.cloud.storage
-from appcfg import ObjstConfigInternal
+from appcfg import ObjstConfig
 
 NET_TIMEOUT = 60 # The amount of time, in seconds, to wait for the server response
 
 flask = Flask(__name__)
-flask.config.from_object(ObjstConfigInternal())
+flask.config.from_object(ObjstConfig())
 
 if flask.config['AFC_OBJST_LOG_FILE']:
     logging.basicConfig(filename=flask.config['AFC_OBJST_LOG_FILE'],

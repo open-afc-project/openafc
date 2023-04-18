@@ -118,7 +118,7 @@ class BrokerConfigurator(object):
         self.BROKER_EXCH_DISPAT = os.getenv('BROKER_EXCH_DISPAT', 'dispatcher_bcast')
 
 
-class ObjstConfig():
+class ObjstConfigBase():
     """Parent of configuration for filestorage"""
     def __init__(self):
         self.AFC_OBJST_PORT = os.getenv("AFC_OBJST_PORT", "5000")
@@ -129,10 +129,10 @@ class ObjstConfig():
             raise InvalidEnvVar("Invalid AFC_OBJST_HIST_PORT env var.")
 
 
-class ObjstConfigInternal(ObjstConfig):
+class ObjstConfig(ObjstConfigBase):
     """Filestorage internal config"""
     def __init__(self):
-        ObjstConfig.__init__(self)
+        ObjstConfigBase.__init__(self)
         self.AFC_OBJST_LOG_FILE = os.getenv("AFC_OBJST_LOG_FILE", "/proc/self/fd/2")
         self.AFC_OBJST_LOG_LVL = os.getenv("AFC_OBJST_LOG_LVL", "ERROR")
         # supported AFC_OBJST_MEDIA backends are "GoogleCloudBucket" and "LocalFS"
@@ -146,24 +146,3 @@ class ObjstConfigInternal(ObjstConfig):
             self.AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON = os.getenv("AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON")
             self.AFC_OBJST_GOOGLE_CLOUD_BUCKET = os.getenv("AFC_OBJST_GOOGLE_CLOUD_BUCKET")
 
-
-class ObjstConfigExternal(ObjstConfig):
-    """Filestorage external config"""
-    def __init__(self):
-        ObjstConfig.__init__(self)
-        self.AFC_OBJST_HOST = os.getenv("AFC_OBJST_HOST")
-        self.AFC_OBJST_HIST_HOST = os.getenv("AFC_OBJST_HIST_HOST")
-
-        self.AFC_OBJST_SCHEME = None
-        if "AFC_OBJST_SCHEME" in os.environ:
-            self.AFC_OBJST_SCHEME = os.environ["AFC_OBJST_SCHEME"]
-            if self.AFC_OBJST_SCHEME not in ("HTTPS", "HTTP"):
-                raise InvalidEnvVar("Invalid AFC_OBJST_SCHEME env var.")
-
-
-class WorkerConfig(BrokerConfigurator):
-    """Worker internal config"""
-    def __init__(self):
-        BrokerConfigurator.__init__(self)
-        self.AFC_ENGINE = os.getenv("AFC_ENGINE")
-        self.AFC_ENGINE_LOG_LVL = os.getenv("AFC_ENGINE_LOG_LVL", "info")

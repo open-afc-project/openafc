@@ -12,12 +12,19 @@ import subprocess
 import shutil
 from celery import Celery
 from celery.utils.log import get_task_logger
-from appcfg import WorkerConfig
+from appcfg import BrokerConfigurator
 from fst import DataIf
 import defs
 import afctask
 
 LOGGER = get_task_logger(__name__)
+
+class WorkerConfig(BrokerConfigurator):
+    """Worker internal config"""
+    def __init__(self):
+        BrokerConfigurator.__init__(self)
+        self.AFC_ENGINE = os.getenv("AFC_ENGINE")
+        self.AFC_ENGINE_LOG_LVL = os.getenv("AFC_ENGINE_LOG_LVL", "info")
 
 conf = WorkerConfig()
 

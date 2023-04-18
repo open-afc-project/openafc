@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
 EXPOSE 4999 5000
 
-COPY src/filestorage/filestorage.py src/filestorage/history.py /usr/app/
+COPY src/filestorage/*.py /usr/app/
 COPY src/filestorage/docker-entrypoint.sh /docker-entrypoint.sh
 RUN chmod +x /usr/app/filestorage.py /usr/app/history.py /docker-entrypoint.sh
 
