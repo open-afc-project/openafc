@@ -364,6 +364,29 @@ class MTLS(MethodView):
 
     methods = ['POST', 'GET', 'DELETE']
 
+    def _rebuild_cert_bundle(self) -> None:
+        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() ")
+        bundle_data = ''
+        cmd = 'cmd_restart'
+        for certs in db.session.query(aaa.MTLS).all():
+            LOGGER.info(f"{certs.id}")
+            bundle_data += certs.cert
+        db.session.commit() # pylint: disable=no-member
+        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() {bundle_data} {len(bundle_data)}")
+        with DataIf().open("certificate/client.bundle.pem") as hfile:
+            if len(bundle_data) == 0:
+                hfile.delete()
+                cmd = 'cmd_remove'
+            else:
+                hfile.write(bundle_data)
+        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() "
+                     f"{flask.current_app.config['BROKER_URL']}")
+        publisher = MsgPublisher(
+                        flask.current_app.config['BROKER_URL'],
+                        flask.current_app.config['BROKER_EXCH_DISPAT'])
+        publisher.publish(cmd)
+        publisher.close()
+
     def get(self, id):
         ''' Get MTLS info with specific user_id. '''
         LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() ")
@@ -429,20 +452,7 @@ class MTLS(MethodView):
                      f"Added cert id: {str(mtls.id)} org: {org}")
 
         try:
-            bundle_data = ''
-            for certs in db.session.query(aaa.MTLS).all():
-                LOGGER.info(f"{certs.id}")
-                bundle_data += certs.cert
-            db.session.commit() # pylint: disable=no-member
-            with DataIf().open("certificate/client.bundle.pem") as hfile:
-                hfile.write(bundle_data)
-            LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() "
-                         f"{flask.current_app.config['BROKER_URL']}")
-            publisher = MsgPublisher(
-                            flask.current_app.config['BROKER_URL'],
-                            flask.current_app.config['BROKER_EXCH_DISPAT'])
-            publisher.publish('cmd_restart')
-            publisher.close()
+            self._rebuild_cert_bundle()
         except Exception as e:
             LOGGER.error(f"Failed to prepare new bundle with mtls: "
                          f"{str(mtls.id)}, ({type(e)} {e})")
@@ -455,7 +465,7 @@ class MTLS(MethodView):
         """Remove an mtls cert from the system.
            Here the id is the mtls cert id instead of the user_id
         """
-        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() ")
+        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}()")
 
         mtls = aaa.MTLS.query.filter_by(id=id).first()
         user_id = auth(roles=['Admin'], org=mtls.org)
@@ -464,6 +474,13 @@ class MTLS(MethodView):
 
         db.session.delete(mtls) # pylint: disable=no-member
         db.session.commit() # pylint: disable=no-member
+
+        try:
+            self._rebuild_cert_bundle()
+        except Exception as e:
+            LOGGER.error(f"Failed to prepare new bundle without mtls: "
+                         f"{str(mtls.id)}, ({type(e)} {e})")
+            raise exceptions.BadRequest("Failed to prepare new bundle file")
 
         return flask.make_response()
 

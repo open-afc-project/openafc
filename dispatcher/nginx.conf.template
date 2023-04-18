@@ -42,6 +42,9 @@ http {
         ssl_verify_client optional;
         ssl_verify_depth 10;
 
+        #ssl_stapling on;
+        #ssl_stapling_verify on;
+
         location / {
             root   /usr/share/nginx/html;
             index  index.html index.htm;

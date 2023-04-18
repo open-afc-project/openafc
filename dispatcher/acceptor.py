@@ -60,6 +60,10 @@ class Configurator(dict):
     def __init__(self):
         dict.__init__(self)
         self.update(BrokerConfigurator().__dict__.items())
+        self['OBJST_CERT_CLI_BUNDLE'] = \
+            'certificate/client.bundle.pem'
+        self['DISPAT_CERT_CLI_BUNDLE'] = \
+            '/certificates/clients/client.bundle.pem'
 
 
 log_level_map = {
@@ -76,28 +80,51 @@ def set_log_level(opt) -> int:
     app_log.setLevel(log_level_map[opt])
     return log_level_map[opt]
 
-def get_commands(msg):
+def run_restart(cfg):
     """Get messages"""
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
-    app_log.info(f"{msg}")
     dataif = DataIf()
-    with dataif.open("/certificate/client.bundle.pem") as hfile:
+    with dataif.open(cfg['OBJST_CERT_CLI_BUNDLE']) as hfile:
         if not hfile.head():
-            app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() ")
-            app_log.error(f"Misssing certificate file")
+            app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+            app_log.error(f"Misssing certificate file "
+                          f"{cfg['OBJST_CERT_CLI_BUNDLE']}")
         else:
-            with open('/certificates/clients/client.bundle.pem', 'w') as ofile:
+            with open(cfg['DISPAT_CERT_CLI_BUNDLE'], 'w') as ofile:
                 ofile.write(hfile.read().decode('utf-8'))
-            app_log.info(f"{os.path.getctime('/certificates/clients/client.bundle.pem')}")
+            app_log.info(f"{os.path.getctime(cfg['DISPAT_CERT_CLI_BUNDLE'])}")
             p = subprocess.Popen("nginx -s reload",
                                  stdout=subprocess.PIPE, shell=True)
             app_log.info(f"{p.communicate()}")
+
+
+def run_remove(cfg):
+    """Get messages"""
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() "
+                  f"{cfg['DISPAT_CERT_CLI_BUNDLE']}")
+    os.unlink(cfg['DISPAT_CERT_CLI_BUNDLE'])
+    p = subprocess.Popen("nginx -s reload",
+                         stdout=subprocess.PIPE, shell=True)
+    app_log.info(f"{p.communicate()}")
+
+
+commands_map = {
+    'cmd_restart' : run_restart,
+    'cmd_remove'  : run_remove,
+}
+
+
+def get_commands(cfg, msg):
+    """Get messages"""
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+    commands_map[msg](cfg)
+
 
 def run_it(cfg):
     """Execute command line run command"""
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
     maker = MsgAcceptor(cfg['BROKER_URL'], cfg['BROKER_EXCH_DISPAT'],
-                        msg_handler=get_commands)
+                        msg_handler=get_commands, handler_params=cfg)
     app_log.info(f"({os.getpid()}) Connected to {cfg['BROKER_URL']}")
     maker.run()
 
