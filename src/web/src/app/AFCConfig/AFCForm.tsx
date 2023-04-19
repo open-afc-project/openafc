@@ -75,8 +75,9 @@ export class AFCForm extends React.Component<
                         defConf.regionStr = n;
                         this.updateEntireConfigState(defConf);
                         this.setState({ messageSuccess: "No config found for this region, using region default" });
-                    } else
+                    } else {
                         this.setState({ messageError: res.description, messageSuccess: undefined });
+                    }
                 }
             })
     }
