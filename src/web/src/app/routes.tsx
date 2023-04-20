@@ -205,6 +205,12 @@ const getMTLSModuleAsync = () => {
   return () => import(/* webpackChunkName: "mtlsList" */ "./MTLS/MTLS");
 }
 
+const getDRListModuleAsync = () => {
+  return () => import(/* webpackChunkName: "drList" */ "./DeniedRegions/DRList");
+}
+
+
+
 const APListPage = () => {
   return (
     <DynamicImport load={getAPListModuleAsync()}>
@@ -226,6 +232,19 @@ const MTLSPage = () => {
     </DynamicImport>
   );
 }
+
+const DRListPage = () => {
+  return (
+    <DynamicImport load={getDRListModuleAsync()}>
+      {(Component: any) => {
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
+          : <Component.DRListPage />
+      }}
+    </DynamicImport>
+  );
+}
+
+
 
 const getReplayModuleAsync = () => {
   return () => import(/* webpackChunkName: "replay" */ "./Replay/Replay");
@@ -341,6 +360,13 @@ const routes: IAppRoute[] = [
     icon: null,
     label: "MTLS",
     path: "/mtls"
+  },
+  {
+    component: DRListPage,
+    exact: true,
+    icon: null,
+    label: "Denied Regions",
+    path: "/deniedRegions"
   },
   {
     component: UserAccountPage,

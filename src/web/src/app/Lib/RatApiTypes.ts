@@ -553,6 +553,40 @@ export interface AFCEngineException {
 }
 
 /**
+ * Denied Region model
+ */
+export interface ExclusionCircle {
+    latitude: number,
+    longitude: number,
+    radiusKm: number
+
+}
+export interface ExclusionRect {
+    topLat: number,
+    leftLong: number,
+    bottomLat: number,
+    rightLong: number
+}
+export interface  ExclusionTwoRect {
+    rectangleOne: ExclusionRect,
+    rectangleTwo: ExclusionRect
+}
+export interface  ExclusionHorizon {
+    latitude: number,
+    longitude: number,
+    aglHeightM: number
+}
+
+export interface DeniedRegion {
+    regionStr: string,
+    name: string,
+    startFreq: number,
+    endFreq: number,
+    exclusionZone: ExclusionCircle | ExclusionRect | ExclusionTwoRect | ExclusionHorizon
+}
+
+
+/**
  * Simple implementation of the Either sum type. Used to encode the possibility of success or error in type.
  * This Either type is specialized to encode errors that are usually the result of failed HTTP requests
  * but in principle the type can be used anywhere.
