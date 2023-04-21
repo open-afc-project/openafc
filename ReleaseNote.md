@@ -1,6 +1,25 @@
  # Release Note
 
 ## **Version and Date**
+|Version|**OA-658**|
+| :- | :- |
+|**Date**|**04/21/2023**|
+
+## **Issues Addressed**
+ * Jira OA-658: bug in daily_uls_parser corrupt fsid_table
+ * Download updated fsid_table.csv from https://drive.google.com/drive/folders/1O6bx3uZyinnnKL8Z-04a6DTnU7gX6bxx and place it here: /mnt/nfs/rat_transfer/daily_uls_parse/data_files/fsid_table.csv
+
+
+## **Interface Changes**
+ *  the FS parser was updated.
+
+
+## **Testing Done**
+ * Re-ran the FS parser and validated that the issue is resolved.
+
+## **Open Issues** 
+ 
+## **Version and Date**
 |Version|3.7.6.0|
 | :- | :- |
 |**Date**|**04/16/2023**|

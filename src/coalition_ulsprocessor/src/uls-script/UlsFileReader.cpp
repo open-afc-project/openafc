@@ -110,7 +110,7 @@ UlsFileReader::UlsFileReader(const char *fpath, FILE *fwarn, bool alignFederated
                 } else if (front == "US:LO") {
                     readIndividualLocationUS(fieldList, alignFederatedFlag, alignFederatedScale);
                 } else if (front == "US:EM") {
-                    readIndividualEmissionUS(fieldList);
+                    readIndividualEmissionUS(fieldList, fwarn);
                 } else if (front == "US:EN") {
                     readIndividualEntityUS(fieldList);
                 } else if (front == "US:MF") {
@@ -169,6 +169,13 @@ UlsFileReader::UlsFileReader(const char *fpath, FILE *fwarn, bool alignFederated
     fclose(fi);
 }
 /**************************************************************************/
+
+inline bool isInvalidChar(char c)
+{
+    bool isComma = (c == ',');
+    bool isInvalidAscii = (c&0x80 ? true : false);
+    return(isComma || isInvalidAscii);
+}
 
 /**************************************************************************/
 /* UlsFileReader::readIndividualPathUS()                                  */
@@ -270,7 +277,7 @@ void UlsFileReader::readIndividualPathUS(const std::vector<std::string> &fieldLi
 /**************************************************************************/
 /* UlsFileReader::readIndividualEmissionUS()                              */
 /**************************************************************************/
-void UlsFileReader::readIndividualEmissionUS(const std::vector<std::string> &fieldList)
+void UlsFileReader::readIndividualEmissionUS(const std::vector<std::string> &fieldList, FILE *fwarn)
 {
     UlsEmission current;
 
@@ -300,12 +307,33 @@ void UlsFileReader::readIndividualEmissionUS(const std::vector<std::string> &fie
                 current.modRate = emptyAtof(field.c_str());
                 break;
             case 11:
-                strlcpy(current.modCode, field.c_str(), 256);
+                current.modCode = field;
                 break;
             case 12:
                 current.frequencyId = atoi(field.c_str());
                 break;
         }
+    }
+
+    std::string origModCode = current.modCode;
+    std::string modCode = origModCode;
+
+    modCode.erase(std::remove_if(modCode.begin(), modCode.end(), isInvalidChar), modCode.end());
+
+    if (modCode != origModCode) {
+        if (fwarn) {
+            fprintf(fwarn, "WARNING: Mod Code \"");
+            for(int i=0; i<(int) origModCode.length(); ++i) {
+                char  ch = origModCode[i];
+                if (isInvalidChar(ch)) {
+                    fprintf(fwarn, "\\x%2X", (unsigned char) ch);
+                } else {
+                    fprintf(fwarn, "%c", ch);
+                }
+            }
+            fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n", modCode.c_str());
+        }
+        current.modCode = modCode;
     }
 
     allEmissions << current;
@@ -527,13 +555,6 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
     return;
 }
 /**************************************************************************/
-
-inline bool isInvalidChar(char c)
-{
-    bool isComma = (c == ',');
-    bool isInvalidAscii = (c&0x80 ? true : false);
-    return(isComma || isInvalidAscii);
-}
 
 /**************************************************************************/
 /* UlsFileReader::readIndividualAntennaUS()                               */

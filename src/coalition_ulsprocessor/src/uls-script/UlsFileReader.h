@@ -115,7 +115,7 @@ private:
     void readIndividualAntennaUS(const std::vector<std::string> &fieldList, FILE *fwarn);
     void readIndividualFrequencyUS(const std::vector<std::string> &fieldList, FILE *fwarn);
     void readIndividualLocationUS(const std::vector<std::string> &fieldList, bool alignFederatedFlag, double alignFederatedScale);
-    void readIndividualEmissionUS(const std::vector<std::string> &fieldList);
+    void readIndividualEmissionUS(const std::vector<std::string> &fieldList, FILE *fwarn);
     void readIndividualEntityUS(const std::vector<std::string> &fieldList);
     void readIndividualMarketFrequencyUS(const std::vector<std::string> &fieldList);
     void readIndividualControlPointUS(const std::vector<std::string> &fieldList);

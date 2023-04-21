@@ -773,7 +773,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                 if (txEmFound) {
                     row << QString(e.desig);      // Emissions Designator
                     row << UlsFunctionsClass::makeNumber(e.modRate); // Digital Mod Rate
-                    row << QString(e.modCode);    // Digital Mod Type
+                    row << QString::fromStdString(e.modCode);    // Digital Mod Type
                 } else {
                     row << ""
                         << ""

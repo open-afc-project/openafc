@@ -14,7 +14,7 @@ def sortCallsignsAddFSID(inputPath, fsidTableFile, outputPath, logFile):
     if not exists(fsidTableFile):
         logFile.write("FSIDTable does NOT exist, creating Table at " + fsidTableFile + "\n")
         with open(fsidTableFile, 'w') as fsidTable:
-            fsidTable.write("FSID,Region,US,Callsign,Path Number,Center Frequency (MHz),Bandwidth (MHz)\n")
+            fsidTable.write("FSID,Region,Callsign,Path Number,Center Frequency (MHz),Bandwidth (MHz)\n")
 
     entriesRead = 0
     highestFSID = 0

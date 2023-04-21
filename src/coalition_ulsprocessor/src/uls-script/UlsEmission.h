@@ -10,7 +10,7 @@ public:
 	double frequency;
 	char desig[11];
     double modRate;
-    char modCode[256];
+    std::string modCode;
     int frequencyId;
 };
 
