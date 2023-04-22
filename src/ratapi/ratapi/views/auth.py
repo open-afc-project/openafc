@@ -6,7 +6,7 @@
 # This work is licensed under the OpenAFC Project License, a copy
 # of which is included with this software program.
 #
-import appcfg
+from appcfg import OIDCConfigurator
 import os
 import logging
 import datetime
@@ -22,14 +22,7 @@ from ..models.aaa import User
 from flask_login import current_user
 from .. import als
 
-OIDC_LOGIN = appcfg.OIDC_LOGIN
-try:
-    from .. import priv_config
-    OIDC_LOGIN = priv_config.OIDC_LOGIN
-except:
-    pass
-
-OIDC_LOGIN=(os.getenv('OIDC_LOGIN', str(OIDC_LOGIN)).lower() == "true")
+OIDC_LOGIN=OIDCConfigurator().OIDC_LOGIN
 
 if OIDC_LOGIN:
     from flask_login import (

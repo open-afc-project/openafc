@@ -59,36 +59,6 @@ TASK_QUEUE = '/var/spool/fbrat'
 #: Tracks if the daily uls parser ran today. Overwritten by the tasks that use it.
 DAILY_ULS_RAN_TODAY = False
 
-# OIDC default configurations
-OIDC_LOGIN = False
-OIDC_CLIENT_ID = ""
-OIDC_CLIENT_SECRET = ""
-OIDC_DISCOVERY_URL = ""
-
-
-# CAPTCHA FOR USER REGISTRATION
-USE_CAPTCHA=False
-CAPTCHA_SECRET=''
-CAPTCHA_SITEKEY=''
-CAPTCHA_VERIFY=''
-
-# EMAIL FOR USER REGISTRATION
-# MAIL SERVER Config.  If MAIL_SERVER is set, all MAIL SERVER config needs to be set.
-# If MAIL_SERVER is NOT set, local mail server is used, do not set any of of the MAIL configs below.
-#MAIL_SERVER= ''
-#MAIL_PORT= 465
-#MAIL_USE_TLS = False
-#MAIL_USE_SSL = True
-#MAIL_USERNAME= ''
-#MAIL_PASSWORD = ''
-
-# EMAIL configurations not related to MAIL SERVER. Control contents of the registration email
-REGISTRATION_DEST_EMAIL = ''
-REGISTRATION_SRC_EMAIL = ""
-REGISTRATION_APPROVE_LINK=''
-ABOUT_CONTENT=''
-
-
 class InvalidEnvVar(Exception):
     """Wrong/missing env var exception""" 
     pass
@@ -117,7 +87,6 @@ class BrokerConfigurator(object):
                           self.BROKER_VHOST
         self.BROKER_EXCH_DISPAT = os.getenv('BROKER_EXCH_DISPAT', 'dispatcher_bcast')
 
-
 class ObjstConfigBase():
     """Parent of configuration for filestorage"""
     def __init__(self):
@@ -141,3 +110,50 @@ class ObjstConfig(ObjstConfigBase):
             if self.AFC_OBJST_SCHEME not in ("HTTPS", "HTTP"):
                 raise InvalidEnvVar("Invalid AFC_OBJST_SCHEME env var.")
 
+
+class OIDCConfigurator(object):
+
+    def __init__(self):
+        # OIDC default configurations
+        self.OIDC_LOGIN = False
+        self.OIDC_CLIENT_ID = ""
+        self.OIDC_CLIENT_SECRET = ""
+        self.OIDC_DISCOVERY_URL = ""
+
+        bool_attr = ['OIDC_LOGIN']
+        str_attr = ['OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'OIDC_DISCOVERY_URL']
+        attr = bool_attr + str_attr
+
+        # load priv config if available.
+        try:
+           from ratapi import priv_config
+           for k in attr:
+               val = getattr(priv_config, k, None)
+               if not val is None:
+                   setattr(self, k, val)
+        except:
+           priv_config = None
+
+        # override boolean config with environment variables
+        for k in bool_attr:
+            # Override with environment variables
+            ret = os.getenv(k)
+            if ret:
+                setattr(self, k, (ret.lower() == 'true'))
+
+        # override string config with environment variables
+        for k in str_attr:
+            ret = os.getenv(k)
+            if ret:
+                setattr(self, k, ret)
+
+        # Override values from config with secret file
+        if self.OIDC_LOGIN:
+            OIDC_ARG=os.getenv('OIDC_ARG')
+            if OIDC_ARG:
+                import json
+                with open(OIDC_ARG) as oidc_config:
+                    data = json.load(oidc_config)
+                    self.OIDC_CLIENT_SECRET=data['OIDC_CLIENT_SECRET']
+                    self.OIDC_CLIENT_ID=data['OIDC_CLIENT_ID']
+                    self.OIDC_DISCOVERY_URL=data['OIDC_DISCOVERY_URL']

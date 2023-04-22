@@ -10,20 +10,13 @@
 # pylint: disable=no-member
 ''' Authentication, authorization, and accounting classes.
 '''
-import appcfg
+from appcfg import OIDCConfigurator
 import os
-OIDC_LOGIN = appcfg.OIDC_LOGIN
 from sqlalchemy.schema import Sequence
 from sqlalchemy.dialects.postgresql import JSON
 
-try:
-    # priv_config overrides defaults
-    from .. import priv_config
-    OIDC_LOGIN = priv_config.OIDC_LOGIN
-except:
-    pass
+OIDC_LOGIN=OIDCConfigurator().OIDC_LOGIN
 
-OIDC_LOGIN=(os.getenv('OIDC_LOGIN', str(OIDC_LOGIN)).lower() == "true")
 if OIDC_LOGIN:
     from flask_login import UserMixin
 else:

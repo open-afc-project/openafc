@@ -26,6 +26,45 @@ LOGGER = logging.getLogger(__name__)
 #: Current file path
 owndir = os.path.abspath(os.path.dirname(__file__))
 
+class RatApiConfigurator(object):
+
+    def __init__(self):
+        bool_attr = ['MAIL_USE_TLS', 'MAIL_USE_SSL', 'USE_CAPTCHA', 'SEND_MAIL']
+        str_attr = ['REGISTRATION_APPROVE_LINK', 'REGISTRATION_DEST_EMAIL',
+                    'REGISTRATION_DEST_PDL_EMAIL', 'REGISTRATION_SRC_EMAIL',
+                    'MAIL_PASSWORD', 'MAIL_USERNAME', 'MAIL_SERVER', 'CAPTCHA_SECRET',
+                    'CAPTCHA_SITEKEY', 'CAPTCHA_VERIFY']
+        int_attr = ['MAIL_PORT']
+        attr = bool_attr + str_attr + int_attr
+
+        # load priv config if available.
+        try:
+           from ratapi import priv_config
+           for k in attr:
+               val = getattr(priv_config, k, None)
+               if not val is None:
+                   setattr(self, k, val)
+        except:
+           priv_config = None
+
+        # override boolean config with environment variables
+        for k in bool_attr:
+            # Override with environment variables
+            ret = os.getenv(k)
+            if ret:
+                setattr(self, k, (ret.lower() == 'true'))
+
+        # override string config with environment variables
+        for k in str_attr:
+            ret = os.getenv(k)
+            if ret:
+                setattr(self, k, ret)
+
+        # override int config
+        for k in int_attr:
+            ret = os.getenv(k)
+            if ret:
+                setattr(self, k, int(ret))
 
 def create_app(config_override=None):
     ''' Build up a WSGI application for this server.
@@ -47,6 +86,8 @@ def create_app(config_override=None):
     # default config state from module
     flaskapp.config.from_object(appcfg)
     flaskapp.config.from_object(appcfg.BrokerConfigurator())
+    flaskapp.config.from_object(appcfg.OIDCConfigurator())
+    flaskapp.config.from_object(RatApiConfigurator())
 
     # initial override from system config
     config_path = BaseDirectory.load_first_config('fbrat', 'ratapi.conf')
@@ -81,47 +122,11 @@ def create_app(config_override=None):
     Migrate(
         flaskapp, db, directory=os.path.join(owndir, 'migrations'))
 
-    try:
-        # private configuration. Override values from config
-        from . import priv_config
-        flaskapp.config.from_object(priv_config)
-    except:
-        pass
-
-    # override boolean config with environment variables
-    for k in ["OIDC_LOGIN", "MAIL_USE_TLS", "MAIL_USE_SSL", "USE_CAPTCHA", "SEND_MAIL"]:
-        if os.getenv(k):
-            flaskapp.config[k]=(os.getenv(k).lower() == "true")
-
-    # override string config with environment variables
-    for k in ["REGISTRATION_APPROVE_LINK", "REGISTRATION_DEST_EMAIL",
-              "REGISTRATION_DEST_PDL_EMAIL", "REGISTRATION_SRC_EMAIL",
-              "MAIL_PASSWORD", "MAIL_USERNAME", "MAIL_SERVER", "CAPTCHA_SECRET",
-              "CAPTCHA_SITEKEY", "CAPTCHA_VERIFY"]:
-        if os.getenv(k):
-            flaskapp.config[k] = os.getenv(k)
-
-    # override int config
-    for k in ["MAIL_PORT"]:
-        if os.getenv(k):
-            flaskapp.config[k] = int(os.getenv(k))
-
     if flaskapp.config['OIDC_LOGIN']:
         from .models.aaa import User
         from flask_login import  LoginManager
         login_manager = LoginManager()
         login_manager.init_app(flaskapp)
-
-        # Override values from config
-        flaskapp.config['OIDC_ARG']=os.getenv('OIDC_ARG')
-        if flaskapp.config['OIDC_ARG']:
-            import json
-            with open(flaskapp.config['OIDC_ARG']) as oidc_config:
-                data = json.load(oidc_config)
-
-            flaskapp.config['OIDC_CLIENT_SECRET']=data['OIDC_CLIENT_SECRET']
-            flaskapp.config['OIDC_CLIENT_ID']=data['OIDC_CLIENT_ID']
-            flaskapp.config['OIDC_DISCOVERY_URL']=data['OIDC_DISCOVERY_URL']
 
         if (flaskapp.config['OIDC_DISCOVERY_URL']):
             endpoints = requests.get(flaskapp.config['OIDC_DISCOVERY_URL'],

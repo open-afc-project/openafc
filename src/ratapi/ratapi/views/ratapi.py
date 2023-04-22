@@ -127,7 +127,8 @@ class GuiConfig(MethodView):
         u = urlparse(flask.request.url)
         histurl = u.scheme + "://" + u.netloc + "/dbg"
 
-        if flask.current_app.config['USE_CAPTCHA']:
+        if 'USE_CAPTCHA' in flask.current_app.config and \
+            flask.current_app.config['USE_CAPTCHA']:
             about_sitekey=flask.current_app.config['CAPTCHA_SITEKEY']
         else:
             about_sitekey=None
@@ -404,7 +405,8 @@ class About(MethodView):
             src_email = flask.current_app.config['REGISTRATION_SRC_EMAIL']
             approve_link = flask.current_app.config['REGISTRATION_APPROVE_LINK']
 
-            if flask.current_app.config['USE_CAPTCHA']:
+            if 'USE_CAPTCHA' in flask.current_app.config and \
+                flask.current_app.config['USE_CAPTCHA']:
                 captcha_secret = flask.current_app.config['CAPTCHA_SECRET']
                 captcha_verify = flask.current_app.config['CAPTCHA_VERIFY']
             else:
