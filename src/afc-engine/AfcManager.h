@@ -126,6 +126,9 @@ class AfcManager
 		// Read configuration parameters for AFC
 		void importConfigAFCjson(const std::string &inputJSONpath, const std::string &tempDir);
 
+		/* create OGR layer for generateExclusionZoneJson, generateMapDataGeoJson, generateHeatmap */
+		OGRLayer* createGeoJSONLayer(const char *tmpPath,  GDALDataset **dataSet);
+
 		// create JSON object for exclusion zone to be sent to GUI
 		QJsonDocument generateExclusionZoneJson();
 

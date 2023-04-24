@@ -3030,17 +3030,6 @@ QJsonDocument AfcManager::generateRatAfcJson()
 
 QJsonDocument AfcManager::generateExclusionZoneJson()
 {
-	// Temporarily export layer so that we can re-import it as a geoJSON-formatted string
-	const std::string gdalDriverName = "GeoJSON";
-	OGRRegisterAll();
-
-	OGRSFDriver* ptrDriver = (OGRSFDriver*)OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
-	// This is the same as !(unique_ptr.get() != nullptr)
-	if (ptrDriver == nullptr)
-	{
-		throw std::runtime_error("AfcManager::generateExclusionZone(): " + gdalDriverName + " driver was not found");
-	}
-
 	QTemporaryDir tempDir;
 	if (!tempDir.isValid())
 	{
@@ -3050,19 +3039,8 @@ QJsonDocument AfcManager::generateExclusionZoneJson()
 	const QString tempOutFileName = "output.tmp";
 	const QString tempOutFilePath = tempDir.filePath(tempOutFileName);
 
-	std::unique_ptr<OGRDataSource> ptrOutputDS(ptrDriver->CreateDataSource(tempOutFilePath.toStdString().c_str(), NULL));
-	if (ptrOutputDS == nullptr)
-	{
-		throw std::runtime_error("AfcManager::generateExclusionZone(): Could not create a data source at " + tempOutFilePath.toStdString());
-	}
-
-	OGRSpatialReference spatialRefWGS84; // Set the desired spatial reference (WGS84 in this case)
-	spatialRefWGS84.SetWellKnownGeogCS("WGS84");
-	OGRLayer *exclusionLayer = ptrOutputDS->CreateLayer("Temp_Output", &spatialRefWGS84, wkbPolygon, NULL);
-	if (exclusionLayer == nullptr)
-	{
-		throw std::runtime_error("AfcManager::generateExclusionZone(): Could not create a layer in output data source");
-	}
+	GDALDataset *dataSet;
+	OGRLayer *exclusionLayer = createGeoJSONLayer(tempOutFilePath.toStdString().c_str(), &dataSet);
 
 	OGRFieldDefn objKind("kind", OFTString);
 	OGRFieldDefn fsid("FSID", OFTInteger);
@@ -3149,7 +3127,7 @@ QJsonDocument AfcManager::generateExclusionZoneJson()
 	}
 
 	// Allocation clean-up
-	OGRDataSource::DestroyDataSource(ptrOutputDS.release()); // Remove the reference to the data source
+	GDALClose(dataSet); // Remove the reference to the dataset
 
 	// Create file to be written to (creates a file, a json object, and a json document in order to store)
 	std::ifstream tempFileStream(tempOutFilePath.toStdString(), std::ifstream::in);
@@ -3166,41 +3144,46 @@ QJsonDocument AfcManager::generateExclusionZoneJson()
 	return QJsonDocument(analysisJsonObj);
 }
 
-QJsonDocument AfcManager::generateHeatmap()
+OGRLayer* AfcManager::createGeoJSONLayer(const char *tmpPath,  GDALDataset **dataSet)
 {
-	// Temporarily export layer so that we can re-import it as a geoJSON-formatted string
-	const std::string gdalDriverName = "GeoJSON";
-	OGRRegisterAll();
-
-	OGRSFDriver* ptrDriver = (OGRSFDriver*)OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
-	// This is the same as !(unique_ptr.get() != nullptr)
-	if (ptrDriver == nullptr)
+	GDALDriver *driver = (GDALDriver*)GDALGetDriverByName("GeoJSON");
+	if (!driver)
 	{
-		throw std::runtime_error("AfcManager::generateHeatmap(): " + gdalDriverName + " driver was not found");
+		throw std::runtime_error("GDALGetDriverByName() error");
 	}
 
+	/* create empty dataset */
+	*dataSet = driver->Create(tmpPath, 0, 0, 0, GDT_Unknown, NULL);
+	if (!(*dataSet))
+	{
+		throw std::runtime_error("GDALOpenEx() error");
+	}
+
+
+	OGRSpatialReference spatialRefWGS84; // Set the desired spatial reference (WGS84 in this case)
+	spatialRefWGS84.SetWellKnownGeogCS("WGS84");
+
+	OGRLayer *layer = (*dataSet)->CreateLayer("Temp_Output", &spatialRefWGS84, wkbPolygon, NULL);
+	if (!layer)
+	{
+		throw std::runtime_error("GDALDataset::CreateLayer() error");
+	}
+
+	return layer;
+}
+
+QJsonDocument AfcManager::generateHeatmap()
+{
 	QTemporaryDir tempDir;
 	if (!tempDir.isValid())
 	{
 		throw std::runtime_error("AfcManager::generateHeatmap(): Failed to create a temporary directory to store output of GeoJSON driver");
 	}
-
 	const QString tempOutFileName = "output.tmp";
 	const QString tempOutFilePath = tempDir.filePath(tempOutFileName);
 
-	std::unique_ptr<OGRDataSource> ptrOutputDS(ptrDriver->CreateDataSource(tempOutFilePath.toStdString().c_str(), NULL));
-	if (ptrOutputDS == nullptr)
-	{
-		throw std::runtime_error("AfcManager::generateHeatmap(): Could not create a data source at " + tempOutFilePath.toStdString());
-	}
-
-	OGRSpatialReference spatialRefWGS84; // Set the desired spatial reference (WGS84 in this case)
-	spatialRefWGS84.SetWellKnownGeogCS("WGS84");
-	OGRLayer *heatmapLayer = ptrOutputDS->CreateLayer("Temp_Output", &spatialRefWGS84, wkbPolygon, NULL);
-	if (heatmapLayer == nullptr)
-	{
-		throw std::runtime_error("AfcManager::generateHeatmap(): Could not create a layer in output data source");
-	}
+	GDALDataset *dataSet;
+	OGRLayer *heatmapLayer = createGeoJSONLayer(tempOutFilePath.toStdString().c_str(), &dataSet);
 
 	OGRFieldDefn objKind("kind", OFTString);
 	OGRFieldDefn iToN("ItoN", OFTReal);
@@ -3288,7 +3271,7 @@ QJsonDocument AfcManager::generateHeatmap()
 	addBuildingDatabaseTiles(heatmapLayer);
 
 	// Allocation clean-up
-	OGRDataSource::DestroyDataSource(ptrOutputDS.release()); // Remove the reference to the data source
+	GDALClose(dataSet); // Remove the reference to the dataset
 
 	// Create file to be written to (creates a file, a json object, and a json document in order to store)
 	std::ifstream tempFileStream(tempOutFilePath.toStdString(), std::ifstream::in);
@@ -3370,17 +3353,6 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 {
 	QJsonDocument outputDocument;
 
-	// Temporarily export layer so that we can re-import it as a geoJSON-formatted string
-	const std::string gdalDriverName = "GeoJSON";
-	OGRRegisterAll();
-
-	OGRSFDriver* ptrDriver = (OGRSFDriver*)OGRSFDriverRegistrar::GetRegistrar()->GetDriverByName(gdalDriverName.c_str());
-	// This is the same as !(unique_ptr.get() != nullptr)
-	if (ptrDriver == nullptr)
-	{
-		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): " + gdalDriverName + " driver was not found");
-	}
-
 	QTemporaryDir geoTempDir;
 	if (!geoTempDir.isValid())
 	{
@@ -3390,19 +3362,8 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 	const QString tempOutFileName = "output.tmp";
 	const QString tempOutFilePath = geoTempDir.filePath(tempOutFileName);
 
-	std::unique_ptr<OGRDataSource> ptrOutputDS(ptrDriver->CreateDataSource(tempOutFilePath.toStdString().c_str(), NULL));
-	if (ptrOutputDS == nullptr)
-	{
-		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create a data source at " + tempOutFilePath.toStdString());
-	}
-
-	OGRSpatialReference spatialRefWGS84; // Set the desired spatial reference (WGS84 in this case)
-	spatialRefWGS84.SetWellKnownGeogCS("WGS84");
-	OGRLayer *coneLayer = ptrOutputDS->CreateLayer("Temp_Output", &spatialRefWGS84, wkbPolygon, NULL);
-	if (coneLayer == nullptr)
-	{
-		throw std::runtime_error("AfcManager::generateMapDataGeoJson(): Could not create a layer in output data source");
-	}
+	GDALDataset *dataSet;
+	OGRLayer *coneLayer = createGeoJSONLayer(tempOutFilePath.toStdString().c_str(), &dataSet);
 
 	OGRFieldDefn objKind("kind", OFTString);
 	OGRFieldDefn dbNameField("DBNAME", OFTString);
@@ -3537,7 +3498,7 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 	addBuildingDatabaseTiles(coneLayer);
 
 	// Allocation clean-up
-	OGRDataSource::DestroyDataSource(ptrOutputDS.release()); // Remove the reference to the data source
+	GDALClose(dataSet); // Remove the reference to the dataset
 
 	// Create file to be written to (creates a file, a json object, and a json document in order to store)
 	std::ifstream tempFileStream(tempOutFilePath.toStdString(), std::ifstream::in);
