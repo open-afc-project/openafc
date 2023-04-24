@@ -41,7 +41,7 @@ export class AFCForm extends React.Component<
         super(props);
         let config = props.config as AFCConfigFile
         if (props.frequencyBands.length > 0) {
-            config.freqBands = props.frequencyBands.filter((x)=> (x.region == config.regionStr) || (!x.region && config.regionStr == 'US'));
+            config.freqBands = props.frequencyBands.filter((x) => (x.region == config.regionStr) || (!x.region && config.regionStr == 'US'));
         } else {
             config.freqBands = defaultRanges[config.regionStr ?? "US"];
         }
@@ -64,15 +64,20 @@ export class AFCForm extends React.Component<
         // region changed by user, reload the coresponding configuration for that region
         getAfcConfigFile(n).then(
             res => {
+                logger.error("conf response: " + res);
                 if (res.kind === "Success") {
                     this.updateEntireConfigState(res.result);
                     document.cookie = `afc-config-last-region=${n};max-age=2592000;path='/';SameSite=strict`
                 } else {
                     if (res.errorCode == 404) {
-                        this.updateEntireConfigState(getDefaultAfcConf(n));
+
+                        let defConf = getDefaultAfcConf(n);
+                        defConf.regionStr = n;
+                        this.updateEntireConfigState(defConf);
                         this.setState({ messageSuccess: "No config found for this region, using region default" });
+                    } else {
+                        this.setState({ messageError: res.description, messageSuccess: undefined });
                     }
-                    this.setState({ messageError: res.description, messageSuccess: undefined });
                 }
             })
     }
@@ -201,8 +206,8 @@ export class AFCForm extends React.Component<
 
     private reset = () => {
         let config = getDefaultAfcConf(this.state.config.regionStr);
-       
-        config.freqBands = this.props.frequencyBands.filter((x)=> (x.region == this.state.config.regionStr)  || (!x.region && this.state.config.regionStr == 'US'))
+
+        config.freqBands = this.props.frequencyBands.filter((x) => (x.region == this.state.config.regionStr) || (!x.region && this.state.config.regionStr == 'US'))
 
         this.updateEntireConfigState(config);
     }
@@ -342,11 +347,16 @@ export class AFCForm extends React.Component<
                                 </FormSelect>
                             </FormGroup>
                         </GalleryItem>
-                        {(this.state.config.regionStr == "CA" || this.state.config.regionStr == "US") &&
+                        {(
+                            this.state.config.regionStr == "CA" ||
+                            this.state.config.regionStr == "US" ||
+                            this.state.config.regionStr?.endsWith("CA") ||
+                            this.state.config.regionStr?.endsWith("US")
+                        ) &&
                             <AFCFormUSACanada
                                 config={this.state.config}
                                 antennaPatterns={this.state.antennaPatternData}
-                                frequencyBands={this.props.frequencyBands.filter((x)=>x.region == this.state.config.regionStr)}
+                                frequencyBands={this.props.frequencyBands.filter((x) => x.region == this.state.config.regionStr)}
                                 limit={this.props.limit}
                                 updateConfig={(x) => this.updateConfigFromComponent(x)}
                                 updateAntennaData={(x) => this.updateAntennaDataFromComponent(x)} />

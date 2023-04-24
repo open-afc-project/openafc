@@ -1,5 +1,5 @@
 # Test user configuration
-Test user can chose **TEST_USA** as a region in the AFC Config tab.  The admin needs to create AP with NRA of **TEST_FCC** for the test user to use in the query.
+Test user can chose **TEST_US** as a region in the AFC Config tab.  The admin needs to create AP with NRA of **TEST_FCC** for the test user to use in the query.
 
 # New User Registration
 New user can request an account on the web page. Filling out the webform to request access to the Broadcom AFC website will send an email to the AFC Admin email alias e.g. afc-admin@broadcom.com.

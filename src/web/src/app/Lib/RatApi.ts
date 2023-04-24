@@ -360,6 +360,9 @@ export const setAboutAfc = (name: string, email: string, org:string, token:strin
  * @returns The default AFC Configuration
  */
 export const getDefaultAfcConf = (x: string | undefined) => {
+    if (!!x && (x.startsWith("TEST_") || x.startsWith("DEMO_"))){
+        x = x.substring(5);
+    }
     if (x == "CA") {
         return defaultAfcConfCanada();
     } else {

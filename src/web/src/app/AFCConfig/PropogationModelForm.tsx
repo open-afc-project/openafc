@@ -8,33 +8,39 @@ import { BuildingSourceValues, CustomPropagation, CustomPropagationLOSOptions, F
  * author: Sam Smucny
  */
 
-/**
- * Enumeration of propogation models
- */
-const propogationModels = {
-    "US": [
-        "FSPL",
-        "ITM with building data",
-        //"ITM with no building data",
-        "FCC 6GHz Report & Order",
-        "Ray Tracing",
-        "Custom"
-    ],
-    "CA": [
-        "FSPL",
-        "ITM with building data",
-        //"ITM with no building data",
-        "ISED DBS-06",
-        "Ray Tracing",
-        "Custom"
-    ]
-}
-
 
 /**
  * Sub for for propogation model
  */
 export class PropogationModelForm extends React.PureComponent<{ data: PropagationModel, region: string, onChange: (x: PropagationModel) => void }> {
+
+    private getModelOptionsByRegion = (region: string) => {
+
+        if (region.endsWith("CA")) {
+            return [
+                "FSPL",
+                "ITM with building data",
+                //"ITM with no building data",
+                "ISED DBS-06",
+                "Ray Tracing",
+                "Custom"
+            ]
+        } else {
+            return [
+                "FSPL",
+                "ITM with building data",
+                //"ITM with no building data",
+                "FCC 6GHz Report & Order",
+                "Ray Tracing",
+                "Custom"
+            ]
+        }
+    }
+
+
+
+
+
     private setKind = (s: string) => {
         switch (s) {
             case "FSPL":
@@ -767,7 +773,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <OutlinedQuestionCircleIcon />
                         </Tooltip>
                         <FormSelect value={model.winner2LOSOption} onChange={this.setLosOption} id="propogation-model-win-los-option"
-                            name="propogation-model-win-los-option" style={{ textAlign: "right" } }
+                            name="propogation-model-win-los-option" style={{ textAlign: "right" }}
                         >
                             <FormSelectOption key="BLDG_DATA_REQ_TX" value="BLDG_DATA_REQ_TX" label="Los/NLoS per building data" />
                         </FormSelect>
@@ -805,7 +811,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
-                
+
                     <FormGroup label="ITM with Tx Clutter Method" fieldId="propogation-model-itm-tx-clutter">
                         {" "}<Tooltip
                             position={TooltipPosition.top}
@@ -827,7 +833,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             <FormSelectOption key="FORCE_TRUE" value="FORCE_TRUE" label="Always add clutter" />
                             {/* <FormSelectOption key="FORCE_FALSE" value="FORCE_FALSE" label="Never add clutter" />
                             <FormSelectOption key="BLDG_DATA" value="BLDG_DATA" label="Clutter/No clutter per building data" /> */}
-                        </FormSelect> 
+                        </FormSelect>
                     </FormGroup>
                     <FormGroup label="ITM Confidence" fieldId="propogation-model-itm-confidence">
                         <InputGroup>
@@ -954,7 +960,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 style={{ textAlign: "right" }}
             >
                 <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select Propogation Model" />
-                {propogationModels[this.props.region].map((option) => (
+                {this.getModelOptionsByRegion(this.props.region).map((option) => (
                     <FormSelectOption isDisabled={option === "Ray Tracing"} key={option} value={option} label={option} />
                 ))}
             </FormSelect>
