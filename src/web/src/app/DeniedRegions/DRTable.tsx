@@ -13,7 +13,7 @@ import { AccessPointModel, DeniedRegion, UserModel } from "../Lib/RatApiTypes";
 interface DRTableProps {
     deniedRegions: DeniedRegion[],
     currentRegionStr: string,
-    onDelete: (id: number) => void
+    onDelete: (id: string) => void
 }
 
 /**
@@ -33,16 +33,11 @@ export class DRTable extends React.Component<DRTableProps, {}> {
 
     }
 
-    private apToRow = (ap: AccessPointModel) => ({
-        id: ap.id,
-        cells: this.props.filterId ? [
-            ap.serialNumber,
-            ap.certificationId || "",
-        ] : [
-            ap.serialNumber,
-            ap.certificationId || "",
-            ap.org,
-       ]
+    private toRow = (dr: DeniedRegion) => ({
+        id: dr.name+dr.zoneType,
+        cells: [
+            dr.name, dr.startFreq, dr.endFreq, dr.zoneType
+        ]
     })
 
     actionResolver(data: any, extraData: any) {
@@ -57,9 +52,9 @@ export class DRTable extends React.Component<DRTableProps, {}> {
     render() {
         return (
             <Table
-                aria-label="Access Point Table"
+                aria-label="Denied Region Table"
                 cells={this.columns as any}
-                rows={this.props.accessPoints.map(this.apToRow)}
+                rows={this.props.deniedRegions.filter(x=>x.regionStr == this.props.currentRegionStr).map(this.toRow)}
                 variant={TableVariant.compact}
                 actionResolver={(a, b) => this.actionResolver(a, b)}
             >

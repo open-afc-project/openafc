@@ -2,7 +2,6 @@ import { guiConfig } from "./RatApi";
 import { UserModel, success, error, AccessPointModel, FreqRange, DeniedRegion, ExclusionCircle, ExclusionTwoRect, ExclusionRect, ExclusionHorizon } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { Role } from "./User";
-import { parse } from 'csv-parse/browser/esm/sync';
 import { Rect } from "react-konva";
 import { Circle } from "konva/types/shapes/Circle";
 
@@ -293,17 +292,17 @@ export const getDeniedRegions = (regionStr: string) => {
         } else if (res.status == 404) {
             return success([])
         } else {
-            return error("Unable to get denied regions for "+ regionStr, res.status, res);
+            return error("Unable to get denied regions for " + regionStr, res.status, res);
         }
     }).catch(err => error("An error was encountered", undefined, err));
 }
 
 // Update the denied regions for a given region
-export const updateDeniedRegions = (records:DeniedRegion[], regionStr: string) => (
+export const updateDeniedRegions = (records: DeniedRegion[], regionStr: string) => (
     fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
         method: "PUT",
         headers: { "Content-Type": "text/csv" },
-        body: mapDeniedRegionToCsv(records, regionStr,true)
+        body: mapDeniedRegionToCsv(records, regionStr, true)
     }).then(res => {
         if (res.status === 204) {
             return success("Denied regions updated.");
@@ -317,10 +316,72 @@ export const updateDeniedRegions = (records:DeniedRegion[], regionStr: string) =
     })
 );
 
+function parseCSV(str: string, headers = true) {
+    const arr: string[][] = [];
+    let quote = false;  // 'true' means we're inside a quoted field
+
+    // Iterate over each character, keep track of current row and column (of the returned array)
+    for (let row = 0, col = 0, c = 0; c < str.length; c++) {
+        let cc = str[c], nc = str[c + 1];        // Current character, next character
+        arr[row] = arr[row] || [];             // Create a new row if necessary
+        arr[row][col] = arr[row][col] || '';   // Create a new column (start with empty string) if necessary
+
+        // If the current character is a quotation mark, and we're inside a
+        // quoted field, and the next character is also a quotation mark,
+        // add a quotation mark to the current column and skip the next character
+        if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
+
+        // If it's just one quotation mark, begin/end quoted field
+        if (cc == '"') { quote = !quote; continue; }
+
+        // If it's a comma and we're not in a quoted field, move on to the next column
+        if (cc == ',' && !quote) { ++col; continue; }
+
+        // If it's a newline (CRLF) and we're not in a quoted field, skip the next character
+        // and move on to the next row and move to column 0 of that new row
+        if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
+
+        // If it's a newline (LF or CR) and we're not in a quoted field,
+        // move on to the next row and move to column 0 of that new row
+        if (cc == '\n' && !quote) { ++row; col = 0; continue; }
+        if (cc == '\r' && !quote) { ++row; col = 0; continue; }
+
+        // Otherwise, append the current character to the current column
+        arr[row][col] += cc;
+    }
+
+    if (headers) {
+        let headerRow = arr[0];
+
+
+    }
+
+    return arr;
+}
+
+function parseCSVtoObjects(csvString: string) {
+    var csvRows = parseCSV(csvString);
+
+    var columnNames = csvRows[0];
+    var firstDataRow = 1;
+
+
+    var result = [];
+    for (var i = firstDataRow, n = csvRows.length; i < n; i++) {
+        var rowObject:any = {};
+        var row = csvRows[i];
+        for (var j = 0, m = Math.min(row.length, columnNames.length); j < m; j++) {
+            var columnName = columnNames[j];
+            var columnValue = row[j];
+            rowObject[columnName] = columnValue;
+        }
+        result.push(rowObject);
+    }
+    return result;
+}
+
 const mapDeniedRegionFromCsv = (data: string, regionStr: string) => {
-    let records = parse(data, {
-        columns: true
-    });
+    let records = parseCSVtoObjects(data);
     let objects = records.map(x => {
         let newRegion: DeniedRegion = {
             regionStr: regionStr,
@@ -388,7 +449,7 @@ const mapDeniedRegionToCsv = (records: DeniedRegion[], regionStr: string, includ
     if (includeHeader) {
         result.push(defaultDeniedRegionHeaders);
     }
-    let strings = records.filter(x=>x.regionStr == regionStr).map((rec) => {
+    let strings = records.filter(x => x.regionStr == regionStr).map((rec) => {
         let header = `${rec.name},${rec.startFreq},${rec.endFreq},${rec.zoneType},`;
         let excl = "";
         switch (rec.zoneType) {
@@ -409,16 +470,16 @@ const mapDeniedRegionToCsv = (records: DeniedRegion[], regionStr: string, includ
                     let x = rec.exclusionZone as ExclusionTwoRect;
                     excl = `${x.rectangleOne.topLat},${x.rectangleOne.leftLong},${x.rectangleOne.bottomLat},${x.rectangleOne.rightLong},${x.rectangleTwo.topLat},${x.rectangleTwo.leftLong},${x.rectangleTwo.bottomLat},${x.rectangleTwo.rightLong},,,,`;
                 }
-                break;  
-            case "Horizon Distance":  {
+                break;
+            case "Horizon Distance": {
                 let x = rec.exclusionZone as ExclusionHorizon;
                 excl = `,,,,,,,,,${x.latitude},${x.longitude},${x.aglHeightM}`;
             }
-            break;
+                break;
             default:
                 throw "Bad data in mapDeniedRegionToCsv: " + JSON.stringify(rec)
         }
-        return header+excl;
+        return header + excl;
     });
     result.concat(strings);
     return result.join("\n");
@@ -429,3 +490,11 @@ const mapDeniedRegionToCsv = (records: DeniedRegion[], regionStr: string, includ
 
 const dummyExclusionZone: ExclusionCircle = { latitude: 0, longitude: 0, radiusKm: 0 }
 const defaultDeniedRegionHeaders = "Location,Start Freq (MHz),Stop Freq (MHz),Exclusion Zone,Rectangle1 Lat 1,Rectangle1 Lat 2,Rectangle1 Lon 1,Rectangle1 Lon 2,Rectangle2 Lat 1,Rectangle2 Lat 2,Rectangle2 Lon 1,Rectangle2 Lon 2,Circle Radius (km),Circle center Lat,Circle center Lon,Antenna AGL height (m)"
+export const BlankDeniedRegion: DeniedRegion = {
+    regionStr: "US",
+    name: "Placeholder",
+    endFreq: 5298,
+    startFreq: 5298,
+    exclusionZone: dummyExclusionZone,
+    zoneType: "Circle"
+}
