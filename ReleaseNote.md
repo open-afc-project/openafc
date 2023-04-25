@@ -1,4 +1,19 @@
  # Release Note
+## **Version and Date**
+|Version|3.7.7.0|
+| :- | :- |
+|**Date**|**04/16/2023**|
+|compiled server's version is TBD | git tag 3.7.7.0|
+## **Issues Addressed**
+ * Jira OA-633-fix-demo-test-use-cases-with-regional-afc-configs
+ * Jira OA-650-upon-delete-rebuild-certificate-bundle-file
+ * Jira OA-652-geospatial-files-conversion-scripts
+ * Jira OA-641-move-configs-to-appcfg-py
+ * Jira OA-651-missing-sqlalchemy-in-uls-after-worker-base-cleanup
+ * Jira OA-649-rename-nginx-container-to-dispatcher
+ * Jira OA-511-ability-to-update-nginx-certificates-file
+ * Jira OA-644-define-broker-configuration-in-appcfg-module
+
 
 ## **Version and Date**
 |Version|**OA-658**|
