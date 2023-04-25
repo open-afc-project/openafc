@@ -21,7 +21,7 @@ RUN echo "AFC_APP_TYPE = 'server'" >> /etc/xdg/fbrat/ratapi.conf
 #
 # Build Message Handler application
 #
-FROM httpd:2.4.54-alpine as rat_server.build
+FROM httpd:2.4.55-alpine as rat_server.build
 COPY --from=rat_server.preinstall / /
 # Development env
 RUN apk add --update --no-cache build-base cmake ninja yarn \
@@ -43,7 +43,7 @@ ninja -j$(nproc) install
 #
 # Install Message Handler application
 #
-FROM httpd:2.4.54-alpine as install_image
+FROM httpd:2.4.55-alpine as install_image
 COPY --from=rat_server.preinstall / /
 COPY --from=rat_server.build /wd/__install /usr/
 COPY --from=rat_server.build /usr/lib/python3.10/site-packages/mod_wsgi /usr/lib/python3.10/site-packages/mod_wsgi

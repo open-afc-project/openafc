@@ -3,12 +3,8 @@
 version: '3.2'
 services:
   ratdb:
-    image: postgres:14.7
+    image: public.ecr.aws/w9v6y1o0/openafc/ratdb-image:${TAG:-latest}
     restart: always
-    environment:
-      - POSTGRES_PASSWORD=N3SF0LVKJx1RAhFGx4fcw
-      - PGDATA=/var/lib/pgsql/data
-      - POSTGRES_DB=fbrat
     dns_search: [.]
 
   rmq:

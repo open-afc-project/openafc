@@ -13,21 +13,22 @@
 
 # TODO: deprecated MSGHND_PRINST="public.ecr.aws/w9v6y1o0/openafc/centos-msghnd-preinstall" # msghnd preinstall image name
 SRV="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"    # server image
-MSGHND="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd"         # msghnd image
-OBJST="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"          # object storage
-RMQ="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                   # rabbitmq image
-DISPATCHER="public.ecr.aws/w9v6y1o0/openafc/dispatcher-image"                 # dispatcher image
-ALS_SIPHON="public.ecr.aws/w9v6y1o0/openafc/als-siphon-image"     # ALS Siphon image
-ALS_KAFKA="public.ecr.aws/w9v6y1o0/openafc/als-kafka-image"       # Kafka for ALS
+MSGHND="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd" # msghnd image
+OBJST="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"         # object storage
+RATDB="public.ecr.aws/w9v6y1o0/openafc/ratdb-image"              # ratdb image
+RMQ="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                  # rabbitmq image
+DISPATCHER="public.ecr.aws/w9v6y1o0/openafc/dispatcher-image"    # dispatcher image
+ALS_SIPHON="public.ecr.aws/w9v6y1o0/openafc/als-siphon-image"    # ALS Siphon image
+ALS_KAFKA="public.ecr.aws/w9v6y1o0/openafc/als-kafka-image"      # Kafka for ALS
 ALS_POSTGRES="public.ecr.aws/w9v6y1o0/openafc/als-postgres-image" # PostgreSQL for ALS
 
-WORKER="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker"        # msghnd image
-WORKER_AL_D4B="public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image"   # Alpine worker build img
+WORKER="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker"  # msghnd image
+WORKER_AL_D4B="public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image" # Alpine worker build img
 WORKER_AL_PRINST="public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall" # Alpine worker preinst
 
-ULS_UPDATER="110738915961.dkr.ecr.us-east-1.amazonaws.com/uls-updater"    # ULS Updater images
+ULS_UPDATER="110738915961.dkr.ecr.us-east-1.amazonaws.com/uls-updater" # ULS Updater images
 
-RTEST_DI="rtest"                                                  # regression tests image
+RTEST_DI="rtest"                                                 # regression tests image
 
 # TODO: deprecated, will be removed in future release
 PRINST_WRKR_DI="public.ecr.aws/w9v6y1o0/openafc/centos-worker-preinstall" # worker preinst image name
@@ -134,6 +135,9 @@ build_dev_server() {
   # build worker image
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=worker"
   docker_build_and_push ${wd}/worker/Dockerfile   ${WORKER}:${tag} ${push} "${EXT_ARGS}" &
+
+  # build afc ratdb docker image
+  docker_build_and_push ${wd}/ratdb/Dockerfile ${RATDB}:${tag} ${push} &
 
   # build afc dynamic data storage image
   docker_build_and_push ${wd}/src/filestorage/Dockerfile ${OBJST}:${tag} ${push}&
