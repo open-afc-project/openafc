@@ -234,6 +234,61 @@ class AccessPoint(MethodView):
 
         return flask.make_response()
 
+class DeniedRegion(MethodView):
+    ''' resources to manage access points'''
+
+    methods = ['PUT', 'GET']
+
+    def _open(self, rel_path, mode, user=None):
+        ''' Open a configuration file.
+
+        :param rel_path: The specific config name to open.
+        :param mode: The file open mode.
+        :return: The opened file.
+        :rtype: file-like
+        '''
+
+        config_path = os.path.join(flask.current_app.config['NFS_MOUNT_PATH'], 'rat_transfer', 'denied_regions')
+        if not os.path.exists(config_path):
+            os.makedirs(config_path)
+
+        file_path = os.path.join(config_path, rel_path)
+        LOGGER.debug('Opening denied region file "%s"', file_path)
+        if not os.path.exists(file_path) and mode != 'wb':
+            raise werkzeug.exceptions.NotFound()
+
+        handle = open(file_path, mode)
+
+        if mode == 'wb':
+            os.chmod(file_path, 0o666)
+
+        return handle
+
+    def get(self, regionStr):
+        ''' GET method for denied regions
+        '''
+        LOGGER.debug('getting denied regions')
+        filename= regionStr+"_denied_regions.csv"
+
+        resp = flask.make_response()
+        with self._open(filename, 'rb') as conf_file:
+            resp.data = conf_file.read()
+        resp.content_type = "text/csv"
+        return resp
+
+    def put(self, regionStr):
+        ''' PUT method for denied regions
+        '''
+        user_id = auth(roles=['Super'])
+        LOGGER.debug("current user: %s", user_id)
+        filename= regionStr+"_denied_regions.csv"
+
+        if flask.request.content_type !=  "text/csv":
+            raise werkzeug.exceptions.UnsupportedMediaType()
+
+        with contextlib.closing(self._open(filename, 'wb', user_id)) as outfile:
+            shutil.copyfileobj(flask.request.stream, outfile)
+        return flask.make_response('Denied regions updated', 204)
 
 class AccessPointTrial(MethodView):
     ''' resource to get the access point for getting trial configuration'''
@@ -491,3 +546,4 @@ module.add_url_rule('/user/eirp_min', view_func=Limits.as_view('Eirp'))
 module.add_url_rule('/user/frequency_range', view_func=AllowedFreqRanges.as_view('Frequency'))
 module.add_url_rule('/user/ap/trial', view_func=AccessPoint.as_view('AccessPointTrial'))
 module.add_url_rule('/user/mtls/<int:id>', view_func=MTLS.as_view('MTLS'))
+module.add_url_rule('/user/denied_regions/<regionStr:string>', view_func=DeniedRegion.as_view('DeniedRegion'))

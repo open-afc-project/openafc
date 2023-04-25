@@ -23,6 +23,8 @@ export interface GuiConfig {
     login_url: string,
     admin_url: string,
     ap_admin_url: string,
+    dr_admin_url: string,
+    mtls_admin_url: string,
     rat_afc: string,
     afc_kml:string
     version: string
@@ -582,6 +584,7 @@ export interface DeniedRegion {
     name: string,
     startFreq: number,
     endFreq: number,
+    zoneType: "Circle" | "One Rectangle" | "Two Rectangles" | "Horizon Distance",
     exclusionZone: ExclusionCircle | ExclusionRect | ExclusionTwoRect | ExclusionHorizon
 }
 

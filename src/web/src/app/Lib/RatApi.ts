@@ -29,11 +29,13 @@ export var guiConfig: GuiConfig = Object.freeze({
     login_url: "",
     admin_url: "",
     ap_admin_url: "",
+    dr_admin_url:"",
     lidar_bounds: "",
     ras_bounds: "",
     rat_afc: "",
     afcconfig_trial: "",
     afc_kml: "",
+    mtls_admin_url:"",
     version: "API NOT LOADED"
 });
 

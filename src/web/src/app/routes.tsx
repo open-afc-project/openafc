@@ -8,9 +8,10 @@ import { getAfcConfigFile, getAllowedRanges, getRegions, getAboutAfc, getAboutSi
 import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv } from "./Lib/FileApi";
 import AppLoginPage from "./AppLayout/AppLogin";
 import { UserAccountPage } from "./UserAccount/UserAccount";
-import { getUsers, getMinimumEIRP, Limit,  } from "./Lib/Admin";
+import { getUsers, getMinimumEIRP, Limit, getDeniedRegions,  } from "./Lib/Admin";
 import { Replay } from "./Replay/Replay"
 import { getLastUsedRegionFromCookie } from "./Lib/Utils";
+import { resolve } from "path";
 
 /**
  * routes.tsx: definition of app routes
@@ -233,9 +234,13 @@ const MTLSPage = () => {
   );
 }
 
+const drResolves = async () => ({
+  regions: await getRegions(),
+})
+
 const DRListPage = () => {
   return (
-    <DynamicImport load={getDRListModuleAsync()}>
+    <DynamicImport load={getDRListModuleAsync()} resolve={drResolves()}>
       {(Component: any) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
           : <Component.DRListPage />

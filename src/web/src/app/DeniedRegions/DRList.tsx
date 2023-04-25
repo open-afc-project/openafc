@@ -14,35 +14,28 @@ import { UserModel } from "../Lib/RatApiTypes";
  */
 
 /**
- * Interface definition of `APList` properties
+ * Interface definition of `DRList` properties
  */
 export interface DRListProps {
+    regions: string[];
 }
 
-interface APListState {
-    regions: DeniedRegion[]
+interface DRListState {
+    deniedRegions: DeniedRegion[]
 }
 
 /**
  * Page level component to list a user's registerd access points. Users use these 
  * credentials to utilize the PAWS interface.
  */
-export class DRList extends React.Component<DRListProps, APListState> {
+export class DRList extends React.Component<DRListProps, DRListState> {
     constructor(props: DRListProps) {
         super(props);
 
         this.state = {
-            accessPoints: []
+            deniedRegions: []
         }
 
-        getAccessPoints(props.filterId)
-        .then(res => {
-            if (res.kind === "Success") {
-                this.setState({ accessPoints: res.result });
-            } else {
-                alert(res.description);
-            }
-        })
     }
 
     private async onAdd(ap: AccessPointModel) {
@@ -80,7 +73,7 @@ export class DRList extends React.Component<DRListProps, APListState> {
                     (<NewAP onAdd={(ap: AccessPointModel) => this.onAdd(ap)} userId={this.props.userId} org={this.props.org}/>)
                     }
                     <br/>
-                    <APTable accessPoints={this.state.accessPoints} onDelete={(id: number) => this.deleteAP(id)} filterId={this.props.filterId} />
+                    <APTable accessPoints={this.state.deniedRegions} onDelete={(id: number) => this.deleteAP(id)} filterId={this.props.filterId} />
                 </CardBody>
             </Card>
         )

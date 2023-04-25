@@ -1,7 +1,11 @@
 import { guiConfig } from "./RatApi";
-import { UserModel, success, error, AccessPointModel, FreqRange } from "./RatApiTypes";
+import { UserModel, success, error, AccessPointModel, FreqRange, DeniedRegion, ExclusionCircle, ExclusionTwoRect, ExclusionRect, ExclusionHorizon } from "./RatApiTypes";
 import { logger } from "./Logger";
-import { Role} from "./User";
+import { Role } from "./User";
+import { parse } from 'csv-parse/browser/esm/sync';
+import { Rect } from "react-konva";
+import { Circle } from "konva/types/shapes/Circle";
+
 
 /** 
 * Admin.ts: Functions for Admin API. User and account management, and permissions
@@ -11,7 +15,7 @@ import { Role} from "./User";
 export class Limit {
     enforce: boolean;
     limit: number;
-    constructor(enforce : boolean, limit : number) {
+    constructor(enforce: boolean, limit: number) {
         this.enforce = enforce;
         this.limit = limit;
     }
@@ -21,7 +25,7 @@ export class Limit {
  * Gets the current Minimum EIRP value
  * @returns object indicating minimum value and whether or not it's enforced if successful, error otherwise
  */
-export const getMinimumEIRP = () => 
+export const getMinimumEIRP = () =>
     fetch(guiConfig.admin_url.replace("-1", "eirp_min"), {
         method: "GET",
     }).then(async res => {
@@ -43,24 +47,24 @@ export const getMinimumEIRP = () =>
 export const setMinimumEIRP = (limit: number | boolean) =>
     fetch(guiConfig.admin_url.replace("-1", "eirp_min"), {
         method: "PUT",
-        headers: {"Content-Type": "application/json"},
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify(limit)
     })
-    .then(async res => {
-        if (res.ok) {
-            return success((await res.json()).limit as number | boolean)
-        } else {
-            return error(res.statusText, res.status, res);
-        }
-    })
-    .catch(err => error("An error was encountered", undefined, err));
+        .then(async res => {
+            if (res.ok) {
+                return success((await res.json()).limit as number | boolean)
+            } else {
+                return error(res.statusText, res.status, res);
+            }
+        })
+        .catch(err => error("An error was encountered", undefined, err));
 
 /**
  * Return list of all users. Must be Admin
  * There is current no support for queried searches/filters/etc. Just returns all.
  * @returns list of users if successful, error otherwise
  */
-export const getUsers = () => 
+export const getUsers = () =>
     fetch(guiConfig.admin_url.replace("-1", "0"), {
         method: "GET",
     }).then(async res => {
@@ -82,10 +86,10 @@ export const getUsers = () =>
 export const getUser = (id: number) =>
     fetch(guiConfig.admin_url.replace("-1", String(id)), {
         method: "GET",
-    }).then(async res => 
+    }).then(async res =>
         res.ok ?
-        success((await res.json()).user as UserModel) :
-        error("Unable to load user", res.status, res)
+            success((await res.json()).user as UserModel) :
+            error("Unable to load user", res.status, res)
     ).catch(e => {
         logger.error(e);
         return error("Request failed");
@@ -95,14 +99,14 @@ export const getUser = (id: number) =>
  * Update a user's data
  * @param user User to replace with
  */
-export const updateUser = (user: { email: string, password: string, id: number, active: boolean }) => 
+export const updateUser = (user: { email: string, password: string, id: number, active: boolean }) =>
     fetch(guiConfig.admin_url.replace("-1", String(user.id)), {
         method: "POST",
         body: JSON.stringify(Object.assign(user, { setProps: true })),
         headers: { "Content-Type": "application/json" }
-    }).then(res => 
-        res.ok ? 
-            success(res.statusText) : 
+    }).then(res =>
+        res.ok ?
+            success(res.statusText) :
             error(res.statusText, res.status, res));
 
 /**
@@ -129,25 +133,25 @@ export const addUserRole = (id: number, role: Role) =>
  * @param role role to remove
  */
 export const removeUserRole = (id: number, role: Role) =>
-fetch(guiConfig.admin_url.replace("-1", id.toString()), {
-    method: "POST",
-    body: JSON.stringify({ removeRole: role }),
-    headers: { "Content-Type": "application/json" }
-}).then(res => {
-    if (res.ok) {
-        return success(res.status);
-    } else {
-        return error(res.statusText, res.status, res);
-    }
-}).catch(err => error("An error was encountered", undefined, err));
+    fetch(guiConfig.admin_url.replace("-1", id.toString()), {
+        method: "POST",
+        body: JSON.stringify({ removeRole: role }),
+        headers: { "Content-Type": "application/json" }
+    }).then(res => {
+        if (res.ok) {
+            return success(res.status);
+        } else {
+            return error(res.statusText, res.status, res);
+        }
+    }).catch(err => error("An error was encountered", undefined, err));
 
 /**
  * Delete a user from the system
  * @param id user'd Id
  */
-export const deleteUser = (id: number) => 
+export const deleteUser = (id: number) =>
     fetch(guiConfig.admin_url.replace("-1", String(id)), {
-       method: "DELETE",
+        method: "DELETE",
     }).then(res => {
         if (res.ok) {
             return success(res.status);
@@ -185,16 +189,16 @@ export const addAccessPoint = (ap: AccessPointModel, userId: number) =>
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(ap)
     })
-    .then(async res => {
-        if (res.ok) {
-            return success((await res.json()).id as number)
-        } else if (res.status === 400) {
-            return error("Invalid AP data", res.status, res);
-        } else {
-            return error(res.statusText, res.status, res);
-        }
-    })
-    .catch(err => error("An error was encountered", undefined, err));
+        .then(async res => {
+            if (res.ok) {
+                return success((await res.json()).id as number)
+            } else if (res.status === 400) {
+                return error("Invalid AP data", res.status, res);
+            } else {
+                return error(res.statusText, res.status, res);
+            }
+        })
+        .catch(err => error("An error was encountered", undefined, err));
 
 /**
  * Delete an access point from the system.
@@ -205,14 +209,14 @@ export const deleteAccessPoint = (id: number) =>
     fetch(guiConfig.ap_admin_url.replace("-1", String(id)), {
         method: "DELETE",
     })
-    .then(res => {
-        if (res.ok) {
-            return success(undefined);
-        } else {
-            return error(res.statusText, res.status, res);
-        }
-    })
-    .catch(err => error("An error was encountered", undefined, err));
+        .then(res => {
+            if (res.ok) {
+                return success(undefined);
+            } else {
+                return error(res.statusText, res.status, res);
+            }
+        })
+        .catch(err => error("An error was encountered", undefined, err));
 
 /**
  * Register an mtls certificate
@@ -225,16 +229,16 @@ export const addMTLS = (mtls: MTLSModel, userId: number) =>
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(mtls)
     })
-    .then(async res => {
-        if (res.ok) {
-            return success((await res.json()).id as number)
-        } else if (res.status === 400) {
-            return error("Unable to add new certificate", res.status, res);
-        } else {
-            return error(res.statusText, res.status, res);
-        }
-    })
-    .catch(err => error("An error was encountered", undefined, err));
+        .then(async res => {
+            if (res.ok) {
+                return success((await res.json()).id as number)
+            } else if (res.status === 400) {
+                return error("Unable to add new certificate", res.status, res);
+            } else {
+                return error(res.statusText, res.status, res);
+            }
+        })
+        .catch(err => error("An error was encountered", undefined, err));
 
 
 /**
@@ -246,14 +250,14 @@ export const deleteMTLSCert = (id: number) =>
     fetch(guiConfig.mtls_admin_url.replace("-1", String(id)), {
         method: "DELETE",
     })
-    .then(res => {
-        if (res.ok) {
-            return success(undefined);
-        } else {
-            return error(res.statusText, res.status, res);
-        }
-    })
-    .catch(err => error("An error was encountered", undefined, err));
+        .then(res => {
+            if (res.ok) {
+                return success(undefined);
+            } else {
+                return error(res.statusText, res.status, res);
+            }
+        })
+        .catch(err => error("An error was encountered", undefined, err));
 
 /**
  * Get mtls cert.  If `userId` is 0, then return all certificates (super)
@@ -275,6 +279,153 @@ export const getMTLS = (userId?: number) =>
     }).catch(err => error("An error was encountered", undefined, err));
 
 
+export const getDeniedRegions = (regionStr: string) => {
+    fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
+        method: "GET",
+        headers: {
+            'content-type': 'text/csv',
+        }
+    }).then(async res => {
+        if (res.ok) {
+            let data = await res.text();
+
+            return success(mapDeniedRegionFromCsv(data, regionStr));
+        } else if (res.status == 404) {
+            return success([])
+        } else {
+            return error("Unable to get denied regions for "+ regionStr, res.status, res);
+        }
+    }).catch(err => error("An error was encountered", undefined, err));
+}
+
+// Update the denied regions for a given region
+export const updateDeniedRegions = (records:DeniedRegion[], regionStr: string) => (
+    fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
+        method: "PUT",
+        headers: { "Content-Type": "text/csv" },
+        body: mapDeniedRegionToCsv(records, regionStr,true)
+    }).then(res => {
+        if (res.status === 204) {
+            return success("Denied regions updated.");
+        }
+        else {
+            return error(res.statusText, res.status);
+        }
+    }).catch(err => {
+        logger.error(err);
+        return error("Unable to update denied regions.");
+    })
+);
+
+const mapDeniedRegionFromCsv = (data: string, regionStr: string) => {
+    let records = parse(data, {
+        columns: true
+    });
+    let objects = records.map(x => {
+        let newRegion: DeniedRegion = {
+            regionStr: regionStr,
+            name: x["Location"],
+            endFreq: x["Stop Freq (MHz)"],
+            startFreq: x["Start Freq (MHz)"],
+            exclusionZone: dummyExclusionZone,
+            zoneType: "Circle"
+        }
+
+        //Is a one or two rect if it has a rect1 lat 1
+        if (!!x["Rectangle1 Lat 1"]) {
+            //Is a two rect if has a rect 2 lat 1
+            if (!!x["Rectangle2 Lat 1"]) {
+                let rect: ExclusionTwoRect = {
+                    rectangleOne: {
+                        topLat: x["Rectangle1 Lat 1"],
+                        leftLong: x["Rectangle1 Lon 1"],
+                        bottomLat: x["Rectangle1 Lat 2"],
+                        rightLong: x["Rectangle1 Lon 2"]
+                    },
+                    rectangleTwo: {
+                        topLat: x["Rectangle2 Lat 1"],
+                        leftLong: x["Rectangle2 Lon 1"],
+                        bottomLat: x["Rectangle2 Lat 2"],
+                        rightLong: x["Rectangle2 Lon 2"]
+                    }
+                }
+                newRegion.exclusionZone = rect;
+                newRegion.zoneType = "Two Rectangles";
+            } else {
+                let rect: ExclusionRect = {
+                    topLat: x["Rectangle1 Lat 1"],
+                    leftLong: x["Rectangle1 Lon 1"],
+                    bottomLat: x["Rectangle1 Lat 2"],
+                    rightLong: x["Rectangle1 Lon 2"]
+                }
+                newRegion.exclusionZone = rect;
+                newRegion.zoneType = "One Rectangle";
+
+            }
+        } else if (!!x["Circle Radius (km)"]) {
+            let circ: ExclusionCircle = {
+                latitude: x["Circle center Lat"],
+                longitude: x["Circle center Lon"],
+                radiusKm: x["Circle Radius (km)"],
+            }
+            newRegion.exclusionZone = circ;
+            newRegion.zoneType = "Circle";
+        } else {
+            let horz: ExclusionHorizon = {
+                latitude: x["Circle center Lat"],
+                longitude: x["Circle center Lon"],
+                aglHeightM: x["Antenna AGL height (m)"],
+            }
+            newRegion.exclusionZone = horz;
+            newRegion.zoneType = "Horizon Distance"
+        }
+        return newRegion;
+    })
+}
+
+const mapDeniedRegionToCsv = (records: DeniedRegion[], regionStr: string, includeHeader: boolean = true) => {
+    let result: string[] = [];
+    if (includeHeader) {
+        result.push(defaultDeniedRegionHeaders);
+    }
+    let strings = records.filter(x=>x.regionStr == regionStr).map((rec) => {
+        let header = `${rec.name},${rec.startFreq},${rec.endFreq},${rec.zoneType},`;
+        let excl = "";
+        switch (rec.zoneType) {
+            case "Circle":
+                {
+                    let x = rec.exclusionZone as ExclusionCircle;
+                    excl = `,,,,,,,,${x.radiusKm},${x.latitude},${x.longitude},`;
+                }
+                break;
+            case "One Rectangle":
+                {
+                    let x = rec.exclusionZone as ExclusionRect;
+                    excl = `${x.topLat},${x.leftLong},${x.bottomLat},${x.rightLong},,,,,,,,`;
+                }
+                break
+            case "Two Rectangles":
+                {
+                    let x = rec.exclusionZone as ExclusionTwoRect;
+                    excl = `${x.rectangleOne.topLat},${x.rectangleOne.leftLong},${x.rectangleOne.bottomLat},${x.rectangleOne.rightLong},${x.rectangleTwo.topLat},${x.rectangleTwo.leftLong},${x.rectangleTwo.bottomLat},${x.rectangleTwo.rightLong},,,,`;
+                }
+                break;  
+            case "Horizon Distance":  {
+                let x = rec.exclusionZone as ExclusionHorizon;
+                excl = `,,,,,,,,,${x.latitude},${x.longitude},${x.aglHeightM}`;
+            }
+            break;
+            default:
+                throw "Bad data in mapDeniedRegionToCsv: " + JSON.stringify(rec)
+        }
+        return header+excl;
+    });
+    result.concat(strings);
+    return result.join("\n");
+
+}
 
 
 
+const dummyExclusionZone: ExclusionCircle = { latitude: 0, longitude: 0, radiusKm: 0 }
+const defaultDeniedRegionHeaders = "Location,Start Freq (MHz),Stop Freq (MHz),Exclusion Zone,Rectangle1 Lat 1,Rectangle1 Lat 2,Rectangle1 Lon 1,Rectangle1 Lon 2,Rectangle2 Lat 1,Rectangle2 Lat 2,Rectangle2 Lon 1,Rectangle2 Lon 2,Circle Radius (km),Circle center Lat,Circle center Lon,Antenna AGL height (m)"

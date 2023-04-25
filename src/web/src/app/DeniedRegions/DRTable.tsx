@@ -1,45 +1,36 @@
 import * as React from "react";
 import { headerCol, Table, TableVariant, TableHeader, TableBody } from "@patternfly/react-table";
-import { AccessPointModel, UserModel } from "../Lib/RatApiTypes";
+import { AccessPointModel, DeniedRegion, UserModel } from "../Lib/RatApiTypes";
 
 /**
- * APTable.tsx: Table that displays access points. Shows org column if admin specifies filterId is 0
+ * DRTable.tsx: Table that displays access points. Shows org column if admin specifies filterId is 0
  * author: Sam Smucny
  */
 
 /**
- * Interface definition of `APTable` properties
+ * Interface definition of `DRTable` properties
  */
-interface APTableProps {
-    accessPoints: AccessPointModel[],
-    /**
-     * If `filterId` is 0 then the org column will be displayed (Super admin feature)
-     */
-    filterId?: number,
+interface DRTableProps {
+    deniedRegions: DeniedRegion[],
+    currentRegionStr: string,
     onDelete: (id: number) => void
 }
 
 /**
  * Table component to display access points.
  */
-export class APTable extends React.Component<APTableProps, {}> {
+export class DRTable extends React.Component<DRTableProps, {}> {
 
     private columns = [
-        { title: "Serial Number", cellTransforms: [headerCol()] },
-        { title: "Certification ID" },
+        "Location","Start Freq (MHz)","Stop Freq (MHz)","Exclusion Zone"
     ]
 
-    constructor(props: APTableProps) {
+    constructor(props: DRTableProps) {
         super(props);
         this.state = {
             rows: []
         };
 
-        if (props.filterId === 0) {
-            this.columns.push({
-                title: "Org"
-            });
-        }
     }
 
     private apToRow = (ap: AccessPointModel) => ({
