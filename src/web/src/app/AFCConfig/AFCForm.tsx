@@ -208,7 +208,7 @@ export class AFCForm extends React.Component<
         let config = getDefaultAfcConf(this.state.config.regionStr);
 
         config.freqBands = this.props.frequencyBands.filter((x) => (x.region == this.state.config.regionStr) || (!x.region && this.state.config.regionStr == 'US'))
-
+        config.deniedRegionFile = `rat_transfer/denied_regions/${this.state.config.regionStr}_denied_regions.csv`
         this.updateEntireConfigState(config);
     }
 
