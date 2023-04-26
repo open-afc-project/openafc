@@ -1,9 +1,10 @@
 import { guiConfig } from "./RatApi";
 import { UserModel, success, error, AccessPointModel, FreqRange, DeniedRegion, ExclusionCircle, ExclusionTwoRect, ExclusionRect, ExclusionHorizon } from "./RatApiTypes";
 import { logger } from "./Logger";
-import { Role } from "./User";
+import { Role, retrieveUserData } from "./User";
 import { Rect } from "react-konva";
 import { Circle } from "konva/types/shapes/Circle";
+import { RatResponse } from "./RatApiTypes";
 
 
 /** 
@@ -279,16 +280,15 @@ export const getMTLS = (userId?: number) =>
 
 
 export const getDeniedRegions = (regionStr: string) => {
-    fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
+   return fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
         method: "GET",
         headers: {
             'content-type': 'text/csv',
         }
     }).then(async res => {
         if (res.ok) {
-            let data = await res.text();
 
-            return success(mapDeniedRegionFromCsv(data, regionStr));
+            return success(mapDeniedRegionFromCsv(await res.text(), regionStr));
         } else if (res.status == 404) {
             return success([])
         } else {
@@ -298,12 +298,13 @@ export const getDeniedRegions = (regionStr: string) => {
 }
 
 // Update the denied regions for a given region
-export const updateDeniedRegions = (records: DeniedRegion[], regionStr: string) => (
-    fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
+export const updateDeniedRegions = (records: DeniedRegion[], regionStr: string) => {
+    let body = mapDeniedRegionToCsv(records, regionStr, true);
+    return fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
         method: "PUT",
         headers: { "Content-Type": "text/csv" },
-        body: mapDeniedRegionToCsv(records, regionStr, true)
-    }).then(res => {
+        body: body
+    }).then(async res => {
         if (res.status === 204) {
             return success("Denied regions updated.");
         }
@@ -314,7 +315,7 @@ export const updateDeniedRegions = (records: DeniedRegion[], regionStr: string) 
         logger.error(err);
         return error("Unable to update denied regions.");
     })
-);
+};
 
 function parseCSV(str: string, headers = true) {
     const arr: string[][] = [];
@@ -368,7 +369,7 @@ function parseCSVtoObjects(csvString: string) {
 
     var result = [];
     for (var i = firstDataRow, n = csvRows.length; i < n; i++) {
-        var rowObject:any = {};
+        var rowObject: any = {};
         var row = csvRows[i];
         for (var j = 0, m = Math.min(row.length, columnNames.length); j < m; j++) {
             var columnName = columnNames[j];
@@ -442,6 +443,7 @@ const mapDeniedRegionFromCsv = (data: string, regionStr: string) => {
         }
         return newRegion;
     })
+    return objects;
 }
 
 const mapDeniedRegionToCsv = (records: DeniedRegion[], regionStr: string, includeHeader: boolean = true) => {
@@ -481,7 +483,7 @@ const mapDeniedRegionToCsv = (records: DeniedRegion[], regionStr: string, includ
         }
         return header + excl;
     });
-    result.concat(strings);
+    result = result.concat(strings);
     return result.join("\n");
 
 }

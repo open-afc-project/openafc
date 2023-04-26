@@ -299,7 +299,7 @@ export const getRegions = (): Promise<RatResponse<string[]>> => (
 
 
 
-export const getAboutLoginAfc = (): Promiss<RatResponse<string>> => (
+export const getAboutLoginAfc = (): Promise<RatResponse<string>> => (
     fetch(guiConfig.about_login_url, {
         method: "GET",
     }).then(async (res: Response) => {
@@ -320,7 +320,7 @@ export const getAboutLoginAfc = (): Promiss<RatResponse<string>> => (
 
 export const getAboutSiteKey = () => (guiConfig.about_sitekey)
 
-export const getAboutAfc = (): Promiss<RatResponse<string>> => (
+export const getAboutAfc = (): Promise<RatResponse<string>> => (
     fetch(guiConfig.about_url, {
         method: "GET",
     }).then(async (res: Response) => {

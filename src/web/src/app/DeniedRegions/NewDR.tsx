@@ -68,7 +68,18 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                 name: props.drToEdit.name,
                 startFreq: props.drToEdit.startFreq,
                 endFreq: props.drToEdit.endFreq,
-                zoneType: props.drToEdit.zoneType
+                zoneType: props.drToEdit.zoneType,
+                circleLat: undefined,
+                circleLong: undefined,
+                radiusHeight: undefined,
+                rect1topLat: undefined,
+                rect1leftLong: undefined,
+                rect1bottomLat: undefined,
+                rect1rightLong: undefined,
+                rect2topLat: undefined,
+                rect2leftLong: undefined,
+                rect2bottomLat: undefined,
+                rect2rightLong: undefined,
             };
             switch (props.drToEdit.zoneType) {
                 case "Circle":
@@ -99,9 +110,25 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
         } else {
             this.state = {
                 isEdit: false,
+                regionStr: props.currentRegionStr,
                 prevName: "Placeholder",
                 prevZoneType: "Circle",
-                needsSave: false
+                needsSave: false,
+                name: undefined,
+                startFreq: undefined,
+                endFreq: undefined,
+                zoneType: "Circle",
+                circleLat: undefined,
+                circleLong: undefined,
+                radiusHeight: undefined,
+                rect1topLat: undefined,
+                rect1leftLong: undefined,
+                rect1bottomLat: undefined,
+                rect1rightLong: undefined,
+                rect2topLat: undefined,
+                rect2leftLong: undefined,
+                rect2bottomLat: undefined,
+                rect2rightLong: undefined,
             };
         }
     }
@@ -266,8 +293,6 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
         }
     }
 
-
-
     render() {
 
         return (
@@ -286,7 +311,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                                 name="location-name-form"
                                 aria-describedby="location-name-form-helper"
                                 value={this.state.name}
-                                onChange={this.setName}
+                                onChange={x => this.setName(x)}
                                 isValid={(!!this.state.name && this.state.name.length > 0)}
                             />
                         </FormGroup>
@@ -326,6 +351,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                             />
                         </FormGroup>
                     </GalleryItem>
+
                     <GalleryItem>
                         <FormGroup
                             label="Exclusion Zone"
@@ -337,144 +363,147 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                                 id="zone-type-form"
                                 name="zone-type-form"
                                 aria-describedby="zone-type-form-helper"
-                                value={this.state.endFreq}
+                                value={this.state.zoneType}
                                 onChange={(x) => this.setZoneType(x)}
                                 isValid={!!this.state.zoneType}>
-                                {
-                                    zoneTypes.map(x => {
-                                        <FormSelectOption label={x} key={x} value={x}></FormSelectOption>
-                                    })
-                                }
+                                <FormSelectOption label="Circle" key="Circle" value="Circle" />
+                                <FormSelectOption label="One Rectangle" key="One Rectangle" value="One Rectangle" />
+                                <FormSelectOption label="Two Rectangles" key="Two Rectangles" value="Two Rectangles" />
+                                <FormSelectOption label="Horizon Distance" key="Horizon Distance" value="Horizon Distance" />
                             </FormSelect>
                         </FormGroup>
                     </GalleryItem>
 
                     {this.state.zoneType == "Circle" &&
                         <>
-                            <GalleryItem>
-                                <FormGroup
-                                    label="Circle Center Latitude"
-                                    isRequired={true}
-                                    fieldId="circ-lat-form"
-                                >
-                                    <TextInput
-                                        type="number"
-                                        id="circ-lat-form"
-                                        name="circ-lat-form"
-                                        aria-describedby="circ-lat-form-helper"
-                                        value={this.state.circleLat}
-                                        onChange={(x) => this.setCircleLat(Number(x))}
-                                        isValid={(this.state.circleLat !== undefined)}
-                                    />
-                                </FormGroup>
-                            </GalleryItem>
-                            <GalleryItem>
-                                <FormGroup
-                                    label="Circle Center Longitude"
-                                    isRequired={true}
-                                    fieldId="circ-long-form"
-                                >
-                                    <TextInput
-                                        type="number"
-                                        id="circ-long-form"
-                                        name="circ-long-form"
-                                        aria-describedby="circ-long-form-helper"
-                                        value={this.state.circleLong}
-                                        onChange={(x) => this.setCircleLong(Number(x))}
-                                        isValid={(this.state.circleLong !== undefined)}
-                                    />
-                                </FormGroup>
-                            </GalleryItem>
-                            <GalleryItem>
-                                <FormGroup
-                                    label="Circle Radius (km)"
-                                    isRequired={true}
-                                    fieldId="circ-radius-form"
-                                >
-                                    <TextInput
-                                        type="number"
-                                        id="circ-radius-form"
-                                        name="circ-radius-form"
-                                        aria-describedby="circ-radius-form-helper"
-                                        value={this.state.radiusHeight}
-                                        onChange={(x) => this.setCircleRadius(Number(x))}
-                                        isValid={(this.state.radiusHeight !== undefined)}
-                                    />
-                                </FormGroup>
-                            </GalleryItem>
+                            <FormGroup fieldId="circle-group">
+
+                                <GalleryItem>
+                                    <FormGroup
+                                        label="Circle Center Latitude"
+                                        isRequired={true}
+                                        fieldId="circ-lat-form"
+                                    >
+                                        <TextInput
+                                            type="number"
+                                            id="circ-lat-form"
+                                            name="circ-lat-form"
+                                            aria-describedby="circ-lat-form-helper"
+                                            value={this.state.circleLat}
+                                            onChange={(x) => this.setCircleLat(Number(x))}
+                                            isValid={(this.state.circleLat !== undefined)}
+                                        />
+                                    </FormGroup>
+                                </GalleryItem>
+                                <GalleryItem>
+                                    <FormGroup
+                                        label="Circle Center Longitude"
+                                        isRequired={true}
+                                        fieldId="circ-long-form"
+                                    >
+                                        <TextInput
+                                            type="number"
+                                            id="circ-long-form"
+                                            name="circ-long-form"
+                                            aria-describedby="circ-long-form-helper"
+                                            value={this.state.circleLong}
+                                            onChange={(x) => this.setCircleLong(Number(x))}
+                                            isValid={(this.state.circleLong !== undefined)}
+                                        />
+                                    </FormGroup>
+                                </GalleryItem>
+                                <GalleryItem>
+                                    <FormGroup
+                                        label="Circle Radius (km)"
+                                        isRequired={true}
+                                        fieldId="circ-radius-form"
+                                    >
+                                        <TextInput
+                                            type="number"
+                                            id="circ-radius-form"
+                                            name="circ-radius-form"
+                                            aria-describedby="circ-radius-form-helper"
+                                            value={this.state.radiusHeight}
+                                            onChange={(x) => this.setCircleRadius(Number(x))}
+                                            isValid={(this.state.radiusHeight !== undefined)}
+                                        />
+                                    </FormGroup>
+                                </GalleryItem>
+                            </FormGroup>
                         </>
                     }
                     {this.state.zoneType == "One Rectangle" &&
                         <>
-                            <GalleryItem>
-                                <FormGroup
-                                    label="Top Latitude"
-                                    isRequired={true}
-                                    fieldId="rect-toplat-form"
-                                >
-                                    <TextInput
-                                        type="number"
-                                        id="rect-toplat-form"
-                                        name="rect-toplat-form"
-                                        aria-describedby="rect-toplat-form-helper"
-                                        value={this.state.rect1topLat}
-                                        onChange={(x) => this.setRectTopLat(Number(x), 1)}
-                                        isValid={(this.state.circleLat !== undefined)}
-                                    />
-                                </FormGroup>
-                            </GalleryItem>
-                            <GalleryItem>
-                                <FormGroup
-                                    label="Left Longitude"
-                                    isRequired={true}
-                                    fieldId="circ-long-form"
-                                >
-                                    <TextInput
-                                        type="number"
-                                        id="circ-long-form"
-                                        name="circ-long-form"
-                                        aria-describedby="circ-long-form-helper"
-                                        value={this.state.circleLong}
-                                        onChange={(x) => this.setRectLeftLong(Number(x), 1)}
-                                        isValid={(this.state.circleLong !== undefined)}
-                                    />
-                                </FormGroup>
-                            </GalleryItem>
-                            <GalleryItem>
-                                <FormGroup
-                                    label="Bottom Latitude"
-                                    isRequired={true}
-                                    fieldId="rect-botlat-form"
-                                >
-                                    <TextInput
-                                        type="number"
-                                        id="rect-botlat-form"
-                                        name="rect-botlat-form"
-                                        aria-describedby="rect-botlat-form-helper"
-                                        value={this.state.rect1bottomLat}
-                                        onChange={(x) => this.setRectBottomLat(Number(x), 1)}
-                                        isValid={(this.state.rect1bottomLat !== undefined)}
-                                    />
-                                </FormGroup>
-                            </GalleryItem>
-                            <GalleryItem>
-                                <FormGroup
-                                    label="Right Longitude"
-                                    isRequired={true}
-                                    fieldId="rect-rgtlon-form"
-                                >
-                                    <TextInput
-                                        type="number"
-                                        id="rect-rgtlon-form"
-                                        name="rect-rgtlon-formm"
-                                        aria-describedby="rect-rgtlon-form-helper"
-                                        value={this.state.rect1rightLong}
-                                        onChange={(x) => this.setRectRightLong(Number(x), 1)}
-                                        isValid={(this.state.rect1rightLong !== undefined)}
-                                    />
-                                </FormGroup>
-                            </GalleryItem>
-
+                            <FormGroup fieldId="one-rect-group">
+                                <GalleryItem>
+                                    <FormGroup
+                                        label="Top Latitude"
+                                        isRequired={true}
+                                        fieldId="rect-toplat-form"
+                                    >
+                                        <TextInput
+                                            type="number"
+                                            id="rect-toplat-form"
+                                            name="rect-toplat-form"
+                                            aria-describedby="rect-toplat-form-helper"
+                                            value={this.state.rect1topLat}
+                                            onChange={(x) => this.setRectTopLat(Number(x), 1)}
+                                            isValid={(this.state.circleLat !== undefined)}
+                                        />
+                                    </FormGroup>
+                                </GalleryItem>
+                                <GalleryItem>
+                                    <FormGroup
+                                        label="Left Longitude"
+                                        isRequired={true}
+                                        fieldId="circ-long-form"
+                                    >
+                                        <TextInput
+                                            type="number"
+                                            id="circ-long-form"
+                                            name="circ-long-form"
+                                            aria-describedby="circ-long-form-helper"
+                                            value={this.state.circleLong}
+                                            onChange={(x) => this.setRectLeftLong(Number(x), 1)}
+                                            isValid={(this.state.circleLong !== undefined)}
+                                        />
+                                    </FormGroup>
+                                </GalleryItem>
+                                <GalleryItem>
+                                    <FormGroup
+                                        label="Bottom Latitude"
+                                        isRequired={true}
+                                        fieldId="rect-botlat-form"
+                                    >
+                                        <TextInput
+                                            type="number"
+                                            id="rect-botlat-form"
+                                            name="rect-botlat-form"
+                                            aria-describedby="rect-botlat-form-helper"
+                                            value={this.state.rect1bottomLat}
+                                            onChange={(x) => this.setRectBottomLat(Number(x), 1)}
+                                            isValid={(this.state.rect1bottomLat !== undefined)}
+                                        />
+                                    </FormGroup>
+                                </GalleryItem>
+                                <GalleryItem>
+                                    <FormGroup
+                                        label="Right Longitude"
+                                        isRequired={true}
+                                        fieldId="rect-rgtlon-form"
+                                    >
+                                        <TextInput
+                                            type="number"
+                                            id="rect-rgtlon-form"
+                                            name="rect-rgtlon-formm"
+                                            aria-describedby="rect-rgtlon-form-helper"
+                                            value={this.state.rect1rightLong}
+                                            onChange={(x) => this.setRectRightLong(Number(x), 1)}
+                                            isValid={(this.state.rect1rightLong !== undefined)}
+                                        />
+                                    </FormGroup>
+                                </GalleryItem>
+                            </FormGroup>
                         </>
                     }
                     {this.state.zoneType == "Two Rectangles" &&
@@ -623,57 +652,59 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                     }
                     {this.state.zoneType == "Horizon Distance" &&
                         <>
-                            <GalleryItem>
-                                <FormGroup
-                                    label="Latitude"
-                                    isRequired={true}
-                                    fieldId="circ-lat-form"
-                                >
-                                    <TextInput
-                                        type="number"
-                                        id="circ-lat-form"
-                                        name="circ-lat-form"
-                                        aria-describedby="circ-lat-form-helper"
-                                        value={this.state.circleLat}
-                                        onChange={(x) => this.setCircleLat(Number(x))}
-                                        isValid={(this.state.circleLat !== undefined)}
-                                    />
-                                </FormGroup>
-                            </GalleryItem>
-                            <GalleryItem>
-                                <FormGroup
-                                    label="Longitude"
-                                    isRequired={true}
-                                    fieldId="circ-long-form"
-                                >
-                                    <TextInput
-                                        type="number"
-                                        id="circ-long-form"
-                                        name="circ-long-form"
-                                        aria-describedby="circ-long-form-helper"
-                                        value={this.state.circleLong}
-                                        onChange={(x) => this.setCircleLong(Number(x))}
-                                        isValid={(this.state.circleLong !== undefined)}
-                                    />
-                                </FormGroup>
-                            </GalleryItem>
-                            <GalleryItem>
-                                <FormGroup
-                                    label="Antenna AGL height (m)"
-                                    isRequired={true}
-                                    fieldId="circ-radius-form"
-                                >
-                                    <TextInput
-                                        type="number"
-                                        id="circ-radius-form"
-                                        name="circ-radius-form"
-                                        aria-describedby="circ-radius-form-helper"
-                                        value={this.state.radiusHeight}
-                                        onChange={(x) => this.setCircleRadius(Number(x))}
-                                        isValid={(this.state.radiusHeight !== undefined)}
-                                    />
-                                </FormGroup>
-                            </GalleryItem>
+                            <FormGroup fieldId="horz-group">
+                                <GalleryItem>
+                                    <FormGroup
+                                        label="Latitude"
+                                        isRequired={true}
+                                        fieldId="circ-lat-form"
+                                    >
+                                        <TextInput
+                                            type="number"
+                                            id="circ-lat-form"
+                                            name="circ-lat-form"
+                                            aria-describedby="circ-lat-form-helper"
+                                            value={this.state.circleLat}
+                                            onChange={(x) => this.setCircleLat(Number(x))}
+                                            isValid={(this.state.circleLat !== undefined)}
+                                        />
+                                    </FormGroup>
+                                </GalleryItem>
+                                <GalleryItem>
+                                    <FormGroup
+                                        label="Longitude"
+                                        isRequired={true}
+                                        fieldId="circ-long-form"
+                                    >
+                                        <TextInput
+                                            type="number"
+                                            id="circ-long-form"
+                                            name="circ-long-form"
+                                            aria-describedby="circ-long-form-helper"
+                                            value={this.state.circleLong}
+                                            onChange={(x) => this.setCircleLong(Number(x))}
+                                            isValid={(this.state.circleLong !== undefined)}
+                                        />
+                                    </FormGroup>
+                                </GalleryItem>
+                                <GalleryItem>
+                                    <FormGroup
+                                        label="Antenna AGL height (m)"
+                                        isRequired={true}
+                                        fieldId="circ-radius-form"
+                                    >
+                                        <TextInput
+                                            type="number"
+                                            id="circ-radius-form"
+                                            name="circ-radius-form"
+                                            aria-describedby="circ-radius-form-helper"
+                                            value={this.state.radiusHeight}
+                                            onChange={(x) => this.setCircleRadius(Number(x))}
+                                            isValid={(this.state.radiusHeight !== undefined)}
+                                        />
+                                    </FormGroup>
+                                </GalleryItem>
+                            </FormGroup>
                         </>
                     }
                     <GalleryItem>

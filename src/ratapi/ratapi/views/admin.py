@@ -235,7 +235,7 @@ class AccessPoint(MethodView):
         return flask.make_response()
 
 class DeniedRegion(MethodView):
-    ''' resources to manage access points'''
+    ''' resources to manage denied regions'''
 
     methods = ['PUT', 'GET']
 
@@ -546,4 +546,4 @@ module.add_url_rule('/user/eirp_min', view_func=Limits.as_view('Eirp'))
 module.add_url_rule('/user/frequency_range', view_func=AllowedFreqRanges.as_view('Frequency'))
 module.add_url_rule('/user/ap/trial', view_func=AccessPoint.as_view('AccessPointTrial'))
 module.add_url_rule('/user/mtls/<int:id>', view_func=MTLS.as_view('MTLS'))
-module.add_url_rule('/user/denied_regions/<regionStr:string>', view_func=DeniedRegion.as_view('DeniedRegion'))
+module.add_url_rule('/user/denied_regions/<string:regionStr>', view_func=DeniedRegion.as_view('DeniedRegion'))

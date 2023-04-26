@@ -241,9 +241,9 @@ const drResolves = async () => ({
 const DRListPage = () => {
   return (
     <DynamicImport load={getDRListModuleAsync()} resolve={drResolves()}>
-      {(Component: any) => {
+      {(Component: any,resolve) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
-          : <Component.DRListPage />
+          : <Component.DRListPage regions={resolve.regions} />
       }}
     </DynamicImport>
   );
