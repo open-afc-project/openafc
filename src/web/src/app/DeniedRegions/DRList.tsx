@@ -1,6 +1,6 @@
 import * as React from "react";
 import { DeniedRegion, error, success, RatResponse } from "../Lib/RatApiTypes";
-import { getDeniedRegions, updateDeniedRegions } from "../Lib/Admin";
+import { getDeniedRegions, getDeniedRegionsCsvFile, updateDeniedRegions } from "../Lib/Admin";
 import { Card, CardHead, CardHeader, CardBody, PageSection, InputGroup, Select, SelectOption, FormSelect, FormSelectOption, Button, Modal, Alert, AlertActionCloseButton, GalleryItem, FormGroup } from "@patternfly/react-core";
 import { NewDR } from "./NewDR";
 import { DRTable } from "./DRTable";
@@ -113,6 +113,22 @@ export class DRList extends React.Component<DRListProps, DRListState> {
             })
     }
 
+    downloadCSVFile = () => {
+        getDeniedRegionsCsvFile(this.state.regionStr).then(res => {
+            if (res.kind === "Success") {
+                let file = new Blob([res.result], {
+                    type: "text/csv"
+                });
+                const element = document.createElement("a");
+                element.href = URL.createObjectURL(file);
+                element.download = this.state.regionStr + "_denied_regions.csv";
+                document.body.appendChild(element); // Required for this to work in FireFox
+                element.click();
+
+            }
+        });
+    }
+
     closeEditor = () => {
         this.setState({ isEditorOpen: false })
     }
@@ -171,7 +187,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
 
 
                     <GalleryItem>
-                        <FormGroup label="Country" fieldId="form-region" style={{width: "25%"}}>
+                        <FormGroup label="Country" fieldId="form-region" style={{ width: "25%" }}>
                             <FormSelect
                                 value={this.state.regionStr}
                                 onChange={x => this.setUlsRegion(x)}
@@ -194,16 +210,18 @@ export class DRList extends React.Component<DRListProps, DRListState> {
                         currentRegionStr={this.state.regionStr} />
                     <br />
                     {hasRole("Admin") &&
+                        <Button key="AddNew" variant="primary" onClick={() => this.openEditor()} >
+                            Add New Denied Region
+                        </Button>
+                    }
+                    <br />
+                    {hasRole("Admin") &&
                         (<Button onClick={() => this.putDeniedRegions()}
                             isDisabled={!this.state.deniedRegionsNeedSaving}>Submit Denied Regions
                         </Button>)}
                     <br />
                     {hasRole("Admin") &&
-                        <Button key="AddNew" variant="primary" onClick={() => this.openEditor()} >
-                            Add New Denied Region
-                        </Button>
-                    }
-
+                        (<Button onClick={() => this.downloadCSVFile()}>Download Denied Regions File</Button>)}
                 </CardBody>
             </Card >
         )

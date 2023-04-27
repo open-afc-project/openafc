@@ -280,7 +280,7 @@ export const getMTLS = (userId?: number) =>
 
 
 export const getDeniedRegions = (regionStr: string) => {
-   return fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
+    return fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
         method: "GET",
         headers: {
             'content-type': 'text/csv',
@@ -291,6 +291,21 @@ export const getDeniedRegions = (regionStr: string) => {
             return success(mapDeniedRegionFromCsv(await res.text(), regionStr));
         } else if (res.status == 404) {
             return success([])
+        } else {
+            return error("Unable to get denied regions for " + regionStr, res.status, res);
+        }
+    }).catch(err => error("An error was encountered", undefined, err));
+}
+
+export const getDeniedRegionsCsvFile = (regionStr: string) => {
+    return fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
+        method: "GET",
+        headers: {
+            'content-type': 'text/csv',
+        }
+    }).then(async res => {
+        if (res.ok) {
+            return success(await res.text())
         } else {
             return error("Unable to get denied regions for " + regionStr, res.status, res);
         }
