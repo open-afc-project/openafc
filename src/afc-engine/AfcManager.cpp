@@ -7709,7 +7709,20 @@ void AfcManager::runPointAnalysis()
 
 					// If contains2D is set, FS lon/lat is inside 2D-uncertainty region, depending on height may be above, below, or actually inside uncertainty region.
 					// If contains3D is set, FS is inside 3D-uncertainty
-					_rlanRegion->closestPoint(ulsRxLatLon, contains2D);
+					LatLon closestLatLon = _rlanRegion->closestPoint(ulsRxLatLon, contains2D);
+					if ( (!contains2D) && ( fabs(closestLatLon.first - ulsRxLatLon.first) < 2.0/_scanres_points_per_degree )
+					                   && ( fabs(closestLatLon.second - ulsRxLatLon.second) < 2.0/_scanres_points_per_degree ) ) {
+						double adjFSRxLongitude = (std::floor(ulsRxLongitude*_scanres_points_per_degree) + 0.5)/_scanres_points_per_degree;
+						double adjFSRxLatitude = (std::floor(ulsRxLatitude*_scanres_points_per_degree) + 0.5)/_scanres_points_per_degree;
+
+						for(scanPtIdx=0; (scanPtIdx<(int) scanPointList.size())&&(!contains2D); scanPtIdx++) {
+							LatLon scanPt = scanPointList[scanPtIdx];
+							if (    (fabs(scanPt.second - adjFSRxLongitude) < 1.0e-10)
+							     && (fabs(scanPt.first  - adjFSRxLatitude)  < 1.0e-10) ) {
+								contains2D = true;
+							}
+					    }
+					}
 
 					contains3D = false;
 					if (contains2D) {
