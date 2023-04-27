@@ -464,13 +464,13 @@ const mapDeniedRegionToCsv = (records: DeniedRegion[], regionStr: string, includ
             case "One Rectangle":
                 {
                     let x = rec.exclusionZone as ExclusionRect;
-                    excl = `${x.topLat},${x.leftLong},${x.bottomLat},${x.rightLong},,,,,,,,`;
+                    excl = `${x.topLat},${x.bottomLat},${x.leftLong},${x.rightLong},,,,,,,,`;
                 }
                 break
             case "Two Rectangles":
                 {
                     let x = rec.exclusionZone as ExclusionTwoRect;
-                    excl = `${x.rectangleOne.topLat},${x.rectangleOne.leftLong},${x.rectangleOne.bottomLat},${x.rectangleOne.rightLong},${x.rectangleTwo.topLat},${x.rectangleTwo.leftLong},${x.rectangleTwo.bottomLat},${x.rectangleTwo.rightLong},,,,`;
+                    excl = `${x.rectangleOne.topLat},${x.rectangleOne.bottomLat},${x.rectangleOne.leftLong},${x.rectangleOne.rightLong},${x.rectangleTwo.topLat},${x.rectangleTwo.bottomLat},${x.rectangleTwo.leftLong},${x.rectangleTwo.rightLong},,,,`;
                 }
                 break;
             case "Horizon Distance": {
