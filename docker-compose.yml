@@ -1,0 +1,249 @@
+version: '3.2'
+
+
+services:
+
+  ratdb:
+    image: postgres:14.7
+    hostname: ratdb
+    restart: always
+    volumes:
+      - /var/databases/pgdata:/mnt/nfs/pgsql/data
+    environment:
+      POSTGRES_PASSWORD: N3SF0LVKJx1RAhFGx4fcw
+      PGDATA: /mnt/nfs/pgsql/data
+      POSTGRES_DB: fbrat
+
+  rmq:
+    image: rmq
+    container_name: rmq
+    hostname: rmq
+    build:
+      context: ./rabbitmq
+    restart: always
+    ports:
+ #    - "${BROKER_PORT}:5672"
+      - "${BROKER_MNG_PORT}:15672"
+    environment:
+      # Message broker params: 
+      BROKER_TYPE: ${BROKER_TYPE}
+      BROKER_PROT: ${BROKER_PROT}
+      BROKER_USER: ${BROKER_USER}
+      BROKER_PWD: ${BROKER_PWD}
+      BROKER_PORT: ${BROKER_PORT}
+      BROKER_FQDN: ${BROKER_FQDN}
+      BROKER_MNG_PORT: ${BROKER_MNG_PORT}
+
+# loadb:
+#   image: loadb
+#   hostname: loadb
+#   build:
+#     context: .
+#     dockerfile: loadb/Dockerfile
+#   restart: always
+#   ports:
+#     - "8888:8888"
+#   environment:
+#     AFC_DEVEL_ENV: ${AFC_LOADB_DEVEL_ENV:-production}
+##    AFC_MSGHND_NAME: ${AFC_MSGHND_NAME}
+##    AFC_MSGHND_PORT: ${AFC_MSGHND_PORT}
+##    AFC_PROXY_CONN_TOUT: ${AFC_PROXY_CONN_TOUT:-600}
+#   volumes:
+#     - ${AFC_LOADB_VOL_H_CFG:-./loadb_vol_h}:${AFC_LOADB_VOL_C_CFG:-/loadb_vol_c}
+#     - ${MYWORK}/afc:/wd/afc
+
+  dispatcher:
+    image: dispatcher
+    hostname: dispatcher
+    build:
+      context: .
+      dockerfile: dispatcher/Dockerfile
+    restart: always
+    ports:
+      - "9443:443"
+      - "80:80"
+ #    OA-511
+ #    - "9443-9453:443"
+    environment:
+      AFC_DEVEL_ENV: ${AFC_NGINX_DEVEL_ENV:-production}
+      AFC_MSGHND_NAME: ${AFC_MSGHND_NAME}
+      AFC_MSGHND_PORT: ${AFC_MSGHND_PORT}
+      AFC_PROXY_CONN_TOUT: ${AFC_PROXY_CONN_TOUT:-600}
+      # Filestorage params: 
+      AFC_OBJST_HOST: ${AFC_OBJST_HOST}
+      AFC_OBJST_PORT: ${AFC_OBJST_PORT}
+      AFC_OBJST_SCHEME: ${AFC_OBJST_SCHEME}
+    volumes:
+      - ${AFC_NGINX_VOL_H_CFG:-./nginx_vol_h}:${AFC_NGINX_VOL_C_CFG:-/nginx_vol_c}
+      - ${MYWORK}/afc:/wd/afc
+
+  objst:
+    image: objst
+    hostname: objst
+    build:
+      context: .
+      dockerfile: src/filestorage/Dockerfile
+    restart: always
+    environment:
+      - AFC_OBJST_PORT=${AFC_OBJST_PORT}
+      - AFC_OBJST_HIST_PORT=${AFC_OBJST_HIST_PORT}
+      - AFC_OBJST_LOCAL_DIR=/wd/storage
+      - AFC_OBJST_LOG_LVL=${AFC_OBJST_LOG_LVL:-ERROR}
+
+  worker:
+    image: worker
+    container_name: worker
+    hostname: worker
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+      args:
+        - AFC_DEVEL_ENV=${AFC_WORKER_DEVEL_ENV:-production}
+    environment:
+      # Filestorage params: 
+      AFC_OBJST_HOST: ${AFC_OBJST_HOST}
+      AFC_OBJST_PORT: ${AFC_OBJST_PORT}
+      AFC_OBJST_SCHEME: ${AFC_OBJST_SCHEME}
+      # Message worker params: 
+      CELERY_TYPE: ${CELERY_TYPE}
+      CELERY_OPTIONS: ${CELERY_OPTIONS}
+      CELERY_LOG: ${CELERY_LOG}
+      # Message broker params: 
+      BROKER_TYPE: ${BROKER_TYPE}
+      BROKER_PROT: ${BROKER_PROT}
+      BROKER_USER: ${BROKER_USER}
+      BROKER_PWD: ${BROKER_PWD}
+      BROKER_PORT: ${BROKER_PORT}
+      BROKER_FQDN: ${BROKER_FQDN}
+      BROKER_MNG_PORT: ${BROKER_MNG_PORT}
+    volumes:
+      - /data/users/mmandell/rkf/docker_afc_devel/databases:/mnt/nfs/rat_transfer
+      - /mnt/rkf_data:/mnt/rkf_data
+      - /data/users/mmandell/rkf/docker_afc_devel/mmandell:/root
+      - type: bind
+        source: ${MYWORK}/rkf/docker_afc_devel/afc_source/worker_bld
+        target: /wd/afc/oafc_bld
+        consistency: cached
+      - type: bind
+        source: ${MYWORK}/rkf/docker_afc_devel/afc_source/open-afc
+        target: /wd/afc/open-afc
+        consistency: cached
+
+  msghnd:
+    image: msghnd
+    container_name: msghnd
+    hostname: msghnd
+    build:
+      context: .
+      dockerfile: msghnd/Dockerfile
+      args:
+        - AFC_DEVEL_ENV=${AFC_MSGHND_DEVEL_ENV:-production}
+    volumes:
+      - type: bind
+        source: ${MYWORK}/afc/msghnd_bld
+        target: /wd/afc/oafc_bld
+        consistency: cached
+      - type: bind
+        source: ${MYWORK}/afc/open-afc
+        target: /wd/afc/open-afc
+        consistency: cached
+    environment:
+      GXK_OPENAFC_PROJ: /wd/afc/open-afc
+      WORKINGDIR: /wd/afc/oafc_bld
+      # Message broker params: 
+      BROKER_TYPE: ${BROKER_TYPE}
+      BROKER_PROT: ${BROKER_PROT}
+      BROKER_USER: ${BROKER_USER}
+      BROKER_PWD: ${BROKER_PWD}
+      BROKER_PORT: ${BROKER_PORT}
+      BROKER_FQDN: ${BROKER_FQDN}
+      BROKER_MNG_PORT: ${BROKER_MNG_PORT}
+      # Filestorage params: 
+      AFC_OBJST_HOST: ${AFC_OBJST_HOST}
+      AFC_OBJST_PORT: ${AFC_OBJST_PORT}
+      AFC_OBJST_SCHEME: ${AFC_OBJST_SCHEME}
+      # Msghnd parameters
+      AFC_MSGHND_WORKERS: ${AFC_MSGHND_WORKERS}
+      AFC_MSGHND_TIMEOUT: ${AFC_MSGHND_TIMEOUT}
+
+  rat_server:
+    image: rat_server
+    container_name: rat_server
+    hostname: rat_server
+    build:
+      context: .
+      dockerfile: rat_server/Dockerfile
+      args:
+        - AFC_DEVEL_ENV=${AFC_RATSRVR_DEVEL_ENV:-production}
+    ports:
+ #    - "9080:9080"
+      - "443:443"
+    volumes:
+      - /projects/wcc_afc_01/databases/rat_transfer:/mnt/nfs/rat_transfer
+      - ${AFC_RATSRVR_VOL_H_CFG:-./rat_srvr_vol_h}:${AFC_RATSRVR_VOL_C_CFG:-/ratsrvr_vol_c}
+      - type: bind
+        source: ${MYWORK}/afc/receiver_bld
+        target: /wd/afc/oafc_bld
+        consistency: cached
+      - type: bind
+        source: ${MYWORK}/afc/open-afc
+        target: /wd/afc/open-afc
+        consistency: cached
+    environment:
+      GXK_OPENAFC_PROJ: /wd/afc/open-afc
+      # Message broker params: 
+      BROKER_TYPE: ${BROKER_TYPE}
+      BROKER_PROT: ${BROKER_PROT}
+      BROKER_USER: ${BROKER_USER}
+      BROKER_PWD: ${BROKER_PWD}
+      BROKER_PORT: ${BROKER_PORT}
+      BROKER_FQDN: ${BROKER_FQDN}
+      BROKER_MNG_PORT: ${BROKER_MNG_PORT}
+      # Filestorage params: 
+      AFC_OBJST_HOST: ${AFC_OBJST_HOST}
+      AFC_OBJST_PORT: ${AFC_OBJST_PORT}
+      AFC_OBJST_SCHEME: ${AFC_OBJST_SCHEME}
+      AFC_OBJST_HIST_HOST: ${AFC_OBJST_HIST_HOST}
+
+# ulsupd:
+#   image: ulsupd
+#   container_name: ulsupd
+#   hostname: ulsupd
+#   build:
+#     context: .
+#     dockerfile: uls/Dockerfile-uls_updater
+#   environment:
+#     AFC_DEVEL_ENV: ${AFC_NGINX_DEVEL_ENV:-production}
+#   volumes:
+#     - /projects/wcc_afc_01/databases/rat_transfer/daily_uls_parse/data_files:/mnt/nfs/rat_transfer/daily_uls_parse/data_files
+#     - ${MYWORK}/afc/ulsupd:/output_folder
+#     - type: bind
+#       source: ${MYWORK}/afc/ulsupd_bld
+#       target: /wd/afc/oafc_bld
+#       consistency: cached
+#     - type: bind
+#       source: ${MYWORK}/afc/open-afc
+#       target: /wd/afc/open-afc
+#       consistency: cached
+
+# test_dns:
+#   image: test_dns
+#   hostname: test_dns
+#   build:
+#     context: ./test_dns
+#   restart: always
+#   ports:
+#     - "5353:53/udp"
+#   volumes:
+#   volumes:
+#     - *dev_bld
+#     - *dev_src
+#     #- ${MYWORK}/afc/open-afc/test_dns/dnsmasq.conf:/etc/dnsmasq.conf
+
+#networks:
+
+# openafc_net:
+#   driver: bridge
+#   ipam:
+#     config:
+#       - subnet: 10.5.0.0/24
