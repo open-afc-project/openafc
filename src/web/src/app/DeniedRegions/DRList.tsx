@@ -209,18 +209,18 @@ export class DRList extends React.Component<DRListProps, DRListState> {
                         onDelete={(id: string) => this.deleteDR(id)}
                         currentRegionStr={this.state.regionStr} />
                     <br />
-                    {hasRole("Admin") &&
+                    {hasRole("Super") &&
                         <Button key="AddNew" variant="primary" onClick={() => this.openEditor()} >
                             Add New Denied Region
                         </Button>
                     }
                     <br />
-                    {hasRole("Admin") &&
+                    {hasRole("Super") &&
                         (<Button onClick={() => this.putDeniedRegions()}
                             isDisabled={!this.state.deniedRegionsNeedSaving}>Submit Denied Regions
                         </Button>)}
                     <br />
-                    {hasRole("Admin") &&
+                    {hasRole("Super") &&
                         (<Button onClick={() => this.downloadCSVFile()}>Download Denied Regions File</Button>)}
                 </CardBody>
             </Card >
