@@ -1,5 +1,5 @@
 #
-# Copyright © 2021 Broadcom. All rights reserved. The term "Broadcom"
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
@@ -61,6 +61,10 @@ RUN rm -f /wd/devel.sh
 
 FROM alpine:3.17
 COPY --from=install_image / /
+
+# set alternative user
+ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
+USER ${AFC_WORKER_USER}
 
 LABEL revision="afc-worker-al"
 WORKDIR /wd
