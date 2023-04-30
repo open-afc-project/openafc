@@ -78,6 +78,12 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
             <NavLink to="/mtls" activeClassName="pf-m-current">MTLS</NavLink>
           </NavItem> : <NavItem />}
         </UserContext.Consumer>
+        <UserContext.Consumer>{(u: UserState) => isAdmin() ?
+          <NavItem id="dr-link" itemId="dr-link">
+            <NavLink to="/deniedRegions" activeClassName="pf-m-current">Denied Regions</NavLink>
+          </NavItem> : <NavItem />}
+        </UserContext.Consumer>
+
       </NavList>
     </Nav>
   )

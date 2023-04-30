@@ -169,6 +169,7 @@ class GuiConfig(MethodView):
             admin_url=flask.url_for('admin.User', user_id=-1),
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             mtls_admin_url=flask.url_for('admin.MTLS', id=-1),
+            dr_admin_url=flask.url_for('admin.DeniedRegion', regionStr="XX"),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
             about_url=about_url,
             about_login_url=about_login_url,

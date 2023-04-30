@@ -4,7 +4,7 @@ import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
 import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache, getRegions } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
-import { Limit } from "../Lib/Admin";
+import { Limit, getDeniedRegionsCsvFile } from "../Lib/Admin";
 import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
 import DownloadContents from "../Components/DownloadContents";
 import { AFCFormUSACanada } from "./AFCFormUSACanada";
@@ -175,13 +175,20 @@ export class AFCForm extends React.Component<
      * @param config new configuation file
      */
     private updateEntireConfigState(config: AFCConfigFile) {
-        this.setState({
-            config: config,
-            antennaPatternData: {
-                defaultAntennaPattern: config.ulsDefaultAntennaType,
+        getDeniedRegionsCsvFile(config.regionStr!).then(res => {
+            if (res.kind === "Success") {
+                config.deniedRegionFile = `rat_transfer/denied_regions/${config.regionStr}_denied_regions.csv`;
+            } else {
+                config.deniedRegionFile = "";
             }
-        }
-        );
+
+            this.setState({
+                config: config,
+                antennaPatternData: {
+                    defaultAntennaPattern: config.ulsDefaultAntennaType,
+                }
+            });
+        });
     }
 
     /**
@@ -206,9 +213,10 @@ export class AFCForm extends React.Component<
 
     private reset = () => {
         let config = getDefaultAfcConf(this.state.config.regionStr);
-
+        if(config.regionStr != this.state.config.regionStr){ // this is a demo/test config likely because they don't match
+            config.regionStr = this.state.config.regionStr
+        }
         config.freqBands = this.props.frequencyBands.filter((x) => (x.region == this.state.config.regionStr) || (!x.region && this.state.config.regionStr == 'US'))
-
         this.updateEntireConfigState(config);
     }
 

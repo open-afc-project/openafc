@@ -8,7 +8,7 @@ import { getAfcConfigFile, getAllowedRanges, getRegions, getAboutAfc, getAboutSi
 import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv } from "./Lib/FileApi";
 import AppLoginPage from "./AppLayout/AppLogin";
 import { UserAccountPage } from "./UserAccount/UserAccount";
-import { getUsers, getMinimumEIRP, Limit,  } from "./Lib/Admin";
+import { getUsers, getMinimumEIRP, } from "./Lib/Admin";
 import { Replay } from "./Replay/Replay"
 import { getLastUsedRegionFromCookie } from "./Lib/Utils";
 
@@ -205,6 +205,12 @@ const getMTLSModuleAsync = () => {
   return () => import(/* webpackChunkName: "mtlsList" */ "./MTLS/MTLS");
 }
 
+const getDRListModuleAsync = () => {
+  return () => import(/* webpackChunkName: "drList" */ "./DeniedRegions/DRList");
+}
+
+
+
 const APListPage = () => {
   return (
     <DynamicImport load={getAPListModuleAsync()}>
@@ -226,6 +232,23 @@ const MTLSPage = () => {
     </DynamicImport>
   );
 }
+
+const drResolves = async () => ({
+  regions: await getRegions(),
+})
+
+const DRListPage = () => {
+  return (
+    <DynamicImport load={getDRListModuleAsync()} resolve={drResolves()}>
+      {(Component: any,resolve) => {
+        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
+          : <Component.DRListPage regions={resolve.regions} />
+      }}
+    </DynamicImport>
+  );
+}
+
+
 
 const getReplayModuleAsync = () => {
   return () => import(/* webpackChunkName: "replay" */ "./Replay/Replay");
@@ -341,6 +364,13 @@ const routes: IAppRoute[] = [
     icon: null,
     label: "MTLS",
     path: "/mtls"
+  },
+  {
+    component: DRListPage,
+    exact: true,
+    icon: null,
+    label: "Denied Regions",
+    path: "/deniedRegions"
   },
   {
     component: UserAccountPage,
