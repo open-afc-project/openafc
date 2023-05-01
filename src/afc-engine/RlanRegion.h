@@ -31,6 +31,7 @@ class RlanRegionClass
 		virtual std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const = 0;
 		virtual double getMaxDist() const = 0;
 		virtual void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain) = 0;
+		virtual double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL) = 0;
 
 		double getMinHeightAGL()  const;
 		double getMaxHeightAGL()  const;
@@ -46,6 +47,7 @@ class RlanRegionClass
 	protected:
 		double centerLongitude;
 		double centerLatitude;
+		double cosVal, oneOverCosVal;
 		double centerHeightInput;
 		double centerHeightAMSL;
 		double centerTerrainHeight;
@@ -79,6 +81,7 @@ class EllipseRlanRegionClass : RlanRegionClass
 		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const;
 		double getMaxDist() const;
 		void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
+		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL);
 
 	private:
 		void calcHorizExtents(double latVal, double& lonA, double& lonB, bool& flag) const;
@@ -93,6 +96,7 @@ class EllipseRlanRegionClass : RlanRegionClass
 
 		arma::mat mxA;
 		arma::mat mxB;
+		arma::mat mxC;
 };
 /******************************************************************************************/
 
@@ -113,9 +117,10 @@ class PolygonRlanRegionClass : RlanRegionClass
 		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const;
 		double getMaxDist() const;
 		void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
+		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL);
 
 	private:
-		double resolution, cosVal, oneOverCosVal;
+		double resolution;
 		PolygonClass *polygon;
 		RLANBoundary polygonType;
 };

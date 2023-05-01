@@ -7711,17 +7711,17 @@ void AfcManager::runPointAnalysis()
 					// If contains3D is set, FS is inside 3D-uncertainty
 					LatLon closestLatLon = _rlanRegion->closestPoint(ulsRxLatLon, contains2D);
 					if ( (!contains2D) && ( fabs(closestLatLon.first - ulsRxLatLon.first) < 2.0/_scanres_points_per_degree )
-					                   && ( fabs(closestLatLon.second - ulsRxLatLon.second) < 2.0/_scanres_points_per_degree ) ) {
+									   && ( fabs(closestLatLon.second - ulsRxLatLon.second) < 2.0/_scanres_points_per_degree ) ) {
 						double adjFSRxLongitude = (std::floor(ulsRxLongitude*_scanres_points_per_degree) + 0.5)/_scanres_points_per_degree;
 						double adjFSRxLatitude = (std::floor(ulsRxLatitude*_scanres_points_per_degree) + 0.5)/_scanres_points_per_degree;
 
 						for(scanPtIdx=0; (scanPtIdx<(int) scanPointList.size())&&(!contains2D); scanPtIdx++) {
 							LatLon scanPt = scanPointList[scanPtIdx];
 							if (    (fabs(scanPt.second - adjFSRxLongitude) < 1.0e-10)
-							     && (fabs(scanPt.first  - adjFSRxLatitude)  < 1.0e-10) ) {
+								 && (fabs(scanPt.first  - adjFSRxLatitude)  < 1.0e-10) ) {
 								contains2D = true;
 							}
-					    }
+						}
 					}
 
 					contains3D = false;
@@ -7764,6 +7764,12 @@ void AfcManager::runPointAnalysis()
 						LOGGER_INFO(logger) << "FSID = " << uls->getID() << " is inside specified RLAN region.";
 						minRLANDist = 0.0;
 					} else {
+						Vector3 ulsAntennaPointing = (segIdx == numPR ? (divIdx == 0 ? uls->getAntennaPointing() : uls->getDiversityAntennaPointing()) : uls->getPR(segIdx).pointing);
+
+						double minAngleOffBoresightDeg = 0.0;
+						if (contains2D) {
+							minAngleOffBoresightDeg = _rlanRegion->calcMinAOB(ulsRxLatLon, ulsAntennaPointing, ulsRxHeightAMSL);
+						}
 
 						for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
 							LatLon scanPt = scanPointList[scanPtIdx];
@@ -7874,8 +7880,11 @@ void AfcManager::runPointAnalysis()
 #endif
 														);
 
-												Vector3 ulsAntennaPointing = (segIdx == numPR ? (divIdx == 0 ? uls->getAntennaPointing() : uls->getDiversityAntennaPointing()) : uls->getPR(segIdx).pointing);
-												angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+												if (contains2D) {
+													angleOffBoresightDeg = minAngleOffBoresightDeg;
+												} else {
+													angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+												}
 												if (segIdx == numPR) {
 													rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, divIdx);
 												} else {

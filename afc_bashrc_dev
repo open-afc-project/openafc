@@ -74,14 +74,25 @@ export N_THREADS=$(nproc --all) && \
 export APIDOCDIR=${WORKINGDIR}/testroot/share/doc/fbrat-api && \
 export LD_LIBRARY_PATH=${WORKINGDIR}/testroot/lib64
 '
+# alias afc_dbg='cmake3 -DCMAKE_INSTALL_PREFIX=/usr \
+#               -DCMAKE_PREFIX_PATH=/usr \
+#               -DAPIDOC_INSTALL_PATH=${APIDOCDIR} \
+#               -DBOOST_INCLUDEDIR=/usr/include/boost169 \
+#               -DBOOST_LIBRARYDIR=/usr/lib64/boost169 \
+#               -DBUILD_WITH_COVERAGE=off \
+#               -DCMAKE_BUILD_TYPE=DebugWithTest \
+#               -G Ninja ${GXK_OPENAFC_PROJ}'
+
 alias afc_dbg='cmake3 -DCMAKE_INSTALL_PREFIX=/usr \
               -DCMAKE_PREFIX_PATH=/usr \
               -DAPIDOC_INSTALL_PATH=${APIDOCDIR} \
               -DBOOST_INCLUDEDIR=/usr/include/boost169 \
               -DBOOST_LIBRARYDIR=/usr/lib64/boost169 \
               -DBUILD_WITH_COVERAGE=off \
-              -DCMAKE_BUILD_TYPE=DebugWithTest \
-              -G Ninja ${GXK_OPENAFC_PROJ}'
+              -DCMAKE_BUILD_TYPE=Debug \
+              -DDEBUG_AFC=1 \
+              -S . -B /wd/afc/oafc_bld'
+
 alias afc_rel='cmake3 -DCMAKE_INSTALL_PREFIX=/usr \
               -DCMAKE_PREFIX_PATH=/usr \
               -DAPIDOC_INSTALL_PATH=${APIDOCDIR} \
