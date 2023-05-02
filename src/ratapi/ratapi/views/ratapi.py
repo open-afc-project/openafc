@@ -42,16 +42,16 @@ def regions():
     return ['US', 'CA', 'TEST_US', 'DEMO_US']
 
 
-def regionStrToNra(region_str):
+def regionStrToRulesetId(region_str):
     """ Input: region_str: regionStr field of the afc config.
         Output: nra
         nra: can match with the NRA field of the AP, e.g. FCC
         Eg. 'USA' => 'FCC'
     """
     map = {
-       'DEFAULT':'FCC',
-       'US':'FCC',
-       'CA':'ISED',
+       'DEFAULT':'US_47_CFR_PART_15_SUBPART_E',
+       'US':'"US_47_CFR_PART_15_SUBPART_E"',
+       'CA':'CA_RES_DBS-06',
        'TEST_US':'TEST_FCC',
        'DEMO_US':'DEMO_FCC'
     }
@@ -61,18 +61,18 @@ def regionStrToNra(region_str):
     except:
         raise werkzeug.exceptions.NotFound('Invalid Region %s' % region_str)
 
-def nraToRegionStr(nra):
+def rulesetIdToRegionStr(rulesetId):
     map = {
-        'FCC':'US',
+        'US_47_CFR_PART_15_SUBPART_E':'US',
         'TEST_FCC':'TEST_US',
-        'ISED':'CA',
+        'CA_RES_DBS-06':'CA',
         'DEMO_FCC':'DEMO_US',
     }
-    nra = nra.upper()
+    rulesetId = rulesetId.upper()
     try:
-        return map[nra]
+        return map[rulesetId]
     except:
-        raise werkzeug.exceptions.NotFound('Invalid NRA %s' % nra)
+        raise werkzeug.exceptions.NotFound('Invalid ruleset %s' % rulesetId)
 
 
 def build_task(dataif,
@@ -339,7 +339,7 @@ class AfcConfigFile(MethodView):
         filename = rcrd['regionStr'].upper()
         LOGGER.debug('AfcConfigFile.put({})'.format(filename))
         # validate the region string
-        regionStrToNra(filename)
+        regionStrToRulesetId(filename)
         # make sure the config region string is upper case
         rcrd['regionStr'] = filename
         ordered_bytes = json.dumps(rcrd, sort_keys=True)

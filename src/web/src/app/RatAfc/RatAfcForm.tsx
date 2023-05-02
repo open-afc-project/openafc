@@ -420,7 +420,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                                             <FormSelectOption label={x} key={x} value={x} />
                                         ))
                                     }
-                                    <FormSelectOption label="Unknown RS - For Testing only" value={"UNKNOWN RS"} key={"unknown"} />
+                                    <FormSelectOption label="Unknown RS - For Testing only" value={"UNKNOWN_RS"} key={"unknown"} />
                                 </FormSelect>
 
                                 <TextInput

@@ -17,7 +17,7 @@ export const spectrumInquiryRequest = (request: AvailableSpectrumInquiryRequest)
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ version: "1.3", availableSpectrumInquiryRequests: [request] })
+        body: JSON.stringify({ version: "1.4", availableSpectrumInquiryRequests: [request] })
     })
         .then(async resp => {
             if (resp.status == 200) {
@@ -58,11 +58,10 @@ export const sampleRequestObject: AvailableSpectrumInquiryRequest = {
         serialNumber: "sample-ap",
         certificationId: [
             {
-                nra: "FCC",
+                rulesetId: "US_47_CFR_PART_15_SUBPART_E",
                 id: "1234567890"
             }
-        ],
-        rulesetIds: ["US_47_CFR_PART_15_SUBPART_E"]
+        ]
     },
     location: {
         ellipse: {

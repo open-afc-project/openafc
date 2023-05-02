@@ -3,7 +3,8 @@ import { AccessPointModel, RatResponse } from "../Lib/RatApiTypes";
 import { Gallery, GalleryItem, FormGroup, TextInput, Button, Alert, AlertActionCloseButton, FormSelect, FormSelectOption, InputGroup } from "@patternfly/react-core";
 import { PlusCircleIcon } from "@patternfly/react-icons";
 import { UserModel } from "../Lib/RatApiTypes";
-import { hasRole} from "../Lib/User";
+import { hasRole } from "../Lib/User";
+import { KnownRuleSetIds } from "../Lib/RatAfcTypes";
 
 /**
  * NewAP.tsx: Form for creating a new access point
@@ -21,7 +22,7 @@ interface NewAPProps {
 
 interface NewAPState {
     serialNumber?: string,
-    certificationIdNra?: string,
+    certificationIdRulesetId?: string,
     certificationIdId?: string,
     model?: string,
     manufacturer?: string,
@@ -42,7 +43,7 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
             serialNumber: "",
             model: undefined,
             manufacturer: undefined,
-            certificationIdNra: undefined,
+            certificationIdRulesetId: KnownRuleSetIds[0],
             certificationIdId: undefined,
             org: this.props.org,
         };
@@ -61,7 +62,7 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
         this.props.onAdd({
             id: 0,
             serialNumber: this.state.serialNumber,
-            certificationId: this.state.certificationIdNra + " " + this.state.certificationIdId,
+            certificationId: this.state.certificationIdRulesetId + " " + this.state.certificationIdId,
             model: this.state.model,
             manufacturer: this.state.manufacturer,
             org: this.state.org,
@@ -80,7 +81,7 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
     render() {
 
         const serialNumberChange = (s?: string) => this.setState({ serialNumber: s });
-        const certificationIdNraChange = (s?: string) => this.setState({ certificationIdNra: s });
+        const certificationIdNraChange = (s?: string) => this.setState({ certificationIdRulesetId: s });
         const certificationIdIdChange = (s?: string) => this.setState({ certificationIdId: s });
         const modelChange = (s?: string) => this.setState({ model: s });
         const manufacturerChange = (s?: string) => this.setState({ manufacturer: s });
@@ -119,17 +120,23 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
                             fieldId="certification-id-form"
                         >
                             <div>
-                                <TextInput
-                                    label="NRA"
-                                    value={this.state.certificationIdNra}
+                                <FormSelect
+                                    label="Ruleset"
+                                    value={this.state.certificationIdRulesetId}
                                     onChange={certificationIdNraChange}
                                     type="text"
                                     step="any"
                                     id="horizontal-form-certification-nra"
                                     name="horizontal-form-certification-nra"
                                     style={{ textAlign: "left" }}
-                                    placeholder="NRA"
-                                />
+                                    placeholder="Ruleset"
+                                >
+                                    {
+                                        KnownRuleSetIds.map((x) => (
+                                            <FormSelectOption label={x} key={x} value={x} />
+                                        ))
+                                    }
+                                </FormSelect>
 
                                 <TextInput
                                     label="Id"
@@ -145,7 +152,7 @@ export class NewAP extends React.Component<NewAPProps, NewAPState> {
                             </div>
                         </FormGroup>
                     </GalleryItem>
-                  
+
                     {hasRole("Super") &&
                         (<GalleryItem>
                             <FormGroup

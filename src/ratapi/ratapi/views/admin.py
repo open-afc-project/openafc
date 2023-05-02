@@ -22,7 +22,7 @@ import werkzeug
 from ..models import aaa
 from .auth import auth
 from ..models.base import db
-from .ratapi import nraToRegionStr
+from .ratapi import rulesetIdToRegionStr
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -206,9 +206,9 @@ class AccessPoint(MethodView):
         org = content.get('org')
         auth(roles=['Admin'], org=org)
         certId = content.get('certificationId')
-        nra = certId.split()[0]
-        # check nra is valid
-        region = nraToRegionStr(nra)
+        rulesetId = certId.split()[0]
+        # check ruleset is valid
+        region = rulesetIdToRegionStr(rulesetId)
 
         try:
             ap = aaa.AccessPoint(content.get('serialNumber'), content.get('model'), content.get('manufacturer'), content.get('certificationId'), org)

@@ -972,7 +972,7 @@ class ConfigAdd(Command):
         LOGGER.debug('ConfigAdd.__call__() %s', src)
         from .models.aaa import User
         from .models.aaa import AFCConfig
-        from .views.ratapi import regionStrToNra
+        from .views.ratapi import regionStrToRulesetId
         import datetime
 
         split_items = src.split('=', 1)
@@ -1023,7 +1023,7 @@ class ConfigAdd(Command):
                         cfg_rcrd = json_lookup('afcConfig', new_rcrd, None)
                         region_rcrd = json_lookup('regionStr', cfg_rcrd, None)
                         # validate the region string
-                        regionStrToNra(region_rcrd[0])
+                        regionStrToRulesetId(region_rcrd[0])
 
                         config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
                             == region_rcrd[0]).first()

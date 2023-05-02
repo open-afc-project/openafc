@@ -33,7 +33,7 @@ from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint, AFCConfig
 from .auth import auth
-from .ratapi import build_task, nraToRegionStr
+from .ratapi import build_task, rulesetIdToRegionStr
 from fst import DataIf
 import afctask
 from .. import als
@@ -44,12 +44,12 @@ import traceback
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
 
-RULESET = 'US_47_CFR_PART_15_SUBPART_E'
+RULESETS = ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'TEST_FCC','DEMO_FCC']
 
 #: All views under this API blueprint
 module = flask.Blueprint('ap-afc', 'ap-afc')
 
-ALLOWED_VERSIONS = ['1.1', '1.3']
+ALLOWED_VERSIONS = ['1.1', '1.3', '1.4']
 
 class AP_Exception(Exception):
     ''' Exception type used for RAT AFC respones
@@ -329,8 +329,7 @@ class RatAfc(MethodView):
 
         ap = AccessPoint.query.filter_by(serial_number=serial_number).first()
 
-        if rulesets is None or len(rulesets) != 1 or rulesets[0] != RULESET:
-            raise InvalidValueException(["rulesets"])
+       
         if ap is None:
             raise DeviceUnallowedException()  # InvalidCredentialsException()
         if certification_id is None:
@@ -339,6 +338,8 @@ class RatAfc(MethodView):
             raise DeviceUnallowedException()  # InvalidCredentialsException()
 
         LOGGER.info('Found AP, certification id %s serial %s', certification_id, serial_number)
+        if ap.org is None:
+            return "NA"
         return ap.org
 
     def get(self):
@@ -408,7 +409,7 @@ class RatAfc(MethodView):
                     'deviceDescriptor')
 
                 try:
-                    firstCertId = device_desc['certificationId'][0]['nra'] + \
+                    firstCertId = device_desc['certificationId'][0]['rulesetId'] + \
                         ' ' + device_desc['certificationId'][0]['id']
                 except:
                     firstCertId = None
@@ -417,8 +418,8 @@ class RatAfc(MethodView):
                                     firstCertId,
                                     device_desc.get('rulesetIds'))
 
-                nra = (device_desc['certificationId'][0]['nra']).strip()
-                region = nraToRegionStr(nra)
+                rulesetId = (device_desc['certificationId'][0]['rulesetId']).strip()
+                region = rulesetIdToRegionStr(rulesetId)
                 runtime_opts = RNTM_OPT_NODBG_NOGUI
                 debug_opt = flask.request.args.get('debug')
                 if debug_opt == 'True':
@@ -448,7 +449,7 @@ class RatAfc(MethodView):
                 hashlibobj.update(config_bytes.encode('utf-8'))
                 hash1 = hashlibobj.hexdigest()
 
-                config_path = os.path.join("/afc_config", nra, hash1, "afc_config.json")
+                config_path = os.path.join("/afc_config", rulesetId, hash1, "afc_config.json")
                 # check config_path exist
                 with dataif.open(config_path) as hfile:
                     if not hfile.head():
@@ -589,7 +590,10 @@ class RatAfc(MethodView):
 
 
 # registration of default runtime options
-module.add_url_rule('/1.3/availableSpectrumInquiry',
+# Keeping 1.3 around for compatability
+# module.add_url_rule('/1.3/availableSpectrumInquiry',
+#                     view_func=RatAfc.as_view('RatAfc'))
+module.add_url_rule('/1.4/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))
 
 # Local Variables:
