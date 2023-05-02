@@ -54,10 +54,12 @@ RUN chmod +x /usr/bin/afc-engine.sh
 
 # Development env
 COPY worker/devel.sh /wd/
+COPY worker/ddd-3.3.12.tar.gz /wd/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
 RUN /wd/devel.sh
 RUN rm -f /wd/devel.sh
+RUN rm -f /wd/ddd-3.3.12.tar.gz
 
 FROM alpine:3.17
 COPY --from=install_image / /
@@ -67,3 +69,5 @@ WORKDIR /wd
 ENV PGPORT=5432
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 CMD ["/docker-entrypoint.sh"]
+
+USER mmandell

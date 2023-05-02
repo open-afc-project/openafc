@@ -6998,7 +6998,7 @@ void AfcManager::runPointAnalysis()
 #if DEBUG_AFC
 	// std::vector<int> fsidTraceList{2128, 3198, 82443};
 	// std::vector<int> fsidTraceList{64324};
-	std::vector<int> fsidTraceList{96635};
+	std::vector<int> fsidTraceList{8177};
 	std::string pathTraceFile = "path_trace.csv.gz";
 #endif
 
@@ -7745,19 +7745,17 @@ void AfcManager::runPointAnalysis()
 						int chanIdx;
 						for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 							ChannelStruct *channel = &(_channelList[chanIdx]);
-							if (channel->availability != BLACK) {
-								double chanStartFreq = channel->startFreqMHz * 1.0e6;
-								double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-								bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
-								if (hasOverlap > 0.0) {
-									double eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+							double chanStartFreq = channel->startFreqMHz * 1.0e6;
+							double chanStopFreq = channel->stopFreqMHz * 1.0e6;
+							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
+							if (hasOverlap > 0.0) {
+								double eirpLimit_dBm = -std::numeric_limits<double>::infinity();
 
-									channel->availability = BLACK;
-									channel->eirpLimit_dBm = eirpLimit_dBm;
+								channel->availability = BLACK;
+								channel->eirpLimit_dBm = eirpLimit_dBm;
 
-									if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
-										eirpLimitList[ulsIdx] = eirpLimit_dBm;
-									}
+								if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+									eirpLimitList[ulsIdx] = eirpLimit_dBm;
 								}
 							}
 						}
@@ -8010,8 +8008,8 @@ void AfcManager::runPointAnalysis()
 													channel->eirpLimit_dBm = eirpLimit_dBm;
 												}
 
-												if ((channel->eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
-													eirpLimitList[ulsIdx] = channel->eirpLimit_dBm;
+												if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+													eirpLimitList[ulsIdx] = eirpLimit_dBm;
 												}
 											}
 
