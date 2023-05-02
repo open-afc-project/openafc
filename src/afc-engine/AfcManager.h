@@ -284,6 +284,8 @@ class AfcManager
 		double _maxEIRP_dBm;                    // maximum RLAN EIRP (in dBm)
 		double _minPSD_dBmPerMHz = quietNaN;    // minimum RLAN PSD (in dBm/Hz)
 
+		double _reportUnavailPSDdBmPerMHz;      // Unavailable channels inside uncertinty volume or in uncertainty footprint are reported at this level;
+
 		double _IoverN_threshold_dB;            // IoverN not to exceed this value for a viable channel
 		double _bodyLossIndoorDB;               // Indoor body Loss (dB)
 		double _bodyLossOutdoorDB;              // Outdoor body Loss (dB)
@@ -392,6 +394,7 @@ class AfcManager
 		std::vector<FreqBandClass> _allowableFreqBandList; // List of allowable freq bands.  For USA, correspond to UNII-5 and UNII-7
 		std::string _mapDataGeoJsonFile;               // File to write map data geojson
 		std::string _deniedRegionFile;                 // File containing data on denied geographic regions
+		int _inquiredFrequencyResolutionMHz;           // Resolution of inquired frequency response in MHz
 		/**************************************************************************************/
 
 		/**************************************************************************************/
