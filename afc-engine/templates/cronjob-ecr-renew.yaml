@@ -1,0 +1,31 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cron-ecr-renew
+  labels:
+    app: ecr-renew
+spec:
+  schedule: "0 */6 * * *"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          serviceAccountName: svc-ecr-renew
+          containers:
+            - name: ecr-renew
+              image: nabsul/k8s-ecr-login-renew:main
+              env:
+                - name: DOCKER_SECRET_NAME
+                  value: ecr-docker-login
+                - name: TARGET_NAMESPACE
+                  value: default
+                - name: AWS_REGION
+                  value: us-east-1
+                - name: DOCKER_REGISTRIES
+                  value: "https://110738915961.dkr.ecr.us-east-1.amazonaws.com"
+              envFrom:
+              - secretRef:
+                  name: ecr-renew-cred

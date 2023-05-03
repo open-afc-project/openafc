@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "afc-engine.fullname" . }}-rmq
+  labels:
+    {{- include "afc-engine.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5672
+      targetPort: rmqp
+      protocol: TCP
+      name: rmqp
+  selector:
+    {{- include "afc-engine.selectorLabels" . | nindent 4 }}
+    afc: rmq
