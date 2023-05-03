@@ -574,6 +574,7 @@ AfcManager::AfcManager()
 	_minPSD_dBmPerMHz = quietNaN;
 	_reportUnavailPSDdBmPerMHz = quietNaN;
 	_inquiredFrequencyResolutionMHz = -1;
+	_inquiredFrequencyMaxPSD_dBmPerMHz = quietNaN;
 
 	_IoverN_threshold_dB = -6.0;
 	_bodyLossIndoorDB = 0.0;               // Indoor body Loss (dB)
@@ -2401,7 +2402,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 			if (uncertaintyObj.contains("points_per_degree") && !uncertaintyObj["points_per_degree"].isUndefined()) {
 				_scanres_points_per_degree = uncertaintyObj["points_per_degree"].toInt();
 			} else {
-				_scanres_points_per_degree = 3600;  // Defalut 1 arcsec
+				_scanres_points_per_degree = 3600;  // Default 1 arcsec
 			}
 			break;
 		default:
@@ -2469,7 +2470,13 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (jsonObj.contains("inquiredFrequencyResolutionMHz") && !jsonObj["inquiredFrequencyResolutionMHz"].isUndefined()) {
 		_inquiredFrequencyResolutionMHz = jsonObj["inquiredFrequencyResolutionMHz"].toInt();
 	} else {
-		_inquiredFrequencyResolutionMHz = 20;  // Defalut 1 arcsec
+		_inquiredFrequencyResolutionMHz = 20;  // Default 20 MHz
+	}
+
+	if (jsonObj.contains("inquiredFrequencyMaxPSD_dBmPerMHz") && !jsonObj["inquiredFrequencyMaxPSD_dBmPerMHz"].isUndefined()) {
+		_inquiredFrequencyMaxPSD_dBmPerMHz = jsonObj["inquiredFrequencyMaxPSD_dBmPerMHz"].toInt();
+	} else {
+		_inquiredFrequencyMaxPSD_dBmPerMHz = _maxEIRP_dBm - 10.0*log10(20.0);  // Default maxEIRP over 20 MHz
 	}
 
 	_IoverN_threshold_dB = jsonObj["threshold"].toDouble();
@@ -6977,7 +6984,11 @@ void AfcManager::compute()
 
 	// initialize all channels to max EIRP before computing
 	for (auto& channel : _channelList)
-		channel.eirpLimit_dBm = _maxEIRP_dBm;
+		if (channel.type == INQUIRED_FREQUENCY) {
+			channel.eirpLimit_dBm = _inquiredFrequencyMaxPSD_dBmPerMHz + 10.0*log10((double) channel.bandwidth());
+		} else {
+			channel.eirpLimit_dBm = _maxEIRP_dBm;
+		}
 
 	if (_analysisType == "AP-AFC") {
 		runPointAnalysis();
@@ -7866,6 +7877,13 @@ void AfcManager::runPointAnalysis()
 											double bandwidth = chanStopFreq - chanStartFreq;
 											double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
 
+											double maxEIRPdBm;
+											if (channel->type == INQUIRED_FREQUENCY) {
+												maxEIRPdBm = _inquiredFrequencyMaxPSD_dBmPerMHz + 10.0*log10((double) channel->bandwidth());
+											} else {
+												maxEIRPdBm = _maxEIRP_dBm;
+											}
+
 											std::string buildingPenetrationModelStr;
 											double buildingPenetrationCDF;
 											double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF);
@@ -7953,13 +7971,13 @@ void AfcManager::runPointAnalysis()
 													}
 												}
 
-												rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+												rxPowerDBW = (maxEIRPdBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
 												I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
 
 												marginDB = _IoverN_threshold_dB - I2NDB;
 
-												eirpLimit_dBm = _maxEIRP_dBm + marginDB;
+												eirpLimit_dBm = maxEIRPdBm + marginDB;
 
 												if (eirpGc) {
 													eirpGc.callsign = uls->getCallsign();
@@ -8037,9 +8055,16 @@ void AfcManager::runPointAnalysis()
 													}
 												}
 												if (channel->type == ChannelType::INQUIRED_CHANNEL) {
-													if (eirpLimit_dBm < _minEIRP_dBm) {
-														channel->eirpLimit_dBm = _minEIRP_dBm;
-														channel->availability = RED;
+													if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
+														if (eirpLimit_dBm < _minEIRP_dBm) {
+															channel->eirpLimit_dBm = _minEIRP_dBm;
+															channel->availability = RED;
+														} else {
+															channel->eirpLimit_dBm = eirpLimit_dBm;
+														}
+													}
+													if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+														eirpLimitList[ulsIdx] = eirpLimit_dBm;
 													}
 												} else {
 													// INQUIRED_FREQUENCY
@@ -8048,14 +8073,6 @@ void AfcManager::runPointAnalysis()
 														channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
 														channel->availability = RED;
 													}
-												}
-
-												if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
-													channel->eirpLimit_dBm = eirpLimit_dBm;
-												}
-
-												if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
-													eirpLimitList[ulsIdx] = eirpLimit_dBm;
 												}
 											}
 
@@ -8140,7 +8157,7 @@ void AfcManager::runPointAnalysis()
 												excthrGc.rlanFsGroundDist = groundDistanceKm;
 												excthrGc.rlanElevAngle = elevationAngleTxDeg;
 												excthrGc.boresightAngle = angleOffBoresightDeg;
-												excthrGc.rlanTxEirp = _maxEIRP_dBm;
+												excthrGc.rlanTxEirp = maxEIRPdBm;
 												excthrGc.bodyLoss = _bodyLossDB;
 												excthrGc.rlanClutterCategory = txClutterStr;
 												excthrGc.fsClutterCategory = rxClutterStr;
@@ -10419,6 +10436,7 @@ void AfcManager::printUserInputs()
 		    inputGc.writeRow({ "REPORT_UNAVAIL_PSD_DBM_PER_MHZ", f2s(_reportUnavailPSDdBmPerMHz) });
 		}
 		inputGc.writeRow({ "INQUIRED_FREQUENCY_RESOLUTION_MHZ", std::to_string(_inquiredFrequencyResolutionMHz) });
+		inputGc.writeRow({ "INQUIRED_FREQUENCY_MAX_PSD_DBM_PER_MHZ", f2s(_inquiredFrequencyMaxPSD_dBmPerMHz) });
 		inputGc.writeRow({ "VISIBILITY_THRESHOLD", f2s(_visibilityThreshold) } );
 		inputGc.writeRow({ "PRINT_SKIPPED_LINKS_FLAG", (_printSkippedLinksFlag ? "true" : "false" ) } );
 
