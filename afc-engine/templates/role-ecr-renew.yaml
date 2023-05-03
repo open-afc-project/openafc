@@ -1,0 +1,8 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cr-ecr-renew
+rules:
+  - apiGroups: [""]
+    resources: ["secrets", "namespaces"]
+    verbs: ["list", "create", "update", "get", "delete"]

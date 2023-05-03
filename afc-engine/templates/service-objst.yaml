@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "afc-engine.fullname" . }}-objst
+  labels:
+    {{- include "afc-engine.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5000
+      targetPort: afc-objst-port
+      protocol: TCP
+      name: afc-objst-port
+    - port: 4999
+      targetPort: afc-objst-hist
+      protocol: TCP
+      name: afc-objst-hist
+  selector:
+    {{- include "afc-engine.selectorLabels" . | nindent 4 }}
+    afc: objst
