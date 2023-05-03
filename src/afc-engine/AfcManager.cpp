@@ -8068,10 +8068,14 @@ void AfcManager::runPointAnalysis()
 													}
 												} else {
 													// INQUIRED_FREQUENCY
-													double psd = eirpLimit_dBm - 10.0*log((double) channel->bandwidth())/log(10.0);
-													if (psd < _minPSD_dBmPerMHz) {
-														channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
-														channel->availability = RED;
+													if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
+														double psd = eirpLimit_dBm - 10.0*log((double) channel->bandwidth())/log(10.0);
+														if (psd < _minPSD_dBmPerMHz) {
+															channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
+															channel->availability = RED;
+														} else {
+															channel->eirpLimit_dBm = eirpLimit_dBm;
+														}
 													}
 												}
 											}
