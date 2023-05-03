@@ -23,6 +23,8 @@ export interface GuiConfig {
     login_url: string,
     admin_url: string,
     ap_admin_url: string,
+    dr_admin_url: string,
+    mtls_admin_url: string,
     rat_afc: string,
     afc_kml:string
     version: string
@@ -553,6 +555,41 @@ export interface AFCEngineException {
     description: string,
     env?: any
 }
+
+/**
+ * Denied Region model
+ */
+export interface ExclusionCircle {
+    latitude: number,
+    longitude: number,
+    radiusKm: number
+
+}
+export interface ExclusionRect {
+    topLat: number,
+    leftLong: number,
+    bottomLat: number,
+    rightLong: number
+}
+export interface  ExclusionTwoRect {
+    rectangleOne: ExclusionRect,
+    rectangleTwo: ExclusionRect
+}
+export interface  ExclusionHorizon {
+    latitude: number,
+    longitude: number,
+    aglHeightM: number
+}
+
+export interface DeniedRegion {
+    regionStr: string,
+    name: string,
+    startFreq: number,
+    endFreq: number,
+    zoneType: "Circle" | "One Rectangle" | "Two Rectangles" | "Horizon Distance",
+    exclusionZone: ExclusionCircle | ExclusionRect | ExclusionTwoRect | ExclusionHorizon
+}
+
 
 /**
  * Simple implementation of the Either sum type. Used to encode the possibility of success or error in type.

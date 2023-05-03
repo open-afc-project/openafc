@@ -1,4 +1,25 @@
  # Release Note
+
+## **Version and Date**
+|Version|**OA-636**|
+| :- | :- |
+|**Date**|**04/28/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-636: Create UI form for denied region
+
+
+## **Interface Changes**
+ * The denied region files are being saved to rat_transfer/denied_regions/<COUNTRY>_denied_regions.csv so US_denied_regions.csv, CA_denied_regions.csv and the config editor is updated to set that path correctly for the region
+
+
+## **Testing Done**
+ * Tested (in both US and CA), the different denied regions (circle, one rectangle, two rectangles and horizon distance). Tests are attached to the jira ticket.
+
+## **Open Issues** 
+ * Make the denied region list editable in the UI (OA-667) 
+
 ## **Version and Date**
 |Version|**OA-657**|
 | :- | :- |

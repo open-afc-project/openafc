@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: cont-confs-claim
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: b-ssd
+  resources:
+    requests:
+      storage: 2.5Ti

@@ -29,11 +29,13 @@ export var guiConfig: GuiConfig = Object.freeze({
     login_url: "",
     admin_url: "",
     ap_admin_url: "",
+    dr_admin_url:"",
     lidar_bounds: "",
     ras_bounds: "",
     rat_afc: "",
     afcconfig_trial: "",
     afc_kml: "",
+    mtls_admin_url:"",
     version: "API NOT LOADED"
 });
 
@@ -303,7 +305,7 @@ export const getRegions = (): Promise<RatResponse<string[]>> => (
 
 
 
-export const getAboutLoginAfc = (): Promiss<RatResponse<string>> => (
+export const getAboutLoginAfc = (): Promise<RatResponse<string>> => (
     fetch(guiConfig.about_login_url, {
         method: "GET",
     }).then(async (res: Response) => {
@@ -324,7 +326,7 @@ export const getAboutLoginAfc = (): Promiss<RatResponse<string>> => (
 
 export const getAboutSiteKey = () => (guiConfig.about_sitekey)
 
-export const getAboutAfc = (): Promiss<RatResponse<string>> => (
+export const getAboutAfc = (): Promise<RatResponse<string>> => (
     fetch(guiConfig.about_url, {
         method: "GET",
     }).then(async (res: Response) => {

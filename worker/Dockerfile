@@ -1,5 +1,5 @@
 #
-# Copyright © 2021 Broadcom. All rights reserved. The term "Broadcom"
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
@@ -53,18 +53,21 @@ COPY worker/afc-engine.sh /usr/bin/
 RUN chmod +x /usr/bin/afc-engine.sh
 
 # Development env
-COPY worker/devel.sh /wd/
-COPY worker/ddd-3.3.12.tar.gz /wd/
+COPY worker/devel.sh worker/ddd.tar.gz /wd/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
+# set alternative user
+ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
+ARG AFC_WORKER_UID=${AFC_WORKER_UID}
 RUN /wd/devel.sh
-RUN rm -f /wd/devel.sh
-RUN rm -f /wd/ddd-3.3.12.tar.gz
+RUN rm -f /wd/devel.sh /wd/ddd.tar.gz
 
 FROM alpine:3.17
 COPY --from=install_image / /
 
 LABEL revision="afc-worker-al"
+ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
+ENV AFC_WORKER_USER ${AFC_WORKER_USER}
 WORKDIR /wd
 ENV PGPORT=5432
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
