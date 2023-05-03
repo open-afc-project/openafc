@@ -53,20 +53,21 @@ COPY worker/afc-engine.sh /usr/bin/
 RUN chmod +x /usr/bin/afc-engine.sh
 
 # Development env
-COPY worker/devel.sh /wd/
+COPY worker/devel.sh worker/ddd.tar.gz /wd/
 ARG AFC_DEVEL_ENV=production
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
+# set alternative user
+ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
+ARG AFC_WORKER_UID=${AFC_WORKER_UID}
 RUN /wd/devel.sh
-RUN rm -f /wd/devel.sh
+RUN rm -f /wd/devel.sh /wd/ddd.tar.gz
 
 FROM alpine:3.17
 COPY --from=install_image / /
 
-# set alternative user
-ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
-USER ${AFC_WORKER_USER}
-
 LABEL revision="afc-worker-al"
+ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
+ENV AFC_WORKER_USER ${AFC_WORKER_USER}
 WORKDIR /wd
 ENV PGPORT=5432
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
