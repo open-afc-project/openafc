@@ -1,5 +1,35 @@
  # Release Note
 ## **Version and Date**
+|Version|**OA-657**|
+| :- | :- |
+|**Date**|**05/03/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-657: Implement WINNF option 2b where FS inside uncertainty volume, or above/below the uncertainty volume
+ * Jira OA-670: Add additional information in engine-log to indicate whether the primary/diversity/passive-site is inside RLAN uncertainty region
+
+## **Interface Changes**
+ *  There are 3 new parameters in afc-config.json. These are: "reportUnavailableSpectrum": true, "reportUnavailPSDdBPerMHz": -40, "inquiredFrequencyResolutionMHz": 1
+ *  The first 2 parameters allow setting PSD levels to -40 dBm/MHz (instead of no reporting) ONLY when FS is inside the uncertainty volume. To report no PSD/EIRP values (as the previous implementation) set "reportUnavailableSpectrum": false. 
+ * The 3rd parameter allows doing the PSD computations per x MHz where x is configurable (previously this was 20 MHz, and now we'll be using 1 MHz).
+ * Above are the default values we want to use for WFA testing.
+ * In addition, there's a hidden new parameter in afc config (not set in .json) which is: INQUIRED_FREQUENCY_MAX_PSD_DBM_PER_MHZ,22.989700043360187 (this is in the userInputs file generated under Debug folder).
+
+## **Testing Done**
+ * Test to use same min-angle-off-boresight for all RLAN scan points to the same FS when FS is outside RLAN uncertainty volume (but inside RLAN's footprint): FSP-4 has 5 FS (IDs: 27752, 29885, 42201, 65560, 65561) that are outside uncertainty volume at heights much higher than RLAN (they're on top of a very tall building with AGL height between 356 to 443m while RLAN max AGL height of 110m). Confirmed exc_thr file that for each FS, min angle off boresight (to the uncertainty volume) was used for all RLAN scan points and as such same FS Rx Gain was applied. Also, confirmed that FSPL path lossed was used for all these points.
+* In addition FSP-4 has FS ID 109944 and 109945 that are outside the RLAN uncertainty footprint but within the touching 3DEP tile. Confirmed that the min angle off boresight is used for all RLAN scan points. Note that FS ID 109945 has a diversity antenna so a different min angle off boresight is used for that.
+* For FS inside uncertainty volume: ran FSP-13 which has FS IDs 8177, 4140 and 28023 inside, and confirmed that the channels were set to PSD of -40 dBm/MHz.
+* Note that above tests were tested before implementing updated psd calculations. Tests below are with the full implementation.
+* Tested FSP1 where there are a few FS inside RLAN uncertainty footprint but outside volume. Tested with 20MHz PSD calculation and 1 MHz PSD.
+* For 20MHz psd, confirmed that we get same results as before for the channels that are not impacted (also for all of FSP14).
+* For 1MHz psd, confirmed that the psd levels were always higher than the case with 20MHz. 
+* For 1MHz psd, confirmed getting same results as QCOM for some FSPs (e.g. 14, 1 and 2) over freqs where we have same implementation 
+
+## **Open Issues** 
+ *
+
+## **Version and Date**
 |Version|3.7.7.0|
 | :- | :- |
 |**Date**|**04/16/2023**|
