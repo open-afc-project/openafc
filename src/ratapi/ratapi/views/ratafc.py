@@ -33,7 +33,7 @@ from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPoint, AFCConfig
 from .auth import auth
-from .ratapi import build_task, rulesetIdToRegionStr
+from .ratapi import build_task, nraToRegionStr, rulesetIdToRegionStr
 from fst import DataIf
 import afctask
 from .. import als
@@ -317,18 +317,21 @@ class RatAfc(MethodView):
     ''' RAT AFC resources
     '''
 
-    def _auth_ap(self, serial_number, certification_id, rulesets):
+    def _auth_ap(self, serial_number, certification_id, rulesets, version):
         ''' Authenticate an access point. If must match the serial_number and certification_id in the database to be valid
         '''
         LOGGER.debug('RatAfc::_auth_ap()')
-        LOGGER.debug('Starting auth_ap,serial: %s; certId: %s; ruleset %s.',
-                     serial_number, certification_id, rulesets)
+        LOGGER.debug('Starting auth_ap,serial: %s; certId: %s; ruleset %s; version %s',
+                     serial_number, certification_id, rulesets, version)
 
         if serial_number is None:
             raise MissingParamException(['serialNumber'])
 
         ap = AccessPoint.query.filter_by(serial_number=serial_number).first()
 
+        if version <= 1.3:
+            if rulesets is None or len(rulesets) != 1 or rulesets[0] not in RULESETS:
+                raise InvalidValueException(["rulesets"])
        
         if ap is None:
             raise DeviceUnallowedException()  # InvalidCredentialsException()
@@ -416,10 +419,15 @@ class RatAfc(MethodView):
                 serial = device_desc.get('serialNumber')
                 org = self._auth_ap(serial,
                                     firstCertId,
-                                    device_desc.get('rulesetIds'))
+                                    device_desc.get('rulesetIds'), ver)
 
-                rulesetId = (device_desc['certificationId'][0]['rulesetId']).strip()
-                region = rulesetIdToRegionStr(rulesetId)
+                if ver <= 1.3:
+                    nra = (device_desc['certificationId'][0]['nra']).strip()
+                    region = nraToRegionStr(nra)
+                else:
+                    rulesetId = (device_desc['certificationId'][0]['rulesetId']).strip()
+                    region = rulesetIdToRegionStr(rulesetId)
+
                 runtime_opts = RNTM_OPT_NODBG_NOGUI
                 debug_opt = flask.request.args.get('debug')
                 if debug_opt == 'True':
@@ -449,7 +457,11 @@ class RatAfc(MethodView):
                 hashlibobj.update(config_bytes.encode('utf-8'))
                 hash1 = hashlibobj.hexdigest()
 
-                config_path = os.path.join("/afc_config", rulesetId, hash1, "afc_config.json")
+                if ver <= 1.3:
+                    config_path = os.path.join("/afc_config", nra, hash1, "afc_config.json")
+                else:
+                    config_path = os.path.join("/afc_config", rulesetId, hash1, "afc_config.json")
+
                 # check config_path exist
                 with dataif.open(config_path) as hfile:
                     if not hfile.head():
@@ -591,8 +603,8 @@ class RatAfc(MethodView):
 
 # registration of default runtime options
 # Keeping 1.3 around for compatability
-# module.add_url_rule('/1.3/availableSpectrumInquiry',
-#                     view_func=RatAfc.as_view('RatAfc'))
+module.add_url_rule('/1.3/availableSpectrumInquiry',
+                     view_func=RatAfc.as_view('RatAfc'))
 module.add_url_rule('/1.4/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))
 

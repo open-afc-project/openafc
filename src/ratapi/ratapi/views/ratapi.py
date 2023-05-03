@@ -41,7 +41,40 @@ module = flask.Blueprint('ratapi-v1', 'ratapi')
 def regions():
     return ['US', 'CA', 'TEST_US', 'DEMO_US']
 
+# Keep the NRA for 1.3 compatability
+def regionStrToNra(region_str):
+    """ Input: region_str: regionStr field of the afc config.
+        Output: nra
+        nra: can match with the NRA field of the AP, e.g. FCC
+        Eg. 'USA' => 'FCC'
+    """
+    map = {
+       'DEFAULT':'FCC',
+       'US':'FCC',
+       'CA':'ISED',
+       'TEST_US':'TEST_FCC',
+       'DEMO_US':'DEMO_FCC'
+    }
+    region_str = region_str.upper()
+    try:
+        return map[region_str]
+    except:
+        raise werkzeug.exceptions.NotFound('Invalid Region %s' % region_str)
 
+def nraToRegionStr(nra):
+    map = {
+        'FCC':'US',
+        'TEST_FCC':'TEST_US',
+        'ISED':'CA',
+        'DEMO_FCC':'DEMO_US',
+    }
+    nra = nra.upper()
+    try:
+        return map[nra]
+    except:
+        raise werkzeug.exceptions.NotFound('Invalid NRA %s' % nra)
+
+# after 1.4 use Ruleset ID
 def regionStrToRulesetId(region_str):
     """ Input: region_str: regionStr field of the afc config.
         Output: nra
