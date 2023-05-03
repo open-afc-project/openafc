@@ -602,9 +602,7 @@ class RatAfc(MethodView):
 
 
 # registration of default runtime options
-# Keeping 1.3 around for compatability
-module.add_url_rule('/1.3/availableSpectrumInquiry',
-                     view_func=RatAfc.as_view('RatAfc'))
+
 module.add_url_rule('/1.4/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))
 
