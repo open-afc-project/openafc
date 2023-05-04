@@ -1134,16 +1134,35 @@ def parse_tests(cfg):
         else:
             res_str += '{' + REQ_INQ_CHA_HEADER
             cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_90)
-            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) 
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_91)
+            if cell.value is not None:
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+            res_str += '}, '
             cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_92)
-            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_93)
+            if cell.value is not None:
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+            res_str += '}, '
             cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_94)
-            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_95)
+            if cell.value is not None:
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+            res_str += '}, '
             cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_96)
-            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}, '
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_97)
+            if cell.value is not None:
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+            res_str += '}, '
             cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_98)
-            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) + '}'
-            res_str += REQ_INQ_CHA_FOOTER + ' '
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_99)
+            if cell.value is not None:
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+            res_str += '}, ' + REQ_INQ_CHA_FOOTER + ' '
 
             res_str += REQ_DEV_DESC_HEADER
             cell = sheet.cell(row = i, column = RULESET_CLM)
