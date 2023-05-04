@@ -217,6 +217,7 @@ class AfcManager
 
 		void importGUIjsonVersion1_0(const QJsonObject &jsonObj);
 		void importGUIjsonVersion1_3(const QJsonObject &jsonObj);
+		void importGUIjsonVersion1_4(const QJsonObject &jsonObj);
 
 		void isValid() const { // Checks the inputs to ensure cooperation with terrain
 			if (_rlanHeightType == CConst::AMSLHeightType) {
