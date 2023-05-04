@@ -26,7 +26,8 @@ WORKER="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker"  # msghnd image
 WORKER_AL_D4B="public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image" # Alpine worker build img
 WORKER_AL_PRINST="public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall" # Alpine worker preinst
 
-ULS_UPDATER="110738915961.dkr.ecr.us-east-1.amazonaws.com/uls-updater" # ULS Updater images
+ULS_UPDATER="110738915961.dkr.ecr.us-east-1.amazonaws.com/uls-updater" # ULS Updater image
+ULS_DOWNLOADER="public.ecr.aws/w9v6y1o0/openafc/uls-downloader" # ULS Downloader image
 
 RTEST_DI="rtest"                                                 # regression tests image
 
@@ -125,9 +126,10 @@ build_dev_server() {
   wait
   msg "prereqs are built"
 
-  # build of ULS docker
+  # build of ULS dockers
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=${BUILDREV}"
   docker_build_and_push ${wd}/uls/Dockerfile-uls_updater ${ULS_UPDATER}:${tag} ${push} "${EXT_ARGS}" &
+  docker_build_and_push ${wd}/uls/Dockerfile-uls_service ${ULS_DOWNLOADER}:${tag} ${push} "${EXT_ARGS}" &
 
   # build msghnd  (flask + gunicorn)
   docker_build_and_push ${wd}/msghnd/Dockerfile ${MSGHND}:${tag} ${push} &
