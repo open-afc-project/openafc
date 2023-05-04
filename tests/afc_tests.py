@@ -1162,7 +1162,7 @@ def parse_tests(cfg):
             cell = sheet.cell(row = i, column = CHANNEL_CFI_99)
             if cell.value is not None:
                 res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
-            res_str += '}, ' + REQ_INQ_CHA_FOOTER + ' '
+            res_str += '}' + REQ_INQ_CHA_FOOTER + ' '
 
             res_str += REQ_DEV_DESC_HEADER
             cell = sheet.cell(row = i, column = RULESET_CLM)
