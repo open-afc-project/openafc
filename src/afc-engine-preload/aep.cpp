@@ -245,6 +245,23 @@ static unsigned int stoptime(struct timeval *tv)
 	return (unsigned int) us;
 }
 
+static sem_t* semopen(const char *fname)
+{
+	int i;
+	sem_t *sem;
+	char* tmp = strdup(fname);
+
+	for (i = 1; tmp[i]; i++) {
+		if (tmp[i] == '/') {
+			tmp[i] = '_';
+		}
+	}
+	sem = sem_open(tmp, O_CREAT, 0666, 1);
+	free(tmp);
+	aep_assert(sem, "sem_open");
+	return sem;
+}
+
 static inline FILE* orig_fopen(const char *path, const char *mode)
 {
 	typedef FILE* (*orig_fopen_t)(const char*, const char*);
@@ -579,8 +596,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	strcpy(fakepath, cache_path);
 	strcat(fakepath, data_fd->tpath);
 
-	sem = sem_open(data_fd->tpath, O_CREAT, 0666, 1);
-	aep_assert(sem, "sem_open");
+	sem = semopen(data_fd->tpath);
 	//dbg("read_data %s", data_fd->tpath);
 	sem_wait(sem);
 
@@ -768,7 +784,7 @@ static int ftw_reduce_callback(const char *fpath, const struct stat *sb, int typ
 		char *tpath = (char*)fpath + strlen(cache_path);
 		if (!files_open_get(tpath)) {
 			sem_t *sem;
-			sem = sem_open(tpath, O_CREAT, 0666, 1);
+			sem = semopen(tpath);
 			sem_wait(sem);
 			truncate(fpath, 0);
 			sem_post(sem);
