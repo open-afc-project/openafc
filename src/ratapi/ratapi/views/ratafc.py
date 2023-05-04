@@ -50,6 +50,8 @@ RULESETS = ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'TEST_FCC','DEMO_FCC
 module = flask.Blueprint('ap-afc', 'ap-afc')
 
 ALLOWED_VERSIONS = ['1.1', '1.3', '1.4']
+NRA_VERSIONS = ['1.1', '1.3']
+RULESET_VERSIONS = ['1.4']
 
 class AP_Exception(Exception):
     ''' Exception type used for RAT AFC respones
@@ -329,10 +331,14 @@ class RatAfc(MethodView):
 
         ap = AccessPoint.query.filter_by(serial_number=serial_number).first()
 
-        if version <= 1.3:
+        if version in NRA_VERSIONS:
             if rulesets is None or len(rulesets) != 1 or rulesets[0] not in RULESETS:
-                raise InvalidValueException(["rulesets"])
-       
+                raise InvalidValueException(["rulesets", rulesets ])
+        else:
+            ruleset =  certification_id.split(' ')[0]
+            if ruleset is None or ruleset not in RULESETS:
+                raise InvalidValueException(["ruleset", ruleset])
+
         if ap is None:
             raise DeviceUnallowedException()  # InvalidCredentialsException()
         if certification_id is None:
@@ -385,7 +391,6 @@ class RatAfc(MethodView):
             raise VersionNotSupportedException([ver])
 
         # start request
-
         args = flask.request.json
         # split multiple requests into an array of individual requests
         requests = map(lambda r: {"availableSpectrumInquiryRequests": [
@@ -412,8 +417,14 @@ class RatAfc(MethodView):
                     'deviceDescriptor')
 
                 try:
-                    firstCertId = device_desc['certificationId'][0]['rulesetId'] + \
-                        ' ' + device_desc['certificationId'][0]['id']
+                    if ver in NRA_VERSIONS:
+                        LOGGER.error("ver has NRA")
+                        firstCertId = device_desc['certificationId'][0]['nra'] + \
+                            ' ' + device_desc['certificationId'][0]['id']
+                    else:
+                        LOGGER.error("ver has RulesetId")
+                        firstCertId = device_desc['certificationId'][0]['rulesetId'] + \
+                            ' ' + device_desc['certificationId'][0]['id']
                 except:
                     firstCertId = None
                 serial = device_desc.get('serialNumber')
@@ -421,7 +432,7 @@ class RatAfc(MethodView):
                                     firstCertId,
                                     device_desc.get('rulesetIds'), ver)
 
-                if ver <= 1.3:
+                if ver in NRA_VERSIONS:
                     nra = (device_desc['certificationId'][0]['nra']).strip()
                     region = nraToRegionStr(nra)
                 else:
@@ -457,7 +468,7 @@ class RatAfc(MethodView):
                 hashlibobj.update(config_bytes.encode('utf-8'))
                 hash1 = hashlibobj.hexdigest()
 
-                if ver <= 1.3:
+                if ver in NRA_VERSIONS:
                     config_path = os.path.join("/afc_config", nra, hash1, "afc_config.json")
                 else:
                     config_path = os.path.join("/afc_config", rulesetId, hash1, "afc_config.json")
