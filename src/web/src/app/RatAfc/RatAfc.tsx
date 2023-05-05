@@ -1,6 +1,6 @@
 import * as React from "react";
-import { PageSection, Title, Card, CardBody, Alert, AlertActionCloseButton } from "@patternfly/react-core";
-import { spectrumInquiryRequest, downloadMapData } from "../Lib/RatAfcApi";
+import { PageSection, Title, Card, CardBody, Alert, AlertActionCloseButton, Button, Modal, TextArea } from "@patternfly/react-core";
+import { spectrumInquiryRequest, downloadMapData, spectrumInquiryRequestByString } from "../Lib/RatAfcApi";
 import { getCacheItem, cacheItem } from "../Lib/RatApi";
 import { ResError, AFCConfigFile, RatResponse, error, ChannelData, GeoJson } from "../Lib/RatApiTypes";
 import { SpectrumDisplayAFC, SpectrumDisplayLineAFC } from "../Components/SpectrumDisplay";
@@ -10,7 +10,7 @@ import { MapContainer, MapProps } from "../Components/MapContainer";
 import DownloadContents from "../Components/DownloadContents";
 import LoadLidarBounds from "../Components/LoadLidarBounds";
 import LoadRasBounds from "../Components/LoadRasBounds";
-import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, AvailableChannelInfo, Ellipse, Point } from "../Lib/RatAfcTypes";
+import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, AvailableChannelInfo, Ellipse, Point, AvailableSpectrumInquiryResponseMessage } from "../Lib/RatAfcTypes";
 import { Timer } from "../Components/Timer";
 import { logger } from "../Lib/Logger";
 import { RatAfcForm } from "./RatAfcForm";
@@ -55,7 +55,10 @@ interface RatAfcState {
     clickedMapPoint?: Point,
     fullJsonResponse?: string,
     redChannels?: AvailableChannelInfo[],
-    blackChannels?: AvailableChannelInfo[]
+    blackChannels?: AvailableChannelInfo[],
+    showSendDirect: boolean,
+    sendDirectModalOpen: boolean,
+    sendDirectValue?: string
 }
 
 const mapProps: MapProps = {
@@ -194,7 +197,9 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 clickedMapPoint: {
                     latitude: 40,
                     longitude: -100
-                }
+                },
+                sendDirectModalOpen: false,
+                showSendDirect: true
             }
         } else {
             this.state = {
@@ -218,7 +223,9 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 clickedMapPoint: {
                     latitude: 40,
                     longitude: -100
-                }
+                },
+                sendDirectModalOpen: false,
+                showSendDirect: true
             };
         }
         this.changeMapLocationChild = React.createRef();
@@ -276,6 +283,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
         this.setMapState({ val: newGeoJson, versionId: this.state.mapState.versionId + 1 });
         this.changeMapLocationChild.current.setEllipseCenter({ latitude: lat, longitude: lon })
     }
+
     /**
      * make a request to AFC Engine
      * @param request request to send
@@ -289,69 +297,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
             clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng }
         });
         return spectrumInquiryRequest(request)
-            .then(resp => {
-                if (resp.kind == "Success") {
-                    const response = resp.result.availableSpectrumInquiryResponses[0];
-                    if (response.response.responseCode === 0) {
-                        const minEirp = request.minDesiredPower || this.state.minEirp;
-
-                        this.setState({
-                            status: "Success",
-                            response: response,
-                            minEirp: minEirp,
-                            mapCenter: rlanLoc,
-                            clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng },
-                            fullJsonResponse: JSON.stringify(resp.result, (k, v) => (k == "kmzFile") ? "Removed binary data" : v, 2),
-
-                        });
-
-
-                        if (response.vendorExtensions
-                            && response.vendorExtensions.length > 0
-                            && response.vendorExtensions.findIndex(x => x.extensionId == "openAfc.redBlackData") >= 0) {
-                            let extraChannels = response.vendorExtensions.find(x => x.extensionId == "openAfc.redBlackData").parameters;
-                            this.setState({ redChannels: extraChannels["redChannelInfo"], blackChannels: extraChannels["blackChannelInfo"] })
-                        } else {
-                            this.setState({ redChannels: undefined, blackChannels: undefined })
-                        }
-
-
-                        if (this.state.includeMap
-                            && response.vendorExtensions
-                            && response.vendorExtensions.length > 0
-                            && response.vendorExtensions.findIndex(x => x.extensionId == "openAfc.mapinfo") >= 0) {
-                            //Get the KML file and load it into the state.kml parameters; get the GeoJson if present
-                            let kml_filename = response.vendorExtensions.find(x => x.extensionId == "openAfc.mapinfo").parameters["kmzFile"];
-                            let geoJson_filename = response.vendorExtensions.find(x => x.extensionId == "openAfc.mapinfo").parameters["geoJsonFile"];
-                            this.setKml(kml_filename)
-                            let geojson = JSON.parse(geoJson_filename);
-                            if (request.location.ellipse && geojson && geojson.geoJson) {
-
-                                geojson.geoJson.features.push(
-                                    {
-                                        type: "Feature",
-                                        properties: {
-                                            kind: "RLAN",
-                                            FSLonLat: [
-                                                this.state.mapCenter.lng,
-                                                this.state.mapCenter.lat
-                                            ]
-                                        },
-                                        geometry: {
-                                            type: "Polygon",
-                                            coordinates: [rasterizeEllipse(request.location.ellipse, 32)]
-                                        }
-                                    });
-
-                            }
-                            this.setMapState({ val: geojson.geoJson, valid: true, versionId: this.state.mapState.versionId + 1 })
-
-                        }
-                    }
-                } else if (!resp.kind || resp.kind == "Error") {
-                    this.setState({ status: "Error", err: error(resp.description, resp.errorCode, resp.body), response: resp.body });
-                }
-            });
+            .then(resp => this.processResponse(resp, request, rlanLoc));
     }
 
     private getLatLongFromRequest(request: AvailableSpectrumInquiryRequest): { lat: number, lng: number } | undefined {
@@ -373,6 +319,92 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
             return undefined
     }
 
+    private processResponse(resp: RatResponse<AvailableSpectrumInquiryResponseMessage>, request?: AvailableSpectrumInquiryRequest,rlanLoc? ) {
+        if (resp.kind == "Success") {
+            const response = resp.result.availableSpectrumInquiryResponses[0];
+            if (response.response.responseCode === 0) {
+                const minEirp = request?.minDesiredPower || this.state.minEirp;
+
+                if (!!rlanLoc){
+                    this.setState({
+                        status: "Success",
+                        response: response,
+                        mapCenter:rlanLoc,
+                        clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng },
+                        minEirp: minEirp,
+                        fullJsonResponse: JSON.stringify(resp.result, (k, v) => (k == "kmzFile") ? "Removed binary data" : v, 2),
+                    })
+                }else{
+                    this.setState({
+                        status: "Success",
+                        response: response,
+                        minEirp: minEirp,
+                        fullJsonResponse: JSON.stringify(resp.result, (k, v) => (k == "kmzFile") ? "Removed binary data" : v, 2),
+                    })
+                }
+
+                if (response.vendorExtensions
+                    && response.vendorExtensions.length > 0
+                    && response.vendorExtensions.findIndex(x => x.extensionId == "openAfc.redBlackData") >= 0) {
+                    let extraChannels = response.vendorExtensions.find(x => x.extensionId == "openAfc.redBlackData").parameters;
+                    this.setState({ redChannels: extraChannels["redChannelInfo"], blackChannels: extraChannels["blackChannelInfo"] })
+                } else {
+                    this.setState({ redChannels: undefined, blackChannels: undefined })
+                }
+
+
+                if (this.state.includeMap
+                    && response.vendorExtensions
+                    && response.vendorExtensions.length > 0
+                    && response.vendorExtensions.findIndex(x => x.extensionId == "openAfc.mapinfo") >= 0) {
+                    //Get the KML file and load it into the state.kml parameters; get the GeoJson if present
+                    let kml_filename = response.vendorExtensions.find(x => x.extensionId == "openAfc.mapinfo").parameters["kmzFile"];
+                    let geoJson_filename = response.vendorExtensions.find(x => x.extensionId == "openAfc.mapinfo").parameters["geoJsonFile"];
+                    this.setKml(kml_filename)
+                    let geojson = JSON.parse(geoJson_filename);
+                    if (request?.location.ellipse && geojson && geojson.geoJson) {
+
+                        geojson.geoJson.features.push(
+                            {
+                                type: "Feature",
+                                properties: {
+                                    kind: "RLAN",
+                                    FSLonLat: [
+                                        this.state.mapCenter.lng,
+                                        this.state.mapCenter.lat
+                                    ]
+                                },
+                                geometry: {
+                                    type: "Polygon",
+                                    coordinates: [rasterizeEllipse(request.location.ellipse, 32)]
+                                }
+                            });
+
+                    }
+                    this.setMapState({ val: geojson.geoJson, valid: true, versionId: this.state.mapState.versionId + 1 })
+
+                }
+            }
+        } else if (!resp.kind || resp.kind == "Error") {
+            this.setState({ status: "Error", err: error(resp.description, resp.errorCode, resp.body), response: resp.body });
+        }
+
+
+    }
+
+    private showDirectSendModal(b: boolean): void {
+        this.setState({ sendDirectModalOpen: b })
+    }
+
+    private sendDirect(jsonString: string | undefined) {
+        if (!!jsonString) {
+            this.setState({ sendDirectModalOpen: false, status: "Info" });
+            return spectrumInquiryRequestByString("1.3", jsonString)
+                .then(resp => this.processResponse(resp));
+        }
+    }
+
+
     render() {
         return (
             <PageSection id="ap-afc-page">
@@ -385,6 +417,22 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             onSubmit={req => this.sendRequest(req)}
                             ellipseCenterPoint={!this.state.clickedMapPoint ? undefined : this.state.clickedMapPoint}
                         />
+                        {this.state.showSendDirect && (
+                            <>
+                                <Button key="open-manualSend" variant="secondary" onClick={() => this.showDirectSendModal(true)}>Send 1.3 Request Data</Button>
+                                <Modal key={"directSendModal"} title="Direct Send Request"
+                                    isLarge={true}
+                                    isOpen={this.state.sendDirectModalOpen}
+                                    onClose={() =>  this.showDirectSendModal(false)}
+                                    actions={[
+                                        <Button key="sendDirect-close" variant="secondary" onClick={() => this.showDirectSendModal(false)}>Close</Button>,
+                                        <Button key="sendDirect-send" variant="primary" onClick={() => this.sendDirect(this.state.sendDirectValue)}>Send</Button>
+                                    ]} >
+                                    <TextArea
+                                        resizeOrientation="vertical"
+                                        onChange={(text: string) => this.setState({ sendDirectValue: text })} aria-label="text area"></TextArea>
+                                </Modal>
+                            </>)}
                     </CardBody>
                 </Card>
                 <br />
@@ -467,4 +515,5 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 <JsonRawDisp value={this.state?.fullJsonResponse ? this.state.fullJsonResponse : this.state?.err?.body} />
             </PageSection>);
     }
+
 }
