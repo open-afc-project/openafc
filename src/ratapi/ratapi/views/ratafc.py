@@ -31,7 +31,7 @@ import six
 from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG
 from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from ..models.aaa import User, AccessPoint, AFCConfig
+from ..models.aaa import User, AccessPoint, AccessPointDeny, AFCConfig
 from .auth import auth
 from .ratapi import build_task, nraToRegionStr, rulesetIdToRegionStr
 from fst import DataIf
@@ -319,15 +319,26 @@ class RatAfc(MethodView):
     ''' RAT AFC resources
     '''
 
-    def _auth_ap(self, serial_number, certification_id, rulesets, version):
+    def _auth_ap(self, serial_number, prefix, cert_id, rulesets, version):
         ''' Authenticate an access point. If must match the serial_number and certification_id in the database to be valid
         '''
         LOGGER.debug('RatAfc::_auth_ap()')
-        LOGGER.debug('Starting auth_ap,serial: %s; certId: %s; ruleset %s; version %s',
-                     serial_number, certification_id, rulesets, version)
+        LOGGER.debug('Starting auth_ap,serial: %s; prefix: %s; certId: %s; ruleset %s; version %s',
+                     serial_number, prefix, cert_id, rulesets, version)
 
         if serial_number is None:
             raise MissingParamException(['serialNumber'])
+
+        deny_ap = AccessPointDeny.query.filter_by(serial_number=serial_number).\
+                  filter_by(certification_id=cert_id).first()
+        if deny_ap:
+            raise DeviceUnallowedException()  # InvalidCredentialsException()
+
+        deny_ap = AccessPointDeny.query.filter_by(certification_id=cert_id).\
+                  filter_by(serial_number=None).first()
+        if deny_ap:
+            # denied all devices matching certification id
+            raise DeviceUnallowedException()  # InvalidCredentialsException()
 
         ap = AccessPoint.query.filter_by(serial_number=serial_number).first()
 
@@ -341,12 +352,12 @@ class RatAfc(MethodView):
 
         if ap is None:
             raise DeviceUnallowedException()  # InvalidCredentialsException()
-        if certification_id is None:
+        if cert_id is None or prefix is None:
             raise MissingParamException(missing_params=['certificationId'])
-        if ap.certification_id != certification_id:
+        if ap.certification_id != prefix + ' ' + cert_id:
             raise DeviceUnallowedException()  # InvalidCredentialsException()
 
-        LOGGER.info('Found AP, certification id %s serial %s', certification_id, serial_number)
+        LOGGER.info('Found AP, cert id %s serial %s', cert_id, serial_number)
         if ap.org is None:
             return "NA"
         return ap.org
@@ -419,25 +430,23 @@ class RatAfc(MethodView):
                 try:
                     if ver in NRA_VERSIONS:
                         LOGGER.error("ver has NRA")
-                        firstCertId = device_desc['certificationId'][0]['nra'] + \
-                            ' ' + device_desc['certificationId'][0]['id']
+                        prefix = device_desc['certificationId'][0]['nra'].strip()
+                        region = nraToRegionStr(prefix)
                     else:
                         LOGGER.error("ver has RulesetId")
-                        firstCertId = device_desc['certificationId'][0]['rulesetId'] + \
-                            ' ' + device_desc['certificationId'][0]['id']
+                        prefix = device_desc['certificationId'][0]['rulesetId'].strip()
+                        region = rulesetIdToRegionStr(prefix)
+                    certId = device_desc['certificationId'][0]['id']
+                    firstCertId = prefix + ' ' + certId
                 except:
-                    firstCertId = None
+                    prefix = None
+                    certId = None
+
                 serial = device_desc.get('serialNumber')
                 org = self._auth_ap(serial,
-                                    firstCertId,
+                                    prefix,
+                                    certId,
                                     device_desc.get('rulesetIds'), ver)
-
-                if ver in NRA_VERSIONS:
-                    nra = (device_desc['certificationId'][0]['nra']).strip()
-                    region = nraToRegionStr(nra)
-                else:
-                    rulesetId = (device_desc['certificationId'][0]['rulesetId']).strip()
-                    region = rulesetIdToRegionStr(rulesetId)
 
                 runtime_opts = RNTM_OPT_NODBG_NOGUI
                 debug_opt = flask.request.args.get('debug')
@@ -467,11 +476,7 @@ class RatAfc(MethodView):
                 hashlibobj = hashlib.md5()
                 hashlibobj.update(config_bytes.encode('utf-8'))
                 hash1 = hashlibobj.hexdigest()
-
-                if ver in NRA_VERSIONS:
-                    config_path = os.path.join("/afc_config", nra, hash1, "afc_config.json")
-                else:
-                    config_path = os.path.join("/afc_config", rulesetId, hash1, "afc_config.json")
+                config_path = os.path.join("/afc_config", prefix, hash1, "afc_config.json")
 
                 # check config_path exist
                 with dataif.open(config_path) as hfile:

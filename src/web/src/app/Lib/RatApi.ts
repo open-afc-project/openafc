@@ -364,6 +364,21 @@ export const setAboutAfc = (name: string, email: string, org:string, token:strin
 );
 
 /**
+ * Retrive the known rulesets
+ */
+export const getRulesetIds = (): Promise<RatResponse<string[]>> => (
+    fetch("../ratapi/v1/rulesetIds", {
+        method: "GET"
+    }).then(res => {
+        return res.text();
+    }).then(name => {
+        return success(name.split(" "));
+    }).catch(err => {
+        logger.error(err)
+    })
+)
+
+/**
  * Return a copy of the hard coded afc confic used as the default
  * @returns The default AFC Configuration
  */

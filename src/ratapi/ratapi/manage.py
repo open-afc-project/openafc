@@ -168,14 +168,17 @@ class DbCreate(Command):
     def __call__(self, flaskapp):
         LOGGER.debug('DbCreate.__call__()')
         with flaskapp.app_context():
-            from .models.aaa import Role
+            from .models.aaa import Role, Ruleset
             from flask_migrate import stamp
+            ruleset_list = ratapi.rulesets()
             db.create_all()
             get_or_create(db.session, Role, name='Admin')
             get_or_create(db.session, Role, name='Super')
             get_or_create(db.session, Role, name='Analysis')
             get_or_create(db.session, Role, name='AP')
             get_or_create(db.session, Role, name='Trial')
+            for rule in ruleset_list:
+                get_or_create(db.session, Ruleset, name=rule)
             stamp(revision='head')
 
 class DbDrop(Command):
@@ -257,7 +260,8 @@ def setUserIdNextVal():
     cmd = 'select max(id) from aaa_user'
     res = db.session.execute(cmd)
     val = res.fetchone()[0]
-    cmd = 'ALTER SEQUENCE aaa_user_id_seq RESTART WITH ' + str(val+1)
+    if val:
+        cmd = 'ALTER SEQUENCE aaa_user_id_seq RESTART WITH ' + str(val+1)
     db.session.execute(cmd)
     db.session.commit()
 
@@ -338,6 +342,7 @@ class DbUpgrade(Command):
     def __call__(self, flaskapp):
         with flaskapp.app_context():
             import flask
+            from .models.aaa import Ruleset
             from flask_migrate import (upgrade, stamp)
             setUserIdNextVal()
             try:
@@ -350,9 +355,15 @@ class DbUpgrade(Command):
                 elif 'aaa_user.org does not exist' in str(exception.args):
                     LOGGER.error("upgrade from mtls version")
                     stamp(revision='230b7680b81e')
-
             db.session.commit()
             upgrade()
+            get_or_create(db.session, Ruleset,
+                          name='US_47_CFR_PART_15_SUBPART_E')
+            get_or_create(db.session, Ruleset,
+                          name='CA_RES_DBS-06')
+            # There's no way to know which denied APs belong to
+            # which ruleset. So we can't add APs to ruleset automatically
+ 
 
 class UserCreate(Command):
     ''' Create a new user functionality. '''
@@ -376,7 +387,7 @@ hashed, org = None):
         ''' Create user in database. '''
         from contextlib import closing
         import datetime
-        from .models.aaa import User, Role
+        from .models.aaa import User, Role, Organization
         LOGGER.debug('UserCreate.__create_user() %s %s %s',
                      email, password_in, role)
 
@@ -416,6 +427,11 @@ hashed, org = None):
                         org = email[email.index('@') + 1:]
                     except:
                         org = ""
+
+                organization = Organization.query.filter_by(name=org).first()
+                if not organization:
+                    organization = Organization(name=org)
+                    db.session.add(organization)
 
                 if id:
                     user = User(
@@ -498,7 +514,7 @@ class UserUpdate(Command):
     def _update_user(self, flaskapp, email, role, org = None):
         ''' Create user in database. '''
         from contextlib import closing
-        from .models.aaa import User, Role
+        from .models.aaa import User, Role, Organization
 
         if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
             return
@@ -510,12 +526,17 @@ class UserUpdate(Command):
                 if user:
                     user.roles = []
                     for rolename in role:
-                        if not rolename in user.roles:
-                            user.roles.append(get_or_create(
-                                db.session, Role, name=rolename))
+                        user.roles.append(get_or_create(
+                            db.session, Role, name=rolename))
                     user.active = True
                     if org:
-                        user.org = org;
+                        user.org = org
+                    org = user.org
+                    organization = Organization.query.filter_by(name=org).first()
+                    if not organization:
+                        organization = aaa.Organization(name=org)
+                        db.session.add(organization) # pylint: disable=no-member
+
                     db.session.commit()  # pylint: disable=no-member
                 else:
                     raise RuntimeError("User update: User not found")
@@ -577,7 +598,7 @@ class UserList(Command):
 
         with flaskapp.app_context():
             user_info = {}
-            # select email, name from aaa_user as au join aaa_user_role as aur
+            # select email, name from aaa_user as a join aaa_user_role as aur
             # on au.id = aur.user_id join aaa_role as ar on ar.id = aur.role_id;
             for user, _, role in db.session.query(User, UserRole,
 Role).filter(User.id == UserRole.user_id).filter(UserRole.role_id ==
@@ -715,6 +736,214 @@ class AccessPoints(Manager):
         self.add_command("create", AccessPointCreate())
         self.add_command("remove", AccessPointRemove())
         self.add_command("list", AccessPointList())
+
+
+class AccessPointDenyCreate(Command):
+    ''' Create a new access point. '''
+
+    option_list = (
+        Option('--serial', type=str, default=None,
+               help='serial number of the ap'),
+        Option('--cert_id', type=str, default=None, required=True,
+               help='certification id of the ap'),
+        Option('--ruleset', type=str, default=None, required=True,
+               help='ruleset of the ap'),
+        Option('--org', type=str, default=None, required=True,
+               help='org of the ap'),
+    )
+
+    def _create_ap(self, flaskapp, serial, cert_id, ruleset, org):
+        from contextlib import closing
+        import datetime
+        from .models.aaa import AccessPointDeny, Organization, Ruleset
+        LOGGER.debug('AccessPointDenyCreate._create_ap() %s %s %s',
+                      serial, cert_id, ruleset)
+        with flaskapp.app_context():
+            if not cert_id or not org or not ruleset:
+                raise RuntimeError('Certification, org and ruleset required')
+
+            ruleset = Ruleset.query.filter_by(name=ruleset).first()
+            if not ruleset:
+                raise RuntimeError('Bad ruleset')
+
+            ap = AccessPointDeny.query.filter(AccessPointDeny.\
+                 certification_id==cert_id).\
+                 filter(AccessPointDeny.serial_number == serial).first()
+            if ap:
+                    raise RuntimeError('Duplicate device detected')
+
+            organization = Organization.query.filter_by(name=org).first()
+            if not organization:
+                organization = Organization(name=org)
+                db.session.add(organization)
+            ap = AccessPointDeny(
+                serial_number=serial,
+                certification_id=cert_id
+            )
+
+            organization.aps.append(ap)
+            ruleset.aps.append(ap)
+            db.session.add(ap)
+            db.session.commit()
+
+    def __init__(self, flaskapp=None, serial_id=None,
+                 cert_id=None, ruleset=None, org=None):
+        if flaskapp:
+            self._create_ap(flaskapp, str(serial_id), cert_id, ruleset, org)
+
+    def __call__(self, flaskapp, serial=None, cert_id=None, ruleset=None, org=None):
+        self._create_ap(flaskapp, serial, cert_id, ruleset, org)
+
+
+class AccessPointDenyRemove(Command):
+    '''Removes an access point by serial number and or certification id'''
+
+    option_list = (
+        Option('--serial', type=str, default=None,
+               help='Serial number of an Access Point'),
+        Option('--cert_id', type=str, default=None,
+               help='certification id of the ap'),
+    )
+
+    def _remove_ap(self, flaskapp, serial, cert_id):
+        from .models.aaa import AccessPointDeny
+        LOGGER.debug('AccessPointDenyRemove._remove_ap() %s', serial)
+        with flaskapp.app_context():
+            try:
+                # select * from access_point as ap where ap.serial_number = ?
+                ap = AccessPointDeny.query.filter(\
+                     AccessPointDeny.serial_number == serial).\
+                     filter(AccessPointDeny.certification_id == cert_id).one()
+
+                if not ap:
+                    raise RuntimeError('No access point found')
+            except:
+                raise RuntimeError('No access point found')
+
+            db.session.delete(ap)  # pylint: disable=no-member
+            db.session.commit()  # pylint: disable=no-member
+
+    def __init__(self, flaskapp=None, serial=None, cert_id=None):
+        if flaskapp:
+            self._remove_ap(flaskapp, serial, cert_id)
+
+    def __call__(self, flaskapp, serial=None, cert_id=None):
+        self._remove_ap(flaskapp, serial, cert_id)
+
+
+class AccessPointDenyList(Command):
+    '''Lists all access points'''
+
+    def __call__(self, flaskapp):
+        table = PrettyTable()
+        from .models.aaa import AccessPointDeny
+
+        table.field_names = ["Serial Number", "Cert ID", "Ruleset", "Org"]
+        with flaskapp.app_context():
+            for ap in db.session.query(AccessPointDeny).all():  # pylint: disable=no-member
+                table.add_row([ap.serial_number, ap.certification_id,\
+                    ap.ruleset.name, ap.org.name])
+            print(table)
+
+
+class AccessPointsDeny(Manager):
+    '''View and manage Access Points Denied'''
+
+    def __init__(self, *args, **kwargs):
+        Manager.__init__(self, *args, **kwargs)
+        self.add_command("create", AccessPointDenyCreate())
+        self.add_command("remove", AccessPointDenyRemove())
+        self.add_command("list", AccessPointDenyList())
+
+class Organization(Manager):
+    '''View and manage Organizations '''
+
+    def __init__(self, *args, **kwargs):
+        Manager.__init__(self, *args, **kwargs)
+        self.add_command("create", OrganizationCreate())
+        self.add_command("remove", OrganizationRemove())
+        self.add_command("list", OrganizationList())
+
+class OrganizationCreate(Command):
+    ''' Create a new Organization. '''
+
+    option_list = (
+        Option('--name', type=str, default=None,
+               help='Name of Organization'),
+    )
+
+    def _create_org(self, flaskapp, name):
+        from contextlib import closing
+        import datetime
+        from .models.aaa import Organization
+        LOGGER.debug('OrganizationCreate._create_org() %s %s', name)
+        with flaskapp.app_context():
+            if not name:
+                raise RuntimeError('Name required')
+
+            org = Organization.query.filter(Organization.\
+                 name==name).first()
+            if org:
+                raise RuntimeError('Duplicate org detected')
+
+            organization = Organization(name=name)
+            db.session.add(organization)  # pylint: disable=no-member
+            db.session.commit()  # pylint: disable=no-member
+
+    def __init__(self, flaskapp=None, name=None):
+        if flaskapp:
+            self._create_org(flaskapp, name)
+
+    def __call__(self, flaskapp, name=None):
+        self._create_org(flaskapp, name)
+
+
+class OrganizationRemove(Command):
+    '''Removes an access point by serial number and or certification id'''
+
+    option_list = (
+        Option('--name', type=str, default=None,
+               help='Name of Organization'),
+    )
+
+    def _remove_org(self, flaskapp, name):
+        from .models.aaa import Organization
+        LOGGER.debug('Organization._remove_org() %s', name)
+        with flaskapp.app_context():
+            try:
+                # select * from access_point as ap where ap.serial_number = ?
+                org = Organization.query.filter(\
+                     Organization.name == name).one()
+
+                if not org:
+                    raise RuntimeError('No organization found')
+            except:
+                raise RuntimeError('No organization found')
+
+            db.session.delete(org)  # pylint: disable=no-member
+            db.session.commit()  # pylint: disable=no-member
+
+    def __init__(self, flaskapp=None, name=None):
+        if flaskapp:
+            self._remove_org(flaskapp, name)
+
+    def __call__(self, flaskapp, name=None):
+        self._remove_org(flaskapp, name)
+
+
+class OrganizationList(Command):
+    '''Lists all access points'''
+
+    def __call__(self, flaskapp):
+        table = PrettyTable()
+        from .models.aaa import Organization
+
+        table.field_names = ["Name"]
+        with flaskapp.app_context():
+            for org in db.session.query(Organization).all():  # pylint: disable=no-member
+                table.add_row([org.name])
+            print(table)
+
 
 class MTLSCreate(Command):
     ''' Create a new mtls certificate. '''
@@ -1178,6 +1407,8 @@ def main():
     manager.add_command('data', Data())
     manager.add_command('celery', Celery())
     manager.add_command('ap', AccessPoints())
+    manager.add_command('ap-deny', AccessPointsDeny())
+    manager.add_command('org', Organization())
     manager.add_command('cfg', Config())
 
     manager.run()
