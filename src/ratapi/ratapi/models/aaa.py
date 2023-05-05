@@ -38,18 +38,9 @@ class User(db.Model, UserMixin):
     # UserDbInfo.VER indicates the version of the user database.
     # This can be overriden with env variables in case the server
     # is boot up with an older database before it's migrated.
-    try:
-        import os
-        DBVER = int(os.getenv('RAT_DBVER'))
-        UserDbInfo.VER = DBVER
-    except:
-        pass
-
-    if UserDbInfo.VER >= 1:
-        username = db.Column(db.String(50), nullable=False, unique=True)
-        sub = db.Column(db.String(255))
-        org = db.Column(db.String(255), nullable=True)
-
+    org = db.Column(db.String(255), nullable=True)
+    username = db.Column(db.String(50), nullable=False, unique=True)
+    sub = db.Column(db.String(255))
     email = db.Column(db.String(255), nullable=False)
     email_confirmed_at = db.Column(db.DateTime())
     password = db.Column(db.String(255), nullable=False)
@@ -68,10 +59,7 @@ class User(db.Model, UserMixin):
 
     @staticmethod
     def getsub(user_sub):
-        if UserDbInfo.VER >= 1:
-            return User.query.filter_by(sub=user_sub).first()
-        else:
-            return None
+        return User.query.filter_by(sub=user_sub).first()
 
     @staticmethod
     def getemail(user_email):
@@ -130,6 +118,22 @@ class AccessPoint(db.Model):
         self.certification_id = certification_id
         self.org = org
 
+
+class AccessPointDeny(db.Model):
+    ''' entry to designate allowed AP's for the PAWS interface '''
+    __tablename__ = 'access_point_deny'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    serial_number = db.Column(db.String(64), nullable=True, index=True)
+    certification_id = db.Column(db.String(64))
+    org_id = db.Column(db.Integer, db.ForeignKey(
+        'aaa_org.id', ondelete='CASCADE'))
+    ruleset_id = db.Column(db.Integer, db.ForeignKey(
+        'aaa_ruleset.id', ondelete='CASCADE'))
+
+    def __init__(self, serial_number=None, certification_id=None):
+        self.serial_number = serial_number
+        self.certification_id = certification_id
+
 class MTLS(db.Model):
     ''' entry to designate allowed MTLS's for the PAWS interface '''
 
@@ -169,7 +173,7 @@ class Limit(db.Model):
         self.enforce = True
 
 class AFCConfig(db.Model):
-    ''' entry fpr AFC Config '''
+    ''' entry for AFC Config '''
 
     __tablename__ = 'AFCConfig'
 
@@ -181,6 +185,28 @@ class AFCConfig(db.Model):
     def __init__(self, config):
         self.config = config
         self.created = datetime.datetime.fromtimestamp(time.time())
+
+class Organization(db.Model):
+    ''' entry for Organization '''
+
+    __tablename__ = 'aaa_org'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    aps = db.relationship("AccessPointDeny", backref="org")
+
+    def __init__(self, name):
+        self.name = name
+
+class Ruleset(db.Model):
+    ''' entry for Organization '''
+
+    __tablename__ = 'aaa_ruleset'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(50), nullable=False, unique=True)
+    aps = db.relationship("AccessPointDeny", backref="ruleset")
+
+    def __init__(self, name):
+        self.name = name
 
 
 # Local Variables:

@@ -206,7 +206,7 @@ const getMTLSModuleAsync = () => {
 }
 
 const getDRListModuleAsync = () => {
-  return () => import(/* webpackChunkName: "drList" */ "./DeniedRegions/DRList");
+  return () => import(/* webpackChunkName: "drList" */ "./DeniedRules/DRList");
 }
 
 
@@ -369,8 +369,8 @@ const routes: IAppRoute[] = [
     component: DRListPage,
     exact: true,
     icon: null,
-    label: "Denied Regions",
-    path: "/deniedRegions"
+    label: "Denied Rules",
+    path: "/deniedRules"
   },
   {
     component: UserAccountPage,

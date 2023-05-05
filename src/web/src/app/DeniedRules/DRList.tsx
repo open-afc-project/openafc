@@ -1,15 +1,18 @@
 import * as React from "react";
 import { DeniedRegion, error, success, RatResponse } from "../Lib/RatApiTypes";
-import { getDeniedRegions, getDeniedRegionsCsvFile, updateDeniedRegions } from "../Lib/Admin";
+import { getDeniedRegions, getDeniedRegionsCsvFile, updateDeniedRegions, putAccessPointDenyList, getAccessPointsDeny, addAccessPointDeny } from "../Lib/Admin";
 import { Card, CardHead, CardHeader, CardBody, PageSection, InputGroup, Select, SelectOption, FormSelect, FormSelectOption, Button, Modal, Alert, AlertActionCloseButton, GalleryItem, FormGroup } from "@patternfly/react-core";
 import { NewDR } from "./NewDR";
 import { DRTable } from "./DRTable";
+import { NewAPDeny } from "./NewAPDeny";
 import { logger } from "../Lib/Logger";
 import { UserContext, UserState, isLoggedIn, hasRole } from "../Lib/User";
 import { mapRegionCodeToName } from "../Lib/Utils";
+import { exportCache, getRulesetIds } from "../Lib/RatApi";
 
 /**
- * DRList.tsx: List of denied Regions (by regionStr) to add/remove
+ * DRList.tsx: List of denied rules by regionStr and by AP cert id and/or serial number
+ * to add/remove
  * author: mgelman@rkf-eng.com
  */
 
@@ -17,7 +20,9 @@ import { mapRegionCodeToName } from "../Lib/Utils";
  * Interface definition of `DRList` properties
  */
 export interface DRListProps {
-    regions: string[]
+    regions: string[],
+    userId: number,
+    org: string
 }
 
 interface DRListState {
@@ -30,6 +35,9 @@ interface DRListState {
     messageSuccess?: string,
     messageError?: string,
     isEditorOpen: boolean
+    rulesetIds: [],
+    apMessageSuccess?: string,
+    apMessageError?: string,
 }
 
 /**
@@ -46,9 +54,20 @@ export class DRList extends React.Component<DRListProps, DRListState> {
             deniedRegionsNeedSaving: false,
             showingSaveWarning: false,
             allRegions: this.props.regions,
-            isEditorOpen: false
+            isEditorOpen: false,
+            rulesetIds: []
         }
         this.loadCurrentDeniedRegions();
+
+        getRulesetIds()
+        .then(res => {
+            if (res.kind === "Success") {
+                this.setState({ rulesetIds: res.result });
+            } else {
+                alert(res.description);
+            }
+        })
+
     }
 
     loadCurrentDeniedRegions = () => {
@@ -113,18 +132,21 @@ export class DRList extends React.Component<DRListProps, DRListState> {
             })
     }
 
+    downloadBlob = (b:Blob, filename:string) => {
+        const element = document.createElement("a");
+        element.href = URL.createObjectURL(b);
+        element.download = filename;
+        document.body.appendChild(element); // Required for this to work in FireFox
+        element.click();
+    }
+
     downloadCSVFile = () => {
         getDeniedRegionsCsvFile(this.state.regionStr).then(res => {
             if (res.kind === "Success") {
                 let file = new Blob([res.result], {
                     type: "text/csv"
                 });
-                const element = document.createElement("a");
-                element.href = URL.createObjectURL(file);
-                element.download = this.state.regionStr + "_denied_regions.csv";
-                document.body.appendChild(element); // Required for this to work in FireFox
-                element.click();
-
+                this.downloadBlob(file, this.state.regionStr + "_denied_regions.csv");
             }
         });
     }
@@ -137,9 +159,56 @@ export class DRList extends React.Component<DRListProps, DRListState> {
         this.setState({ isEditorOpen: true })
     }
 
+    importList(ev) {
+        // @ts-ignore
+        const file = ev.target.files[0];
+        const reader = new FileReader();
+        try {
+            reader.onload = async () => {
+                try {
+                    const value:AccessPointListModel = {accessPoints:reader.result as string}
+                    const putResp = await putAccessPointDenyList(value, this.props.userId);
+                    if (putResp.kind === "Error") {
+                        this.setState({ apMessageError: putResp.description, apMessageSuccess: undefined });
+                        return;
+                    } else {
+                        this.setState({ apMessageError: undefined, apMessageSuccess: "Import successful!" });
+                    }
+                } catch (e) {
+                    this.setState({ apMessageError: "Unable to read file", apMessageSuccess: undefined })
+                }
+            }
+
+            reader.readAsText(file);
+            ev.target.value = "";
+        } catch (e) {
+            logger.error("Failed read file ", e);
+            this.setState({ apMessageError: "Failed to read read file", apMessageSuccess: undefined });
+        }
+    }
+
+    async onAddAPDeny(ap: AccessPointModel) {
+        const res = await addAccessPointDeny(ap, this.props.userId);
+        if (res.kind === "Success") {
+            return success("Added")
+        } else {
+            return res;
+        }
+    }
+
+    async exportList() {
+        const res = await getAccessPointsDeny(this.props.userId);
+        if (res.kind ==  "Success") {
+            let b = new Blob([res.result], {
+                    type: "text/csv"
+            });
+            this.downloadBlob(b, "denied_aps.json")
+        }
+    }
 
     render() {
         return (
+          <PageSection>
             <Card>
                 <CardHead><CardHeader>Denied Region</CardHeader></CardHead>
                 <CardBody>
@@ -222,14 +291,63 @@ export class DRList extends React.Component<DRListProps, DRListState> {
                     <br />
                     {hasRole("Super") &&
                         (<Button onClick={() => this.downloadCSVFile()}>Download Denied Regions File</Button>)}
+
+
+
                 </CardBody>
             </Card >
+
+            <Card>
+                <CardHead><CardHeader> Denied Access Points</CardHeader></CardHead>
+                <CardBody>
+                    {hasRole("Admin") &&
+                    (<NewAPDeny onAdd={(ap: AccessPointModel) => this.onAddAPDeny(ap)} rulesetIds={this.state.rulesetIds} org={this.props.org}/>)
+                    }
+
+                    <br />
+                    {this.state.apMessageError !== undefined && (
+                        <Alert
+                            variant="danger"
+                            title="Error"
+                            action={<AlertActionCloseButton onClose={() => this.setState({ apMessageError: undefined })} />}
+                        >{this.state.apMessageError}</Alert>
+                    )}
+
+                    {this.state.apMessageSuccess !== undefined && (
+                        <Alert
+                            variant="success"
+                            title="Success"
+                            action={<AlertActionCloseButton onClose={() => this.setState({ apMessageSuccess: undefined })} />}
+                        >{this.state.apMessageSuccess}</Alert>
+                    )}
+
+                    <FormGroup
+                        label="Import Deny AP List"
+                        fieldId="import-deny-ap-list"
+                    >
+                       <input
+                          // @ts-ignore
+                          type="file"
+                          name="import deny ap list"
+                          // @ts-ignore
+                          onChange={(ev) => this.importList(ev)}
+                       />
+                    </FormGroup>
+
+                    <br/>
+                    {hasRole("Admin") &&
+                        (<Button onClick={() => this.exportList()}>Download Denied APs</Button>)}
+                    <br/>
+
+                </CardBody>
+            </Card>
+
+          </PageSection>
         )
     }
 
 
 }
-
 /**
  * wrapper for ap list when it is not embedded in another page
  */
@@ -253,7 +371,7 @@ export class DRListPage extends React.Component<{ regions: RatResponse<string[]>
         return (
             <PageSection id="ap-list-page">
                 <UserContext.Consumer>{(u: UserState) => u.data.loggedIn &&
-                    <DRList regions={this.state.regions} />}
+                    <DRList regions={this.state.regions} userId ={u.data.userId} org={u.data.org}/>}
                 </UserContext.Consumer>
             </PageSection>
         )

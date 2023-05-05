@@ -1,5 +1,5 @@
 import { guiConfig } from "./RatApi";
-import { UserModel, success, error, AccessPointModel, FreqRange, DeniedRegion, ExclusionCircle, ExclusionTwoRect, ExclusionRect, ExclusionHorizon } from "./RatApiTypes";
+import { UserModel, success, error, AccessPointModel, AccessPointListModel, FreqRange, DeniedRegion, ExclusionCircle, ExclusionTwoRect, ExclusionRect, ExclusionHorizon } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { Role, retrieveUserData } from "./User";
 import { Rect } from "react-konva";
@@ -57,7 +57,7 @@ export const setMinimumEIRP = (limit: number | boolean) =>
                 return error(res.statusText, res.status, res);
             }
         })
-        .catch(err => error("An error was encountered", undefined, err));
+        .catch(err => error("An error was encountered #1", undefined, err));
 
 /**
  * Return list of all users. Must be Admin
@@ -125,7 +125,7 @@ export const addUserRole = (id: number, role: Role) =>
         } else {
             return error(res.statusText, res.status, res);
         }
-    }).catch(err => error("An error was encountered", undefined, err));
+    }).catch(err => error("An error was encountered #2", undefined, err));
 
 /**
  * Remove a role from a user
@@ -143,7 +143,7 @@ export const removeUserRole = (id: number, role: Role) =>
         } else {
             return error(res.statusText, res.status, res);
         }
-    }).catch(err => error("An error was encountered", undefined, err));
+    }).catch(err => error("An error was encountered #3", undefined, err));
 
 /**
  * Delete a user from the system
@@ -158,7 +158,7 @@ export const deleteUser = (id: number) =>
         } else {
             return error(res.statusText, res.status, res);
         }
-    }).catch(err => error("An error was encountered", undefined, err));
+    }).catch(err => error("An error was encountered #4", undefined, err));
 
 /**
  * Get access points. If `userId` is provided then only return access
@@ -176,7 +176,7 @@ export const getAccessPoints = (userId?: number) =>
         } else {
             return error("Unable to load access points", res.status, res);
         }
-    }).catch(err => error("An error was encountered", undefined, err));
+    }).catch(err => error("An error was encountered #5", undefined, err));
 
 /**
  * Register an access point with a user.
@@ -198,7 +198,7 @@ export const addAccessPoint = (ap: AccessPointModel, userId: number) =>
                 return error(res.statusText, res.status, res);
             }
         })
-        .catch(err => error("An error was encountered", undefined, err));
+        .catch(err => error("An error was encountered #6", undefined, err));
 
 /**
  * Delete an access point from the system.
@@ -216,7 +216,70 @@ export const deleteAccessPoint = (id: number) =>
                 return error(res.statusText, res.status, res);
             }
         })
-        .catch(err => error("An error was encountered", undefined, err));
+        .catch(err => error("An error was encountered #7", undefined, err));
+
+/**
+ * Get access points. If `userId` is provided then only return access
+ * points owned by the user. If no `userId` is provided then return all
+ * access points (must be `Admin`).
+ * @param userId (optional) user's Id
+ * @returns list of access points if successful, error otherwise
+ */
+export const getAccessPointsDeny = (userId?: number) =>
+    fetch(guiConfig.ap_deny_admin_url.replace("-1", String(userId || 0)), {
+        method: "GET",
+    }).then(async res => {
+        if (res.ok) {
+            return success(await res.text());
+        } else {
+            return error("Unable to load access points", res.status, res);
+        }
+    }).catch(err => error("An error was encountered #8", undefined, err));
+
+/**
+ * Register an access point with a user.
+ * @param ap Access point to add
+ * @param userId owner of new access point
+ */
+export const addAccessPointDeny = (ap: AccessPointModel, userId: number) =>
+    fetch(guiConfig.ap_deny_admin_url.replace("-1", String(userId)), {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ap)
+    })
+    .then(async res => {
+        if (res.ok) {
+            return success((await res.json()).id as number)
+        } else if (res.status === 400) {
+            return error("Invalid AP data", res.status, res);
+        } else {
+            return error(res.statusText, res.status, res);
+        }
+    })
+    .catch(err => error("An error was encountered #9", undefined, err));
+
+
+/**
+ * Post a new deny access point file
+ * @param ap Access point to add
+ * @param userId owner of new access point
+ */
+export const putAccessPointDenyList = (ap: AccessPointListModel, userId: number) =>
+    fetch(guiConfig.ap_deny_admin_url.replace("-1", String(userId)), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(ap)
+    })
+    .then(res => {
+        if (res.ok) {
+            return success(res.status)
+        } else if (res.status === 400) {
+            return error("Invalid AP data", res.status, res);
+        } else {
+            return error(res.statusText, res.status, res);
+        }
+    })
+    .catch(err => error("An error was encountered #10", undefined, err));
 
 /**
  * Register an mtls certificate
@@ -238,7 +301,7 @@ export const addMTLS = (mtls: MTLSModel, userId: number) =>
                 return error(res.statusText, res.status, res);
             }
         })
-        .catch(err => error("An error was encountered", undefined, err));
+        .catch(err => error("An error was encountered #11", undefined, err));
 
 
 /**
@@ -257,7 +320,7 @@ export const deleteMTLSCert = (id: number) =>
                 return error(res.statusText, res.status, res);
             }
         })
-        .catch(err => error("An error was encountered", undefined, err));
+        .catch(err => error("An error was encountered #12", undefined, err));
 
 /**
  * Get mtls cert.  If `userId` is 0, then return all certificates (super)
@@ -276,7 +339,7 @@ export const getMTLS = (userId?: number) =>
         } else {
             return error("Unable to load mtls", res.status, res);
         }
-    }).catch(err => error("An error was encountered", undefined, err));
+    }).catch(err => error("An error was encountered #13", undefined, err));
 
 
 export const getDeniedRegions = (regionStr: string) => {
@@ -294,7 +357,7 @@ export const getDeniedRegions = (regionStr: string) => {
         } else {
             return error("Unable to get denied regions for " + regionStr, res.status, res);
         }
-    }).catch(err => error("An error was encountered", undefined, err));
+    }).catch(err => error("An error was encountered #14", undefined, err));
 }
 
 export const getDeniedRegionsCsvFile = (regionStr: string) => {
@@ -309,7 +372,7 @@ export const getDeniedRegionsCsvFile = (regionStr: string) => {
         } else {
             return error("Unable to get denied regions for " + regionStr, res.status, res);
         }
-    }).catch(err => error("An error was encountered", undefined, err));
+    }).catch(err => error("An error was encountered #15", undefined, err));
 }
 
 // Update the denied regions for a given region
