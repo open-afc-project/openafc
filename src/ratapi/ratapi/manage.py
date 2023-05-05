@@ -169,8 +169,9 @@ class DbCreate(Command):
         LOGGER.debug('DbCreate.__call__()')
         with flaskapp.app_context():
             from .models.aaa import Role, Ruleset
+            from .views.ratapi import rulesets
             from flask_migrate import stamp
-            ruleset_list = ratapi.rulesets()
+            ruleset_list = rulesets()
             db.create_all()
             get_or_create(db.session, Role, name='Admin')
             get_or_create(db.session, Role, name='Super')
@@ -343,6 +344,7 @@ class DbUpgrade(Command):
         with flaskapp.app_context():
             import flask
             from .models.aaa import Ruleset
+            from .views.ratapi import rulesets
             from flask_migrate import (upgrade, stamp)
             setUserIdNextVal()
             try:
@@ -357,12 +359,9 @@ class DbUpgrade(Command):
                     stamp(revision='230b7680b81e')
             db.session.commit()
             upgrade()
-            get_or_create(db.session, Ruleset,
-                          name='US_47_CFR_PART_15_SUBPART_E')
-            get_or_create(db.session, Ruleset,
-                          name='CA_RES_DBS-06')
-            # There's no way to know which denied APs belong to
-            # which ruleset. So we can't add APs to ruleset automatically
+            ruleset_list = rulesets()
+            for rule in ruleset_list:
+                get_or_create(db.session, Ruleset, name=rule)
  
 
 class UserCreate(Command):
