@@ -170,7 +170,7 @@ typedef struct fe_t
 {
 	fe_t *next, *down;
 	char *name;
-	uint64_t size;
+	int64_t size;
 } fe_t;
 
 typedef struct
@@ -182,6 +182,7 @@ typedef struct
 	char tpath[AEP_PATH_MAX];
 	struct dirent dirent;
 	fe_t *readdir_p;
+	int64_t size;
 } data_fd_t;
 
 static fe_t tree = {}; /* the root "/" entry of file tree */
@@ -603,16 +604,16 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	/* download whole file to cache if possible */
 	if (!orig_stat(fakepath, &stat))
 	{
-		if (data_fd->fe->size == (uint64_t) stat.st_size)
+		if (data_fd->size == stat.st_size)
 		{
 			is_cached = true;
 		}
-		if (!is_cached && data_fd->fe->size <= max_cached_file_size)
+		if (!is_cached && data_fd->fe->size <= (int64_t)max_cached_file_size)
 		{
-			if (data_fd->fe->size + cache_size_get() > max_cached_size) {
+			if (data_fd->size + cache_size_get() > (int64_t)max_cached_size) {
 				reduce_cache(data_fd->fe->size);
 			}
-			if (data_fd->fe->size + cache_size_get() < max_cached_size) {
+			if (data_fd->fe->size + cache_size_get() < (int64_t)max_cached_size) {
 				//dbg("download %s", data_fd->tpath);
 				if (!download_file(data_fd, fakepath))
 				{
@@ -725,7 +726,21 @@ static int fd_add(char *tpath)
 #endif
 	data_fds[fd].readdir_p = NULL;
 	data_fds[fd].dir.fd = fd;
-	strcpy(data_fds[fd].tpath, tpath);
+	if (fe->size < 0) {
+		/* It's softlink */
+		char tmp[AEP_PATH_MAX];
+		struct stat statbuf;
+
+		strcpy(fakepath, ae_mountpoint);
+		strcat(fakepath, tpath);
+		readlink(fakepath, tmp, AEP_PATH_MAX);
+		strcpy(data_fds[fd].tpath, (char*) tmp + strlen(ae_mountpoint));
+		orig_stat(tmp, &statbuf);
+		data_fds[fd].size = statbuf.st_size;
+	} else {
+		strcpy(data_fds[fd].tpath, tpath);
+		data_fds[fd].size = fe->size;
+	}
 	//dbg("fd_add(%s) done", tpath, fd);
 	return fd;
 }
