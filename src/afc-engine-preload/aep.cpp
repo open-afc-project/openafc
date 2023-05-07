@@ -217,6 +217,7 @@ static int download_file_gs(data_fd_t *data_fd, char *dest);
 static ssize_t read_remote_data_gs(void *destv, size_t size, char *tpath, off_t off);
 static int init_gs();
 static void reduce_cache(uint64_t size);
+static bool fd_is_remote(int fd);
 
 static inline void prn_statistic()
 {
@@ -224,7 +225,7 @@ static inline void prn_statistic()
 		return;
 	}
 	dprintf(logfile,
-		"statistics: remoteIO %u/%u/%u cachedIO %u/%u/%u dl %u/%u/%u cs %lu",
+		"statistics: remoteIO %u/%u/%u cachedIO %u/%u/%u dl %u/%u/%u cs %lu\n",
 		aepst.read_remote, aepst.read_remote_size, aepst.read_remote_time,
 		aepst.read_cached, aepst.read_cached_size, aepst.read_cached_time,
 		aepst.read_write, aepst.read_write_size, aepst.read_write_time,
@@ -494,16 +495,23 @@ static size_t f_write(FILE *f, const unsigned char *buff, size_t size)
 
 static off_t f_seek(FILE *f, off_t off, int whence)
 {
-	if (whence == SEEK_CUR && off == 0)
-	{
-		/* ignore */
-		return fd_get_data_fd(fileno(f))->off;
-	}
-	aep_assert(whence == SEEK_SET, "f_seek(%d(%s), %ld, %d) unsupported whence", fileno(f), fd_get_name(fileno(f)), off, whence);
+	data_fd_t *data_fd = fd_get_data_fd(fileno(f));
 	dbgd("FILE->seek(%d(%s), %jd, %d)", fileno(f), fd_get_name(fileno(f)), off, whence);
-	fd_get_data_fd(fileno(f))->off = off;
-	return off;
+	switch (whence) {
+	case SEEK_SET: /* 0 */
+		data_fd->off = off;
+		break;
+	case SEEK_CUR: /* 0 */
+		data_fd->off += off;
+		break;
+	case SEEK_END:
+		data_fd->off = data_fd->fe->size + off;
+		break;
+	}
+	dbgd("FILE->seek(%d(%s), %jd, %d) %jd", fileno(f), fd_get_name(fileno(f)), off, whence, data_fd->off);
+	return data_fd->off;
 }
+
 /* never used */
 static int f_close(FILE *f)
 {
@@ -680,10 +688,11 @@ static int fd_add(char *tpath)
 	{
 		return -1;
 	}
+	dbg("fd_add(%s) size 0x%jx", tpath, fe->size);
+
 	strcpy(fakepath, cache_path);
 	strcat(fakepath, tpath);
 
-	//dbg("fd_add(%s)", tpath);
 	/* create cache file */
 	if (orig_stat(fakepath, &statbuf))
 	{
@@ -782,6 +791,7 @@ static inline char* fd_get_name(int fd)
 
 static bool is_remote_file(const char *path, char **tpath)
 {
+	dbg("is_remote_file(%s)", path);
 	if (!path)
 	{
 		*tpath = (char*) path;
@@ -961,7 +971,7 @@ void __attribute__((constructor)) aep_init(void)
 	{
 		uint8_t tab = 0;
 		char *name;
-		uint64_t size;
+		int64_t size;
 
 		/* read next line */
 		while (*fl == '\t')
@@ -972,8 +982,8 @@ void __attribute__((constructor)) aep_init(void)
 		name = (char*) (fl);
 		fl += strlen(name) + 1;
 
-		size = *((uint64_t*) fl);
-		fl += sizeof(uint64_t);
+		size = *((int64_t*) fl);
+		fl += sizeof(int64_t);
 		if (tab != tab_prev)
 		{
 			if (tab < tab_prev)
@@ -1315,7 +1325,7 @@ long int syscall(long int __sysno, ...)
 				return -1;
 			}
 
-			dbgd("SYS_statx(%s, 0x%lx, %s) 0", tpath, fe->size, fe->size ? "file" : "dir");
+			dbgd("syscall(SYS_statx, dirfd:%d, path:%s, flags:0x%x, mask:0x%x) 0x%lx", dirfd, path, flags, mask, fe->size);
 			memcpy(st, &def_statx, sizeof(struct statx));
 			if (fe->size)
 			{
