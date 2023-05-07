@@ -171,6 +171,7 @@ typedef struct fe_t
 	fe_t *next, *down;
 	char *name;
 	int64_t size;
+	char *slink_to;
 } fe_t;
 
 typedef struct
@@ -182,7 +183,6 @@ typedef struct
 	char tpath[AEP_PATH_MAX];
 	struct dirent dirent;
 	fe_t *readdir_p;
-	int64_t size;
 } data_fd_t;
 
 static fe_t tree = {}; /* the root "/" entry of file tree */
@@ -604,13 +604,13 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	/* download whole file to cache if possible */
 	if (!orig_stat(fakepath, &stat))
 	{
-		if (data_fd->size == stat.st_size)
+		if (data_fd->fe->size == stat.st_size)
 		{
 			is_cached = true;
 		}
 		if (!is_cached && data_fd->fe->size <= (int64_t)max_cached_file_size)
 		{
-			if (data_fd->size + cache_size_get() > (int64_t)max_cached_size) {
+			if (data_fd->fe->size + cache_size_get() > (int64_t)max_cached_size) {
 				reduce_cache(data_fd->fe->size);
 			}
 			if (data_fd->fe->size + cache_size_get() < (int64_t)max_cached_size) {
@@ -655,7 +655,9 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	{
 		sem_post(sem);
 		sem_close(sem);
-		ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
+		ret = read_remote_data(destv, size,
+			data_fd->fe->slink_to ? data_fd->fe->slink_to : data_fd->tpath,
+			data_fd->off);
 		aep_assert(ret >= 0, "read_data(%s) read_remote_data", fakepath)
 	}
 	//dbg("read_data %s done", data_fd->tpath);
@@ -728,18 +730,21 @@ static int fd_add(char *tpath)
 	data_fds[fd].dir.fd = fd;
 	if (fe->size < 0) {
 		/* It's softlink */
-		char tmp[AEP_PATH_MAX];
+		char tmp[AEP_PATH_MAX];	/* path to the linked file */
 		struct stat statbuf;
 
+		/* save path of the soft link in fakepath */
 		strcpy(fakepath, ae_mountpoint);
 		strcat(fakepath, tpath);
+
 		readlink(fakepath, tmp, AEP_PATH_MAX);
-		strcpy(data_fds[fd].tpath, (char*) tmp + strlen(ae_mountpoint));
+		fe->slink_to = (char*)malloc(strlen(tmp + strlen(ae_mountpoint)) + 1);
+		aep_assert(fe->slink_to, "malloc");
 		orig_stat(tmp, &statbuf);
-		data_fds[fd].size = statbuf.st_size;
+		data_fds[fd].fe->size = statbuf.st_size;
+		strcpy(fe->slink_to, (char*) tmp + strlen(ae_mountpoint));
 	} else {
 		strcpy(data_fds[fd].tpath, tpath);
-		data_fds[fd].size = fe->size;
 	}
 	//dbg("fd_add(%s) done", tpath, fd);
 	return fd;
@@ -1156,26 +1161,28 @@ int stat(const char *pathname, struct stat *statbuf)
 
 	if (is_remote_file(pathname, &tpath))
 	{
-		fe_t *fe;
+		int fd;
+		data_fd_t* data_fd;
 
-		fe = find_fe(tpath);
-		if (!fe)
-		{
+		fd = fd_add(tpath);
+		if (fd < 0) {
 			return -1;
 		}
+		data_fd = fd_get_data_fd(fd);
 
 		memcpy(statbuf, &def_stat, sizeof(struct stat));
-		if (fe->size)
+		if (data_fd)
 		{
 			statbuf->st_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
 		} else
 		{
 			statbuf->st_mode = S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO;
 		}
-		statbuf->st_size = fe->size;
+		statbuf->st_size = data_fd->fe->size;
 		statbuf->st_blocks = (statbuf->st_size >> 9) + (statbuf->st_size & 0x1ff) ? 1 : 0;
 		ret = 0;
-		dbgd("stat(%s, 0x%lx, %s) %d", tpath, fe->size, fe->size ? "file" : "dir", ret);
+		dbgd("stat(%s, 0x%lx, %s) %d", tpath, data_fd->fe->size, data_fd->fe->size ? "file" : "dir", ret);
+		fd_rm(fd);
 	} else
 	{
 		ret = orig_stat(pathname, statbuf);
@@ -1222,26 +1229,28 @@ int lstat(const char *pathname, struct stat *statbuf)
 
 	if (is_remote_file(pathname, &tpath) && 0)
 	{
-		fe_t *fe;
+		int fd;
+		data_fd_t* data_fd;
 
-		fe = find_fe(tpath);
-		if (!fe)
-		{
+		fd = fd_add(tpath);
+		if (fd < 0) {
 			return -1;
 		}
+		data_fd = fd_get_data_fd(fd);
 
 		memcpy(statbuf, &def_stat, sizeof(struct stat));
-		if (fe->size)
+		if (data_fd->fe->size)
 		{
 			statbuf->st_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
 		} else
 		{
 			statbuf->st_mode = S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO;
 		}
-		statbuf->st_size = fe->size;
+		statbuf->st_size = data_fd->fe->size;
 		statbuf->st_blocks = (statbuf->st_size >> 9) + (statbuf->st_size & 0x1ff) ? 1 : 0;
 		ret = 0;
-		dbgd("lstat(%s, 0x%lx, %s) %d", tpath, fe->size, fe->size ? "file" : "dir", ret);
+		dbgd("lstat(%s, 0x%lx, %s) %d", tpath, data_fd->fe->size, data_fd->fe->size ? "file" : "dir", ret);
+		fd_rm(fd);
 	} else
 	{
 		ret = orig_lstat(pathname, statbuf);
@@ -1598,7 +1607,7 @@ static int download_file_nfs(data_fd_t *data_fd, char *dest)
 	unsigned int us;
 
 	strcpy(realpath, real_mountpoint);
-	strcat(realpath, data_fd->tpath);
+	strcat(realpath, data_fd->fe->slink_to ? data_fd->fe->slink_to : data_fd->tpath);
 
 	starttime(&tv);
 	if ((output = orig_open(dest, O_CREAT | O_RDWR)) < 0)
