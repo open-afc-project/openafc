@@ -728,6 +728,7 @@ static int fd_add(char *tpath)
 #endif
 	data_fds[fd].readdir_p = NULL;
 	data_fds[fd].dir.fd = fd;
+	strcpy(data_fds[fd].tpath, tpath);
 	if (fe->size < 0) {
 		/* It's softlink */
 		char tmp[AEP_PATH_MAX];	/* path to the linked file */
@@ -743,8 +744,6 @@ static int fd_add(char *tpath)
 		orig_stat(tmp, &statbuf);
 		data_fds[fd].fe->size = statbuf.st_size;
 		strcpy(fe->slink_to, (char*) tmp + strlen(ae_mountpoint));
-	} else {
-		strcpy(data_fds[fd].tpath, tpath);
 	}
 	//dbg("fd_add(%s) done", tpath, fd);
 	return fd;
