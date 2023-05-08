@@ -24,9 +24,8 @@ def write_obj(name, size, tab, outfile):
         if tab > max_tab:
             max_tab = tab
     outfile.write(name.encode('utf-8'))
-    #outfile.write("\n".encode('utf-8'))
     outfile.write("\0".encode('utf-8'))
-    outfile.write(size.to_bytes(8, byteorder="little", signed=False))
+    outfile.write(size.to_bytes(8, byteorder="little", signed=True))
     if size != 0:
         global nooffiles
         global max_size
