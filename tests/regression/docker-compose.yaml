@@ -92,6 +92,7 @@ services:
     image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
+      - /opt/afc/work/yd889380/src/aep:/aep
       - ./pipe:/pipe
     environment:
       # Filestorage params:
