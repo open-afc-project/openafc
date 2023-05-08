@@ -106,8 +106,7 @@ services:
       - BROKER_FQDN=rmq
       # afc-engine preload lib params
       - AFC_AEP_ENABLE=1
-      - AFC_AEP_DEBUG=1
-      - AFC_AEP_REAL_MOUNTPOINT=${VOL_C_DB}
+      - AFC_AEP_DEBUG=15
     depends_on:
       - ratdb
       - rmq
