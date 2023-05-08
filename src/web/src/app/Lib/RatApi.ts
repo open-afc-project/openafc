@@ -149,7 +149,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "indoorFixedHeightAMSL":false,
     "reportUnavailableSpectrum": true,
     "reportUnavailPSDdBPerMHz": -40,
-    "inquiredFrequencyResolutionMHz": 1
+    "inquiredFrequencyResolutionMHz": 20
 });
 
 const defaultAfcConfCanada: () => AFCConfigFile = () => ({
@@ -241,9 +241,9 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "nearFieldAdjFlag": false,
     "deniedRegionFile": "",
     "indoorFixedHeightAMSL":false,
-    "reportUnavailableSpectrum": true,
+    "reportUnavailableSpectrum": false,
     "reportUnavailPSDdBPerMHz": -40,
-    "inquiredFrequencyResolutionMHz": 1
+    "inquiredFrequencyResolutionMHz": 20
 });
 
 const defaultAllRegionFreqRanges: () => FreqRange[] = () => (
