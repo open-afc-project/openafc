@@ -1,5 +1,28 @@
  # Release Note
+## **Version and Date**
+|Version|**OA-634**|
+| :- | :- |
+|**Date**|**05/08/2023**|
 
+## **Issues Addressed**
+ * Jira OA-634: Update WFA SDI to Version 1.4 from 1.3 with backward compatibility to V1.3
+
+## **Interface Changes**
+ *  Changes are done to Virtual AP page for compliance with SDI V1.4
+   * Changed the device descriptor to use rulesetId instead of NRA
+   * Changed the python API to authenticate against the rulset ID
+   * Changed the server path for virtual AP requests to /1.4/availableSpectrumInquiry           
+ *  In addition, in Virtual AP, one can copy-in an V1.3 AP request.json (note that the GUI parameters won't be updated) to run a v1.3 SDI.
+
+## **Testing Done**
+ * Entered a v1.3 AP request and got same AP response as before with version 1.3 in the response message
+ * Ran FSP1 under v1.4 and got identical results as v1.3. 
+ * Confirmed that for v1.4, AP request and response message formats are correct and have version 1.4.
+ * Ran a test with rulsetId for ISED and another a dummy one and got correct resuts.
+
+## **Open Issues** 
+ * Need to confirm with WFA the proper Error code when rulesetId is not set to one of the valid values.
+ 
 ## **Version and Date**
 |Version|**OA-636**|
 | :- | :- |
