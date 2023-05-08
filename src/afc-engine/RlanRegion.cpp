@@ -86,6 +86,9 @@ EllipseRlanRegionClass::EllipseRlanRegionClass(DoubleTriplet rlanLLA, DoubleTrip
     std::tie(semiMinorAxis, semiMajorAxis, heightUncertainty) = rlanUncerts_m;
     orientationDeg = rlanOrientationDeg;
 
+    cosVal = cos(centerLatitude*M_PI/180.0);
+    oneOverCosVal = 1.0/cosVal;
+
     double rlanOrientationRad = rlanOrientationDeg*M_PI/180.0;
 
     upVec = EcefModel::geodeticToEcef(centerLatitude, centerLongitude, 0.0).normalized();
@@ -114,19 +117,26 @@ EllipseRlanRegionClass::EllipseRlanRegionClass(DoubleTriplet rlanLLA, DoubleTrip
     mxR(1, 0) = -sin(rlanOrientationRad);
     mxR(1, 1) =  cos(rlanOrientationRad);
 
-    arma::mat mxS(2, 2);
-    mxS(0, 0) = CConst::earthRadius*cos(centerLatitude*M_PI/180.0)*M_PI/180.0;
-    mxS(0, 1) = 0.0;
-    mxS(1, 0) = 0.0;
-    mxS(1, 1) = CConst::earthRadius*M_PI/180.0;
+    arma::mat mxS1(2, 2);
+    mxS1(0, 0) = CConst::earthRadius*M_PI/180.0;
+    mxS1(0, 1) = 0.0;
+    mxS1(1, 0) = 0.0;
+    mxS1(1, 1) = CConst::earthRadius*M_PI/180.0;
+
+    arma::mat mxS2(2, 2);
+    mxS2(0, 0) = cosVal;
+    mxS2(0, 1) = 0.0;
+    mxS2(1, 0) = 0.0;
+    mxS2(1, 1) = 1.0;
 
     arma::mat mxInvS(2, 2);
-    mxInvS(0, 0) = 1.0/(CConst::earthRadius*cos(centerLatitude*M_PI/180.0)*M_PI/180.0);
+    mxInvS(0, 0) = 1.0/(CConst::earthRadius*cosVal*M_PI/180.0);
     mxInvS(0, 1) = 0.0;
     mxInvS(1, 0) = 0.0;
     mxInvS(1, 1) = 1.0/(CConst::earthRadius*M_PI/180.0);
 
-    mxA = mxS*mxR*mxE*(mxR.t())*mxS;
+    mxC = mxS1*mxR*mxE*(mxR.t())*mxS1;
+    mxA = mxS2*mxC*mxS2;
     mxB = mxInvS*mxR*mxD;
 }
 /******************************************************************************************/
@@ -179,6 +189,73 @@ void EllipseRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, Te
     }
 
     configuredFlag = true;
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** CONSTRUCTOR: EllipseRlanRegionClass::calcMinAOB()                                ****/
+/******************************************************************************************/
+double EllipseRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL)
+{
+	double minAOB;
+
+	arma::vec ptg(3);
+	ptg(0) = ulsAntennaPointing.dot(eastVec);
+	ptg(1) = ulsAntennaPointing.dot(northVec);
+	ptg(2) = ulsAntennaPointing.dot(upVec);
+
+	arma::vec P(3);
+	P(0) = (ulsRxLatLon.second - centerLongitude)*cosVal;
+	P(1) = ulsRxLatLon.first  - centerLatitude;
+	if (ulsRxHeightAMSL > centerHeightAMSL) {
+		P(2) = ulsRxHeightAMSL - (centerHeightAMSL + heightUncertainty);
+	} else {
+		P(2) = ulsRxHeightAMSL - (centerHeightAMSL - heightUncertainty);
+	}
+	P(2) *= (180.0/M_PI)/CConst::earthRadius;
+
+	bool found = false;
+    if (    ((ptg(2) < 0.0) && (P(2) > 0.0)) 
+         || ((ptg(2) > 0.0) && (P(2) < 0.0)) ) {
+        double dist = -P(2) / ptg(2);
+	    arma::vec intcpt(2);
+        intcpt(0) = (P(0) + dist*ptg(0))/cosVal;
+        intcpt(1) = P(1) + dist*ptg(1);
+
+		double d = dot(intcpt, mxA*intcpt);
+		if (d<=1) {
+			minAOB = 0.0;
+			found = true;
+		}
+	}
+
+	if (!found) {
+		arma::vec F(2);
+		arma::vec U(2);
+		F(0) = P(0);
+		F(1) = P(1);
+		U(0) = ptg(0);
+		U(1) = ptg(1);
+
+		double a = dot(U, mxC*U);
+		double b = dot(U, (mxC+mxC.t())*F);
+		double c = dot(F, mxC*F) - 1.0;
+
+		double eps = (-b + sqrt(b*b - 4*a*c))/(2*a);
+
+		arma::vec E(3);
+		E(0) = F(0) + eps*U(0);
+		E(1) = F(1) + eps*U(1);
+		E(2) = 0.0;
+
+		arma::vec L = E - P;
+		L = (1.0/norm(L))*L;
+
+		double cosAOB = dot(L, ptg);
+		minAOB = acos(cosAOB)*180.0/M_PI;
+	}
+
+	return minAOB;
 }
 /******************************************************************************************/
 
@@ -270,7 +347,7 @@ std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
         int N = floor(semiMajorAxis / scanResolutionM);
 
         double deltaLat = (scanResolutionM / CConst::earthRadius)*(180.0/M_PI);
-        double deltaLon = deltaLat / cos(centerLatitude*M_PI/180.0);
+        double deltaLon = deltaLat / cosVal;
 
         int ix, iy;
         for(iy=-N; iy<=N; ++iy) {
@@ -315,7 +392,6 @@ std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
         }
     } else if (method == CConst::latLonAlignGridScanRegionMethod) {
         // Scan points aligned with lat / lon grid
-        double cosVal = cos(centerLatitude*M_PI/180.0);
         int N = floor( (semiMajorAxis / CConst::earthRadius)*(180.0/M_PI)*pointsPerDegree/cosVal ) + 1;
         int S[2*N+1][2*N+1];
 
@@ -540,6 +616,92 @@ void PolygonRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, Te
     }
 
     configuredFlag = true;
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** CONSTRUCTOR: PolygonRlanRegionClass::calcMinAOB()                                ****/
+/******************************************************************************************/
+double PolygonRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL)
+{
+	double minAOB;
+
+	arma::vec ptg(3);
+	ptg(0) = ulsAntennaPointing.dot(eastVec);
+	ptg(1) = ulsAntennaPointing.dot(northVec);
+	ptg(2) = ulsAntennaPointing.dot(upVec);
+
+	arma::vec F(3);
+	F(0) = (ulsRxLatLon.second - centerLongitude)*cosVal;
+	F(1) = ulsRxLatLon.first  - centerLatitude;
+	if (ulsRxHeightAMSL > centerHeightAMSL) {
+		F(2) = ulsRxHeightAMSL - (centerHeightAMSL + heightUncertainty);
+	} else {
+		F(2) = ulsRxHeightAMSL - (centerHeightAMSL - heightUncertainty);
+	}
+	F(2) *= (180.0/M_PI)/CConst::earthRadius;
+
+	bool found = false;
+    if (    ((ptg(2) < 0.0) && (F(2) > 0.0)) 
+         || ((ptg(2) > 0.0) && (F(2) < 0.0)) ) {
+        double dist = -F(2) / ptg(2);
+	    arma::vec intcpt(2);
+        int xval = (int) floor((F(0) + dist*ptg(0))/resolution + 0.5);
+        int yval = (int) floor((F(1) + dist*ptg(1))/resolution + 0.5);
+
+		bool edge;
+		bool contains = polygon->in_bdy_area(xval, yval, &edge);
+
+		if (contains || edge) {
+			minAOB = 0.0;
+			found = true;
+		}
+	}
+
+	if (!found) {
+        double maxCosAOB = -1.0;
+        for(int segIdx=0; segIdx<polygon->num_segment; ++segIdx) {
+            int prevIdx = polygon->num_bdy_pt[segIdx]-1;
+	        arma::vec prevVirtex(3);
+            prevVirtex(0) = polygon->bdy_pt_x[segIdx][prevIdx]*resolution;
+            prevVirtex(1) = polygon->bdy_pt_y[segIdx][prevIdx]*resolution;
+            prevVirtex(2) = 0.0;
+            for(int ptIdx=0; ptIdx<polygon->num_bdy_pt[segIdx]; ++ptIdx) {
+	            arma::vec virtex(3);
+                virtex(0) = polygon->bdy_pt_x[segIdx][ptIdx]*resolution;
+                virtex(1) = polygon->bdy_pt_y[segIdx][ptIdx]*resolution;
+                virtex(2) = 0.0;
+
+                double D0 = dot(virtex - prevVirtex, virtex - prevVirtex);
+                double D1 = 2*dot(virtex - prevVirtex, prevVirtex - F);
+                double D2 = dot(prevVirtex - F, prevVirtex - F);
+
+                double C0 = dot(prevVirtex - F, ptg);
+                double C1 = dot(virtex - prevVirtex, ptg);
+
+                double eps = (D0*C1 - C0*D1/2)/(D2*C0 - C1*D1/2);
+
+                double cosAOB = C0 / sqrt(D0);
+                if (cosAOB > maxCosAOB) {
+                    maxCosAOB = cosAOB;
+                }
+
+                if ((eps > 0.0) && (eps < 1.0)) {
+                    cosAOB = (C0 + C1*eps)/ sqrt(D0 + eps*(D1 + eps*D2));
+                    if (cosAOB > maxCosAOB) {
+                        maxCosAOB = cosAOB;
+                    }
+                }
+
+                prevIdx = ptIdx;
+                prevVirtex = virtex;
+            }
+        }
+
+		minAOB = acos(maxCosAOB)*180.0/M_PI;
+	}
+
+    return minAOB;
 }
 /******************************************************************************************/
 

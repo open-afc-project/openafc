@@ -16,6 +16,7 @@ build/*
 .github/*
 .DS_Store
 .dockerignore
+mfk_*
 src/web/node_modules/*
 CMakeCache.txt
 CMakeFiles/*

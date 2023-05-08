@@ -51,6 +51,7 @@ import sys
 import time
 from deepdiff import DeepDiff
 from multiprocessing.pool import Pool
+from string import Template
 from _afc_types import *
 from _afc_errors import *
 from _version import __version__
@@ -1162,7 +1163,7 @@ def parse_tests(cfg):
             cell = sheet.cell(row = i, column = CHANNEL_CFI_99)
             if cell.value is not None:
                 res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
-            res_str += '}, ' + REQ_INQ_CHA_FOOTER + ' '
+            res_str += '}' + REQ_INQ_CHA_FOOTER + ' '
 
             res_str += REQ_DEV_DESC_HEADER
             cell = sheet.cell(row = i, column = RULESET_CLM)
@@ -1324,15 +1325,18 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
             app_log.warning(f"The requested test case {test_case} is "
                             f"invalid/not available in database")
             continue
-            
+
         request_data = reqs[test_case][0]
 
         before_ts = time.monotonic()
         resp = _send_recv(cfg, json.dumps(request_data))
         tm_secs = time.monotonic() - before_ts
+        res=f"id {test_case} name {req_id} status $status time {tm_secs:.1f}"
+        res_template = Template(res)
 
         if isinstance(resp, type(None)):
             test_res = AFC_ERR
+            all_test_res = AFC_ERR
         else:
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)
@@ -1343,7 +1347,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
                                                result_str=upd_data)
             if (resps[test_case][1] == hash_obj.hexdigest()) \
                     if cfg['precision'] is None else (not diffs):
-                app_log.info(f"Test {req_id} is Ok")
+                res=res_template.substitute(status="Ok")
             else:
                 for line in diffs:
                     app_log.error(f"  Difference: {line}")
@@ -1351,11 +1355,12 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
                 test_res = AFC_ERR
 
         if test_res == AFC_ERR:
-            app_log.error(f"Test {test_case} ({req_id}) is Fail")
+            res=res_template.substitute(status="Fail")
+            app_log.error(res)
             all_test_res = AFC_ERR
-        
+
         accum_secs += tm_secs
-        app_log.info('Test done at %.1f secs', tm_secs)
+        app_log.info(res)
 
         # For saving test results option
         if isinstance(cfg['outfile'], list):

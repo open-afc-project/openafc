@@ -572,6 +572,9 @@ AfcManager::AfcManager()
 	_minEIRP_dBm = quietNaN;
 	_maxEIRP_dBm = quietNaN;
 	_minPSD_dBmPerMHz = quietNaN;
+	_reportUnavailPSDdBmPerMHz = quietNaN;
+	_inquiredFrequencyResolutionMHz = -1;
+	_inquiredFrequencyMaxPSD_dBmPerMHz = quietNaN;
 
 	_IoverN_threshold_dB = -6.0;
 	_bodyLossIndoorDB = 0.0;               // Indoor body Loss (dB)
@@ -2399,7 +2402,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 			if (uncertaintyObj.contains("points_per_degree") && !uncertaintyObj["points_per_degree"].isUndefined()) {
 				_scanres_points_per_degree = uncertaintyObj["points_per_degree"].toInt();
 			} else {
-				_scanres_points_per_degree = 3600;  // Defalut 1 arcsec
+				_scanres_points_per_degree = 3600;  // Default 1 arcsec
 			}
 			break;
 		default:
@@ -2444,6 +2447,36 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_minPSD_dBmPerMHz = jsonObj["minPSD"].toDouble();
 	} else {
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): minPSD is missing.");
+	}
+
+    bool reportUnavailableSpectrumFlag;
+	if (jsonObj.contains("reportUnavailableSpectrum") && !jsonObj["reportUnavailableSpectrum"].isUndefined()) {
+		reportUnavailableSpectrumFlag = jsonObj["reportUnavailableSpectrum"].toBool();
+	} else {
+		reportUnavailableSpectrumFlag = false;
+	}
+
+	if (reportUnavailableSpectrumFlag) {
+	    if (jsonObj.contains("reportUnavailPSDdBPerMHz") && !jsonObj["reportUnavailPSDdBPerMHz"].isUndefined()) {
+		    _reportUnavailPSDdBmPerMHz = jsonObj["reportUnavailPSDdBPerMHz"].toDouble();
+		} else {
+			throw std::runtime_error("AfcManager::importConfigAFCjson(): reportUnavailableSpectrum set but reportUnavailPSDdBPerMHz is missing.");
+		}
+	} else {
+		_reportUnavailPSDdBmPerMHz = quietNaN;
+	}
+	
+
+	if (jsonObj.contains("inquiredFrequencyResolutionMHz") && !jsonObj["inquiredFrequencyResolutionMHz"].isUndefined()) {
+		_inquiredFrequencyResolutionMHz = jsonObj["inquiredFrequencyResolutionMHz"].toInt();
+	} else {
+		_inquiredFrequencyResolutionMHz = 20;  // Default 20 MHz
+	}
+
+	if (jsonObj.contains("inquiredFrequencyMaxPSD_dBmPerMHz") && !jsonObj["inquiredFrequencyMaxPSD_dBmPerMHz"].isUndefined()) {
+		_inquiredFrequencyMaxPSD_dBmPerMHz = jsonObj["inquiredFrequencyMaxPSD_dBmPerMHz"].toInt();
+	} else {
+		_inquiredFrequencyMaxPSD_dBmPerMHz = _maxEIRP_dBm - 10.0*log10(20.0);  // Default maxEIRP over 20 MHz
 	}
 
 	_IoverN_threshold_dB = jsonObj["threshold"].toDouble();
@@ -6951,7 +6984,11 @@ void AfcManager::compute()
 
 	// initialize all channels to max EIRP before computing
 	for (auto& channel : _channelList)
-		channel.eirpLimit_dBm = _maxEIRP_dBm;
+		if (channel.type == INQUIRED_FREQUENCY) {
+			channel.eirpLimit_dBm = _inquiredFrequencyMaxPSD_dBmPerMHz + 10.0*log10((double) channel.bandwidth());
+		} else {
+			channel.eirpLimit_dBm = _maxEIRP_dBm;
+		}
 
 	if (_analysisType == "AP-AFC") {
 		runPointAnalysis();
@@ -6998,7 +7035,7 @@ void AfcManager::runPointAnalysis()
 #if DEBUG_AFC
 	// std::vector<int> fsidTraceList{2128, 3198, 82443};
 	// std::vector<int> fsidTraceList{64324};
-	std::vector<int> fsidTraceList{96635};
+	std::vector<int> fsidTraceList{8177};
 	std::string pathTraceFile = "path_trace.csv.gz";
 #endif
 
@@ -7709,7 +7746,20 @@ void AfcManager::runPointAnalysis()
 
 					// If contains2D is set, FS lon/lat is inside 2D-uncertainty region, depending on height may be above, below, or actually inside uncertainty region.
 					// If contains3D is set, FS is inside 3D-uncertainty
-					_rlanRegion->closestPoint(ulsRxLatLon, contains2D);
+					LatLon closestLatLon = _rlanRegion->closestPoint(ulsRxLatLon, contains2D);
+					if ( (!contains2D) && ( fabs(closestLatLon.first - ulsRxLatLon.first) < 2.0/_scanres_points_per_degree )
+									   && ( fabs(closestLatLon.second - ulsRxLatLon.second) < 2.0/_scanres_points_per_degree ) ) {
+						double adjFSRxLongitude = (std::floor(ulsRxLongitude*_scanres_points_per_degree) + 0.5)/_scanres_points_per_degree;
+						double adjFSRxLatitude = (std::floor(ulsRxLatitude*_scanres_points_per_degree) + 0.5)/_scanres_points_per_degree;
+
+						for(scanPtIdx=0; (scanPtIdx<(int) scanPointList.size())&&(!contains2D); scanPtIdx++) {
+							LatLon scanPt = scanPointList[scanPtIdx];
+							if (    (fabs(scanPt.second - adjFSRxLongitude) < 1.0e-10)
+								 && (fabs(scanPt.first  - adjFSRxLatitude)  < 1.0e-10) ) {
+								contains2D = true;
+							}
+						}
+					}
 
 					contains3D = false;
 					if (contains2D) {
@@ -7719,8 +7769,18 @@ void AfcManager::runPointAnalysis()
 								double maxHeight = rlanCoordList[scanPtIdx][0].heightKm * 1000;
 								if ((ulsRxHeightAMSL >= minHeight) && (ulsRxHeightAMSL <= maxHeight)) {
 									contains3D = true;
+						            LOGGER_INFO(logger) << "FSID = " << uls->getID()
+										<< (divIdx ? " DIVERSITY LINK" : "")
+										<< (segIdx == numPR ? " RX" : " PR " + std::to_string(segIdx+1))
+										<< " inside uncertainty volume";
 								}
 							}
+						}
+						if (!contains3D) {
+							LOGGER_INFO(logger) << "FSID = " << uls->getID()
+								<< (divIdx ? " DIVERSITY LINK" : "")
+								<< (segIdx == numPR ? " RX" : " PR " + std::to_string(segIdx+1))
+								<< " inside uncertainty footprint, not in volume";
 						}
 					}
 
@@ -7732,25 +7792,33 @@ void AfcManager::runPointAnalysis()
 						int chanIdx;
 						for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 							ChannelStruct *channel = &(_channelList[chanIdx]);
-							if (channel->availability != BLACK) {
-								double chanStartFreq = channel->startFreqMHz * 1.0e6;
-								double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-								bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
-								if (hasOverlap > 0.0) {
-									double eirpLimit_dBm = -std::numeric_limits<double>::infinity();
-
+							double chanStartFreq = channel->startFreqMHz * 1.0e6;
+							double chanStopFreq = channel->stopFreqMHz * 1.0e6;
+							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
+							if (hasOverlap > 0.0) {
+								double eirpLimit_dBm;
+								if (std::isnan(_reportUnavailPSDdBmPerMHz)) {
+									eirpLimit_dBm = -std::numeric_limits<double>::infinity();
 									channel->availability = BLACK;
-									channel->eirpLimit_dBm = eirpLimit_dBm;
+								} else {
+									double bwMHz = (double) channel->bandwidth();
+									eirpLimit_dBm = _reportUnavailPSDdBmPerMHz + 10*log10(bwMHz);
+								}
+								channel->eirpLimit_dBm = eirpLimit_dBm;
 
-									if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
-										eirpLimitList[ulsIdx] = eirpLimit_dBm;
-									}
+								if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+									eirpLimitList[ulsIdx] = eirpLimit_dBm;
 								}
 							}
 						}
-						LOGGER_INFO(logger) << "FSID = " << uls->getID() << " is inside specified RLAN region.";
 						minRLANDist = 0.0;
 					} else {
+						Vector3 ulsAntennaPointing = (segIdx == numPR ? (divIdx == 0 ? uls->getAntennaPointing() : uls->getDiversityAntennaPointing()) : uls->getPR(segIdx).pointing);
+
+						double minAngleOffBoresightDeg = 0.0;
+						if (contains2D) {
+							minAngleOffBoresightDeg = _rlanRegion->calcMinAOB(ulsRxLatLon, ulsAntennaPointing, ulsRxHeightAMSL);
+						}
 
 						for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
 							LatLon scanPt = scanPointList[scanPtIdx];
@@ -7809,6 +7877,13 @@ void AfcManager::runPointAnalysis()
 											double bandwidth = chanStopFreq - chanStartFreq;
 											double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
 
+											double maxEIRPdBm;
+											if (channel->type == INQUIRED_FREQUENCY) {
+												maxEIRPdBm = _inquiredFrequencyMaxPSD_dBmPerMHz + 10.0*log10((double) channel->bandwidth());
+											} else {
+												maxEIRPdBm = _maxEIRP_dBm;
+											}
+
 											std::string buildingPenetrationModelStr;
 											double buildingPenetrationCDF;
 											double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF);
@@ -7861,8 +7936,11 @@ void AfcManager::runPointAnalysis()
 #endif
 														);
 
-												Vector3 ulsAntennaPointing = (segIdx == numPR ? (divIdx == 0 ? uls->getAntennaPointing() : uls->getDiversityAntennaPointing()) : uls->getPR(segIdx).pointing);
-												angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+												if (contains2D) {
+													angleOffBoresightDeg = minAngleOffBoresightDeg;
+												} else {
+													angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+												}
 												if (segIdx == numPR) {
 													rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, divIdx);
 												} else {
@@ -7893,13 +7971,13 @@ void AfcManager::runPointAnalysis()
 													}
 												}
 
-												rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+												rxPowerDBW = (maxEIRPdBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
 												I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
 
 												marginDB = _IoverN_threshold_dB - I2NDB;
 
-												eirpLimit_dBm = _maxEIRP_dBm + marginDB;
+												eirpLimit_dBm = maxEIRPdBm + marginDB;
 
 												if (eirpGc) {
 													eirpGc.callsign = uls->getCallsign();
@@ -7970,26 +8048,35 @@ void AfcManager::runPointAnalysis()
 											}
 
 											if (!skip) {
+												if ((contains2D)&&(!std::isnan(_reportUnavailPSDdBmPerMHz))) {
+													double clipeirpLimit_dBm = _reportUnavailPSDdBmPerMHz + 10*log10((double) channel->bandwidth());
+													if (eirpLimit_dBm < clipeirpLimit_dBm) {
+														eirpLimit_dBm = clipeirpLimit_dBm;
+													}
+												}
 												if (channel->type == ChannelType::INQUIRED_CHANNEL) {
-													if (eirpLimit_dBm < _minEIRP_dBm) {
-														channel->eirpLimit_dBm = _minEIRP_dBm;
-														channel->availability = RED;
+													if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
+														if (eirpLimit_dBm < _minEIRP_dBm) {
+															channel->eirpLimit_dBm = _minEIRP_dBm;
+															channel->availability = RED;
+														} else {
+															channel->eirpLimit_dBm = eirpLimit_dBm;
+														}
+													}
+													if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+														eirpLimitList[ulsIdx] = eirpLimit_dBm;
 													}
 												} else {
 													// INQUIRED_FREQUENCY
-													double psd = eirpLimit_dBm - 10.0*log((double) channel->bandwidth())/log(10.0);
-													if (psd < _minPSD_dBmPerMHz) {
-														channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
-														channel->availability = RED;
+													if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
+														double psd = eirpLimit_dBm - 10.0*log((double) channel->bandwidth())/log(10.0);
+														if (psd < _minPSD_dBmPerMHz) {
+															channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
+															channel->availability = RED;
+														} else {
+															channel->eirpLimit_dBm = eirpLimit_dBm;
+														}
 													}
-												}
-
-												if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
-													channel->eirpLimit_dBm = eirpLimit_dBm;
-												}
-
-												if ((channel->eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
-													eirpLimitList[ulsIdx] = channel->eirpLimit_dBm;
 												}
 											}
 
@@ -8074,7 +8161,7 @@ void AfcManager::runPointAnalysis()
 												excthrGc.rlanFsGroundDist = groundDistanceKm;
 												excthrGc.rlanElevAngle = elevationAngleTxDeg;
 												excthrGc.boresightAngle = angleOffBoresightDeg;
-												excthrGc.rlanTxEirp = _maxEIRP_dBm;
+												excthrGc.rlanTxEirp = maxEIRPdBm;
 												excthrGc.bodyLoss = _bodyLossDB;
 												excthrGc.rlanClutterCategory = txClutterStr;
 												excthrGc.fsClutterCategory = rxClutterStr;
@@ -10348,6 +10435,12 @@ void AfcManager::printUserInputs()
 			inputGc.writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT (m)", f2s(_heatmapRLANOutdoorHeight) } );
 			inputGc.writeRow({ "HEATMAP_RLAN_OUTDOOR_HEIGHT_UNCERTAINTY (m)", f2s(_heatmapRLANOutdoorHeightUncertainty) } );
 		}
+		inputGc.writeRow({ "REPORT_UNAVAILABLE_SPECTRUM", (std::isnan(_reportUnavailPSDdBmPerMHz) ? "false" : "true" ) } );
+		if (!std::isnan(_reportUnavailPSDdBmPerMHz)) {
+		    inputGc.writeRow({ "REPORT_UNAVAIL_PSD_DBM_PER_MHZ", f2s(_reportUnavailPSDdBmPerMHz) });
+		}
+		inputGc.writeRow({ "INQUIRED_FREQUENCY_RESOLUTION_MHZ", std::to_string(_inquiredFrequencyResolutionMHz) });
+		inputGc.writeRow({ "INQUIRED_FREQUENCY_MAX_PSD_DBM_PER_MHZ", f2s(_inquiredFrequencyMaxPSD_dBmPerMHz) });
 		inputGc.writeRow({ "VISIBILITY_THRESHOLD", f2s(_visibilityThreshold) } );
 		inputGc.writeRow({ "PRINT_SKIPPED_LINKS_FLAG", (_printSkippedLinksFlag ? "true" : "false" ) } );
 
@@ -10660,28 +10753,23 @@ void AfcManager::createChannelList()
 
 			numChan = 0;
 
-			// Iterate each operating classes and add all channels within the given frequency range
-			for (auto &opClass: _psdOpClassList)
-			{
-				for (auto &cfi: opClass.channels)
-				{
-					ChannelStruct channel;
-					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
-					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
+		    int startFreq = inquiredStartFreqMHz;
+			int stopFreq = startFreq + _inquiredFrequencyResolutionMHz;
+			while(stopFreq <= inquiredStopFreqMHz) {
+				ChannelStruct channel;
+				channel.startFreqMHz = startFreq;
+				channel.stopFreqMHz = stopFreq;
+				channel.operatingClass = -1;
+				channel.index = -1;
+				channel.availability = GREEN; // Everything initialized to GREEN
+				channel.eirpLimit_dBm = 0;
+				channel.type = INQUIRED_FREQUENCY;
+				_channelList.push_back(channel);
+				numChan++;
+				totalNumChan++;
 
-					if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
-						if ( (channel.stopFreqMHz > inquiredStartFreqMHz) && (channel.startFreqMHz < inquiredStopFreqMHz) ) {
-							channel.operatingClass = opClass.opClass;
-							channel.index = cfi;
-							channel.availability = GREEN; // Everything initialized to GREEN
-							channel.eirpLimit_dBm = 0;
-							channel.type = INQUIRED_FREQUENCY;
-							_channelList.push_back(channel);
-							numChan++;
-							totalNumChan++;
-						}
-					}
-				}
+				startFreq = stopFreq;
+				stopFreq = startFreq + _inquiredFrequencyResolutionMHz;
 			}
 
 			if (numChan == 0) {

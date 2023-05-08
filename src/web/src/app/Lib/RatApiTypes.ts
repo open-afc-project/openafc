@@ -65,7 +65,9 @@ export interface AFCConfigFile {
     nearFieldAdjFlag?: boolean,
     deniedRegionFile?: string,
     indoorFixedHeightAMSL?: boolean,
-
+    reportUnavailableSpectrum?: boolean,
+    reportUnavailPSDdBPerMHz?: number,
+    inquiredFrequencyResolutionMHz?: number
 }
 
 export type FreqRange = {
