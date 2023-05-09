@@ -346,7 +346,7 @@ class RatAfc(MethodView):
             if rulesets is None or len(rulesets) != 1 or rulesets[0] not in RULESETS:
                 raise InvalidValueException(["rulesets", rulesets ])
         else:
-            ruleset =  certification_id.split(' ')[0]
+            ruleset = prefix
             if ruleset is None or ruleset not in RULESETS:
                 raise InvalidValueException(["ruleset", ruleset])
 
