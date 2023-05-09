@@ -390,6 +390,7 @@ public:
 	ColDouble rlanElevAngle;
 	ColDouble boresightAngle;
 	ColDouble rlanTxEirp;
+	ColDouble rlanDiscriminationGainDB;
 	ColDouble bodyLoss;
 	ColStr rlanClutterCategory;
 	ColStr fsClutterCategory;
@@ -471,6 +472,7 @@ public:
 		rlanElevAngle(this, 			"RLAN_FS_RX_ELEVATION_ANGLE (deg)"),
 		boresightAngle(this, 			"FS_RX_ANGLE_OFF_BORESIGHT (deg)"),
 		rlanTxEirp(this, 				"RLAN_TX_EIRP (dBm)"),
+		rlanDiscriminationGainDB(this, 	"RLAN_DISCRIMINATION_GAIN (dB)"),
 		bodyLoss(this, 					"BODY_LOSS (dB)"),
 		rlanClutterCategory(this, 		"RLAN_CLUTTER_CATEGORY"),
 		fsClutterCategory(this, 		"FS_CLUTTER_CATEGORY"),
@@ -713,6 +715,9 @@ AfcManager::AfcManager()
 	_prTable = (PRTABLEClass *) NULL;
 
 	_aciFlag = true;
+
+	_rlanAntenna = (AntennaClass *) NULL;
+	_rlanPointing = Vector3(0.0,0.0,0.0);
 
 	_exclusionZoneFSTerrainHeight = quietNaN;
 	_exclusionZoneHeightAboveTerrain = quietNaN;
@@ -8491,6 +8496,20 @@ void AfcManager::runPointAnalysis()
 								double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
 								double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
 
+								double rlanDiscriminationGainDB;
+								if (_rlanAntenna) {
+									double cosAOB = _rlanPointing.dot(lineOfSightVectorKm)/distKm;
+									if (cosAOB > 1.0) {
+										cosAOB = 1.0;
+									} else if (cosAOB < -1.0) {
+										cosAOB = -1.0;
+									}
+									double rlanAngleOffBoresightRad = acos(cosAOB);
+									rlanDiscriminationGainDB = _rlanAntenna->gainDB(rlanAngleOffBoresightRad);
+								} else {
+									rlanDiscriminationGainDB = 0.0;
+								}
+
 								if ((minRLANDist == -1.0) || (distKm*1000.0 < minRLANDist)) {
 									minRLANDist = distKm*1000.0;
 								}
@@ -8604,7 +8623,7 @@ void AfcManager::runPointAnalysis()
 													}
 												}
 
-												rxPowerDBW = (maxEIRPdBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+												rxPowerDBW = (maxEIRPdBm - 30.0) + rlanDiscriminationGainDB - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
 												I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
 
