@@ -196,6 +196,9 @@ export const mapRegionCodeToName = (code:string)=>{
         case 'CA':
             return 'Canada';
             break;
+        case 'BR':
+            return 'Brazil';
+            break;
         default:
             return code;
     }

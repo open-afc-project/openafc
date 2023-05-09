@@ -246,6 +246,96 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "inquiredFrequencyResolutionMHz": 20
 });
 
+const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
+    "freqBands": [
+        {
+            "region": "BR",
+            "name": "Brazil",
+            "startFreqMHz": 5925,
+            "stopFreqMHz": 6875
+        },
+    ],
+    "ulsDefaultAntennaType": "WINNF-AIP-07",
+    "scanPointBelowGroundMethod": "truncate",
+    "polarizationMismatchLoss": {
+        "kind": "Fixed Value",
+        "value": 3
+    },
+    "bodyLoss": {
+        "kind": "Fixed Value",
+        "valueIndoor": 0,
+        "valueOutdoor": 0
+    },
+    "buildingPenetrationLoss": {
+        "kind": "Fixed Value",
+        "value": 0
+    },
+    "receiverFeederLoss": {
+        "IDU": 0,
+        "ODU": 0,
+        "UNKNOWN": 0
+    },
+    "fsReceiverNoise": {
+        "freqList": [6425],
+        "noiseFloorList": [-110, -109.5]
+    },
+    "threshold": -6,
+    "maxLinkDistance": 130,
+    "maxEIRP": 36,
+    "minEIRP": 21,
+
+    "minPSD": 8,
+    "propagationModel": {
+        "kind": "Brazilian Propagation Model",
+        "win2ConfidenceCombined": 16,
+        "win2ConfidenceLOS": 16,
+        "itmConfidence": 5,
+        "itmReliability": 20,
+        "p2108Confidence": 25,
+        "buildingSource": "None",
+        "terrainSource": "SRTM (90m)",
+        "winner2LOSOption": "UNKNOWN"
+    },
+    "propagationEnv": "Population Density Map",
+    "ulsDatabase": "Brazil_ULS_LATEST.sqlite3",
+    "regionStr": "BR",
+    "APUncertainty": {
+        "horizontal": 30,
+        "height": 5
+    },
+    "ITMParameters": {
+        "polarization": "Vertical",
+        "ground": "Average Ground",
+        "dielectricConst": 25,
+        "conductivity": 0.005,
+        "minSpacing": 30,
+        "maxPoints": 1500
+    },
+    "rlanITMTxClutterMethod": "FORCE_TRUE",
+    "clutterAtFS": false,
+    "fsClutterModel": {
+        "p2108Confidence": 5,
+        "maxFsAglHeight": 6
+    },
+    "nlcdFile": "",
+    "enableMapInVirtualAp": false,
+    "channelResponseAlgorithm": "psd",
+    "visibilityThreshold": -6,
+    "version": guiConfig.version,
+    "allowScanPtsInUncReg": false,
+    "passiveRepeaterFlag": true,
+    "printSkippedLinksFlag": false,
+    "reportErrorRlanHeightLowFlag": false,
+    "nearFieldAdjFlag": false,
+    "deniedRegionFile": "",
+    "indoorFixedHeightAMSL":false,
+    "reportUnavailableSpectrum": true,
+    "reportUnavailPSDdBPerMHz": -40,
+    "inquiredFrequencyResolutionMHz": 20
+});
+
+
+
 const defaultAllRegionFreqRanges: () => FreqRange[] = () => (
     [
         {
@@ -388,6 +478,8 @@ export const getDefaultAfcConf = (x: string | undefined) => {
     }
     if (x == "CA") {
         return defaultAfcConfCanada();
+    }else if(x == "BR"){
+        return defaultAfcConfBrazil();
     } else {
         return defaultAfcConf();
     }

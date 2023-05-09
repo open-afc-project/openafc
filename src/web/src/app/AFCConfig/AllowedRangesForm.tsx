@@ -39,7 +39,17 @@ export class AllowedRangesDisplay extends React.PureComponent<{data: FreqRange[]
                     stopFreqMHz : 6875
                 },      
             ]
-        } else {
+        } else if (region.endsWith("BR")) {
+            return [
+                {
+                    region: "BR",
+                    name: "Brazil",
+                    startFreqMHz : 5925,
+                    stopFreqMHz : 6875
+                },      
+            ]
+        }  
+        else {
             return [           
                 {   
                     region: "US",    

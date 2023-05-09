@@ -159,6 +159,8 @@ export class AFCForm extends React.Component<
                 if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
                 if (propModel.buildingSource !== "None" && propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
                 break;
+            case "Brazilian Propagation Model":
+                break;
             default:
                 return err();
         }
@@ -213,7 +215,7 @@ export class AFCForm extends React.Component<
 
     private reset = () => {
         let config = getDefaultAfcConf(this.state.config.regionStr);
-        if(config.regionStr != this.state.config.regionStr){ // this is a demo/test config likely because they don't match
+        if (config.regionStr != this.state.config.regionStr) { // this is a demo/test config likely because they don't match
             config.regionStr = this.state.config.regionStr
         }
         config.freqBands = this.props.frequencyBands.filter((x) => (x.region == this.state.config.regionStr) || (!x.region && this.state.config.regionStr == 'US'))
@@ -356,20 +358,15 @@ export class AFCForm extends React.Component<
                                 </FormSelect>
                             </FormGroup>
                         </GalleryItem>
-                        {(
-                            this.state.config.regionStr == "CA" ||
-                            this.state.config.regionStr == "US" ||
-                            this.state.config.regionStr?.endsWith("CA") ||
-                            this.state.config.regionStr?.endsWith("US")
-                        ) &&
-                            <AFCFormUSACanada
-                                config={this.state.config}
-                                antennaPatterns={this.state.antennaPatternData}
-                                frequencyBands={this.props.frequencyBands.filter((x) => x.region == this.state.config.regionStr)}
-                                limit={this.props.limit}
-                                updateConfig={(x) => this.updateConfigFromComponent(x)}
-                                updateAntennaData={(x) => this.updateAntennaDataFromComponent(x)} />
-                        }
+
+                        <AFCFormUSACanada
+                            config={this.state.config}
+                            antennaPatterns={this.state.antennaPatternData}
+                            frequencyBands={this.props.frequencyBands.filter((x) => x.region == this.state.config.regionStr)}
+                            limit={this.props.limit}
+                            updateConfig={(x) => this.updateConfigFromComponent(x)}
+                            updateAntennaData={(x) => this.updateAntennaDataFromComponent(x)} />
+
                     </Gallery>
                     <br />
                     <>

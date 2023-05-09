@@ -51,7 +51,13 @@ export default class AntennaPatternForm extends React.PureComponent<{ data: Ante
                 "F.699",
                 "F.1245"
             ]
-        } else {
+        } else if (region.endsWith("BR")) {
+            return [
+                'WINNF-AIP-07',
+                "F.699",
+                "F.1245"
+            ]
+        }else{
             return [
                 'WINNF-AIP-07',
                 "F.699",
