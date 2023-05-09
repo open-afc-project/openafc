@@ -58,7 +58,7 @@ def regionStrToNra(region_str):
        'CA':'ISED',
        'TEST_US':'TEST_FCC',
        'DEMO_US':'DEMO_FCC',
-       'BR':'ANATEL'
+       'BR':'BRAZIL_NRA'
     }
     region_str = region_str.upper()
     try:
@@ -72,7 +72,7 @@ def nraToRegionStr(nra):
         'TEST_FCC':'TEST_US',
         'ISED':'CA',
         'DEMO_FCC':'DEMO_US',
-        'ANATEL':'BR'
+        'BRAZIL_NRA':'BR'
     }
     nra = nra.upper()
     try:
@@ -89,10 +89,11 @@ def regionStrToRulesetId(region_str):
     """
     map = {
        'DEFAULT':'US_47_CFR_PART_15_SUBPART_E',
-       'US':'"US_47_CFR_PART_15_SUBPART_E"',
+       'US':'US_47_CFR_PART_15_SUBPART_E',
        'CA':'CA_RES_DBS-06',
        'TEST_US':'TEST_FCC',
-       'DEMO_US':'DEMO_FCC'
+       'DEMO_US':'DEMO_FCC',
+       'BR':'BRAZIL_RULESET'
     }
     region_str = region_str.upper()
     try:
@@ -106,6 +107,7 @@ def rulesetIdToRegionStr(rulesetId):
         'TEST_FCC':'TEST_US',
         'CA_RES_DBS-06':'CA',
         'DEMO_FCC':'DEMO_US',
+        'BRAZIL_RULESET':'BR'
     }
     rulesetId = rulesetId.upper()
     try:
