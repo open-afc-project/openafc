@@ -75,6 +75,20 @@ double RlanRegionClass::getMaxHeightAGL() const
 /******************************************************************************************/
 
 /******************************************************************************************/
+/**** FUNCTION: RlanRegionClass::computePointing()                                     ****/
+/******************************************************************************************/
+Vector3 RlanRegionClass::computePointing(double azimuth, double elevation) const
+{
+    double azimuthRad   = azimuth*M_PI/180.0;
+    double elevationRad = elevation*M_PI/180.0;
+
+    Vector3 pointing = (northVec*cos(azimuthRad) + eastVec*sin(azimuthRad))*cos(elevationRad) + upVec*sin(elevationRad);
+
+	return(pointing);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
 /**** CONSTRUCTOR: EllipseRlanRegionClass::EllipseRlanRegionClass()                    ****/
 /******************************************************************************************/
 EllipseRlanRegionClass::EllipseRlanRegionClass(DoubleTriplet rlanLLA, DoubleTriplet rlanUncerts_m,

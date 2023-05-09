@@ -1,8 +1,10 @@
 // AfcManager.cpp -- Manages I/O and top-level operations for the AFC Engine
-#include "AfcManager.h"
 #include <boost/format.hpp>
-#include "RlanRegion.h"
 #include <QFileInfo>
+
+#include "AfcManager.h"
+#include "RlanRegion.h"
+#include "lininterp.h"
 
 // "--runtime_opt" masks
 // These bits corresponds to RNTM_OPT_... bits in src/ratapi/ratapi/defs.py
@@ -390,6 +392,8 @@ public:
 	ColDouble rlanElevAngle;
 	ColDouble boresightAngle;
 	ColDouble rlanTxEirp;
+	ColStr rlanAntennaModel;
+	ColDouble rlanAOB;
 	ColDouble rlanDiscriminationGainDB;
 	ColDouble bodyLoss;
 	ColStr rlanClutterCategory;
@@ -472,6 +476,8 @@ public:
 		rlanElevAngle(this, 			"RLAN_FS_RX_ELEVATION_ANGLE (deg)"),
 		boresightAngle(this, 			"FS_RX_ANGLE_OFF_BORESIGHT (deg)"),
 		rlanTxEirp(this, 				"RLAN_TX_EIRP (dBm)"),
+		rlanAntennaModel(this, 			"RLAN_ANTENNA_MODEL"),
+		rlanAOB(this,				 	"RLAN_ANGLE_OFF_BORESIGHT (deg)"),
 		rlanDiscriminationGainDB(this, 	"RLAN_DISCRIMINATION_GAIN (dB)"),
 		bodyLoss(this, 					"BODY_LOSS (dB)"),
 		rlanClutterCategory(this, 		"RLAN_CLUTTER_CATEGORY"),
@@ -1214,10 +1220,6 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	// Read JSON from file
 	QJsonObject jsonObj = jsonDoc.object();
 
-
-	// Properly set _aciFlag from GUI.  When set to true, ACI is considered in interference calculations, when set to false, there is no ACI.
-	_aciFlag = true;
-
 	if (jsonObj.contains("version") && !jsonObj["version"].isUndefined()) {
 		_guiJsonVersion = jsonObj["version"].toString();
 	} else {
@@ -1329,6 +1331,12 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		} else {
 			_minEIRP_dBm = quietNaN;
 		}
+
+		QJsonArray vendorExtensionArray;
+		if (!optionalParams.contains("vendorExtensions")) {
+			vendorExtensionArray = requestObj["vendorExtensions"].toArray();
+		}
+
 		/**********************************************************************/
 
 		/**********************************************************************/
@@ -1672,6 +1680,31 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		}
 		/**********************************************************************/
 
+		/**********************************************************************/
+		/* VendorExtension Object (Table 23)                                  */
+		/**********************************************************************/
+		for(auto vendorExtensionVal : vendorExtensionArray) {
+			auto vendorExtensionObj = vendorExtensionVal.toObject();
+			requiredParams = QStringList() << "extensionId" << "parameters";
+			optionalParams = QStringList();
+			for(auto key : vendorExtensionObj.keys()) {
+				int rIdx = requiredParams.indexOf(key);
+				if (rIdx != -1) {
+					requiredParams.erase(requiredParams.begin()+rIdx);
+				} else {
+					int oIdx = optionalParams.indexOf(key);
+					if (oIdx != -1) {
+						optionalParams.erase(optionalParams.begin()+oIdx);
+					} else {
+						_unexpectedParams << key;
+					}
+				}
+			}
+			_missingParams << requiredParams;
+		}
+		/**********************************************************************/
+
+
 		if (_missingParams.size()) {
 			_responseCode = CConst::missingParamResponseCode;
 			return;
@@ -1853,6 +1886,47 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 						inquiredFrequencyRangeObj["highFrequency"].toInt()));
 		}
 		LOGGER_INFO(logger) << inquiredFrequencyRangeArray.size() << " frequency range(s) requested";
+
+		bool hasRLANAntenna = false;
+		for(auto vendorExtensionVal : vendorExtensionArray) {
+			auto vendorExtensionObj = vendorExtensionVal.toObject();
+			auto parametersObj = vendorExtensionObj["parameters"].toObject();
+			if (parametersObj.contains("type") && !parametersObj["type"].isUndefined()) {
+				std::string type = parametersObj["type"].toString().toStdString();
+				if (type == "rlanAntenna") {
+					if (hasRLANAntenna) {
+						LOGGER_WARN(logger) << "GENERAL FAILURE: multiple RLAN antennas specified";
+						_responseCode = CConst::generalFailureResponseCode;
+						return;
+					}
+					std::string antennaName =  parametersObj["antennaModel"].toString().toStdString();
+					_rlanAzimuthPointing =  parametersObj["azimuthPointing"].toDouble();
+					_rlanElevationPointing =  parametersObj["elevationPointing"].toDouble();
+					int numAntennaAOB =  parametersObj["numAOB"].toInt();
+					QJsonArray gainArray;
+					gainArray = parametersObj["discriminationGainDB"].toArray();
+
+					if (gainArray.size() != numAntennaAOB) {
+						LOGGER_WARN(logger) << "GENERAL FAILURE: numAntennaAOB = " << numAntennaAOB << " discriminationGainDB has " << gainArray.size() << " elements";
+						_responseCode = CConst::generalFailureResponseCode;
+						return;
+					}
+
+					std::vector<std::tuple<double, double>> sampledData;
+					std::tuple<double, double> pt;
+					for(int aobIdx=0; aobIdx<numAntennaAOB; ++aobIdx) {
+						std::get<0>(pt) = (((double) aobIdx)/(numAntennaAOB-1))*M_PI;
+						std::get<1>(pt) = gainArray.at(aobIdx).toDouble();
+						sampledData.push_back(pt);
+					}
+					_rlanAntenna = new AntennaClass(CConst::antennaLUT_Boresight, antennaName.c_str());
+					LinInterpClass *gainTable = new LinInterpClass(sampledData);
+					_rlanAntenna->setBoresightGainTable(gainTable);
+
+					hasRLANAntenna = true;
+				}
+			}
+		}
 
 		if (inquiredChannelsArray.size() + inquiredFrequencyRangeArray.size() == 0) {
 			LOGGER_WARN(logger) << "GENERAL FAILURE: must specify either inquiredChannels or inquiredFrequencies";
@@ -3454,6 +3528,16 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_reportErrorRlanHeightLowFlag = jsonObj["reportErrorRlanHeightLowFlag"].toBool();
 	} else {
 		_reportErrorRlanHeightLowFlag = false;
+	}
+	// ***********************************
+
+	// ***********************************
+	// If this flag is set, include ACI in channel I/N calculations
+	// ***********************************
+	if (jsonObj.contains("aciFlag") && !jsonObj["aciFlag"].isUndefined()) {
+		_aciFlag = jsonObj["aciFlag"].toBool();
+	} else {
+		_aciFlag = true;
 	}
 	// ***********************************
 
@@ -7681,6 +7765,8 @@ void AfcManager::runPointAnalysis()
 
 	_rlanRegion->configure(_rlanHeightType, _terrainDataModel);
 
+	_rlanPointing = _rlanRegion->computePointing(_rlanAzimuthPointing, _rlanElevationPointing);
+
 	// Sorting by distance from AP
 	double cosLatSq = cos(_rlanRegion->getCenterLatitude() / 180.0 * M_PI);
 	cosLatSq *= cosLatSq;
@@ -8496,6 +8582,7 @@ void AfcManager::runPointAnalysis()
 								double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
 								double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
 
+								double rlanAngleOffBoresightRad;
 								double rlanDiscriminationGainDB;
 								if (_rlanAntenna) {
 									double cosAOB = _rlanPointing.dot(lineOfSightVectorKm)/distKm;
@@ -8504,9 +8591,10 @@ void AfcManager::runPointAnalysis()
 									} else if (cosAOB < -1.0) {
 										cosAOB = -1.0;
 									}
-									double rlanAngleOffBoresightRad = acos(cosAOB);
+									rlanAngleOffBoresightRad = acos(cosAOB);
 									rlanDiscriminationGainDB = _rlanAntenna->gainDB(rlanAngleOffBoresightRad);
 								} else {
+									rlanAngleOffBoresightRad = 0.0;
 									rlanDiscriminationGainDB = 0.0;
 								}
 
@@ -8814,6 +8902,14 @@ void AfcManager::runPointAnalysis()
 												excthrGc.rlanElevAngle = elevationAngleTxDeg;
 												excthrGc.boresightAngle = angleOffBoresightDeg;
 												excthrGc.rlanTxEirp = maxEIRPdBm;
+												if (_rlanAntenna) {
+													excthrGc.rlanAntennaModel = _rlanAntenna->get_strid();
+													excthrGc.rlanAOB = rlanAngleOffBoresightRad*180.0/M_PI;
+												} else {
+													excthrGc.rlanAntennaModel = "";
+													excthrGc.rlanAOB = -1.0;
+												}
+												excthrGc.rlanDiscriminationGainDB = rlanDiscriminationGainDB;
 												excthrGc.bodyLoss = _bodyLossDB;
 												excthrGc.rlanClutterCategory = txClutterStr;
 												excthrGc.fsClutterCategory = rxClutterStr;
@@ -11095,6 +11191,7 @@ void AfcManager::printUserInputs()
 		inputGc.writeRow({ "INQUIRED_FREQUENCY_MAX_PSD_DBM_PER_MHZ", f2s(_inquiredFrequencyMaxPSD_dBmPerMHz) });
 		inputGc.writeRow({ "VISIBILITY_THRESHOLD", f2s(_visibilityThreshold) } );
 		inputGc.writeRow({ "PRINT_SKIPPED_LINKS_FLAG", (_printSkippedLinksFlag ? "true" : "false" ) } );
+		inputGc.writeRow({ "ACI_FLAG", (_aciFlag ? "true" : "false" ) } );
 
 	}
 	LOGGER_DEBUG(logger) << "User inputs written to userInputs.csv";

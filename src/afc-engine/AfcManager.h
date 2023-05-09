@@ -400,6 +400,7 @@ class AfcManager
 
 		AntennaClass *_rlanAntenna;
 		Vector3 _rlanPointing;
+		double _rlanAzimuthPointing, _rlanElevationPointing;
 		/**************************************************************************************/
 
 		/**************************************************************************************/

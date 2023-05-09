@@ -41,8 +41,9 @@ class RlanRegionClass
 		double getCenterTerrainHeight()    const { return(centerTerrainHeight); }
 		double getHeightUncertainty()  const { return(heightUncertainty); }
 		bool   getFixedHeightAMSL()    const { return(fixedHeightAMSL); }
-
 		Vector3 getCenterPosn()  const { return(centerPosn); }
+
+		Vector3 computePointing(double azimuth, double elevation) const;
 
 	protected:
 		double centerLongitude;
