@@ -25,6 +25,15 @@
  * The brazil jira tickets are yet to be tested. We're pushing this branch to get the fix for the 682 bug in ASAP as this is needed for WFA TVs.
 
 ## **Version and Date**
+
+
+|Version|**OA-634**|
+|**Date**|**05/09/2023**|
+## **Issues Addressed**
+ * Jira OA-582: Add support for denied devices.  UI for uploading and download list is under "Denied Rules" tab, which now contains both denied devices and denied regions. Denied devices can be specified by both certification id and serial number, or by just the certification id.  In the latter case, the serial number field can be filled in with * or None.
+  Since database version changes, need to run  rat-manage-api db-upgrade once from shell upon first time running container with this new version.
+
+## **Version and Date**
 |Version|**OA-634**|
 | :- | :- |
 |**Date**|**05/08/2023**|
@@ -48,10 +57,6 @@
 ## **Open Issues** 
  * Need to confirm with WFA the proper Error code when rulesetId is not set to one of the valid values.
  
-## **Issues Addressed**
- * Jira OA-582: Add support for denied devices.  UI for uploading and download list is under "Denied Rules" tab, which now contains both denied devices and denied regions. Denied devices can be specified by both certification id and serial number, or by just the certification id.  In the latter case, the serial number field can be filled in with * or None.
-
-## **Version and Date**
 |Version|**OA-636**|
 | :- | :- |
 |**Date**|**04/28/2023**|
