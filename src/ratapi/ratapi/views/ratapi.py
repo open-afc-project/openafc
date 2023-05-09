@@ -41,7 +41,7 @@ module = flask.Blueprint('ratapi-v1', 'ratapi')
 def regions():
     return ['US', 'CA', 'TEST_US', 'DEMO_US']
 
-
+# Keep the NRA for 1.3 compatability
 def regionStrToNra(region_str):
     """ Input: region_str: regionStr field of the afc config.
         Output: nra
@@ -73,6 +73,39 @@ def nraToRegionStr(nra):
         return map[nra]
     except:
         raise werkzeug.exceptions.NotFound('Invalid NRA %s' % nra)
+
+# after 1.4 use Ruleset ID
+def regionStrToRulesetId(region_str):
+    """ Input: region_str: regionStr field of the afc config.
+        Output: nra
+        nra: can match with the NRA field of the AP, e.g. FCC
+        Eg. 'USA' => 'FCC'
+    """
+    map = {
+       'DEFAULT':'US_47_CFR_PART_15_SUBPART_E',
+       'US':'"US_47_CFR_PART_15_SUBPART_E"',
+       'CA':'CA_RES_DBS-06',
+       'TEST_US':'TEST_FCC',
+       'DEMO_US':'DEMO_FCC'
+    }
+    region_str = region_str.upper()
+    try:
+        return map[region_str]
+    except:
+        raise werkzeug.exceptions.NotFound('Invalid Region %s' % region_str)
+
+def rulesetIdToRegionStr(rulesetId):
+    map = {
+        'US_47_CFR_PART_15_SUBPART_E':'US',
+        'TEST_FCC':'TEST_US',
+        'CA_RES_DBS-06':'CA',
+        'DEMO_FCC':'DEMO_US',
+    }
+    rulesetId = rulesetId.upper()
+    try:
+        return map[rulesetId]
+    except:
+        raise werkzeug.exceptions.NotFound('Invalid ruleset %s' % rulesetId)
 
 
 def build_task(dataif,
@@ -339,7 +372,7 @@ class AfcConfigFile(MethodView):
         filename = rcrd['regionStr'].upper()
         LOGGER.debug('AfcConfigFile.put({})'.format(filename))
         # validate the region string
-        regionStrToNra(filename)
+        regionStrToRulesetId(filename)
         # make sure the config region string is upper case
         rcrd['regionStr'] = filename
         ordered_bytes = json.dumps(rcrd, sort_keys=True)

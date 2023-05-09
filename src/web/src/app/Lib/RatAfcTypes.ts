@@ -17,16 +17,22 @@ export interface AvailableSpectrumInquiryRequest {
     vendorExtensions: VendorExtension[]
 }
 
-export interface CertificationId{
-    nra:string,
-    id:string
+export const KnownRuleSetIds = [
+    "US_47_CFR_PART_15_SUBPART_E",
+    "CA_RES_DBS-06",
+    "TEST_FCC",
+    "DEMO_FCC"
+]
+
+export interface CertificationId {
+    rulesetId: string,
+    id: string
 }
 
 
 export interface DeviceDescriptor {
     serialNumber: string,
     certificationId: CertificationId[],
-    rulesetIds: ["US_47_CFR_PART_15_SUBPART_E"]
 }
 
 export interface Elevation {
@@ -80,7 +86,7 @@ export interface Channels {
     channelCfi?: number[]
 }
 
-export interface AvailableSpectrumInquiryResponseMessage{
+export interface AvailableSpectrumInquiryResponseMessage {
     version: string,
     availableSpectrumInquiryResponses: AvailableSpectrumInquiryResponse[],
     vendorExtensions?: VendorExtension[]

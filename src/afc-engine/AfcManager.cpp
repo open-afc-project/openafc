@@ -1219,7 +1219,9 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 		_guiJsonVersion = QString("1.3");
 	}
 
-	if (_guiJsonVersion == "1.3") {
+	if (_guiJsonVersion == "1.4") {
+		importGUIjsonVersion1_4(jsonObj);
+	} else if (_guiJsonVersion == "1.3") {
 		importGUIjsonVersion1_3(jsonObj);
 	} else if (_guiJsonVersion == "1.1") {
 		// 1.3 and 1.1 are the same
@@ -1231,6 +1233,637 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 			"VERSION NOT SUPPORTED: GUI JSON FILE \"" << inputJSONpath << "\": version: " << _guiJsonVersion;
 		_responseCode = CConst::versionNotSupportedResponseCode;
 		return;
+	}
+
+	return;
+}
+
+void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
+{
+	QString errMsg;
+
+	if ( (_analysisType == "AP-AFC") || (_analysisType == "ScanAnalysis") || (_analysisType == "test_itm") ) {
+		QStringList requiredParams;
+		QStringList optionalParams;
+
+		/**********************************************************************/
+		/* AvailableSpectrumInquiryRequestMessage Object (Table 5)            */
+		/**********************************************************************/
+		requiredParams = QStringList() << "availableSpectrumInquiryRequests" << "version";
+		optionalParams = QStringList() << "vendorExtensions";
+		for(auto key : jsonObj.keys()) {
+			int rIdx = requiredParams.indexOf(key);
+			if (rIdx != -1) {
+				requiredParams.erase(requiredParams.begin()+rIdx);
+			} else {
+				int oIdx = optionalParams.indexOf(key);
+				if (oIdx != -1) {
+					optionalParams.erase(optionalParams.begin()+oIdx);
+				} else {
+					_unexpectedParams << key;
+				}
+			}
+		}
+		_missingParams << requiredParams;
+
+		QJsonObject requestObj;
+		if (!requiredParams.contains("availableSpectrumInquiryRequests")) {
+			QJsonArray requestArray = jsonObj["availableSpectrumInquiryRequests"].toArray();
+			if (requestArray.size() != 1) {
+				LOGGER_WARN(logger) << "GENERAL FAILURE: afc-engine only processes a single request, "
+					<< requestArray.size() << " requests specified";
+				_responseCode = CConst::generalFailureResponseCode;
+				return;
+			}
+			requestObj = requestArray.at(0).toObject();
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* AvailableSpectrumInquiryRequest Object (Table 6)                   */
+		/**********************************************************************/
+		requiredParams = QStringList() << "requestId" << "deviceDescriptor" << "location";
+		optionalParams = QStringList() << "inquiredFrequencyRange" << "inquiredChannels" << "minDesiredPower" << "vendorExtensions";
+		for(auto key : requestObj.keys()) {
+			int rIdx = requiredParams.indexOf(key);
+			if (rIdx != -1) {
+				requiredParams.erase(requiredParams.begin()+rIdx);
+			} else {
+				int oIdx = optionalParams.indexOf(key);
+				if (oIdx != -1) {
+					optionalParams.erase(optionalParams.begin()+oIdx);
+				} else {
+					_unexpectedParams << key;
+				}
+			}
+		}
+		_missingParams << requiredParams;
+
+		QJsonObject deviceDescriptorObj;
+		if (!requiredParams.contains("deviceDescriptor")) {
+			deviceDescriptorObj = requestObj["deviceDescriptor"].toObject();
+		}
+
+		QJsonObject locationObj;
+		if (!requiredParams.contains("location")) {
+			locationObj = requestObj["location"].toObject();
+		}
+
+		QJsonArray inquiredFrequencyRangeArray;
+		if (!optionalParams.contains("inquiredFrequencyRange")) {
+			inquiredFrequencyRangeArray = requestObj["inquiredFrequencyRange"].toArray();
+		}
+
+		QJsonArray inquiredChannelsArray;
+		if (!optionalParams.contains("inquiredChannels")) {
+			inquiredChannelsArray = requestObj["inquiredChannels"].toArray();
+		}
+
+		if (!optionalParams.contains("minDesiredPower")) {
+			_minEIRP_dBm = requestObj["minDesiredPower"].toDouble();
+		} else {
+			_minEIRP_dBm = quietNaN;
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* DeviceDescriptor Object (Table 7)                                  */
+		/**********************************************************************/
+		requiredParams = QStringList() << "serialNumber" << "certificationId";
+		optionalParams = QStringList();
+		for(auto key : deviceDescriptorObj.keys()) {
+			int rIdx = requiredParams.indexOf(key);
+			if (rIdx != -1) {
+				requiredParams.erase(requiredParams.begin()+rIdx);
+			} else {
+				int oIdx = optionalParams.indexOf(key);
+				if (oIdx != -1) {
+					optionalParams.erase(optionalParams.begin()+oIdx);
+				} else {
+					_unexpectedParams << key;
+				}
+			}
+		}
+		_missingParams << requiredParams;
+
+		QJsonArray certificationIdArray;
+		if (!requiredParams.contains("certificationId")) {
+			certificationIdArray = deviceDescriptorObj["certificationId"].toArray();
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* CertificationID Object (Table 8)                                   */
+		/**********************************************************************/
+		for(auto certificationIDVal : certificationIdArray) {
+			auto certificationIDObj = certificationIDVal.toObject();
+			requiredParams = QStringList() << "rulesetId" << "id";
+			optionalParams = QStringList();
+			for(auto key : certificationIDObj.keys()) {
+				int rIdx = requiredParams.indexOf(key);
+				if (rIdx != -1) {
+					requiredParams.erase(requiredParams.begin()+rIdx);
+				} else {
+					int oIdx = optionalParams.indexOf(key);
+					if (oIdx != -1) {
+						optionalParams.erase(optionalParams.begin()+oIdx);
+					} else {
+						_unexpectedParams << key;
+					}
+				}
+			}
+			_missingParams << requiredParams;
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* Location Object (Table 9)                                          */
+		/**********************************************************************/
+		requiredParams = QStringList() << "elevation";
+		optionalParams = QStringList() << "ellipse" << "linearPolygon" << "radialPolygon" << "indoorDeployment";
+		for(auto key : locationObj.keys()) {
+			int rIdx = requiredParams.indexOf(key);
+			if (rIdx != -1) {
+				requiredParams.erase(requiredParams.begin()+rIdx);
+			} else {
+				int oIdx = optionalParams.indexOf(key);
+				if (oIdx != -1) {
+					optionalParams.erase(optionalParams.begin()+oIdx);
+				} else {
+					_unexpectedParams << key;
+				}
+			}
+		}
+		_missingParams << requiredParams;
+
+		int hasIndoorDeploymentFlag = (optionalParams.contains("indoorDeployment") ? 0 : 1);
+
+		int hasEllipseFlag       = (optionalParams.contains("ellipse")       ? 0 : 1);
+		int hasLinearPolygonFlag = (optionalParams.contains("linearPolygon") ? 0 : 1);
+		int hasRadialPolygonFlag = (optionalParams.contains("radialPolygon") ? 0 : 1);
+
+		int n = hasEllipseFlag + hasLinearPolygonFlag + hasRadialPolygonFlag;
+
+		if (n != 1) {
+			LOGGER_WARN(logger) << "GENERAL FAILURE: location object must contain exactly one instance of ellipse, linearPolygon, or radialPolygon, total of "
+				<< n << " instances found";
+			_responseCode = CConst::generalFailureResponseCode;
+			return;
+		}
+
+		QJsonObject ellipseObj;
+		if (hasEllipseFlag) {
+			ellipseObj = locationObj["ellipse"].toObject();
+		}
+
+		QJsonObject linearPolygonObj;
+		if (hasLinearPolygonFlag) {
+			linearPolygonObj = locationObj["linearPolygon"].toObject();
+		}
+
+		QJsonObject radialPolygonObj;
+		if (hasRadialPolygonFlag) {
+			radialPolygonObj = locationObj["radialPolygon"].toObject();
+		}
+
+		QJsonObject elevationObj;
+		if (!requiredParams.contains("elevation")) {
+			elevationObj = locationObj["elevation"].toObject();
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* Ellipse Object (Table 10)                                          */
+		/**********************************************************************/
+		bool hasCenterFlag = false;
+		QJsonObject centerObj;
+		if (hasEllipseFlag) {
+			requiredParams = QStringList() << "center" << "majorAxis" << "minorAxis" << "orientation";
+			optionalParams = QStringList();
+			for(auto key : ellipseObj.keys()) {
+				int rIdx = requiredParams.indexOf(key);
+				if (rIdx != -1) {
+					requiredParams.erase(requiredParams.begin()+rIdx);
+				} else {
+					int oIdx = optionalParams.indexOf(key);
+					if (oIdx != -1) {
+						optionalParams.erase(optionalParams.begin()+oIdx);
+					} else {
+						_unexpectedParams << key;
+					}
+				}
+			}
+			_missingParams << requiredParams;
+
+			if (!requiredParams.contains("center")) {
+				centerObj = ellipseObj["center"].toObject();
+				hasCenterFlag = true;
+			}
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* LinearPolygon Object (Table 11)                                    */
+		/**********************************************************************/
+		bool hasOuterBoundaryPointArrayFlag = false;
+		QJsonArray outerBoundaryPointArray;
+		if (hasLinearPolygonFlag) {
+			requiredParams = QStringList() << "outerBoundary";
+			optionalParams = QStringList();
+			for(auto key : linearPolygonObj.keys()) {
+				int rIdx = requiredParams.indexOf(key);
+				if (rIdx != -1) {
+					requiredParams.erase(requiredParams.begin()+rIdx);
+				} else {
+					int oIdx = optionalParams.indexOf(key);
+					if (oIdx != -1) {
+						optionalParams.erase(optionalParams.begin()+oIdx);
+					} else {
+						_unexpectedParams << key;
+					}
+				}
+			}
+			_missingParams << requiredParams;
+
+			if (!requiredParams.contains("outerBoundary")) {
+				outerBoundaryPointArray = linearPolygonObj["outerBoundary"].toArray();
+				hasOuterBoundaryPointArrayFlag = true;
+			}
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* RadialPolygon Object (Table 12)                                    */
+		/**********************************************************************/
+		bool hasOuterBoundaryVectorArrayFlag = false;
+		QJsonArray outerBoundaryVectorArray;
+		if (hasRadialPolygonFlag) {
+			requiredParams = QStringList() << "center" << "outerBoundary";
+			optionalParams = QStringList();
+			for(auto key : radialPolygonObj.keys()) {
+				int rIdx = requiredParams.indexOf(key);
+				if (rIdx != -1) {
+					requiredParams.erase(requiredParams.begin()+rIdx);
+				} else {
+					int oIdx = optionalParams.indexOf(key);
+					if (oIdx != -1) {
+						optionalParams.erase(optionalParams.begin()+oIdx);
+					} else {
+						_unexpectedParams << key;
+					}
+				}
+			}
+			_missingParams << requiredParams;
+
+			if (!requiredParams.contains("center")) {
+				centerObj = radialPolygonObj["center"].toObject();
+				hasCenterFlag = true;
+			}
+
+			if (!requiredParams.contains("outerBoundary")) {
+				outerBoundaryVectorArray = radialPolygonObj["outerBoundary"].toArray();
+				hasOuterBoundaryVectorArrayFlag = true;
+			}
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* ElevationPolygon Object (Table 13)                                 */
+		/**********************************************************************/
+		requiredParams = QStringList() << "height" << "heightType" << "verticalUncertainty";
+		optionalParams = QStringList();
+		for(auto key : elevationObj.keys()) {
+			int rIdx = requiredParams.indexOf(key);
+			if (rIdx != -1) {
+				requiredParams.erase(requiredParams.begin()+rIdx);
+			} else {
+				int oIdx = optionalParams.indexOf(key);
+				if (oIdx != -1) {
+					optionalParams.erase(optionalParams.begin()+oIdx);
+				} else {
+					_unexpectedParams << key;
+				}
+			}
+		}
+		_missingParams << requiredParams;
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* Point Object (Table 14)                                            */
+		/**********************************************************************/
+		if (hasCenterFlag) {
+			requiredParams = QStringList() << "longitude" << "latitude";
+			optionalParams = QStringList();
+			for(auto key : centerObj.keys()) {
+				int rIdx = requiredParams.indexOf(key);
+				if (rIdx != -1) {
+					requiredParams.erase(requiredParams.begin()+rIdx);
+				} else {
+					int oIdx = optionalParams.indexOf(key);
+					if (oIdx != -1) {
+						optionalParams.erase(optionalParams.begin()+oIdx);
+					} else {
+						_unexpectedParams << key;
+					}
+				}
+			}
+			_missingParams << requiredParams;
+		}
+
+		if (hasOuterBoundaryPointArrayFlag) {
+			for(auto outerBoundaryPointVal : outerBoundaryPointArray) {
+				auto outerBoundaryPointObj = outerBoundaryPointVal.toObject();
+				requiredParams = QStringList() << "longitude" << "latitude";
+				optionalParams = QStringList();
+				for(auto key : outerBoundaryPointObj.keys()) {
+					int rIdx = requiredParams.indexOf(key);
+					if (rIdx != -1) {
+						requiredParams.erase(requiredParams.begin()+rIdx);
+					} else {
+						int oIdx = optionalParams.indexOf(key);
+						if (oIdx != -1) {
+							optionalParams.erase(optionalParams.begin()+oIdx);
+						} else {
+							_unexpectedParams << key;
+						}
+					}
+				}
+				_missingParams << requiredParams;
+			}
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* Vector Object (Table 15)                                           */
+		/**********************************************************************/
+		if (hasOuterBoundaryVectorArrayFlag) {
+			for(auto outerBoundaryVectorVal : outerBoundaryVectorArray) {
+				auto outerBoundaryVectorObj = outerBoundaryVectorVal.toObject();
+				requiredParams = QStringList() << "length" << "angle";
+				optionalParams = QStringList();
+				for(auto key : outerBoundaryVectorObj.keys()) {
+					int rIdx = requiredParams.indexOf(key);
+					if (rIdx != -1) {
+						requiredParams.erase(requiredParams.begin()+rIdx);
+					} else {
+						int oIdx = optionalParams.indexOf(key);
+						if (oIdx != -1) {
+							optionalParams.erase(optionalParams.begin()+oIdx);
+						} else {
+							_unexpectedParams << key;
+						}
+					}
+				}
+				_missingParams << requiredParams;
+			}
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* FrequencyRange Object (Table 16)                                   */
+		/**********************************************************************/
+		for(auto inquiredFrequencyRangeVal : inquiredFrequencyRangeArray) {
+			auto inquiredFrequencyRangeObj = inquiredFrequencyRangeVal.toObject();
+			requiredParams = QStringList() << "lowFrequency" << "highFrequency";
+			optionalParams = QStringList();
+			for(auto key : inquiredFrequencyRangeObj.keys()) {
+				int rIdx = requiredParams.indexOf(key);
+				if (rIdx != -1) {
+					requiredParams.erase(requiredParams.begin()+rIdx);
+				} else {
+					int oIdx = optionalParams.indexOf(key);
+					if (oIdx != -1) {
+						optionalParams.erase(optionalParams.begin()+oIdx);
+					} else {
+						_unexpectedParams << key;
+					}
+				}
+			}
+			_missingParams << requiredParams;
+		}
+		/**********************************************************************/
+
+		/**********************************************************************/
+		/* Channels Object (Table 17)                                         */
+		/**********************************************************************/
+		for(auto inquiredChannelsVal : inquiredChannelsArray) {
+			auto inquiredChannelsObj = inquiredChannelsVal.toObject();
+			requiredParams = QStringList() << "globalOperatingClass";
+			optionalParams = QStringList() << "channelCfi";
+			for(auto key : inquiredChannelsObj.keys()) {
+				int rIdx = requiredParams.indexOf(key);
+				if (rIdx != -1) {
+					requiredParams.erase(requiredParams.begin()+rIdx);
+				} else {
+					int oIdx = optionalParams.indexOf(key);
+					if (oIdx != -1) {
+						optionalParams.erase(optionalParams.begin()+oIdx);
+					} else {
+						_unexpectedParams << key;
+					}
+				}
+			}
+			_missingParams << requiredParams;
+		}
+		/**********************************************************************/
+
+		if (_missingParams.size()) {
+			_responseCode = CConst::missingParamResponseCode;
+			return;
+		} else if (_unexpectedParams.size()) {
+			_responseCode = CConst::unexpectedParamResponseCode;
+			return;
+		}
+
+		/**********************************************************************/
+		/* Extract values                                                     */
+		/**********************************************************************/
+		_requestId = requestObj["requestId"].toString();
+		_serialNumber = deviceDescriptorObj["serialNumber"].toString();
+
+		if (certificationIdArray.size() == 0) {
+			_responseCode = CConst::invalidValueResponseCode;
+			_invalidParams << "certificationId";
+			return;
+		}
+		_rulesetId = certificationIdArray.at(0)["rulesetId"].toString();
+
+		if (hasIndoorDeploymentFlag) {
+			int indoorDeploymentVal = locationObj["indoorDeployment"].toInt();
+			switch(indoorDeploymentVal) {
+				case 0:
+				case 2:
+					_rlanType = RLANType::RLAN_OUTDOOR;
+					break;
+				case 1:
+					_rlanType = RLANType::RLAN_INDOOR;
+					break;
+				default:
+					_invalidParams << "indoorDeployment";
+			}
+		} else {
+			_rlanType = RLANType::RLAN_OUTDOOR;
+		}
+
+		QString rlanHeightType = elevationObj["heightType"].toString();
+
+		if (rlanHeightType == "AMSL") {
+			_rlanHeightType = CConst::AMSLHeightType;
+		} else if (rlanHeightType == "AGL") {
+			_rlanHeightType = CConst::AGLHeightType;
+		} else {
+			_invalidParams << "heightType";
+		}
+
+		double verticalUncertainty = elevationObj["verticalUncertainty"].toDouble();
+		if (verticalUncertainty < 0.0) {
+			_invalidParams << "verticalUncertainty";
+		}
+		double centerHeight = elevationObj["height"].toDouble();
+
+		if (hasEllipseFlag) {
+			_rlanUncertaintyRegionType = RLANBoundary::ELLIPSE;
+			double centerLatitude = centerObj["latitude"].toDouble();
+			double centerLongitude = centerObj["longitude"].toDouble();
+
+			double minorAxis = ellipseObj["minorAxis"].toDouble();
+			double majorAxis = ellipseObj["majorAxis"].toDouble();
+
+			double orientation = ellipseObj["orientation"].toDouble();
+
+			if ( (centerLatitude < -90.0) || (centerLatitude > 90.0) ) {
+				_invalidParams << "latitude";
+			}
+			if ( (centerLongitude < -180.0) || (centerLongitude > 180.0) ) {
+				_invalidParams << "longitude";
+			}
+
+			if (majorAxis < minorAxis) {
+				_invalidParams << "minorAxis";
+				_invalidParams << "majorAxis";
+			} else {
+				if (minorAxis < 0.0) {
+					_invalidParams << "minorAxis";
+				}
+				if (majorAxis < 0.0) {
+					_invalidParams << "majorAxis";
+				}
+			}
+
+			if ( (orientation < 0.0) || (orientation > 180.0) ) {
+				_invalidParams << "orientation";
+			}
+
+			_rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
+			_rlanUncerts_m = std::make_tuple(minorAxis, majorAxis, verticalUncertainty);
+			_rlanOrientation_deg = orientation;
+		} else if (hasLinearPolygonFlag) {
+			_rlanUncertaintyRegionType = RLANBoundary::LINEAR_POLY;
+
+			if ((outerBoundaryPointArray.size() < 3) || (outerBoundaryPointArray.size() > 15)) {
+				_invalidParams << "outerBoundary";
+			}
+
+			for(auto outerBoundaryPointVal : outerBoundaryPointArray) {
+				auto outerBoundaryPointObj = outerBoundaryPointVal.toObject();
+				double latitude = outerBoundaryPointObj["latitude"].toDouble();
+				double longitude = outerBoundaryPointObj["longitude"].toDouble();
+
+				if ( (latitude < -90.0) || (latitude > 90.0) ) {
+					_invalidParams << "latitude";
+				}
+				if ( (longitude < -180.0) || (longitude > 180.0) ) {
+					_invalidParams << "longitude";
+				}
+
+				_rlanLinearPolygon.push_back(std::make_pair(latitude, longitude));
+			}
+
+			double centerLongitude;
+			double centerLatitude;
+
+			// Average LON/LAT of vertices
+			double sumLon = 0.0;
+			double sumLat = 0.0;
+			int i;
+			for(i=0; i< (int) _rlanLinearPolygon.size(); i++) {
+				sumLon += _rlanLinearPolygon[i].second;
+				sumLat += _rlanLinearPolygon[i].first;
+			}
+			centerLongitude = sumLon / _rlanLinearPolygon.size();
+			centerLatitude  = sumLat / _rlanLinearPolygon.size();
+
+			_rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
+			_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, verticalUncertainty);
+		} else if (hasRadialPolygonFlag) {
+			_rlanUncertaintyRegionType = RLANBoundary::RADIAL_POLY;
+
+			if ((outerBoundaryVectorArray.size() < 3) || (outerBoundaryVectorArray.size() > 15)) {
+				_invalidParams << "outerBoundary";
+			}
+
+			for(auto outerBoundaryVectorVal : outerBoundaryVectorArray) {
+				auto outerBoundaryVectorObj = outerBoundaryVectorVal.toObject();
+				double angle = outerBoundaryVectorObj["angle"].toDouble();
+				double length = outerBoundaryVectorObj["length"].toDouble();
+
+				if (length < 0.0) {
+					_invalidParams << "length";
+				}
+				if ( (angle < 0.0) || (angle > 360.0) ) {
+					_invalidParams << "angle";
+				}
+
+				_rlanRadialPolygon.push_back(std::make_pair(angle, length));
+			}
+
+			double centerLatitude = centerObj["latitude"].toDouble();
+			double centerLongitude = centerObj["longitude"].toDouble();
+
+			_rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
+			_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, verticalUncertainty);
+		}
+
+		for(auto inquiredChannelsVal : inquiredChannelsArray) {
+			auto inquiredChannelsObj = inquiredChannelsVal.toObject();
+			auto chanClass = std::make_pair<int, std::vector<int>>(inquiredChannelsObj["globalOperatingClass"].toInt(), std::vector<int>());
+			if (inquiredChannelsObj.contains("channelCfi")) {
+				for (const QJsonValue& chanIdx : inquiredChannelsObj["channelCfi"].toArray())
+					chanClass.second.push_back(chanIdx.toInt());
+			}
+			LOGGER_INFO(logger)
+				<< (chanClass.second.empty() ? "ALL" : std::to_string(chanClass.second.size()))
+				<< " channels requested in operating class "
+				<< chanClass.first;
+			// TODO: are we handling the case where they want all?
+
+			_inquiredChannels.push_back(chanClass);
+		}
+		LOGGER_INFO(logger) << inquiredChannelsArray.size() << " operating class(es) requested";
+
+		for(auto inquiredFrequencyRangeVal : inquiredFrequencyRangeArray) {
+			auto inquiredFrequencyRangeObj = inquiredFrequencyRangeVal.toObject();
+			_inquiredFrquencyRangesMHz.push_back(std::make_pair(
+						inquiredFrequencyRangeObj["lowFrequency"].toInt(),
+						inquiredFrequencyRangeObj["highFrequency"].toInt()));
+		}
+		LOGGER_INFO(logger) << inquiredFrequencyRangeArray.size() << " frequency range(s) requested";
+
+		if (inquiredChannelsArray.size() + inquiredFrequencyRangeArray.size() == 0) {
+			LOGGER_WARN(logger) << "GENERAL FAILURE: must specify either inquiredChannels or inquiredFrequencies";
+			_responseCode = CConst::generalFailureResponseCode;
+			return;
+		}
+
+		if (_invalidParams.size()) {
+			_responseCode = CConst::invalidValueResponseCode;
+		}
+#if DEBUG_AFC
+	} else if (_analysisType == "test_winner2") {
+		// Do nothing
+#endif
+	} else {
+		throw std::runtime_error(QString("Invalid analysis type for version 1.1: %1").arg(QString::fromStdString(_analysisType)).toStdString());
 	}
 
 	return;

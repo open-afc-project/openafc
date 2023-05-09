@@ -1,13 +1,13 @@
 import * as React from "react";
 import {
     AvailableSpectrumInquiryRequest, LinearPolygon, RadialPolygon, Ellipse,
-    DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange, Point
+    DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange, Point, KnownRuleSetIds
 } from "../Lib/RatAfcTypes";
 import { logger } from "../Lib/Logger";
 import {
     Modal, Button, ClipboardCopy, ClipboardCopyVariant, Alert, Gallery, GalleryItem,
     FormGroup, TextInput, InputGroup, InputGroupText, FormSelect, FormSelectOption,
-    ChipGroup, Chip
+    ChipGroup, Chip, SelectOption
 } from "@patternfly/react-core";
 import { getCacheItem, cacheItem } from "../Lib/RatApi";
 import { AFCConfigFile, RatResponse } from "../Lib/RatApiTypes";
@@ -41,12 +41,12 @@ interface RatAfcFormState {
     },
 
     serialNumber?: string,
-    certificationId?: CertificationId[],
+    certificationId: CertificationId[],
     newCertificationId?: string,
-    newCertificationNra?: string,
+    newCertificationRulesetId?: string,
     indoorDeployment?: DeploymentEnum,
     minDesiredPower?: number,
-    inquiredFrequencyRange: FrequencyRange[],
+    inquiredFrequencyRange?: FrequencyRange[],
     newChannel?: number,
 
     operatingClasses: OperatingClass[]
@@ -98,7 +98,8 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                     num: 136,
                     include: OperatingClassIncludeType.None
                 },
-            ]
+            ],
+            newCertificationRulesetId: KnownRuleSetIds[0]
 
         };
     }
@@ -145,14 +146,13 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
     }
     addCertificationId(newCertificationId: CertificationId): void {
         const copyOfcertificationId = this.state.certificationId.slice();
-        copyOfcertificationId.push({ id: newCertificationId.id, nra: newCertificationId.nra });
-        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationNra: '' });
+        copyOfcertificationId.push({ id: newCertificationId.id, rulesetId: newCertificationId.rulesetId });
+        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: '' });
     }
 
     resetCertificationId(newCertificationId: CertificationId): void {
-        const copyOfcertificationId = [];
-        copyOfcertificationId.push({ id: newCertificationId.id, nra: newCertificationId.nra });
-        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationNra: '' });
+        const copyOfcertificationId = [{ id: newCertificationId.id, rulesetId: newCertificationId.rulesetId }];
+        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: '' });
     }
 
     private updateOperatingClass(e: OperatingClass, i: number) {
@@ -166,7 +166,6 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
         deviceDescriptor: {
             serialNumber: this.state.serialNumber!,
             certificationId: this.state.certificationId!,
-            rulesetIds: ["US_47_CFR_PART_15_SUBPART_E"]
         },
         location: {
             ellipse: this.state.location.ellipse!,
@@ -354,7 +353,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                             helperText="Must be unique for every AP"
                         >
                             {hasRole("Trial") ?
-                                <Button key="trial-cert-fill-btn" variant="link" sizes="sm" onClick={() => this.setState({ serialNumber: 'TestSerialNumber'})}>
+                                <Button key="trial-cert-fill-btn" variant="link" sizes="sm" onClick={() => this.setState({ serialNumber: 'TestSerialNumber' })}>
                                     Fill Trial Serial
                                 </Button>
                                 : <></>
@@ -379,9 +378,9 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                             // helperTextInvalidIcon={<ExclamationCircleIcon />} //This is not supported in our version of Patternfly
                             validated={this.state.certificationId.length > 0 ? "success" : "error"}
                         >
-                           {hasRole("Trial") ?
+                            {hasRole("Trial") ?
                                 <Button key="trial-cert-fill-btn" variant="link" sizes="sm"
-                                onClick={() => this.resetCertificationId({ id: 'TestCertificationId', nra: 'FCC'})}>
+                                    onClick={() => this.resetCertificationId({ id: 'TestCertificationId', rulesetId: 'FCC' })}>
                                     Fill Trial Cert Id
                                 </Button>
                                 : <></>
@@ -391,28 +390,38 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                             >
                                 {this.state.certificationId.map(currentCid => (
                                     <Chip width="100%" key={currentCid.id} onClick={() => this.deleteCertifcationId(currentCid.id)}>
-                                        {currentCid.nra + " " + currentCid.id}
+                                        {currentCid.rulesetId + " " + currentCid.id}
                                     </Chip>
                                 ))}
                             </ChipGroup>
                             <div>
                                 {" "}<Button key="add-certificationId" variant="tertiary"
-                                    onClick={() => this.addCertificationId({ id: this.state.newCertificationId, nra: this.state.newCertificationNra })}>
+                                    onClick={() => this.addCertificationId({
+                                        id: this.state.newCertificationId!,
+                                        rulesetId: this.state.newCertificationRulesetId!
+                                    })}>
                                     +
                                 </Button>
                             </div>
                             <div>
-                                <TextInput
-                                    label="NRA"
-                                    value={this.state.newCertificationNra}
-                                    onChange={x => this.setState({ newCertificationNra: x })}
+                                <FormSelect
+                                    label="Ruleset"
+                                    value={this.state.newCertificationRulesetId}
+                                    onChange={x => this.setState({ newCertificationRulesetId: x })}
                                     type="text"
                                     step="any"
                                     id="horizontal-form-certification-nra"
                                     name="horizontal-form-certification-nra"
                                     style={{ textAlign: "left" }}
-                                    placeholder="NRA"
-                                />
+                                    placeholder="Ruleset"
+                                >
+                                    {
+                                        KnownRuleSetIds.map((x) => (
+                                            <FormSelectOption label={x} key={x} value={x} />
+                                        ))
+                                    }
+                                    <FormSelectOption label="Unknown RS - For Testing only" value={"UNKNOWN_RS"} key={"unknown"} />
+                                </FormSelect>
 
                                 <TextInput
                                     label="Id"
