@@ -136,3 +136,19 @@ services:
   als_postgres:
     image: public.ecr.aws/w9v6y1o0/openafc/als-postgres-image:${TAG:-latest}
     dns_search: [.]
+
+  uls_downloader:
+    image: public.ecr.aws/w9v6y1o0/openafc/uls-downloader:${TAG:-latest}
+    restart: always
+    volumes:
+      - ${VOL_H_DB}/ULS_Database:/ULS_Database
+      - uls_downloader_state:/uls_downloader_state
+    healthcheck:
+      test: ["CMD", "/wd/uls_service_healthcheck.py", "--status_dir=/uls_downloader_state"]
+      interval: 1h
+      timeout: 1m
+      retries: 3
+    dns_search: [.]
+
+volumes:
+  uls_downloader_state:

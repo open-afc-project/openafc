@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import os, datetime, zipfile, shutil, subprocess, sys, glob, argparse, csv
 import urllib.request, urllib.parse, urllib.error
 from collections import OrderedDict
@@ -9,6 +10,7 @@ from csvToSqliteULS import convertULS
 from sort_callsigns_addfsid import sortCallsignsAddFSID
 from fix_bps import fixBPS
 from fix_params import fixParams
+import sqlalchemy as sa, hashlib, fnmatch
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
@@ -53,7 +55,7 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
     regionDataDir = fullPathTempDir + '/' + region
     if (not os.path.isdir(regionDataDir)):
         os.mkdir(regionDataDir)
-    logFile.write('Downloading data fils for ' + region + ' into ' + regionDataDir + '\n')
+    logFile.write('Downloading data files for ' + region + ' into ' + regionDataDir + '\n')
     if region == 'US':
         # download the latest Weekly Update
         weeklyURL =  'https://data.fcc.gov/download/pub/uls/complete/l_micro.zip'
@@ -290,9 +292,13 @@ def readEntries(dayFile, directory, day, versionIdx):
     removeFromCombinedFile(dayFile, directory, idsToRemove, day, versionIdx)
     updateIndividualFile(dayFile, directory, recordBuffer)
 
-# Processes the daily files, replacing weekly entries when needed 
+# Processes the daily files, replacing weekly entries when needed
+# Returns datetime of ULS data upload (ULS data identity)
 def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
     logFile.write('Processing daily files' + '\n')
+
+    # Most recent timetag from 'counts'
+    upload_time = weeklyCreation
 
     # Process weekly file
     if (weeklyCreation >= versionTime):
@@ -312,6 +318,7 @@ def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
         fileCreationDate = verifyCountsFile(dayDirectory)
         timeDiff = fileCreationDate - weeklyCreation
         if(timeDiff.total_seconds() > 0):
+            upload_time = fileCreationDate
             if (fileCreationDate >= versionTime):
                 versionIdx = 1
             else:
@@ -326,6 +333,7 @@ def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
         # Exit after processing yesterdays file
         if (key == currentWeekday):
             break
+    return upload_time
 
 # Generates the combined text file that the coalition processor uses. 
 def generateUlsScriptInputUS(directory, logFile, genFilename):
@@ -339,9 +347,14 @@ def generateUlsScriptInputUS(directory, logFile, genFilename):
                         combined.write('US:' + line)
 
 def generateUlsScriptInputCA(directory, logFile, genFilename):
+    """ Returns identity string of downloaded data """
     logFile.write('Appending CA data to ' + genFilename + ' as input for uls script' + '\n')
+    # Names of source files (to compute MD5 of)
+    sourceFilenames = []
     with open(genFilename, 'a', encoding='utf8') as combined:
         for dataFile in os.listdir(directory):
+            if fnmatch.fnmatch(dataFile, "??.csv") and os.path.isfile(os.path.join(directory, dataFile)):
+                sourceFilenames.append(dataFile)
             if dataFile != "AP.csv": # skip antenna pattern file, processed separately
                 logFile.write('Adding ' + directory + '/' + dataFile + ' to ' + genFilename + '\n')
                 with open(directory +'/' + dataFile, 'r', encoding='utf8') as csvfile:
@@ -351,6 +364,39 @@ def generateUlsScriptInputCA(directory, logFile, genFilename):
                         for (i,field) in enumerate(row):
                             row[i] = field.replace('|', ':')
                         combined.write('CA:' + code + '|' + ('|'.join(row)) + '|\n')
+    if not sourceFilenames:
+        raise Exception("CA source filenames not found")
+    sources_md5 = hashlib.md5()
+    for sourceFilename in sorted(sourceFilenames):
+        with open(os.path.join(directory, sourceFilename), mode="rb") as f:
+            sources_md5.update(f.read())
+    return sources_md5.hexdigest()
+
+def storeDataIdentities(sqlFile, identityDict):
+    """ Stores region data identities in gewnerated SQLite database.
+    For FCC ULS identity is upload datetime, for Canada SMS, for now, sadly,
+    only an MD5 of downloaded files.
+
+    Arguments:
+    sqlFile      -- SQLite file where to add table with region identities
+    identityDict -- Dictionary of region identities. Keys are region names (US,
+                    CA, ...), values are identity strings
+    """
+    assert os.path.isfile(sqlFile)
+    engine = sa.create_engine("sqlite:///" + sqlFile)
+    conn = engine.connect()
+    metadata = sa.MetaData(engine)
+    if not sa.inspect(engine).has_table("data_ids"):
+        dataIdsTable = \
+            sa.Table("data_ids", metadata,
+                     sa.Column("region", sa.String(100), primary_key=True),
+                     sa.Column("identity", sa.String(1000), nullable=False))
+        metadata.create_all()
+    idsTable = metadata.tables["data_ids"]
+    for region in sorted(identityDict.keys()):
+        conn.execute(sa.insert(idsTable).values(region=region,
+                                                identity=identityDict[region]))
+    conn.close()
 
 def daily_uls_parse(state_root, interactive):
     startTime = datetime.datetime.now()
@@ -605,6 +651,9 @@ def daily_uls_parse(state_root, interactive):
     # input filename for uls-script
     fullPathCoalitionScriptInput = fullPathTempDir + "/combined.txt"
 
+    # Per region data identities - upload date, hash, etc.
+    dataIdentities = {}
+
     ###########################################################################
     # If processDownloadFlag set, process Download files to create combined.txt         #
     ###########################################################################
@@ -615,13 +664,16 @@ def daily_uls_parse(state_root, interactive):
         for region in regionList:
 
             regionDataDir = fullPathTempDir + '/' + region
+            dataIdentity = None
 
             if region == 'US':
                 # US files (FCC) consist of weekly and daily updates.
                 # get the time creation of weekly file from the counts file
                 weeklyCreation = verifyCountsFile(regionDataDir + '/weekly')
                 # process the daily files day by day
-                processDailyFiles(weeklyCreation, logFile, regionDataDir, currentWeekday)
+                uploadTime = processDailyFiles(weeklyCreation, logFile, regionDataDir, currentWeekday)
+                # For US identity is FCC ULS upoload datetime
+                dataIdentity = uploadTime.isoformat()
 
                 rasDataFileUSSrc =  root + '/data_files/RASdatabase.dat'
                 rasDataFileUSTgt = regionDataDir + '/weekly/RA.dat_withDaily'
@@ -631,10 +683,14 @@ def daily_uls_parse(state_root, interactive):
                 # generate the combined csv/txt file for the coalition uls processor 
                 generateUlsScriptInputUS(regionDataDir + '/weekly', logFile, fullPathCoalitionScriptInput) 
             elif region == 'CA':
-                generateUlsScriptInputCA(regionDataDir, logFile, fullPathCoalitionScriptInput) 
+                # For Canada identity is MD5 of downloaded files
+                dataIdentity = generateUlsScriptInputCA(regionDataDir, logFile, fullPathCoalitionScriptInput)
             else:
                 logFile.write('ERROR: Invalid region = ' + region)
                 raise e
+            assert dataIdentity is not None
+            dataIdentities[region] = dataIdentity
+
     ###########################################################################
 
     ###########################################################################
@@ -847,6 +903,7 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if runConvertULSFlag:
         convertULS(paramOutput, fullPathRASDabataseFile, fullPathAntennaPatternFile, state_root, logFile, outputSQL)
+        storeDataIdentities(outputSQL, dataIdentities)
     ###########################################################################
     
     finishTime = datetime.datetime.now()

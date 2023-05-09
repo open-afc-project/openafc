@@ -1,0 +1,87 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+# default value of args
+ARG BLD_TAG=latest
+ARG PRINST_TAG=latest
+ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image
+ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall
+
+# Stage Build
+FROM ${BLD_NAME}:${BLD_TAG} as build_image
+ARG BUILDREV=localbuild
+COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /root/afc/
+COPY cmake /root/afc/cmake/
+COPY pkg /root/afc/pkg/
+COPY selinux /root/afc/selinux/
+COPY src /root/afc/src/
+
+RUN apk add py3-setuptools
+
+RUN mkdir -p -m 777 /root/afc/build
+RUN cd /root/afc/build && \
+cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_BUILD_TYPE=Ulsprocessor -DSVN_LAST_REVISION=$BUILDREV -G Ninja /root/afc && \
+ninja -j$(nproc --all --ignore=2) install
+
+FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
+RUN apk add py3-sqlalchemy py3-numpy
+RUN pip3 install google-auth google-auth-oauthlib google-auth-httplib2 google-api-python-client
+RUN mkdir -p /mnt/nfs/rat_transfer/daily_uls_parse/data_files \
+            /mnt/nfs/rat_transfer/daily_uls_parse/temp \
+            /mnt/nfs/rat_transfer/ULS_Database \
+            /mnt/nfs/rat_transfer/Antenna_Patterns \
+            /output_folder
+
+COPY uls/antenna_model/antenna_model_map.csv uls/antenna_model/antenna_model_list.csv /mnt/nfs/rat_transfer/daily_uls_parse/
+COPY uls/RASdatabase.dat uls/modcod_bps.csv /mnt/nfs/rat_transfer/daily_uls_parse/data_files/
+COPY --from=build_image /root/afc/__install/bin /mnt/nfs/rat_transfer/daily_uls_parse/
+COPY --from=build_image /root/afc/build/src/ratapi/pkg/ratapi/db/ /mnt/nfs/rat_transfer/daily_uls_parse/
+COPY uls/uls_service*.py /wd/
+RUN chmod +x /wd/uls_service*.py
+
+FROM alpine:3.17
+
+# Downloader service script parameters
+# Additional argfuments (besides --region) to pass to daily_uls_parse.py
+# ENV ULS_DOWNLOAD_SCRIPT_ARGS
+
+# Colon separated list of regions t download. Default - all of them
+#ENV ULS_DOWNLOAD_REGION
+
+# Where to directory with ULS databases is mapped
+ENV ULS_EXT_DB_DIR=/ULS_Database
+
+# Symlink that points to recent ULS database
+ENV ULS_CURRENT_DB_SYMLINK=FS_LATEST.sqlite3
+
+# Persistent location of FSID registry file
+ENV ULS_FSID_FILE=/uls_downloader_state/fsid_table.csv
+
+# Persistent state directory
+ENV ULS_STATE_DIR=/uls_downloader_state
+
+# Download interval in hours
+ENV ULS_INTERVAL_HR=4
+
+# Download maximum duration in hours
+ENV ULS_TIMEOUT_HR=1
+
+COPY --from=install_image / /
+
+WORKDIR /wd
+
+ENTRYPOINT /wd/uls_service.py \
+    --download_script=/mnt/nfs/rat_transfer/daily_uls_parse/daily_uls_parse.py \
+    --download_script_args=$ULS_DOWNLOAD_SCRIPT_ARGS \
+    --region=$ULS_DOWNLOAD_REGION \
+    --result_dir=/mnt/nfs/rat_transfer/ULS_Database/ \
+    --ext_db_dir=$ULS_EXT_DB_DIR \
+    --ext_db_symlink=$ULS_CURRENT_DB_SYMLINK \
+    --ext_fsid_file=$ULS_FSID_FILE \
+    --fsid_file=/mnt/nfs/rat_transfer/daily_uls_parse/data_files/fsid_table.csv \
+    --status_dir=$ULS_STATE_DIR \
+    --interval_hr=$ULS_INTERVAL_HR \
+    --timeout_hr=$ULS_TIMEOUT_HR
