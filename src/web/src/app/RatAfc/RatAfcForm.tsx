@@ -147,12 +147,12 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
     addCertificationId(newCertificationId: CertificationId): void {
         const copyOfcertificationId = this.state.certificationId.slice();
         copyOfcertificationId.push({ id: newCertificationId.id, rulesetId: newCertificationId.rulesetId });
-        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: '' });
+        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId:  KnownRuleSetIds[0] });
     }
 
     resetCertificationId(newCertificationId: CertificationId): void {
         const copyOfcertificationId = [{ id: newCertificationId.id, rulesetId: newCertificationId.rulesetId }];
-        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: '' });
+        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId:  KnownRuleSetIds[0] });
     }
 
     private updateOperatingClass(e: OperatingClass, i: number) {
