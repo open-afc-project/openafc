@@ -279,6 +279,7 @@ export class AFCForm extends React.Component<
             }
 
             reader.readAsText(file);
+            ev.target.value = '';
 
         } catch (e) {
             logger.error("Failed to import application state", e);

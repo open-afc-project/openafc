@@ -533,6 +533,11 @@ export interface AccessPointModel {
     manufacturer?: string,
     certificationId?: string,
     org?: string,
+    rulesetId?: string,
+}
+
+export interface AccessPointListModel {
+    accessPoints?: string
 }
 
 /**

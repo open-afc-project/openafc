@@ -22,7 +22,7 @@ import werkzeug
 from ..models import aaa
 from .auth import auth
 from ..models.base import db
-from .ratapi import rulesetIdToRegionStr
+from .ratapi import rulesetIdToRegionStr, nraToRegionStr, rulesets
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -233,6 +233,183 @@ class AccessPoint(MethodView):
         db.session.commit() # pylint: disable=no-member
 
         return flask.make_response()
+
+
+class AccessPointDeny(MethodView):
+    ''' resources to manage access points'''
+
+    methods = ['PUT', 'GET', 'DELETE', 'POST']
+
+    def get(self, id):
+        ''' Get APs info with an org '''
+        id = auth(roles=['Admin', 'AP'])
+
+        user = aaa.User.query.filter_by(id=id).first()
+        roles = [r.name for r in user.roles]
+        if "Super" in roles:
+            # Super user gets all access points
+            access_points = db.session.query(aaa.AccessPointDeny).all()
+        else:
+            # Admin only user gets all access points within own org
+            org = user.org if user.org else ""
+            organization = db.session.query(aaa.Organization).filter(aaa.Organization.name == org).first()
+            if organization:
+                access_points = organization.aps
+
+        # translate ruleset.id to index into rulesets
+        rules = rulesets()
+        rule_map = {}
+        for idx, rule in enumerate(rules):
+            r = db.session.query(aaa.Ruleset).filter(aaa.Ruleset.name == rule).first()
+            rule_map[r.id] = idx
+
+        return flask.jsonify(
+             rulesets=rules,
+             access_points={
+                 'data':["{},{},{},{}".format(ap.serial_number, ap.certification_id, rule_map[ap.ruleset_id], ap.org.name)
+                     for ap in access_points]
+             })
+
+    def put(self, id):
+        ''' add an AP. '''
+
+        content = flask.request.json
+        user = aaa.User.query.filter_by(id=id).first()
+        org = content.get('org')
+        auth(roles=['Admin'], org=org)
+
+        serial = content.get('serialNumber')
+        if serial == "*" or not serial:
+            # match all
+            serial = None
+
+        cert_id = content.get('certificationId')
+        if not cert_id:
+            raise exceptions.BadRequest("Certification Id required")
+
+        rulesetId = content.get('rulesetId')
+        if not rulesetId:
+            raise exceptions.BadRequest("Ruleset Id required")
+
+        ap = aaa.AccessPointDeny.query.filter_by(certification_id=cert_id).\
+            filter_by(serial_number=serial).first()
+        if ap:
+            # We detect existing entry
+            raise exceptions.BadRequest("Duplicate device detected")
+
+        organization = aaa.Organization.query.filter_by(name=org).first()
+        if not organization:
+            raise exceptions.BadRequest("Organization does not exist")
+
+        ruleset = aaa.Ruleset.query.filter_by(name=rulesetId).first()
+        if not ruleset:
+            raise exceptions.BadRequest("Ruleset does not exist")
+
+        ap = aaa.AccessPointDeny(serial, cert_id)
+        organization.aps.append(ap)
+        ruleset.aps.append(ap)
+        db.session.add(ap) # pylint: disable=no-member
+        db.session.commit() # pylint: disable=no-member
+
+        return flask.jsonify(id=ap.id)
+
+    def post(self, id):
+        ''' replace list of APs. '''
+
+        import json
+
+        content = flask.request.json
+        user = aaa.User.query.filter_by(id=id).first()
+        user_org = user.org
+        auth(roles=['Admin'])
+
+        # format as below.  The organization (e.g. my_org) is optional, and if not listed will default
+        # to the org of the logged in user.
+        # e.g.
+        # {'rulesets':['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06'],
+        #  'access_points': {
+        #    'data': ['serial1, cert1, 0, my_org',
+        #             'serial2, cert2, 0']
+        #    }
+        # }
+
+        roles = [r.name for r in user.roles]
+        if "Super" in roles:
+            # delete, replace whole list
+            aaa.AccessPointDeny.query.delete()
+        else:
+            # delete, replace list belonging to the admin's org
+            organization = aaa.Organization.query.filter_by(name=user_org).first()
+            aaa.AccessPointDeny.query.filter_by(org_id=organization.id).delete()
+
+        payload = content.get('accessPoints')
+        rcrd = json.loads(payload)
+        ruleset_list = rcrd['rulesets']
+        access_points = rcrd['access_points']['data']
+        rows = list(map(lambda a : a.strip('\r').split(','), access_points))
+
+        for row in rows:
+            if len(row) < 3:
+                raise exceptions.BadRequest("serial number, cert id, ruleset are required")
+
+            org = user_org
+            serial = row[0].strip()
+            if serial == "*" or serial == "None" or not serial:
+                # match all
+                serial = None
+
+            cert_id = row[1].strip()
+            try:
+                ruleset_id = ruleset_list[int(row[2].strip())]
+                ruleset = aaa.Ruleset.query.filter_by(name=ruleset_id).first()
+                if not ruleset:
+                    raise exceptions.BadRequest("ruleset {} does not exist".format(ruleset_id))
+            except:
+                raise exceptions.BadRequest("ruleset does not exist")
+
+            if len(row) > 3: # this column is to override the AP org if user is Super
+                if not ''.join(row): # ignore empty row
+                    continue
+
+                org_override = row[3].strip().lower()
+                if 'Super' in [r.name for r in user.roles]:
+                    org = org_override
+                elif user_org != org_override:
+                        # can't override org 
+                        raise exceptions.BadRequest("organization {} not accessible".\
+                                                    format(org_override))
+            ap = aaa.AccessPointDeny.query.filter_by(certification_id=cert_id).\
+                filter_by(serial_number=serial).first()
+            if not ap:
+                organization = aaa.Organization.query.filter_by(name=org).first()
+                if not organization:
+                    raise exceptions.BadRequest("organization {} does not exist".format(org))
+                  
+                ap = aaa.AccessPointDeny(serial, cert_id)
+                organization.aps.append(ap)
+                ruleset.aps.append(ap)
+                db.session.add(ap) # pylint: disable=no-member
+            else:
+                raise exceptions.BadRequest("duplicate entry")
+
+        db.session.commit() # pylint: disable=no-member
+        return "Success", 200
+
+
+    def delete(self, id):
+        ''' Remove an AP from the system. Here the id is the AP id '''
+
+        LOGGER.info("Deleting ap: %s", id)
+        ap = aaa.AccessPointDeny.query.filter_by(id=id).first()
+        if not ap:
+            raise exceptions.BadRequest("Bad AP")
+
+        # check user roles
+        auth(roles=['Admin'], org=ap.org.name)
+        db.session.delete(ap) # pylint: disable=no-member
+        db.session.commit() # pylint: disable=no-member
+        return flask.make_response()
+
 
 class DeniedRegion(MethodView):
     ''' resources to manage denied regions'''
@@ -542,6 +719,7 @@ class MTLS(MethodView):
 
 module.add_url_rule('/user/<int:user_id>', view_func=User.as_view('User'))
 module.add_url_rule('/user/ap/<int:id>', view_func=AccessPoint.as_view('AccessPoint'))
+module.add_url_rule('/user/ap_deny/<int:id>', view_func=AccessPointDeny.as_view('AccessPointDeny'))
 module.add_url_rule('/user/eirp_min', view_func=Limits.as_view('Eirp'))
 module.add_url_rule('/user/frequency_range', view_func=AllowedFreqRanges.as_view('Frequency'))
 module.add_url_rule('/user/ap/trial', view_func=AccessPoint.as_view('AccessPointTrial'))

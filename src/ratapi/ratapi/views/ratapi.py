@@ -26,7 +26,7 @@ import werkzeug.exceptions
 from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
 from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from ..models.aaa import User, AccessPoint, AFCConfig
+from ..models.aaa import User, AccessPoint, AccessPointDeny, AFCConfig
 from ..models.base import db
 from .auth import auth
 from ..models import aaa
@@ -40,6 +40,10 @@ module = flask.Blueprint('ratapi-v1', 'ratapi')
 
 def regions():
     return ['US', 'CA', 'TEST_US', 'DEMO_US']
+
+def rulesets():
+    return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06']
+
 
 # Keep the NRA for 1.3 compatability
 def regionStrToNra(region_str):
@@ -201,6 +205,7 @@ class GuiConfig(MethodView):
             logout_url=logout_url,
             admin_url=flask.url_for('admin.User', user_id=-1),
             ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
+            ap_deny_admin_url=flask.url_for('admin.AccessPointDeny', id=-1),
             mtls_admin_url=flask.url_for('admin.MTLS', id=-1),
             dr_admin_url=flask.url_for('admin.DeniedRegion', regionStr="XX"),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
@@ -403,6 +408,19 @@ class AfcRegions(MethodView):
         '''
         resp = flask.make_response()
         resp.data = ' '.join(regions())
+        resp.content_type = 'text/plain'
+        return resp
+
+
+class AfcRulesetIds(MethodView):
+    ''' Allow the web UI to manipulate configuration directly.
+    '''
+
+    def get(self):
+        ''' GET method for afc config
+        '''
+        resp = flask.make_response()
+        resp.data = ' '.join(rulesets())
         resp.content_type = 'text/plain'
         return resp
 
@@ -1009,5 +1027,7 @@ module.add_url_rule('/replay',
                     view_func=ReloadAnalysis.as_view('ReloadAnalysis'))
 module.add_url_rule('/regions',
                     view_func=AfcRegions.as_view('AfcRegions'))
+module.add_url_rule('/rulesetIds',
+                    view_func=AfcRulesetIds.as_view('AfcRulesetIds'))
 module.add_url_rule('/about',
                     view_func=About.as_view('About'))

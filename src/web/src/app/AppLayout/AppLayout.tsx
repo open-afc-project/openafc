@@ -80,7 +80,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
         </UserContext.Consumer>
         <UserContext.Consumer>{(u: UserState) => isAdmin() ?
           <NavItem id="dr-link" itemId="dr-link">
-            <NavLink to="/deniedRegions" activeClassName="pf-m-current">Denied Regions</NavLink>
+            <NavLink to="/deniedRules" activeClassName="pf-m-current">Denied Rules</NavLink>
           </NavItem> : <NavItem />}
         </UserContext.Consumer>
 
