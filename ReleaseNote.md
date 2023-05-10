@@ -27,7 +27,7 @@
 ## **Version and Date**
 
 
-|Version|**OA-634**|
+|Version|**OA-582**|
 |**Date**|**05/09/2023**|
 ## **Issues Addressed**
  * Jira OA-582: Add support for denied devices.  UI for uploading and download list is under "Denied Rules" tab, which now contains both denied devices and denied regions. Denied devices can be specified by both certification id and serial number, or by just the certification id.  In the latter case, the serial number field can be filled in with * or None.
