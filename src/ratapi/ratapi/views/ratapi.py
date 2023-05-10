@@ -93,7 +93,7 @@ def regionStrToRulesetId(region_str):
        'CA':'CA_RES_DBS-06',
        'TEST_US':'TEST_FCC',
        'DEMO_US':'DEMO_FCC',
-       'BR':'BRAZIL_RULESET'
+       'BR':'BRAZIL_RULESETID'
     }
     region_str = region_str.upper()
     try:
@@ -107,7 +107,7 @@ def rulesetIdToRegionStr(rulesetId):
         'TEST_FCC':'TEST_US',
         'CA_RES_DBS-06':'CA',
         'DEMO_FCC':'DEMO_US',
-        'BRAZIL_RULESET':'BR'
+        'BRAZIL_RULESETID':'BR'
     }
     rulesetId = rulesetId.upper()
     try:
