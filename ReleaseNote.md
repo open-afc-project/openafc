@@ -1,4 +1,28 @@
  # Release Note
+
+
+## **Version and Date**
+|Version|**OA-564*|
+| :- | :- |
+|**Date**|**05/11/2023**|
+
+## **Issues Addressed**
+ * Jira OA-682: Angle off boresight calculation when FS outside but within 1arcsec of ellipse
+ * Jira OA-564: RLAN with a directional antenna
+ * Jira OA-659: Add Country Boundary for Brazil
+ * Jira OA-681: Add Brazilian Propagation Model to AFC Engine
+
+## **Interface Changes**
+ * None of OA-682
+
+## **Testing Done**
+ * The issue was found in FSP2. This was tested again and got expected results.
+ * Also tested FSP1 (where there was no impact) and found same results as before.
+ * Test results are attached to OA-682
+
+## **Open Issues** 
+ * The brazil jira tickets are yet to be tested. We're pushing this branch to get the fix for the 682 bug in ASAP as this is needed for WFA TVs.
+
 ## **Version and Date**
 |Version|**OA-634**|
 | :- | :- |
