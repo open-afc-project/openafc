@@ -255,7 +255,16 @@ double EllipseRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntenna
 		double b = dot(U, (mxC+mxC.t())*F);
 		double c = dot(F, mxC*F) - 1.0;
 
-		double eps = (-b + sqrt(b*b - 4*a*c))/(2*a);
+		double d = b*b - 4*a*c;
+
+        // Consider case where FS is not actually in footprint of ellipse, but within 1 grid point, and U points 
+		// in a direction that never intersects the ellipse.  In this case d < 0, just take eps = 0.
+		double eps;
+		if (d < 0.0) {
+			eps = 0.0;
+		} else {
+			eps = (-b + sqrt(b*b - 4*a*c))/(2*a);
+		}
 
 		arma::vec E(3);
 		E(0) = F(0) + eps*U(0);

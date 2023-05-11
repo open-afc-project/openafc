@@ -3035,7 +3035,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (jsonObj.contains("nlcdFile") && !jsonObj["nlcdFile"].isUndefined()) {
 		_nlcdFile = SearchPaths::forReading("data", jsonObj["nlcdFile"].toString(), true).toStdString();
 	} else {
-		_nlcdFile = SearchPaths::forReading("data", "rat_transfer/nlcd/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
+		_nlcdFile = SearchPaths::forReading("data", "rat_transfer/nlcd/nlcd_production/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
 	}
 
 	if (jsonObj.contains("fsAnalysisListFile") && !jsonObj["fsAnalysisListFile"].isUndefined()) {
@@ -3389,8 +3389,9 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 			_useBDesignFlag = propModel["buildingSource"].toString() == "B-Design3D";
 			_useLiDAR = propModel["buildingSource"].toString() == "LiDAR";
-			// for now, we always use 3DEP for FCC 6Ghz
-			_use3DEP = true;//propModel["terrainSource"].toString() == "3DEP (30m)";
+
+			// In the GUI, force this to be true for US and CA.
+			_use3DEP = propModel["terrainSource"].toString() == "3DEP (30m)";
 
 			_winner2LOSOption = ((_useBDesignFlag || _useLiDAR) ? CConst::BldgDataReqTxRxLOSOption : CConst::UnknownLOSOption);
 			_winner2UnknownLOSMethod = CConst::PLOSCombineWinner2UnknownLOSMethod;
