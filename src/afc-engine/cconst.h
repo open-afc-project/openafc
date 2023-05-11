@@ -138,6 +138,7 @@ public:
 		FCC6GHzReportAndOrderPathLossModel,
 		CustomPathLossModel,
 		ISEDDBS06PathLossModel,
+		BrazilPathLossModel,
 		FSPLPathLossModel
 	};
 	/**************************************************************************************/

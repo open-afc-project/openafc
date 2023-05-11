@@ -45,13 +45,14 @@ const int CConst::unii8StopFreqMHz  = 7125;
 /**** Static StrTypeClass lists                                                        ****/
 /******************************************************************************************/
 const StrTypeClass CConst::strPathLossModelList[] = {
-	{               CConst::unknownPathLossModel, "UNKNOWN"                   },
-	{                  CConst::FSPLPathLossModel, "FSPL"                      },
-	{               CConst::ITMBldgPathLossModel, "ITM with building data"    },
-	{ CConst::FCC6GHzReportAndOrderPathLossModel, "FCC 6GHz Report & Order"   },
-	{                CConst::CustomPathLossModel, "Custom"                    },
-	{             CConst::ISEDDBS06PathLossModel, "ISED DBS-06"               },
-	{         CConst::CoalitionOpt6PathLossModel, "ITM with no building data" },
+	{               CConst::unknownPathLossModel, "UNKNOWN"                     },
+	{                  CConst::FSPLPathLossModel, "FSPL"                        },
+	{               CConst::ITMBldgPathLossModel, "ITM with building data"      },
+	{ CConst::FCC6GHzReportAndOrderPathLossModel, "FCC 6GHz Report & Order"     },
+	{                CConst::CustomPathLossModel, "Custom"                      },
+	{             CConst::ISEDDBS06PathLossModel, "ISED DBS-06"                 },
+	{                CConst::BrazilPathLossModel, "Brazilian Propagation Model" },
+	{         CConst::CoalitionOpt6PathLossModel, "ITM with no building data"   },
 
 	{                                    -1,  (char *) 0                      }
 };
