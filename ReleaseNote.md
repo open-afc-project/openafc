@@ -5,7 +5,6 @@
 | :- | :- |
 |**Date**|**05/12/2023**|
 
-
 ## **Issues Addressed**
  * Jira OA-682: Angle off boresight calculation when FS outside but within 1arcsec of ellipse
  * Jira OA-564: RLAN with a directional antenna
