@@ -28,13 +28,16 @@ class RlanRegionClass
 		virtual RLANBoundary getType() const = 0;
 		virtual LatLon closestPoint(LatLon latlon, bool& contains) const = 0;
 		virtual std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const = 0;
-		virtual std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const = 0;
+		virtual std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) = 0;
 		virtual double getMaxDist() const = 0;
 		virtual void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain) = 0;
 		virtual double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL) = 0;
 
+		std::vector<GeodeticCoord> getBoundaryPolygon(TerrainClass *terrain) const;
 		double getMinHeightAGL()  const;
 		double getMaxHeightAGL()  const;
+		double getMinHeightAMSL()  const;
+		double getMaxHeightAMSL()  const;
 		double getCenterLongitude() const { return(centerLongitude); }
 		double getCenterLatitude()  const { return(centerLatitude); }
 		double getCenterHeightAMSL()    const { return(centerHeightAMSL); }
@@ -48,6 +51,8 @@ class RlanRegionClass
 		static double calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec F, arma::vec ptg);
 
 	protected:
+		std::vector<std::tuple<int, int>> *calcScanPointVirtices(int **S, int NX, int NY) const;
+
 		double centerLongitude;
 		double centerLatitude;
 		double cosVal, oneOverCosVal;
@@ -64,6 +69,9 @@ class RlanRegionClass
 
 		bool fixedHeightAMSL;
 		bool configuredFlag;
+
+		PolygonClass *boundaryPolygon;
+		double polygonResolution;
 };
 /******************************************************************************************/
 
@@ -81,7 +89,7 @@ class EllipseRlanRegionClass : RlanRegionClass
 		RLANBoundary getType() const;
 		LatLon closestPoint(LatLon latlon, bool& contains) const;
 		std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const;
-		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const;
+		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree);
 		double getMaxDist() const;
 		void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
 		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL);
@@ -117,13 +125,12 @@ class PolygonRlanRegionClass : RlanRegionClass
 		RLANBoundary getType() const;
 		LatLon closestPoint(LatLon latlon, bool& contains) const;
 		std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const;
-		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const;
+		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree);
 		double getMaxDist() const;
 		void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
 		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL);
 
 	private:
-		double resolution;
 		PolygonClass *polygon;
 		RLANBoundary polygonType;
 };

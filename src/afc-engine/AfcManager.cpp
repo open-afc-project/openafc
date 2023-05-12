@@ -8123,6 +8123,64 @@ void AfcManager::runPointAnalysis()
 		fkml->writeEndElement(); // Scan Points
 		/**********************************************************************************/
 
+		std::vector<GeodeticCoord> bdyPtList = _rlanRegion->getBoundaryPolygon(_terrainDataModel);
+
+		if (bdyPtList.size()) {
+			/**********************************************************************************/
+			/* TOP BOUNDARY                                                                   */
+			/**********************************************************************************/
+			fkml->writeStartElement("Placemark");
+			fkml->writeTextElement("name", "TOP BOUNDARY");
+			fkml->writeTextElement("visibility", "1");
+			fkml->writeTextElement("styleUrl", "#transGrayPoly");
+			fkml->writeStartElement("Polygon");
+			fkml->writeTextElement("extrude", "0");
+			fkml->writeTextElement("tessellate", "0");
+			fkml->writeTextElement("altitudeMode", "absolute");
+			fkml->writeStartElement("outerBoundaryIs");
+			fkml->writeStartElement("LinearRing");
+
+			QString top_bdy_coords = QString();
+			for(ptIdx=0; ptIdx<=(int) bdyPtList.size(); ptIdx++) {
+				GeodeticCoord pt = bdyPtList[ptIdx % bdyPtList.size()];
+				top_bdy_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, _rlanRegion->getMaxHeightAMSL()));
+			}
+
+			fkml->writeTextElement("coordinates", top_bdy_coords);
+			fkml->writeEndElement(); // LinearRing
+			fkml->writeEndElement(); // outerBoundaryIs
+			fkml->writeEndElement(); // Polygon
+			fkml->writeEndElement(); // Placemark
+			/**********************************************************************************/
+
+			/**********************************************************************************/
+			/* BOTTOM BOUNDARY                                                                   */
+			/**********************************************************************************/
+			fkml->writeStartElement("Placemark");
+			fkml->writeTextElement("name", "BOTTOM BOUNDARY");
+			fkml->writeTextElement("visibility", "1");
+			fkml->writeTextElement("styleUrl", "#transGrayPoly");
+			fkml->writeStartElement("Polygon");
+			fkml->writeTextElement("extrude", "0");
+			fkml->writeTextElement("tessellate", "0");
+			fkml->writeTextElement("altitudeMode", "absolute");
+			fkml->writeStartElement("outerBoundaryIs");
+			fkml->writeStartElement("LinearRing");
+
+			QString bottom_bdy_coords = QString();
+			for(ptIdx=0; ptIdx<=(int) bdyPtList.size(); ptIdx++) {
+				GeodeticCoord pt = bdyPtList[ptIdx % bdyPtList.size()];
+				bottom_bdy_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, _rlanRegion->getMinHeightAMSL()));
+			}
+
+			fkml->writeTextElement("coordinates", bottom_bdy_coords);
+			fkml->writeEndElement(); // LinearRing
+			fkml->writeEndElement(); // outerBoundaryIs
+			fkml->writeEndElement(); // Polygon
+			fkml->writeEndElement(); // Placemark
+			/**********************************************************************************/
+		}
+
 		fkml->writeEndElement(); // Folder
 
 		fkml->writeStartElement("Folder");
@@ -8490,18 +8548,12 @@ void AfcManager::runPointAnalysis()
 
 					contains3D = false;
 					if (contains2D) {
-						for(scanPtIdx=0; (scanPtIdx<(int) scanPointList.size())&&(!contains3D); scanPtIdx++) {
-							if (numRlanHt[scanPtIdx]) {
-								double minHeight = rlanCoordList[scanPtIdx][numRlanHt[scanPtIdx]-1].heightKm * 1000;
-								double maxHeight = rlanCoordList[scanPtIdx][0].heightKm * 1000;
-								if ((ulsRxHeightAMSL >= minHeight) && (ulsRxHeightAMSL <= maxHeight)) {
-									contains3D = true;
-						            LOGGER_INFO(logger) << "FSID = " << uls->getID()
-										<< (divIdx ? " DIVERSITY LINK" : "")
-										<< (segIdx == numPR ? " RX" : " PR " + std::to_string(segIdx+1))
-										<< " inside uncertainty volume";
-								}
-							}
+						if ((ulsRxHeightAMSL >= _rlanRegion->getMinHeightAMSL()) && (ulsRxHeightAMSL <= _rlanRegion->getMaxHeightAMSL())) {
+							contains3D = true;
+					           LOGGER_INFO(logger) << "FSID = " << uls->getID()
+								<< (divIdx ? " DIVERSITY LINK" : "")
+								<< (segIdx == numPR ? " RX" : " PR " + std::to_string(segIdx+1))
+								<< " inside uncertainty volume";
 						}
 						if (!contains3D) {
 							LOGGER_INFO(logger) << "FSID = " << uls->getID()
