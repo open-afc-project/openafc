@@ -11,15 +11,13 @@
 # pylint: disable=logging-fstring-interpolation, invalid-name, too-many-locals
 
 import argparse
-import base64
 import datetime
 import email.mime.text
-import google_auth_oauthlib.flow
-import googleapiclient.discovery
 import logging
 import os
-from typing import Any, List, Optional, Set, Union
+import smtplib
 import sys
+from typing import Any, List, Optional, Set, Union
 
 from uls_service_common import *
 
@@ -33,36 +31,58 @@ DEFAULT_SUCCESS_AGE_HR = 8.
 DEFAULT_UPDATE_AGE_HR = 40.
 
 
-def send_email(client_credentials: Optional[str], sender: Optional[str],
-               to: Optional[str], subject: str, body: str) -> None:
+def send_email_smtp(smtp_info_filename: Optional[str], to: Optional[str],
+                    subject: str, body: str) -> None:
     """ Send an email vis Gmail
 
     Arguments:
-    client_credentials -- Credentials file from Gmail
-    sender             -- Sender name
-    to                 -- Recipient email
-    subject            -- Message subject
-    body               -- Message body
+    smtp_info -- Optional name of json file containing SMTP credentials
+    to        -- Optional recipient email
+    subject   -- Message subject
+    body      -- Message body
     """
-    error_if(not client_credentials,
-             "Gmail client credentials file was not provided")
-    assert client_credentials is not None
-    error_if(not os.path.isfile(client_credentials),
-             f"Gmail client credentials file '{client_credentials}' not found")
-    error_if(not to, "Alarm email address was not provided")
-    error_if(not sender, "Sender name not provided")
-
-    flow = google_auth_oauthlib.flow.InstalledAppFlow.from_client_secrets_file(
-        client_credentials, ["https://www.googleapis.com/auth/gmail.send"])
-    creds = flow.run_local_server(port=0)
-    service = googleapiclient.discovery.build("gmail", "v1", credentials=creds)
-    message = email.mime.text.MIMEText(body)
-    message["to"] = to
-    message["subject"] = subject
-    create_message = \
-        {'raw': base64.urlsafe_b64encode(message.as_bytes()).decode()}
-    service.users().messages().send(userId=sender, body=create_message).\
-        execute()
+    if not (smtp_info_filename and to):
+        return
+    error_if(not os.path.isfile(smtp_info_filename),
+             f"SMTP credentials file '{smtp_info_filename}' not found")
+    with open(smtp_info_filename, mode="rb") as f:
+        smtp_info_content = f.read()
+    if not smtp_info_content:
+        return
+    try:
+        credentials = json.loads(smtp_info_content)
+    except json.JSONDecodeError as ex:
+        error(f"Invalid format of '{smtp_info_filename}': {ex}")
+    smtp_kwargs: Dict[str, Any] = {}
+    login_kwargs: Dict[str, Any] = {}
+    for key, key_type, kwargs, arg_name in \
+            [("SERVER", str, smtp_kwargs, "host"),
+             ("PORT", int, smtp_kwargs, "port"),
+             ("USERNAME", str, login_kwargs, "user"),
+             ("PASSWORD", str, login_kwargs, "password")]:
+        value = credentials.get(key)
+        if value is None:
+            continue
+        error_if(not isinstance(value, key_type),
+                 f"Invalid type for '{key}' in '{smtp_info_filename}'")
+        kwargs[arg_name] = value
+    error_if("user" not in login_kwargs,
+             f"`USERNAME' (sender email) not found in '{smtp_info_filename}'")
+    msg = email.mime.text.MIMEText(body)
+    msg["Subject"] = subject
+    msg["From"] = login_kwargs["user"]
+    msg["To"] = to
+    try:
+        smtp = smtplib.SMTP_SSL(**smtp_kwargs) if credentials.get("USE_SSL") \
+            else smtplib.SMTP(**smtp_kwargs)
+        if credentials.get("USE_TLS"):
+            smtp.starttls()  # No idea how it would work without key/cert
+        else:
+            smtp.login(**login_kwargs)
+        smtp.sendmail(msg["From"], [msg["To"]], msg.as_string())
+        smtp.quit()
+    except smtplib.SMTPException as ex:
+        error(f"Email send failure: {ex}")
 
 
 def expired(event_td: Optional[datetime.datetime],
@@ -174,11 +194,10 @@ def emeil_if_needed(status_storage: StatusStorage, args: Any) -> None:
         message_body += \
             (f"ULS data for region '{reg}' last time updated in: "
              f"{'Unknown' if et is None else et.isoformat()}")
-    send_email(client_credentials=args.client_credentials,
-               sender=args.email_sender, to=args.email_to,
-               subject=message_subject, body=message_body)
+    send_email_smtp(smtp_info_filename=args.smtp_info, to=args.email_to,
+                    subject=message_subject, body=message_body)
     status_storage.write_milestone(email_milestone)
-    
+
 
 def main(argv: List[str]) -> None:
     """Do the job.
@@ -194,17 +213,15 @@ def main(argv: List[str]) -> None:
         help=f"Directory with control script status information. Default is "
         f"'{DEFAULT_STATUS_DIR}'")
     argument_parser.add_argument(
-        "--client_credentials", metavar="CLIENT_SECRET_FILE",
-        help="Gmail client credentials secret file. Must be specified if "
-        "sending alarm emails is expected")
+        "--smtp_info", metavar="SMTP_CREDENTIALS_FILE",
+        help="SMTP credentials file. For its structure - see "
+        "NOTIFIER_MAIL.json secret in one of files in tools/secrets/templates "
+        "directory. If parameter not specified or secret file is empty - no "
+        "alarm/beacon emails will be sent")
     argument_parser.add_argument(
         "--email_to", metavar="EMAIL",
-        help="Email address to send alarms/beacons to. Must be specified if "
-        "sending alarm/beacon emails is expected")
-    argument_parser.add_argument(
-        "--email_sender", metavar="SENDER_NAME",
-        help="Sender name. Must be specified if sending alarm/beacon emails "
-        "is expected")
+        help="Email address to send alarms/beacons to. If parameter not "
+        "specified - no alarm/beacon emails will be sent")
     argument_parser.add_argument(
         "--email_sender_location", metavar="TEXT",
         type=docker_arg_type(str),

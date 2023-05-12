@@ -43,6 +43,11 @@ services:
       - als_kafka
       - als_siphon
       - als_postgres
+    secrets:
+      - NOTIFIER_MAIL.json
+      - OIDC.json
+      - REGISTRATION.json
+      - REGISTRATION_CAPTCHA.json
     dns_search: [.]
     environment:
       # RabbitMQ server name:
@@ -143,8 +148,10 @@ services:
     volumes:
       - ${VOL_H_DB}/ULS_Database:/ULS_Database
       - uls_downloader_state:/uls_downloader_state
+    secrets:
+      - NOTIFIER_MAIL.json
     healthcheck:
-      test: ["CMD", "/wd/uls_service_healthcheck.py", "--status_dir=/uls_downloader_state"]
+      test: ["CMD", "/wd/uls_service_healthcheck.py", "--status_dir=/uls_downloader_state", "--smtp_info=${VOL_C_SECRETS}/NOTIFIER_MAIL.json"]
       interval: 1h
       timeout: 1m
       retries: 3
@@ -152,3 +159,13 @@ services:
 
 volumes:
   uls_downloader_state:
+
+secrets:
+    NOTIFIER_MAIL.json:
+        file: ${VOL_H_SECRETS}/NOTIFIER_MAIL.json
+    OIDC.json:
+        file: ${VOL_H_SECRETS}/OIDC.json
+    REGISTRATION.json:
+        file: ${VOL_H_SECRETS}/REGISTRATION.json
+    REGISTRATION_CAPTCHA.json:
+        file: ${VOL_H_SECRETS}/REGISTRATION_CAPTCHA.json
