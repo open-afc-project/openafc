@@ -31,7 +31,8 @@ class RlanRegionClass
 		virtual std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) = 0;
 		virtual double getMaxDist() const = 0;
 		virtual void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain) = 0;
-		virtual double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL) = 0;
+		virtual double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL,
+			double& minAOBLon, double& minAOBLat, double& minAOBHeghtAMSL) = 0;
 
 		std::vector<GeodeticCoord> getBoundaryPolygon(TerrainClass *terrain) const;
 		double getMinHeightAGL()  const;
@@ -48,7 +49,7 @@ class RlanRegionClass
 
 		Vector3 computePointing(double azimuth, double elevation) const;
 
-		static double calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec F, arma::vec ptg);
+		static double calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec F, arma::vec ptg, arma::vec& minLoc);
 
 	protected:
 		std::vector<std::tuple<int, int>> *calcScanPointVirtices(int **S, int NX, int NY) const;
@@ -92,7 +93,8 @@ class EllipseRlanRegionClass : RlanRegionClass
 		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree);
 		double getMaxDist() const;
 		void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
-		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL);
+		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL,
+			double& minAOBLon, double& minAOBLat, double& minAOBHeghtAMSL);
 
 	private:
 		void calcHorizExtents(double latVal, double& lonA, double& lonB, bool& flag) const;
@@ -128,7 +130,8 @@ class PolygonRlanRegionClass : RlanRegionClass
 		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree);
 		double getMaxDist() const;
 		void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
-		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL);
+		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL,
+			double& minAOBLon, double& minAOBLat, double& minAOBHeghtAMSL);
 
 	private:
 		PolygonClass *polygon;

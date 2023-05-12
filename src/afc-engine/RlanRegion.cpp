@@ -255,7 +255,8 @@ void EllipseRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, Te
 /******************************************************************************************/
 /**** CONSTRUCTOR: EllipseRlanRegionClass::calcMinAOB()                                ****/
 /******************************************************************************************/
-double EllipseRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL)
+double EllipseRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL,
+	double& minAOBLon, double& minAOBLat, double& minAOBHeghtAMSL)
 {
 
     if (!boundaryPolygon) {
@@ -293,12 +294,17 @@ double EllipseRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntenna
     F(1) = ulsRxLatLon.first  - centerLatitude;
     if (ulsRxHeightAMSL > centerHeightAMSL) {
         F(2) = ulsRxHeightAMSL - getMaxHeightAMSL();
+		minAOBHeghtAMSL = getMaxHeightAMSL();
     } else {
         F(2) = ulsRxHeightAMSL - getMinHeightAMSL();
+		minAOBHeghtAMSL = getMinHeightAMSL();
     }
     F(2) *= (180.0/M_PI)/CConst::earthRadius;
 
-	double minAOB = RlanRegionClass::calcMinAOB(boundaryPolygon, polygonResolution, F, ptg);
+    arma::vec minLoc(2);
+	double minAOB = RlanRegionClass::calcMinAOB(boundaryPolygon, polygonResolution, F, ptg, minLoc);
+	minAOBLon = centerLongitude + minLoc(0)*oneOverCosVal;
+	minAOBLat = centerLatitude + minLoc(1);
 
 	return minAOB;
 }
@@ -702,7 +708,8 @@ void PolygonRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, Te
 /******************************************************************************************/
 /**** CONSTRUCTOR: PolygonRlanRegionClass::calcMinAOB()                                ****/
 /******************************************************************************************/
-double PolygonRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL)
+double PolygonRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL,
+	double& minAOBLon, double& minAOBLat, double& minAOBHeghtAMSL)
 {
 	arma::vec ptg(3);
 	ptg(0) = ulsAntennaPointing.dot(eastVec);
@@ -714,12 +721,17 @@ double PolygonRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntenna
 	F(1) = ulsRxLatLon.first  - centerLatitude;
 	if (ulsRxHeightAMSL > centerHeightAMSL) {
 		F(2) = ulsRxHeightAMSL - getMaxHeightAMSL();
+		minAOBHeghtAMSL = getMaxHeightAMSL();
 	} else {
 		F(2) = ulsRxHeightAMSL - getMinHeightAMSL();
+		minAOBHeghtAMSL = getMinHeightAMSL();
 	}
 	F(2) *= (180.0/M_PI)/CConst::earthRadius;
 
-	double minAOB = RlanRegionClass::calcMinAOB(polygon, polygonResolution, F, ptg);
+    arma::vec minLoc(2);
+	double minAOB = RlanRegionClass::calcMinAOB(polygon, polygonResolution, F, ptg, minLoc);
+	minAOBLon = centerLongitude + minLoc(0)*oneOverCosVal;
+	minAOBLat = centerLatitude + minLoc(1);
 
     return minAOB;
 }
@@ -1100,7 +1112,7 @@ std::vector<std::tuple<int, int>> *RlanRegionClass::calcScanPointVirtices(int **
 /******************************************************************************************/
 /**** FUNCTION: RlanRegionClass::calcMinAOB()                                          ****/
 /******************************************************************************************/
-double RlanRegionClass::calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec F, arma::vec ptg)
+double RlanRegionClass::calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec F, arma::vec ptg, arma::vec& minLoc)
 {
     double minAOB;
 
@@ -1125,6 +1137,8 @@ double RlanRegionClass::calcMinAOB(PolygonClass *poly, double polyResolution, ar
 			bool contains = poly->in_bdy_area(xval, yval, &edge);
 
 			if (contains || edge) {
+				minLoc(0) = xproj;
+				minLoc(1) = yproj;
 				minAOB = 0.0;
 				found = true;
 			}
@@ -1157,12 +1171,16 @@ double RlanRegionClass::calcMinAOB(PolygonClass *poly, double polyResolution, ar
 				double cosAOB = C0 / sqrt(D0);
 				if (cosAOB > maxCosAOB) {
 					maxCosAOB = cosAOB;
+					minLoc(0) = prevVirtex(0);
+					minLoc(1) = prevVirtex(1);
 				}
 
 				if ((eps > 0.0) && (eps < 1.0)) {
 					cosAOB = (C0 + C1*eps)/ sqrt(D0 + eps*(D1 + eps*D2));
 					if (cosAOB > maxCosAOB) {
 						maxCosAOB = cosAOB;
+						minLoc(0) = (1.0 - eps)*prevVirtex(0) + eps*virtex(0);
+						minLoc(1) = (1.0 - eps)*prevVirtex(1) + eps*virtex(1);
 					}
 				}
 

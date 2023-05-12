@@ -7880,6 +7880,9 @@ void AfcManager::runPointAnalysis()
 		fkml->writeStartElement("PolyStyle");
 		fkml->writeTextElement("color", "7d7f7f7f");
 		fkml->writeEndElement(); // Polystyle
+		fkml->writeEndElement(); // Style
+
+		fkml->writeStartElement("Style");
 		fkml->writeAttribute("id", "transBluePoly");
 		fkml->writeStartElement("LineStyle");
 		fkml->writeTextElement("width", "1.5");
@@ -8016,7 +8019,7 @@ void AfcManager::runPointAnalysis()
 		fkml->writeStartElement("Placemark");
 		fkml->writeTextElement("name", "TOP");
 		fkml->writeTextElement("visibility", "1");
-		fkml->writeTextElement("styleUrl", "#transGrayPoly");
+		fkml->writeTextElement("styleUrl", "#transBluePoly");
 		fkml->writeStartElement("Polygon");
 		fkml->writeTextElement("extrude", "0");
 		fkml->writeTextElement("tessellate", "0");
@@ -8043,7 +8046,7 @@ void AfcManager::runPointAnalysis()
 		fkml->writeStartElement("Placemark");
 		fkml->writeTextElement("name", "BOTTOM");
 		fkml->writeTextElement("visibility", "1");
-		fkml->writeTextElement("styleUrl", "#transGrayPoly");
+		fkml->writeTextElement("styleUrl", "#transBluePoly");
 		fkml->writeStartElement("Polygon");
 		fkml->writeTextElement("extrude", "0");
 		fkml->writeTextElement("tessellate", "0");
@@ -8071,7 +8074,7 @@ void AfcManager::runPointAnalysis()
 			fkml->writeStartElement("Placemark");
 			fkml->writeTextElement("name", QString::asprintf("S_%d", ptIdx));
 			fkml->writeTextElement("visibility", "1");
-			fkml->writeTextElement("styleUrl", "#transGrayPoly");
+			fkml->writeTextElement("styleUrl", "#transBluePoly");
 			fkml->writeStartElement("Polygon");
 			fkml->writeTextElement("extrude", "0");
 			fkml->writeTextElement("tessellate", "0");
@@ -8596,7 +8599,10 @@ void AfcManager::runPointAnalysis()
 
 						double minAngleOffBoresightDeg = 0.0;
 						if (contains2D) {
-							minAngleOffBoresightDeg = _rlanRegion->calcMinAOB(ulsRxLatLon, ulsAntennaPointing, ulsRxHeightAMSL);
+							double minAOBLon, minAOBLat, minAOBHeghtAMSL;
+							minAngleOffBoresightDeg = _rlanRegion->calcMinAOB(ulsRxLatLon, ulsAntennaPointing, ulsRxHeightAMSL, minAOBLon, minAOBLat, minAOBHeghtAMSL);
+							LOGGER_DEBUG(logger) << std::setprecision(15) << "FSID = " << uls->getID() << " MIN_AOB = " << minAngleOffBoresightDeg
+								<< " at LON = " << minAOBLon << " LAT = " << minAOBLat << " HEIGHT_AMSL = " << minAOBHeghtAMSL;
 						}
 
 						for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
@@ -9464,6 +9470,9 @@ void AfcManager::runScanAnalysis()
 		fkml->writeStartElement("PolyStyle");
 		fkml->writeTextElement("color", "7d7f7f7f");
 		fkml->writeEndElement(); // Polystyle
+		fkml->writeEndElement(); // Style
+
+		fkml->writeStartElement("Style");
 		fkml->writeAttribute("id", "transBluePoly");
 		fkml->writeStartElement("LineStyle");
 		fkml->writeTextElement("width", "1.5");
