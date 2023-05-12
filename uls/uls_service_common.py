@@ -6,7 +6,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# pylint: disable=wrong-import-order, invalid-name
+# pylint: disable=wrong-import-order, invalid-name,
+# pylint: disable=logging-fstring-interpolation
 
 import __main__
 import argparse
