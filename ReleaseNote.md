@@ -1,10 +1,10 @@
  # Release Note
 
-
 ## **Version and Date**
 |Version|**OA-564*|
 | :- | :- |
-|**Date**|**05/11/2023**|
+|**Date**|**05/12/2023**|
+
 
 ## **Issues Addressed**
  * Jira OA-682: Angle off boresight calculation when FS outside but within 1arcsec of ellipse
@@ -17,7 +17,8 @@
 
 ## **Testing Done**
  * The issue was found in FSP2. This was tested again and got expected results.
- * Also tested FSP1 (where there was no impact) and found same results as before.
+ * Also tested FSP1 (where there was no impact) and found same results as before (except a lower PSD over 5930-5990 MHz as expected).
+ * Made up linear and radial polygon tests over FSP2 and FSP1 regions.
  * Test results are attached to OA-682
 
 ## **Open Issues** 
