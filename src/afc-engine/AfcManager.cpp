@@ -8601,7 +8601,7 @@ void AfcManager::runPointAnalysis()
 						if (contains2D) {
 							double minAOBLon, minAOBLat, minAOBHeghtAMSL;
 							minAngleOffBoresightDeg = _rlanRegion->calcMinAOB(ulsRxLatLon, ulsAntennaPointing, ulsRxHeightAMSL, minAOBLon, minAOBLat, minAOBHeghtAMSL);
-							LOGGER_DEBUG(logger) << std::setprecision(15) << "FSID = " << uls->getID() << " MIN_AOB = " << minAngleOffBoresightDeg
+							LOGGER_INFO(logger) << std::setprecision(15) << "FSID = " << uls->getID() << " MIN_AOB = " << minAngleOffBoresightDeg
 								<< " at LON = " << minAOBLon << " LAT = " << minAOBLat << " HEIGHT_AMSL = " << minAOBHeghtAMSL;
 						}
 
