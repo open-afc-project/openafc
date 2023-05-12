@@ -94,6 +94,10 @@ pre {
   margin-top: 20px;
 }
 
+.vendorParamsEntry {
+  width: 600px;
+}
+
 .lowerInline, .upperInline{
   max-width: 40%;
   display:inline;

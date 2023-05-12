@@ -214,20 +214,19 @@ export interface IsedDbs06 {
 
 export interface BrazilPropModel {
     kind: "Brazilian Propagation Model",
-    winner2LOSOption: 'UNKNOWN',
     win2ConfidenceCombined: number,
-    win2ConfidenceLOS:number,
-    // win2ConfidenceNLOS?:number,
+    win2ConfidenceLOS?:number,
+    win2ConfidenceNLOS?:number,
     itmConfidence: number,
     itmReliability: number,
     p2108Confidence: number,
-    buildingSource: "None",
+    buildingSource: BuildingSourceValues,
     terrainSource: "SRTM (90m)"
-    // rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
-    // win2UseGroundDistance: boolean,
-    // fsplUseGroundDistance: boolean,
-    // winner2HgtFlag: boolean,
-    // winner2HgtLOS: number
+    winner2LOSOption: 'UNKNOWN' | 'BLDG_DATA_REQ_TX',
+    win2UseGroundDistance: boolean,
+    fsplUseGroundDistance: boolean,
+    winner2HgtFlag: boolean,
+    winner2HgtLOS: number
 }
 
 

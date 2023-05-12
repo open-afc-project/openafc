@@ -289,15 +289,19 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
         "kind": "Brazilian Propagation Model",
         "win2ConfidenceCombined": 16,
         "win2ConfidenceLOS": 16,
+        "winner2LOSOption": "BLDG_DATA_REQ_TX",
+        "win2UseGroundDistance": false,
+        "fsplUseGroundDistance": false,
+        "winner2HgtFlag": false,
+        "winner2HgtLOS": 15,
         "itmConfidence": 5,
         "itmReliability": 20,
         "p2108Confidence": 25,
         "buildingSource": "None",
-        "terrainSource": "SRTM (90m)",
-        "winner2LOSOption": "UNKNOWN"
+        "terrainSource": "SRTM (90m)"
     },
     "propagationEnv": "Population Density Map",
-    "ulsDatabase": "Brazil_ULS_LATEST.sqlite3",
+    "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
     "regionStr": "BR",
     "APUncertainty": {
         "horizontal": 30,
@@ -355,7 +359,14 @@ const defaultAllRegionFreqRanges: () => FreqRange[] = () => (
             "name": "Canada",
             "startFreqMHz": 5925,
             "stopFreqMHz": 6875
+        },
+        {
+            "region": "BR",
+            "name": "Brazil",
+            "startFreqMHz": 5925,
+            "stopFreqMHz": 6875
         }
+
 
     ]);
 // API Calls

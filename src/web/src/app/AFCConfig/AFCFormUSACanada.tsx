@@ -151,6 +151,16 @@ export class AFCFormUSACanada extends React.Component<
             if (x.kind === "FCC 6GHz Report & Order" && x.buildingSource === "None") {
                 delete x.win2ConfidenceNLOS;
             }
+            if (x.kind === "Brazilian Propagation Model" && x.buildingSource === "B-Design3D") {
+                delete x.win2ConfidenceLOS;
+                delete x.win2ConfidenceNLOS;
+            }
+ 
+            if (x.kind === "Brazilian Propagation Model" && x.buildingSource === "None") {
+                delete x.win2ConfidenceNLOS;
+            }
+
+
 
             conf.propagationModel = x;
             this.props.updateConfig(conf);
