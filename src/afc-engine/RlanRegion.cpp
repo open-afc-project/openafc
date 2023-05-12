@@ -211,72 +211,51 @@ void EllipseRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, Te
 /******************************************************************************************/
 double EllipseRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL)
 {
-	double minAOB;
 
-	arma::vec ptg(3);
-	ptg(0) = ulsAntennaPointing.dot(eastVec);
-	ptg(1) = ulsAntennaPointing.dot(northVec);
-	ptg(2) = ulsAntennaPointing.dot(upVec);
+	int numPts = 32;
 
-	arma::vec P(3);
-	P(0) = (ulsRxLatLon.second - centerLongitude)*cosVal;
-	P(1) = ulsRxLatLon.first  - centerLatitude;
-	if (ulsRxHeightAMSL > centerHeightAMSL) {
-		P(2) = ulsRxHeightAMSL - (centerHeightAMSL + heightUncertainty);
-	} else {
-		P(2) = ulsRxHeightAMSL - (centerHeightAMSL - heightUncertainty);
-	}
-	P(2) *= (180.0/M_PI)/CConst::earthRadius;
+    arma::vec x0(2);
+	arma::vec x3(2);
 
-	bool found = false;
-    if (    ((ptg(2) < 0.0) && (P(2) > 0.0)) 
-         || ((ptg(2) > 0.0) && (P(2) < 0.0)) ) {
-        double dist = -P(2) / ptg(2);
-	    arma::vec intcpt(2);
-        intcpt(0) = (P(0) + dist*ptg(0))/cosVal;
-        intcpt(1) = P(1) + dist*ptg(1);
+    double polyResolution = 1.0e-6; // 0.11 meter
+    double polyCenterLongitude = floor((centerLongitude / polyResolution) + 0.5)*polyResolution;
+    double polyCenterLatitude  = floor((centerLatitude / polyResolution) + 0.5)*polyResolution;
+    double polyCosVal = cos(polyCenterLatitude*M_PI/180.0);
+	double r = 1.0/cos(M_PI / numPts);
+	std::vector<std::tuple<int, int>> *ii_list = new std::vector<std::tuple<int, int>>();
 
-		double d = dot(intcpt, mxA*intcpt);
-		if (d<=1) {
-			minAOB = 0.0;
-			found = true;
-		}
+	for(int ptIdx=0; ptIdx<numPts; ++ptIdx) {
+		x0[0] = r*cos(2*M_PI*ptIdx / numPts);
+		x0[1] = r*sin(2*M_PI*ptIdx / numPts);
+
+		x3 = mxB * x0;
+
+        int xval = (int) floor((x3[0]*polyCosVal/polyResolution) + 0.5);
+        int yval = (int) floor((x3[1]/polyResolution) + 0.5);
+		ii_list->push_back(std::tuple<int, int>(xval, yval));
 	}
 
-	if (!found) {
-		arma::vec F(2);
-		arma::vec U(2);
-		F(0) = P(0);
-		F(1) = P(1);
-		U(0) = ptg(0);
-		U(1) = ptg(1);
+	PolygonClass *boundingPolygon = new PolygonClass(ii_list);
 
-		double a = dot(U, mxC*U);
-		double b = dot(U, (mxC+mxC.t())*F);
-		double c = dot(F, mxC*F) - 1.0;
+    arma::vec ptg(3);
+    ptg(0) = ulsAntennaPointing.dot(eastVec);
+    ptg(1) = ulsAntennaPointing.dot(northVec);
+    ptg(2) = ulsAntennaPointing.dot(upVec);
 
-		double d = b*b - 4*a*c;
+    arma::vec F(3);
+    F(0) = (ulsRxLatLon.second - polyCenterLongitude)*polyCosVal;
+    F(1) = ulsRxLatLon.first  - polyCenterLatitude;
+    if (ulsRxHeightAMSL > centerHeightAMSL) {
+        F(2) = ulsRxHeightAMSL - (centerHeightAMSL + heightUncertainty);
+    } else {
+        F(2) = ulsRxHeightAMSL - (centerHeightAMSL - heightUncertainty);
+    }
+    F(2) *= (180.0/M_PI)/CConst::earthRadius;
 
-        // Consider case where FS is not actually in footprint of ellipse, but within 1 grid point, and U points 
-		// in a direction that never intersects the ellipse.  In this case d < 0, just take eps = 0.
-		double eps;
-		if (d < 0.0) {
-			eps = 0.0;
-		} else {
-			eps = (-b + sqrt(b*b - 4*a*c))/(2*a);
-		}
+	double minAOB = RlanRegionClass::calcMinAOB(boundingPolygon, polyResolution, F, ptg);
 
-		arma::vec E(3);
-		E(0) = F(0) + eps*U(0);
-		E(1) = F(1) + eps*U(1);
-		E(2) = 0.0;
-
-		arma::vec L = E - P;
-		L = (1.0/norm(L))*L;
-
-		double cosAOB = dot(L, ptg);
-		minAOB = acos(cosAOB)*180.0/M_PI;
-	}
+	delete ii_list;
+	delete boundingPolygon;
 
 	return minAOB;
 }
@@ -647,8 +626,6 @@ void PolygonRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, Te
 /******************************************************************************************/
 double PolygonRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL)
 {
-	double minAOB;
-
 	arma::vec ptg(3);
 	ptg(0) = ulsAntennaPointing.dot(eastVec);
 	ptg(1) = ulsAntennaPointing.dot(northVec);
@@ -664,65 +641,7 @@ double PolygonRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntenna
 	}
 	F(2) *= (180.0/M_PI)/CConst::earthRadius;
 
-	bool found = false;
-    if (    ((ptg(2) < 0.0) && (F(2) > 0.0)) 
-         || ((ptg(2) > 0.0) && (F(2) < 0.0)) ) {
-        double dist = -F(2) / ptg(2);
-	    arma::vec intcpt(2);
-        int xval = (int) floor((F(0) + dist*ptg(0))/resolution + 0.5);
-        int yval = (int) floor((F(1) + dist*ptg(1))/resolution + 0.5);
-
-		bool edge;
-		bool contains = polygon->in_bdy_area(xval, yval, &edge);
-
-		if (contains || edge) {
-			minAOB = 0.0;
-			found = true;
-		}
-	}
-
-	if (!found) {
-        double maxCosAOB = -1.0;
-        for(int segIdx=0; segIdx<polygon->num_segment; ++segIdx) {
-            int prevIdx = polygon->num_bdy_pt[segIdx]-1;
-	        arma::vec prevVirtex(3);
-            prevVirtex(0) = polygon->bdy_pt_x[segIdx][prevIdx]*resolution;
-            prevVirtex(1) = polygon->bdy_pt_y[segIdx][prevIdx]*resolution;
-            prevVirtex(2) = 0.0;
-            for(int ptIdx=0; ptIdx<polygon->num_bdy_pt[segIdx]; ++ptIdx) {
-	            arma::vec virtex(3);
-                virtex(0) = polygon->bdy_pt_x[segIdx][ptIdx]*resolution;
-                virtex(1) = polygon->bdy_pt_y[segIdx][ptIdx]*resolution;
-                virtex(2) = 0.0;
-
-                double D0 = dot(virtex - prevVirtex, virtex - prevVirtex);
-                double D1 = 2*dot(virtex - prevVirtex, prevVirtex - F);
-                double D2 = dot(prevVirtex - F, prevVirtex - F);
-
-                double C0 = dot(prevVirtex - F, ptg);
-                double C1 = dot(virtex - prevVirtex, ptg);
-
-                double eps = (D0*C1 - C0*D1/2)/(D2*C0 - C1*D1/2);
-
-                double cosAOB = C0 / sqrt(D0);
-                if (cosAOB > maxCosAOB) {
-                    maxCosAOB = cosAOB;
-                }
-
-                if ((eps > 0.0) && (eps < 1.0)) {
-                    cosAOB = (C0 + C1*eps)/ sqrt(D0 + eps*(D1 + eps*D2));
-                    if (cosAOB > maxCosAOB) {
-                        maxCosAOB = cosAOB;
-                    }
-                }
-
-                prevIdx = ptIdx;
-                prevVirtex = virtex;
-            }
-        }
-
-		minAOB = acos(maxCosAOB)*180.0/M_PI;
-	}
+	double minAOB = RlanRegionClass::calcMinAOB(polygon, resolution, F, ptg);
 
     return minAOB;
 }
@@ -930,6 +849,87 @@ double PolygonRlanRegionClass::getMaxDist() const
         }
     }
     return(maxDist);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: RlanRegionClass::calcMinAOB()                                          ****/
+/******************************************************************************************/
+double RlanRegionClass::calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec F, arma::vec ptg)
+{
+    double minAOB;
+
+    bool found = false;
+	if (    ((ptg(2) < 0.0) && (F(2) > 0.0))
+         || ((ptg(2) > 0.0) && (F(2) < 0.0)) ) {
+		double dist = -F(2) / ptg(2);
+		double xproj = F(0) + dist*ptg(0);
+		double yproj = F(1) + dist*ptg(1);
+
+		int minx, maxx, miny, maxy;
+		poly->comp_bdy_min_max(minx, maxx, miny, maxy);
+		if (    (xproj >= (minx-1)*polyResolution)
+		     && (xproj <= (maxx+1)*polyResolution)
+		     && (yproj >= (miny-1)*polyResolution)
+		     && (yproj <= (maxy+1)*polyResolution) ) {
+
+			int xval = (int) floor(xproj/polyResolution + 0.5);
+			int yval = (int) floor(yproj/polyResolution + 0.5);
+
+			bool edge;
+			bool contains = poly->in_bdy_area(xval, yval, &edge);
+
+			if (contains || edge) {
+				minAOB = 0.0;
+				found = true;
+			}
+		}
+	}
+
+	if (!found) {
+		double maxCosAOB = -1.0;
+		for(int segIdx=0; segIdx<poly->num_segment; ++segIdx) {
+			int prevIdx = poly->num_bdy_pt[segIdx]-1;
+			arma::vec prevVirtex(3);
+			prevVirtex(0) = poly->bdy_pt_x[segIdx][prevIdx]*polyResolution;
+			prevVirtex(1) = poly->bdy_pt_y[segIdx][prevIdx]*polyResolution;
+			prevVirtex(2) = 0.0;
+			for(int ptIdx=0; ptIdx<poly->num_bdy_pt[segIdx]; ++ptIdx) {
+				arma::vec virtex(3);
+				virtex(0) = poly->bdy_pt_x[segIdx][ptIdx]*polyResolution;
+				virtex(1) = poly->bdy_pt_y[segIdx][ptIdx]*polyResolution;
+				virtex(2) = 0.0;
+
+				double D2 = dot(virtex - prevVirtex, virtex - prevVirtex);
+				double D1 = 2*dot(virtex - prevVirtex, prevVirtex - F);
+				double D0 = dot(prevVirtex - F, prevVirtex - F);
+
+				double C0 = dot(prevVirtex - F, ptg);
+				double C1 = dot(virtex - prevVirtex, ptg);
+
+				double eps = (D0*C1 - C0*D1/2)/(D2*C0 - C1*D1/2);
+
+				double cosAOB = C0 / sqrt(D0);
+				if (cosAOB > maxCosAOB) {
+					maxCosAOB = cosAOB;
+				}
+
+				if ((eps > 0.0) && (eps < 1.0)) {
+					cosAOB = (C0 + C1*eps)/ sqrt(D0 + eps*(D1 + eps*D2));
+					if (cosAOB > maxCosAOB) {
+						maxCosAOB = cosAOB;
+					}
+				}
+
+				prevIdx = ptIdx;
+				prevVirtex = virtex;
+			}
+		}
+
+		minAOB = acos(maxCosAOB)*180.0/M_PI;
+	}
+
+	return minAOB;
 }
 /******************************************************************************************/
 
