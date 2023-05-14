@@ -15,9 +15,8 @@ TEST_CAT_CLM = 4
 VERSION_CLM = 9
 REQ_ID_CLM = 10
 SER_NBR_CLM = 11
-NRA_CLM = 12
-ID_CLM = 13
-RULESET_CLM = 14
+RULESET_CLM = 13
+ID_CLM = 14
 ELLIPSE_LONGITUDE_CLM = 15
 ELLIPSE_LATITUDE_CLM = 16
 ELLIPSE_MAJORAXIS_CLM = 17
@@ -61,11 +60,11 @@ REQ_INQ_CHA_CHANCFI = '"channelCfi": '
 
 REQ_DEV_DESC_HEADER = '"deviceDescriptor": {'
 REQ_DEV_DESC_FOOTER = '},'
-REQ_RULESET = '"rulesetIds": '
 REQ_SER_NBR = '"serialNumber": ' 
 REQ_CERT_ID_HEADER = '"certificationId": [{'
 REQ_CERT_ID_FOOTER = '}]'
-REQ_NRA = '"nra": '
+REQ_RULESET = '"rulesetIds": '
+#REQ_NRA = '"nra": '
 REQ_ID = '"id": '
 
 REQ_REQUEST_ID = '"requestId": '
