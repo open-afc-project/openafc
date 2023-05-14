@@ -1166,18 +1166,14 @@ def parse_tests(cfg):
             res_str += '}' + REQ_INQ_CHA_FOOTER + ' '
 
             res_str += REQ_DEV_DESC_HEADER
-            cell = sheet.cell(row = i, column = RULESET_CLM)
-            res_str += REQ_RULESET + '["' + str(cell.value) + '"],'
-
             cell = sheet.cell(row = i, column = SER_NBR_CLM)
             if isinstance(cell.value, str):
                 serial_id = cell.value
             else:
                 serial_id = ""
             res_str += REQ_SER_NBR + '"' + serial_id + '",' + REQ_CERT_ID_HEADER
-
-            cell = sheet.cell(row = i, column = NRA_CLM)
-            res_str += REQ_NRA + '"' + cell.value + '",'
+            cell = sheet.cell(row = i, column = RULESET_CLM)
+            res_str += REQ_RULESET + '["' + str(cell.value) + '"],'
 
             cell = sheet.cell(row = i, column = ID_CLM)
             if isinstance(cell.value, str):
