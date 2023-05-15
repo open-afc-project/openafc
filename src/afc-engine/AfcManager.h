@@ -397,6 +397,10 @@ class AfcManager
 		std::string _deniedRegionFile;                 // File containing data on denied geographic regions
 		int _inquiredFrequencyResolutionMHz;           // Resolution of inquired frequency response in MHz
 		double _inquiredFrequencyMaxPSD_dBmPerMHz;     // Max PSD for inquired frequency analysis
+
+		AntennaClass *_rlanAntenna;
+		Vector3 _rlanPointing;
+		double _rlanAzimuthPointing, _rlanElevationPointing;
 		/**************************************************************************************/
 
 		/**************************************************************************************/

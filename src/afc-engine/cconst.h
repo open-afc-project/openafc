@@ -78,22 +78,6 @@ public:
 	/**************************************************************************************/
 
 	/**************************************************************************************/
-	/**** AntennaModel                                                                 ****/
-	/**************************************************************************************/
-	enum AntennaModelEnum
-	{
-		idealOmniAntennaModel,
-
-		indoorUTAverageAntennaModel,
-		outdoorClientAntennaModel,
-		outdoorDirPtToPtAntennaModel,
-		outdoorOmniPtToMptAntennaModel,
-		outdoorOmniRLANAntennaModel,
-		unknownAntennaModel
-	};
-	/**************************************************************************************/
-
-	/**************************************************************************************/
 	/**** AntennaType                                                                  ****/
 	/**************************************************************************************/
 	enum AntennaTypeEnum
@@ -154,6 +138,7 @@ public:
 		FCC6GHzReportAndOrderPathLossModel,
 		CustomPathLossModel,
 		ISEDDBS06PathLossModel,
+		BrazilPathLossModel,
 		FSPLPathLossModel
 	};
 	/**************************************************************************************/

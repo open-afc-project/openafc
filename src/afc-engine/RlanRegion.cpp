@@ -23,6 +23,9 @@ RlanRegionClass::RlanRegionClass()
 
     fixedHeightAMSL = false;
     configuredFlag = false;
+	boundaryPolygon = (PolygonClass *) NULL;
+
+    polygonResolution = 1.0e-6; // 0.11 meter
 }
 /******************************************************************************************/
 
@@ -31,6 +34,9 @@ RlanRegionClass::RlanRegionClass()
 /******************************************************************************************/
 RlanRegionClass::~RlanRegionClass()
 {
+    if (boundaryPolygon) {
+		delete boundaryPolygon;
+	}
 }
 /******************************************************************************************/
 
@@ -71,6 +77,60 @@ double RlanRegionClass::getMaxHeightAGL() const
     }
 
     return(maxHeightAGL);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: RlanRegionClass::getMinHeightAMSL()                                    ****/
+/******************************************************************************************/
+double RlanRegionClass::getMinHeightAMSL() const
+{
+    if (!configuredFlag) {
+        throw std::runtime_error(ErrStream() << "ERROR: RlanRegionClass::getMinHeightAMSL() RlanRegion not configured");
+    }
+
+    double minHeightAMSL;
+    if (fixedHeightAMSL) {
+        minHeightAMSL = centerHeightAMSL - heightUncertainty;
+    } else {
+        minHeightAMSL = centerHeightAMSL - heightUncertainty - centerTerrainHeight + minTerrainHeight;
+    }
+
+    return(minHeightAMSL);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: RlanRegionClass::getMaxHeightAMSL()                                    ****/
+/******************************************************************************************/
+double RlanRegionClass::getMaxHeightAMSL() const
+{
+    if (!configuredFlag) {
+        throw std::runtime_error(ErrStream() << "ERROR: RlanRegionClass::getMaxHeightAMSL() RlanRegion not configured");
+    }
+
+    double maxHeightAMSL;
+    if (fixedHeightAMSL) {
+        maxHeightAMSL = centerHeightAMSL + heightUncertainty;
+    } else {
+        maxHeightAMSL = centerHeightAMSL + heightUncertainty - centerTerrainHeight + maxTerrainHeight;
+    }
+
+    return(maxHeightAMSL);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: RlanRegionClass::computePointing()                                     ****/
+/******************************************************************************************/
+Vector3 RlanRegionClass::computePointing(double azimuth, double elevation) const
+{
+    double azimuthRad   = azimuth*M_PI/180.0;
+    double elevationRad = elevation*M_PI/180.0;
+
+    Vector3 pointing = (northVec*cos(azimuthRad) + eastVec*sin(azimuthRad))*cos(elevationRad) + upVec*sin(elevationRad);
+
+	return(pointing);
 }
 /******************************************************************************************/
 
@@ -195,65 +255,56 @@ void EllipseRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, Te
 /******************************************************************************************/
 /**** CONSTRUCTOR: EllipseRlanRegionClass::calcMinAOB()                                ****/
 /******************************************************************************************/
-double EllipseRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL)
+double EllipseRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL,
+	double& minAOBLon, double& minAOBLat, double& minAOBHeghtAMSL)
 {
-	double minAOB;
 
-	arma::vec ptg(3);
-	ptg(0) = ulsAntennaPointing.dot(eastVec);
-	ptg(1) = ulsAntennaPointing.dot(northVec);
-	ptg(2) = ulsAntennaPointing.dot(upVec);
+    if (!boundaryPolygon) {
+		int numPts = 32;
 
-	arma::vec P(3);
-	P(0) = (ulsRxLatLon.second - centerLongitude)*cosVal;
-	P(1) = ulsRxLatLon.first  - centerLatitude;
-	if (ulsRxHeightAMSL > centerHeightAMSL) {
-		P(2) = ulsRxHeightAMSL - (centerHeightAMSL + heightUncertainty);
-	} else {
-		P(2) = ulsRxHeightAMSL - (centerHeightAMSL - heightUncertainty);
-	}
-	P(2) *= (180.0/M_PI)/CConst::earthRadius;
+    	arma::vec x0(2);
+		arma::vec x3(2);
 
-	bool found = false;
-    if (    ((ptg(2) < 0.0) && (P(2) > 0.0)) 
-         || ((ptg(2) > 0.0) && (P(2) < 0.0)) ) {
-        double dist = -P(2) / ptg(2);
-	    arma::vec intcpt(2);
-        intcpt(0) = (P(0) + dist*ptg(0))/cosVal;
-        intcpt(1) = P(1) + dist*ptg(1);
+		double r = 1.0/cos(M_PI / numPts);
+		std::vector<std::tuple<int, int>> *ii_list = new std::vector<std::tuple<int, int>>();
 
-		double d = dot(intcpt, mxA*intcpt);
-		if (d<=1) {
-			minAOB = 0.0;
-			found = true;
+		for(int ptIdx=0; ptIdx<numPts; ++ptIdx) {
+			x0[0] = r*cos(2*M_PI*ptIdx / numPts);
+			x0[1] = r*sin(2*M_PI*ptIdx / numPts);
+
+			x3 = mxB * x0;
+
+        	int xval = (int) floor((x3[0]*cosVal/polygonResolution) + 0.5);
+        	int yval = (int) floor((x3[1]/polygonResolution) + 0.5);
+			ii_list->push_back(std::tuple<int, int>(xval, yval));
 		}
+
+		boundaryPolygon = new PolygonClass(ii_list);
+
+		delete ii_list;
 	}
 
-	if (!found) {
-		arma::vec F(2);
-		arma::vec U(2);
-		F(0) = P(0);
-		F(1) = P(1);
-		U(0) = ptg(0);
-		U(1) = ptg(1);
+    arma::vec ptg(3);
+    ptg(0) = ulsAntennaPointing.dot(eastVec);
+    ptg(1) = ulsAntennaPointing.dot(northVec);
+    ptg(2) = ulsAntennaPointing.dot(upVec);
 
-		double a = dot(U, mxC*U);
-		double b = dot(U, (mxC+mxC.t())*F);
-		double c = dot(F, mxC*F) - 1.0;
+    arma::vec F(3);
+    F(0) = (ulsRxLatLon.second - centerLongitude)*cosVal;
+    F(1) = ulsRxLatLon.first  - centerLatitude;
+    if (ulsRxHeightAMSL > centerHeightAMSL) {
+        F(2) = ulsRxHeightAMSL - getMaxHeightAMSL();
+		minAOBHeghtAMSL = getMaxHeightAMSL();
+    } else {
+        F(2) = ulsRxHeightAMSL - getMinHeightAMSL();
+		minAOBHeghtAMSL = getMinHeightAMSL();
+    }
+    F(2) *= (180.0/M_PI)/CConst::earthRadius;
 
-		double eps = (-b + sqrt(b*b - 4*a*c))/(2*a);
-
-		arma::vec E(3);
-		E(0) = F(0) + eps*U(0);
-		E(1) = F(1) + eps*U(1);
-		E(2) = 0.0;
-
-		arma::vec L = E - P;
-		L = (1.0/norm(L))*L;
-
-		double cosAOB = dot(L, ptg);
-		minAOB = acos(cosAOB)*180.0/M_PI;
-	}
+    arma::vec minLoc(2);
+	double minAOB = RlanRegionClass::calcMinAOB(boundaryPolygon, polygonResolution, F, ptg, minLoc);
+	minAOBLon = centerLongitude + minLoc(0)*oneOverCosVal;
+	minAOBLat = centerLatitude + minLoc(1);
 
 	return minAOB;
 }
@@ -338,7 +389,7 @@ std::vector<GeodeticCoord> EllipseRlanRegionClass::getBoundary(TerrainClass *ter
 /******************************************************************************************/
 /**** FUNCTION: EllipseRlanRegionClass::getScan()                                      ****/
 /******************************************************************************************/
-std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const
+std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree)
 {
     std::vector<LatLon> ptList;
 
@@ -392,11 +443,12 @@ std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
         }
     } else if (method == CConst::latLonAlignGridScanRegionMethod) {
         // Scan points aligned with lat / lon grid
-        int N = floor( (semiMajorAxis / CConst::earthRadius)*(180.0/M_PI)*pointsPerDegree/cosVal ) + 1;
-        int S[2*N+1][2*N+1];
-
         int ix, iy;
+
+        int N = floor( (semiMajorAxis / CConst::earthRadius)*(180.0/M_PI)*pointsPerDegree/cosVal ) + 1;
+        int **S = (int **) malloc((2*N+1)*sizeof(int *));
         for(ix=0; ix<=2*N; ++ix) {
+			S[ix] = (int *) malloc((2*N+1)*sizeof(int));
             for(iy=0; iy<=2*N; ++iy) {
                 S[ix][iy] = 0;
             }
@@ -445,6 +497,41 @@ std::vector<LatLon> EllipseRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
                 }
             }
         }
+
+    	std::vector<std::tuple<int, int>> *vListS = calcScanPointVirtices(S, 2*N+1, 2*N+1);
+
+#if 0
+		printf("BOUNDARY POLYGON\n");
+        for(iy=2*N; iy>=0; --iy) {
+            for(ix=0; ix<=2*N; ++ix) {
+			    printf("%d ", S[ix][iy]);
+			}
+			printf("\n");
+		}
+		for(int i=0; i<(int) vListS->size(); ++i) {
+			std::tie(ix, iy) = (*vListS)[i];
+			printf("%d %d\n", ix, iy);
+		}
+#endif
+
+		std::vector<std::tuple<int, int>> *ii_list = new std::vector<std::tuple<int, int>>();
+		for(int i=0; i<(int) vListS->size(); ++i) {
+			std::tie(ix, iy) = (*vListS)[i];
+			double lonVal = ((double) lonN0 + ix - N)/pointsPerDegree; 
+			double latVal = ((double) latN0 + iy - N)/pointsPerDegree; 
+
+			int xval = (int) floor(((lonVal - centerLongitude)*cosVal/polygonResolution) + 0.5);
+			int yval = (int) floor(((latVal  - centerLatitude)/polygonResolution) + 0.5);
+			ii_list->push_back(std::tuple<int, int>(xval, yval));
+		}
+		boundaryPolygon = new PolygonClass(ii_list);
+
+		delete ii_list;
+		delete vListS;
+        for(ix=0; ix<=2*N; ++ix) {
+			free(S[ix]);
+        }
+		free(S);
     } else {
         CORE_DUMP;
     }
@@ -530,9 +617,8 @@ polygonType(polygonTypeVal)
     eastVec = (Vector3(-upVec.y(), upVec.x(), 0.0)).normalized();
     northVec = upVec.cross(eastVec);
 
-    resolution = 1.0e-6; // 0.11 meter
-    centerLongitude = floor((centerLongitude / resolution) + 0.5)*resolution;
-    centerLatitude  = floor((centerLatitude / resolution) + 0.5)*resolution;
+    centerLongitude = floor((centerLongitude / polygonResolution) + 0.5)*polygonResolution;
+    centerLatitude  = floor((centerLatitude / polygonResolution) + 0.5)*polygonResolution;
     cosVal = cos(centerLatitude*M_PI/180.0);
     oneOverCosVal = 1.0/cosVal;
 
@@ -556,8 +642,8 @@ polygonType(polygonTypeVal)
             throw std::runtime_error(ErrStream() << "ERROR: INVALID polygonType = " << polygonType);
         }
 
-        int xval = (int) floor(((longitude - centerLongitude)*cosVal/resolution) + 0.5);
-        int yval = (int) floor(((latitude  - centerLatitude)/resolution) + 0.5);
+        int xval = (int) floor(((longitude - centerLongitude)*cosVal/polygonResolution) + 0.5);
+        int yval = (int) floor(((latitude  - centerLatitude)/polygonResolution) + 0.5);
         ii_list->push_back(std::tuple<int, int>(xval, yval));
     }
 
@@ -622,10 +708,9 @@ void PolygonRlanRegionClass::configure(CConst::HeightTypeEnum rlanHeightType, Te
 /******************************************************************************************/
 /**** CONSTRUCTOR: PolygonRlanRegionClass::calcMinAOB()                                ****/
 /******************************************************************************************/
-double PolygonRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL)
+double PolygonRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL,
+	double& minAOBLon, double& minAOBLat, double& minAOBHeghtAMSL)
 {
-	double minAOB;
-
 	arma::vec ptg(3);
 	ptg(0) = ulsAntennaPointing.dot(eastVec);
 	ptg(1) = ulsAntennaPointing.dot(northVec);
@@ -635,71 +720,18 @@ double PolygonRlanRegionClass::calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntenna
 	F(0) = (ulsRxLatLon.second - centerLongitude)*cosVal;
 	F(1) = ulsRxLatLon.first  - centerLatitude;
 	if (ulsRxHeightAMSL > centerHeightAMSL) {
-		F(2) = ulsRxHeightAMSL - (centerHeightAMSL + heightUncertainty);
+		F(2) = ulsRxHeightAMSL - getMaxHeightAMSL();
+		minAOBHeghtAMSL = getMaxHeightAMSL();
 	} else {
-		F(2) = ulsRxHeightAMSL - (centerHeightAMSL - heightUncertainty);
+		F(2) = ulsRxHeightAMSL - getMinHeightAMSL();
+		minAOBHeghtAMSL = getMinHeightAMSL();
 	}
 	F(2) *= (180.0/M_PI)/CConst::earthRadius;
 
-	bool found = false;
-    if (    ((ptg(2) < 0.0) && (F(2) > 0.0)) 
-         || ((ptg(2) > 0.0) && (F(2) < 0.0)) ) {
-        double dist = -F(2) / ptg(2);
-	    arma::vec intcpt(2);
-        int xval = (int) floor((F(0) + dist*ptg(0))/resolution + 0.5);
-        int yval = (int) floor((F(1) + dist*ptg(1))/resolution + 0.5);
-
-		bool edge;
-		bool contains = polygon->in_bdy_area(xval, yval, &edge);
-
-		if (contains || edge) {
-			minAOB = 0.0;
-			found = true;
-		}
-	}
-
-	if (!found) {
-        double maxCosAOB = -1.0;
-        for(int segIdx=0; segIdx<polygon->num_segment; ++segIdx) {
-            int prevIdx = polygon->num_bdy_pt[segIdx]-1;
-	        arma::vec prevVirtex(3);
-            prevVirtex(0) = polygon->bdy_pt_x[segIdx][prevIdx]*resolution;
-            prevVirtex(1) = polygon->bdy_pt_y[segIdx][prevIdx]*resolution;
-            prevVirtex(2) = 0.0;
-            for(int ptIdx=0; ptIdx<polygon->num_bdy_pt[segIdx]; ++ptIdx) {
-	            arma::vec virtex(3);
-                virtex(0) = polygon->bdy_pt_x[segIdx][ptIdx]*resolution;
-                virtex(1) = polygon->bdy_pt_y[segIdx][ptIdx]*resolution;
-                virtex(2) = 0.0;
-
-                double D0 = dot(virtex - prevVirtex, virtex - prevVirtex);
-                double D1 = 2*dot(virtex - prevVirtex, prevVirtex - F);
-                double D2 = dot(prevVirtex - F, prevVirtex - F);
-
-                double C0 = dot(prevVirtex - F, ptg);
-                double C1 = dot(virtex - prevVirtex, ptg);
-
-                double eps = (D0*C1 - C0*D1/2)/(D2*C0 - C1*D1/2);
-
-                double cosAOB = C0 / sqrt(D0);
-                if (cosAOB > maxCosAOB) {
-                    maxCosAOB = cosAOB;
-                }
-
-                if ((eps > 0.0) && (eps < 1.0)) {
-                    cosAOB = (C0 + C1*eps)/ sqrt(D0 + eps*(D1 + eps*D2));
-                    if (cosAOB > maxCosAOB) {
-                        maxCosAOB = cosAOB;
-                    }
-                }
-
-                prevIdx = ptIdx;
-                prevVirtex = virtex;
-            }
-        }
-
-		minAOB = acos(maxCosAOB)*180.0/M_PI;
-	}
+    arma::vec minLoc(2);
+	double minAOB = RlanRegionClass::calcMinAOB(polygon, polygonResolution, F, ptg, minLoc);
+	minAOBLon = centerLongitude + minLoc(0)*oneOverCosVal;
+	minAOBLat = centerLatitude + minLoc(1);
 
     return minAOB;
 }
@@ -723,8 +755,8 @@ LatLon PolygonRlanRegionClass::closestPoint(LatLon latlon, bool& contains) const
     double longitude = 0.0;
 
     int xval, yval;
-    xval = (int) floor((latlon.second - centerLongitude)*cosVal/resolution + 0.5); // longitude
-    yval = (int) floor((latlon.first  - centerLatitude )/resolution + 0.5); // latitude
+    xval = (int) floor((latlon.second - centerLongitude)*cosVal/polygonResolution + 0.5); // longitude
+    yval = (int) floor((latlon.first  - centerLatitude )/polygonResolution + 0.5); // latitude
 
     bool edge;
     contains = polygon->in_bdy_area(xval, yval, &edge);
@@ -736,8 +768,8 @@ LatLon PolygonRlanRegionClass::closestPoint(LatLon latlon, bool& contains) const
         double ptX, ptY;
         std::tie(ptX, ptY) =  polygon->closestPoint(std::tuple<int, int>(xval, yval));
 
-        longitude = centerLongitude + ptX*resolution*oneOverCosVal;
-        latitude  = centerLatitude  + ptY*resolution;
+        longitude = centerLongitude + ptX*polygonResolution*oneOverCosVal;
+        latitude  = centerLatitude  + ptY*polygonResolution;
     }
 
     return(std::pair<double, double>(latitude, longitude));
@@ -761,8 +793,8 @@ std::vector<GeodeticCoord> PolygonRlanRegionClass::getBoundary(TerrainClass *ter
     for(ptIdx=0; ptIdx<numRLANPoints; ptIdx++) {
         int xval = polygon->bdy_pt_x[0][ptIdx];
         int yval = polygon->bdy_pt_y[0][ptIdx];
-        double longitude = centerLongitude + xval*resolution*oneOverCosVal;
-        double latitude  = centerLatitude  + yval*resolution;
+        double longitude = centerLongitude + xval*polygonResolution*oneOverCosVal;
+        double latitude  = centerLatitude  + yval*polygonResolution;
 
         double heightAMSL;
         if (fixedHeightAMSL) {
@@ -785,7 +817,7 @@ std::vector<GeodeticCoord> PolygonRlanRegionClass::getBoundary(TerrainClass *ter
 /******************************************************************************************/
 /**** FUNCTION: PolygonRlanRegionClass::getScan()                                      ****/
 /******************************************************************************************/
-std::vector<LatLon> PolygonRlanRegionClass::getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const
+std::vector<LatLon> PolygonRlanRegionClass::getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree)
 {
     std::vector<LatLon> ptList;
 
@@ -794,56 +826,51 @@ std::vector<LatLon> PolygonRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
 
     if (    (method == CConst::xyAlignRegionNorthEastScanRegionMethod)
          || (method == CConst::xyAlignRegionMajorMinorScanRegionMethod) ) {
-        int minScanXIdx = (int) floor(minx*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM);
-        int maxScanXIdx = (int) floor(maxx*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM)+1;
-        int minScanYIdx = (int) floor(miny*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM);
-        int maxScanYIdx = (int) floor(maxy*resolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM)+1;
+        int minScanXIdx = (int) floor(minx*polygonResolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM);
+        int maxScanXIdx = (int) floor(maxx*polygonResolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM)+1;
+        int minScanYIdx = (int) floor(miny*polygonResolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM);
+        int maxScanYIdx = (int) floor(maxy*polygonResolution*(M_PI/180.0)*CConst::earthRadius / scanResolutionM)+1;
 
         int ix, iy;
         bool isEdge;
         for(iy=minScanYIdx; iy<=maxScanYIdx; ++iy) {
-            int yIdx = (int) floor(iy*scanResolutionM*(180.0/M_PI)/(CConst::earthRadius*resolution) + 0.5);
+            int yIdx = (int) floor(iy*scanResolutionM*(180.0/M_PI)/(CConst::earthRadius*polygonResolution) + 0.5);
             for(ix=minScanXIdx; ix<=maxScanXIdx; ++ix) {
-                int xIdx = (int) floor(ix*scanResolutionM*(180.0/M_PI)/(CConst::earthRadius*resolution) + 0.5);
+                int xIdx = (int) floor(ix*scanResolutionM*(180.0/M_PI)/(CConst::earthRadius*polygonResolution) + 0.5);
                 bool inBdyArea = polygon->in_bdy_area(xIdx, yIdx, &isEdge);
                 if (inBdyArea || isEdge) {
-                    double longitude = centerLongitude + xIdx*resolution*oneOverCosVal;
-                    double latitude  = centerLatitude  + yIdx*resolution;
+                    double longitude = centerLongitude + xIdx*polygonResolution*oneOverCosVal;
+                    double latitude  = centerLatitude  + yIdx*polygonResolution;
                     ptList.push_back(std::pair<double, double>(latitude, longitude));
                 }
             }
         }
     } else if (method == CConst::latLonAlignGridScanRegionMethod) {
         // Scan points aligned with lat / lon grid
-        int NX = (int) floor( (maxx - minx)*resolution*oneOverCosVal*pointsPerDegree ) + 2;
-        int NY = (int) floor( (maxy - miny)*resolution*pointsPerDegree ) + 2;
-
-        int S[NX][NY];
-
-        // int xval = polygon->bdy_pt_x[0][ptIdx];
-        // int yval = polygon->bdy_pt_y[0][ptIdx];
-        // double longitude = centerLongitude + xval*resolution*oneOverCosVal;
-        // double latitude  = centerLatitude  + yval*resolution;
-
         int ix, iy;
+
+        int NX = (int) floor( (maxx - minx)*polygonResolution*oneOverCosVal*pointsPerDegree ) + 2;
+        int NY = (int) floor( (maxy - miny)*polygonResolution*pointsPerDegree ) + 2;
+        int **S = (int **) malloc((NX)*sizeof(int *));
         for(ix=0; ix<NX; ++ix) {
+			S[ix] = (int *) malloc((NY)*sizeof(int));
             for(iy=0; iy<NY; ++iy) {
                 S[ix][iy] = 0;
             }
         }
 
-        int latN0 = (int) floor((centerLatitude + miny*resolution)*pointsPerDegree);
-        int lonN0 = (int) floor((centerLongitude + minx*resolution*oneOverCosVal)*pointsPerDegree);
+        int latN0 = (int) floor((centerLatitude + miny*polygonResolution)*pointsPerDegree);
+        int lonN0 = (int) floor((centerLongitude + minx*polygonResolution*oneOverCosVal)*pointsPerDegree);
 
         for(iy=1; iy<NY; ++iy) {
             double latVal = ((double) (latN0 + iy))/pointsPerDegree;
-            double yVal = (latVal - centerLatitude)/resolution;
+            double yVal = (latVal - centerLatitude)/polygonResolution;
             bool flag;
             double xA, xB;
             polygon->calcHorizExtents(yVal, xA, xB, flag);
             if (flag) {
-                double lonA = centerLongitude + xA*resolution*oneOverCosVal;
-                double lonB = centerLongitude + xB*resolution*oneOverCosVal;
+                double lonA = centerLongitude + xA*polygonResolution*oneOverCosVal;
+                double lonB = centerLongitude + xB*polygonResolution*oneOverCosVal;
                 int iA = ((int) floor(lonA*pointsPerDegree)) - lonN0;
                 int iB = ((int) floor(lonB*pointsPerDegree)) - lonN0;
                 for(ix=iA; ix<=iB; ++ix) {
@@ -855,13 +882,13 @@ std::vector<LatLon> PolygonRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
 
         for(ix=1; ix<NX; ++ix) {
             double lonVal = ((double) (lonN0 + ix))/pointsPerDegree;
-            double xVal = (lonVal - centerLongitude)/resolution;
+            double xVal = (lonVal - centerLongitude)/polygonResolution;
             bool flag;
             double yA, yB;
             polygon->calcVertExtents(xVal, yA, yB, flag);
             if (flag) {
-                double latA = centerLatitude + yA*resolution;
-                double latB = centerLatitude + yB*resolution;
+                double latA = centerLatitude + yA*polygonResolution;
+                double latB = centerLatitude + yB*polygonResolution;
                 int iA = ((int) floor(latA*pointsPerDegree)) - latN0;
                 int iB = ((int) floor(latB*pointsPerDegree)) - latN0;
                 for(iy=iA; iy<=iB; ++iy) {
@@ -880,6 +907,27 @@ std::vector<LatLon> PolygonRlanRegionClass::getScan(CConst::ScanRegionMethodEnum
                 }
             }
         }
+
+		std::vector<std::tuple<int, int>> *vListS = calcScanPointVirtices(S, NX, NY);
+
+		std::vector<std::tuple<int, int>> *ii_list = new std::vector<std::tuple<int, int>>();
+		for(int i=0; i<(int) vListS->size(); ++i) {
+			std::tie(ix, iy) = (*vListS)[i];
+			double lonVal = ((double) lonN0 + ix)/pointsPerDegree;
+			double latVal = ((double) latN0 + iy)/pointsPerDegree;
+
+			int xval = (int) floor(((lonVal - centerLongitude)*cosVal/polygonResolution) + 0.5);
+			int yval = (int) floor(((latVal  - centerLatitude)/polygonResolution) + 0.5);
+			ii_list->push_back(std::tuple<int, int>(xval, yval));
+		}
+		boundaryPolygon = new PolygonClass(ii_list);
+
+		delete ii_list;
+		delete vListS;
+        for(ix=0; ix<NX; ++ix) {
+            free(S[ix]);
+        }
+        free(S);
     } else {
         CORE_DUMP;
     }
@@ -901,12 +949,250 @@ double PolygonRlanRegionClass::getMaxDist() const
     for(ptIdx=0; ptIdx<numRLANPoints; ptIdx++) {
         int xval = polygon->bdy_pt_x[0][ptIdx];
         int yval = polygon->bdy_pt_y[0][ptIdx];
-        dist = sqrt(((double) xval)*xval + ((double) yval)*yval)*(resolution*M_PI/180.0)*CConst::earthRadius;
+        dist = sqrt(((double) xval)*xval + ((double) yval)*yval)*(polygonResolution*M_PI/180.0)*CConst::earthRadius;
         if (dist > maxDist) {
             maxDist = dist;
         }
     }
     return(maxDist);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: RlanRegionClass::getBoundaryPolygon()                           ****/
+/******************************************************************************************/
+std::vector<GeodeticCoord> RlanRegionClass::getBoundaryPolygon(TerrainClass *terrain) const
+{
+    std::vector<GeodeticCoord> ptList;
+
+    if (!configuredFlag) {
+        throw std::runtime_error(ErrStream() << "ERROR: RlanRegionClass::getBoundaryPolygon() RlanRegion not configured");
+    }
+
+	if (boundaryPolygon) {
+    	int ptIdx;
+    	int numRLANPoints = boundaryPolygon->num_bdy_pt[0];
+
+    	for(ptIdx=0; ptIdx<numRLANPoints; ptIdx++) {
+        	int xval = boundaryPolygon->bdy_pt_x[0][ptIdx];
+        	int yval = boundaryPolygon->bdy_pt_y[0][ptIdx];
+        	double longitude = centerLongitude + xval*polygonResolution*oneOverCosVal;
+        	double latitude  = centerLatitude  + yval*polygonResolution;
+
+        	double heightAMSL;
+        	if (fixedHeightAMSL) {
+            	heightAMSL = centerHeightAMSL;
+        	} else {
+            	double terrainHeight, bldgHeight;
+            	MultibandRasterClass::HeightResult lidarHeightResult;
+            	CConst::HeightSourceEnum rlanHeightSource;
+            	terrain->getTerrainHeight(longitude, latitude, terrainHeight, bldgHeight, lidarHeightResult, rlanHeightSource);
+            	heightAMSL = terrainHeight + centerHeightAMSL - centerTerrainHeight;
+        	}
+        	GeodeticCoord rlanEllipsePtGeo = GeodeticCoord::fromLatLon(latitude, longitude, heightAMSL/1000.0);
+        	ptList.push_back(rlanEllipsePtGeo);
+    	}
+   	}
+
+    return(ptList);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: RlanRegionClass::calcScanPointVirtices()                               ****/
+/******************************************************************************************/
+std::vector<std::tuple<int, int>> *RlanRegionClass::calcScanPointVirtices(int **S, int NX, int NY) const
+{
+    int ix, iy;
+    int minx, miny, maxx, maxy;
+    /**************************************************************************************/
+    /* Find minx, miny, maxx, maxy                                                        */
+    /**************************************************************************************/
+	bool initFlag = false;
+	for(ix=0; ix<NX; ++ix) {
+	    for(iy=0; iy<NY; ++iy) {
+			if (S[ix][iy]) {
+				if ((!initFlag) || (ix < minx)) {
+					minx = ix;
+				}
+				if ((!initFlag) || (ix > maxx)) {
+					maxx = ix;
+				}
+				if ((!initFlag) || (iy < miny)) {
+					miny = iy;
+				}
+				if ((!initFlag) || (iy > maxy)) {
+					maxy = iy;
+				}
+				initFlag = true;
+			}
+		}
+	}
+	if (!initFlag) {
+        throw std::runtime_error(ErrStream() << "ERROR: RlanRegionClass::calcScanPointVirtices() Invalid scan matrix");
+	}
+    /**************************************************************************************/
+	
+    /**************************************************************************************/
+    /* Create vlist and initialize to 4 corners, counterclockwise orientation             */
+    /**************************************************************************************/
+	std::vector<std::tuple<int, int>> *vlist = new std::vector<std::tuple<int, int>>();
+	vlist->push_back(std::tuple<int, int>(minx,   miny));
+	vlist->push_back(std::tuple<int, int>(maxx+1, miny));
+	vlist->push_back(std::tuple<int, int>(maxx+1, maxy+1));
+	vlist->push_back(std::tuple<int, int>(minx,   maxy+1));
+    /**************************************************************************************/
+
+	bool cont = true;
+	int vA = 0;
+
+	while(cont) {
+	    int vB = vA + 1;
+		if (vB == (int) vlist->size()) {
+			vB = 0;
+			cont = false;
+		}
+		int vAx, vAy, vBx, vBy;
+		std::tie (vAx, vAy) = (*vlist)[vA];
+		std::tie (vBx, vBy) = (*vlist)[vB];
+		int dx = (vBx > vAx ? 1 : vBx < vAx ? -1 : 0);
+		int dy = (vBy > vAy ? 1 : vBy < vAy ? -1 : 0);
+		int incx = -dy;
+		int incy =  dx;
+		int vx0 = vAx;
+		int vy0 = vAy;
+		initFlag = true;
+		int prevn;
+		while((vx0 != vBx) || (vy0 != vBy)) {
+		    int vx1 = vx0 + dx;
+		    int vy1 = vy0 + dy;
+			ix = (((dx == 1) || (incx == 1)) ? vx0 : vx0 - 1);
+			iy = (((dy == 1) || (incy == 1)) ? vy0 : vy0 - 1);
+			int n = 0;
+			while(S[ix][iy] == 0) {
+			    ix += incx;
+			    iy += incy;
+				n++;
+			}
+			if (initFlag) {
+			    if (n) {
+					(*vlist)[vA] = std::make_tuple(vx0 + n*incx, vy0 + n*incy);
+				}
+				initFlag = false;
+			} else if (prevn != n) {
+			    vlist->insert(vlist->begin()+vB, std::make_tuple(vx0 + prevn*incx, vy0 + prevn*incy));
+				vB++;
+			    vlist->insert(vlist->begin()+vB, std::make_tuple(vx0 + n*incx, vy0 + n*incy));
+				vB++;
+			}
+
+            prevn = n;
+		    vx0 = vx1;
+		    vy0 = vy1;
+
+#if 0
+			for(int k=0; k<vlist->size(); ++k) {
+				int printx, printy;
+				std::tie (printx, printy) = (*vlist)[k];
+				printf("(%d,%d) ", printx, printy);
+			}
+			printf("\n");
+#endif
+		}
+		if (prevn) {
+			(*vlist)[vB] = std::make_tuple(vx0 + prevn*incx, vy0 + prevn*incy);
+		}
+		vA = vB;
+	}
+
+	return(vlist);
+}
+/******************************************************************************************/
+
+/******************************************************************************************/
+/**** FUNCTION: RlanRegionClass::calcMinAOB()                                          ****/
+/******************************************************************************************/
+double RlanRegionClass::calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec F, arma::vec ptg, arma::vec& minLoc)
+{
+    double minAOB;
+
+    bool found = false;
+	if (    ((ptg(2) < 0.0) && (F(2) > 0.0))
+         || ((ptg(2) > 0.0) && (F(2) < 0.0)) ) {
+		double dist = -F(2) / ptg(2);
+		double xproj = F(0) + dist*ptg(0);
+		double yproj = F(1) + dist*ptg(1);
+
+		int minx, maxx, miny, maxy;
+		poly->comp_bdy_min_max(minx, maxx, miny, maxy);
+		if (    (xproj >= (minx-1)*polyResolution)
+		     && (xproj <= (maxx+1)*polyResolution)
+		     && (yproj >= (miny-1)*polyResolution)
+		     && (yproj <= (maxy+1)*polyResolution) ) {
+
+			int xval = (int) floor(xproj/polyResolution + 0.5);
+			int yval = (int) floor(yproj/polyResolution + 0.5);
+
+			bool edge;
+			bool contains = poly->in_bdy_area(xval, yval, &edge);
+
+			if (contains || edge) {
+				minLoc(0) = xproj;
+				minLoc(1) = yproj;
+				minAOB = 0.0;
+				found = true;
+			}
+		}
+	}
+
+	if (!found) {
+		double maxCosAOB = -1.0;
+		for(int segIdx=0; segIdx<poly->num_segment; ++segIdx) {
+			int prevIdx = poly->num_bdy_pt[segIdx]-1;
+			arma::vec prevVirtex(3);
+			prevVirtex(0) = poly->bdy_pt_x[segIdx][prevIdx]*polyResolution;
+			prevVirtex(1) = poly->bdy_pt_y[segIdx][prevIdx]*polyResolution;
+			prevVirtex(2) = 0.0;
+			for(int ptIdx=0; ptIdx<poly->num_bdy_pt[segIdx]; ++ptIdx) {
+				arma::vec virtex(3);
+				virtex(0) = poly->bdy_pt_x[segIdx][ptIdx]*polyResolution;
+				virtex(1) = poly->bdy_pt_y[segIdx][ptIdx]*polyResolution;
+				virtex(2) = 0.0;
+
+				double D2 = dot(virtex - prevVirtex, virtex - prevVirtex);
+				double D1 = 2*dot(virtex - prevVirtex, prevVirtex - F);
+				double D0 = dot(prevVirtex - F, prevVirtex - F);
+
+				double C0 = dot(prevVirtex - F, ptg);
+				double C1 = dot(virtex - prevVirtex, ptg);
+
+				double eps = (D0*C1 - C0*D1/2)/(D2*C0 - C1*D1/2);
+
+				double cosAOB = C0 / sqrt(D0);
+				if (cosAOB > maxCosAOB) {
+					maxCosAOB = cosAOB;
+					minLoc(0) = prevVirtex(0);
+					minLoc(1) = prevVirtex(1);
+				}
+
+				if ((eps > 0.0) && (eps < 1.0)) {
+					cosAOB = (C0 + C1*eps)/ sqrt(D0 + eps*(D1 + eps*D2));
+					if (cosAOB > maxCosAOB) {
+						maxCosAOB = cosAOB;
+						minLoc(0) = (1.0 - eps)*prevVirtex(0) + eps*virtex(0);
+						minLoc(1) = (1.0 - eps)*prevVirtex(1) + eps*virtex(1);
+					}
+				}
+
+				prevIdx = ptIdx;
+				prevVirtex = virtex;
+			}
+		}
+
+		minAOB = acos(maxCosAOB)*180.0/M_PI;
+	}
+
+	return minAOB;
 }
 /******************************************************************************************/
 

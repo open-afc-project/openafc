@@ -803,7 +803,7 @@ AntennaClass *UlsDatabase::createAntennaPattern(SqlScopedConnection<SqlException
 
 	std::tuple<double, double> pt;
 	std::get<1>(pt) = quietNaN;
-	for(int aobIdx=0; aobIdx<numAntennaAOB-1; ++aobIdx) {
+	for(int aobIdx=0; aobIdx<numAntennaAOB; ++aobIdx) {
         std::get<0>(pt) = antennaAOBList[aobIdx];
         sampledData.push_back(pt);
 	}

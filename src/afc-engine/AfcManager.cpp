@@ -1,8 +1,10 @@
 // AfcManager.cpp -- Manages I/O and top-level operations for the AFC Engine
-#include "AfcManager.h"
 #include <boost/format.hpp>
-#include "RlanRegion.h"
 #include <QFileInfo>
+
+#include "AfcManager.h"
+#include "RlanRegion.h"
+#include "lininterp.h"
 
 // "--runtime_opt" masks
 // These bits corresponds to RNTM_OPT_... bits in src/ratapi/ratapi/defs.py
@@ -236,6 +238,7 @@ static const std::map<int, std::string> pathLossModelNames = {
 	{CConst::FCC6GHzReportAndOrderPathLossModel, "FCC6GHzReportAndOrderPathLossModel"},
 	{CConst::CustomPathLossModel, "CustomPathLossModel"},
 	{CConst::ISEDDBS06PathLossModel, "ISEDDBS06PathLossModel"},
+	{CConst::BrazilPathLossModel, "BrazilPathLossModel"},
 	{CConst::FSPLPathLossModel, "FSPLPathLossModel"}
 };
 static const std::map<int, std::string> propEnvNames = {
@@ -390,6 +393,9 @@ public:
 	ColDouble rlanElevAngle;
 	ColDouble boresightAngle;
 	ColDouble rlanTxEirp;
+	ColStr rlanAntennaModel;
+	ColDouble rlanAOB;
+	ColDouble rlanDiscriminationGainDB;
 	ColDouble bodyLoss;
 	ColStr rlanClutterCategory;
 	ColStr fsClutterCategory;
@@ -471,6 +477,9 @@ public:
 		rlanElevAngle(this, 			"RLAN_FS_RX_ELEVATION_ANGLE (deg)"),
 		boresightAngle(this, 			"FS_RX_ANGLE_OFF_BORESIGHT (deg)"),
 		rlanTxEirp(this, 				"RLAN_TX_EIRP (dBm)"),
+		rlanAntennaModel(this, 			"RLAN_ANTENNA_MODEL"),
+		rlanAOB(this,				 	"RLAN_ANGLE_OFF_BORESIGHT (deg)"),
+		rlanDiscriminationGainDB(this, 	"RLAN_DISCRIMINATION_GAIN (dB)"),
 		bodyLoss(this, 					"BODY_LOSS (dB)"),
 		rlanClutterCategory(this, 		"RLAN_CLUTTER_CATEGORY"),
 		fsClutterCategory(this, 		"FS_CLUTTER_CATEGORY"),
@@ -713,6 +722,9 @@ AfcManager::AfcManager()
 	_prTable = (PRTABLEClass *) NULL;
 
 	_aciFlag = true;
+
+	_rlanAntenna = (AntennaClass *) NULL;
+	_rlanPointing = Vector3(0.0,0.0,0.0);
 
 	_exclusionZoneFSTerrainHeight = quietNaN;
 	_exclusionZoneHeightAboveTerrain = quietNaN;
@@ -1209,10 +1221,6 @@ void AfcManager::importGUIjson(const std::string &inputJSONpath)
 	// Read JSON from file
 	QJsonObject jsonObj = jsonDoc.object();
 
-
-	// Properly set _aciFlag from GUI.  When set to true, ACI is considered in interference calculations, when set to false, there is no ACI.
-	_aciFlag = true;
-
 	if (jsonObj.contains("version") && !jsonObj["version"].isUndefined()) {
 		_guiJsonVersion = jsonObj["version"].toString();
 	} else {
@@ -1324,6 +1332,12 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		} else {
 			_minEIRP_dBm = quietNaN;
 		}
+
+		QJsonArray vendorExtensionArray;
+		if (!optionalParams.contains("vendorExtensions")) {
+			vendorExtensionArray = requestObj["vendorExtensions"].toArray();
+		}
+
 		/**********************************************************************/
 
 		/**********************************************************************/
@@ -1667,6 +1681,31 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		}
 		/**********************************************************************/
 
+		/**********************************************************************/
+		/* VendorExtension Object (Table 23)                                  */
+		/**********************************************************************/
+		for(auto vendorExtensionVal : vendorExtensionArray) {
+			auto vendorExtensionObj = vendorExtensionVal.toObject();
+			requiredParams = QStringList() << "extensionId" << "parameters";
+			optionalParams = QStringList();
+			for(auto key : vendorExtensionObj.keys()) {
+				int rIdx = requiredParams.indexOf(key);
+				if (rIdx != -1) {
+					requiredParams.erase(requiredParams.begin()+rIdx);
+				} else {
+					int oIdx = optionalParams.indexOf(key);
+					if (oIdx != -1) {
+						optionalParams.erase(optionalParams.begin()+oIdx);
+					} else {
+						_unexpectedParams << key;
+					}
+				}
+			}
+			_missingParams << requiredParams;
+		}
+		/**********************************************************************/
+
+
 		if (_missingParams.size()) {
 			_responseCode = CConst::missingParamResponseCode;
 			return;
@@ -1848,6 +1887,47 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 						inquiredFrequencyRangeObj["highFrequency"].toInt()));
 		}
 		LOGGER_INFO(logger) << inquiredFrequencyRangeArray.size() << " frequency range(s) requested";
+
+		bool hasRLANAntenna = false;
+		for(auto vendorExtensionVal : vendorExtensionArray) {
+			auto vendorExtensionObj = vendorExtensionVal.toObject();
+			auto parametersObj = vendorExtensionObj["parameters"].toObject();
+			if (parametersObj.contains("type") && !parametersObj["type"].isUndefined()) {
+				std::string type = parametersObj["type"].toString().toStdString();
+				if (type == "rlanAntenna") {
+					if (hasRLANAntenna) {
+						LOGGER_WARN(logger) << "GENERAL FAILURE: multiple RLAN antennas specified";
+						_responseCode = CConst::generalFailureResponseCode;
+						return;
+					}
+					std::string antennaName =  parametersObj["antennaModel"].toString().toStdString();
+					_rlanAzimuthPointing =  parametersObj["azimuthPointing"].toDouble();
+					_rlanElevationPointing =  parametersObj["elevationPointing"].toDouble();
+					int numAntennaAOB =  parametersObj["numAOB"].toInt();
+					QJsonArray gainArray;
+					gainArray = parametersObj["discriminationGainDB"].toArray();
+
+					if (gainArray.size() != numAntennaAOB) {
+						LOGGER_WARN(logger) << "GENERAL FAILURE: numAntennaAOB = " << numAntennaAOB << " discriminationGainDB has " << gainArray.size() << " elements";
+						_responseCode = CConst::generalFailureResponseCode;
+						return;
+					}
+
+					std::vector<std::tuple<double, double>> sampledData;
+					std::tuple<double, double> pt;
+					for(int aobIdx=0; aobIdx<numAntennaAOB; ++aobIdx) {
+						std::get<0>(pt) = (((double) aobIdx)/(numAntennaAOB-1))*M_PI;
+						std::get<1>(pt) = gainArray.at(aobIdx).toDouble();
+						sampledData.push_back(pt);
+					}
+					_rlanAntenna = new AntennaClass(CConst::antennaLUT_Boresight, antennaName.c_str());
+					LinInterpClass *gainTable = new LinInterpClass(sampledData);
+					_rlanAntenna->setBoresightGainTable(gainTable);
+
+					hasRLANAntenna = true;
+				}
+			}
+		}
 
 		if (inquiredChannelsArray.size() + inquiredFrequencyRangeArray.size() == 0) {
 			LOGGER_WARN(logger) << "GENERAL FAILURE: must specify either inquiredChannels or inquiredFrequencies";
@@ -2955,7 +3035,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	if (jsonObj.contains("nlcdFile") && !jsonObj["nlcdFile"].isUndefined()) {
 		_nlcdFile = SearchPaths::forReading("data", jsonObj["nlcdFile"].toString(), true).toStdString();
 	} else {
-		_nlcdFile = SearchPaths::forReading("data", "rat_transfer/nlcd/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
+		_nlcdFile = SearchPaths::forReading("data", "rat_transfer/nlcd/nlcd_production/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
 	}
 
 	if (jsonObj.contains("fsAnalysisListFile") && !jsonObj["fsAnalysisListFile"].isUndefined()) {
@@ -3264,7 +3344,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	}
 
 	if (    (_pathLossModel == CConst::CustomPathLossModel)
-	     || (_pathLossModel == CConst::ISEDDBS06PathLossModel) ) {
+	     || (_pathLossModel == CConst::ISEDDBS06PathLossModel)
+	     || (_pathLossModel == CConst::BrazilPathLossModel) ) {
 		_pathLossModel = CConst::FCC6GHzReportAndOrderPathLossModel;
 	}
 
@@ -3308,8 +3389,9 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 			_useBDesignFlag = propModel["buildingSource"].toString() == "B-Design3D";
 			_useLiDAR = propModel["buildingSource"].toString() == "LiDAR";
-			// for now, we always use 3DEP for FCC 6Ghz
-			_use3DEP = true;//propModel["terrainSource"].toString() == "3DEP (30m)";
+
+			// In the GUI, force this to be true for US and CA.
+			_use3DEP = propModel["terrainSource"].toString() == "3DEP (30m)";
 
 			_winner2LOSOption = ((_useBDesignFlag || _useLiDAR) ? CConst::BldgDataReqTxRxLOSOption : CConst::UnknownLOSOption);
 			_winner2UnknownLOSMethod = CConst::PLOSCombineWinner2UnknownLOSMethod;
@@ -3449,6 +3531,16 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_reportErrorRlanHeightLowFlag = jsonObj["reportErrorRlanHeightLowFlag"].toBool();
 	} else {
 		_reportErrorRlanHeightLowFlag = false;
+	}
+	// ***********************************
+
+	// ***********************************
+	// If this flag is set, include ACI in channel I/N calculations
+	// ***********************************
+	if (jsonObj.contains("aciFlag") && !jsonObj["aciFlag"].isUndefined()) {
+		_aciFlag = jsonObj["aciFlag"].toBool();
+	} else {
+		_aciFlag = true;
 	}
 	// ***********************************
 
@@ -7676,6 +7768,8 @@ void AfcManager::runPointAnalysis()
 
 	_rlanRegion->configure(_rlanHeightType, _terrainDataModel);
 
+	_rlanPointing = _rlanRegion->computePointing(_rlanAzimuthPointing, _rlanElevationPointing);
+
 	// Sorting by distance from AP
 	double cosLatSq = cos(_rlanRegion->getCenterLatitude() / 180.0 * M_PI);
 	cosLatSq *= cosLatSq;
@@ -7786,6 +7880,9 @@ void AfcManager::runPointAnalysis()
 		fkml->writeStartElement("PolyStyle");
 		fkml->writeTextElement("color", "7d7f7f7f");
 		fkml->writeEndElement(); // Polystyle
+		fkml->writeEndElement(); // Style
+
+		fkml->writeStartElement("Style");
 		fkml->writeAttribute("id", "transBluePoly");
 		fkml->writeStartElement("LineStyle");
 		fkml->writeTextElement("width", "1.5");
@@ -7922,7 +8019,7 @@ void AfcManager::runPointAnalysis()
 		fkml->writeStartElement("Placemark");
 		fkml->writeTextElement("name", "TOP");
 		fkml->writeTextElement("visibility", "1");
-		fkml->writeTextElement("styleUrl", "#transGrayPoly");
+		fkml->writeTextElement("styleUrl", "#transBluePoly");
 		fkml->writeStartElement("Polygon");
 		fkml->writeTextElement("extrude", "0");
 		fkml->writeTextElement("tessellate", "0");
@@ -7949,7 +8046,7 @@ void AfcManager::runPointAnalysis()
 		fkml->writeStartElement("Placemark");
 		fkml->writeTextElement("name", "BOTTOM");
 		fkml->writeTextElement("visibility", "1");
-		fkml->writeTextElement("styleUrl", "#transGrayPoly");
+		fkml->writeTextElement("styleUrl", "#transBluePoly");
 		fkml->writeStartElement("Polygon");
 		fkml->writeTextElement("extrude", "0");
 		fkml->writeTextElement("tessellate", "0");
@@ -7977,7 +8074,7 @@ void AfcManager::runPointAnalysis()
 			fkml->writeStartElement("Placemark");
 			fkml->writeTextElement("name", QString::asprintf("S_%d", ptIdx));
 			fkml->writeTextElement("visibility", "1");
-			fkml->writeTextElement("styleUrl", "#transGrayPoly");
+			fkml->writeTextElement("styleUrl", "#transBluePoly");
 			fkml->writeStartElement("Polygon");
 			fkml->writeTextElement("extrude", "0");
 			fkml->writeTextElement("tessellate", "0");
@@ -8028,6 +8125,64 @@ void AfcManager::runPointAnalysis()
 
 		fkml->writeEndElement(); // Scan Points
 		/**********************************************************************************/
+
+		std::vector<GeodeticCoord> bdyPtList = _rlanRegion->getBoundaryPolygon(_terrainDataModel);
+
+		if (bdyPtList.size()) {
+			/**********************************************************************************/
+			/* TOP BOUNDARY                                                                   */
+			/**********************************************************************************/
+			fkml->writeStartElement("Placemark");
+			fkml->writeTextElement("name", "TOP BOUNDARY");
+			fkml->writeTextElement("visibility", "1");
+			fkml->writeTextElement("styleUrl", "#transGrayPoly");
+			fkml->writeStartElement("Polygon");
+			fkml->writeTextElement("extrude", "0");
+			fkml->writeTextElement("tessellate", "0");
+			fkml->writeTextElement("altitudeMode", "absolute");
+			fkml->writeStartElement("outerBoundaryIs");
+			fkml->writeStartElement("LinearRing");
+
+			QString top_bdy_coords = QString();
+			for(ptIdx=0; ptIdx<=(int) bdyPtList.size(); ptIdx++) {
+				GeodeticCoord pt = bdyPtList[ptIdx % bdyPtList.size()];
+				top_bdy_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, _rlanRegion->getMaxHeightAMSL()));
+			}
+
+			fkml->writeTextElement("coordinates", top_bdy_coords);
+			fkml->writeEndElement(); // LinearRing
+			fkml->writeEndElement(); // outerBoundaryIs
+			fkml->writeEndElement(); // Polygon
+			fkml->writeEndElement(); // Placemark
+			/**********************************************************************************/
+
+			/**********************************************************************************/
+			/* BOTTOM BOUNDARY                                                                   */
+			/**********************************************************************************/
+			fkml->writeStartElement("Placemark");
+			fkml->writeTextElement("name", "BOTTOM BOUNDARY");
+			fkml->writeTextElement("visibility", "1");
+			fkml->writeTextElement("styleUrl", "#transGrayPoly");
+			fkml->writeStartElement("Polygon");
+			fkml->writeTextElement("extrude", "0");
+			fkml->writeTextElement("tessellate", "0");
+			fkml->writeTextElement("altitudeMode", "absolute");
+			fkml->writeStartElement("outerBoundaryIs");
+			fkml->writeStartElement("LinearRing");
+
+			QString bottom_bdy_coords = QString();
+			for(ptIdx=0; ptIdx<=(int) bdyPtList.size(); ptIdx++) {
+				GeodeticCoord pt = bdyPtList[ptIdx % bdyPtList.size()];
+				bottom_bdy_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, _rlanRegion->getMinHeightAMSL()));
+			}
+
+			fkml->writeTextElement("coordinates", bottom_bdy_coords);
+			fkml->writeEndElement(); // LinearRing
+			fkml->writeEndElement(); // outerBoundaryIs
+			fkml->writeEndElement(); // Polygon
+			fkml->writeEndElement(); // Placemark
+			/**********************************************************************************/
+		}
 
 		fkml->writeEndElement(); // Folder
 
@@ -8396,18 +8551,12 @@ void AfcManager::runPointAnalysis()
 
 					contains3D = false;
 					if (contains2D) {
-						for(scanPtIdx=0; (scanPtIdx<(int) scanPointList.size())&&(!contains3D); scanPtIdx++) {
-							if (numRlanHt[scanPtIdx]) {
-								double minHeight = rlanCoordList[scanPtIdx][numRlanHt[scanPtIdx]-1].heightKm * 1000;
-								double maxHeight = rlanCoordList[scanPtIdx][0].heightKm * 1000;
-								if ((ulsRxHeightAMSL >= minHeight) && (ulsRxHeightAMSL <= maxHeight)) {
-									contains3D = true;
-						            LOGGER_INFO(logger) << "FSID = " << uls->getID()
-										<< (divIdx ? " DIVERSITY LINK" : "")
-										<< (segIdx == numPR ? " RX" : " PR " + std::to_string(segIdx+1))
-										<< " inside uncertainty volume";
-								}
-							}
+						if ((ulsRxHeightAMSL >= _rlanRegion->getMinHeightAMSL()) && (ulsRxHeightAMSL <= _rlanRegion->getMaxHeightAMSL())) {
+							contains3D = true;
+					           LOGGER_INFO(logger) << "FSID = " << uls->getID()
+								<< (divIdx ? " DIVERSITY LINK" : "")
+								<< (segIdx == numPR ? " RX" : " PR " + std::to_string(segIdx+1))
+								<< " inside uncertainty volume";
 						}
 						if (!contains3D) {
 							LOGGER_INFO(logger) << "FSID = " << uls->getID()
@@ -8450,7 +8599,10 @@ void AfcManager::runPointAnalysis()
 
 						double minAngleOffBoresightDeg = 0.0;
 						if (contains2D) {
-							minAngleOffBoresightDeg = _rlanRegion->calcMinAOB(ulsRxLatLon, ulsAntennaPointing, ulsRxHeightAMSL);
+							double minAOBLon, minAOBLat, minAOBHeghtAMSL;
+							minAngleOffBoresightDeg = _rlanRegion->calcMinAOB(ulsRxLatLon, ulsAntennaPointing, ulsRxHeightAMSL, minAOBLon, minAOBLat, minAOBHeghtAMSL);
+							LOGGER_INFO(logger) << std::setprecision(15) << "FSID = " << uls->getID() << " MIN_AOB = " << minAngleOffBoresightDeg
+								<< " at LON = " << minAOBLon << " LAT = " << minAOBLat << " HEIGHT_AMSL = " << minAOBHeghtAMSL;
 						}
 
 						for(scanPtIdx=0; scanPtIdx<(int) scanPointList.size(); scanPtIdx++) {
@@ -8490,6 +8642,22 @@ void AfcManager::runPointAnalysis()
 								double duls = ulsRxPos.len();
 								double elevationAngleTxDeg = 90.0 - acos(rlanPosn.dot(lineOfSightVectorKm)/(dAP*distKm))*180.0/M_PI;
 								double elevationAngleRxDeg = 90.0 - acos(ulsRxPos.dot(-lineOfSightVectorKm)/(duls*distKm))*180.0/M_PI;
+
+								double rlanAngleOffBoresightRad;
+								double rlanDiscriminationGainDB;
+								if (_rlanAntenna) {
+									double cosAOB = _rlanPointing.dot(lineOfSightVectorKm)/distKm;
+									if (cosAOB > 1.0) {
+										cosAOB = 1.0;
+									} else if (cosAOB < -1.0) {
+										cosAOB = -1.0;
+									}
+									rlanAngleOffBoresightRad = acos(cosAOB);
+									rlanDiscriminationGainDB = _rlanAntenna->gainDB(rlanAngleOffBoresightRad);
+								} else {
+									rlanAngleOffBoresightRad = 0.0;
+									rlanDiscriminationGainDB = 0.0;
+								}
 
 								if ((minRLANDist == -1.0) || (distKm*1000.0 < minRLANDist)) {
 									minRLANDist = distKm*1000.0;
@@ -8604,7 +8772,7 @@ void AfcManager::runPointAnalysis()
 													}
 												}
 
-												rxPowerDBW = (maxEIRPdBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+												rxPowerDBW = (maxEIRPdBm - 30.0) + rlanDiscriminationGainDB - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
 												I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
 
@@ -8795,6 +8963,14 @@ void AfcManager::runPointAnalysis()
 												excthrGc.rlanElevAngle = elevationAngleTxDeg;
 												excthrGc.boresightAngle = angleOffBoresightDeg;
 												excthrGc.rlanTxEirp = maxEIRPdBm;
+												if (_rlanAntenna) {
+													excthrGc.rlanAntennaModel = _rlanAntenna->get_strid();
+													excthrGc.rlanAOB = rlanAngleOffBoresightRad*180.0/M_PI;
+												} else {
+													excthrGc.rlanAntennaModel = "";
+													excthrGc.rlanAOB = -1.0;
+												}
+												excthrGc.rlanDiscriminationGainDB = rlanDiscriminationGainDB;
 												excthrGc.bodyLoss = _bodyLossDB;
 												excthrGc.rlanClutterCategory = txClutterStr;
 												excthrGc.fsClutterCategory = rxClutterStr;
@@ -9294,6 +9470,9 @@ void AfcManager::runScanAnalysis()
 		fkml->writeStartElement("PolyStyle");
 		fkml->writeTextElement("color", "7d7f7f7f");
 		fkml->writeEndElement(); // Polystyle
+		fkml->writeEndElement(); // Style
+
+		fkml->writeStartElement("Style");
 		fkml->writeAttribute("id", "transBluePoly");
 		fkml->writeStartElement("LineStyle");
 		fkml->writeTextElement("width", "1.5");
@@ -11076,6 +11255,7 @@ void AfcManager::printUserInputs()
 		inputGc.writeRow({ "INQUIRED_FREQUENCY_MAX_PSD_DBM_PER_MHZ", f2s(_inquiredFrequencyMaxPSD_dBmPerMHz) });
 		inputGc.writeRow({ "VISIBILITY_THRESHOLD", f2s(_visibilityThreshold) } );
 		inputGc.writeRow({ "PRINT_SKIPPED_LINKS_FLAG", (_printSkippedLinksFlag ? "true" : "false" ) } );
+		inputGc.writeRow({ "ACI_FLAG", (_aciFlag ? "true" : "false" ) } );
 
 	}
 	LOGGER_DEBUG(logger) << "User inputs written to userInputs.csv";

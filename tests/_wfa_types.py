@@ -63,7 +63,8 @@ REQ_DEV_DESC_FOOTER = '},'
 REQ_SER_NBR = '"serialNumber": ' 
 REQ_CERT_ID_HEADER = '"certificationId": [{'
 REQ_CERT_ID_FOOTER = '}]'
-REQ_RULESET = '"rulesetIds": '
+REQ_RULESET = '"rulesetId": '
+
 #REQ_NRA = '"nra": '
 REQ_ID = '"id": '
 

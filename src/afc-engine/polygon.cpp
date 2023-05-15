@@ -133,7 +133,7 @@ PolygonClass::PolygonClass(std::string kmlFilename, double resolution)
 	found = sval.find("<Polygon>");
 	if (found!=std::string::npos) {
 		std::cout << "SVAL: " << sval << std::endl;
-		errStr << "ERROR: multiple <Polygon>'s found";
+		errStr << "ERROR: File " << kmlFilename << " multiple <Polygon>'s found";
 		throw std::runtime_error(errStr.str());
 	}
 

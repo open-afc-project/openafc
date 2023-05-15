@@ -28,23 +28,32 @@ class RlanRegionClass
 		virtual RLANBoundary getType() const = 0;
 		virtual LatLon closestPoint(LatLon latlon, bool& contains) const = 0;
 		virtual std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const = 0;
-		virtual std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const = 0;
+		virtual std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) = 0;
 		virtual double getMaxDist() const = 0;
 		virtual void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain) = 0;
-		virtual double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL) = 0;
+		virtual double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL,
+			double& minAOBLon, double& minAOBLat, double& minAOBHeghtAMSL) = 0;
 
+		std::vector<GeodeticCoord> getBoundaryPolygon(TerrainClass *terrain) const;
 		double getMinHeightAGL()  const;
 		double getMaxHeightAGL()  const;
+		double getMinHeightAMSL()  const;
+		double getMaxHeightAMSL()  const;
 		double getCenterLongitude() const { return(centerLongitude); }
 		double getCenterLatitude()  const { return(centerLatitude); }
 		double getCenterHeightAMSL()    const { return(centerHeightAMSL); }
 		double getCenterTerrainHeight()    const { return(centerTerrainHeight); }
 		double getHeightUncertainty()  const { return(heightUncertainty); }
 		bool   getFixedHeightAMSL()    const { return(fixedHeightAMSL); }
-
 		Vector3 getCenterPosn()  const { return(centerPosn); }
 
+		Vector3 computePointing(double azimuth, double elevation) const;
+
+		static double calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec F, arma::vec ptg, arma::vec& minLoc);
+
 	protected:
+		std::vector<std::tuple<int, int>> *calcScanPointVirtices(int **S, int NX, int NY) const;
+
 		double centerLongitude;
 		double centerLatitude;
 		double cosVal, oneOverCosVal;
@@ -61,6 +70,9 @@ class RlanRegionClass
 
 		bool fixedHeightAMSL;
 		bool configuredFlag;
+
+		PolygonClass *boundaryPolygon;
+		double polygonResolution;
 };
 /******************************************************************************************/
 
@@ -78,10 +90,11 @@ class EllipseRlanRegionClass : RlanRegionClass
 		RLANBoundary getType() const;
 		LatLon closestPoint(LatLon latlon, bool& contains) const;
 		std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const;
-		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const;
+		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree);
 		double getMaxDist() const;
 		void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
-		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL);
+		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL,
+			double& minAOBLon, double& minAOBLat, double& minAOBHeghtAMSL);
 
 	private:
 		void calcHorizExtents(double latVal, double& lonA, double& lonB, bool& flag) const;
@@ -114,13 +127,13 @@ class PolygonRlanRegionClass : RlanRegionClass
 		RLANBoundary getType() const;
 		LatLon closestPoint(LatLon latlon, bool& contains) const;
 		std::vector<GeodeticCoord> getBoundary(TerrainClass *terrain) const;
-		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree) const;
+		std::vector<LatLon> getScan(CConst::ScanRegionMethodEnum method, double scanResolutionM, int pointsPerDegree);
 		double getMaxDist() const;
 		void configure(CConst::HeightTypeEnum rlanHeightType, TerrainClass *terrain);
-		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL);
+		double calcMinAOB(LatLon ulsRxLatLon, Vector3 ulsAntennaPointing, double ulsRxHeightAMSL,
+			double& minAOBLon, double& minAOBLat, double& minAOBHeghtAMSL);
 
 	private:
-		double resolution;
 		PolygonClass *polygon;
 		RLANBoundary polygonType;
 };

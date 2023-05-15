@@ -1,4 +1,37 @@
  # Release Note
+
+## **Version and Date**
+|Version|**OA-564*|
+| :- | :- |
+|**Date**|**05/12/2023**|
+
+## **Issues Addressed**
+ * Jira OA-682: Angle off boresight calculation when FS outside but within 1arcsec of ellipse
+ * Jira OA-564: RLAN with a directional antenna
+ * Jira OA-659: Add Country Boundary for Brazil
+ * Jira OA-681: Add Brazilian Propagation Model to AFC Engine
+
+## **Interface Changes**
+ * None of OA-682
+
+## **Testing Done**
+ * The issue was found in FSP2. This was tested again and got expected results.
+ * Also tested FSP1 (where there was no impact) and found same results as before (except a lower PSD over 5930-5990 MHz as expected).
+ * Made up linear and radial polygon tests over FSP2 and FSP1 regions.
+ * Test results are attached to OA-682
+
+## **Open Issues** 
+ * The brazil jira tickets are yet to be tested. We're pushing this branch to get the fix for the 682 bug in ASAP as this is needed for WFA TVs.
+
+## **Version and Date**
+
+
+|Version|**OA-582**|
+|**Date**|**05/09/2023**|
+## **Issues Addressed**
+ * Jira OA-582: Add support for denied devices.  UI for uploading and download list is under "Denied Rules" tab, which now contains both denied devices and denied regions. Denied devices can be specified by both certification id and serial number, or by just the certification id.  In the latter case, the serial number field can be filled in with * or None.
+  Since database version changes, need to run  rat-manage-api db-upgrade once from shell upon first time running container with this new version.
+
 ## **Version and Date**
 
 
