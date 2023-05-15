@@ -1173,7 +1173,7 @@ def parse_tests(cfg):
                 serial_id = ""
             res_str += REQ_SER_NBR + '"' + serial_id + '",' + REQ_CERT_ID_HEADER
             cell = sheet.cell(row = i, column = RULESET_CLM)
-            res_str += REQ_RULESET + '["' + str(cell.value) + '"],'
+            res_str += REQ_RULESET + '"' + str(cell.value) + '",'
 
             cell = sheet.cell(row = i, column = ID_CLM)
             if isinstance(cell.value, str):
