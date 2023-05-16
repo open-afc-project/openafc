@@ -4,7 +4,7 @@
 |Version|3.8.0.0|
 | :- | :- |
 |**Date**|**05/16/2023**|
-|compiled server's version is TBD | git tag 3.8.7.0|
+|compiled server's version is f38e78d | git tag 3.8.0.0|
 
 
 ## **Version and Date**
