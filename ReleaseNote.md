@@ -1,6 +1,13 @@
  # Release Note
 
 ## **Version and Date**
+|Version|3.8.0.0|
+| :- | :- |
+|**Date**|**05/16/2023**|
+|compiled server's version is TBD | git tag 3.8.7.0|
+
+
+## **Version and Date**
 |Version|**OA-564*|
 | :- | :- |
 |**Date**|**05/12/2023**|

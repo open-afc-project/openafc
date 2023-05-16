@@ -24,13 +24,13 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
     - [Prerequisites:](#prerequisites)
     - [Building Docker image from Dockerfile (can be omitted once we have Docker registry)](#building-docker-image-from-dockerfile-can-be-omitted-once-we-have-docker-registry)
     - [Pulling the Docker image from Docker registry](#pulling-the-docker-image-from-docker-registry)
-  - [Building OpenAFC engine server](#building-openafc-engine-server)
-- [**OpenAFC Engine usage in Docker Environment**](#openafc-engine-usage-in-docker-environment)
+  - [Building OpenAFC engine](#building-openafc-engine)
+- [**OpenAFC Engine Server usage in Docker Environment**](#openafc-engine-server-usage-in-docker-environment)
 - [AFC Engine build in docker](#afc-engine-build-in-docker)
   - [Building Docker Container OpenAFC engine server](#building-docker-container-openafc-engine-server)
     - [Using scripts from the code base](#using-scripts-from-the-code-base)
     - [To 'manually' build containers one by one:](#to-manually-build-containers-one-by-one)
-    - [celery worker prereq containers:](#celery-worker-prereq-containers)
+    - [celery worker prereq containers](#celery-worker-prereq-containers)
   - [Prereqs](#prereqs)
   - [docker-compose](#docker-compose)
   - [**Environment variables**](#environment-variables)
@@ -112,8 +112,7 @@ This will add your changes on top of what's already in upstream, minimizing merg
 
 ### Step 6: Run the tests
 
-TBD
-Make sure that all tests are passing before submitting a pull request.
+Make sure that all regression tests are passing before submitting a pull request.
 
 ### Step 7: Push your branch to GitHub
 
@@ -167,14 +166,14 @@ In this doc we assume to work in directory /tmp/work
 This can take some time
 
 ```
-docker build . -t afc-build -f dockerfiles/Dockerfile-for-build
+docker build . -t afc-build -f worker/Dockerfile
 ```
 
 ### Pulling the Docker image from Docker registry
 
-Not available currently. Possibly will be added later.
+Not available. Possibly will be added later.
 
-## Building OpenAFC engine 
+## Building OpenAFC engine
 
 Building and runnig building and running afc-engine as standalone application.
 
@@ -190,14 +189,14 @@ cd open-afc
 
 run shell of alpine docker-for-build shell
 ```
-docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image:my_tag ash
+docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image:latest ash
 ```
 
 inside the container's shell, execute:
 ```
 mkdir -p -m 777 /wd/afc/build && BUILDREV=offlinebuild && cd /wd/afc/build && cmake -DCMAKE_INSTALL_PREFIX=/wd/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRatapiRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd/afc && ninja -j$(nproc) install
 ```
-Now the afc-engine is built: 
+Now the afc-engine is ready: 
 ```
 [@wcc-afc-01 work/dimar/open-afc] > ls -l build/src/afc-engine/afc-engine
 -rwxr-xr-x. 1 dr942120 dr942120 4073528 Mar  8 04:03 build/src/afc-engine/afc-engine
@@ -217,13 +216,13 @@ inside the worker container execute the afc-engine app
 
 ## Building Docker Container OpenAFC engine server
 There is a script that builds all container used by the AFC service.
-this script is used by automatic test infrastructure. Please check [tests/regression](/tests/regression/) dir.
+This script is used by automatic test infrastructure. Please check [tests/regression](/tests/regression/) dir.
 
 ### Using scripts from the code base
 to rebuild all containers use this scripts:
 ```
 cd open-afc
-tests/regression/build_imgs.sh `pwd` my_tag 0 
+tests/regression/build_imgs.sh `pwd` my_tag 0
 ```
 after the build, check all new containers:
 ```
@@ -233,8 +232,7 @@ these containes are used by [tests/regression/run_srvr.sh](/tests/regression/run
 to run server using test infra scrips, please check and update [.env](/tests/regression/.env) used by [docker-compose.yaml](/tests/regression/docker-compose.yaml)
 1. update path to host's AFC static data directory (where nlcd, 3dep, lidar and other stuff exists)
 2. update port variables values
-3. comment out tls/mtls vars if simple http connection is used 
-
+3. comment out tls/mtls vars if simple http connection is used
 ```
 ./tests/regression/run_srvr.sh `pwd` my_tag
 ```
@@ -248,16 +246,26 @@ docker build . -t rat_server -f rat_server/Dockerfile
 
 docker build . -t worker -f worker/Dockerfile
 
+docker build . -t uls_updater -f uls/Dockerfile-uls_updater
+
+docker build . -t uls_service -f uls/Dockerfile-uls_service
+
 docker build . -t msghnd -f msghnd/Dockerfile
 
-cd nginx && docker build . -t nginx ; cd ..
+docker build . -t ratdb -f ratdb/Dockerfile
 
-cd rabbitmq/ && docker build . -t rmq ; cd ..
+docler build . -t objst -f src/filestorage/Dockerfile
 
-cd src/filestorage/ && docker build . -t objst; cd ../..
+cd rabbitmq && docker build . -t rmq -f Dockerfile; cd ../
+
+docker build . -t dispatcher -f dispatcher/Dockerfile
+
+cd src/als && docker build . -t als_siphon   -f Dockerfile.siphon; cd ../
+cd src/als && docker build . -t als_kafka    -f Dockerfile.kafka; cd ../
+cd src/als && docker build . -t afc_postgres -f Dockerfile.postgres; cd ../
 ```
 
-### celery worker prereq containers:
+### celery worker prereq containers
 ```
 docker build . -t worker-preinst -f worker/Dockerfile.preinstall
 
@@ -425,7 +433,7 @@ services:
     image: worker
     build:
       context: .
-      dockerfile: worker/Dockerfile    
+      dockerfile: worker/Dockerfile
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
     environment:
