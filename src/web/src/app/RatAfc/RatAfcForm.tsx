@@ -190,6 +190,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
             case OperatingClassIncludeType.All:
                 return {
                     globalOperatingClass: oc.num,
+                    channelCfi:[]
                 }
             case OperatingClassIncludeType.Some:
                 return {
