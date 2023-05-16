@@ -190,7 +190,6 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
             case OperatingClassIncludeType.All:
                 return {
                     globalOperatingClass: oc.num,
-                    channelCfi:[]
                 }
             case OperatingClassIncludeType.Some:
                 return {
@@ -244,15 +243,15 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
 
     private toOperatingClass(c: Channels) {
         var include = OperatingClassIncludeType.None
-        if (!c.channelCfi) {
-            include = OperatingClassIncludeType.All
-        } else if (c.channelCfi && c.channelCfi.length > 0) {
+        if (c.channelCfi && c.channelCfi.length > 0) {
             include = OperatingClassIncludeType.Some
+        } else {
+            include = OperatingClassIncludeType.All
         }
 
         var oc: OperatingClass = {
             num: c.globalOperatingClass,
-            channels: c.channelCfi,
+            channels: c.channelCfi || [],
             include: include
         }
         return oc;
