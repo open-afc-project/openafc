@@ -31,6 +31,7 @@ class PolygonClass
 		void calcHorizExtents(double yVal, double& xA, double& xB, bool& flag) const;
 		void calcVertExtents (double xVal, double& yA, double& yB, bool& flag) const;
 
+		static PolygonClass *combinePolygons(std::vector<PolygonClass *> polyList);
 		static double comp_bdy_area(const int n, const int *x, const int *y);
 		static double comp_bdy_area(std::vector<std::tuple<int, int>> *ii_list);
 		static int in_bdy_area(const int a, const int b, const int n, const int *x, const int *y, int *edge = (int *) NULL);
