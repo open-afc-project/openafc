@@ -682,6 +682,7 @@ AfcManager::AfcManager()
 	_popDensityNumLat = -1;
 
 	_regionPolygonResolution = quietNaN;
+	_rainForestPolygon = (PolygonClass *) NULL;
 
 	_densityThrUrban = quietNaN;
 	_densityThrSuburban = quietNaN;
@@ -1007,14 +1008,7 @@ void AfcManager::initializeDatabases()
 		_lidarDir = "";
 	}
 
-	if (_use3DEP)
-	{
-		// 3DEP directory is currently not present so this will fail if called
-		// LOGGER_WARN(logger) << "3DEP loading request is being ignored";
-		_depDir = SearchPaths::forReading("data", "rat_transfer/3dep/1_arcsec", true).toStdString();
-	}
-	else
-	{
+	if (!_use3DEP) {
 		_depDir = "";
 	}
 
@@ -1097,6 +1091,17 @@ void AfcManager::initializeDatabases()
 		cgNlcd->setNoData(0);
 		/**********************************************************************************/
 	} else if (_propEnvMethod == CConst::popDensityMapPropEnvMethod) {
+		if (!(_rainForestFile.empty())) {
+	    	std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(_rainForestFile, _regionPolygonResolution);
+			_rainForestPolygon = PolygonClass::combinePolygons(polyList);
+
+			_rainForestPolygon->name = "Rain Forest";
+
+			for(int polyIdx=0; polyIdx<(int) polyList.size(); ++polyIdx) {
+				PolygonClass *poly = polyList[polyIdx];
+				delete poly;
+			}
+		}
 		_popGrid = new PopGridClass(_worldPopulationFile, _regionPolygonList, _regionPolygonResolution,
 			_densityThrUrban, _densityThrSuburban, _densityThrRural,
 			minLat, minLon, maxLat, maxLon);
@@ -3054,6 +3059,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_nlcdFile = SearchPaths::forReading("data", "rat_transfer/nlcd/nlcd_production/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
 	}
 
+	if (jsonObj.contains("rainForestFile") && !jsonObj["rainForestFile"].isUndefined()) {
+		_rainForestFile = SearchPaths::forReading("data", jsonObj["rainForestFile"].toString(), true).toStdString();
+	} else {
+		_rainForestFile = "";
+	}
+
 	if (jsonObj.contains("srtmDir") && !jsonObj["srtmDir"].isUndefined()) {
 		_srtmDir = SearchPaths::forReading("data", jsonObj["srtmDir"].toString(), true).toStdString();
 	} else {
@@ -3235,6 +3246,24 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		}
 	} else {
 		_propEnvMethod = CConst::nlcdPointPropEnvMethod;
+	}
+
+	if (jsonObj.contains("densityThrUrban") && !jsonObj["densityThrUrban"].isUndefined()) {
+	    _densityThrUrban = jsonObj["densityThrUrban"].toDouble();
+	} else {
+		_densityThrUrban = 486.75e-6;
+	}
+
+	if (jsonObj.contains("densityThrSuburban") && !jsonObj["densityThrSuburban"].isUndefined()) {
+	    _densityThrSuburban = jsonObj["densityThrSuburban"].toDouble();
+	} else {
+		_densityThrSuburban = 211.205e-6;
+	}
+
+	if (jsonObj.contains("densityThrRural") && !jsonObj["densityThrRural"].isUndefined()) {
+	    _densityThrRural = jsonObj["densityThrRural"].toDouble();
+	} else {
+		_densityThrRural = 57.1965e-6;
 	}
 	// ***********************************
 
@@ -7201,6 +7230,11 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 							dk = 0.07;
 							if (txClutterStrPtr) { *txClutterStrPtr = "VILLAGE_CENTER"; }
 							break;
+						case CConst::tropicalRainForestNLCDLandCat:
+							ha = 20.0;
+							dk = 0.03;
+							if (txClutterStrPtr) { *txClutterStrPtr = "TROPICAL_RAIN_FOREST"; }
+							break;
 						default:
 							ha = quietNaN;
 							dk = quietNaN;
@@ -9033,9 +9067,15 @@ void AfcManager::runPointAnalysis()
 												}
 
 												excthrGc.fsGainToRlan = rxGainDB;
-												excthrGc.fsNearFieldXdb = nearField_xdb;
-												excthrGc.fsNearFieldU = nearField_u;
-												excthrGc.fsNearFieldEff = nearField_eff;
+												if (!std::isnan(nearField_xdb)) {
+													excthrGc.fsNearFieldXdb = nearField_xdb;
+												}
+												if (!std::isnan(nearField_u)) {
+													excthrGc.fsNearFieldU = nearField_u;
+												}
+												if (!std::isnan(nearField_eff)) {
+													excthrGc.fsNearFieldEff = nearField_eff;
+												}
 												excthrGc.fsNearFieldOffset = nearFieldOffsetDB;
 												excthrGc.spectralOverlapLoss = spectralOverlapLossDB;
 												excthrGc.polarizationLoss = _polarizationLossDB;
@@ -11247,7 +11287,9 @@ void AfcManager::printUserInputs()
 		inputGc.writeRow({ "RX ANTENNA FEEDER LOSS IDU (DB)", f2s(_rxFeederLossDBIDU)  } );
 		inputGc.writeRow({ "RX ANTENNA FEEDER LOSS ODU (DB)", f2s(_rxFeederLossDBODU)  } );
 		inputGc.writeRow({ "RX ANTENNA FEEDER LOSS UNKNOWN (DB)", f2s(_rxFeederLossDBUnknown)  } );
-
+		inputGc.writeRow({ "RAIN_FOREST_FILE", _rainForestFile} );
+		inputGc.writeRow({ "SRTM DIRECTORY", _srtmDir } );
+		inputGc.writeRow({ "DEP  DIRECTORY", _depDir } );
 		if (_analysisType == "ExclusionZoneAnalysis") {
 			double chanCenterFreq = _wlanMinFreq + (_exclusionZoneRLANChanIdx + 0.5) * _exclusionZoneRLANBWHz;
 
@@ -11362,6 +11404,7 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 				break;
 			case 'R':
 				propEnv = CConst::ruralPropEnv;
+				nlcdLandCat = CConst::villageCenterNLCDLandCat;
 				break;
 			case 'B':
 				propEnv = CConst::barrenPropEnv;
@@ -11372,6 +11415,15 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 			default:
 				propEnv = CConst::unknownPropEnv;
 				break;
+		}
+
+		if (_rainForestPolygon) {
+			int xIdx = (int) floor(lonDeg/_regionPolygonResolution + 0.5);
+			int yIdx = (int) floor(latDeg/_regionPolygonResolution + 0.5);
+
+			if (_rainForestPolygon->in_bdy_area(xIdx, yIdx)) {
+				nlcdLandCat = CConst::tropicalRainForestNLCDLandCat;
+			}
 		}
 
 		// For constant set environments:
@@ -11477,10 +11529,6 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_popDensityNumLon = 3467;
 	_popDensityMinLat = 24.5333;
 	_popDensityNumLat = 1491;
-
-	_densityThrUrban = 486.75e-6;
-	_densityThrSuburban = 211.205e-6;
-	_densityThrRural = 57.1965e-6;
 
 	_filterSimRegionOnly = false;
 

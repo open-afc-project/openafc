@@ -75,6 +75,7 @@ public:
 		highCropFieldsNLCDLandCat,
 		noClutterNLCDLandCat,
 		villageCenterNLCDLandCat,
+		tropicalRainForestNLCDLandCat,
 
 		unknownNLCDLandCat
 	};
