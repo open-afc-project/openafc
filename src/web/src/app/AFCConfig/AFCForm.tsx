@@ -5,7 +5,7 @@ import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossMod
 import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache, getRegions } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit, getDeniedRegionsCsvFile } from "../Lib/Admin";
-import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
+import { AllowedRangesDisplay,getDefaultRangesByRegion } from './AllowedRangesForm'
 import DownloadContents from "../Components/DownloadContents";
 import { AFCFormUSACanada } from "./AFCFormUSACanada";
 import { mapRegionCodeToName } from "../Lib/Utils";
@@ -43,7 +43,7 @@ export class AFCForm extends React.Component<
         if (props.frequencyBands.length > 0) {
             config.freqBands = props.frequencyBands.filter((x) => (x.region == config.regionStr) || (!x.region && config.regionStr == 'US'));
         } else {
-            config.freqBands = defaultRanges[config.regionStr ?? "US"];
+            config.freqBands = getDefaultRangesByRegion(config.regionStr ?? "US");
         }
 
         this.state = {
@@ -145,7 +145,7 @@ export class AFCForm extends React.Component<
                 if (propModel.win2ConfidenceCombined < 0 || propModel.win2ConfidenceCombined > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
                 if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
-                if (propModel.terrainSource != "SRTM (90m)") return err("Invalid terrain source.");
+                if (propModel.terrainSource != "SRTM (30m)") return err("Invalid terrain source.");
                 break;
             case "FSPL":
                 break;

@@ -67,7 +67,9 @@ export interface AFCConfigFile {
     indoorFixedHeightAMSL?: boolean,
     reportUnavailableSpectrum?: boolean,
     reportUnavailPSDdBPerMHz?: number,
-    inquiredFrequencyResolutionMHz?: number
+    inquiredFrequencyResolutionMHz?: number,
+    srtmDir?:string,
+    depDir?:string,
 }
 
 export type FreqRange = {
@@ -124,10 +126,10 @@ export type APUncertainty = {
 export type ITMParameters = {
     polarization: 'Vertical' | 'Horizontal',
     ground: GroundType,
-    dielectricConst: Number,
-    conductivity: Number,
-    minSpacing: Number,
-    maxPoints: Number
+    dielectricConst: number,
+    conductivity: number,
+    minSpacing: number,
+    maxPoints: number
 }
 
 export type GroundType = 'Average Ground' | 'Poor Ground' | 'Good Ground' | 'Fresh Water' | 'Sea Water';
@@ -221,7 +223,7 @@ export interface BrazilPropModel {
     itmReliability: number,
     p2108Confidence: number,
     buildingSource: BuildingSourceValues,
-    terrainSource: "SRTM (90m)"
+    terrainSource: "SRTM (30m)"
     winner2LOSOption: 'UNKNOWN' | 'BLDG_DATA_REQ_TX',
     win2UseGroundDistance: boolean,
     fsplUseGroundDistance: boolean,

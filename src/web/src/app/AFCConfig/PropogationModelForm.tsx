@@ -126,7 +126,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                     itmReliability: 20,
                     p2108Confidence: 25,
                     buildingSource: "None",
-                    terrainSource: "SRTM (90m)"
+                    terrainSource: "SRTM (30m)"
                 } as BrazilPropModel);
                 break;
 
@@ -207,7 +207,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
             } else if (model.kind === "Brazilian Propagation Model") {
                 let newData: Partial<BrazilPropModel> = { buildingSource: s };
                 if (model.buildingSource === "None" && s !== "LiDAR") {
-                    newData.terrainSource = "SRTM (90m)";
+                    newData.terrainSource = "SRTM (30m)";
                 }
                 if (s == "LiDAR") {
                     if (!model.win2ConfidenceLOS) {
@@ -1101,9 +1101,10 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                                 id="terrain-source"
                                 name="terrain-source"
                                 style={{ textAlign: "right" }}
-                                isValid={model.terrainSource === "SRTM (90m)"}>
+                                isValid={model.terrainSource === "SRTM (30m)"}>
                                 <FormSelectOption isDisabled={true} key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
-                                <FormSelectOption key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
+                                <FormSelectOption isDisabled={true} key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
+                                <FormSelectOption key="SRTM (30m)" value="SRTM (30m)" label="SRTM (30m)" />
                             </FormSelect>
                         </FormGroup>
                         :

@@ -149,7 +149,9 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "indoorFixedHeightAMSL":false,
     "reportUnavailableSpectrum": true,
     "reportUnavailPSDdBPerMHz": -40,
-    "inquiredFrequencyResolutionMHz": 20
+    "inquiredFrequencyResolutionMHz": 20, 
+    "srtmDir":"rat_transfer/srtm3arcsecondv003",
+    "depDir":"rat_transfer/3dep/1_arcsec",
 });
 
 const defaultAfcConfCanada: () => AFCConfigFile = () => ({
@@ -243,7 +245,9 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "indoorFixedHeightAMSL":false,
     "reportUnavailableSpectrum": false,
     "reportUnavailPSDdBPerMHz": -40,
-    "inquiredFrequencyResolutionMHz": 20
+    "inquiredFrequencyResolutionMHz": 20, 
+    "srtmDir":"rat_transfer/srtm3arcsecondv003",
+    "depDir":"rat_transfer/3dep/1_arcsec_wgs84",
 });
 
 const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
@@ -298,7 +302,7 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
         "itmReliability": 20,
         "p2108Confidence": 25,
         "buildingSource": "None",
-        "terrainSource": "SRTM (90m)"
+        "terrainSource": "SRTM (30m)"
     },
     "propagationEnv": "Population Density Map",
     "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
@@ -335,7 +339,8 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     "indoorFixedHeightAMSL":false,
     "reportUnavailableSpectrum": true,
     "reportUnavailPSDdBPerMHz": -40,
-    "inquiredFrequencyResolutionMHz": 20
+    "inquiredFrequencyResolutionMHz": 20,
+    "srtmDir":"rat_transfer/srtm1arcsecond"
 });
 
 
