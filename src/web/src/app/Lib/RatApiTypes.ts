@@ -70,6 +70,7 @@ export interface AFCConfigFile {
     inquiredFrequencyResolutionMHz?: number,
     srtmDir?:string,
     depDir?:string,
+    cdsmDir?:string,
 }
 
 export type FreqRange = {
@@ -153,7 +154,7 @@ export interface UserUpload {
 
 export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FCC6GHz | CustomPropagation | IsedDbs06 | BrazilPropModel; 
 
-export type BuildingSourceValues =  "B-Design3D" | "LiDAR" | "None"
+export type BuildingSourceValues =  "B-Design3D" | "LiDAR" | "None" | "Canada DSM (2000)"
 
 export interface FSPL { kind: "FSPL",
     fsplUseGroundDistance: boolean,

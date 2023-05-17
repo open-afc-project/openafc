@@ -115,16 +115,16 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 break;
             case "Brazilian Propagation Model":
                 this.props.onChange({
-                    kind: s, win2ConfidenceCombined: 16,
-                    win2ConfidenceLOS: 16,
+                    kind: s, win2ConfidenceCombined: 50,
+                    win2ConfidenceLOS: 50,
                     winner2LOSOption: "BLDG_DATA_REQ_TX",
                     win2UseGroundDistance: false,
                     fsplUseGroundDistance: false,
                     winner2HgtFlag: false,
-                    winner2HgtLOS: 15,
-                    itmConfidence: 5,
-                    itmReliability: 20,
-                    p2108Confidence: 25,
+                    winner2HgtLOS: 50,
+                    itmConfidence: 50,
+                    itmReliability: 50,
+                    p2108Confidence: 50,
                     buildingSource: "None",
                     terrainSource: "SRTM (30m)"
                 } as BrazilPropModel);
@@ -225,18 +225,15 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 }
                 this.props.onChange(Object.assign(this.props.data, newData));
             }
-
-        }
-        else {
-            if ((model as Win2ItmDb | FCC6GHz | CustomPropagation).buildingSource === "None" && s !== "None") {
-                this.props.onChange(Object.assign(this.props.data, { buildingSource: s, terrainSource: "3DEP (30m)" }));
-            } else if ((model as BrazilPropModel).buildingSource === "None" && s !== "None") {
-                this.props.onChange(Object.assign(this.props.data, { buildingSource: s, terrainSource: "SRTM (90m)" }));
-            } else {
-                this.props.onChange(Object.assign(this.props.data, { buildingSource: s }));
+            else {
+                if ((model as Win2ItmDb | CustomPropagation| IsedDbs06).buildingSource === "None" && s !== "None") {
+                    this.props.onChange(Object.assign(this.props.data, { buildingSource: s, terrainSource: "3DEP (30m)" }));
+                } else {
+                    this.props.onChange(Object.assign(this.props.data, { buildingSource: s }));
+                }
             }
-        }
 
+        }
     }
 
     setTerrainSource = (s: string) => {
@@ -943,10 +940,8 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                                     id="propogation-model-data-source"
                                     name="propogation-model-data-source"
                                     style={{ textAlign: "right" }}
-                                    isValid={model.buildingSource === "LiDAR"
-                                        || model.buildingSource === "B-Design3D" || model.buildingSource === "None"}>
-                                    <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
-                                    <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
+                                    isValid={model.buildingSource === "Canada DSM (2000)" || model.buildingSource === "None"}>
+                                    <FormSelectOption key="Canada DSM (2000)" value="Canada DSM (2000)" label="Canada DSM (2000)" />
                                     <FormSelectOption key="None" value="None" label="None" />
                                 </FormSelect>
                             </FormGroup>
@@ -1084,9 +1079,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             id="propogation-model-data-source"
                             name="propogation-model-data-source"
                             style={{ textAlign: "right" }}
-                            isValid={model.buildingSource === "LiDAR" || model.buildingSource === "B-Design3D" || model.buildingSource === "None"}>
-                            <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
-                            <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
+                            isValid={model.buildingSource === "None"}>
                             <FormSelectOption key="None" value="None" label="None" />
                         </FormSelect>
                     </FormGroup>
@@ -1102,8 +1095,6 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                                 name="terrain-source"
                                 style={{ textAlign: "right" }}
                                 isValid={model.terrainSource === "SRTM (30m)"}>
-                                <FormSelectOption isDisabled={true} key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
-                                <FormSelectOption isDisabled={true} key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
                                 <FormSelectOption key="SRTM (30m)" value="SRTM (30m)" label="SRTM (30m)" />
                             </FormSelect>
                         </FormGroup>

@@ -164,7 +164,7 @@ export class AFCForm extends React.Component<
                 if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
                 if (propModel.win2ConfidenceCombined! < 0 || propModel.win2ConfidenceCombined! > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
-                if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
+                if (propModel.buildingSource != "Canada DSM (2000)" && propModel.buildingSource != "None") return err();
                 if (propModel.buildingSource !== "None" && propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
                 break;
             default:

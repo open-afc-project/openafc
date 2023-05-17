@@ -248,6 +248,7 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "inquiredFrequencyResolutionMHz": 20, 
     "srtmDir":"rat_transfer/srtm3arcsecondv003",
     "depDir":"rat_transfer/3dep/1_arcsec_wgs84",
+    "cdsmDir":"rat_transfer/cdsm/3ov4_arcsec_wgs84"
 });
 
 const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
@@ -291,16 +292,16 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     "minPSD": 8,
     "propagationModel": {
         "kind": "Brazilian Propagation Model",
-        "win2ConfidenceCombined": 16,
-        "win2ConfidenceLOS": 16,
+        "win2ConfidenceCombined": 50,
+        "win2ConfidenceLOS": 50,
         "winner2LOSOption": "BLDG_DATA_REQ_TX",
         "win2UseGroundDistance": false,
         "fsplUseGroundDistance": false,
         "winner2HgtFlag": false,
         "winner2HgtLOS": 15,
-        "itmConfidence": 5,
-        "itmReliability": 20,
-        "p2108Confidence": 25,
+        "itmConfidence": 50,
+        "itmReliability": 50,
+        "p2108Confidence": 50,
         "buildingSource": "None",
         "terrainSource": "SRTM (30m)"
     },
@@ -340,7 +341,7 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     "reportUnavailableSpectrum": true,
     "reportUnavailPSDdBPerMHz": -40,
     "inquiredFrequencyResolutionMHz": 20,
-    "srtmDir":"rat_transfer/srtm1arcsecond"
+    "srtmDir":"rat_transfer/srtm1arcsecond_wgs84"
 });
 
 
