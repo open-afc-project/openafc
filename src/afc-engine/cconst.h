@@ -51,6 +51,21 @@ public:
 	/**************************************************************************************/
 
 	/**************************************************************************************/
+	/**** PropEnvMethod                                                                ****/
+	/**************************************************************************************/
+	enum PropEnvMethodEnum
+	{
+		    nlcdPointPropEnvMethod,
+		popDensityMapPropEnvMethod,
+		        urbanPropEnvMethod,
+		     suburbanPropEnvMethod,
+		        ruralPropEnvMethod,
+
+		      unknownPropEnvMethod
+	};
+	/**************************************************************************************/
+
+	/**************************************************************************************/
 	/**** NLCDLandCat                                                                  ****/
 	/**************************************************************************************/
 	enum NLCDLandCatEnum
@@ -330,6 +345,7 @@ public:
 
 	static const StrTypeClass strULSAntennaTypeList[];
 	static const StrTypeClass strPropEnvList[];
+	static const StrTypeClass strPropEnvMethodList[];
 	static const StrTypeClass strPathLossModelList[];
 	static const StrTypeClass strLOSOptionList[];
 	static const StrTypeClass strITMClutterMethodList[];

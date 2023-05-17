@@ -548,7 +548,6 @@ std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilen
 }
 /******************************************************************************************/
 
-
 /******************************************************************************************/
 /**** FUNCTION: PolygonClass::comp_bdy_min_max                                         ****/
 /**** Find minx, maxx, miny, maxy for a list of bdy points.                            ****/
@@ -969,4 +968,41 @@ void PolygonClass::calcVertExtents (double xVal, double& yA, double& yB, bool& f
 }
 /******************************************************************************************/
 
+/******************************************************************************************/
+/**** FUNCTION: PolygonClass::combinePolygons                                          ****/
+/******************************************************************************************/
+PolygonClass *PolygonClass::combinePolygons(std::vector<PolygonClass *> polyList)
+{
+	PolygonClass *combinedPoly = new PolygonClass();
+
+    int totalNumSegment = 0;
+	for(int polyIdx=0; polyIdx<polyList.size(); ++polyIdx) {
+		totalNumSegment += polyList[polyIdx]->num_segment;
+	}
+
+	combinedPoly->num_segment = totalNumSegment;
+
+	combinedPoly->num_bdy_pt = (int  *) malloc(totalNumSegment*sizeof(int));
+	combinedPoly->bdy_pt_x   = (int **) malloc(totalNumSegment*sizeof(int *));
+	combinedPoly->bdy_pt_y   = (int **) malloc(totalNumSegment*sizeof(int *));
+
+	int segIdx = 0;
+	for(int polyIdx=0; polyIdx<polyList.size(); ++polyIdx) {
+		PolygonClass *poly = polyList[polyIdx];
+		for (int segment_idx=0; segment_idx<=poly->num_segment-1; segment_idx++) {
+			int numPt = poly->num_bdy_pt[segment_idx];
+			combinedPoly->num_bdy_pt[segIdx] = numPt;
+			combinedPoly->bdy_pt_x[segIdx]   = (int *) malloc(numPt*sizeof(int));
+			combinedPoly->bdy_pt_y[segIdx]   = (int *) malloc(numPt*sizeof(int));
+			for (int bdy_pt_idx=0; bdy_pt_idx<numPt; bdy_pt_idx++) {
+				combinedPoly->bdy_pt_x[segIdx][bdy_pt_idx] = poly->bdy_pt_x[segment_idx][bdy_pt_idx];
+				combinedPoly->bdy_pt_y[segIdx][bdy_pt_idx] = poly->bdy_pt_y[segment_idx][bdy_pt_idx];
+			}
+			segIdx++;
+		}
+	}
+
+	return combinedPoly;
+}
+/******************************************************************************************/
 

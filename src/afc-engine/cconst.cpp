@@ -86,6 +86,15 @@ const StrTypeClass CConst::strPropEnvList[] = {
 	{                                    -1,  (char *) 0     }
 };
 
+const StrTypeClass CConst::strPropEnvMethodList[] = {
+	{        CConst::nlcdPointPropEnvMethod, "NLCD Point"             },
+	{    CConst::popDensityMapPropEnvMethod, "Population Density Map" },
+	{            CConst::urbanPropEnvMethod, "Urban"                  },
+	{         CConst::suburbanPropEnvMethod, "Suburban"               },
+	{            CConst::ruralPropEnvMethod, "Rural"                  },
+	{                                    -1,  (char *) 0     }
+};
+
 const StrTypeClass CConst::strULSAntennaTypeList[] = {
 	{      CConst::F1336OmniAntennaType, "F.1336 Omni"       },
 	{          CConst::F1245AntennaType, "F.1245"            },

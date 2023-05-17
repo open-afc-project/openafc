@@ -344,8 +344,7 @@ class AfcManager
 
 		QString _inputULSDatabaseStr;           // ULS Database being used
 
-		QString _propagationEnviro;             // Propagation environment (e.g. Population Density Map)
-
+		CConst::PropEnvMethodEnum _propEnvMethod; // Method for determining propagation environment (e.g. Population Density Map)
 
 		double _rxFeederLossDBIDU;                // User-inputted ULS receiver feeder loss for IDU Architecture
 		double _rxFeederLossDBODU;                // User-inputted ULS receiver feeder loss for ODU Architecture
