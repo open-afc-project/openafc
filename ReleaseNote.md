@@ -1,6 +1,25 @@
  # Release Note
 
 ## **Version and Date**
+|Version|**OA-678*|
+| :- | :- |
+|**Date**|**05/17/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-678: channelCfi [] not working inside GUI
+
+## **Interface Changes**
+ * 
+
+## **Testing Done**
+ * Entered the following AP request in Virtual AP Copy/Paste and confirmed that ALL of channels of Global Operating Class 134 were selected
+ * {"inquiredChannels": [{"channelCfi": [],"globalOperatingClass": 134}], "deviceDescriptor": {"rulesetIds": ["US_47_CFR_PART_15_SUBPART_E"], "serialNumber": "REG123", "certificationId": [{"nra": "FCC", "id": "FCCID-REG123"}]}, "inquiredFrequencyRange": [], "location": {"indoorDeployment": 1, "elevation": {"verticalUncertainty": 2, "heightType": "AGL", "height": 3}, "ellipse": {"center": {"latitude": 33.180621, "longitude": -97.560614}, "orientation": 45, "minorAxis": 50, "majorAxis": 100}}, "requestId": "REQ-FSP1"}
+
+## **Open Issues** 
+ * 
+
+## **Version and Date**
 |Version|3.8.0.0|
 | :- | :- |
 |**Date**|**05/16/2023**|
