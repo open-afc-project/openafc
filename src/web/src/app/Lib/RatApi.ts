@@ -179,9 +179,9 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
         "value": 0
     },
     "receiverFeederLoss": {
-        "IDU": 0,
+        "IDU": 3,
         "ODU": 0,
-        "UNKNOWN": 0
+        "UNKNOWN": 3
     },
     "fsReceiverNoise": {
         "freqList": [6425],
@@ -233,7 +233,7 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     },
     "nlcdFile": "rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif",
     "enableMapInVirtualAp": false,
-    "channelResponseAlgorithm": "psd",
+    "channelResponseAlgorithm": "pwr",
     "visibilityThreshold": -6,
     "version": guiConfig.version,
     "allowScanPtsInUncReg": false,
@@ -257,7 +257,7 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
             "region": "BR",
             "name": "Brazil",
             "startFreqMHz": 5925,
-            "stopFreqMHz": 6875
+            "stopFreqMHz": 7125
         },
     ],
     "ulsDefaultAntennaType": "WINNF-AIP-07",
@@ -276,9 +276,9 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
         "value": 0
     },
     "receiverFeederLoss": {
-        "IDU": 0,
+        "IDU": 3,
         "ODU": 0,
-        "UNKNOWN": 0
+        "UNKNOWN": 3
     },
     "fsReceiverNoise": {
         "freqList": [6425],
@@ -328,7 +328,7 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     },
     "nlcdFile": "",
     "enableMapInVirtualAp": false,
-    "channelResponseAlgorithm": "psd",
+    "channelResponseAlgorithm": "pwr",
     "visibilityThreshold": -6,
     "version": guiConfig.version,
     "allowScanPtsInUncReg": false,
@@ -341,7 +341,8 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     "reportUnavailableSpectrum": true,
     "reportUnavailPSDdBPerMHz": -40,
     "inquiredFrequencyResolutionMHz": 20,
-    "srtmDir":"rat_transfer/srtm1arcsecond_wgs84"
+    "srtmDir":"rat_transfer/srtm1arcsecond_wgs84",
+    "rainForestFile": "rat_transfer/population/Brazil_AmazonRainForest.kml"
 });
 
 
@@ -370,7 +371,7 @@ const defaultAllRegionFreqRanges: () => FreqRange[] = () => (
             "region": "BR",
             "name": "Brazil",
             "startFreqMHz": 5925,
-            "stopFreqMHz": 6875
+            "stopFreqMHz": 7125
         }
 
 

@@ -71,6 +71,7 @@ export interface AFCConfigFile {
     srtmDir?:string,
     depDir?:string,
     cdsmDir?:string,
+    rainForestFile?:string,
 }
 
 export type FreqRange = {
