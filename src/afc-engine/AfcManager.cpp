@@ -682,6 +682,7 @@ AfcManager::AfcManager()
 	_popDensityNumLat = -1;
 
 	_regionPolygonResolution = quietNaN;
+	_rainForestPolygon = (PolygonClass *) NULL;
 
 	_densityThrUrban = quietNaN;
 	_densityThrSuburban = quietNaN;
@@ -773,16 +774,26 @@ void AfcManager::initializeDatabases()
 	/**************************************************************************************/
 	std::vector<std::string> regionPolygonFileStrList = split(_regionPolygonFileList, ',');
 	_numRegion = regionPolygonFileStrList.size();
-	std::vector<PolygonClass *> regionPolygonList;
 
 	for(int regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
 	    std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(regionPolygonFileStrList[regionIdx], _regionPolygonResolution);
-		double regionArea = 0.0;
+		PolygonClass *regionPoly = PolygonClass::combinePolygons(polyList);
+		regionPoly->name = _regionPolygonFileList[regionIdx];
+
+		double regionArea = regionPoly->comp_bdy_area();
+
+		double checkArea = 0.0;
 		for(int polyIdx=0; polyIdx<(int) polyList.size(); ++polyIdx) {
 			PolygonClass *poly = polyList[polyIdx];
-            regionArea += poly->comp_bdy_area();
-			_regionPolygonList.push_back(poly);
+            checkArea += poly->comp_bdy_area();
+			delete poly;
 		}
+
+		if (fabs(regionArea - checkArea) > 1.0e-6) {
+			throw std::runtime_error(ErrStream() << "ERROR: INVALID region polygon file = " << regionPolygonFileStrList[regionIdx]);
+		}
+
+		_regionPolygonList.push_back(regionPoly);
 		LOGGER_INFO(logger) << "REGION: " << regionPolygonFileStrList[regionIdx] << " AREA: " << regionArea;
 	}
 
@@ -997,14 +1008,7 @@ void AfcManager::initializeDatabases()
 		_lidarDir = "";
 	}
 
-	if (_use3DEP)
-	{
-		// 3DEP directory is currently not present so this will fail if called
-		// LOGGER_WARN(logger) << "3DEP loading request is being ignored";
-		_depDir = SearchPaths::forReading("data", "rat_transfer/3dep/1_arcsec", true).toStdString();
-	}
-	else
-	{
+	if (!_use3DEP) {
 		_depDir = "";
 	}
 
@@ -1043,26 +1047,6 @@ void AfcManager::initializeDatabases()
 	/**************************************************************************************/
 
 	/**************************************************************************************/
-	/* Setup NLCD data                                                                    */
-	/**************************************************************************************/
-	if (_nlcdFile.empty()) {
-		throw std::runtime_error("AfcManager::initializeDatabases(): _nlcdFile not defined.");
-	}
-	std::string nlcdPattern, nlcdDirectory;
-	auto nlcdFileInfo = QFileInfo(QString::fromStdString(_nlcdFile));
-	if (nlcdFileInfo.isDir()) {
-		nlcdPattern = "*";
-		nlcdDirectory = _nlcdFile;
-	} else {
-		nlcdPattern = nlcdFileInfo.fileName().toStdString();
-		nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
-	}
-	cgNlcd.reset(new CachedGdal<uint8_t>(nlcdDirectory, "nlcd",
-		GdalNameMapperDirect::make_unique(nlcdPattern, nlcdDirectory)));
-	cgNlcd->setNoData(0);
-	/**************************************************************************************/
-
-	/**************************************************************************************/
 	/* Setup ITU data                                                                    */
 	/**************************************************************************************/
 	_ituData = new ITUDataClass(_radioClimateFile, _surfRefracFile);
@@ -1084,10 +1068,43 @@ void AfcManager::initializeDatabases()
 	/**************************************************************************************/
 
 	/**************************************************************************************/
-	/* Read Population data                                                               */
+	/* Read NLCD data or Polulation Density data depending on propEnvMethod               */
 	/**************************************************************************************/
-	if (_propagationEnviro.toStdString() == "Population Density Map") {
-		readPopulationGrid(); // Reads population density in grid of lat/lon, multiply by area to get population of specified regions
+	if (_propEnvMethod == CConst::nlcdPointPropEnvMethod) {
+		/**********************************************************************************/
+		/* Setup NLCD data                                                                */
+		/**********************************************************************************/
+		if (_nlcdFile.empty()) {
+			throw std::runtime_error("AfcManager::initializeDatabases(): _nlcdFile not defined.");
+		}
+		std::string nlcdPattern, nlcdDirectory;
+		auto nlcdFileInfo = QFileInfo(QString::fromStdString(_nlcdFile));
+		if (nlcdFileInfo.isDir()) {
+			nlcdPattern = "*";
+			nlcdDirectory = _nlcdFile;
+		} else {
+			nlcdPattern = nlcdFileInfo.fileName().toStdString();
+			nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
+		}
+		cgNlcd.reset(new CachedGdal<uint8_t>(nlcdDirectory, "nlcd",
+			GdalNameMapperDirect::make_unique(nlcdPattern, nlcdDirectory)));
+		cgNlcd->setNoData(0);
+		/**********************************************************************************/
+	} else if (_propEnvMethod == CConst::popDensityMapPropEnvMethod) {
+		if (!(_rainForestFile.empty())) {
+	    	std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(_rainForestFile, _regionPolygonResolution);
+			_rainForestPolygon = PolygonClass::combinePolygons(polyList);
+
+			_rainForestPolygon->name = "Rain Forest";
+
+			for(int polyIdx=0; polyIdx<(int) polyList.size(); ++polyIdx) {
+				PolygonClass *poly = polyList[polyIdx];
+				delete poly;
+			}
+		}
+		_popGrid = new PopGridClass(_worldPopulationFile, _regionPolygonList, _regionPolygonResolution,
+			_densityThrUrban, _densityThrSuburban, _densityThrRural,
+			minLat, minLon, maxLat, maxLon);
 	}
 	/**************************************************************************************/
 
@@ -1176,6 +1193,10 @@ void AfcManager::clearData()
 	if (_passiveRepeaterFlag) {
 		delete _prTable;
 		_prTable = (PRTABLEClass *) NULL;
+	}
+
+	for(int regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
+		delete _regionPolygonList[regionIdx];
 	}
 }
 /******************************************************************************************/
@@ -3038,6 +3059,24 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_nlcdFile = SearchPaths::forReading("data", "rat_transfer/nlcd/nlcd_production/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
 	}
 
+	if (jsonObj.contains("rainForestFile") && !jsonObj["rainForestFile"].isUndefined()) {
+		_rainForestFile = SearchPaths::forReading("data", jsonObj["rainForestFile"].toString(), true).toStdString();
+	} else {
+		_rainForestFile = "";
+	}
+
+	if (jsonObj.contains("srtmDir") && !jsonObj["srtmDir"].isUndefined()) {
+		_srtmDir = SearchPaths::forReading("data", jsonObj["srtmDir"].toString(), true).toStdString();
+	} else {
+		_srtmDir = SearchPaths::forReading("data", "rat_transfer/srtm3arcsecondv003", true).toStdString();
+	}
+
+	if (jsonObj.contains("depDir") && !jsonObj["depDir"].isUndefined()) {
+		_depDir = SearchPaths::forReading("data", jsonObj["depDir"].toString(), true).toStdString();
+	} else {
+		_depDir = SearchPaths::forReading("data", "rat_transfer/3dep/1_arcsec", true).toStdString();
+	}
+
 	if (jsonObj.contains("fsAnalysisListFile") && !jsonObj["fsAnalysisListFile"].isUndefined()) {
 		_fsAnalysisListFile = QDir(QString::fromStdString(tempDir)).filePath(jsonObj["fsAnalysisListFile"].toString()).toStdString();
 	} else {
@@ -3198,7 +3237,35 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	_bodyLossOutdoorDB = jsonObj["bodyLoss"].toObject()["valueOutdoor"].toDouble();
 	_polarizationLossDB = jsonObj["polarizationMismatchLoss"].toObject()["value"].toDouble();
 	_buildingLossModel = (buildingLoss["kind"]).toString();
-	_propagationEnviro = jsonObj["propagationEnv"].toString();
+
+	int validFlag;
+	if (jsonObj.contains("propagationEnv") && !jsonObj["propagationEnv"].isUndefined()) {
+		_propEnvMethod = (CConst::PropEnvMethodEnum) CConst::strPropEnvMethodList->str_to_type(jsonObj["propagationEnv"].toString().toStdString(), validFlag, 0);
+		if (!validFlag) {
+			throw std::runtime_error("ERROR: Invalid propagationEnv");
+		}
+	} else {
+		_propEnvMethod = CConst::nlcdPointPropEnvMethod;
+	}
+
+	if (jsonObj.contains("densityThrUrban") && !jsonObj["densityThrUrban"].isUndefined()) {
+	    _densityThrUrban = jsonObj["densityThrUrban"].toDouble();
+	} else {
+		_densityThrUrban = 486.75e-6;
+	}
+
+	if (jsonObj.contains("densityThrSuburban") && !jsonObj["densityThrSuburban"].isUndefined()) {
+	    _densityThrSuburban = jsonObj["densityThrSuburban"].toDouble();
+	} else {
+		_densityThrSuburban = 211.205e-6;
+	}
+
+	if (jsonObj.contains("densityThrRural") && !jsonObj["densityThrRural"].isUndefined()) {
+	    _densityThrRural = jsonObj["densityThrRural"].toDouble();
+	} else {
+		_densityThrRural = 57.1965e-6;
+	}
+	// ***********************************
 
 	// ***********************************
 	// Feeder loss parameters
@@ -3275,7 +3342,6 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): fsClutterModel missing.");
 	}
 
-	int validFlag;
 	if (jsonObj.contains("rlanITMTxClutterMethod") && !jsonObj["rlanITMTxClutterMethod"].isUndefined()) {
 		_rlanITMTxClutterMethod = (CConst::ITMClutterMethodEnum) CConst::strITMClutterMethodList->str_to_type(jsonObj["rlanITMTxClutterMethod"].toString().toStdString(), validFlag, 0);
 		if (!validFlag) {
@@ -4466,6 +4532,7 @@ QJsonObject jsonSpectrumData(const std::vector<ChannelStruct> &channelList, cons
 /******************************************************************************************/
 void AfcManager::readPopulationGrid()
 {
+#if 0
 	int regionIdx; // CONUS simulations typically treat CONUS as one region; left here in case of EU or other simulation
 
 	if (_worldPopulationFile.empty()) {
@@ -4492,16 +4559,12 @@ void AfcManager::readPopulationGrid()
 				_popDensityNumLat, _popDensityResLat, _popDensityMinLat);
 		LOGGER_DEBUG(logger) << "Population grid read complete";
 	} else {
-		std::vector<std::string> regionPolygonFileStrList = split(_regionPolygonFileList, ',');
-		_numRegion = regionPolygonFileStrList.size();
-		std::vector<PolygonClass *> regionPolygonList;
 		std::vector<std::tuple<double, double>> unused_lon_list;
 		unused_lon_list.push_back(std::make_tuple(-180.0, 180.0));
 
 		for(regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
-			PolygonClass *regionPolygon = new PolygonClass(regionPolygonFileStrList[regionIdx], _regionPolygonResolution);
+			PolygonClass *regionPolygon = _regionPolygonList[regionIdx];
 			std::cout << "REGION: " << regionPolygon->name << " AREA: " << regionPolygon->comp_bdy_area() << std::endl;
-			regionPolygonList.push_back(regionPolygon);
 			int minx, maxx, miny, maxy;
 			regionPolygon->comp_bdy_min_max(minx, maxx, miny, maxy);
 			double minLon = (minx-1)*_regionPolygonResolution;
@@ -4574,7 +4637,7 @@ void AfcManager::readPopulationGrid()
 		int translateN = (int) floor(360.0 / _regionPolygonResolution + 0.5);
 
 		for(regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
-			PolygonClass *regionPolygon = regionPolygonList[regionIdx];
+			PolygonClass *regionPolygon = _regionPolygonList[regionIdx];
 			while(regionPolygon->bdy_pt_x[0][0] < minN) {
 				regionPolygon->translate(translateN, 0);
 			}
@@ -4583,13 +4646,9 @@ void AfcManager::readPopulationGrid()
 			}
 		}
 
-		_popGrid = new PopGridClass(_worldPopulationFile, regionPolygonList, _regionPolygonResolution, _densityThrUrban, _densityThrSuburban, _densityThrRural);
-
-		for(regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
-			PolygonClass *regionPolygon = regionPolygonList[regionIdx];
-			delete regionPolygon;
-		}
+		_popGrid = new PopGridClass(_worldPopulationFile, _regionPolygonList, _regionPolygonResolution, _densityThrUrban, _densityThrSuburban, _densityThrRural);
 	}
+#endif
 }
 /******************************************************************************************/
 
@@ -7171,6 +7230,11 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 							dk = 0.07;
 							if (txClutterStrPtr) { *txClutterStrPtr = "VILLAGE_CENTER"; }
 							break;
+						case CConst::tropicalRainForestNLCDLandCat:
+							ha = 20.0;
+							dk = 0.03;
+							if (txClutterStrPtr) { *txClutterStrPtr = "TROPICAL_RAIN_FOREST"; }
+							break;
 						default:
 							ha = quietNaN;
 							dk = quietNaN;
@@ -9003,9 +9067,15 @@ void AfcManager::runPointAnalysis()
 												}
 
 												excthrGc.fsGainToRlan = rxGainDB;
-												excthrGc.fsNearFieldXdb = nearField_xdb;
-												excthrGc.fsNearFieldU = nearField_u;
-												excthrGc.fsNearFieldEff = nearField_eff;
+												if (!std::isnan(nearField_xdb)) {
+													excthrGc.fsNearFieldXdb = nearField_xdb;
+												}
+												if (!std::isnan(nearField_u)) {
+													excthrGc.fsNearFieldU = nearField_u;
+												}
+												if (!std::isnan(nearField_eff)) {
+													excthrGc.fsNearFieldEff = nearField_eff;
+												}
 												excthrGc.fsNearFieldOffset = nearFieldOffsetDB;
 												excthrGc.spectralOverlapLoss = spectralOverlapLossDB;
 												excthrGc.polarizationLoss = _polarizationLossDB;
@@ -11186,7 +11256,7 @@ void AfcManager::printUserInputs()
 		inputGc.writeRow({ "CHANNEL_RESPONSE_ALGORITHM", CConst::strSpectralAlgorithmList->type_to_str(_channelResponseAlgorithm) } );
 
 		// inputGc.writeRow({ "ULS_DATABASE", _inputULSDatabaseStr } );
-		inputGc.writeRow({ "AP/CLIENT_PROPAGATION_ENVIRO", _propagationEnviro.toStdString() });
+		inputGc.writeRow({ "AP/CLIENT_PROPAGATION_ENVIRO", CConst::strPropEnvMethodList->type_to_str(_propEnvMethod) });
 		inputGc.writeRow({ "AP/CLIENT_MIN_EIRP (DBM)", f2s(_minEIRP_dBm) } );
 		inputGc.writeRow({ "AP/CLIENT_MAX_EIRP (DBM)", f2s(_maxEIRP_dBm) } );
 
@@ -11217,7 +11287,9 @@ void AfcManager::printUserInputs()
 		inputGc.writeRow({ "RX ANTENNA FEEDER LOSS IDU (DB)", f2s(_rxFeederLossDBIDU)  } );
 		inputGc.writeRow({ "RX ANTENNA FEEDER LOSS ODU (DB)", f2s(_rxFeederLossDBODU)  } );
 		inputGc.writeRow({ "RX ANTENNA FEEDER LOSS UNKNOWN (DB)", f2s(_rxFeederLossDBUnknown)  } );
-
+		inputGc.writeRow({ "RAIN_FOREST_FILE", _rainForestFile} );
+		inputGc.writeRow({ "SRTM DIRECTORY", _srtmDir } );
+		inputGc.writeRow({ "DEP  DIRECTORY", _depDir } );
 		if (_analysisType == "ExclusionZoneAnalysis") {
 			double chanCenterFreq = _wlanMinFreq + (_exclusionZoneRLANChanIdx + 0.5) * _exclusionZoneRLANBWHz;
 
@@ -11272,7 +11344,7 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 	int latIdx;
 	CConst::PropEnvEnum propEnv;
 	nlcdLandCat = CConst::unknownNLCDLandCat;
-	if (_propagationEnviro.toStdString() == "NLCD Point" || _propagationEnviro.isEmpty()) { //.isEmpty() == true in DEBUG mode
+	if (_propEnvMethod == CConst::nlcdPointPropEnvMethod) {
 		unsigned int landcat = cgNlcd->valueAt(latDeg, lonDeg);
 
 		switch(landcat) {
@@ -11317,7 +11389,7 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 				propEnv = CConst::ruralPropEnv;
 				break;
 		}
-	} else if (_propagationEnviro.toStdString() == "Population Density Map") {
+	} else if (_propEnvMethod == CConst::popDensityMapPropEnvMethod) {
 		int regionIdx;
 		char propEnvChar;
 		_popGrid->findDeg(lonDeg, latDeg, lonIdx, latIdx, propEnvChar, regionIdx);
@@ -11332,6 +11404,7 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 				break;
 			case 'R':
 				propEnv = CConst::ruralPropEnv;
+				nlcdLandCat = CConst::villageCenterNLCDLandCat;
 				break;
 			case 'B':
 				propEnv = CConst::barrenPropEnv;
@@ -11344,15 +11417,24 @@ CConst::PropEnvEnum AfcManager::computePropEnv(double lonDeg, double latDeg, CCo
 				break;
 		}
 
+		if (_rainForestPolygon) {
+			int xIdx = (int) floor(lonDeg/_regionPolygonResolution + 0.5);
+			int yIdx = (int) floor(latDeg/_regionPolygonResolution + 0.5);
+
+			if (_rainForestPolygon->in_bdy_area(xIdx, yIdx)) {
+				nlcdLandCat = CConst::tropicalRainForestNLCDLandCat;
+			}
+		}
+
 		// For constant set environments:
-	} else if (_propagationEnviro.toStdString() == "Urban") {
+	} else if (_propEnvMethod == CConst::urbanPropEnvMethod) {
 		propEnv = CConst::urbanPropEnv;
-	} else if (_propagationEnviro.toStdString() == "Suburban") {
+	} else if (_propEnvMethod == CConst::suburbanPropEnvMethod) {
 		propEnv = CConst::suburbanPropEnv;
-	} else if (_propagationEnviro.toStdString() == "Rural") {
+	} else if (_propEnvMethod == CConst::ruralPropEnvMethod) {
 		propEnv = CConst::ruralPropEnv;
 	} else {
-		throw std::runtime_error("Error in selecting a constant propagation environment (e.g. Urban)");
+		throw std::runtime_error("Error in selecting propagation environment");
 	}
 
 	if ((propEnv == CConst::unknownPropEnv) && (errorFlag))
@@ -11435,10 +11517,6 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_wlanMinFreq = _wlanMinFreqMHz*1.0e6;
 	_wlanMaxFreq = _wlanMaxFreqMHz*1.0e6;
 
-	_srtmDir = SearchPaths::forReading("data", "rat_transfer/srtm3arcsecondv003", true).toStdString();
-
-	_depDir = SearchPaths::forReading("data", "rat_transfer/3dep/1_arcsec", true).toStdString();
-
 	_lidarDir = SearchPaths::forReading("data", "rat_transfer/proc_lidar_2019", true);
 
 	_globeDir = SearchPaths::forReading("data", "rat_transfer/globe", true);
@@ -11451,10 +11529,6 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_popDensityNumLon = 3467;
 	_popDensityMinLat = 24.5333;
 	_popDensityNumLat = 1491;
-
-	_densityThrUrban = 486.75e-6;
-	_densityThrSuburban = 211.205e-6;
-	_densityThrRural = 57.1965e-6;
 
 	_filterSimRegionOnly = false;
 

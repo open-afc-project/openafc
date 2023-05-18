@@ -31,7 +31,9 @@ class PopGridClass
 {
 	public:
 		PopGridClass(double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal);
-		PopGridClass(std::string worldPopulationFile, const std::vector<PolygonClass *> &regionPolygonList, double regionPolygonResolution, double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal);
+		PopGridClass(std::string worldPopulationFile, const std::vector<PolygonClass *> &regionPolygonList, double regionPolygonResolution,
+			double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal,
+			double minLat, double minLon, double maxLat, double maxLon);
 		PopGridClass(const PopGridClass &obj);
 		~PopGridClass();
 		void readData(std::string populationDensityFile, const std::vector<std::string> &regionNameList, const std::vector<int> &regionIDList,

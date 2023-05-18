@@ -64,7 +64,8 @@ densityThrUrban(densityThrUrbanVal), densityThrSuburban(densityThrSuburbanVal), 
 /**** CONSTRUCTOR: PopGridClass::PopGridClass()                                        ****/
 /******************************************************************************************/
 PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<PolygonClass *> &regionPolygonList, double regionPolygonResolution,
-    double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal
+    double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal,
+	double minLat, double minLon, double maxLat, double maxLon
     ) : densityThrUrban(densityThrUrbanVal), densityThrSuburban(densityThrSuburbanVal), densityThrRural(densityThrRuralVal)
 {
     // NOTE: Each point in the PopGridClass is taken to be in the first region in which the point is contained.  So,
@@ -75,6 +76,8 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
     if (worldPopulationFile.empty()) {
         throw std::invalid_argument("worldPopulationFile is empty");
     }
+
+	int regionIdx;
 
 #if DEBUG_AFC
     FILE *fchk = (FILE *) NULL;
@@ -215,35 +218,10 @@ PopGridClass::PopGridClass(std::string worldPopulationFile, const std::vector<Po
         std::cout << "ORIG NODATA undefined" << std::endl;
     }
 
-    int minx, maxx, miny, maxy;
-    int regionIdx;
-    for(regionIdx=0; regionIdx< (int) regionPolygonList.size(); ++regionIdx) {
-        PolygonClass *regionPolygon = regionPolygonList[regionIdx];
-        regionNameList.push_back(regionPolygon->name);
-
-        int x0, x1, y0, y1;
-        regionPolygon->comp_bdy_min_max(x0, x1, y0, y1);
-
-        if ((regionIdx == 0) || (x0 < minx)) { minx = x0; }
-        if ((regionIdx == 0) || (x1 > maxx)) { maxx = x1; }
-        if ((regionIdx == 0) || (y0 < miny)) { miny = y0; }
-        if ((regionIdx == 0) || (y1 > maxy)) { maxy = y1; }
-    }
-
-#if 0
-    if (minLon > minx*regionPolygonResolution) {
-        minx = (int) floor(minLon / regionPolygonResolution);
-    }
-    if (maxLon < maxx*regionPolygonResolution) {
-        maxx = (int) floor(maxLon / regionPolygonResolution) + 1;
-    }
-    if (minLat > minx*regionPolygonResolution) {
-        miny = (int) floor(minLat / regionPolygonResolution);
-    }
-    if (maxLat < maxx*regionPolygonResolution) {
-        maxy = (int) floor(maxLat / regionPolygonResolution) + 1;
-    }
-#endif
+	int minx = (int) floor(minLon / regionPolygonResolution);
+	int maxx = (int) floor(maxLon / regionPolygonResolution) + 1;
+	int miny = (int) floor(minLat / regionPolygonResolution);
+	int maxy = (int) floor(maxLat / regionPolygonResolution) + 1;
 
     minLonDeg = minx*regionPolygonResolution;
     minLatDeg = miny*regionPolygonResolution;
