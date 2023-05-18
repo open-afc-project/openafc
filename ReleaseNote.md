@@ -1,6 +1,66 @@
  # Release Note
 
 ## **Version and Date**
+|Version|**OA-564*|
+| :- | :- |
+|**Date**|**05/18/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-564: RLAN with a directional antenna
+ * Jira OA-659: Add Country Boundary for Brazil
+ * Jira OA-681: Add Brazilian Propagation Model to AFC Engine
+ * Jira OA-638: Add Brazil Region in AFC Config and AFC Engine
+ * Jira OA-669: Use Population Density Threshold along with Amazon Rainforest polygon
+ * Jira OA-679: Fix the Bug in setting CertificationId in Virtual AP's GUI
+ * Jira OA-639: Integrate 1-arcsec SRTM terrain database
+
+## **Interface Changes**
+ * OA-638: In AFC Config, there is a BR (Brazil) region with a new 'Brazilian Propagation Model.'
+ * In the Access Point and Virtual AP, there is a BRAZIL RULESETID.
+ * In Administrator, there's a BR field for Allowed Frequency Range to specify for Brazil.
+ * Added "srtmDir":"rat_transfer/srtm3arcsecondv003" in US and Canada AFC Config and "srtmDir":"rat_transfer/srtm1arcsecond_wgs84" in Brazil AFC Config.
+ * Note that if "srtmDir" is not specified, it would point to srtm3arcsecond by default.
+ * Added "depDir":"rat_transfer/3dep/1_arcsec" in US AFC Config and "depDir":"rat_transfer/3dep/1_arcsec_wgs84" in Canada AFC Config.
+ * Removed "LiDAR" and "B-Design3D" from Building data Source options for Brazil and Canada since they are for US only.
+
+ * OA-564: In Virtual AP, there is an ability to add Vendor Extension. This is needed to enter the requried parameters for point-to-point AP.
+ * When adding a vendor extension, the parameter field is a copy/paste box so one can open it up if there are a lot of parameters.  
+ * It is persnickety about the format so would need to have the "{" and "}" around the entire properties list, put double quotes around the property name, put commas between the parameters, and put double quotes around text values.
+ * If there is a problem, it does give the parsing error but it's not always clear what the difficulty is from the error.
+ * Note that this is temporary solution to specify the point-to-point AP parameters through Vendor Extension and in a near-future, this will be added to the WFA SDI.
+ * In the Vendor Extension for point-to-point, the following parameters need to be specified:
+ * "type": "rlanAntenna", "antennaModel": "xyz", "azimuthPointing": -45.0, "elevationPointing": 25.0, "numAOB": 181, "discriminationGainDB": []
+ * where the AP pointing direction is specified by the azimuth/elevationPointing parameters. 
+ * The antenna pattern is specified as discriminatioGainDB versus angle-off-boresight (AOB) that goes from 0 to 180 degrees.
+ * The spacing of the AOB specified is assumed to be constant and based on numAOB. For example, for 1-deg spacing, numAOB is set to 181 and for 0.1 deg spacing, numAOB is set to 1810.
+ * The discriminationGainDB is an array that contains numAOB values which are zero or negative numbers. 
+
+ * OA-659: The brazil country boundary (BR.kml) (attached to the jira ticket) is placed at /mnt/nfs/rat_transfer/population/ where the other .kml boundary files are.
+
+ * OA-669: The Amazon Rainforest Polygon (attached to the jira ticket) must be placed at /mnt/nfs/rat_transfer/population/Brazil_AmazonRainForest.kml
+ * For BR AFC Config, add "rainForestFile": "rat_transfer/population/Brazil_AmazonRainForest.kml" 
+
+ * OA-639: instructions for downloading the 1arcsec srtm will be provided in github.
+
+## **Testing Done**
+ * OA-638: Confirmed that the AFC Config is configured correctly for Brazil (and by default) and the .json has the correct parameters.
+ * OA-659: Confirmed that for a Brazil Access point, an AP in US will be rejected based on the BR.kml country boundary.
+ * OA-681: Confirmed in the UserInputs file that the Brazilian Propagation Model is mapped to the FCC 6GHz Report & Order for now (as currently, we're using the same model).
+ * OA-564: Confirmed in generated AP request message that the Vendor extension for Point-to-Point AP was added successfully in Virtual AP UI.
+ * There are 3 new fields in exc_thr.csv: RLAN_ANTENNA_MODEL, RLAN_ANGLE_OFF_BORESIGHT (deg), RLAN_DISCRIMINATION_GAIN (dB)
+ * Confirmed in exc_thr file that the I/N level and the EIRP limits are computed correctly based on the RLAN pointing direction and its antenna pattern.
+ * Confirmed from exc_thr file and the position of RLAN scan point vs. FS Rx in results.kml that the RLAN to FS AOB is computed correctly.
+ * OA-679: Confirmed in GUI that the issue is resovled.
+ * Confirmed in afc_config.json that the depDir and srtmDir are present per above for US/CA/BR AFC Configs.
+ * Confirmed in engine log that the correct srtm was used for Brazil and the correct 3dep was used for US.
+ * OA-669: Ran 2 tests: One with AP inside amazon rainforest and confirmed that tropical rainforest P.452 clutter loss was used correctly.
+ * Second test had AP outside amazon rainforest and AP was assigned to Urban correctly. Tests attached to the ticket.
+
+## **Open Issues** 
+ * 
+
+## **Version and Date**
 |Version|**OA-678*|
 | :- | :- |
 |**Date**|**05/17/2023**|
