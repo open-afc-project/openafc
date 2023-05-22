@@ -1,5 +1,5 @@
 #
-# Copyright © 2022 Broadcom. All rights reserved. The term "Broadcom"
+# Copyright (C) 2022 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
@@ -14,41 +14,51 @@ TEST_VEC_CLM = 3
 TEST_CAT_CLM = 4
 VERSION_CLM = 9
 REQ_ID_CLM = 10
+
 SER_NBR_CLM = 11
-RULESET_CLM = 13
-ID_CLM = 14
-ELLIPSE_LONGITUDE_CLM = 15
-ELLIPSE_LATITUDE_CLM = 16
-ELLIPSE_MAJORAXIS_CLM = 17
-ELLIPSE_MINORAXIS_CLM = 18
-ELLIPSE_ORIENTATION_CLM = 19
-L_POLYGON_LONGITUDE_CLM = 20 
-L_POLYGON_LATITUDE_CLM = 21
-R_POLYGON_CENTER_LONG_CLM = 50
-R_POLYGON_CENTER_LAT_CLM  = 51
-R_POLYGON_LENGTH_CLM = 52
-R_POLYGON_ANGLE_CLM = 53
-HEIGHT = 82
-HEIGHTTYPE = 83
-VERTICALUNCERTAINTY = 84
-INDOORDEPLOYMENT = 85
-LOWFREQUENCY_86 = 86
-HIGHFREQUENCY_87 = 87
-LOWFREQUENCY_88 = 88
-HIGHFREQUENCY_89 = 89
-GLOBALOPERATINGCLASS_90 = 90
-CHANNEL_CFI_91 = 91
-GLOBALOPERATINGCLASS_92 = 92
-CHANNEL_CFI_93 = 93
-GLOBALOPERATINGCLASS_94 = 94
-CHANNEL_CFI_95 = 95
-GLOBALOPERATINGCLASS_96 = 96
-CHANNEL_CFI_97 = 97
-GLOBALOPERATINGCLASS_98 = 98
-CHANNEL_CFI_99 = 99
-MINDESIREDPOWER = 100
-VENDOREXTS = 101
-COMBINED_CLM = 103
+RULESET_CLM = 12
+ID_CLM = 13
+
+ELLIPSE_LONGITUDE_CLM = 14
+ELLIPSE_LATITUDE_CLM = 15
+ELLIPSE_MAJORAXIS_CLM = 16
+ELLIPSE_MINORAXIS_CLM = 17
+ELLIPSE_ORIENTATION_CLM = 18
+
+L_POLYGON_LONGITUDE_CLM = 19
+L_POLYGON_LATITUDE_CLM = 20
+
+R_POLYGON_CENTER_LONG_CLM = 49
+R_POLYGON_CENTER_LAT_CLM  = 50
+R_POLYGON_LENGTH_CLM = 51
+R_POLYGON_ANGLE_CLM = 52
+
+ELE_HEIGHT = 81
+ELE_HEIGHTTYPE = 82
+ELE_VERTICALUNCERTAINTY = 83
+
+INDOORDEPLOYMENT = 84
+
+INQ_FREQ_RNG_LOWFREQ_A = 85
+INQ_FREQ_RNG_HIGHFREQ_A = 86
+INQ_FREQ_RNG_LOWFREQ_B = 87
+INQ_FREQ_RNG_HIGHFREQ_B = 88
+
+GLOBALOPERATINGCLASS_131 = 89
+CHANNEL_CFI_131 = 90
+GLOBALOPERATINGCLASS_132 = 91
+CHANNEL_CFI_132 = 92
+GLOBALOPERATINGCLASS_133 = 93
+CHANNEL_CFI_133 = 94
+GLOBALOPERATINGCLASS_134 = 95
+CHANNEL_CFI_134 = 96
+GLOBALOPERATINGCLASS_136 = 97
+CHANNEL_CFI_136 = 98
+
+MINDESIREDPOWER = 99
+VENDOREXTS = 100
+STANDALONE_VENDOREXTS = 101
+COMBINED_CLM = 102
 
 REQ_INQUIRY_HEADER = '{"availableSpectrumInquiryRequests": ['
 REQ_INQUIRY_FOOTER = '],'
@@ -58,15 +68,13 @@ REQ_INQ_CHA_FOOTER = '],'
 REQ_INQ_CHA_GL_OPER_CLS = '"globalOperatingClass": '
 REQ_INQ_CHA_CHANCFI = '"channelCfi": '
 
-REQ_DEV_DESC_HEADER = '"deviceDescriptor": {'
-REQ_DEV_DESC_FOOTER = '},'
+REQ_DEV_DESC_HEADER = '"deviceDescriptor": '
+REQ_DEV_DESC_FOOTER = '}'
 REQ_SER_NBR = '"serialNumber": ' 
 REQ_CERT_ID_HEADER = '"certificationId": [{'
 REQ_CERT_ID_FOOTER = '}]'
 REQ_RULESET = '"rulesetId": '
-
-#REQ_NRA = '"nra": '
-REQ_ID = '"id": '
+REQ_CERT_ID = '"id": '
 
 REQ_REQUEST_ID = '"requestId": '
 REQ_VENDOR_EXT = '"vendorExtensions": [],'
@@ -305,6 +313,18 @@ class AfcGeoCoordinates:
                   REQ_LOC_R_POLYGON_FOOTER
         return res
 
+
+def build_device_desc(ser_nbr, ruleset_id, cert_id):
+    _ser_nbr = ""
+    _cert_id = ""
+    if isinstance(ser_nbr, str):
+        _ser_nbr = str(ser_nbr)
+    if isinstance(cert_id, str):
+        _cert_id = str(cert_id)
+    return '{' + REQ_SER_NBR + '"' + _ser_nbr + '",' +\
+           REQ_CERT_ID_HEADER + REQ_RULESET + '"' + str(ruleset_id) + '",' +\
+           REQ_CERT_ID + '"' + _cert_id + '"' + REQ_CERT_ID_FOOTER +\
+           REQ_DEV_DESC_FOOTER
 
 # Local Variables:
 # mode: Python

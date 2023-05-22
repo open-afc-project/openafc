@@ -206,6 +206,14 @@ Following sequence creates files at path "`pwd`/data/wfa_test".
 ```
 docker run --rm -v `pwd`/data:/data test --cmd dump_db --table wfa --outpath /data
 ```
+There is a way to export device descriptors from WFA excel file into JSON format file.
+```
+afc_tests.py --cmd parse_tests --dev_desc --infile <input file> --outfile <output file>
+```
+Next step, to import those device descriptors into test DB.
+```
+afc_tests.py --cmd inp_devs --infile abc.txt
+```
 
 ## Compare AFC config records
 
@@ -290,10 +298,7 @@ mv ./afc_input.sqlite3 ./afc_input.sqlite3_backup
 ```
 Open a new file and create tables in it.
 ```
-sqlite3 ./afc_input.sqlite3
-
-.read dump.sql
-.quit
+sqlite3 ./afc_input.sqlite3 .dump > dump.sql
 
 ```
 At this stage there is a fixed DB that can be used.

@@ -1,7 +1,7 @@
 #
 # This Python file uses the following encoding: utf-8
 #
-# Portions copyright © 2021 Broadcom.
+# Portions copyright (C) 2021 Broadcom.
 # All rights reserved. The term “Broadcom” refers solely
 # to the Broadcom Inc. corporate affiliate that owns the software below.
 # This work is licensed under the OpenAFC Project License, a copy of which
@@ -1232,7 +1232,8 @@ class ConfigAdd(Command):
                     serial_id = json_lookup('serialNumber', ap_rcrd, None)
                     cert_id = json_lookup('certificationId', ap_rcrd, None)
                     for i in range(len(serial_id)):
-                        cert_str = cert_id[i][0]['nra'] + ' ' + cert_id[i][0]['id']
+                        cert_str = cert_id[i][0]['rulesetId'] + ' ' +\
+                                        cert_id[i][0]['id']
                         email = username[0]
                         if '@' in email:
                             org = email[email.index('@') + 1:]
