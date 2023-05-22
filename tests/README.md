@@ -5,7 +5,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 
 ## Table of Contents
 - [**Introduction**](#introduction)
-- [**Description**](#introduction)
+- [**Description**](#description)
 - [**Basic functionality**](#basic-functionality)
   - [Testing sequence](#testing-sequence)
   - [Set AFC Server configuration](#set-afc-server-configuration)
@@ -24,10 +24,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Reacquisition response records for exist requests](#reacquisition-response-records-for-exist-requests)
   - [How to run HTTPs access test](#how-to-run-https-access-test)
 - [**Testing setup**](#testing-setup)
-- [**Change testing database manually**](#change-testing-database-manually*)
-
-- [Back to main readme](/README.md)
-<br /><br />
+- [**Change testing database manually**](#change-testing-database-manually)
 
 # **Introduction**
 
@@ -283,12 +280,7 @@ The procedure requires to drop the DB into a SQL file, edit if needed and create
 
 Open the DB and dump to a SQL file.
 ```
-sqlite3 afc_input.sqlite3
-
-.output dump.sql
-.dump
-.quit
-
+sqlite3 ./afc_input.sqlite3 .dump > dump.sql
 ```
 Open and edit dump.sql with any editor as it is a text file with not complicated SQL code.
 
@@ -298,7 +290,9 @@ mv ./afc_input.sqlite3 ./afc_input.sqlite3_backup
 ```
 Open a new file and create tables in it.
 ```
-sqlite3 ./afc_input.sqlite3 .dump > dump.sql
+sqlite3 ./afc_input.sqlite3
+.read dump.sql
+.quit
 
 ```
 At this stage there is a fixed DB that can be used.
