@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# Copyright © 2021 Broadcom. All rights reserved. The term "Broadcom"
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
@@ -13,23 +13,6 @@ The execution always done in specific order: configuration, database, testing.
 In case there are not available valid responses to compare with
 need to make acquisition and create new database as following.
     ./afc_tests.py --addr <address> --log debug --cmd run
-
-EXAMPLES
-
-1. Provide test file with new requests to add into DB
-    ./afc_tests.py --addr 1.2.3.4 --cmd add_reqs --infile test_vector.txt
-
-2. Configure adrress and run all tests
-    ./afc_tests.py --addr 1.2.3.4 --cmd run
-
-3. Configure adrress and log level, run tests based on row index
-    ./afc_tests.py --testcase_indexes 2 --addr 1.2.3.4 --cmd run --log debug
-    
-4. Configure adrress and log level, run tests based on test case ID
-    ./afc_tests.py --testcase_ids AFCS.IBP.5,AFCS.FSP.18 --addr 1.2.3.4 --cmd run --log debug
-
-5. Refresh responses by reacquisition tests from the DB
-    ./afc_tests.py --addr 1.2.3.4 --cmd reacq
 """
 
 import argparse
@@ -659,7 +642,7 @@ def get_db_req_resp(cfg):
     return db_reqs_list, db_resp_list
 
 
-def ins_reqs(cfg):
+def insert_reqs(cfg):
     """
     Insert requests from input file to a table in test db.
     Drop previous table of requests.
@@ -720,6 +703,57 @@ def ins_reqs(cfg):
                         (metadata_json[TESTCASE_ID], 
                         json.dumps(request_json),))
             con.commit()
+    con.close()
+    return AFC_OK
+
+
+def insert_devs(cfg):
+    """
+    Insert device descriptors from input file to a table in test db.
+    Drop previous table of devices.
+    """
+    app_log.debug(f"{inspect.stack()[0][3]}()")
+
+    if isinstance(cfg['infile'], type(None)):
+        app_log.error(f"Missing input file")
+        return AFC_ERR
+
+    filename = cfg['infile'][0]
+    app_log.debug(f"{inspect.stack()[0][3]}() {filename}")
+
+    if not os.path.isfile(filename):
+        app_log.error(f"Missing raw test data file {filename}")
+        return AFC_ERR
+
+    if not os.path.isfile(cfg['db_filename']):
+        app_log.error(f"Unable to find test db file.")
+        return AFC_ERR
+
+    con = sqlite3.connect(cfg['db_filename'])
+    # drop existing table of requests and create new one
+    app_log.info(f"Drop table of devices ({TBL_AP_CFG_NAME})")
+    cur = con.cursor()
+    try:
+        cur.execute('DROP TABLE ' + TBL_AP_CFG_NAME)
+    except Exception as OperationalError:
+        app_log.debug(f"Fail to drop, missing table {TBL_AP_CFG_NAME}")
+    cur.execute('CREATE TABLE ' + TBL_AP_CFG_NAME +
+        ' (ap_config_id, data json, user_id)')
+    cnt = 1
+    con.commit()
+    with open(filename, 'r') as fp_test:
+        while True:
+            dataline = fp_test.readline()
+            if not dataline or (len(dataline) < 72):
+                break
+
+            # process dataline arguments
+            app_log.debug(f"= {dataline}")
+
+            cur.execute('INSERT INTO ' + TBL_AP_CFG_NAME + ' VALUES ( ?, ?, ?)',
+                        (cnt, dataline[:-1], 1))
+            con.commit()
+            cnt += 1
     con.close()
     return AFC_OK
 
@@ -909,37 +943,31 @@ def export_admin_config(cfg):
 
     con = sqlite3.connect(cfg['db_filename'])
     cur = con.cursor()
-    cur.execute('SELECT COUNT(*) FROM ' + TBL_USERS_NAME)
+    cur.execute('SELECT COUNT(*) FROM ' + TBL_AP_CFG_NAME)
     found_rcds = cur.fetchall()
     with open(cfg['outfile'][0], 'w') as fp_exp:
-        for i in range(1, found_rcds[0][0] + 1):
-            query = 'SELECT * FROM ' + TBL_USERS_NAME + ' WHERE '\
-                    'user_id=\"' + str(i) + "\""
-            cur.execute(query)
-            found_user = cur.fetchall()
+        cur.execute('SELECT * FROM %s' % TBL_AFC_CFG_NAME)
+        found_cfg = cur.fetchall()
+        app_log.debug('Found AfcCfg: %s', found_cfg)
 
-            query = 'SELECT * FROM ' + TBL_AFC_CFG_NAME + ' WHERE '\
-                    'user_id=\"' + str(i) + "\""
-            cur.execute(query)
-            found_cfg = cur.fetchall()
+        cur.execute('SELECT * FROM %s\n' % TBL_USERS_NAME)
+        found_user = cur.fetchall()
+        app_log.debug('Found Users: %s\n', found_user)
 
-            query = 'SELECT * FROM ' + TBL_AP_CFG_NAME + ' WHERE '\
-                    'user_id=\"' + str(i) + "\""
-            cur.execute(query)
-            found_aps = cur.fetchall()
+        cur.execute('SELECT * FROM %s\n' % TBL_AP_CFG_NAME)
+        found_aps = cur.fetchall()
+        con.close()
 
-            aps = ''
-            for val in enumerate(found_aps):
-                aps += val[1][1]
-                if val[1][0] != found_aps[-1][0]:
-                    aps += ','
-            out_str = '{"afcAdminConfig":' + found_cfg[0][1] + ', '\
-                      '"userConfig":' + found_user[0][1] + ', '\
-                      '"apConfig":[' + aps + ']}'
-            if i != range(found_rcds[0][0]):
-                out_str += '\n'
-            fp_exp.write(out_str)
-    con.close()
+        aps = ''
+        idx = 0
+        for count, val in enumerate(found_aps):
+            aps += str(val[1]) + ','
+        app_log.debug('Found APs: %s\n', aps[:-1])
+
+        out_str = '{"afcAdminConfig":' + found_cfg[0][1] + ', '\
+                  '"userConfig":' + found_user[0][1] + ', '\
+                  '"apConfig":[' + aps[:-1] + ']}'
+        fp_exp.write(out_str)
     app_log.info('Server admin config exported to %s', cfg['outfile'][0])
     return AFC_OK
 
@@ -1056,45 +1084,37 @@ def collect_tests2combine(sh, rows, t_ident, t2cmb, cmb_t):
                     cmb_t[test_case_id] += [t]
 
 
-def parse_tests(cfg):
+def _parse_tests_dev_desc(sheet, fp_new, rows):
     app_log.debug('%s()\n', inspect.stack()[0][3])
-    filename = ''
-    out_fname = ''
+    for i in range(1, rows + 1):
+        res_str = ""
+        cell = sheet.cell(row = i, column = PURPOSE_CLM)
+        if ((cell.value is None) or
+            (AFC_TEST_IDENT.get(cell.value.lower()) is None) or
+            (cell.value == 'SRI')):
+            continue
 
-    if isinstance(cfg['infile'], type(None)):
-        app_log.error('Missing input file')
-        return AFC_ERR
+        # skip combined test vectors because device descriptor is missing
+        cell = sheet.cell(row = i, column = COMBINED_CLM)
+        if cell.value is not None and \
+            cell.value.upper() != 'NO':
+            continue
 
-    filename = cfg['infile'][0]
+        res_str += build_device_desc(
+                            sheet.cell(row = i, column = SER_NBR_CLM).value,
+                            sheet.cell(row = i, column = RULESET_CLM).value,
+                            sheet.cell(row = i, column = ID_CLM).value)
+        fp_new.write(res_str+'\n')
+    return res_str
 
-    if not os.path.isfile(filename):
-        app_log.error('Missing raw test data file %s', filename)
-        return AFC_ERR
 
-    test_ident = cfg['test_id']
-
-    if isinstance(cfg['outfile'], type(None)):
-        out_fname = test_ident + NEW_AFC_TEST_SUFX
-    else:
-        out_fname = cfg['outfile'][0]
-
-    wb = oxl.load_workbook(filename, data_only=True)
-
-    for sh in wb:
-        app_log.debug('Sheet title: %s', sh.title)
-        app_log.debug('rows %d, cols %d\n', sh.max_row, sh.max_column)
-
-    app_log.info('Export tests into file: %s', out_fname)
-    fp_new = open(out_fname, 'w')
-    sheet = wb.active
-    nbr_rows = sheet.max_row
-    app_log.debug('Rows range 1 - %d', nbr_rows + 1)
-
+def _parse_tests_all(sheet, fp_new, rows, test_ident):
+    app_log.debug('%s()\n', inspect.stack()[0][3])
     # collect tests to combine in next loop
     tests2combine = dict()
     # gather combined tests
     combined_tests = dict()
-    collect_tests2combine(sheet, nbr_rows, test_ident,
+    collect_tests2combine(sheet, rows, test_ident,
                           tests2combine,
                           combined_tests)
     if len(combined_tests):
@@ -1102,8 +1122,7 @@ def parse_tests(cfg):
                       ' '.join(combined_tests))
         app_log.info('Found test vectors to combine: %s',
                       ' '.join(tests2combine))
-
-    for i in range(1, nbr_rows + 1):
+    for i in range(1, rows + 1):
         cell = sheet.cell(row = i, column = PURPOSE_CLM)
         if ((cell.value is None) or
             (AFC_TEST_IDENT.get(cell.value.lower()) is None) or
@@ -1113,14 +1132,11 @@ def parse_tests(cfg):
         if (test_ident != 'all') and (cell.value.lower() != test_ident):
             continue
 
-        app_log.debug('Value: %s', cell.value)
         uut = sheet.cell(row = i, column = UNIT_NAME_CLM).value
         purpose = sheet.cell(row = i, column = PURPOSE_CLM).value
         test_vec = sheet.cell(row = i, column = TEST_VEC_CLM).value
 
         test_case_id = uut + "." + purpose + "." + str(test_vec)
-
-        ver = sheet.cell(row = i, column = VERSION_CLM).value
 
         # Prepare request header '{"availableSpectrumInquiryRequests": [{'
         res_str = REQ_INQUIRY_HEADER
@@ -1128,83 +1144,81 @@ def parse_tests(cfg):
         cell = sheet.cell(row = i, column = COMBINED_CLM)
         if cell.value is not None and \
             cell.value.upper() != 'NO':
-            app_log.debug('Value1: %s', cell.value)
             for item in combined_tests[test_case_id]:
                 res_str += tests2combine[item] + ','
             res_str = res_str[:-1]
         else:
+            #
+            # Inquired Channels
+            #
             res_str += '{' + REQ_INQ_CHA_HEADER
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_90)
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_131)
             res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) 
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_91)
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_131)
             if cell.value is not None:
                 res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
             res_str += '}, '
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_92)
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_132)
             res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_93)
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_132)
             if cell.value is not None:
                 res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
             res_str += '}, '
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_94)
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_133)
             res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_95)
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_133)
             if cell.value is not None:
                 res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
             res_str += '}, '
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_96)
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_134)
             res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_97)
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_134)
             if cell.value is not None:
                 res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
             res_str += '}, '
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_98)
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_136)
             res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_99)
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_136)
             if cell.value is not None:
                 res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
             res_str += '}' + REQ_INQ_CHA_FOOTER + ' '
-
+            #
+            # Device descriptor
+            #
             res_str += REQ_DEV_DESC_HEADER
-            cell = sheet.cell(row = i, column = SER_NBR_CLM)
-            if isinstance(cell.value, str):
-                serial_id = cell.value
-            else:
-                serial_id = ""
-            res_str += REQ_SER_NBR + '"' + serial_id + '",' + REQ_CERT_ID_HEADER
-            cell = sheet.cell(row = i, column = RULESET_CLM)
-            res_str += REQ_RULESET + '"' + str(cell.value) + '",'
-
-            cell = sheet.cell(row = i, column = ID_CLM)
-            if isinstance(cell.value, str):
-                cert_id = cell.value
-            else:
-                cert_id = ""
-            res_str += REQ_ID + '"' + cert_id + '"' + REQ_CERT_ID_FOOTER
-            res_str += REQ_DEV_DESC_FOOTER + REQ_INQ_FREQ_RANG_HEADER
-
+            res_str += build_device_desc(
+                                sheet.cell(row = i, column = SER_NBR_CLM).value,
+                                sheet.cell(row = i, column = RULESET_CLM).value,
+                                sheet.cell(row = i, column = ID_CLM).value)
+            res_str += ','
+            #
+            # Inquired Frequency Range
+            #
+            res_str += REQ_INQ_FREQ_RANG_HEADER
             freq_range = AfcFreqRange()
-            freq_range.set_range_limit(sheet.cell(row = i, column = LOWFREQUENCY_86), 'low')
-            freq_range.set_range_limit(sheet.cell(row = i, column = HIGHFREQUENCY_87), 'high')
+            freq_range.set_range_limit(sheet.cell(row = i,
+                column = INQ_FREQ_RNG_LOWFREQ_A), 'low')
+            freq_range.set_range_limit(sheet.cell(row = i,
+                column = INQ_FREQ_RNG_HIGHFREQ_A), 'high')
             try:
                 res_str += freq_range.append_range()
             except IncompleteFreqRange as e:
                 app_log.debug(f"{e} -  row {i}")
             freq_range = AfcFreqRange()
-            freq_range.set_range_limit(sheet.cell(row = i, column = LOWFREQUENCY_88), 'low')
-            freq_range.set_range_limit(sheet.cell(row = i, column = HIGHFREQUENCY_89), 'high')
+            freq_range.set_range_limit(sheet.cell(row = i,
+                column = INQ_FREQ_RNG_LOWFREQ_B), 'low')
+            freq_range.set_range_limit(sheet.cell(row = i,
+                column = INQ_FREQ_RNG_HIGHFREQ_B), 'high')
             try:
                 tmp_str = freq_range.append_range()
                 res_str += ', ' + tmp_str
             except IncompleteFreqRange as e:
                 app_log.debug(f"{e} -  row {i}")
-
             res_str += REQ_INQ_FREQ_RANG_FOOTER
 
             cell = sheet.cell(row = i, column = MINDESIREDPOWER)
             if (cell.value):
                 res_str += REQ_MIN_DESIRD_PWR + str(cell.value) + ', '
-
             #
             # Location
             #
@@ -1214,12 +1228,12 @@ def parse_tests(cfg):
 
             # Location - elevation
             res_str += REQ_LOC_ELEV_HEADER
-            cell = sheet.cell(row = i, column = VERTICALUNCERTAINTY)
+            cell = sheet.cell(row = i, column = ELE_VERTICALUNCERTAINTY)
             if isinstance(cell.value, int):
                 res_str += REQ_LOC_VERT_UNCERT + str(cell.value) + ', '
-            cell = sheet.cell(row = i, column = HEIGHTTYPE)
+            cell = sheet.cell(row = i, column = ELE_HEIGHTTYPE)
             res_str += REQ_LOC_HEIGHT_TYPE + '"' + str(cell.value) + '"'
-            cell = sheet.cell(row = i, column = HEIGHT)
+            cell = sheet.cell(row = i, column = ELE_HEIGHT)
             if isinstance(cell.value, int) or isinstance(cell.value, float):
                 res_str += ', ' + REQ_LOC_HEIGHT + str(cell.value)
             res_str += '}, '
@@ -1259,8 +1273,51 @@ def parse_tests(cfg):
         res_str += META_HEADER
         res_str += META_TESTCASE_ID + '"' + test_case_id + '"'
         res_str += META_FOOTER
-
         fp_new.write(res_str+'\n')
+    return AFC_OK
+
+
+def parse_tests(cfg):
+    app_log.debug('%s()\n', inspect.stack()[0][3])
+    filename = ''
+    out_fname = ''
+
+    if isinstance(cfg['infile'], type(None)):
+        app_log.error('Missing input file')
+        return AFC_ERR
+
+    filename = cfg['infile'][0]
+
+    if not os.path.isfile(filename):
+        app_log.error('Missing raw test data file %s', filename)
+        return AFC_ERR
+
+    test_ident = cfg['test_id']
+
+    if isinstance(cfg['outfile'], type(None)):
+        out_fname = test_ident + NEW_AFC_TEST_SUFX
+    else:
+        out_fname = cfg['outfile'][0]
+
+    wb = oxl.load_workbook(filename, data_only=True)
+
+    for sh in wb:
+        app_log.debug('Sheet title: %s', sh.title)
+        app_log.debug('rows %d, cols %d\n', sh.max_row, sh.max_column)
+
+    sheet = wb.active
+    nbr_rows = sheet.max_row
+    app_log.debug('Rows range 1 - %d', nbr_rows + 1)
+    app_log.info('Export tests into file: %s', out_fname)
+    fp_new = open(out_fname, 'w')
+
+    # partial parse if only certain parameters required.
+    # only for device descriptor for now.
+    if cfg['dev_desc'] == True:
+        res_str = _parse_tests_dev_desc(sheet, fp_new, nbr_rows)
+        fp_new.write(res_str+'\n')
+    else:
+        _parse_tests_all(sheet, fp_new, nbr_rows, test_ident)
 
     fp_new.close()
     return AFC_OK
@@ -1323,6 +1380,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
             continue
 
         request_data = reqs[test_case][0]
+        app_log.debug(f"{inspect.stack()[0][3]}() {request_data}")
 
         before_ts = time.monotonic()
         resp = _send_recv(cfg, json.dumps(request_data))
@@ -1618,7 +1676,8 @@ def parse_run_cert_args(cfg):
 # available commands to execute in alphabetical order
 execution_map = {
     'add_reqs' : [add_reqs, parse_run_test_args],
-    'ins_reqs' : [ins_reqs, parse_run_test_args],
+    'ins_reqs' : [insert_reqs, parse_run_test_args],
+    'ins_devs' : [insert_devs, parse_run_test_args],
     'cmp_cfg' : [compare_afc_config, parse_run_test_args],
     'dry_run' : [dry_run_test, parse_run_test_args],
     'dump_db': [dump_database, parse_run_test_args],
@@ -1713,6 +1772,8 @@ def make_arg_parser():
                          help="<filename> - set client certificate filename.\n")
     args_parser.add_argument('--cli_key', nargs=1, type=str,
                          help="<filename> - set client private key filename.\n")
+    args_parser.add_argument('--dev_desc', action='store_true',
+                         help="parse only device descriptors values.\n")
 
     args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?',
         help="run - run test from DB and compare.\n"
@@ -1720,7 +1781,9 @@ def make_arg_parser():
         "exp_adm_cfg - export admin config into a file.\n"
         "add_reqs - run test from provided file and insert with response into "
         "the databsse.\n"
-        "ins_reqs - insert tests from provided file into the databsse.\n"
+        "ins_reqs - insert test vectors from provided file into the test db.\n"
+        "ins_devs - insert device descriptors from provided file "
+        "into the test db.\n"
         "dump_db - dump tables from the database.\n"
         "get_nbr_testcases - return number of testcases.\n"
         "parse_tests - parse WFA provided tests into a files.\n"
