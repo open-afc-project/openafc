@@ -39,7 +39,7 @@ LOGGER = logging.getLogger(__name__)
 module = flask.Blueprint('ratapi-v1', 'ratapi')
 
 def regions():
-    return ['US', 'CA', 'TEST_US', 'DEMO_US']
+    return ['US', 'CA', 'TEST_US', 'DEMO_US', 'BR']
 
 def rulesets():
     return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06']
@@ -57,7 +57,8 @@ def regionStrToNra(region_str):
        'US':'FCC',
        'CA':'ISED',
        'TEST_US':'TEST_FCC',
-       'DEMO_US':'DEMO_FCC'
+       'DEMO_US':'DEMO_FCC',
+       'BR':'BRAZIL_NRA'
     }
     region_str = region_str.upper()
     try:
@@ -71,6 +72,7 @@ def nraToRegionStr(nra):
         'TEST_FCC':'TEST_US',
         'ISED':'CA',
         'DEMO_FCC':'DEMO_US',
+        'BRAZIL_NRA':'BR'
     }
     nra = nra.upper()
     try:
@@ -87,10 +89,11 @@ def regionStrToRulesetId(region_str):
     """
     map = {
        'DEFAULT':'US_47_CFR_PART_15_SUBPART_E',
-       'US':'"US_47_CFR_PART_15_SUBPART_E"',
+       'US':'US_47_CFR_PART_15_SUBPART_E',
        'CA':'CA_RES_DBS-06',
        'TEST_US':'TEST_FCC',
-       'DEMO_US':'DEMO_FCC'
+       'DEMO_US':'DEMO_FCC',
+       'BR':'BRAZIL_RULESETID'
     }
     region_str = region_str.upper()
     try:
@@ -104,6 +107,7 @@ def rulesetIdToRegionStr(rulesetId):
         'TEST_FCC':'TEST_US',
         'CA_RES_DBS-06':'CA',
         'DEMO_FCC':'DEMO_US',
+        'BRAZIL_RULESETID':'BR'
     }
     rulesetId = rulesetId.upper()
     try:

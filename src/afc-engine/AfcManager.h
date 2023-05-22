@@ -344,8 +344,7 @@ class AfcManager
 
 		QString _inputULSDatabaseStr;           // ULS Database being used
 
-		QString _propagationEnviro;             // Propagation environment (e.g. Population Density Map)
-
+		CConst::PropEnvMethodEnum _propEnvMethod; // Method for determining propagation environment (e.g. Population Density Map)
 
 		double _rxFeederLossDBIDU;                // User-inputted ULS receiver feeder loss for IDU Architecture
 		double _rxFeederLossDBODU;                // User-inputted ULS receiver feeder loss for ODU Architecture
@@ -451,6 +450,8 @@ class AfcManager
 		std::string _regionPolygonFileList;     // Comma separated list of KML files, one for each region in simulation
 		std::vector<PolygonClass *> _regionPolygonList; // Polygon list, multiple polygons for each region
 		double _regionPolygonResolution;   // Resolution to use for polygon vertices, 1.0e-5 corresp to 1.11m, should not have to change
+		std::string _rainForestFile;            // KML file contining rain forest polygon
+		PolygonClass *_rainForestPolygon;       // Polygon that defines rain forest region
 		std::string _nlcdFile;                  // GDAL file contining NLCD data
 		std::string _radioClimateFile;           // ITU radio climate data
 		std::string _surfRefracFile;             // ITU surface refractivity data

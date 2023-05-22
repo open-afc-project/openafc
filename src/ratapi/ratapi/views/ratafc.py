@@ -44,7 +44,7 @@ import traceback
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
 
-RULESETS = ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'TEST_FCC','DEMO_FCC']
+RULESETS = ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'TEST_FCC','DEMO_FCC', "BRAZIL_RULESETID"]
 
 #: All views under this API blueprint
 module = flask.Blueprint('ap-afc', 'ap-afc')

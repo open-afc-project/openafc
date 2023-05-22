@@ -151,6 +151,16 @@ export class AFCFormUSACanada extends React.Component<
             if (x.kind === "FCC 6GHz Report & Order" && x.buildingSource === "None") {
                 delete x.win2ConfidenceNLOS;
             }
+            if (x.kind === "Brazilian Propagation Model" && x.buildingSource === "B-Design3D") {
+                delete x.win2ConfidenceLOS;
+                delete x.win2ConfidenceNLOS;
+            }
+ 
+            if (x.kind === "Brazilian Propagation Model" && x.buildingSource === "None") {
+                delete x.win2ConfidenceNLOS;
+            }
+
+
 
             conf.propagationModel = x;
             this.props.updateConfig(conf);
@@ -226,6 +236,10 @@ export class AFCFormUSACanada extends React.Component<
             return <>
                 <FormSelectOption key="2020 Land Cover " value="rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif" label="Land Cover of Canada" />
             </>
+        } else if (this.props.config.regionStr == "BR") {
+            return <>
+                <FormSelectOption key="Brazilian Land Cover" value="rat_transfer/nlcd/br/landcover-for-brazil.tbd.tif" label="Land Cover of Brazil (TBD)" />
+            </>
         }
     }
 
@@ -233,6 +247,8 @@ export class AFCFormUSACanada extends React.Component<
         switch (this.props.config.regionStr) {
             case "CA":
                 return 'rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif';
+            case "BR":
+                return 'rat_transfer/nlcd/br/landcover-for-brazil.tbd.tif'
             case "US":
             default:
                 return 'rat_transfer/nlcd/nlcd_production';
@@ -488,7 +504,10 @@ export class AFCFormUSACanada extends React.Component<
                     onChange={this.setPropogationModel}
                     region={this.props.config.regionStr ?? "US"} />
             </GalleryItem>
-            {(this.props.config.propagationModel.kind === "ITM with no building data" || this.props.config.propagationModel.kind == "FCC 6GHz Report & Order" || this.props.config.propagationModel.kind == "ISED DBS-06") &&
+            {(this.props.config.propagationModel.kind === "ITM with no building data"
+                || this.props.config.propagationModel.kind == "FCC 6GHz Report & Order"
+                || this.props.config.propagationModel.kind == "ISED DBS-06"
+                || this.props.config.propagationModel.kind == "Brazilian Propagation Model") &&
                 <GalleryItem>
                     <FormGroup
                         label="AP Propagation Environment"

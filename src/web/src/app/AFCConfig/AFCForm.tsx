@@ -5,7 +5,7 @@ import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossMod
 import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache, getRegions } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit, getDeniedRegionsCsvFile } from "../Lib/Admin";
-import { AllowedRangesDisplay, defaultRanges } from './AllowedRangesForm'
+import { AllowedRangesDisplay,getDefaultRangesByRegion } from './AllowedRangesForm'
 import DownloadContents from "../Components/DownloadContents";
 import { AFCFormUSACanada } from "./AFCFormUSACanada";
 import { mapRegionCodeToName } from "../Lib/Utils";
@@ -43,7 +43,7 @@ export class AFCForm extends React.Component<
         if (props.frequencyBands.length > 0) {
             config.freqBands = props.frequencyBands.filter((x) => (x.region == config.regionStr) || (!x.region && config.regionStr == 'US'));
         } else {
-            config.freqBands = defaultRanges[config.regionStr ?? "US"];
+            config.freqBands = getDefaultRangesByRegion(config.regionStr ?? "US");
         }
 
         this.state = {
@@ -139,6 +139,14 @@ export class AFCForm extends React.Component<
                 if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
                 if (propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
                 break;
+            case "Brazilian Propagation Model":
+                if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
+                if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
+                if (propModel.win2ConfidenceCombined < 0 || propModel.win2ConfidenceCombined > 100) return err();
+                if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
+                if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
+                if (propModel.terrainSource != "SRTM (30m)") return err("Invalid terrain source.");
+                break;
             case "FSPL":
                 break;
             case "Ray Tracing":
@@ -156,7 +164,7 @@ export class AFCForm extends React.Component<
                 if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
                 if (propModel.win2ConfidenceCombined! < 0 || propModel.win2ConfidenceCombined! > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
-                if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
+                if (propModel.buildingSource != "Canada DSM (2000)" && propModel.buildingSource != "None") return err();
                 if (propModel.buildingSource !== "None" && propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
                 break;
             default:
@@ -213,7 +221,7 @@ export class AFCForm extends React.Component<
 
     private reset = () => {
         let config = getDefaultAfcConf(this.state.config.regionStr);
-        if(config.regionStr != this.state.config.regionStr){ // this is a demo/test config likely because they don't match
+        if (config.regionStr != this.state.config.regionStr) { // this is a demo/test config likely because they don't match
             config.regionStr = this.state.config.regionStr
         }
         config.freqBands = this.props.frequencyBands.filter((x) => (x.region == this.state.config.regionStr) || (!x.region && this.state.config.regionStr == 'US'))
@@ -356,20 +364,15 @@ export class AFCForm extends React.Component<
                                 </FormSelect>
                             </FormGroup>
                         </GalleryItem>
-                        {(
-                            this.state.config.regionStr == "CA" ||
-                            this.state.config.regionStr == "US" ||
-                            this.state.config.regionStr?.endsWith("CA") ||
-                            this.state.config.regionStr?.endsWith("US")
-                        ) &&
-                            <AFCFormUSACanada
-                                config={this.state.config}
-                                antennaPatterns={this.state.antennaPatternData}
-                                frequencyBands={this.props.frequencyBands.filter((x) => x.region == this.state.config.regionStr)}
-                                limit={this.props.limit}
-                                updateConfig={(x) => this.updateConfigFromComponent(x)}
-                                updateAntennaData={(x) => this.updateAntennaDataFromComponent(x)} />
-                        }
+
+                        <AFCFormUSACanada
+                            config={this.state.config}
+                            antennaPatterns={this.state.antennaPatternData}
+                            frequencyBands={this.props.frequencyBands.filter((x) => x.region == this.state.config.regionStr)}
+                            limit={this.props.limit}
+                            updateConfig={(x) => this.updateConfigFromComponent(x)}
+                            updateAntennaData={(x) => this.updateAntennaDataFromComponent(x)} />
+
                     </Gallery>
                     <br />
                     <>

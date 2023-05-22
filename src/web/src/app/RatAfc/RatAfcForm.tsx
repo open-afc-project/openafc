@@ -1,7 +1,7 @@
 import * as React from "react";
 import {
     AvailableSpectrumInquiryRequest, LinearPolygon, RadialPolygon, Ellipse,
-    DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange, Point, KnownRuleSetIds
+    DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange, Point, KnownRuleSetIds, VendorExtension
 } from "../Lib/RatAfcTypes";
 import { logger } from "../Lib/Logger";
 import {
@@ -18,6 +18,7 @@ import { OperatingClass, OperatingClassIncludeType } from "../Lib/RatAfcTypes";
 import { OperatingClassForm } from "./OperatingClassForm";
 import { InquiredFrequencyForm } from "./InquiredFrequencyForm";
 import { hasRole } from "../Lib/User";
+import { VendorExtensionForm } from "./VendorExtensionForm";
 
 
 interface RatAfcFormParams {
@@ -49,8 +50,9 @@ interface RatAfcFormState {
     inquiredFrequencyRange?: FrequencyRange[],
     newChannel?: number,
 
-    operatingClasses: OperatingClass[]
+    operatingClasses: OperatingClass[],
 
+    vendorExtensions: VendorExtension[],
 
 }
 
@@ -99,7 +101,8 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                     include: OperatingClassIncludeType.None
                 },
             ],
-            newCertificationRulesetId: KnownRuleSetIds[0]
+            newCertificationRulesetId: KnownRuleSetIds[0],
+            vendorExtensions: [],
 
         };
     }
@@ -133,6 +136,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                 minDesiredPower: params?.minDesiredPower,
                 operatingClasses: this.toOperatingClassArray(params?.inquiredChannels),
                 inquiredFrequencyRange: params.inquiredFrequencyRange,
+                vendorExtensions: params.vendorExtensions
             })
         } catch (e) {
             logger.error("Pasted value is not valid JSON {" + value + "}");
@@ -147,12 +151,12 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
     addCertificationId(newCertificationId: CertificationId): void {
         const copyOfcertificationId = this.state.certificationId.slice();
         copyOfcertificationId.push({ id: newCertificationId.id, rulesetId: newCertificationId.rulesetId });
-        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: '' });
+        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: KnownRuleSetIds[0] });
     }
 
     resetCertificationId(newCertificationId: CertificationId): void {
         const copyOfcertificationId = [{ id: newCertificationId.id, rulesetId: newCertificationId.rulesetId }];
-        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: '' });
+        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: KnownRuleSetIds[0] });
     }
 
     private updateOperatingClass(e: OperatingClass, i: number) {
@@ -175,7 +179,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
             indoorDeployment: this.state.indoorDeployment!
         },
         minDesiredPower: this.state.minDesiredPower!,
-        vendorExtensions: [],
+        vendorExtensions: this.state.vendorExtensions,
         inquiredChannels:
             this.state.operatingClasses.filter(x => x.include != OperatingClassIncludeType.None).map(x => this.fromOperatingClass(x)),
 
@@ -331,6 +335,10 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
             location.ellipse = { center: center, majorAxis: location.ellipse.majorAxis, minorAxis: location.ellipse.minorAxis, orientation: location.ellipse.orientation }
             this.setState({ location: location });
         }
+    }
+
+    setVendorExtensions = (newVendorsExtensions: VendorExtension[]) => {
+        this.setState({ vendorExtensions: newVendorsExtensions });
     }
 
     render() {
@@ -524,7 +532,10 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                         )}
                     </Gallery>
                 </FormGroup>
-
+                <FormGroup label="Vendor Extensions" fieldId="form-vendor-extensions" className="vendorExtensionSection">
+                    <VendorExtensionForm VendorExtensions={this.state.vendorExtensions} onChange={this.setVendorExtensions}>
+                    </VendorExtensionForm>
+                </FormGroup>
 
                 <br />
                 {

@@ -67,7 +67,11 @@ export interface AFCConfigFile {
     indoorFixedHeightAMSL?: boolean,
     reportUnavailableSpectrum?: boolean,
     reportUnavailPSDdBPerMHz?: number,
-    inquiredFrequencyResolutionMHz?: number
+    inquiredFrequencyResolutionMHz?: number,
+    srtmDir?:string,
+    depDir?:string,
+    cdsmDir?:string,
+    rainForestFile?:string,
 }
 
 export type FreqRange = {
@@ -124,10 +128,10 @@ export type APUncertainty = {
 export type ITMParameters = {
     polarization: 'Vertical' | 'Horizontal',
     ground: GroundType,
-    dielectricConst: Number,
-    conductivity: Number,
-    minSpacing: Number,
-    maxPoints: Number
+    dielectricConst: number,
+    conductivity: number,
+    minSpacing: number,
+    maxPoints: number
 }
 
 export type GroundType = 'Average Ground' | 'Poor Ground' | 'Good Ground' | 'Fresh Water' | 'Sea Water';
@@ -149,9 +153,9 @@ export interface UserUpload {
     value: string
 }
 
-export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FCC6GHz | CustomPropagation | IsedDbs06;
+export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FCC6GHz | CustomPropagation | IsedDbs06 | BrazilPropModel; 
 
-export type BuildingSourceValues =  "B-Design3D" | "LiDAR" | "None"
+export type BuildingSourceValues =  "B-Design3D" | "LiDAR" | "None" | "Canada DSM (2000)"
 
 export interface FSPL { kind: "FSPL",
     fsplUseGroundDistance: boolean,
@@ -212,7 +216,22 @@ export interface IsedDbs06 {
     winner2HgtLOS: number
 }
 
-
+export interface BrazilPropModel {
+    kind: "Brazilian Propagation Model",
+    win2ConfidenceCombined: number,
+    win2ConfidenceLOS?:number,
+    win2ConfidenceNLOS?:number,
+    itmConfidence: number,
+    itmReliability: number,
+    p2108Confidence: number,
+    buildingSource: BuildingSourceValues,
+    terrainSource: "SRTM (30m)"
+    winner2LOSOption: 'UNKNOWN' | 'BLDG_DATA_REQ_TX',
+    win2UseGroundDistance: boolean,
+    fsplUseGroundDistance: boolean,
+    winner2HgtFlag: boolean,
+    winner2HgtLOS: number
+}
 
 
 export type CustomPropagationLOSOptions =  'UNKNOWN' | 'FORCE_LOS' | 'FORCE_NLOS' | 'BLDG_DATA_REQ_TX'

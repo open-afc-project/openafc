@@ -1,7 +1,7 @@
 import * as React from "react";
 import { FormGroup, FormSelect, FormSelectOption, TextInput, InputGroup, InputGroupText, Tooltip, TooltipPosition } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
-import { BuildingSourceValues, CustomPropagation, CustomPropagationLOSOptions, FCC6GHz, FSPL, IsedDbs06, PropagationModel, Win2ItmClutter, Win2ItmDb } from "../Lib/RatApiTypes";
+import { BuildingSourceValues, CustomPropagation, CustomPropagationLOSOptions, FCC6GHz, FSPL, IsedDbs06, PropagationModel, Win2ItmClutter, Win2ItmDb, BrazilPropModel } from "../Lib/RatApiTypes";
 
 /**
  * PropogationModelForm.tsx: sub form of afc config form
@@ -22,6 +22,15 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 "ITM with building data",
                 //"ITM with no building data",
                 "ISED DBS-06",
+                "Ray Tracing",
+                "Custom"
+            ]
+        } else if (region.endsWith("BR")) {
+            return [
+                "FSPL",
+                "ITM with building data",
+                //"ITM with no building data",
+                "Brazilian Propagation Model",
                 "Ray Tracing",
                 "Custom"
             ]
@@ -60,12 +69,18 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 break;
             case "FCC 6GHz Report & Order":
                 this.props.onChange({
-                    kind: s, winner2LOSOption: "BLDG_DATA_REQ_TX", win2ConfidenceCombined: 50,
-                    itmConfidence: 50, win2ConfidenceLOS: 50, win2ConfidenceNLOS: 50, itmReliability: 50, p2108Confidence: 50,
-                    buildingSource: "LiDAR", terrainSource: "3DEP (30m)", win2UseGroundDistance: false,
+                    kind: s, win2ConfidenceCombined: 16,
+                    win2ConfidenceLOS: 16,
+                    winner2LOSOption: "BLDG_DATA_REQ_TX",
+                    win2UseGroundDistance: false,
                     fsplUseGroundDistance: false,
                     winner2HgtFlag: false,
                     winner2HgtLOS: 15,
+                    itmConfidence: 5,
+                    itmReliability: 20,
+                    p2108Confidence: 25,
+                    buildingSource: "None",
+                    terrainSource: "3DEP (30m)"
                 } as FCC6GHz);
                 break;
             case "Ray Tracing":
@@ -82,14 +97,39 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 break;
             case "ISED DBS-06":
                 this.props.onChange({
-                    kind: s, winner2LOSOption: "BLDG_DATA_REQ_TX", win2ConfidenceCombined: 50,
-                    itmConfidence: 50, win2ConfidenceLOS: 50, win2ConfidenceNLOS: 50, itmReliability: 50, p2108Confidence: 10,
-                    buildingSource: "LiDAR", terrainSource: "3DEP (30m)", win2UseGroundDistance: false, rlanITMTxClutterMethod: "FORCE_TRUE",
+                    kind: s, win2ConfidenceCombined: 16,
+                    win2ConfidenceLOS: 50,
+                    win2ConfidenceNLOS: 50,
+                    winner2LOSOption: "BLDG_DATA_REQ_TX",
+                    win2UseGroundDistance: false,
                     fsplUseGroundDistance: false,
                     winner2HgtFlag: false,
                     winner2HgtLOS: 15,
+                    itmConfidence: 5,
+                    itmReliability: 20,
+                    p2108Confidence: 10,
+                    buildingSource: "None",
+                    terrainSource: "3DEP (30m)",
+                    rlanITMTxClutterMethod: "FORCE_TRUE",
                 } as IsedDbs06);
                 break;
+            case "Brazilian Propagation Model":
+                this.props.onChange({
+                    kind: s, win2ConfidenceCombined: 50,
+                    win2ConfidenceLOS: 50,
+                    winner2LOSOption: "BLDG_DATA_REQ_TX",
+                    win2UseGroundDistance: false,
+                    fsplUseGroundDistance: false,
+                    winner2HgtFlag: false,
+                    winner2HgtLOS: 50,
+                    itmConfidence: 50,
+                    itmReliability: 50,
+                    p2108Confidence: 50,
+                    buildingSource: "None",
+                    terrainSource: "SRTM (30m)"
+                } as BrazilPropModel);
+                break;
+
         }
     }
 
@@ -164,9 +204,29 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 }
 
                 this.props.onChange(Object.assign(this.props.data, newData));
+            } else if (model.kind === "Brazilian Propagation Model") {
+                let newData: Partial<BrazilPropModel> = { buildingSource: s };
+                if (model.buildingSource === "None" && s !== "LiDAR") {
+                    newData.terrainSource = "SRTM (30m)";
+                }
+                if (s == "LiDAR") {
+                    if (!model.win2ConfidenceLOS) {
+                        newData.win2ConfidenceLOS = 50;
+                    }
+                    if (!model.win2ConfidenceNLOS) {
+                        newData.win2ConfidenceNLOS = 50;
+                    }
+                }
+                if (s === "None") {
+                    newData.winner2LOSOption = "UNKNOWN";
+                    newData.win2ConfidenceLOS = 50;
+                } else {
+                    newData.winner2LOSOption = "BLDG_DATA_REQ_TX";
+                }
+                this.props.onChange(Object.assign(this.props.data, newData));
             }
             else {
-                if ((model as Win2ItmDb | FCC6GHz | CustomPropagation).buildingSource === "None" && s !== "None") {
+                if ((model as Win2ItmDb | CustomPropagation| IsedDbs06).buildingSource === "None" && s !== "None") {
                     this.props.onChange(Object.assign(this.props.data, { buildingSource: s, terrainSource: "3DEP (30m)" }));
                 } else {
                     this.props.onChange(Object.assign(this.props.data, { buildingSource: s }));
@@ -880,10 +940,8 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                                     id="propogation-model-data-source"
                                     name="propogation-model-data-source"
                                     style={{ textAlign: "right" }}
-                                    isValid={model.buildingSource === "LiDAR"
-                                        || model.buildingSource === "B-Design3D" || model.buildingSource === "None"}>
-                                    <FormSelectOption key="B-Design3D" value="B-Design3D" label="B-Design3D (Manhattan)" />
-                                    <FormSelectOption key="LiDAR" value="LiDAR" label="LiDAR" />
+                                    isValid={model.buildingSource === "Canada DSM (2000)" || model.buildingSource === "None"}>
+                                    <FormSelectOption key="Canada DSM (2000)" value="Canada DSM (2000)" label="Canada DSM (2000)" />
                                     <FormSelectOption key="None" value="None" label="None" />
                                 </FormSelect>
                             </FormGroup>
@@ -915,6 +973,133 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         :
                         false}
 
+                </>
+            case "Brazilian Propagation Model":
+                return <>
+                    <FormGroup
+                        label="Winner II Combined Confidence"
+                        fieldId="propogation-model-win-confidence"
+                    ><InputGroup><TextInput
+                        value={model.win2ConfidenceCombined}
+                        type="number"
+                        onChange={this.setWin2ConfidenceCombined}
+                        id="propogation-model-win-confidence"
+                        name="propogation-model-win-confidence"
+                        style={{ textAlign: "right" }}
+                        isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
+                    </FormGroup>
+                    {model.buildingSource === "LiDAR" ?
+                        <>
+                            <FormGroup
+                                label="Winner II LOS/NLOS Confidence"
+                                fieldId="propogation-model-win-los-nlos-confidence"
+                            >
+                                <InputGroup><TextInput
+                                    value={model.win2ConfidenceLOS}
+                                    type="number"
+                                    onChange={v => { this.setWin2ConfidenceLOS_NLOS(v); }}
+                                    id="propogation-model-win-los-nlos-confidence"
+                                    name="propogation-model-win-los-nlos-confidence"
+                                    style={{ textAlign: "right" }}
+                                    isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100} />
+                                    <InputGroupText>%</InputGroupText></InputGroup>
+                            </FormGroup>
+                        </>
+                        :
+                        <></>
+                    }
+                    {model.buildingSource === "None" ?
+                        <>
+                            <FormGroup
+                                label="Winner II LOS Confidence"
+                                fieldId="propogation-model-win-los-nlos-confidence"
+                            >
+                                <InputGroup><TextInput
+                                    value={model.win2ConfidenceLOS}
+                                    type="number"
+                                    onChange={v => { this.setWin2ConfidenceLOS(v); }}
+                                    id="propogation-model-win-los-confidence"
+                                    name="propogation-model-win-los-confidence"
+                                    style={{ textAlign: "right" }}
+                                    isValid={model.win2ConfidenceLOS >= 0 && model.win2ConfidenceLOS <= 100} />
+                                    <InputGroupText>%</InputGroupText></InputGroup>
+                            </FormGroup>
+                        </>
+                        :
+                        <></>
+                    }
+                    <FormGroup
+                        label="ITM Confidence"
+                        fieldId="propogation-model-itm-confidence"
+                    ><InputGroup><TextInput
+                        value={model.itmConfidence}
+                        type="number"
+                        onChange={this.setItmConfidence}
+                        id="propogation-model-itm-confidence"
+                        name="propogation-model-itm-confidence"
+                        style={{ textAlign: "right" }}
+                        isValid={model.itmConfidence >= 0 && model.itmConfidence <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
+                    </FormGroup>
+                    <FormGroup
+                        label="ITM Reliability"
+                        fieldId="propogation-model-itm-reliability"
+                    >
+                        <InputGroup><TextInput
+                            value={model.itmReliability}
+                            type="number"
+                            onChange={this.setItmReliability}
+                            id="propogation-model-itm-reliability"
+                            name="propogation-model-itm-reliability"
+                            style={{ textAlign: "right" }}
+                            isValid={model.itmReliability >= 0 && model.itmReliability <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
+                    </FormGroup>
+                    <FormGroup
+                        label="P.2108 Percentage of Locations"
+                        fieldId="propogation-model-p2108-confidence"
+                    ><InputGroup><TextInput
+                        value={model.p2108Confidence}
+                        type="number"
+                        onChange={this.setP2108Confidence}
+                        id="propogation-model-p2108-confidence"
+                        name="propogation-model-p2108-confidence"
+                        style={{ textAlign: "right" }}
+                        isValid={model.p2108Confidence >= 0 && model.p2108Confidence <= 100} />
+                            <InputGroupText>%</InputGroupText></InputGroup>
+                    </FormGroup>
+                    <FormGroup
+                        label="Building Data Source"
+                        fieldId="propogation-model-data-source"
+                    >
+                        <FormSelect
+                            value={model.buildingSource}
+                            onChange={v => this.setBuildingSource(v as BuildingSourceValues)}
+                            id="propogation-model-data-source"
+                            name="propogation-model-data-source"
+                            style={{ textAlign: "right" }}
+                            isValid={model.buildingSource === "None"}>
+                            <FormSelectOption key="None" value="None" label="None" />
+                        </FormSelect>
+                    </FormGroup>
+                    {model.buildingSource === "None" ?
+                        <FormGroup
+                            label="Terrain Source"
+                            fieldId="terrain-source"
+                        >
+                            <FormSelect
+                                value={model.terrainSource}
+                                onChange={this.setTerrainSource}
+                                id="terrain-source"
+                                name="terrain-source"
+                                style={{ textAlign: "right" }}
+                                isValid={model.terrainSource === "SRTM (30m)"}>
+                                <FormSelectOption key="SRTM (30m)" value="SRTM (30m)" label="SRTM (30m)" />
+                            </FormSelect>
+                        </FormGroup>
+                        :
+                        false}
                 </>
             default: throw "Invalid propogation model";
         }

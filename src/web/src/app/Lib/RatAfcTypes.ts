@@ -21,7 +21,8 @@ export const KnownRuleSetIds = [
     "US_47_CFR_PART_15_SUBPART_E",
     "CA_RES_DBS-06",
     "TEST_FCC",
-    "DEMO_FCC"
+    "DEMO_FCC",
+    "BRAZIL_RULESETID"
 ]
 
 export interface CertificationId {
