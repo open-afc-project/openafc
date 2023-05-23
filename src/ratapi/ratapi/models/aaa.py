@@ -94,14 +94,32 @@ class UserRole(db.Model):
         'aaa_role.id', ondelete='CASCADE'))
 
 
-class AccessPoint(db.Model):
+class CertId(db.Model):
     ''' entry to designate allowed AP's for the PAWS interface '''
 
+    __tablename__ = 'cert_id'
+    UNKNOWN = 0
+    OUTDOOR = 2
+    INDOOR = 1
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    certification_id = db.Column(db.String(64), nullable=False)
+    refreshed_at = db.Column(db.DateTime())
+    ruleset_id = db.Column(db.Integer, db.ForeignKey(
+        'aaa_ruleset.id', ondelete='CASCADE'), nullable=False)
+    location = db.Column(db.Integer, nullable=False)
+
+    def __init__(self, certification_id, location):
+        self.certification_id = certification_id
+        self.location = location
+        self.refreshed_at = datetime.datetime.now()
+
+
+class AccessPoint(db.Model):
+    ''' entry to designate allowed AP's for the PAWS interface '''
     __tablename__ = 'access_point'
     __table_args__ = (
         db.UniqueConstraint('serial_number', 'serial_number'),
     )
-
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     serial_number = db.Column(db.String(64), nullable=False, index=True)
     model = db.Column(db.String(64))
@@ -109,7 +127,8 @@ class AccessPoint(db.Model):
     certification_id = db.Column(db.String(64))
     org = db.Column(db.String(64), nullable=True)
 
-    def __init__(self, serial_number, model, manufacturer, certification_id, org=None):
+    def __init__(self, serial_number, model, manufacturer, certification_id,
+org=None):
         if not serial_number:
             raise RuntimeError("Serial number cannot be empty")
         self.serial_number = serial_number
@@ -119,12 +138,14 @@ class AccessPoint(db.Model):
         self.org = org
 
 
-class AccessPointDeny(db.Model):
-    ''' entry to designate allowed AP's for the PAWS interface '''
-    __tablename__ = 'access_point_deny'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    serial_number = db.Column(db.String(64), nullable=True, index=True)
-    certification_id = db.Column(db.String(64))
+class AccessPointDeny(db.Model):                                                     
+    ''' entry to designate allowed AP's for the PAWS interface '''               
+                                                                                 
+    __tablename__ = 'access_point_deny'                                               
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)             
+    serial_number = db.Column(db.String(64), nullable=True, index=True)         
+    certification_id = db.Column(db.String(64))                                  
     org_id = db.Column(db.Integer, db.ForeignKey(
         'aaa_org.id', ondelete='CASCADE'))
     ruleset_id = db.Column(db.Integer, db.ForeignKey(
@@ -133,6 +154,8 @@ class AccessPointDeny(db.Model):
     def __init__(self, serial_number=None, certification_id=None):
         self.serial_number = serial_number
         self.certification_id = certification_id
+
+
 
 class MTLS(db.Model):
     ''' entry to designate allowed MTLS's for the PAWS interface '''
@@ -204,6 +227,7 @@ class Ruleset(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(50), nullable=False, unique=True)
     aps = db.relationship("AccessPointDeny", backref="ruleset")
+    cert_ids = db.relationship("CertId", backref="ruleset")
 
     def __init__(self, name):
         self.name = name

@@ -88,18 +88,6 @@ const MobileAP = () => {
   );
 }
 
-const getVirtualAPModuleAsync = () => {
-  return () => import(/* webpackChunkName: "virtualap" */ "./VirtualAP/VirtualAP");
-}
-const VirtualAP = () => {
-  return (
-    <DynamicImport load={getVirtualAPModuleAsync()}>
-      {(Component: any, resolve) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection> : <Component.VirtualAP />
-      }}
-    </DynamicImport>
-  );
-}
 
 const getAfcConfigModuleAsync = () => {
   return () => import(/* webpackChunkName: "afcconfig" */ "./AFCConfig/AFCConfig");
@@ -197,10 +185,6 @@ const Admin = () => {
   );
 }
 
-const getAPListModuleAsync = () => {
-  return () => import(/* webpackChunkName: "apList" */ "./APList/APList");
-}
-
 const getMTLSModuleAsync = () => {
   return () => import(/* webpackChunkName: "mtlsList" */ "./MTLS/MTLS");
 }
@@ -210,17 +194,6 @@ const getDRListModuleAsync = () => {
 }
 
 
-
-const APListPage = () => {
-  return (
-    <DynamicImport load={getAPListModuleAsync()}>
-      {(Component: any) => {
-        return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
-          : <Component.APListPage />
-      }}
-    </DynamicImport>
-  );
-}
 
 const MTLSPage = () => {
   return (
@@ -310,13 +283,6 @@ const routes: IAppRoute[] = [
     path: "/mobile-ap"
   },
   {
-    component: VirtualAP,
-    exact: true,
-    icon: null,
-    label: "Virtual AP",
-    path: "/virtual-ap"
-  },
-  {
     component: AFCConfig,
     exact: true,
     icon: null,
@@ -350,13 +316,6 @@ const routes: IAppRoute[] = [
     icon: null,
     label: "Administrator",
     path: "/admin"
-  },
-  {
-    component: APListPage,
-    exact: true,
-    icon: null,
-    label: "Access Points",
-    path: "/ap-list"
   },
   {
     component: MTLSPage,

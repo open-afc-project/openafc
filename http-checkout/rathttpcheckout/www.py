@@ -45,7 +45,7 @@ class TestWebApp(BaseTestCase):
             'history_url',
             'admin_url',
             'user_url',
-            'ap_admin_url',
+            'ap_deny_admin_url',
             'rat_api_analysis',
             'version',
             'antenna_url',

@@ -160,63 +160,6 @@ export const deleteUser = (id: number) =>
         }
     }).catch(err => error("An error was encountered #4", undefined, err));
 
-/**
- * Get access points. If `userId` is provided then only return access
- * points owned by the user. If no `userId` is provided then return all
- * access points (must be `Admin`).
- * @param userId (optional) user's Id
- * @returns list of access points if successful, error otherwise
- */
-export const getAccessPoints = (userId?: number) =>
-    fetch(guiConfig.ap_admin_url.replace("-1", String(userId || 0)), {
-        method: "GET",
-    }).then(async res => {
-        if (res.ok) {
-            return success((await res.json()).accessPoints as AccessPointModel[]);
-        } else {
-            return error("Unable to load access points", res.status, res);
-        }
-    }).catch(err => error("An error was encountered #5", undefined, err));
-
-/**
- * Register an access point with a user.
- * @param ap Access point to add
- * @param userId owner of new access point
- */
-export const addAccessPoint = (ap: AccessPointModel, userId: number) =>
-    fetch(guiConfig.ap_admin_url.replace("-1", String(userId)), {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(ap)
-    })
-        .then(async res => {
-            if (res.ok) {
-                return success((await res.json()).id as number)
-            } else if (res.status === 400) {
-                return error("Invalid AP data", res.status, res);
-            } else {
-                return error(res.statusText, res.status, res);
-            }
-        })
-        .catch(err => error("An error was encountered #6", undefined, err));
-
-/**
- * Delete an access point from the system.
- * @param id access point id
- */
-export const deleteAccessPoint = (id: number) =>
-    // here the id in the url is the ap id, not the user id
-    fetch(guiConfig.ap_admin_url.replace("-1", String(id)), {
-        method: "DELETE",
-    })
-        .then(res => {
-            if (res.ok) {
-                return success(undefined);
-            } else {
-                return error(res.statusText, res.status, res);
-            }
-        })
-        .catch(err => error("An error was encountered #7", undefined, err));
 
 /**
  * Get access points. If `userId` is provided then only return access

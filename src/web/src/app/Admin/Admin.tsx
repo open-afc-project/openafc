@@ -4,7 +4,6 @@ import { UserTable } from "./UserList";
 import { Role, UserState } from "../Lib/User";
 import { getUsers, addUserRole, deleteUser, removeUserRole, setMinimumEIRP, Limit } from "../Lib/Admin";
 import { logger } from "../Lib/Logger";
-import { APList } from "../APList/APList";
 import { UserAccount } from "../UserAccount/UserAccount";
 import { UserModel, RatResponse, FreqRange } from "../Lib/RatApiTypes";
 import { Table, TableHeader, TableBody, TableVariant } from "@patternfly/react-table";
@@ -431,10 +430,6 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
             <UserAccount userId={this.state.userId!} onSuccess={() => this.userEdited()} />
           </Modal>
         </Card>
-        <br />
-        <UserContext.Consumer>{(u: UserState) =>
-          <APList filterId={0} userId={u.data.userId} />}
-        </UserContext.Consumer>
         <br />
       </PageSection>
     )

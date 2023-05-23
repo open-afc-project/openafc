@@ -323,7 +323,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
 
                     <FormGroup
                         label="Import Deny AP List"
-                        fieldId="import-deny-ap-list"
+                        fieldId="import-ap-deny-list"
                     >
                        <input
                           // @ts-ignore
@@ -369,7 +369,7 @@ export class DRListPage extends React.Component<{ regions: RatResponse<string[]>
 
     render() {
         return (
-            <PageSection id="ap-list-page">
+            <PageSection id="ap-deny-list-page">
                 <UserContext.Consumer>{(u: UserState) => u.data.loggedIn &&
                     <DRList regions={this.state.regions} userId ={u.data.userId} org={u.data.org}/>}
                 </UserContext.Consumer>

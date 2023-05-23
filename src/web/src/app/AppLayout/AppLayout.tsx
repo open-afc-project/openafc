@@ -67,11 +67,6 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
             <NavLink to="/admin" activeClassName="pf-m-current">Administrator</NavLink>
           </NavItem> : <NavItem />}
         </UserContext.Consumer>
-        <UserContext.Consumer>{(u: UserState) => hasRole("AP") ?
-          <NavItem id="ap-list-link" itemId="ap-list-link">
-            <NavLink to="/ap-list" activeClassName="pf-m-current">Access Points</NavLink>
-          </NavItem> : <NavItem />}
-        </UserContext.Consumer>
 
         <UserContext.Consumer>{(u: UserState) => isAdmin() ?
           <NavItem id="mtls-link" itemId="mtls-link">

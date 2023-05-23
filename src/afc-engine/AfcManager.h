@@ -260,6 +260,7 @@ class AfcManager
 		bool _createKmz;
 		bool _createDebugFiles;
 		bool _createSlowDebugFiles;
+		bool _certifiedIndoor;
 
 		AfcDataIf* _dataIf;
 

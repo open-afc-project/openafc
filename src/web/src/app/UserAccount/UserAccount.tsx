@@ -25,7 +25,7 @@ import {
     Checkbox
   } from "@patternfly/react-core";
 import { error, success } from "../Lib/RatApiTypes";
-import { getAccessPoints, addAccessPoint, deleteAccessPoint, getUser, updateUser } from "../Lib/Admin";
+import { getUser, updateUser } from "../Lib/Admin";
 import { logger } from "../Lib/Logger";
 import { UserContext, UserState, isAdmin, isEditCredential } from "../Lib/User";
 

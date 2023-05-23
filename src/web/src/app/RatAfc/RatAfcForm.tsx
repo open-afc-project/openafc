@@ -388,7 +388,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                         >
                             {hasRole("Trial") ?
                                 <Button key="trial-cert-fill-btn" variant="link" sizes="sm"
-                                    onClick={() => this.resetCertificationId({ id: 'TestCertificationId', rulesetId: 'FCC' })}>
+                                    onClick={() => this.resetCertificationId({ id: 'TestCertificationId', rulesetId: KnownRuleSetIds[0] })}>
                                     Fill Trial Cert Id
                                 </Button>
                                 : <></>

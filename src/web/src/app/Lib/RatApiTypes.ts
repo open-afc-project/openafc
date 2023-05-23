@@ -22,7 +22,7 @@ export interface GuiConfig {
     uls_convert_url: string,
     login_url: string,
     admin_url: string,
-    ap_admin_url: string,
+    ap_deny_admin_url: string,
     dr_admin_url: string,
     mtls_admin_url: string,
     rat_afc: string,
@@ -548,8 +548,6 @@ export interface UserModel {
 export interface AccessPointModel {
     id: number,
     serialNumber: string,
-    model?: string,
-    manufacturer?: string,
     certificationId?: string,
     org?: string,
     rulesetId?: string,

@@ -28,10 +28,13 @@ import uuid
 from flask.views import MethodView
 import werkzeug.exceptions
 import six
-from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG
+from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, \
+RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG, \
+RNTM_OPT_CERT_ID
 from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from ..models.aaa import User, AccessPoint, AccessPointDeny, AFCConfig
+from ..models.aaa import User, AFCConfig, CertId, Ruleset, \
+                         Organization, AccessPointDeny
 from .auth import auth
 from .ratapi import build_task, nraToRegionStr, rulesetIdToRegionStr
 from fst import DataIf
@@ -44,6 +47,8 @@ import traceback
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
 
+# We want to dynamically trim this this list e.g.
+# via environment variable, for the current deployment
 RULESETS = ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'TEST_FCC','DEMO_FCC', "BRAZIL_RULESETID"]
 
 #: All views under this API blueprint
@@ -96,9 +101,9 @@ class DeviceUnallowedException(AP_Exception):
     serial number is not allowed to operate under AFC control due to regulatory action or other action.
     '''
 
-    def __init__(self):
+    def __init__(self, err_str):
         super(DeviceUnallowedException, self).__init__(
-            101, 'This specific device is not allowed to operate under AFC control.')
+            101, 'This specific device is not allowed to operate under AFC control.' + err_str)
 
 
 class MissingParamException(AP_Exception):
@@ -319,48 +324,75 @@ class RatAfc(MethodView):
     ''' RAT AFC resources
     '''
 
-    def _auth_ap(self, serial_number, prefix, cert_id, rulesets, version):
+    def _auth_cert_id(self, cert_id, ruleset, indoor):
+        ''' Authenticate certification id. Return new indoor value
+            for bell application
+        '''
+        indoor_certified = True
+
+        certId = CertId.query.filter_by(certification_id=cert_id).first()
+        if not certId:
+            raise DeviceUnallowedException("")
+        if not certId.ruleset.name == ruleset:
+            raise InvalidValueException(["ruleset", ruleset])
+        # add check for certId.valid
+
+        now = datetime.datetime.now()
+        delta = now - certId.refreshed_at
+        if delta.days > 1:
+            LOGGER.debug('RatAfc::_auth_cert_id(): stale CertId %s', certId.certification_id )
+
+        if not certId.location & certId.OUTDOOR:
+            raise DeviceUnallowedException("Outdoor operation not allowed")
+        elif certId.location & certId.INDOOR:
+            indoor_certified = True
+        else:
+            indoor_certified = False
+
+        return indoor_certified
+
+    def _auth_ap(self, serial_number, prefix, cert_id, rulesets, indoor, version):
         ''' Authenticate an access point. If must match the serial_number and certification_id in the database to be valid
         '''
         LOGGER.debug('RatAfc::_auth_ap()')
         LOGGER.debug('Starting auth_ap,serial: %s; prefix: %s; certId: %s; ruleset %s; version %s',
                      serial_number, prefix, cert_id, rulesets, version)
 
-        if serial_number is None:
-            raise MissingParamException(['serialNumber'])
+        if not serial_number:
+            raise DeviceUnallowedException("")
 
         deny_ap = AccessPointDeny.query.filter_by(serial_number=serial_number).\
                   filter_by(certification_id=cert_id).first()
         if deny_ap:
-            raise DeviceUnallowedException()  # InvalidCredentialsException()
+            raise DeviceUnallowedException("")  # InvalidCredentialsException()
 
         deny_ap = AccessPointDeny.query.filter_by(certification_id=cert_id).\
                   filter_by(serial_number=None).first()
         if deny_ap:
             # denied all devices matching certification id
-            raise DeviceUnallowedException()  # InvalidCredentialsException()
-
-        ap = AccessPoint.query.filter_by(serial_number=serial_number).first()
+            raise DeviceUnallowedException("")  # InvalidCredentialsException()
 
         if version in NRA_VERSIONS:
             if rulesets is None or len(rulesets) != 1 or rulesets[0] not in RULESETS:
                 raise InvalidValueException(["rulesets", rulesets ])
+            ruleset = rulesets[0]
         else:
             ruleset = prefix
             if ruleset is None or ruleset not in RULESETS:
                 raise InvalidValueException(["ruleset", ruleset])
 
-        if ap is None:
-            raise DeviceUnallowedException()  # InvalidCredentialsException()
-        if cert_id is None or prefix is None:
+        if cert_id is None:
             raise MissingParamException(missing_params=['certificationId'])
-        if ap.certification_id != prefix + ' ' + cert_id:
-            raise DeviceUnallowedException()  # InvalidCredentialsException()
 
-        LOGGER.info('Found AP, cert id %s serial %s', cert_id, serial_number)
-        if ap.org is None:
-            return "NA"
-        return ap.org
+        # Test AP will by pass certification ID check as Indoor Certified
+        if cert_id == "TestCertificationId" \
+           and serial_number == "TestSerialNumber":
+            return True
+
+        # Assume that once we got here, we already trim the cert_obj list down
+        # to only one entry for the country we're operating in
+        return self._auth_cert_id(cert_id, ruleset, indoor)
+
 
     def get(self):
         ''' GET method for Analysis Status '''
@@ -404,9 +436,7 @@ class RatAfc(MethodView):
         # start request
         args = flask.request.json
         # split multiple requests into an array of individual requests
-        requests = map(lambda r: {"availableSpectrumInquiryRequests": [
-                       r], "version": ver}, args["availableSpectrumInquiryRequests"])
-
+        requests = map(lambda r: {"availableSpectrumInquiryRequests": [r], "version": ver}, args["availableSpectrumInquiryRequests"])
         LOGGER.debug("Running AFC analysis with params: %s", args)
         request_type = 'AP-AFC'
 
@@ -418,6 +448,7 @@ class RatAfc(MethodView):
         als_config_infos = []
         uls_id = "Unknown"
         geo_id = "Unknown"
+        indoor_certified = True
 
         try:
 
@@ -429,26 +460,43 @@ class RatAfc(MethodView):
 
                 try:
                     if ver in NRA_VERSIONS:
-                        LOGGER.error("ver has NRA")
+                        LOGGER.debug("ver has NRA")
                         prefix = device_desc['certificationId'][0]['nra'].strip()
                         region = nraToRegionStr(prefix)
+                        certId = device_desc['certificationId'][0]['id']
                     else:
-                        LOGGER.error("ver has RulesetId")
-                        prefix = device_desc['certificationId'][0]['rulesetId'].strip()
-                        region = rulesetIdToRegionStr(prefix)
-                    certId = device_desc['certificationId'][0]['id']
-                    firstCertId = prefix + ' ' + certId
+                        LOGGER.debug("ver has RulesetId")
+                        # Pick one ruleset that is being used for the
+                        # deployment of this AFC (RULESETS)
+                        prefix = None
+                        for r in device_desc['certificationId']:
+                            prefix = r['rulesetId'].strip()
+                            if prefix in RULESETS:
+                                region = rulesetIdToRegionStr(prefix)
+                                certId = r['id']
+                                break
                 except:
                     prefix = None
                     certId = None
 
                 serial = device_desc.get('serialNumber')
-                org = self._auth_ap(serial,
-                                    prefix,
-                                    certId,
-                                    device_desc.get('rulesetIds'), ver)
 
-                runtime_opts = RNTM_OPT_NODBG_NOGUI
+                location = request["availableSpectrumInquiryRequests"][0].get(
+                    'location')
+                indoor = location['indoorDeployment']
+
+                indoor_certified = self._auth_ap(serial,
+                                   prefix,
+                                   certId,
+                                   device_desc.get('rulesetIds'),
+                                   indoor,
+                                   ver)
+
+                if indoor_certified:
+                    runtime_opts = RNTM_OPT_CERT_ID | RNTM_OPT_NODBG_NOGUI
+                else:
+                    runtime_opts = RNTM_OPT_NODBG_NOGUI
+
                 debug_opt = flask.request.args.get('debug')
                 if debug_opt == 'True':
                     runtime_opts |= RNTM_OPT_DBG
@@ -469,6 +517,9 @@ class RatAfc(MethodView):
 
                 config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
                          == region).first()
+
+                if not config:
+                    raise DeviceUnallowedException("No AFC configuration for ruleset")
 
                 config_bytes = json.dumps(config.config, sort_keys=True)
 
@@ -516,7 +567,7 @@ class RatAfc(MethodView):
                     hfile.write(request_json_bytes)
                 history_dir = None
                 if runtime_opts & (RNTM_OPT_DBG | RNTM_OPT_SLOW_DBG):
-                    history_dir = os.path.join("/history", org, str(serial),
+                    history_dir = os.path.join("/history", str(serial),
                                                str(datetime.datetime.now().isoformat()))
                 if runtime_opts & RNTM_OPT_DBG:
                     with dataif.open(os.path.join(history_dir, "analysisRequest.json")) as hfile:

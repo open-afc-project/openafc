@@ -22,7 +22,7 @@ import werkzeug
 from ..models import aaa
 from .auth import auth
 from ..models.base import db
-from .ratapi import rulesetIdToRegionStr, nraToRegionStr, rulesets
+from .ratapi import rulesetIdToRegionStr, rulesets
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -161,75 +161,6 @@ class User(MethodView):
         org = user.org if user.org else ""
         auth(roles=['Admin'], org=org)
         db.session.delete(user) # pylint: disable=no-member
-        db.session.commit() # pylint: disable=no-member
-
-        return flask.make_response()
-
-
-class AccessPoint(MethodView):
-    ''' resources to manage access points'''
-
-    methods = ['PUT', 'GET', 'DELETE']
-
-    def get(self, id):
-        ''' Get AP info with specific user_id. '''
-        id = auth(roles=['Admin', 'AP'])
-        user = aaa.User.query.filter_by(id=id).first()
-        roles = [r.name for r in user.roles]
-        if "Super" in roles:
-            # Super user gets all access points
-            access_points = db.session.query(aaa.AccessPoint).all()
-        else:
-            # Admin only user gets all access points within own org
-            org = user.org if user.org else ""
-            access_points = []
-            for ap in db.session.query(aaa.AccessPoint).filter(aaa.AccessPoint.org == org).all():
-                access_points.append(ap)
-
-        return flask.jsonify(accessPoints=[
-            {
-                'id': ap.id,
-                'serialNumber': ap.serial_number,
-                'model': ap.model,
-                'manufacturer': ap.manufacturer,
-                'certificationId': ap.certification_id,
-                'org': ap.org
-            }
-            for ap in access_points
-        ])
-
-    def put(self, id):
-        ''' add an AP. '''
-
-        content = flask.request.json
-        user = aaa.User.query.filter_by(id=id).first()
-        org = content.get('org')
-        auth(roles=['Admin'], org=org)
-        certId = content.get('certificationId')
-        rulesetId = certId.split()[0]
-        # check ruleset is valid
-        region = rulesetIdToRegionStr(rulesetId)
-
-        try:
-            ap = aaa.AccessPoint(content.get('serialNumber'), content.get('model'), content.get('manufacturer'), content.get('certificationId'), org)
-
-            db.session.add(ap) # pylint: disable=no-member
-            db.session.commit() # pylint: disable=no-member
-
-            return flask.jsonify(id=ap.id)
-        except IntegrityError:
-            raise exceptions.BadRequest("Serial number must be unique")
-
-    def delete(self, id):
-        ''' Remove an AP from the system. Here the id is the AP id instead of the user_id '''
-
-        ap = aaa.AccessPoint.query.filter_by(id=id).first()
-
-        auth(roles=['Admin'], org=ap.org)
-
-        LOGGER.info("Deleting ap: %s", id)
-
-        db.session.delete(ap) # pylint: disable=no-member
         db.session.commit() # pylint: disable=no-member
 
         return flask.make_response()
@@ -467,27 +398,29 @@ class DeniedRegion(MethodView):
             shutil.copyfileobj(flask.request.stream, outfile)
         return flask.make_response('Denied regions updated', 204)
 
-class AccessPointTrial(MethodView):
-    ''' resource to get the access point for getting trial configuration'''
+
+class CertId(MethodView):
+    ''' resources to manage access points'''
 
     methods = ['GET']
 
-    def get(self):
-        ap = aaa.AccessPoint.query.filter_by(serial_number="TestSerialNumber", certification_id = "FCC TestCertificationId").first()
+    def get(self, id):
+        ''' Get Certification Id info with specific user_id. '''
+        id = auth(roles=['Super', 'Admin'])
+        user = aaa.User.query.filter_by(id=id).first()
+        roles = [r.name for r in user.roles]
+        # Super user gets all access points
+        cert_ids = db.session.query(aaa.CertId).all()
 
-
-        return flask.jsonify(accessPoint=
+        return flask.jsonify(certIds=[
             {
-                'id': ap.id,
-                'serialNumber': ap.serial_number,
-                'model': ap.model,
-                'manufacturer': ap.manufacturer,
-                'ownerId': ap.user_id,
-                'certificationId': ap.certification_id,
+                'id': cert.id,
+                'certificationId': cert.certification_id,
+                'rulesetId': cert.ruleset_id,
                 'org': ap.org
             }
-        )
-
+            for cert in cert_ids
+        ])
 
 class Limits(MethodView):
     methods = ['PUT', 'GET']
@@ -718,10 +651,9 @@ class MTLS(MethodView):
 
 
 module.add_url_rule('/user/<int:user_id>', view_func=User.as_view('User'))
-module.add_url_rule('/user/ap/<int:id>', view_func=AccessPoint.as_view('AccessPoint'))
 module.add_url_rule('/user/ap_deny/<int:id>', view_func=AccessPointDeny.as_view('AccessPointDeny'))
+module.add_url_rule('/user/cert/<int:id>', view_func=CertId.as_view('CertId'))
 module.add_url_rule('/user/eirp_min', view_func=Limits.as_view('Eirp'))
 module.add_url_rule('/user/frequency_range', view_func=AllowedFreqRanges.as_view('Frequency'))
-module.add_url_rule('/user/ap/trial', view_func=AccessPoint.as_view('AccessPointTrial'))
 module.add_url_rule('/user/mtls/<int:id>', view_func=MTLS.as_view('MTLS'))
 module.add_url_rule('/user/denied_regions/<string:regionStr>', view_func=DeniedRegion.as_view('DeniedRegion'))

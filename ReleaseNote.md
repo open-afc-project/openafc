@@ -120,12 +120,20 @@
 
 ## **Version and Date**
 
+|Version|**OA-595, OA-587**|
+|**Date**|**05/15/2023**|
+## **Issues Addressed**
+ * Jira OA-595: Authorization of FCC 6SD and 6SD+6ID certified devices.  The 6SD query is not currently available
+ * Jira OA-585: Device authentication by checking with ISED database per DBS-06.
+ * Since database version changes, need to run  rat-manage-api db-upgrade once from shell upon first time running container
+
+## **Interface Changes**
+  Removed the AP tab, since the AFC server now no longer maintains a list of AP devices. 
 
 |Version|**OA-582**|
 |**Date**|**05/09/2023**|
 ## **Issues Addressed**
- * Jira OA-582: Add support for denied devices.  UI for uploading and download list is under "Denied Rules" tab, which now contains both denied devices and denied regions. Denied devices can be specified by both certification id and serial number, or by just the certification id.  In the latter case, the serial number field can be filled in with * or None.
-  Since database version changes, need to run  rat-manage-api db-upgrade once from shell upon first time running container with this new version.
+ * Jira OA-582: Add support for denied devices.  UI for uploading and download list is under "Denied Rules" tab, which now contains both denied devices and denied regions. Denied devices can be specified by both certification id and serial numbe r, or by just the certification id.  In the latter case, the serial number field can be filled in with * or None.  Since database version changes, need to run  rat-manage-api db-upgrade once from shell upon first time running container
 
 ## **Version and Date**
 |Version|**OA-634**|

@@ -13,6 +13,7 @@
 #define RUNTIME_OPT_ENABLE_GUI 2
 #define RUNTIME_OPT_URL 4
 #define RUNTIME_OPT_ENABLE_SLOW_DBG 16
+#define RUNTIME_OPT_CERT_ID 32
 
 extern double qerfi(double q);
 
@@ -561,6 +562,7 @@ AfcManager::AfcManager()
 	_createKmz = false;
 	_createDebugFiles = false;
 	_createSlowDebugFiles = false;
+	_certifiedIndoor = false;
 
 	_dataIf = (AfcDataIf *) NULL;
 
@@ -1751,18 +1753,44 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		if (hasIndoorDeploymentFlag) {
 			int indoorDeploymentVal = locationObj["indoorDeployment"].toInt();
 			switch(indoorDeploymentVal) {
-				case 0:
+				case 0: /* Unknown */
+					if (_certifiedIndoor) {
+						_rlanType = RLANType::RLAN_INDOOR;
+					} else {
+						_rlanType = RLANType::RLAN_OUTDOOR;
+					}
+					break;
+				case 1: /* Indoor */
+					if (_rulesetId == QString::fromStdString("US_47_CFR_PART_15_SUBPART_E")) {
+						/* US */
+						if (_certifiedIndoor) {
+							_rlanType = RLANType::RLAN_INDOOR;
+						} else {
+			                                 LOGGER_INFO(logger)
+				                               << _serialNumber.toStdString()
+                                                               << " indicated as deployed indoor "
+                                                               << "but is not certified as Indoor. "
+                                                               << "So it is analyzed as outdoor";
+
+							_rlanType = RLANType::RLAN_OUTDOOR;
+						}
+					} else {
+						/* Everywhere else including Canada */
+						_rlanType = RLANType::RLAN_INDOOR;
+					}
+					break;
 				case 2:
 					_rlanType = RLANType::RLAN_OUTDOOR;
-					break;
-				case 1:
-					_rlanType = RLANType::RLAN_INDOOR;
 					break;
 				default:
 					_invalidParams << "indoorDeployment";
 			}
-		} else {
-			_rlanType = RLANType::RLAN_OUTDOOR;
+		} else { /* not specified, treated as unknown */
+			if (_certifiedIndoor) {
+				_rlanType = RLANType::RLAN_INDOOR;
+			} else {
+				_rlanType = RLANType::RLAN_OUTDOOR;
+			}
 		}
 
 		QString rlanHeightType = elevationObj["heightType"].toString();
@@ -2984,6 +3012,10 @@ void AfcManager::setCmdLineParams(std::string &inputFilePath, std::string &confi
 		}
 		if (tmp & RUNTIME_OPT_ENABLE_GUI) {
 			AfcManager::_createKmz = true;
+		}
+
+		if (tmp & RUNTIME_OPT_CERT_ID) {
+			AfcManager::_certifiedIndoor = true;
 		}
 		AfcManager::_dataIf = new AfcDataIf(tmp & RUNTIME_OPT_URL);
 		if (tmp & RUNTIME_OPT_ENABLE_SLOW_DBG) {
@@ -11253,6 +11285,7 @@ void AfcManager::printUserInputs()
 		inputGc.writeRow({ "HEIGHT_TYPE", (_rlanHeightType == CConst::AMSLHeightType ? "AMSL" : _rlanHeightType == CConst::AGLHeightType ? "AGL" : "INVALID") } );
 		inputGc.writeRow({ "ALLOW_SCAN_PTS_IN_UNC_REG", (_allowScanPtsInUncRegFlag ? "true" : "false" ) } );
 		inputGc.writeRow({ "INDOOR/OUTDOOR", (_rlanType == RLAN_INDOOR ? "indoor" : _rlanType == RLAN_OUTDOOR ? "outdoor" : "error") } );
+		inputGc.writeRow({ "CERT_INDOOR", (_certifiedIndoor ? "True" : "False" ) } );
 		inputGc.writeRow({ "CHANNEL_RESPONSE_ALGORITHM", CConst::strSpectralAlgorithmList->type_to_str(_channelResponseAlgorithm) } );
 
 		// inputGc.writeRow({ "ULS_DATABASE", _inputULSDatabaseStr } );

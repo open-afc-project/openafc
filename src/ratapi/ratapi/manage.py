@@ -203,7 +203,7 @@ class DbExport(Command):
 
     def __call__(self, flaskapp, dst):
         LOGGER.debug('DbExportPrev.__call__()')
-        from .models.aaa import User, UserRole, Role, AccessPoint, Limit
+        from .models.aaa import User, UserRole, Role, Limit
 
         filename = dst
 
@@ -301,19 +301,6 @@ class DbImport(Command):
                         except RuntimeError:
                             LOGGER.debug('User %s already exists', username[0])
 
-                        try:
-                            email = username[0]
-                            if '@' in email:
-                                org = email[email.index('@') + 1:]
-                            else:
-                                org = ""
-
-                            ap_list = json_lookup('ap', user_rcrd, None)
-                            for ap in ap_list[0]:
-                                AccessPointCreate(flaskapp, ap['serial_number'],
-                                    ap['certification_id'], org)
-                        except RuntimeError:
-                            LOGGER.debug('AccessPoint %s user %s already exists', ap['serial_number'], username[0])
                     else:
                         limit = json_lookup('Limit', new_rcrd, None)
                         try:
@@ -633,110 +620,6 @@ class User(Manager):
         self.add_command('list', UserList())
 
 
-class AccessPointCreate(Command):
-    ''' Create a new access point. '''
-
-    option_list = (
-        Option('serial', type=str,
-               help='serial number of the ap'),
-        Option('cert_id', type=str,
-               help='certification id of the ap'),
-        Option('--model', type=str, default=None,
-               help="model number"),
-        Option('--manuf', type=str, default=None,
-               help="manufacturer"),
-        Option('--org', type=str,
-               help="organization with this access point.")
-    )
-
-    def _create_ap(self, flaskapp, serial, cert_id,
-                   model=None, manuf=None, org=None):
-        from contextlib import closing
-        import datetime
-        from .models.aaa import AccessPoint
-        LOGGER.debug('AccessPointCreate._create_ap() %s %s %s',
-                      serial, cert_id, org)
-        with flaskapp.app_context():
-            if AccessPoint.query.filter(AccessPoint.serial_number ==
-serial).filter(AccessPoint.certification_id==cert_id).count() > 0:
-                raise RuntimeError(
-                    'Existing access point found with serial number "{0}"'.format(serial))
-
-            if not org: org = ""
-
-            ap = AccessPoint(
-                serial_number=serial,
-                model=model,
-                manufacturer=manuf,
-                certification_id=cert_id,
-                org=org
-            )
-            db.session.add(ap)  # pylint: disable=no-member
-            db.session.commit()  # pylint: disable=no-member
-
-    def __init__(self, flaskapp=None, serial_id=None,
-                 cert_id=None, org=None):
-        if flaskapp and serial_id:
-            self._create_ap(flaskapp, str(serial_id), cert_id, org=org)
-
-    def __call__(self, flaskapp, serial, cert_id, model, manuf, org=None):
-        self._create_ap(flaskapp, serial, cert_id, model, manuf, org)
-
-
-class AccessPointRemove(Command):
-    '''Removes an access point by serial number '''
-
-    option_list = (
-        Option('serial', type=str,
-               help='Serial number of an Access Point'),
-    )
-
-    def _remove_ap(self, flaskapp, serial):
-        from .models.aaa import AccessPoint
-        LOGGER.debug('AccessPointRemove._remove_ap() %s', serial)
-        with flaskapp.app_context():
-            try:
-                # select * from access_point as ap where ap.serial_number = ?
-                ap = AccessPoint.query.filter(
-                    AccessPoint.serial_number == serial).one()
-            except sqlalchemy.orm.exc.NoResultFound:
-                raise RuntimeError(
-                    'No access point found with serial number "{0}"'.format(serial))
-            db.session.delete(ap)  # pylint: disable=no-member
-            db.session.commit()  # pylint: disable=no-member
-
-    def __init__(self, flaskapp=None, serial=None):
-        if flaskapp and serial:
-            self._remove_ap(flaskapp, serial)
-
-    def __call__(self, flaskapp, serial):
-        self._remove_ap(flaskapp, serial)
-
-
-class AccessPointList(Command):
-    '''Lists all access points'''
-
-    def __call__(self, flaskapp):
-        table = PrettyTable()
-        from .models.aaa import AccessPoint
-
-        table.field_names = ["Serial Number", "Cert ID", "Org"]
-        with flaskapp.app_context():
-            for ap in db.session.query(AccessPoint).all():  # pylint: disable=no-member
-                table.add_row([ap.serial_number, ap.certification_id, ap.org])
-            print(table)
-
-
-class AccessPoints(Manager):
-    '''View and manage Access Points'''
-
-    def __init__(self, *args, **kwargs):
-        Manager.__init__(self, *args, **kwargs)
-        self.add_command("create", AccessPointCreate())
-        self.add_command("remove", AccessPointRemove())
-        self.add_command("list", AccessPointList())
-
-
 class AccessPointDenyCreate(Command):
     ''' Create a new access point. '''
 
@@ -854,6 +737,244 @@ class AccessPointsDeny(Manager):
         self.add_command("remove", AccessPointDenyRemove())
         self.add_command("list", AccessPointDenyList())
 
+
+class CertificationId(Manager):
+    '''View and manage CertificationId '''
+
+    def __init__(self, *args, **kwargs):
+        Manager.__init__(self, *args, **kwargs)
+        self.add_command("create", CertIdCreate())
+        self.add_command("remove", CertIdRemove())
+        self.add_command("list", CertIdList())
+        self.add_command("sweep", CertIdSweep())
+
+class CertIdList(Command):
+    '''Lists all access points'''
+
+    def __call__(self, flaskapp):
+        table = PrettyTable()
+        from .models.aaa import CertId, Organization
+
+        table.field_names = ["Cert ID", "Ruleset", "Loc", "Refreshed"]
+        with flaskapp.app_context():
+            for cert in db.session.query(CertId).all():  # pylint: disable=no-member
+                table.add_row([cert.certification_id, cert.ruleset.name, \
+                               cert.location, cert.refreshed_at])
+            print(table)
+
+
+class CertIdRemove(Command):
+    '''Removes an Certificate Id by certificate id '''
+
+    option_list = (
+        Option('--cert_id', type=str,
+               help='certificate id',
+               required=True),
+    )
+
+    def _remove_cert_id(self, flaskapp, cert_id):
+        from .models.aaa import CertId
+        LOGGER.debug('CertIdRemove._remove_cert_id() %s', cert_id)
+        with flaskapp.app_context():
+            try:
+                cert = CertId.query.filter(
+                    CertId.certification_id == cert_id).one()
+            except sqlalchemy.orm.exc.NoResultFound:
+                raise RuntimeError(
+                    'No certificate found with id "{0}"'.format(cert_id))
+            db.session.delete(cert)  # pylint: disable=no-member
+            db.session.commit()  # pylint: disable=no-member
+
+    def __init__(self, flaskapp=None, cert_id=None):
+        if flaskapp:
+            self._remove_cert_id(flaskapp, cert_id)
+
+    def __call__(self, flaskapp, cert_id):
+        self._remove_cert_id(flaskapp, cert_id)
+
+
+class CertIdCreate(Command):
+    ''' Create a new certification Id. '''
+    option_list = (
+        Option('--cert_id', type=str,
+               help='certification id',
+               required=True),
+        Option('--ruleset_id', type=str,
+               help='ruleset id',
+               required=True),
+        Option('--location', type=int,
+               help="location. 1 indoor - 2 outdoor - 3 both",
+               required=True)
+    )
+
+    def _create_cert_id(self, flaskapp, cert_id, ruleset_id, location=0):
+        from contextlib import closing
+        import datetime
+        from .models.aaa import CertId, Ruleset, Organization
+        LOGGER.debug('CertIdCreate._create_cert_id() %s %s %s',
+                      cert_id, ruleset_id)
+        with flaskapp.app_context():
+            if not ruleset_id:
+                raise RuntimeError("Ruleset is required")
+
+            # validate ruleset
+            ruleset = Ruleset.query.filter_by(name=ruleset_id).first()
+            if not ruleset:
+                raise RuntimeError("Invalid Ruleset")
+
+            if CertId.query.filter(CertId.certification_id==cert_id).count() > 0:
+                raise RuntimeError(
+                    'Existing certificate found with id "{0}"'.format(cert_id))
+
+            cert = CertId(certification_id=cert_id, location=location)
+            ruleset.cert_ids.append(cert)
+
+            db.session.add(cert)  # pylint: disable=no-member
+            db.session.commit()  # pylint: disable=no-member
+
+    def __init__(self, flaskapp=None, cert_id=None, ruleset_id=None, location=0):
+        if flaskapp and cert_id:
+            self._create_cert_id(flaskapp, cert_id, ruleset_id=ruleset_id,
+location=location)
+
+    def __call__(self, flaskapp, cert_id, ruleset_id=None, location=0):
+        self._create_cert_id(flaskapp, cert_id, ruleset_id, location)
+
+
+class CertIdSweep(Command):
+    '''Lists all access points'''
+    option_list = (
+        Option('--country', type=str,
+               help='country e.g. US or CA'),
+    )
+
+    def sweep_canada(self, flaskapp):
+        import csv
+        import requests
+        from .views.ratapi import regionStrToRulesetId
+        from .models.aaa import CertId, Ruleset
+        import datetime
+        now = datetime.datetime.now()
+
+        with flaskapp.app_context():
+            url = \
+                 "https://www.ic.gc.ca/engineering/Certified_Standard_Power_Access_Points_6GHz.csv"
+            headers = {
+              'accept': 'text/html,application/xhtml+xml,application/xml',
+              'cache-control': 'max-age=0',
+              'content-type': 'application/x-www-form-urlencoded',
+              'user-agent': 'rat_server/1.0'
+            }
+                                                                                 
+            with requests.get(url, headers, stream=True) as r:
+                r.raise_for_status()
+                local_filename = "/tmp/SD6_list.csv"
+                with open(local_filename, 'wb') as f:
+                    for chunk in r.iter_content(chunk_size=8192): 
+                        f.write(chunk)
+
+
+            with open(local_filename, newline='') as csvfile:
+                rdr = csv.reader(csvfile, delimiter=',')
+                for i in range(2):
+                    # do this twice so that the SD devices can be
+                    # updated with ID location too
+                    for row in rdr:
+                        try:
+                            cert_id = row[7] 
+                            code = int(row[6])
+                            if code == 103:
+                                location = CertId.OUTDOOR
+                            elif code == 107:
+                                location = CertId.INDOOR
+                            else:
+                                location = CertId.UNKNOWN
+                            if not location == CertId.UNKNOWN:
+                                cert = CertId.query.filter_by(certification_id=cert_id).first()
+                                if cert :
+                                    cert.refreshed_at = now
+                                    cert.location = cert.location | location
+                                elif location == CertId.OUTDOOR:
+                                    cert = CertId(certification_id=cert_id,
+                                                  location=CertId.OUTDOOR)
+                                    ruleset_id_str = regionStrToRulesetId("CA")
+                                    ruleset = Ruleset.query.filter_by(name=ruleset_id_str).first()
+                                    ruleset.cert_ids.append(cert)
+                                    db.session.add(cert)
+                        except: 
+                            # ignore badly formatted rows
+                            pass
+
+                db.session.commit()  # pylint: disable=no-member
+
+    def sweep_fcc_id(self, flaskapp):
+        from .models.aaa import CertId
+        id_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=243&equipment_class_description=6ID-15E+6+GHz+Low+Power+Indoor+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"
+        self.sweep_fcc_data(flaskapp, id_data, CertId.INDOOR)
+
+
+    def sweep_fcc_sd(self, flaskapp):
+        from .models.aaa import CertId
+
+        if False:
+            # TBD replace with real 6SD request data. The below is 6ID query and
+            # therefore, is kept here as a place holder, and should not be
+            # excercised
+            sd_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=243&equipment_class_description=6ID-15E+6+GHz+Low+Power+Indoor+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"
+            self.sweep_fcc_data(flaskapp, sd_data, CertId.OUTDOOR)
+
+    def sweep_fcc_data(self, flaskapp, data, location):
+        from .models.aaa import CertId, Ruleset
+        from .views.ratapi import regionStrToRulesetId
+        import requests
+        import datetime
+
+        now = datetime.datetime.now()
+        with flaskapp.app_context():
+            url  = 'https://apps.fcc.gov/oetcf/eas/reports/GenericSearchResult.cfm?RequestTimeout=500'
+            headers = {
+              'accept': 'text/html,application/xhtml+xml,application/xml',
+              'cache-control': 'max-age=0',
+              'content-type': 'application/x-www-form-urlencoded',
+              'user-agent': 'rat_server/1.0'
+            }
+
+            resp = requests.post(url, headers=headers, data=data)
+            if resp.status_code == 200:
+                try:
+                    from xml.etree import ElementTree
+                    tree = ElementTree.fromstring(resp.content)
+                    for node in tree:
+                        fcc_id = node.find('fcc_id').text
+                        cert = CertId.query.filter_by(certification_id=fcc_id).first()
+                         
+                        if cert:
+                            cert.refreshed_at = now
+                            cert.location = cert.location | location
+                        elif location == CertId.OUTDOOR:
+                            # add new entries that are in 6SD list.
+                            cert = CertId(certification_id=fcc_id,
+                                          location=CertId.OUTDOOR)
+                            ruleset_id_str = regionStrToRulesetId("US")
+                            ruleset = Ruleset.query.filter_by(name=ruleset_id_str).first()
+                            ruleset.cert_ids.append(cert)
+                            db.session.add(cert)
+
+                except:
+                    raise RuntimeError("Bad XML in Cert Id download")
+            else:
+                raise RuntimeError("Bad Cert Id download")
+            db.session.commit()  # pylint: disable=no-member
+
+    def __call__(self, flaskapp, country):
+        if country == "US":
+            # first sweep SD (outdoor) entries, then sweep ID list.
+            self.sweep_fcc_sd(flaskapp)
+            self.sweep_fcc_id(flaskapp)
+        else:
+            self.sweep_canada(flaskapp)
+
+
 class Organization(Manager):
     '''View and manage Organizations '''
 
@@ -868,7 +989,8 @@ class OrganizationCreate(Command):
 
     option_list = (
         Option('--name', type=str, default=None,
-               help='Name of Organization'),
+               help='Name of Organization',
+               required=True),
     )
 
     def _create_org(self, flaskapp, name):
@@ -877,7 +999,7 @@ class OrganizationCreate(Command):
         from .models.aaa import Organization
         LOGGER.debug('OrganizationCreate._create_org() %s %s', name)
         with flaskapp.app_context():
-            if not name:
+            if name is None:
                 raise RuntimeError('Name required')
 
             org = Organization.query.filter(Organization.\
@@ -899,10 +1021,10 @@ class OrganizationCreate(Command):
 
 class OrganizationRemove(Command):
     '''Removes an access point by serial number and or certification id'''
-
     option_list = (
         Option('--name', type=str, default=None,
-               help='Name of Organization'),
+               help='Name of Organization',
+               required=True),
     )
 
     def _remove_org(self, flaskapp, name):
@@ -913,11 +1035,13 @@ class OrganizationRemove(Command):
                 # select * from access_point as ap where ap.serial_number = ?
                 org = Organization.query.filter(\
                      Organization.name == name).one()
-
                 if not org:
                     raise RuntimeError('No organization found')
             except:
                 raise RuntimeError('No organization found')
+
+            for ap in org.aps:
+                db.session.delete(ap)
 
             db.session.delete(org)  # pylint: disable=no-member
             db.session.commit()  # pylint: disable=no-member
@@ -929,20 +1053,17 @@ class OrganizationRemove(Command):
     def __call__(self, flaskapp, name=None):
         self._remove_org(flaskapp, name)
 
-
 class OrganizationList(Command):
     '''Lists all access points'''
 
     def __call__(self, flaskapp):
         table = PrettyTable()
         from .models.aaa import Organization
-
         table.field_names = ["Name"]
         with flaskapp.app_context():
             for org in db.session.query(Organization).all():  # pylint: disable=no-member
                 table.add_row([org.name])
             print(table)
-
 
 class MTLSCreate(Command):
     ''' Create a new mtls certificate. '''
@@ -1198,8 +1319,7 @@ class ConfigAdd(Command):
 
     def __call__(self, flaskapp, src):
         LOGGER.debug('ConfigAdd.__call__() %s', src)
-        from .models.aaa import User
-        from .models.aaa import AFCConfig
+        from .models.aaa import AFCConfig, CertId, User
         from .views.ratapi import regionStrToRulesetId
         import datetime
 
@@ -1230,20 +1350,39 @@ class ConfigAdd(Command):
                 try:
                     ap_rcrd = json_lookup('apConfig', new_rcrd, None)
                     serial_id = json_lookup('serialNumber', ap_rcrd, None)
+                    location = json_lookup('location', ap_rcrd, None)
                     cert_id = json_lookup('certificationId', ap_rcrd, None)
                     for i in range(len(serial_id)):
-                        cert_str = cert_id[i][0]['rulesetId'] + ' ' +\
-                                        cert_id[i][0]['id']
+                        cert_id_str = cert_id[i][0]['id']
+                        ruleset_id_str = cert_id[i][0]['rulesetId']
+                        loc = location[i]
+                        if loc == CertId.UNKNOWN:
+                            loc = CertId.OUTDOOR
+                        elif loc == CertId.INDOOR:
+                            loc = CertId.OUTDOOR | CertId.INDOOR 
+
                         email = username[0]
                         if '@' in email:
                             org = email[email.index('@') + 1:]
                         else:
                             org = ""
 
-                        AccessPointCreate(flaskapp, serial_id[i],
-                                          cert_str, org)
-                        f_str = "AccessPointRemove(flaskapp, '" + serial_id[i] + "')"
-                        rollback.insert(0, f_str)
+                        try:
+                            OrganizationCreate(flaskapp, org)
+                            f_str = "OrganizationRemove(flaskapp, '" + org + "')"
+                            rollback.insert(0, f_str)
+                        except:
+                            pass
+
+                        try:
+                            # Since this is test, we mark these as both indoor
+                            # and indoor certified 
+                            CertIdCreate(flaskapp, cert_id_str, ruleset_id_str, loc)
+                            f_str = "CertIdRemove(flaskapp, '" + cert_id_str + "')"
+                            rollback.insert(0, f_str)
+                        except:
+                            LOGGER.debug('CertId %s already exists', cert_id_str)
+
 
                     with flaskapp.app_context():
                         user = User.query.filter(User.email == username[0]).one()
@@ -1300,13 +1439,6 @@ class ConfigRemove(Command):
                 new_rcrd = json.loads(dataline)
 
                 ap_rcrd = json_lookup('apConfig', new_rcrd, None)
-                serial_id = json_lookup('serialNumber', ap_rcrd, None)
-                for i in range(len(serial_id)):
-                    try:
-                        AccessPointRemove(flaskapp, serial_id[i])
-                    except RuntimeError:
-                        LOGGER.debug('AP %s not found', serial_id[i])
-
                 user_rcrd = json_lookup('userConfig', new_rcrd, None)
                 username = json_lookup('username', user_rcrd, None)
                 with flaskapp.app_context():
@@ -1406,10 +1538,11 @@ def main():
     manager.add_command('mtls', MTLS())
     manager.add_command('data', Data())
     manager.add_command('celery', Celery())
-    manager.add_command('ap', AccessPoints())
     manager.add_command('ap-deny', AccessPointsDeny())
     manager.add_command('org', Organization())
+    manager.add_command('cert_id', CertificationId())
     manager.add_command('cfg', Config())
+    manager.add_command('org', Organization())
 
     manager.run()
 

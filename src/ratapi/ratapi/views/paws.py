@@ -16,7 +16,7 @@ from flask_jsonrpc.exceptions import (
 import flask
 from ..util import TemporaryDirectory, getQueueDirectory
 from ..xml_utils import (datetime_to_xml)
-from ..models.aaa import AccessPoint, User
+from ..models.aaa import User
 import gzip
 from .ratapi import build_task
 
@@ -78,20 +78,9 @@ def _auth_paws(serial_number, model, manufacturer, rulesets):
     if serial_number is None:
         raise InvalidParamsError('serialNumber is required in the deviceDesc')
 
-    LOGGER.debug('ap serial number: %s', serial_number)
-    ap = AccessPoint.query.filter_by(serial_number=str(serial_number)).first()
-
     if rulesets is None or len(rulesets) != 1 or rulesets[0] != RULESET:
         raise InvalidParamsError(
             'Invalid rulesetIds: ["{}"] expected'.format(RULESET))
-    if ap is None:
-        raise InvalidParamsError('Invalid serial number')
-    if ap.model is not None and ap.model != model:
-        raise InvalidParamsError()
-    if ap.manufacturer is not None and ap.manufacturer != manufacturer:
-        raise InvalidParamsError()
-
-    return ap.user_id
 
 
 def getSpectrum(**kwargs):
@@ -99,6 +88,10 @@ def getSpectrum(**kwargs):
     Parameters are AVAIL_SPECTRUM_REQ data and
     result is AVAIL_SPECTRUM_RESP data.
     '''
+
+
+    from flask_login import current_user
+
     REQUIRED_PARAMS = (
         'deviceDesc',
         'location',
@@ -187,8 +180,9 @@ def getSpectrum(**kwargs):
 
     # authenitcate access point
     description = kwargs['deviceDesc']
-    user_id = _auth_paws(description.get('serialNumber'), description.get(
-        'modelId'), description.get('manufacturerId'), description.get('rulesetIds'))
+    auth_paws(description.get('serialNumber'), description.get(
+-        'modelId'), description.get('manufacturerId'), description.get('rulesetIds'))
+    user_id = current_user.id
     user = User.query.filter_by(id=user_id).first()
 
     request_type = "APAnalysis"

@@ -26,7 +26,7 @@ import werkzeug.exceptions
 from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
 from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from ..models.aaa import User, AccessPoint, AccessPointDeny, AFCConfig
+from ..models.aaa import User, AccessPointDeny, AFCConfig
 from ..models.base import db
 from .auth import auth
 from ..models import aaa
@@ -42,29 +42,8 @@ def regions():
     return ['US', 'CA', 'TEST_US', 'DEMO_US', 'BR']
 
 def rulesets():
-    return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06']
+    return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'BRAZIL_RULESETID']
 
-
-# Keep the NRA for 1.3 compatability
-def regionStrToNra(region_str):
-    """ Input: region_str: regionStr field of the afc config.
-        Output: nra
-        nra: can match with the NRA field of the AP, e.g. FCC
-        Eg. 'USA' => 'FCC'
-    """
-    map = {
-       'DEFAULT':'FCC',
-       'US':'FCC',
-       'CA':'ISED',
-       'TEST_US':'TEST_FCC',
-       'DEMO_US':'DEMO_FCC',
-       'BR':'BRAZIL_NRA'
-    }
-    region_str = region_str.upper()
-    try:
-        return map[region_str]
-    except:
-        raise werkzeug.exceptions.NotFound('Invalid Region %s' % region_str)
 
 def nraToRegionStr(nra):
     map = {
@@ -186,12 +165,7 @@ class GuiConfig(MethodView):
             about_login_url=None
 
         # TODO: temporary support python2
-        if sys.version_info.major != 3:
-            _paws_url=flask.url_for('paws'),
-        else:
-            _paws_url=flask.url_for('urn:app:ratapi:paws'),
         resp = flask.jsonify(
-            paws_url=_paws_url,
             uls_url=flask.url_for('files.uls_db'),
             antenna_url=flask.url_for('files.antenna_pattern'),
             history_url=histurl,
@@ -208,8 +182,8 @@ class GuiConfig(MethodView):
             login_url=login_url,
             logout_url=logout_url,
             admin_url=flask.url_for('admin.User', user_id=-1),
-            ap_admin_url=flask.url_for('admin.AccessPoint', id=-1),
             ap_deny_admin_url=flask.url_for('admin.AccessPointDeny', id=-1),
+            cert_id_admin_url=flask.url_for('admin.CertId', id=-1),
             mtls_admin_url=flask.url_for('admin.MTLS', id=-1),
             dr_admin_url=flask.url_for('admin.DeniedRegion', regionStr="XX"),
             rat_afc=flask.url_for('ap-afc.RatAfc'),
@@ -412,19 +386,6 @@ class AfcRegions(MethodView):
         '''
         resp = flask.make_response()
         resp.data = ' '.join(regions())
-        resp.content_type = 'text/plain'
-        return resp
-
-
-class AfcRulesetIds(MethodView):
-    ''' Allow the web UI to manipulate configuration directly.
-    '''
-
-    def get(self):
-        ''' GET method for afc config
-        '''
-        resp = flask.make_response()
-        resp.data = ' '.join(rulesets())
         resp.content_type = 'text/plain'
         return resp
 
@@ -1011,6 +972,18 @@ class DailyULSStatus(MethodView):
             raise werkzeug.exceptions.NotFound('Task not found')
 
 
+class AfcRulesetIds(MethodView):
+    ''' Allow the web UI to manipulate configuration directly.
+    '''
+
+    def get(self):
+        ''' GET method for afc config
+        '''
+        resp = flask.make_response()
+        resp.data = ' '.join(rulesets())
+        resp.content_type = 'text/plain'
+        return resp
+
 
 module.add_url_rule('/guiconfig', view_func=GuiConfig.as_view('GuiConfig'))
 module.add_url_rule('/afcconfig/<path:filename>',
@@ -1031,7 +1004,8 @@ module.add_url_rule('/replay',
                     view_func=ReloadAnalysis.as_view('ReloadAnalysis'))
 module.add_url_rule('/regions',
                     view_func=AfcRegions.as_view('AfcRegions'))
-module.add_url_rule('/rulesetIds',
-                    view_func=AfcRulesetIds.as_view('AfcRulesetIds'))
 module.add_url_rule('/about',
                     view_func=About.as_view('About'))
+module.add_url_rule('/rulesetIds',
+                    view_func=AfcRulesetIds.as_view('AfcRulesetIds'))
+

@@ -28,7 +28,7 @@ export var guiConfig: GuiConfig = Object.freeze({
     allowed_freq_url: "",
     login_url: "",
     admin_url: "",
-    ap_admin_url: "",
+    ap_deny_admin_url: "",
     dr_admin_url:"",
     lidar_bounds: "",
     ras_bounds: "",

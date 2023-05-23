@@ -18,7 +18,7 @@ import flask
 from flask.views import MethodView
 import requests
 from ..models.base import db
-from ..models.aaa import User, Organization
+from ..models.aaa import User, Organization, Role
 from flask_login import current_user
 from .. import als
 
@@ -297,6 +297,14 @@ class UserAPI(MethodView):
                 db.session.commit()
             except:
                 current_user.org = ""
+
+        if not current_user.roles:
+            try:
+                user = User.query.filter(User.id == current_user.id).first()
+                user.roles.append(db.session.query(Role).filter_by(name="Trial").first())
+                db.session.commit()
+            except:
+                pass
 
         # add organization if not exist.
         org = current_user.org if current_user.org else ""
