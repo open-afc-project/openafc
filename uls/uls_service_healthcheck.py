@@ -9,6 +9,7 @@
 
 # pylint: disable=unused-wildcard-import, wrong-import-order, wildcard-import
 # pylint: disable=logging-fstring-interpolation, invalid-name, too-many-locals
+# pylint: disable=too-many-branches
 
 import argparse
 import datetime
@@ -33,10 +34,10 @@ DEFAULT_UPDATE_AGE_HR = 40.
 
 def send_email_smtp(smtp_info_filename: Optional[str], to: Optional[str],
                     subject: str, body: str) -> None:
-    """ Send an email vis Gmail
+    """ Send an email via SMTP
 
     Arguments:
-    smtp_info -- Optional name of json file containing SMTP credentials
+    smtp_info -- Optional name of JSON file containing SMTP credentials
     to        -- Optional recipient email
     subject   -- Message subject
     body      -- Message body
@@ -103,7 +104,7 @@ def expired(event_td: Optional[datetime.datetime],
         datetime.timedelta(hours=max_age_hr)
 
 
-def emeil_if_needed(status_storage: StatusStorage, args: Any) -> None:
+def email_if_needed(status_storage: StatusStorage, args: Any) -> None:
     """ Send alarm/beacon emails if needed
 
     Arguments:
@@ -151,6 +152,12 @@ def emeil_if_needed(status_storage: StatusStorage, args: Any) -> None:
             problems.append(
                 f"No new data for region '{reg}' were downloaded for more "
                 f"than {max_age_hr} hours")
+
+    external_files_problems = \
+        ExtParamFilesChecker(status_storage=status_storage).get_problems()
+    if external_files_problems:
+        problems.append("External parameters files synchronization problems:")
+        problems += [("  " + efp) for efp in external_files_problems]
 
     loc = args.email_sender_location
     if problems:
@@ -236,7 +243,7 @@ def main(argv: List[str]) -> None:
         "--beacon_email_interval_hr", metavar="HOURS",
         type=docker_arg_type(float),
         help="Interval (in hours) between beacon (everything is OK) email "
-        "messages. Defauld is to not send beacon emails")
+        "messages. Default is to not send beacon emails")
     argument_parser.add_argument(
         "--download_attempt_max_age_health_hr", metavar="HOURS",
         default=DEFAULT_ATTEMPT_AGE_HR,
@@ -283,7 +290,7 @@ def main(argv: List[str]) -> None:
 
     status_storage = StatusStorage(status_dir=args.status_dir)
 
-    emeil_if_needed(status_storage=status_storage, args=args)
+    email_if_needed(status_storage=status_storage, args=args)
 
     last_start = status_storage.read_milestone(StatusStorage.S.ServiceStart)
     if last_start is None:

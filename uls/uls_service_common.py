@@ -17,11 +17,14 @@ import inspect
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 import tempfile
 import time
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, NamedTuple, Optional
+import urllib.error
+import urllib.request
 
 # Default directory for status filers
 DEFAULT_STATUS_DIR = os.path.join(os.path.dirname(__file__), "status")
@@ -147,6 +150,9 @@ class StatusStorage:
         # (Filename for) last data update time
         RegionUpdate = "region_update_time.json"
 
+        # (Filename for) external parameter files' sync status
+        ExtParamSyncStatus = "ext_param_sync_status.json"
+
     # Number of IO retries
     _NUM_IO_ATTEMPTS = 4
 
@@ -209,6 +215,27 @@ class StatusStorage:
             else {reg: datetime.datetime.fromisoformat(d)
                   for reg, d in json.loads(file_content).items()}
 
+    def write_ext_param_sync_status(
+            self,  ext_param_sync_status: Dict[str, str]) -> None:
+        """ Write synchronization status for external parameter files
+
+        Arguments:
+        ext_param_sync_status -- Per-file report of synchronization status
+        """
+        self._write_file(
+            filename=StatusStorage.S.ExtParamSyncStatus.value,
+            data=json.dumps(ext_param_sync_status, indent=4))
+
+    def read_ext_param_sync_status(self) -> Dict[str, str]:
+        """ Read synchronization status for external parameter files
+
+        Arguments:
+        Returns dictionary of per-file status report
+        """
+        file_content = \
+            self._read_file(StatusStorage.S.ExtParamSyncStatus.value)
+        return {} if file_content is None else json.loads(file_content)
+
     def _read_file(self, filename: str) -> Optional[str]:
         """ Reads file
 
@@ -251,3 +278,96 @@ class StatusStorage:
                     time.sleep(self._IO_ATTEMPT_DELAY_SEC)
                     continue
                 raise
+
+
+class ExtParamFilesChecker:
+    """ Checks that external parameter file match those in image
+
+    Private attributes:
+    _epf_list       -- List of external parameter file sets descriptors
+                       (_ExtParamFiles objects) or None
+    _script_dir     -- Downloader script directory or None
+    _status_storage -- Status information persistent storage
+    """
+
+    # Descriptor of external parameter files
+    _ExtParamFiles = \
+        NamedTuple("_ExtParamFiles",
+                   [
+                    # Location in the internet
+                    ("base_url", str),
+                    # Downloader script subdirectory
+                    ("subdir", str), ("files", List[str])])
+
+    def __init__(self, status_storage: StatusStorage,
+                 ext_files_arg: Optional[List[str]] = None,
+                 script_dir: Optional[str] = None) -> None:
+        """ Constructor
+
+        Arguments:
+        ext_files_arg  -- List of 'BASE_URL:SUBDIR:FILES,FILE... external
+                          parameter file descriptors from command line
+        status_storage -- Status information persistent storage
+        """
+        self._epf_list: \
+            Optional[List["ExtParamFilesChecker._ExtParamFiles"]] = None
+        if ext_files_arg is not None:
+            self._epf_list = []
+            for ef in ext_files_arg:
+                m = re.match(r"^(.*):(.+):(.+)$", ef)
+                error_if(
+                    m is None,
+                    f"Invalid format of --check_ext_files parameter: '{ef}'")
+                assert m is not None
+                self._epf_list.append(
+                    self._ExtParamFiles(base_url=m.group(1).rstrip("/"),
+                                        subdir=m.group(2),
+                                        files=m.group(3).split(",")))
+        self._script_dir = script_dir
+        self._status_storage = status_storage
+
+    def check(self) -> None:
+        """ Check that external files matches those in image """
+        assert (self._epf_list is not None) and (self._script_dir is not None)
+        temp_dir: Optional[str] = None
+        status_dict: Dict[str, str] = {}
+        try:
+            temp_dir = tempfile.mkdtemp()
+            for epf in self._epf_list:
+                for filename in epf.files:
+                    key = os.path.join(epf.subdir, filename)
+                    internal_file_name = \
+                        os.path.join(self._script_dir, epf.subdir, filename)
+                    if not os.path.isfile(internal_file_name):
+                        status_dict[key] = "Absent in container"
+                        continue
+                    try:
+                        url = f"{epf.base_url}/{filename}"
+                        external_file_name = os.path.join(temp_dir, filename)
+                        urllib.request.urlretrieve(url, external_file_name)
+                    except urllib.error.URLError as ex:
+                        logging.warning(f"Error downloading '{url}': {ex}")
+                        status_dict[key] = "Download failed"
+                        continue
+                    contents: List[bytes] = []
+                    try:
+                        for fn in (internal_file_name, external_file_name):
+                            with open(fn, "rb") as f:
+                                contents.append(f.read())
+                    except OSError as ex:
+                        logging.warning(f"Read failed: {ex}")
+                        status_dict[key] = "Read failed"
+                        continue
+                    status_dict[key] = \
+                        "External content changed" \
+                        if contents[0] != contents[1] else "OK"
+        finally:
+            if temp_dir:
+                shutil.rmtree(temp_dir, ignore_errors=True)
+        self._status_storage.write_ext_param_sync_status(status_dict)
+
+    def get_problems(self) -> List[str]:
+        """ Return list of lines that describe problematic files """
+        status_dict = self._status_storage.read_ext_param_sync_status()
+        return [f"{key}: {value}" for key, value in status_dict.items()
+                if value != "OK"]

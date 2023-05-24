@@ -19,10 +19,10 @@ import os
 import shutil
 import sqlalchemy as sa
 import subprocess
+import sys
 import tempfile
 import time
-from typing import Dict, List, Optional
-import sys
+from typing import Dict, List, Optional, Set
 
 from uls_service_common import *
 
@@ -45,9 +45,6 @@ DEFAULT_EXTERNAL_DB_DIR = "/ULS_Database"
 # Default value for --ext_db_symlink
 DEFAULT_CURRENT_DB_SYMLINK = "FS_LATEST.sqlite3"
 
-# Default value for --ext_fsid_file
-DEFAULT_FSID_EXTERNAL_FILE = "/ULS_Database/fsid_table.csv"
-
 # Default value for --fsid_file
 DEFAULT_FSID_INTERNAL_FILE = \
     "/mnt/nfs/rat_transfer/daily_uls_parse/data_files/fsid_table.csv"
@@ -64,10 +61,64 @@ DATA_IDS_REG_COLUMN = "region"
 # Identity table region ID column
 DATA_IDS_ID_COLUMN = "identity"
 
+# Name of FSID tool script
+FSID_TOOL = os.path.join(os.path.dirname(__file__), "fsid_tool.py")
+
 
 class ProcessingException(Exception):
     """ ULS processing exception """
     pass
+
+
+def print_args(args: Any) -> None:
+    """ Print invocation parameters to log """
+    logging.info("ULS downloader started with the following parameters")
+    logging.info(f"ULS download script: {args.download_script}")
+    logging.info(f"Download regions: {args.region if args.region else 'All'}")
+    logging.info(f"Additional ULS download script arguments: "
+                 f"{args.download_script_args}")
+    logging.info(f"Directory where ULS download script puts downloaded file: "
+                 f"{args.result_dir}")
+    logging.info(f"Temporary directory of ULS download script, cleaned before "
+                 f"downloading: {args.temp_dir}")
+    logging.info(f"Ultimate downloaded file destination directory: "
+                 f"{args.ext_db_dir}")
+    logging.info(f"Symlink pointing to current ULS file: "
+                 f"{args.ext_db_symlink}")
+    logging.info(f"FSID file location expected by ULS download script: "
+                 f"{args.fsid_file}")
+    logging.info(f"ULS download service state storage directory: "
+                 f"{args.status_dir}")
+    logging.info(f"ULS download interval in hours: {args.interval_hr}")
+    logging.info(f"ULS download script maximum duration in hours: "
+                 f"{args.timeout_hr}")
+    logging.info(f"Run: {'Once' if args.run_once else 'Indefinitely'}")
+    logging.info(f"Print debug info: {'Yes' if args.verbose else 'No'}")
+
+
+def extract_fsid_table(uls_file: str, fsid_file: str) -> None:
+    """ Try to extract FSID table from ULS database:
+
+    Arguments:
+    uls_file  -- FS database filename
+    fsid_file -- FSID table filename
+    """
+    # Clean previous fsid files...
+    try:
+        fsid_name_parts = os.path.splitext(fsid_file)
+        logging.info("Extracting FSID table")
+        subprocess.run(f"rm -f {fsid_name_parts[0]}*{fsid_name_parts[1]}",
+                       shell=True, check=True)
+    except OSError as ex:
+        logging.warning(f"Strangely can't remove "
+                        f"{fsid_name_parts[0]}*{fsid_name_parts[1]}. "
+                        f"Proceeding nevertheless: {ex}")
+    # ... and extracting latest one from previous FS database
+    if os.path.isfile(uls_file):
+        if subprocess.run(
+                [FSID_TOOL, "check", uls_file], check=False).returncode == 0:
+            subprocess.run([FSID_TOOL, "extract", uls_file, fsid_file],
+                           check=True)
 
 
 def get_uls_identity(uls_file: str) -> Optional[Dict[str, str]]:
@@ -98,6 +149,47 @@ def get_uls_identity(uls_file: str) -> Optional[Dict[str, str]]:
         conn.close()
 
 
+def update_uls_file(uls_dir: str, uls_file: str, symlink: str) -> None:
+    """ Atomically retargeting symlink to new ULS file
+
+    Arguments:
+    uls_dir  -- Directory containing ULS files and symlink
+    uls_file -- Base name of new ULS file (already in ULS directory)
+    symlink  -- Base name of symlink pointing to current ULS file
+    """
+    # Getting random name for temporary symlink
+    fd, temp_symlink_name = tempfile.mkstemp(dir=uls_dir, suffix="_" + symlink)
+    os.close(fd)
+    os.unlink(temp_symlink_name)
+    # Name race condition is astronomically improbable, as name is random and
+    # downloader is one (except for development environment)
+
+    assert uls_file == os.path.basename(uls_file)
+    assert os.path.isfile(os.path.join(uls_dir, uls_file))
+    os.symlink(uls_file, temp_symlink_name)
+    subprocess.check_call(["mv", "-fT", temp_symlink_name,
+                           os.path.join(uls_dir, symlink)])
+
+
+def update_region_change_times(status_storage: StatusStorage,
+                               all_regions: List[str],
+                               updated_regions: Set[str]) -> None:
+    """ Update region update times status
+
+    Arguments:
+    status_storage  -- Status storage facility
+    all_regions     -- All regions contained in ULS file
+    updated_regions -- Regions changed since previous ULS file
+    """
+    data_update_times = \
+        status_storage.read_reg_data_changes(StatusStorage.S.RegionUpdate)
+    for region in all_regions:
+        if (region in updated_regions) or (region not in data_update_times):
+            data_update_times[region] = datetime.datetime.now()
+    status_storage.write_reg_data_changes(StatusStorage.S.RegionUpdate,
+                                          data_update_times)
+
+
 def main(argv: List[str]) -> None:
     """Do the job.
 
@@ -124,6 +216,11 @@ def main(argv: List[str]) -> None:
         help=f"Directory where ULS download script puts resulting database. "
         f"Default is '{DEFAULT_RESULT_DIR}'")
     argument_parser.add_argument(
+        "--temp_dir", metavar="TEMP_DIR",
+        type=docker_arg_type(str),
+        help="Directory containing downloader's temporary files (cleared "
+        "before downloading)")
+    argument_parser.add_argument(
         "--ext_db_dir", metavar="EXTERNAL_DATABASE_DIR",
         default=DEFAULT_EXTERNAL_DB_DIR,
         type=docker_arg_type(str, default=DEFAULT_EXTERNAL_DB_DIR),
@@ -136,12 +233,6 @@ def main(argv: List[str]) -> None:
         help=f"Symlink in database directory that points to current database. "
         f"Default is '{DEFAULT_CURRENT_DB_SYMLINK}'")
     argument_parser.add_argument(
-        "--ext_fsid_file", metavar="EXT_FSID_FILE",
-        default=DEFAULT_FSID_EXTERNAL_FILE,
-        type=docker_arg_type(str, default=DEFAULT_FSID_EXTERNAL_FILE),
-        help="FSID file at place where it is permanently stored. Default is "
-        f"'{DEFAULT_FSID_EXTERNAL_FILE}'")
-    argument_parser.add_argument(
         "--fsid_file", metavar="FSID_FILE",
         default=DEFAULT_FSID_INTERNAL_FILE,
         type=docker_arg_type(str, default=DEFAULT_FSID_INTERNAL_FILE),
@@ -153,6 +244,12 @@ def main(argv: List[str]) -> None:
         help=f"Directory where this (control) script places its status "
         f"information - for use by healthcheck script. Default is "
         f"'{DEFAULT_STATUS_DIR}'")
+    argument_parser.add_argument(
+        "--check_ext_files", metavar="BASE_URL:SUBDIR:FILENAME[,FILENAME...]",
+        action="append", default=[],
+        help="Verify that given files at given location match files at given "
+        "subdirectory of ULS downloader script. This parameter may be "
+        "specified several times")
     argument_parser.add_argument(
         "--interval_hr", metavar="INTERVAL_HR", default=DEFAULT_INTERVAL_HR,
         type=docker_arg_type(float, default=DEFAULT_INTERVAL_HR),
@@ -175,30 +272,9 @@ def main(argv: List[str]) -> None:
 
     setup_logging(verbose=args.verbose)
 
-    logging.info("ULS downloader started with the following parameters")
-    logging.info(f"ULS download script: {args.download_script}")
-    logging.info(f"Download regions: {args.region if args.region else 'All'}")
-    logging.info(f"Additional ULS download script arguments: "
-                 f"{args.download_script_args}")
-    logging.info(f"Directory where ULS download script puts downloaded file: "
-                 f"{args.result_dir}")
-    logging.info(f"Ultimate downloaded file destination directory: "
-                 f"{args.ext_db_dir}")
-    logging.info(f"Symlink pointing to current ULS file: "
-                 f"{args.ext_db_symlink}")
-    logging.info(f"Long-term FSID table location: {args.ext_fsid_file}")
-    logging.info(f"FSID file location expected by ULS download script: "
-                 f"{args.fsid_file}")
-    logging.info(f"ULS download service state storage directory: "
-                 f"{args.status_dir}")
-    logging.info(f"ULS download interval in hours: {args.interval_hr}")
-    logging.info(f"ULS download script maximum duration in hours: "
-                 f"{args.timeout_hr}")
-    logging.info(f"Run: {'Once' if args.run_once else 'Indefinitely'}")
-    logging.info(f"Print debug info: {'Yes' if args.verbose else 'No'}")
+    print_args(args)
 
     status_storage = StatusStorage(status_dir=args.status_dir)
-    os.makedirs(os.path.dirname(args.ext_fsid_file), exist_ok=True)
     if status_storage.read_milestone(StatusStorage.S.ServiceBirth) is None:
         status_storage.write_milestone(StatusStorage.S.ServiceBirth)
 
@@ -207,6 +283,12 @@ def main(argv: List[str]) -> None:
     error_if(not os.path.isdir(args.ext_db_dir),
              f"External database directory '{args.ext_db_dir}' not found")
 
+    ext_params_file_checker = \
+        ExtParamFilesChecker(
+            ext_files_arg=args.check_ext_files,
+            script_dir=os.path.dirname(args.download_script),
+            status_storage=status_storage)
+
     status_storage.write_milestone(StatusStorage.S.ServiceStart)
 
     while True:
@@ -214,14 +296,24 @@ def main(argv: List[str]) -> None:
         download_start_time = datetime.datetime.now()
         status_storage.write_milestone(StatusStorage.S.DownloadStart)
         try:
-            # Bring in FSID registration file
-            if os.path.isfile(args.ext_fsid_file):
-                shutil.copy2(args.ext_fsid_file, args.fsid_file)
+            current_uls_file = \
+                os.path.join(args.ext_db_dir, args.ext_db_symlink)
 
-            # Clear downloader script output directory
-            if os.path.isdir(args.result_dir):
-                subprocess.run(f"rm -rf {args.result_dir}/*", shell=True,
-                               check=True, timeout=100)
+            if os.path.islink(current_uls_file):
+                logging.info(
+                    f"Current database: '{os.readlink(current_uls_file)}'")
+
+            extract_fsid_table(uls_file=current_uls_file,
+                               fsid_file=args.fsid_file)
+
+            # Clear some directories from stuff left from previous downloads
+            for dir_to_clean in [args.result_dir, args.temp_dir]:
+                if dir_to_clean and os.path.isdir(dir_to_clean):
+                    subprocess.run(f"rm -rf {dir_to_clean}/*", shell=True,
+                                   timeout=100, check=True)
+
+            logging.info("Checking if external parameter files changed")
+            ext_params_file_checker.check()
 
             # Issue download script
             cmdline_args = [args.download_script]
@@ -229,8 +321,9 @@ def main(argv: List[str]) -> None:
                 cmdline_args += ["--region", args.region]
             if args.download_script_args:
                 cmdline_args.append(args.download_script_args)
+            logging.info(f"Starting {' '.join(cmdline_args)}")
             subprocess.run(
-                args=", ".join(cmdline_args) if args.download_script_args
+                args=" ".join(cmdline_args) if args.download_script_args
                 else cmdline_args,
                 check=True, shell=bool(args.download_script_args),
                 cwd=os.path.dirname(args.download_script),
@@ -255,8 +348,6 @@ def main(argv: List[str]) -> None:
             status_storage.write_milestone(StatusStorage.S.DownloadSuccess)
 
             updated_regions = set(new_uls_identity.keys())
-            current_uls_file = \
-                os.path.join(args.ext_db_dir, args.ext_db_symlink)
             if os.path.isfile(current_uls_file):
                 for current_region, current_identity in \
                         (get_uls_identity(current_uls_file) or {}).items():
@@ -267,40 +358,33 @@ def main(argv: List[str]) -> None:
 
             # If anything was updated - do the update routine
             if updated_regions:
-                # Update file
+                # Embed updated FSID table to the new database
+                logging.info("Embedding FSID table")
+                subprocess.run(
+                    [FSID_TOOL, "embed", new_uls_file, args.fsid_file],
+                    check=True)
+
+                # Copy new ULS file to external directory
                 shutil.copy2(new_uls_file, args.ext_db_dir)
 
-                fd, temp_symlink_name = \
-                    tempfile.mkstemp(dir=args.ext_db_dir,
-                                     suffix="_" + args.ext_db_symlink)
-                os.close(fd)
-                # Can be race condition on name here - but we have just one
-                # producer this is astronomically improbable, plus we have just
-                # one producer - so it is also impossible
-                os.unlink(temp_symlink_name)
-                os.symlink(os.path.basename(new_uls_file), temp_symlink_name)
-                subprocess.check_call(
-                    ["mv", "-fT", temp_symlink_name,
-                     os.path.join(args.ext_db_dir, args.ext_db_symlink)])
-
-                # Copy back updated FSID registration file
-                shutil.copy2(args.fsid_file, args.ext_fsid_file)
+                # Retargeting symlink
+                update_uls_file(uls_dir=args.ext_db_dir,
+                                uls_file=os.path.basename(new_uls_file),
+                                symlink=args.ext_db_symlink)
 
                 # Update data change times (for health checker)
-                data_update_times = \
-                    status_storage.read_reg_data_changes(
-                        StatusStorage.S.RegionUpdate)
-                for region in new_uls_identity:
-                    if (region in updated_regions) or \
-                            (region not in data_update_times):
-                        data_update_times[region] = datetime.datetime.now()
-                status_storage.write_reg_data_changes(
-                    StatusStorage.S.RegionUpdate, data_update_times)
+                update_region_change_times(
+                    status_storage=status_storage,
+                    all_regions=list(new_uls_identity.keys()),
+                    updated_regions=updated_regions)
 
                 status_storage.write_milestone(StatusStorage.S.SqliteUpdate)
+            else:
+                logging.info("FS data is identical to previous. No update "
+                             "will be done")
         except (OSError, subprocess.SubprocessError, ProcessingException) \
                 as ex:
-            logging.error(f"Download failed: {repr(ex)}")
+            logging.error(f"Download failed: {ex}")
 
         # Prepare to sleep
         download_duration_sec = \

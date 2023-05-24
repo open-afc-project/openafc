@@ -96,51 +96,37 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
 ###############################################################################
 
 # Downloads antenna files
-def downloadAFCGitHubFiles(dataDir, logFile):
-    # download AFC GitHub data files
-    # Manually view at: https://github.com/Wireless-Innovation-Forum/6-GHz-AFC/tree/main/data/common_data
-    dataURL = 'https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data/'
-    dataFileList = [ 'antenna_model_diameter_gain',
-                    'billboard_reflector',
-                    'category_b1_antennas',
-                    'high_performance_antennas',
-                    'fcc_fixed_service_channelization',
-                    'transmit_radio_unit_architecture',
+def prepareAFCGitHubFiles(rawDir, destDir, logFile):
+    # Files in rawDir are downloaded from
+    # https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data/
+    # (can also be viewed at https://github.com/Wireless-Innovation-Forum/6-GHz-AFC/tree/main/data/common_data)
+    # This function brings them to palatable state in destDir
+    dataFileList = [ 'antenna_model_diameter_gain.csv',
+                    'billboard_reflector.csv',
+                    'category_b1_antennas.csv',
+                    'high_performance_antennas.csv',
+                    'fcc_fixed_service_channelization.csv',
+                    'transmit_radio_unit_architecture.csv',
                   ]
 
     for dataFile in dataFileList:
-
-        try:
-            (local_filename, headers) = urllib.request.urlretrieve(dataURL + dataFile + '.csv', dataFile + '_orig.csv')
-            downloadFlag = True
-        except URLError as e:
-            logFile.write("Failed to download '{}'. '{}'".format(dataFile, e.reason))
-            downloadFlag = False
-
-        if (not downloadFlag) and (dataFile == 'transmit_radio_unit_architecture'):
-            subprocess.call(['cp', dataDir + "/" + dataFile + ".csv", dataFile + '_orig.csv']) 
-            if os.path.isfile(dataFile + '_orig.csv'):
-                downloadFlag = True
-                logFile.write("Using local copy of {}\n".format(dataFile))
-
-        if (not downloadFlag):
-            raise Exception('ERROR: Failed to download {}'.format(dataFile))
-
+        srcFile = os.path.join(rawDir, dataFile)
+        dstFile = os.path.join(destDir, dataFile)
         # Remove control characters.
-        cmd = 'tr -d \'\\200-\\377\\015\' < ' + dataFile + '_orig.csv ' \
+        cmd = 'tr -d \'\\200-\\377\\015\' < ' + srcFile + ' '
         # Remove blank lines.
         # cmd += '| gawk -F "," \'($2 != "") { print }\' ' \
         # Fix spelling error.
         # cmd += '| sed \'s/daimeter/diameter/\' ' \
 
-        cmd += '>| ' + dataFile + '.csv'
+        cmd += '>| ' + dstFile
         os.system(cmd)
-        if dataFile == "fcc_fixed_service_channelization":
+        if dataFile == "fcc_fixed_service_channelization.csv":
             cmd = 'echo -e "5967.4375,30,\n' \
                         +  '6056.3875,30,\n' \
                         +  '6189.8275,30,\n' \
                         +  '6219.4775,30,\n' \
-                        +  '6308.4275,30," >> ' + dataFile + '.csv'
+                        +  '6308.4275,30," >> ' + dstFile
             os.system(cmd)
 
 # Extracts all the zip files into sub-directories
@@ -180,7 +166,7 @@ def verifyCountsFile(directory):
             fileCreationDate = datetime.datetime(year, month, day, hours, mins, sec)
             return fileCreationDate
         else: 
-            raise Exception('ERROR: Could not parse month of FCC string in counts file for ' + dirName + ' update')
+            raise Exception('ERROR: Could not parse month of FCC string in counts file for ' + directory + ' update')
             
 
 # Removes any record with the given id from the given file
@@ -549,31 +535,31 @@ def daily_uls_parse(state_root, interactive):
             ###########################################################################
 
     ###########################################################################
-    # If interactive, prompt for downloading AFC GitHub data files            #
+    # If interactive, prompt for converting AFC GitHub data files            #
     ###########################################################################
     if wfaFlag:
-        downloadAFCGitHubFilesFlag = False
+        prepareAFCGitHubFilesFlag = False
     elif interactive:
         accepted = False
         while not accepted:
-            value = input("Download AFC GitHub data files? (y/n): ")
+            value = input("Prepare AFC GitHub data files? (y/n): ")
             if value == "y":
                 accepted = True
-                downloadAFCGitHubFilesFlag = True
+                prepareAFCGitHubFilesFlag = True
             elif value == "n":
                 accepted = True
-                downloadAFCGitHubFilesFlag = False
+                prepareAFCGitHubFilesFlag = False
             else:
                 print("ERROR: Invalid input: " + value + ", must be y or n")
     else:
-        downloadAFCGitHubFilesFlag = True
+        prepareAFCGitHubFilesFlag = True
     ###########################################################################
 
     ###########################################################################
-    # If downloadAFCGitHubFilesFlag set, download AFC GitHub data files       #
+    # If prepareAFCGitHubFilesFlag set, prepare AFC GitHub data files         #
     ###########################################################################
-    if downloadAFCGitHubFilesFlag:
-        downloadAFCGitHubFiles(root + '/data_files', logFile)
+    if prepareAFCGitHubFilesFlag:
+        prepareAFCGitHubFiles(root + '/raw_wireless_innovation_forum_files', ".", logFile)
     ###########################################################################
 
     ###########################################################################
