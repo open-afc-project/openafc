@@ -384,14 +384,15 @@ def storeDataIdentities(sqlFile, identityDict):
     """
     assert os.path.isfile(sqlFile)
     engine = sa.create_engine("sqlite:///" + sqlFile)
+    metadata = sa.MetaData()
+    metadata.reflect(bind=engine)
     conn = engine.connect()
-    metadata = sa.MetaData(engine)
     if not sa.inspect(engine).has_table("data_ids"):
         dataIdsTable = \
             sa.Table("data_ids", metadata,
                      sa.Column("region", sa.String(100), primary_key=True),
                      sa.Column("identity", sa.String(1000), nullable=False))
-        metadata.create_all()
+        metadata.create_all(engine)
     idsTable = metadata.tables["data_ids"]
     for region in sorted(identityDict.keys()):
         conn.execute(sa.insert(idsTable).values(region=region,
