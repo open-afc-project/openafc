@@ -1,10 +1,28 @@
  # Release Note
 
 ## **Version and Date**
+|Version|**OA-640*|
+| :- | :- |
+|**Date**|**05/24/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-640: Generate FS Database for Brazil
+
+## **Interface Changes**
+ * A new Brazil FS database is generated for SaoPaulo provided by Anatel. It can be downloaded from: https://drive.google.com/file/d/1Rw8jtgFNkVzQ1xqmwpuby6nPxV65j7yn/view?usp=share_link
+
+## **Testing Done**
+ * Validated that the Antenna diameter calculated from F.1245 and F.699 is correct.
+ * Ran a test (attached to OA-699) and confirmed in exc_thr file that the data is valid.
+
+## **Open Issues**
+ *
+
+## **Version and Date**
 |Version|**OA-564*|
 | :- | :- |
 |**Date**|**05/18/2023**|
-
 
 ## **Issues Addressed**
  * Jira OA-564: RLAN with a directional antenna

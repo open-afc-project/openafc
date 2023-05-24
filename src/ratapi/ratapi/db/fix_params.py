@@ -782,6 +782,36 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                             r[fwdHeightStr] = '56'
                         elif float(r[fwdHeightStr]) < 1.5:
                             r[fwdHeightStr] = '1.5'
+                else:
+                    freq = float(r['Center Frequency (MHz)'])
+
+                    for prIdx in range(2*numPR+1):
+                        if prIdx == 0:
+                            prNum = 0
+                            prDir = 0
+                            antType = 'Ant'
+                        else:
+                            prNum = ((prIdx - 1) % numPR) + 1
+                            prDir = (prIdx - 1) // numPR
+                            antType = r['Passive Repeater ' + str(prNum) + ' Ant Type']
+
+                        if prNum == 0:
+                            fwdGainStr    = 'Rx Gain (dBi)'
+                            fwdAntDiameterStr = 'Rx Ant Diameter (m)'
+                        else:
+                            if prDir == 0:
+                                prDirStr = 'Rx'
+                            else:
+                                prDirStr = 'Tx'
+                            fwdGainStr    = 'Passive Repeater ' + str(prNum) + ' Back-to-Back Gain ' + prDirStr + ' (dBi)'
+                            fwdAntDiameterStr = 'Passive Repeater ' + str(prNum) + ' ' + fwd + ' Ant Diameter (m)'
+
+                        if (antType == "Ant"):
+                            if (r[fwdAntDiameterStr] == '-1'):
+                                gain = float(r[fwdGainStr])
+                                wavelength = 2.99792458e2 / freq
+                                D = wavelength*10**((gain-7.7)/20.0)
+                                r[fwdAntDiameterStr] = str(D)
 
             for ri,r in enumerate(csmap[keyv]):
                 fsid = int(r['FSID'])
