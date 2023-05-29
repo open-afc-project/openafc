@@ -1,4 +1,10 @@
  # Release Note
+## **Version and Date**
+|Version|3.8.1.0|
+| :- | :- |
+|**Date**|**05/29/2023**|
+|compiled server's version is TBD | git tag 3.8.1.0|
+
 
 ## **Version and Date**
 |Version|**OA-694*|
