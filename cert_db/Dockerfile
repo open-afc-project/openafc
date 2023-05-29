@@ -54,7 +54,6 @@ chown fbrat:fbrat /var/lib/fbrat
 #
 LABEL revision="afc-cert_db"
 WORKDIR /wd
-EXPOSE 8000
 COPY cert_db/entrypoint.sh /
 # Add debugging env if configured
 ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}

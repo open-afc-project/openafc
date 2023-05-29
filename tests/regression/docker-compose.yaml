@@ -157,6 +157,17 @@ services:
       retries: 3
     dns_search: [.]
 
+  cert_db:
+    image: public.ecr.aws/w9v6y1o0/openafc/cert_db:${TAG:-latest}
+    depends_on:
+      - ratdb
+    links:
+      - ratdb
+      - als_kafka
+    environment:
+      - ALS_KAFKA_SERVER_ID=cert_db
+      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+
 volumes:
   uls_downloader_state:
 

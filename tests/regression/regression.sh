@@ -29,6 +29,7 @@ WORKER_AL_PRINST="public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall" # Alpine
 ULS_UPDATER="110738915961.dkr.ecr.us-east-1.amazonaws.com/uls-updater" # ULS Updater image
 ULS_DOWNLOADER="public.ecr.aws/w9v6y1o0/openafc/uls-downloader" # ULS Downloader image
 
+CERT_DB="public.ecr.aws/w9v6y1o0/openafc/cert_db" # CERT DB image
 RTEST_DI="rtest"                                                 # regression tests image
 
 # TODO: deprecated, will be removed in future release
@@ -161,6 +162,9 @@ build_dev_server() {
   cd ${wd}/src/als && docker_build_and_push Dockerfile.kafka ${ALS_KAFKA}:${tag} ${push} &
   cd ${wd}/src/als && docker_build_and_push Dockerfile.postgres ${ALS_POSTGRES}:${tag} ${push} &
   cd ${wd}
+
+   # build cert db image
+  docker_build_and_push ${wd}/cert_db/Dockerfile ${CERT_DB}:${tag} ${push} &
 
   msg "wait for all images to be built"
   wait
