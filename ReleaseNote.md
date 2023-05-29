@@ -1,6 +1,24 @@
  # Release Note
 
 ## **Version and Date**
+|Version|**OA-694*|
+| :- | :- |
+|**Date**|**05/29/2023**|
+
+
+## **Issues Addressed**
+ * Jira OA-694: put web-gui and msghnd behind nginx saving mTLS auth for API requests
+
+## **Interface Changes**
+ * Now all the http services (WebUI (rat_server), msghnd) are to be behind the dispatcher service.
+ * From now on the all the HTTP requests by default are redirected to https. To disable this behaviour you should set AFC_ENFORCE_HTTPS variable to FALSE.
+ * Removed external ports and VOL_H_APACH VOL_C_APACH variables from apache config.
+
+## **Testing Done**
+ * Automated regression testing - passed
+ * manual testing from WebUI
+ 
+## **Version and Date**
 |Version|**OA-640*|
 | :- | :- |
 |**Date**|**05/24/2023**|

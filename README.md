@@ -345,50 +345,52 @@ also check [docker-compose.yaml](/tests/regression/docker-compose.yaml) and [.en
 version: '3.2'
 services:
   ratdb:
-    image: postgres:9
+    image: public.ecr.aws/w9v6y1o0/openafc/ratdb-image:${TAG:-latest}
     restart: always
-    environment:
-      - POSTGRES_PASSWORD=N3SF0LVKJx1RAhFGx4fcw
-      - PGDATA=/mnt/nfs/pgsql/data
-      - POSTGRES_DB=fbrat
-
+    dns_search: [.]
 
   rmq:
-    image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:latest
+    image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:${TAG:-latest}
     restart: always
+    dns_search: [.]
 
-
-  nginx:
-    image: public.ecr.aws/w9v6y1o0/openafc/ngnx-image:latest
+  dispatcher:
+    image: public.ecr.aws/w9v6y1o0/openafc/dispatcher-image:${TAG:-latest}
     restart: always
-    ports:
-      - "${EXT_MTLS_PORT}:443"
-    volumes:
-      - ${VOL_H_NGNX:-/tmp}:${VOL_C_NGNX:-/dummyngnx}
-    environment:
-      - AFC_MSGHND_NAME=msghnd
-      - AFC_MSGHND_PORT=8000
-    depends_on:
-      - msghnd
-
-
-  rat_server:
-    image: rat_server:latest
-    build:
-      context: .
-      dockerfile: rat_server/Dockerfile
     ports:
       - "${EXT_PORT}:80"
       - "${EXT_PORT_S}:443"
     volumes:
+      - ${VOL_H_NGNX:-/tmp}:${VOL_C_NGNX:-/dummyngnx}
+    environment:
+      - AFC_ENFORCE_HTTPS=${AFC_ENFORCE_HTTPS:-TRUE}
+      - AFC_MSGHND_NAME=msghnd
+      - AFC_MSGHND_PORT=8000
+      - AFC_WEBUI_NAME=rat_server
+      - AFC_WEBUI_PORT=80
+    depends_on:
+      - msghnd
+      - rat_server
+    dns_search: [.]
+
+  rat_server:
+    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server:${TAG:-latest}
+    volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
-      - ${VOL_H_SSL:-/tmp}:${VOL_C_SSL:-/dummy1}
-      - ${VOL_H_APACH:-/tmp}:${VOL_C_APACH:-/dummy2}
       - ./pipe:/pipe
     depends_on:
       - ratdb
       - rmq
       - objst
+      - als_kafka
+      - als_siphon
+      - als_postgres
+    secrets:
+      - NOTIFIER_MAIL.json
+      - OIDC.json
+      - REGISTRATION.json
+      - REGISTRATION_CAPTCHA.json
+    dns_search: [.]
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
@@ -400,13 +402,12 @@ services:
       - AFC_OBJST_HIST_HOST=objst
       # worker params
       - CELERY_TYPE=external
-
+      # ALS params
+      - ALS_KAFKA_SERVER_ID=rat_server
+      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
 
   msghnd:
-    image: msghnd
-    build:
-      context: .
-      dockerfile: msghnd/Dockerfile
+    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd:${TAG:-latest}
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
@@ -415,11 +416,17 @@ services:
       - AFC_OBJST_HOST=objst
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_SCHEME=HTTP
+      # ALS params
+      - ALS_KAFKA_SERVER_ID=msghnd
+      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+    dns_search: [.]
     depends_on:
       - ratdb
       - rmq
       - objst
-
+      - als_kafka
+      - als_siphon
+      - als_postgres
 
   objst:
     image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:-latest}
@@ -427,15 +434,12 @@ services:
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_HIST_PORT=4999
       - AFC_OBJST_LOCAL_DIR=/storage
-
-
+    dns_search: [.]
   worker:
-    image: worker
-    build:
-      context: .
-      dockerfile: worker/Dockerfile
+    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
+      - ./pipe:/pipe
     environment:
       # Filestorage params:
       - AFC_OBJST_HOST=objst
@@ -446,10 +450,68 @@ services:
       # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
+      # afc-engine preload lib params
+      - AFC_AEP_ENABLE=1
+      - AFC_AEP_DEBUG=1
+      - AFC_AEP_REAL_MOUNTPOINT=${VOL_C_DB}/3dep/1_arcsec
     depends_on:
       - ratdb
       - rmq
       - objst
+    dns_search: [.]
+
+  als_kafka:
+    image: public.ecr.aws/w9v6y1o0/openafc/als-kafka-image:${TAG:-latest}
+    restart: always
+    environment:
+      - KAFKA_ADVERTISED_HOST=${ALS_KAFKA_SERVER_}
+      - KAFKA_CLIENT_PORT=${ALS_KAFKA_CLIENT_PORT_}
+    dns_search: [.]
+
+  als_siphon:
+    image: public.ecr.aws/w9v6y1o0/openafc/als-siphon-image:${TAG:-latest}
+    restart: always
+    environment:
+      - KAFKA_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - POSTGRES_HOST=als_postgres
+      - INIT_IF_EXISTS=skip
+    depends_on:
+      - als_kafka
+      - als_postgres
+    dns_search: [.]
+
+  als_postgres:
+    image: public.ecr.aws/w9v6y1o0/openafc/als-postgres-image:${TAG:-latest}
+    dns_search: [.]
+
+  uls_downloader:
+    image: public.ecr.aws/w9v6y1o0/openafc/uls-downloader:${TAG:-latest}
+    restart: always
+    volumes:
+      - ${VOL_H_DB}/ULS_Database:/ULS_Database
+      - uls_downloader_state:/uls_downloader_state
+    secrets:
+      - NOTIFIER_MAIL.json
+    healthcheck:
+      test: ["CMD", "/wd/uls_service_healthcheck.py", "--status_dir=/uls_downloader_state", "--smtp_info=${VOL_C_SECRETS}/NOTIFIER_MAIL.json"]
+      interval: 1h
+      timeout: 1m
+      retries: 3
+    dns_search: [.]
+
+volumes:
+  uls_downloader_state:
+
+secrets:
+    NOTIFIER_MAIL.json:
+        file: ${VOL_H_SECRETS}/NOTIFIER_MAIL.json
+    OIDC.json:
+        file: ${VOL_H_SECRETS}/OIDC.json
+    REGISTRATION.json:
+        file: ${VOL_H_SECRETS}/REGISTRATION.json
+    REGISTRATION_CAPTCHA.json:
+        file: ${VOL_H_SECRETS}/REGISTRATION_CAPTCHA.json
+
 ```
 `.env` file used with the docker-compose.yaml. please read comments in the file and update it accordingly 
 ```
@@ -461,6 +523,8 @@ services:
 # --------------------------------------------------- #
 
 # -= MUST BE defined =-
+# Wether to forward all http requests to https
+AFC_ENFORCE_HTTPS=TRUE
 
 # Host static DB root dir
 VOL_H_DB=/opt/afc/databases/rat_transfer
@@ -506,8 +570,6 @@ EXT_MTLS_PORT=172.31.11.188:544-644
 # files in these host volumes
 VOL_H_SSL=./ssl
 VOL_C_SSL=/etc/httpd/certs
-VOL_H_APACH=./apache-conf
-VOL_C_APACH=/etc/httpd/conf.d
 VOL_H_NGNX=./ssl/nginx
 VOL_C_NGNX=/certificates/servers
 
@@ -586,6 +648,11 @@ chown 999:999 /var/databases/pgdata
 |CELERY_OPTIONS|`rat_1`|worker|Celery app instance to use|
 |CELERY_LOG|`INFO`|worker|Celery log level. `ERROR` or `INFO` or `DEBUG`|
 |AFC_ENGINE_LOG_LVL|'info'|worker|afc-engine log level|
+|AFC_MSGHND_NAME|msghnd|dispatcher|Message handler service hostname|
+|AFC_MSGHND_PORT|8000|dispatcher|Message handler service HTTP port|
+|AFC_WEBUI_NAME|rat_server|dispatcher|WebUI service hostname|
+|AFC_WEBUI_PORT|80|dispatcher|WebUI service HTTP Port|
+|AFC_ENFORCE_HTTPS|TRUE|dispatcher|Wether to enforce forwarding of HTTP requests to HTTPS. TRUE - for enable, everything else - to disable|
 
 
 ## RabbitMQ settings
