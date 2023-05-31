@@ -68,6 +68,11 @@ http {
             proxy_set_header   "Connection" "";
         }
 
+        # forbid internal tests
+        location /fbrat/ap-afc/1.4/availableSpectrumInquiryInternal {
+            return 403;
+        }
+
         location / {
             sendfile on;
             proxy_bind $server_addr;
@@ -127,6 +132,11 @@ http {
             # keep connections open by changing it's header
             proxy_http_version 1.1;
             proxy_set_header   "Connection" "";
+        }
+
+        # forbid internal tests
+        location /fbrat/ap-afc/1.4/availableSpectrumInquiryInternal {
+            return 403;
         }
 
         location / {

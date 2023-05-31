@@ -1976,6 +1976,11 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 					hasRLANAntenna = true;
 				}
 			}
+
+			std::string extensionId = vendorExtensionObj["extensionId"].toString().toStdString();
+			if (extensionId == "OpenAfcOverrideAfcConfig") {
+				AfcManager::_uls = parametersObj["ulsDatabase"].toString().toStdString();
+			}
 		}
 
 		if (inquiredChannelsArray.size() + inquiredFrequencyRangeArray.size() == 0) {
@@ -3209,7 +3214,10 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 			_ulsDatabaseList.push_back(std::make_tuple(name, dbfile));
 		}
 	} else {
-		std::string dbfile = _mntPath + "/rat_transfer/ULS_Database/" + jsonObj["ulsDatabase"].toString().toStdString();
+		std::string dbfile = _mntPath + "/rat_transfer/ULS_Database/" +
+			(AfcManager::_uls.empty() ?
+			jsonObj["ulsDatabase"].toString().toStdString() :
+			AfcManager::_uls);
 		_ulsDatabaseList.push_back(std::make_tuple("FSDATA", dbfile));
 	}
 

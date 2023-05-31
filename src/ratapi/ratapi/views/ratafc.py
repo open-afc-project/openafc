@@ -43,6 +43,7 @@ from .. import als
 from ..models.base import db
 from flask_login import current_user
 import traceback
+from urllib.parse import urlparse
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -394,6 +395,28 @@ class RatAfc(MethodView):
         return self._auth_cert_id(cert_id, ruleset, indoor)
 
 
+    def __filter(self, url, json):
+        """ Check correspondence of URL to request file.
+        Return true if the request should be filtered."""
+        urlp = urlparse(url)
+        if urlp.path.endswith("/1.4/availableSpectrumInquiryInternal"):
+            # It's internal test
+            return False
+        if "availableSpectrumInquiryRequests" not in json:
+            # No requests in the json
+            return False
+        requests = json["availableSpectrumInquiryRequests"]
+        for request in requests:
+            if "vendorExtensions" not in request:
+                break
+            extensions = request["vendorExtensions"]
+            for extension in extensions:
+                if "extensionId" not in extension:
+                    break;
+                if (extension["extensionId"] == "OpenAfcOverrideAfcConfig"):
+                    return True
+        return False
+
     def get(self):
         ''' GET method for Analysis Status '''
         LOGGER.debug('RatAfc::get()')
@@ -425,8 +448,11 @@ class RatAfc(MethodView):
     def post(self):
         ''' POST method for RAT AFC
         '''
-        LOGGER.debug('RatAfc::post()')
-        LOGGER.debug(flask.request.url)
+        LOGGER.debug('RatAfc::post() from {}'.format(flask.request.url))
+
+        if self.__filter(flask.request.url, flask.request.json):
+            LOGGER.debug("request filtered out")
+            raise RuntimeError("Wrong analysisRequest.json from {}".format(flask.request.url))
 
         # check request version
         ver = flask.request.json["version"]
@@ -667,11 +693,17 @@ class RatAfc(MethodView):
         resp.content_type = 'application/json'
         return resp
 
+class RatAfcInternal(MethodView):
+    """ Allow to regiter second URL on RatAfc """
+    pass
 
 # registration of default runtime options
 
 module.add_url_rule('/1.4/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))
+
+module.add_url_rule('/1.4/availableSpectrumInquiryInternal',
+                    view_func=RatAfc.as_view('RatAfcInternal'))
 
 # Local Variables:
 # mode: Python
