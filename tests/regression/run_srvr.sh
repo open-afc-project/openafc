@@ -43,7 +43,7 @@ check_ret $?
 [ -d ~/template_regrtest/ssl ] && cp -a ~/template_regrtest/ssl .
 
 # run srvr
-docker-compose down && docker-compose up -d && docker ps -a
+docker-compose down -v && docker-compose up -d && docker ps -a
 check_ret $?
 sleep 5
 
