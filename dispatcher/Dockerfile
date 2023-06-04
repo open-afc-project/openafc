@@ -34,13 +34,11 @@ RUN set -x \
     /etc/nginx/templates
 
 # Server side certificates
-COPY dispatcher/certs/servers/server.cert.pem /certificates/servers/
-COPY dispatcher/certs/servers/server.key.pem /certificates/servers/
-COPY dispatcher/certs/clients/client.bundle.pem /certificates/clients/
-# Client side certificates
-COPY dispatcher/certs/servers/server.bundle.pem /certificates/servers/
-COPY dispatcher/certs/clients/client.key.pem /certificates/clients/
-COPY dispatcher/certs/clients/client.bdl.pem /certificates/clients/
+COPY dispatcher/certs/servers/server.cert.pem \
+dispatcher/certs/servers/server.key.pem /certificates/servers/
+# Client side CA certificates
+COPY dispatcher/certs/clients/test_ca_crt.pem \
+/certificates/clients/
 
 # Copy nginx configuration files
 COPY dispatcher/nginx.conf /etc/nginx/

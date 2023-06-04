@@ -45,7 +45,12 @@ loop() {
         echo "from $s  to $e"
         # run processes and store pids in array
         for i in `seq $((s+1)) ${e}`; do
-            docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} --cmd=run --testcase_indexes=${i} ${verify_tls} ${ext_args} &
+            docker run --rm ${di_name} --addr=${addr} --port=${port} \
+                --prot=${prot} --cmd=run --testcase_indexes=${i} \
+                --prefix_cmd  /usr/app/certs.sh cert_client \
+                ${verify_tls} ${ext_args} \
+                --cli_cert /usr/app/test_cli/test_cli_crt.pem \
+                --cli_key /usr/app/test_cli/test_cli_key.pem &
             pids+=( $! )
         done
         s=$((s + ${step}))

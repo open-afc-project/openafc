@@ -30,6 +30,7 @@ import re
 import requests
 import shutil
 import sqlite3
+import subprocess
 import sys
 import time
 from deepdiff import DeepDiff
@@ -1646,6 +1647,12 @@ def get_version(cfg):
     app_log.info('AFC Test db hash %s', get_md5(AFC_TEST_DB_FILENAME))
 
 
+def pre_hook(cfg):
+    """Execute provided functionality prior to main command"""
+    app_log.debug(f"{inspect.stack()[0][3]}()")
+    return subprocess.call(cfg['prefix_cmd'])
+
+
 def parse_run_test_args(cfg):
     """Parse arguments for command 'run_test'"""
     app_log.debug(f"{inspect.stack()[0][3]}()")
@@ -1715,7 +1722,7 @@ def make_arg_parser():
                          help="<secs> - set timeout for asynchronous "
                               "connection (default=None). \n")
     args_parser.add_argument('--verif', action='store_true',
-                         help="<verif> - skip SSL veryfication "
+                         help="<verif> - skip SSL verification "
                               "on post request.\n")
     args_parser.add_argument('--outfile', nargs=1, type=str,
                          help="<filename> - set filename for test "
@@ -1774,6 +1781,9 @@ def make_arg_parser():
                          help="<filename> - set client private key filename.\n")
     args_parser.add_argument('--dev_desc', action='store_true',
                          help="parse only device descriptors values.\n")
+    args_parser.add_argument('--prefix_cmd', nargs='*', type=str,
+                         help="hook to call currently provided command before "
+                         "main command specified by --cmd option.\n")
 
     args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?',
         help="run - run test from DB and compare.\n"
@@ -1811,6 +1821,18 @@ def prepare_args(parser, cfg):
     return execution_map[cfg['cmd']][1](cfg)
 
 
+def main_execution(cfg):
+    """Call all requested commands"""
+    app_log.debug(f"{inspect.stack()[0][3]}()")
+    if (isinstance(cfg['prefix_cmd'], list) and
+        (pre_hook(cfg) == AFC_ERR)):
+        return AFC_ERR
+    if isinstance(cfg['cmd'], type(None)):
+        parser.print_help()
+        return AFC_ERR
+    return execution_map[cfg['cmd']][0](cfg)
+
+
 def main():
     """Main function of the utility"""
     app_log.setLevel(logging.INFO)
@@ -1825,10 +1847,7 @@ def main():
         # error in preparing arguments
         res = AFC_ERR
     else:
-        if isinstance(test_cfg['cmd'], type(None)):
-            parser.print_help()
-        else:
-            res = execution_map[test_cfg['cmd']][0](test_cfg)
+        res = main_execution(test_cfg)
     sys.exit(res)
 
 

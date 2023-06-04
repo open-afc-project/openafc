@@ -89,9 +89,9 @@ http {
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_prefer_server_ciphers on;
         ssl_certificate /certificates/servers/server.cert.pem;
-	    ssl_certificate_key /certificates/servers/server.key.pem;
+	ssl_certificate_key /certificates/servers/server.key.pem;
 
-        ssl_client_certificate /certificates/clients/client.bundle.pem;
+        ssl_client_certificate /certificates/clients/test_ca_crt.pem;
         ssl_verify_client optional;
         ssl_verify_depth 10;
 
@@ -155,10 +155,10 @@ http {
         #    root   /usr/share/nginx/html;
         #}
 
-        #error_page 403 /403.html;
-        #location /403.html {
-        #    access_log /dev/stdout error_fmt;
-        #}
+        error_page 403 /403.html;
+        location /403.html {
+            access_log /dev/stdout error_fmt;
+        }
     }
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
