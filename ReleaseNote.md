@@ -1,5 +1,22 @@
  # Release Note
 ## **Version and Date**
+|Version|3.8.2.0|
+| :- | :- |
+|**Date**|**06/7/2023**|
+|compiled server's version is TBD | git tag 3.8.2.0|
+
+## **Issues Addressed**
+ * Jira OA-715 Take loglvl from AFC_RATAPI_LOG_LEVEL (#553)
+ * Jira OA-709 Use yaml.Loader when yaml.CLoader is unavailable (#552)
+ * Jira OA-716 redesigning redirect rules in both apache and nginx (#555)
+ * Jira OA-718 adding tzdata (#556)
+ * Jira OA-701 Provide mtls certification during regressoin tests (#546)
+ * Jira OA-708 Cleaning volumes after compose completion (#551)
+ * Jira OA-692 ULS test internal URL (#548)
+
+
+ # Release Note
+## **Version and Date**
 |Version|3.8.1.0|
 | :- | :- |
 |**Date**|**05/29/2023**|
