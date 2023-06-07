@@ -57,7 +57,10 @@ def get_yaml(filename: str, secret_name: str, secret_value: Optional[str]) \
             (os.path.splitext(secret_name)[1] not in YAML_EXTENSIONS):
         return (True, None)
     try:
-        return (True, yaml.load(secret_value, Loader=yaml.CLoader))
+        return (True,
+                yaml.load(secret_value,
+                          Loader=yaml.CLoader if hasattr(yaml, "CLoader")
+                          else yaml.Loader))
     except yaml.YAMLError as ex:
         logging.error(f"File '{filename}' has incorrectly formatted YAML "
                       f"secret '{secret_name}': {ex}")
@@ -134,7 +137,10 @@ def manifests(files: List[str], is_template: Optional[bool] = None) \
             yield ManifestInfo(filename=filename, valid=False)
         try:
             with open(filename, encoding="utf-8") as f:
-                yaml_dict = yaml.load(f, Loader=yaml.CLoader)
+                yaml_dict = \
+                    yaml.load(f,
+                              Loader=yaml.CLoader if hasattr(yaml, "CLoader")
+                              else yaml.Loader)
         except OSError as ex:
             logging.error(f"Error reading manifest file '{filename}': {ex}")
             yield ManifestInfo(filename=filename, valid=False)
