@@ -21,6 +21,7 @@ import json
 import glob
 import re
 import datetime
+import appcfg
 from flask.views import MethodView
 import werkzeug.exceptions
 from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
@@ -34,6 +35,7 @@ from fst import DataIf
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(appcfg.AFC_RATAPI_LOG_LEVEL)
 
 #: All views under this API blueprint
 module = flask.Blueprint('ratapi-v1', 'ratapi')

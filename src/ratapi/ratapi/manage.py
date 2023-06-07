@@ -811,7 +811,7 @@ class CertIdCreate(Command):
         from contextlib import closing
         import datetime
         from .models.aaa import CertId, Ruleset, Organization
-        LOGGER.debug('CertIdCreate._create_cert_id() %s %s %s',
+        LOGGER.debug('CertIdCreate._create_cert_id() %s %s',
                       cert_id, ruleset_id)
         with flaskapp.app_context():
             if not ruleset_id:
@@ -997,7 +997,7 @@ class OrganizationCreate(Command):
         from contextlib import closing
         import datetime
         from .models.aaa import Organization
-        LOGGER.debug('OrganizationCreate._create_org() %s %s', name)
+        LOGGER.debug('OrganizationCreate._create_org() %s', name)
         with flaskapp.app_context():
             if name is None:
                 raise RuntimeError('Name required')
