@@ -3,7 +3,7 @@
 |Version|3.8.2.0|
 | :- | :- |
 |**Date**|**06/7/2023**|
-|compiled server's version is TBD | git tag 3.8.2.0|
+|compiled server's version is 51930bc | git tag 3.8.2.0|
 
 ## **Issues Addressed**
  * Jira OA-715 Take loglvl from AFC_RATAPI_LOG_LEVEL (#553)
