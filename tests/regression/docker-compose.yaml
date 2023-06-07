@@ -26,6 +26,10 @@ services:
       - AFC_MSGHND_PORT=8000
       - AFC_WEBUI_NAME=rat_server
       - AFC_WEBUI_PORT=80
+      # Filestorage params:
+      - AFC_OBJST_HOST=objst
+      - AFC_OBJST_PORT=5000
+      - AFC_OBJST_SCHEME=HTTP
     depends_on:
       - msghnd
       - rat_server

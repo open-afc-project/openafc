@@ -83,40 +83,17 @@ class DataIntHttp(DataInt):
 
 class DataIfBaseV1():
     """ Object storage access """
-    AUTO = "auto"
-    HTTP = "http"
-    HTTPS = "https"
+    HTTP = "HTTP"
+    HTTPS = "HTTPS"
 
     # HTTPS connection timeout before falling to HTTP
     HTTPS_TIMEOUT = 0.5
 
-    def __init__(self, probeHttps):
-        def httpsProbe(host, port, probeHttps):
-            if probeHttps is False:
-                return False
-            if not host or not port:
-                raise Exception("Missing host:port")
-            url = "https://" + host + ":" + str(port) + "/"
-            try:
-                requests.head(url, timeout=self.HTTPS_TIMEOUT)
-            except requests.exceptions.ConnectionError:  # fall to http
-                app_log.debug("httpsProbe() fall to HTTP")
-                return False
-            # use https
-            app_log.debug("httpsProbe() HTTPS ok")
-            return True
-
-        if self._prot == self.AUTO:
-            if httpsProbe(self._host, self._port, probeHttps):
-                self._prot = self.HTTPS
-            else:
-                self._prot = self.HTTP
-
-        self._pref = None
-        if self._prot == self.HTTP:
-            self._pref = "http://" + self._host + ":" + str(self._port) + "/"
-        elif self._prot == self.HTTPS:
-            self._pref = "https://" + self._host + ":" + str(self._port) + "/"
+    def __init__(self):
+        assert self._host is not None, "Missing host"
+        assert self._port is not None, "Missing port"
+        assert self._prot in (self.HTTP, self.HTTPS), "Wrong or missing scheme"
+        self._pref = self._prot + "://" + self._host + ":" + str(self._port) + "/"
 
     def open(self, r_name):
         """ Create FileInt instance """
@@ -124,39 +101,41 @@ class DataIfBaseV1():
         app_log.debug("DataIfBaseV1.open({})".format(r_name))
         return DataIntHttp(r_name)
 
+    @staticmethod
+    def httpsProbe(host, port):
+        if not host or not port:
+            raise Exception("Missing host:port")
+        url = "https://" + host + ":" + str(port) + "/"
+        try:
+            requests.head(url, timeout=self.HTTPS_TIMEOUT)
+        except requests.exceptions.ConnectionError:  # fall to http
+            app_log.debug("httpsProbe() fall to HTTP")
+            return False
+        # use https
+        app_log.debug("httpsProbe() HTTPS ok")
+        return True
 
 class DataIf(DataIfBaseV1):
     """ Wrappers for RATAPI data operations """
-    def __init__(self, prot=DataIfBaseV1.AUTO, host=None, port=None, probeHttps=None):
+    def __init__(self, prot=None, host=None, port=None):
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         # Assign default args from env vars
         self._host = host
-        if host is None:
-            self._host =conf.AFC_OBJST_HOST
+        if self._host is None:
+            self._host = conf.AFC_OBJST_HOST
+
         self._port = port
-        if port is None:
+        if self._port is None:
             self._port = conf.AFC_OBJST_PORT
-        scheme = conf.AFC_OBJST_SCHEME
-        if probeHttps is None:
-            probeHttps = False
-
-        # Clarify protocol by env.vars
-        if prot == self.AUTO:
-            if scheme == "HTTPS":
-                prot = self.HTTPS
-            if scheme == "HTTP":
-                prot = self.HTTP
-
-        # Check protocol
-        if prot not in (self.HTTP, self.HTTPS, self.AUTO):
-            raise Exception("Bad prot arg")
 
         self._prot = prot
+        if self._prot is None:
+            self._prot = conf.AFC_OBJST_SCHEME
 
-        DataIfBaseV1.__init__(self, probeHttps)
+        DataIfBaseV1.__init__(self)
 
-        app_log.debug("DataIf.__init__: prot={} host={} port={} probeHttps={} scheme={} _pref={}"
-                      .format(self._prot, self._host, self._port, probeHttps, scheme, self._pref))
+        app_log.debug("DataIf.__init__: prot={} host={} port={} _pref={}"
+                      .format(self._prot, self._host, self._port, self._pref))
 
     def rname(self, baseName):
         """ Return remote file name by basename """
