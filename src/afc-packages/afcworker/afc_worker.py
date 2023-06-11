@@ -99,8 +99,11 @@ def run(prot, host, port, state_root, request_type, task_id, hash_val,
             ]
             LOGGER.debug(cmd)
             proc = subprocess.Popen(cmd, stderr=err_file, stdout=log_file)
-
-            retcode = proc.wait()
+            try:
+                retcode = proc.wait(timeout=afctask.AFC_ENG_TIMEOUT)
+            except:
+                LOGGER.error("run(): afc-engine timeout error")
+                raise subprocess.CalledProcessError(retcode, cmd)
             if retcode:
                 raise subprocess.CalledProcessError(retcode, cmd)
 

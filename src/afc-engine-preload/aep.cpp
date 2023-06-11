@@ -26,14 +26,18 @@
 #include <sys/sendfile.h>
 #include <sys/time.h>
 #include <sys/mman.h>
-
-/* max number of simultaneously open files */
-#define AEP_NO_FILES 30
+#include <map>
 
 #define AEP_PATH_MAX PATH_MAX
 #define AEP_FILENAME_MAX FILENAME_MAX
 
 #define HASH_SIZE	USHRT_MAX
+
+/* debug flags */
+#define DBG_LOG		1	/* statistic log */
+#define DBG_DBG		2	/* debug messages */
+#define DBG_CACHED	8	/* cached file IO */
+#define DBG_ANY		4	/* any file IO */
 
 #define aep_assert(cond, format, ...) \
 	if (!(cond)) { \
@@ -44,7 +48,7 @@
 		abort(); \
 	}
 #define dbg(format, ...) \
-	if (aep_debug & 2) { \
+	if (aep_debug & DBG_DBG) { \
 		dprintf(logfile, "%d: " format "\n", getpid(), ##__VA_ARGS__); \
 	}
 #define dbge(format, ...) \
@@ -53,15 +57,15 @@
 		dprintf(logfile, format " Error!\n", ##__VA_ARGS__); \
 	}
 #define dbgd(format, ...) \
-	if (aep_debug & 8) { \
+	if (aep_debug & DBG_CACHED) { \
 		dprintf(logfile, "data " format "\n", ##__VA_ARGS__); \
 	}
 #define dbgo(format, ...) \
-	if (aep_debug & 4) { \
+	if (aep_debug & DBG_ANY) { \
 		dprintf(logfile, "orig " format "\n", ##__VA_ARGS__); \
 	}
 #define dbgl(format, ...) \
-	if (aep_debug & 1) { \
+	if (aep_debug & DBG_LOG) { \
 		dprintf(logfile, format "\n", ##__VA_ARGS__); \
 	}
 
@@ -195,8 +199,10 @@ typedef struct
 	fe_t *readdir_p;
 } data_fd_t;
 
-static fe_t tree = {}; /* the root "/" entry of file tree */
-static data_fd_t data_fds[AEP_NO_FILES] = {};
+/* the root "/" entry of file tree */
+static fe_t tree = {};
+/* open files array */
+static std::map<int, data_fd_t> data_fds;
 
 /* Dynamically allocated buffers. Sometime in the future I'll free them */
 static uint8_t *filelist; /* row file tree buffer */
@@ -218,9 +224,11 @@ static volatile int8_t *open_files;
 static sem_t *shmem_sem;
 static int64_t claimed_size;
 
-static data_fd_t* fd_get_data_fd(int fd);
-static char* fd_get_name(int fd);
-static void fd_rm(int fd);
+static data_fd_t* fd_get_data_fd(const int fd);
+static char* fd_get_dbg_name(const int fd);
+static void fd_set_dbg_name(const int fd, const char* tpath);
+static void fd_rm(const int fd, bool closeit = false);
+
 static int download_file_nfs(data_fd_t *data_fd, char *dest);
 static ssize_t read_remote_data_nfs(void *destv, size_t size, char *tpath, off_t off);
 static int download_file_gs(data_fd_t *data_fd, char *dest);
@@ -231,7 +239,7 @@ static bool fd_is_remote(int fd);
 
 static inline void prn_statistic()
 {
-	if (!(aep_debug & 3)) {
+	if (!(aep_debug & (DBG_LOG | DBG_DBG))) {
 		return;
 	}
 	dprintf(logfile,
@@ -281,8 +289,8 @@ static inline FILE* orig_fopen(const char *path, const char *mode)
 	FILE *ret;
 
 	ret = (*orig)(path, mode);
-	if (aep_debug && ret) {
-		strcpy(data_fds[fileno(ret)].tpath, path);
+	if (ret) {
+		fd_set_dbg_name(fileno(ret), path);
 	}
 	return ret;
 }
@@ -312,9 +320,7 @@ static inline int orig_open(const char *pathname, int flags, ...)
 	orig_open_t orig = (orig_open_t) dlsym(RTLD_NEXT, "open");
 
 	fd = (*orig)(pathname, flags, 0666);
-	if (aep_debug && fd >= 0) {
-		strcpy(data_fds[fd].tpath, pathname);
-	}
+	fd_set_dbg_name(fd, pathname);
 	return fd;
 }
 
@@ -325,9 +331,7 @@ static inline int orig_openat(int dirfd, const char *pathname, int flags, ...)
 	int fd;
 
 	fd = (*orig)(dirfd, pathname, flags);
-	if (aep_debug && fd >= 0) {
-		strcpy(data_fds[fd].tpath, pathname);
-	}
+	fd_set_dbg_name(fd, pathname);
 	return fd;
 }
 
@@ -354,7 +358,7 @@ static inline ssize_t orig_read(int fd, void *buf, size_t count)
 	orig_read_t orig = (orig_read_t) dlsym(RTLD_NEXT, "read");
 
 	ret = (*orig)(fd, buf, count);
-	dbgo("orig_read(%d, %zu) %zd", fd, count, ret);
+	//dbgo("orig_read(%d, %zu) %zd", fd, count, ret);
 	return ret;
 }
 
@@ -415,8 +419,8 @@ static inline DIR* orig_opendir(const char *name)
 	DIR *ret;
 
 	ret = (*orig)(name);
-	if (aep_debug && ret) {
-		strcpy(data_fds[dirfd(ret)].tpath, name);
+	if (ret) {
+		fd_set_dbg_name(dirfd(ret), name);
 	}
 	return ret;
 }
@@ -482,13 +486,13 @@ static fe_t* find_fe(char *tpath)
 /* never used */
 static size_t f_read(FILE *f, unsigned char *buf, size_t size)
 {
-	dbgo("FILE->read(%d(%s), %zu)", fileno(f), fd_get_name(fileno(f)), size);
+	dbgo("FILE->read(%d(%s), %zu)", fileno(f), fd_get_dbg_name(fileno(f)), size);
 	return 0;
 }
 /* never used */
 static size_t f_write(FILE *f, const unsigned char *buff, size_t size)
 {
-	dbgo("FILE->write(%d(%s), %zu)", fileno(f), fd_get_name(fileno(f)), size);
+	dbgo("FILE->write(%d(%s), %zu)", fileno(f), fd_get_dbg_name(fileno(f)), size);
 	f->wpos = 0;
 	return 0;
 }
@@ -496,7 +500,7 @@ static size_t f_write(FILE *f, const unsigned char *buff, size_t size)
 static off_t f_seek(FILE *f, off_t off, int whence)
 {
 	data_fd_t *data_fd = fd_get_data_fd(fileno(f));
-	dbgd("FILE->seek(%d(%s), %jd, %d)", fileno(f), fd_get_name(fileno(f)), off, whence);
+	dbgd("FILE->seek(%d(%s), %jd, %d)", fileno(f), fd_get_dbg_name(fileno(f)), off, whence);
 	switch (whence) {
 	case SEEK_SET: /* 0 */
 		data_fd->off = off;
@@ -508,14 +512,14 @@ static off_t f_seek(FILE *f, off_t off, int whence)
 		data_fd->off = data_fd->fe->size + off;
 		break;
 	}
-	dbgd("FILE->seek(%d(%s), %jd, %d) %jd", fileno(f), fd_get_name(fileno(f)), off, whence, data_fd->off);
+	dbgd("FILE->seek(%d(%s), %jd, %d) %jd", fileno(f), fd_get_dbg_name(fileno(f)), off, whence, data_fd->off);
 	return data_fd->off;
 }
 
 /* never used */
 static int f_close(FILE *f)
 {
-	dbgd("FILE->close(%d(%s))", fileno(f), fd_get_name(fileno(f)));
+	dbgd("FILE->close(%d(%s))", fileno(f), fd_get_dbg_name(fileno(f)));
 	fd_rm(fileno(f));
 	return 0;
 }
@@ -555,6 +559,7 @@ static uint16_t hash_fname(const char *str)
 
 static uint8_t files_open_set(const char *name, int val)
 {
+	aep_assert(strcmp(name, "noname"), "files_open_set(noname)");
 	uint16_t fno = hash_fname(name);
 	uint8_t ret;
 
@@ -570,6 +575,7 @@ static uint8_t files_open_set(const char *name, int val)
 
 static uint8_t files_open_get(const char *name)
 {
+	aep_assert(strcmp(name, "noname"), "files_open_get(noname)");
 	uint16_t fno = hash_fname(name);
 	uint8_t ret;
 
@@ -581,6 +587,7 @@ static uint8_t files_open_get(const char *name)
 
 static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 {
+	dbg("read_data(%s)", data_fd->tpath);
 	char fakepath[AEP_PATH_MAX];
 	ssize_t ret;
 	ssize_t (*read_remote_data)(void *destv, size_t size, char *tpath, off_t off) =
@@ -592,8 +599,8 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	sem_t *sem;
 	bool is_cached = false;
 
-	strcpy(fakepath, cache_path);
-	strcat(fakepath, data_fd->tpath);
+	strncpy(fakepath, cache_path, AEP_PATH_MAX);
+	strncat(fakepath, data_fd->tpath, AEP_PATH_MAX - strlen(fakepath));
 
 	sem = semopen(data_fd->tpath);
 	//dbg("read_data %s", data_fd->tpath);
@@ -665,15 +672,16 @@ static int fd_add(char *tpath)
 	char fakepath[AEP_PATH_MAX];
 	char *p = fakepath;
 	struct stat statbuf;
+	data_fd_t *data_fd;
 
 	fe = find_fe(tpath);
 	if (!fe) {
 		return -1;
 	}
-	//dbg("fd_add(%s) size 0x%jx", tpath, fe->size);
+	dbg("fd_add(%s) size 0x%jx", tpath, fe->size);
 
-	strcpy(fakepath, cache_path);
-	strcat(fakepath, tpath);
+	strncpy(fakepath, cache_path, AEP_PATH_MAX);
+	strncat(fakepath, tpath, AEP_PATH_MAX - strlen(fakepath));
 
 	/* create cache file */
 	if (orig_stat(fakepath, &statbuf)) {
@@ -699,70 +707,93 @@ static int fd_add(char *tpath)
 		files_open_set(tpath, 1);
 	}
 	fd = orig_open(fakepath, O_RDONLY);
-	aep_assert(fd >= 0, "fd_add(%s) open()", tpath);
-	memset(data_fds + fd, 0, sizeof(data_fd_t));
+	data_fd = &data_fds[fd];
+	memset(data_fd, 0, sizeof(data_fd_t));
 	aep_assert(!orig_fstat(fd, &statbuf), "fd_add(%s) fstat", tpath);
-	data_fds[fd].fe = fe;
-	data_fds[fd].off = 0;
+	data_fd->fe = fe;
+	data_fd->off = 0;
 #ifndef __GLIBC__
-	data_fds[fd].file.fd = fd;
-	data_fds[fd].file.read = f_read;
-	data_fds[fd].file.write = f_write;
-	data_fds[fd].file.seek = f_seek;
-	data_fds[fd].file.close = f_close;
+	data_fd->file.fd = fd;
+	data_fd->file.read = f_read;
+	data_fd->file.write = f_write;
+	data_fd->file.seek = f_seek;
+	data_fd->file.close = f_close;
 #endif
-	data_fds[fd].readdir_p = NULL;
-	data_fds[fd].dir.fd = fd;
-	strcpy(data_fds[fd].tpath, tpath);
+	data_fd->readdir_p = NULL;
+	data_fd->dir.fd = fd;
+	strncpy(data_fd->tpath, tpath, AEP_PATH_MAX);
 	if (fe->size < 0) {
 		/* It's softlink */
 		char tmp[AEP_PATH_MAX];	/* path to the linked file */
 		struct stat statbuf;
 
 		/* save path of the soft link in fakepath */
-		strcpy(fakepath, ae_mountpoint);
-		strcat(fakepath, tpath);
+		strncpy(fakepath, ae_mountpoint, AEP_PATH_MAX);
+		strncat(fakepath, tpath, AEP_PATH_MAX - strlen(fakepath));
 
-		readlink(fakepath, tmp, AEP_PATH_MAX);
+		aep_assert(readlink(fakepath, tmp, AEP_PATH_MAX) >= 0, "fd_add():readlink()");
 		fe->slink_to = (char*)malloc(strlen(tmp + strlen(ae_mountpoint)) + 1);
 		aep_assert(fe->slink_to, "malloc");
 		orig_stat(tmp, &statbuf);
-		data_fds[fd].fe->size = statbuf.st_size;
-		strcpy(fe->slink_to, (char*) tmp + strlen(ae_mountpoint));
+		data_fd->fe->size = statbuf.st_size;
+		strncpy(fe->slink_to, (char*) tmp + strlen(ae_mountpoint),
+			strlen(tmp + strlen(ae_mountpoint)) + 1);
 	}
-	//dbg("fd_add(%s) %d done", tpath, fd);
+	dbg("fd_add(%s) %d done", tpath, fd);
 	return fd;
 }
 
 static bool fd_is_remote(int fd)
 {
-	return fd >= 0 && fd < AEP_NO_FILES && data_fds[fd].fe;
+	data_fd_t *data_fd = fd_get_data_fd(fd);
+	return data_fd && data_fd->fe;
 }
 
-static void fd_rm(int fd)
+static void fd_rm(const int fd, bool closeit)
 {
-	data_fd_t *data_fd = data_fds + fd;
+	data_fd_t *data_fd = fd_get_data_fd(fd);
 
-	//dbg("fd_rm(%d)", fd);
-	if (!data_fd->fe) {
-		return;
+	dbg("fd_rm(%d)", fd);
+	if (data_fd && data_fd->fe) {
+		if (data_fd->fe->size) {
+			files_open_set(data_fd->tpath, -1);
+		}
+		if (closeit) {
+			orig_close(fd);
+		}
 	}
-	if (data_fd->fe->size) {
-		files_open_set(data_fd->tpath, -1);
+	if (data_fd) {
+		data_fds.erase(fd);
 	}
-	orig_close(fd);
-	data_fd->fe = NULL;
-	//dbg("fd_rm(%d) done", fd);
+	dbg("fd_rm(%d) done", fd);
 }
 
-static inline data_fd_t* fd_get_data_fd(int fd)
+static inline data_fd_t* fd_get_data_fd(const int fd)
 {
-	return data_fds + fd;
+	auto search = data_fds.find(fd);
+
+	if (search == data_fds.end()) {
+		return NULL;
+	}
+	return &search->second;
 }
 
-static inline char* fd_get_name(int fd)
+static inline char* fd_get_dbg_name(const int fd)
 {
-	return data_fds[fd].tpath;
+	data_fd_t *data_fd = fd_get_data_fd(fd);
+	if (data_fd) {
+		return data_fd->tpath;
+	}
+	return (char*)"noname";
+}
+
+static inline void fd_set_dbg_name(const int fd, const char *tpath)
+{
+	data_fd_t *data_fd = fd_get_data_fd(fd);
+
+	if((aep_debug & DBG_ANY) && data_fd) {
+		strncpy(data_fd->tpath, tpath, AEP_PATH_MAX);
+	}
 }
 
 static bool is_remote_file(const char *path, char **tpath)
@@ -789,7 +820,7 @@ static int ftw_reduce_callback(const char *fpath, const struct stat *sb, int typ
 			sem_t *sem;
 			sem = semopen(tpath);
 			sem_wait(sem);
-			truncate(fpath, 0);
+			aep_assert(!truncate(fpath, 0), "truncate");
 			sem_post(sem);
 			cache_size_set(-sb->st_size);
 			if (cache_size_get() + claimed_size <= (int64_t) max_cached_size) {
@@ -969,7 +1000,7 @@ void __attribute__((constructor)) aep_init(void)
 
 	/* share cache size */
 	shmem_sem = sem_open("aep_shmem_sem", O_CREAT, 0666, 1);
-	aep_assert(shmem_sem, "sem_open");
+	aep_assert(shmem_sem, "aep_init:sem_open");
 	shm_fd = shm_open("aep_shmem", O_RDWR | O_CREAT | O_EXCL, 0666);
 	//dbg("aep_init");
 	sem_wait(shmem_sem);
@@ -983,7 +1014,7 @@ void __attribute__((constructor)) aep_init(void)
 		open_files = (int8_t*) (cache_size + 1);
 	} else {
 		//dbg("aep_init recount cache");
-		ftruncate(shm_fd, sizeof(uint64_t) + HASH_SIZE);
+		aep_assert(!ftruncate(shm_fd, sizeof(uint64_t) + HASH_SIZE), "aep_init:ftruncate");
 		cache_size = (int64_t*) mmap(NULL, sizeof(int64_t) + HASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
 		open_files = (int8_t*) (cache_size + 1);
@@ -992,7 +1023,8 @@ void __attribute__((constructor)) aep_init(void)
 		ftw(cache_path, ftw_callback, 100);
 	}
 	sem_post(shmem_sem);
-	//dbg("aep_init done cs %lu", *cache_size);
+
+	dbg("aep_init done cs %lu", *cache_size);
 }
 
 FILE* fopen(const char *path, const char *mode)
@@ -1030,10 +1062,10 @@ size_t fread(void *destv, size_t size, size_t nmemb, FILE *f)
 
 		ret = read_data(destv, size * nmemb, data_fd);
 		ret /= size;
-		dbgd("fread(%d(%s), %zu * %zu) %zu", fileno(f), fd_get_name(fileno(f)), size, nmemb, ret);
+		//dbgd("fread(%d(%s), %zu * %zu) %zu", fileno(f), fd_get_dbg_name(fileno(f)), size, nmemb, ret);
 	} else {
 		ret = orig_fread(destv, size, nmemb, f);
-		dbgo("fread(%d, %zu * %zu) %zu", fileno(f), size, nmemb, ret);
+		//dbgo("fread(%d, %zu * %zu) %zu", fileno(f), size, nmemb, ret);
 	}
 	return ret;
 }
@@ -1042,15 +1074,19 @@ int fclose(FILE *f)
 {
 	int ret;
 
+	dbg("fclose(%p)", f);
+
 	if (fd_is_remote(fileno(f))) {
-		dbgd("fclose(%d(%s))", fileno(f), fd_get_name(fileno(f)));
-		fd_rm(fileno(f));
+		dbgd("fclose(%d(%s))", fileno(f), fd_get_dbg_name(fileno(f)));
+		fd_rm(fileno(f), true);
 		ret = 0;
 		prn_statistic();
 	} else {
 		dbgo("fclose(%d)", fileno(f));
 		ret = orig_fclose(f);
 	}
+
+	dbg("fclose(%p) %d done", f, ret);
 	return ret;
 }
 
@@ -1089,11 +1125,11 @@ int close(int fd)
 	int ret = 0;
 
 	if (fd_is_remote(fd)) {
-		dbgd("close(%d(%s))", fd, fd_get_name(fd));
-		fd_rm(fd);
+		dbgd("close(%d(%s))", fd, fd_get_dbg_name(fd));
+		fd_rm(fd, true);
 	} else {
 		ret = orig_close(fd);
-		dbgo("close(%d(%s))=%d", fd, fd_get_name(fd), ret);
+		dbgo("close(%d(%s))=%d", fd, fd_get_dbg_name(fd), ret);
 	}
 	return ret;
 }
@@ -1124,7 +1160,7 @@ int stat(const char *pathname, struct stat *statbuf)
 		statbuf->st_size = data_fd->fe->size;
 		statbuf->st_blocks = (statbuf->st_size >> 9) + (statbuf->st_size & 0x1ff) ? 1 : 0;
 		dbgd("stat(%s, 0x%lx)", tpath, data_fd->fe->size);
-		fd_rm(fd);
+		fd_rm(fd, true);
 		ret = 0;
 	} else {
 		ret = orig_stat(pathname, statbuf);
@@ -1141,7 +1177,7 @@ int fstat(int fd, struct stat *statbuf)
 		data_fd_t *data_fd;
 		data_fd = fd_get_data_fd(fd);
 
-		dbgd("fstat(%d(%s))", fd, fd_get_name(fd));
+		dbgd("fstat(%d(%s))", fd, fd_get_dbg_name(fd));
 
 		memcpy(statbuf, &def_stat, sizeof(struct stat));
 		if (data_fd->fe->size) {
@@ -1152,7 +1188,7 @@ int fstat(int fd, struct stat *statbuf)
 		statbuf->st_size = data_fd->fe->size;
 		statbuf->st_blocks = (statbuf->st_size >> 9) + (statbuf->st_size & 0x1ff) ? 1 : 0;
 		ret = 0;
-		dbgd("fstat(%s, 0x%lx, %s) %d", fd_get_name(fd), data_fd->fe->size, data_fd->fe->size ? "file" : "dir", ret);
+		dbgd("fstat(%s, 0x%lx, %s) %d", fd_get_dbg_name(fd), data_fd->fe->size, data_fd->fe->size ? "file" : "dir", ret);
 	} else {
 		ret = orig_fstat(fd, statbuf);
 		dbgo("fstat(%d) %d", fd, ret);
@@ -1185,7 +1221,7 @@ int lstat(const char *pathname, struct stat *statbuf)
 		statbuf->st_blocks = (statbuf->st_size >> 9) + (statbuf->st_size & 0x1ff) ? 1 : 0;
 		ret = 0;
 		dbgd("lstat(%s, 0x%lx, %s) %d", tpath, data_fd->fe->size, data_fd->fe->size ? "file" : "dir", ret);
-		fd_rm(fd);
+		fd_rm(fd, true);
 	} else {
 		ret = orig_lstat(pathname, statbuf);
 	}
@@ -1285,7 +1321,7 @@ int fcntl(int fd, int cmd, ...)
 {
 	if (fd_is_remote(fd)) {
 		aep_assert(cmd == F_SETLK, "fcntl(unsupported cmd=%d)", cmd);
-		dbgd("fcntl(%s, %d)", fd_get_name(fd), cmd);
+		dbgd("fcntl(%s, %d)", fd_get_dbg_name(fd), cmd);
 		return 0;
 	} else {
 		void *args = __builtin_apply_args();
@@ -1310,10 +1346,10 @@ ssize_t read(int fd, void *buf, size_t count)
 		data_fd_t *data_fd = fd_get_data_fd(fd);
 
 		ret = read_data(buf, count, data_fd);
-		dbgd("read(%d(%s), %zu) %zd", fd, fd_get_name(fd), count, ret);
+		//dbgd("read(%d(%s), %zu) %zd", fd, fd_get_dbg_name(fd), count, ret);
 	} else {
 		ret = orig_read(fd, buf, count);
-		dbgo("read(%d(%s), %zu) %zd", fd, fd_get_name(fd), count, ret);
+		//dbgo("read(%d(%s), %zu) %zd", fd, fd_get_dbg_name(fd), count, ret);
 	}
 	return ret;
 }
@@ -1325,13 +1361,13 @@ off_t lseek(int fd, off_t offset, int whence)
 	if (fd_is_remote(fd)) {
 		data_fd_t *data_fd = fd_get_data_fd(fd);
 
-		aep_assert(whence == SEEK_SET, "lseek(%s, %ld, %d) unsupported whence", fd_get_name(fd), offset, whence);
+		aep_assert(whence == SEEK_SET, "lseek(%s, %ld, %d) unsupported whence", fd_get_dbg_name(fd), offset, whence);
 		data_fd->off = offset;
 		ret = 0;
-		dbgd("lseek(%d(%s), %ld, %d) %ld", fd, fd_get_name(fd), offset, whence, ret);
+		dbgd("lseek(%d(%s), %ld, %d) %ld", fd, fd_get_dbg_name(fd), offset, whence, ret);
 	} else {
 		ret = orig_lseek(fd, offset, whence);
-		dbgo("lseek(%d(%s), %ld, %d) %ld", fd, fd_get_name(fd), offset, whence, ret);
+		dbgo("lseek(%d(%s), %ld, %d) %ld", fd, fd_get_dbg_name(fd), offset, whence, ret);
 	}
 	return ret;
 }
@@ -1349,13 +1385,13 @@ struct dirent* readdir(DIR *dir)
 			data_fd->readdir_p = data_fd->readdir_p->next;
 		}
 		if (!data_fd->readdir_p) {
-			dbgd("readdir(%s) NULL", fd_get_name(dirfd(dir)));
+			//dbgd("readdir(%s) NULL", fd_get_dbg_name(dirfd(dir)));
 			return NULL;
 		}
 
 		data_fd->dirent.d_type = data_fd->readdir_p->size ? DT_REG : DT_DIR;
-		strcpy(data_fd->dirent.d_name, data_fd->readdir_p->name);
-		dbgd("readdir(%s) %s", fd_get_name(dirfd(dir)), data_fd->dirent.d_name);
+		strncpy(data_fd->dirent.d_name, data_fd->readdir_p->name, 256);
+		//dbgd("readdir(%s) %s", fd_get_dbg_name(dirfd(dir)), data_fd->dirent.d_name);
 		return &data_fd->dirent;
 	} else {
 		ret = orig_readdir(dir);
@@ -1371,7 +1407,7 @@ struct dirent* readdir(DIR *dir)
 void rewind(FILE *stream)
 {
 	if (fd_is_remote(fileno(stream))) {
-		dbgd("rewind(%d(%s))", fileno(stream), fd_get_name(fileno(stream)));
+		dbgd("rewind(%d(%s))", fileno(stream), fd_get_dbg_name(fileno(stream)));
 		data_fd_t *data_fd = fd_get_data_fd(fileno(stream));
 		data_fd->off = 0;
 #ifndef __GLIBC__
@@ -1418,9 +1454,10 @@ DIR* fdopendir(int fd)
 
 int closedir(DIR *dirp)
 {
+	dbgd("closedir");
 	if (fd_is_remote(dirfd(dirp))) {
-		dbgd("closedir(%d(%s))", dirfd(dirp), fd_get_name(dirfd(dirp)));
-		fd_rm(dirfd(dirp));
+		dbgd("closedir(%d(%s))", dirfd(dirp), fd_get_dbg_name(dirfd(dirp)));
+		fd_rm(dirfd(dirp), true);
 		return 0;
 	} else {
 		dbgo("closedir(%d)", dirfd(dirp));
@@ -1441,10 +1478,10 @@ int fgetc(FILE *stream)
 		} else {
 			ret = c;
 		}
-		dbgd("fgetc(%d(%s)) %d", fileno(stream), fd_get_name(fileno(stream)), ret);
+		dbgd("fgetc(%d(%s)) %d", fileno(stream), fd_get_dbg_name(fileno(stream)), ret);
 	} else {
 		ret = orig_fgetc(stream);
-		dbgo("fgetc(%d(%s)) %d", fileno(stream), fd_get_name(fileno(stream)), ret);
+		dbgo("fgetc(%d(%s)) %d", fileno(stream), fd_get_dbg_name(fileno(stream)), ret);
 	}
 	return ret;
 }
@@ -1506,8 +1543,9 @@ static int download_file_nfs(data_fd_t *data_fd, char *dest)
 	struct timeval tv;
 	unsigned int us;
 
-	strcpy(realpath, real_mountpoint);
-	strcat(realpath, data_fd->fe->slink_to ? data_fd->fe->slink_to : data_fd->tpath);
+	strncpy(realpath, real_mountpoint, AEP_PATH_MAX);
+	strncat(realpath, data_fd->fe->slink_to ? data_fd->fe->slink_to : data_fd->tpath,
+		AEP_PATH_MAX - strlen(realpath));
 
 	starttime(&tv);
 	if ((output = orig_open(dest, O_CREAT | O_RDWR)) < 0) {
@@ -1540,8 +1578,8 @@ static ssize_t read_remote_data_nfs(void *destv, size_t size, char *tpath, off_t
 	struct timeval tv;
 	unsigned int us;
 
-	strcpy(path, real_mountpoint);
-	strcat(path, tpath);
+	strncpy(path, real_mountpoint, AEP_PATH_MAX);
+	strncat(path, tpath, AEP_PATH_MAX - strlen(path));
 	starttime(&tv);
 	fd = orig_open(path, O_RDONLY);
 	aep_assert(fd >= 0, "read_data_fs(%s) open", path);
