@@ -42,6 +42,7 @@ import afctask
 from .. import als
 from ..models.base import db
 from flask_login import current_user
+from .auth import auth
 import traceback
 from urllib.parse import urlparse
 
@@ -693,11 +694,24 @@ class RatAfc(MethodView):
         resp.content_type = 'application/json'
         return resp
 
+
+class RatAfcSec(RatAfc):
+    def get(self):
+        user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
+        return super().get()
+
+    def post(self):
+        user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
+        return super().post()
+
 class RatAfcInternal(MethodView):
     """ Allow to regiter second URL on RatAfc """
     pass
 
 # registration of default runtime options
+
+module.add_url_rule('/availableSpectrumInquirySec',
+                    view_func=RatAfcSec.as_view('RatAfcSec'))
 
 module.add_url_rule('/1.4/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))
