@@ -309,7 +309,7 @@ class Als:
             self._last_attempt = datetime.datetime.now()
             try:
                 self._producer = kafka.KafkaProducer(**self._producer_kwargs)
-                LOGGER.error("Kafka server successfully connected")
+                LOGGER.info("Kafka server successfully connected")
                 return True
             except kafka.errors.KafkaError as ex:
                 LOGGER.error(
