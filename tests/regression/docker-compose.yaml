@@ -46,7 +46,7 @@ services:
       - objst
       - als_kafka
       - als_siphon
-      - als_postgres
+      - bulk_postgres
     secrets:
       - NOTIFIER_MAIL.json
       - OIDC.json
@@ -88,7 +88,7 @@ services:
       - objst
       - als_kafka
       - als_siphon
-      - als_postgres
+      - bulk_postgres
 
   objst:
     image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:-latest}
@@ -135,14 +135,14 @@ services:
     restart: always
     environment:
       - KAFKA_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
-      - POSTGRES_HOST=als_postgres
+      - POSTGRES_HOST=bulk_postgres
       - INIT_IF_EXISTS=skip
     depends_on:
       - als_kafka
-      - als_postgres
+      - bulk_postgres
     dns_search: [.]
 
-  als_postgres:
+  bulk_postgres:
     image: public.ecr.aws/w9v6y1o0/openafc/als-postgres-image:${TAG:-latest}
     dns_search: [.]
 

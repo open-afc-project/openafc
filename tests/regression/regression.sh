@@ -20,7 +20,7 @@ RMQ="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                  # rabbitmq imag
 DISPATCHER="public.ecr.aws/w9v6y1o0/openafc/dispatcher-image"    # dispatcher image
 ALS_SIPHON="public.ecr.aws/w9v6y1o0/openafc/als-siphon-image"    # ALS Siphon image
 ALS_KAFKA="public.ecr.aws/w9v6y1o0/openafc/als-kafka-image"      # Kafka for ALS
-ALS_POSTGRES="public.ecr.aws/w9v6y1o0/openafc/als-postgres-image" # PostgreSQL for ALS
+BULK_POSTGRES="public.ecr.aws/w9v6y1o0/openafc/als-postgres-image" # PostgreSQL for bulk stuff (ALS, req cache, etc.)
 
 WORKER="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker"  # msghnd image
 WORKER_AL_D4B="public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image" # Alpine worker build img
@@ -160,7 +160,7 @@ build_dev_server() {
   # build ALS-related images
   cd ${wd}/src/als && docker_build_and_push Dockerfile.siphon ${ALS_SIPHON}:${tag} ${push} &
   cd ${wd}/src/als && docker_build_and_push Dockerfile.kafka ${ALS_KAFKA}:${tag} ${push} &
-  cd ${wd}/src/als && docker_build_and_push Dockerfile.postgres ${ALS_POSTGRES}:${tag} ${push} &
+  cd ${wd}/src/als && docker_build_and_push Dockerfile.postgres ${BULK_POSTGRES}:${tag} ${push} &
   cd ${wd}
 
    # build cert db image

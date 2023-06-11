@@ -105,7 +105,7 @@ Another important aspect is how to access PostgreSQL database server where logs 
 
 Using `--server` (aka `-s`) and `--password` parameters of `als_query.py` command line). Here are most probable cases:
 
-1. `als_query.py` runs inside `als_siphon.py` container, PostgreSQL runs inside the container, named `als_postgres` in *docker-compose.yaml* (that's how it is named as of time of this writing):  
+1. `als_query.py` runs inside `als_siphon.py` container, PostgreSQL runs inside the container, named `bulk_postgres` in *docker-compose.yaml* (that's how it is named as of time of this writing):  
   `$ docker exec SIPHON_CONTAINER als_query.py CMD \ `  
   `--server [USER@]als_postrgres[:PORT][?OPTIONS] [--password PASSWORD] ...`  
   Here `USER` or `PORT` might be omitted if they are `postgres` and `5432` respectively. `--password PASSWORD` and `OPTIONS` are optional.   
