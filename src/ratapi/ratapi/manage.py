@@ -876,35 +876,31 @@ class CertIdSweep(Command):
 
             with open(local_filename, newline='') as csvfile:
                 rdr = csv.reader(csvfile, delimiter=',')
-                for i in range(2):
-                    # do this twice so that the SD devices can be
-                    # updated with ID location too
-                    for row in rdr:
-                        try:
-                            cert_id = row[7] 
-                            code = int(row[6])
-                            if code == 103:
-                                location = CertId.OUTDOOR
-                            elif code == 107:
-                                location = CertId.INDOOR
+                for row in rdr:
+                    try:
+                        cert_id = row[7]
+                        code = int(row[6])
+                        if code == 103:
+                            location = CertId.OUTDOOR
+                        elif code == 111:
+                            location = CertId.INDOOR | CertId.OUTDOOR
+                        else:
+                            location = CertId.UNKNOWN
+                        if not location == CertId.UNKNOWN:
+                            cert = CertId.query.filter_by(certification_id=cert_id).first()
+                            if cert :
+                                cert.refreshed_at = now
+                                cert.location = location
                             else:
-                                location = CertId.UNKNOWN
-                            if not location == CertId.UNKNOWN:
-                                cert = CertId.query.filter_by(certification_id=cert_id).first()
-                                if cert :
-                                    cert.refreshed_at = now
-                                    cert.location = cert.location | location
-                                elif location == CertId.OUTDOOR:
-                                    cert = CertId(certification_id=cert_id,
-                                                  location=CertId.OUTDOOR)
-                                    ruleset_id_str = regionStrToRulesetId("CA")
-                                    ruleset = Ruleset.query.filter_by(name=ruleset_id_str).first()
-                                    ruleset.cert_ids.append(cert)
-                                    db.session.add(cert)
-                        except: 
-                            # ignore badly formatted rows
-                            pass
-
+                                cert = CertId(certification_id=cert_id,
+                                              location=location)
+                                ruleset_id_str = regionStrToRulesetId("CA")
+                                ruleset = Ruleset.query.filter_by(name=ruleset_id_str).first()
+                                ruleset.cert_ids.append(cert)
+                                db.session.add(cert)
+                    except:
+                        # ignore badly formatted rows
+                        pass
                 db.session.commit()  # pylint: disable=no-member
 
     def sweep_fcc_id(self, flaskapp):
