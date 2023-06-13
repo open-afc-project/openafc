@@ -185,7 +185,13 @@ afc_tests.py --cmd parse_tests --infile "AFC System (SUT) Test Vectors r6.xlsx" 
 ```
 Next step, to import those test vectors into test DB.
 ```
-afc_tests.py --cmd inp_reqs --infile abc.txt
+afc_tests.py --cmd ins_reqs --infile abc.txt
+```
+
+Add extended (enhanced tests) that are not wfa. For example:
+```
+afc_tests.py --cmd ext_reqs --infile brcm_ext.txt
+
 ```
 Next step, to get new AFC responses for test vectors. It requires to make reacquisition.
 The commands sends every test vector, gets relevant response and inserts into test DB.
@@ -203,13 +209,17 @@ Following sequence creates files at path "`pwd`/data/wfa_test".
 ```
 docker run --rm -v `pwd`/data:/data test --cmd dump_db --table wfa --outpath /data
 ```
+dump all test requests and responses, including extended ones :
+```
+docker run --rm -v `pwd`/data:/data test --cmd dump_db --table all --outpath /data
+```
 There is a way to export device descriptors from WFA excel file into JSON format file.
 ```
 afc_tests.py --cmd parse_tests --dev_desc --infile <input file> --outfile <output file>
 ```
 Next step, to import those device descriptors into test DB.
 ```
-afc_tests.py --cmd inp_devs --infile abc.txt
+afc_tests.py --cmd ins_devs --infile abc.txt
 ```
 
 ## Compare AFC config records

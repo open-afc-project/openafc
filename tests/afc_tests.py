@@ -643,6 +643,42 @@ def get_db_req_resp(cfg):
     return db_reqs_list, db_resp_list
 
 
+def insert_reqs_int(filename, con, cur):
+    """
+    Insert requests from input file to a table in test db.
+    
+    """
+    with open(filename, 'r') as fp_test:
+        while True:
+            dataline = fp_test.readline()
+            if not dataline:
+                break
+
+            # process dataline arguments
+            app_log.debug(f"= {dataline}")
+            request_json, metadata_json = process_jsonline(dataline)
+
+            # reject the request if mandatory metadata arguments are not present
+            if not MANDATORY_METADATA_KEYS.issubset(
+                    set(metadata_json.keys())):
+                # missing mandatory keys in test case input
+                app_log.error("Test case input does not contain required"
+                    " mandatory arguments: %s",
+                    ", ".join(list(
+                        MANDATORY_METADATA_KEYS - set(metadata_json.keys()))))
+                return AFC_ERR
+
+            app_log.info(f"Insert new request in DB "
+                         f"({metadata_json[TESTCASE_ID]})")
+            app_log.debug(f"+ {metadata_json[TESTCASE_ID]}")
+            cur.execute('INSERT INTO ' + TBL_REQS_NAME + ' VALUES ( ?, ?)',
+                        (metadata_json[TESTCASE_ID], 
+                        json.dumps(request_json),))
+            con.commit()
+    con.close()
+    return AFC_OK
+
+
 def insert_reqs(cfg):
     """
     Insert requests from input file to a table in test db.
@@ -677,35 +713,37 @@ def insert_reqs(cfg):
     cur.execute('CREATE TABLE ' + TBL_REQS_NAME + 
         ' (test_id varchar(50), data json)')
     con.commit()
-    with open(filename, 'r') as fp_test:
-        while True:
-            dataline = fp_test.readline()
-            if not dataline:
-                break
+    return insert_reqs_int(filename, con, cur)
 
-            # process dataline arguments
-            app_log.debug(f"= {dataline}")
-            request_json, metadata_json = process_jsonline(dataline)
 
-            # reject the request if mandatory metadata arguments are not present
-            if not MANDATORY_METADATA_KEYS.issubset(
-                    set(metadata_json.keys())):
-                # missing mandatory keys in test case input
-                app_log.error("Test case input does not contain required"
-                    " mandatory arguments: %s",
-                    ", ".join(list(
-                        MANDATORY_METADATA_KEYS - set(metadata_json.keys()))))
-                return AFC_ERR
+def extend_reqs(cfg):
+    """
+    Insert requests from input file to a table in test db.
+    Drop previous table of requests.
+    
+    """
+    app_log.debug(f"{inspect.stack()[0][3]}()")
 
-            app_log.info(f"Insert new request in DB "
-                         f"({metadata_json[TESTCASE_ID]})")
-            app_log.debug(f"+ {metadata_json[TESTCASE_ID]}")
-            cur.execute('INSERT INTO ' + TBL_REQS_NAME + ' VALUES ( ?, ?)',
-                        (metadata_json[TESTCASE_ID], 
-                        json.dumps(request_json),))
-            con.commit()
-    con.close()
-    return AFC_OK
+    if isinstance(cfg['infile'], type(None)):
+        app_log.error(f"Missing input file")
+        return AFC_ERR
+
+    filename = cfg['infile'][0]
+    app_log.debug(f"{inspect.stack()[0][3]}() {filename}")
+
+    if not os.path.isfile(filename):
+        app_log.error(f"Missing raw test data file {filename}")
+        return AFC_ERR
+
+    if not os.path.isfile(cfg['db_filename']):
+        app_log.error(f"Unable to find test db file.")
+        return AFC_ERR
+
+    con = sqlite3.connect(cfg['db_filename'])
+    # add more rows to existing table of requests
+    app_log.info(f"Extending table of requests ({TBL_REQS_NAME})")
+    cur = con.cursor()
+    return insert_reqs_int(filename, con, cur)
 
 
 def insert_devs(cfg):
@@ -842,9 +880,8 @@ def add_reqs(cfg):
     return AFC_OK
 
 
-def dump_table(conn, tbl_name, out_file):
+def dump_table(conn, tbl_name, out_file, pref ):
     app_log.debug(f"{inspect.stack()[0][3]}() {tbl_name}")
-    app_log.info(f"\n\tDump DB table ({tbl_name}) to file.\n")
     fp_new = ''
 
     if 'single' in out_file:
@@ -861,13 +898,13 @@ def dump_table(conn, tbl_name, out_file):
                 TBL_RESPS_NAME: '_Response.txt'
             }
             new_json = json.loads(val[1][1].encode('utf-8'))
-            _, name, nbr = val[1][0].split('.')
+            prefix, name, nbr = val[1][0].split('.')
             app_log.debug(f"{inspect.stack()[0][3]}() {name} {nbr}")
             # omit URS testcases
-            if (name.lower().find('urs') != -1):
+            if (name.lower().find('urs') != -1) or (pref and not pref == prefix):
                 continue
 
-            fp_test = open(f"{out_file['split']}/AFCS_{name}_{nbr}" +\
+            fp_test = open(f"{out_file['split']}/{prefix}_{name}_{nbr}" +\
                            f"{tbl_fname[tbl_name]}", 'a')
             fp_test.write(f"{val[1][1]}\n")
             fp_test.close()
@@ -895,11 +932,17 @@ def dump_database(cfg):
 
     set_dump_db_opts = {
         'wfa': [(TBL_REQS_NAME,), (TBL_RESPS_NAME,)],
+        'all': [(TBL_REQS_NAME,), (TBL_RESPS_NAME,)],
         'req': [(TBL_REQS_NAME,)],
         'resp': [(TBL_RESPS_NAME,)],
         'ap': [('ap_config',)],
         'cfg': [('afc_config',)],
         'user': [('user_config',)]
+    }
+
+    prefix = {
+        'wfa': "AFCS",
+        'all': None
     }
 
     tbl = 'True'
@@ -916,7 +959,11 @@ def dump_database(cfg):
         cur.execute(f"SELECT name FROM sqlite_master WHERE type='table';")
         found_tables = cur.fetchall()
 
-    if tbl == 'wfa':
+    pref = None
+    if tbl == 'wfa' or tbl == 'all':
+        if tbl in prefix:
+            pref = prefix[tbl]
+
         out_file['split'] = './'
         if not isinstance(cfg['outpath'], type(None)):
             out_file['split'] = cfg['outpath'][0] + '/'
@@ -933,7 +980,7 @@ def dump_database(cfg):
 
     for tbl in enumerate(found_tables):
         app_log.debug(f"Dump {tbl} to {out_file}")
-        dump_table(cur, tbl[1][0], out_file)
+        dump_table(cur, tbl[1][0], out_file, pref)
     con.close()
     return AFC_OK
 
@@ -1102,6 +1149,7 @@ def _parse_tests_dev_desc(sheet, fp_new, rows):
             continue
 
         res_str += build_device_desc(
+                            sheet.cell(row = i, column = INDOOR_DEPL_CLM).value,
                             sheet.cell(row = i, column = SER_NBR_CLM).value,
                             sheet.cell(row = i, column = RULESET_CLM).value,
                             sheet.cell(row = i, column = ID_CLM).value)
@@ -1187,7 +1235,15 @@ def _parse_tests_all(sheet, fp_new, rows, test_ident):
             # Device descriptor
             #
             res_str += REQ_DEV_DESC_HEADER
+
+            indoor_deploy = sheet.cell(row = i, column = 6)
+            if "indoor" in indoor_deploy.lower():
+                location = "1"
+            else:
+                location = "2"
+
             res_str += build_device_desc(
+                                sheet.cell(row = i, column = INDOOR_DEPL_CLM).value,
                                 sheet.cell(row = i, column = SER_NBR_CLM).value,
                                 sheet.cell(row = i, column = RULESET_CLM).value,
                                 sheet.cell(row = i, column = ID_CLM).value)
@@ -1684,6 +1740,7 @@ def parse_run_cert_args(cfg):
 execution_map = {
     'add_reqs' : [add_reqs, parse_run_test_args],
     'ins_reqs' : [insert_reqs, parse_run_test_args],
+    'ext_reqs' : [extend_reqs, parse_run_test_args],
     'ins_devs' : [insert_devs, parse_run_test_args],
     'cmp_cfg' : [compare_afc_config, parse_run_test_args],
     'dry_run' : [dry_run_test, parse_run_test_args],

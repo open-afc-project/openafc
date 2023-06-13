@@ -12,6 +12,7 @@ UNIT_NAME_CLM = 1
 PURPOSE_CLM = 2
 TEST_VEC_CLM = 3
 TEST_CAT_CLM = 4
+INDOOR_DEPL_CLM = 6
 VERSION_CLM = 9
 REQ_ID_CLM = 10
 
@@ -70,6 +71,7 @@ REQ_INQ_CHA_CHANCFI = '"channelCfi": '
 
 REQ_DEV_DESC_HEADER = '"deviceDescriptor": '
 REQ_DEV_DESC_FOOTER = '}'
+REQ_CERT_LOC = '"location": ' 
 REQ_SER_NBR = '"serialNumber": ' 
 REQ_CERT_ID_HEADER = '"certificationId": [{'
 REQ_CERT_ID_FOOTER = '}]'
@@ -314,14 +316,22 @@ class AfcGeoCoordinates:
         return res
 
 
-def build_device_desc(ser_nbr, ruleset_id, cert_id):
+def build_device_desc(indoor_deploy, ser_nbr, ruleset_id, cert_id):
     _ser_nbr = ""
     _cert_id = ""
     if isinstance(ser_nbr, str):
         _ser_nbr = str(ser_nbr)
     if isinstance(cert_id, str):
         _cert_id = str(cert_id)
-    return '{' + REQ_SER_NBR + '"' + _ser_nbr + '",' +\
+    if not indoor_deploy:
+        location = "2"
+    elif "indoor" in indoor_deploy.lower():
+        location = "3"
+    else:                                   
+        location = "2"
+
+    return '{' + REQ_CERT_LOC + '"' + location + '",' +\
+           REQ_SER_NBR + '"' + _ser_nbr + '",' +\
            REQ_CERT_ID_HEADER + REQ_RULESET + '"' + str(ruleset_id) + '",' +\
            REQ_CERT_ID + '"' + _cert_id + '"' + REQ_CERT_ID_FOOTER +\
            REQ_DEV_DESC_FOOTER

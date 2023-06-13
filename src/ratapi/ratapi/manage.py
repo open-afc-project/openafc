@@ -1351,11 +1351,7 @@ class ConfigAdd(Command):
                     for i in range(len(serial_id)):
                         cert_id_str = cert_id[i][0]['id']
                         ruleset_id_str = cert_id[i][0]['rulesetId']
-                        loc = location[i]
-                        if loc == CertId.UNKNOWN:
-                            loc = CertId.OUTDOOR
-                        elif loc == CertId.INDOOR:
-                            loc = CertId.OUTDOOR | CertId.INDOOR 
+                        loc = int(location[i])
 
                         email = username[0]
                         if '@' in email:
