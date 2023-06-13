@@ -56,8 +56,7 @@ RULESETS = ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'TEST_FCC','DEMO_FCC
 #: All views under this API blueprint
 module = flask.Blueprint('ap-afc', 'ap-afc')
 
-ALLOWED_VERSIONS = ['1.1', '1.3', '1.4']
-NRA_VERSIONS = ['1.1', '1.3']
+ALLOWED_VERSIONS = ['1.4']
 RULESET_VERSIONS = ['1.4']
 
 class AP_Exception(Exception):
@@ -374,14 +373,9 @@ class RatAfc(MethodView):
             # denied all devices matching certification id
             raise DeviceUnallowedException("")  # InvalidCredentialsException()
 
-        if version in NRA_VERSIONS:
-            if rulesets is None or len(rulesets) != 1 or rulesets[0] not in RULESETS:
-                raise InvalidValueException(["rulesets", rulesets ])
-            ruleset = rulesets[0]
-        else:
-            ruleset = prefix
-            if ruleset is None or ruleset not in RULESETS:
-                raise InvalidValueException(["ruleset", ruleset])
+        ruleset = prefix
+        if ruleset is None or ruleset not in RULESETS:
+            raise InvalidValueException(["ruleset", ruleset])
 
         if cert_id is None:
             raise MissingParamException(missing_params=['certificationId'])
@@ -400,7 +394,7 @@ class RatAfc(MethodView):
         """ Check correspondence of URL to request file.
         Return true if the request should be filtered."""
         urlp = urlparse(url)
-        if urlp.path.endswith("/1.4/availableSpectrumInquiryInternal"):
+        if urlp.path.endswith("/availableSpectrumInquiryInternal"):
             # It's internal test
             return False
         if "availableSpectrumInquiryRequests" not in json:
@@ -486,22 +480,16 @@ class RatAfc(MethodView):
                     'deviceDescriptor')
 
                 try:
-                    if ver in NRA_VERSIONS:
-                        LOGGER.debug("ver has NRA")
-                        prefix = device_desc['certificationId'][0]['nra'].strip()
-                        region = nraToRegionStr(prefix)
-                        certId = device_desc['certificationId'][0]['id']
-                    else:
-                        LOGGER.debug("ver has RulesetId")
-                        # Pick one ruleset that is being used for the
-                        # deployment of this AFC (RULESETS)
-                        prefix = None
-                        for r in device_desc['certificationId']:
-                            prefix = r['rulesetId'].strip()
-                            if prefix in RULESETS:
-                                region = rulesetIdToRegionStr(prefix)
-                                certId = r['id']
-                                break
+                    LOGGER.debug("ver has RulesetId")
+                    # Pick one ruleset that is being used for the
+                    # deployment of this AFC (RULESETS)
+                    prefix = None
+                    for r in device_desc['certificationId']:
+                        prefix = r['rulesetId'].strip()
+                        if prefix in RULESETS:
+                            region = rulesetIdToRegionStr(prefix)
+                            certId = r['id']
+                            break
                 except:
                     prefix = None
                     certId = None
@@ -713,10 +701,10 @@ class RatAfcInternal(MethodView):
 module.add_url_rule('/availableSpectrumInquirySec',
                     view_func=RatAfcSec.as_view('RatAfcSec'))
 
-module.add_url_rule('/1.4/availableSpectrumInquiry',
+module.add_url_rule('/availableSpectrumInquiry',
                     view_func=RatAfc.as_view('RatAfc'))
 
-module.add_url_rule('/1.4/availableSpectrumInquiryInternal',
+module.add_url_rule('/availableSpectrumInquiryInternal',
                     view_func=RatAfc.as_view('RatAfcInternal'))
 
 # Local Variables:

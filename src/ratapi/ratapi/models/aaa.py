@@ -114,30 +114,6 @@ class CertId(db.Model):
         self.refreshed_at = datetime.datetime.now()
 
 
-class AccessPoint(db.Model):
-    ''' entry to designate allowed AP's for the PAWS interface '''
-    __tablename__ = 'access_point'
-    __table_args__ = (
-        db.UniqueConstraint('serial_number', 'serial_number'),
-    )
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    serial_number = db.Column(db.String(64), nullable=False, index=True)
-    model = db.Column(db.String(64))
-    manufacturer = db.Column(db.String(64))
-    certification_id = db.Column(db.String(64))
-    org = db.Column(db.String(64), nullable=True)
-
-    def __init__(self, serial_number, model, manufacturer, certification_id,
-org=None):
-        if not serial_number:
-            raise RuntimeError("Serial number cannot be empty")
-        self.serial_number = serial_number
-        self.model = model
-        self.manufacturer = manufacturer
-        self.certification_id = certification_id
-        self.org = org
-
-
 class AccessPointDeny(db.Model):                                                     
     ''' entry to designate allowed AP's for the PAWS interface '''               
                                                                                  
