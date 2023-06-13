@@ -64,7 +64,7 @@ WORKDIR /wd
 EXPOSE 80 443
 COPY rat_server/httpd.conf /usr/local/apache2/conf/
 COPY rat_server/httpd-default.conf rat_server/httpd-info.conf rat_server/httpd-vhosts.conf \
-rat_server/httpd-mpm.conf rat_server/httpd-dav.conf rat_server/httpd-ssl.conf /usr/local/apache2/conf/extra/
+rat_server/httpd-mpm.conf rat_server/httpd-ssl.conf /usr/local/apache2/conf/extra/
 #COPY rat_server/fbrat.wsgi /usr/local/apache2/cgi-bin/fbrat.wsgi
 COPY rat_server/fbrat.wsgi /usr/local/apache2/fbrat.wsgi
 RUN mkdir -p /usr/share/ca-certificates/certs
