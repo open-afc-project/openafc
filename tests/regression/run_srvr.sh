@@ -52,6 +52,12 @@ docker-compose exec -T rat_server rat-manage-api db-create
 docker-compose exec -T rat_server rat-manage-api cfg add src=/pipe/export_admin_cfg.json
 docker-compose exec -T rat_server rat-manage-api user create --role Super --role Admin \
 --role AP --role Analysis --org fcc "admin@afc.com" "openafc"
+docker-compose exec -T rat_server rat-manage-api cert_id create  --location 3 \
+--cert_id FsDownloaderCertIdUS --ruleset_id US_47_CFR_PART_15_SUBPART_E
+docker-compose exec -T rat_server rat-manage-api cert_id create  --location 3 \
+--cert_id FsDownloaderCertIdCA --ruleset_id CA_RES_DBS-06
+docker-compose exec -T rat_server rat-manage-api cert_id create  --location 3 \
+--cert_id FsDownloaderCertIdBR --ruleset_id BRAZIL_RULESETID
 
 # Local Variables:
 # vim: sw=2:et:tw=80:cc=+1

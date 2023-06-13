@@ -1,0 +1,827 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# Parameter file for fs_afc.py.
+# Contains request template(s), region template(s), point coordinates
+---
+# Default number of parallel requests
+default_parallel: 10
+
+# Default request timeout in minutes
+default_timeout_min: 5
+
+# Request ID format. May use following values:
+# req_idx    - 0-based request index
+# region     - 2-letter region name
+# random_str - 10-character random string (uppercase + digits)
+req_id_format: "FS_AFC_{random_str}_{region}"
+
+# Substitution points (see 'paths' dictionary below must be set to null)
+req_pattern: |
+    {
+        "version" : "1.4",
+        "availableSpectrumInquiryRequests": [
+            {
+                "requestId": null,
+                "deviceDescriptor": {
+                    "serialNumber": "FS_ACCEPTANCE_TEST",
+                    "certificationId": [ null ]
+                },
+                "location": {
+                    "ellipse": {
+                        "center": null,
+                        "majorAxis": 20,
+                        "minorAxis": 20,
+                        "orientation": 70
+                    },
+                    "elevation": {
+                        "height": 20.0,
+                        "heightType": "AGL",
+                        "verticalUncertainty": 2
+                    },
+                    "indoorDeployment": 2
+                },
+                "inquiredFrequencyRange": [
+                    { "lowFrequency": 5925, "highFrequency": 6425 },
+                    { "lowFrequency": 6525, "highFrequency": 6875 }
+                ],
+                "inquiredChannels": [
+                    { "globalOperatingClass": 131 },
+                    { "globalOperatingClass": 132 },
+                    { "globalOperatingClass": 133 },
+                    { "globalOperatingClass": 134 },
+                    { "globalOperatingClass": 135 },
+                    { "globalOperatingClass": 136 }
+                ],
+                "minDesiredPower": 24,
+                "vendorExtensions": [
+                    {
+                        "extensionId": "OpenAfcOverrideAfcConfig",
+                        "parameters": {
+                            "ulsDatabase": null
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+region_patterns:
+    US:
+        rulesetId: US_47_CFR_PART_15_SUBPART_E
+        id: FsDownloaderCertIdUS
+    CA:
+        rulesetId: CA_RES_DBS-06
+        id: FsDownloaderCertIdCA
+    BR:
+        rulesetId: BRAZIL_RULESETID
+        id: FsDownloaderCertIdBR
+
+paths:
+    request_id: [availableSpectrumInquiryRequests, 0, requestId]
+    region: [availableSpectrumInquiryRequests, 0, deviceDescriptor,
+             certificationId, 0]
+    coordinates: [availableSpectrumInquiryRequests, 0, location, ellipse,
+                  center]
+    fs_database: [availableSpectrumInquiryRequests, 0, vendorExtensions, 0,
+                  parameters, ulsDatabase]
+    response_code: [availableSpectrumInquiryResponses, 0, response,
+                    responseCode]
+    response_desc: [availableSpectrumInquiryResponses, 0, response,
+                    shortDescription]
+
+# List of statuses to be considered successful. Each element may include 'code'
+# (for a value of response/responseCode) and/or 'desc_substr' for substring of
+# response/shortDescription
+success_statuses:
+    - code: 0
+    - code: 101
+      desc_substr: No AFC configuration for ruleset
+
+point_patterns:
+    US:
+        - name: "New York"
+          coordinates: {latitude: 40.67, longitude: -73.94}
+        - name: "Los Angeles"
+          coordinates: {latitude: 34.11, longitude: -118.41}
+        - name: "Chicago"
+          coordinates: {latitude: 41.84, longitude: -87.68}
+        - name: "Houston"
+          coordinates: {latitude: 29.77, longitude: -95.39}
+        - name: "Philadelphia"
+          coordinates: {latitude: 40.01, longitude: -75.13}
+        - name: "Phoenix"
+          coordinates: {latitude: 33.54, longitude: -112.07}
+        - name: "San Diego"
+          coordinates: {latitude: 32.81, longitude: -117.14}
+        - name: "San Antonio"
+          coordinates: {latitude: 29.46, longitude: -98.51}
+        - name: "Dallas"
+          coordinates: {latitude: 32.79, longitude: -96.77}
+        - name: "Detroit"
+          coordinates: {latitude: 42.38, longitude: -83.1}
+        - name: "San Jose"
+          coordinates: {latitude: 37.3, longitude: -121.85}
+        - name: "Jacksonville"
+          coordinates: {latitude: 30.33, longitude: -81.66}
+        - name: "Indianapolis"
+          coordinates: {latitude: 39.78, longitude: -86.15}
+        - name: "San Francisco"
+          coordinates: {latitude: 37.77, longitude: -122.45}
+        - name: "Columbus"
+          coordinates: {latitude: 39.99, longitude: -82.99}
+        - name: "Austin"
+          coordinates: {latitude: 30.31, longitude: -97.75}
+        - name: "Memphis"
+          coordinates: {latitude: 35.11, longitude: -90.01}
+        - name: "Baltimore"
+          coordinates: {latitude: 39.3, longitude: -76.61}
+        - name: "Fort Worth"
+          coordinates: {latitude: 32.75, longitude: -97.34}
+        - name: "El Paso"
+          coordinates: {latitude: 31.85, longitude: -106.44}
+        - name: "Charlotte"
+          coordinates: {latitude: 35.2, longitude: -80.83}
+        - name: "Milwaukee"
+          coordinates: {latitude: 43.06, longitude: -87.97}
+        - name: "Boston"
+          coordinates: {latitude: 42.34, longitude: -71.02}
+        - name: "Seattle"
+          coordinates: {latitude: 47.62, longitude: -122.35}
+        - name: "Denver"
+          coordinates: {latitude: 39.77, longitude: -104.87}
+        - name: "Washington"
+          coordinates: {latitude: 38.91, longitude: -77.02}
+        - name: "Nashville"
+          coordinates: {latitude: 36.17, longitude: -86.78}
+        - name: "Portland"
+          coordinates: {latitude: 45.54, longitude: -122.66}
+        - name: "Las Vegas"
+          coordinates: {latitude: 36.21, longitude: -115.22}
+        - name: "Oklahoma City"
+          coordinates: {latitude: 35.47, longitude: -97.51}
+        - name: "Tucson"
+          coordinates: {latitude: 32.2, longitude: -110.89}
+        - name: "Long Beach"
+          coordinates: {latitude: 33.79, longitude: -118.16}
+        - name: "Albuquerque"
+          coordinates: {latitude: 35.12, longitude: -106.62}
+        - name: "New Orleans"
+          coordinates: {latitude: 30.07, longitude: -89.93}
+        - name: "Cleveland"
+          coordinates: {latitude: 41.48, longitude: -81.68}
+        - name: "Fresno"
+          coordinates: {latitude: 36.78, longitude: -119.79}
+        - name: "Sacramento"
+          coordinates: {latitude: 38.57, longitude: -121.47}
+        - name: "Virginia Beach"
+          coordinates: {latitude: 36.74, longitude: -76.04}
+        - name: "Kansas City"
+          coordinates: {latitude: 39.12, longitude: -94.55}
+        - name: "Mesa"
+          coordinates: {latitude: 33.42, longitude: -111.74}
+        - name: "Atlanta"
+          coordinates: {latitude: 33.76, longitude: -84.42}
+        - name: "Omaha"
+          coordinates: {latitude: 41.26, longitude: -96.01}
+        - name: "Oakland"
+          coordinates: {latitude: 37.77, longitude: -122.22}
+        - name: "Tulsa"
+          coordinates: {latitude: 36.13, longitude: -95.92}
+        - name: "Honolulu"
+          coordinates: {latitude: 21.32, longitude: -157.8}
+        - name: "Miami"
+          coordinates: {latitude: 25.78, longitude: -80.21}
+        - name: "Minneapolis"
+          coordinates: {latitude: 44.96, longitude: -93.27}
+        - name: "Colorado Springs"
+          coordinates: {latitude: 38.86, longitude: -104.76}
+        - name: "Arlington"
+          coordinates: {latitude: 32.69, longitude: -97.13}
+        - name: "Wichita"
+          coordinates: {latitude: 37.69, longitude: -97.34}
+        - name: "Santa Ana"
+          coordinates: {latitude: 33.74, longitude: -117.88}
+        - name: "Anaheim"
+          coordinates: {latitude: 33.84, longitude: -117.87}
+        - name: "Saint Louis"
+          coordinates: {latitude: 38.64, longitude: -90.24}
+        - name: "Raleigh"
+          coordinates: {latitude: 35.82, longitude: -78.66}
+        - name: "Pittsburgh"
+          coordinates: {latitude: 40.44, longitude: -79.98}
+        - name: "Tampa"
+          coordinates: {latitude: 27.96, longitude: -82.48}
+        - name: "Cincinnati"
+          coordinates: {latitude: 39.14, longitude: -84.51}
+        - name: "Toledo"
+          coordinates: {latitude: 41.66, longitude: -83.58}
+        - name: "Aurora"
+          coordinates: {latitude: 39.71, longitude: -104.73}
+        - name: "Riverside"
+          coordinates: {latitude: 33.94, longitude: -117.4}
+        - name: "Buffalo"
+          coordinates: {latitude: 42.89, longitude: -78.86}
+        - name: "Corpus Christi"
+          coordinates: {latitude: 27.71, longitude: -97.35}
+        - name: "Newark"
+          coordinates: {latitude: 40.72, longitude: -74.17}
+        - name: "Saint Paul"
+          coordinates: {latitude: 44.95, longitude: -93.1}
+        - name: "Bakersfield"
+          coordinates: {latitude: 35.36, longitude: -119}
+        - name: "Stockton"
+          coordinates: {latitude: 37.97, longitude: -121.31}
+        - name: "Anchorage"
+          coordinates: {latitude: 61.18, longitude: -149.19}
+        - name: "Lexington-Fayette"
+          coordinates: {latitude: 38.04, longitude: -84.46}
+        - name: "Saint Petersburg"
+          coordinates: {latitude: 27.76, longitude: -82.64}
+        - name: "Louisville"
+          coordinates: {latitude: 38.22, longitude: -85.74}
+        - name: "Plano"
+          coordinates: {latitude: 33.05, longitude: -96.75}
+        - name: "Norfolk"
+          coordinates: {latitude: 36.92, longitude: -76.24}
+        - name: "Jersey City"
+          coordinates: {latitude: 40.71, longitude: -74.06}
+        - name: "Lincoln"
+          coordinates: {latitude: 40.82, longitude: -96.69}
+        - name: "Glendale"
+          coordinates: {latitude: 33.58, longitude: -112.2}
+        - name: "Birmingham"
+          coordinates: {latitude: 33.53, longitude: -86.8}
+        - name: "Greensboro"
+          coordinates: {latitude: 36.08, longitude: -79.83}
+        - name: "Hialeah"
+          coordinates: {latitude: 25.86, longitude: -80.3}
+        - name: "Fort Wayne"
+          coordinates: {latitude: 41.07, longitude: -85.14}
+        - name: "Baton Rouge"
+          coordinates: {latitude: 30.45, longitude: -91.13}
+        - name: "Henderson"
+          coordinates: {latitude: 36.03, longitude: -115}
+        - name: "Scottsdale"
+          coordinates: {latitude: 33.69, longitude: -111.87}
+        - name: "Madison"
+          coordinates: {latitude: 43.08, longitude: -89.39}
+        - name: "Chandler"
+          coordinates: {latitude: 33.3, longitude: -111.87}
+        - name: "Garland"
+          coordinates: {latitude: 32.91, longitude: -96.63}
+        - name: "Chesapeake"
+          coordinates: {latitude: 36.68, longitude: -76.31}
+        - name: "Rochester"
+          coordinates: {latitude: 43.17, longitude: -77.62}
+        - name: "Akron"
+          coordinates: {latitude: 41.08, longitude: -81.52}
+        - name: "Modesto"
+          coordinates: {latitude: 37.66, longitude: -120.99}
+        - name: "Lubbock"
+          coordinates: {latitude: 33.58, longitude: -101.88}
+        - name: "Paradise"
+          coordinates: {latitude: 36.08, longitude: -115.13}
+        - name: "Orlando"
+          coordinates: {latitude: 28.5, longitude: -81.37}
+        - name: "Fremont"
+          coordinates: {latitude: 37.53, longitude: -122}
+        - name: "Chula Vista"
+          coordinates: {latitude: 32.63, longitude: -117.04}
+        - name: "Laredo"
+          coordinates: {latitude: 27.53, longitude: -99.49}
+        - name: "Glendale"
+          coordinates: {latitude: 34.18, longitude: -118.25}
+        - name: "Durham"
+          coordinates: {latitude: 35.98, longitude: -78.91}
+        - name: "Montgomery"
+          coordinates: {latitude: 32.35, longitude: -86.28}
+        - name: "San Bernardino"
+          coordinates: {latitude: 34.14, longitude: -117.29}
+        - name: "Reno"
+          coordinates: {latitude: 39.54, longitude: -119.82}
+        - name: "Shreveport"
+          coordinates: {latitude: 32.47, longitude: -93.8}
+        - name: "Yonkers"
+          coordinates: {latitude: 40.95, longitude: -73.87}
+        - name: "Spokane"
+          coordinates: {latitude: 47.67, longitude: -117.41}
+        - name: "Tacoma"
+          coordinates: {latitude: 47.25, longitude: -122.46}
+        - name: "Huntington Beach"
+          coordinates: {latitude: 33.69, longitude: -118.01}
+        - name: "Grand Rapids"
+          coordinates: {latitude: 42.96, longitude: -85.66}
+        - name: "Des Moines"
+          coordinates: {latitude: 41.58, longitude: -93.62}
+        - name: "Augusta-Richmond"
+          coordinates: {latitude: 33.46, longitude: -81.99}
+        - name: "Irving"
+          coordinates: {latitude: 32.86, longitude: -96.97}
+        - name: "Richmond"
+          coordinates: {latitude: 37.53, longitude: -77.47}
+        - name: "Mobile"
+          coordinates: {latitude: 30.68, longitude: -88.09}
+        - name: "Winston-Salem"
+          coordinates: {latitude: 36.1, longitude: -80.26}
+        - name: "Boise City"
+          coordinates: {latitude: 43.61, longitude: -116.23}
+        - name: "Arlington"
+          coordinates: {latitude: 38.88, longitude: -77.1}
+        - name: "Columbus"
+          coordinates: {latitude: 32.51, longitude: -84.87}
+        - name: "Little Rock"
+          coordinates: {latitude: 34.72, longitude: -92.35}
+        - name: "Oxnard"
+          coordinates: {latitude: 34.2, longitude: -119.21}
+        - name: "Newport News"
+          coordinates: {latitude: 37.08, longitude: -76.51}
+        - name: "Amarillo"
+          coordinates: {latitude: 35.2, longitude: -101.82}
+        - name: "Salt Lake City"
+          coordinates: {latitude: 40.78, longitude: -111.93}
+    CA:
+        - name: "Toronto"
+          coordinates: {latitude: 43.65, longitude: -79.38}
+        - name: "Montreal"
+          coordinates: {latitude: 45.52, longitude: -73.57}
+        - name: "Vancouver"
+          coordinates: {latitude: 49.28, longitude: -123.13}
+        - name: "Calgary"
+          coordinates: {latitude: 51.05, longitude: -114.06}
+        - name: "Ottawa"
+          coordinates: {latitude: 45.42, longitude: -75.71}
+        - name: "Edmonton"
+          coordinates: {latitude: 53.57, longitude: -113.54}
+        - name: "Hamilton"
+          coordinates: {latitude: 43.26, longitude: -79.85}
+        - name: "Quebec"
+          coordinates: {latitude: 46.82, longitude: -71.23}
+        - name: "Winnipeg"
+          coordinates: {latitude: 49.88, longitude: -97.17}
+        - name: "Kitchener"
+          coordinates: {latitude: 43.46, longitude: -80.5}
+        - name: "London"
+          coordinates: {latitude: 42.97, longitude: -81.24}
+        - name: "Saint Catharines-Niagara"
+          coordinates: {latitude: 43.18, longitude: -79.24}
+        - name: "Victoria"
+          coordinates: {latitude: 48.43, longitude: -123.37}
+        - name: "Windsor"
+          coordinates: {latitude: 42.3, longitude: -83.03}
+        - name: "Halifax"
+          coordinates: {latitude: 44.67, longitude: -63.61}
+        - name: "Oshawa"
+          coordinates: {latitude: 43.89, longitude: -78.86}
+        - name: "Gatineau"
+          coordinates: {latitude: 45.42, longitude: -75.71}
+        - name: "Saskatoon"
+          coordinates: {latitude: 52.15, longitude: -106.66}
+        - name: "Regina"
+          coordinates: {latitude: 50.45, longitude: -104.61}
+        - name: "Barrie"
+          coordinates: {latitude: 44.38, longitude: -79.68}
+        - name: "Abbotsford"
+          coordinates: {latitude: 49.06, longitude: -122.3}
+        - name: "Sherbrooke"
+          coordinates: {latitude: 45.4, longitude: -71.9}
+        - name: "Trois-Rivieres"
+          coordinates: {latitude: 46.35, longitude: -72.57}
+        - name: "Kelowna"
+          coordinates: {latitude: 49.89, longitude: -119.46}
+        - name: "Saint John's"
+          coordinates: {latitude: 47.58, longitude: -52.69}
+        - name: "Guelph"
+          coordinates: {latitude: 43.56, longitude: -80.26}
+        - name: "Kingston"
+          coordinates: {latitude: 44.23, longitude: -76.5}
+        - name: "Chicoutimi-Jonquiere"
+          coordinates: {latitude: 48.43, longitude: -71.08}
+        - name: "Sudbury"
+          coordinates: {latitude: 46.49, longitude: -81.01}
+        - name: "Thunder Bay"
+          coordinates: {latitude: 48.42, longitude: -89.28}
+        - name: "Saint John"
+          coordinates: {latitude: 45.29, longitude: -66.06}
+        - name: "Brantford"
+          coordinates: {latitude: 43.15, longitude: -80.26}
+        - name: "Moncton"
+          coordinates: {latitude: 46.09, longitude: -64.78}
+        - name: "Sarnia"
+          coordinates: {latitude: 42.99, longitude: -82.4}
+        - name: "Nanaimo"
+          coordinates: {latitude: 49.21, longitude: -123.97}
+        - name: "Kanata"
+          coordinates: {latitude: 45.34, longitude: -75.88}
+        - name: "Peterborough"
+          coordinates: {latitude: 44.3, longitude: -78.34}
+        - name: "Red Deer"
+          coordinates: {latitude: 52.27, longitude: -113.83}
+        - name: "Saint-Jean-Sur-Richelieu"
+          coordinates: {latitude: 45.31, longitude: -73.26}
+        - name: "Lethbridge"
+          coordinates: {latitude: 49.69, longitude: -112.83}
+        - name: "Kamloops"
+          coordinates: {latitude: 50.68, longitude: -120.34}
+        - name: "Sault Sainte Marie"
+          coordinates: {latitude: 46.53, longitude: -84.35}
+        - name: "White Rock"
+          coordinates: {latitude: 49.03, longitude: -122.83}
+        - name: "Prince George"
+          coordinates: {latitude: 53.91, longitude: -122.77}
+        - name: "Belleville"
+          coordinates: {latitude: 44.17, longitude: -77.38}
+        - name: "Medicine Hat"
+          coordinates: {latitude: 50.04, longitude: -110.69}
+        - name: "Drummondville"
+          coordinates: {latitude: 45.89, longitude: -72.49}
+        - name: "Saint-Jerome"
+          coordinates: {latitude: 45.78, longitude: -74}
+        - name: "Granby"
+          coordinates: {latitude: 45.41, longitude: -72.73}
+        - name: "Fredericton"
+          coordinates: {latitude: 45.96, longitude: -66.66}
+        - name: "Chilliwack"
+          coordinates: {latitude: 49.17, longitude: -121.96}
+        - name: "North Bay"
+          coordinates: {latitude: 46.3, longitude: -79.45}
+        - name: "Cornwall"
+          coordinates: {latitude: 45.03, longitude: -74.74}
+        - name: "Shawinigan"
+          coordinates: {latitude: 46.56, longitude: -72.75}
+        - name: "Saint-Hyacinthe"
+          coordinates: {latitude: 45.63, longitude: -72.96}
+        - name: "Chatham"
+          coordinates: {latitude: 42.41, longitude: -82.19}
+        - name: "Vernon"
+          coordinates: {latitude: 50.27, longitude: -119.28}
+        - name: "Beloeil"
+          coordinates: {latitude: 45.55, longitude: -73.23}
+        - name: "Wood Buffalo"
+          coordinates: {latitude: 56.74, longitude: -111.43}
+        - name: "Charlottetown"
+          coordinates: {latitude: 46.24, longitude: -63.14}
+        - name: "Grande Prairie"
+          coordinates: {latitude: 55.18, longitude: -118.8}
+        - name: "Georgina"
+          coordinates: {latitude: 44.27, longitude: -79.25}
+        - name: "Salaberry-De-Valleyfield"
+          coordinates: {latitude: 45.26, longitude: -74.14}
+        - name: "Saint Thomas"
+          coordinates: {latitude: 42.78, longitude: -81.19}
+        - name: "Rimouski"
+          coordinates: {latitude: 48.44, longitude: -68.54}
+        - name: "Sorel"
+          coordinates: {latitude: 46.05, longitude: -73.14}
+        - name: "Penticton"
+          coordinates: {latitude: 49.5, longitude: -119.59}
+        - name: "Victoriaville"
+          coordinates: {latitude: 46.06, longitude: -71.96}
+        - name: "Joliette"
+          coordinates: {latitude: 46.03, longitude: -73.45}
+        - name: "Prince Albert"
+          coordinates: {latitude: 53.2, longitude: -105.75}
+        - name: "Woodstock"
+          coordinates: {latitude: 43.13, longitude: -80.76}
+        - name: "Bowmanville-Newcastle"
+          coordinates: {latitude: 43.9, longitude: -78.68}
+        - name: "Sydney"
+          coordinates: {latitude: 46.2, longitude: -59.97}
+        - name: "Courtenay"
+          coordinates: {latitude: 49.69, longitude: -125}
+        - name: "Georgetown"
+          coordinates: {latitude: 43.66, longitude: -79.93}
+        - name: "Timmins"
+          coordinates: {latitude: 48.49, longitude: -81.35}
+        - name: "Campbell River"
+          coordinates: {latitude: 49.99, longitude: -125.23}
+        - name: "Moose Jaw"
+          coordinates: {latitude: 50.39, longitude: -105.54}
+        - name: "Midland"
+          coordinates: {latitude: 44.75, longitude: -79.89}
+        - name: "Stratford"
+          coordinates: {latitude: 43.37, longitude: -80.98}
+        - name: "Orangeville"
+          coordinates: {latitude: 43.92, longitude: -80.1}
+        - name: "Orillia"
+          coordinates: {latitude: 44.6, longitude: -79.42}
+        - name: "Leamington"
+          coordinates: {latitude: 42.06, longitude: -82.6}
+        - name: "Alma"
+          coordinates: {latitude: 48.55, longitude: -71.66}
+        - name: "Brandon"
+          coordinates: {latitude: 49.84, longitude: -99.96}
+        - name: "Nanticoke"
+          coordinates: {latitude: 42.81, longitude: -80.09}
+        - name: "North Cowichan"
+          coordinates: {latitude: 48.82, longitude: -123.73}
+        - name: "Val-D'or"
+          coordinates: {latitude: 48.11, longitude: -77.79}
+        - name: "Rouyn-Noranda"
+          coordinates: {latitude: 48.24, longitude: -79.03}
+        - name: "Brockville"
+          coordinates: {latitude: 44.61, longitude: -75.7}
+        - name: "Milton"
+          coordinates: {latitude: 43.51, longitude: -79.89}
+        - name: "Sept-Iles"
+          coordinates: {latitude: 50.22, longitude: -66.38}
+        - name: "Central Okanagan"
+          coordinates: {latitude: 50.03, longitude: -119.87}
+        - name: "Owen Sound"
+          coordinates: {latitude: 44.57, longitude: -80.94}
+        - name: "Airdrie"
+          coordinates: {latitude: 51.3, longitude: -114.02}
+        - name: "Duncan"
+          coordinates: {latitude: 48.78, longitude: -123.7}
+        - name: "Lloydminster"
+          coordinates: {latitude: 53.28, longitude: -110.01}
+        - name: "Thetford Mines"
+          coordinates: {latitude: 46.1, longitude: -71.31}
+        - name: "Walnut Grove"
+          coordinates: {latitude: 49.19, longitude: -122.62}
+        - name: "Bolton"
+          coordinates: {latitude: 43.88, longitude: -79.73}
+        - name: "Buckingham"
+          coordinates: {latitude: 45.58, longitude: -75.42}
+        - name: "Saint-Georges"
+          coordinates: {latitude: 46.13, longitude: -70.68}
+        - name: "Parksville"
+          coordinates: {latitude: 49.33, longitude: -124.33}
+        - name: "Port Alberni"
+          coordinates: {latitude: 49.27, longitude: -124.82}
+        - name: "Truro"
+          coordinates: {latitude: 45.36, longitude: -63.28}
+        - name: "Glace Bay"
+          coordinates: {latitude: 46.2, longitude: -59.97}
+        - name: "New Glasgow"
+          coordinates: {latitude: 45.59, longitude: -62.65}
+        - name: "Magog"
+          coordinates: {latitude: 45.26, longitude: -72.14}
+        - name: "Corner Brook"
+          coordinates: {latitude: 48.96, longitude: -57.96}
+        - name: "Whitehorse"
+          coordinates: {latitude: 60.73, longitude: -135.05}
+        - name: "Valley East"
+          coordinates: {latitude: 46.64, longitude: -81.01}
+        - name: "Cranbrook"
+          coordinates: {latitude: 49.51, longitude: -115.77}
+        - name: "Terrace"
+          coordinates: {latitude: 54.52, longitude: -128.61}
+        - name: "Bradford"
+          coordinates: {latitude: 44.12, longitude: -79.56}
+        - name: "North Battleford"
+          coordinates: {latitude: 52.79, longitude: -108.29}
+        - name: "Lindsay"
+          coordinates: {latitude: 44.35, longitude: -78.74}
+        - name: "Cobourg"
+          coordinates: {latitude: 43.96, longitude: -78.17}
+        - name: "Spruce Grove"
+          coordinates: {latitude: 53.53, longitude: -113.92}
+        - name: "Fergus"
+          coordinates: {latitude: 43.7, longitude: -80.37}
+        - name: "Bathurst"
+          coordinates: {latitude: 47.62, longitude: -65.65}
+    BR:
+        - name: "Sao Paulo"
+          coordinates: {latitude: -23.53, longitude: -46.63}
+        - name: "Rio De Janeiro"
+          coordinates: {latitude: -22.91, longitude: -43.2}
+        - name: "Salvador"
+          coordinates: {latitude: -12.97, longitude: -38.5}
+        - name: "Belo Horizonte"
+          coordinates: {latitude: -19.92, longitude: -43.94}
+        - name: "Fortaleza"
+          coordinates: {latitude: -3.78, longitude: -38.59}
+        - name: "Brasilia"
+          coordinates: {latitude: -15.78, longitude: -47.91}
+        - name: "Curitiba"
+          coordinates: {latitude: -25.42, longitude: -49.29}
+        - name: "Manaus"
+          coordinates: {latitude: -3.12, longitude: -60.02}
+        - name: "Recife"
+          coordinates: {latitude: -8.08, longitude: -34.92}
+        - name: "Belem"
+          coordinates: {latitude: -1.44, longitude: -48.5}
+        - name: "Porto Alegre"
+          coordinates: {latitude: -30.04, longitude: -51.22}
+        - name: "Goiania"
+          coordinates: {latitude: -16.72, longitude: -49.26}
+        - name: "Guarulhos"
+          coordinates: {latitude: -23.46, longitude: -46.49}
+        - name: "Campinas"
+          coordinates: {latitude: -22.91, longitude: -47.08}
+        - name: "Nova Iguacu"
+          coordinates: {latitude: -22.74, longitude: -43.47}
+        - name: "Sao Goncalo"
+          coordinates: {latitude: -22.84, longitude: -43.07}
+        - name: "Sao Luis"
+          coordinates: {latitude: -2.5, longitude: -44.3}
+        - name: "Maceio"
+          coordinates: {latitude: -9.65, longitude: -35.75}
+        - name: "Duque De Caxias"
+          coordinates: {latitude: -22.77, longitude: -43.31}
+        - name: "Natal"
+          coordinates: {latitude: -5.8, longitude: -35.22}
+        - name: "Sao Bernardo Do Campo"
+          coordinates: {latitude: -23.71, longitude: -46.54}
+        - name: "Teresina"
+          coordinates: {latitude: -5.1, longitude: -42.8}
+        - name: "Campo Grande"
+          coordinates: {latitude: -20.45, longitude: -54.63}
+        - name: "Osasco"
+          coordinates: {latitude: -23.53, longitude: -46.78}
+        - name: "Santo Andre"
+          coordinates: {latitude: -23.65, longitude: -46.53}
+        - name: "Jaboatao"
+          coordinates: {latitude: -8.11, longitude: -35.02}
+        - name: "Joao Pessoa"
+          coordinates: {latitude: -7.12, longitude: -34.86}
+        - name: "Contagem"
+          coordinates: {latitude: -19.91, longitude: -44.1}
+        - name: "Sao Jose Dos Campos"
+          coordinates: {latitude: -23.2, longitude: -45.88}
+        - name: "Ribeirao Preto"
+          coordinates: {latitude: -21.17, longitude: -47.8}
+        - name: "Sorocaba"
+          coordinates: {latitude: -23.49, longitude: -47.47}
+        - name: "Uberlandia"
+          coordinates: {latitude: -18.9, longitude: -48.28}
+        - name: "Cuiaba"
+          coordinates: {latitude: -15.61, longitude: -56.09}
+        - name: "Aracaju"
+          coordinates: {latitude: -10.91, longitude: -37.07}
+        - name: "Niteroi"
+          coordinates: {latitude: -22.9, longitude: -43.13}
+        - name: "Juiz De Fora"
+          coordinates: {latitude: -21.75, longitude: -43.36}
+        - name: "Sao Joao De Meriti"
+          coordinates: {latitude: -22.8, longitude: -43.35}
+        - name: "Belford Roxo"
+          coordinates: {latitude: -22.75, longitude: -43.42}
+        - name: "Londrina"
+          coordinates: {latitude: -23.3, longitude: -51.18}
+        - name: "Feira De Santana"
+          coordinates: {latitude: -12.25, longitude: -38.97}
+        - name: "Joinville"
+          coordinates: {latitude: -26.32, longitude: -48.84}
+        - name: "Ananindeua"
+          coordinates: {latitude: -1.38, longitude: -48.38}
+        - name: "Santos"
+          coordinates: {latitude: -23.95, longitude: -46.33}
+        - name: "Aparecida De Goiania"
+          coordinates: {latitude: -16.82, longitude: -49.24}
+        - name: "Campos"
+          coordinates: {latitude: -21.75, longitude: -41.34}
+        - name: "Diadema"
+          coordinates: {latitude: -23.69, longitude: -46.61}
+        - name: "Vila Velha"
+          coordinates: {latitude: -20.32, longitude: -40.28}
+        - name: "Maua"
+          coordinates: {latitude: -23.66, longitude: -46.46}
+        - name: "Florianopolis"
+          coordinates: {latitude: -27.6, longitude: -48.54}
+        - name: "Olinda"
+          coordinates: {latitude: -8, longitude: -34.85}
+        - name: "Sao Jose Do Rio Preto"
+          coordinates: {latitude: -20.8, longitude: -49.39}
+        - name: "Caxias Do Sul"
+          coordinates: {latitude: -29.18, longitude: -51.17}
+        - name: "Serra"
+          coordinates: {latitude: -20.13, longitude: -40.32}
+        - name: "Carapicuiba"
+          coordinates: {latitude: -23.52, longitude: -46.84}
+        - name: "Campina Grande"
+          coordinates: {latitude: -7.23, longitude: -35.88}
+        - name: "Betim"
+          coordinates: {latitude: -19.97, longitude: -44.19}
+        - name: "Piracicaba"
+          coordinates: {latitude: -22.71, longitude: -47.64}
+        - name: "Cariacica"
+          coordinates: {latitude: -20.23, longitude: -40.37}
+        - name: "Bauru"
+          coordinates: {latitude: -22.33, longitude: -49.08}
+        - name: "Macapa"
+          coordinates: {latitude: 0.04, longitude: -51.05}
+        - name: "Canoas"
+          coordinates: {latitude: -29.92, longitude: -51.18}
+        - name: "Sao Vicente"
+          coordinates: {latitude: -23.96, longitude: -46.39}
+        - name: "Moji Das Cruzes"
+          coordinates: {latitude: -23.52, longitude: -46.21}
+        - name: "Jundiai"
+          coordinates: {latitude: -23.2, longitude: -46.88}
+        - name: "Montes Claros"
+          coordinates: {latitude: -16.72, longitude: -43.86}
+        - name: "Pelotas"
+          coordinates: {latitude: -31.76, longitude: -52.34}
+        - name: "Vitoria"
+          coordinates: {latitude: -20.31, longitude: -40.31}
+        - name: "Anapolis"
+          coordinates: {latitude: -16.32, longitude: -48.96}
+        - name: "Itaquaquecetuba"
+          coordinates: {latitude: -23.47, longitude: -46.35}
+        - name: "Porto Velho"
+          coordinates: {latitude: -8.76, longitude: -63.91}
+        - name: "Maringa"
+          coordinates: {latitude: -23.41, longitude: -51.93}
+        - name: "Franca"
+          coordinates: {latitude: -20.53, longitude: -47.39}
+        - name: "Guaruja"
+          coordinates: {latitude: -24, longitude: -46.27}
+        - name: "Ribeirao Das Neves"
+          coordinates: {latitude: -19.76, longitude: -44.08}
+        - name: "Ponta Grossa"
+          coordinates: {latitude: -25.09, longitude: -50.16}
+        - name: "Paulista"
+          coordinates: {latitude: -7.9, longitude: -34.91}
+        - name: "Foz Do Iguacu"
+          coordinates: {latitude: -25.55, longitude: -54.58}
+        - name: "Petropolis"
+          coordinates: {latitude: -22.51, longitude: -43.2}
+        - name: "Blumenau"
+          coordinates: {latitude: -26.92, longitude: -49.09}
+        - name: "Limeira"
+          coordinates: {latitude: -22.55, longitude: -47.4}
+        - name: "Suzano"
+          coordinates: {latitude: -23.55, longitude: -46.31}
+        - name: "Uberaba"
+          coordinates: {latitude: -19.76, longitude: -47.94}
+        - name: "Caucaia"
+          coordinates: {latitude: -3.74, longitude: -38.67}
+        - name: "Volta Redonda"
+          coordinates: {latitude: -22.51, longitude: -44.12}
+        - name: "Rio Branco"
+          coordinates: {latitude: -9.98, longitude: -67.82}
+        - name: "Governador Valadares"
+          coordinates: {latitude: -18.87, longitude: -41.97}
+        - name: "Novo Hamburgo"
+          coordinates: {latitude: -29.71, longitude: -51.14}
+        - name: "Cascavel"
+          coordinates: {latitude: -24.96, longitude: -53.46}
+        - name: "Taubate"
+          coordinates: {latitude: -23.02, longitude: -45.56}
+        - name: "Viamao"
+          coordinates: {latitude: -30.09, longitude: -50.98}
+        - name: "Santa Maria"
+          coordinates: {latitude: -29.69, longitude: -53.83}
+        - name: "Vitoria Da Conquista"
+          coordinates: {latitude: -14.85, longitude: -40.84}
+        - name: "Varzea Grande"
+          coordinates: {latitude: -15.65, longitude: -56.14}
+        - name: "Boa Vista"
+          coordinates: {latitude: 2.83, longitude: -60.66}
+        - name: "Barueri"
+          coordinates: {latitude: -23.49, longitude: -46.86}
+        - name: "Caruaru"
+          coordinates: {latitude: -8.28, longitude: -35.98}
+        - name: "Gravatai"
+          coordinates: {latitude: -29.95, longitude: -50.99}
+        - name: "Ipatinga"
+          coordinates: {latitude: -19.48, longitude: -42.52}
+        - name: "Praia Grande"
+          coordinates: {latitude: -24, longitude: -46.4}
+        - name: "Imperatriz"
+          coordinates: {latitude: -5.52, longitude: -47.49}
+        - name: "Juazeiro Do Norte"
+          coordinates: {latitude: -7.21, longitude: -39.32}
+        - name: "Embu"
+          coordinates: {latitude: -23.64, longitude: -46.84}
+        - name: "Sumare"
+          coordinates: {latitude: -22.8, longitude: -47.29}
+        - name: "Santa Luzia"
+          coordinates: {latitude: -19.78, longitude: -43.87}
+        - name: "Mage"
+          coordinates: {latitude: -22.65, longitude: -43.05}
+        - name: "Taboao Da Serra"
+          coordinates: {latitude: -23.6, longitude: -46.78}
+        - name: "Sao Jose Dos Pinhais"
+          coordinates: {latitude: -25.57, longitude: -49.18}
+        - name: "Marilia"
+          coordinates: {latitude: -22.21, longitude: -49.95}
+        - name: "Jacarei"
+          coordinates: {latitude: -23.3, longitude: -45.96}
+        - name: "Presidente Prudente"
+          coordinates: {latitude: -22.12, longitude: -51.39}
+        - name: "Sao Leopoldo"
+          coordinates: {latitude: -29.78, longitude: -51.15}
+        - name: "Mossoro"
+          coordinates: {latitude: -5.19, longitude: -37.34}
+        - name: "Itabuna"
+          coordinates: {latitude: -14.79, longitude: -39.28}
+        - name: "Sao Carlos"
+          coordinates: {latitude: -22.02, longitude: -47.89}
+        - name: "Alvorada"
+          coordinates: {latitude: -30.02, longitude: -51.09}
+        - name: "Colombo"
+          coordinates: {latitude: -25.29, longitude: -49.24}
+        - name: "Santarem"
+          coordinates: {latitude: -2.43, longitude: -54.72}
+        - name: "Sete Lagoas"
+          coordinates: {latitude: -19.45, longitude: -44.25}
+        - name: "Americana"
+          coordinates: {latitude: -22.75, longitude: -47.33}
+        - name: "Sao Jose"
+          coordinates: {latitude: -27.59, longitude: -48.62}

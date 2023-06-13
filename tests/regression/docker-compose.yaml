@@ -149,6 +149,8 @@ services:
   uls_downloader:
     image: public.ecr.aws/w9v6y1o0/openafc/uls-downloader:${TAG:-latest}
     restart: always
+    environment:
+      - ULS_AFC_URL=http://msghnd:8000/fbrat/ap-afc/1.4/availableSpectrumInquiryInternal
     volumes:
       - ${VOL_H_DB}/ULS_Database:/ULS_Database
       - uls_downloader_state:/uls_downloader_state

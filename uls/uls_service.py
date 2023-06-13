@@ -10,6 +10,7 @@
 # pylint: disable=unused-wildcard-import, wrong-import-order, wildcard-import
 # pylint: disable=too-many-statements, too-many-branches, unnecessary-pass
 # pylint: disable=logging-fstring-interpolation, invalid-name, too-many-locals
+# pylint: disable=too-few-public-methods
 
 import argparse
 import datetime
@@ -22,7 +23,7 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Dict, List, Optional, Set
+from typing import cast, Dict, List, Optional, Set
 
 from uls_service_common import *
 
@@ -64,6 +65,12 @@ DATA_IDS_ID_COLUMN = "identity"
 # Name of FSID tool script
 FSID_TOOL = os.path.join(os.path.dirname(__file__), "fsid_tool.py")
 
+# Name of FS DB Diff script
+FS_DB_DIFF = os.path.join(os.path.dirname(__file__), "fs_db_diff.py")
+
+# Name of FS AFC test script
+FS_AFC = os.path.join(os.path.dirname(__file__), "fs_afc.py")
+
 
 class ProcessingException(Exception):
     """ ULS processing exception """
@@ -89,6 +96,11 @@ def print_args(args: Any) -> None:
                  f"{args.fsid_file}")
     logging.info(f"ULS download service state storage directory: "
                  f"{args.status_dir}")
+    mcp = "Unspecified" if args.max_change_percent is None \
+        else f"{args.max_change_percent}%"
+    logging.info(f"Limit on paths changed since previous: {mcp}")
+    logging.info(f"AFC Service URL to use for database validity check: "
+                 f"{'Unspecified' if args.afc_url is None else args.afc_url}")
     logging.info(f"ULS download interval in hours: {args.interval_hr}")
     logging.info(f"ULS download script maximum duration in hours: "
                  f"{args.timeout_hr}")
@@ -103,7 +115,7 @@ def extract_fsid_table(uls_file: str, fsid_file: str) -> None:
     uls_file  -- FS database filename
     fsid_file -- FSID table filename
     """
-    # Clean previous fsid files...
+    # Clean previous FSID files...
     try:
         fsid_name_parts = os.path.splitext(fsid_file)
         logging.info("Extracting FSID table")
@@ -190,6 +202,100 @@ def update_region_change_times(status_storage: StatusStorage,
                                           data_update_times)
 
 
+class UlsFileChecker:
+    """ Checker of ULS database validity
+
+    Private attributes:
+    _prev_filename      -- Optional name of previous database. Since it is
+                           symlink-based, it is fixed
+    _max_change_percent -- Optional percent of maximum difference
+    _afc_url            -- Optional AFC Service URL to test ULS database on
+    _regions            -- List of regions to test database on. Empty if on all
+                           regions
+    """
+    def __init__(self, prev_filename: Optional[str] = None,
+                 max_change_percent: Optional[float] = None,
+                 afc_url: Optional[str] = None,
+                 regions: Optional[List[str]] = None) -> None:
+        """ Constructor
+
+        Arguments:
+        prev_filename      -- Optional name of previous database. Since it is
+                              symlink-based, it is fixed
+        max_change_percent -- Optional percent of maximum difference
+        afc_url            -- Optional AFC Service URL to test ULS database on
+        regions            -- Optional list of regions to test database on. If
+                              empty or None - test on all regions
+        """
+        self._prev_filename = prev_filename
+        self._max_change_percent = max_change_percent
+        self._afc_url = afc_url
+        self._regions: List[str] = regions or []
+
+    def valid(self, new_filename: str) -> bool:
+        """ Checks validity of given database """
+        return self._check_diff(new_filename) and self._check_afc(new_filename)
+
+    def _check_diff(self, new_filename) -> bool:
+        """ Checks amount of difference since previous database """
+        if (self._prev_filename is None) or \
+                (not os.path.isfile(self._prev_filename)) or \
+                (self._max_change_percent is None):
+            return True
+        logging.info("Comparing with previous database")
+        try:
+            p = subprocess.run(
+                [FS_DB_DIFF, self._prev_filename, new_filename],
+                stdout=subprocess.PIPE, check=True, timeout=10 * 60,
+                encoding="ascii")
+            m = re.search(r"Paths in DB1:\s+(?P<db1>\d+)(.|\n)+"
+                          r"Paths in DB2:\s+(?P<db2>\d+)(.|\n)+"
+                          r"Different paths:\s+(?P<diff>\d+)(.|\n)+",
+                          cast(str, p.stdout))
+            if m is None:
+                logging.error(
+                    f"Output of '{FS_DB_DIFF}' has unrecognized structure")
+                return False
+            db2_len = int(cast(str, m.group("db2")))
+            diff_len = int(cast(str, m.group("diff")))
+            diff_percent = \
+                round(
+                    100 if diff_len == 0 else ((diff_len * 100) / db2_len),
+                    3)
+            if diff_percent > self._max_change_percent:
+                logging.error(
+                    f"Database changed by {diff_percent}%, which exceeds "
+                    f"the limit of {self._max_change_percent}%")
+                return False
+            logging.info(
+                f"Database comparison succeeded: "
+                f"{os.path.basename(self._prev_filename)} had "
+                f"{int(cast(str, m.group('db1')))} paths, "
+                f"{os.path.basename(new_filename)} has {db2_len} paths, "
+                f"difference is in {diff_len}, amount of change is "
+                f"{diff_percent}%, which is below the threshold of "
+                f"{self._max_change_percent}%")
+        except (subprocess.SubprocessError, OSError) as ex:
+            logging.error(f"Database comparison failed: {ex}")
+            return False
+        return True
+
+    def _check_afc(self, new_filename: str) -> bool:
+        """ Checks new database against AFC Service """
+        if self._afc_url is None:
+            return True
+        logging.info("Testing new FS database on AFC Service")
+        try:
+            subprocess.run(
+                [FS_AFC, "--server_url", self._afc_url] +
+                [f"--region={r}" for r in self._regions] +
+                [os.path.basename(new_filename)], check=True, timeout=30 * 60)
+        except (subprocess.SubprocessError, OSError) as ex:
+            logging.error(f"AFC Service test failed: {ex}")
+            return False
+        return True
+
+
 def main(argv: List[str]) -> None:
     """Do the job.
 
@@ -251,6 +357,13 @@ def main(argv: List[str]) -> None:
         "subdirectory of ULS downloader script. This parameter may be "
         "specified several times")
     argument_parser.add_argument(
+        "--max_change_percent", metavar="MAX_CHANGE_PERCENT",
+        type=docker_arg_type(float),
+        help="Maximum allowed change since previous database in percents")
+    argument_parser.add_argument(
+        "--afc_url", metavar="URL", type=docker_arg_type(str),
+        help="URL for making trial AFC Requests with new database")
+    argument_parser.add_argument(
         "--interval_hr", metavar="INTERVAL_HR", default=DEFAULT_INTERVAL_HR,
         type=docker_arg_type(float, default=DEFAULT_INTERVAL_HR),
         help=f"Download interval in hours. Default is {DEFAULT_INTERVAL_HR}")
@@ -289,6 +402,14 @@ def main(argv: List[str]) -> None:
             script_dir=os.path.dirname(args.download_script),
             status_storage=status_storage)
 
+    current_uls_file = os.path.join(args.ext_db_dir, args.ext_db_symlink)
+
+    uls_file_checker = \
+        UlsFileChecker(
+            prev_filename=current_uls_file,
+            max_change_percent=args.max_change_percent, afc_url=args.afc_url,
+            regions=None if args.region is None else args.region.split(":"))
+
     status_storage.write_milestone(StatusStorage.S.ServiceStart)
 
     while True:
@@ -296,9 +417,6 @@ def main(argv: List[str]) -> None:
         download_start_time = datetime.datetime.now()
         status_storage.write_milestone(StatusStorage.S.DownloadStart)
         try:
-            current_uls_file = \
-                os.path.join(args.ext_db_dir, args.ext_db_symlink)
-
             if os.path.islink(current_uls_file):
                 logging.info(
                     f"Current database: '{os.readlink(current_uls_file)}'")
@@ -367,18 +485,27 @@ def main(argv: List[str]) -> None:
                 # Copy new ULS file to external directory
                 shutil.copy2(new_uls_file, args.ext_db_dir)
 
-                # Retargeting symlink
-                update_uls_file(uls_dir=args.ext_db_dir,
-                                uls_file=os.path.basename(new_uls_file),
-                                symlink=args.ext_db_symlink)
+                new_uls_file_name = \
+                    os.path.join(args.ext_db_dir,
+                                 os.path.basename(new_uls_file))
+                if uls_file_checker.valid(new_uls_file_name):
+                    # Retargeting symlink
+                    update_uls_file(uls_dir=args.ext_db_dir,
+                                    uls_file=os.path.basename(new_uls_file),
+                                    symlink=args.ext_db_symlink)
 
-                # Update data change times (for health checker)
-                update_region_change_times(
-                    status_storage=status_storage,
-                    all_regions=list(new_uls_identity.keys()),
-                    updated_regions=updated_regions)
+                    # Update data change times (for health checker)
+                    update_region_change_times(
+                        status_storage=status_storage,
+                        all_regions=list(new_uls_identity.keys()),
+                        updated_regions=updated_regions)
 
-                status_storage.write_milestone(StatusStorage.S.SqliteUpdate)
+                    status_storage.write_milestone(
+                        StatusStorage.S.SqliteUpdate)
+                else:
+                    # Removing (almost) production database that failed
+                    # validity check
+                    os.unlink(new_uls_file_name)
             else:
                 logging.info("FS data is identical to previous. No update "
                              "will be done")

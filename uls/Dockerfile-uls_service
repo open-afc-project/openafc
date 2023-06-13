@@ -27,7 +27,8 @@ cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_BUILD_TYPE=Ulsprocessor
 ninja -j$(nproc --all --ignore=2) install
 
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
-RUN apk add py3-sqlalchemy py3-numpy
+RUN apk add py3-sqlalchemy py3-numpy py3-yaml
+
 RUN mkdir -p /mnt/nfs/rat_transfer/daily_uls_parse/data_files \
             /mnt/nfs/rat_transfer/daily_uls_parse/temp \
             /mnt/nfs/rat_transfer/ULS_Database \
@@ -36,8 +37,9 @@ RUN mkdir -p /mnt/nfs/rat_transfer/daily_uls_parse/data_files \
 
 COPY --from=build_image /root/afc/__install/bin /mnt/nfs/rat_transfer/daily_uls_parse/
 COPY --from=build_image /root/afc/build/src/ratapi/pkg/ratapi/db/ /mnt/nfs/rat_transfer/daily_uls_parse/
-COPY uls/uls_service*.py uls/fsid_tool.py /wd/
-RUN chmod +x /wd/uls_service*.py wd/fsid_tool.py
+COPY uls/uls_service*.py uls/fsid_tool.py uls/fs_db_diff.py uls/fs_afc.py uls/fs_afc.yaml /wd/
+RUN chmod -x /wd/*.py
+RUN chmod +x /wd/uls_service.py /wd/uls_service_healthcheck.py wd/fsid_tool.py wd/fs_db_diff.py wd/fs_afc.py
 
 FROM alpine:3.17
 
@@ -60,6 +62,12 @@ ENV ULS_STATE_DIR=/uls_downloader_state
 # Download interval in hours
 ENV ULS_INTERVAL_HR=4
 
+# Maximum allowed change since previous download in percents
+ENV ULS_MAX_CHANGE_PERCENT=10
+
+# URL to use for testing new ULS database against AFC Service
+# ENV ULS_AFC_URL
+
 # Download maximum duration in hours
 ENV ULS_TIMEOUT_HR=1
 
@@ -78,5 +86,7 @@ ENTRYPOINT /wd/uls_service.py \
     --fsid_file=/mnt/nfs/rat_transfer/daily_uls_parse/data_files/fsid_table.csv \
     --status_dir=$ULS_STATE_DIR \
     --check_ext_files=https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data:raw_wireless_innovation_forum_files:antenna_model_diameter_gain.csv,billboard_reflector.csv,category_b1_antennas.csv,high_performance_antennas.csv,fcc_fixed_service_channelization.csv,transmit_radio_unit_architecture.csv \
+    --max_change_percent=$ULS_MAX_CHANGE_PERCENT \
+    --afc_url=$ULS_AFC_URL \
     --interval_hr=$ULS_INTERVAL_HR \
     --timeout_hr=$ULS_TIMEOUT_HR
