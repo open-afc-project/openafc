@@ -10,7 +10,7 @@
 # pylint: disable=unused-wildcard-import, wrong-import-order, wildcard-import
 # pylint: disable=too-many-statements, too-many-branches, unnecessary-pass
 # pylint: disable=logging-fstring-interpolation, invalid-name, too-many-locals
-# pylint: disable=too-few-public-methods
+# pylint: disable=too-few-public-methods, too-many-arguments
 
 import argparse
 import datetime
@@ -210,12 +210,15 @@ class UlsFileChecker:
                            symlink-based, it is fixed
     _max_change_percent -- Optional percent of maximum difference
     _afc_url            -- Optional AFC Service URL to test ULS database on
+    _afc_parallel       -- Optional number of parallel AFC requests to make
+                           during database verification
     _regions            -- List of regions to test database on. Empty if on all
                            regions
     """
     def __init__(self, prev_filename: Optional[str] = None,
                  max_change_percent: Optional[float] = None,
                  afc_url: Optional[str] = None,
+                 afc_parallel: Optional[int] = None,
                  regions: Optional[List[str]] = None) -> None:
         """ Constructor
 
@@ -224,12 +227,15 @@ class UlsFileChecker:
                               symlink-based, it is fixed
         max_change_percent -- Optional percent of maximum difference
         afc_url            -- Optional AFC Service URL to test ULS database on
+        afc_parallel       -- Optional number of parallel AFC requests to make
+                              during database verification
         regions            -- Optional list of regions to test database on. If
                               empty or None - test on all regions
         """
         self._prev_filename = prev_filename
         self._max_change_percent = max_change_percent
         self._afc_url = afc_url
+        self._afc_parallel = afc_parallel
         self._regions: List[str] = regions or []
 
     def valid(self, new_filename: str) -> bool:
@@ -288,6 +294,8 @@ class UlsFileChecker:
         try:
             subprocess.run(
                 [FS_AFC, "--server_url", self._afc_url] +
+                (["--parallel", str(self._afc_parallel)]
+                 if self._afc_parallel is not None else []) +
                 [f"--region={r}" for r in self._regions] +
                 [os.path.basename(new_filename)], check=True, timeout=30 * 60)
         except (subprocess.SubprocessError, OSError) as ex:
@@ -364,6 +372,14 @@ def main(argv: List[str]) -> None:
         "--afc_url", metavar="URL", type=docker_arg_type(str),
         help="URL for making trial AFC Requests with new database")
     argument_parser.add_argument(
+        "--afc_parallel", metavar="NUMBER", type=docker_arg_type(int),
+        help=f"Number of parallel AFC Request to make during verifying new "
+        f"database against AFC Engine. Default see in config file of "
+        f"'{FS_AFC}'")
+    argument_parser.add_argument(
+        "--delay_hr", metavar="DELAY_HR", type=docker_arg_type(float),
+        help="Delay before invocation in hours. Default is no delay")
+    argument_parser.add_argument(
         "--interval_hr", metavar="INTERVAL_HR", default=DEFAULT_INTERVAL_HR,
         type=docker_arg_type(float, default=DEFAULT_INTERVAL_HR),
         help=f"Download interval in hours. Default is {DEFAULT_INTERVAL_HR}")
@@ -372,6 +388,10 @@ def main(argv: List[str]) -> None:
         type=docker_arg_type(float, default=DEFAULT_TIMEOUT_HR),
         help=f"Download script execution timeout in hours. Default is "
         f"{DEFAULT_INTERVAL_HR}")
+    argument_parser.add_argument(
+        "--nice", nargs="?", metavar="[YES/NO]", const=True,
+        type=docker_arg_type(bool, default=False),
+        help="Run download script on nice (low) priority")
     argument_parser.add_argument(
         "--run_once", nargs="?", metavar="[YES/NO]", const=True,
         type=docker_arg_type(bool, default=False),
@@ -408,9 +428,17 @@ def main(argv: List[str]) -> None:
         UlsFileChecker(
             prev_filename=current_uls_file,
             max_change_percent=args.max_change_percent, afc_url=args.afc_url,
+            afc_parallel=args.afc_parallel,
             regions=None if args.region is None else args.region.split(":"))
 
     status_storage.write_milestone(StatusStorage.S.ServiceStart)
+
+    if args.delay_hr:
+        logging.info(f"Delaying by {args.delay_hr} hours")
+        time.sleep(args.delay_hr * 3600)
+
+    # Temporary name of new ULS database in external directory
+    temp_uls_file_name: Optional[str] = None
 
     while True:
         logging.info("Starting ULS download")
@@ -434,7 +462,10 @@ def main(argv: List[str]) -> None:
             ext_params_file_checker.check()
 
             # Issue download script
-            cmdline_args = [args.download_script]
+            cmdline_args: List[str] = []
+            if args.nice and (os.name == "posix"):
+                cmdline_args.append("nice")
+            cmdline_args.append(args.download_script)
             if args.region:
                 cmdline_args += ["--region", args.region]
             if args.download_script_args:
@@ -459,6 +490,8 @@ def main(argv: List[str]) -> None:
 
             # Check what regions were updated
             new_uls_file = uls_files[0]
+            logging.info(f"ULS file '{new_uls_file}' created. It will undergo "
+                         f"some inspection")
             new_uls_identity = get_uls_identity(new_uls_file)
             if new_uls_identity is None:
                 raise ProcessingException(
@@ -482,13 +515,18 @@ def main(argv: List[str]) -> None:
                     [FSID_TOOL, "embed", new_uls_file, args.fsid_file],
                     check=True)
 
-                # Copy new ULS file to external directory
-                shutil.copy2(new_uls_file, args.ext_db_dir)
-
-                new_uls_file_name = \
+                temp_uls_file_name = \
                     os.path.join(args.ext_db_dir,
-                                 os.path.basename(new_uls_file))
-                if uls_file_checker.valid(new_uls_file_name):
+                                 "temp_" + os.path.basename(new_uls_file))
+                # Copy new ULS file to external directory
+                shutil.copy2(new_uls_file, temp_uls_file_name)
+
+                if uls_file_checker.valid(temp_uls_file_name):
+                    # Renaming database
+                    permanent_uls_file_name = \
+                        os.path.join(args.ext_db_dir,
+                                     os.path.basename(new_uls_file))
+                    os.rename(temp_uls_file_name, permanent_uls_file_name)
                     # Retargeting symlink
                     update_uls_file(uls_dir=args.ext_db_dir,
                                     uls_file=os.path.basename(new_uls_file),
@@ -502,16 +540,19 @@ def main(argv: List[str]) -> None:
 
                     status_storage.write_milestone(
                         StatusStorage.S.SqliteUpdate)
-                else:
-                    # Removing (almost) production database that failed
-                    # validity check
-                    os.unlink(new_uls_file_name)
             else:
                 logging.info("FS data is identical to previous. No update "
                              "will be done")
         except (OSError, subprocess.SubprocessError, ProcessingException) \
                 as ex:
             logging.error(f"Download failed: {ex}")
+        finally:
+            try:
+                if temp_uls_file_name and os.path.isfile(temp_uls_file_name):
+                    os.unlink(temp_uls_file_name)
+            except OSError as ex:
+                logging.error(f"Attempt to remove temporary ULS database "
+                              f"'{temp_uls_file_name}' failed: {ex}")
 
         # Prepare to sleep
         download_duration_sec = \

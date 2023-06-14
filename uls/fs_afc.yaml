@@ -8,7 +8,7 @@
 # Contains request template(s), region template(s), point coordinates
 ---
 # Default number of parallel requests
-default_parallel: 10
+default_parallel: 3
 
 # Default request timeout in minutes
 default_timeout_min: 5
@@ -17,7 +17,7 @@ default_timeout_min: 5
 # req_idx    - 0-based request index
 # region     - 2-letter region name
 # random_str - 10-character random string (uppercase + digits)
-req_id_format: "FS_AFC_{random_str}_{region}"
+req_id_format: "FS_DOWNLOADER_{region}"
 
 # Substitution points (see 'paths' dictionary below must be set to null)
 req_pattern: |

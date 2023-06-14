@@ -43,7 +43,12 @@ RUN chmod +x /wd/uls_service.py /wd/uls_service_healthcheck.py wd/fsid_tool.py w
 
 FROM alpine:3.17
 
-# Downloader service script parameters
+# DOWNLOADER SERVICE SCRIPT PARAMETERS
+
+# Run downloader script on nioce (lowered) priority. Default is to use normal
+# priority
+ENV ULS_NICE=YES
+
 # Additional argfuments (besides --region) to pass to daily_uls_parse.py
 # ENV ULS_DOWNLOAD_SCRIPT_ARGS
 
@@ -59,6 +64,9 @@ ENV ULS_CURRENT_DB_SYMLINK=FS_LATEST.sqlite3
 # Persistent state directory
 ENV ULS_STATE_DIR=/uls_downloader_state
 
+# Deklay first download by given number of hours
+# ENV ULS_DELAY_HR
+
 # Download interval in hours
 ENV ULS_INTERVAL_HR=4
 
@@ -67,6 +75,10 @@ ENV ULS_MAX_CHANGE_PERCENT=10
 
 # URL to use for testing new ULS database against AFC Service
 # ENV ULS_AFC_URL
+
+# Number of parallel AFC Requests to make during new ULS database verification
+# Default see config file of uls_afc.py
+# ENV ULS_AFC_PARALLEL
 
 # Download maximum duration in hours
 ENV ULS_TIMEOUT_HR=1
@@ -88,5 +100,8 @@ ENTRYPOINT /wd/uls_service.py \
     --check_ext_files=https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data:raw_wireless_innovation_forum_files:antenna_model_diameter_gain.csv,billboard_reflector.csv,category_b1_antennas.csv,high_performance_antennas.csv,fcc_fixed_service_channelization.csv,transmit_radio_unit_architecture.csv \
     --max_change_percent=$ULS_MAX_CHANGE_PERCENT \
     --afc_url=$ULS_AFC_URL \
+    --afc_parallel=$ULS_AFC_PARALLEL \
+    --delay_hr=$ULS_DELAY_HR \
     --interval_hr=$ULS_INTERVAL_HR \
-    --timeout_hr=$ULS_TIMEOUT_HR
+    --timeout_hr=$ULS_TIMEOUT_HR \
+    --nice=$ULS_NICE
