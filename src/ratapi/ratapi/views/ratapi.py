@@ -26,12 +26,13 @@ from flask.views import MethodView
 import werkzeug.exceptions
 from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
 from afc_worker import run
+from fst import DataIf
+from ncli import MsgPublisher
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from ..models.aaa import User, AccessPointDeny, AFCConfig
 from ..models.base import db
 from .auth import auth
 from ..models import aaa
-from fst import DataIf
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -195,6 +196,43 @@ class GuiConfig(MethodView):
             version=serververs,
         )
         return resp
+
+
+class HealthCheck(MethodView):
+
+    def get(self):
+        '''GET method for HealthCheck'''
+        cert_bdl_name='certificate/client.bundle.pem'
+        bundle_data = ''
+        try:
+            with DataIf().open(cert_bdl_name) as hfile:
+                if hfile.head():
+                    LOGGER.debug(f"Cert bundle already exists.")
+                    raise
+                # create client bundle certificate file if not exists
+                for certs in db.session.query(aaa.MTLS).all():
+                    LOGGER.info(f"{certs.id}")
+                    bundle_data += certs.cert
+                db.session.commit() # pylint: disable=no-member
+                if len(bundle_data) == 0:
+                    LOGGER.debug(f"No certificates stored.")
+                    raise
+                # write certificates bundle for clients to objst cache.
+                hfile.write(bundle_data)
+
+                # note relevant listen peers
+                cmd = 'cmd_restart'
+                publisher = MsgPublisher(
+                        flask.current_app.config['BROKER_URL'],
+                        flask.current_app.config['BROKER_EXCH_DISPAT'])
+                publisher.publish(cmd)
+                publisher.close()
+        except:
+            pass
+
+        msg = 'The ' + flask.current_app.config['AFC_APP_TYPE'] + ' is healthy'
+        LOGGER.info(f"{msg}")
+        return flask.make_response(msg, 200)
 
 
 class ReloadAnalysis(MethodView):
@@ -1010,4 +1048,5 @@ module.add_url_rule('/about',
                     view_func=About.as_view('About'))
 module.add_url_rule('/rulesetIds',
                     view_func=AfcRulesetIds.as_view('AfcRulesetIds'))
+module.add_url_rule('/healthy', view_func=HealthCheck.as_view('HealthCheck'))
 

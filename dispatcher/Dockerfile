@@ -30,15 +30,14 @@ RUN set -x \
 # create certificate directories
     && mkdir -p \
     /certificates/servers \
-    /certificates/clients \
     /etc/nginx/templates
 
 # Server side certificates
 COPY dispatcher/certs/servers/server.cert.pem \
 dispatcher/certs/servers/server.key.pem /certificates/servers/
-# Client side CA certificates
-COPY dispatcher/certs/clients/test_ca_crt.pem \
-/certificates/clients/
+# Default client side CA certificates as a placeholder
+COPY dispatcher/certs/clients/client.bundle.pem \
+/etc/nginx/certs/
 
 # Copy nginx configuration files
 COPY dispatcher/nginx.conf /etc/nginx/

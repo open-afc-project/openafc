@@ -8,7 +8,7 @@
 make_key()
 {
     local k_name=$1
-    local cmd="openssl genrsa -out $k_name/$k_name"_key.pem" 4096 $dbg_log"
+    local cmd="openssl genrsa -out $k_name/$k_name"_key.pem" 4096 > /dev/null 2>&1"
     eval $cmd
     if [ "$?" -ne "0" ]; then echo -e "ERROR: Failed to generate key $k_name\n" ; return 1 ; fi
 }
@@ -24,7 +24,7 @@ make_client_cert()
     make_key $cli_name
     openssl req -new -key $cli_name/$cli_name"_key.pem" \
         -out $cli_name/$cli_name".csr" -sha256 \
-        -subj "/C=IL/ST=Israel/L=Tel Aviv/O=Broadcom/CN=$cli_name"
+        -subj "/C=IL/ST=Israel/L=Tel Aviv/O=Broadcom/CN=$cli_name" > /dev/null 2>&1
 
     cat << EOF > $cli_name"_ext.cnf"
 authorityKeyIdentifier=keyid,issuer
@@ -58,7 +58,8 @@ EOF
         -days 29 -batch -notext \
         -out $cli_name/$cli_name"_crt.pem" -cert $ca_path/$ca_crt \
         -keyfile $ca_path/$ca_key \
-        -in $cli_name/$cli_name".csr" -extfile $cli_name"_ext.cnf"
+        -in $cli_name/$cli_name".csr" -extfile $cli_name"_ext.cnf" > /dev/null 2>&1
+    echo "\nCreated certificate."
     openssl x509 -startdate -enddate -noout -in $cli_name/$cli_name"_crt.pem"
     return 0
 }

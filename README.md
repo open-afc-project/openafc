@@ -763,6 +763,8 @@ Roles are: Super, admin, AP, Admin, Analysis, Trial
 "Super" is a new role, which allows access rights to all organizations, as opposed to "Admin", which is limited to one organization.  When upgrade from older system without "Super", you will need to decide which users to be assigned role of "Super" and update their roles via the user update command.
 
 ## MTLS
+Vanilla installation comes with placeholder file for client certificate bundle.
+
 Besides the GUI, mtls certificates can be managed via CLI.
 To list certificates:
 ```

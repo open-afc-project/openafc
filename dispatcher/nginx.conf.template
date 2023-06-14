@@ -1,5 +1,5 @@
 #
-# Copyright © 2022 Broadcom. All rights reserved. The term "Broadcom"
+# Copyright (C) 2022 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
@@ -43,7 +43,7 @@ http {
         ssl_certificate /certificates/servers/server.cert.pem;
         ssl_certificate_key /certificates/servers/server.key.pem;
 
-        ssl_client_certificate /certificates/clients/test_ca_crt.pem;
+        ssl_client_certificate /etc/nginx/certs/client.bundle.pem;
         ssl_verify_client optional;
         ssl_verify_depth 10;
 

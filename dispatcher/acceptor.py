@@ -21,6 +21,7 @@ from logging.config import dictConfig
 import argparse
 import inspect
 import subprocess
+import shutil
 from ncli import MsgAcceptor
 from fst import DataIf
 
@@ -63,7 +64,9 @@ class Configurator(dict):
         self['OBJST_CERT_CLI_BUNDLE'] = \
             'certificate/client.bundle.pem'
         self['DISPAT_CERT_CLI_BUNDLE'] = \
-            '/certificates/clients/client.bundle.pem'
+            '/etc/nginx/certs/client.bundle.pem'
+        self['DISPAT_CERT_CLI_BUNDLE_DFLT'] = \
+            '/etc/nginx/certs/client.bundle.pem_dflt'
 
 
 log_level_map = {
@@ -80,22 +83,29 @@ def set_log_level(opt) -> int:
     app_log.setLevel(log_level_map[opt])
     return log_level_map[opt]
 
+
 def run_restart(cfg):
     """Get messages"""
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
-    dataif = DataIf()
-    with dataif.open(cfg['OBJST_CERT_CLI_BUNDLE']) as hfile:
-        if not hfile.head():
-            app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
-            app_log.error(f"Misssing certificate file "
-                          f"{cfg['OBJST_CERT_CLI_BUNDLE']}")
-        else:
+    with DataIf().open(cfg['OBJST_CERT_CLI_BUNDLE']) as hfile:
+        if hfile.head():
+            app_log.debug(f"Found cert bundle file.")
             with open(cfg['DISPAT_CERT_CLI_BUNDLE'], 'w') as ofile:
                 ofile.write(hfile.read().decode('utf-8'))
-            app_log.info(f"{os.path.getctime(cfg['DISPAT_CERT_CLI_BUNDLE'])}")
-            p = subprocess.Popen("nginx -s reload",
-                                 stdout=subprocess.PIPE, shell=True)
-            app_log.info(f"{p.communicate()}")
+            app_log.info(f"{os.path.getctime(cfg['DISPAT_CERT_CLI_BUNDLE'])}, "
+                         f"{os.path.getsize(cfg['DISPAT_CERT_CLI_BUNDLE'])}")
+        else:
+            app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+            # use default certificate (placeholder)
+            # in any case of missing file, no more certificates included
+            app_log.info(f"Misssing certificate file "
+                          f"{cfg['OBJST_CERT_CLI_BUNDLE']}, back to default "
+                          f"{cfg['DISPAT_CERT_CLI_BUNDLE_DFLT']}")
+            shutil.copy2(cfg['DISPAT_CERT_CLI_BUNDLE_DFLT'],
+                         cfg['DISPAT_CERT_CLI_BUNDLE'])
+        p = subprocess.Popen("nginx -s reload",
+                             stdout=subprocess.PIPE, shell=True)
+        app_log.info(f"{p.communicate()}")
 
 
 def run_remove(cfg):
@@ -103,6 +113,12 @@ def run_remove(cfg):
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() "
                   f"{cfg['DISPAT_CERT_CLI_BUNDLE']}")
     os.unlink(cfg['DISPAT_CERT_CLI_BUNDLE'])
+    # restore builtin certifiicate from backup
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() "
+                  f"restore default certificate "
+                  f"{cfg['DISPAT_CERT_CLI_BUNDLE_DFLT']}")
+    shutil.copy2(cfg['DISPAT_CERT_CLI_BUNDLE_DFLT'],
+                 cfg['DISPAT_CERT_CLI_BUNDLE'])
     p = subprocess.Popen("nginx -s reload",
                          stdout=subprocess.PIPE, shell=True)
     app_log.info(f"{p.communicate()}")
@@ -123,6 +139,13 @@ def get_commands(cfg, msg):
 def run_it(cfg):
     """Execute command line run command"""
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+
+    # backup builtin certifiicate as a default one
+    shutil.copy2(cfg['DISPAT_CERT_CLI_BUNDLE'],
+                 cfg['DISPAT_CERT_CLI_BUNDLE_DFLT'])
+    # check if lucky to find new certificate bundle already
+    run_restart(cfg)
+
     maker = MsgAcceptor(cfg['BROKER_URL'], cfg['BROKER_EXCH_DISPAT'],
                         msg_handler=get_commands, handler_params=cfg)
     app_log.info(f"({os.getpid()}) Connected to {cfg['BROKER_URL']}")

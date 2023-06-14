@@ -65,7 +65,6 @@ EXPOSE 80 443
 COPY rat_server/httpd.conf /usr/local/apache2/conf/
 COPY rat_server/httpd-default.conf rat_server/httpd-info.conf rat_server/httpd-vhosts.conf \
 rat_server/httpd-mpm.conf rat_server/httpd-ssl.conf /usr/local/apache2/conf/extra/
-#COPY rat_server/fbrat.wsgi /usr/local/apache2/cgi-bin/fbrat.wsgi
 COPY rat_server/fbrat.wsgi /usr/local/apache2/fbrat.wsgi
 RUN mkdir -p /usr/share/ca-certificates/certs
 COPY rat_server/http.key rat_server/http.crt /usr/share/ca-certificates/certs/
@@ -78,4 +77,5 @@ RUN /wd/devel.sh
 COPY rat_server/entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
+HEALTHCHECK CMD wget --no-verbose --tries=1 --spider localhost/fbrat/ratapi/v1/healthy || exit 1
 #
