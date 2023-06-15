@@ -1,0 +1,38 @@
+1. Get the application URL by running these commands:
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  {{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+{{- else }}
+
+  {{- if eq .Values.service.msghnd.type "LoadBalancer" }}
+  echo "Fetching LoadBalancer IP for msghnd..."
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "afc-int.fullname" . }}-msghnd --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.msghnd.port }}
+  {{- end }}
+
+  {{- if eq .Values.service.webui.type "LoadBalancer" }}
+  echo "Fetching LoadBalancer IP for webui..."
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "afc-int.fullname" . }}-webui --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  echo http://$SERVICE_IP:{{ .Values.service.webui.port }}
+  {{- end }}
+
+  {{- if eq .Values.service.objst.type "ClusterIP" }}
+  echo "Fetching ClusterIP for objst..."
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "afc-int.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:{{ .Values.service.objst.fileStoragePort }} to use your application"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:{{ .Values.service.objst.fileStoragePort }}
+  {{- end }}
+
+  {{- if eq .Values.service.rmq.type "ClusterIP" }}
+  echo "Fetching ClusterIP for rmq..."
+  export POD_NAME=$(kubectl get pods --namespace {{ .Release.Namespace }} -l "app.kubernetes.io/name={{ include "afc-int.name" . }},app.kubernetes.io/instance={{ .Release.Name }}" -o jsonpath="{.items[0].metadata.name}")
+  export CONTAINER_PORT=$(kubectl get pod --namespace {{ .Release.Namespace }} $POD_NAME -o jsonpath="{.spec.containers[0].ports[0].containerPort}")
+  echo "Visit http://127.0.0.1:{{ .Values.service.rmq.port }} to use your application"
+  kubectl --namespace {{ .Release.Namespace }} port-forward $POD_NAME 8080:{{ .Values.service.rmq.port }}
+  {{- end }}
+
+{{- end }}

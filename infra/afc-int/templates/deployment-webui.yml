@@ -1,0 +1,100 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "afc-int.fullname" . }}-webui
+  labels:
+    {{- include "afc-int.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount.webui }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "afc-int.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "afc-int.selectorLabels" . | nindent 8 }}
+        afc: webui
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "afc-int.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-webui
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.webui.repository }}:{{ .Values.image.webui.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.webui.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.webui.port }}
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /fbrat/www/index.html
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          volumeMounts:
+            - mountPath: "/mnt/nfs"
+              name: cont-confs
+            - name: webui-rat-api-secret
+              mountPath: /etc/xdg/fbrat/ratapi.conf
+              subPath: ratapi.conf
+          env:
+            # RabbitMQ server name:
+            - name: BROKER_TYPE
+              value: "external"
+            - name: BROKER_FQDN
+              value: {{ .Values.service.rmq.loadBalancerIP }}
+            # Filestorage params:
+            - name: AFC_OBJST_HOST
+              value: {{ .Values.service.objst.loadBalancerIP }}
+            - name: AFC_OBJST_PORT
+              value: {{ .Values.service.objst.fileStoragePort | quote }}
+            - name: AFC_OBJST_SCHEME
+              value: "HTTP"
+            - name: AFC_OBJST_HIST_HOST
+              value: {{ .Values.service.objst.loadBalancerIP }}
+            # worker params
+            - name: CELERY_TYPE
+              value: external
+            # ALS params
+            - name: ALS_KAFKA_SERVER_ID
+              value: webui
+            - name: ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
+              value: "{{ .Values.service.kafka.loadBalancerIP }}:{{ .Values.service.kafka.port }}"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: cont-confs
+          persistentVolumeClaim:
+            claimName: cont-confs-claim
+        - name: webui-rat-api-secret
+          secret:
+            secretName: {{ .Release.Name }}-webui-rat-api-secret
+      imagePullSecrets:
+        - name: brcm-artifactory-secret
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "afc-int.fullname" . }}-msghnd
+  labels:
+    {{- include "afc-int.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount.msghnd }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "afc-int.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "afc-int.selectorLabels" . | nindent 8 }}
+        afc: msghnd
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "afc-int.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-msghnd
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.msghnd.repository }}:{{ .Values.image.msghnd.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.msghnd.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.msghnd.containerPort | int }}
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /fbrat/www/index.html
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          volumeMounts:
+            - name: msghnd-rat-api-secret
+              mountPath: /etc/xdg/fbrat/ratapi.conf
+              subPath: ratapi.conf
+          env:
+            # RabbitMQ server name:
+            - name: BROKER_TYPE
+              value: "external"
+            - name: BROKER_FQDN
+              value: {{ .Values.service.rmq.loadBalancerIP }}
+            # Filestorage params:
+            - name: AFC_OBJST_HOST
+              value: {{ .Values.service.objst.loadBalancerIP }}
+            - name: AFC_OBJST_PORT
+              value: {{ .Values.service.objst.fileStoragePort | quote }}
+            - name: AFC_OBJST_SCHEME
+              value: "HTTP"
+            # worker params
+            - name: CELERY_TYPE
+              value: external
+            # ALS params
+            - name: ALS_KAFKA_SERVER_ID
+              value: msghnd
+            - name: ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
+              value: "{{ .Values.service.kafka.loadBalancerIP }}:{{ .Values.service.kafka.port }}"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: msghnd-rat-api-secret
+          secret:
+            secretName: {{ .Release.Name }}-msghnd-rat-api-secret
+      imagePullSecrets:
+        - name: brcm-artifactory-secret
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

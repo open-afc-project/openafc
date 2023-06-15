@@ -1,0 +1,12 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: b-ssd
+provisioner: filestore.csi.storage.gke.io
+reclaimPolicy: Retain
+volumeBindingMode: Immediate
+allowVolumeExpansion: false
+parameters:
+  tier: BASIC_SSD
+  network: "projects/wcc-enterprise-afc-host/global/networks/internal-dev"
+  connect-mode: PRIVATE_SERVICE_ACCESS

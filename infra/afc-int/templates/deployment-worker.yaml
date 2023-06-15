@@ -1,0 +1,83 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "afc-int.fullname" . }}-worker
+  labels:
+    {{- include "afc-int.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount.worker }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "afc-int.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "afc-int.selectorLabels" . | nindent 8 }}
+        afc: worker
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "afc-int.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.worker.repository }}:{{ .Values.image.worker.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.worker.pullPolicy }}
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: rmqp
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: rmqp
+          volumeMounts:
+            - mountPath: "/mnt/nfs"
+              name: cont-confs
+          env:
+            # RabbitMQ server name:
+            - name: BROKER_TYPE
+              value: "external"
+            - name: BROKER_FQDN
+              value: {{ .Values.service.rmq.loadBalancerIP }}
+            # Filestorage params:
+            - name: AFC_OBJST_HOST
+              value: {{ .Values.service.objst.loadBalancerIP }}
+            - name: AFC_OBJST_PORT
+              value: {{ .Values.service.objst.fileStoragePort | quote }}
+            - name: AFC_OBJST_SCHEME
+              value: "HTTP"
+            # celery params
+            - name: CELERY_OPTIONS
+              value: "rat_worker"
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: cont-confs
+          persistentVolumeClaim:
+            claimName: cont-confs-claim
+      imagePullSecrets:
+        - name: brcm-artifactory-secret
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

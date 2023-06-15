@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "afc-int.fullname" . }}-webui
+  annotations:
+    cloud.google.com/load-balancer-type: "Internal"
+    networking.gke.io/internal-load-balancer-allow-global-access: "true"
+  labels:
+    {{- include "afc-int.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.webui.type }}
+  loadBalancerIP: {{ .Values.service.webui.loadBalancerIP }}
+  ports:
+    - port: {{ .Values.service.webui.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "afc-int.selectorLabels" . | nindent 4 }}
+    afc: webui
