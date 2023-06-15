@@ -1,3 +1,49 @@
+# Release Note
+
+## **Version and Date**
+|Version|**OA-685*|
+| :- | :- |
+|**Date**|**06/13/2023**|
+
+## **Issues Addressed**
+ * Jira OA-722: Finish Open Issues from OA-685 
+ * Jira OA-676: RLAN scan point spacing knob in AFC Config not working properly
+
+## **Interface Changes**
+ * OA-722: There are changes in AFC Config and afc-config.json for the ISED DSB-06 propagation model as detailed in OA-722
+ * OA-676: There are changes in AFC Config GUI and json file as detailed in OA-676.
+
+## **Testing Done**
+ * OA-722: Repeated OA-685 test cases and confirmed that in presence of CDSM data, WinnerII LoS/NLoS is used and in the absence of CDSM data, WinnerII Combined is used.
+ * OA-676: ran tests with 3600 and 1800 points-per-deg (30m and 60m spacing respectively) and confirmed in the KMZ files that the scan points were placed correctly. Tests are attached to the ticket.
+ * Confirmed that the default AFC Config for all regions sets the Horizontal Plane points per degree to 3600.
+
+## **Open Issues** 
+ * 
+
+## **Version and Date**
+|Version|**OA-685*|
+| :- | :- |
+|**Date**|**06/08/2023**|
+
+## **Issues Addressed**
+ * Jira OA-685: Canada Propagation Model with CDSM
+
+## **Interface Changes**
+ * Make sure the 3/4-arcsec CDSM database converted to wgs84 is at rat_transfer/cdsm/3ov4_arcsec_wgs84
+ * Make sure the 1-arcsec 3DEP database converted to wgs84 is at rat_transfer/3dep/1_arcsec_wgs84
+ * Change "winner2LOSOption" from "BLDG_DATA_REQ_TX" to "CDSM"
+
+## **Testing Done**
+ * Validated that when RLAN is within 1-km of FS and there is CDSM data available, that data is used. Test is attached to the jira ticket with the afc-config.json file.
+ * The 'PATH LOSS MODEL' in exc_thr file would show fraction of the path points (b/w RLAN to FS Rx) where there was cdsm and whether WinnerII LOS or NLOS was used. An example is: W2C1_SUBURBAN_LOS cdsmFrac = 1.000000.
+
+## **Open Issues**
+ * A new parameter "cdsmLOSThr" needs to be added to afc-config default file.
+ * This parameter determines what % of points in ITM path profile need to have surface database in order for the surface database to be used.
+ * It takes values between 0 and 1 and default is set to 0.5.
+ * When the ISED propagation model is chosen, afc-config.json should have "winner2LOSOption":"CDSM" (in place of "BLDG_DATA_REQ_TX"). The immediate remedy is to change this in the .json file manually before doing a run.
+
  # Release Note
 ## **Version and Date**
 |Version|3.8.2.0|

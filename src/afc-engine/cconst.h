@@ -236,6 +236,7 @@ public:
 		globalHeightSource,
 		depHeightSource,
 		srtmHeightSource,
+		cdsmHeightSource,
 		lidarHeightSource
 	};
 	/**************************************************************************************/
@@ -260,6 +261,7 @@ public:
 		BldgDataReqTxLOSOption,
 		BldgDataReqRxLOSOption,
 		BldgDataReqTxRxLOSOption,
+		CdsmLOSOption,
 		ForceLOSLOSOption,
 		ForceNLOSLOSOption
 	};

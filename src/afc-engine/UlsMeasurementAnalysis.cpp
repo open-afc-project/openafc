@@ -290,7 +290,7 @@ namespace UlsMeasurementAnalysis {
 		return ret;
 	}
 
-	double *computeElevationVector(const TerrainClass *terrain, bool includeBldg, const QPointF &from, const QPointF &to, int numpts){
+	double *computeElevationVector(const TerrainClass *terrain, bool includeBldg, bool cdsmFlag, const QPointF &from, const QPointF &to, int numpts, double *cdsmFracPtr){
 		double tdist;
 		double terrainHeight, bldgHeight;
 		MultibandRasterClass::HeightResult lidarHeightResult;
@@ -367,15 +367,28 @@ namespace UlsMeasurementAnalysis {
 			/*********************************************************************************************************/
 		}
 
+		int cdsmCount = 0;
 		double *pos = ret + 2;
 		for(int i = 0; i < numpts; ++i, ++pos){
 			const QPointF &pt = latlons.at(i);
+			bool cdsmFlagVal = (((i == 0) || (i == numpts-1)) ? false : cdsmFlag);
 
-			terrain->getTerrainHeight(pt.y(), pt.x(), terrainHeight, bldgHeight, lidarHeightResult, heightSource);
+			terrain->getTerrainHeight(pt.y(), pt.x(), terrainHeight, bldgHeight, lidarHeightResult, heightSource, cdsmFlagVal);
 			if (includeBldg && (lidarHeightResult == MultibandRasterClass::BUILDING) && (i >= numBldgPtTX) && (i <= numpts-1-numBldgPtRX)) {
 				*pos = terrainHeight + bldgHeight;
 			} else {
 				*pos = terrainHeight;
+			}
+
+			if (heightSource == CConst::cdsmHeightSource) {
+			    cdsmCount++;
+			}
+		}
+		if (cdsmFracPtr) {
+			if (numpts < 3) {
+				*cdsmFracPtr = 0.0;
+			} else {
+				*cdsmFracPtr = cdsmCount / (numpts - 2);
 			}
 		}
 
@@ -448,7 +461,7 @@ namespace UlsMeasurementAnalysis {
 			double receiveHt, double lineOfSightDistanceKm, double eps_dielect, double sgm_conductivity, double eno_ns_surfref,
 			double frq_mhz, int radio_climate, int pol, double conf, double rel, int numpts, char *prefix,double **heightProfilePtr){
 		if (!(*heightProfilePtr)) {
-			*heightProfilePtr = computeElevationVector(terrain, includeBldg, transLocLatLon, receiveLocLatLon, numpts);
+			*heightProfilePtr = computeElevationVector(terrain, includeBldg, false, transLocLatLon, receiveLocLatLon, numpts, (double *) NULL);
 		}
 
 		double rv;
@@ -473,9 +486,9 @@ namespace UlsMeasurementAnalysis {
 	}
 
 	bool isLOS(const TerrainClass *terrain, QPointF transLocLatLon, double transHt, QPointF receiveLocLatLon,
-			double receiveHt, double lineOfSightDistanceKm, int numpts, double **heightProfilePtr) {
+			double receiveHt, double lineOfSightDistanceKm, int numpts, double **heightProfilePtr, double *cdsmFracPtr) {
 		if (!(*heightProfilePtr)) {
-			*heightProfilePtr = computeElevationVector(terrain, true, transLocLatLon, receiveLocLatLon, numpts);
+			*heightProfilePtr = computeElevationVector(terrain, true, true, transLocLatLon, receiveLocLatLon, numpts, cdsmFracPtr);
 		}
 
 		double txHeightAMSL = (*heightProfilePtr)[2] + transHt;

@@ -188,7 +188,7 @@ class AfcManager
 				double& pathLoss, double& pathClutterTxDB, double& pathClutterRxDB,
 				std::string& pathLossModelStr, double& pathLossCDF,
 				std::string& pathClutterTxModelStr, double& pathClutterTxCDF, std::string& pathClutterRxModelStr, double& pathClutterRxCDF,
-				std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr
+				std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr, double *isLOSSurfaceFracPtr
 #if DEBUG_AFC
 				, std::vector<std::string> &ITMHeightType
 #endif
@@ -408,12 +408,15 @@ class AfcManager
 		/* Constant Parameters                                                                */
 		/**************************************************************************************/
 		std::string _srtmDir;                   // Directory that contain SRTM terrain height files
+		std::string _cdsmDir;                   // Directory that contain CDSM (Canadian Digital Surface Model) height files
 		std::string _depDir;                   // Directory that contain 3DEP terrain height files
 		QString _globeDir;                  // Directory that contains NOAA GLOBE data files
 		QString _lidarDir;                      // Directory that contain LiDAR multiband raster files.
 		bool _useBDesignFlag = false;           // Force use B-Design3D building data in Manhattan
 		bool _useLiDAR = false;                 // flag to enable use of LiDAR files for computation
 		bool _use3DEP = false;                  // flag to enable use of 3DEP 10m terrain data
+
+		double _cdsmLOSThr;                     // Fraction of points in path profile below which path is considered to not have CDSM data
 
 		double _minRlanHeightAboveTerrain;      // Min height above terrain for RLAN
 

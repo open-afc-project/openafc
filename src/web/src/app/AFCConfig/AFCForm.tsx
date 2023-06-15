@@ -87,7 +87,7 @@ export class AFCForm extends React.Component<
         const err = (s?: string) => ({ isError: true, message: s || "One or more inputs are invalid" });
         const model = this.state.config;
 
-        if (model.APUncertainty.horizontal <= 0 || model.APUncertainty.height <= 0) return err();
+        if (model.APUncertainty.points_per_degree <= 0 || model.APUncertainty.height <= 0) return err();
         if (model.ITMParameters.minSpacing < 1 || model.ITMParameters.minSpacing > 30) return err('Path Min Spacing must be between 1 and 30')
         if (model.ITMParameters.maxPoints < 100 || model.ITMParameters.maxPoints > 10000) return err('Path Max Points must be between 100 and 10000')
 
@@ -164,9 +164,7 @@ export class AFCForm extends React.Component<
                 if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
                 if (propModel.win2ConfidenceCombined! < 0 || propModel.win2ConfidenceCombined! > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
-                if (propModel.buildingSource != "Canada DSM (2000)" && propModel.buildingSource != "None") return err();
-                if (propModel.buildingSource !== "None" && propModel.terrainSource != "3DEP (30m)") return err("Invalid terrain source.");
-                break;
+               break;
             default:
                 return err();
         }

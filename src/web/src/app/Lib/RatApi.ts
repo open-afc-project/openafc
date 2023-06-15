@@ -118,7 +118,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
     "regionStr": "US",
     "APUncertainty": {
-        "horizontal": 30,
+        "points_per_degree": 3600,
         "height": 5
     },
     "ITMParameters": {
@@ -198,7 +198,7 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
         "win2ConfidenceCombined": 16,
         "win2ConfidenceLOS": 50,
         "win2ConfidenceNLOS": 50,
-        "winner2LOSOption": "BLDG_DATA_REQ_TX",
+        "winner2LOSOption": "CDSM",
         "win2UseGroundDistance": false,
         "fsplUseGroundDistance": false,
         "winner2HgtFlag": false,
@@ -206,7 +206,7 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
         "itmConfidence": 5,
         "itmReliability": 20,
         "p2108Confidence": 10,
-        "buildingSource": "None",
+        "surfaceDataSource": 'Canada DSM (2000)',
         "terrainSource": "3DEP (30m)",
         "rlanITMTxClutterMethod": "FORCE_TRUE",
     },
@@ -214,7 +214,7 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
     "regionStr": "CA",
     "APUncertainty": {
-        "horizontal": 30,
+        "points_per_degree": 3600,
         "height": 5
     },
     "ITMParameters": {
@@ -248,7 +248,8 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "inquiredFrequencyResolutionMHz": 20, 
     "srtmDir":"rat_transfer/srtm3arcsecondv003",
     "depDir":"rat_transfer/3dep/1_arcsec_wgs84",
-    "cdsmDir":"rat_transfer/cdsm/3ov4_arcsec_wgs84"
+    "cdsmDir":"rat_transfer/cdsm/3ov4_arcsec_wgs84",
+    "cdsmLOSThr": 0.5
 });
 
 const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
@@ -309,7 +310,7 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
     "regionStr": "BR",
     "APUncertainty": {
-        "horizontal": 30,
+        "points_per_degree": 3600,
         "height": 5
     },
     "ITMParameters": {
@@ -482,7 +483,8 @@ export const getRulesetIds = (): Promise<RatResponse<string[]>> => (
     }).then(name => {
         return success(name.split(" "));
     }).catch(err => {
-        logger.error(err)
+        logger.error(err);
+        return error(err);
     })
 )
 

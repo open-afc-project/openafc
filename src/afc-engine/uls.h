@@ -253,6 +253,7 @@ public:
 	char *location;
 	double *ITMHeightProfile;
 	double *isLOSHeightProfile;
+	double isLOSSurfaceFrac;
 
 #if DEBUG_AFC
 	std::vector<std::string> ITMHeightType;

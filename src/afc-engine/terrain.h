@@ -43,7 +43,7 @@ struct LidarRegionStruct {
 class TerrainClass
 {
 	public:
-		TerrainClass(QString lidarDir, std::string srtmDir, std::string depDir, QString globeDir,
+		TerrainClass(QString lidarDir, std::string cdsmDir, std::string srtmDir, std::string depDir, QString globeDir,
 				double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon,
 				double terrainMinLatBldg, double terrainMinLonBldg, double terrainMaxLatBldg, double terrainMaxLonBldg,
 				int maxLidarRegionLoadVal);
@@ -56,7 +56,7 @@ class TerrainClass
 
 		void printStats();
 
-		void getTerrainHeight(double longitudeDeg, double latitudeDeg, double& terrainHeight, double& bldgHeight, MultibandRasterClass::HeightResult& lidarHeightResult, CConst::HeightSourceEnum& heightSource) const;
+		void getTerrainHeight(double longitudeDeg, double latitudeDeg, double& terrainHeight, double& bldgHeight, MultibandRasterClass::HeightResult& lidarHeightResult, CConst::HeightSourceEnum& heightSource, bool cdsmFlag = false) const;
 
 		void writeTerrainProfile(std::string filename, double startLongitudeDeg, double startLatitudeDeg, double startHeightAboveTerrain,
 				double  stopLongitudeDeg, double  stopLatitudeDeg, double  stopHeightAboveTerrain);
@@ -82,6 +82,7 @@ class TerrainClass
 		double minLidarLatitude,  maxLidarLatitude;
 		int maxLidarRegionLoad;
 
+		std::shared_ptr<CachedGdal<float>> cgCdsm;
 		std::shared_ptr<CachedGdal<int16_t>> cgSrtm;
 		std::shared_ptr<CachedGdal<float>> cgDep;
 		std::shared_ptr<CachedGdal<int16_t>> cgGlobe;
@@ -90,6 +91,7 @@ class TerrainClass
 		std::map<CConst::HeightSourceEnum, std::string> sourceNames = {};
 
 		static std::atomic_llong numLidar;
+		static std::atomic_llong numCDSM;
 		static std::atomic_llong numSRTM;
 		static std::atomic_llong numDEP;
 		static std::atomic_llong numGlobal;

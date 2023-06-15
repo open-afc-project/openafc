@@ -63,6 +63,7 @@ const StrTypeClass CConst::strLOSOptionList[] = {
 	{         CConst::  BldgDataReqTxLOSOption, "BLDG_DATA_REQ_TX"    },
 	{         CConst::  BldgDataReqRxLOSOption, "BLDG_DATA_REQ_RX"    },
 	{         CConst::BldgDataReqTxRxLOSOption, "BLDG_DATA_REQ_TX_RX" },
+	{         CConst::           CdsmLOSOption, "CDSM"                },
 	{         CConst::       ForceLOSLOSOption, "FORCE_LOS"           },
 	{         CConst::      ForceNLOSLOSOption, "FORCE_NLOS"          },
 
@@ -109,6 +110,7 @@ const StrTypeClass CConst::strHeightSourceList[] = {
 	{          CConst::globalHeightSource, "GLOBAL"          },
 	{          CConst::depHeightSource, "3DEP"            },
 	{          CConst::srtmHeightSource, "SRTM"              },
+	{          CConst::cdsmHeightSource, "CDSM"              },
 	{          CConst::lidarHeightSource, "LiDAR"            },
 	{                                    -1,  (char *) 0     }
 };

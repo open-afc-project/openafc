@@ -72,6 +72,7 @@ export interface AFCConfigFile {
     depDir?:string,
     cdsmDir?:string,
     rainForestFile?:string,
+    cdsmLOSThr?:number,
 }
 
 export type FreqRange = {
@@ -121,7 +122,7 @@ export type BodyLossModel = EU | {
 };
 
 export type APUncertainty = {
-    horizontal: number,
+    points_per_degree: number,
     height: number
 }
 
@@ -200,14 +201,14 @@ export interface FCC6GHz {
 
 export interface IsedDbs06 {
     kind: "ISED DBS-06",
-    winner2LOSOption: 'BLDG_DATA_REQ_TX',
+    winner2LOSOption: 'CDSM',
     win2ConfidenceCombined?: number,
     win2ConfidenceLOS?:number,
     win2ConfidenceNLOS?:number,
     itmConfidence: number,
     itmReliability: number,
     p2108Confidence: number,
-    buildingSource: BuildingSourceValues,
+    surfaceDataSource: 'Canada DSM (2000)' | 'None'
     terrainSource: "SRTM (90m)" | "3DEP (30m)"
     rlanITMTxClutterMethod?: 'FORCE_TRUE' | 'FORCE_FALSE' | 'BLDG_DATA',
     win2UseGroundDistance: boolean,

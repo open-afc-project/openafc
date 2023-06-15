@@ -100,7 +100,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                     kind: s, win2ConfidenceCombined: 16,
                     win2ConfidenceLOS: 50,
                     win2ConfidenceNLOS: 50,
-                    winner2LOSOption: "BLDG_DATA_REQ_TX",
+                    winner2LOSOption: "CDSM",
                     win2UseGroundDistance: false,
                     fsplUseGroundDistance: false,
                     winner2HgtFlag: false,
@@ -108,7 +108,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                     itmConfidence: 5,
                     itmReliability: 20,
                     p2108Confidence: 10,
-                    buildingSource: "None",
+                    surfaceDataSource: "Canada DSM (2000)",
                     terrainSource: "3DEP (30m)",
                     rlanITMTxClutterMethod: "FORCE_TRUE",
                 } as IsedDbs06);
@@ -226,7 +226,7 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                 this.props.onChange(Object.assign(this.props.data, newData));
             }
             else {
-                if ((model as Win2ItmDb | CustomPropagation| IsedDbs06).buildingSource === "None" && s !== "None") {
+                if ((model as Win2ItmDb | CustomPropagation ).buildingSource === "None" && s !== "None") {
                     this.props.onChange(Object.assign(this.props.data, { buildingSource: s, terrainSource: "3DEP (30m)" }));
                 } else {
                     this.props.onChange(Object.assign(this.props.data, { buildingSource: s }));
@@ -238,6 +238,10 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
 
     setTerrainSource = (s: string) => {
         this.props.onChange(Object.assign(this.props.data, { terrainSource: s }));
+    }
+
+    setSurfaceDataSource = (s: string) => {
+        this.props.onChange(Object.assign(this.props.data, { surfaceDataSource: s }));
     }
 
     setLosOption = (s: string) => {
@@ -823,19 +827,19 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                             maxWidth="40.0rem"
                             content={
                                 <>
-                                    <p>If <strong>LoS/NLoS per building data</strong> is selected, and if the RLAN is in a region where there is building database,
-                                        then terrain plus building database is used to determine whether the path is LoS or not.
-                                        Otherwise, the Combined LoS/NLoS model is used. By the same logic, if the <strong>Building Data Source</strong> is None,
+                                    <p>If <strong>LoS/NLoS per surface data</strong> is selected, and if the RLAN is in a region where there is surface database,
+                                        then terrain plus surface database is used to determine whether the path is LoS or not.
+                                        Otherwise, the Combined LoS/NLoS model is used. By the same logic, if the <strong>Surface Data Source</strong> is None,
                                         the Combined LoS/NLoS model is always used. </p>
                                 </>
                             }
                         >
                             <OutlinedQuestionCircleIcon />
-                        </Tooltip>
+                        </Tooltip> 
                         <FormSelect value={model.winner2LOSOption} onChange={this.setLosOption} id="propogation-model-win-los-option"
                             name="propogation-model-win-los-option" style={{ textAlign: "right" }}
                         >
-                            <FormSelectOption key="BLDG_DATA_REQ_TX" value="BLDG_DATA_REQ_TX" label="Los/NLoS per building data" />
+                            <FormSelectOption key="CDSM" value="CDSM" label="Los/NLos per surface data" />
                         </FormSelect>
                     </FormGroup>
 
@@ -930,48 +934,54 @@ export class PropogationModelForm extends React.PureComponent<{ data: Propagatio
                         </InputGroup>
                     </FormGroup>
 
-                    {model.rlanITMTxClutterMethod === "BLDG_DATA" || model.winner2LOSOption === "BLDG_DATA_REQ_TX" ?
-                        <>
+                    <FormGroup label="Surface Data Source" fieldId="surface-source">
+                        {/* {" "}<Tooltip
+                            position={TooltipPosition.top}
+                            enableFlip={true}
+                            className="fs-feeder-loss-tooltip"
+                            maxWidth="40.0rem"
+                            content={
+                                <>
+                                    <p>The higher terrain height resolution (that goes with the building database)
+                                        is used instead within the first 1 km (when WinnerII building data is chosen)
+                                        and greater than 1 km (when ITM with building data is chosen).</p>
+                                </>
+                            }
+                        >
+                            <OutlinedQuestionCircleIcon />
+                        </Tooltip> */}
+                        <FormSelect value={model.surfaceDataSource} onChange={this.setSurfaceDataSource} id="surface-source"
+                            name="surface-source" style={{ textAlign: "right" }} >
+                        <FormSelectOption key="CDSM" value="Canada DSM (2000)" label="Canada DSM (2000)" />
+                        <FormSelectOption key="None" value="None" label="None" />
 
-                            <FormGroup label="Building Data Source" fieldId="propogation-model-data-source">
-                                <FormSelect
-                                    value={model.buildingSource}
-                                    onChange={v => this.setBuildingSource(v as BuildingSourceValues)}
-                                    id="propogation-model-data-source"
-                                    name="propogation-model-data-source"
-                                    style={{ textAlign: "right" }}
-                                    isValid={model.buildingSource === "Canada DSM (2000)" || model.buildingSource === "None"}>
-                                    <FormSelectOption key="Canada DSM (2000)" value="Canada DSM (2000)" label="Canada DSM (2000)" />
-                                    <FormSelectOption key="None" value="None" label="None" />
-                                </FormSelect>
-                            </FormGroup>
+                        </FormSelect>
+                    </FormGroup>
 
-                            <FormGroup label="Terrain Source" fieldId="terrain-source">
-                                {" "}<Tooltip
-                                    position={TooltipPosition.top}
-                                    enableFlip={true}
-                                    className="fs-feeder-loss-tooltip"
-                                    maxWidth="40.0rem"
-                                    content={
-                                        <>
-                                            <p>The higher terrain height resolution (that goes with the building database)
-                                                is used instead within the first 1 km (when WinnerII building data is chosen)
-                                                and greater than 1 km (when ITM with building data is chosen).</p>
-                                        </>
-                                    }
-                                >
-                                    <OutlinedQuestionCircleIcon />
-                                </Tooltip>
-                                <FormSelect value={model.terrainSource} onChange={this.setTerrainSource} id="terrain-source"
-                                    name="terrain-source" style={{ textAlign: "right" }} >
-                                    <FormSelectOption key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
-                                    <FormSelectOption isDisabled={true} key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
+                    <FormGroup label="Terrain Source" fieldId="terrain-source">
+                        {" "}<Tooltip
+                            position={TooltipPosition.top}
+                            enableFlip={true}
+                            className="fs-feeder-loss-tooltip"
+                            maxWidth="40.0rem"
+                            content={
+                                <>
+                                    <p>The higher terrain height resolution (that goes with the building database)
+                                        is used instead within the first 1 km (when WinnerII building data is chosen)
+                                        and greater than 1 km (when ITM with building data is chosen).</p>
+                                </>
+                            }
+                        >
+                            <OutlinedQuestionCircleIcon />
+                        </Tooltip>
+                        <FormSelect value={model.terrainSource} onChange={this.setTerrainSource} id="terrain-source"
+                            name="terrain-source" style={{ textAlign: "right" }} >
+                            <FormSelectOption key="3DEP (30m)" value="3DEP (30m)" label="3DEP (30m)" />
+                            <FormSelectOption isDisabled={true} key="SRTM (90m)" value="SRTM (90m)" label="SRTM (90m)" />
 
-                                </FormSelect>
-                            </FormGroup>
-                        </>
-                        :
-                        false}
+                        </FormSelect>
+                    </FormGroup>
+
 
                 </>
             case "Brazilian Propagation Model":

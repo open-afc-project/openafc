@@ -1,6 +1,6 @@
 import * as React from "react";
 import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition, Radio, CardHead, PageSection } from "@patternfly/react-core";
-import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
+import { IglooIcon, OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import BuildlingPenetrationLossForm from "./BuildingPenetrationLossForm";
 import PolarizationMismatchLossForm from "./PolarizationMismatchLossForm";
 import { ITMParametersForm } from "./ITMParametersForm";
@@ -105,7 +105,7 @@ export class AFCFormUSACanada extends React.Component<
         conf.ulsDefaultAntennaType = x.defaultAntennaPattern;
         this.props.updateConfig(conf);
     }
-    private setPropogationModel = (x: PropagationModel) => {
+    private setPropagationModel = (x: PropagationModel) => {
         if (x.kind === "Custom") {
             //rlanITMTxClutterMethod is set in the CustomPropagation but stored at the top level
             // so move it up if present
@@ -138,7 +138,7 @@ export class AFCFormUSACanada extends React.Component<
 
 
         } else {
-            const conf = this.props.config;
+            const conf = { ...this.props.config };
             if (x.kind === "ITM with building data") {
                 conf.rlanITMTxClutterMethod = "BLDG_DATA"
             } else {
@@ -155,12 +155,20 @@ export class AFCFormUSACanada extends React.Component<
                 delete x.win2ConfidenceLOS;
                 delete x.win2ConfidenceNLOS;
             }
- 
+
             if (x.kind === "Brazilian Propagation Model" && x.buildingSource === "None") {
                 delete x.win2ConfidenceNLOS;
             }
-
-
+            if (x.kind !== "ISED DBS-06" && !!conf.cdsmDir) {
+                delete conf.cdsmDir;
+            }
+            if (x.kind === "ISED DBS-06") {
+                if (x.surfaceDataSource === 'None') {
+                    delete conf.cdsmDir;
+                } else if (!conf.cdsmDir) {
+                    conf.cdsmDir = "rat_transfer/cdsm/3ov4_arcsec_wgs84";
+                }
+            }
 
             conf.propagationModel = x;
             this.props.updateConfig(conf);
@@ -501,7 +509,7 @@ export class AFCFormUSACanada extends React.Component<
             <GalleryItem>
                 <PropogationModelForm
                     data={this.getPropagationModelForForm()}
-                    onChange={this.setPropogationModel}
+                    onChange={this.setPropagationModel}
                     region={this.props.config.regionStr ?? "US"} />
             </GalleryItem>
             {(this.props.config.propagationModel.kind === "ITM with no building data"

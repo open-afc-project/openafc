@@ -19,6 +19,7 @@
 
 
 std::atomic_llong TerrainClass::numLidar;
+std::atomic_llong TerrainClass::numCDSM;
 std::atomic_llong TerrainClass::numSRTM;
 std::atomic_llong TerrainClass::numGlobal;
 std::atomic_llong TerrainClass::numDEP;
@@ -31,7 +32,7 @@ namespace {
 /******************************************************************************************/
 /**** FUNCTION: TerrainClass::TerrainClass()                                           ****/
 /******************************************************************************************/
-TerrainClass::TerrainClass(QString lidarDir, std::string srtmDir, std::string depDir, QString globeDir,
+TerrainClass::TerrainClass(QString lidarDir, std::string cdsmDir, std::string srtmDir, std::string depDir, QString globeDir,
 		double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon,
 		double terrainMinLatBldg, double terrainMinLonBldg, double terrainMaxLatBldg, double terrainMaxLonBldg,
 		int maxLidarRegionLoadVal) :
@@ -51,6 +52,18 @@ TerrainClass::TerrainClass(QString lidarDir, std::string srtmDir, std::string de
 		maxLidarLongitude = -1.0;
 		minLidarLatitude  = 0.0;
 		maxLidarLatitude  = -1.0;
+	}
+
+	if (!cdsmDir.empty())
+	{
+		cgCdsm.reset(new CachedGdal<float>(cdsmDir, "cdsm",
+			GdalNameMapperPattern::make_unique(
+			"{latHem:ns}{latDegCeil:02}{lonHem:ew}{lonDegFloor:03}.tif", cdsmDir)));
+		cgCdsm->setTransformationModifier(
+			[](GdalTransform *t) {
+				t->roundPpdToMultipleOf(1.);
+				t->setMarginsOutsideDeg(1.);
+			});
 	}
 
 	if (!depDir.empty())
@@ -82,6 +95,7 @@ TerrainClass::TerrainClass(QString lidarDir, std::string srtmDir, std::string de
 	cgGlobe->setNoData(0);
 
 	numLidar = (long long) 0;
+	numCDSM = (long long) 0;
 	numSRTM = (long long) 0;
 	numGlobal = (long long) 0;
 
@@ -128,11 +142,19 @@ LidarRegionStruct& TerrainClass::getLidarRegion(int lidarRegionIdx)
 /**** FUNCTION: TerrainClass::getTerrainHeight()                                       ****/
 /******************************************************************************************/
 void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, double& terrainHeight, double& bldgHeight,
-		MultibandRasterClass::HeightResult& lidarHeightResult, CConst::HeightSourceEnum& heightSource) const
+		MultibandRasterClass::HeightResult& lidarHeightResult, CConst::HeightSourceEnum& heightSource, bool cdsmFlag) const
 {
 	int lidarRegionIdx = -1;
+	heightSource = CConst::unknownHeightSource;
 
-	if (    (longitudeDeg >= minLidarLongitude) 
+	if (cdsmFlag && cgCdsm.get()) {
+		float ht;
+		if (cgCdsm->getValueAt(latitudeDeg, longitudeDeg, &ht, 1, gdalDirectMode)) {
+			heightSource = CConst::cdsmHeightSource;
+			terrainHeight = (double) ht;
+			numCDSM++;
+		}
+	} else if (    (longitudeDeg >= minLidarLongitude) 
 			&& (longitudeDeg <= maxLidarLongitude) 
 			&& (latitudeDeg  >= minLidarLatitude) 
 			&& (latitudeDeg  <= maxLidarLatitude) ) {
@@ -168,7 +190,6 @@ void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, dou
 	} else {
 		lidarHeightResult  = MultibandRasterClass::OUTSIDE_REGION;
 		bldgHeight    = quietNaN;
-		heightSource = CConst::unknownHeightSource;
 	}
 
 	if (heightSource == CConst::unknownHeightSource && cgDep.get()) {
@@ -563,11 +584,14 @@ const std::string& TerrainClass::getSourceName(const CConst::HeightSourceEnum& s
 /******************************************************************************************/
 void TerrainClass::printStats()
 {
-	long long totalNumTerrain = numLidar + numSRTM + numDEP + numGlobal;
+	long long totalNumTerrain = numLidar + numCDSM + numSRTM + numDEP + numGlobal;
 
 	LOGGER_INFO(logger) << "TOTAL_NUM_TERRAIN = " << totalNumTerrain;
 	LOGGER_INFO(logger) << "NUM_LIDAR = " << numLidar << "  ("
 		<< (double) (totalNumTerrain ? numLidar*100.0/totalNumTerrain : 0.0)
+		<< " %)";
+	LOGGER_INFO(logger) << "NUM_CDSM = " << numCDSM << "  ("
+		<< (double) (totalNumTerrain ? numCDSM*100.0/totalNumTerrain : 0.0)
 		<< " %)";
 	LOGGER_INFO(logger) << "NUM_DEP = " << numDEP << "  ("
 		<< (double) (totalNumTerrain ? numDEP*100.0/totalNumTerrain : 0.0)

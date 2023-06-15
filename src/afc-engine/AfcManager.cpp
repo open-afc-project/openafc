@@ -656,6 +656,8 @@ AfcManager::AfcManager()
 
 	_rlanITMTxClutterMethod = CConst::ForceTrueITMClutterMethod;
 
+	_cdsmLOSThr = quietNaN;
+
 	_minRlanHeightAboveTerrain = quietNaN;
 
 	_maxRadius = quietNaN;
@@ -1014,7 +1016,7 @@ void AfcManager::initializeDatabases()
 		_depDir = "";
 	}
 
-	_terrainDataModel = new TerrainClass(_lidarDir, _srtmDir.c_str(), _depDir.c_str(), _globeDir,
+	_terrainDataModel = new TerrainClass(_lidarDir, _cdsmDir, _srtmDir, _depDir, _globeDir,
 			minLat, minLon, maxLat, maxLon,
 			minLatBldg, minLonBldg, maxLatBldg, maxLonBldg,
 			_maxLidarRegionLoadVal);
@@ -3114,6 +3116,18 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_depDir = SearchPaths::forReading("data", "rat_transfer/3dep/1_arcsec", true).toStdString();
 	}
 
+	if (jsonObj.contains("cdsmDir") && !jsonObj["cdsmDir"].isUndefined()) {
+		_cdsmDir = SearchPaths::forReading("data", jsonObj["cdsmDir"].toString(), true).toStdString();
+	} else {
+		_cdsmDir = "";
+	}
+
+	if (jsonObj.contains("cdsmLOSThr") && !jsonObj["cdsmLOSThr"].isUndefined()) {
+		_cdsmLOSThr =  jsonObj["cdsmLOSThr"].toDouble();
+	} else {
+		_cdsmLOSThr =  0.5;
+	}
+
 	if (jsonObj.contains("fsAnalysisListFile") && !jsonObj["fsAnalysisListFile"].isUndefined()) {
 		_fsAnalysisListFile = QDir(QString::fromStdString(tempDir)).filePath(jsonObj["fsAnalysisListFile"].toString()).toStdString();
 	} else {
@@ -3499,7 +3513,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 			// In the GUI, force this to be true for US and CA.
 			_use3DEP = propModel["terrainSource"].toString() == "3DEP (30m)";
 
-			_winner2LOSOption = ((_useBDesignFlag || _useLiDAR) ? CConst::BldgDataReqTxRxLOSOption : CConst::UnknownLOSOption);
+			_winner2LOSOption = ((_useBDesignFlag || _useLiDAR) ? CConst::BldgDataReqTxRxLOSOption :
+				(!_cdsmDir.empty()) ? CConst::CdsmLOSOption : CConst::UnknownLOSOption);
 			_winner2UnknownLOSMethod = CConst::PLOSCombineWinner2UnknownLOSMethod;
 
 			_pathLossClampFSPL = true;
@@ -6807,7 +6822,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 		double &pathLoss, double &pathClutterTxDB, double &pathClutterRxDB,
 		std::string &pathLossModelStr, double &pathLossCDF,
 		std::string &pathClutterTxModelStr, double &pathClutterTxCDF, std::string &pathClutterRxModelStr, double &pathClutterRxCDF,
-		std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr
+		std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr, double **isLOSProfilePtr, double *isLOSSurfaceFracPtr
 #if DEBUG_AFC
 		, std::vector<std::string> &ITMHeightType
 #endif
@@ -6847,13 +6862,14 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 							(_winner2LOSOption == CConst::BldgDataLOSOption)
 							|| (_winner2LOSOption == CConst::BldgDataReqTxLOSOption)
 							|| (_winner2LOSOption == CConst::BldgDataReqRxLOSOption)
-							|| (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption) ) {
+							|| (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption)
+							|| (_winner2LOSOption == CConst::CdsmLOSOption) ) {
 						double terrainHeight;
 						double bldgHeight;
 						MultibandRasterClass::HeightResult lidarHeightResult;
 						CConst::HeightSourceEnum txHeightSource, rxHeightSource;
-						_terrainDataModel->getTerrainHeight(txLongitudeDeg, txLatitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, txHeightSource);
-						_terrainDataModel->getTerrainHeight(rxLongitudeDeg, rxLatitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, rxHeightSource);
+						_terrainDataModel->getTerrainHeight(txLongitudeDeg, txLatitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, txHeightSource, false);
+						_terrainDataModel->getTerrainHeight(rxLongitudeDeg, rxLatitudeDeg, terrainHeight, bldgHeight, lidarHeightResult, rxHeightSource, false);
 
 						bool reqTx = (_winner2LOSOption == CConst::BldgDataReqTxLOSOption) || (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption);
 						bool reqRx = (_winner2LOSOption == CConst::BldgDataReqRxLOSOption) || (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption);
@@ -6864,8 +6880,16 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 							bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
 									QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 									QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-									distKm, numPts, isLOSProfilePtr);
-							winner2LOSValue = (losFlag ? 1 : 2);
+									distKm, numPts, isLOSProfilePtr, isLOSSurfaceFracPtr);
+							if (losFlag) {
+								if ((_winner2LOSOption == CConst::CdsmLOSOption) && (*isLOSSurfaceFracPtr < _cdsmLOSThr)) {
+									winner2LOSValue = 0;
+								} else {
+									winner2LOSValue = 1;
+								}
+							} else {
+								winner2LOSValue = 2;
+							}
 						}
 					} else if (_winner2LOSOption == CConst::ForceLOSLOSOption) {
 						winner2LOSValue = 1;
@@ -7122,7 +7146,8 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 					(_winner2LOSOption == CConst::BldgDataLOSOption)
 					|| (_winner2LOSOption == CConst::BldgDataReqTxLOSOption)
 					|| (_winner2LOSOption == CConst::BldgDataReqRxLOSOption)
-					|| (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption) ) {
+					|| (_winner2LOSOption == CConst::BldgDataReqTxRxLOSOption)
+					|| (_winner2LOSOption == CConst::CdsmLOSOption) ) {
 				double terrainHeight;
 				double bldgHeight;
 				MultibandRasterClass::HeightResult lidarHeightResult;
@@ -7139,8 +7164,16 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 					bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
 							QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 							QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-							distKm, numPts, isLOSProfilePtr);
-					winner2LOSValue = (losFlag ? 1 : 2);
+							distKm, numPts, isLOSProfilePtr, isLOSSurfaceFracPtr);
+					if (losFlag) {
+						if ((_winner2LOSOption == CConst::CdsmLOSOption) && (*isLOSSurfaceFracPtr < _cdsmLOSThr)) {
+							winner2LOSValue = 0;
+						} else {
+							winner2LOSValue = 1;
+						}
+					} else {
+						winner2LOSValue = 2;
+					}
 				}
 			} else if (_winner2LOSOption == CConst::ForceLOSLOSOption) {
 				winner2LOSValue = 1;
@@ -7161,6 +7194,9 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 			} else {
 				throw std::runtime_error(ErrStream() << "ERROR: propEnv = " << propEnv << " INVALID value");
 			}
+			if (_winner2LOSOption == CConst::CdsmLOSOption) {
+				pathLossModelStr += " cdsmFrac = " + std::to_string(*isLOSSurfaceFracPtr);
+			}
 			pathClutterTxModelStr = "NONE";
 			pathClutterTxDB = 0.0;
 			pathClutterTxCDF = 0.5;
@@ -7179,7 +7215,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 						bool losFlag = UlsMeasurementAnalysis::isLOS(_terrainDataModel,
 								QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 								QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-								distKm, numPts, isLOSProfilePtr);
+								distKm, numPts, isLOSProfilePtr, isLOSSurfaceFracPtr);
 						rlanHasClutter = !losFlag;
 					}
 					break;
@@ -7409,7 +7445,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 	if (_pathLossClampFSPL) {
 		double fspl = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
 		if (pathLoss < fspl) {
-			pathLossModelStr += std::to_string(pathLoss) + "_CLAMPFSPL";
+			pathLossModelStr += "_" + std::to_string(pathLoss) + "_CLAMPFSPL";
 			pathLoss = fspl;
 		}
 	}
@@ -8835,7 +8871,7 @@ void AfcManager::runPointAnalysis()
 														pathLoss, pathClutterTxDB, pathClutterRxDB,
 														pathLossModelStr, pathLossCDF,
 														pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-														&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
+														&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
 #if DEBUG_AFC
 														, uls->ITMHeightType
 #endif
@@ -10121,7 +10157,7 @@ void AfcManager::runScanAnalysis()
 										pathLoss, pathClutterTxDB, pathClutterRxDB,
 										pathLossModelStr, pathLossCDF,
 										pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-										&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
+										&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
 #if DEBUG_AFC
 										, uls->ITMHeightType
 #endif
@@ -10570,7 +10606,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 				pathLoss, pathClutterTxDB, pathClutterRxDB,
 				pathLossModelStr, pathLossCDF,
 				pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-				&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
+				&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
 #if DEBUG_AFC
 				, uls->ITMHeightType
 #endif
@@ -11059,7 +11095,7 @@ void AfcManager::runHeatmapAnalysis()
 									pathLoss, pathClutterTxDB, pathClutterRxDB,
 									pathLossModelStr, pathLossCDF,
 									pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-									&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile)
+									&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
 #if DEBUG_AFC
 									, uls->ITMHeightType
 #endif
@@ -11331,6 +11367,8 @@ void AfcManager::printUserInputs()
 		inputGc.writeRow({ "RAIN_FOREST_FILE", _rainForestFile} );
 		inputGc.writeRow({ "SRTM DIRECTORY", _srtmDir } );
 		inputGc.writeRow({ "DEP  DIRECTORY", _depDir } );
+		inputGc.writeRow({ "CDSM  DIRECTORY", _cdsmDir } );
+		inputGc.writeRow({ "CDSM  LOS THREHOLD", f2s(_cdsmLOSThr) } );
 		if (_analysisType == "ExclusionZoneAnalysis") {
 			double chanCenterFreq = _wlanMinFreq + (_exclusionZoneRLANChanIdx + 0.5) * _exclusionZoneRLANBWHz;
 
