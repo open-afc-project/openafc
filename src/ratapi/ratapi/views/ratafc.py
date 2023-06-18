@@ -325,7 +325,7 @@ class RatAfc(MethodView):
     ''' RAT AFC resources
     '''
 
-    def _auth_cert_id(self, cert_id, ruleset, indoor):
+    def _auth_cert_id(self, cert_id, ruleset):
         ''' Authenticate certification id. Return new indoor value
             for bell application
         '''
@@ -352,15 +352,12 @@ class RatAfc(MethodView):
 
         return indoor_certified
 
-    def _auth_ap(self, serial_number, prefix, cert_id, rulesets, indoor, version):
+    def _auth_ap(self, serial_number, prefix, cert_id, rulesets, version):
         ''' Authenticate an access point. If must match the serial_number and certification_id in the database to be valid
         '''
         LOGGER.debug('RatAfc::_auth_ap()')
         LOGGER.debug('Starting auth_ap,serial: %s; prefix: %s; certId: %s; ruleset %s; version %s',
                      serial_number, prefix, cert_id, rulesets, version)
-
-        if not serial_number:
-            raise DeviceUnallowedException("")
 
         deny_ap = AccessPointDeny.query.filter_by(serial_number=serial_number).\
                   filter_by(certification_id=cert_id).first()
@@ -374,11 +371,6 @@ class RatAfc(MethodView):
             raise DeviceUnallowedException("")  # InvalidCredentialsException()
 
         ruleset = prefix
-        if ruleset is None or ruleset not in RULESETS:
-            raise InvalidValueException(["ruleset", ruleset])
-
-        if cert_id is None:
-            raise MissingParamException(missing_params=['certificationId'])
 
         # Test AP will by pass certification ID check as Indoor Certified
         if cert_id == "TestCertificationId" \
@@ -387,7 +379,7 @@ class RatAfc(MethodView):
 
         # Assume that once we got here, we already trim the cert_obj list down
         # to only one entry for the country we're operating in
-        return self._auth_cert_id(cert_id, ruleset, indoor)
+        return self._auth_cert_id(cert_id, ruleset)
 
 
     def __filter(self, url, json):
@@ -472,39 +464,60 @@ class RatAfc(MethodView):
         indoor_certified = True
 
         try:
-
             for req_idx, request in enumerate(requests):
                 # authenticate
                 LOGGER.debug("Request: %s", request)
                 device_desc = request["availableSpectrumInquiryRequests"][0].get(
                     'deviceDescriptor')
 
-                try:
-                    LOGGER.debug("ver has RulesetId")
-                    # Pick one ruleset that is being used for the
-                    # deployment of this AFC (RULESETS)
-                    prefix = None
-                    for r in device_desc['certificationId']:
-                        prefix = r['rulesetId'].strip()
-                        if prefix in RULESETS:
-                            region = rulesetIdToRegionStr(prefix)
-                            certId = r['id']
-                            break
-                except:
-                    prefix = None
-                    certId = None
+                devices = device_desc.get('certificationId')
+                if not devices:
+                    raise MissingParamException(missing_params=['certificationId'])
+
+                # Pick one ruleset that is being used for the
+                # deployment of this AFC (RULESETS)
+                prefix = None
+                certId = None
+                region = None
+                for r in devices:
+                    prefix = r.get('rulesetId')
+                    if not prefix:
+                        # empty/non-exist ruleset
+                        break
+                    if prefix in RULESETS:
+                        region = rulesetIdToRegionStr(prefix)
+                        certId = r.get('id')
+                        break
+                    prefix = prefix.strip()
+
+                if prefix is None: 
+                    raise MissingParamException(missing_params=['rulesetId'])
+                elif not prefix:
+                   raise InvalidValueException(["rulesetId", prefix])
+
+                if region:
+                    if certId is None:
+                        # certificationId id field does not exist
+                        raise MissingParamException(missing_params=['certificationId', 'id'])
+                    elif not certId:
+                        raise InvalidValueException(["certificationId", certId])
+                else:
+                   # ruleset is not in list
+                   raise DeviceUnallowedException("")
 
                 serial = device_desc.get('serialNumber')
+                if serial is None:
+                    raise MissingParamException(missing_params=['serialNumber'])
+                elif not serial:
+                    raise InvalidValueException(["serialNumber", serial])
 
                 location = request["availableSpectrumInquiryRequests"][0].get(
                     'location')
-                indoor = location['indoorDeployment']
 
                 indoor_certified = self._auth_ap(serial,
                                    prefix,
                                    certId,
                                    device_desc.get('rulesetIds'),
-                                   indoor,
                                    ver)
 
                 if indoor_certified:
