@@ -1,6 +1,23 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-705*|
+| :- | :- |
+|**Date**|**06/14/2023**|
+
+## **Issues Addressed**
+ * Jira OA-705: Add AP directionality in the map/kmz
+
+## **Interface Changes**
+ * 
+
+## **Testing Done**
+ * Ran a test in Brazil and confirmed that the AP cone was shown correctly (based on Az/El pointing) in both the map and the results.kmz file using the test case from OA-669 (outside Amazon rainforest) with point-to-point AP.
+
+## **Open Issues** 
+*
+
+## **Version and Date**
 |Version|**OA-685*|
 | :- | :- |
 |**Date**|**06/13/2023**|

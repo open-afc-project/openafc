@@ -4193,7 +4193,7 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string&
 		//outputDocument = QJsonDocument(jsonSpectrumData(_rlanBWList, _numChan, _channelData, _deviceDesc, _wlanMinFreq));
 		outputDocument = generateRatAfcJson();
 
-		if (!_mapDataGeoJsonFile.empty()) {
+		if ( (_responseCode == CConst::successResponseCode) && (!_mapDataGeoJsonFile.empty()) ) {
 			generateMapDataGeoJson(tempDir);
 		}
 	}
@@ -4370,6 +4370,69 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 			{
 				throw std::runtime_error("Could not add cone feature in layer of output data source");
 			}
+		}
+	}
+	if (_rlanAntenna) {
+		// Instantiate cone object
+		std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> coneFeature(OGRFeature::CreateFeature(coneLayer->GetLayerDefn()));
+
+		double rlanAntennaArrowLength = 1000.0;
+		Vector3 centerPosn = _rlanRegion->getCenterPosn();
+		Vector3 ptgPosn = centerPosn + (rlanAntennaArrowLength / 1000.0)*_rlanPointing;
+
+		GeodeticCoord ptgPosnGeodetic = EcefModel::ecefToGeodetic(ptgPosn);
+
+		LatLon rlanLatLonVal = std::make_pair(_rlanRegion->getCenterLatitude(), _rlanRegion->getCenterLongitude());
+		LatLon ptgLatLonVal = std::make_pair(ptgPosnGeodetic.latitudeDeg, ptgPosnGeodetic.longitudeDeg);
+
+		double cosVal = cos(_rlanRegion->getCenterLatitude()*M_PI/180.0);
+		double cvgTheta = 2.0*M_PI/180.0;
+		double deltaLat = ptgLatLonVal.first - rlanLatLonVal.first;
+		double deltaLon = ptgLatLonVal.second - rlanLatLonVal.second;
+		posPointLatLon = std::make_pair( rlanLatLonVal.first  + deltaLat*cos(cvgTheta) + deltaLon*cosVal*sin(cvgTheta),
+		                                 rlanLatLonVal.second + (deltaLon*cosVal*cos(cvgTheta) - deltaLat*sin(cvgTheta))/cosVal );
+		negPointLatLon = std::make_pair( rlanLatLonVal.first  + deltaLat*cos(cvgTheta) - deltaLon*cosVal*sin(cvgTheta),
+		                                 rlanLatLonVal.second + (deltaLon*cosVal*cos(cvgTheta) + deltaLat*sin(cvgTheta))/cosVal );
+
+		// Intantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
+		GdalHelpers::GeomUniquePtr<OGRPolygon> beamCone(GdalHelpers::createGeometry<OGRPolygon>()); // Use GdalHelpers.h templates to have unique pointers create these on the heap
+		GdalHelpers::GeomUniquePtr<OGRLinearRing> exteriorOfCone(GdalHelpers::createGeometry<OGRLinearRing>());
+
+		// Create OGRPoints to store the coordinates of the beam triangle
+		// ***IMPORTANT NOTE: Coordinates stored as (Lon,Lat) here, required by geoJSON specifications
+		GdalHelpers::GeomUniquePtr<OGRPoint> rlanPoint(GdalHelpers::createGeometry<OGRPoint>());
+		rlanPoint->setX(rlanLatLonVal.second);
+		rlanPoint->setY(rlanLatLonVal.first); // Must set points manually since cannot construct while pointing at with unique pointer
+		GdalHelpers::GeomUniquePtr<OGRPoint> posPoint(GdalHelpers::createGeometry<OGRPoint>());
+		posPoint->setX(posPointLatLon.second);
+		posPoint->setY(posPointLatLon.first);
+		GdalHelpers::GeomUniquePtr<OGRPoint> negPoint(GdalHelpers::createGeometry<OGRPoint>());
+		negPoint->setX(negPointLatLon.second);
+		negPoint->setY(negPointLatLon.first);
+
+		// Adding the polygon vertices to a OGRLinearRing object for geoJSON export
+		exteriorOfCone->addPoint(rlanPoint.get()); // Using .get() gives access to the pointer without giving up ownership
+		exteriorOfCone->addPoint(posPoint.get());
+		exteriorOfCone->addPoint(negPoint.get());
+		exteriorOfCone->addPoint(rlanPoint.get()); // Adds this again just so that the polygon closes where it starts (at FS location)
+
+		// Add exterior boundary of cone's polygon
+		beamCone->addRingDirectly(exteriorOfCone.release()); // Points unique-pointer to null and gives up ownership of exteriorOfCone to beamCone
+
+		// Add properties to the geoJSON features
+		coneFeature->SetField("FSID", 0);
+		coneFeature->SetField("SEGMENT", 0);
+		coneFeature->SetField("DBNAME", "0");
+		coneFeature->SetField("kind", "RLAN");
+		coneFeature->SetField("startFreq", 0.0);
+		coneFeature->SetField("stopFreq", 0.0);
+
+		// Add geometry to feature
+		coneFeature->SetGeometryDirectly(beamCone.release());
+
+		if (coneLayer->CreateFeature(coneFeature.release()) != OGRERR_NONE)
+		{
+			throw std::runtime_error("Could not add cone feature in layer of output data source");
 		}
 	}
 
@@ -8066,6 +8129,16 @@ void AfcManager::runPointAnalysis()
 		fkml->writeEndElement(); // Style
 
 		fkml->writeStartElement("Style");
+		fkml->writeAttribute("id", "bluePoly");
+		fkml->writeStartElement("LineStyle");
+		fkml->writeTextElement("width", "1.5");
+		fkml->writeEndElement(); // LineStyle
+		fkml->writeStartElement("PolyStyle");
+		fkml->writeTextElement("color", "ffff0000");
+		fkml->writeEndElement(); // PolyStyle
+		fkml->writeEndElement(); // Style
+
+		fkml->writeStartElement("Style");
 		fkml->writeAttribute("id", "blackPoly");
 		fkml->writeStartElement("LineStyle");
 		fkml->writeTextElement("color", "ff000000");
@@ -8265,6 +8338,62 @@ void AfcManager::runPointAnalysis()
 
 		fkml->writeEndElement(); // Scan Points
 		/**********************************************************************************/
+
+		if (_rlanAntenna) {
+			double rlanAntennaArrowLength = 1000.0;
+			Vector3 centerPosn = _rlanRegion->getCenterPosn();
+
+			Vector3 zvec = _rlanPointing;
+			Vector3 xvec = (Vector3(zvec.y(), -zvec.x(),0.0)).normalized();
+			Vector3 yvec = zvec.cross(xvec);
+
+			int numCvgPoints = 32;
+
+			std::vector<GeodeticCoord> ptgPtList;
+			double cvgTheta = 2.0*M_PI/180.0;
+			int cvgPhiIdx;
+			for(cvgPhiIdx=0; cvgPhiIdx<numCvgPoints; ++cvgPhiIdx) {
+				double cvgPhi = 2*M_PI*cvgPhiIdx / numCvgPoints;
+				Vector3 cvgIntPosn = centerPosn + (rlanAntennaArrowLength / 1000.0)*(zvec*cos(cvgTheta) + (xvec*cos(cvgPhi) + yvec*sin(cvgPhi))*sin(cvgTheta));
+
+				GeodeticCoord cvgIntPosnGeodetic = EcefModel::ecefToGeodetic(cvgIntPosn);
+				ptgPtList.push_back(cvgIntPosnGeodetic);
+			}
+
+			if (true) {
+				fkml->writeStartElement("Folder");
+				fkml->writeTextElement("name", "DIR_ANTENNA");
+
+				for(cvgPhiIdx=0; cvgPhiIdx<numCvgPoints; ++cvgPhiIdx) {
+					fkml->writeStartElement("Placemark");
+					fkml->writeTextElement("name", QString::asprintf("p%d", cvgPhiIdx));
+					fkml->writeTextElement("styleUrl", "#bluePoly");
+					fkml->writeTextElement("visibility", "1");
+					fkml->writeStartElement("Polygon");	
+					fkml->writeTextElement("extrude", "0");
+					fkml->writeTextElement("altitudeMode", "absolute");
+					fkml->writeStartElement("outerBoundaryIs");
+					fkml->writeStartElement("LinearRing");
+
+					QString more_coords = QString::asprintf("%.10f,%.10f,%.2f\n", _rlanRegion->getCenterLongitude(), _rlanRegion->getCenterLatitude(), _rlanRegion->getCenterHeightAMSL());
+
+					GeodeticCoord pt = ptgPtList[cvgPhiIdx];
+					more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, pt.heightKm*1000.0));
+
+					pt = ptgPtList[(cvgPhiIdx +1) % numCvgPoints];
+					more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", pt.longitudeDeg, pt.latitudeDeg, pt.heightKm*1000.0));
+
+					more_coords.append(QString::asprintf("%.10f,%.10f,%.2f\n", _rlanRegion->getCenterLongitude(), _rlanRegion->getCenterLatitude(), _rlanRegion->getCenterHeightAMSL()));
+
+					fkml->writeTextElement("coordinates", more_coords);
+					fkml->writeEndElement(); // LinearRing
+					fkml->writeEndElement(); // outerBoundaryIs
+					fkml->writeEndElement(); // Polygon
+					fkml->writeEndElement(); // Placemark
+				}
+				fkml->writeEndElement(); // Beamcone
+			}
+		}
 
 		std::vector<GeodeticCoord> bdyPtList = _rlanRegion->getBoundaryPolygon(_terrainDataModel);
 
