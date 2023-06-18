@@ -63,5 +63,6 @@ COPY msghnd/devel.sh /wd/
 RUN chmod +x /wd/devel.sh
 RUN /wd/devel.sh
 #
+ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]
