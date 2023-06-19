@@ -254,7 +254,7 @@ docker build . -t msghnd -f msghnd/Dockerfile
 
 docker build . -t ratdb -f ratdb/Dockerfile
 
-docler build . -t objst -f src/filestorage/Dockerfile
+docler build . -t objst -f objstorage/Dockerfile
 
 cd rabbitmq && docker build . -t rmq -f Dockerfile; cd ../
 
@@ -618,7 +618,7 @@ chown 999:999 /var/databases/pgdata
 |BROKER_PWD |`celery`|rat-server,msghnd,worker | password used for AFC RMQ service|
 |BROKER_FQDN|`localhost`|rat-server,msghnd,worker | IP/domain name of AFC RMQ service|
 |BROKER_PORT|`5672`|rat-server,msghnd,worker | port of AFC RMQ service|
-| **AFC Object Storage** |||please read [objst README.md](/src/filestorage/README.md)|
+| **AFC Object Storage** |||please read [objst README.md](/objstorage/README.md)|
 |AFC_OBJST_HOST|`0.0.0.0`|objst,rat-server,msghnd,worker|file storage service host domain/IP|
 |AFC_OBJST_PORT|`5000`|objst,rat-server,msghnd,worker|file storage service port|
 |AFC_OBJST_SCHEME|'HTTP'|rat-server,msghnd,worker|file storage service scheme. `HTTP` or `HTTPS`|
@@ -627,6 +627,8 @@ chown 999:999 /var/databases/pgdata
 |AFC_OBJST_LOG_LVL|`ERROR`|objst|logging level of the file storage. The relevant values are `DEBUG` and `ERROR`|
 |AFC_OBJST_HIST_HOST|`0.0.0.0`|objst,rat-server,msghnd,worker|history service host domain/IP|
 |AFC_OBJST_HIST_PORT|`4999`|objst,rat-server,msghnd,worker|history service port|
+|AFC_OBJST_WORKERS|`10`|objst|number of gunicorn workers running objst server|
+|AFC_OBJST_HIST_WORKERS|`2`|objst|number of gunicorn workers runnining history server|
 | **MSGHND settings**||||
 |AFC_MSGHND_BIND|`0.0.0.0:8000`|msghnd| the socket to bind. a string of the form: <host>:<port>|
 |AFC_MSGHND_PID|`/run/gunicorn/openafc_app.pid`|msghnd| a filename to use for the PID file|

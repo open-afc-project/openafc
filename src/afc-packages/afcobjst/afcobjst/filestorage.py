@@ -17,23 +17,23 @@ import abc
 import waitress
 from flask import Flask, request, abort, make_response
 import google.cloud.storage
-from objstconf import ObjstConfigInternal
+from .objstconf import ObjstConfigInternal
 
 NET_TIMEOUT = 600 # The amount of time, in seconds, to wait for the server response
 
-flask = Flask(__name__)
-flask.config.from_object(ObjstConfigInternal())
+objst_app = Flask(__name__)
+objst_app.config.from_object(ObjstConfigInternal())
 
-if flask.config['AFC_OBJST_LOG_FILE']:
-    logging.basicConfig(filename=flask.config['AFC_OBJST_LOG_FILE'],
-                        level=flask.config['AFC_OBJST_LOG_LVL'])
+if objst_app.config['AFC_OBJST_LOG_FILE']:
+    logging.basicConfig(filename=objst_app.config['AFC_OBJST_LOG_FILE'],
+                        level=objst_app.config['AFC_OBJST_LOG_LVL'])
 else:
-    logging.basicConfig(level=flask.config['AFC_OBJST_LOG_LVL'])
+    logging.basicConfig(level=objst_app.config['AFC_OBJST_LOG_LVL'])
 
-if flask.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = flask.config["AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON"]
+if objst_app.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = objst_app.config["AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON"]
     client = google.cloud.storage.client.Client()
-    bucket = client.bucket(flask.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
+    bucket = client.bucket(objst_app.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
 
 class ObjInt:
     """ Abstract class for data prot operations """
@@ -88,7 +88,7 @@ class ObjIntLocalFS(ObjInt):
                 os.remove(self._file_name)
 
     def __mkdir_local(self, path):
-        flask.logger.debug('__mkdir_local({})'.format(path))
+        objst_app.logger.debug('__mkdir_local({})'.format(path))
         os.makedirs(path, exist_ok=True)
 
 
@@ -126,33 +126,33 @@ class ObjIntGoogleCloudBucket(ObjInt):
 class Objstorage:
     def open(self, name):
         """ Create ObjInt instance """
-        flask.logger.debug("Objstorage.open({})".format(name))
-        if flask.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
+        objst_app.logger.debug("Objstorage.open({})".format(name))
+        if objst_app.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
             return ObjIntGoogleCloudBucket(name)
-        if flask.config["AFC_OBJST_MEDIA"] == "LocalFS":
+        if objst_app.config["AFC_OBJST_MEDIA"] == "LocalFS":
             return ObjIntLocalFS(name)
 
 
 def get_local_path(path):
-    path = os.path.join(flask.config["AFC_OBJST_FILE_LOCATION"], path)
+    path = os.path.join(objst_app.config["AFC_OBJST_FILE_LOCATION"], path)
     return path
 
 
-@flask.route('/'+'<path:path>', methods=['POST'])
+@objst_app.route('/'+'<path:path>', methods=['POST'])
 def post(path):
     ''' File upload handler. '''
     try:
-        flask.logger.debug('post method={}, path={}'.format(request.method, path))
+        objst_app.logger.debug('post method={}, path={}'.format(request.method, path))
         path = get_local_path(path)
 
         data = None
 
         if 'file' in request.files:
             if not request.files['file']:
-                flask.logger.error('No file in request')
+                objst_app.logger.error('No file in request')
                 abort(400)
             if request.files['file'].filename == '':
-                flask.logger.error('Empty filename')
+                objst_app.logger.error('Empty filename')
                 abort(400)
             path = os.path.join(path, request.files['file'].filename)
             data = request.files['file'].read()
@@ -163,16 +163,16 @@ def post(path):
         with objst.open(path) as hobj:
             hobj.write(data)
     except Exception as e:
-        flask.logger.error(e)
+        objst_app.logger.error(e)
         return abort(500)
 
     return make_response('OK', 200)
 
 
-@flask.route('/'+'<path:path>', methods=["DELETE"])
+@objst_app.route('/'+'<path:path>', methods=["DELETE"])
 def delete(path):
     ''' File/dir delete handler. '''
-    flask.logger.debug('delete method={}, path={}'.format(request.method, path))
+    objst_app.logger.debug('delete method={}, path={}'.format(request.method, path))
     path = get_local_path(path)
 
     try:
@@ -180,17 +180,17 @@ def delete(path):
         with objst.open(path) as hobj:
             hobj.delete()
     except Exception as e:
-        flask.logger.error(e)
+        objst_app.logger.error(e)
         return make_response('File not found', 404)
 
     return make_response('OK', 204)
 
 
-@flask.route('/', defaults={'path': ''}, methods=['HEAD'])
-@flask.route('/'+'<path:path>', methods=['HEAD'])  # handle URL with filename
+@objst_app.route('/', defaults={'path': ''}, methods=['HEAD'])
+@objst_app.route('/'+'<path:path>', methods=['HEAD'])  # handle URL with filename
 def head(path):
     ''' Is file exist handler. '''
-    flask.logger.debug('head method={}, path={}'.format(request.method, path))
+    objst_app.logger.debug('head method={}, path={}'.format(request.method, path))
     path = get_local_path(path)
 
     try:
@@ -201,14 +201,14 @@ def head(path):
             else:
                 return make_response('File not found', 404)
     except Exception as e:
-        flask.logger.error(e)
+        objst_app.logger.error(e)
         return abort(500)
 
 
-@flask.route('/'+'<path:path>', methods=['GET'])  # handle URL with filename
+@objst_app.route('/'+'<path:path>', methods=['GET'])  # handle URL with filename
 def get(path):
     ''' File download handler. '''
-    flask.logger.debug('get method={}, path={}'.format(request.method, path))
+    objst_app.logger.debug('get method={}, path={}'.format(request.method, path))
     path = get_local_path(path)
 
     try:
@@ -217,23 +217,23 @@ def get(path):
             data = hobj.read()
             if data:
                 return data
-            flask.logger.error('{}: File not found'.format(path))
+            objst_app.logger.error('{}: File not found'.format(path))
             return make_response('File not found', 404)
     except Exception as e:
-        flask.logger.error(e)
+        objst_app.logger.error(e)
         return abort(500)
 
 
 if __name__ == '__main__':
-    flask.logger.debug("port={} AFC_OBJST_FILE_LOCATION={} AFC_OBJST_MEDIA={}".
-                       format(flask.config['AFC_OBJST_PORT'],
-                              flask.config['AFC_OBJST_FILE_LOCATION'],
-                              flask.config["AFC_OBJST_MEDIA"]))
-    os.makedirs(flask.config['AFC_OBJST_FILE_LOCATION'], exist_ok=True)
+    objst_app.logger.debug("port={} AFC_OBJST_FILE_LOCATION={} AFC_OBJST_MEDIA={}".
+                       format(objst_app.config['AFC_OBJST_PORT'],
+                              objst_app.config['AFC_OBJST_FILE_LOCATION'],
+                              objst_app.config["AFC_OBJST_MEDIA"]))
+    os.makedirs(objst_app.config['AFC_OBJST_FILE_LOCATION'], exist_ok=True)
     # production env:
-    waitress.serve(flask, port=flask.config['AFC_OBJST_PORT'], host="0.0.0.0")
+    waitress.serve(objst_app, port=objst_app.config['AFC_OBJST_PORT'], host="0.0.0.0")
     # Development env:
-    #flask.run(port=flask.config['AFC_OBJST_PORT'], host="0.0.0.0", debug=True)
+    #objst_app.run(port=objst_app.config['AFC_OBJST_PORT'], host="0.0.0.0", debug=True)
 
 # Local Variables:
 # mode: Python

@@ -143,7 +143,7 @@ build_dev_server() {
   docker_build_and_push ${wd}/ratdb/Dockerfile ${RATDB}:${tag} ${push} &
 
   # build afc dynamic data storage image
-  docker_build_and_push ${wd}/src/filestorage/Dockerfile ${OBJST}:${tag} ${push}&
+  docker_build_and_push ${wd}/objstorage/Dockerfile ${OBJST}:${tag} ${push}&
   cd ${wd}
 
   # build afc rabbit MQ docker image

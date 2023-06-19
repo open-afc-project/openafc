@@ -88,7 +88,7 @@ class BrokerConfigurator(object):
         self.BROKER_EXCH_DISPAT = os.getenv('BROKER_EXCH_DISPAT', 'dispatcher_bcast')
 
 class ObjstConfigBase():
-    """Parent of configuration for filestorage"""
+    """Parent of configuration for objstorage"""
     def __init__(self):
         self.AFC_OBJST_PORT = os.getenv("AFC_OBJST_PORT", "5000")
         if not self.AFC_OBJST_PORT.isdigit():

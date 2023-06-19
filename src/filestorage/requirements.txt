@@ -1,5 +1,0 @@
-requests
-flask
-werkzeug
-waitress
-google.cloud.storage

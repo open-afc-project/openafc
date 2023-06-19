@@ -17,26 +17,26 @@ import abc
 import waitress
 from flask import Flask, request, helpers, abort
 import google.cloud.storage
-from objstconf import ObjstConfigInternal
+from .objstconf import ObjstConfigInternal
 
 NET_TIMEOUT = 60 # The amount of time, in seconds, to wait for the server response
 
-flask = Flask(__name__)
-flask.config.from_object(ObjstConfigInternal())
+hist_app = Flask(__name__)
+hist_app.config.from_object(ObjstConfigInternal())
 
-if flask.config['AFC_OBJST_LOG_FILE']:
-    logging.basicConfig(filename=flask.config['AFC_OBJST_LOG_FILE'],
-                        level=flask.config['AFC_OBJST_LOG_LVL'])
+if hist_app.config['AFC_OBJST_LOG_FILE']:
+    logging.basicConfig(filename=hist_app.config['AFC_OBJST_LOG_FILE'],
+                        level=hist_app.config['AFC_OBJST_LOG_LVL'])
 else:
-    logging.basicConfig(level=flask.config['AFC_OBJST_LOG_LVL'])
+    logging.basicConfig(level=hist_app.config['AFC_OBJST_LOG_LVL'])
 
-if flask.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = flask.config["AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON"]
+if hist_app.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = hist_app.config["AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON"]
     client = google.cloud.storage.client.Client()
-    bucket = client.bucket(flask.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
+    bucket = client.bucket(hist_app.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
 
 def generateHtml(schema, baseurl, dirs, files):
-    flask.logger.debug("generateHtml({}, {}, {})".format(baseurl, dirs, files))
+    hist_app.logger.debug("generateHtml({}, {}, {})".format(baseurl, dirs, files))
     dirs.sort()
     files.sort()
 
@@ -52,7 +52,7 @@ def generateHtml(schema, baseurl, dirs, files):
     baseSplit = baseurl.split("/")
     if len(baseSplit) >= 4:
         url = schema + "://" + baseSplit[2] + "/dbg"
-        flask.logger.debug("url {}".format(url))
+        hist_app.logger.debug("url {}".format(url))
         html += "<a href=" + url + ">" + "dbg" + "</a> "
         i = 4
         while i < len(baseSplit):
@@ -79,7 +79,7 @@ def generateHtml(schema, baseurl, dirs, files):
 </html>
 """
 
-    flask.logger.debug(html)
+    hist_app.logger.debug(html)
 
     return html.encode()
 
@@ -115,14 +115,14 @@ class ObjIntLocalFS(ObjInt):
         return os.path.isdir(self.__file_name)
 
     def list(self):
-        flask.logger.debug("ObjIntLocalFS.list")
+        hist_app.logger.debug("ObjIntLocalFS.list")
         ls = os.listdir(self.__file_name)
         files = [f for f in ls if os.path.isfile(os.path.join(self.__file_name, f))]
         dirs = [f for f in ls if os.path.isdir(os.path.join(self.__file_name, f))]
         return dirs, files
 
     def read(self):
-        flask.logger.debug("ObjIntLocalFS.read({})".format(self.__file_name))
+        hist_app.logger.debug("ObjIntLocalFS.read({})".format(self.__file_name))
         if os.path.isfile(self.__file_name):
             with open(self.__file_name, "rb") as hfile:
                 return hfile.read()
@@ -138,7 +138,7 @@ class ObjIntGoogleCloudBucket(ObjInt):
         return not self.__blob.exists()
 
     def list(self):
-        flask.logger.debug("ObjIntGoogleCloudBucket.list")
+        hist_app.logger.debug("ObjIntGoogleCloudBucket.list")
         blobs = bucket.list_blobs(prefix=self.__file_name + "/")
         files = []
         dirs = set()
@@ -159,13 +159,13 @@ class ObjIntGoogleCloudBucket(ObjInt):
 class Objstorage:
     def open(self, name):
         """ Create ObjInt instance """
-        flask.logger.debug("Objstorage.open({})".format(name))
-        if flask.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
+        hist_app.logger.debug("Objstorage.open({})".format(name))
+        if hist_app.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
             return ObjIntGoogleCloudBucket(name)
-        if flask.config["AFC_OBJST_MEDIA"] == "LocalFS":
+        if hist_app.config["AFC_OBJST_MEDIA"] == "LocalFS":
             return ObjIntLocalFS(name)
         raise Exception("Unsupported AFC_OBJST_MEDIA \"{}\"".
-                        format(flask.config["AFC_OBJST_MEDIA"]))
+                        format(hist_app.config["AFC_OBJST_MEDIA"]))
 
 
 def get_local_path(path):
@@ -174,17 +174,17 @@ def get_local_path(path):
     if prefix == "dbgs":
         schema = "https"
     elif prefix != "dbg":
-        flask.logger.error('get_local_path: wrong path {}'.format(path))
+        hist_app.logger.error('get_local_path: wrong path {}'.format(path))
         abort(403, 'Forbidden')
-    path = os.path.join(flask.config["AFC_OBJST_FILE_LOCATION"], "history", path[len(prefix)+1:])
-    flask.logger.debug("get_local_path() {}".format(path))
+    path = os.path.join(hist_app.config["AFC_OBJST_FILE_LOCATION"], "history", path[len(prefix)+1:])
+    hist_app.logger.debug("get_local_path() {}".format(path))
     return path, schema
 
 
-@flask.route('/'+'<path:path>', methods=['GET'])
+@hist_app.route('/'+'<path:path>', methods=['GET'])
 def get(path):
     ''' File download handler. '''
-    flask.logger.debug('get method={}, path={}'.format(request.method, path))
+    hist_app.logger.debug('get method={}, path={}'.format(request.method, path))
     path, schema = get_local_path(path)
 
     try:
@@ -198,13 +198,13 @@ def get(path):
                 io.BytesIO(data),
                 download_name=os.path.basename(path))
     except Exception as e:
-        flask.logger.error(e)
+        hist_app.logger.error(e)
         return abort(500)
 
 
 if __name__ == '__main__':
-    os.makedirs(os.path.join(flask.config["AFC_OBJST_FILE_LOCATION"], "history"), exist_ok=True)
-    waitress.serve(flask, port=flask.config["AFC_OBJST_HIST_PORT"], host="0.0.0.0")
+    os.makedirs(os.path.join(hist_app.config["AFC_OBJST_FILE_LOCATION"], "history"), exist_ok=True)
+    waitress.serve(hist_app, port=hist_app.config["AFC_OBJST_HIST_PORT"], host="0.0.0.0")
 
-    #flask.run(port=flask.config['AFC_OBJST_HIST_PORT'], host="0.0.0.0", debug=True)
+    #hist_app.run(port=hist_app.config['AFC_OBJST_HIST_PORT'], host="0.0.0.0", debug=True)
 

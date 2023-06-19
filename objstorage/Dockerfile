@@ -5,25 +5,21 @@
 # a copy of which is included with this software program
 #
 
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /usr/app
 
-COPY src/filestorage/requirements.txt /usr/app/
+COPY objstorage/requirements.txt objstorage/docker-entrypoint.sh /usr/app/
 RUN /usr/local/bin/python -m pip install --upgrade pip
 RUN pip install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
-EXPOSE 4999 5000
-
-COPY src/filestorage/*.py /usr/app/
-COPY src/filestorage/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /usr/app/filestorage.py /usr/app/history.py /docker-entrypoint.sh
+RUN chmod +x /usr/app/docker-entrypoint.sh
 
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
-        -r /wd/afc-packages/pkgs.filestorage \
+        -r /wd/afc-packages/pkgs.objstorage \
     && rm -rf /wd/afc-packages
 
 ENV PYTHONPATH=/usr/app
 
-CMD ["/docker-entrypoint.sh"]
+CMD ["/usr/app/docker-entrypoint.sh"]
