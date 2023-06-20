@@ -17,8 +17,8 @@ import werkzeug
 import flask
 from flask.views import MethodView
 import requests
-from ..models.base import db
-from ..models.aaa import User, Organization, Role
+from afcmodels.base import db
+from afcmodels.aaa import User, Organization, Role
 from flask_login import current_user
 from .. import als
 

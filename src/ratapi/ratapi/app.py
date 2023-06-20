@@ -18,6 +18,8 @@ import flask
 import requests
 from sqlalchemy import exc
 from fst import DataIf
+from afcmodels.base import db
+from afcmodels.aaa import User
 from . import als
 
 #: Logger for this module
@@ -78,7 +80,7 @@ def create_app(config_override=None):
     from xdg import BaseDirectory
 
     # Child members
-    from . import models, views, util
+    from . import views, util
 
     flaskapp = flask.Flask(__name__.split('.')[0])
     flaskapp.response_class = util.Response
@@ -115,15 +117,11 @@ def create_app(config_override=None):
 
     LOGGER.debug('BROKER_URL %s', flaskapp.config['BROKER_URL'])
 
-    # DB and AAA setup
-    db = models.base.db
-
     db.init_app(flaskapp)
     Migrate(
         flaskapp, db, directory=os.path.join(owndir, 'migrations'))
 
     if flaskapp.config['OIDC_LOGIN']:
-        from .models.aaa import User
         from flask_login import  LoginManager
         login_manager = LoginManager()
         login_manager.init_app(flaskapp)
@@ -143,7 +141,7 @@ def create_app(config_override=None):
     else:
         # Non OIDC login.
         from flask_user import UserManager
-        user_manager = UserManager(flaskapp, db, models.aaa.User)
+        user_manager = UserManager(flaskapp, db, User)
 
         @flaskapp.before_request
         def log_user_access():
@@ -367,7 +365,6 @@ def create_app(config_override=None):
     # check database
     with flaskapp.app_context():
         try:
-            from .models.aaa import User
             user = db.session.query(User).first()  # pylint: disable=no-member
 
         except exc.SQLAlchemyError as e:

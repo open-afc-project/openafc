@@ -29,10 +29,9 @@ from afc_worker import run
 from fst import DataIf
 from ncli import MsgPublisher
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from ..models.aaa import User, AccessPointDeny, AFCConfig
-from ..models.base import db
+from afcmodels.aaa import User, AccessPointDeny, AFCConfig, MTLS
+from afcmodels.base import db
 from .auth import auth
-from ..models import aaa
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -210,7 +209,7 @@ class HealthCheck(MethodView):
                     LOGGER.debug(f"Cert bundle already exists.")
                     raise
                 # create client bundle certificate file if not exists
-                for certs in db.session.query(aaa.MTLS).all():
+                for certs in db.session.query(MTLS).all():
                     LOGGER.info(f"{certs.id}")
                     bundle_data += certs.cert
                 db.session.commit() # pylint: disable=no-member

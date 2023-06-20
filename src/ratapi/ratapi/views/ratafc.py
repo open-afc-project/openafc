@@ -33,14 +33,14 @@ RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG, \
 RNTM_OPT_CERT_ID
 from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
-from ..models.aaa import User, AFCConfig, CertId, Ruleset, \
-                         Organization, AccessPointDeny
+from afcmodels.aaa import User, AFCConfig, CertId, Ruleset, \
+                          Organization, AccessPointDeny
 from .auth import auth
 from .ratapi import build_task, nraToRegionStr, rulesetIdToRegionStr
 from fst import DataIf
 import afctask
 from .. import als
-from ..models.base import db
+from afcmodels.base import db
 from flask_login import current_user
 from .auth import auth
 import traceback

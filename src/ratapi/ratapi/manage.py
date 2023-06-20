@@ -19,7 +19,7 @@ import sqlalchemy
 import time
 from flask_migrate import MigrateCommand
 from . import create_app
-from .models.base import db
+from afcmodels.base import db
 from .db.generators import shp_to_spatialite, spatialite_to_raster
 from prettytable import PrettyTable
 from flask_script import Manager, Command, Option, commands
@@ -168,7 +168,7 @@ class DbCreate(Command):
     def __call__(self, flaskapp):
         LOGGER.debug('DbCreate.__call__()')
         with flaskapp.app_context():
-            from .models.aaa import Role, Ruleset
+            from afcmodels.aaa import Role, Ruleset
             from .views.ratapi import rulesets
             from flask_migrate import stamp
             ruleset_list = rulesets()
@@ -187,7 +187,7 @@ class DbDrop(Command):
     def __call__(self, flaskapp):
         LOGGER.debug('DbDrop.__call__()')
         with flaskapp.app_context():
-            from .models.aaa import User, Role
+            from afcmodels.aaa import User, Role
             db.drop_all()
 
 
@@ -203,7 +203,7 @@ class DbExport(Command):
 
     def __call__(self, flaskapp, dst):
         LOGGER.debug('DbExportPrev.__call__()')
-        from .models.aaa import User, UserRole, Role, Limit
+        from afcmodels.aaa import User, UserRole, Role, Limit
 
         filename = dst
 
@@ -277,7 +277,7 @@ class DbImport(Command):
 
     def __call__(self, flaskapp, src):
         LOGGER.debug('DbImport.__call__() %s', src)
-        from .models.aaa import User, Limit
+        from afcmodels.aaa import User, Limit
 
         filename = src
         if not os.path.exists(filename):
@@ -330,12 +330,12 @@ class DbUpgrade(Command):
     def __call__(self, flaskapp):
         with flaskapp.app_context():
             import flask
-            from .models.aaa import Ruleset
+            from afcmodels.aaa import Ruleset
             from .views.ratapi import rulesets
             from flask_migrate import (upgrade, stamp)
             setUserIdNextVal()
             try:
-                from .models.aaa import User
+                from afcmodels.aaa import User
                 user = db.session.query(User).first()  # pylint: disable=no-member
             except Exception as exception:
                 if 'aaa_user.username does not exist' in str(exception.args):
@@ -373,7 +373,7 @@ hashed, org = None):
         ''' Create user in database. '''
         from contextlib import closing
         import datetime
-        from .models.aaa import User, Role, Organization
+        from afcmodels.aaa import User, Role, Organization
         LOGGER.debug('UserCreate.__create_user() %s %s %s',
                      email, password_in, role)
 
@@ -500,7 +500,7 @@ class UserUpdate(Command):
     def _update_user(self, flaskapp, email, role, org = None):
         ''' Create user in database. '''
         from contextlib import closing
-        from .models.aaa import User, Role, Organization
+        from afcmodels.aaa import User, Role, Organization
 
         if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
             return
@@ -549,7 +549,7 @@ class UserRemove(Command):
     )
 
     def _remove_user(self, flaskapp, email):
-        from .models.aaa import User, Role
+        from afcmodels.aaa import User, Role
         LOGGER.debug('UserRemove._remove_user() %s', email)
 
         with flaskapp.app_context():
@@ -576,7 +576,7 @@ class UserList(Command):
     def __call__(self, flaskapp):
         LOGGER.debug('UserList.__call__()')
         table = PrettyTable()
-        from .models.aaa import User, UserRole, Role
+        from afcmodels.aaa import User, UserRole, Role
         table.field_names = ["ID", "UserName", "Email", "Org", "Roles"]
  
         if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
@@ -637,7 +637,7 @@ class AccessPointDenyCreate(Command):
     def _create_ap(self, flaskapp, serial, cert_id, ruleset, org):
         from contextlib import closing
         import datetime
-        from .models.aaa import AccessPointDeny, Organization, Ruleset
+        from afcmodels.aaa import AccessPointDeny, Organization, Ruleset
         LOGGER.debug('AccessPointDenyCreate._create_ap() %s %s %s',
                       serial, cert_id, ruleset)
         with flaskapp.app_context():
@@ -688,7 +688,7 @@ class AccessPointDenyRemove(Command):
     )
 
     def _remove_ap(self, flaskapp, serial, cert_id):
-        from .models.aaa import AccessPointDeny
+        from afcmodels.aaa import AccessPointDeny
         LOGGER.debug('AccessPointDenyRemove._remove_ap() %s', serial)
         with flaskapp.app_context():
             try:
@@ -718,7 +718,7 @@ class AccessPointDenyList(Command):
 
     def __call__(self, flaskapp):
         table = PrettyTable()
-        from .models.aaa import AccessPointDeny
+        from afcmodels.aaa import AccessPointDeny
 
         table.field_names = ["Serial Number", "Cert ID", "Ruleset", "Org"]
         with flaskapp.app_context():
@@ -753,7 +753,7 @@ class CertIdList(Command):
 
     def __call__(self, flaskapp):
         table = PrettyTable()
-        from .models.aaa import CertId, Organization
+        from afcmodels.aaa import CertId, Organization
 
         table.field_names = ["Cert ID", "Ruleset", "Loc", "Refreshed"]
         with flaskapp.app_context():
@@ -773,7 +773,7 @@ class CertIdRemove(Command):
     )
 
     def _remove_cert_id(self, flaskapp, cert_id):
-        from .models.aaa import CertId
+        from afcmodels.aaa import CertId
         LOGGER.debug('CertIdRemove._remove_cert_id() %s', cert_id)
         with flaskapp.app_context():
             try:
@@ -810,7 +810,7 @@ class CertIdCreate(Command):
     def _create_cert_id(self, flaskapp, cert_id, ruleset_id, location=0):
         from contextlib import closing
         import datetime
-        from .models.aaa import CertId, Ruleset, Organization
+        from afcmodels.aaa import CertId, Ruleset, Organization
         LOGGER.debug('CertIdCreate._create_cert_id() %s %s',
                       cert_id, ruleset_id)
         with flaskapp.app_context():
@@ -852,7 +852,7 @@ class CertIdSweep(Command):
         import csv
         import requests
         from .views.ratapi import regionStrToRulesetId
-        from .models.aaa import CertId, Ruleset
+        from afcmodels.aaa import CertId, Ruleset
         import datetime
         now = datetime.datetime.now()
 
@@ -904,13 +904,13 @@ class CertIdSweep(Command):
                 db.session.commit()  # pylint: disable=no-member
 
     def sweep_fcc_id(self, flaskapp):
-        from .models.aaa import CertId
+        from afcmodels.aaa import CertId
         id_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=243&equipment_class_description=6ID-15E+6+GHz+Low+Power+Indoor+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"
         self.sweep_fcc_data(flaskapp, id_data, CertId.INDOOR)
 
 
     def sweep_fcc_sd(self, flaskapp):
-        from .models.aaa import CertId
+        from afcmodels.aaa import CertId
 
         if False:
             # TBD replace with real 6SD request data. The below is 6ID query and
@@ -920,7 +920,7 @@ class CertIdSweep(Command):
             self.sweep_fcc_data(flaskapp, sd_data, CertId.OUTDOOR)
 
     def sweep_fcc_data(self, flaskapp, data, location):
-        from .models.aaa import CertId, Ruleset
+        from afcmodels.aaa import CertId, Ruleset
         from .views.ratapi import regionStrToRulesetId
         import requests
         import datetime
@@ -992,7 +992,7 @@ class OrganizationCreate(Command):
     def _create_org(self, flaskapp, name):
         from contextlib import closing
         import datetime
-        from .models.aaa import Organization
+        from afcmodels.aaa import Organization
         LOGGER.debug('OrganizationCreate._create_org() %s', name)
         with flaskapp.app_context():
             if name is None:
@@ -1024,7 +1024,7 @@ class OrganizationRemove(Command):
     )
 
     def _remove_org(self, flaskapp, name):
-        from .models.aaa import Organization
+        from afcmodels.aaa import Organization
         LOGGER.debug('Organization._remove_org() %s', name)
         with flaskapp.app_context():
             try:
@@ -1054,7 +1054,7 @@ class OrganizationList(Command):
 
     def __call__(self, flaskapp):
         table = PrettyTable()
-        from .models.aaa import Organization
+        from afcmodels.aaa import Organization
         table.field_names = ["Name"]
         with flaskapp.app_context():
             for org in db.session.query(Organization).all():  # pylint: disable=no-member
@@ -1076,7 +1076,7 @@ class MTLSCreate(Command):
     def _create_mtls(self, flaskapp, note="", org="", src=None):
         from contextlib import closing
         import datetime
-        from .models.aaa import MTLS, User
+        from afcmodels.aaa import MTLS, User
         LOGGER.debug('MTLS._create_mtls() %s %s %s',
                       note, org, src)
         if not src:
@@ -1115,7 +1115,7 @@ class MTLSRemove(Command):
     def _remove_mtls(self, flaskapp, id=None):
         from contextlib import closing
         import datetime
-        from .models.aaa import MTLS, User
+        from afcmodels.aaa import MTLS, User
         LOGGER.debug('MTLS._remove_mtls() %d', id)
 
         if not id:
@@ -1143,7 +1143,7 @@ class MTLSList(Command):
 
     def __call__(self, flaskapp):
         table = PrettyTable()
-        from .models.aaa import MTLS
+        from afcmodels.aaa import MTLS
 
         table.field_names = ["ID", "Note", "Org", "Create"]
         with flaskapp.app_context():
@@ -1167,7 +1167,7 @@ class MTLSDump(Command):
     def _dump_mtls(self, flaskapp, id=None, dst=None):
         from contextlib import closing
         import datetime
-        from .models.aaa import MTLS, User
+        from afcmodels.aaa import MTLS, User
         LOGGER.debug('MTLS._remove_mtls() %d', id)
         if not id:
             raise RuntimeError('mtls id required')
@@ -1315,7 +1315,7 @@ class ConfigAdd(Command):
 
     def __call__(self, flaskapp, src):
         LOGGER.debug('ConfigAdd.__call__() %s', src)
-        from .models.aaa import AFCConfig, CertId, User
+        from afcmodels.aaa import AFCConfig, CertId, User
         from .views.ratapi import regionStrToRulesetId
         import datetime
 
@@ -1414,7 +1414,7 @@ class ConfigRemove(Command):
 
     def __call__(self, flaskapp, src):
         LOGGER.debug('ConfigRemove.__call__() %s', src)
-        from .models.aaa import User
+        from afcmodels.aaa import User
 
         split_items = src.split('=', 1)
         filename = split_items[1].strip()

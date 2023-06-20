@@ -19,9 +19,9 @@ from ncli import MsgPublisher
 from werkzeug import exceptions
 from sqlalchemy.exc import IntegrityError
 import werkzeug
-from ..models import aaa
+import afcmodels.aaa as aaa
 from .auth import auth
-from ..models.base import db
+from afcmodels.base import db
 from .ratapi import rulesetIdToRegionStr, rulesets
 
 #: Logger for this module

@@ -1,7 +1,7 @@
 #
 # This Python file uses the following encoding: utf-8
 #
-# Portions copyright © 2021 Broadcom.
+# Portions copyright (C) 2021 Broadcom.
 # All rights reserved. The term “Broadcom” refers solely
 # to the Broadcom Inc. corporate affiliate that owns the software below.
 # This work is licensed under the OpenAFC Project License, a copy of which

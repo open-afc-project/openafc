@@ -19,7 +19,6 @@ setuptools.setup(
     },
     packages=[
         'ratapi',
-        'ratapi.models',
         'ratapi.migrations',
         'ratapi.migrations.versions',
         'ratapi.views',

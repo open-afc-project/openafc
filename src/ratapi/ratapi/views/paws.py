@@ -16,7 +16,7 @@ from flask_jsonrpc.exceptions import (
 import flask
 from ..util import TemporaryDirectory, getQueueDirectory
 from ..xml_utils import (datetime_to_xml)
-from ..models.aaa import User
+from afcmodels.aaa import User
 import gzip
 from .ratapi import build_task
 

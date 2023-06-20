@@ -1,4 +1,11 @@
-''' Non-table database definitions '''
+#!/usr/bin/env python3
+#
+
+"""
+Description
+
+Non-table database definitions
+"""
 
 from flask_sqlalchemy import SQLAlchemy
 
