@@ -631,8 +631,9 @@ class RatAfc(MethodView):
                     LOGGER.debug("Task complete: %s", task_stat)
                     if t.successful(task_stat):
                         taskResponse = response_map[task_stat['status']](t)
-                        # we might be able to clean this up by having the result functions not return a full response object
-                        # need to check everywhere they are called
+                        # we might be able to clean this up by having the result
+                        # functions not return a full response object.
+                        # need to check everywhere they are called.
                         dataAsJson = json.loads(taskResponse.data)
                         LOGGER.debug("dataAsJson: %s", dataAsJson)
                         engine_result_ext = \
@@ -682,11 +683,16 @@ class RatAfc(MethodView):
                          getattr(e, 'message', repr(e)))
             results["availableSpectrumInquiryResponses"].append(
                 {
-                    'requestId': request["availableSpectrumInquiryRequests"][0]["requestId"],
+                    'requestId': request["availableSpectrumInquiryRequests"]\
+                                            [0]["requestId"],
+                    'rulesetId': request["availableSpectrumInquiryRequests"]\
+                                            [0]["deviceDescriptor"]\
+                                            ["certificationId"][0]["rulesetId"],
                     'response': {
                         'responseCode': e.response_code,
                         'shortDescription': e.description,
-                        'supplementalInfo': json.dumps(e.supplemental_info) if e.supplemental_info is not None else None
+                        'supplementalInfo': json.dumps(e.supplemental_info)
+                            if e.supplemental_info is not None else None
                     }
                 })
         als.als_afc_response(req_id=als_req_id, resp=results)

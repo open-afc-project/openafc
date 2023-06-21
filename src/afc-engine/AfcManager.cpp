@@ -1332,6 +1332,11 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		}
 		_missingParams << requiredParams;
 
+		/* The requestId is required for any response so keep it */
+		if (!requiredParams.contains("requestId")) {
+			_requestId = requestObj["requestId"].toString();
+		}
+
 		QJsonObject deviceDescriptorObj;
 		if (!requiredParams.contains("deviceDescriptor")) {
 			deviceDescriptorObj = requestObj["deviceDescriptor"].toObject();
@@ -1389,6 +1394,11 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		if (!requiredParams.contains("certificationId")) {
 			certificationIdArray = deviceDescriptorObj["certificationId"].toArray();
 		}
+
+		if (!requiredParams.contains("serialNumber")) {
+			_serialNumber = deviceDescriptorObj["serialNumber"].toString();
+		}
+
 		/**********************************************************************/
 
 		/**********************************************************************/
@@ -1412,6 +1422,9 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 				}
 			}
 			_missingParams << requiredParams;
+			if (!requiredParams.contains("rulesetId")) {
+		        	_rulesetId = certificationIdArray.at(0)["rulesetId"].toString();
+			}
 		}
 		/**********************************************************************/
 
@@ -1742,15 +1755,11 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		/**********************************************************************/
 		/* Extract values                                                     */
 		/**********************************************************************/
-		_requestId = requestObj["requestId"].toString();
-		_serialNumber = deviceDescriptorObj["serialNumber"].toString();
-
 		if (certificationIdArray.size() == 0) {
 			_responseCode = CConst::invalidValueResponseCode;
 			_invalidParams << "certificationId";
 			return;
 		}
-		_rulesetId = certificationIdArray.at(0)["rulesetId"].toString();
 
 		if (hasIndoorDeploymentFlag) {
 			int indoorDeploymentVal = locationObj["indoorDeployment"].toInt();
