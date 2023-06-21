@@ -1,6 +1,27 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-695*|
+| :- | :- |
+|**Date**|**06/21/2023**|
+
+## **Issues Addressed**
+ * Jira OA-695: AFC Config GUI not displaying F.699 or F.1245 when selected 
+ * Jira OA-714: Add "info" next to CertificationId and Serial Number in Virtual
+ 
+## **Interface Changes**
+ * 
+
+## **Testing Done**
+ * OA-695: Confirmed in AFC Config's UI that when choosing F.699 or F.1245 for Default FS Receiver Antenna Pattern, it was shown as selected and the afc-config.json was correct.
+ * Confirmed that for Brazil, F.699 is selected in default afc config.
+ * OA-714: Confirmed in Virtual AP that the info was added to both CertificationId and Serial Number
+
+
+## **Open Issues** 
+ * 
+
+## **Version and Date**
 |Version|**OA-705*|
 | :- | :- |
 |**Date**|**06/14/2023**|

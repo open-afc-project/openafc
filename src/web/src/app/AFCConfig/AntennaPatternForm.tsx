@@ -13,7 +13,10 @@ import { AntennaPatternState } from "../Lib/RatApiTypes";
 /**
  * Sub form component for Antenna patterns
  */
-export default class AntennaPatternForm extends React.PureComponent<{ data: AntennaPatternState, region: string, onChange: (x: AntennaPatternState) => void }> {
+export default class AntennaPatternForm extends React.PureComponent<{
+    data: AntennaPatternState, region: string,
+    onChange: (x: AntennaPatternState) => void
+}> {
 
     private setKind = (s: string) => {
         switch (s) {
@@ -57,7 +60,7 @@ export default class AntennaPatternForm extends React.PureComponent<{ data: Ante
                 "F.699",
                 "F.1245"
             ]
-        }else{
+        } else {
             return [
                 'WINNF-AIP-07',
                 "F.699",

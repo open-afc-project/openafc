@@ -7,7 +7,7 @@ import { logger } from "../Lib/Logger";
 import {
     Modal, Button, ClipboardCopy, ClipboardCopyVariant, Alert, Gallery, GalleryItem,
     FormGroup, TextInput, InputGroup, InputGroupText, FormSelect, FormSelectOption,
-    ChipGroup, Chip, SelectOption
+    ChipGroup, Chip, SelectOption, Tooltip, TooltipPosition
 } from "@patternfly/react-core";
 import { getCacheItem, cacheItem } from "../Lib/RatApi";
 import { AFCConfigFile, RatResponse } from "../Lib/RatApiTypes";
@@ -19,6 +19,7 @@ import { OperatingClassForm } from "./OperatingClassForm";
 import { InquiredFrequencyForm } from "./InquiredFrequencyForm";
 import { hasRole } from "../Lib/User";
 import { VendorExtensionForm } from "./VendorExtensionForm";
+import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 
 
 interface RatAfcFormParams {
@@ -360,6 +361,28 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                             fieldId="horizontal-form-name"
                             helperText="Must be unique for every AP"
                         >
+                            {" "}<Tooltip
+                                position={TooltipPosition.top}
+                                enableFlip={true}
+                                className="fs-feeder-loss-tooltip"
+                                maxWidth="40.0rem"
+                                content={
+                                    <>
+                                        <p>The following Serial Number and Certification ID pair can be used for any rulesetID:
+                                            <ul style={{listStyleType:"none"}} >
+                                            <li>Serial Number=TestSerialNumber</li>
+
+                                            <li>CertificationId=TestCertificationId</li>
+                                            </ul>
+                                            Note that this device is certified as an indoor Access Point and as such if in the AP request message, 
+                                            the indoorDeployment field is set to Unknow or if it is missing, it will be treated as indoor 
+                                            (i.e. BEL will be applied). If the indoorDeployment field is set to Outdoor, no BEL will be applied.
+                                            </p>
+                                    </>
+                                }
+                            >
+                                <OutlinedQuestionCircleIcon />
+                            </Tooltip>
                             {hasRole("Trial") ?
                                 <Button key="trial-cert-fill-btn" variant="link" sizes="sm" onClick={() => this.setState({ serialNumber: 'TestSerialNumber' })}>
                                     Fill Trial Serial
@@ -386,6 +409,28 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                             // helperTextInvalidIcon={<ExclamationCircleIcon />} //This is not supported in our version of Patternfly
                             validated={this.state.certificationId.length > 0 ? "success" : "error"}
                         >
+                            {" "}<Tooltip
+                                position={TooltipPosition.top}
+                                enableFlip={true}
+                                className="fs-feeder-loss-tooltip"
+                                maxWidth="40.0rem"
+                                content={
+                                    <>
+                                        <p>The following Serial Number and Certification ID pair can be used for any rulesetID:
+                                            <ul style={{listStyleType:"none"}} >
+                                            <li>Serial Number=TestSerialNumber</li>
+
+                                            <li>CertificationId=TestCertificationId</li>
+                                            </ul>
+                                            Note that this device is certified as an indoor Access Point and as such if in the AP request message, 
+                                            the indoorDeployment field is set to Unknow or if it is missing, it will be treated as indoor 
+                                            (i.e. BEL will be applied). If the indoorDeployment field is set to Outdoor, no BEL will be applied.
+                                            </p>
+                                    </>
+                                }
+                            >
+                                <OutlinedQuestionCircleIcon />
+                            </Tooltip>
                             {hasRole("Trial") ?
                                 <Button key="trial-cert-fill-btn" variant="link" sizes="sm"
                                     onClick={() => this.resetCertificationId({ id: 'TestCertificationId', rulesetId: KnownRuleSetIds[0] })}>

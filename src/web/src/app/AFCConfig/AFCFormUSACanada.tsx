@@ -101,8 +101,9 @@ export class AFCFormUSACanada extends React.Component<
         this.props.updateConfig(conf);
     }
     private setAntennaPattern = (x: AntennaPatternState) => {
-        const conf = this.props.config;
+        const conf = {...this.props.config};
         conf.ulsDefaultAntennaType = x.defaultAntennaPattern;
+        this.props.updateAntennaData(x);
         this.props.updateConfig(conf);
     }
     private setPropagationModel = (x: PropagationModel) => {

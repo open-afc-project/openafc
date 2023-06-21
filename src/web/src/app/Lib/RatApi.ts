@@ -261,7 +261,7 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
             "stopFreqMHz": 7125
         },
     ],
-    "ulsDefaultAntennaType": "WINNF-AIP-07",
+    "ulsDefaultAntennaType": "F.699",
     "scanPointBelowGroundMethod": "truncate",
     "polarizationMismatchLoss": {
         "kind": "Fixed Value",
