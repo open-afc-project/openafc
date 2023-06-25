@@ -433,6 +433,7 @@ class AfcManager
 		std::string _closeInPathLossModel;      // Close in path loss model is used
 		bool _pathLossClampFSPL;                // If set, when path loss < fspl, clamp to fspl value
 		bool _printSkippedLinksFlag;			// If set, links that are skipped in the analysis because using FSPL does not limit I/N performance are still printed in exc_thr file.  This
+		bool _roundPSDEIRPFlag;		  		 	// If set, round down PSD and EIRP values in output json to nearest multiple of 0.1 dB.
 												// is useful for debugging, but depending on visibility threshold setting may impact execution speed.
 
 		int _wlanMinFreqMHz;                    // Min Frequency for WiFi system (integer in MHz)

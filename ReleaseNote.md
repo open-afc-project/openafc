@@ -83,6 +83,24 @@
  * When the ISED propagation model is chosen, afc-config.json should have "winner2LOSOption":"CDSM" (in place of "BLDG_DATA_REQ_TX"). The immediate remedy is to change this in the .json file manually before doing a run.
 
  # Release Note
+ 
+## **Version and Date**
+|Version|**OA-698*|
+| :- | :- |
+|**Date**|**06/14/2023**|
+
+## **Issues Addressed**
+ * Jira OA-698: Printout EIRP and PSDs up to 1 decimal digit in response json
+
+## **Interface Changes**
+ * Added to afc-config.json a flag to turn this rounding on/off: "roundPSDEIRPFlag": "false"
+
+## **Testing Done**
+ * Tested FSP1 with "roundPSDEIRPFlag": "false" and validated results
+ * Tested FSP1 with "roundPSDEIRPFlag": "true" and validated results
+
+## **Open Issues** 
+ * 
 ## **Version and Date**
 |Version|3.8.2.0|
 | :- | :- |

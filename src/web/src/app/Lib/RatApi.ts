@@ -152,6 +152,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "inquiredFrequencyResolutionMHz": 20, 
     "srtmDir":"rat_transfer/srtm3arcsecondv003",
     "depDir":"rat_transfer/3dep/1_arcsec",
+    "roundPSDEIRPFlag": false,
 });
 
 const defaultAfcConfCanada: () => AFCConfigFile = () => ({
@@ -249,7 +250,8 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "srtmDir":"rat_transfer/srtm3arcsecondv003",
     "depDir":"rat_transfer/3dep/1_arcsec_wgs84",
     "cdsmDir":"rat_transfer/cdsm/3ov4_arcsec_wgs84",
-    "cdsmLOSThr": 0.5
+    "cdsmLOSThr": 0.5,
+    "roundPSDEIRPFlag": false,
 });
 
 const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
@@ -343,7 +345,8 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     "reportUnavailPSDdBPerMHz": -40,
     "inquiredFrequencyResolutionMHz": 20,
     "srtmDir":"rat_transfer/srtm1arcsecond_wgs84",
-    "rainForestFile": "rat_transfer/population/Brazil_AmazonRainForest.kml"
+    "rainForestFile": "rat_transfer/population/Brazil_AmazonRainForest.kml",
+    "roundPSDEIRPFlag": false,
 });
 
 

@@ -59,8 +59,8 @@ EOF
         -out $cli_name/$cli_name"_crt.pem" -cert $ca_path/$ca_crt \
         -keyfile $ca_path/$ca_key \
         -in $cli_name/$cli_name".csr" -extfile $cli_name"_ext.cnf" > /dev/null 2>&1
-    echo "\nCreated certificate."
-    openssl x509 -startdate -enddate -noout -in $cli_name/$cli_name"_crt.pem"
+    # echo "\nCreated certificate."
+    openssl x509 -startdate -enddate -noout -in $cli_name/$cli_name"_crt.pem" > /dev/null
     return 0
 }
 #

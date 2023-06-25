@@ -672,6 +672,7 @@ AfcManager::AfcManager()
 	_closeInDist = quietNaN;
 	_pathLossClampFSPL = false;
 	_printSkippedLinksFlag = false;
+	_roundPSDEIRPFlag = true;
 
 	_wlanMinFreqMHz = -1;
 	_wlanMaxFreqMHz = -1;
@@ -3622,6 +3623,13 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_printSkippedLinksFlag = false;
 	}
 
+	if (jsonObj.contains("roundPSDEIRPFlag") && !jsonObj["roundPSDEIRPFlag"].isUndefined()) {
+		_roundPSDEIRPFlag = jsonObj["roundPSDEIRPFlag"].toBool();
+	} else {
+		_roundPSDEIRPFlag = true;
+	}
+
+
 	if (jsonObj.contains("allowScanPtsInUncReg") && !jsonObj["allowScanPtsInUncReg"].isUndefined()) {
 		_allowScanPtsInUncRegFlag = jsonObj["allowScanPtsInUncReg"].toBool();
 	} else {
@@ -3785,7 +3793,12 @@ QJsonDocument AfcManager::generateRatAfcJson()
 						redIndexArray.append(chan.index);
 					} else {
 						indexArray.append(chan.index);
-						eirpArray.append(chan.eirpLimit_dBm);
+						double eirpVal = chan.eirpLimit_dBm;
+						if (_roundPSDEIRPFlag) {
+							// EIRP value rounded down to nearest multiple of 0.1 dB
+							eirpVal = std::floor(eirpVal*10)/10.0;
+						}
+						eirpArray.append(eirpVal);
 					}
 				}
 			}
@@ -11544,6 +11557,7 @@ void AfcManager::printUserInputs()
 		inputGc.writeRow({ "INQUIRED_FREQUENCY_MAX_PSD_DBM_PER_MHZ", f2s(_inquiredFrequencyMaxPSD_dBmPerMHz) });
 		inputGc.writeRow({ "VISIBILITY_THRESHOLD", f2s(_visibilityThreshold) } );
 		inputGc.writeRow({ "PRINT_SKIPPED_LINKS_FLAG", (_printSkippedLinksFlag ? "true" : "false" ) } );
+		inputGc.writeRow({ "ROUND_PSD_EIRP_FLAG", (_roundPSDEIRPFlag ? "true" : "false" ) } );
 		inputGc.writeRow({ "ACI_FLAG", (_aciFlag ? "true" : "false" ) } );
 
 	}
@@ -11792,6 +11806,10 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 				if ( (channel.type == INQUIRED_FREQUENCY) && (channel.availability != BLACK) && (channel.availability != RED) ) {
 					if ((channel.startFreqMHz <= prevFreqMHz) && (channel.stopFreqMHz > prevFreqMHz)) {
 						double psd = channel.eirpLimit_dBm - 10.0*log((double) channel.bandwidth())/log(10.0);
+						if (_roundPSDEIRPFlag) {
+							// PSD value rounded down to nearest multiple of 0.1 dB
+							psd = std::floor(psd*10)/10.0;
+						}
 						if ((initFlag) || (psd < minPSD)) {
 							minPSD = psd;
 						}

@@ -51,7 +51,8 @@ export class AFCFormUSACanada extends React.Component<
     private setThreshold = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { threshold: n }));
     private setMaxLinkDistance = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { maxLinkDistance: n }));
     private setEnableMapInVirtualAp = (n: boolean) => this.props.updateConfig(Object.assign(this.props.config, { enableMapInVirtualAp: n }));
-    private setNearFieldAdjFlag = (n: boolean) => this.props.updateConfig(Object.assign(this.props.config, { enableMapInVirtualAp: n }));
+    private setRoundPSDEIRPFlag = (n: boolean) => this.props.updateConfig(Object.assign(this.props.config, { roundPSDEIRPFlag: n }));
+    private setNearFieldAdjFlag = (n: boolean) => this.props.updateConfig(Object.assign(this.props.config, { nearFieldAdjFlag: n }));
     private setVisiblityThreshold = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { visibilityThreshold: n }));
     private setPropogationEnv = (n: string) => {
 
@@ -683,6 +684,32 @@ export class AFCFormUSACanada extends React.Component<
                                 label="Enable Map in Virtual AP"
                                 isChecked={this.props.config.enableMapInVirtualAp ?? false}
                                 onChange={this.setEnableMapInVirtualAp}
+                                id="horizontal-form-clutter"
+                                name="horizontal-form-clutter"
+                                style={{ textAlign: "right" }}
+                            />
+
+                            <OutlinedQuestionCircleIcon style={{ marginLeft: "5px" }} />
+                        </InputGroup>
+                    </FormGroup>
+                </Tooltip>
+            </GalleryItem>
+            <GalleryItem>
+                <Tooltip
+                    position={TooltipPosition.top}
+                    enableFlip={true}
+                    //className="prop-env-tooltip"
+                    maxWidth="40.0rem"
+                    content={
+                        <p>If enabled, the EIRP and PSD values will be rounded down to one decimal place</p>
+                    }
+                >
+                    <FormGroup fieldId="horizontal-form-roundins">
+                        <InputGroup label="">
+                            <Checkbox
+                                label="Round EIRP and PSD values"
+                                isChecked={this.props.config.roundPSDEIRPFlag ?? false}
+                                onChange={this.setRoundPSDEIRPFlag}
                                 id="horizontal-form-clutter"
                                 name="horizontal-form-clutter"
                                 style={{ textAlign: "right" }}

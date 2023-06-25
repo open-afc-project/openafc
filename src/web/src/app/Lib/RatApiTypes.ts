@@ -73,6 +73,7 @@ export interface AFCConfigFile {
     cdsmDir?:string,
     rainForestFile?:string,
     cdsmLOSThr?:number,
+    roundPSDEIRPFlag?: boolean,
 }
 
 export type FreqRange = {
