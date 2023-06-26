@@ -399,7 +399,6 @@ services:
       - AFC_OBJST_HOST=objst
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_SCHEME=HTTP
-      - AFC_OBJST_HIST_HOST=objst
       # worker params
       - CELERY_TYPE=external
       # ALS params
@@ -625,7 +624,6 @@ chown 999:999 /var/databases/pgdata
 |AFC_OBJST_MEDIA|`LocalFS`|objst|The media used for storing files by the service. The possible values are `LocalFS` - store files on docker's FS. `GoogleCloudBucket` - store files on Google Store|
 |AFC_OBJST_LOCAL_DIR|`/storage`|objst|file system path to stored files in file storage container. Used only when `AFC_OBJST_MEDIA` is `LocalFS`|
 |AFC_OBJST_LOG_LVL|`ERROR`|objst|logging level of the file storage. The relevant values are `DEBUG` and `ERROR`|
-|AFC_OBJST_HIST_HOST|`0.0.0.0`|objst,rat-server,msghnd,worker|history service host domain/IP|
 |AFC_OBJST_HIST_PORT|`4999`|objst,rat-server,msghnd,worker|history service port|
 |AFC_OBJST_WORKERS|`10`|objst|number of gunicorn workers running objst server|
 |AFC_OBJST_HIST_WORKERS|`2`|objst|number of gunicorn workers runnining history server|

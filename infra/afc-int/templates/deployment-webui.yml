@@ -65,8 +65,6 @@ spec:
               value: {{ .Values.service.objst.fileStoragePort | quote }}
             - name: AFC_OBJST_SCHEME
               value: "HTTP"
-            - name: AFC_OBJST_HIST_HOST
-              value: {{ .Values.service.objst.loadBalancerIP }}
             # worker params
             - name: CELERY_TYPE
               value: external

@@ -28,6 +28,7 @@ import uuid
 from flask.views import MethodView
 import werkzeug.exceptions
 import six
+from appcfg import ObjstConfig
 from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, \
 RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG, \
 RNTM_OPT_CERT_ID
@@ -712,7 +713,7 @@ class RatAfcSec(RatAfc):
         return super().post()
 
 class RatAfcInternal(MethodView):
-    """ Allow to regiter second URL on RatAfc """
+    """ Add rule for availableSpectrumInquiryInternal """
     pass
 
 # registration of default runtime options

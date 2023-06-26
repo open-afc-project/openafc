@@ -102,7 +102,6 @@ class ObjstConfig(ObjstConfigBase):
     def __init__(self):
         ObjstConfigBase.__init__(self)
         self.AFC_OBJST_HOST = os.getenv("AFC_OBJST_HOST")
-        self.AFC_OBJST_HIST_HOST = os.getenv("AFC_OBJST_HIST_HOST")
 
         self.AFC_OBJST_SCHEME = None
         if "AFC_OBJST_SCHEME" in os.environ:

@@ -35,10 +35,11 @@ if hist_app.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
     client = google.cloud.storage.client.Client()
     bucket = client.bucket(hist_app.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
 
-def generateHtml(schema, baseurl, dirs, files):
-    hist_app.logger.debug("generateHtml({}, {}, {})".format(baseurl, dirs, files))
+def generateHtml(rurl, path, dirs, files):
+    hist_app.logger.debug(f"generateHtml({path}, {dirs}, {files})")
     dirs.sort()
     files.sort()
+    vpath = os.path.join("history", path)
 
     html = """<!DOCTYPE html>
 <html>
@@ -48,29 +49,25 @@ def generateHtml(schema, baseurl, dirs, files):
 <body>
 <h1>Directory listing for """
 
-    burl = ""
-    baseSplit = baseurl.split("/")
-    if len(baseSplit) >= 4:
-        url = schema + "://" + baseSplit[2] + "/dbg"
-        hist_app.logger.debug("url {}".format(url))
-        html += "<a href=" + url + ">" + "dbg" + "</a> "
-        i = 4
-        while i < len(baseSplit):
-            url += "/" + baseSplit[i]
-            html += " <a href=" + url + ">" + "/" + baseSplit[i] + "</a> "
-            i += 1
-        burl = url
-
+    path_split = vpath.split("/")
+    url = rurl
+    i = 0
+    for dir in path_split:
+        if dir != "":
+            if i != 0:
+                url += "/" + dir
+            html += " <a href=" + url + ">" + "/" + dir + "</a> "
+        i = i + 1
 
     html += """</h1><hr>
 <ul>
 """
 
     for e in dirs:
-        html += "<li><a href=" + burl + "/" + e + "><b>" + e + """/</b></a></li>
+        html += "<li><a href=" + rurl + "/" + path + "/" + e + "><b>" + e + """/</b></a></li>
 """
     for e in files:
-        html += "<li><a href=" + burl + "/" + e + ">" + e + """</a></li>
+        html += "<li><a href=" + rurl + "/" + path + "/" + e + ">" + e + """</a></li>
 """
 
     html += """</ul>
@@ -168,31 +165,22 @@ class Objstorage:
                         format(hist_app.config["AFC_OBJST_MEDIA"]))
 
 
-def get_local_path(path):
-    prefix = path.split('/')[0]
-    schema = "http"
-    if prefix == "dbgs":
-        schema = "https"
-    elif prefix != "dbg":
-        hist_app.logger.error('get_local_path: wrong path {}'.format(path))
-        abort(403, 'Forbidden')
-    path = os.path.join(hist_app.config["AFC_OBJST_FILE_LOCATION"], "history", path[len(prefix)+1:])
-    hist_app.logger.debug("get_local_path() {}".format(path))
-    return path, schema
-
-
+@hist_app.route('/', defaults={'path': ""}, methods=['GET'])
 @hist_app.route('/'+'<path:path>', methods=['GET'])
 def get(path):
     ''' File download handler. '''
-    hist_app.logger.debug('get method={}, path={}'.format(request.method, path))
-    path, schema = get_local_path(path)
+    # ratapi URL preffix
+    rurl = request.args["url"]
+    hist_app.logger.debug(f'get method={request.method}, path={path} url={rurl}')
+    # local path in the storage
+    lpath = os.path.join(hist_app.config["AFC_OBJST_FILE_LOCATION"], "history", path)
 
     try:
         objst = Objstorage()
-        with objst.open(path) as hobj:
+        with objst.open(lpath) as hobj:
             if hobj.isdir() is True:
                 dirs, files = hobj.list()
-                return generateHtml(schema, request.base_url, dirs, files)
+                return generateHtml(rurl, path, dirs, files)
             data = hobj.read()
             return helpers.send_file(
                 io.BytesIO(data),

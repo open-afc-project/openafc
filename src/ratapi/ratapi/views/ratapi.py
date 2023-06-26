@@ -21,6 +21,7 @@ import json
 import glob
 import re
 import datetime
+import requests
 import appcfg
 from flask.views import MethodView
 import werkzeug.exceptions
@@ -32,6 +33,7 @@ from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from afcmodels.aaa import User, AccessPointDeny, AFCConfig, MTLS
 from afcmodels.base import db
 from .auth import auth
+from appcfg import ObjstConfig
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -147,7 +149,6 @@ class GuiConfig(MethodView):
             from urllib.parse import urlparse
 
         u = urlparse(flask.request.url)
-        histurl = u.scheme + "://" + u.netloc + "/dbg"
 
         if 'USE_CAPTCHA' in flask.current_app.config and \
             flask.current_app.config['USE_CAPTCHA']:
@@ -170,7 +171,7 @@ class GuiConfig(MethodView):
         resp = flask.jsonify(
             uls_url=flask.url_for('files.uls_db'),
             antenna_url=flask.url_for('files.antenna_pattern'),
-            history_url=histurl,
+            history_url=flask.url_for("files.history"),
             afcconfig_defaults=flask.url_for(
                 'ratapi-v1.AfcConfigFile', filename='default'),
             lidar_bounds=flask.url_for('ratapi-v1.LiDAR_Bounds'),
@@ -453,7 +454,6 @@ class About(MethodView):
 
         from flask import request
         from flask_mail import Mail, Message
-        import requests
 
         try:
             dest_email = flask.current_app.config['REGISTRATION_DEST_EMAIL']
@@ -1024,6 +1024,30 @@ class AfcRulesetIds(MethodView):
         return resp
 
 
+class DbgFiles(MethodView):
+    def get(self, path=None):
+        LOGGER.debug(f"DbgFiles::get({path})")
+        user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
+        conf = ObjstConfig()
+        try:
+            rurl = flask.request.base_url
+            if path is not None:
+                path_len = len(path)
+                rurl = flask.request.base_url[:-path_len]
+            response = requests.get(conf.AFC_OBJST_SCHEME + "://" + conf.AFC_OBJST_HOST + ":" +
+                                    conf.AFC_OBJST_HIST_PORT +
+                                    (("/" + path) if path is not None else ""),
+                                    params = {"url": rurl})
+            return flask.render_template_string(response.text)
+        except Exception as exc:
+            LOGGER.error(f"Unreachable history host. {exc}")
+            return f"Unreachable history host. {exc}"
+
+
+class DbgFiles0(DbgFiles):
+    pass
+
+
 module.add_url_rule('/guiconfig', view_func=GuiConfig.as_view('GuiConfig'))
 module.add_url_rule('/afcconfig/<path:filename>',
                     view_func=AfcConfigFile.as_view('AfcConfigFile'))
@@ -1049,3 +1073,7 @@ module.add_url_rule('/rulesetIds',
                     view_func=AfcRulesetIds.as_view('AfcRulesetIds'))
 module.add_url_rule('/healthy', view_func=HealthCheck.as_view('HealthCheck'))
 
+module.add_url_rule('/files/history',
+                    view_func=DbgFiles0.as_view('DbgFiles0'))
+module.add_url_rule('/files/history/<path:path>',
+                    view_func=DbgFiles.as_view('DbgFiles'))

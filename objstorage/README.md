@@ -46,7 +46,6 @@ Accordingly, the file storage server requires the following two variables:
 
 ## The history view HTTP server configuration
 The history view HTTP server receive its configuration from the following environment variables:
-- **AFC_OBJST_HIST_HOST** - history view server host (default: the same as AFC_OBJST_HOST)
 - **AFC_OBJST_HIST_PORT** - history view server port (default: 4999)
     - The object storage Dockerfile exposes port 4999 for access to the history server.
 
@@ -54,7 +53,6 @@ The history view HTTP server receive its configuration from the following enviro
 The docker service accesses file storage according to the following environment variables:
 - **AFC_OBJST_HOST** - file storage server host
 - **AFC_OBJST_PORT** - file storage server post
-- **AFC_OBJST_HIST_HOST** - history view server host (currently the same as **AFC_OBJST_HOST**)
 - **AFC_OBJST_SCHEME** - file storage server scheme, HTTP or HTTPS
 
 **AFC_OBJST_HOST** and **AFC_OBJST_PORT** environment variables have to be declared to enable using HTTP object storage.
@@ -92,29 +90,6 @@ services:
       - AFC_OBJST_HOST=objst
       # Object storage port as declared in "objst:environment:AFC_OBJST_PORT"
       - AFC_OBJST_PORT=5000
-      # History view server host same as file storage host
-      - AFC_OBJST_HIST_HOST=objst
       # Use HTTP (not HTTPS) to access file storage
       - AFC_OBJST_SCHEME=HTTP
 ```
-
-## Apache configuration
-To enable "Debug Files" link in GUI, the Apache server must forward history HTTP(S) requests to the history server.
-To do this, the Apache proxy module should be configured in the following way:
-```
-<VirtualHost APACHE_HOSTNAME:80>
-  ProxyPassReverse /dbg http://HISTORY_HOSTNAME:4999/dbg
-  ProxyPass /dbg http://HISTORY_HOSTNAME:4999/dbg
-  ProxyPreserveHost On
-  ProxyRequests Off
-</VirtualHost>
-<VirtualHost APACHE_HOSTNAME:443>
-  ProxyPassReverse /dbg http://HISTORY_HOSTNAME:4999/dbgs
-  ProxyPass /dbg http://HISTORY_HOSTNAME:4999/dbgs
-  ProxyPreserveHost On
-  ProxyRequests Off
-</VirtualHost>
-```
-where APACHE_HOSTNAME is the name of the Apache host and HISTORY_HOSTNAME is the name of the history host.
-
-That is, HTTP accesses to "/dbg" and HTTPS accesses to "/dbgs" are forwarded to the history server.
