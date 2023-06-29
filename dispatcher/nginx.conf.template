@@ -105,6 +105,11 @@ http {
             return 403;
         }
 
+        # forbid webdav
+        location /fbrat/ratapi/v1/files {
+            return 403;
+        }
+
         location / {
             if ($request_uri = "/") {
                 return 301 $scheme://$http_host/fbrat;

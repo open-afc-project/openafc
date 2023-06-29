@@ -169,8 +169,8 @@ class GuiConfig(MethodView):
 
         # TODO: temporary support python2
         resp = flask.jsonify(
-            uls_url=flask.url_for('files.uls_db'),
-            antenna_url=flask.url_for('files.antenna_pattern'),
+            uls_url=flask.url_for('ratapi-v1.UlsFiles'),
+            antenna_url=flask.url_for('ratapi-v1.AntennaFiles'),
             history_url=flask.url_for("files.history"),
             afcconfig_defaults=flask.url_for(
                 'ratapi-v1.AfcConfigFile', filename='default'),
@@ -1009,6 +1009,54 @@ class DailyULSStatus(MethodView):
 
         else:
             raise werkzeug.exceptions.NotFound('Task not found')
+
+
+class BackendFiles():
+    ''' Allow the web UI to manipulate configuration directly.
+    '''
+
+    def get(self, url):
+        ''' GET method for afc config
+        '''
+        import requests
+        headers = {
+              'accept': 'text/html,application/xhtml+xml,application/xml',
+              'Accept-Encoding': 'gzip, deflate',
+              'cache-control': 'max-age=0',
+              'content-type': 'application/x-www-form-urlencoded',
+              'user-agent': 'rat_server/1.0'
+            }
+        resp = requests.get(url, headers)
+        response = flask.make_response()
+        response.content_type = 'text/html'
+        response.data= resp.content
+        return response
+
+
+class UlsFiles(MethodView):
+    ''' Allow the web UI to manipulate configuration directly.
+    '''
+
+    def get(self):
+        ''' GET method for uls
+        '''
+        user_id = auth(roles=['AP', 'Analysis', 'Admin'])
+        url = "http://localhost/" + flask.url_for('files.uls_db')
+        be = BackendFiles()
+        return be.get(url)
+
+
+class AntennaFiles(MethodView):
+    ''' Allow the web UI to manipulate configuration directly.
+    '''
+
+    def get(self):
+        ''' GET method for uls
+        '''
+        user_id = auth(roles=['AP', 'Analysis', 'Admin'])
+        url = "http://localhost/" + flask.url_for('files.antenna_pattern')
+        be = BackendFiles()
+        return be.get(url)
 
 
 class AfcRulesetIds(MethodView):
