@@ -1125,3 +1125,7 @@ module.add_url_rule('/files/history',
                     view_func=DbgFiles0.as_view('DbgFiles0'))
 module.add_url_rule('/files/history/<path:path>',
                     view_func=DbgFiles.as_view('DbgFiles'))
+module.add_url_rule('/ulsFiles/',
+                    view_func=UlsFiles.as_view('UlsFiles'))
+module.add_url_rule('/antennaFiles/',
+                    view_func=AntennaFiles.as_view('AntennaFiles'))

@@ -76,7 +76,6 @@ export const configure = (get: () => UserState, set: (user: UserState) => void) 
  */
 export const retrieveUserData = async (): Promise<RatResponse<string>> => {
     // get user information
-    console.log("retrieveUserData: ", guiConfig.status_url);
     const userInfoResult = await fetch(guiConfig.status_url, {
         headers: {
             "Content-Type": "application/json",
