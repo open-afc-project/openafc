@@ -1,6 +1,51 @@
 # Release Note
 
 ## **Version and Date**
+|Version|3.8.3.0|
+| :- | :- |
+|**Date**|**07/2/2023**|
+|compiled server's version is TBD | git tag 3.8.3.0|
+
+## **Issues Addressed**
+US static geo data files were updated to be wgs84 based.
+please download latest
+ * srtm3arcsecondv003.zip
+ *  3dep.zip
+ *  globe.zip
+from shared BOX account: https://broadcom.ent.box.com/folder/151997790033?v=OPEN-AFC-DB-ARC
+
+ * JIRA: OA-742 authenticate uls and antenna file accesses (#580)
+ * JIRA: OA-734 history URL to be authorized (#581)
+ * JIRA: Oa 698 printout eirp and ps ds up to 1 decimal digit in response json (#568)
+ * JIRA: Oa 695 afc config gui not displaying f 699 or f 1245 when selected & OA-714 (#578)
+ * JIRA: OA-741 Provide requestId and rulesetId on TV URS.1-6 (#577)
+ * JIRA: Oa 740 make afc sql alchemy models as separate module (#576)
+ * JIRA: OA-729 Virtual AP request to be forwarded to rat_server (#569)
+ * JIRA: Oa 733 g unicorn for objst (#574)
+ * JIRA: Update cert_db Flask package to 2.3.2 (#575)
+ * JIRA: Oa 705 add ap directionality in the map kmz (#570)
+ * JIRA: OA-728 return 101,102,103 for not allowed, missing, or empty/invalid … (#571)
+ * JIRA: Update rat_server Flask package to 2.3.2 (#573)
+ * JIRA: Update msghnd Flask package to 2.3.2 (#572)
+ * JIRA: OA-672 split helm charts to ext and int and then productize it (#547)
+ * JIRA: Oa 685 canada propagation model with cdsm (#561)
+ * JIRA: OA-717 Check for mtls bundle at Dispatcher boot, Ratserver healthcheck to update mtls bundle (#554)
+ * JIRA: Fix afc-engine build command
+ * JIRA: OA-727 Throttling FS (aka ULS) downloader (#567)
+ * JIRA: OA 699 FS database validity check (#560)
+ * JIRA: OA-704 Add additional TVs not covered by WFA (#549)
+ * JIRA: OA-706_remove_1_3 (#565)
+ * JIRA: OA-726 disabling and removing WebDAV from apache (#566)
+ * JIRA: OA-724. Rename als_postgres to bulk_postgres (#564)
+ * JIRA: OA-713 use code 111 (#559)
+ * JIRA: Oa 721 new orleans request hungs (#562)
+ * JIRA: OA-707 Create a separate URI for spectrum availability inquiry that goes through the rat_server from the browser. (#550)
+ * JIRA: OA-723 Get rid of annoying "Kafka server successfully connected" (#563)
+ * JIRA: update release version in ReleaseNote.md to 51930bc
+ * JIRA: OA-720 Remove automatic HTTPS probe from DataIf (#558)
+
+
+## **Version and Date**
 |Version|**OA-695*|
 | :- | :- |
 |**Date**|**06/21/2023**|
