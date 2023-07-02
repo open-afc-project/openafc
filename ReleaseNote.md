@@ -4,7 +4,7 @@
 |Version|3.8.3.0|
 | :- | :- |
 |**Date**|**07/2/2023**|
-|compiled server's version is TBD | git tag 3.8.3.0|
+|compiled server's version is 83f3e0c | git tag 3.8.3.0|
 
 ## **Issues Addressed**
 US static geo data files were updated to be wgs84 based.
