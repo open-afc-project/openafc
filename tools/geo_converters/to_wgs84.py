@@ -15,6 +15,7 @@ import argparse
 from collections.abc import Sequence
 import datetime
 import enum
+import fnmatch
 import glob
 import multiprocessing.pool
 import os
@@ -42,11 +43,15 @@ BoundaryStatus = enum.Enum("BoundaryStatus",
                             "OutOfBounds", "Error"])
 
 
+# Names of source and destination file
+SrcDst = NamedTuple("SrcDst", [("src", str), ("dst", str)])
+
+
 class BoundaryResult(NamedTuple):
     """ Boundary detection result """
 
-    # Filename
-    filename: str
+    # Name of source and destination file
+    src_dst: SrcDst
 
     # Boundary detection status
     status: BoundaryStatus
@@ -61,7 +66,7 @@ class BoundaryResult(NamedTuple):
     data_types: Optional[Sequence[str]] = None
 
 
-def boundary_worker(filename: str, pixel_size: Optional[float],
+def boundary_worker(src_dst: SrcDst, pixel_size: Optional[float],
                     pixels_per_degree: Optional[float], top: Optional[float],
                     bottom: Optional[float], left: Optional[float],
                     right: Optional[float], round_boundaries_to_degree: bool,
@@ -70,7 +75,7 @@ def boundary_worker(filename: str, pixel_size: Optional[float],
     """ Boundary detection worker
 
     Arguments:
-    filename                   -- File name
+    src_dst                    -- Contains source file name
     pixel_size                 -- Optional pixel size
     pixels_per_degree          -- Optional number of pixels per degree
     top                        -- Optional top boundary
@@ -87,33 +92,33 @@ def boundary_worker(filename: str, pixel_size: Optional[float],
     try:
         boundaries = \
             Boundaries(
-                filename, pixel_size=pixel_size,
+                src_dst.src, pixel_size=pixel_size,
                 pixels_per_degree=pixels_per_degree, top=top, bottom=bottom,
                 left=left, right=right,
                 round_boundaries_to_degree=round_boundaries_to_degree,
                 round_pixels_to_degree=round_pixels_to_degree)
-        gi = GdalInfo(filename)
+        gi = GdalInfo(src_dst.src)
         if not boundaries.intersects(
                 Boundaries(top=gi.top, bottom=gi.bottom, left=gi.left,
                            right=gi.right)):
-            return BoundaryResult(filename=filename,
+            return BoundaryResult(src_dst=src_dst,
                                   status=BoundaryStatus.OutOfBounds)
         if src_geoids and \
                 (not src_geoids.geoid_for(boundaries,
                                           fail_if_not_found=False)):
-            return BoundaryResult(filename=filename,
+            return BoundaryResult(src_dst=src_dst,
                                   status=BoundaryStatus.NoSrcGeoid,
                                   data_types=gi.data_types)
         if dst_geoids and \
                 (not dst_geoids.geoid_for(boundaries,
                                           fail_if_not_found=False)):
-            return BoundaryResult(filename=filename,
+            return BoundaryResult(src_dst=src_dst,
                                   status=BoundaryStatus.NoDstGeoid,
                                   data_types=gi.data_types)
-        return BoundaryResult(filename=filename, status=BoundaryStatus.Success,
+        return BoundaryResult(src_dst=src_dst, status=BoundaryStatus.Success,
                               boundaries=boundaries, data_types=gi.data_types)
     except (Exception, KeyboardInterrupt, SystemExit) as ex:
-        return BoundaryResult(filename=filename, status=BoundaryStatus.Error,
+        return BoundaryResult(src_dst=src_dst, status=BoundaryStatus.Error,
                               msg=repr(ex))
 
 
@@ -136,33 +141,32 @@ ConvResult = \
 
 
 def conversion_worker(
-        src: str, dst: str, boundaries: Boundaries, resampling: str,
+        src_dst: SrcDst, boundaries: Boundaries, resampling: str,
         src_geoids: Geoids, dst_geoids: Geoids, out_format: Optional[str],
         format_params: List[str], overwrite: bool, quiet: bool,
         remove_src: bool) -> ConvResult:
     """ Worker function performing the conversion
 
     Arguments:
-    src                        -- Source file name
-    dst                        -- Destination file name
-    boundaries                 -- Destination file boundaries
-    resampling                 -- Resampling method
-    src_geoids                 -- Geoid(s) of source file
-    dst_geoids                 -- Geoid(s) for destination file
-    out_format                 -- Optional output file format
-    format_params              -- Output format options
-    overwrite                  -- True to overwrite file if it exists
-    quiet                      -- True to not print anything, returning message
-                                  instead
-    remove_src                 -- Remove source file
+    src_dst       -- Source ands destination file names
+    boundaries    -- Destination file boundaries
+    resampling    -- Resampling method
+    src_geoids    -- Geoid(s) of source file
+    dst_geoids    -- Geoid(s) for destination file
+    out_format    -- Optional output file format
+    format_params -- Output format options
+    overwrite     -- True to overwrite file if it exists
+    quiet         -- True to not print anything, returning message
+                     instead
+    remove_src    -- Remove source file
     Returns ConvResult object
     """
-    stem, ext = os.path.splitext(dst)
+    stem, ext = os.path.splitext(src_dst.dst)
     temp_file = stem + ".incomplete" + ext
     start_time = datetime.datetime.now()
     try:
-        if os.path.isfile(dst) and (not overwrite):
-            return ConvResult(filename=src, status=ConvStatus.Exists,
+        if os.path.isfile(src_dst.dst) and (not overwrite):
+            return ConvResult(filename=src_dst.src, status=ConvStatus.Exists,
                               duration=datetime.datetime.now()-start_time,
                               msg=None)
         src_geoid: Optional[str] = None
@@ -178,7 +182,7 @@ def conversion_worker(
             assert src_geoid is not None
 
         success, msg = \
-            warp(src=src, dst=temp_file, resampling=resampling,
+            warp(src=src_dst.src, dst=temp_file, resampling=resampling,
                  top=boundaries.top if boundaries.edges_overridden else None,
                  bottom=boundaries.bottom
                  if boundaries.edges_overridden else None,
@@ -193,22 +197,22 @@ def conversion_worker(
                  out_format=out_format, format_params=format_params,
                  overwrite=True, quiet=quiet)
         if not success:
-            return ConvResult(filename=src, status=ConvStatus.Error,
+            return ConvResult(filename=src_dst.src, status=ConvStatus.Error,
                               duration=datetime.datetime.now()-start_time,
                               msg=msg)
-        if os.path.isfile(dst):
+        if os.path.isfile(src_dst.dst):
             if not quiet:
-                print(f"Removing '{dst}'")
-            os.unlink(dst)
+                print(f"Removing '{src_dst.dst}'")
+            os.unlink(src_dst.dst)
         if not quiet:
-            print(f"Renaming '{temp_file}' to '{dst}'")
-        os.rename(temp_file, dst)
+            print(f"Renaming '{temp_file}' to '{src_dst.dst}'")
+        os.rename(temp_file, src_dst.dst)
         if remove_src:
-            os.unlink(src)
-        return ConvResult(filename=src, status=ConvStatus.Success,
+            os.unlink(src_dst.src)
+        return ConvResult(filename=src_dst.src, status=ConvStatus.Success,
                           duration=datetime.datetime.now()-start_time, msg=msg)
     except (Exception, KeyboardInterrupt, SystemExit) as ex:
-        return ConvResult(filename=src, status=ConvStatus.Error,
+        return ConvResult(filename=src_dst.src, status=ConvStatus.Error,
                           duration=datetime.datetime.now()-start_time,
                           msg=repr(ex))
     finally:
@@ -297,6 +301,10 @@ def main(argv: List[str]) -> None:
         help="If present - mass conversion is performed and this is the "
         "target directory")
     argument_parser.add_argument(
+        "--recursive", action="store_true",
+        help="Recreate folder structure in destination directory - see help "
+        "to FILES. If specified then --out_dir must be specified")
+    argument_parser.add_argument(
         "--out_ext", metavar=".EXT",
         help="Extension for output files to use in case of mass conversion. "
         "Default is to keep original extension")
@@ -320,9 +328,12 @@ def main(argv: List[str]) -> None:
         "space)")
     argument_parser.add_argument(
         "FILES", nargs="+",
-        help="In case of mass conversion (--out_dir is provided) - source "
-        "file names. Otherwise it should be 'SRC DST' pair")
-
+        help="If --recursive specified, file specification has form "
+        "like BASE_DIR/*.EXT (search in subdirectories of BASE_DIR performed, "
+        "these subdirectories below BASE_DIR replicated in output directory). "
+        "If --out_dir specified, but --recursive not specified - mass "
+        "conversion to given directory. If --out_dir not specified - SRC_FILE "
+        "DST_FILE pair should be specified")
     if not argv:
         argument_parser.print_help()
         sys.exit(1)
@@ -333,7 +344,13 @@ def main(argv: List[str]) -> None:
     if args.nice:
         nice()
 
-    filenames: List[str] = []
+    def change_dst_ext(dst: str) -> str:
+        """ Changes extension of given given destination file name if it was
+        requested """
+        return (os.path.splitext(dst)[0] + args.out_ext) \
+            if args.out_ext is not None else dst
+
+    filenames: List[SrcDst] = []
     if args.out_dir is None:
         error_if(len(args.FILES) < 2,
                  "Destination file name not provided")
@@ -342,17 +359,44 @@ def main(argv: List[str]) -> None:
                  "provided")
         error_if(not os.path.isfile(args.FILES[0]),
                  f"File '{args.FILES[0]}' not found")
-        filenames.append(args.FILES[0])
-    else:
+        filenames.append(
+            SrcDst(src=args.FILES[0],
+                   dst=os.path.join(args.FILES[1],
+                                    os.path.basename(args.FILES[0]))
+                   if os.path.isdir(args.FILES[1]) else args.FILES[1]))
+    elif not args.recursive:
         for files_arg in args.FILES:
             files = glob.glob(files_arg)
             error_if(not files,
                      f"No source files matching '{files_arg}' found")
-            filenames += list(files)
+            filenames += \
+                [SrcDst(f, os.path.join(args.out_dir,
+                                        change_dst_ext(os.path.basename(f))))
+                 for f in files]
+    else:
+        for files_arg in args.FILES:
+            base_dir, filemask = os.path.split(files_arg)
+            base_dir = base_dir or "."
+            error_if(not os.path.isdir(base_dir),
+                     f"Directory '{base_dir}' not found")
+            found = False
+            for walk_dirpath, _, walk_filenames in os.walk(base_dir):
+                for filename in walk_filenames:
+                    if not fnmatch.fnmatch(filename, filemask):
+                        continue
+                    found = True
+                    filenames.append(
+                        SrcDst(src=os.path.join(walk_dirpath, filename),
+                               dst=os.path.join(
+                                   args.out_dir,
+                                   os.path.relpath(walk_dirpath, base_dir),
+                                   change_dst_ext(filename))))
+            error_if(not found,
+                     f"No '{filemask}' files were found beneath '{base_dir}'")
 
     try:
         SrcInfo = NamedTuple("SrcInfo",
-                             [("filename", str), ("boundaries", Boundaries)])
+                             [("src_dst", SrcDst), ("boundaries", Boundaries)])
         src_infos: List[SrcInfo] = []
         oob_files: List[str] = []
         no_geoid_files: List[str] = []
@@ -368,37 +412,37 @@ def main(argv: List[str]) -> None:
                 source_data_types.update(br.data_types)
             if br.status == BoundaryStatus.Success:
                 assert br.boundaries is not None
-                src_infos.append(SrcInfo(filename=br.filename,
+                src_infos.append(SrcInfo(src_dst=br.src_dst,
                                          boundaries=br.boundaries))
                 return
             if br.status == BoundaryStatus.OutOfBounds:
-                warning(f"'{br.filename}' lies outside of given boundaries. "
-                        f"It will not be processed")
-                oob_files.append(br.filename)
+                warning(f"'{br.src_dst.src}' lies outside of given "
+                        f"boundaries. It will not be processed")
+                oob_files.append(br.src_dst.src)
                 return
             if br.status == BoundaryStatus.NoSrcGeoid:
-                warning(f"'{br.filename}' not covered by any source geoid. It "
-                        f"will not be processed")
-                no_geoid_files.append(br.filename)
+                warning(f"'{br.src_dst.src}' not covered by any source geoid. "
+                        f"It will not be processed")
+                no_geoid_files.append(br.src_dst.src)
                 return
             if br.status == BoundaryStatus.NoDstGeoid:
-                warning(f"'{br.filename}' not covered by any target geoid. It "
-                        f"will not be processed")
-                no_geoid_files.append(br.filename)
+                warning(f"'{br.src_dst.src}' not covered by any target geoid. "
+                        f"It will not be processed")
+                no_geoid_files.append(br.src_dst.src)
                 return
             if br.status == BoundaryStatus.Error:
-                warning(f"'{br.filename}' has a problem: {br.msg}")
-                failed_files.append(br.filename)
+                warning(f"'{br.src_dst.src}' has a problem: {br.msg}")
+                failed_files.append(br.src_dst.src)
                 return
 
         original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
         with multiprocessing.pool.ThreadPool(
                 processes=threads_arg(args.threads)) as pool:
             signal.signal(signal.SIGINT, original_sigint_handler)
-            for filename in filenames:
+            for src_dst in filenames:
                 pool.apply_async(
                     boundary_worker,
-                    kwds={"filename": filename, "pixel_size": args.pixel_size,
+                    kwds={"src_dst": src_dst, "pixel_size": args.pixel_size,
                           "pixels_per_degree": args.pixels_per_degree,
                           "top": args.top, "bottom": args.bottom,
                           "left": args.left, "right": args.right,
@@ -422,25 +466,7 @@ def main(argv: List[str]) -> None:
             "format_params": args.format_param,
             "overwrite": args.overwrite,
             "remove_src": args.remove_src}
-        if args.out_dir is None:
-            error_if(not src_infos, "Nothing to convert")
-            cr = conversion_worker(src=args.FILES[0], dst=args.FILES[1],
-                                   boundaries=src_infos[0].boundaries,
-                                   quiet=False, **common_kwargs)
-            if cr.status == ConvStatus.Error:
-                assert cr.msg is not None
-                error(cr.msg)
-            error_if(cr.status == ConvStatus.Exists,
-                     f"File '{args.FILES[1]}' already exists. Specify "
-                     f"--overwrite to overwrite it")
-            assert cr.status == ConvStatus.Success
-            print(f"Conversion took {Durator.duration_to_hms(cr.duration)}")
-            return
-
         start_time = datetime.datetime.now()
-
-        if not os.path.isdir(args.out_dir):
-            os.makedirs(args.out_dir)
 
         total_count = len(src_infos)
         completed_count = [0]  # Made list to facilitate closure in completer()
@@ -469,10 +495,10 @@ def main(argv: List[str]) -> None:
             signal.signal(signal.SIGINT, original_sigint_handler)
             for src_info in src_infos:
                 kwargs = common_kwargs.copy()
-                kwargs["src"] = src_info.filename
-                kwargs["dst"] = \
-                    os.path.join(args.out_dir,
-                                 os.path.basename(src_info.filename))
+                kwargs["src_dst"] = src_info.src_dst
+                dest_dir = os.path.dirname(src_info.src_dst.dst) or "."
+                if not os.path.isdir(dest_dir):
+                    os.makedirs(dest_dir)
                 if args.out_ext is not None:
                     kwargs["dst"] = \
                         os.path.splitext(kwargs["dst"])[0] + args.out_ext

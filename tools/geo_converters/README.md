@@ -312,7 +312,10 @@ Some source files are in geodetic coordinate system that is not WGS84.
 
 `to_wgs84.py [options] FILES`
 
-Here `FILES` may be pair `SRC_FILE DST_FILE` or, if `--out_dir` option specified, `FILES` are source files (in any number, may include wildcards).
+Here `FILES` may be:
+- `SRC_FILE DST_FILE` pair - if `--out_dir` option not specified
+- One or more filenames that may include wildcards - if `--out_dir` specified, but `--recursive` not specified
+- One or more `BASE_DIR/*.EXT` specifiers - if both `--out_dir` and `--recursive` not specified. In this case files are being looked up in subdirectories and structure of these subdirectories is copied to output directory.
 
 |Option|Function|
 |------|--------|
@@ -366,6 +369,7 @@ Here `FILES` may be pair `SRC_FILE DST_FILE` or, if `--out_dir` option specified
 |--format_param **NAME=VALUE**|Set output format option. See [GDAL Raster Drivers](https://gdal.org/drivers/raster/index.html) for more information|
 |--resampling **METHOD**|Resampling method to use. See [gdalwarp -r](https://gdal.org/programs/gdalwarp.html#cmdoption-gdalwarp-r) for more details. Default is 'nearest' for byte data (e.g. land usage), 'cubic' otherwise|
 |--out_dir **DIRECTORY**|Do the mass conversion to given directory. In this case `FILES` in command line is a list of files to convert|
+|--recursive|Look in subdirectories of given source file parameters and copy subdirectory structure to output directory (that must be specified)|
 |--out_ext **EXT**|Extension of resulting files. May be used in mass conversion. By default source files' extension is kept|
 |--overwrite|Overwrite already existing resulting files. By default already existing resulting files considered to be completed, thus facilitating process restartability|
 |--remove_src|Remove source files after successful conversion. May help save disk space (e.g. when dealing with huge LiDAR files)|
@@ -579,7 +583,7 @@ Takes ***22 hours on 16 CPUs (probably ~45 hours on 8CPUs)***. YMMV
 
 4. Convert TIF files in *tiled_lidar_wgs84_tif* directory to PNG files in *tiled_lidar_wgs84_png* directory:  
 `to_png.py --out_dir tiled_lidar_wgs84_png 'tiled_lidar_wgs84_tif/*'`  
-Takes 6 hours on 8 CPUs. YMMV
+Takes ~8 hours on 8 CPUs. YMMV
 
 
 ### Canada CDSM surface model <a name="cdsm_routine">
