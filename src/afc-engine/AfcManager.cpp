@@ -1035,15 +1035,6 @@ void AfcManager::initializeDatabases()
 		_terrainDataModel->setSourceName(CConst::HeightSourceEnum::lidarHeightSource, "LiDAR");
 	}
 
-	// Check to make sure that the inputs are valid (e.g. such that antenna height does not go underground)
-	try {
-		isValid();
-	}
-	catch (std::exception &err) {
-		throw std::runtime_error(
-				ErrStream() << "AfcManager::initializeDatabases(): User provided invalid input parameters: " << err.what()
-				);
-	}
 	if (_pathLossModel == CConst::ITMBldgPathLossModel) {
 		if (_terrainDataModel->getNumLidarRegion() == 0) {
 			throw std::runtime_error(ErrStream() << "Path loss model set to ITM_BLDG, but no building data found within the analysis region.");

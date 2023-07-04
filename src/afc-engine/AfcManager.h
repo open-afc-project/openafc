@@ -219,25 +219,6 @@ class AfcManager
 		void importGUIjsonVersion1_3(const QJsonObject &jsonObj);
 		void importGUIjsonVersion1_4(const QJsonObject &jsonObj);
 
-		void isValid() const { // Checks the inputs to ensure cooperation with terrain
-			if (_rlanHeightType == CConst::AMSLHeightType) {
-				if (_terrainDataModel == NULL) {
-					throw std::runtime_error("isValid() called before terrain data has been initialized.");
-				}
-				// Check to make sure antenna height is valid with terrain
-				double minRLANHeight_m = std::get<2>(_rlanLLA) - std::get<2>(_rlanUncerts_m);
-				double terrainHeight_m, bldgHeight;
-				MultibandRasterClass::HeightResult lidarHeightResult;
-				CConst::HeightSourceEnum heightSource;
-				_terrainDataModel->getTerrainHeight(std::get<1>(_rlanLLA), std::get<0>(_rlanLLA), terrainHeight_m,bldgHeight, lidarHeightResult, heightSource);
-				if (minRLANHeight_m <= terrainHeight_m) {
-					throw std::invalid_argument("AfcManager::isValid(): User provided RLAN height (" + std::to_string(minRLANHeight_m)
-							+ " meters) that goes below the terrain height (" + std::to_string(terrainHeight_m)
-							+ " meters) at the specified RLAN location");
-				}
-			}
-		}
-
 		void runPointAnalysis();
 		void runScanAnalysis();
 		void runExclusionZoneAnalysis();
