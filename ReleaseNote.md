@@ -3,7 +3,7 @@
 |Version|3.8.4.0|
 | :- | :- |
 |**Date**|**07/04/2023**|
-|compiled server's version is TBD | git tag 3.8.4.0|
+|compiled server's version is a625df8 | git tag 3.8.4.0|
 
 ## **Issues Addressed**
  * JIRA: OA-742 authenticate uls and antenna file accesses (#580)
