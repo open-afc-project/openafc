@@ -1,4 +1,16 @@
 # Release Note
+## **Version and Date**
+|Version|3.8.4.0|
+| :- | :- |
+|**Date**|**07/04/2023**|
+|compiled server's version is TBD | git tag 3.8.4.0|
+
+## **Issues Addressed**
+ * JIRA: OA-742 authenticate uls and antenna file accesses (#580)
+ * JIRA: OA-749. Add --recursive to to_wgs84. --recursive option allows to copy structure of input files to output directory. Used to create a WGS84 drop-in replacement for LiDAR files in its current status
+ * JIRA: OA-750. Removing AfcManager::isValid() AfcManager::isValid() throws if height is WGS84 and bottom of uncertainty area is below the terrain. This incorrect behavior is removed by this changeset
+ * JIRA: OA-716-make-fbrat-redirect-configurable  Make rat-server apache config fbrat path redirection configurable by env variable
+
 
 ## **Version and Date**
 |Version|3.8.3.0|
