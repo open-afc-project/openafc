@@ -241,14 +241,26 @@ afc_tests.py --cmd reacq --addr 1.2.3.4
 
 ## How to run HTTPs access test
 
-Follows example how to run HTTPS access test. The test utility only does
+Follows an example on how to run an HTTPS access test. The test utility only does
 protocol handshake using mutual TLS.
 ```
 cd <open-afc path>/tests
-./afc_tests.py --cmd run_cert --addr <ip addr> --port <port> --ca_cert ../nginx/tmp.bundle.pem 
---cli_key ../nginx/tmp_cli.key.pem --cli_cert ../nginx/tmp_cli.bdl.pem
+./afc_tests.py --cmd run --addr <ip addr> --port <port> --ca_cert tmp.bundle.pem 
+--cli_key tmp_cli.key.pem --cli_cert tmp_cli.bundle.pem
 ```
-
+How to run specific tests with existing AFC servers using a docker image.
+It uses afc_tests.py utility internally in addition to script 'certs.sh' which
+creates client certificates at runtime.
+```
+docker run --rm <test image> --addr <ip addr> --port <port> --cmd run --testcase_ids AFCS.FSP.1
+--prefix_cmd /usr/app/certs.sh cert_client --cli_cert /usr/app/test_cli/test_cli_crt.pem
+--cli_key /usr/app/test_cli/test_cli_key.pem
+```
+How to build a docker image for testing from sources. As a result there is a docker image 'afc_test'.
+```
+cd <open-afc path>
+docker build -f tests/Dockerfile -t afc_test .
+```
 <br /><br />
 
 
