@@ -35,6 +35,7 @@ gunicorn \
 --access-logfile "${AFC_MSGHND_ACCESS_LOG}" \
 --error-logfile "${AFC_MSGHND_ERROR_LOG}" \
 --log-level "${AFC_MSGHND_LOG_LEVEL}" \
+--worker-class gevent \
 wsgi:app
 
 #
