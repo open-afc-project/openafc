@@ -1096,6 +1096,40 @@ class DbgFiles0(DbgFiles):
     pass
 
 
+class GetRuleset(MethodView):
+    """ Get all active rulesets """
+    def get(self):
+        try:
+            configs = AFCConfig.query.all()
+            regionStrs = set()
+            for config in configs:
+                regionStrs.add(regionStrToRulesetId(config.config['regionStr']))
+        except:
+            return flask.make_response('DB error', 404)
+        resp = flask.make_response()
+        resp.data = "{ \n\trulesetId: [" + ", ".join('"{0}"'.format(x) for x in regionStrs) + \
+        "]\n}\n"
+        resp.content_type = 'application/json'
+        return resp
+
+
+class GetAfcConfigByRuleset(MethodView):
+    """ Get afc_config by rulesets """
+    def get(self, ruleset):
+        regionStr = rulesetIdToRegionStr(ruleset) # returns 404 if not found
+        try:
+            config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
+             == regionStr).first()
+        except:
+            return flask.make_response('DB error', 404)
+        if config is None:
+            return flask.make_response("Ruleset unactive", 404)
+        resp = flask.make_response()
+        resp.data = json.dumps(config.config, sort_keys=True, indent = 4) + "\n"
+        resp.content_type = 'application/json'
+        return resp
+
+
 module.add_url_rule('/guiconfig', view_func=GuiConfig.as_view('GuiConfig'))
 module.add_url_rule('/afcconfig/<path:filename>',
                     view_func=AfcConfigFile.as_view('AfcConfigFile'))
@@ -1129,3 +1163,7 @@ module.add_url_rule('/ulsFiles/',
                     view_func=UlsFiles.as_view('UlsFiles'))
 module.add_url_rule('/antennaFiles/',
                     view_func=AntennaFiles.as_view('AntennaFiles'))
+module.add_url_rule('/GetRulesetIDs',
+                    view_func=GetRuleset.as_view('GetRuleset'))
+module.add_url_rule('/GetAfcConfigByRulesetID/<ruleset>',
+                    view_func=GetAfcConfigByRuleset.as_view('GetAfcConfigByRuleset'))
