@@ -5,13 +5,15 @@
 # a copy of which is included with this software program
 #
 
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /usr/app
-
 COPY tests/requirements.txt /usr/app/
-RUN /usr/local/bin/python3 -m pip install --upgrade pip
-RUN pip3 install --no-cache-dir -r requirements.txt
+
+RUN apt-get update \
+    && apt-get install net-tools \
+    && pip3 install --no-cache-dir -r requirements.txt \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY \
 tests/afc_tests.py \
