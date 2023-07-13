@@ -78,7 +78,7 @@ class Task():
                     stat['status'] == Task.STAT_FAILURE):
                 return stat
             if (time.time() - time0) > timeout:
-                LOGGER.debug("task.wait() timeout")
+                LOGGER.error("task.wait() timeout")
                 return self.__toDict(Task.STAT_PROGRESS)
         LOGGER.debug("task.wait() exit")
 

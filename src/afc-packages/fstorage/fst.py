@@ -118,7 +118,6 @@ class DataIfBaseV1():
 class DataIf(DataIfBaseV1):
     """ Wrappers for RATAPI data operations """
     def __init__(self, prot=None, host=None, port=None):
-        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         # Assign default args from env vars
         self._host = host
         if self._host is None:
@@ -139,16 +138,13 @@ class DataIf(DataIfBaseV1):
 
     def rname(self, baseName):
         """ Return remote file name by basename """
-        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         return self._pref + baseName
 
     def open(self, baseName):
         """ Create FileInt instance """
-        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         return DataIfBaseV1.open(self, self.rname(baseName))
 
     def getProtocol(self):
-        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         return self._prot, self._host, self._port
 
 # vim: sw=4:et:tw=80:cc=+1

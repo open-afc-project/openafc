@@ -9,7 +9,7 @@
 AFC_OBJST_WORKERS=${AFC_OBJST_WORKERS:=10}
 AFC_OBJST_HIST_WORKERS=${AFC_OBJST_HIST_WORKERS:=2}
 
-gunicorn --workers ${AFC_OBJST_WORKERS} --bind 0.0.0.0:${AFC_OBJST_PORT} afcobjst:objst_app &
-gunicorn --workers ${AFC_OBJST_HIST_WORKERS} --bind 0.0.0.0:${AFC_OBJST_HIST_PORT} afcobjst:hist_app &
+gunicorn --workers ${AFC_OBJST_WORKERS} --worker-class gevent --bind 0.0.0.0:${AFC_OBJST_PORT} afcobjst:objst_app &
+gunicorn --workers ${AFC_OBJST_HIST_WORKERS} --worker-class gevent --bind 0.0.0.0:${AFC_OBJST_HIST_PORT} afcobjst:hist_app &
 
 sleep infinity
