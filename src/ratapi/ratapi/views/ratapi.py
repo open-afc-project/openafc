@@ -41,27 +41,14 @@ LOGGER.setLevel(appcfg.AFC_RATAPI_LOG_LEVEL)
 
 #: All views under this API blueprint
 module = flask.Blueprint('ratapi-v1', 'ratapi')
+baseRegions =  ['US', 'CA', 'BR']
 
 def regions():
-    return ['US', 'CA', 'TEST_US', 'DEMO_US', 'BR']
+    return baseRegions + list(map(lambda s: 'DEMO_'+ s, baseRegions)) + list(map(lambda s: 'TEST_'+ s, baseRegions))
 
 def rulesets():
-    return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'BRAZIL_RULESETID']
+    return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'BRAZIL_RULESETID'] + list(map(lambda s: 'DEMO_'+ s, baseRegions)) + list(map(lambda s: 'TEST_'+ s, baseRegions))
 
-
-def nraToRegionStr(nra):
-    map = {
-        'FCC':'US',
-        'TEST_FCC':'TEST_US',
-        'ISED':'CA',
-        'DEMO_FCC':'DEMO_US',
-        'BRAZIL_NRA':'BR'
-    }
-    nra = nra.upper()
-    try:
-        return map[nra]
-    except:
-        raise werkzeug.exceptions.NotFound('Invalid NRA %s' % nra)
 
 # after 1.4 use Ruleset ID
 def regionStrToRulesetId(region_str):
@@ -74,12 +61,14 @@ def regionStrToRulesetId(region_str):
        'DEFAULT':'US_47_CFR_PART_15_SUBPART_E',
        'US':'US_47_CFR_PART_15_SUBPART_E',
        'CA':'CA_RES_DBS-06',
-       'TEST_US':'TEST_FCC',
-       'DEMO_US':'DEMO_FCC',
        'BR':'BRAZIL_RULESETID'
     }
     region_str = region_str.upper()
     try:
+        # for test and demo
+        if region_str.startswith("DEMO_") or  region_str.startswith("TEST_"):
+            return region_str
+ 
         return map[region_str]
     except:
         raise werkzeug.exceptions.NotFound('Invalid Region %s' % region_str)
@@ -87,13 +76,15 @@ def regionStrToRulesetId(region_str):
 def rulesetIdToRegionStr(rulesetId):
     map = {
         'US_47_CFR_PART_15_SUBPART_E':'US',
-        'TEST_FCC':'TEST_US',
         'CA_RES_DBS-06':'CA',
-        'DEMO_FCC':'DEMO_US',
         'BRAZIL_RULESETID':'BR'
     }
     rulesetId = rulesetId.upper()
     try:
+        if rulesetId.startswith("DEMO_") or  rulesetId.startswith("TEST_"):
+            if(rulesets().contains(rulesetId)):
+                return rulesetId
+
         return map[rulesetId]
     except:
         raise werkzeug.exceptions.NotFound('Invalid ruleset %s' % rulesetId)

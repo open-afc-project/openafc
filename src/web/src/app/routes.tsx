@@ -4,7 +4,7 @@ import { DynamicImport } from "./DynamicImport";
 import { NotFound } from "./NotFound/NotFound";
 import { Dashboard } from "./Dashboard/Dashboard";
 import { PageSection, Card, CardHeader } from "@patternfly/react-core";
-import { getAfcConfigFile, getAllowedRanges, getRegions, getAboutAfc, getAboutSiteKey } from "./Lib/RatApi";
+import { getAfcConfigFile, getAllowedRanges, getRegions, getAboutAfc, getAboutSiteKey, getRulesetIds } from "./Lib/RatApi";
 import { getUlsFiles, getAntennaPatterns, getUlsFilesCsv } from "./Lib/FileApi";
 import AppLoginPage from "./AppLayout/AppLogin";
 import { UserAccountPage } from "./UserAccount/UserAccount";
@@ -40,7 +40,8 @@ const getRatAfcModuleAsync = () => {
 }
 const ratAfcResolves = async () => ({
   conf: await getAfcConfigFile(getLastUsedRegionFromCookie()),
-  limit: await getMinimumEIRP()
+  limit: await getMinimumEIRP(),
+  rulesetIds: await getRulesetIds(),
 })
 
 
@@ -49,7 +50,7 @@ const RatAfc = () => {
     <DynamicImport load={getRatAfcModuleAsync()} resolve={ratAfcResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
-          : <Component.RatAfc afcConfig={resolve.conf} limit={resolve.limit} />
+          : <Component.RatAfc afcConfig={resolve.conf} limit={resolve.limit} rulesetIds={resolve.rulesetIds} />
       }}
     </DynamicImport>
   );

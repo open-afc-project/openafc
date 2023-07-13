@@ -33,6 +33,16 @@ export class AFCFormUSACanada extends React.Component<
     }
 > {
 
+
+    private trimmedRegionStr = () => {
+        if (!!this.props.config.regionStr && (this.props.config.regionStr?.startsWith("TEST_") || this.props.config.regionStr?.startsWith("DEMO_"))) {
+            return this.props.config.regionStr.substring(5);
+        } else {
+            return this.props.config.regionStr
+        }
+    }
+
+
     private hasValue = (val: any) => val !== undefined && val !== null;
     private hasValueExists = (f: () => any): boolean => {
         try {
@@ -102,7 +112,7 @@ export class AFCFormUSACanada extends React.Component<
         this.props.updateConfig(conf);
     }
     private setAntennaPattern = (x: AntennaPatternState) => {
-        const conf = {...this.props.config};
+        const conf = { ...this.props.config };
         conf.ulsDefaultAntennaType = x.defaultAntennaPattern;
         this.props.updateAntennaData(x);
         this.props.updateConfig(conf);
@@ -237,24 +247,30 @@ export class AFCFormUSACanada extends React.Component<
     }
 
     private getLandCoverOptions = () => {
-        if (this.props.config.regionStr == "US") {
-            return <>
-                <FormSelectOption key="Production NLCD " value="rat_transfer/nlcd/nlcd_production" label="Production NLCD" />
-                <FormSelectOption key="WFA Test NLCD " value="rat_transfer/nlcd/nlcd_wfa" label="WFA Test NLCD" />
-            </>
-        } else if (this.props.config.regionStr == "CA") {
-            return <>
-                <FormSelectOption key="2020 Land Cover " value="rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif" label="Land Cover of Canada" />
-            </>
-        } else if (this.props.config.regionStr == "BR") {
-            return <>
-                <FormSelectOption key="Brazilian Land Cover" value="rat_transfer/nlcd/br/landcover-for-brazil.tbd.tif" label="Land Cover of Brazil (TBD)" />
-            </>
+        let trimmed = this.trimmedRegionStr();
+        switch (trimmed) {
+           
+            case "CA":
+                return <>
+                    <FormSelectOption key="2020 Land Cover " value="rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif" label="Land Cover of Canada" />
+                </>
+            case "BR":
+                return <>
+                    <FormSelectOption key="Brazilian Land Cover" value="rat_transfer/nlcd/br/landcover-for-brazil.tbd.tif" label="Land Cover of Brazil (TBD)" />
+                </>
+            case "US":
+            default:
+                return <>
+                    <FormSelectOption key="Production NLCD " value="rat_transfer/nlcd/nlcd_production" label="Production NLCD" />
+                    <FormSelectOption key="WFA Test NLCD " value="rat_transfer/nlcd/nlcd_wfa" label="WFA Test NLCD" />
+                </>
         }
+
+       
     }
 
     private getDefaultLandCoverDatabase = () => {
-        switch (this.props.config.regionStr) {
+        switch (this.trimmedRegionStr()) {
             case "CA":
                 return 'rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif';
             case "BR":
@@ -501,7 +517,7 @@ export class AFCFormUSACanada extends React.Component<
                 <AntennaPatternForm
                     data={this.props.antennaPatterns}
                     onChange={this.setAntennaPattern}
-                    region={this.props.config.regionStr ?? "US"} />
+                    region={this.trimmedRegionStr() ?? "US"} />
             </GalleryItem>
             <GalleryItem>
                 <APUncertaintyForm
@@ -512,7 +528,7 @@ export class AFCFormUSACanada extends React.Component<
                 <PropogationModelForm
                     data={this.getPropagationModelForForm()}
                     onChange={this.setPropagationModel}
-                    region={this.props.config.regionStr ?? "US"} />
+                    region={this.trimmedRegionStr() ?? "US"} />
             </GalleryItem>
             {(this.props.config.propagationModel.kind === "ITM with no building data"
                 || this.props.config.propagationModel.kind == "FCC 6GHz Report & Order"
@@ -635,7 +651,7 @@ export class AFCFormUSACanada extends React.Component<
                     : <></>}
             </GalleryItem>
             <GalleryItem>
-                <AllowedRangesDisplay data={this.props.config.freqBands} region={this.props.config.regionStr ?? "US"} />
+                <AllowedRangesDisplay data={this.props.config.freqBands} region={this.trimmedRegionStr() ?? "US"} />
             </GalleryItem>
             <GalleryItem>
                 <FormGroup label="AP Height below Min Allowable AGL Height Behavior"

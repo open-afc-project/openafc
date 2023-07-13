@@ -497,8 +497,10 @@ export const getRulesetIds = (): Promise<RatResponse<string[]>> => (
  */
 export const getDefaultAfcConf = (x: string | undefined) => {
     if (!!x && (x.startsWith("TEST_") || x.startsWith("DEMO_"))){
-        x = x.substring(5);
-    }
+        let testOrDemo:AFCConfigFile = getDefaultAfcConf(x.substring(5));
+        testOrDemo.regionStr = x;
+        return testOrDemo;
+    } 
     if (x == "CA") {
         return defaultAfcConfCanada();
     }else if(x == "BR"){

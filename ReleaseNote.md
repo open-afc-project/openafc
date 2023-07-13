@@ -1,4 +1,28 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-667, 697,712, 743*|
+| :- | :- |
+|**Date**|**07/13/2023**|
+
+## **Issues Addressed**
+ * Jira OA-667:Allow *editability* of existing denied region list in UI
+ * Jira OA-697: Harmonization of DEMO and TEST use-cases for different countries
+ * Jira OA-712: Remove support of SDI version 1.3 from GUI and Engine
+ * Jira OA-743: Selection of Land Cover Point (WFA or Production) is missing for Region=TEST_US and DEMO_US
+ 
+## **Interface Changes**
+ * 
+
+## **Testing Done**
+ * OA-667: Generated a denied circle around AP center lat/long of FSP1 for 5925-5945 MHz and ran FSP1. Confirmed that the channel was black in response. Confirmed that the denied region list was editable.
+ * OA-697: Confirmed that the country code in AFC Config, Administration's Freq ranges and rulsetID are all consistent and use DEMO/TEST_{2-letter country code} and that has been generated for Canada and Brazil as well.
+ * OA-712: Confirmed support for SDI version 1.3 is removed from the GUI; sent a 1.3 request via SOAPUI and got correct error message back
+ * OA-743: Confirmed that selection of Land Cover Point is not present for the TEST and DEMO use-cases. 
+
+## **Open Issues** 
+ *
+
 ## **Version and Date**
 |Version|3.8.4.0|
 | :- | :- |

@@ -13,7 +13,8 @@ import { AccessPointModel, DeniedRegion, ExclusionCircle, ExclusionHorizon, Excl
 interface DRTableProps {
     deniedRegions: DeniedRegion[],
     currentRegionStr: string,
-    onDelete: (id: string) => void
+    onDelete: (id: string) => void,
+    onOpenEdit: (id: string) => void
 }
 
 /**
@@ -34,7 +35,7 @@ export class DRTable extends React.Component<DRTableProps, {}> {
     }
 
     private toRow = (dr: DeniedRegion) => ({
-        id: dr.name + dr.zoneType,
+        id: dr.name + "===" + dr.zoneType,
         cells: [
             dr.name, dr.startFreq, dr.endFreq, dr.zoneType, this.zoneToText(dr)
         ]
@@ -63,6 +64,10 @@ export class DRTable extends React.Component<DRTableProps, {}> {
     actionResolver(data: any, extraData: any) {
         return [
             {
+                title: "Edit",
+                onClick: (event: any, rowId: number, rowData: any, extra: any) => this.props.onOpenEdit(rowData.id)
+            },
+            {
                 title: "Remove",
                 onClick: (event: any, rowId: number, rowData: any, extra: any) => this.props.onDelete(rowData.id)
             }
@@ -74,7 +79,9 @@ export class DRTable extends React.Component<DRTableProps, {}> {
             <Table
                 aria-label="Denied Region Table"
                 cells={this.columns as any}
-                rows={this.props.deniedRegions.filter(x => x.regionStr == this.props.currentRegionStr).map(this.toRow)}
+                rows={Array.isArray(this.props.deniedRegions) ?
+                    this.props.deniedRegions?.filter(x => x.regionStr == this.props.currentRegionStr).map(this.toRow) :
+                    []}
                 variant={TableVariant.compact}
                 actionResolver={(a, b) => this.actionResolver(a, b)}
             >

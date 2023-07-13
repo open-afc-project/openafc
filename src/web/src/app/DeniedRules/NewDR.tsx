@@ -21,10 +21,9 @@ const zoneTypes = [
  */
 interface NewDRProps {
     currentRegionStr: string,
-    isEdit: boolean,
-    drToEdit: DeniedRegion | null,
+    drToEdit: DeniedRegion | undefined,
     onAdd: (dr: DeniedRegion) => void,
-    onEdit: (dr: DeniedRegion, prevName: string, prevZoneType: string) => void
+    onCloseEdit: (dr: DeniedRegion, prevName: string, prevZoneType: string) => void
 }
 
 interface NewDRState {
@@ -58,8 +57,8 @@ interface NewDRState {
 export class NewDR extends React.Component<NewDRProps, NewDRState> {
     constructor(props: NewDRProps) {
         super(props);
-        if (props.drToEdit && props.isEdit) {
-            this.state = {
+        if (props.drToEdit !== undefined) {
+            let preState: NewDRState = {
                 isEdit: true,
                 prevName: props.drToEdit.name,
                 prevZoneType: props.drToEdit.zoneType,
@@ -69,43 +68,36 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                 startFreq: props.drToEdit.startFreq,
                 endFreq: props.drToEdit.endFreq,
                 zoneType: props.drToEdit.zoneType,
-                circleLat: undefined,
-                circleLong: undefined,
-                radiusHeight: undefined,
-                rect1topLat: undefined,
-                rect1leftLong: undefined,
-                rect1bottomLat: undefined,
-                rect1rightLong: undefined,
-                rect2topLat: undefined,
-                rect2leftLong: undefined,
-                rect2bottomLat: undefined,
-                rect2rightLong: undefined,
             };
             switch (props.drToEdit.zoneType) {
                 case "Circle":
                     let circ = props.drToEdit.exclusionZone as ExclusionCircle;
-                    this.setState({ circleLat: circ.latitude, circleLong: circ.longitude, radiusHeight: circ.radiusKm });
+                    preState.circleLat = circ.latitude;
+                    preState.circleLong = circ.longitude;
+                    preState.radiusHeight = circ.radiusKm;
                     break;
                 case "One Rectangle":
                     let rect = props.drToEdit.exclusionZone as ExclusionRect;
-                    this.setState({ rect1topLat: rect.topLat, rect1leftLong: rect.leftLong, rect1bottomLat: rect.bottomLat, rect1rightLong: rect.rightLong });
+                    preState.rect1topLat = rect.topLat; preState.rect1leftLong = rect.leftLong;
+                    preState.rect1bottomLat = rect.bottomLat; preState.rect1rightLong = rect.rightLong;
                     break;
                 case "Two Rectangles":
                     let rect2 = props.drToEdit.exclusionZone as ExclusionTwoRect;
-                    this.setState({
-                        rect1topLat: rect2.rectangleOne.topLat, rect1leftLong: rect2.rectangleOne.leftLong,
-                        rect1bottomLat: rect2.rectangleOne.bottomLat, rect1rightLong: rect2.rectangleOne.rightLong,
-                        rect2topLat: rect2.rectangleTwo.topLat, rect2leftLong: rect2.rectangleTwo.leftLong,
-                        rect2bottomLat: rect2.rectangleTwo.bottomLat, rect2rightLong: rect2.rectangleTwo.rightLong
-                    });
+                    preState.rect1topLat = rect2.rectangleOne.topLat; preState.rect1leftLong = rect2.rectangleOne.leftLong;
+                    preState.rect1bottomLat = rect2.rectangleOne.bottomLat; preState.rect1rightLong = rect2.rectangleOne.rightLong;
+                    preState.rect2topLat = rect2.rectangleTwo.topLat; preState.rect2leftLong = rect2.rectangleTwo.leftLong;
+                    preState.rect2bottomLat = rect2.rectangleTwo.bottomLat; preState.rect2rightLong = rect2.rectangleTwo.rightLong;
                     break;
                 case "Horizon Distance":
                     let horz = props.drToEdit.exclusionZone as ExclusionHorizon;
-                    this.setState({ circleLat: horz.latitude, circleLong: horz.longitude, radiusHeight: horz.aglHeightM });
+                    preState.circleLat = horz.latitude;
+                    preState.circleLong = horz.longitude;
+                    preState.radiusHeight = horz.aglHeightM;
                     break;
                 default:
                     break;
             }
+            this.state = preState
 
         } else {
             this.state = {
@@ -197,8 +189,8 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
 
     private submit() {
         let newDr = this.stateToDeniedRegion();
-        if (this.props.isEdit) {
-            this.props.onEdit(newDr, this.state.prevName, this.state.prevZoneType);
+        if (this.state.isEdit) {
+            this.props.onCloseEdit(newDr, this.state.prevName, this.state.prevZoneType);
         } else {
             this.props.onAdd(newDr)
         }
@@ -456,16 +448,16 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                                     <FormGroup
                                         label="Left Longitude"
                                         isRequired={true}
-                                        fieldId="circ-long-form"
+                                        fieldId="rect-toplong-form"
                                     >
                                         <TextInput
                                             type="number"
-                                            id="circ-long-form"
-                                            name="circ-long-form"
-                                            aria-describedby="circ-long-form-helper"
-                                            value={this.state.circleLong}
+                                            id="rect-toplong-form"
+                                            name="rect-toplong-form"
+                                            aria-describedby="rect-toplong-form-helper"
+                                            value={this.state.rect1leftLong}
                                             onChange={(x) => this.setRectLeftLong(Number(x), 1)}
-                                            isValid={(this.state.circleLong !== undefined)}
+                                            isValid={(this.state.rect1leftLong !== undefined)}
                                         />
                                     </FormGroup>
                                 </GalleryItem>
@@ -708,7 +700,7 @@ export class NewDR extends React.Component<NewDRProps, NewDRState> {
                         </>
                     }
                     <GalleryItem>
-                        <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()}>Add</Button>
+                        <Button variant="primary" icon={<PlusCircleIcon />} onClick={() => this.submit()}>{this.state.isEdit?"Update": "Add"}</Button>
                     </GalleryItem>
                 </Gallery></>
         )

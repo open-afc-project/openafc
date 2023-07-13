@@ -37,7 +37,7 @@ from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from afcmodels.aaa import User, AFCConfig, CertId, Ruleset, \
                           Organization, AccessPointDeny
 from .auth import auth
-from .ratapi import build_task, nraToRegionStr, rulesetIdToRegionStr
+from .ratapi import build_task, rulesetIdToRegionStr
 from fst import DataIf
 import afctask
 from .. import als
@@ -46,13 +46,14 @@ from flask_login import current_user
 from .auth import auth
 import traceback
 from urllib.parse import urlparse
+from .ratapi import rulesets
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
 
 # We want to dynamically trim this this list e.g.
 # via environment variable, for the current deployment
-RULESETS = ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'TEST_FCC','DEMO_FCC', "BRAZIL_RULESETID"]
+RULESETS = rulesets()
 
 #: All views under this API blueprint
 module = flask.Blueprint('ap-afc', 'ap-afc')
@@ -437,34 +438,36 @@ class RatAfc(MethodView):
         ''' POST method for RAT AFC
         '''
         LOGGER.debug('RatAfc::post() from {}'.format(flask.request.url))
-
-        if self.__filter(flask.request.url, flask.request.json):
-            LOGGER.debug("request filtered out")
-            raise RuntimeError("Wrong analysisRequest.json from {}".format(flask.request.url))
-
-        # check request version
-        ver = flask.request.json["version"]
-        if not (ver in ALLOWED_VERSIONS):
-            raise VersionNotSupportedException([ver])
-
-        # start request
-        args = flask.request.json
-        # split multiple requests into an array of individual requests
-        requests = map(lambda r: {"availableSpectrumInquiryRequests": [r], "version": ver}, args["availableSpectrumInquiryRequests"])
-        LOGGER.debug("Running AFC analysis with params: %s", args)
-        request_type = 'AP-AFC'
-
-        results = {"availableSpectrumInquiryResponses": [], "version": ver}
-
         als_req_id = als.als_afc_req_id()
-        als.als_afc_request(req_id=als_req_id, req=args)
-        tasks = []
-        als_config_infos = []
-        uls_id = "Unknown"
-        geo_id = "Unknown"
-        indoor_certified = True
+        results = {"availableSpectrumInquiryResponses": []}
 
         try:
+            if self.__filter(flask.request.url, flask.request.json):
+                LOGGER.debug("request filtered out")
+                raise RuntimeError("Wrong analysisRequest.json from {}".format(flask.request.url))
+            # start request
+            args = flask.request.json
+            # check request version
+            ver = flask.request.json["version"]
+            if not (ver in ALLOWED_VERSIONS):
+                raise VersionNotSupportedException([ver])
+            results["version"] = ver;
+
+           
+            # split multiple requests into an array of individual requests
+            requests = map(lambda r: {"availableSpectrumInquiryRequests": [r], "version": ver}, args["availableSpectrumInquiryRequests"])
+            LOGGER.debug("Running AFC analysis with params: %s", args)
+            request_type = 'AP-AFC'
+
+
+            als.als_afc_request(req_id=als_req_id, req=args)
+            tasks = []
+            als_config_infos = []
+            uls_id = "Unknown"
+            geo_id = "Unknown"
+            indoor_certified = True
+
+
             for req_idx, request in enumerate(requests):
                 # authenticate
                 LOGGER.debug("Request: %s", request)
@@ -682,13 +685,22 @@ class RatAfc(MethodView):
         except AP_Exception as e:
             LOGGER.error('catching exception: %s',
                          getattr(e, 'message', repr(e)))
+            LOGGER.error('set up data %s',  args["availableSpectrumInquiryRequests"][0])
+            try:
+                requestId = args["availableSpectrumInquiryRequests"]\
+                                            [0]["requestId"]
+            except KeyError:
+                requestId = "not available"
+            try:
+               rulesetId = args["availableSpectrumInquiryRequests"]\
+                                            [0]["deviceDescriptor"]['certificationId'][0]["rulesetId"]
+            except KeyError:
+                rulesetId = "not available"
+
             results["availableSpectrumInquiryResponses"].append(
                 {
-                    'requestId': request["availableSpectrumInquiryRequests"]\
-                                            [0]["requestId"],
-                    'rulesetId': request["availableSpectrumInquiryRequests"]\
-                                            [0]["deviceDescriptor"]\
-                                            ["certificationId"][0]["rulesetId"],
+                    'requestId': requestId,
+                    'rulesetId': rulesetId,
                     'response': {
                         'responseCode': e.response_code,
                         'shortDescription': e.description,
@@ -696,6 +708,8 @@ class RatAfc(MethodView):
                             if e.supplemental_info is not None else None
                     }
                 })
+            LOGGER.error('results of error: %s', results)
+
         als.als_afc_response(req_id=als_req_id, resp=results)
         LOGGER.error("Final results: %s", str(results))
         resp = flask.make_response(flask.json.dumps(results), 200)

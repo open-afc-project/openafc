@@ -1,7 +1,7 @@
 import * as React from "react";
 import {
     AvailableSpectrumInquiryRequest, LinearPolygon, RadialPolygon, Ellipse,
-    DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange, Point, KnownRuleSetIds, VendorExtension
+    DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange, Point,  VendorExtension
 } from "../Lib/RatAfcTypes";
 import { logger } from "../Lib/Logger";
 import {
@@ -26,7 +26,8 @@ interface RatAfcFormParams {
     onSubmit: (a: AvailableSpectrumInquiryRequest) => Promise<void>,
     config: RatResponse<AFCConfigFile>,
     limit: Limit,
-    ellipseCenterPoint?: Point
+    ellipseCenterPoint?: Point,
+    rulesetIds: string[]
 }
 
 interface RatAfcFormState {
@@ -102,7 +103,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                     include: OperatingClassIncludeType.None
                 },
             ],
-            newCertificationRulesetId: KnownRuleSetIds[0],
+            newCertificationRulesetId: this.props.rulesetIds[0],
             vendorExtensions: [],
 
         };
@@ -152,12 +153,12 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
     addCertificationId(newCertificationId: CertificationId): void {
         const copyOfcertificationId = this.state.certificationId.slice();
         copyOfcertificationId.push({ id: newCertificationId.id, rulesetId: newCertificationId.rulesetId });
-        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: KnownRuleSetIds[0] });
+        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: this.props.rulesetIds[0] });
     }
 
     resetCertificationId(newCertificationId: CertificationId): void {
         const copyOfcertificationId = [{ id: newCertificationId.id, rulesetId: newCertificationId.rulesetId }];
-        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: KnownRuleSetIds[0] });
+        this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: this.props.rulesetIds[0] });
     }
 
     private updateOperatingClass(e: OperatingClass, i: number) {
@@ -433,7 +434,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                             </Tooltip>
                             {hasRole("Trial") ?
                                 <Button key="trial-cert-fill-btn" variant="link" sizes="sm"
-                                    onClick={() => this.resetCertificationId({ id: 'TestCertificationId', rulesetId: KnownRuleSetIds[0] })}>
+                                    onClick={() => this.resetCertificationId({ id: 'TestCertificationId', rulesetId: this.props.rulesetIds[0] })}>
                                     Fill Trial Cert Id
                                 </Button>
                                 : <></>
@@ -469,7 +470,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                                     placeholder="Ruleset"
                                 >
                                     {
-                                        KnownRuleSetIds.map((x) => (
+                                        this.props.rulesetIds.map((x) => (
                                             <FormSelectOption label={x} key={x} value={x} />
                                         ))
                                     }

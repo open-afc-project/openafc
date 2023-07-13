@@ -38,6 +38,7 @@ interface DRListState {
     rulesetIds: [],
     apMessageSuccess?: string,
     apMessageError?: string,
+    drForEditing?: DeniedRegion
 }
 
 /**
@@ -55,18 +56,19 @@ export class DRList extends React.Component<DRListProps, DRListState> {
             showingSaveWarning: false,
             allRegions: this.props.regions,
             isEditorOpen: false,
-            rulesetIds: []
+            rulesetIds: [],
+            drForEditing: undefined
         }
         this.loadCurrentDeniedRegions();
 
         getRulesetIds()
-        .then(res => {
-            if (res.kind === "Success") {
-                this.setState({ rulesetIds: res.result });
-            } else {
-                alert(res.description);
-            }
-        })
+            .then(res => {
+                if (res.kind === "Success") {
+                    this.setState({ rulesetIds: res.result });
+                } else {
+                    alert(res.description);
+                }
+            })
 
     }
 
@@ -83,14 +85,30 @@ export class DRList extends React.Component<DRListProps, DRListState> {
 
     }
 
-    onEdit = (dr: DeniedRegion, prevName: string, prevZoneType: string) => {
-        //Need to make changes here
-        this.setState({ deniedRegions: this.state.deniedRegions.concat(dr), deniedRegionsNeedSaving: true })
+    onOpenEdit = (id: string) => {
+        let drToEdit = this.state.deniedRegions.find(x => (x.regionStr == this.state.regionStr && x.name + "===" + x.zoneType == id));
+        this.setState({ drForEditing: drToEdit, isEditorOpen: true })
+    }
+
+    onCloseEdit = (dr: DeniedRegion, prevName: string, prevZoneType: string) => {
+        if (!!dr) {
+            let oldId = prevName + "===" + prevZoneType
+            let drToEdit = this.state.deniedRegions.findIndex(x => (x.regionStr == this.state.regionStr && x.name + "===" + x.zoneType == oldId));
+            if (drToEdit >= 0) {
+                //Need to copy the array so that the updated state will trigger
+                let newDrs = Array.from(this.state.deniedRegions);
+                newDrs[drToEdit] = dr;
+                this.setState({ deniedRegions: newDrs, deniedRegionsNeedSaving: true, isEditorOpen: false, drForEditing: undefined })
+            }
+        } else {
+            this.setState({ isEditorOpen: false, drForEditing: undefined })
+        }
+
     }
 
     deleteDR = (id: string) => {
         this.setState({
-            deniedRegions: this.state.deniedRegions.filter(x => !(x.regionStr == this.state.regionStr && x.name + x.zoneType == id)),
+            deniedRegions: this.state.deniedRegions.filter(x => !(x.regionStr == this.state.regionStr && x.name + "===" + x.zoneType == id)),
             deniedRegionsNeedSaving: true
         })
     }
@@ -132,7 +150,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
             })
     }
 
-    downloadBlob = (b:Blob, filename:string) => {
+    downloadBlob = (b: Blob, filename: string) => {
         const element = document.createElement("a");
         element.href = URL.createObjectURL(b);
         element.download = filename;
@@ -152,12 +170,13 @@ export class DRList extends React.Component<DRListProps, DRListState> {
     }
 
     closeEditor = () => {
-        this.setState({ isEditorOpen: false })
+        this.setState({ isEditorOpen: false, drForEditing: undefined })
     }
 
     openEditor = () => {
         this.setState({ isEditorOpen: true })
     }
+
 
     importList(ev) {
         // @ts-ignore
@@ -166,7 +185,7 @@ export class DRList extends React.Component<DRListProps, DRListState> {
         try {
             reader.onload = async () => {
                 try {
-                    const value:AccessPointListModel = {accessPoints:reader.result as string}
+                    const value: AccessPointListModel = { accessPoints: reader.result as string }
                     const putResp = await putAccessPointDenyList(value, this.props.userId);
                     if (putResp.kind === "Error") {
                         this.setState({ apMessageError: putResp.description, apMessageSuccess: undefined });
@@ -198,9 +217,9 @@ export class DRList extends React.Component<DRListProps, DRListState> {
 
     async exportList() {
         const res = await getAccessPointsDeny(this.props.userId);
-        if (res.kind ==  "Success") {
+        if (res.kind == "Success") {
             let b = new Blob([res.result], {
-                    type: "text/csv"
+                type: "text/csv"
             });
             this.downloadBlob(b, "denied_aps.json")
         }
@@ -208,141 +227,142 @@ export class DRList extends React.Component<DRListProps, DRListState> {
 
     render() {
         return (
-          <PageSection>
-            <Card>
-                <CardHead><CardHeader>Denied Region</CardHeader></CardHead>
-                <CardBody>
-                    <Modal
-                        title="Unsaved Changes"
-                        isOpen={this.state.showingSaveWarning}
-                        onClose={() => this.closeSaveWarning()}
-                        actions={[
-                            <Button key="confirm" variant="link" onClick={() => this.forceChangeRegion()}>
-                                Confirm
-                            </Button>,
-                            <Button key="cancel" variant="primary" onClick={() => this.closeSaveWarning()}>
-                                Cancel
+            <PageSection>
+                <Card>
+                    <CardHead><CardHeader>Denied Region</CardHeader></CardHead>
+                    <CardBody>
+                        <Modal
+                            title="Unsaved Changes"
+                            isOpen={this.state.showingSaveWarning}
+                            onClose={() => this.closeSaveWarning()}
+                            actions={[
+                                <Button key="confirm" variant="link" onClick={() => this.forceChangeRegion()}>
+                                    Confirm
+                                </Button>,
+                                <Button key="cancel" variant="primary" onClick={() => this.closeSaveWarning()}>
+                                    Cancel
+                                </Button>
+                            ]}
+                        >
+                            You have unsaved changes to the denied regions for the current country. Proceed and lose changes?
+                        </Modal>
+                        {this.state.messageError !== undefined && (
+                            <Alert
+                                variant="danger"
+                                title="Error"
+                                action={<AlertActionCloseButton onClose={() => this.setState({ messageError: undefined })} />}
+                            >{this.state.messageError}</Alert>
+                        )}
+
+                        {this.state.messageSuccess !== undefined && (
+                            <Alert
+                                variant="success"
+                                title="Success"
+                                action={<AlertActionCloseButton onClose={() => this.setState({ messageSuccess: undefined })} />}
+                            >{this.state.messageSuccess}</Alert>
+                        )}
+                        <Modal title="Add Denied Region"
+                            isOpen={this.state.isEditorOpen}
+                            onClose={() => this.closeEditor()}
+                            actions={[
+
+                                <Button key="cancel" variant="primary" onClick={() => this.closeEditor()}>
+                                    Close without saving 
+                                </Button>
+                            ]}>
+                            <NewDR onAdd={(dr) => this.onAdd(dr)} onCloseEdit={(dr, prevName, prevZone) => this.onCloseEdit(dr, prevName, prevZone)} currentRegionStr={this.state.regionStr} drToEdit={this.state.drForEditing} />
+                        </Modal>
+
+
+                        <GalleryItem>
+                            <FormGroup label="Country" fieldId="form-region" style={{ width: "25%" }}>
+                                <FormSelect
+                                    value={this.state.regionStr}
+                                    onChange={x => this.setUlsRegion(x)}
+                                    id="horizontal-form-uls-region"
+                                    name="horizontal-form-uls-region"
+                                    isValid={!!this.state.regionStr}
+                                    style={{ textAlign: "right" }}
+                                >
+                                    <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
+                                    {this.state.allRegions.map((option: string) => (
+                                        <FormSelectOption key={option} value={option} label={mapRegionCodeToName(option)} />
+                                    ))}
+                                </FormSelect>
+                            </FormGroup>
+                        </GalleryItem>
+                        <br />
+                        <DRTable
+                            deniedRegions={this.state.deniedRegions}
+                            onDelete={(id: string) => this.deleteDR(id)}
+                            currentRegionStr={this.state.regionStr}
+                            onOpenEdit={(id: string) => this.onOpenEdit(id)} />
+                        <br />
+                        {hasRole("Super") &&
+                            <Button key="AddNew" variant="primary" onClick={() => this.openEditor()} >
+                                Add New Denied Region
                             </Button>
-                        ]}
-                    >
-                        You have unsaved changes to the denied regions for the current country. Proceed and lose changes?
-                    </Modal>
-                    {this.state.messageError !== undefined && (
-                        <Alert
-                            variant="danger"
-                            title="Error"
-                            action={<AlertActionCloseButton onClose={() => this.setState({ messageError: undefined })} />}
-                        >{this.state.messageError}</Alert>
-                    )}
-
-                    {this.state.messageSuccess !== undefined && (
-                        <Alert
-                            variant="success"
-                            title="Success"
-                            action={<AlertActionCloseButton onClose={() => this.setState({ messageSuccess: undefined })} />}
-                        >{this.state.messageSuccess}</Alert>
-                    )}
-                    <Modal title="Add Denied Region"
-                        isOpen={this.state.isEditorOpen}
-                        onClose={() => this.closeEditor()}
-                        actions={[
-
-                            <Button key="cancel" variant="primary" onClick={() => this.closeEditor()}>
-                                Close
-                            </Button>
-                        ]}>
-                        <NewDR onAdd={(dr) => this.onAdd(dr)} onEdit={(dr) => this.onEdit(dr, dr.name, dr.zoneType)} currentRegionStr={this.state.regionStr} drToEdit={null} isEdit={false} />
-                    </Modal>
+                        }
+                        <br />
+                        {hasRole("Super") &&
+                            (<Button onClick={() => this.putDeniedRegions()}
+                                isDisabled={!this.state.deniedRegionsNeedSaving}>Submit Denied Regions
+                            </Button>)}
+                        <br />
+                        {hasRole("Super") &&
+                            (<Button onClick={() => this.downloadCSVFile()}>Download Denied Regions File</Button>)}
 
 
-                    <GalleryItem>
-                        <FormGroup label="Country" fieldId="form-region" style={{ width: "25%" }}>
-                            <FormSelect
-                                value={this.state.regionStr}
-                                onChange={x => this.setUlsRegion(x)}
-                                id="horizontal-form-uls-region"
-                                name="horizontal-form-uls-region"
-                                isValid={!!this.state.regionStr}
-                                style={{ textAlign: "right" }}
-                            >
-                                <FormSelectOption key={undefined} value={undefined} label="Select a Country" />
-                                {this.state.allRegions.map((option: string) => (
-                                    <FormSelectOption key={option} value={option} label={mapRegionCodeToName(option)} />
-                                ))}
-                            </FormSelect>
+
+                    </CardBody>
+                </Card >
+
+                <Card>
+                    <CardHead><CardHeader> Denied Access Points</CardHeader></CardHead>
+                    <CardBody>
+                        {hasRole("Admin") &&
+                            (<NewAPDeny onAdd={(ap: AccessPointModel) => this.onAddAPDeny(ap)} rulesetIds={this.state.rulesetIds} org={this.props.org} />)
+                        }
+
+                        <br />
+                        {this.state.apMessageError !== undefined && (
+                            <Alert
+                                variant="danger"
+                                title="Error"
+                                action={<AlertActionCloseButton onClose={() => this.setState({ apMessageError: undefined })} />}
+                            >{this.state.apMessageError}</Alert>
+                        )}
+
+                        {this.state.apMessageSuccess !== undefined && (
+                            <Alert
+                                variant="success"
+                                title="Success"
+                                action={<AlertActionCloseButton onClose={() => this.setState({ apMessageSuccess: undefined })} />}
+                            >{this.state.apMessageSuccess}</Alert>
+                        )}
+
+                        <FormGroup
+                            label="Import Deny AP List"
+                            fieldId="import-ap-deny-list"
+                        >
+                            <input
+                                // @ts-ignore
+                                type="file"
+                                name="import deny ap list"
+                                // @ts-ignore
+                                onChange={(ev) => this.importList(ev)}
+                            />
                         </FormGroup>
-                    </GalleryItem>
-                    <br />
-                    <DRTable
-                        deniedRegions={this.state.deniedRegions}
-                        onDelete={(id: string) => this.deleteDR(id)}
-                        currentRegionStr={this.state.regionStr} />
-                    <br />
-                    {hasRole("Super") &&
-                        <Button key="AddNew" variant="primary" onClick={() => this.openEditor()} >
-                            Add New Denied Region
-                        </Button>
-                    }
-                    <br />
-                    {hasRole("Super") &&
-                        (<Button onClick={() => this.putDeniedRegions()}
-                            isDisabled={!this.state.deniedRegionsNeedSaving}>Submit Denied Regions
-                        </Button>)}
-                    <br />
-                    {hasRole("Super") &&
-                        (<Button onClick={() => this.downloadCSVFile()}>Download Denied Regions File</Button>)}
 
+                        <br />
+                        {hasRole("Admin") &&
+                            (<Button onClick={() => this.exportList()}>Download Denied APs</Button>)}
+                        <br />
 
+                    </CardBody>
+                </Card>
 
-                </CardBody>
-            </Card >
-
-            <Card>
-                <CardHead><CardHeader> Denied Access Points</CardHeader></CardHead>
-                <CardBody>
-                    {hasRole("Admin") &&
-                    (<NewAPDeny onAdd={(ap: AccessPointModel) => this.onAddAPDeny(ap)} rulesetIds={this.state.rulesetIds} org={this.props.org}/>)
-                    }
-
-                    <br />
-                    {this.state.apMessageError !== undefined && (
-                        <Alert
-                            variant="danger"
-                            title="Error"
-                            action={<AlertActionCloseButton onClose={() => this.setState({ apMessageError: undefined })} />}
-                        >{this.state.apMessageError}</Alert>
-                    )}
-
-                    {this.state.apMessageSuccess !== undefined && (
-                        <Alert
-                            variant="success"
-                            title="Success"
-                            action={<AlertActionCloseButton onClose={() => this.setState({ apMessageSuccess: undefined })} />}
-                        >{this.state.apMessageSuccess}</Alert>
-                    )}
-
-                    <FormGroup
-                        label="Import Deny AP List"
-                        fieldId="import-ap-deny-list"
-                    >
-                       <input
-                          // @ts-ignore
-                          type="file"
-                          name="import deny ap list"
-                          // @ts-ignore
-                          onChange={(ev) => this.importList(ev)}
-                       />
-                    </FormGroup>
-
-                    <br/>
-                    {hasRole("Admin") &&
-                        (<Button onClick={() => this.exportList()}>Download Denied APs</Button>)}
-                    <br/>
-
-                </CardBody>
-            </Card>
-
-          </PageSection>
+            </PageSection>
         )
     }
 
@@ -371,7 +391,7 @@ export class DRListPage extends React.Component<{ regions: RatResponse<string[]>
         return (
             <PageSection id="ap-deny-list-page">
                 <UserContext.Consumer>{(u: UserState) => u.data.loggedIn &&
-                    <DRList regions={this.state.regions} userId ={u.data.userId} org={u.data.org}/>}
+                    <DRList regions={this.state.regions} userId={u.data.userId} org={u.data.org} />}
                 </UserContext.Consumer>
             </PageSection>
         )

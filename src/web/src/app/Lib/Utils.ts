@@ -117,18 +117,18 @@ export const maybe = <T>(obj: T | undefined, def: T) => obj === undefined ? def 
  * @param p2 point 2
  * @returns distance between `p1` and `p2` in miles
  */
-export const distancePtoP = (p1: { lat: number, lon: number }, p2: { lat: number, lon: number}) => {
+export const distancePtoP = (p1: { lat: number, lon: number }, p2: { lat: number, lon: number }) => {
     // https://www.movable-type.co.uk/scripts/latlong.html
     const R = 6371e3; // metres
     const phi1 = toRad(p1.lat); // φ, λ in radians
     const phi2 = toRad(p2.lat);
-    const deltaphi = toRad(p2.lat-p1.lat);
-    const deltalambda = toRad(p2.lon-p1.lon);
+    const deltaphi = toRad(p2.lat - p1.lat);
+    const deltalambda = toRad(p2.lon - p1.lon);
 
-    const a = Math.sin(deltaphi/2) * Math.sin(deltaphi/2) +
-              Math.cos(phi1) * Math.cos(phi2) *
-              Math.sin(deltalambda/2) * Math.sin(deltalambda/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a = Math.sin(deltaphi / 2) * Math.sin(deltaphi / 2) +
+        Math.cos(phi1) * Math.cos(phi2) *
+        Math.sin(deltalambda / 2) * Math.sin(deltalambda / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c / 1609; // in mi
 }
@@ -139,21 +139,21 @@ export const distancePtoP = (p1: { lat: number, lon: number }, p2: { lat: number
  * @param p2 point 2
  * @returns distance between `p1` and `p2` in meters
  */
-export const distancePtoPSI = (p1: { lat: number, lon: number }, p2: { lat: number, lon: number}) => {
+export const distancePtoPSI = (p1: { lat: number, lon: number }, p2: { lat: number, lon: number }) => {
     return distancePtoP(p1, p2) * 1609; // in m
 }
 
-export const bearing = (p1: { lat: number, lon: number }, p2: { lat: number, lon: number}) => {
+export const bearing = (p1: { lat: number, lon: number }, p2: { lat: number, lon: number }) => {
     // https://www.movable-type.co.uk/scripts/latlong.html
     const dphi = toRad(p2.lat - p1.lat); // radians
     const dlambda = toRad(p2.lon - p1.lon); // radians
     if (dphi === 0)
         return dlambda > 0 ? 90 : 270;
     const y = Math.sin(dlambda) * Math.cos(toRad(p2.lat));
-    const x = Math.cos(toRad(p1.lat))*Math.sin(toRad(p2.lat)) -
-            Math.sin(toRad(p1.lat))*Math.cos(toRad(p2.lat))*Math.cos(dlambda);
+    const x = Math.cos(toRad(p1.lat)) * Math.sin(toRad(p2.lat)) -
+        Math.sin(toRad(p1.lat)) * Math.cos(toRad(p2.lat)) * Math.cos(dlambda);
     const θ = Math.atan2(y, x);
-    const brng = (θ*180/Math.PI + 360) % 360; // bearing in degrees
+    const brng = (θ * 180 / Math.PI + 360) % 360; // bearing in degrees
     return brng;
 }
 
@@ -162,7 +162,7 @@ export const bearing = (p1: { lat: number, lon: number }, p2: { lat: number, lon
 export const getLastUsedRegionFromCookie = () => {
 
     var lastRegFromCookie: string | undefined = undefined;
-    if (document.cookie.indexOf("afc-config-last-region=") >=0) {
+    if (document.cookie.indexOf("afc-config-last-region=") >= 0) {
         lastRegFromCookie = document.cookie
             .split("; ")
             .find((row) => row.startsWith("afc-config-last-region="))
@@ -172,24 +172,12 @@ export const getLastUsedRegionFromCookie = () => {
         lastRegFromCookie = "US"
     }
 
-    // Update when region names change
-    switch (lastRegFromCookie) {
-        case "USA":
-            lastRegFromCookie = "US"
-            break;
-        case "CANADA":
-            lastRegFromCookie = "CA"
-            break;
-        default:
-            break;
-    }
-
     return lastRegFromCookie!;
 }
 
 // Converts the region codes to human readable text
-export const mapRegionCodeToName = (code:string)=>{
-    switch (code){
+export const mapRegionCodeToName = (code: string) => {
+    switch (code) {
         case 'US':
             return 'USA';
             break;
@@ -201,5 +189,13 @@ export const mapRegionCodeToName = (code:string)=>{
             break;
         default:
             return code;
+    }
+}
+
+export const trimmedRegionStr = (regionStr: string | undefined) => {
+    if (!!regionStr && (regionStr.startsWith("TEST_") || regionStr.startsWith("DEMO_"))) {
+        return regionStr.substring(5);
+    } else {
+        return regionStr;
     }
 }

@@ -2,13 +2,13 @@ import * as React from "react";
 import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition, Radio, CardHead, PageSection } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
-import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache, getRegions } from "../Lib/RatApi";
+import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache, getRegions, getAllowedRanges } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit, getDeniedRegionsCsvFile } from "../Lib/Admin";
-import { AllowedRangesDisplay,getDefaultRangesByRegion } from './AllowedRangesForm'
+import { AllowedRangesDisplay, getDefaultRangesByRegion } from './AllowedRangesForm'
 import DownloadContents from "../Components/DownloadContents";
 import { AFCFormUSACanada } from "./AFCFormUSACanada";
-import { mapRegionCodeToName } from "../Lib/Utils";
+import { mapRegionCodeToName, trimmedRegionStr } from "../Lib/Utils";
 
 /**
 * AFCForm.tsx: form for generating afc configuration files to be used to update server
@@ -42,6 +42,11 @@ export class AFCForm extends React.Component<
         let config = props.config as AFCConfigFile
         if (props.frequencyBands.length > 0) {
             config.freqBands = props.frequencyBands.filter((x) => (x.region == config.regionStr) || (!x.region && config.regionStr == 'US'));
+            if (config.freqBands.length == 0) {
+                // There were none - check if we are a demo/test config and then use the actual
+                config.freqBands = props.frequencyBands.filter((x) => (x.region == trimmedRegionStr(config.regionStr)) || (!x.region && config.regionStr == 'US'));
+            }
+
         } else {
             config.freqBands = getDefaultRangesByRegion(config.regionStr ?? "US");
         }
@@ -58,13 +63,29 @@ export class AFCForm extends React.Component<
         }
     }
 
+    private getFrequencyRanges = async (regionStr: string | undefined) => {
+        return getAllowedRanges().then(rangeRes => {
+            if (rangeRes.kind === "Success") {
+                // Get for the region if present
+                let freqBands = rangeRes.result.filter((x) => (x.region == regionStr) || (!x.region && regionStr == 'US'));
+                if (freqBands.length == 0) {
+                    // There were none - check if we are a demo/test config and then use the actual
+                    freqBands = rangeRes.result.filter((x) => (x.region == trimmedRegionStr(regionStr)) || (!x.region && regionStr == 'US'));
+                }
+                return freqBands;
+            } else {
+                return getDefaultRangesByRegion(trimmedRegionStr(regionStr) ?? "US");
+            }
+
+        })
+    }
+
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => {
-        this.setState({ config: Object.assign(this.state.config, { regionStr: n }) });
+       // this.setState({ config: Object.assign(this.state.config, { regionStr: n }) });
         // region changed by user, reload the coresponding configuration for that region
         getAfcConfigFile(n).then(
             res => {
-                logger.error("conf response: " + res);
                 if (res.kind === "Success") {
                     this.updateEntireConfigState(res.result);
                     document.cookie = `afc-config-last-region=${n};max-age=2592000;path='/';SameSite=strict`
@@ -72,8 +93,8 @@ export class AFCForm extends React.Component<
                     if (res.errorCode == 404) {
 
                         let defConf = getDefaultAfcConf(n);
-                        defConf.regionStr = n;
                         this.updateEntireConfigState(defConf);
+                        document.cookie = `afc-config-last-region=${n};max-age=2592000;path='/';SameSite=strict`
                         this.setState({ messageSuccess: "No config found for this region, using region default" });
                     } else {
                         this.setState({ messageError: res.description, messageSuccess: undefined });
@@ -164,7 +185,7 @@ export class AFCForm extends React.Component<
                 if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
                 if (propModel.win2ConfidenceCombined! < 0 || propModel.win2ConfidenceCombined! > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
-               break;
+                break;
             default:
                 return err();
         }
@@ -188,12 +209,18 @@ export class AFCForm extends React.Component<
                 config.deniedRegionFile = "";
             }
 
-            this.setState({
-                config: config,
-                antennaPatternData: {
-                    defaultAntennaPattern: config.ulsDefaultAntennaType,
-                }
-            });
+            this.getFrequencyRanges(config.regionStr!).then(rangeRes => {
+                config.freqBands = rangeRes;
+                this.setState({
+                    config: config,
+                    antennaPatternData: {
+                        defaultAntennaPattern: config.ulsDefaultAntennaType,
+                    }
+
+                }, () => {
+                    document.cookie = `afc-config-last-region=${config.regionStr};max-age=2592000;path='/';SameSite=strict`
+                });
+            })
         });
     }
 
@@ -219,9 +246,6 @@ export class AFCForm extends React.Component<
 
     private reset = () => {
         let config = getDefaultAfcConf(this.state.config.regionStr);
-        if (config.regionStr != this.state.config.regionStr) { // this is a demo/test config likely because they don't match
-            config.regionStr = this.state.config.regionStr
-        }
         config.freqBands = this.props.frequencyBands.filter((x) => (x.region == this.state.config.regionStr) || (!x.region && this.state.config.regionStr == 'US'))
         this.updateEntireConfigState(config);
     }
@@ -366,7 +390,7 @@ export class AFCForm extends React.Component<
                         <AFCFormUSACanada
                             config={this.state.config}
                             antennaPatterns={this.state.antennaPatternData}
-                            frequencyBands={this.props.frequencyBands.filter((x) => x.region == this.state.config.regionStr)}
+                            frequencyBands={this.state.config.freqBands.filter((x) => x.region == this.state.config.regionStr)}
                             limit={this.props.limit}
                             updateConfig={(x) => this.updateConfigFromComponent(x)}
                             updateAntennaData={(x) => this.updateAntennaDataFromComponent(x)} />

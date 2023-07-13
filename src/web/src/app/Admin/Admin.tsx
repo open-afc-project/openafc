@@ -200,7 +200,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
   private removeFreqBand = (index: number) => {
     const { frequencyBands } = this.state;
     frequencyBands.splice(index, 1);
-    this.setState({ frequencyBands: frequencyBands })
+    this.setState({ frequencyBands: frequencyBands, frequencyBandsNeedSaving: true  })
   }
 
   private addNewBand = () => {

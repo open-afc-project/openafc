@@ -215,8 +215,6 @@ class AfcManager
 
 	private:
 
-		void importGUIjsonVersion1_0(const QJsonObject &jsonObj);
-		void importGUIjsonVersion1_3(const QJsonObject &jsonObj);
 		void importGUIjsonVersion1_4(const QJsonObject &jsonObj);
 
 		void runPointAnalysis();

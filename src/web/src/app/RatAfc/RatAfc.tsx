@@ -30,7 +30,8 @@ import { rotate, meterOffsetToDeg } from "../Lib/Utils"
  */
 interface RatAfcProps {
     afcConfig: RatResponse<AFCConfigFile>
-    limit: RatResponse<Limit>
+    limit: RatResponse<Limit>,
+    rulesetIds: RatResponse<string[]>
 }
 
 /**
@@ -56,7 +57,7 @@ interface RatAfcState {
     fullJsonResponse?: string,
     redChannels?: AvailableChannelInfo[],
     blackChannels?: AvailableChannelInfo[],
-    showSendDirect: boolean,
+    showSendDirect: boolean, // shows the send direct box used for legacy support - turned off (false) for now
     sendDirectModalOpen: boolean,
     sendDirectValue?: string
 }
@@ -199,7 +200,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                     longitude: -100
                 },
                 sendDirectModalOpen: false,
-                showSendDirect: true
+                showSendDirect: false
             }
         } else {
             this.state = {
@@ -225,7 +226,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                     longitude: -100
                 },
                 sendDirectModalOpen: false,
-                showSendDirect: true
+                showSendDirect: false
             };
         }
         this.changeMapLocationChild = React.createRef();
@@ -396,6 +397,11 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
         this.setState({ sendDirectModalOpen: b })
     }
 
+    /***
+     * Sends a json string to an eariler version of the API directly (not using the controls on the page to 
+     * generate the values).  Used to support legacy values when/if supported during transitions.  Uses the 
+     * showSendDirect state property to hide/show
+     */
     private sendDirect(jsonString: string | undefined) {
         if (!!jsonString) {
             this.setState({ sendDirectModalOpen: false, status: "Info" });
@@ -416,6 +422,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                             config={this.props.afcConfig}
                             onSubmit={req => this.sendRequest(req)}
                             ellipseCenterPoint={!this.state.clickedMapPoint ? undefined : this.state.clickedMapPoint}
+                            rulesetIds={this.props.rulesetIds.kind == "Success" ? this.props.rulesetIds.result : ['No rulesets']}
                         />
                         {this.state.showSendDirect && (
                             <>
