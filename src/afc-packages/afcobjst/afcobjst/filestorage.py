@@ -88,7 +88,6 @@ class ObjIntLocalFS(ObjInt):
                 os.remove(self._file_name)
 
     def __mkdir_local(self, path):
-        objst_app.logger.debug('__mkdir_local({})'.format(path))
         os.makedirs(path, exist_ok=True)
 
 
@@ -126,7 +125,6 @@ class ObjIntGoogleCloudBucket(ObjInt):
 class Objstorage:
     def open(self, name):
         """ Create ObjInt instance """
-        objst_app.logger.debug("Objstorage.open({})".format(name))
         if objst_app.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
             return ObjIntGoogleCloudBucket(name)
         if objst_app.config["AFC_OBJST_MEDIA"] == "LocalFS":
@@ -141,8 +139,8 @@ def get_local_path(path):
 @objst_app.route('/'+'<path:path>', methods=['POST'])
 def post(path):
     ''' File upload handler. '''
+    objst_app.logger.debug(f'post {path}')
     try:
-        objst_app.logger.debug('post method={}, path={}'.format(request.method, path))
         path = get_local_path(path)
 
         data = None
@@ -172,7 +170,7 @@ def post(path):
 @objst_app.route('/'+'<path:path>', methods=["DELETE"])
 def delete(path):
     ''' File/dir delete handler. '''
-    objst_app.logger.debug('delete method={}, path={}'.format(request.method, path))
+    objst_app.logger.debug(f'delete {path}')
     path = get_local_path(path)
 
     try:
@@ -190,7 +188,7 @@ def delete(path):
 @objst_app.route('/'+'<path:path>', methods=['HEAD'])  # handle URL with filename
 def head(path):
     ''' Is file exist handler. '''
-    objst_app.logger.debug('head method={}, path={}'.format(request.method, path))
+    objst_app.logger.debug(f'head {path}')
     path = get_local_path(path)
 
     try:
@@ -208,7 +206,7 @@ def head(path):
 @objst_app.route('/'+'<path:path>', methods=['GET'])  # handle URL with filename
 def get(path):
     ''' File download handler. '''
-    objst_app.logger.debug('get method={}, path={}'.format(request.method, path))
+    objst_app.logger.debug(f'get {path}')
     path = get_local_path(path)
 
     try:
