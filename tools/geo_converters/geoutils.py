@@ -643,6 +643,7 @@ class Boundaries:
     pixel_size_lon        -- Pixel size in longitudinal direction
     pixel_size_overridden -- True if pixel size overridden - with command line
                              parameters, map->geodetic conversion or adjustment
+    cross_180             -- Crosses 180 longitude. None if not known
     """
     def __init__(self, filename: Optional[str] = None,
                  top: Optional[float] = None, bottom: Optional[float] = None,
@@ -682,6 +683,7 @@ class Boundaries:
         self.right = right
         self.pixel_size_lat: Optional[float]
         self.pixel_size_lon: Optional[float]
+        self.cross_180: Optional[bool] = None
         if pixel_size is not None:
             self.pixel_size_lat = self.pixel_size_lon = pixel_size
         elif pixels_per_degree is not None:
@@ -741,6 +743,16 @@ class Boundaries:
                     continue
                 self.pixel_size_overridden = True
                 setattr(self, attr, 1 / round(1 / v))
+        if (self.left is not None) and (self.right is not None):
+            left, right = self.left, self.right
+            while left > 180:
+                left -= 360
+                right -= 360
+            while left <= -180:
+                left += 360
+                right += 360
+            assert -180 < left <= 180
+            self.cross_180 = right >= 180
 
     def __eq__(self, other: Any) -> bool:
         """ Equality comparison """

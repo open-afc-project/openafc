@@ -515,24 +515,26 @@ Let's create combined tiled global terrain model.
 1. Download Globe files from [Get Data Tiles-Global Land One-km Base Elevation Project | NCEI](https://www.ngdc.noaa.gov/mgg/topo/gltiles.html) as [All Tiles in One .zip file](https://www.ngdc.noaa.gov/mgg/topo/DATATILES/elev/all10g.zip)   
   Unpack files to *all10* directory
 
-2. SRTM data - finding source data to download is not that easy (albeit probably possible). Assume we have them in *srtm_geoidal_hgt* directory.
+2. Download header files for Globe files from [Topography and Digital Terrain Data | NCEI](https://www.ngdc.noaa.gov/mgg/topo/elev/esri/hdr/) - to the same *all10* directory
 
-3. Ascribe coordinate system to GLOBE files in *all10* and convert them to .tif. Result in *globe_geoidal_tif*:  
+3. SRTM data - finding source data to download is not that easy (albeit probably possible). Assume we have them in *srtm_geoidal_hgt* directory.
+
+4. Ascribe coordinate system to GLOBE files in *all10* and convert them to .tif. Result in *globe_geoidal_tif*:  
 ```
 mkdir globe_geoidal_tif
-for fn in all10/* ; do gdal_translate -a_srs '+proj=longlat +datum=WGS84' $fn globe_geoidal_tif/${fn##*/}.tif ; done
+for fn in all10/???? ; do gdal_translate -a_srs '+proj=longlat +datum=WGS84' $fn globe_geoidal_tif/${fn##*/}.tif ; done
 ```  
 Takes ~1 minute. YMMV
 
-4. Convert heights of files in *globe_geoidal_tif* directory to ellipsoidal. Result in *globe_wgs84_tif*:  
+5. Convert heights of files in *globe_geoidal_tif* directory to ellipsoidal. Result in *globe_wgs84_tif*:  
    `to_wgs84.py --src_geoid GEOID_DIR/wrd_ge/wrd_ge_prd_egm2008.gtx --out_dir globe_wgs84_tif 'globe_geoidal_tif/*.tif'`  
 Takes ~1 minute on 8 CPUs. YMMV
 
-5. Convert heights of SRTM in *srtm_geoidal_hgt* directory to WGS84. Result in *wgs84_tif* directory:  
+6. Convert heights of SRTM in *srtm_geoidal_hgt* directory to WGS84. Result in *wgs84_tif* directory:  
    `to_wgs84.py --src_geoid GEOID_DIR/wrd_ge/wrd_ge_prd_egm2008.gtx --out_ext .tif --out_dir wgs84_tif 'srtm_geoidal_hgt/*.hgt'`  
 Takes ~40 minutes on 8 CPUs. YMMV
 
-6. Add GLOBE tiles to the north of 60N to *wgs84_tif* directory:  
+7. Add GLOBE tiles to the north of 60N to *wgs84_tif* directory:  
 ```
 tiler.py --bottom 60 --margin 1 \
     --tile_pattern 'wgs84_tif/{LAT_HEM}{lat_d:02}{LON_HEM}{lon_l:03}_globe.tif' \
@@ -540,7 +542,7 @@ tiler.py --bottom 60 --margin 1 \
 ```  
 Takes ~8 minutes on 8 CPUs. YMMV
 
-7. Add GLOBE tiles to the south of 567S to *wgs84_tif* directory:  
+8. Add GLOBE tiles to the south of 567S to *wgs84_tif* directory:  
 ```
 tiler.py --top=-56 --margin 1 \
     --tile_pattern 'wgs84_tif/{LAT_HEM}{lat_d:02}{LON_HEM}{lon_l:03}_globe.tif' \
@@ -548,7 +550,7 @@ tiler.py --top=-56 --margin 1 \
 ```
 Takes ~9 minutes on 8 CPUs. YMMV
 
-8. Convert TIFF files in *wgs84_tif* directory to PNG in *wgs84_png*:  
+9. Convert TIFF files in *wgs84_tif* directory to PNG in *wgs84_png*:  
    `to_png.py --data_type UInt16 --out_dir wgs84_png 'wgs84_tif/*.tif'`  
 Takes ~45 minutes on 8 CPUs. YMMV
 

@@ -194,6 +194,7 @@ def conversion_worker(
                  pixel_size_lon=boundaries.pixel_size_lon
                  if boundaries.pixel_size_overridden else None,
                  src_geoid=src_geoid, dst_geoid=dst_geoid,
+                 center_lon_180=bool(boundaries.cross_180),
                  out_format=out_format, format_params=format_params,
                  overwrite=True, quiet=quiet)
         if not success:
@@ -499,11 +500,8 @@ def main(argv: List[str]) -> None:
                 dest_dir = os.path.dirname(src_info.src_dst.dst) or "."
                 if not os.path.isdir(dest_dir):
                     os.makedirs(dest_dir)
-                if args.out_ext is not None:
-                    kwargs["dst"] = \
-                        os.path.splitext(kwargs["dst"])[0] + args.out_ext
                 kwargs["boundaries"] = src_info.boundaries
-                kwargs["quiet"] = True
+                kwargs["quiet"] = args.out_dir is not None
                 pool.apply_async(conversion_worker, kwds=kwargs,
                                  callback=conversionCompleter)
             pool.close()
