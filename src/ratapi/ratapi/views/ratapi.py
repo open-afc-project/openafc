@@ -162,7 +162,7 @@ class GuiConfig(MethodView):
         resp = flask.jsonify(
             uls_url=flask.url_for('ratapi-v1.UlsFiles'),
             antenna_url=flask.url_for('ratapi-v1.AntennaFiles'),
-            history_url=flask.url_for("files.history"),
+            history_url=flask.url_for("ratapi-v1.History0"),
             afcconfig_defaults=flask.url_for(
                 'ratapi-v1.AfcConfigFile', filename='default'),
             lidar_bounds=flask.url_for('ratapi-v1.LiDAR_Bounds'),
@@ -1063,9 +1063,9 @@ class AfcRulesetIds(MethodView):
         return resp
 
 
-class DbgFiles(MethodView):
+class History(MethodView):
     def get(self, path=None):
-        LOGGER.debug(f"DbgFiles::get({path})")
+        LOGGER.debug(f"History::get({path})")
         user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
         conf = ObjstConfig()
         try:
@@ -1083,7 +1083,7 @@ class DbgFiles(MethodView):
             return f"Unreachable history host. {exc}"
 
 
-class DbgFiles0(DbgFiles):
+class History0(History):
     pass
 
 
@@ -1146,10 +1146,10 @@ module.add_url_rule('/rulesetIds',
                     view_func=AfcRulesetIds.as_view('AfcRulesetIds'))
 module.add_url_rule('/healthy', view_func=HealthCheck.as_view('HealthCheck'))
 
-module.add_url_rule('/files/history',
-                    view_func=DbgFiles0.as_view('DbgFiles0'))
-module.add_url_rule('/files/history/<path:path>',
-                    view_func=DbgFiles.as_view('DbgFiles'))
+module.add_url_rule('/history',
+                    view_func=History0.as_view('History0'))
+module.add_url_rule('/history/<path:path>',
+                    view_func=History.as_view('History'))
 module.add_url_rule('/ulsFiles/',
                     view_func=UlsFiles.as_view('UlsFiles'))
 module.add_url_rule('/antennaFiles/',

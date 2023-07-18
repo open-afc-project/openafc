@@ -321,7 +321,6 @@ def create_app(config_override=None):
         'www.index': '/www/index.html',
         'files.uls_db': '/ratapi/v1/files/uls_db',
         'files.antenna_pattern': '/ratapi/v1/files/antenna_pattern',
-        'files.history': '/ratapi/v1/files/history',
     })
 
     def external_url_handler(error, endpoint, _values):

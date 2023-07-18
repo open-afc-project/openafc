@@ -140,7 +140,7 @@ class TestHistory(BaseTestCase):
         self.assertIn(resp.status_code, (200,))
         index_url = resp.url
 
-        self.history_url = urljoin(index_url, '../ratapi/v1/files/history')
+        self.history_url = urljoin(index_url, '../ratapi/v1/history')
         history = self.httpsession.get(self.history_url)
         self.history = history
 
