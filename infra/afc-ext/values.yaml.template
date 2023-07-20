@@ -97,3 +97,4 @@ env_template:
     afc_objst_host: %AFC_OBJST_HOST%
     afc_objst_stor_port: %AFC_OBJST_PORT%
     afc_objst_hist_port: %AFC_OBJST_HIST_PORT%
+    afc_objst_scheme: "HTTP"

@@ -62,7 +62,7 @@ spec:
             - name: AFC_OBJST_PORT
               value: {{ .Values.service.objst.fileStoragePort | quote }}
             - name: AFC_OBJST_SCHEME
-              value: "HTTP"
+              value: {{ .Values.service.objst.scheme | quote }}
             # worker params
             - name: CELERY_TYPE
               value: external
@@ -71,6 +71,8 @@ spec:
               value: msghnd
             - name: ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
               value: "{{ .Values.service.kafka.loadBalancerIP }}:{{ .Values.service.kafka.port }}"
+            - name: AFC_MSGHND_WORKERS
+              value: {{ .Values.service.msghnd.threads_per_pod | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:

@@ -75,6 +75,8 @@ spec:
               value: {{ .Values.env_template.dispatcher.afc_objst_host | quote }}
             - name: AFC_OBJST_PORT
               value: {{ .Values.env_template.dispatcher.afc_objst_stor_port | quote }}
+            - name: AFC_OBJST_SCHEME
+              value: {{ .Values.env_template.dispatcher.afc_objst_scheme | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       # volumes:

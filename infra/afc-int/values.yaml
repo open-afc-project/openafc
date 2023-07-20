@@ -72,6 +72,7 @@ service:
     port: 80
     containerPort: 8000
     loadBalancerIP: 10.255.128.212
+    threads_per_pod: 2
   webui:
     type: LoadBalancer
     port: 80
@@ -85,6 +86,7 @@ service:
     fileStoragePort: 5000
     historyViewPort: 4999
     loadBalancerIP: 10.255.128.215
+    scheme: "HTTP"
   kafka:
     type: LoadBalancer
     port: 9092
