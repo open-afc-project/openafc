@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 replicaCount:
-  msqhnd: 1
+  msghnd: 1
   objst: 1
   rmq: 1
   worker: 10
