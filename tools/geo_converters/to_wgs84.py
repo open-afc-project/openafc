@@ -144,7 +144,7 @@ def conversion_worker(
         src_dst: SrcDst, boundaries: Boundaries, resampling: str,
         src_geoids: Geoids, dst_geoids: Geoids, out_format: Optional[str],
         format_params: List[str], overwrite: bool, quiet: bool,
-        remove_src: bool) -> ConvResult:
+        remove_src: bool, keep_ext: List[str]) -> ConvResult:
     """ Worker function performing the conversion
 
     Arguments:
@@ -159,10 +159,12 @@ def conversion_worker(
     quiet         -- True to not print anything, returning message
                      instead
     remove_src    -- Remove source file
+    keep_ext      -- List of extensions to keep
     Returns ConvResult object
     """
     stem, ext = os.path.splitext(src_dst.dst)
-    temp_file = stem + ".incomplete" + ext
+    incomplete_stem = stem + ".incomplete"
+    temp_file = incomplete_stem + ext
     start_time = datetime.datetime.now()
     try:
         if os.path.isfile(src_dst.dst) and (not overwrite):
@@ -208,8 +210,27 @@ def conversion_worker(
         if not quiet:
             print(f"Renaming '{temp_file}' to '{src_dst.dst}'")
         os.rename(temp_file, src_dst.dst)
+
         if remove_src:
             os.unlink(src_dst.src)
+
+        for other_generated in glob.glob(incomplete_stem + "*"):
+            if not os.path.isfile(other_generated):
+                continue
+            other_ext = os.path.splitext(other_generated)[1]
+            if other_ext in keep_ext:
+                other_target = stem + other_ext
+                if os.path.isfile(other_target):
+                    if not quiet:
+                        print(f"Removing '{other_target}'")
+                    os.unlink(other_target)
+                if not quiet:
+                    print(f"Renaming '{other_generated}' to '{other_target}'")
+                os.rename(other_generated, other_target)
+            else:
+                if not quiet:
+                    print(f"Removing '{other_generated}'")
+                os.unlink(other_generated)
         return ConvResult(filename=src_dst.src, status=ConvStatus.Success,
                           duration=datetime.datetime.now()-start_time, msg=msg)
     except (Exception, KeyboardInterrupt, SystemExit) as ex:
@@ -309,6 +330,10 @@ def main(argv: List[str]) -> None:
         "--out_ext", metavar=".EXT",
         help="Extension for output files to use in case of mass conversion. "
         "Default is to keep original extension")
+    argument_parser.add_argument(
+        "--keep_ext", metavar=".EXT", action="append", default=[],
+        help="Also keep generated files of given extension. This parameter "
+        "may be specified several times")
     argument_parser.add_argument(
         "--overwrite", action="store_true",
         help="Overwrite target file if exists. By default if mass conversion "
@@ -466,7 +491,8 @@ def main(argv: List[str]) -> None:
             "out_format": args.format,
             "format_params": args.format_param,
             "overwrite": args.overwrite,
-            "remove_src": args.remove_src}
+            "remove_src": args.remove_src,
+            "keep_ext": args.keep_ext}
         start_time = datetime.datetime.now()
 
         total_count = len(src_infos)

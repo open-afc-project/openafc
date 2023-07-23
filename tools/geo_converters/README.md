@@ -335,6 +335,7 @@ Here `FILES` may be:
 |--resampling **METHOD**|Resampling method to use. See [gdalwarp -r](https://gdal.org/programs/gdalwarp.html#cmdoption-gdalwarp-r) for more details. Default is 'nearest' for byte data (e.g. land usage), 'cubic' otherwise|
 |--out_dir **DIRECTORY**|Do the mass conversion to given directory. In this case `FILES` in command line is a list of files to convert|
 |--out_ext **EXT**|Extension of resulting files. May be used in mass conversion. By default source files' extension is kept|
+|--keep_ext **EXT**|Don't remove generated files with given extension. Useful for file formats that involve files of several extensions (e.g. EHdr that involves .bil, .hdr and .prj). This parameter may be specified several times|
 |--overwrite|Overwrite already existing resulting files. By default already existing resulting files considered to be completed, thus facilitating process restartability|
 |--remove_src|Remove source files after successful conversion. May help save disk space (e.g. when dealing with huge LiDAR files)|
 |--threads [-]**N**[%]|How many CPUs to use (if positive), leave unused (if negative) or percent of CPUs (if followed by %)|
