@@ -15,11 +15,13 @@ import logging
 import shutil
 import abc
 import waitress
+from posix_ipc import Semaphore, O_CREAT
 from flask import Flask, request, abort, make_response
 import google.cloud.storage
 from .objstconf import ObjstConfigInternal
 
 NET_TIMEOUT = 600 # The amount of time, in seconds, to wait for the server response
+SEM_TIMEOUT = 60 # Per file semaphore timeout
 
 objst_app = Flask(__name__)
 objst_app.config.from_object(ObjstConfigInternal())
@@ -66,26 +68,48 @@ class ObjInt:
 
 
 class ObjIntLocalFS(ObjInt):
+    def __lock(self, name):
+        sem_name = "/" + name[1:].replace("/", "_")
+        sem = Semaphore(sem_name, O_CREAT, initial_value = 1)
+        sem.acquire(timeout=SEM_TIMEOUT)
+        return sem
+
+    def __unlock(self, sem):
+        sem.release()
+        sem.close()
+
     def write(self, data):
         self.__mkdir_local(os.path.dirname(self._file_name))
+        sem = self.__lock(self._file_name)
         with open(self._file_name, 'wb') as f:
             f.write(data)
+        self.__unlock(sem)
 
     def read(self):
         if not os.path.isfile(self._file_name):
             return None
+        sem = self.__lock(self._file_name)
         with open(self._file_name, "rb") as hfile:
-            return hfile.read()
+            ret = hfile.read()
+        self.__unlock(sem)
+        return ret
 
     def head(self):
-        return os.path.exists(self._file_name)
+        sem = self.__lock(self._file_name)
+        ret = os.path.exists(self._file_name)
+        self.__unlock(sem)
+        return ret
 
     def delete(self):
+        """ During recursive dir delete only the dir is protected by semaphore from
+        parallel use. Files in the dir arn't protected. """
         if os.path.exists(self._file_name):
+            sem = self.__lock(self._file_name)
             if os.path.isdir(self._file_name):
                 shutil.rmtree(self._file_name)
             else:
                 os.remove(self._file_name)
+            self.__unlock(sem)
 
     def __mkdir_local(self, path):
         os.makedirs(path, exist_ok=True)
