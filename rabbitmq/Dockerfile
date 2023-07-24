@@ -1,3 +1,12 @@
-FROM rabbitmq:3.8-management
-COPY rabbitmq.conf /etc/rabbitmq/
-EXPOSE 15672 5672
+FROM rabbitmq:3.12.2-alpine
+COPY rabbitmq/rabbitmq.conf /etc/rabbitmq/
+# Add debugging env if configured
+ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
+COPY rabbitmq/devel.sh /
+RUN chmod +x /devel.sh
+RUN /devel.sh
+#
+ENTRYPOINT ["docker-entrypoint.sh"]
+CMD ["rabbitmq-server"]
+HEALTHCHECK --start-period=20s --interval=10s --timeout=5s --retries=3 \
+    CMD rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms || exit 1

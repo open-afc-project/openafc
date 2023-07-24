@@ -147,8 +147,7 @@ build_dev_server() {
   cd ${wd}
 
   # build afc rabbit MQ docker image
-  cd ${wd}/rabbitmq && docker_build_and_push Dockerfile ${RMQ}:${tag} ${push} &
-  cd ${wd}
+  docker_build_and_push ${wd}/rabbitmq/Dockerfile ${RMQ}:${tag} ${push} &
 
   # build afc dispatcher docker image
   docker_build_and_push ${wd}/dispatcher/Dockerfile ${DISPATCHER}:${tag} ${push} &

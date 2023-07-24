@@ -256,7 +256,7 @@ docker build . -t ratdb -f ratdb/Dockerfile
 
 docler build . -t objst -f objstorage/Dockerfile
 
-cd rabbitmq && docker build . -t rmq -f Dockerfile; cd ../
+docker build . -t rmq -f rabbitmq/Dockerfile
 
 docker build . -t dispatcher -f dispatcher/Dockerfile
 
