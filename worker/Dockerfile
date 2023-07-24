@@ -32,7 +32,6 @@ RUN strip --strip-unneeded /root/afc/__install/lib/*.so
 # Stage Install
 #
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
-
 COPY --from=build_image /root/afc/__install /usr/
 
 COPY src/afc-packages /wd/afc-packages
@@ -67,7 +66,11 @@ COPY --from=install_image / /
 
 LABEL revision="afc-worker-al"
 ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
-ENV AFC_WORKER_USER ${AFC_WORKER_USER}
+ENV AFC_WORKER_USER=${AFC_WORKER_USER}
+ENV AFC_WORKER_CELERY_OPTS=${AFC_WORKER_CELERY_OPTS:-"rat_1"}
+ENV AFC_WORKER_CELERY_LOG=${AFC_WORKER_CELERY_LOG:-WARNING}
+ENV AFC_WORKER_ENG_TOUT=${AFC_WORKER_ENG_TOUT:-600}
+ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 WORKDIR /wd
 ENV PGPORT=5432
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs

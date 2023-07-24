@@ -25,6 +25,10 @@ class WorkerConfig(BrokerConfigurator):
         BrokerConfigurator.__init__(self)
         self.AFC_ENGINE = os.getenv("AFC_ENGINE")
         self.AFC_ENGINE_LOG_LVL = os.getenv("AFC_ENGINE_LOG_LVL", "info")
+        self.AFC_WORKER_CELERY_LOG = os.getenv("AFC_WORKER_CELERY_LOG")
+        # worker task engine timeout
+        # the default value predefined by image environment (Dockefile)
+        self.AFC_WORKER_ENG_TOUT = os.getenv("AFC_WORKER_ENG_TOUT")
 
 conf = WorkerConfig()
 
@@ -61,9 +65,9 @@ def run(prot, host, port, state_root, request_type, task_id, hash_val,
 
         :param hash_val: md5 of request and config files
     """
-    LOGGER.debug(
-        "run(prot={}, host={}, port={}, root={}, task_id={}, hash={}, opts={}, mntroot={})".
-                 format(prot, host, port, state_root, task_id, hash_val, runtime_opts, mntroot))
+    LOGGER.debug(f"run(prot={prot}, host={host}, port={port}, root={state_root}, "
+                 f"task_id={task_id}, hash={hash_val}, opts={runtime_opts}, "
+                 f"mntroot={mntroot}, timeout={conf.AFC_WORKER_ENG_TOUT}")
 
     # local pathes
     tmpdir = os.path.join(state_root, task_id)
@@ -98,17 +102,19 @@ def run(prot, host, port, state_root, request_type, task_id, hash_val,
                 "--runtime_opt=" + str(runtime_opts),
             ]
             LOGGER.debug(cmd)
+            retcode = 0
             proc = subprocess.Popen(cmd, stderr=err_file, stdout=log_file)
             try:
-                retcode = proc.wait(timeout=afctask.AFC_ENG_TIMEOUT)
-            except:
-                LOGGER.error("run(): afc-engine timeout error")
+                retcode = proc.wait(timeout=int(conf.AFC_WORKER_ENG_TOUT))
+            except Exception as e:
+                LOGGER.error(f"run(): afc-engine timeout "
+                             f"{conf.AFC_WORKER_ENG_TOUT} error {type(e)}")
                 raise subprocess.CalledProcessError(retcode, cmd)
             if retcode:
                 raise subprocess.CalledProcessError(retcode, cmd)
 
         except subprocess.CalledProcessError as error:
-            LOGGER.error("run(): afc-egine error")
+            LOGGER.error("run(): afc-engine error")
             proc = None
             err_file.close()  # close the file just in case it is still open from writing
             log_file.close()

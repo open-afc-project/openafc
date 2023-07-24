@@ -25,6 +25,7 @@ AFC_RATAPI_LOG_LEVEL = os.getenv("AFC_RATAPI_LOG_LEVEL", "WARNING")
 LOG_HANDLERS = [
     logging.StreamHandler(),
 ]
+
 SECRET_KEY = None  # Must be set in app config
 
 # Flask-SQLAlchemy settings
@@ -156,3 +157,11 @@ class OIDCConfigurator(object):
                     self.OIDC_CLIENT_SECRET=data['OIDC_CLIENT_SECRET']
                     self.OIDC_CLIENT_ID=data['OIDC_CLIENT_ID']
                     self.OIDC_DISCOVERY_URL=data['OIDC_DISCOVERY_URL']
+
+class MsghndConfigurator(object):
+    """Keep configuration for msghnd"""
+
+    def __init__(self) -> None:
+        # msghnd task RatAfc timeout
+        # the default value predefined by image environment (Dockefile)
+        self.AFC_MSGHND_RATAFC_TOUT = int(os.getenv("AFC_MSGHND_RATAFC_TOUT"))

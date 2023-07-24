@@ -21,6 +21,7 @@ RUN echo "AFC_APP_TYPE = 'msghnd'" >> /etc/xdg/fbrat/ratapi.conf
 # Build Message Handler application
 #
 FROM alpine:3.17 as msghnd.build
+ENV PYTHONUNBUFFERED=1
 COPY --from=msghnd.preinstall / /
 # Development env
 RUN apk add --update --no-cache cmake ninja
@@ -38,6 +39,7 @@ ninja -j$(nproc) install
 # Install Message Handler application
 #
 FROM alpine:3.17 as msghnd.install
+ENV PYTHONUNBUFFERED=1
 COPY --from=msghnd.preinstall / /
 COPY --from=msghnd.build /wd/__install /usr/
 #
@@ -62,7 +64,14 @@ ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 COPY msghnd/devel.sh /wd/
 RUN chmod +x /wd/devel.sh
 RUN /wd/devel.sh
-#
+# msghnd environment variables default values
+ENV AFC_MSGHND_BIND=${AFC_MSGHND_BIND:-"0.0.0.0:8000"}
+ENV AFC_MSGHND_PID=${AFC_MSGHND_PID:-"/run/gunicorn/openafc_app.pid"}
+ENV AFC_MSGHND_ACCESS_LOG=${AFC_MSGHND_ACCESS_LOG:-"/proc/self/fd/2"}
+ENV AFC_MSGHND_ERROR_LOG=${AFC_MSGHND_ERROR_LOG:-"/proc/self/fd/2"}
+ENV AFC_MSGHND_TIMEOUT=${AFC_MSGHND_TIMEOUT:-180}
+ENV AFC_MSGHND_WORKERS=${AFC_MSGHND_WORKERS:-20}
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
+ENV AFC_MSGHND_RATAFC_TOUT=${AFC_MSGHND_RATAFC_TOUT:-600}
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]

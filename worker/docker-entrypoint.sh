@@ -5,6 +5,21 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
+AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
+case "$AFC_DEVEL_ENV" in
+  "devel")
+    echo "Running debug profile" 
+    echo "AFC_WORKER_CELERY_OPTIONS = ${AFC_WORKER_CELERY_OPTS}"
+    echo "AFC_WORKER_CELERY_LOG = ${AFC_WORKER_CELERY_LOG}"
+    echo "AFC_WORKER_ENG_TOUT = ${AFC_WORKER_ENG_TOUT}"
+    ;;
+  "production")
+    echo "Running production profile"
+    ;;
+  *)
+    echo "Uknown profile"
+    ;;
+esac
 
 if [ ! -z ${AFC_AEP_ENABLE+x} ]; then
 	if [ -z "$AFC_AEP_DEBUG" ]; then
@@ -42,9 +57,6 @@ else
 	export AFC_ENGINE="/usr/bin/afc-engine"
 fi
 
-#celery
-CELERY_OPTIONS=${CELERY_OPTIONS:="rat_1"}
-CELERY_LOG=${CELERY_LOG:=WARNING}
-celery multi start $CELERY_OPTIONS -A afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$CELERY_LOG &
+celery multi start $AFC_WORKER_CELERY_OPTS -A afc_worker --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$AFC_WORKER_CELERY_LOG &
 
 sleep infinity

@@ -1,6 +1,6 @@
 # coding=utf-8
 
-# Copyright © 2021 Broadcom. All rights reserved. The term "Broadcom"
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
@@ -16,7 +16,6 @@ import time
 import os
 
 LOGGER = logging.getLogger(__name__)
-AFC_ENG_TIMEOUT = 600
 
 class Task():
     """ Replacement for AsyncResult class and self serialization"""
@@ -27,7 +26,7 @@ class Task():
     STAT_FAILURE = "FAILURE"
 
     def __init__(self, task_id, dataif, hash_val=None, history_dir=None):
-        LOGGER.debug("task.__init__(task_id={})".format(task_id))
+        LOGGER.debug(f"Task.__init__() {task_id}")
         self.__dataif = dataif
         self.__task_id = task_id
         self.__stat = {
@@ -66,8 +65,8 @@ class Task():
         self.__stat = stat
         return self.__stat
 
-    def wait(self, delay=2, timeout=AFC_ENG_TIMEOUT):
-        LOGGER.debug("task.wait()")
+    def wait(self, timeout, delay=2):
+        LOGGER.debug("Task.wait() timeout={timeout}")
         stat = None
         time0 = time.time()
         while True:

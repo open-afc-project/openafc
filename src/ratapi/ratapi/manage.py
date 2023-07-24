@@ -1534,7 +1534,6 @@ def main():
     manager.add_command('org', Organization())
     manager.add_command('cert_id', CertificationId())
     manager.add_command('cfg', Config())
-    manager.add_command('org', Organization())
 
     manager.run()
 

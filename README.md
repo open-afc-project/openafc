@@ -399,8 +399,6 @@ services:
       - AFC_OBJST_HOST=objst
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_SCHEME=HTTP
-      # worker params
-      - CELERY_TYPE=external
       # ALS params
       - ALS_KAFKA_SERVER_ID=rat_server
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
@@ -445,7 +443,7 @@ services:
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_SCHEME=HTTP
       # worker params
-      - CELERY_OPTIONS=rat_1 rat_2
+      - AFC_WORKER_CELERY_OPTIONS=rat_1 rat_2
       # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
@@ -645,8 +643,8 @@ chown 999:999 /var/databases/pgdata
 |AFC_AEP_CACHE_MAX_SIZE|`1000000000`|worker|Max cache size|
 |AFC_AEP_REAL_MOUNTPOINT|`/mnt/nfs/rat_transfer`|worker|Redirect read access to there|
 |AFC_AEP_ENGINE_MOUNTPOINT|value of AFC_AEP_REAL_MOUNTPOINT|worker|Redirect read access from here|
-|CELERY_OPTIONS|`rat_1`|worker|Celery app instance to use|
-|CELERY_LOG|`INFO`|worker|Celery log level. `ERROR` or `INFO` or `DEBUG`|
+|AFC_WORKER_CELERY_OPTIONS|`rat_1`|worker|Celery app instance to use|
+|AFC_WORKER_CELERY_LOG|`INFO`|worker|Celery log level. `ERROR` or `INFO` or `DEBUG`|
 |AFC_ENGINE_LOG_LVL|'info'|worker|afc-engine log level|
 |AFC_MSGHND_NAME|msghnd|dispatcher|Message handler service hostname|
 |AFC_MSGHND_PORT|8000|dispatcher|Message handler service HTTP port|

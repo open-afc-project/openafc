@@ -27,8 +27,10 @@ import hashlib
 import uuid
 from flask.views import MethodView
 import werkzeug.exceptions
+import threading
+import inspect
 import six
-from appcfg import ObjstConfig
+from appcfg import MsghndConfigurator
 from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, \
 RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG, \
 RNTM_OPT_CERT_ID
@@ -48,7 +50,6 @@ import traceback
 from urllib.parse import urlparse
 from .ratapi import rulesets
 
-#: Logger for this module
 LOGGER = logging.getLogger(__name__)
 
 # We want to dynamically trim this this list e.g.
@@ -59,7 +60,6 @@ RULESETS = rulesets()
 module = flask.Blueprint('ap-afc', 'ap-afc')
 
 ALLOWED_VERSIONS = ['1.4']
-RULESET_VERSIONS = ['1.4']
 
 class AP_Exception(Exception):
     ''' Exception type used for RAT AFC respones
@@ -227,7 +227,8 @@ def in_progress(t):
     # get progress and ETA
     LOGGER.debug('in_progress()')
     task_stat = t.getStat()
-    if task_stat['runtime_opts'] & RNTM_OPT_GUI:
+    if not isinstance(task_stat['runtime_opts'], type(None)) and \
+        task_stat['runtime_opts'] & RNTM_OPT_GUI:
         return flask.jsonify(
             percent=0,
             message='In progress...'
@@ -326,11 +327,12 @@ class AlsConfigInfo:
 class RatAfc(MethodView):
     ''' RAT AFC resources
     '''
-
     def _auth_cert_id(self, cert_id, ruleset):
         ''' Authenticate certification id. Return new indoor value
             for bell application
         '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__}::{inspect.stack()[0][3]}()")
         indoor_certified = True
 
         certId = CertId.query.filter_by(certification_id=cert_id).first()
@@ -343,7 +345,9 @@ class RatAfc(MethodView):
         now = datetime.datetime.now()
         delta = now - certId.refreshed_at
         if delta.days > 1:
-            LOGGER.debug('RatAfc::_auth_cert_id(): stale CertId %s', certId.certification_id )
+            LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__}::{inspect.stack()[0][3]}()"
+                     f" stale CertId {certId.certification_id}")
 
         if not certId.location & certId.OUTDOOR:
             raise DeviceUnallowedException("Outdoor operation not allowed")
@@ -355,11 +359,14 @@ class RatAfc(MethodView):
         return indoor_certified
 
     def _auth_ap(self, serial_number, prefix, cert_id, rulesets, version):
-        ''' Authenticate an access point. If must match the serial_number and certification_id in the database to be valid
+        ''' Authenticate an access point. If must match the serial_number and
+            certification_id in the database to be valid
         '''
-        LOGGER.debug('RatAfc::_auth_ap()')
-        LOGGER.debug('Starting auth_ap,serial: %s; prefix: %s; certId: %s; ruleset %s; version %s',
-                     serial_number, prefix, cert_id, rulesets, version)
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__}::{inspect.stack()[0][3]}()"
+                     f" Starting auth_ap,serial: {serial_number};"
+                     f" prefix: {prefix}; certId: {cert_id};"
+                     f" ruleset {rulesets}; version {version}")
 
         deny_ap = AccessPointDeny.query.filter_by(serial_number=serial_number).\
                   filter_by(certification_id=cert_id).first()
@@ -408,13 +415,14 @@ class RatAfc(MethodView):
 
     def get(self):
         ''' GET method for Analysis Status '''
-        LOGGER.debug('RatAfc::get()')
-
         task_id = flask.request.args['task_id']
-        LOGGER.debug("RatAfc.get() task_id={}".format(task_id))
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__}::{inspect.stack()[0][3]}()"
+                     f" task_id={task_id}")
 
         dataif = DataIf()
-        t = afctask.Task(task_id, dataif)
+        t = afctask.Task(task_id, dataif,
+                         MsghndConfigurator().AFC_MSGHND_RATAFC_TOUT)
         task_stat = t.get()
 
         if t.ready(task_stat):  # The task is done
@@ -428,8 +436,9 @@ class RatAfc(MethodView):
                 # 'PROGRESS' is task.state value, not task.result['status']
                 return response_map[afctask.Task.STAT_PROGRESS](t)
             else:  # The task yet not started
-                LOGGER.debug('RatAfc::get() not ready state: %s',
-                             task_stat['status'])
+                LOGGER.debug(f"({threading.get_native_id()})"
+                             f" {self.__class__}::{inspect.stack()[0][3]}()"
+                             f" not ready state: {task_stat['status']}")
                 return flask.make_response(
                     flask.json.dumps(dict(percent=0, message='Pending...')),
                     202)
@@ -437,13 +446,16 @@ class RatAfc(MethodView):
     def post(self):
         ''' POST method for RAT AFC
         '''
-        LOGGER.debug('RatAfc::post() from {}'.format(flask.request.url))
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__}::{inspect.stack()[0][3]}()")
         als_req_id = als.als_afc_req_id()
         results = {"availableSpectrumInquiryResponses": []}
 
         try:
             if self.__filter(flask.request.url, flask.request.json):
-                LOGGER.debug("request filtered out")
+                LOGGER.debug(f"({threading.get_native_id()})"
+                             f" {self.__class__}::{inspect.stack()[0][3]}()"
+                             f" request filtered out")
                 raise RuntimeError("Wrong analysisRequest.json from {}".format(flask.request.url))
             # start request
             args = flask.request.json
@@ -456,7 +468,9 @@ class RatAfc(MethodView):
            
             # split multiple requests into an array of individual requests
             requests = map(lambda r: {"availableSpectrumInquiryRequests": [r], "version": ver}, args["availableSpectrumInquiryRequests"])
-            LOGGER.debug("Running AFC analysis with params: %s", args)
+            LOGGER.debug(f"({threading.get_native_id()})"
+                         f" {self.__class__}::{inspect.stack()[0][3]}()"
+                         f" Running AFC analysis with params: {args}")
             request_type = 'AP-AFC'
 
 
@@ -470,7 +484,9 @@ class RatAfc(MethodView):
 
             for req_idx, request in enumerate(requests):
                 # authenticate
-                LOGGER.debug("Request: %s", request)
+                LOGGER.debug(f"({threading.get_native_id()})"
+                             f" {self.__class__}::{inspect.stack()[0][3]}()"
+                             f" Request: {request}")
                 device_desc = request["availableSpectrumInquiryRequests"][0].get(
                     'deviceDescriptor')
 
@@ -542,7 +558,9 @@ class RatAfc(MethodView):
                 if opt == 'True':
                     runtime_opts |= RNTM_OPT_NOCACHE
                 runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
-                LOGGER.debug('RatAfc::post() runtime %d', runtime_opts)
+                LOGGER.debug(f"({threading.get_native_id()})"
+                             f" {self.__class__}::{inspect.stack()[0][3]}()"
+                             f" runtime {runtime_opts}")
 
                 task_id = str(uuid.uuid4())
                 dataif = DataIf()
@@ -588,7 +606,9 @@ class RatAfc(MethodView):
                     else:
                         resp_data = zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
                         dataAsJson = json.loads(resp_data)
-                        LOGGER.debug("dataAsJson: %s", dataAsJson)
+                        LOGGER.debug(f"({threading.get_native_id()})"
+                                     f" {self.__class__}::{inspect.stack()[0][3]}()"
+                                     f" dataAsJson: {dataAsJson}")
                         actualResult = dataAsJson.get(
                             "availableSpectrumInquiryResponses")
                         results["availableSpectrumInquiryResponses"].append(
@@ -612,7 +632,9 @@ class RatAfc(MethodView):
                         runtime_opts)
 
                 conn_type = flask.request.args.get('conn_type')
-                LOGGER.debug("RatAfc:post() conn_type={}".format(conn_type))
+                LOGGER.debug(f"({threading.get_native_id()})"
+                             f" {self.__class__}::{inspect.stack()[0][3]}()"
+                             f" RatAfc:post() conn_type={conn_type}")
                 t = afctask.Task(task_id, dataif, hash_val, history_dir)
                 if conn_type == 'async':
                     if len(requests) > 1:
@@ -631,15 +653,20 @@ class RatAfc(MethodView):
                 uls_id = "Unknown"
                 geo_id = "Unknown"
                 try:
-                    task_stat = t.wait()
-                    LOGGER.debug("Task complete: %s", task_stat)
+                    task_stat = t.wait(timeout=MsghndConfigurator().AFC_MSGHND_RATAFC_TOUT)
+                    LOGGER.debug(f"({threading.get_native_id()})"
+                                 f" {self.__class__}::{inspect.stack()[0][3]}()"
+                                 f" Task complete: {task_stat['status']}")
+
                     if t.successful(task_stat):
                         taskResponse = response_map[task_stat['status']](t)
                         # we might be able to clean this up by having the result
                         # functions not return a full response object.
                         # need to check everywhere they are called.
                         dataAsJson = json.loads(taskResponse.data)
-                        LOGGER.debug("dataAsJson: %s", dataAsJson)
+                        LOGGER.debug(f"({threading.get_native_id()})"
+                                     f" {self.__class__}::{inspect.stack()[0][3]}()"
+                                     f" dataAsJson: {dataAsJson}")
                         engine_result_ext = \
                             _get_vendor_extension(dataAsJson,
                                                   "openAfc.used_data")
@@ -650,25 +677,27 @@ class RatAfc(MethodView):
                         actualResult = dataAsJson.get(
                             "availableSpectrumInquiryResponses")
                         if actualResult is not None:
-                            # LOGGER.debug("actualResult: %s", actualResult)
                             results["availableSpectrumInquiryResponses"].append(
                                 actualResult[0])
                         else:
-                            LOGGER.debug("actualResult was None")
+                            LOGGER.debug(f"({threading.get_native_id()})"
+                                         f" {self.__class__}::{inspect.stack()[0][3]}()"
+                                         f" actualResult was None")
                             results["availableSpectrumInquiryResponses"].append(
                                 dataAsJson)
                     else:
-                        LOGGER.debug("Task was not successful")
                         taskResponse = response_map[task_stat['status']](t)
                         dataAsJson = json.loads(taskResponse.data)
-                        LOGGER.debug(
-                            "Unsuccessful dataAsJson: %s", dataAsJson)
+                        LOGGER.debug(f"({threading.get_native_id()})"
+                                     f" {self.__class__}::{inspect.stack()[0][3]}()"
+                                     f" Task unsuccessful"
+                                     f" dataAsJson: {dataAsJson}")
                         results["availableSpectrumInquiryResponses"].append(
                             dataAsJson)
 
                 except Exception as e:
-                    LOGGER.error('catching and rethrowing exception: %s',
-                                 getattr(e, 'message', repr(e)))
+                    LOGGER.error(f"catching and rethrowing exception "
+                                 f"{type(e).__name__} : {e}")
                     LOGGER.debug(''.join(traceback.format_exception(None, e, e.__traceback__)))
                     raise AP_Exception(-1,
                                        'The task state is invalid. '
@@ -685,7 +714,8 @@ class RatAfc(MethodView):
         except AP_Exception as e:
             LOGGER.error('catching exception: %s',
                          getattr(e, 'message', repr(e)))
-            LOGGER.error('set up data %s',  args["availableSpectrumInquiryRequests"][0])
+            LOGGER.error('set up data %s',
+                         args["availableSpectrumInquiryRequests"][0])
             try:
                 requestId = args["availableSpectrumInquiryRequests"]\
                                             [0]["requestId"]

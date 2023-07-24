@@ -63,9 +63,6 @@ spec:
               value: {{ .Values.service.objst.fileStoragePort | quote }}
             - name: AFC_OBJST_SCHEME
               value: {{ .Values.service.objst.scheme | quote }}
-            # worker params
-            - name: CELERY_TYPE
-              value: external
             # ALS params
             - name: ALS_KAFKA_SERVER_ID
               value: msghnd
