@@ -74,6 +74,8 @@ ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 COPY rat_server/devel.sh /wd/
 RUN chmod +x /wd/devel.sh
 RUN /wd/devel.sh
+# TODO to rename following variable after source split
+ENV AFC_MSGHND_RATAFC_TOUT=${AFC_MSGHND_RATAFC_TOUT:-600}
 COPY rat_server/entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
