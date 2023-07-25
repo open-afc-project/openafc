@@ -1,5 +1,23 @@
 # Release Note
+## **Version and Date**
+|Version|**OA-619*|
+| :- | :- |
+|**Date**|**07/21/2023**|
 
+## **Issues Addressed**
+ * Jira OA-619: Add support of 320 MHz AP channels 
+ * Jira OA-621: Show RAS Exclusion and Show LiDAR bounds in Google Map are not working
+ 
+## **Interface Changes**
+ * In Virtual AP, added Operating Class 137 and updated the channel map and the plots to include the 360 MHz channels.
+
+## **Testing Done**
+ * OA-619: Ran FSP1 (from WFA Test Vector) without Operating Class 137 in the request and got exact same results as before.
+ * Ran FSP1 with Operating Class 137 and the result made sense. Confirmed that exc_thr.csv included the 360 MHz channels. Confirmed the inclusion of 360 MHz channels in Virtual AP and the chanenl EIRP plot. Confirmed inclusion of Operating Class 137 in the ap-request and ap-response json files.
+ * OA-621: Confirmed that can view RAS Exclusion in Virtual AP map
+
+## **Open Issues** 
+ * Show LiDAR map in Virtual AP map is not working. Denied Region will be tested separately once the kmz creation is fixed (need to talk to BRCM).
 ## **Version and Date**
 |Version|**OA-667, 697,712, 743*|
 | :- | :- |

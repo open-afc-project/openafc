@@ -141,6 +141,9 @@ class AfcManager
 		// add building database bounds to OGR layer
 		void addBuildingDatabaseTiles(OGRLayer *layer);
 
+		// add denied regions to OGR layer
+		void addDeniedRegions(OGRLayer *layer);
+
 		// Export calculations and FS locations in geoJSON format for GUI
 		void exportGUIjson(const QString &exportJsonPath, const std::string& tempDir);
 

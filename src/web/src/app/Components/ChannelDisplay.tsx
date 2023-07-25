@@ -18,6 +18,8 @@ const emptyChannels: ChannelData[] = [
     { channelWidth: 80, startFrequency: 5945, channels: Array(14).fill(0).map((_, i) => ({ name: String(7 + 16 * i), color: "grey", maxEIRP: 0 })) },
     { channelWidth: 160, startFrequency: 5945, channels: Array(7).fill(0).map((_, i) => ({ name: String(15 + 32 * i), color: "grey", maxEIRP: 0 })) },
     { channelWidth: 20, startFrequency: 5925, channels: Array(1).fill(0).map((_, i) => ({ name: String(2 + 4 * i), color: "grey", maxEIRP: 0 })) },
+    { channelWidth: 320, startFrequency: 5945, channels: Array(3).fill(0).map((_, i) => ({ name: String(31 + 64 * i), color: "grey", maxEIRP: 0 }))},
+    { channelWidth: 320, startFrequency: 6105, channels: Array(3).fill(0).map((_, i) => ({ name: String(63 + 64 * i), color: "grey", maxEIRP: 0 }))},
 ];
 
 interface ChannelProps {

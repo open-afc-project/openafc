@@ -43,7 +43,8 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
         132: "Operating Class 132 (40 MHz)",
         133: "Operating Class 133 (80 MHz)",
         134: "Operating Class 134 (160 MHz)",
-        136: "Operating Class 136 (20 MHz)"
+        136: "Operating Class 136 (20 MHz)",
+        137: "Operating Class 137 (320 MHz)"
     }
 
     private setInclude(n: OperatingClassIncludeType) {
@@ -97,6 +98,12 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
                 interval = 4;
                 count = 1;
                 break;
+            case 137:
+                start = 31;
+                interval = 32;
+                count = 6;
+                break;
+
             default:
                 return [];
         }
@@ -119,7 +126,7 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
         if (isChecked && !this.props.operatingClass.channels) {
             this.setChannels([selectedChannel]);
         } else {
-            var prevSelections = this.props.operatingClass.channels.slice();
+            var prevSelections = this.props.operatingClass.channels!.slice();
 
             if (isChecked) {
                 if (prevSelections.includes(selectedChannel)) {

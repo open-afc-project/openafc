@@ -162,6 +162,16 @@ namespace OpClass
 		}
 	};
 
+	const OpClass GlobalOpClass_137 =
+	{
+		137,
+		320,
+		5950,
+		{
+			31,  63,  95, 127, 159, 191
+		}
+	};
+
 	const OpClass GlobalOpClass_135 =
 	{
 		135,
@@ -189,7 +199,8 @@ namespace OpClass
 		GlobalOpClass_134,
 		// Opclass 135 is a non contiguous 80+80 channels.
 		// GlobalOpClass_135,
-		GlobalOpClass_136
+		GlobalOpClass_136,
+		GlobalOpClass_137
 	};
 
 	// Hardcode for PSD to only consider 20MHz channels
@@ -781,7 +792,7 @@ void AfcManager::initializeDatabases()
 	_numRegion = regionPolygonFileStrList.size();
 
 	for(int regionIdx=0; regionIdx<_numRegion; ++regionIdx) {
-	    std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(regionPolygonFileStrList[regionIdx], _regionPolygonResolution);
+		std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(regionPolygonFileStrList[regionIdx], _regionPolygonResolution);
 		PolygonClass *regionPoly = PolygonClass::combinePolygons(polyList);
 		regionPoly->name = _regionPolygonFileList[regionIdx];
 
@@ -790,7 +801,7 @@ void AfcManager::initializeDatabases()
 		double checkArea = 0.0;
 		for(int polyIdx=0; polyIdx<(int) polyList.size(); ++polyIdx) {
 			PolygonClass *poly = polyList[polyIdx];
-            checkArea += poly->comp_bdy_area();
+			checkArea += poly->comp_bdy_area();
 			delete poly;
 		}
 
@@ -802,7 +813,7 @@ void AfcManager::initializeDatabases()
 		LOGGER_INFO(logger) << "REGION: " << regionPolygonFileStrList[regionIdx] << " AREA: " << regionArea;
 	}
 
-    double rlanLatitude, rlanLongitude, rlanHeightInput;
+	double rlanLatitude, rlanLongitude, rlanHeightInput;
 	std::tie(rlanLatitude, rlanLongitude, rlanHeightInput) = _rlanLLA;
 	int xIdx = (int) floor(rlanLongitude/_regionPolygonResolution + 0.5);
 	int yIdx = (int) floor(rlanLatitude/_regionPolygonResolution + 0.5);
@@ -810,7 +821,7 @@ void AfcManager::initializeDatabases()
 	bool found = false;
 	for(int polyIdx=0; (polyIdx<(int) _regionPolygonList.size())&&(!found); ++polyIdx) {
 		PolygonClass *poly = _regionPolygonList[polyIdx];
-    
+
 		if (poly->in_bdy_area(xIdx, yIdx)) {
 			found = true;
 		}
@@ -1088,7 +1099,7 @@ void AfcManager::initializeDatabases()
 		/**********************************************************************************/
 	} else if (_propEnvMethod == CConst::popDensityMapPropEnvMethod) {
 		if (!(_rainForestFile.empty())) {
-	    	std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(_rainForestFile, _regionPolygonResolution);
+			std::vector<PolygonClass *> polyList = PolygonClass::readMultiGeometry(_rainForestFile, _regionPolygonResolution);
 			_rainForestPolygon = PolygonClass::combinePolygons(polyList);
 
 			_rainForestPolygon->name = "Rain Forest";
@@ -1408,7 +1419,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			}
 			_missingParams << requiredParams;
 			if (!requiredParams.contains("rulesetId")) {
-		        	_rulesetId = certificationIdArray.at(0)["rulesetId"].toString();
+				_rulesetId = certificationIdArray.at(0)["rulesetId"].toString();
 			}
 		}
 		/**********************************************************************/
@@ -1762,11 +1773,11 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 						if (_certifiedIndoor) {
 							_rlanType = RLANType::RLAN_INDOOR;
 						} else {
-			                                 LOGGER_INFO(logger)
-				                               << _serialNumber.toStdString()
-                                                               << " indicated as deployed indoor "
-                                                               << "but is not certified as Indoor. "
-                                                               << "So it is analyzed as outdoor";
+							LOGGER_INFO(logger)
+								<< _serialNumber.toStdString()
+								<< " indicated as deployed indoor "
+								<< "but is not certified as Indoor. "
+								<< "So it is analyzed as outdoor";
 
 							_rlanType = RLANType::RLAN_OUTDOOR;
 						}
@@ -2343,7 +2354,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): minPSD is missing.");
 	}
 
-    bool reportUnavailableSpectrumFlag;
+	bool reportUnavailableSpectrumFlag;
 	if (jsonObj.contains("reportUnavailableSpectrum") && !jsonObj["reportUnavailableSpectrum"].isUndefined()) {
 		reportUnavailableSpectrumFlag = jsonObj["reportUnavailableSpectrum"].toBool();
 	} else {
@@ -2351,8 +2362,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	}
 
 	if (reportUnavailableSpectrumFlag) {
-	    if (jsonObj.contains("reportUnavailPSDdBPerMHz") && !jsonObj["reportUnavailPSDdBPerMHz"].isUndefined()) {
-		    _reportUnavailPSDdBmPerMHz = jsonObj["reportUnavailPSDdBPerMHz"].toDouble();
+		if (jsonObj.contains("reportUnavailPSDdBPerMHz") && !jsonObj["reportUnavailPSDdBPerMHz"].isUndefined()) {
+			_reportUnavailPSDdBmPerMHz = jsonObj["reportUnavailPSDdBPerMHz"].toDouble();
 		} else {
 			throw std::runtime_error("AfcManager::importConfigAFCjson(): reportUnavailableSpectrum set but reportUnavailPSDdBPerMHz is missing.");
 		}
@@ -2391,19 +2402,19 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	}
 
 	if (jsonObj.contains("densityThrUrban") && !jsonObj["densityThrUrban"].isUndefined()) {
-	    _densityThrUrban = jsonObj["densityThrUrban"].toDouble();
+		_densityThrUrban = jsonObj["densityThrUrban"].toDouble();
 	} else {
 		_densityThrUrban = 486.75e-6;
 	}
 
 	if (jsonObj.contains("densityThrSuburban") && !jsonObj["densityThrSuburban"].isUndefined()) {
-	    _densityThrSuburban = jsonObj["densityThrSuburban"].toDouble();
+		_densityThrSuburban = jsonObj["densityThrSuburban"].toDouble();
 	} else {
 		_densityThrSuburban = 211.205e-6;
 	}
 
 	if (jsonObj.contains("densityThrRural") && !jsonObj["densityThrRural"].isUndefined()) {
-	    _densityThrRural = jsonObj["densityThrRural"].toDouble();
+		_densityThrRural = jsonObj["densityThrRural"].toDouble();
 	} else {
 		_densityThrRural = 57.1965e-6;
 	}
@@ -2552,8 +2563,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	}
 
 	if (    (_pathLossModel == CConst::CustomPathLossModel)
-	     || (_pathLossModel == CConst::ISEDDBS06PathLossModel)
-	     || (_pathLossModel == CConst::BrazilPathLossModel) ) {
+		|| (_pathLossModel == CConst::ISEDDBS06PathLossModel)
+		|| (_pathLossModel == CConst::BrazilPathLossModel) ) {
 		_pathLossModel = CConst::FCC6GHzReportAndOrderPathLossModel;
 	}
 
@@ -2761,7 +2772,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	// ***********************************
 
 	if (jsonObj.contains("deniedRegionFile") && !jsonObj["deniedRegionFile"].isUndefined()) {
-        _deniedRegionFile = SearchPaths::forReading("data", jsonObj["deniedRegionFile"].toString(), true).toStdString();
+		_deniedRegionFile = SearchPaths::forReading("data", jsonObj["deniedRegionFile"].toString(), true).toStdString();
 	}
 }
 
@@ -2776,7 +2787,7 @@ QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
 void AfcManager::addBuildingDatabaseTiles(OGRLayer *layer)
 {
 	// add building database raster boundary if loaded
-	if (_pathLossModel == CConst::ITMBldgPathLossModel)
+	if (_terrainDataModel->getNumLidarRegion())
 	{
 		LOGGER_DEBUG(logger) << "adding raster bounds";
 		for (QRectF b : _terrainDataModel->getBounds())
@@ -2821,6 +2832,131 @@ void AfcManager::addBuildingDatabaseTiles(OGRLayer *layer)
 			if (layer->CreateFeature(boxFeature.release()) != OGRERR_NONE)
 			{
 				throw std::runtime_error("Could not add bound feature in layer of output data source");
+			}
+		}
+	}
+}
+
+void AfcManager::addDeniedRegions(OGRLayer *layer)
+{
+	// add denied regions
+	LOGGER_DEBUG(logger) << "adding denied regions";
+	int drIdx;
+	for (drIdx = 0; drIdx < (int) _deniedRegionList.size(); ++drIdx) {
+		DeniedRegionClass *dr = _deniedRegionList[drIdx];
+
+		DeniedRegionClass::TypeEnum drType = dr->getType();
+
+		std::string pfx;
+		switch(drType) {
+			case DeniedRegionClass::RASType:
+				pfx = "RAS_";
+				break;
+			case DeniedRegionClass::userSpecifiedType:
+				pfx = "USER_SPEC_";
+				break;
+			default:
+				CORE_DUMP;
+			break;
+		}
+		std::string name = pfx + std::to_string(dr->getID());
+
+		LOGGER_DEBUG(logger) << "adding denied region " << name;
+
+		int numPtsCircle = 32;
+		double rectLonStart, rectLonStop, rectLatStart, rectLatStop;
+		double circleRadius, longitudeCenter, latitudeCenter;
+		double drTerrainHeight, drBldgHeight, drHeightAGL;
+		Vector3 drCenterPosn;
+		Vector3 drUpVec;
+		Vector3 drEastVec;
+		Vector3 drNorthVec;
+		QString dr_coords;
+		MultibandRasterClass::HeightResult drLidarHeightResult;
+		CConst::HeightSourceEnum drHeightSource;
+		DeniedRegionClass::GeometryEnum drGeometry = dr->getGeometry();
+		int numGeom;
+		bool rectFlag;
+		switch(drGeometry) {
+			case DeniedRegionClass::rectGeometry:
+			case DeniedRegionClass::rect2Geometry:
+				numGeom = ((RectDeniedRegionClass *) dr)->getNumRect();
+				rectFlag = true;
+				break;
+			case DeniedRegionClass::circleGeometry:
+			case DeniedRegionClass::horizonDistGeometry:
+				numGeom = 1;
+				rectFlag = false;
+				break;
+			default:
+				CORE_DUMP;
+				break;
+		}
+		for(int geomIdx=0; geomIdx<numGeom; ++geomIdx) {
+			GdalHelpers::GeomUniquePtr<OGRLinearRing> ptList(GdalHelpers::createGeometry<OGRLinearRing>());
+			if (rectFlag) {
+				std::tie(rectLonStart, rectLonStop, rectLatStart, rectLatStop) = ((RectDeniedRegionClass *) dr)->getRect(geomIdx);
+				GdalHelpers::GeomUniquePtr<OGRPoint> topLeft(GdalHelpers::createGeometry<OGRPoint>());
+				topLeft->setY(rectLatStop);
+				topLeft->setX(rectLonStart);
+				GdalHelpers::GeomUniquePtr<OGRPoint> topRight(GdalHelpers::createGeometry<OGRPoint>());
+				topRight->setY(rectLatStop);
+				topRight->setX(rectLonStop);
+				GdalHelpers::GeomUniquePtr<OGRPoint> botLeft(GdalHelpers::createGeometry<OGRPoint>());
+				botLeft->setY(rectLatStart);
+				botLeft->setX(rectLonStart);
+				GdalHelpers::GeomUniquePtr<OGRPoint> botRight(GdalHelpers::createGeometry<OGRPoint>());
+				botRight->setY(rectLatStart);
+				botRight->setX(rectLonStop);
+
+				ptList->addPoint(topLeft.get()); // Using .get() gives access to the pointer without giving up ownership
+				ptList->addPoint(topRight.get());
+				ptList->addPoint(botRight.get());
+				ptList->addPoint(botLeft.get());
+				ptList->addPoint(topLeft.get());
+			} else {
+				OGRPoint* ogrPtList[numPtsCircle];
+				circleRadius = ((CircleDeniedRegionClass *) dr)->computeRadius(_rlanRegion->getMaxHeightAGL());
+				longitudeCenter = ((CircleDeniedRegionClass *) dr)->getLongitudeCenter();
+				latitudeCenter = ((CircleDeniedRegionClass *) dr)->getLatitudeCenter();
+				drHeightAGL = dr->getHeightAGL();
+				_terrainDataModel->getTerrainHeight(longitudeCenter, latitudeCenter, drTerrainHeight, drBldgHeight, drLidarHeightResult, drHeightSource);
+				drCenterPosn = EcefModel::geodeticToEcef(latitudeCenter, longitudeCenter, (drTerrainHeight + drHeightAGL)/ 1000.0);
+				drUpVec = drCenterPosn.normalized();
+				drEastVec = (Vector3(-drUpVec.y(), drUpVec.x(), 0.0)).normalized();
+				drNorthVec = drUpVec.cross(drEastVec);
+				for(int ptIdx=0; ptIdx<numPtsCircle; ++ptIdx) {
+					ogrPtList[ptIdx] = GdalHelpers::createGeometry<OGRPoint>();
+					double phi = 2*M_PI*ptIdx / numPtsCircle;
+					Vector3 circlePtPosn = drCenterPosn + (circleRadius/1000)*(drEastVec*cos(phi) + drNorthVec*sin(phi));
+
+					GeodeticCoord circlePtPosnGeodetic = EcefModel::ecefToGeodetic(circlePtPosn);
+
+					ogrPtList[ptIdx]->setX(circlePtPosnGeodetic.longitudeDeg);
+					ogrPtList[ptIdx]->setY(circlePtPosnGeodetic.latitudeDeg);
+
+					ptList->addPoint(ogrPtList[ptIdx]);
+				}
+				ptList->addPoint(ogrPtList[0]);
+			}
+
+			// Intantiate unique-pointers to OGRPolygon and OGRLinearRing for denied region
+			GdalHelpers::GeomUniquePtr<OGRPolygon> boundBox(GdalHelpers::createGeometry<OGRPolygon>());
+			// Use GdalHelpers.h templates to have unique pointers create these on the heap
+
+			// Adding the polygon vertices to a OGRLinearRing object for geoJSON export
+			boundBox->addRingDirectly(ptList.release());
+
+			// Add properties to the geoJSON features
+			std::unique_ptr<OGRFeature, GdalHelpers::FeatureDeleter> regionFeature(OGRFeature::CreateFeature(layer->GetLayerDefn()));
+			regionFeature->SetField("kind", "DR"); // DR = denied region
+
+			// Add geometry to feature
+			regionFeature->SetGeometryDirectly(boundBox.release());
+
+			if (layer->CreateFeature(regionFeature.release()) != OGRERR_NONE)
+			{
+				throw std::runtime_error("Could not add denied region feature in layer of output data source");
 			}
 		}
 	}
@@ -3490,9 +3626,9 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 		double deltaLat = ptgLatLonVal.first - rlanLatLonVal.first;
 		double deltaLon = ptgLatLonVal.second - rlanLatLonVal.second;
 		posPointLatLon = std::make_pair( rlanLatLonVal.first  + deltaLat*cos(cvgTheta) + deltaLon*cosVal*sin(cvgTheta),
-		                                 rlanLatLonVal.second + (deltaLon*cosVal*cos(cvgTheta) - deltaLat*sin(cvgTheta))/cosVal );
+										rlanLatLonVal.second + (deltaLon*cosVal*cos(cvgTheta) - deltaLat*sin(cvgTheta))/cosVal );
 		negPointLatLon = std::make_pair( rlanLatLonVal.first  + deltaLat*cos(cvgTheta) - deltaLon*cosVal*sin(cvgTheta),
-		                                 rlanLatLonVal.second + (deltaLon*cosVal*cos(cvgTheta) + deltaLat*sin(cvgTheta))/cosVal );
+										rlanLatLonVal.second + (deltaLon*cosVal*cos(cvgTheta) + deltaLat*sin(cvgTheta))/cosVal );
 
 		// Intantiate unique-pointers to OGRPolygon and OGRLinearRing for storing the beam coverage
 		GdalHelpers::GeomUniquePtr<OGRPolygon> beamCone(GdalHelpers::createGeometry<OGRPolygon>()); // Use GdalHelpers.h templates to have unique pointers create these on the heap
@@ -3538,6 +3674,9 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 
 	// add building database raster boundary if loaded
 	addBuildingDatabaseTiles(coneLayer);
+
+	// add denied regions
+	addDeniedRegions(coneLayer);
 
 	// Allocation clean-up
 	GDALClose(dataSet); // Remove the reference to the dataset
@@ -3603,11 +3742,13 @@ QJsonArray jsonChannelData(const std::vector<ChannelStruct> &channelList)
 	channelNameStart[40] = 3;
 	channelNameStart[80] = 7;
 	channelNameStart[160] = 15;
+	channelNameStart[320] = 31;
 	std::map<int, int> channelNameStep;
 	channelNameStep[20] = 4;
 	channelNameStep[40] = 8;
 	channelNameStep[80] = 16;
 	channelNameStep[160] = 32;
+	channelNameStep[320] = 32;
 
 	for (const auto &channelGroup : rlanBWList)
 	{
@@ -4027,18 +4168,18 @@ std::make_pair(uls->getRxLatitudeDeg(), uls->getRxLongitudeDeg());
 
 	// Obtain the angle in radians for 3 dB attenuation
 	double theta_rad = uls->computeBeamWidth(3.0) * M_PI / 180;
-    double cosTheta = cos(theta_rad);
-    double sinTheta = sin(theta_rad);
+	double cosTheta = cos(theta_rad);
+	double sinTheta = sin(theta_rad);
 
-    double cosVal = cos(rxLatLonVal.first*M_PI/180.0);
-    double deltaX = (txLatLonVal.second - rxLatLonVal.second)*cosVal;
-    double deltaY = txLatLonVal.first  - rxLatLonVal.first;
+	double cosVal = cos(rxLatLonVal.first*M_PI/180.0);
+	double deltaX = (txLatLonVal.second - rxLatLonVal.second)*cosVal;
+	double deltaY = txLatLonVal.first  - rxLatLonVal.first;
 
-    double deltaLon1 = (deltaX*cosTheta + deltaY*sinTheta)/cosVal;
-    double deltaLat1 = (deltaY*cosTheta - deltaX*sinTheta);
+	double deltaLon1 = (deltaX*cosTheta + deltaY*sinTheta)/cosVal;
+	double deltaLat1 = (deltaY*cosTheta - deltaX*sinTheta);
 
-    double deltaLon2 = (deltaX*cosTheta - deltaY*sinTheta)/cosVal;
-    double deltaLat2 = (deltaY*cosTheta + deltaX*sinTheta);
+	double deltaLon2 = (deltaX*cosTheta - deltaY*sinTheta)/cosVal;
+	double deltaLat2 = (deltaY*cosTheta + deltaX*sinTheta);
 
 	// Store in DoublePairs
 	LatLon posPointLatLon = std::make_pair(rxLatLonVal.first + deltaLat1, rxLatLonVal.second + deltaLon1);
@@ -5508,8 +5649,8 @@ void AfcManager::readDeniedRegionData(std::string filename)
 {
 
 	if (filename.empty()) {
-	    LOGGER_INFO(logger) << "No denied region file specified";
-        return;
+		LOGGER_INFO(logger) << "No denied region file specified";
+		return;
 	}
 
 	int linenum, fIdx;
@@ -7922,7 +8063,7 @@ void AfcManager::runPointAnalysis()
 					if (contains2D) {
 						if ((ulsRxHeightAMSL >= _rlanRegion->getMinHeightAMSL()) && (ulsRxHeightAMSL <= _rlanRegion->getMaxHeightAMSL())) {
 							contains3D = true;
-					           LOGGER_INFO(logger) << "FSID = " << uls->getID()
+							LOGGER_INFO(logger) << "FSID = " << uls->getID()
 								<< (divIdx ? " DIVERSITY LINK" : "")
 								<< (segIdx == numPR ? " RX" : " PR " + std::to_string(segIdx+1))
 								<< " inside uncertainty volume";
@@ -8414,11 +8555,11 @@ void AfcManager::runPointAnalysis()
 										int N = ((int) uls->ITMHeightProfile[0]) + 1;
 										for(int ptIdx=0; ptIdx<N; ptIdx++) {
 											Vector3 losPathPosn = (((double) (N-1-ptIdx))/(N-1))*rlanPosn + (((double) ptIdx)/(N-1))*ulsRxPos;
-						                	GeodeticCoord losPathPosnGeodetic = EcefModel::ecefToGeodetic(losPathPosn);
+											GeodeticCoord losPathPosnGeodetic = EcefModel::ecefToGeodetic(losPathPosn);
 
-                                        	double ptLon = losPathPosnGeodetic.longitudeDeg;
-                                        	double ptLat = losPathPosnGeodetic.latitudeDeg;
-                                        	double losPathHeight = losPathPosnGeodetic.heightKm*1000.0;
+											double ptLon = losPathPosnGeodetic.longitudeDeg;
+											double ptLat = losPathPosnGeodetic.latitudeDeg;
+											double losPathHeight = losPathPosnGeodetic.heightKm*1000.0;
 
 											double lon2Rad = ptLon*M_PI/180.0;
 											double lat2Rad = ptLat*M_PI/180.0;
@@ -10629,7 +10770,7 @@ void AfcManager::printUserInputs()
 		}
 		inputGc.writeRow({ "REPORT_UNAVAILABLE_SPECTRUM", (std::isnan(_reportUnavailPSDdBmPerMHz) ? "false" : "true" ) } );
 		if (!std::isnan(_reportUnavailPSDdBmPerMHz)) {
-		    inputGc.writeRow({ "REPORT_UNAVAIL_PSD_DBM_PER_MHZ", f2s(_reportUnavailPSDdBmPerMHz) });
+			inputGc.writeRow({ "REPORT_UNAVAIL_PSD_DBM_PER_MHZ", f2s(_reportUnavailPSDdBmPerMHz) });
 		}
 		inputGc.writeRow({ "INQUIRED_FREQUENCY_RESOLUTION_MHZ", std::to_string(_inquiredFrequencyResolutionMHz) });
 		inputGc.writeRow({ "INQUIRED_FREQUENCY_MAX_PSD_DBM_PER_MHZ", f2s(_inquiredFrequencyMaxPSD_dBmPerMHz) });
@@ -10953,7 +11094,7 @@ void AfcManager::createChannelList()
 
 			numChan = 0;
 
-		    int startFreq = inquiredStartFreqMHz;
+			int startFreq = inquiredStartFreqMHz;
 			int stopFreq = startFreq + _inquiredFrequencyResolutionMHz;
 			while(stopFreq <= inquiredStopFreqMHz) {
 				ChannelStruct channel;
@@ -11110,10 +11251,10 @@ void AfcManager::runTestITM(std::string inputFile)
 	LOGGER_INFO(logger) << "Executing AfcManager::runTestITM()";
 
 #if 1
-    extern void point_to_point(double elev[], double tht_m, double rht_m,
-        double eps_dielect, double sgm_conductivity, double eno_ns_surfref,
-        double frq_mhz, int radio_climate, int pol, double conf, double rel,
-        double &dbloss, std::string &strmode, int &errnum);
+	extern void point_to_point(double elev[], double tht_m, double rht_m,
+		double eps_dielect, double sgm_conductivity, double eno_ns_surfref,
+		double frq_mhz, int radio_climate, int pol, double conf, double rel,
+		double &dbloss, std::string &strmode, int &errnum);
 #endif
 
 
@@ -11124,14 +11265,14 @@ void AfcManager::runTestITM(std::string inputFile)
 	std::string reasonIgnored;
 	std::ostringstream errStr;
 
-    double rlanLon = -91.43291667;
-    double rlanLat = 41.4848611111;
+	double rlanLon = -91.43291667;
+	double rlanLat = 41.4848611111;
 
-    double fsLon = -91.74102778;
-    double fsLat = 41.96444444;
-    double fsHeightAGL = 108.5;
+	double fsLon = -91.74102778;
+	double fsLat = 41.96444444;
+	double fsHeightAGL = 108.5;
 
-    double frequencyMHz = 6175.0;
+	double frequencyMHz = 6175.0;
 
 	double groundDistanceKm;
 	{
@@ -11153,7 +11294,7 @@ void AfcManager::runTestITM(std::string inputFile)
 
 	double terrainHeight;
 
-    std::vector<double> heightList;
+	std::vector<double> heightList;
 
 	int fieldIdx;
 
@@ -11253,7 +11394,7 @@ void AfcManager::runTestITM(std::string inputFile)
 				terrainHeight = std::strtod(strval.c_str(), &chptr);
 				/**************************************************************************/
 
-                heightList.push_back(terrainHeight);
+				heightList.push_back(terrainHeight);
 
 				break;
 			case  ignoreLineType:
@@ -11266,88 +11407,88 @@ void AfcManager::runTestITM(std::string inputFile)
 		}
 	}
 
-    int numpts = heightList.size();
-    double *heightProfile = (double *)calloc(sizeof(double), numpts + 2);
+	int numpts = heightList.size();
+	double *heightProfile = (double *)calloc(sizeof(double), numpts + 2);
 
-    heightProfile[0] = numpts - 1;
-    heightProfile[1] = (groundDistanceKm / (numpts-1)) * 1000.0;
+	heightProfile[0] = numpts - 1;
+	heightProfile[1] = (groundDistanceKm / (numpts-1)) * 1000.0;
 
-    double eps_dielect = _itmEpsDielect;
-    double sgm_conductivity = _itmSgmConductivity;
-    double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((rlanLat+fsLat)/2, (rlanLon+fsLon)/2);
+	double eps_dielect = _itmEpsDielect;
+	double sgm_conductivity = _itmSgmConductivity;
+	double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((rlanLat+fsLat)/2, (rlanLon+fsLon)/2);
 
-    int radioClimate    = _ituData->getRadioClimateValue(rlanLat, rlanLon);
-    int radioClimateTmp = _ituData->getRadioClimateValue(fsLat, fsLon);
-    if (radioClimateTmp < radioClimate) {
-        radioClimate = radioClimateTmp;
-    }
+	int radioClimate    = _ituData->getRadioClimateValue(rlanLat, rlanLon);
+	int radioClimateTmp = _ituData->getRadioClimateValue(fsLat, fsLon);
+	if (radioClimateTmp < radioClimate) {
+		radioClimate = radioClimateTmp;
+	}
 
-    int pol = _itmPolarization;
-    double conf = _confidenceITM;
-    double rel = _reliabilityITM;
+	int pol = _itmPolarization;
+	double conf = _confidenceITM;
+	double rel = _reliabilityITM;
 
-    int errnum;
-    double pathLoss;
-    std::string strmode;
-    // char strmode[50];
+	int errnum;
+	double pathLoss;
+	std::string strmode;
+	// char strmode[50];
 
-    std::cout << "PATH_PROFILE: " << inputFile << std::endl;
-    std::cout << "GROUND DISTANCE (Km): " << groundDistanceKm << std::endl;
-    std::cout << "NUMPTS: " << numpts << std::endl;
-    std::cout << "DELTA (m): " << heightProfile[1] << std::endl;
+	std::cout << "PATH_PROFILE: " << inputFile << std::endl;
+	std::cout << "GROUND DISTANCE (Km): " << groundDistanceKm << std::endl;
+	std::cout << "NUMPTS: " << numpts << std::endl;
+	std::cout << "DELTA (m): " << heightProfile[1] << std::endl;
 
-    std::cout << "RLAN LON (deg): " << rlanLon << std::endl;
-    std::cout << "RLAN LAT (deg): " << rlanLat << std::endl;
-    std::cout << "FS   LON (deg): " << fsLon << std::endl;
-    std::cout << "FS   LAT (deg): " << fsLat << std::endl;
-    std::cout << "FS   HEIGHT AGL (m) : " << fsHeightAGL << std::endl;
+	std::cout << "RLAN LON (deg): " << rlanLon << std::endl;
+	std::cout << "RLAN LAT (deg): " << rlanLat << std::endl;
+	std::cout << "FS   LON (deg): " << fsLon << std::endl;
+	std::cout << "FS   LAT (deg): " << fsLat << std::endl;
+	std::cout << "FS   HEIGHT AGL (m) : " << fsHeightAGL << std::endl;
 
-    std::cout << "eps_dielect: " << eps_dielect << std::endl;
-    std::cout << "sgm_conductivity: " << sgm_conductivity << std::endl;
-    std::cout << "surfaceRefractivity: " << surfaceRefractivity << std::endl;
-    std::cout << "frequencyMHz: " << frequencyMHz << std::endl;
-    std::cout << "radioClimate: " << radioClimate << std::endl;
-    std::cout << "pol: " << pol << std::endl;
-    std::cout << "conf: " << conf << std::endl;
-    std::cout << "rel: " << rel << std::endl;
+	std::cout << "eps_dielect: " << eps_dielect << std::endl;
+	std::cout << "sgm_conductivity: " << sgm_conductivity << std::endl;
+	std::cout << "surfaceRefractivity: " << surfaceRefractivity << std::endl;
+	std::cout << "frequencyMHz: " << frequencyMHz << std::endl;
+	std::cout << "radioClimate: " << radioClimate << std::endl;
+	std::cout << "pol: " << pol << std::endl;
+	std::cout << "conf: " << conf << std::endl;
+	std::cout << "rel: " << rel << std::endl;
 
-    std::cout << std::endl;
+	std::cout << std::endl;
 
-    int numRlanHeight = 2;
-    double rlanHeightAGLStart = 10.0;
-    double rlanHeightAGLStop = 11.0;
+	int numRlanHeight = 2;
+	double rlanHeightAGLStart = 10.0;
+	double rlanHeightAGLStop = 11.0;
 
-    for (bool reverseFlag : {false}) {
-        for(int rlanHeightIdx=0; rlanHeightIdx<numRlanHeight; ++rlanHeightIdx) {
-            double rlanHeightAGL = (rlanHeightAGLStart*(numRlanHeight-1-rlanHeightIdx) + rlanHeightAGLStop*rlanHeightIdx) / (numRlanHeight-1);
-            std::cout << "RLAN HEIGHT AGL (m) : " << rlanHeightAGL << std::endl;
+	for (bool reverseFlag : {false}) {
+		for(int rlanHeightIdx=0; rlanHeightIdx<numRlanHeight; ++rlanHeightIdx) {
+			double rlanHeightAGL = (rlanHeightAGLStart*(numRlanHeight-1-rlanHeightIdx) + rlanHeightAGLStop*rlanHeightIdx) / (numRlanHeight-1);
+			std::cout << "RLAN HEIGHT AGL (m) : " << rlanHeightAGL << std::endl;
 
-            for(int i=0; i<numpts; ++i) {
-                heightProfile[2+i] = heightList[reverseFlag ? numpts-1-i : i];
-            }
+			for(int i=0; i<numpts; ++i) {
+				heightProfile[2+i] = heightList[reverseFlag ? numpts-1-i : i];
+			}
 
-            double txHeightAGL;
-            double rxHeightAGL;
+			double txHeightAGL;
+			double rxHeightAGL;
 
-            if (reverseFlag) {
-                txHeightAGL = fsHeightAGL;
-                rxHeightAGL = rlanHeightAGL;
-            } else {
-                txHeightAGL = rlanHeightAGL;
-                rxHeightAGL = fsHeightAGL;
-            }
+			if (reverseFlag) {
+				txHeightAGL = fsHeightAGL;
+				rxHeightAGL = rlanHeightAGL;
+			} else {
+				txHeightAGL = rlanHeightAGL;
+				rxHeightAGL = fsHeightAGL;
+			}
 
 
-            point_to_point(heightProfile, txHeightAGL, rxHeightAGL, eps_dielect, sgm_conductivity, surfaceRefractivity, frequencyMHz, radioClimate, pol, conf, rel, pathLoss, strmode, errnum);
+			point_to_point(heightProfile, txHeightAGL, rxHeightAGL, eps_dielect, sgm_conductivity, surfaceRefractivity, frequencyMHz, radioClimate, pol, conf, rel, pathLoss, strmode, errnum);
 
-            std::cout << "REVERSE_FLAG: " << reverseFlag << std::endl;
-            std::cout << "MODE: " << strmode << std::endl;
-            std::cout << "ERRNUM: " << errnum << std::endl;
-            std::cout << "PATH_LOSS (DB): " << pathLoss << std::endl;
-            std::cout << "PT," << inputFile << "," << rlanHeightAGL << "," << pathLoss << std::endl;
-        }
-        std::cout << "PT,,," << std::endl;
-    }
+			std::cout << "REVERSE_FLAG: " << reverseFlag << std::endl;
+			std::cout << "MODE: " << strmode << std::endl;
+			std::cout << "ERRNUM: " << errnum << std::endl;
+			std::cout << "PATH_LOSS (DB): " << pathLoss << std::endl;
+			std::cout << "PT," << inputFile << "," << rlanHeightAGL << "," << pathLoss << std::endl;
+		}
+		std::cout << "PT,,," << std::endl;
+	}
 
 	return;
 }

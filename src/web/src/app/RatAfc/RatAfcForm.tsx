@@ -1,7 +1,7 @@
 import * as React from "react";
 import {
     AvailableSpectrumInquiryRequest, LinearPolygon, RadialPolygon, Ellipse,
-    DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange, Point,  VendorExtension
+    DeploymentEnum, Elevation, CertificationId, Channels, FrequencyRange, Point, VendorExtension
 } from "../Lib/RatAfcTypes";
 import { logger } from "../Lib/Logger";
 import {
@@ -102,6 +102,10 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                     num: 136,
                     include: OperatingClassIncludeType.None
                 },
+                {
+                    num: 137,
+                    include: OperatingClassIncludeType.None
+                }
             ],
             newCertificationRulesetId: this.props.rulesetIds[0],
             vendorExtensions: [],
@@ -231,6 +235,11 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
             },
             {
                 num: 136,
+                channels: [],
+                include: OperatingClassIncludeType.None
+            },
+            {
+                num: 137,
                 channels: [],
                 include: OperatingClassIncludeType.None
             },
@@ -369,16 +378,16 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                                 maxWidth="40.0rem"
                                 content={
                                     <>
-                                        <p>The following Serial Number and Certification ID pair can be used for any rulesetID:
-                                            <ul style={{listStyleType:"none"}} >
+                                        <p>The following Serial Number and Certification ID pair can be used for any rulesetID:</p>
+                                        <ul style={{ listStyleType: "none" }} >
                                             <li>Serial Number=TestSerialNumber</li>
 
                                             <li>CertificationId=TestCertificationId</li>
-                                            </ul>
-                                            Note that this device is certified as an indoor Access Point and as such if in the AP request message, 
-                                            the indoorDeployment field is set to Unknow or if it is missing, it will be treated as indoor 
+                                        </ul>
+                                        <p>   Note that this device is certified as an indoor Access Point and as such if in the AP request message,
+                                            the indoorDeployment field is set to Unknow or if it is missing, it will be treated as indoor
                                             (i.e. BEL will be applied). If the indoorDeployment field is set to Outdoor, no BEL will be applied.
-                                            </p>
+                                        </p>
                                     </>
                                 }
                             >
@@ -418,15 +427,15 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                                 content={
                                     <>
                                         <p>The following Serial Number and Certification ID pair can be used for any rulesetID:
-                                            <ul style={{listStyleType:"none"}} >
-                                            <li>Serial Number=TestSerialNumber</li>
+                                            <ul style={{ listStyleType: "none" }} >
+                                                <li>Serial Number=TestSerialNumber</li>
 
-                                            <li>CertificationId=TestCertificationId</li>
+                                                <li>CertificationId=TestCertificationId</li>
                                             </ul>
-                                            Note that this device is certified as an indoor Access Point and as such if in the AP request message, 
-                                            the indoorDeployment field is set to Unknow or if it is missing, it will be treated as indoor 
+                                            Note that this device is certified as an indoor Access Point and as such if in the AP request message,
+                                            the indoorDeployment field is set to Unknow or if it is missing, it will be treated as indoor
                                             (i.e. BEL will be applied). If the indoorDeployment field is set to Outdoor, no BEL will be applied.
-                                            </p>
+                                        </p>
                                     </>
                                 }
                             >
