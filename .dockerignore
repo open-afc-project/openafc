@@ -1,3 +1,0 @@
-puppet/environments/rh/.resource_types/**
-puppet/.r10k/**
-puppet/.puppetlabs/**
