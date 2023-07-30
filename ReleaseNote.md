@@ -1,5 +1,36 @@
 # Release Note
 ## **Version and Date**
+|Version|3.8.5.0|
+| :- | :- |
+|**Date**|**07/30/2023**|
+|compiled server's version is TBD | git tag 3.8.5.0|
+
+## **Issues Addressed**
+ * JIRA: 21d5e11c (docker-scout-security-report) OA-774 Remove healthcheck logging, minimize GUI requests logging (#609)
+ * Bump certifi from 2022.12.7 to 2023.7.22 in /msghnd (#607)
+ * Jira OA-771 Add missing env var AFC_MSGHND_RATAFC_TOUT (#605)
+ * Jira Oa 619 add support of 320 m hz ap channels (#601)
+ * Jira Oa 767 rabbitmq debugging and docker healthcheck (#604)
+ * Jira OA-761 task timeout parameter for msghnd and worker (#602)
+ * Jira OA-754 Sync objst file IO (#600)
+ * Jira OA-766. Keep desired and remove undesired extensions in to_wgs84.py (#603)
+ * Jira OA-763 switching Helm charts to version 3.8.4.0
+ * Jira OA-764 adding AFC_MSGHND_WORKERS AFC_OBJST_SCHEME into some deployments
+ * Jira OA-762 fix typo in msghnd replicacount
+ * Jira OA-758 mv web history path from /files/history to /history (#597)
+ * Bump pyyaml from 5.3.1 to 5.4 in /rat_server (#596)
+ * Jira OA-757 Fix installation of PyYAML (#595)
+ * Jira OA-756. Bugfixes in to_wgs84.py and in conversion procedure description (#594)
+ * Jira OA 667 697 712 743 - UI fixes and remove 1.3 support (#592)
+ * Jira OA-755 Install net-tools to get ifconfig (#593)
+ * Jira OA-754-objst-performance-issue
+ * Jira OA-754 Fix error and debug messages around objst
+ * Jira OA-752 Add get req for available rulesets and afc_config be ruleset (#590)
+ * Jira OA-753-increase-concurrent-connections-on-msghnd
+ * Update README.md - run tests accessing with mTLS
+ * Jira OA-753 enable gevent on gunicorn to increase concurrent connection capacity
+
+## **Version and Date**
 |Version|**OA-619*|
 | :- | :- |
 |**Date**|**07/21/2023**|
