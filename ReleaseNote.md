@@ -3,7 +3,7 @@
 |Version|3.8.5.0|
 | :- | :- |
 |**Date**|**07/30/2023**|
-|compiled server's version is TBD | git tag 3.8.5.0|
+|compiled server's version is 4e3cb1a | git tag 3.8.5.0|
 
 ## **Issues Addressed**
  * JIRA: 21d5e11c (docker-scout-security-report) OA-774 Remove healthcheck logging, minimize GUI requests logging (#609)
