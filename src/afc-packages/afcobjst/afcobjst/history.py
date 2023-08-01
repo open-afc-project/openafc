@@ -36,10 +36,12 @@ if hist_app.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
     bucket = client.bucket(hist_app.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
 
 def generateHtml(rurl, path, dirs, files):
-    hist_app.logger.debug(f"generateHtml({path}, {dirs}, {files})")
+    hist_app.logger.debug(f"generateHtml({rurl}, {path}, {dirs}, {files})")
     dirs.sort()
     files.sort()
-    vpath = os.path.join("history", path)
+    vpath = "history"
+    if path is not None and path != "":
+        vpath += "/" + path
 
     html = """<!DOCTYPE html>
 <html>
@@ -51,12 +53,13 @@ def generateHtml(rurl, path, dirs, files):
 
     path_split = vpath.split("/")
     url = rurl
+    if url[len(url)-1] == "/":
+        url = url[:len(url)-1]
     i = 0
     for dir in path_split:
-        if dir != "":
-            if i != 0:
-                url += "/" + dir
-            html += " <a href=" + url + ">" + "/" + dir + "</a> "
+        if i != 0:
+            url += "/" + dir
+        html += " <a href=" + url + ">" + "/" + dir + "</a> "
         i = i + 1
 
     html += """</h1><hr>

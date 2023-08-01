@@ -1076,8 +1076,15 @@ class History(MethodView):
             response = requests.get(conf.AFC_OBJST_SCHEME + "://" + conf.AFC_OBJST_HOST + ":" +
                                     conf.AFC_OBJST_HIST_PORT +
                                     (("/" + path) if path is not None else ""),
-                                    params = {"url": rurl})
-            return flask.render_template_string(response.text)
+                                    params = {"url": rurl}, stream=True)
+            if response.headers['Content-Type'].startswith("application/octet-stream") \
+                and "Content-Encoding" not in response.headers:
+                # results.kmz case. Apache can't decompress it. 
+                resp = flask.make_response()
+                resp.data = response.raw.read()
+                return resp
+            else:
+                return flask.render_template_string(response.text)
         except Exception as exc:
             LOGGER.error(f"Unreachable history host. {exc}")
             return f"Unreachable history host. {exc}"
