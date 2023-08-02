@@ -478,7 +478,7 @@ services:
     dns_search: [.]
 
   bulk_postgres:
-    image: public.ecr.aws/w9v6y1o0/openafc/als-postgres-image:${TAG:-latest}
+    image: public.ecr.aws/w9v6y1o0/openafc/bulk-postgres-image:${TAG:-latest}
     dns_search: [.]
 
   uls_downloader:
