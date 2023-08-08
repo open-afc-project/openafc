@@ -184,6 +184,7 @@ class GuiConfig(MethodView):
             about_url=about_url,
             about_login_url=about_login_url,
             about_sitekey=about_sitekey if about_sitekey else None,
+            about_csrf=flask.url_for('ratapi-v1.AboutCSRF'),
             version=serververs,
         )
         return resp
@@ -492,6 +493,22 @@ Approve request at: {approve_link}'''
             return flask.make_response(f"Thank you {name}. An access request for {email} has been submitted", 204)
         except:
             raise werkzeug.exceptions.NotFound()
+
+
+class AboutCSRF(MethodView):
+    ''' Allow the web UI to manipulate configuration directly.
+    '''
+
+    def get(self):
+        ''' GET method for About
+        '''
+
+        resp = flask.make_response()
+        about_content = "about_csrf.html"
+
+        resp.data = flask.render_template(about_content)
+        resp.content_type = 'text/html'
+        return resp
 
 
 class LiDAR_Bounds(MethodView):
@@ -1165,3 +1182,5 @@ module.add_url_rule('/GetRulesetIDs',
                     view_func=GetRuleset.as_view('GetRuleset'))
 module.add_url_rule('/GetAfcConfigByRulesetID/<ruleset>',
                     view_func=GetAfcConfigByRuleset.as_view('GetAfcConfigByRuleset'))
+module.add_url_rule('/about_csrf',
+                    view_func=AboutCSRF.as_view('AboutCSRF'))

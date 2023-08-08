@@ -33,9 +33,9 @@ loop() {
     step=${2:-10}
     s=${start}
     verify_tls=''
-    if [ "$prot" == "https" ]; then
-        verify_tls='--verif'
-    fi
+    #if [ "$prot" == "https" ]; then
+        #verify_tls='--verif'
+    #fi
 
     echo "verify_tls - $verify_tls"
 

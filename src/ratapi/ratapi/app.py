@@ -81,8 +81,10 @@ def create_app(config_override=None):
 
     # Child members
     from . import views, util
+    from flask_wtf.csrf import CSRFProtect
 
     flaskapp = flask.Flask(__name__.split('.')[0])
+    csrf = CSRFProtect(flaskapp)
     flaskapp.response_class = util.Response
 
     # default config state from module
@@ -164,6 +166,10 @@ def create_app(config_override=None):
                     als.als_json_log('user_access', {'action':'login', 'user':flask.request.form['username'], 'from':flask.request.remote_addr, 'status':'success'})
 
             return response
+
+    @flaskapp.before_request
+    def check_csrf():
+        csrf.protect()
 
     # Check configuration
     state_path = flaskapp.config['STATE_ROOT_PATH']

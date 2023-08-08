@@ -105,9 +105,16 @@ http {
             return 403;
         }
 
-        # forbid webdav
+        # forbid webdav methods other than GET
         location /fbrat/ratapi/v1/files {
-            return 403;
+            limit_except GET { deny  all; }
+            sendfile on;
+            proxy_bind $server_addr;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_pass http://webui;
+            proxy_redirect http:// $scheme://;
         }
 
         # forbid internal request

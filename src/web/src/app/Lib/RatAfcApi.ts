@@ -1,6 +1,6 @@
 import { AvailableSpectrumInquiryRequest, AvailableSpectrumInquiryResponse, AvailableSpectrumInquiryResponseMessage, DeploymentEnum, VendorExtension } from "./RatAfcTypes";
 import { RatResponse, success, error } from "./RatApiTypes";
-import { guiConfig, getDefaultAfcConf } from "./RatApi";
+import { guiConfig, getDefaultAfcConf, getCSRF } from "./RatApi";
 
 
 /**
@@ -11,11 +11,14 @@ import { guiConfig, getDefaultAfcConf } from "./RatApi";
 /**
  * Call RAT AFC resource
  */
-export const spectrumInquiryRequest = (request: AvailableSpectrumInquiryRequest): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> =>
+export const spectrumInquiryRequest = async (request: AvailableSpectrumInquiryRequest): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> => {
+    let csrf_token = await(getCSRF());
+
     fetch(guiConfig.rat_afc + "?debug=True&gui=True", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token,
         },
         body: JSON.stringify({ version: "1.4", availableSpectrumInquiryRequests: [request] })
     })
@@ -36,14 +39,16 @@ export const spectrumInquiryRequest = (request: AvailableSpectrumInquiryRequest)
         .catch(e => {
             return error("encountered an error when running request", undefined, e);
         })
+}
 
 
-
-export const spectrumInquiryRequestByString = (version: string, requestAsJsonString: string): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> =>
+export const spectrumInquiryRequestByString = async (version: string, requestAsJsonString: string): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.rat_afc + "?debug=True&gui=True", {
         method: "POST",
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token,
         },
         body: JSON.stringify({ version: version, availableSpectrumInquiryRequests: [JSON.parse(requestAsJsonString)] })
     })
@@ -64,6 +69,7 @@ export const spectrumInquiryRequestByString = (version: string, requestAsJsonStr
         .catch(e => {
             return error("encountered an error when running request", undefined, e);
         })
+}
 
 
 /**
