@@ -1013,7 +1013,7 @@ void AfcManager::initializeDatabases()
 	if (_useBDesignFlag) {
 		_lidarDir = SearchPaths::forReading("data", "rat_transfer/Multiband-BDesign3D", true);
 	}
-	else if (_useLiDAR & 0)
+	else if (_useLiDAR)
 	{
 		_lidarDir = SearchPaths::forReading("data", "rat_transfer/proc_lidar_2019", true);
 
@@ -1041,7 +1041,7 @@ void AfcManager::initializeDatabases()
 	{
 		_terrainDataModel->setSourceName(CConst::HeightSourceEnum::lidarHeightSource, "B3D-3DEP");
 	}
-	else if (_useLiDAR & 0)
+	else if (_useLiDAR)
 	{
 		_terrainDataModel->setSourceName(CConst::HeightSourceEnum::lidarHeightSource, "LiDAR");
 	}
@@ -2582,8 +2582,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 			_confidenceITM = propModel["itmConfidence"].toDouble()/100.0;
 			_confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
 			_useBDesignFlag = propModel["buildingSource"].toString() == "B-Design3D";
-			//_useLiDAR = propModel["buildingSource"].toString() == "LiDAR";
-			_useLiDAR = false;
+			_useLiDAR = propModel["buildingSource"].toString() == "LiDAR";
 			_use3DEP = true;
 			_winner2LOSOption = CConst::UnknownLOSOption;
 			_winner2UnknownLOSMethod = CConst::PLOSThresholdWinner2UnknownLOSMethod;
@@ -2608,13 +2607,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 			_confidenceClutter2108 = propModel["p2108Confidence"].toDouble()/100.0;
 
 			_useBDesignFlag = propModel["buildingSource"].toString() == "B-Design3D";
-			//_useLiDAR = propModel["buildingSource"].toString() == "LiDAR";
-			_useLiDAR = false;
+			_useLiDAR = propModel["buildingSource"].toString() == "LiDAR";
 
 			// In the GUI, force this to be true for US and CA.
 			_use3DEP = propModel["terrainSource"].toString() == "3DEP (30m)";
 
-			_winner2LOSOption = ((_useBDesignFlag || (_useLiDAR & 0)) ? CConst::BldgDataReqTxRxLOSOption :
+			_winner2LOSOption = ((_useBDesignFlag || _useLiDAR) ? CConst::BldgDataReqTxRxLOSOption :
 				(!_cdsmDir.empty()) ? CConst::CdsmLOSOption : CConst::UnknownLOSOption);
 			_winner2UnknownLOSMethod = CConst::PLOSCombineWinner2UnknownLOSMethod;
 
@@ -10969,8 +10967,7 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_wlanMinFreq = _wlanMinFreqMHz*1.0e6;
 	_wlanMaxFreq = _wlanMaxFreqMHz*1.0e6;
 
-	//_lidarDir = SearchPaths::forReading("data", "rat_transfer/proc_lidar_2019", true);
-	_lidarDir = "";
+	_lidarDir = SearchPaths::forReading("data", "rat_transfer/proc_lidar_2019", true);
 
 	_globeDir = SearchPaths::forReading("data", "rat_transfer/globe", true);
 
