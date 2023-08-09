@@ -84,7 +84,6 @@ def create_app(config_override=None):
     from flask_wtf.csrf import CSRFProtect
 
     flaskapp = flask.Flask(__name__.split('.')[0])
-    csrf = CSRFProtect(flaskapp)
     flaskapp.response_class = util.Response
 
     # default config state from module
@@ -167,10 +166,6 @@ def create_app(config_override=None):
 
             return response
 
-    @flaskapp.before_request
-    def check_csrf():
-        csrf.protect()
-
     # Check configuration
     state_path = flaskapp.config['STATE_ROOT_PATH']
     nfs_mount_path = flaskapp.config['NFS_MOUNT_PATH']
@@ -184,6 +179,11 @@ def create_app(config_override=None):
 
     # Static file dispatchers
     if flaskapp.config['AFC_APP_TYPE'] == 'server':
+        csrf = CSRFProtect(flaskapp)
+        @flaskapp.before_request
+        def check_csrf():
+            csrf.protect()
+
         if not os.path.exists(os.path.join(nfs_mount_path, 'rat_transfer', 'frequency_bands')):
             os.makedirs(os.path.join(nfs_mount_path, 'rat_transfer', 'frequency_bands'))
 
