@@ -7,6 +7,12 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
+# pylint: disable=raise-missing-from, logging-fstring-interpolation
+# pylint: disable=too-many-lines, invalid-name, consider-using-f-string
+# pylint: disable=unnecessary-pass, unnecessary-ellipsis, too-many-arguments
+# pylint: disable=too-many-instance-attributes, too-few-public-methods
+# pylint: disable=wrong-import-order, too-many-locals, too-many-branches
+
 from abc import ABC, abstractmethod
 import argparse
 from collections.abc import Iterable
@@ -32,8 +38,6 @@ import sys
 from typing import Any, Dict, Generic, List, NamedTuple, Optional, Set, \
     Tuple, Type, TypeVar, Union
 import uuid
-
-# pylint: disable=raise-missing-from, logging-fstring-interpolation
 
 # This script version
 VERSION = "0.1"
@@ -1062,7 +1066,8 @@ class CertificationList:
     """
     # Single certification
     Certification = \
-        NamedTuple("Certification", [("nra", str), ("certification_id", str)])
+        NamedTuple("Certification", [("ruleset_id", str),
+                                     ("certification_id", str)])
 
     def __init__(self, json_data: Optional[List[JSON_DATA_TYPE]] = None) \
             -> None:
@@ -1077,14 +1082,15 @@ class CertificationList:
             try:
                 for c in json_data:
                     cert: Dict[str, Any] = jd(c)
-                    nra = cert["nra"]
+                    ruleset_id = cert["rulesetId"]
                     certification_id = cert["id"]
-                    if not (isinstance(nra, str),
+                    if not (isinstance(ruleset_id, str),
                             isinstance(certification_id, str)):
                         raise TypeError()
                     self._certifications[len(self._certifications)] = \
-                        self.Certification(nra=js(cert["nra"]),
-                                           certification_id=js(cert["id"]))
+                        self.Certification(
+                            ruleset_id=js(ruleset_id),
+                            certification_id=js(certification_id))
             except (LookupError, TypeError, ValueError):
                 raise JsonFormatError(
                     "Invalid DeviceDescriptor.certificationId format",
@@ -1106,7 +1112,7 @@ class CertificationList:
         certidications) """
         return \
             BytesUtils.json_to_uuid(
-                [{"nra": self._certifications[idx].nra,
+                [{"rulesetId": self._certifications[idx].ruleset_id,
                   "id": self._certifications[idx].certification_id}
                  for idx in sorted(self._certifications.keys())])
 
@@ -1403,11 +1409,11 @@ class CertificationsLookup(LookupBase[uuid.UUID, CertificationList]):
     """ Certifications' lookup
 
     Private attributes:
-    _col_digest    -- Certifications' digest column
-    _col_index     -- Index in Certifications' list column
-    _col_month_idx -- Month index column
-    _col_nra       -- National Registration Authority name column
-    _col_id        -- Certificate ID column
+    _col_digest     -- Certifications' digest column
+    _col_index      -- Index in Certifications' list column
+    _col_month_idx  -- Month index column
+    _col_ruleset_id -- National Registration Authority name column
+    _col_id         -- Certificate ID column
     """
     # Table name
     TABLE_NAME = "certification"
@@ -1424,7 +1430,7 @@ class CertificationsLookup(LookupBase[uuid.UUID, CertificationList]):
         self._col_index = self.get_column("certification_index",
                                           sa.SmallInteger)
         self._col_month_idx = self.get_month_idx_col()
-        self._col_nra = self.get_column("nra", sa.Text)
+        self._col_ruleset_id = self.get_column("ruleset_id", sa.Text)
         self._col_id = self.get_column("certification_id", sa.Text)
 
     def _key_from_row(self, row: ROW_DATA_TYPE) -> uuid.UUID:
@@ -1444,7 +1450,7 @@ class CertificationsLookup(LookupBase[uuid.UUID, CertificationList]):
         value.add_certification(
             index=ji(row[ms(self._col_index.name)]),
             certification=CertificationList.Certification(
-                nra=js(row[ms(self._col_nra.name)]),
+                ruleset_id=js(row[ms(self._col_ruleset_id.name)]),
                 certification_id=js(row[ms(self._col_id.name)])))
 
     def _key_from_value(self, value: CertificationList) -> uuid.UUID:
@@ -1457,71 +1463,12 @@ class CertificationsLookup(LookupBase[uuid.UUID, CertificationList]):
         """
         ret: List[ROW_DATA_TYPE] = []
         for cert_idx, certification in enumerate(value.certifications()):
-            ret.append({ms(self._col_digest.name): value.get_uuid().urn,
-                        ms(self._col_index.name): cert_idx,
-                        ms(self._col_month_idx.name): month_idx,
-                        ms(self._col_nra.name): certification.nra,
-                        ms(self._col_id.name): certification.certification_id})
-        return ret
-
-
-class RegRulesLookup(LookupBase[uuid.UUID, RegRuleList]):
-    """ Regulatory Rules lookup table
-
-    Private attributes:
-    _col_digest    -- Rules' digest column
-    _col_index     -- Index in rule list column
-    _col_month_idx -- Month index column
-    _col_name      -- Rule name column
-    """
-    # Table name
-    TABLE_NAME = "regulatory_rule"
-
-    def __init__(self, adb: AlsDatabase, lookups: Lookups) -> None:
-        """ Constructor
-
-        Arguments:
-        adb     -- AlsDatabase object
-        lookups -- Lookup collection to register self in
-        """
-        super().__init__(adb=adb, table_name=self.TABLE_NAME, lookups=lookups)
-        self._col_digest = self.get_column("regulatory_rules_digest",
-                                           sa_pg.UUID)
-        self._col_index = self.get_column("regulatory_rule_index",
-                                          sa.SmallInteger)
-        self._col_month_idx = self.get_month_idx_col()
-        self._col_name = self.get_column("regulatory_rule_name", sa.Text)
-
-    def _key_from_row(self, row: ROW_DATA_TYPE) -> uuid.UUID:
-        """ Rules' digest for given row dictionary """
-        return uuid.UUID(js(row[ms(self._col_digest.name)]))
-
-    def _value_from_row_create(self, row: ROW_DATA_TYPE) -> RegRuleList:
-        """ Returns partial rules' list from given row dictionary """
-        ret = RegRuleList()
-        self._value_from_row_update(row, ret)
-        return ret
-
-    def _value_from_row_update(self, row: ROW_DATA_TYPE,
-                               value: RegRuleList) -> None:
-        """ Updates given partial rules list from given row dictionary """
-        value.add_rule(index=ji(row[ms(self._col_index.name)]),
-                       reg_rule=js(row[ms(self._col_name.name)]))
-
-    def _key_from_value(self, value: RegRuleList) -> uuid.UUID:
-        """ Table (semi) key from RegRuleList object """
-        return value.get_uuid()
-
-    def _rows_from_value(self, value: RegRuleList, month_idx: int) \
-            -> List[ROW_DATA_TYPE]:
-        """ List of rows dictionaries, representing given RegRuleList object
-        """
-        ret: List[ROW_DATA_TYPE] = []
-        for rule_idx, rule_name in enumerate(value.reg_rules()):
-            ret.append({ms(self._col_digest.name): value.get_uuid().urn,
-                        ms(self._col_index.name): rule_idx,
-                        ms(self._col_month_idx.name): month_idx,
-                        ms(self._col_name.name): rule_name})
+            ret.append(
+                {ms(self._col_digest.name): value.get_uuid().urn,
+                 ms(self._col_index.name): cert_idx,
+                 ms(self._col_month_idx.name): month_idx,
+                 ms(self._col_ruleset_id.name): certification.ruleset_id,
+                 ms(self._col_id.name): certification.certification_id})
         return ret
 
 
@@ -1832,36 +1779,30 @@ class DeviceDescriptorTableUpdater(TableUpdaterBase[uuid.UUID,
 
     Private data:
     _cert_lookup          -- Certificates' lookup
-    _reg_rules_lookup     -- Regulatory rules' lookup
     _col_digest           -- Digest column
     _col_month_idx        -- Month index column
     _col_serial           -- AP Serial Number column
     _col_cert_digest      -- Certificates' digest column
-    _col_reg_rules_digest -- Regulatory rules' digest column
     """
     TABLE_NAME = "device_descriptor"
 
-    def __init__(self, adb: AlsDatabase, cert_lookup: CertificationsLookup,
-                 reg_rules_lookup: RegRulesLookup) -> None:
+    def __init__(self, adb: AlsDatabase, cert_lookup: CertificationsLookup) \
+            -> None:
         """ Constructor
 
         Arguments:
         adb              -- AlsDatabase object
         cert_lookup      -- Certificates' lookup
-        reg_rules_lookup -- Regulatory rules' lookup
         """
         super().__init__(adb=adb, table_name=self.TABLE_NAME,
                          json_obj_name="DeviceDescriptor")
         self._cert_lookup = cert_lookup
-        self._reg_rules_lookup = reg_rules_lookup
         self._col_digest = self.get_column("device_descriptor_digest",
                                            sa_pg.UUID)
         self._col_month_idx = self.get_month_idx_col()
         self._col_serial = self.get_column("serial_number", sa.Text)
         self._col_cert_digest = self.get_column("certifications_digest",
                                                 sa_pg.UUID)
-        self._col_reg_rules_digest = self.get_column("regulatory_rules_digest",
-                                                     sa_pg.UUID)
 
     def _update_lookups(self, data_objects: Iterable[JSON_DATA_TYPE],
                         month_idx: int) -> None:
@@ -1874,18 +1815,15 @@ class DeviceDescriptorTableUpdater(TableUpdaterBase[uuid.UUID,
         month_idx    -- Month index
         """
         cert_lists: List[CertificationList] = []
-        reg_rule_lists: List[RegRuleList] = []
         for d in data_objects:
             j = jd(d)
             try:
                 cert_lists.append(CertificationList(jl(j["certificationId"])))
-                reg_rule_lists.append(RegRuleList(j["rulesetIds"]))
             except LookupError as ex:
                 raise JsonFormatError(
-                    f"Certifications or rules not found: {ex}",
+                    f"Certifications not found: {ex}",
                     code_line=LineNumber.exc(), data=j)
         self._cert_lookup.update_db(cert_lists, month_idx=month_idx)
-        self._reg_rules_lookup.update_db(reg_rule_lists, month_idx=month_idx)
 
     def _make_rows(self, data_key: uuid.UUID, data_object: JSON_DATA_TYPE,
                    month_idx: int) -> List[ROW_DATA_TYPE]:
@@ -1906,10 +1844,6 @@ class DeviceDescriptorTableUpdater(TableUpdaterBase[uuid.UUID,
                      ms(self._col_cert_digest.name):
                          self._cert_lookup.key_for_value(
                              CertificationList(json_object["certificationId"]),
-                             month_idx=month_idx).urn,
-                     ms(self._col_reg_rules_digest.name):
-                         self._reg_rules_lookup.key_for_value(
-                             RegRuleList(json_object["rulesetIds"]),
                              month_idx=month_idx).urn}]
         except (LookupError, TypeError, ValueError) as ex:
             raise \
@@ -3090,7 +3024,6 @@ class Siphon:
     _decode_error_writer     -- Decode error table writer
     _lookups                 -- Lookup collection
     _cert_lookup             -- Certificates' lookup
-    _reg_rules_lookup        -- Regulatory rules' lookup
     _afc_config_lookup       -- AFC Configs lookup
     _afc_server_lookup       -- AFC Server name lookup
     _customer_lookup         -- Customer name lookup
@@ -3229,8 +3162,6 @@ class Siphon:
             self._lookups = Lookups()
             self._cert_lookup = CertificationsLookup(adb=self._adb,
                                                      lookups=self._lookups)
-            self._reg_rules_lookup = RegRulesLookup(adb=self._adb,
-                                                    lookups=self._lookups)
             self._afc_config_lookup = AfcConfigLookup(adb=self._adb,
                                                       lookups=self._lookups)
             self._afc_server_lookup = \
@@ -3251,8 +3182,7 @@ class Siphon:
                              lookups=self._lookups)
             self._dev_desc_updater = \
                 DeviceDescriptorTableUpdater(
-                    adb=self._adb, cert_lookup=self._cert_lookup,
-                    reg_rules_lookup=self._reg_rules_lookup)
+                    adb=self._adb, cert_lookup=self._cert_lookup)
             self._location_updater = LocationTableUpdater(adb=self._adb)
             self._compressed_json_updater = \
                 CompressedJsonTableUpdater(adb=self._adb)
@@ -3455,6 +3385,22 @@ class Siphon:
         self._prev_progress_info = copy.copy(self._progress_info)
 
 
+def read_sql_file(sql_file: str) -> str:
+    """ Returns content of SQL file properly cleaned """
+    with open(sql_file, encoding="ascii", newline=None) as f:
+        content = f.read()
+
+    # Removing -- and /* */ comments. Courtesy of stackoverflow :)
+    def replacer(match: re.Match) -> str:
+        """ Replacement callback """
+        s = match.group(0)
+        return " " if s.startswith('/') else s  # /* */ comment is separator
+
+    return re.sub(
+        r'--.*?$|/\*.*?\*/|\'(?:\\.|[^\\\'])*\'|"(?:\\.|[^\\"])*"',
+        replacer, content, flags=re.DOTALL | re.MULTILINE)
+
+
 def do_init_db(args: Any) -> None:
     """Execute "init" command.
 
@@ -3497,15 +3443,15 @@ def do_init_db(args: Any) -> None:
                 db = db_class(arg_conn_str=conn_str, arg_password=password)
                 databases.add(db)
                 if created and sql_file:
-                    with open(sql_file, encoding="ascii") as f:
-                        db.engine.execute(sa.text(f.read()))
+                    dp(read_sql_file(sql_file))
+                    db.engine.execute(sa.text(read_sql_file(sql_file)))
             except sa.exc.SQLAlchemyError as ex:
                 error(f"{db_class.name_for_logs()} database initialization "
                       f"failed: {ex}")
                 if created:
                     try:
                         init_db.drop_db(database)
-                    except sa.exc.SQLAlchemyError as ex:
+                    except sa.exc.SQLAlchemyError:
                         pass
         error_if(nothing_done, "Nothing to do")
     finally:
