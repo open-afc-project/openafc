@@ -54,7 +54,6 @@ CREATE TABLE "device_descriptor" (
   "month_idx" smallint,
   "serial_number" text,
   "certifications_digest" uuid,
-  "regulatory_rules_digest" uuid,
   PRIMARY KEY ("device_descriptor_digest", "month_idx")
 );
 
@@ -62,17 +61,9 @@ CREATE TABLE "certification" (
   "certifications_digest" uuid,
   "certification_index" smallint,
   "month_idx" smallint,
-  "nra" text,
+  "ruleset_id" text,
   "certification_id" text,
   PRIMARY KEY ("certifications_digest", "certification_index", "month_idx")
-);
-
-CREATE TABLE "regulatory_rule" (
-  "regulatory_rules_digest" uuid,
-  "regulatory_rule_index" smallint,
-  "month_idx" smallint,
-  "regulatory_rule_name" text,
-  PRIMARY KEY ("regulatory_rules_digest", "regulatory_rule_index", "month_idx")
 );
 
 CREATE TABLE "compressed_json" (
@@ -194,17 +185,11 @@ CREATE INDEX ON "device_descriptor" ("serial_number");
 
 CREATE INDEX ON "device_descriptor" ("certifications_digest");
 
-CREATE INDEX ON "device_descriptor" ("regulatory_rules_digest");
-
 CREATE INDEX ON "certification" USING HASH ("certifications_digest");
 
-CREATE INDEX ON "certification" ("nra");
+CREATE INDEX ON "certification" ("ruleset_id");
 
 CREATE INDEX ON "certification" ("certification_id");
-
-CREATE INDEX ON "regulatory_rule" USING HASH ("regulatory_rules_digest");
-
-CREATE INDEX ON "regulatory_rule" ("regulatory_rule_name");
 
 CREATE INDEX ON "compressed_json" USING HASH ("compressed_json_digest");
 
@@ -310,25 +295,15 @@ COMMENT ON COLUMN "device_descriptor"."serial_number" IS 'AP serial number';
 
 COMMENT ON COLUMN "device_descriptor"."certifications_digest" IS 'Device certifications';
 
-COMMENT ON COLUMN "device_descriptor"."regulatory_rules_digest" IS 'Device computation rules';
-
 COMMENT ON TABLE "certification" IS 'Element of certifications list';
 
 COMMENT ON COLUMN "certification"."certifications_digest" IS 'MD5 of certification list json';
 
 COMMENT ON COLUMN "certification"."certification_index" IS 'Index in certification list';
 
-COMMENT ON COLUMN "certification"."nra" IS 'National regulatory authority';
+COMMENT ON COLUMN "certification"."ruleset_id" IS 'Name of rules for which AP certified (equivalent of region)';
 
-COMMENT ON COLUMN "certification"."certification_id" IS 'Certification ID';
-
-COMMENT ON TABLE "regulatory_rule" IS 'Element of regulatory rules list';
-
-COMMENT ON COLUMN "regulatory_rule"."regulatory_rules_digest" IS 'MD5 of rules list';
-
-COMMENT ON COLUMN "regulatory_rule"."regulatory_rule_index" IS 'Index in regulatory rules list';
-
-COMMENT ON COLUMN "regulatory_rule"."regulatory_rule_name" IS 'Rule name';
+COMMENT ON COLUMN "certification"."certification_id" IS 'ID of certification (equivalent of manufacturer)';
 
 COMMENT ON TABLE "compressed_json" IS 'Compressed body of request or response';
 
@@ -415,19 +390,6 @@ CREATE TABLE "device_descriptor_certification" (
 ALTER TABLE "device_descriptor_certification" ADD FOREIGN KEY ("device_descriptor_certifications_digest", "device_descriptor_month_idx") REFERENCES "device_descriptor" ("certifications_digest", "month_idx");
 
 ALTER TABLE "device_descriptor_certification" ADD FOREIGN KEY ("certification_certifications_digest", "certification_month_idx") REFERENCES "certification" ("certifications_digest", "month_idx");
-
-
-CREATE TABLE "device_descriptor_regulatory_rule" (
-  "device_descriptor_regulatory_rules_digest" uuid,
-  "device_descriptor_month_idx" smallint,
-  "regulatory_rule_regulatory_rules_digest" uuid,
-  "regulatory_rule_month_idx" smallint,
-  PRIMARY KEY ("device_descriptor_regulatory_rules_digest", "device_descriptor_month_idx", "regulatory_rule_regulatory_rules_digest", "regulatory_rule_month_idx")
-);
-
-ALTER TABLE "device_descriptor_regulatory_rule" ADD FOREIGN KEY ("device_descriptor_regulatory_rules_digest", "device_descriptor_month_idx") REFERENCES "device_descriptor" ("regulatory_rules_digest", "month_idx");
-
-ALTER TABLE "device_descriptor_regulatory_rule" ADD FOREIGN KEY ("regulatory_rule_regulatory_rules_digest", "regulatory_rule_month_idx") REFERENCES "regulatory_rule" ("regulatory_rules_digest", "month_idx");
 
 
 ALTER TABLE "max_psd" ADD CONSTRAINT "max_psd_request_response_digest_ref" FOREIGN KEY ("request_response_digest", "month_idx") REFERENCES "request_response" ("request_response_digest", "month_idx");

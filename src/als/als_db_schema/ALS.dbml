@@ -16,7 +16,7 @@ table afc_message [headercolor: #000000, note: 'AFC Request/Response message pai
   tx_time timestamptz
   rx_envelope_digest uuid [note: 'Envelope of AFC Request message']
   tx_envelope_digest uuid [note: 'Envelope of AFC Response message']
-  
+
   indexes {
     (message_id, month_idx) [pk]
     rx_time
@@ -33,7 +33,7 @@ table rx_envelope [headercolor: #4B82B0, note: 'Envelope (constant part) of AFC 
   rx_envelope_digest uuid [note: 'MD5 of envelope_json field in UTF8 encoding']
   month_idx smallint
   envelope_json json [note: 'AFC Request JSON with empty availableSpectrumInquiryRequests field']
-  
+
   indexes {
     (rx_envelope_digest, month_idx) [pk]
     rx_envelope_digest [type: hash]
@@ -45,7 +45,7 @@ table tx_envelope [headercolor: #4B82B0, note: 'Envelope (constant part) of AFC 
   tx_envelope_digest uuid [note: 'MD5 of envelope_json field in UTF8 encoding']
   month_idx smallint
   envelope_json json [note: 'AFC Response JSON with empty availableSpectrumInquiryRequests field']
-  
+
   indexes {
     (tx_envelope_digest, month_idx) [pk]
     tx_envelope_digest [type: hash]
@@ -60,7 +60,7 @@ table request_response_in_message [headercolor: #4B82B0, note: 'Associative tabl
   month_idx smallint
   request_response_digest uuid [note: 'Reference to otentially constant part of request/response']
   expire_time timestamptz [note: 'Response expiration time']
-  
+
   indexes {
     (message_id, request_id, month_idx) [pk]
     request_id
@@ -116,47 +116,30 @@ table device_descriptor [headercolor: #2D6512, note: 'Information about device (
   month_idx smallint
   serial_number text [note: 'AP serial number']
   certifications_digest uuid [note: 'Device certifications']
-  regulatory_rules_digest uuid [note: 'Device computation rules']
 
   indexes {
     (device_descriptor_digest, month_idx) [pk]
     device_descriptor_digest [type: hash]
     serial_number
     certifications_digest
-    regulatory_rules_digest
-  }  
+  }
 }
 
 Ref device_descriptor_certifications_digest_ref: device_descriptor.(certifications_digest, month_idx) <> certification.(certifications_digest, month_idx)
-Ref device_descriptor_regulatory_rules_digest_ref: device_descriptor.(regulatory_rules_digest, month_idx) <> regulatory_rule.(regulatory_rules_digest, month_idx)
 
 // Single certification
 table certification [headercolor: #79AD51, note: 'Element of certifications list'] {
   certifications_digest uuid [note: 'MD5 of certification list json']
   certification_index smallint [note: 'Index in certification list']
   month_idx smallint
-  nra text [note: 'National regulatory authority']
-  certification_id text [note: 'Certification ID']
-  
+  ruleset_id text [note: 'Name of rules for which AP certified (equivalent of region)']
+  certification_id text [note: 'ID of certification (equivalent of manufacturer)']
+
   indexes {
     (certifications_digest, certification_index, month_idx) [pk]
     certifications_digest [type: hash]
-    nra
+    ruleset_id
     certification_id
-  }
-}
-
-// Single regulatory rule
-table regulatory_rule [headercolor: #79AD51, note: 'Element of regulatory rules list'] {
-  regulatory_rules_digest uuid [note: 'MD5 of rules list']
-  regulatory_rule_index smallint [note: 'Index in regulatory rules list']
-  month_idx smallint
-  regulatory_rule_name text [note: 'Rule name']
-  
-  indexes {
-    (regulatory_rules_digest, regulatory_rule_index, month_idx) [pk]
-    regulatory_rules_digest [type: hash]
-    regulatory_rule_name
   }
 }
 
@@ -165,7 +148,7 @@ table compressed_json [headercolor: #2D6512, note: 'Compressed body of request o
   compressed_json_digest uuid [note: 'MD5 hash of compressed data']
   month_idx smallint
   compressed_json_data bytea [note: 'Compressed data']
-  
+
   indexes {
     (compressed_json_digest, month_idx) [pk]
     compressed_json_digest [type: hash]
@@ -177,7 +160,7 @@ table customer [headercolor: #79AD51, note: 'Customer aka vendor aka user'] {
   customer_id serial
   month_idx smallint
   customer_name text [note: 'Its name']
-  
+
   indexes {
     (customer_id, month_idx) [pk]
     customer_name
@@ -195,7 +178,7 @@ table location [headercolor: #2D6512, note: 'AP location'] {
   height_m real [note: 'AP elevation in meters']
   height_uncertainty_m real [note: 'Elevation uncertainty in meters']
   height_type text [note: 'Elevation type']
-  
+
   indexes {
     (location_digest, month_idx) [pk]
     location_digest [type: hash]
@@ -212,7 +195,7 @@ table afc_config [headercolor: #79AD51, note: 'AFC Config'] {
   month_idx smallint
   afc_config_text text [note: 'Text representation of AFC Config']
   afc_config_json json [note: 'JSON representation of AFC Config']
-  
+
   indexes {
     (afc_config_text_digest, month_idx) [pk]
     afc_config_text_digest [type: hash]
@@ -224,7 +207,7 @@ table geo_data_version [headercolor: #79AD51, note: 'Version of geospatial data'
   geo_data_version_id serial
   month_idx smallint
   geo_data_version text
-  
+
   indexes {
     (geo_data_version_id, month_idx) [pk]
     (geo_data_version, month_idx) [unique]
@@ -237,7 +220,7 @@ table uls_data_version [headercolor: #79AD51, note: "Version of ULS data'"] {
   uls_data_version_id serial
   month_idx smallint
   uls_data_version text
-  
+
   indexes {
     (uls_data_version_id, month_idx) [pk]
     (uls_data_version, month_idx) [unique]
@@ -249,10 +232,10 @@ table uls_data_version [headercolor: #79AD51, note: "Version of ULS data'"] {
 table max_psd [headercolor: #990D0D, note: 'PSD result'] {
   request_response_digest uuid [note: 'Request this result belongs to']
   month_idx smallint
-  low_frequency_mhz smallint 
+  low_frequency_mhz smallint
   high_frequency_mhz smallint
   max_psd_dbm_mhz real
-  
+
   indexes {
     (request_response_digest, month_idx, low_frequency_mhz, high_frequency_mhz) [pk]
     request_response_digest [type: hash]
@@ -271,7 +254,7 @@ table max_eirp [headercolor: #990D0D, note: 'EIRP result'] {
   op_class smallint
   channel smallint
   max_eirp_dbm real
-  
+
   indexes {
     (request_response_digest, month_idx, op_class, channel) [pk]
     request_response_digest [type: hash]
@@ -288,7 +271,7 @@ table afc_server [headercolor: #4B82B0] {
   afc_server_id serial
   month_idx smallint
   afc_server_name text [unique]
-  
+
   indexes {
     (afc_server_id, month_idx) [pk]
     (afc_server_name, month_idx) [unique]
