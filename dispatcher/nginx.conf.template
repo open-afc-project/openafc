@@ -160,4 +160,5 @@ http {
     tcp_nopush     on;
 
     keepalive_timeout  180;
+    server_tokens off;
 }
