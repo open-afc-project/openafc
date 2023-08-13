@@ -1,5 +1,12 @@
 # Release Note
 ## **Version and Date**
+|Version|**OA-790*|
+| :- | :- |
+|**Date**|**08/11/2023**|
+
+## **Issues Addressed**
+ * Jira OA-790: Add py3-nump3 to worker docker image so daily_uls_parse.py works
+
 |Version|**OA-760*|
 | :- | :- |
 |**Date**|**08/10/2023**|

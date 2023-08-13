@@ -10,7 +10,7 @@ if [ "$AFC_DEVEL_ENV" == "devel" ]; then
     apk add build-base cmake samurai gdal-dev \
     boost-dev qt5-qtbase-dev armadillo-dev minizip-dev libbsd-dev \
     bash gdb musl-dbg musl-dev strace sudo \
-    libxt-dev motif-dev xterm vim
+    libxt-dev motif-dev xterm vim py3-numpy
     # prebuilt ddd executable installed.
     # steps to rebuild ddd binary from a stable release
     # tar zxf ddd-3.3.12.tar.gz
