@@ -192,7 +192,8 @@ class AccessPointDeny(MethodView):
         rule_map = {}
         for idx, rule in enumerate(rules):
             r = db.session.query(aaa.Ruleset).filter(aaa.Ruleset.name == rule).first()
-            rule_map[r.id] = idx
+            if r:
+                rule_map[r.id] = idx
 
         return flask.jsonify(
              rulesets=rules,

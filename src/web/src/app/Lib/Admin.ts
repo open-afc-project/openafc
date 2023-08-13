@@ -1,4 +1,4 @@
-import { guiConfig } from "./RatApi";
+import { guiConfig, getCSRF } from "./RatApi";
 import { UserModel, success, error, AccessPointModel, AccessPointListModel, FreqRange, DeniedRegion, ExclusionCircle, ExclusionTwoRect, ExclusionRect, ExclusionHorizon } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { Role, retrieveUserData } from "./User";
@@ -44,10 +44,12 @@ export const getMinimumEIRP = () =>
  * Sets the Minimum EIRP value.
  * @param limit the new EIRP value 
  */
-export const setMinimumEIRP = (limit: number | boolean) =>
+export const setMinimumEIRP = async (limit: number | boolean) => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.admin_url.replace("-1", "eirp_min"), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token},
         body: JSON.stringify(limit)
     })
         .then(async res => {
@@ -58,6 +60,7 @@ export const setMinimumEIRP = (limit: number | boolean) =>
             }
         })
         .catch(err => error("An error was encountered #1", undefined, err));
+}
 
 /**
  * Return list of all users. Must be Admin
@@ -99,26 +102,31 @@ export const getUser = (id: number) =>
  * Update a user's data
  * @param user User to replace with
  */
-export const updateUser = (user: { email: string, password: string, id: number, active: boolean }) =>
+export const updateUser = async (user: { email: string, password: string, id: number, active: boolean }) => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.admin_url.replace("-1", String(user.id)), {
         method: "POST",
         body: JSON.stringify(Object.assign(user, { setProps: true })),
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json",
+             'X-CSRF-Token': csrf_token},
     }).then(res =>
         res.ok ?
             success(res.statusText) :
             error(res.statusText, res.status, res));
+}
 
 /**
  * Give a user a role
  * @param id user's Id
  * @param role role to add
  */
-export const addUserRole = (id: number, role: Role) =>
+export const addUserRole = async (id: number, role: Role) => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.admin_url.replace("-1", String(id)), {
         method: "POST",
         body: JSON.stringify({ addRole: role }),
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token}
     }).then(res => {
         if (res.ok) {
             return success(res.status);
@@ -126,17 +134,20 @@ export const addUserRole = (id: number, role: Role) =>
             return error(res.statusText, res.status, res);
         }
     }).catch(err => error("An error was encountered #2", undefined, err));
+}
 
 /**
  * Remove a role from a user
  * @param id user's Id
  * @param role role to remove
  */
-export const removeUserRole = (id: number, role: Role) =>
+export const removeUserRole = async (id: number, role: Role) => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.admin_url.replace("-1", id.toString()), {
         method: "POST",
         body: JSON.stringify({ removeRole: role }),
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token}
     }).then(res => {
         if (res.ok) {
             return success(res.status);
@@ -144,14 +155,18 @@ export const removeUserRole = (id: number, role: Role) =>
             return error(res.statusText, res.status, res);
         }
     }).catch(err => error("An error was encountered #3", undefined, err));
+}
+
 
 /**
  * Delete a user from the system
  * @param id user'd Id
  */
-export const deleteUser = (id: number) =>
+export const deleteUser = async (id: number) => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.admin_url.replace("-1", String(id)), {
         method: "DELETE",
+        headers: {'X-CSRF-Token': csrf_token},
     }).then(res => {
         if (res.ok) {
             return success(res.status);
@@ -159,6 +174,7 @@ export const deleteUser = (id: number) =>
             return error(res.statusText, res.status, res);
         }
     }).catch(err => error("An error was encountered #4", undefined, err));
+}
 
 
 /**
@@ -184,10 +200,13 @@ export const getAccessPointsDeny = (userId?: number) =>
  * @param ap Access point to add
  * @param userId owner of new access point
  */
-export const addAccessPointDeny = (ap: AccessPointModel, userId: number) =>
+export const addAccessPointDeny = async (ap: AccessPointModel, userId: number) => {
+    let csrf_token = await(getCSRF());
+
     fetch(guiConfig.ap_deny_admin_url.replace("-1", String(userId)), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", 
+             'X-CSRF-Token': csrf_token},
         body: JSON.stringify(ap)
     })
     .then(async res => {
@@ -200,17 +219,19 @@ export const addAccessPointDeny = (ap: AccessPointModel, userId: number) =>
         }
     })
     .catch(err => error("An error was encountered #9", undefined, err));
-
+}
 
 /**
  * Post a new deny access point file
  * @param ap Access point to add
  * @param userId owner of new access point
  */
-export const putAccessPointDenyList = (ap: AccessPointListModel, userId: number) =>
+export const putAccessPointDenyList = async (ap: AccessPointListModel, userId: number) => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.ap_deny_admin_url.replace("-1", String(userId)), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token},
         body: JSON.stringify(ap)
     })
     .then(res => {
@@ -223,16 +244,19 @@ export const putAccessPointDenyList = (ap: AccessPointListModel, userId: number)
         }
     })
     .catch(err => error("An error was encountered #10", undefined, err));
+}
 
 /**
  * Register an mtls certificate
  * @param mtls cert to add
  * @param userId who creates the new mtls cert
  */
-export const addMTLS = (mtls: MTLSModel, userId: number) =>
+export const addMTLS = async (mtls: MTLSModel, userId: number) => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.mtls_admin_url.replace("-1", String(userId)), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token},
         body: JSON.stringify(mtls)
     })
         .then(async res => {
@@ -245,16 +269,19 @@ export const addMTLS = (mtls: MTLSModel, userId: number) =>
             }
         })
         .catch(err => error("An error was encountered #11", undefined, err));
+}
 
 
 /**
  * Delete an mtls cert from the system.
  * @param id mtls cert id
  */
-export const deleteMTLSCert = (id: number) =>
+export const deleteMTLSCert = async (id: number) => {
     // here the id in the url is the mtls id, not the user id
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.mtls_admin_url.replace("-1", String(id)), {
         method: "DELETE",
+        headers: {'X-CSRF-Token': csrf_token},
     })
         .then(res => {
             if (res.ok) {
@@ -264,6 +291,7 @@ export const deleteMTLSCert = (id: number) =>
             }
         })
         .catch(err => error("An error was encountered #12", undefined, err));
+}
 
 /**
  * Get mtls cert.  If `userId` is 0, then return all certificates (super)
@@ -319,11 +347,14 @@ export const getDeniedRegionsCsvFile = (regionStr: string) => {
 }
 
 // Update the denied regions for a given region
-export const updateDeniedRegions = (records: DeniedRegion[], regionStr: string) => {
+export const updateDeniedRegions = async (records: DeniedRegion[], regionStr: string) => {
     let body = mapDeniedRegionToCsv(records, regionStr, true);
+    let csrf_token = await(getCSRF());
+
     return fetch(guiConfig.dr_admin_url.replace("XX", regionStr), {
         method: "PUT",
-        headers: { "Content-Type": "text/csv" },
+        headers: { "Content-Type": "text/csv",
+           'X-CSRF-Token': csrf_token},
         body: body
     }).then(async res => {
         if (res.status === 204) {

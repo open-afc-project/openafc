@@ -457,10 +457,12 @@ export const getAboutAfc = (): Promise<RatResponse<string>> => (
     })
 )
 
-export const setAboutAfc = (name: string, email: string, org:string, token:string ): Promise<RatResponse<string>> => (
+export const setAboutAfc = async (name: string, email: string, org:string, token:string ): Promise<RatResponse<string>> => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.about_url, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", 
+            'X-CSRF-Token': csrf_token},
         body: JSON.stringify({name:name, email:email, org:org, token:token}, undefined, 3)
     }).then(res => {
         if (res.status === 204) {
@@ -473,7 +475,7 @@ export const setAboutAfc = (name: string, email: string, org:string, token:strin
         logger.error(err);
         return error("Unable to submit access request");
     })
-);
+}
 
 /**
  * Retrive the known rulesets
@@ -539,10 +541,12 @@ export const getAfcConfigFile = (region: string): Promise<RatResponse<AFCConfigF
  * @param conf The AFC Config that will overwrite the server
  * @returns success message or error
  */
-export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<string>> => (
-    fetch(guiConfig.afcconfig_defaults.replace("default", conf.regionStr ?? "US"), {
+export const putAfcConfigFile = async (conf: AFCConfigFile): Promise<RatResponse<string>> => {
+    let csrf_token = await(getCSRF());
+    return (fetch(guiConfig.afcconfig_defaults.replace("default", conf.regionStr ?? "US"), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token},
         body: JSON.stringify(conf, undefined, 3)
     }).then(res => {
         if (res.status === 204) {
@@ -554,8 +558,8 @@ export const putAfcConfigFile = (conf: AFCConfigFile): Promise<RatResponse<strin
     }).catch(err => {
         logger.error(err);
         return error("Unable to update configuration");
-    })
-);
+    }));
+};
 
 /**
  * Gets the admin supplied allowed frequency ranges for all regions. 
@@ -592,10 +596,12 @@ export const getAllowedRanges = () =>
     )
 
 // Update all the frequency ranges to a new set
-export const updateAllAllowedRanges = (allRanges: FreqRange[]) => (
+export const updateAllAllowedRanges = async (allRanges: FreqRange[]) => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token},
         body: JSON.stringify(allRanges)
     }).then(res => {
         if (res.status === 204) {
@@ -608,10 +614,10 @@ export const updateAllAllowedRanges = (allRanges: FreqRange[]) => (
         logger.error(err);
         return error("Unable to update frequency ranges.");
     })
-);
+};
 
 //Update all the ranges for a single region
-export const updateAllowedRanges = (regionStr: string, conf: FreqRange[]) => (
+export const updateAllowedRanges = async (regionStr: string, conf: FreqRange[]) => (
     getAllowedRanges().then((res) => {
         let allRanges: FreqRange[];
         if (res.kind == "Success") {
@@ -621,10 +627,12 @@ export const updateAllowedRanges = (regionStr: string, conf: FreqRange[]) => (
         }
         let updated = allRanges.filter((s)=> s.region != regionStr).concat(conf);
         Promise.resolve(updated);
-    }).then((newData) => {
+    }).then(async (newData) => {
+        let csrf_token = await(getCSRF());
         fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
             method: "PUT",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token},
             body: JSON.stringify(newData)
         }).then(res => {
             if (res.status === 204) {
@@ -739,10 +747,12 @@ function analysisContinuation<T>(isCanceled?: () => boolean, status?: (progress:
  * @param status callback which is used to notify caller of status of task. The PointAnalysis request provides minimal progress updates
  * @returns Analysis results or error
  */
-export const phase1Analysis = (params: PAWSRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<AnalysisResults>> => (
+export const phase1Analysis = async (params: PAWSRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<AnalysisResults>> => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.rat_api_analysis.replace("p_request_type", "PointAnalysis"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token},
         body: JSON.stringify(params)
     }).then(analysisContinuation<AnalysisResults>(isCanceled, status, setKml))
         .catch(
@@ -750,7 +760,7 @@ export const phase1Analysis = (params: PAWSRequest, isCanceled?: () => boolean, 
                 logger.error(err);
                 return error("Your request was unable to be processed", undefined, err);
             })
-)
+}
 
 /**
  * Run ExclusionZoneAnalysis
@@ -760,10 +770,12 @@ export const phase1Analysis = (params: PAWSRequest, isCanceled?: () => boolean, 
  * @param setKml Callback function that is used to set KML file object that is generated by the exclusion zone
  * @returns Exclusion zone result or error
  */
-export const runExclusionZone = (params: ExclusionZoneRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<ExclusionZoneResult>> =>
+export const runExclusionZone = async (params: ExclusionZoneRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<ExclusionZoneResult>> => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.rat_api_analysis.replace("p_request_type", "ExclusionZoneAnalysis"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token},
         body: JSON.stringify(params)
     })
         .then(analysisContinuation<ExclusionZoneResult>(isCanceled, status, setKml))
@@ -771,6 +783,7 @@ export const runExclusionZone = (params: ExclusionZoneRequest, isCanceled?: () =
             logger.error(err);
             return error("Your request was unable to be processed", undefined, err);
         });
+}
 
 /**
  * Run HeatmapAnalysis
@@ -779,10 +792,12 @@ export const runExclusionZone = (params: ExclusionZoneRequest, isCanceled?: () =
  * @param status callback which notifies caller of progress updates. Heatmap provides percentages and ETA in message string.
  * @returns Heat map result or error
  */
-export const runHeatMap = (params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>> =>
+export const runHeatMap = async (params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>> => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.rat_api_analysis.replace("p_request_type", "HeatmapAnalysis"), {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token},
         body: JSON.stringify(params)
     })
         .then(analysisContinuation<HeatMapResult>(isCanceled, status))
@@ -790,15 +805,18 @@ export const runHeatMap = (params: HeatMapRequest, isCanceled?: () => boolean, s
             logger.error(err);
             return error("Your request was unable to be processed", undefined, err);
         });
+}
 
 /**
  * Convert a ULS file in .csv format to .sqlite3
  * @param fileName `.csv` file to convert
  * @returns Success: number of rows in ULS file that could not be converted. Error: information on why file could not be converted
  */
-export const ulsFileConvert = (fileName: string): Promise<RatResponse<{ invalidRows: number, errors: string[] }>> =>
+export const ulsFileConvert = async (fileName: string): Promise<RatResponse<{ invalidRows: number, errors: string[] }>> => {
+    let csrf_token = await(getCSRF());
     fetch(guiConfig.uls_convert_url.replace("p_uls_file", fileName), {
         method: "POST",
+        headers: { 'X-CSRF-Token': csrf_token},
     }).then(
         async res => {
             if (res.ok) {
@@ -815,6 +833,7 @@ export const ulsFileConvert = (fileName: string): Promise<RatResponse<{ invalidR
             return error("Your request was unable to be processed", undefined, err);
         }
     )
+}
 
 /**
  * Continues a long running task by polling for status updates every 3 seconds.
@@ -894,3 +913,27 @@ export const importCache = (s: { [k: string]: any }) =>
  * Removes all items in cache
  */
 export const clearCache = (): void => Object.keys(applicationCache).forEach(key => delete applicationCache[key]);
+
+export const getCSRF = ():Promise<string> => (
+    fetch(guiConfig.about_csrf, {
+        method: "GET",
+    }).then(async (res)=> {
+        if (res.ok) {
+            const el = document.createElement('html');
+            el.innerHTML = await(res.text());
+            const inp = el.getElementsByTagName("input");
+            const len = inp.length;
+            for (let i = 0; i < len; i++) {
+                if (inp[i].name === "csrf_token") {
+                    return (inp[i].value);
+                }
+            }
+        } else {
+           console.log(res.statusText, res.status);
+           return ("");
+        }})
+        .catch(e => {
+            console.log("encountered an error when fetching csrf", undefined, e);
+            return ("");
+        })
+)

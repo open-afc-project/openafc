@@ -81,6 +81,7 @@ def create_app(config_override=None):
 
     # Child members
     from . import views, util
+    from flask_wtf.csrf import CSRFProtect
 
     flaskapp = flask.Flask(__name__.split('.')[0])
     flaskapp.response_class = util.Response
@@ -178,6 +179,11 @@ def create_app(config_override=None):
 
     # Static file dispatchers
     if flaskapp.config['AFC_APP_TYPE'] == 'server':
+        csrf = CSRFProtect(flaskapp)
+        @flaskapp.before_request
+        def check_csrf():
+            csrf.protect()
+
         if not os.path.exists(os.path.join(nfs_mount_path, 'rat_transfer', 'frequency_bands')):
             os.makedirs(os.path.join(nfs_mount_path, 'rat_transfer', 'frequency_bands'))
 

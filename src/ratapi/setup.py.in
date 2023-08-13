@@ -30,7 +30,9 @@ setuptools.setup(
             'migrations/alembic.ini',
             'migrations/script.py.mako',
             'templates/flask_user_layout.html',
+            'templates/login.html',
             'templates/about.html',
+            'templates/about_csrf.html',
             'templates/*.html',
         ]
     },

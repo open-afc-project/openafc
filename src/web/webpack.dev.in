@@ -9,7 +9,7 @@ const PORT = process.env.PORT || "9000";
 
 module.exports = merge(common, {
   mode: "development",
-  devtool: "eval-source-map",
+  devtool: "source-map",
   devServer: {
     contentBase: "@CMAKE_CURRENT_BINARY_DIR@",
     host: HOST,

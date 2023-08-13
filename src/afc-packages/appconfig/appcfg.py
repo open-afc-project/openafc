@@ -43,6 +43,8 @@ USER_EMAIL_SENDER_EMAIL = None
 REMEMBER_COOKIE_DURATION = datetime.timedelta(days=30) # remember me timeout
 USER_USER_SESSION_EXPIRATION = 3600 # One hour idle timeout
 PERMANENT_SESSION_LIFETIME = datetime.timedelta(seconds=USER_USER_SESSION_EXPIRATION) # idle session timeout
+USER_LOGIN_TEMPLATE = 'login.html'
+USER_REGISTER_TEMPLATE = 'register.html'
 
 #: API key used for google maps
 GOOGLE_APIKEY = None
