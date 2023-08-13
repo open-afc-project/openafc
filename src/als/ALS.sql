@@ -1,3 +1,14 @@
+/*
+ * This file creates ALS (AFC Request/Response/Config Logging System) database on PostgreSQL+PostGIS server
+ * This file is generated, direct editing is not recommended.
+ * Intended maintenance sequence is as follows:
+ *   1. Load (copypaste) als_db_schema/ALS.dbml into dbdiagram.io
+ *   2. Modify as needed
+ *   3. Save (copypaste) modified sources back to als_db_schema/ALS.dbml
+ *   4. Also export schema in PostgreSQL format as als_db_schema/ALS_raw.sql
+ *   5. Rectify exported schema with als_rectifier.awk (awk -f als_db_schema/als_rectifier.awk < als_db_schema/ALS_raw.sql > ALS.sql)
+ */
+
 CREATE EXTENSION postgis;
 
 CREATE TABLE "afc_message" (
@@ -56,7 +67,6 @@ CREATE TABLE "device_descriptor" (
   "month_idx" smallint,
   "serial_number" text,
   "certifications_digest" uuid,
-  "regulatory_rules_digest" uuid,
   PRIMARY KEY ("device_descriptor_digest", "month_idx")
 );
 
@@ -64,17 +74,9 @@ CREATE TABLE "certification" (
   "certifications_digest" uuid,
   "certification_index" smallint,
   "month_idx" smallint,
-  "nra" text,
+  "ruleset_id" text,
   "certification_id" text,
   PRIMARY KEY ("certifications_digest", "certification_index", "month_idx")
-);
-
-CREATE TABLE "regulatory_rule" (
-  "regulatory_rules_digest" uuid,
-  "regulatory_rule_index" smallint,
-  "month_idx" smallint,
-  "regulatory_rule_name" text,
-  PRIMARY KEY ("regulatory_rules_digest", "regulatory_rule_index", "month_idx")
 );
 
 CREATE TABLE "compressed_json" (
@@ -196,17 +198,11 @@ CREATE INDEX ON "device_descriptor" ("serial_number");
 
 CREATE INDEX ON "device_descriptor" ("certifications_digest");
 
-CREATE INDEX ON "device_descriptor" ("regulatory_rules_digest");
-
 CREATE INDEX ON "certification" USING HASH ("certifications_digest");
 
-CREATE INDEX ON "certification" ("nra");
+CREATE INDEX ON "certification" ("ruleset_id");
 
 CREATE INDEX ON "certification" ("certification_id");
-
-CREATE INDEX ON "regulatory_rule" USING HASH ("regulatory_rules_digest");
-
-CREATE INDEX ON "regulatory_rule" ("regulatory_rule_name");
 
 CREATE INDEX ON "compressed_json" USING HASH ("compressed_json_digest");
 
@@ -312,25 +308,15 @@ COMMENT ON COLUMN "device_descriptor"."serial_number" IS 'AP serial number';
 
 COMMENT ON COLUMN "device_descriptor"."certifications_digest" IS 'Device certifications';
 
-COMMENT ON COLUMN "device_descriptor"."regulatory_rules_digest" IS 'Device computation rules';
-
 COMMENT ON TABLE "certification" IS 'Element of certifications list';
 
 COMMENT ON COLUMN "certification"."certifications_digest" IS 'MD5 of certification list json';
 
 COMMENT ON COLUMN "certification"."certification_index" IS 'Index in certification list';
 
-COMMENT ON COLUMN "certification"."nra" IS 'National regulatory authority';
+COMMENT ON COLUMN "certification"."ruleset_id" IS 'Name of rules for which AP certified (equivalent of region)';
 
-COMMENT ON COLUMN "certification"."certification_id" IS 'Certification ID';
-
-COMMENT ON TABLE "regulatory_rule" IS 'Element of regulatory rules list';
-
-COMMENT ON COLUMN "regulatory_rule"."regulatory_rules_digest" IS 'MD5 of rules list';
-
-COMMENT ON COLUMN "regulatory_rule"."regulatory_rule_index" IS 'Index in regulatory rules list';
-
-COMMENT ON COLUMN "regulatory_rule"."regulatory_rule_name" IS 'Rule name';
+COMMENT ON COLUMN "certification"."certification_id" IS 'ID of certification (equivalent of manufacturer)';
 
 COMMENT ON TABLE "compressed_json" IS 'Compressed body of request or response';
 
@@ -406,6 +392,8 @@ ALTER TABLE "request_response" ADD CONSTRAINT "request_response_device_descripto
 
 ALTER TABLE "request_response" ADD CONSTRAINT "request_response_location_digest_ref" FOREIGN KEY ("location_digest", "month_idx") REFERENCES "location" ("location_digest", "month_idx");
 
+
 ALTER TABLE "max_psd" ADD CONSTRAINT "max_psd_request_response_digest_ref" FOREIGN KEY ("request_response_digest", "month_idx") REFERENCES "request_response" ("request_response_digest", "month_idx");
 
 ALTER TABLE "max_eirp" ADD CONSTRAINT "max_eirp_request_response_digest_ref" FOREIGN KEY ("request_response_digest", "month_idx") REFERENCES "request_response" ("request_response_digest", "month_idx");
+;
