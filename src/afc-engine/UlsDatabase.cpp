@@ -432,7 +432,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 	while (rasQueryRes.next()) {
 		int rasid = rasQueryRes.value(ras_rasidIdx).toInt();
 		std::string exclusionZoneStr = rasQueryRes.value(ras_exclusionZoneIdx).toString().toStdString();
-		DeniedRegionClass::GeometryEnum exclusionZoneType;
+		DeniedRegionClass::GeometryEnum exclusionZoneType = DeniedRegionClass::nullGeometry;
 
 		if (exclusionZoneStr == "One Rectangle") {
 			exclusionZoneType = DeniedRegionClass::rectGeometry;
@@ -446,7 +446,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
 			CORE_DUMP;
 		}
 
-        DeniedRegionClass *ras;
+        DeniedRegionClass *ras = (DeniedRegionClass *) NULL;
         switch(exclusionZoneType) {
             case DeniedRegionClass::rectGeometry:
             case DeniedRegionClass::rect2Geometry:

@@ -1,5 +1,13 @@
 # Release Note
 ## **Version and Date**
+|Version|**OA-760*|
+| :- | :- |
+|**Date**|**08/10/2023**|
+
+## **Issues Addressed**
+ * Resolved several coverity issues.
+ 
+## **Version and Date**
 |Version|3.8.5.0|
 | :- | :- |
 |**Date**|**07/30/2023**|

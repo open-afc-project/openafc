@@ -597,6 +597,8 @@ AfcManager::AfcManager()
 	_reportUnavailPSDdBmPerMHz = quietNaN;
 	_inquiredFrequencyResolutionMHz = -1;
 	_inquiredFrequencyMaxPSD_dBmPerMHz = quietNaN;
+	_rlanAzimuthPointing = quietNaN;
+	_rlanElevationPointing = quietNaN;
 
 	_IoverN_threshold_dB = -6.0;
 	_bodyLossIndoorDB = 0.0;               // Indoor body Loss (dB)
@@ -629,6 +631,8 @@ AfcManager::AfcManager()
 
 	_winner2UseGroundDistanceFlag = true;
 	_fsplUseGroundDistanceFlag = false;
+
+	_propEnvMethod = CConst::unknownPropEnvMethod;
 
 	_rxFeederLossDBIDU = quietNaN;
 	_rxFeederLossDBODU = quietNaN;
@@ -2461,10 +2465,10 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 	if (_noisePSDList.size() != _noisePSDFreqList.size()+1) {
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): Invalid fsReceiverNoise specification.");
-		for(int i=1; i<(int) _noisePSDFreqList.size(); ++i) {
-			if (!(_noisePSDFreqList[i] > _noisePSDFreqList[i-1])) {
-				throw std::runtime_error("AfcManager::importConfigAFCjson(): fsReceiverNoise freqList not monotonically increasing.");
-			}
+	}
+	for(int i=1; i<(int) _noisePSDFreqList.size(); ++i) {
+		if (!(_noisePSDFreqList[i] > _noisePSDFreqList[i-1])) {
+			throw std::runtime_error("AfcManager::importConfigAFCjson(): fsReceiverNoise freqList not monotonically increasing.");
 		}
 	}
 

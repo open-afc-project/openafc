@@ -40,12 +40,14 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal
 	location = (char *) NULL;
 	ITMHeightProfile = (double *) NULL;
 	isLOSHeightProfile = (double *) NULL;
+	isLOSSurfaceFrac = quietNaN;
 
 	dataSet = (AfcManager *) NULL;
 
 	startFreq = quietNaN;
 	stopFreq = quietNaN;
 	noiseBandwidth = quietNaN;
+	pathNumber = -1;
 	rxAntennaNumber = -1;
 	rxLatitudeDeg = quietNaN;
 	rxLongitudeDeg = quietNaN;
@@ -63,6 +65,8 @@ ULSClass::ULSClass(AfcManager *dataSetVal, int idVal, int dbIdxVal, int numPRVal
 	txHeightAboveTerrain = quietNaN;
 	txHeightAMSL = quietNaN;
 	txHeightSource = CConst::unknownHeightSource;
+	azimuthAngleToTx = quietNaN;
+	elevationAngleToTx = quietNaN;
 	txCenterToRAATHeight = quietNaN;
 	txLidarRegion = -1;
 	txTerrainHeightFlag = false;

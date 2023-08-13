@@ -14,6 +14,8 @@ RlanRegionClass::RlanRegionClass()
 {
     centerLongitude = quietNaN;
     centerLatitude = quietNaN;
+	cosVal = quietNaN;
+	oneOverCosVal = quietNaN;
     centerHeightInput = quietNaN;
     centerHeightAMSL = quietNaN;
     centerTerrainHeight = quietNaN;
