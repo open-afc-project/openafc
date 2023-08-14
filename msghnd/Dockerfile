@@ -66,7 +66,8 @@ COPY msghnd/devel.sh /wd/
 RUN chmod +x /wd/devel.sh
 RUN /wd/devel.sh
 # msghnd environment variables default values
-ENV AFC_MSGHND_BIND=${AFC_MSGHND_BIND:-"0.0.0.0:8000"}
+ENV AFC_MSGHND_PORT=${AFC_MSGHND_PORT:-"8000"}
+ENV AFC_MSGHND_BIND=${AFC_MSGHND_BIND:-"0.0.0.0"}
 ENV AFC_MSGHND_PID=${AFC_MSGHND_PID:-"/run/gunicorn/openafc_app.pid"}
 ENV AFC_MSGHND_ACCESS_LOG=${AFC_MSGHND_ACCESS_LOG:-"/proc/self/fd/2"}
 ENV AFC_MSGHND_ERROR_LOG=${AFC_MSGHND_ERROR_LOG:-"/proc/self/fd/2"}
@@ -76,3 +77,5 @@ ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 ENV AFC_MSGHND_RATAFC_TOUT=${AFC_MSGHND_RATAFC_TOUT:-600}
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]
+HEALTHCHECK CMD wget --no-verbose --tries=1 --spider \
+    http://localhost:${AFC_MSGHND_PORT}/fbrat/ap-afc/healthy || exit 1

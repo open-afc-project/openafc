@@ -101,6 +101,12 @@ class DataIfBaseV1():
         app_log.debug("DataIfBaseV1.open({})".format(r_name))
         return DataIntHttp(r_name)
 
+    def healthcheck(self):
+        """ Call healthcheck """
+        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+        app_log.debug("DataIfBaseV1.healthcheck()")
+        return requests.get(self._pref + '/healthy')
+
     @staticmethod
     def httpsProbe(host, port):
         if not host or not port:

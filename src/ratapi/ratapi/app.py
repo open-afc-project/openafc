@@ -91,6 +91,7 @@ def create_app(config_override=None):
     # default config state from module
     flaskapp.config.from_object(appcfg)
     flaskapp.config.from_object(appcfg.BrokerConfigurator())
+    flaskapp.config.from_object(appcfg.ObjstConfig())
     flaskapp.config.from_object(appcfg.OIDCConfigurator())
     flaskapp.config.from_object(RatApiConfigurator())
 

@@ -30,7 +30,8 @@ import werkzeug.exceptions
 import threading
 import inspect
 import six
-from appcfg import MsghndConfigurator
+from appcfg import MsghndConfigurator as MsghndCfg
+from hchecks import RmqHealthcheck
 from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, \
 RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG, \
 RNTM_OPT_CERT_ID
@@ -458,7 +459,8 @@ class RatAfc(MethodView):
 
         dataif = DataIf()
         t = afctask.Task(task_id, dataif,
-                         MsghndConfigurator().AFC_MSGHND_RATAFC_TOUT)
+                         int(MsghndCfg(MsghndCfg.CFG_OPT_ONLY_RATAFC_TOUT). \
+                                 AFC_MSGHND_RATAFC_TOUT))
         task_stat = t.get()
 
         if t.ready(task_stat):  # The task is done
@@ -821,16 +823,17 @@ class RatAfc(MethodView):
         if use_tasks:
             ret = {}
             for req_cfg_hash, task in tasks.items():
-                task_stat = \
-                    task.wait(
-                        timeout=MsghndConfigurator().AFC_MSGHND_RATAFC_TOUT)
+                task_stat = task.wait(timeout= \
+                                          int(MsghndCfg(MsghndCfg.CFG_OPT_ONLY_RATAFC_TOUT). \
+                                              AFC_MSGHND_RATAFC_TOUT))
                 ret[req_cfg_hash] = \
                     response_map[task_stat['status']](task).data
             return ret
         ret = \
             get_rcache().rmq_receive_responses(
                 req_cfg_digests=req_infos.keys(),
-                timeout_sec=MsghndConfigurator().AFC_MSGHND_RATAFC_TOUT)
+                timeout_sec=int(MsghndCfg(MsghndCfg.CFG_OPT_ONLY_RATAFC_TOUT). \
+                                          AFC_MSGHND_RATAFC_TOUT))
         for req_cfg_hash, response in ret.items():
             req_info = req_infos[req_cfg_hash]
             if (not response) or (not req_info.history_dir):
@@ -854,6 +857,31 @@ class RatAfcInternal(MethodView):
     """ Add rule for availableSpectrumInquiryInternal """
     pass
 
+
+class HealthCheck(MethodView):
+
+    def get(self):
+        '''GET method for HealthCheck'''
+        msg = 'The ' + flask.current_app.config['AFC_APP_TYPE'] + ' is healthy'
+
+        return flask.make_response(msg, 200)
+
+
+class ReadinessCheck(MethodView):
+
+    def get(self):
+        '''GET method for Readiness Check'''
+        msg = 'The ' + flask.current_app.config['AFC_APP_TYPE'] + ' is '
+
+        hconn = RmqHealthcheck(flask.current_app.config['BROKER_URL'])
+        if hconn.healthcheck():
+            msg += 'not ready'
+            return flask.make_response(msg, 503)
+
+        msg += 'ready'
+        return flask.make_response(msg, 200)
+
+
 # registration of default runtime options
 
 module.add_url_rule('/availableSpectrumInquirySec',
@@ -864,6 +892,10 @@ module.add_url_rule('/availableSpectrumInquiry',
 
 module.add_url_rule('/availableSpectrumInquiryInternal',
                     view_func=RatAfc.as_view('RatAfcInternal'))
+
+module.add_url_rule('/healthy', view_func=HealthCheck.as_view('HealthCheck'))
+
+module.add_url_rule('/ready', view_func=ReadinessCheck.as_view('ReadinessCheck'))
 
 # Local Variables:
 # mode: Python

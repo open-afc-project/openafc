@@ -10,6 +10,7 @@ case "$AFC_DEVEL_ENV" in
   "devel")
     echo "Running debug profile" 
     AFC_MSGHND_LOG_LEVEL="debug"
+    echo "AFC_MSGHND_PORT = ${AFC_MSGHND_PORT}"
     echo "AFC_MSGHND_BIND = ${AFC_MSGHND_BIND}"
     echo "AFC_MSGHND_PID = ${AFC_MSGHND_PID}"
     echo "AFC_MSGHND_ACCESS_LOG = ${AFC_MSGHND_ACCESS_LOG}"
@@ -30,7 +31,7 @@ case "$AFC_DEVEL_ENV" in
 esac
 
 gunicorn \
---bind "${AFC_MSGHND_BIND}" \
+--bind "${AFC_MSGHND_BIND}:${AFC_MSGHND_PORT}" \
 --pid "${AFC_MSGHND_PID}" \
 --workers "${AFC_MSGHND_WORKERS}" \
 --timeout "${AFC_MSGHND_TIMEOUT}" \

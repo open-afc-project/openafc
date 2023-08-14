@@ -20,6 +20,8 @@ import flask
 import json
 import glob
 import re
+import inspect
+import gevent
 import datetime
 import requests
 import appcfg
@@ -29,11 +31,11 @@ from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
 from afc_worker import run
 from fst import DataIf
 from ncli import MsgPublisher
+from hchecks import RmqHealthcheck, ObjstHealthcheck
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from afcmodels.aaa import User, AccessPointDeny, AFCConfig, MTLS
 from afcmodels.base import db
 from .auth import auth
-from appcfg import ObjstConfig
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -227,6 +229,33 @@ class HealthCheck(MethodView):
 
         msg = 'The ' + flask.current_app.config['AFC_APP_TYPE'] + ' is healthy'
         LOGGER.info(f"{msg}")
+        return flask.make_response(msg, 200)
+
+
+def check_rmq(cfg):
+    LOGGER.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
+                 f" {cfg['BROKER_URL']}")
+    hconn = RmqHealthcheck(cfg['BROKER_URL'])
+    if hconn.healthcheck():
+        return 1
+    return 0
+
+class ReadinessCheck(MethodView):
+
+    def get(self):
+        '''GET method for Readiness Check'''
+        LOGGER.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
+                     f" cfg: {flask.current_app.config}")
+        msg = 'The ' + flask.current_app.config['AFC_APP_TYPE'] + ' is'
+        objst_chk = ObjstHealthcheck(flask.current_app.config)
+        checks = [gevent.spawn(objst_chk.healthcheck),
+                  gevent.spawn(check_rmq, flask.current_app.config)]
+        gevent.joinall(checks)
+        for i in checks:
+            if i.value != 0:
+                msg += 'not ready'
+                return flask.make_response(msg, 503)
+        msg += 'ready'
         return flask.make_response(msg, 200)
 
 
@@ -1171,8 +1200,10 @@ module.add_url_rule('/about',
                     view_func=About.as_view('About'))
 module.add_url_rule('/rulesetIds',
                     view_func=AfcRulesetIds.as_view('AfcRulesetIds'))
-module.add_url_rule('/healthy', view_func=HealthCheck.as_view('HealthCheck'))
-
+module.add_url_rule('/healthy',
+                    view_func=HealthCheck.as_view('HealthCheck'))
+module.add_url_rule('/ready',
+                    view_func=ReadinessCheck.as_view('ReadinessCheck'))
 module.add_url_rule('/history',
                     view_func=History0.as_view('History0'))
 module.add_url_rule('/history/<path:path>',
