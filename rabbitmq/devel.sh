@@ -5,17 +5,18 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
+set eux
+rabbitmq-plugins enable --offline rabbitmq_management
+rm -f /etc/rabbitmq/conf.d/20-management_agent.disable_metrics_collector.conf
+cp /plugins/rabbitmq_management-*/priv/www/cli/rabbitmqadmin /usr/local/bin/rabbitmqadmin
+chmod +x /usr/local/bin/rabbitmqadmin
+apk add --no-cache python3
+rabbitmqadmin --version
+
 AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 case "$AFC_DEVEL_ENV" in
   "devel")
     echo "Debug profile" 
-    set eux
-    rabbitmq-plugins enable --offline rabbitmq_management
-    rm -f /etc/rabbitmq/conf.d/20-management_agent.disable_metrics_collector.conf
-    cp /plugins/rabbitmq_management-*/priv/www/cli/rabbitmqadmin /usr/local/bin/rabbitmqadmin
-    chmod +x /usr/local/bin/rabbitmqadmin
-    apk add --no-cache python3
-    rabbitmqadmin --version
     cat << EOF >> /etc/rabbitmq/rabbitmq.conf
 log.console.level = debug
 log.connection.level = debug

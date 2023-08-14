@@ -1,5 +1,6 @@
 FROM rabbitmq:3.12.2-alpine
 COPY rabbitmq/rabbitmq.conf /etc/rabbitmq/
+COPY rabbitmq/definitions.json /etc/rabbitmq/
 # Add debugging env if configured
 ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 COPY rabbitmq/devel.sh /

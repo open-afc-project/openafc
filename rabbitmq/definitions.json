@@ -1,0 +1,38 @@
+{
+  "users": [
+    {
+      "name": "celery",
+      "password": "celery",
+      "tags": "administrator"
+    },
+    {
+      "name": "test_u",
+      "password": "test_u",
+      "tags": "administrator"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "fbrat"
+    },
+    {
+      "name": "afc_test"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "celery",
+      "vhost": "fbrat",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "test_u",
+      "vhost": "afc_test",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ]
+}
