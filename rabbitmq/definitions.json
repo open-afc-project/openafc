@@ -6,8 +6,8 @@
       "tags": "administrator"
     },
     {
-      "name": "test_u",
-      "password": "test_u",
+      "name": "rcache",
+      "password": "rcache",
       "tags": "administrator"
     }
   ],
@@ -16,7 +16,7 @@
       "name": "fbrat"
     },
     {
-      "name": "afc_test"
+      "name": "rcache"
     }
   ],
   "permissions": [
@@ -28,8 +28,8 @@
       "read": ".*"
     },
     {
-      "user": "test_u",
-      "vhost": "afc_test",
+      "user": "rcache",
+      "vhost": "rcache",
       "configure": ".*",
       "write": ".*",
       "read": ".*"
