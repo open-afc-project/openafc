@@ -1,5 +1,20 @@
 # Release Note
 ## **Version and Date**
+|Version|3.8.6.0|
+| :- | :- |
+|**Date**|**08/14/2023**|
+|compiled server's version is TBD | git tag 3.8.6.0|
+
+## **Issues Addressed**
+* Jira OA-792-rabbitmq-rcache-rmq-user-and-host-configuration-for-rcache (#623)
+* Jira OA 725. Response cache service (#616)
+* Jira OA-791 Ability to load enhanced configuration (#621)
+* Jira OA-703-multiple-ruleset-names
+* Jira OA-787_qualys_security_scan
+* Jira OA-780-als-to-bulk-postgres-image-rename
+* Jira OA-779-disable-kmz-files-decompress-in-apache
+
+## **Version and Date**
 |Version|**OA-790*|
 | :- | :- |
 |**Date**|**08/11/2023**|
@@ -21,7 +36,7 @@
 |compiled server's version is 4e3cb1a | git tag 3.8.5.0|
 
 ## **Issues Addressed**
- * JIRA: 21d5e11c (docker-scout-security-report) OA-774 Remove healthcheck logging, minimize GUI requests logging (#609)
+* JIRA: 21d5e11c (docker-scout-security-report) OA-774 Remove healthcheck logging, minimize GUI requests logging (#609)
  * Bump certifi from 2022.12.7 to 2023.7.22 in /msghnd (#607)
  * Jira OA-771 Add missing env var AFC_MSGHND_RATAFC_TOUT (#605)
  * Jira Oa 619 add support of 320 m hz ap channels (#601)
