@@ -21,6 +21,7 @@ DISPATCHER="public.ecr.aws/w9v6y1o0/openafc/dispatcher-image"    # dispatcher im
 ALS_SIPHON="public.ecr.aws/w9v6y1o0/openafc/als-siphon-image"    # ALS Siphon image
 ALS_KAFKA="public.ecr.aws/w9v6y1o0/openafc/als-kafka-image"      # Kafka for ALS
 BULK_POSTGRES="public.ecr.aws/w9v6y1o0/openafc/bulk-postgres-image" # PostgreSQL for bulk stuff (ALS, req cache, etc.)
+RCACHE="public.ecr.aws/w9v6y1o0/openafc/rcache-image"   # Request cache
 
 WORKER="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker"  # msghnd image
 WORKER_AL_D4B="public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image" # Alpine worker build img
@@ -164,6 +165,9 @@ build_dev_server() {
 
    # build cert db image
   docker_build_and_push ${wd}/cert_db/Dockerfile ${CERT_DB}:${tag} ${push} &
+
+  # Build Request Cache
+  docker_build_and_push ${wd}/rcache/Dockerfile ${RCACHE}:${tag} ${push} &
 
   msg "wait for all images to be built"
   wait

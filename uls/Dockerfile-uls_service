@@ -19,7 +19,7 @@ COPY pkg /root/afc/pkg/
 COPY selinux /root/afc/selinux/
 COPY src /root/afc/src/
 
-RUN apk add py3-setuptools
+RUN apk add py3-setuptools py3-pip
 
 RUN mkdir -p -m 777 /root/afc/build
 RUN cd /root/afc/build && \
@@ -43,7 +43,10 @@ RUN chmod +x /wd/uls_service.py /wd/uls_service_healthcheck.py wd/fsid_tool.py w
 
 FROM alpine:3.17
 
-# DOWNLOADER SERVICE SCRIPT PARAMETERS
+# DOWNLOADER SERVICE AND HEALTHCHECK SCRIPTS PARAMETERS
+
+# JSON secret file with SMTP parameters
+# ENV SMTP_INFO
 
 # Run downloader script on nioce (lowered) priority. Default is to use normal
 # priority
@@ -53,7 +56,7 @@ ENV ULS_NICE=YES
 # ENV ULS_DOWNLOAD_SCRIPT_ARGS
 
 # Colon separated list of regions to download. Default - all of them
-#ENV ULS_DOWNLOAD_REGION
+# ENV ULS_DOWNLOAD_REGION
 
 # Where to directory with ULS databases is mapped
 ENV ULS_EXT_DB_DIR=/ULS_Database
@@ -83,7 +86,18 @@ ENV ULS_MAX_CHANGE_PERCENT=10
 # Download maximum duration in hours
 ENV ULS_TIMEOUT_HR=1
 
+# True if Rcache enabled, False if not
+ENV RCACHE_ENABLED=TRUE
+
+# URL of Rcache service
+# ENV RCACHE_SERVICE_URL
+
 COPY --from=install_image / /
+
+COPY src/afc-packages /wd/afc-packages
+RUN pip3 install --use-pep517 --root-user-action=ignore \
+        -r /wd/afc-packages/pkgs.uls \
+    && rm -rf /wd/afc-packages
 
 WORKDIR /wd
 
@@ -101,7 +115,11 @@ ENTRYPOINT /wd/uls_service.py \
     --max_change_percent=$ULS_MAX_CHANGE_PERCENT \
     --afc_url=$ULS_AFC_URL \
     --afc_parallel=$ULS_AFC_PARALLEL \
+    --rcache_enabled=$RCACHE_ENABLED \
+    --rcache_url=$RCACHE_SERVICE_URL \
     --delay_hr=$ULS_DELAY_HR \
     --interval_hr=$ULS_INTERVAL_HR \
     --timeout_hr=$ULS_TIMEOUT_HR \
     --nice=$ULS_NICE
+
+HEALTHCHECK --interval=2h --timeout=2m --retries=3 CMD /wd/uls_service_healthcheck.py --status_dir=/uls_downloader_state --smtp_info=${SMTP_INFO} || exit 1

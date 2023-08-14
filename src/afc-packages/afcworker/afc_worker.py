@@ -10,12 +10,16 @@
 import os
 import subprocess
 import shutil
+import tempfile
+import zlib
 from celery import Celery
 from celery.utils.log import get_task_logger
 from appcfg import BrokerConfigurator
 from fst import DataIf
 import defs
 import afctask
+from rcache_models import RcacheClientSettings
+from rcache_client import ReqCacheClient
 
 LOGGER = get_task_logger(__name__)
 
@@ -32,6 +36,10 @@ class WorkerConfig(BrokerConfigurator):
 
 conf = WorkerConfig()
 
+rcache_settings = RcacheClientSettings()
+rcache = ReqCacheClient(rcache_settings, rmq_receiver=False) \
+    if rcache_settings.enabled else None
+
 LOGGER.info('Celery Broker: %s', conf.BROKER_URL)
 
 #: constant celery reference. Configure once flask app is created
@@ -42,51 +50,82 @@ client = Celery(
 )
 
 @client.task(ignore_result=True)
-def run(prot, host, port, state_root, request_type, task_id, hash_val,
-        config_path, history_dir, runtime_opts, mntroot):
+def run(prot, host, port, request_type, task_id, hash_val,
+        config_path, history_dir, runtime_opts, mntroot, rcache_queue,
+        request_str, config_str):
     """ Run AFC Engine
 
         The parameters are all serializable so they can be passed through the message queue.
 
-        :param config_path: afc_config.json path
+        :param request_type: Anslysis type to pass to AFC Engine
 
-        :param history_dir: history path
+        :param task_id ID of associated task (if task-based synchronization is used), also used as name of directory for error files
 
-        :param state_root: path to directory where fbrat state is held
+        :param hash_val: md5 hex digest of request and config
+
+        :param config_path: Objstore path of afc_config.json if task-based synchronization is used, None otherwise
+
+        :param history_dir: Objstore directory for debug files files
+
+        :param runtime_opts: Runtime options to pass to AFC Engine. Also specifies which debug fles to keep
 
         :param mntroot: path to directory where GeoData and config data are stored
 
-        :param request_type: request type of analysis
-        :type request_type: str
+        :param rcache_queue: None for task-based synchronization, RabbitMQ queue name for RMQ-based synchronization
 
-        :param runtime_opts: indicates if AFC Engine should use DEBUG mode
-         (uses INFO otherwise) or prepare GUI options
-        :type runtime_opts: int
+        :param request_str None for task-based synchronization, request text for RMQ-based synchronization
 
-        :param hash_val: md5 of request and config files
+        :param config_str None for task-based synchronization, config text for RMQ-based synchronization
     """
-    LOGGER.debug(f"run(prot={prot}, host={host}, port={port}, root={state_root}, "
+    LOGGER.debug(f"run(prot={prot}, host={host}, port={port}, "
                  f"task_id={task_id}, hash={hash_val}, opts={runtime_opts}, "
-                 f"mntroot={mntroot}, timeout={conf.AFC_WORKER_ENG_TOUT}")
+                 f"mntroot={mntroot}, timeout={conf.AFC_WORKER_ENG_TOUT}, "
+                 f"rcache_queue={rcache_queue}")
 
-    # local pathes
-    tmpdir = os.path.join(state_root, task_id)
-    os.makedirs(tmpdir)
-
-    dataif = DataIf(prot, host, port)
-    tsk = afctask.Task(task_id, dataif, hash_val, history_dir)
-    tsk.toJson(afctask.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
+    use_tasks = rcache_queue is None
+    if use_tasks:
+        assert task_id and config_path and \
+            (runtime_opts & defs.RNTM_OPT_AFCENGINE_HTTP_IO)
+    else:
+        assert rcache and request_str and config_str and \
+            (not (runtime_opts & defs.RNTM_OPT_AFCENGINE_HTTP_IO))
 
     proc = None
-    err_file = open(os.path.join(tmpdir, "engine-error.txt"), "wb")
-    log_file = open(os.path.join(tmpdir, "engine-log.txt"), "wb")
-
-    # pathes in objstorage
-    analysis_request = os.path.join("/responses", hash_val, "analysisRequest.json")
-    analysis_response = os.path.join("/responses", hash_val, "analysisResponse.json.gz")
-    tmp_dir = os.path.join("/responses", task_id)
-
     try:
+        tmpdir = tempfile.mkdtemp(prefix="afc_worker_")
+
+        dataif = DataIf(prot, host, port)
+        if use_tasks:
+            tsk = afctask.Task(task_id, dataif, hash_val, history_dir)
+            tsk.toJson(afctask.Task.STAT_PROGRESS, runtime_opts=runtime_opts)
+
+        err_file = open(os.path.join(tmpdir, "engine-error.txt"), "wb")
+        log_file = open(os.path.join(tmpdir, "engine-log.txt"), "wb")
+
+        if use_tasks:
+            # pathes in objstorage
+            analysis_request_path = \
+                dataif.rname(os.path.join("/responses", hash_val,
+                                          "analysisRequest.json"))
+            analysis_config_path = dataif.rname(config_path)
+            analysis_response_path = \
+                dataif.rname(os.path.join("/responses", hash_val,
+                                          "analysisResponse.json.gz"))
+        else:
+            analysis_request_path = os.path.join(tmpdir,
+                                                 "analysisRequest.json")
+            analysis_config_path = os.path.join(tmpdir, "afc_config.json")
+            analysis_response_path = os.path.join(tmpdir,
+                                                  "analysisResponse.json.gz")
+            for fname, data in [(analysis_request_path, request_str),
+                                 (analysis_config_path, config_str)]:
+                with open(fname, "w", encoding="utf-8") as outfile:
+                    outfile.write(data)
+
+        tmp_objdir = os.path.join("/responses", task_id)
+        retcode = 0
+        success = False
+
         # run the AFC Engine
         try:
             cmd = [
@@ -94,9 +133,9 @@ def run(prot, host, port, state_root, request_type, task_id, hash_val,
                 "--request-type=" + request_type,
                 "--state-root=" + mntroot + "/rat_transfer",
                 "--mnt-path=" + mntroot,
-                "--input-file-path=" + dataif.rname(analysis_request),
-                "--config-file-path=" + dataif.rname(config_path),
-                "--output-file-path=" + dataif.rname(analysis_response),
+                "--input-file-path=" + analysis_request_path,
+                "--config-file-path=" + analysis_config_path,
+                "--output-file-path=" + analysis_response_path,
                 "--temp-dir=" + tmpdir,
                 "--log-level=" + conf.AFC_ENGINE_LOG_LVL,
                 "--runtime_opt=" + str(runtime_opts),
@@ -112,71 +151,56 @@ def run(prot, host, port, state_root, request_type, task_id, hash_val,
                 raise subprocess.CalledProcessError(retcode, cmd)
             if retcode:
                 raise subprocess.CalledProcessError(retcode, cmd)
+            success = True
 
         except subprocess.CalledProcessError as error:
             LOGGER.error("run(): afc-engine error")
-            proc = None
-            err_file.close()  # close the file just in case it is still open from writing
-            log_file.close()
 
-            with dataif.open(os.path.join(tmp_dir, "engine-error.txt")) as hfile:
+            with dataif.open(os.path.join(tmp_objdir, "engine-error.txt")) as hfile:
                 with open(os.path.join(tmpdir, "engine-error.txt"), "rb") as infile:
                     hfile.write(infile.read())
+        else:
+            LOGGER.info('finished with task computation')
 
-            # store error file in history dir so it can be seen via WebDav
-            if runtime_opts & defs.RNTM_OPT_DBG:
-                for fname in os.listdir(tmpdir):
-                    # request, responce and config are archived from ratapi
-                    if fname not in ("analysisRequest.json", "afc_config.json"):
-                        with dataif.open(os.path.join(history_dir, fname)) as hfile:
-                            with open(os.path.join(tmpdir, fname), "rb") as infile:
-                                hfile.write(infile.read())
-            elif runtime_opts & defs.RNTM_OPT_SLOW_DBG:
-                if os.path.exists(os.path.join(tmpdir, "eirp.csv.gz")):
-                    with dataif.open(os.path.join(history_dir, "eirp.csv.gz")) as hfile:
-                        with open(os.path.join(tmpdir, "eirp.csv.gz"), "rb") as infile:
-                            hfile.write(infile.read())
-
-            tsk.toJson(afctask.Task.STAT_FAILURE, runtime_opts=runtime_opts,
-                       exit_code=error.returncode)
-            return
-
-        LOGGER.info('finished with task computation')
         proc = None
         log_file.close()
         err_file.close()
 
+        if not use_tasks:
+            try:
+                with open(analysis_response_path, "rb") as infile:
+                    response_gz = infile.read()
+            except OSError:
+                response_gz = None
+            response_str = \
+                zlib.decompress(response_gz,
+                                16 + zlib.MAX_WBITS).decode("utf-8") \
+                if success and response_gz else None
+            rcache.rmq_send_response(
+                queue_name=rcache_queue, req_cfg_digest=hash_val,
+                request=request_str, response=response_str)
+
         if runtime_opts & defs.RNTM_OPT_GUI:
-            # copy kml result if it was produced by AFC Engine
-            if os.path.exists(os.path.join(tmpdir, "results.kmz")):
-                with dataif.open(os.path.join(tmp_dir, "results.kmz")) as hfile:
-                    with open(os.path.join(tmpdir, "results.kmz"), "rb") as infile:
-                        hfile.write(infile.read())
-            # copy geoJson file if generated
-            if os.path.exists(os.path.join(tmpdir, "mapData.json.gz")):
-                with dataif.open(os.path.join(tmp_dir, "mapData.json.gz")) as hfile:
-                    with open(os.path.join(tmpdir, "mapData.json.gz"), "rb") as infile:
-                        hfile.write(infile.read())
-
-
-        # copy contents of temporary directory to history directory
-        if runtime_opts & defs.RNTM_OPT_DBG:
-            # remove error file since we completed successfully
-            for fname in os.listdir(tmpdir):
-                # request, response and config are archived from ratapi
-                if fname not in ("analysisRequest.json", "afc_config.json",
-                                 "analysisResponse.json.gz"):
-                    with dataif.open(os.path.join(history_dir, fname)) as hfile:
+            for fname in ("results.kmz", "mapData.json.gz"):
+                # copy if generated
+                if os.path.exists(os.path.join(tmpdir, fname)):
+                    with dataif.open(os.path.join(tmp_objdir, fname)) as hfile:
                         with open(os.path.join(tmpdir, fname), "rb") as infile:
                             hfile.write(infile.read())
-        elif runtime_opts & defs.RNTM_OPT_SLOW_DBG:
-            if os.path.exists(os.path.join(tmpdir, "eirp.csv.gz")):
-                with dataif.open(os.path.join(history_dir, "eirp.csv.gz")) as hfile:
-                    with open(os.path.join(tmpdir, "eirp.csv.gz"), "rb") as infile:
+
+        # copy contents of temporary directory to history directory
+        if runtime_opts & (defs.RNTM_OPT_DBG | defs.RNTM_OPT_SLOW_DBG):
+            for fname in os.listdir(tmpdir):
+                with dataif.open(os.path.join(history_dir, fname)) as hfile:
+                    with open(os.path.join(tmpdir, fname), "rb") as infile:
                         hfile.write(infile.read())
 
         LOGGER.debug('task completed')
-        tsk.toJson(afctask.Task.STAT_SUCCESS, runtime_opts=runtime_opts)
+        if use_tasks:
+            tsk.toJson(
+                afctask.Task.STAT_SUCCESS if success
+                else afctask.Task.STAT_FAILURE,
+                runtime_opts=runtime_opts, exit_code=retcode)
 
     except Exception as exc:
         raise exc
@@ -191,4 +215,6 @@ def run(prot, host, port, state_root, request_type, task_id, hash_val,
             LOGGER.debug('afc-engine terminated')
         if os.path.exists(tmpdir):
             shutil.rmtree(tmpdir)
+        if rcache:
+            rcache.disconnect()
         LOGGER.info('Worker resources cleaned up')

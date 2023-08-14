@@ -10,7 +10,8 @@ FROM alpine:3.17 as msghnd.preinstall
 ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
 apk add --update --no-cache py3-six py3-numpy py3-cryptography py3-sqlalchemy \
-py3-requests py3-flask py3-psycopg2 && python3 -m ensurepip && \
+py3-requests py3-flask py3-psycopg2 py3-pydantic=~1.10 && \
+python3 -m ensurepip && \
 pip3 install --no-cache --upgrade pip setuptools
 COPY msghnd/requirements.txt /wd/
 RUN pip3 install -r /wd/requirements.txt && mkdir -p /run/gunicorn /etc/xdg/fbrat

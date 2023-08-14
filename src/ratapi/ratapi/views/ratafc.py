@@ -49,6 +49,9 @@ from .auth import auth
 import traceback
 from urllib.parse import urlparse
 from .ratapi import rulesets
+from typing import Any, Dict, NamedTuple, Optional
+from rcache_models import RcacheClientSettings
+from rcache_client import ReqCacheClient
 
 LOGGER = logging.getLogger(__name__)
 
@@ -310,18 +313,51 @@ response_map = {
 }
 
 
-class AlsConfigInfo:
-    """ Information pertinent to ALS Config record known before request
-    
-    Attributes:
-    req_idx     -- Index of request in request message
-    config_text -- Content of config file for request
-    customer    -- Custmer name for request
-    """
-    def __init__(self, req_idx, config_text, customer):
-        self.config_text = config_text
-        self.customer = customer
-        self.req_idx = req_idx
+rcache_settings = RcacheClientSettings()
+
+
+def get_rcache():
+    """ Returns RcacheClient instance for given app instance"""
+    if not hasattr(flask.g, "rcache"):
+        if rcache_settings.enabled:
+            flask.g.rcache = ReqCacheClient(rcache_settings, rmq_receiver=True)
+            flask.g.rcache.connect(db=True, rmq=True)
+        else:
+            flask.g.rcache = None
+    return flask.g.rcache
+
+
+class ReqInfo(NamedTuple):
+    """ Information about single AFC Request, needed for its processing """
+    # 0-based request index within message
+    req_idx: int
+
+    # Hash computed over essential part of request and of AFC config
+    req_cfg_hash: str
+
+    # Request ID from message
+    request_id: str
+
+    # AFC Request as dictionary
+    request: Dict[str, Any]
+
+    # AFC Config file content as string
+    config_str: str
+
+    # AFC Config file path. None if tasks not used
+    config_path: Optional[str]
+
+    # Region identifier
+    region: str
+
+    # Root directory for AFC Engine debug files
+    history_dir: Optional[str]
+
+    # AFC Engine Request type
+    request_type: str
+
+    # AFC Engine computation options
+    runtime_opts: int
 
 
 class RatAfc(MethodView):
@@ -450,6 +486,8 @@ class RatAfc(MethodView):
                      f" {self.__class__}::{inspect.stack()[0][3]}()")
         als_req_id = als.als_afc_req_id()
         results = {"availableSpectrumInquiryResponses": []}
+        request_ids = set()
+        dataif = DataIf()
 
         try:
             if self.__filter(flask.request.url, flask.request.json):
@@ -463,289 +501,345 @@ class RatAfc(MethodView):
             ver = flask.request.json["version"]
             if not (ver in ALLOWED_VERSIONS):
                 raise VersionNotSupportedException([ver])
-            results["version"] = ver;
+            results["version"] = ver
 
-           
+
             # split multiple requests into an array of individual requests
             requests = map(lambda r: {"availableSpectrumInquiryRequests": [r], "version": ver}, args["availableSpectrumInquiryRequests"])
+            request_ids = \
+                set([r["requestId"]
+                     for r in args["availableSpectrumInquiryRequests"]])
+
             LOGGER.debug(f"({threading.get_native_id()})"
                          f" {self.__class__}::{inspect.stack()[0][3]}()"
                          f" Running AFC analysis with params: {args}")
             request_type = 'AP-AFC'
 
+            use_tasks = (get_rcache() is None) or \
+                (flask.request.args.get('conn_type') == 'async')
+
 
             als.als_afc_request(req_id=als_req_id, req=args)
-            tasks = []
-            als_config_infos = []
             uls_id = "Unknown"
             geo_id = "Unknown"
             indoor_certified = True
+            req_infos = {}
 
-
+            # Creating req_infos - list of ReqInfo objects
             for req_idx, request in enumerate(requests):
-                # authenticate
-                LOGGER.debug(f"({threading.get_native_id()})"
-                             f" {self.__class__}::{inspect.stack()[0][3]}()"
-                             f" Request: {request}")
-                device_desc = request["availableSpectrumInquiryRequests"][0].get(
-                    'deviceDescriptor')
-
-                devices = device_desc.get('certificationId')
-                if not devices:
-                    raise MissingParamException(missing_params=['certificationId'])
-
-                # Pick one ruleset that is being used for the
-                # deployment of this AFC (RULESETS)
-                prefix = None
-                certId = None
-                region = None
-                for r in devices:
-                    prefix = r.get('rulesetId')
-                    if not prefix:
-                        # empty/non-exist ruleset
-                        break
-                    if prefix in RULESETS:
-                        region = rulesetIdToRegionStr(prefix)
-                        certId = r.get('id')
-                        break
-                    prefix = prefix.strip()
-
-                if prefix is None: 
-                    raise MissingParamException(missing_params=['rulesetId'])
-                elif not prefix:
-                   raise InvalidValueException(["rulesetId", prefix])
-
-                if region:
-                    if certId is None:
-                        # certificationId id field does not exist
-                        raise MissingParamException(missing_params=['certificationId', 'id'])
-                    elif not certId:
-                        raise InvalidValueException(["certificationId", certId])
-                else:
-                   # ruleset is not in list
-                   raise DeviceUnallowedException("")
-
-                serial = device_desc.get('serialNumber')
-                if serial is None:
-                    raise MissingParamException(missing_params=['serialNumber'])
-                elif not serial:
-                    raise InvalidValueException(["serialNumber", serial])
-
-                location = request["availableSpectrumInquiryRequests"][0].get(
-                    'location')
-
-                indoor_certified = self._auth_ap(serial,
-                                   prefix,
-                                   certId,
-                                   device_desc.get('rulesetIds'),
-                                   ver)
-
-                if indoor_certified:
-                    runtime_opts = RNTM_OPT_CERT_ID | RNTM_OPT_NODBG_NOGUI
-                else:
-                    runtime_opts = RNTM_OPT_NODBG_NOGUI
-
-                debug_opt = flask.request.args.get('debug')
-                if debug_opt == 'True':
-                    runtime_opts |= RNTM_OPT_DBG
-                edebug_opt = flask.request.args.get('edebug')
-                if edebug_opt == 'True':
-                    runtime_opts |= RNTM_OPT_SLOW_DBG
-                gui_opt = flask.request.args.get('gui')
-                if gui_opt == 'True':
-                    runtime_opts |= RNTM_OPT_GUI
-                opt = flask.request.args.get('nocache')
-                if opt == 'True':
-                    runtime_opts |= RNTM_OPT_NOCACHE
-                runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
-                LOGGER.debug(f"({threading.get_native_id()})"
-                             f" {self.__class__}::{inspect.stack()[0][3]}()"
-                             f" runtime {runtime_opts}")
-
-                task_id = str(uuid.uuid4())
-                dataif = DataIf()
-
-                config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
-                         == region).first()
-
-                if not config:
-                    raise DeviceUnallowedException("No AFC configuration for ruleset")
-
-                config_bytes = json.dumps(config.config, sort_keys=True)
-
-                # calculate hash of config
-                hashlibobj = hashlib.md5()
-                hashlibobj.update(config_bytes.encode('utf-8'))
-                hash1 = hashlibobj.hexdigest()
-                config_path = os.path.join("/afc_config", prefix, hash1, "afc_config.json")
-
-                # check config_path exist
-                with dataif.open(config_path) as hfile:
-                    if not hfile.head():
-                        # Write afconfig to objst cache.
-                        # convert TESTxxx region to xxx in cache to make afc engine sane
-                        if region[:5] == "TEST_" or region[:5] == 'DEMO_':
-                            patch_config = config.config
-                            patch_config['regionStr'] =  region[5:]
-                            config_bytes = json.dumps(patch_config, sort_keys=True)
-                        hfile.write(config_bytes)
-
-                # calculate hash of config + request
-                request_json_bytes = json.dumps(request, sort_keys=True).encode('utf-8')
-                hashlibobj.update(request_json_bytes)
-                hash_val = hashlibobj.hexdigest()
-
-                # check cache
-                if not runtime_opts & (RNTM_OPT_GUI | RNTM_OPT_NOCACHE):
-                    try:
-                        with dataif.open(os.path.join(
-                            "/responses", hash_val, "analysisResponse.json.gz")) as hfile:
-                            resp_data = hfile.read()
-                    except:
-                        pass
-                    else:
-                        resp_data = zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
-                        dataAsJson = json.loads(resp_data)
-                        LOGGER.debug(f"({threading.get_native_id()})"
-                                     f" {self.__class__}::{inspect.stack()[0][3]}()"
-                                     f" dataAsJson: {dataAsJson}")
-                        actualResult = dataAsJson.get(
-                            "availableSpectrumInquiryResponses")
-                        results["availableSpectrumInquiryResponses"].append(
-                            actualResult[0])
-                        continue
-
-                with dataif.open(os.path.join("/responses", hash_val, "analysisRequest.json")) as hfile:
-                    hfile.write(request_json_bytes)
-                history_dir = None
-                if runtime_opts & (RNTM_OPT_DBG | RNTM_OPT_SLOW_DBG):
-                    history_dir = os.path.join("/history", str(serial),
-                                               str(datetime.datetime.now().isoformat()))
-                if runtime_opts & RNTM_OPT_DBG:
-                    with dataif.open(os.path.join(history_dir, "analysisRequest.json")) as hfile:
-                        hfile.write(request_json_bytes)
-                    with dataif.open(os.path.join(history_dir, "afc_config.json")) as hfile:
-                        hfile.write(config_bytes.encode('utf-8'))
-                build_task(dataif,
-                        request_type,
-                        task_id, hash_val, config_path, history_dir,
-                        runtime_opts)
-
-                conn_type = flask.request.args.get('conn_type')
-                LOGGER.debug(f"({threading.get_native_id()})"
-                             f" {self.__class__}::{inspect.stack()[0][3]}()"
-                             f" RatAfc:post() conn_type={conn_type}")
-                t = afctask.Task(task_id, dataif, hash_val, history_dir)
-                if conn_type == 'async':
-                    if len(requests) > 1:
-                        raise AP_Exception(-1, "Unsupported multipart async request")
-                    task_stat = t.get()
-                    # async request comes from GUI only, so it can't be multi nor cached
-                    return flask.jsonify(taskId = task_id,
-                                     taskState = task_stat["status"])
-                tasks.append(t)
-                als_config_infos.append(
-                    AlsConfigInfo(req_idx=req_idx, config_text=config_bytes,
-                                  customer=region))
-
-            for task_idx, t in enumerate(tasks):
-                # wait for requests to finish processing
-                uls_id = "Unknown"
-                geo_id = "Unknown"
                 try:
-                    task_stat = t.wait(timeout=MsghndConfigurator().AFC_MSGHND_RATAFC_TOUT)
+                    # authenticate
                     LOGGER.debug(f"({threading.get_native_id()})"
                                  f" {self.__class__}::{inspect.stack()[0][3]}()"
-                                 f" Task complete: {task_stat['status']}")
+                                 f" Request: {request}")
+                    individual_request = \
+                        request["availableSpectrumInquiryRequests"][0]
+                    prefix = None
+                    device_desc = individual_request.get('deviceDescriptor')
 
-                    if t.successful(task_stat):
-                        taskResponse = response_map[task_stat['status']](t)
-                        # we might be able to clean this up by having the result
-                        # functions not return a full response object.
-                        # need to check everywhere they are called.
-                        dataAsJson = json.loads(taskResponse.data)
-                        LOGGER.debug(f"({threading.get_native_id()})"
-                                     f" {self.__class__}::{inspect.stack()[0][3]}()"
-                                     f" dataAsJson: {dataAsJson}")
-                        engine_result_ext = \
-                            _get_vendor_extension(dataAsJson,
-                                                  "openAfc.used_data")
-                        uls_id = (engine_result_ext or {}).get("uls_id",
-                                                               uls_id)
-                        geo_id = (engine_result_ext or {}).get("geo_id",
-                                                               geo_id)
-                        actualResult = dataAsJson.get(
-                            "availableSpectrumInquiryResponses")
-                        if actualResult is not None:
-                            results["availableSpectrumInquiryResponses"].append(
-                                actualResult[0])
-                        else:
-                            LOGGER.debug(f"({threading.get_native_id()})"
-                                         f" {self.__class__}::{inspect.stack()[0][3]}()"
-                                         f" actualResult was None")
-                            results["availableSpectrumInquiryResponses"].append(
-                                dataAsJson)
+                    devices = device_desc.get('certificationId')
+                    if not devices:
+                        raise MissingParamException(missing_params=['certificationId'])
+
+                    # Pick one ruleset that is being used for the
+                    # deployment of this AFC (RULESETS)
+                    certId = None
+                    region = None
+                    for r in devices:
+                        prefix = r.get('rulesetId')
+                        if not prefix:
+                            # empty/non-exist ruleset
+                            break
+                        if prefix in RULESETS:
+                            region = rulesetIdToRegionStr(prefix)
+                            certId = r.get('id')
+                            break
+                        prefix = prefix.strip()
+
+                    if prefix is None:
+                        raise MissingParamException(missing_params=['rulesetId'])
+                    elif not prefix:
+                       raise InvalidValueException(["rulesetId", prefix])
+
+                    if region:
+                        if certId is None:
+                            # certificationId id field does not exist
+                            raise MissingParamException(missing_params=['certificationId', 'id'])
+                        elif not certId:
+                            raise InvalidValueException(["certificationId", certId])
                     else:
-                        taskResponse = response_map[task_stat['status']](t)
-                        dataAsJson = json.loads(taskResponse.data)
-                        LOGGER.debug(f"({threading.get_native_id()})"
-                                     f" {self.__class__}::{inspect.stack()[0][3]}()"
-                                     f" Task unsuccessful"
-                                     f" dataAsJson: {dataAsJson}")
-                        results["availableSpectrumInquiryResponses"].append(
-                            dataAsJson)
+                       # ruleset is not in list
+                       raise DeviceUnallowedException("")
 
-                except Exception as e:
-                    LOGGER.error(f"catching and rethrowing exception "
-                                 f"{type(e).__name__} : {e}")
-                    LOGGER.debug(''.join(traceback.format_exception(None, e, e.__traceback__)))
-                    raise AP_Exception(-1,
-                                       'The task state is invalid. '
-                                       'Try again later, and if this issue '
-                                       'persists contact support.')
-                finally:
-                    config_info = als_config_infos[task_idx]
-                    als.als_afc_config(
-                        req_id=als_req_id, config_text=config_info.config_text,
-                        customer=config_info.customer, geo_data_version=geo_id,
-                        uls_id=uls_id, req_indices=[config_info.req_idx])
-                    
+                    serial = device_desc.get('serialNumber')
+                    if serial is None:
+                        raise MissingParamException(missing_params=['serialNumber'])
+                    elif not serial:
+                        raise InvalidValueException(["serialNumber", serial])
 
-        except AP_Exception as e:
-            LOGGER.error('catching exception: %s',
-                         getattr(e, 'message', repr(e)))
-            LOGGER.error('set up data %s',
-                         args["availableSpectrumInquiryRequests"][0])
-            try:
-                requestId = args["availableSpectrumInquiryRequests"]\
-                                            [0]["requestId"]
-            except KeyError:
-                requestId = "not available"
-            try:
-               rulesetId = args["availableSpectrumInquiryRequests"]\
-                                            [0]["deviceDescriptor"]['certificationId'][0]["rulesetId"]
-            except KeyError:
-                rulesetId = "not available"
+                    indoor_certified = \
+                        self._auth_ap(serial, prefix, certId,
+                                      device_desc.get('rulesetIds'), ver)
 
+                    if indoor_certified:
+                        runtime_opts = RNTM_OPT_CERT_ID | RNTM_OPT_NODBG_NOGUI
+                    else:
+                        runtime_opts = RNTM_OPT_NODBG_NOGUI
+
+                    debug_opt = flask.request.args.get('debug')
+                    if debug_opt == 'True':
+                        runtime_opts |= RNTM_OPT_DBG
+                    edebug_opt = flask.request.args.get('edebug')
+                    if edebug_opt == 'True':
+                        runtime_opts |= RNTM_OPT_SLOW_DBG
+                    gui_opt = flask.request.args.get('gui')
+                    if gui_opt == 'True':
+                        runtime_opts |= RNTM_OPT_GUI
+                    opt = flask.request.args.get('nocache')
+                    if opt == 'True':
+                        runtime_opts |= RNTM_OPT_NOCACHE
+                    if use_tasks:
+                        runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
+                    LOGGER.debug(f"({threading.get_native_id()})"
+                                 f" {self.__class__}::{inspect.stack()[0][3]}()"
+                                 f" runtime {runtime_opts}")
+
+                    # Retrieving config
+                    config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
+                             == region).first()
+                    if not config:
+                        raise DeviceUnallowedException("No AFC configuration for ruleset")
+                    afc_config = config.config
+                    if region[:5] == "TEST_" or region[:5] == 'DEMO_':
+                        afc_config = dict(afc_config)
+                        afc_config['regionStr'] = region[5:]
+                    config_str = json.dumps(afc_config, sort_keys=True)
+
+                    # calculate hash of config
+                    hashlibobj = hashlib.md5()
+                    hashlibobj.update(config_str.encode('utf-8'))
+                    config_hash = hashlibobj.hexdigest()
+                    config_path = \
+                        os.path.join("/afc_config", prefix, config_hash,
+                                     "afc_config.json") if use_tasks else None
+
+                    # calculate hash of config + request
+                    hashlibobj.update(
+                        json.dumps(
+                            {k:v for k, v in individual_request.items()
+                             if k != "requestId"},
+                            sort_keys=True).encode('utf-8'))
+                    req_cfg_hash = hashlibobj.hexdigest()
+
+                    history_dir = None
+                    if runtime_opts & (RNTM_OPT_DBG | RNTM_OPT_SLOW_DBG):
+                        history_dir =\
+                            os.path.join(
+                                "/history", str(serial),
+                                str(datetime.datetime.now().isoformat()))
+                    req_infos[req_cfg_hash] = \
+                        ReqInfo(
+                            req_idx=req_idx, req_cfg_hash=req_cfg_hash,
+                            request_id=individual_request["requestId"],
+                            request=request, config_str=config_str,
+                            config_path=config_path, region=region,
+                            history_dir=history_dir, request_type=request_type,
+                            runtime_opts=runtime_opts)
+                except AP_Exception as e:
+                    results["availableSpectrumInquiryResponses"].append(
+                        {"requestId": individual_request["requestId"],
+                         "rulesetId": prefix or "Unknown",
+                         "response": {"responseCode": e.response_code,
+                                      "shortDescription": e.description,
+                                      "supplementalInfo":
+                                      json.dumps(e.supplemental_info)
+                                      if e.supplemental_info is not None
+                                      else None}})
+
+            # Creating 'responses' - dictionary of responses as JSON strings,
+            # indexed by request/config hashes
+            # Firts looking up ijn the cache
+            responses = self._cache_lookup(dataif=dataif, req_infos=req_infos)
+            # Computing the responses not found in cache
+            if len(responses) != len(req_infos):
+                if flask.request.args.get('conn_type') == 'async':
+                    # Special case of async request from GUI
+                    if len(req_infos) > 1:
+                        raise \
+                            AP_Exception(-1,
+                                         "Unsupported multipart async request")
+                    assert use_tasks
+                    task = self._start_processing(dataif=dataif,
+                                                  req_info=req_infos[0],
+                                                  use_tasks=True)
+                    # async request comes from GUI only, so it can't be multi nor cached
+                    return flask.jsonify(taskId=task.getId(),
+                                         taskState=task.get()["status"])
+                responses.update(
+                    self._compute_responses(
+                        dataif=dataif, use_tasks=use_tasks,
+                        req_infos={k: v for k, v in req_infos.items()
+                                   if k not in responses}))
+
+            # Preparing responses for requests
+            for req_info in req_infos.values():
+                response = responses.get(req_info.req_cfg_hash)
+                if not response:
+                    # No response for request
+                    continue
+                dataAsJson = json.loads(response)
+                engine_result_ext = \
+                    _get_vendor_extension(dataAsJson,
+                                          "openAfc.used_data") or {}
+                uls_id = engine_result_ext.get("openAfc.uls_id", uls_id)
+                geo_id = engine_result_ext.get("openAfc.geo_id", geo_id)
+                actualResult = dataAsJson.get(
+                    "availableSpectrumInquiryResponses")
+                if actualResult is not None:
+                    actualResult[0]["requestId"] = req_info.request_id
+                    results["availableSpectrumInquiryResponses"].append(
+                        actualResult[0])
+                als.als_afc_config(
+                    req_id=req_info.request_id,
+                    config_text=req_info.config_str,
+                    customer=req_info.region, geo_data_version=geo_id,
+                    uls_id=uls_id, req_indices=[req_info.req_idx])
+        except Exception as e:
+            LOGGER.error(traceback.format_exc())
+            lineno = "Unknown"
+            frame =  sys.exc_info()[2]
+            while frame is not None:
+                f_code = frame.tb_frame.f_code
+                if os.path.basename(f_code.co_filename) == \
+                        os.path.basename(__file__):
+                    lineno = frame.tb_lineno
+                frame = frame.tb_next
+            LOGGER.error('catching exception: %s, raised at line %s',
+                         getattr(e, 'message', repr(e)), str(lineno))
+
+        # Disaster recovery - filling-in unfulfilled stuff
+        if "version" not in results:
+            results["version"] = ALLOWED_VERSIONS[-1]
+        for missing_id in \
+                request_ids - \
+                set(r["requestId"] for r in
+                    results["availableSpectrumInquiryResponses"]):
             results["availableSpectrumInquiryResponses"].append(
-                {
-                    'requestId': requestId,
-                    'rulesetId': rulesetId,
-                    'response': {
-                        'responseCode': e.response_code,
-                        'shortDescription': e.description,
-                        'supplementalInfo': json.dumps(e.supplemental_info)
-                            if e.supplemental_info is not None else None
-                    }
-                })
-            LOGGER.error('results of error: %s', results)
-
+                {"requestId": missing_id,
+                 "rulesetId": "Unknown",
+                 "response": {"responseCode": -1}})
         als.als_afc_response(req_id=als_req_id, resp=results)
-        LOGGER.error("Final results: %s", str(results))
+
+        LOGGER.debug("Final results: %s", str(results))
         resp = flask.make_response(flask.json.dumps(results), 200)
         resp.content_type = 'application/json'
         return resp
 
+    def _cache_lookup(self, dataif, req_infos):
+        """ Looks up cached results
+
+        Arguments:
+        dataif    -- Objstore handle (used only if RCache not used)
+        req_infos -- Dictionary of ReqInfo objects, indexed by request/config
+                     hashes
+        Returns dictionary of found responses (as strings), indexed by
+        request/config hashes
+        """
+        cached_keys = \
+            [req_cfg_hash for req_cfg_hash in req_infos.keys()
+             if not (req_infos[req_cfg_hash].runtime_opts &
+                     (RNTM_OPT_GUI | RNTM_OPT_NOCACHE))]
+        if not cached_keys:
+            return {}
+        if get_rcache() is None:
+            ret = {}
+            for req_cfg_hash in cached_keys:
+                try:
+                    with dataif.open(os.path.join(
+                            "/responses", req_cfg_hash,
+                            "analysisResponse.json.gz")) as hfile:
+                        resp_data = hfile.read()
+                except:
+                    continue
+                ret[req_cfg_hash] = \
+                    zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
+            return ret
+        return get_rcache().lookup_responses(cached_keys)
+
+    def _start_processing(self, dataif, req_info, use_tasks=False):
+        """ Initiates processing on remote worker
+        If 'use_tasks' - returns created Task
+        """
+        request_str = json.dumps(req_info.request, sort_keys=True)
+        if use_tasks:
+            with dataif.open(req_info.config_path) as hfile:
+                if not hfile.head():
+                    hfile.write(req_info.config_str.encode("utf-8"))
+            with dataif.open(os.path.join("/responses", req_info.req_cfg_hash,
+                                          "analysisRequest.json")) as hfile:
+                hfile.write(request_str)
+
+        if req_info.runtime_opts & RNTM_OPT_DBG:
+            for fname, content in [("analysisRequest.json", request_str),
+                                   ("afc_config.json", req_info.config_str)]:
+                with dataif.open(os.path.join(req_info.history_dir, fname)) \
+                        as hfile:
+                    hfile.write(content.encode("utf-8"))
+        task_id = str(uuid.uuid4())
+        build_task(dataif=dataif, request_type=req_info.request_type,
+                   task_id=task_id, hash_val=req_info.req_cfg_hash,
+                   config_path=req_info.config_path if use_tasks else None,
+                   history_dir=req_info.history_dir,
+                   runtime_opts=req_info.runtime_opts,
+                   rcache_queue=None if use_tasks
+                   else get_rcache().rmq_rx_queue_name(),
+                   request_str=None if use_tasks else request_str,
+                   config_str=None if use_tasks else req_info.config_str)
+        if use_tasks:
+            return afctask.Task(task_id=task_id, dataif=dataif,
+                                hash_val=req_info.req_cfg_hash,
+                                history_dir=req_info.history_dir)
+        return None
+
+    def _compute_responses(self, dataif, use_tasks, req_infos):
+        """ Prepares worker tasks and waits their completion
+
+        Arguments:
+        dataif    -- Objstore handle (used only if RCache not used)
+        use_tasks -- True to use task-based communication with worker, False to
+                     use RabbitMQ-based communication
+        req_infos -- Dictionary of ReqInfo objects, indexed by request/config
+                     hashes
+        Returns dictionary of found responses (as strings), indexed by
+        request/config hashes
+        """
+        tasks = {}
+        for req_cfg_hash, req_info in req_infos.items():
+            tasks[req_cfg_hash] = \
+                self._start_processing(dataif=dataif, req_info=req_info,
+                                  use_tasks=use_tasks)
+        if use_tasks:
+            ret = {}
+            for req_cfg_hash, task in tasks.items():
+                task_stat = \
+                    task.wait(
+                        timeout=MsghndConfigurator().AFC_MSGHND_RATAFC_TOUT)
+                ret[req_cfg_hash] = \
+                    response_map[task_stat['status']](task).data
+            return ret
+        ret = \
+            get_rcache().rmq_receive_responses(
+                req_cfg_digests=req_infos.keys(),
+                timeout_sec=MsghndConfigurator().AFC_MSGHND_RATAFC_TOUT)
+        for req_cfg_hash, response in ret.items():
+            req_info = req_infos[req_cfg_hash]
+            if (not response) or (not req_info.history_dir):
+                continue
+            with dataif.open(os.path.join(req_info.history_dir,
+                                          "analysisResponse.json.gz")) \
+                    as hfile:
+                hfile.write(zlib.compress(response.encode("utf-8")))
+        return ret
 
 class RatAfcSec(RatAfc):
     def get(self):

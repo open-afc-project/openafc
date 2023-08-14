@@ -11,6 +11,7 @@
 # pylint: disable=too-many-statements, too-many-branches, unnecessary-pass
 # pylint: disable=logging-fstring-interpolation, invalid-name, too-many-locals
 # pylint: disable=too-few-public-methods, too-many-arguments
+# pylint: disable=too-many-nested-blocks
 
 import argparse
 import datetime
@@ -26,6 +27,8 @@ import time
 from typing import cast, Dict, List, Optional, Set
 
 from uls_service_common import *
+from rcache_client import ReqCacheClient
+from rcache_models import LatLonRect, RcacheClientSettings
 
 # Default value for --download_script
 DEFAULT_DOWNLOAD_SCRIPT = \
@@ -104,6 +107,9 @@ def print_args(args: Any) -> None:
     logging.info(f"ULS download interval in hours: {args.interval_hr}")
     logging.info(f"ULS download script maximum duration in hours: "
                  f"{args.timeout_hr}")
+    logging.info(f"Rcache spatial invalidation: "
+                 f"{'enabled' if args.rcache_enabled else 'disabled'}")
+    logging.info(f"Rcache URL: {args.rcache_url}")
     logging.info(f"Run: {'Once' if args.run_once else 'Indefinitely'}")
     logging.info(f"Print debug info: {'Yes' if args.verbose else 'No'}")
 
@@ -202,12 +208,75 @@ def update_region_change_times(status_storage: StatusStorage,
                                           data_update_times)
 
 
+class DbDiff:
+    """ Computes and holds difference between two FS (aka ULS) databases
+
+    Public attributes:
+    valid        -- True if difference is valid
+    has_previous -- True if previous database exists
+    prev_len     -- Number of paths in previous database
+    new_len      -- Number of paths in new database
+    diff_len     -- Number of different paths
+    diff_tiles   -- Tiles containing receivers of different paths
+    """
+    def __init__(self, prev_filename: Optional[str], new_filename: str) \
+            -> None:
+        self.has_previous = (prev_filename is not None) and \
+            os.path.isfile(prev_filename)
+        self.valid = False
+        self.prev_len = 0
+        self.new_len = 0
+        self.diff_len = 0
+        self.diff_tiles: List[LatLonRect] = []
+        if not self.has_previous:
+            return
+        logging.info("Getting differences with previous database")
+        try:
+            p = subprocess.run(
+                [FS_DB_DIFF, "--report_tiles", prev_filename, new_filename],
+                stdout=subprocess.PIPE, check=True, timeout=10 * 60,
+                encoding="ascii")
+        except (subprocess.SubprocessError, OSError) as ex:
+            logging.error(f"Database comparison failed: {ex}")
+            return
+        m = re.search(r"Paths in DB1:\s+(?P<db1>\d+)(.|\n)+"
+                      r"Paths in DB2:\s+(?P<db2>\d+)(.|\n)+"
+                      r"Different paths:\s+(?P<diff>\d+)(.|\n)+",
+                      cast(str, p.stdout))
+        if m is None:
+            logging.error(
+                f"Output of '{FS_DB_DIFF}' has unrecognized structure")
+            return
+        self.prev_len = int(cast(str, m.group("db2")))
+        self.new_len = int(cast(str, m.group("db2")))
+        self.diff_len = int(cast(str, m.group("diff")))
+        for m in re.finditer(
+                r"Difference in tile "
+                r"\[(?P<min_lat>[0-9.]+)-(?P<max_lat>[0-9.]+)\]"
+                r"(?P<lat_sign>[NS]), "
+                r"\[(?P<min_lon>[0-9.]+)-(?P<max_lon>[0-9.]+)\]"
+                r"(?P<lon_sign>[EW])", cast(str, p.stdout)):
+            lat_sign = 1 if m.group("lat_sign") == "N" else -1
+            lon_sign = 1 if m.group("lon_sign") == "E" else -1
+            self.diff_tiles.append(
+                LatLonRect(
+                    min_lat=float(m.group("min_lat")) * lat_sign,
+                    max_lat=float(m.group("max_lat")) * lat_sign,
+                    min_lon=float(m.group("min_lon")) * lon_sign,
+                    max_lon=float(m.group("max_lon")) * lon_sign))
+        logging.info(
+            f"Database comparison succeeded: "
+            f"{os.path.basename(prev_filename)} has {self.prev_len} paths, "
+            f"{os.path.basename(new_filename)} has {self.new_len} paths, "
+            f"difference is in {self.diff_len} paths, "
+            f"{len(self.diff_tiles)} tiles")
+        self.valid = True
+
+
 class UlsFileChecker:
     """ Checker of ULS database validity
 
     Private attributes:
-    _prev_filename      -- Optional name of previous database. Since it is
-                           symlink-based, it is fixed
     _max_change_percent -- Optional percent of maximum difference
     _afc_url            -- Optional AFC Service URL to test ULS database on
     _afc_parallel       -- Optional number of parallel AFC requests to make
@@ -215,16 +284,13 @@ class UlsFileChecker:
     _regions            -- List of regions to test database on. Empty if on all
                            regions
     """
-    def __init__(self, prev_filename: Optional[str] = None,
-                 max_change_percent: Optional[float] = None,
+    def __init__(self, max_change_percent: Optional[float] = None,
                  afc_url: Optional[str] = None,
                  afc_parallel: Optional[int] = None,
                  regions: Optional[List[str]] = None) -> None:
         """ Constructor
 
         Arguments:
-        prev_filename      -- Optional name of previous database. Since it is
-                              symlink-based, it is fixed
         max_change_percent -- Optional percent of maximum difference
         afc_url            -- Optional AFC Service URL to test ULS database on
         afc_parallel       -- Optional number of parallel AFC requests to make
@@ -232,57 +298,37 @@ class UlsFileChecker:
         regions            -- Optional list of regions to test database on. If
                               empty or None - test on all regions
         """
-        self._prev_filename = prev_filename
         self._max_change_percent = max_change_percent
         self._afc_url = afc_url
         self._afc_parallel = afc_parallel
         self._regions: List[str] = regions or []
 
-    def valid(self, new_filename: str) -> bool:
+    def valid(self, new_filename: str, db_diff: DbDiff) -> bool:
         """ Checks validity of given database """
-        return self._check_diff(new_filename) and self._check_afc(new_filename)
+        return self._check_diff(db_diff) and self._check_afc(new_filename)
 
-    def _check_diff(self, new_filename) -> bool:
+    def _check_diff(self, db_diff: DbDiff) -> bool:
         """ Checks amount of difference since previous database """
-        if (self._prev_filename is None) or \
-                (not os.path.isfile(self._prev_filename)) or \
-                (self._max_change_percent is None):
+        if not db_diff.has_previous:
             return True
-        logging.info("Comparing with previous database")
-        try:
-            p = subprocess.run(
-                [FS_DB_DIFF, self._prev_filename, new_filename],
-                stdout=subprocess.PIPE, check=True, timeout=10 * 60,
-                encoding="ascii")
-            m = re.search(r"Paths in DB1:\s+(?P<db1>\d+)(.|\n)+"
-                          r"Paths in DB2:\s+(?P<db2>\d+)(.|\n)+"
-                          r"Different paths:\s+(?P<diff>\d+)(.|\n)+",
-                          cast(str, p.stdout))
-            if m is None:
-                logging.error(
-                    f"Output of '{FS_DB_DIFF}' has unrecognized structure")
-                return False
-            db2_len = int(cast(str, m.group("db2")))
-            diff_len = int(cast(str, m.group("diff")))
-            diff_percent = \
-                round(
-                    100 if diff_len == 0 else ((diff_len * 100) / db2_len),
-                    3)
-            if diff_percent > self._max_change_percent:
-                logging.error(
-                    f"Database changed by {diff_percent}%, which exceeds "
-                    f"the limit of {self._max_change_percent}%")
-                return False
-            logging.info(
-                f"Database comparison succeeded: "
-                f"{os.path.basename(self._prev_filename)} had "
-                f"{int(cast(str, m.group('db1')))} paths, "
-                f"{os.path.basename(new_filename)} has {db2_len} paths, "
-                f"difference is in {diff_len}, amount of change is "
-                f"{diff_percent}%, which is below the threshold of "
-                f"{self._max_change_percent}%")
-        except (subprocess.SubprocessError, OSError) as ex:
-            logging.error(f"Database comparison failed: {ex}")
+        if not db_diff.valid:
+            return False
+        if (db_diff.diff_len == 0) != (len(db_diff.diff_tiles) == 0):
+            logging.error(f"Inconsistent indication of database difference: "
+                          f"difference is in {db_diff.diff_len} paths, "
+                          f"but in {len(db_diff.diff_tiles)} tiles")
+            return False
+        if self._max_change_percent is None:
+            return True
+        diff_percent = \
+            round(
+                100 if db_diff.diff_len == 0 else
+                ((db_diff.diff_len * 100) / db_diff.new_len),
+                3)
+        if diff_percent > self._max_change_percent:
+            logging.error(
+                f"Database changed by {diff_percent}%, which exceeds "
+                f"the limit of {self._max_change_percent}%")
             return False
         return True
 
@@ -377,6 +423,14 @@ def main(argv: List[str]) -> None:
         f"database against AFC Engine. Default see in config file of "
         f"'{FS_AFC}'")
     argument_parser.add_argument(
+        "--rcache_url", metavar="URL", type=docker_arg_type(str),
+        help="URL for spatial invalidation")
+    argument_parser.add_argument(
+        "--rcache_enabled", metavar="TRUE/FALSE",
+        type=docker_arg_type(bool, default=True), default=True,
+        help="FALSE to disable spatial invalidation (even if URL specified). "
+        "Default is TRUE")
+    argument_parser.add_argument(
         "--delay_hr", metavar="DELAY_HR", type=docker_arg_type(float),
         help="Delay before invocation in hours. Default is no delay")
     argument_parser.add_argument(
@@ -426,10 +480,14 @@ def main(argv: List[str]) -> None:
 
     uls_file_checker = \
         UlsFileChecker(
-            prev_filename=current_uls_file,
             max_change_percent=args.max_change_percent, afc_url=args.afc_url,
             afc_parallel=args.afc_parallel,
             regions=None if args.region is None else args.region.split(":"))
+
+    rcache: Optional[ReqCacheClient] = \
+        ReqCacheClient(RcacheClientSettings(enabled=True,
+                                            service_url=args.rcache_url)) \
+        if args.rcache_enabled and args.rcache_url else None
 
     status_storage.write_milestone(StatusStorage.S.ServiceStart)
 
@@ -521,7 +579,10 @@ def main(argv: List[str]) -> None:
                 # Copy new ULS file to external directory
                 shutil.copy2(new_uls_file, temp_uls_file_name)
 
-                if uls_file_checker.valid(temp_uls_file_name):
+                db_diff = DbDiff(prev_filename=current_uls_file,
+                                 new_filename=temp_uls_file_name)
+                if uls_file_checker.valid(new_filename=temp_uls_file_name,
+                                          db_diff=db_diff):
                     # Renaming database
                     permanent_uls_file_name = \
                         os.path.join(args.ext_db_dir,
@@ -531,6 +592,9 @@ def main(argv: List[str]) -> None:
                     update_uls_file(uls_dir=args.ext_db_dir,
                                     uls_file=os.path.basename(new_uls_file),
                                     symlink=args.ext_db_symlink)
+                    if rcache:
+                        rcache.rcache_spatial_invalidate(
+                            tiles=db_diff.diff_tiles)
 
                     # Update data change times (for health checker)
                     update_region_change_times(

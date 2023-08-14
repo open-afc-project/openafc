@@ -290,6 +290,8 @@ def main(argv: List[str]) -> None:
 
     status_storage = StatusStorage(status_dir=args.status_dir)
 
+    status_storage.write_milestone(StatusStorage.S.HealthCheck)
+
     email_if_needed(status_storage=status_storage, args=args)
 
     last_start = status_storage.read_milestone(StatusStorage.S.ServiceStart)

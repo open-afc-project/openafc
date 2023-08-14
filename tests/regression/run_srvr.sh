@@ -58,6 +58,10 @@ docker-compose exec -T rat_server rat-manage-api cert_id create  --location 3 \
 --cert_id FsDownloaderCertIdCA --ruleset_id CA_RES_DBS-06
 docker-compose exec -T rat_server rat-manage-api cert_id create  --location 3 \
 --cert_id FsDownloaderCertIdBR --ruleset_id BRAZIL_RULESETID
+docker-compose exec -T rmq rabbitmqctl add_user rcache rcache
+docker-compose exec -T rmq rabbitmqctl add_vhost rcache
+docker-compose exec -T rmq rabbitmqctl set_permissions -p rcache rcache ".*" ".*" ".*"
+
 
 # Local Variables:
 # vim: sw=2:et:tw=80:cc=+1

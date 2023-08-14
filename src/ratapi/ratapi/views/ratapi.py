@@ -93,7 +93,8 @@ def rulesetIdToRegionStr(rulesetId):
 def build_task(dataif,
         request_type,
         task_id, hash_val, config_path, history_dir,
-        runtime_opts=RNTM_OPT_DBG_GUI):
+        runtime_opts=RNTM_OPT_DBG_GUI, rcache_queue=None, request_str=None,
+        config_str=None):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
     """
@@ -103,14 +104,16 @@ def build_task(dataif,
         prot,
         host,
         port,
-        flask.current_app.config['STATE_ROOT_PATH'],
         request_type,
         task_id,
         hash_val,
         config_path,
         history_dir,
         runtime_opts,
-        flask.current_app.config['NFS_MOUNT_PATH']
+        flask.current_app.config['NFS_MOUNT_PATH'],
+        rcache_queue,
+        request_str,
+        config_str
     ]
     LOGGER.debug("build_task() {}".format(args))
     run.apply_async(args)
@@ -1122,7 +1125,7 @@ class GetRuleset(MethodView):
         except:
             return flask.make_response('DB error', 404)
         resp = flask.make_response()
-        resp.data = "{ \n\trulesetId: [" + ", ".join('"{0}"'.format(x) for x in regionStrs) + \
+        resp.data = "{ \n\t\"rulesetId\": [" + ", ".join('"{0}"'.format(x) for x in regionStrs) + \
         "]\n}\n"
         resp.content_type = 'application/json'
         return resp

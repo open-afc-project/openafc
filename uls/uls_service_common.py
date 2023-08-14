@@ -144,6 +144,9 @@ class StatusStorage:
         # (Filename for) last email alarm
         AlarmSent = "alarm_time.txt"
 
+        # (Filename for) last healthcheck time
+        HealthCheck = "last_healthcheck.txt"
+
         # (Filename for) last email beacon
         BeaconSent = "beacon_time.txt"
 
