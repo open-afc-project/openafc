@@ -3,7 +3,7 @@
 |Version|3.8.6.0|
 | :- | :- |
 |**Date**|**08/14/2023**|
-|compiled server's version is TBD | git tag 3.8.6.0|
+|compiled server's version is 7fcebd0 | git tag 3.8.6.0|
 
 ## **Issues Addressed**
 * Jira OA-792-rabbitmq-rcache-rmq-user-and-host-configuration-for-rcache (#623)
