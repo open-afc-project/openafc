@@ -153,6 +153,17 @@ http {
             access_log /dev/stdout error_fmt;
         }
     }
+
+    # only for healthcheck
+    server {
+        listen 127.0.0.1:80;
+
+        location /fbrat/ap-afc/healthy {
+            return 200 "OK";
+        }
+
+    }
+
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
 

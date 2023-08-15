@@ -13,42 +13,27 @@ The acceptor client (aka consumer) registeres own queue within broker
 application (aka rabbitmq). Such queue used as a channel for control commands.
 """
 
-from appcfg import BrokerConfigurator
+from appcfg import BrokerConfigurator, ObjstConfig, MsghndConfigurator
 import os
 import sys
+from sys import stdout
 import logging
-from logging.config import dictConfig
 import argparse
 import inspect
+import gevent
 import subprocess
 import shutil
 from ncli import MsgAcceptor
+from hchecks import MsghndHealthcheck, ObjstHealthcheck
 from fst import DataIf
 
-dictConfig({
-    'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'standard': {
-            'format': '%(asctime)s - [%(levelname)s] %(name)s [%(module)s.%(funcName)s:%(lineno)d]: %(message)s', 
-            'datefmt': '%Y-%m-%d %H:%M:%S',
-        }
-    },
-   'handlers' : {
-        'console': {
-            'level': 'DEBUG', 
-            'class': 'logging.StreamHandler',
-            'formatter': 'standard',
-        }
-   }, 
-   'root': {
-        'level': 'INFO',
-        'handlers': ['console']
-   },
-})
-
 app_log = logging.getLogger()
-
+logFormatter = logging.Formatter\
+(fmt="%(asctime)s - [%(levelname)s] %(name)s [%(module)s.%(funcName)s:%(lineno)d]: %(message)s",\
+datefmt="%Y-%m-%d %H:%M:%S")
+console_hnd = logging.StreamHandler(stdout)
+console_hnd.setFormatter(logFormatter)
+app_log.addHandler(console_hnd)
 
 class Configurator(dict):
     __instance = None
@@ -61,6 +46,8 @@ class Configurator(dict):
     def __init__(self):
         dict.__init__(self)
         self.update(BrokerConfigurator().__dict__.items())
+        self.update(ObjstConfig().__dict__.items())
+        self.update(MsghndConfigurator(MsghndConfigurator.CFG_OPT_NAME_PORT).__dict__.items())
         self['OBJST_CERT_CLI_BUNDLE'] = \
             'certificate/client.bundle.pem'
         self['DISPAT_CERT_CLI_BUNDLE'] = \
@@ -82,6 +69,22 @@ def set_log_level(opt) -> int:
                  f"{app_log.getEffectiveLevel()}")
     app_log.setLevel(log_level_map[opt])
     return log_level_map[opt]
+
+
+def readiness_check(cfg):
+    """Provide readiness check by calling for response preconfigured
+       list of subjects (containers)
+    """
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+    objst_chk = ObjstHealthcheck(cfg)
+    msghnd_chk = MsghndHealthcheck(cfg)
+    checks = [gevent.spawn(objst_chk.healthcheck),
+              gevent.spawn(msghnd_chk.healthcheck)]
+    gevent.joinall(checks)
+    for i in checks:
+        if i.value != 0:
+            return i.value
+    return 0
 
 
 def run_restart(cfg):
@@ -155,6 +158,7 @@ def run_it(cfg):
 # available commands to execute in alphabetical order
 execution_map = {
     'run' : run_it,
+    'check' : readiness_check,
 }
 
 
@@ -169,7 +173,8 @@ def make_arg_parser():
                          "logging level (default=info).\n")
     args_parser.add_argument('--cmd', choices=execution_map.keys(),
         nargs='?',
-        help="run - start accepting commands.\n")
+        help="run - start accepting commands.\n"
+        "check - run readiness check.\n")
 
     return args_parser
 

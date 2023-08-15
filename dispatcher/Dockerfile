@@ -56,3 +56,5 @@ ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 COPY dispatcher/entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]
+HEALTHCHECK --start-period=60s --interval=30s --retries=1 \
+    CMD curl --fail http://localhost/fbrat/ap-afc/healthy || exit 1

@@ -13,6 +13,7 @@ Provides HTTP server for file exchange between Celery clients and workers.
 import os
 import logging
 import shutil
+import socket
 import abc
 import waitress
 from posix_ipc import Semaphore, O_CREAT
@@ -225,6 +226,16 @@ def head(path):
     except Exception as e:
         objst_app.logger.error(e)
         return abort(500)
+
+
+@objst_app.route('/healthy', methods=['GET'])
+def healthcheck():
+    ''' Get method for healthcheck. '''
+    msg = 'The objst is healthy'
+    objst_app.logger.debug(f"{msg}."
+                           f" own ip: {socket.gethostbyname(socket.gethostname())}"
+                           f" from: {request.remote_addr}")
+    return make_response(msg, 200)
 
 
 @objst_app.route('/'+'<path:path>', methods=['GET'])  # handle URL with filename

@@ -9,5 +9,5 @@ RUN /devel.sh
 #
 ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["rabbitmq-server"]
-HEALTHCHECK --start-period=20s --interval=10s --timeout=5s --retries=3 \
-    CMD rabbitmq-diagnostics -q check_running && rabbitmq-diagnostics -q check_local_alarms || exit 1
+HEALTHCHECK --start-period=60s --interval=20s --timeout=5s --retries=3 \
+    CMD rabbitmq-diagnostics -q check_port_connectivity || exit 1

@@ -626,7 +626,8 @@ chown 999:999 /var/databases/pgdata
 |AFC_OBJST_WORKERS|`10`|objst|number of gunicorn workers running objst server|
 |AFC_OBJST_HIST_WORKERS|`2`|objst|number of gunicorn workers runnining history server|
 | **MSGHND settings**||||
-|AFC_MSGHND_BIND|`0.0.0.0:8000`|msghnd| the socket to bind. a string of the form: <host>:<port>|
+|AFC_MSGHND_BIND|`0.0.0.0`|msghnd| the socket to bind. a string of the form: <host>|
+|AFC_MSGHND_PORT|`8000`|msghnd| the port to use in bind. a string of the form: <port>|
 |AFC_MSGHND_PID|`/run/gunicorn/openafc_app.pid`|msghnd| a filename to use for the PID file|
 |AFC_MSGHND_WORKERS|`20`|msghnd| the number of worker processes for handling requests|
 |AFC_MSGHND_TIMEOUT|`180`|msghnd| workers silent for more than this many seconds are killed and restarted|

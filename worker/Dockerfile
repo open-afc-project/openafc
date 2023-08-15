@@ -75,3 +75,5 @@ WORKDIR /wd
 ENV PGPORT=5432
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 CMD ["/docker-entrypoint.sh"]
+HEALTHCHECK --interval=20s --timeout=3s --retries=3 \
+    CMD celery -A afc_worker inspect ping > /dev/null 2>&1 || exit 1

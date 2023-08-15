@@ -1,6 +1,6 @@
 # This Python file uses the following encoding: utf-8
 #
-# Portions copyright © 2022 Broadcom. All rights reserved.
+# Portions copyright (C) 2022 Broadcom. All rights reserved.
 # The term "Broadcom" refers solely to the Broadcom Inc. corporate
 # affiliate that owns the software below.
 # This work is licensed under the OpenAFC Project License, a copy
@@ -160,10 +160,45 @@ class OIDCConfigurator(object):
                     self.OIDC_CLIENT_ID=data['OIDC_CLIENT_ID']
                     self.OIDC_DISCOVERY_URL=data['OIDC_DISCOVERY_URL']
 
+
 class MsghndConfigurator(object):
     """Keep configuration for msghnd"""
+    CFG_OPT_IDX_NAME = 0
+    CFG_OPT_IDX_PORT = 1
+    CFG_OPT_IDX_BIND = 2
+    CFG_OPT_IDX_PID = 3
+    CFG_OPT_IDX_ACC_LOG = 4
+    CFG_OPT_IDX_ERR_LOG = 5
+    CFG_OPT_IDX_WORKERS = 6
+    CFG_OPT_IDX_TIMEOUT = 7
+    CFG_OPT_IDX_RATAFC_TOUT = 8
 
-    def __init__(self) -> None:
-        # msghnd task RatAfc timeout
-        # the default value predefined by image environment (Dockefile)
-        self.AFC_MSGHND_RATAFC_TOUT = int(os.getenv("AFC_MSGHND_RATAFC_TOUT"))
+    CFG_OPT_IGNR_ALL = 0xffff
+
+    CFG_OPT_ONLY_PORT = (CFG_OPT_IGNR_ALL & ~(1<<CFG_OPT_IDX_PORT))
+    CFG_OPT_NAME_PORT = (CFG_OPT_ONLY_PORT & ~(1<<CFG_OPT_IDX_NAME))
+    CFG_OPT_ONLY_RATAFC_TOUT = (CFG_OPT_IGNR_ALL & ~(1<<CFG_OPT_IDX_RATAFC_TOUT))
+
+    # comlete list of msghnd configuration parameters
+    cfg_opt_lst = [
+        "AFC_MSGHND_NAME",
+        "AFC_MSGHND_PORT",
+        "AFC_MSGHND_BIND",
+        "AFC_MSGHND_PID",
+        "AFC_MSGHND_ACCESS_LOG",
+        "AFC_MSGHND_ERROR_LOG",
+        "AFC_MSGHND_WORKERS",
+        "AFC_MSGHND_TIMEOUT",
+        "AFC_MSGHND_RATAFC_TOUT",
+    ]
+
+    # the parameter maps which configuration to ignore
+    def __init__(self, ignore_map=~CFG_OPT_IGNR_ALL) -> None:
+        self.CFG_OPT_MAX_SIZE = len(MsghndConfigurator.cfg_opt_lst)
+
+        # get environment variables according to ignore map
+        for i in range(self.CFG_OPT_MAX_SIZE):
+            if not (1<<i & ignore_map):
+                setattr(self, MsghndConfigurator.cfg_opt_lst[i],
+                        os.getenv(MsghndConfigurator.cfg_opt_lst[i]))
+
