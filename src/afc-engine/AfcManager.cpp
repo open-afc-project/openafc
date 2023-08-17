@@ -10971,7 +10971,11 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	_wlanMinFreq = _wlanMinFreqMHz*1.0e6;
 	_wlanMaxFreq = _wlanMaxFreqMHz*1.0e6;
 
-	_lidarDir = SearchPaths::forReading("data", "rat_transfer/proc_lidar_2019", true);
+	if (_useLiDAR) {
+		_lidarDir = SearchPaths::forReading("data",
+                                                    "rat_transfer/proc_lidar_2019",
+                                                    true);
+	}
 
 	_globeDir = SearchPaths::forReading("data", "rat_transfer/globe", true);
 

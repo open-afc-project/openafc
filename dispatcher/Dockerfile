@@ -4,7 +4,7 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
-FROM nginx:1.22-alpine
+FROM nginx:1.24.0-alpine
 ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3 \
     && ln -sf python3 /usr/bin/python \
