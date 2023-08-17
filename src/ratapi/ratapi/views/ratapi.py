@@ -36,6 +36,7 @@ from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from afcmodels.aaa import User, AccessPointDeny, AFCConfig, MTLS
 from afcmodels.base import db
 from .auth import auth
+from appcfg import ObjstConfig
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
