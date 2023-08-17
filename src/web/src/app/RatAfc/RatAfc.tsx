@@ -289,7 +289,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
      * make a request to AFC Engine
      * @param request request to send
      */
-    private sendRequest = (request: AvailableSpectrumInquiryRequest) => {
+    private sendRequest = async (request: AvailableSpectrumInquiryRequest) => {
         // make api call
         this.setState({ status: "Info" });
         const rlanLoc = this.getLatLongFromRequest(request);
@@ -297,8 +297,8 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
             mapCenter: rlanLoc,
             clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng }
         });
-        return spectrumInquiryRequest(request)
-            .then(resp => this.processResponse(resp, request, rlanLoc));
+        const resp = await spectrumInquiryRequest(request);
+        return this.processResponse(resp, request, rlanLoc);
     }
 
     private getLatLongFromRequest(request: AvailableSpectrumInquiryRequest): { lat: number, lng: number } | undefined {

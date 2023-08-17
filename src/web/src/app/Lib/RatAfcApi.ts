@@ -12,39 +12,37 @@ import { guiConfig, getDefaultAfcConf, getCSRF } from "./RatApi";
  * Call RAT AFC resource
  */
 export const spectrumInquiryRequest = async (request: AvailableSpectrumInquiryRequest): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> => {
-    let csrf_token = await(getCSRF());
+    let csrf_token = await (getCSRF());
 
-    return (fetch(guiConfig.rat_afc + "?debug=True&gui=True", {
+    let resp = await fetch(guiConfig.rat_afc + "?debug=True&gui=True", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
             'X-CSRF-Token': csrf_token,
         },
         body: JSON.stringify({ version: "1.4", availableSpectrumInquiryRequests: [request] })
-    })
-        .then(async resp => {
-            if (resp.status == 200) {
-                const data = (await resp.json()) as AvailableSpectrumInquiryResponseMessage;
-                // Get the first response until API can handle multiple requests
-                const response = data.availableSpectrumInquiryResponses[0];
-                if (response.response.responseCode == 0) {
-                    return success(data);
-                } else {
-                    return error(response.response.shortDescription, response.response.responseCode, response);
-                }
-            } else {
-                return error(resp.statusText, resp.status, resp);
-            }
-        })
-        .catch(e => {
-            return error("encountered an error when running request", undefined, e);
-        }))
+    });
+
+    if (resp.status == 200) {
+        const data = await resp.json() as AvailableSpectrumInquiryResponseMessage;
+        // Get the first response until API can handle multiple requests
+        const response = data.availableSpectrumInquiryResponses[0];
+        if (response.response.responseCode == 0) {
+            return success(data);
+        } else {
+            return error(response.response.shortDescription, response.response.responseCode, response);
+        }
+
+    } else {
+        return error(resp.statusText, resp.status, resp);
+    }
 }
 
 
+
 export const spectrumInquiryRequestByString = async (version: string, requestAsJsonString: string): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> => {
-    let csrf_token = await(getCSRF());
-    return (fetch(guiConfig.rat_afc + "?debug=True&gui=True", {
+    let csrf_token = await (getCSRF());
+    let resp = await fetch(guiConfig.rat_afc + "?debug=True&gui=True", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -52,23 +50,18 @@ export const spectrumInquiryRequestByString = async (version: string, requestAsJ
         },
         body: JSON.stringify({ version: version, availableSpectrumInquiryRequests: [JSON.parse(requestAsJsonString)] })
     })
-        .then(async resp => {
-            if (resp.status == 200) {
-                const data = (await resp.json()) as AvailableSpectrumInquiryResponseMessage;
-                // Get the first response until API can handle multiple requests
-                const response = data.availableSpectrumInquiryResponses[0];
-                if (response.response.responseCode == 0) {
-                    return success(data);
-                } else {
-                    return error(response.response.shortDescription, response.response.responseCode, response);
-                }
-            } else {
-                return error(resp.statusText, resp.status, resp);
-            }
-        })
-        .catch(e => {
-            return error("encountered an error when running request", undefined, e);
-        }));
+    if (resp.status == 200) {
+        const data = (await resp.json()) as AvailableSpectrumInquiryResponseMessage;
+        // Get the first response until API can handle multiple requests
+        const response = data.availableSpectrumInquiryResponses[0];
+        if (response.response.responseCode == 0) {
+            return success(data);
+        } else {
+            return error(response.response.shortDescription, response.response.responseCode, response);
+        }
+    } else {
+        return error(resp.statusText, resp.status, resp);
+    }
 }
 
 
