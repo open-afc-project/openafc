@@ -155,7 +155,7 @@ export interface UserUpload {
     value: string
 }
 
-export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FCC6GHz | CustomPropagation | IsedDbs06 | BrazilPropModel; 
+export type PropagationModel = FSPL | Win2ItmDb | Win2ItmClutter | RayTrace | FCC6GHz | CustomPropagation | IsedDbs06 | BrazilPropModel | OfcomPropModel; 
 
 export type BuildingSourceValues =  "B-Design3D" | "LiDAR" | "None" | "Canada DSM (2000)"
 
@@ -234,6 +234,24 @@ export interface BrazilPropModel {
     winner2HgtFlag: boolean,
     winner2HgtLOS: number
 }
+
+export interface OfcomPropModel {
+    kind: "Ofcom Propagation Model",
+    win2ConfidenceCombined: number,
+    win2ConfidenceLOS?:number,
+    win2ConfidenceNLOS?:number,
+    itmConfidence: number,
+    itmReliability: number,
+    p2108Confidence: number,
+    buildingSource: BuildingSourceValues,
+    terrainSource: "SRTM (30m)"
+    winner2LOSOption: 'UNKNOWN' | 'BLDG_DATA_REQ_TX',
+    win2UseGroundDistance: boolean,
+    fsplUseGroundDistance: boolean,
+    winner2HgtFlag: boolean,
+    winner2HgtLOS: number
+}
+
 
 
 export type CustomPropagationLOSOptions =  'UNKNOWN' | 'FORCE_LOS' | 'FORCE_NLOS' | 'BLDG_DATA_REQ_TX'

@@ -29,13 +29,13 @@ export var guiConfig: GuiConfig = Object.freeze({
     login_url: "",
     admin_url: "",
     ap_deny_admin_url: "",
-    dr_admin_url:"",
+    dr_admin_url: "",
     lidar_bounds: "",
     ras_bounds: "",
     rat_afc: "",
     afcconfig_trial: "",
     afc_kml: "",
-    mtls_admin_url:"",
+    mtls_admin_url: "",
     version: "API NOT LOADED"
 });
 
@@ -146,12 +146,12 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "reportErrorRlanHeightLowFlag": false,
     "nearFieldAdjFlag": true,
     "deniedRegionFile": "",
-    "indoorFixedHeightAMSL":false,
+    "indoorFixedHeightAMSL": false,
     "reportUnavailableSpectrum": true,
     "reportUnavailPSDdBPerMHz": -40,
-    "inquiredFrequencyResolutionMHz": 20, 
-    "srtmDir":"rat_transfer/srtm3arcsecondv003",
-    "depDir":"rat_transfer/3dep/1_arcsec",
+    "inquiredFrequencyResolutionMHz": 20,
+    "srtmDir": "rat_transfer/srtm3arcsecondv003",
+    "depDir": "rat_transfer/3dep/1_arcsec",
     "roundPSDEIRPFlag": false,
 });
 
@@ -243,13 +243,13 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "reportErrorRlanHeightLowFlag": false,
     "nearFieldAdjFlag": false,
     "deniedRegionFile": "",
-    "indoorFixedHeightAMSL":false,
+    "indoorFixedHeightAMSL": false,
     "reportUnavailableSpectrum": false,
     "reportUnavailPSDdBPerMHz": -40,
-    "inquiredFrequencyResolutionMHz": 20, 
-    "srtmDir":"rat_transfer/srtm3arcsecondv003",
-    "depDir":"rat_transfer/3dep/1_arcsec_wgs84",
-    "cdsmDir":"rat_transfer/cdsm/3ov4_arcsec_wgs84",
+    "inquiredFrequencyResolutionMHz": 20,
+    "srtmDir": "rat_transfer/srtm3arcsecondv003",
+    "depDir": "rat_transfer/3dep/1_arcsec_wgs84",
+    "cdsmDir": "rat_transfer/cdsm/3ov4_arcsec_wgs84",
     "cdsmLOSThr": 0.5,
     "roundPSDEIRPFlag": false,
 });
@@ -340,12 +340,106 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     "reportErrorRlanHeightLowFlag": false,
     "nearFieldAdjFlag": false,
     "deniedRegionFile": "",
-    "indoorFixedHeightAMSL":false,
+    "indoorFixedHeightAMSL": false,
     "reportUnavailableSpectrum": true,
     "reportUnavailPSDdBPerMHz": -40,
     "inquiredFrequencyResolutionMHz": 20,
-    "srtmDir":"rat_transfer/srtm1arcsecond_wgs84",
+    "srtmDir": "rat_transfer/srtm1arcsecond_wgs84",
     "rainForestFile": "rat_transfer/population/Brazil_AmazonRainForest.kml",
+    "roundPSDEIRPFlag": false,
+});
+
+const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
+    "freqBands": [
+        {
+            "region": "GB",
+            "name": "United Kingdom",
+            "startFreqMHz": 5925,
+            "stopFreqMHz": 7125
+        },
+    ],
+    "ulsDefaultAntennaType": "F.699",
+    "scanPointBelowGroundMethod": "truncate",
+    "polarizationMismatchLoss": {
+        "kind": "Fixed Value",
+        "value": 3
+    },
+    "bodyLoss": {
+        "kind": "Fixed Value",
+        "valueIndoor": 0,
+        "valueOutdoor": 0
+    },
+    "buildingPenetrationLoss": {
+        "kind": "Fixed Value",
+        "value": 0
+    },
+    "receiverFeederLoss": {
+        "IDU": 3,
+        "ODU": 0,
+        "UNKNOWN": 3
+    },
+    "fsReceiverNoise": {
+        "freqList": [6425],
+        "noiseFloorList": [-110, -109.5]
+    },
+    "threshold": -6,
+    "maxLinkDistance": 130,
+    "maxEIRP": 36,
+    "minEIRP": 21,
+
+    "minPSD": 8,
+    "propagationModel": {
+        "kind": "Ofcom Propagation Model",
+        "win2ConfidenceCombined": 50,
+        "win2ConfidenceLOS": 50,
+        "winner2LOSOption": "BLDG_DATA_REQ_TX",
+        "win2UseGroundDistance": false,
+        "fsplUseGroundDistance": false,
+        "winner2HgtFlag": false,
+        "winner2HgtLOS": 15,
+        "itmConfidence": 50,
+        "itmReliability": 50,
+        "p2108Confidence": 50,
+        "buildingSource": "None",
+        "terrainSource": "SRTM (30m)"
+    },
+    "propagationEnv": "Population Density Map",
+    "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
+    "regionStr": "GB",
+    "APUncertainty": {
+        "points_per_degree": 3600,
+        "height": 5
+    },
+    "ITMParameters": {
+        "polarization": "Vertical",
+        "ground": "Average Ground",
+        "dielectricConst": 25,
+        "conductivity": 0.005,
+        "minSpacing": 30,
+        "maxPoints": 1500
+    },
+    "rlanITMTxClutterMethod": "FORCE_TRUE",
+    "clutterAtFS": false,
+    "fsClutterModel": {
+        "p2108Confidence": 5,
+        "maxFsAglHeight": 6
+    },
+    "nlcdFile": "",
+    "enableMapInVirtualAp": false,
+    "channelResponseAlgorithm": "pwr",
+    "visibilityThreshold": -6,
+    "version": guiConfig.version,
+    "allowScanPtsInUncReg": false,
+    "passiveRepeaterFlag": true,
+    "printSkippedLinksFlag": false,
+    "reportErrorRlanHeightLowFlag": false,
+    "nearFieldAdjFlag": false,
+    "deniedRegionFile": "",
+    "indoorFixedHeightAMSL": false,
+    "reportUnavailableSpectrum": true,
+    "reportUnavailPSDdBPerMHz": -40,
+    "inquiredFrequencyResolutionMHz": 20,
+    "srtmDir": "rat_transfer/srtm1arcsecond_wgs84",
     "roundPSDEIRPFlag": false,
 });
 
@@ -374,6 +468,12 @@ const defaultAllRegionFreqRanges: () => FreqRange[] = () => (
         {
             "region": "BR",
             "name": "Brazil",
+            "startFreqMHz": 5925,
+            "stopFreqMHz": 7125
+        },
+        {
+            "region": "GB",
+            "name": "United Kingdom",
             "startFreqMHz": 5925,
             "stopFreqMHz": 7125
         }
@@ -461,9 +561,11 @@ export const setAboutAfc = async (name: string, email: string, org:string, token
     let csrf_token = await(getCSRF());
     return (fetch(guiConfig.about_url, {
         method: "POST",
-        headers: { "Content-Type": "application/json", 
-            'X-CSRF-Token': csrf_token},
-        body: JSON.stringify({name:name, email:email, org:org, token:token}, undefined, 3)
+        headers: {
+            "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token
+        },
+        body: JSON.stringify({ name: name, email: email, org: org, token: token }, undefined, 3)
     }).then(res => {
         if (res.status === 204) {
             return success("Access request submitted");
@@ -498,18 +600,23 @@ export const getRulesetIds = (): Promise<RatResponse<string[]>> => (
  * @returns The default AFC Configuration
  */
 export const getDefaultAfcConf = (x: string | undefined) => {
-    if (!!x && (x.startsWith("TEST_") || x.startsWith("DEMO_"))){
-        let testOrDemo:AFCConfigFile = getDefaultAfcConf(x.substring(5));
+    if (!!x && (x.startsWith("TEST_") || x.startsWith("DEMO_"))) {
+        let testOrDemo: AFCConfigFile = getDefaultAfcConf(x.substring(5));
         testOrDemo.regionStr = x;
         return testOrDemo;
-    } 
-    if (x == "CA") {
-        return defaultAfcConfCanada();
-    }else if(x == "BR"){
-        return defaultAfcConfBrazil();
-    } else {
-        return defaultAfcConf();
     }
+    switch (x) {
+        case 'CA':
+            return defaultAfcConfCanada();
+        case "BR":
+            return defaultAfcConfBrazil();
+        case 'GB':
+            return defaultAfcConfUnitedKingdom();
+        case 'US':
+        default:
+            return defaultAfcConf();
+    }
+
 }
 
 /**
@@ -542,11 +649,13 @@ export const getAfcConfigFile = (region: string): Promise<RatResponse<AFCConfigF
  * @returns success message or error
  */
 export const putAfcConfigFile = async (conf: AFCConfigFile): Promise<RatResponse<string>> => {
-    let csrf_token = await(getCSRF());
+    let csrf_token = await (getCSRF());
     return (fetch(guiConfig.afcconfig_defaults.replace("default", conf.regionStr ?? "US"), {
         method: "PUT",
-        headers: { "Content-Type": "application/json",
-            'X-CSRF-Token': csrf_token},
+        headers: {
+            "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token
+        },
         body: JSON.stringify(conf, undefined, 3)
     }).then(res => {
         if (res.status === 204) {
@@ -600,8 +709,10 @@ export const updateAllAllowedRanges = async (allRanges: FreqRange[]) => {
     let csrf_token = await(getCSRF());
     return (fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
         method: "PUT",
-        headers: { "Content-Type": "application/json",
-            'X-CSRF-Token': csrf_token},
+        headers: {
+            "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token
+        },
         body: JSON.stringify(allRanges)
     }).then(res => {
         if (res.status === 204) {
@@ -625,14 +736,16 @@ export const updateAllowedRanges = async (regionStr: string, conf: FreqRange[]) 
         } else {
             allRanges = defaultAllRegionFreqRanges();
         }
-        let updated = allRanges.filter((s)=> s.region != regionStr).concat(conf);
+        let updated = allRanges.filter((s) => s.region != regionStr).concat(conf);
         Promise.resolve(updated);
     }).then(async (newData) => {
         let csrf_token = await(getCSRF());
         return (fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
             method: "PUT",
-            headers: { "Content-Type": "application/json",
-            'X-CSRF-Token': csrf_token},
+            headers: {
+                "Content-Type": "application/json",
+                'X-CSRF-Token': csrf_token
+            },
             body: JSON.stringify(newData)
         }).then(res => {
             if (res.status === 204) {
@@ -751,8 +864,10 @@ export const phase1Analysis = async (params: PAWSRequest, isCanceled?: () => boo
     let csrf_token = await(getCSRF());
     return (fetch(guiConfig.rat_api_analysis.replace("p_request_type", "PointAnalysis"), {
         method: "POST",
-        headers: { "Content-Type": "application/json",
-            'X-CSRF-Token': csrf_token},
+        headers: {
+            "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token
+        },
         body: JSON.stringify(params)
     }).then(analysisContinuation<AnalysisResults>(isCanceled, status, setKml))
         .catch(
@@ -774,8 +889,10 @@ export const runExclusionZone = async (params: ExclusionZoneRequest, isCanceled?
     let csrf_token = await(getCSRF());
     return (fetch(guiConfig.rat_api_analysis.replace("p_request_type", "ExclusionZoneAnalysis"), {
         method: "POST",
-        headers: { "Content-Type": "application/json",
-            'X-CSRF-Token': csrf_token},
+        headers: {
+            "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token
+        },
         body: JSON.stringify(params)
     })
         .then(analysisContinuation<ExclusionZoneResult>(isCanceled, status, setKml))
@@ -796,8 +913,10 @@ export const runHeatMap = async (params: HeatMapRequest, isCanceled?: () => bool
     let csrf_token = await(getCSRF());
     return (fetch(guiConfig.rat_api_analysis.replace("p_request_type", "HeatmapAnalysis"), {
         method: "POST",
-        headers: { "Content-Type": "application/json",
-            'X-CSRF-Token': csrf_token},
+        headers: {
+            "Content-Type": "application/json",
+            'X-CSRF-Token': csrf_token
+        },
         body: JSON.stringify(params)
     })
         .then(analysisContinuation<HeatMapResult>(isCanceled, status))
@@ -816,7 +935,7 @@ export const ulsFileConvert = async (fileName: string): Promise<RatResponse<{ in
     let csrf_token = await(getCSRF());
     return (fetch(guiConfig.uls_convert_url.replace("p_uls_file", fileName), {
         method: "POST",
-        headers: { 'X-CSRF-Token': csrf_token},
+        headers: { 'X-CSRF-Token': csrf_token },
     }).then(
         async res => {
             if (res.ok) {
@@ -914,13 +1033,13 @@ export const importCache = (s: { [k: string]: any }) =>
  */
 export const clearCache = (): void => Object.keys(applicationCache).forEach(key => delete applicationCache[key]);
 
-export const getCSRF = ():Promise<string> => (
+export const getCSRF = (): Promise<string> => (
     fetch(guiConfig.about_csrf, {
         method: "GET",
-    }).then(async (res)=> {
+    }).then(async (res) => {
         if (res.ok) {
             const el = document.createElement('html');
-            el.innerHTML = await(res.text());
+            el.innerHTML = await (res.text());
             const inp = el.getElementsByTagName("input");
             const len = inp.length;
             for (let i = 0; i < len; i++) {
@@ -929,9 +1048,10 @@ export const getCSRF = ():Promise<string> => (
                 }
             }
         } else {
-           console.log(res.statusText, res.status);
-           return ("");
-        }})
+            console.log(res.statusText, res.status);
+            return ("");
+        }
+    })
         .catch(e => {
             console.log("encountered an error when fetching csrf", undefined, e);
             return ("");

@@ -187,6 +187,9 @@ export const mapRegionCodeToName = (code: string) => {
         case 'BR':
             return 'Brazil';
             break;
+        case 'GB':
+            return 'United Kingdom';
+            break;
         default:
             return code;
     }
