@@ -371,7 +371,7 @@ const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
     },
     "buildingPenetrationLoss": {
         "kind": "Fixed Value",
-        "value": 0
+        "value": 20.5
     },
     "receiverFeederLoss": {
         "IDU": 3,
@@ -403,7 +403,7 @@ const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
         "buildingSource": "None",
         "terrainSource": "SRTM (30m)"
     },
-    "propagationEnv": "Population Density Map",
+    "propagationEnv": "NLCD Point",
     "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
     "regionStr": "GB",
     "APUncertainty": {

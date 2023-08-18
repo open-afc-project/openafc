@@ -539,7 +539,8 @@ export class AFCFormUSACanada extends React.Component<
             {(this.props.config.propagationModel.kind === "ITM with no building data"
                 || this.props.config.propagationModel.kind == "FCC 6GHz Report & Order"
                 || this.props.config.propagationModel.kind == "ISED DBS-06"
-                || this.props.config.propagationModel.kind == "Brazilian Propagation Model") &&
+                || this.props.config.propagationModel.kind == "Brazilian Propagation Model"
+                || this.props.config.propagationModel.kind == "Ofcom Propagation Model") &&
                 <GalleryItem>
                     <FormGroup
                         label="AP Propagation Environment"
