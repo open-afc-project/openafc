@@ -10953,6 +10953,7 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	/**************************************************************************************/
 
 	_minRlanHeightAboveTerrain = 1.5;
+	RlanRegionClass::minRlanHeightAboveTerrain = _minRlanHeightAboveTerrain;
 
 	_maxRadius = 150.0e3;
 	_exclusionDist = 1.0;
