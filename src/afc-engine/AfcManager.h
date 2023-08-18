@@ -370,6 +370,7 @@ class AfcManager
 		double _heatmapRLANOutdoorHeightUncertainty; // RLAN Outdoor Height Uncertainty (m) to use for Heatmap Analysis
 
 		bool _applyClutterFSRxFlag;
+		bool _allowRuralFSClutterFlag;
 		double _fsConfidenceClutter2108;
 		double _maxFsAglHeight;
 
