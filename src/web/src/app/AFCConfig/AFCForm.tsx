@@ -82,7 +82,7 @@ export class AFCForm extends React.Component<
 
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => {
-       // this.setState({ config: Object.assign(this.state.config, { regionStr: n }) });
+        // this.setState({ config: Object.assign(this.state.config, { regionStr: n }) });
         // region changed by user, reload the coresponding configuration for that region
         getAfcConfigFile(n).then(
             res => {
@@ -185,6 +185,14 @@ export class AFCForm extends React.Component<
                 if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
                 if (propModel.win2ConfidenceCombined! < 0 || propModel.win2ConfidenceCombined! > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
+                break;
+            case "Ofcom Propagation Model":
+                if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
+                if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
+                if (propModel.win2ConfidenceCombined < 0 || propModel.win2ConfidenceCombined > 100) return err();
+                if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
+                if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
+                if (propModel.terrainSource != "SRTM (30m)") return err("Invalid terrain source.");
                 break;
             default:
                 return err();
