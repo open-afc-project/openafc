@@ -424,7 +424,7 @@ const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
         "p2108Confidence": 5,
         "maxFsAglHeight": 6
     },
-    "nlcdFile": "",
+    "nlcdFile": "rat_transfer/nlcd/eu/U2018_CLC2012_V2020_20u1_resampled.tif",
     "enableMapInVirtualAp": false,
     "channelResponseAlgorithm": "pwr",
     "visibilityThreshold": -6,
