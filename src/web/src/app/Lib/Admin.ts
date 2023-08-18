@@ -46,7 +46,7 @@ export const getMinimumEIRP = () =>
  */
 export const setMinimumEIRP = async (limit: number | boolean) => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.admin_url.replace("-1", "eirp_min"), {
+    return (fetch(guiConfig.admin_url.replace("-1", "eirp_min"), {
         method: "PUT",
         headers: { "Content-Type": "application/json",
             'X-CSRF-Token': csrf_token},
@@ -59,7 +59,7 @@ export const setMinimumEIRP = async (limit: number | boolean) => {
                 return error(res.statusText, res.status, res);
             }
         })
-        .catch(err => error("An error was encountered #1", undefined, err));
+        .catch(err => error("An error was encountered #1", undefined, err)));
 }
 
 /**
@@ -104,7 +104,7 @@ export const getUser = (id: number) =>
  */
 export const updateUser = async (user: { email: string, password: string, id: number, active: boolean }) => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.admin_url.replace("-1", String(user.id)), {
+    return (fetch(guiConfig.admin_url.replace("-1", String(user.id)), {
         method: "POST",
         body: JSON.stringify(Object.assign(user, { setProps: true })),
         headers: { "Content-Type": "application/json",
@@ -112,7 +112,7 @@ export const updateUser = async (user: { email: string, password: string, id: nu
     }).then(res =>
         res.ok ?
             success(res.statusText) :
-            error(res.statusText, res.status, res));
+            error(res.statusText, res.status, res)));
 }
 
 /**
@@ -122,7 +122,7 @@ export const updateUser = async (user: { email: string, password: string, id: nu
  */
 export const addUserRole = async (id: number, role: Role) => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.admin_url.replace("-1", String(id)), {
+    return (fetch(guiConfig.admin_url.replace("-1", String(id)), {
         method: "POST",
         body: JSON.stringify({ addRole: role }),
         headers: { "Content-Type": "application/json",
@@ -133,7 +133,7 @@ export const addUserRole = async (id: number, role: Role) => {
         } else {
             return error(res.statusText, res.status, res);
         }
-    }).catch(err => error("An error was encountered #2", undefined, err));
+    }).catch(err => error("An error was encountered #2", undefined, err)));
 }
 
 /**
@@ -143,7 +143,7 @@ export const addUserRole = async (id: number, role: Role) => {
  */
 export const removeUserRole = async (id: number, role: Role) => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.admin_url.replace("-1", id.toString()), {
+    return (fetch(guiConfig.admin_url.replace("-1", id.toString()), {
         method: "POST",
         body: JSON.stringify({ removeRole: role }),
         headers: { "Content-Type": "application/json",
@@ -154,7 +154,7 @@ export const removeUserRole = async (id: number, role: Role) => {
         } else {
             return error(res.statusText, res.status, res);
         }
-    }).catch(err => error("An error was encountered #3", undefined, err));
+    }).catch(err => error("An error was encountered #3", undefined, err)));
 }
 
 
@@ -164,7 +164,7 @@ export const removeUserRole = async (id: number, role: Role) => {
  */
 export const deleteUser = async (id: number) => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.admin_url.replace("-1", String(id)), {
+    return (fetch(guiConfig.admin_url.replace("-1", String(id)), {
         method: "DELETE",
         headers: {'X-CSRF-Token': csrf_token},
     }).then(res => {
@@ -173,7 +173,7 @@ export const deleteUser = async (id: number) => {
         } else {
             return error(res.statusText, res.status, res);
         }
-    }).catch(err => error("An error was encountered #4", undefined, err));
+    }).catch(err => error("An error was encountered #4", undefined, err)));
 }
 
 
@@ -203,9 +203,9 @@ export const getAccessPointsDeny = (userId?: number) =>
 export const addAccessPointDeny = async (ap: AccessPointModel, userId: number) => {
     let csrf_token = await(getCSRF());
 
-    fetch(guiConfig.ap_deny_admin_url.replace("-1", String(userId)), {
+    return (fetch(guiConfig.ap_deny_admin_url.replace("-1", String(userId)), {
         method: "PUT",
-        headers: { "Content-Type": "application/json", 
+        headers: { "Content-Type": "application/json",
              'X-CSRF-Token': csrf_token},
         body: JSON.stringify(ap)
     })
@@ -218,7 +218,7 @@ export const addAccessPointDeny = async (ap: AccessPointModel, userId: number) =
             return error(res.statusText, res.status, res);
         }
     })
-    .catch(err => error("An error was encountered #9", undefined, err));
+    .catch(err => error("An error was encountered #9", undefined, err)));
 }
 
 /**
@@ -228,7 +228,7 @@ export const addAccessPointDeny = async (ap: AccessPointModel, userId: number) =
  */
 export const putAccessPointDenyList = async (ap: AccessPointListModel, userId: number) => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.ap_deny_admin_url.replace("-1", String(userId)), {
+    return (fetch(guiConfig.ap_deny_admin_url.replace("-1", String(userId)), {
         method: "POST",
         headers: { "Content-Type": "application/json",
             'X-CSRF-Token': csrf_token},
@@ -243,7 +243,7 @@ export const putAccessPointDenyList = async (ap: AccessPointListModel, userId: n
             return error(res.statusText, res.status, res);
         }
     })
-    .catch(err => error("An error was encountered #10", undefined, err));
+    .catch(err => error("An error was encountered #10", undefined, err)));
 }
 
 /**
@@ -253,7 +253,7 @@ export const putAccessPointDenyList = async (ap: AccessPointListModel, userId: n
  */
 export const addMTLS = async (mtls: MTLSModel, userId: number) => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.mtls_admin_url.replace("-1", String(userId)), {
+    return (fetch(guiConfig.mtls_admin_url.replace("-1", String(userId)), {
         method: "POST",
         headers: { "Content-Type": "application/json",
             'X-CSRF-Token': csrf_token},
@@ -268,7 +268,7 @@ export const addMTLS = async (mtls: MTLSModel, userId: number) => {
                 return error(res.statusText, res.status, res);
             }
         })
-        .catch(err => error("An error was encountered #11", undefined, err));
+        .catch(err => error("An error was encountered #11", undefined, err)));
 }
 
 
@@ -279,7 +279,7 @@ export const addMTLS = async (mtls: MTLSModel, userId: number) => {
 export const deleteMTLSCert = async (id: number) => {
     // here the id in the url is the mtls id, not the user id
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.mtls_admin_url.replace("-1", String(id)), {
+    return (fetch(guiConfig.mtls_admin_url.replace("-1", String(id)), {
         method: "DELETE",
         headers: {'X-CSRF-Token': csrf_token},
     })
@@ -290,7 +290,7 @@ export const deleteMTLSCert = async (id: number) => {
                 return error(res.statusText, res.status, res);
             }
         })
-        .catch(err => error("An error was encountered #12", undefined, err));
+        .catch(err => error("An error was encountered #12", undefined, err)));
 }
 
 /**

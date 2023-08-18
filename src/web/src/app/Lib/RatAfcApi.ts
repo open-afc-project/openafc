@@ -14,7 +14,7 @@ import { guiConfig, getDefaultAfcConf, getCSRF } from "./RatApi";
 export const spectrumInquiryRequest = async (request: AvailableSpectrumInquiryRequest): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> => {
     let csrf_token = await(getCSRF());
 
-    fetch(guiConfig.rat_afc + "?debug=True&gui=True", {
+    return (fetch(guiConfig.rat_afc + "?debug=True&gui=True", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -38,13 +38,13 @@ export const spectrumInquiryRequest = async (request: AvailableSpectrumInquiryRe
         })
         .catch(e => {
             return error("encountered an error when running request", undefined, e);
-        })
+        }))
 }
 
 
 export const spectrumInquiryRequestByString = async (version: string, requestAsJsonString: string): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.rat_afc + "?debug=True&gui=True", {
+    return (fetch(guiConfig.rat_afc + "?debug=True&gui=True", {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -68,7 +68,7 @@ export const spectrumInquiryRequestByString = async (version: string, requestAsJ
         })
         .catch(e => {
             return error("encountered an error when running request", undefined, e);
-        })
+        }));
 }
 
 

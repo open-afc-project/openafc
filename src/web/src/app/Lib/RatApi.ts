@@ -459,7 +459,7 @@ export const getAboutAfc = (): Promise<RatResponse<string>> => (
 
 export const setAboutAfc = async (name: string, email: string, org:string, token:string ): Promise<RatResponse<string>> => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.about_url, {
+    return (fetch(guiConfig.about_url, {
         method: "POST",
         headers: { "Content-Type": "application/json", 
             'X-CSRF-Token': csrf_token},
@@ -474,7 +474,7 @@ export const setAboutAfc = async (name: string, email: string, org:string, token
     }).catch(err => {
         logger.error(err);
         return error("Unable to submit access request");
-    })
+    }))
 }
 
 /**
@@ -598,7 +598,7 @@ export const getAllowedRanges = () =>
 // Update all the frequency ranges to a new set
 export const updateAllAllowedRanges = async (allRanges: FreqRange[]) => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
+    return (fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
         method: "PUT",
         headers: { "Content-Type": "application/json",
             'X-CSRF-Token': csrf_token},
@@ -613,7 +613,7 @@ export const updateAllAllowedRanges = async (allRanges: FreqRange[]) => {
     }).catch(err => {
         logger.error(err);
         return error("Unable to update frequency ranges.");
-    })
+    }))
 };
 
 //Update all the ranges for a single region
@@ -629,7 +629,7 @@ export const updateAllowedRanges = async (regionStr: string, conf: FreqRange[]) 
         Promise.resolve(updated);
     }).then(async (newData) => {
         let csrf_token = await(getCSRF());
-        fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
+        return (fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
             method: "PUT",
             headers: { "Content-Type": "application/json",
             'X-CSRF-Token': csrf_token},
@@ -644,7 +644,7 @@ export const updateAllowedRanges = async (regionStr: string, conf: FreqRange[]) 
         }).catch(err => {
             logger.error(err);
             return error("Unable to update frequency ranges.");
-        })
+        }))
     })
 );
 
@@ -749,7 +749,7 @@ function analysisContinuation<T>(isCanceled?: () => boolean, status?: (progress:
  */
 export const phase1Analysis = async (params: PAWSRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<AnalysisResults>> => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.rat_api_analysis.replace("p_request_type", "PointAnalysis"), {
+    return (fetch(guiConfig.rat_api_analysis.replace("p_request_type", "PointAnalysis"), {
         method: "POST",
         headers: { "Content-Type": "application/json",
             'X-CSRF-Token': csrf_token},
@@ -759,7 +759,7 @@ export const phase1Analysis = async (params: PAWSRequest, isCanceled?: () => boo
             err => {
                 logger.error(err);
                 return error("Your request was unable to be processed", undefined, err);
-            })
+            }))
 }
 
 /**
@@ -772,7 +772,7 @@ export const phase1Analysis = async (params: PAWSRequest, isCanceled?: () => boo
  */
 export const runExclusionZone = async (params: ExclusionZoneRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<ExclusionZoneResult>> => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.rat_api_analysis.replace("p_request_type", "ExclusionZoneAnalysis"), {
+    return (fetch(guiConfig.rat_api_analysis.replace("p_request_type", "ExclusionZoneAnalysis"), {
         method: "POST",
         headers: { "Content-Type": "application/json",
             'X-CSRF-Token': csrf_token},
@@ -782,7 +782,7 @@ export const runExclusionZone = async (params: ExclusionZoneRequest, isCanceled?
         .catch(err => {
             logger.error(err);
             return error("Your request was unable to be processed", undefined, err);
-        });
+        }));
 }
 
 /**
@@ -794,7 +794,7 @@ export const runExclusionZone = async (params: ExclusionZoneRequest, isCanceled?
  */
 export const runHeatMap = async (params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>> => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.rat_api_analysis.replace("p_request_type", "HeatmapAnalysis"), {
+    return (fetch(guiConfig.rat_api_analysis.replace("p_request_type", "HeatmapAnalysis"), {
         method: "POST",
         headers: { "Content-Type": "application/json",
             'X-CSRF-Token': csrf_token},
@@ -804,7 +804,7 @@ export const runHeatMap = async (params: HeatMapRequest, isCanceled?: () => bool
         .catch(err => {
             logger.error(err);
             return error("Your request was unable to be processed", undefined, err);
-        });
+        }));
 }
 
 /**
@@ -814,7 +814,7 @@ export const runHeatMap = async (params: HeatMapRequest, isCanceled?: () => bool
  */
 export const ulsFileConvert = async (fileName: string): Promise<RatResponse<{ invalidRows: number, errors: string[] }>> => {
     let csrf_token = await(getCSRF());
-    fetch(guiConfig.uls_convert_url.replace("p_uls_file", fileName), {
+    return (fetch(guiConfig.uls_convert_url.replace("p_uls_file", fileName), {
         method: "POST",
         headers: { 'X-CSRF-Token': csrf_token},
     }).then(
@@ -832,7 +832,7 @@ export const ulsFileConvert = async (fileName: string): Promise<RatResponse<{ in
             logger.error(err);
             return error("Your request was unable to be processed", undefined, err);
         }
-    )
+    ))
 }
 
 /**
