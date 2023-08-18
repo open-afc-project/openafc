@@ -8,6 +8,7 @@
 #define RLAN_REGION_H
 
 #include <string>
+#include <armadillo>
 #include "cconst.h"
 #include "AfcDefinitions.h"
 #include "Vector3.h"
