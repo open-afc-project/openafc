@@ -251,6 +251,7 @@ static const std::map<int, std::string> pathLossModelNames = {
 	{CConst::CustomPathLossModel, "CustomPathLossModel"},
 	{CConst::ISEDDBS06PathLossModel, "ISEDDBS06PathLossModel"},
 	{CConst::BrazilPathLossModel, "BrazilPathLossModel"},
+	{CConst::OfcomPathLossModel, "OfcomPathLossModel"},
 	{CConst::FSPLPathLossModel, "FSPLPathLossModel"}
 };
 static const std::map<int, std::string> propEnvNames = {
@@ -2575,7 +2576,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 	if (    (_pathLossModel == CConst::CustomPathLossModel)
 		|| (_pathLossModel == CConst::ISEDDBS06PathLossModel)
-		|| (_pathLossModel == CConst::BrazilPathLossModel) ) {
+		|| (_pathLossModel == CConst::BrazilPathLossModel)
+		|| (_pathLossModel == CConst::OfcomPathLossModel) ) {
 		_pathLossModel = CConst::FCC6GHzReportAndOrderPathLossModel;
 	}
 

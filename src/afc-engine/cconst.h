@@ -155,6 +155,7 @@ public:
 		CustomPathLossModel,
 		ISEDDBS06PathLossModel,
 		BrazilPathLossModel,
+		OfcomPathLossModel,
 		FSPLPathLossModel
 	};
 	/**************************************************************************************/

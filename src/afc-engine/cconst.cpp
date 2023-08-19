@@ -52,6 +52,7 @@ const StrTypeClass CConst::strPathLossModelList[] = {
 	{                CConst::CustomPathLossModel, "Custom"                      },
 	{             CConst::ISEDDBS06PathLossModel, "ISED DBS-06"                 },
 	{                CConst::BrazilPathLossModel, "Brazilian Propagation Model" },
+	{                 CConst::OfcomPathLossModel, "Ofcom Propagation Model"     },
 	{         CConst::CoalitionOpt6PathLossModel, "ITM with no building data"   },
 
 	{                                    -1,  (char *) 0                      }
