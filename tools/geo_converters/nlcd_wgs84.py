@@ -212,6 +212,7 @@ class TranslationContexts:
     # Translation of GDAL raster data types to struct data types
     _DATA_SIZES: Dict[int, str] = \
         {gdal.GDT_Byte: "B",
+         gdal.GDT_Int8: "b",
          gdal.GDT_Int16: "h",
          gdal.GDT_Int32: "i",
          gdal.GDT_UInt16: "H",
