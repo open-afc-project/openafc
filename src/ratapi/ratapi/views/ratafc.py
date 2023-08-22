@@ -43,7 +43,7 @@ from .auth import auth
 from .ratapi import build_task, rulesetIdToRegionStr
 from fst import DataIf
 import afctask
-from .. import als
+import als
 from afcmodels.base import db
 from flask_login import current_user
 from .auth import auth

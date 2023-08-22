@@ -20,7 +20,7 @@ from sqlalchemy import exc
 from fst import DataIf
 from afcmodels.base import db
 from afcmodels.aaa import User
-from . import als
+import als
 from rcache_models import RcacheClientSettings
 from rcache_client import ReqCacheClient
 

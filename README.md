@@ -260,9 +260,9 @@ docker build . -t rmq -f rabbitmq/Dockerfile
 
 docker build . -t dispatcher -f dispatcher/Dockerfile
 
-cd src/als && docker build . -t als_siphon   -f Dockerfile.siphon; cd ../
-cd src/als && docker build . -t als_kafka    -f Dockerfile.kafka; cd ../
-cd src/als && docker build . -t afc_postgres -f Dockerfile.postgres; cd ../
+cd als && docker build . -t als_siphon   -f Dockerfile.siphon; cd ../
+cd als && docker build . -t als_kafka    -f Dockerfile.kafka; cd ../
+cd bulk_postgres && docker build . -t bulk_postgres -f Dockerfile; cd ../
 ```
 
 ### celery worker prereq containers

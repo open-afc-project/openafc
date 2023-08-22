@@ -404,7 +404,7 @@ class AfcConfigFile(MethodView):
     def put(self, filename):
         ''' PUT method for afc config
         '''
-        from .. import als
+        import als
         from flask_login import current_user
 
         user_id = auth(roles=['Super'])

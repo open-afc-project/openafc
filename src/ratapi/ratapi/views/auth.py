@@ -20,7 +20,7 @@ import requests
 from afcmodels.base import db
 from afcmodels.aaa import User, Organization, Role
 from flask_login import current_user
-from .. import als
+import als
 
 OIDC_LOGIN=OIDCConfigurator().OIDC_LOGIN
 

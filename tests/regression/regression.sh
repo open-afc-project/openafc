@@ -158,9 +158,9 @@ build_dev_server() {
   docker_build_and_push ${wd}/rat_server/Dockerfile ${SRV}:${tag}  ${push} "${EXT_ARGS}"
 
   # build ALS-related images
-  cd ${wd}/src/als && docker_build_and_push Dockerfile.siphon ${ALS_SIPHON}:${tag} ${push} &
-  cd ${wd}/src/als && docker_build_and_push Dockerfile.kafka ${ALS_KAFKA}:${tag} ${push} &
-  cd ${wd}/src/als && docker_build_and_push Dockerfile.postgres ${BULK_POSTGRES}:${tag} ${push} &
+  cd ${wd}/als && docker_build_and_push Dockerfile.siphon ${ALS_SIPHON}:${tag} ${push} &
+  cd ${wd}/als && docker_build_and_push Dockerfile.kafka ${ALS_KAFKA}:${tag} ${push} &
+  cd ${wd}/bulk_postgres && docker_build_and_push Dockerfile ${BULK_POSTGRES}:${tag} ${push} &
   cd ${wd}
 
    # build cert db image
