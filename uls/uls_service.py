@@ -484,10 +484,13 @@ def main(argv: List[str]) -> None:
             afc_parallel=args.afc_parallel,
             regions=None if args.region is None else args.region.split(":"))
 
+    rcache_settings = \
+        RcacheClientSettings(
+            enabled=args.rcache_enabled and bool(args.rcache_url),
+            service_url=args.rcache_url)
+    rcache_settings.validate_for(rcache=True)
     rcache: Optional[ReqCacheClient] = \
-        ReqCacheClient(RcacheClientSettings(enabled=True,
-                                            service_url=args.rcache_url)) \
-        if args.rcache_enabled and args.rcache_url else None
+        ReqCacheClient(rcache_settings) if rcache_settings.enabled else None
 
     status_storage.write_milestone(StatusStorage.S.ServiceStart)
 

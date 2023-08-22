@@ -39,6 +39,9 @@ ENV RCACHE_PRECOMPUTE_QUOTA=10
 # responding
 # ENV RCACHE_CONFIG_RETRIEVAL_URL
 
+# Additional command line parameters for uvicorn
+ENV RCACHE_UVICORN_PARAMS=--no-access-log
+
 WORKDIR /wd
 
 RUN apk add --update --no-cache python3=~3.11 py3-sqlalchemy=~1.4 py3-pip \
@@ -55,6 +58,7 @@ RUN pip3 install  --root-user-action=ignore -r /wd/requirements.txt
 COPY rcache/rcache_app.py rcache/rcache_app.py rcache/rcache_db_async.py \
     rcache/rcache_service.py /wd/
 
-ENTRYPOINT uvicorn rcache_app:app --host 0.0.0.0 --port ${RCACHE_PORT}
+ENTRYPOINT uvicorn rcache_app:app --host 0.0.0.0 --port ${RCACHE_PORT} \
+    ${RCACHE_UVICORN_PARAMS}
 
 HEALTHCHECK CMD curl -f http://localhost:${RCACHE_PORT}/healthcheck || exit 1

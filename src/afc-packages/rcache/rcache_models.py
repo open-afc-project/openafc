@@ -111,10 +111,9 @@ class RcacheClientSettings(pydantic.BaseSettings):
             title="RabbitMQ AMQP DSN: amqp://[user[:password]]@host[:port]")
     update_on_send: bool = \
         pydantic.Field(
-            False,
+            True,
             title="True to update cache from worker (on sending response), "
-            "False to update cache on msghnd (on receiving response). Default "
-            "is, somehow, False, which delays AFC processing")
+            "False to update cache on msghnd (on receiving response)")
 
     @pydantic.root_validator(pre=True)
     def _remove_empty(cls, values: Dict[str, Any]) -> Dict[str, Any]:
@@ -123,6 +122,28 @@ class RcacheClientSettings(pydantic.BaseSettings):
             if values[key] == "":
                 del values[key]
         return values
+
+    def validate_for(self, db: bool = False, rmq: bool = False,
+                     rcache: bool = False) -> None:
+        """ Generates exception if Rcache is enabled, but parameter(s) for
+        some its required aspect are not set
+
+        Arguments:
+        db     -- Check parameters for Postgres DB connection
+        rmq    -- Check parameters for RabbitMQ connection
+        rcache -- Check parameters for Rcache service connection
+        """
+        if not self.enabled:
+            return
+        for predicate, attr in [(db, "postgres_dsn"), (rmq, "rmq_dsn"),
+                                (rcache, "service_url")]:
+            if (not predicate) or getattr(self, attr):
+                continue
+            raise ValueError(
+                f"RcacheClientSettings.{attr} Rcache client configuration "
+                f"parameter neither set explicitly nor via "
+                f"{self.Config.env_prefix}{attr.upper()} environment "
+                f"variable")
 
 
 class LatLonRect(pydantic.BaseModel):

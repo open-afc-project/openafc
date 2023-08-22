@@ -315,6 +315,8 @@ response_map = {
 
 
 rcache_settings = RcacheClientSettings()
+# In this validation rcache is True to handle 'not update_on_send' case
+rcache_settings.validate_for(db=True, rmq=True, rcache=True)
 
 
 def get_rcache():
@@ -518,7 +520,8 @@ class RatAfc(MethodView):
             request_type = 'AP-AFC'
 
             use_tasks = (get_rcache() is None) or \
-                (flask.request.args.get('conn_type') == 'async')
+                (flask.request.args.get('conn_type') == 'async') or \
+                (flask.request.args.get('gui') == 'True')
 
 
             als.als_afc_request(req_id=als_req_id, req=args)
@@ -662,19 +665,23 @@ class RatAfc(MethodView):
             # indexed by request/config hashes
             # Firts looking up ijn the cache
             responses = self._cache_lookup(dataif=dataif, req_infos=req_infos)
+
             # Computing the responses not found in cache
+            # First handling async case
             if len(responses) != len(req_infos):
                 if flask.request.args.get('conn_type') == 'async':
-                    # Special case of async request from GUI
+                    # Special case of async request
                     if len(req_infos) > 1:
                         raise \
                             AP_Exception(-1,
                                          "Unsupported multipart async request")
                     assert use_tasks
-                    task = self._start_processing(dataif=dataif,
-                                                  req_info=req_infos[0],
-                                                  use_tasks=True)
-                    # async request comes from GUI only, so it can't be multi nor cached
+                    task = \
+                        self._start_processing(
+                            dataif=dataif,
+                            req_info=list(req_infos.values())[0],
+                            use_tasks=True)
+                    # Async request can't be multi
                     return flask.jsonify(taskId=task.getId(),
                                          taskState=task.get()["status"])
                 responses.update(
@@ -702,8 +709,7 @@ class RatAfc(MethodView):
                     results["availableSpectrumInquiryResponses"].append(
                         actualResult[0])
                 als.als_afc_config(
-                    req_id=req_info.request_id,
-                    config_text=req_info.config_str,
+                    req_id=als_req_id, config_text=req_info.config_str,
                     customer=req_info.region, geo_data_version=geo_id,
                     uls_id=uls_id, req_indices=[req_info.req_idx])
         except Exception as e:

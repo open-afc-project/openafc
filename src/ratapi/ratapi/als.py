@@ -353,7 +353,7 @@ class Als:
         Arguments:
         req_id -- Unique for this AlS object instance request ID string (e.g.
                   returned by req_id())
-        req    -- Response message JSON dictionary
+        resp   -- Response message as JSON dictionary
         """
         if not self._try_connect():
             return

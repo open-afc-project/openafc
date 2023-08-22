@@ -25,6 +25,11 @@ ENV ALLOW_PLAINTEXT_LISTENER=yes
 ENV KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
 ENV KAFKA_CFG_NUM_PARTITIONS=1
 
+# Setting Kafka log level to ERROR limits initialization blurt
+ENV KAFKA_LOG_LEVEL=ERROR
+RUN sed -i "s/log4j\.logger\.kafka=.*/log4j.logger.kafka=${KAFKA_LOG_LEVEL}/" /opt/bitnami/kafka/config/log4j.properties
+RUN sed -i "s/log4j\.logger\.org\.apache\.kafka=.*/log4j.logger.org.apache.kafka=${KAFKA_LOG_LEVEL}/" /opt/bitnami/kafka/config/log4j.properties
+
 # Kafka environment variables, computed from DockerCompose-supplied variables
 # can't be defined in ENV - hence they are moved to ENTRYPOINT
 ENTRYPOINT env \

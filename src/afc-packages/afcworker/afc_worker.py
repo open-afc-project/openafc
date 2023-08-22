@@ -37,6 +37,8 @@ class WorkerConfig(BrokerConfigurator):
 conf = WorkerConfig()
 
 rcache_settings = RcacheClientSettings()
+# In this validation rcache is True to handle 'update_on_send' case
+rcache_settings.validate_for(rmq=True, rcache=True)
 rcache = ReqCacheClient(rcache_settings, rmq_receiver=False) \
     if rcache_settings.enabled else None
 

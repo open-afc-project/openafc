@@ -385,6 +385,7 @@ services:
       - als_kafka
       - als_siphon
       - bulk_postgres
+      - rcache
     secrets:
       - NOTIFIER_MAIL.json
       - OIDC.json
@@ -402,6 +403,11 @@ services:
       # ALS params
       - ALS_KAFKA_SERVER_ID=rat_server
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      # Rcache parameters
+      - RCACHE_ENABLED=${RCACHE_ENABLED}
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
 
   msghnd:
     image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd:${TAG:-latest}
@@ -416,6 +422,11 @@ services:
       # ALS params
       - ALS_KAFKA_SERVER_ID=msghnd
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      # Rcache parameters
+      - RCACHE_ENABLED=${RCACHE_ENABLED}
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
     dns_search: [.]
     depends_on:
       - ratdb
@@ -424,6 +435,7 @@ services:
       - als_kafka
       - als_siphon
       - bulk_postgres
+      - rcache
 
   objst:
     image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:-latest}
@@ -451,10 +463,16 @@ services:
       - AFC_AEP_ENABLE=1
       - AFC_AEP_DEBUG=1
       - AFC_AEP_REAL_MOUNTPOINT=${VOL_C_DB}/3dep/1_arcsec
+      # Rcache parameters
+      - RCACHE_ENABLED=${RCACHE_ENABLED}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
+      - RCACHE_UPDATE_ON_SEND=${RCACHE_UPDATE_ON_SEND}
     depends_on:
       - ratdb
       - rmq
       - objst
+      - rcache
     dns_search: [.]
 
   als_kafka:
@@ -475,6 +493,7 @@ services:
     depends_on:
       - als_kafka
       - bulk_postgres
+      - rcache
     dns_search: [.]
 
   bulk_postgres:
@@ -494,6 +513,20 @@ services:
       interval: 1h
       timeout: 1m
       retries: 3
+    dns_search: [.]
+
+  rcache:
+    image: public.ecr.aws/w9v6y1o0/openafc/rcache-image:${TAG:-latest}
+    restart: always
+    environment:
+      - RCACHE_ENABLED=${RCACHE_ENABLED}
+      - RCACHE_PORT=${RCACHE_PORT}
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
+      - RCACHE_AFC_REQ_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
+      - RCACHE_RULESETS_URL=http://rat_server/fbrat/ratapi/v1/GetRulesetIDs
+      - RCACHE_CONFIG_RETRIEVAL_URL=http://rat_server/fbrat/ratapi/v1/GetAfcConfigByRulesetID
+    depends_on:
+      - bulk_postgres
     dns_search: [.]
 
 volumes:
@@ -560,6 +593,46 @@ EXT_PORT_S=172.31.11.188:443-543
 
 # nginx external (host's) ports range.
 EXT_MTLS_PORT=172.31.11.188:544-644
+
+# -= ALS CONFIGURATION STUFF =-
+
+# Port on which ALS Kafka server listens for clients
+ALS_KAFKA_CLIENT_PORT_=9092
+
+# ALS Kafka server host name
+ALS_KAFKA_SERVER_=als_kafka
+
+
+# -= FS(ULS) DOWNLOADER CONFIGURATION STUFF =-
+
+# Symlink pointing to current ULS database
+ULS_CURRENT_DB_SYMLINK=FS_LATEST.sqlite3
+
+
+# -= RCACHE SERVICE CONFIGURATION STUFF =-
+
+# True (1, t, on, y, yes) to enable use of Rcache. False (0, f, off, n, no) to
+# use legacy file-based cache. Default is True
+RCACHE_ENABLED=True
+
+# True to update Rcache by AFC Response senter (Worker), False to update by
+# AFC REsponse receiver (MsgHandler, RatAPI). This parameter used by sender
+RCACHE_UPDATE_ON_SEND=True
+
+# Port Rcache service listens os
+RCACHE_PORT=8000
+
+
+# -= SECRETS STUFF =-
+
+# Host directory containing secret files
+VOL_H_SECRETS=../../tools/secrets/empty_secrets
+#VOL_H_SECRETS=/opt/afc/secrets
+
+# Directory inside container where to secrets are mounted (always /run/secrets
+# in Compose, may vary in Kubernetes)
+VOL_C_SECRETS=/run/secrets
+
 
 # -= OPTIONAL =-
 # to work without tls/mtls,remove these variables from here  
@@ -652,6 +725,16 @@ chown 999:999 /var/databases/pgdata
 |AFC_WEBUI_NAME|rat_server|dispatcher|WebUI service hostname|
 |AFC_WEBUI_PORT|80|dispatcher|WebUI service HTTP Port|
 |AFC_ENFORCE_HTTPS|TRUE|dispatcher|Wether to enforce forwarding of HTTP requests to HTTPS. TRUE - for enable, everything else - to disable|
+| **RCACHE settings** ||||
+|RCACHE_ENABLED|TRUE|rcache, rat_server, msghnd, worker, uls_downloader|TRUE if Rcache enabled, FALSE to use legacy objstroage response cache|
+|RCACHE_POSTGRES_DSN|Must be set|rcache, rat_server, msghnd|Connection string to Rcache Postgres database|
+|RCACHE_SERVICE_URL|Must be set|rat_server, msghnd, worker, uls_downloader|Rcache service REST API base URL|
+|RCACHE_RMQ_DSN|Must be set|rat_server, msghnd, worker|AMQP URL to RabbitMQ vhost that workers use to communicate computation result|
+|RCACHE_UPDATE_ON_SEND|TRUE|TRUE if worker sends result to Rcache server, FALSE if msghnd/rat_server|
+|RCACHE_PORT|8000|rcache|Rcache REST API port|
+|RCACHE_AFC_REQ_URL||REST API Rcache precomputer uses to send invalidated AFC requests for precomputation. No precomputation if not set|
+|RCACHE_RULESETS_URL||REST API Rcache spatial invalidator uses to retrieve AFC Configs' rulesets. Default invalidation distance usd if not set|
+|RCACHE_CONFIG_RETRIEVAL_URL||REST API Rcache spatial invalidator uses to retrieve AFC Config by ruleset. Default invalidation distance usd if not set|
 
 
 ## RabbitMQ settings

@@ -3443,7 +3443,6 @@ def do_init_db(args: Any) -> None:
                 db = db_class(arg_conn_str=conn_str, arg_password=password)
                 databases.add(db)
                 if created and sql_file:
-                    dp(read_sql_file(sql_file))
                     db.engine.execute(sa.text(read_sql_file(sql_file)))
             except sa.exc.SQLAlchemyError as ex:
                 error(f"{db_class.name_for_logs()} database initialization "
