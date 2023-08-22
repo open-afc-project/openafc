@@ -18,6 +18,7 @@ import logging
 import sys
 import requests
 import socket
+from appcfg import HealthchecksMsghndCfgIface
 from kombu import Connection
 
 app_log = logging.getLogger(__name__)
@@ -49,17 +50,23 @@ class BasicHealthcheck():
 class ObjstHealthcheck(BasicHealthcheck):
     """ Provide basic healthcheck for Objst """
     def __init__(self, cfg) -> None:
-        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+        app_log.debug(f"({os.getpid()}) {self.__class__.__name__}()")
         self.url = 'http://' + cfg['AFC_OBJST_HOST'] + ':' + \
                    cfg['AFC_OBJST_PORT'] + '/healthy'
 
 
 class MsghndHealthcheck(BasicHealthcheck):
     """ Provide basic healthcheck for Msghnd """
-    def __init__(self, cfg) -> None:
-        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
-        self.url = 'http://' + cfg['AFC_MSGHND_NAME'] + ':' + \
-                   cfg['AFC_MSGHND_PORT'] + '/fbrat/ap-afc/healthy'
+
+    def __init__(self, cfg: HealthchecksMsghndCfgIface) -> None:
+        app_log.debug(f"({os.getpid()}) {self.__class__.__name__}()")
+        self.url = 'http://' + cfg.get_name() + ':' + \
+                   cfg.get_port() + '/fbrat/ap-afc/healthy'
+
+    @classmethod
+    def from_hcheck_if(cls) -> None:
+        app_log.debug(f"({os.getpid()}) {cls.__name__}()")
+        return cls(HealthchecksMsghndCfgIface())
 
 
 class RmqHealthcheck():

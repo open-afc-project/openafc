@@ -13,11 +13,12 @@ The acceptor client (aka consumer) registeres own queue within broker
 application (aka rabbitmq). Such queue used as a channel for control commands.
 """
 
-from appcfg import BrokerConfigurator, ObjstConfig, MsghndConfigurator
+from appcfg import BrokerConfigurator, ObjstConfig
 import os
 import sys
 from sys import stdout
 import logging
+from logging.config import dictConfig
 import argparse
 import inspect
 import gevent
@@ -27,13 +28,28 @@ from ncli import MsgAcceptor
 from hchecks import MsghndHealthcheck, ObjstHealthcheck
 from fst import DataIf
 
+dictConfig({
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '%(asctime)s - [%(levelname)s] %(name)s [%(module)s.%(funcName)s:%(lineno)d]: %(message)s',
+            'datefmt': '%Y-%m-%d %H:%M:%S',
+        }
+    },
+   'handlers' : {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        }
+   },
+   'root': {
+        'level': 'INFO',
+        'handlers': ['console']
+   },
+})
 app_log = logging.getLogger()
-logFormatter = logging.Formatter\
-(fmt="%(asctime)s - [%(levelname)s] %(name)s [%(module)s.%(funcName)s:%(lineno)d]: %(message)s",\
-datefmt="%Y-%m-%d %H:%M:%S")
-console_hnd = logging.StreamHandler(stdout)
-console_hnd.setFormatter(logFormatter)
-app_log.addHandler(console_hnd)
 
 class Configurator(dict):
     __instance = None
@@ -47,7 +63,6 @@ class Configurator(dict):
         dict.__init__(self)
         self.update(BrokerConfigurator().__dict__.items())
         self.update(ObjstConfig().__dict__.items())
-        self.update(MsghndConfigurator(MsghndConfigurator.CFG_OPT_NAME_PORT).__dict__.items())
         self['OBJST_CERT_CLI_BUNDLE'] = \
             'certificate/client.bundle.pem'
         self['DISPAT_CERT_CLI_BUNDLE'] = \
@@ -77,7 +92,7 @@ def readiness_check(cfg):
     """
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
     objst_chk = ObjstHealthcheck(cfg)
-    msghnd_chk = MsghndHealthcheck(cfg)
+    msghnd_chk = MsghndHealthcheck.from_hcheck_if()
     checks = [gevent.spawn(objst_chk.healthcheck),
               gevent.spawn(msghnd_chk.healthcheck)]
     gevent.joinall(checks)

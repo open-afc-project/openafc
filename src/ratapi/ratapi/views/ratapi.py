@@ -1116,7 +1116,7 @@ class History(MethodView):
     def get(self, path=None):
         LOGGER.debug(f"History::get({path})")
         user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
-        conf = ObjstConfig()
+        conf = appcfg.ObjstConfig()
         try:
             rurl = flask.request.base_url
             if path is not None:

@@ -28,7 +28,7 @@ class MsgAcceptor(ConsumerMixin):
     handler_params = None
     def __init__(self, broker_url, broker_exch,
                  msg_handler=None, handler_params=None) -> None:
-        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+        app_log.debug(f"({os.getpid()}) {self.__class__.__name__}()")
         self.connection = Connection(broker_url)
         if msg_handler is not None:
             self.message_handler = msg_handler
@@ -52,7 +52,7 @@ class MsgAcceptor(ConsumerMixin):
 class MsgPublisher():
     """ Connection maker """
     def __init__(self, broker_url, broker_exch) -> None:
-        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+        app_log.debug(f"({os.getpid()}) {self.__class__.__name__}()")
         self.connection = Connection(broker_url)
         self.exchange = Exchange(
             broker_exch,

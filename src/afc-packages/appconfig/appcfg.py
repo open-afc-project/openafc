@@ -9,6 +9,7 @@
 
 ''' Application configuration data.
 '''
+import abc
 import os
 import logging
 import datetime
@@ -160,45 +161,83 @@ class OIDCConfigurator(object):
                     self.OIDC_CLIENT_ID=data['OIDC_CLIENT_ID']
                     self.OIDC_DISCOVERY_URL=data['OIDC_DISCOVERY_URL']
 
+# Msghnd configuration interfaces
 
-class MsghndConfigurator(object):
-    """Keep configuration for msghnd"""
-    CFG_OPT_IDX_NAME = 0
-    CFG_OPT_IDX_PORT = 1
-    CFG_OPT_IDX_BIND = 2
-    CFG_OPT_IDX_PID = 3
-    CFG_OPT_IDX_ACC_LOG = 4
-    CFG_OPT_IDX_ERR_LOG = 5
-    CFG_OPT_IDX_WORKERS = 6
-    CFG_OPT_IDX_TIMEOUT = 7
-    CFG_OPT_IDX_RATAFC_TOUT = 8
+class MsghndConfiguration(abc.ABC):
+    @abc.abstractmethod
+    def get_name(self):
+        # AFC_MSGHND_NAME
+        pass
+    @abc.abstractmethod
+    def get_port(self):
+        # AFC_MSGHND_PORT
+        pass
+    @abc.abstractmethod
+    def get_bind(self):
+        # AFC_MSGHND_BIND
+        pass
+    @abc.abstractmethod
+    def get_access_log(self):
+        # AFC_MSGHND_ACCESS_LOG
+        pass
+    @abc.abstractmethod
+    def get_error_log(self):
+        # AFC_MSGHND_ERROR_LOG
+        pass
+    @abc.abstractmethod
+    def get_workers(self):
+        # AFC_MSGHND_WORKERS
+        pass
+    @abc.abstractmethod
+    def get_timeout(self):
+        # AFC_MSGHND_TIMEOUT
+        pass
+    @abc.abstractmethod
+    def get_ratafc_tout(self):
+        # AFC_MSGHND_RATAFC_TOUT
+        pass
 
-    CFG_OPT_IGNR_ALL = 0xffff
 
-    CFG_OPT_ONLY_PORT = (CFG_OPT_IGNR_ALL & ~(1<<CFG_OPT_IDX_PORT))
-    CFG_OPT_NAME_PORT = (CFG_OPT_ONLY_PORT & ~(1<<CFG_OPT_IDX_NAME))
-    CFG_OPT_ONLY_RATAFC_TOUT = (CFG_OPT_IGNR_ALL & ~(1<<CFG_OPT_IDX_RATAFC_TOUT))
+class HealthchecksMsghndCfgIface(MsghndConfiguration):
+    def __init__(self):
+        setattr(self, 'AFC_MSGHND_NAME', os.getenv('AFC_MSGHND_NAME'))
+        setattr(self, 'AFC_MSGHND_PORT', os.getenv('AFC_MSGHND_PORT'))
+    def get_name(self):
+        return self.AFC_MSGHND_NAME
+    def get_port(self):
+        return self.AFC_MSGHND_PORT
+    def get_bind(self):
+        pass
+    def get_access_log(self):
+        pass
+    def get_error_log(self):
+        pass
+    def get_workers(self):
+        pass
+    def get_timeout(self):
+        pass
+    def get_ratafc_tout(self):
+        pass
 
-    # comlete list of msghnd configuration parameters
-    cfg_opt_lst = [
-        "AFC_MSGHND_NAME",
-        "AFC_MSGHND_PORT",
-        "AFC_MSGHND_BIND",
-        "AFC_MSGHND_PID",
-        "AFC_MSGHND_ACCESS_LOG",
-        "AFC_MSGHND_ERROR_LOG",
-        "AFC_MSGHND_WORKERS",
-        "AFC_MSGHND_TIMEOUT",
-        "AFC_MSGHND_RATAFC_TOUT",
-    ]
 
-    # the parameter maps which configuration to ignore
-    def __init__(self, ignore_map=~CFG_OPT_IGNR_ALL) -> None:
-        self.CFG_OPT_MAX_SIZE = len(MsghndConfigurator.cfg_opt_lst)
-
-        # get environment variables according to ignore map
-        for i in range(self.CFG_OPT_MAX_SIZE):
-            if not (1<<i & ignore_map):
-                setattr(self, MsghndConfigurator.cfg_opt_lst[i],
-                        os.getenv(MsghndConfigurator.cfg_opt_lst[i]))
+class RatafcMsghndCfgIface(MsghndConfiguration):
+    def __init__(self):
+        setattr(self, 'AFC_MSGHND_RATAFC_TOUT',
+                os.getenv('AFC_MSGHND_RATAFC_TOUT'))
+    def get_name(self):
+        pass
+    def get_port(self):
+        pass
+    def get_bind(self):
+        pass
+    def get_access_log(self):
+        pass
+    def get_error_log(self):
+        pass
+    def get_workers(self):
+        pass
+    def get_timeout(self):
+        pass
+    def get_ratafc_tout(self):
+        return int(self.AFC_MSGHND_RATAFC_TOUT)
 

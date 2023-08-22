@@ -30,7 +30,7 @@ import werkzeug.exceptions
 import threading
 import inspect
 import six
-from appcfg import MsghndConfigurator as MsghndCfg
+from appcfg import RatafcMsghndCfgIface
 from hchecks import RmqHealthcheck
 from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, \
 RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG, \
@@ -460,9 +460,7 @@ class RatAfc(MethodView):
                      f" task_id={task_id}")
 
         dataif = DataIf()
-        t = afctask.Task(task_id, dataif,
-                         int(MsghndCfg(MsghndCfg.CFG_OPT_ONLY_RATAFC_TOUT). \
-                                 AFC_MSGHND_RATAFC_TOUT))
+        t = afctask.Task(task_id, dataif, RatafcMsghndCfgIface().get_ratafc_tout())
         task_stat = t.get()
 
         if t.ready(task_stat):  # The task is done
@@ -829,17 +827,14 @@ class RatAfc(MethodView):
         if use_tasks:
             ret = {}
             for req_cfg_hash, task in tasks.items():
-                task_stat = task.wait(timeout= \
-                                          int(MsghndCfg(MsghndCfg.CFG_OPT_ONLY_RATAFC_TOUT). \
-                                              AFC_MSGHND_RATAFC_TOUT))
+                task_stat = task.wait(timeout=RatafcMsghndCfgIface().get_ratafc_tout())
                 ret[req_cfg_hash] = \
                     response_map[task_stat['status']](task).data
             return ret
         ret = \
             get_rcache().rmq_receive_responses(
                 req_cfg_digests=req_infos.keys(),
-                timeout_sec=int(MsghndCfg(MsghndCfg.CFG_OPT_ONLY_RATAFC_TOUT). \
-                                          AFC_MSGHND_RATAFC_TOUT))
+                timeout_sec=RatafcMsghndCfgIface().get_ratafc_tout())
         for req_cfg_hash, response in ret.items():
             req_info = req_infos[req_cfg_hash]
             if (not response) or (not req_info.history_dir):
