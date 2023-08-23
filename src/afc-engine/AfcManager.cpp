@@ -431,7 +431,7 @@ public:
 	ColDouble ulsStartFreq;
 	ColDouble ulsStopFreq;
 	ColStr antType;
-	ColEnum antCategory;
+	ColStr antCategory;
 	ColDouble antGainPeak;
 	ColStr prType;
 	ColDouble prEffectiveGain;
@@ -515,10 +515,7 @@ public:
 		ulsStartFreq(this, 				"ULS START FREQ (MHz)"),
 		ulsStopFreq(this, 				"ULS STOP FREQ (MHz)"),
 		antType(this, 					"FS_ANT_TYPE"),
-		antCategory(this, 				"FS_ANT_CATEGORY",
-										{{CConst::B1AntennaCategory, "B1"},
-										{CConst::HPAntennaCategory, "HP"}},
-										"UNKNOWN"),
+		antCategory(this, 				"FS_ANT_CATEGORY"),
 		antGainPeak(this, 				"FS_ANT_GAIN_PEAK (dB)"),
 		prType(this, 					"PR_TYPE (dB)"),
 		prEffectiveGain(this, 			"PR_EFFECTIVE_GAIN (dB)"),
@@ -8515,7 +8512,7 @@ void AfcManager::runPointAnalysis()
 												excthrGc.ulsStartFreq = uls->getStartFreq() * 1.0e-6;
 												excthrGc.ulsStopFreq = uls->getStopFreq() * 1.0e-6;
 												excthrGc.antType = rxAntennaTypeStr;
-												excthrGc.antCategory = segIdx == numPR ? uls->getRxAntennaCategory() : uls->getPR(segIdx).antCategory;
+												excthrGc.antCategory = CConst::strAntennaCategoryList->type_to_str(segIdx == numPR ? uls->getRxAntennaCategory() : uls->getPR(segIdx).antCategory);
 												excthrGc.antGainPeak = divIdx == 0 ? uls->getRxGain() : uls->getDiversityGain();
 
 												if (segIdx != numPR) {

@@ -127,3 +127,11 @@ const StrTypeClass CConst::strPRTypeList[] = {
 	{      CConst::billboardReflectorPRType, "Ref"           },
 	{                                    -1,  (char *) 0     }
 };
+
+const StrTypeClass CConst::strAntennaCategoryList[] = {
+	{             CConst::HPAntennaCategory, "HP"            },
+	{             CConst::B1AntennaCategory, "B1"            },
+	{          CConst::OtherAntennaCategory, "OTHER"         },
+	{        CConst::UnknownAntennaCategory, "UNKNOWN"       },
+	{                                    -1,  (char *) 0     }
+};
