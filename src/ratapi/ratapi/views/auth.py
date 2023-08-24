@@ -140,6 +140,9 @@ class LoginAPI(MethodView):
         code_challenge = encoded.decode('ascii').strip('=')
         redirect_uri = flask.request.base_url
         redirect_uri = redirect_uri.replace("login", "callback")
+        fwd_proto = flask.request.headers.get('X-Forwarded-Proto')
+        if (fwd_proto == 'https') and (flask.request.scheme == "http"):
+            redirect_uri = redirect_uri.replace("http:", "https:")
 
         # get request params
         query_params = {'client_id': flask.current_app.config['OIDC_CLIENT_ID'],
@@ -181,9 +184,15 @@ class CallbackAPI(MethodView):
             als.als_json_log('user_access', {'action':'login', 'user':'unknown', 'from':flask.request.remote_addr, 'status':'no code'})
             return "The code was not returned or is not accessible", 406
 
+        fwd_proto = flask.request.headers.get('X-Forwarded-Proto')
+        if (fwd_proto == 'https') and (flask.request.scheme == "http"):
+            redirect_uri = flask.request.base_url.replace("http:","https:")
+        else:
+            redirect_uri = flask.request.base_url
+
         query_params = {'grant_type': 'authorization_code',
                         'code': code,
-                        'redirect_uri': flask.request.base_url,
+                        'redirect_uri': redirect_uri,
                         'code_verifier': flask.session['code_verifier'],
                        }
         query_params = requests.compat.urlencode(query_params)

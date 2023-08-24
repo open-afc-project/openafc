@@ -1117,6 +1117,9 @@ class History(MethodView):
         LOGGER.debug(f"History::get({path})")
         user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
         conf = appcfg.ObjstConfig()
+        fwd_proto = flask.request.headers.get('X-Forwarded-Proto')
+        if not fwd_proto:
+            forward_proto = flask.request.scheme
         try:
             rurl = flask.request.base_url
             if path is not None:
@@ -1125,6 +1128,7 @@ class History(MethodView):
             response = requests.get(conf.AFC_OBJST_SCHEME + "://" + conf.AFC_OBJST_HOST + ":" +
                                     conf.AFC_OBJST_HIST_PORT +
                                     (("/" + path) if path is not None else ""),
+                                    headers={'X-Forwarded-Proto': fwd_proto},
                                     params = {"url": rurl}, stream=True)
             if response.headers['Content-Type'].startswith("application/octet-stream") \
                 and "Content-Encoding" not in response.headers:

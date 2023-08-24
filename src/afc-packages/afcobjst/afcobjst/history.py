@@ -174,6 +174,9 @@ def get(path):
     ''' File download handler. '''
     # ratapi URL preffix
     rurl = request.args["url"]
+    fwd_proto = request.headers.get('X-Forwarded-Proto')
+    if (fwd_proto == 'https') and (request.scheme == "http"):
+        rurl = rurl.replace("http:","https:")
     hist_app.logger.debug(f'get method={request.method}, path={path} url={rurl}')
     # local path in the storage
     lpath = os.path.join(hist_app.config["AFC_OBJST_FILE_LOCATION"], "history", path)
