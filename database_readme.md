@@ -43,7 +43,7 @@ This also contains all lidar tiles where each city has a subdirectory with tiles
 * **globe:** https://ngdc.noaa.gov/mgg/topo/globe.html
 * **3dep:** https://data.globalchange.gov/dataset/usgs-national-elevation-dataset-ned-1-arc-second
 * **nlcd:** original file nlcd_2019_land_cover_I48_20210604 was downloaded from [link](https://www.mrlc.gov/data?f%5B0%5D=category%3Aland%20cover) (download NLCD 2019 Land Cover (CONUS)). Usig gdal utilties this file was translated to nlcd_2019_land_cover_I48_20210604_resample.zip so that the 1-arcsec tiles matchup with 1-arcsec 3DEP tiles. The federated_nlcd.zip file was obtained by using other gdal utilities to convert federated's many files to one file covering CONUS.
-* **clc:** Download from the [Copernicus](https://land.copernicus.eu/pan-european/corine-land-cover/clc2018) (download the GeoTIFF data). Login required.
+* **clc:** Download from the [Copernicus](https://land.copernicus.eu/pan-european/corine-land-cover/clc2018) website  (download the GeoTIFF data). Login required.
 * **itudata:** Radio Climate map from ITU-R Rec, P.617-3 (https://www.itu.int/rec/R-REC-P.617-3-201309-S/en) and Surface Refractivity map from ITU-R Rec, P.452-17 (https://www.itu.int/rec/R-REC-P.452-17-202109-I/en)
 
 ### **Licences and Source Citations**
