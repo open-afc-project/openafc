@@ -7,6 +7,8 @@
 #include "EcefModel.h"
 #include "global_defines.h"
 
+double RlanRegionClass::minRlanHeightAboveTerrain;
+
 /******************************************************************************************/
 /**** CONSTRUCTOR: RlanRegionClass::RlanRegionClass()                                  ****/
 /******************************************************************************************/
@@ -58,6 +60,10 @@ double RlanRegionClass::getMinHeightAGL() const
         minHeightAGL = centerHeightAMSL - heightUncertainty - centerTerrainHeight;
     }
 
+	if (minHeightAGL < minRlanHeightAboveTerrain) {
+		minHeightAGL = minRlanHeightAboveTerrain;
+	}
+
     return(minHeightAGL);
 }
 /******************************************************************************************/
@@ -77,6 +83,10 @@ double RlanRegionClass::getMaxHeightAGL() const
     } else {
         maxHeightAGL = centerHeightAMSL + heightUncertainty - centerTerrainHeight;
     }
+
+	if (maxHeightAGL < minRlanHeightAboveTerrain) {
+		maxHeightAGL = minRlanHeightAboveTerrain;
+	}
 
     return(maxHeightAGL);
 }
@@ -98,6 +108,10 @@ double RlanRegionClass::getMinHeightAMSL() const
         minHeightAMSL = centerHeightAMSL - heightUncertainty - centerTerrainHeight + minTerrainHeight;
     }
 
+	if (minHeightAMSL < minTerrainHeight + minRlanHeightAboveTerrain) {
+		minHeightAMSL = minTerrainHeight + minRlanHeightAboveTerrain;
+	}
+
     return(minHeightAMSL);
 }
 /******************************************************************************************/
@@ -117,6 +131,10 @@ double RlanRegionClass::getMaxHeightAMSL() const
     } else {
         maxHeightAMSL = centerHeightAMSL + heightUncertainty - centerTerrainHeight + maxTerrainHeight;
     }
+
+	if (maxHeightAMSL < maxTerrainHeight + minRlanHeightAboveTerrain) {
+		maxHeightAMSL = maxTerrainHeight + minRlanHeightAboveTerrain;
+	}
 
     return(maxHeightAMSL);
 }

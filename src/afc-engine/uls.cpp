@@ -750,7 +750,7 @@ double ULSClass::calcR2AIP07CANAntenna(double angleOffBoresightDeg, double frequ
 	} else if ((frequency >= 6425.0e6) && (frequency <= 6930.0e6)) {
 		freqIdx = 1;
 	} else {
-		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07CANAntenna: frequency = " << frequency << " INVALID value");
+		freqIdx = -1;
 	}
 
 	double minSuppression;
@@ -799,7 +799,7 @@ double ULSClass::calcR2AIP07CANAntenna(double angleOffBoresightDeg, double frequ
 			minSuppression = 45.0;
 		}
 	} else {
-		CORE_DUMP;
+		throw std::runtime_error(ErrStream() << "ERROR in ULSClass::calcR2AIP07CANAntenna: frequency = " << frequency << " INVALID value");
 	}
 
 	rxGainDB = maxGain - minSuppression;

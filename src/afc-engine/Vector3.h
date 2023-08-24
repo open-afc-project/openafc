@@ -1,14 +1,12 @@
 #ifndef VECTOR_H
 #define VECTOR_H
 
-#include <armadillo>
 #include <math.h>
 #include <iostream>
 #include <QDebug>
 
 #include "MathHelpers.h"
 
-using namespace arma;
 using namespace MathHelpers;
 
 /**
@@ -35,14 +33,22 @@ class Vector3 {
 		 * 
 		 * @param other Vector to copy
 		 */
-		Vector3(const Vector3 &other) : data(other.data) {}
+		Vector3(const Vector3 &other) {
+			data[0] = other.data[0];
+			data[1] = other.data[1];
+			data[2] = other.data[2];
+		}
 
 		/** 
 		 * Construct Vector from underlying armadillo vector
 		 * 
 		 * @param vec Armadillo 3 point vector
 		 */
-		Vector3(const arma::vec3 &vec) : data(vec) {}
+		// Vector3(const arma::vec3 &vec) {
+		// 	data[0] = vec[0];
+		// 	data[1] = vec[1];
+		// 	data[2] = vec[2];
+		// }
 
 		/** 
 		 * Get the x coordinate
@@ -73,7 +79,9 @@ class Vector3 {
 
 		inline void normalize() {
 			double l = len();
-			data /= l;
+			data[0] /= l;
+			data[1] /= l;
+			data[2] /= l;
 		}
 
 
@@ -96,7 +104,7 @@ class Vector3 {
 		 * @return The result of dot product
 		 */
 		inline double dot(const Vector3 &other) const {
-			return arma::dot(this->data, other.data);
+			return data[0]*other.data[0] + data[1]*other.data[1] + data[2]*other.data[2];
 		}
 
 		/** 
@@ -108,7 +116,9 @@ class Vector3 {
 		 * @return The result of the dot product
 		 */
 		inline double normDot(const Vector3 &other) const {
-			return arma::norm_dot(this->data, other.data);
+			double l1 = len();
+			double l2 = other.len();
+			return dot(other)/(l1*l2);
 		}
 
 		/** 
@@ -126,7 +136,8 @@ class Vector3 {
 		 * @return normalize vector
 		 */
 		inline Vector3 normalized() const {
-			return Vector3(data / len());
+			double l = len();
+			return Vector3(data[0]/l, data[1]/l, data[2]/l);
 		}
 
 		/** 
@@ -137,31 +148,37 @@ class Vector3 {
 		 * @return angle in radians
 		 */
 		inline double angleBetween(const Vector3 &other) const {
-			return acos(dot(other) / (len() * other.len()));
+			double dpVal = normDot(other);
+			if (dpVal > 1.0) {
+				dpVal = 1.0;
+			} else if (dpVal < -1.0) {
+				dpVal = -1.0;
+			}
+			return acos(dpVal);
 		}
 
 		inline Vector3 operator + (const Vector3 &other) const {
-			return Vector3(data + other.data);
+			return Vector3(data[0] + other.data[0], data[1] + other.data[1], data[2] + other.data[2]);
 		}
 
 		inline Vector3 operator - (const Vector3 &other) const {
-			return Vector3(data - other.data);
+			return Vector3(data[0] - other.data[0], data[1] - other.data[1], data[2] - other.data[2]);
 		}
 
 		inline Vector3 operator - () const {
-			return Vector3(-data);
+			return Vector3(-data[0], -data[1], -data[2]);
 		}
 
-		inline Vector3 operator * (const Vector3 &other) const {
-			return Vector3(data % other.data);
-		}
+		// inline Vector3 operator * (const Vector3 &other) const {
+		// 	return Vector3(data % other.data);
+		// }
 
-		inline Vector3 operator / (const Vector3 &other) const {
-			return Vector3(data / other.data);
-		}
+		// inline Vector3 operator / (const Vector3 &other) const {
+		// 	return Vector3(data / other.data);
+		// }
 
 		inline Vector3 operator * (const double scalar) const {
-			return Vector3(data * scalar);		
+			return Vector3(data[0] * scalar, data[1] * scalar, data[2] * scalar);		
 		}
 
 		inline friend Vector3 operator * (const double scalar, const Vector3 &vector) {
@@ -169,7 +186,9 @@ class Vector3 {
 		}
 
 		inline Vector3 operator = (const Vector3 &other) {
-			data = other.data;
+			data[0] = other.data[0];
+			data[1] = other.data[1];
+			data[2] = other.data[2];
 			return *this;
 		}
 
@@ -188,7 +207,7 @@ class Vector3 {
 		}
 
 	protected:
-		arma::vec3 data;
+		double data[3];
 };
 
 #endif
