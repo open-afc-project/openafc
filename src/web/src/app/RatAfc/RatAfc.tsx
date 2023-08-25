@@ -297,8 +297,13 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
             mapCenter: rlanLoc,
             clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng }
         });
-        const resp = await spectrumInquiryRequest(request);
-        return this.processResponse(resp, request, rlanLoc);
+        try {
+            const resp = await spectrumInquiryRequest(request);
+            return this.processResponse(resp, request, rlanLoc);
+        } catch (error) {
+            this.setState({status: "Error", err: {description: "Unable to sumbit request: "+error,kind:"Error",body: error}})
+        }
+     
     }
 
     private getLatLongFromRequest(request: AvailableSpectrumInquiryRequest): { lat: number, lng: number } | undefined {
@@ -406,7 +411,9 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
         if (!!jsonString) {
             this.setState({ sendDirectModalOpen: false, status: "Info" });
             return spectrumInquiryRequestByString("1.3", jsonString)
-                .then(resp => this.processResponse(resp));
+                .then(resp => this.processResponse(resp))
+                .catch(error =>  
+                    this.setState({status: "Error", err: {description: "Unable to sumbit request: "+error,kind:"Error",body: error}}))
         }
     }
 
