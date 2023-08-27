@@ -30,7 +30,7 @@ import werkzeug.exceptions
 import threading
 import inspect
 import six
-from appcfg import RatafcMsghndCfgIface
+from appcfg import RatafcMsghndCfgIface, AFC_RATAPI_LOG_LEVEL
 from hchecks import RmqHealthcheck
 from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, \
 RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG, \
@@ -55,6 +55,7 @@ from rcache_models import RcacheClientSettings
 from rcache_client import ReqCacheClient
 
 LOGGER = logging.getLogger(__name__)
+LOGGER.setLevel(AFC_RATAPI_LOG_LEVEL)
 
 # We want to dynamically trim this this list e.g.
 # via environment variable, for the current deployment
