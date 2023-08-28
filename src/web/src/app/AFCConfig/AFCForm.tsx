@@ -2,7 +2,7 @@ import * as React from "react";
 import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition, Radio, CardHead, PageSection } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
-import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache, getRegions, getAllowedRanges } from "../Lib/RatApi";
+import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, getRegions, getAllowedRanges } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit, getDeniedRegionsCsvFile } from "../Lib/Admin";
 import { AllowedRangesDisplay, getDefaultRangesByRegion } from './AllowedRangesForm'
@@ -267,7 +267,7 @@ export class AFCForm extends React.Component<
     private getConfig = () => JSON.stringify(this.state.config);
 
     private export = () =>
-        new Blob([JSON.stringify(Object.assign(exportCache(), { afcConfig: this.state.config }))], {
+        new Blob([JSON.stringify(Object.assign({afcConfig: this.state.config }))], {
             type: "application/json"
         });
 
