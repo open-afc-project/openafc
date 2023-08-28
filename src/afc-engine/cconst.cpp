@@ -52,6 +52,7 @@ const StrTypeClass CConst::strPathLossModelList[] = {
 	{                CConst::CustomPathLossModel, "Custom"                      },
 	{             CConst::ISEDDBS06PathLossModel, "ISED DBS-06"                 },
 	{                CConst::BrazilPathLossModel, "Brazilian Propagation Model" },
+	{                 CConst::OfcomPathLossModel, "Ofcom Propagation Model"     },
 	{         CConst::CoalitionOpt6PathLossModel, "ITM with no building data"   },
 
 	{                                    -1,  (char *) 0                      }
@@ -124,5 +125,13 @@ const StrTypeClass CConst::strSpectralAlgorithmList[] = {
 const StrTypeClass CConst::strPRTypeList[] = {
 	{       CConst::backToBackAntennaPRType, "Ant"           },
 	{      CConst::billboardReflectorPRType, "Ref"           },
+	{                                    -1,  (char *) 0     }
+};
+
+const StrTypeClass CConst::strAntennaCategoryList[] = {
+	{             CConst::HPAntennaCategory, "HP"            },
+	{             CConst::B1AntennaCategory, "B1"            },
+	{          CConst::OtherAntennaCategory, "OTHER"         },
+	{        CConst::UnknownAntennaCategory, "UNKNOWN"       },
 	{                                    -1,  (char *) 0     }
 };

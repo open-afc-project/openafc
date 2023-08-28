@@ -251,6 +251,7 @@ static const std::map<int, std::string> pathLossModelNames = {
 	{CConst::CustomPathLossModel, "CustomPathLossModel"},
 	{CConst::ISEDDBS06PathLossModel, "ISEDDBS06PathLossModel"},
 	{CConst::BrazilPathLossModel, "BrazilPathLossModel"},
+	{CConst::OfcomPathLossModel, "OfcomPathLossModel"},
 	{CConst::FSPLPathLossModel, "FSPLPathLossModel"}
 };
 static const std::map<int, std::string> propEnvNames = {
@@ -430,7 +431,7 @@ public:
 	ColDouble ulsStartFreq;
 	ColDouble ulsStopFreq;
 	ColStr antType;
-	ColEnum antCategory;
+	ColStr antCategory;
 	ColDouble antGainPeak;
 	ColStr prType;
 	ColDouble prEffectiveGain;
@@ -514,10 +515,7 @@ public:
 		ulsStartFreq(this, 				"ULS START FREQ (MHz)"),
 		ulsStopFreq(this, 				"ULS STOP FREQ (MHz)"),
 		antType(this, 					"FS_ANT_TYPE"),
-		antCategory(this, 				"FS_ANT_CATEGORY",
-										{{CConst::B1AntennaCategory, "B1"},
-										{CConst::HPAntennaCategory, "HP"}},
-										"UNKNOWN"),
+		antCategory(this, 				"FS_ANT_CATEGORY"),
 		antGainPeak(this, 				"FS_ANT_GAIN_PEAK (dB)"),
 		prType(this, 					"PR_TYPE (dB)"),
 		prEffectiveGain(this, 			"PR_EFFECTIVE_GAIN (dB)"),
@@ -666,6 +664,7 @@ AfcManager::AfcManager()
 	_heatmapRLANOutdoorHeightUncertainty = quietNaN;
 
 	_applyClutterFSRxFlag = false;
+	_allowRuralFSClutterFlag = false;
 	_fsConfidenceClutter2108 = quietNaN;
 	_maxFsAglHeight = quietNaN;
 
@@ -1284,7 +1283,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		/**********************************************************************/
 		requiredParams = QStringList() << "availableSpectrumInquiryRequests" << "version";
 		optionalParams = QStringList() << "vendorExtensions";
-		for(auto key : jsonObj.keys()) {
+		for(auto& key : jsonObj.keys()) {
 			int rIdx = requiredParams.indexOf(key);
 			if (rIdx != -1) {
 				requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1317,7 +1316,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		/**********************************************************************/
 		requiredParams = QStringList() << "requestId" << "deviceDescriptor" << "location";
 		optionalParams = QStringList() << "inquiredFrequencyRange" << "inquiredChannels" << "minDesiredPower" << "vendorExtensions";
-		for(auto key : requestObj.keys()) {
+		for(auto& key : requestObj.keys()) {
 			int rIdx = requiredParams.indexOf(key);
 			if (rIdx != -1) {
 				requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1375,7 +1374,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		/**********************************************************************/
 		requiredParams = QStringList() << "serialNumber" << "certificationId";
 		optionalParams = QStringList();
-		for(auto key : deviceDescriptorObj.keys()) {
+		for(auto& key : deviceDescriptorObj.keys()) {
 			int rIdx = requiredParams.indexOf(key);
 			if (rIdx != -1) {
 				requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1408,7 +1407,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			auto certificationIDObj = certificationIDVal.toObject();
 			requiredParams = QStringList() << "rulesetId" << "id";
 			optionalParams = QStringList();
-			for(auto key : certificationIDObj.keys()) {
+			for(auto& key : certificationIDObj.keys()) {
 				int rIdx = requiredParams.indexOf(key);
 				if (rIdx != -1) {
 					requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1433,7 +1432,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		/**********************************************************************/
 		requiredParams = QStringList() << "elevation";
 		optionalParams = QStringList() << "ellipse" << "linearPolygon" << "radialPolygon" << "indoorDeployment";
-		for(auto key : locationObj.keys()) {
+		for(auto& key : locationObj.keys()) {
 			int rIdx = requiredParams.indexOf(key);
 			if (rIdx != -1) {
 				requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1492,7 +1491,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		if (hasEllipseFlag) {
 			requiredParams = QStringList() << "center" << "majorAxis" << "minorAxis" << "orientation";
 			optionalParams = QStringList();
-			for(auto key : ellipseObj.keys()) {
+			for(auto& key : ellipseObj.keys()) {
 				int rIdx = requiredParams.indexOf(key);
 				if (rIdx != -1) {
 					requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1522,7 +1521,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		if (hasLinearPolygonFlag) {
 			requiredParams = QStringList() << "outerBoundary";
 			optionalParams = QStringList();
-			for(auto key : linearPolygonObj.keys()) {
+			for(auto& key : linearPolygonObj.keys()) {
 				int rIdx = requiredParams.indexOf(key);
 				if (rIdx != -1) {
 					requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1552,7 +1551,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		if (hasRadialPolygonFlag) {
 			requiredParams = QStringList() << "center" << "outerBoundary";
 			optionalParams = QStringList();
-			for(auto key : radialPolygonObj.keys()) {
+			for(auto& key : radialPolygonObj.keys()) {
 				int rIdx = requiredParams.indexOf(key);
 				if (rIdx != -1) {
 					requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1584,7 +1583,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		/**********************************************************************/
 		requiredParams = QStringList() << "height" << "heightType" << "verticalUncertainty";
 		optionalParams = QStringList();
-		for(auto key : elevationObj.keys()) {
+		for(auto& key : elevationObj.keys()) {
 			int rIdx = requiredParams.indexOf(key);
 			if (rIdx != -1) {
 				requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1606,7 +1605,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		if (hasCenterFlag) {
 			requiredParams = QStringList() << "longitude" << "latitude";
 			optionalParams = QStringList();
-			for(auto key : centerObj.keys()) {
+			for(auto& key : centerObj.keys()) {
 				int rIdx = requiredParams.indexOf(key);
 				if (rIdx != -1) {
 					requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1627,7 +1626,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 				auto outerBoundaryPointObj = outerBoundaryPointVal.toObject();
 				requiredParams = QStringList() << "longitude" << "latitude";
 				optionalParams = QStringList();
-				for(auto key : outerBoundaryPointObj.keys()) {
+				for(auto& key : outerBoundaryPointObj.keys()) {
 					int rIdx = requiredParams.indexOf(key);
 					if (rIdx != -1) {
 						requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1653,7 +1652,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 				auto outerBoundaryVectorObj = outerBoundaryVectorVal.toObject();
 				requiredParams = QStringList() << "length" << "angle";
 				optionalParams = QStringList();
-				for(auto key : outerBoundaryVectorObj.keys()) {
+				for(auto& key : outerBoundaryVectorObj.keys()) {
 					int rIdx = requiredParams.indexOf(key);
 					if (rIdx != -1) {
 						requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1678,7 +1677,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			auto inquiredFrequencyRangeObj = inquiredFrequencyRangeVal.toObject();
 			requiredParams = QStringList() << "lowFrequency" << "highFrequency";
 			optionalParams = QStringList();
-			for(auto key : inquiredFrequencyRangeObj.keys()) {
+			for(auto& key : inquiredFrequencyRangeObj.keys()) {
 				int rIdx = requiredParams.indexOf(key);
 				if (rIdx != -1) {
 					requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1702,7 +1701,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			auto inquiredChannelsObj = inquiredChannelsVal.toObject();
 			requiredParams = QStringList() << "globalOperatingClass";
 			optionalParams = QStringList() << "channelCfi";
-			for(auto key : inquiredChannelsObj.keys()) {
+			for(auto& key : inquiredChannelsObj.keys()) {
 				int rIdx = requiredParams.indexOf(key);
 				if (rIdx != -1) {
 					requiredParams.erase(requiredParams.begin()+rIdx);
@@ -1726,7 +1725,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			auto vendorExtensionObj = vendorExtensionVal.toObject();
 			requiredParams = QStringList() << "extensionId" << "parameters";
 			optionalParams = QStringList();
-			for(auto key : vendorExtensionObj.keys()) {
+			for(auto& key : vendorExtensionObj.keys()) {
 				int rIdx = requiredParams.indexOf(key);
 				if (rIdx != -1) {
 					requiredParams.erase(requiredParams.begin()+rIdx);
@@ -2483,6 +2482,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_applyClutterFSRxFlag = false;
 	}
 
+	if (jsonObj.contains("allowRuralFSClutter") && !jsonObj["allowRuralFSClutter"].isUndefined()) {
+		_allowRuralFSClutterFlag = jsonObj["allowRuralFSClutter"].toBool();
+	} else {
+		_allowRuralFSClutterFlag = false;
+	}
+
 	if (jsonObj.contains("fsClutterModel") && !jsonObj["fsClutterModel"].isUndefined()) {
 		QJsonObject fsClutterModel = jsonObj["fsClutterModel"].toObject();
 		if (fsClutterModel.contains("p2108Confidence") && !fsClutterModel["p2108Confidence"].isUndefined()) {
@@ -2568,7 +2573,8 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 
 	if (    (_pathLossModel == CConst::CustomPathLossModel)
 		|| (_pathLossModel == CConst::ISEDDBS06PathLossModel)
-		|| (_pathLossModel == CConst::BrazilPathLossModel) ) {
+		|| (_pathLossModel == CConst::BrazilPathLossModel)
+		|| (_pathLossModel == CConst::OfcomPathLossModel) ) {
 		_pathLossModel = CConst::FCC6GHzReportAndOrderPathLossModel;
 	}
 
@@ -2783,7 +2789,7 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 QJsonArray generateStatusMessages(const std::vector<std::string>& messages)
 {
 	auto array = QJsonArray();
-	for (auto m : messages)
+	for (auto& m : messages)
 		array.append(QJsonValue(QString::fromStdString(m)));
 	return array;
 }
@@ -2973,7 +2979,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 
 	// compute availableSpectrumInfo
 	QJsonArray spectrumInfos = QJsonArray();
-	for (auto freqRange : psdFreqRangeList) {
+	for (auto& freqRange : psdFreqRangeList) {
 		for (int i = 0; i < (int) freqRange.psd_dBm_MHzList.size(); i++) {
 			if ( !std::isnan(freqRange.psd_dBm_MHzList.at(i)) ) {
 				spectrumInfos.append(QJsonObject
@@ -3077,7 +3083,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 
 		if (_missingParams.size()) {
 			paramsArray = QJsonArray();
-			for(auto param : _missingParams) {
+			for(auto& param : _missingParams) {
 				paramsArray.append(param);
 			}
 			paramObj.insert("missingParams", paramsArray);
@@ -3085,7 +3091,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 
 		if (_invalidParams.size()) {
 			paramsArray = QJsonArray();
-			for(auto param : _invalidParams) {
+			for(auto& param : _invalidParams) {
 				paramsArray.append(param);
 			}
 			paramObj.insert("invalidParams", paramsArray);
@@ -3093,7 +3099,7 @@ QJsonDocument AfcManager::generateRatAfcJson()
 
 		if (_unexpectedParams.size()) {
 			paramsArray = QJsonArray();
-			for(auto param : _unexpectedParams) {
+			for(auto& param : _unexpectedParams) {
 				paramsArray.append(param);
 			}
 			paramObj.insert("unexpectedParams", paramsArray);
@@ -3723,7 +3729,7 @@ QJsonArray jsonChannelData(const std::vector<ChannelStruct> &channelList)
 	for (const ChannelStruct &channel : channelList)
 	{
 		bool found = false;
-		for (auto &band : rlanBWList)
+		for (auto& band : rlanBWList)
 		{
 			if (channel.bandwidth() == band.first)
 			{
@@ -3806,7 +3812,7 @@ QJsonObject jsonSpectrumData(const std::vector<ChannelStruct> &channelList, cons
 	for (const ChannelStruct &channel : channelList)
 	{
 		bool found = false;
-		for (auto &band : rlanBWList)
+		for (auto& band : rlanBWList)
 		{
 			if (channel.bandwidth() == band.first)
 			{
@@ -4472,7 +4478,7 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 			radioService = row.radioService;
 			entityName = row.entityName;
-			for (auto &c : entityName)
+			for (auto& c : entityName)
 				c = toupper(c);
 
 			/**************************************************************************/
@@ -6672,8 +6678,7 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 				pathClutterRxModelStr = "P.2108";
 				pathClutterRxCDF = q(-gauss[0]);
 			} else if ( (propEnvRx == CConst::ruralPropEnv) || (propEnvRx == CConst::barrenPropEnv) ) {
-				bool allowRuralFSClutterFlag = false;
-				bool clutterFlag = allowRuralFSClutterFlag && (nlcdLandCatRx == CConst::noClutterNLCDLandCat ? false : true);
+				bool clutterFlag = _allowRuralFSClutterFlag && (nlcdLandCatRx == CConst::noClutterNLCDLandCat ? false : true);
 
 				if (clutterFlag) {
 					double ha, dk;
@@ -8507,7 +8512,7 @@ void AfcManager::runPointAnalysis()
 												excthrGc.ulsStartFreq = uls->getStartFreq() * 1.0e-6;
 												excthrGc.ulsStopFreq = uls->getStopFreq() * 1.0e-6;
 												excthrGc.antType = rxAntennaTypeStr;
-												excthrGc.antCategory = segIdx == numPR ? uls->getRxAntennaCategory() : uls->getPR(segIdx).antCategory;
+												excthrGc.antCategory = CConst::strAntennaCategoryList->type_to_str(segIdx == numPR ? uls->getRxAntennaCategory() : uls->getPR(segIdx).antCategory);
 												excthrGc.antGainPeak = divIdx == 0 ? uls->getRxGain() : uls->getDiversityGain();
 
 												if (segIdx != numPR) {
@@ -8931,13 +8936,13 @@ void AfcManager::runScanAnalysis()
 
 
 	// List all bandwidths covered by op-classes, merge duplicates
-	for (auto &opClass: _opClass) {
+	for (auto& opClass: _opClass) {
 		int bw = opClass.bandWidth;
 		bw_index_map[bw] = 0;
 	}
 
 	int numBW = 0;
-	for (auto &map: bw_index_map) {
+	for (auto& map: bw_index_map) {
 		int bw = map.first;
 		fprintf(fscan, ",NUM_CHAN_BLACK_%d_MHZ,NUM_CHAN_RED_%d_MHZ,NUM_CHAN_YELLOW_%d_MHZ,NUM_CHAN_GREEN_%d_MHZ", bw, bw, bw, bw);
 		// Note down the index of bandwidth in the map
@@ -10947,6 +10952,7 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 	/**************************************************************************************/
 
 	_minRlanHeightAboveTerrain = 1.5;
+	RlanRegionClass::minRlanHeightAboveTerrain = _minRlanHeightAboveTerrain;
 
 	_maxRadius = 150.0e3;
 	_exclusionDist = 1.0;
@@ -10960,11 +10966,11 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 
 	// Hardcode to US for now.
 	// When multiple countries are supported this need to come from AFC Configuration
-	for (auto opClass: OpClass::USOpClass) {
+	for (auto& opClass: OpClass::USOpClass) {
 		_opClass.push_back(opClass);
 	}
 
-	for (auto opClass: OpClass::PSDOpClassList) {
+	for (auto& opClass: OpClass::PSDOpClassList) {
 		_psdOpClassList.push_back(opClass);
 	}
 
@@ -11017,7 +11023,7 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 /**************************************************************************************/
 void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &psdFreqRangeList)
 {
-	for(auto freqRange : _inquiredFrquencyRangesMHz) {
+	for(auto& freqRange : _inquiredFrquencyRangesMHz) {
 		auto startFreqMHz = freqRange.first;
 		auto stopFreqMHz = freqRange.second;
 		psdFreqRangeClass psdFreqRange;
@@ -11029,7 +11035,7 @@ void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &ps
 			int nextFreqMHz = stopFreqMHz;
 			double minPSD;
 			int minNextFreq = stopFreqMHz;
-			for(auto channel : _channelList) {
+			for(auto& channel : _channelList) {
 				if ( (channel.type == INQUIRED_FREQUENCY) && (channel.availability != BLACK) && (channel.availability != RED) ) {
 					if ((channel.startFreqMHz <= prevFreqMHz) && (channel.stopFreqMHz > prevFreqMHz)) {
 						double psd = channel.eirpLimit_dBm - 10.0*log((double) channel.bandwidth())/log(10.0);
@@ -11087,7 +11093,7 @@ void AfcManager::createChannelList()
 	// add channel plan to channel list
 	int totalNumChan = 0;
 
-	for(auto freqRange : _inquiredFrquencyRangesMHz) {
+	for(auto& freqRange : _inquiredFrquencyRangesMHz) {
 		auto inquiredStartFreqMHz = freqRange.first;
 		auto inquiredStopFreqMHz = freqRange.second;
 
@@ -11135,21 +11141,21 @@ void AfcManager::createChannelList()
 		}
 	}
 
-	for(auto channelPair : _inquiredChannels) {
+	for(auto& channelPair : _inquiredChannels) {
 		LOGGER_DEBUG(logger) << "creating channels for operating class " << channelPair.first;
 
 		int numChan;
 		numChan = 0;
 
 		// Iterate each operating classes and add all channels of given operating class
-		for (auto &opClass: _opClass)
+		for (auto& opClass: _opClass)
 		{
 			// Skip of classes of not in inquired channel list
 			if (opClass.opClass != channelPair.first) {
 				continue;
 			}
 
-			for (auto &cfi: opClass.channels)
+			for (auto& cfi: opClass.channels)
 			{
 				bool includeChannel;
 
@@ -11212,7 +11218,7 @@ bool AfcManager::containsChannel(const std::vector<FreqBandClass>& freqBandList,
 {
 	auto segmentList = std::vector<std::pair<int,int>> { std::make_pair(chanStartFreqMHz, chanStopFreqMHz) };
 
-	for(auto freqBand : freqBandList) {
+	for(auto& freqBand : freqBandList) {
 		int bandStart = freqBand.getStartFreqMHz();
 		int bandStop  = freqBand.getStopFreqMHz();
 		int segIdx=0;

@@ -8,6 +8,7 @@
 #define RLAN_REGION_H
 
 #include <string>
+#include <armadillo>
 #include "cconst.h"
 #include "AfcDefinitions.h"
 #include "Vector3.h"
@@ -50,6 +51,7 @@ class RlanRegionClass
 		Vector3 computePointing(double azimuth, double elevation) const;
 
 		static double calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec F, arma::vec ptg, arma::vec& minLoc);
+		static double minRlanHeightAboveTerrain;
 
 	protected:
 		std::vector<std::tuple<int, int>> *calcScanPointVirtices(int **S, int NX, int NY) const;

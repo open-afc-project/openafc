@@ -37,6 +37,7 @@ from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from afcmodels.aaa import User, AccessPointDeny, AFCConfig, MTLS
 from afcmodels.base import db
 from .auth import auth
+from appcfg import ObjstConfig
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -44,13 +45,13 @@ LOGGER.setLevel(appcfg.AFC_RATAPI_LOG_LEVEL)
 
 #: All views under this API blueprint
 module = flask.Blueprint('ratapi-v1', 'ratapi')
-baseRegions =  ['US', 'CA', 'BR']
+baseRegions =  ['US', 'CA', 'BR', 'GB']
 
 def regions():
     return baseRegions + list(map(lambda s: 'DEMO_'+ s, baseRegions)) + list(map(lambda s: 'TEST_'+ s, baseRegions))
 
 def rulesets():
-    return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'BRAZIL_RULESETID'] + list(map(lambda s: 'DEMO_'+ s, baseRegions)) + list(map(lambda s: 'TEST_'+ s, baseRegions))
+    return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'BRAZIL_RULESETID','UNITEDKINGDOM_RULESETID'] + list(map(lambda s: 'DEMO_'+ s, baseRegions)) + list(map(lambda s: 'TEST_'+ s, baseRegions))
 
 
 # after 1.4 use Ruleset ID
@@ -64,7 +65,9 @@ def regionStrToRulesetId(region_str):
        'DEFAULT':'US_47_CFR_PART_15_SUBPART_E',
        'US':'US_47_CFR_PART_15_SUBPART_E',
        'CA':'CA_RES_DBS-06',
-       'BR':'BRAZIL_RULESETID'
+       'BR':'BRAZIL_RULESETID',
+       'GB':'UNITEDKINGDOM_RULESETID'
+
     }
     region_str = region_str.upper()
     try:
@@ -80,7 +83,9 @@ def rulesetIdToRegionStr(rulesetId):
     map = {
         'US_47_CFR_PART_15_SUBPART_E':'US',
         'CA_RES_DBS-06':'CA',
-        'BRAZIL_RULESETID':'BR'
+        'BRAZIL_RULESETID':'BR',
+        'UNITEDKINGDOM_RULESETID':'GB'
+
     }
     rulesetId = rulesetId.upper()
     try:

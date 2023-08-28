@@ -1,4 +1,33 @@
 # Release Note
+
+## **Version and Date**
+|Version|**OA-800*|
+| :- | :- |
+|**Date**|**08/24/2023**|
+
+## **Issues Addressed**
+ * Jira OA-782: Integrate Ofcom FS database
+ * Jira OA-784: Integrate EU's Corine Land Cover Database
+ * Jira OA-785: UI changes for Ofcom
+ * Jira OA-786: Add Country Boundary for United Kingdom
+ * Jira OA-789: Investigate the use of arma::vec3  
+ * Jira OA-800: Fix issues from Coverity Report (from 07/14/2023)
+ * Jira OA-803: Fix of treatment of uncertainty region being partially or completely underground
+
+## **Interface Changes**
+ * OA-782: There is a new FS database for UK (downloaded on 17-April-2023), FS_UK_2023-08-23T15_00_00.234567_fixedBPS_sorted_param.sqlite3, that can be downloaded from: https://drive.google.com/file/d/11OCk6ybbyn6Fy-uO4McEF1USzBej2diM/view?usp=drive_link
+
+ * OA-785: Added GB (=Great Britain) region to AFC Config GUI and Admin's Frequency Ranges.
+ * Added UnitedKingdom_RULESETID
+ * OA-786: country boundary GB.kml (attached to the jira ticket) needs to be placed in /mnt/oldother/rat_transfer/population.
+
+## **Testing Done**
+ * Tested UK AFC using the converted Corine Land Cover database (which will be submitted wtih OA-784). The test data is under OA-785 with the corresponding afc-config.json.
+ * Tested OA-803, by using AP height of -200m AGL and confirmed that 1.5m was used and the map data was shown successfully in the GUI.
+
+## **Open Issues** 
+ * OA-784 will be submitted separately.
+
 ## **Version and Date**
 |Version|3.8.6.0|
 | :- | :- |

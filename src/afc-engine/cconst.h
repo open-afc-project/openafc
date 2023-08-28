@@ -155,6 +155,7 @@ public:
 		CustomPathLossModel,
 		ISEDDBS06PathLossModel,
 		BrazilPathLossModel,
+		OfcomPathLossModel,
 		FSPLPathLossModel
 	};
 	/**************************************************************************************/
@@ -355,6 +356,7 @@ public:
 	static const StrTypeClass strHeightSourceList[];
 	static const StrTypeClass strSpectralAlgorithmList[];
 	static const StrTypeClass strPRTypeList[];
+	static const StrTypeClass strAntennaCategoryList[];
 };
 
 #endif
