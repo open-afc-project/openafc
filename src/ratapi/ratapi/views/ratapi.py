@@ -25,6 +25,7 @@ import gevent
 import datetime
 import requests
 import appcfg
+import threading
 from flask.views import MethodView
 import werkzeug.exceptions
 from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
@@ -127,6 +128,9 @@ class GuiConfig(MethodView):
     def get(self):
         ''' GET for gui config
         '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__.__name__}::{inspect.stack()[0][3]}()"
+                     f" {flask.request.cookies}")
 
         # Figure out the current server version
         try:
@@ -325,6 +329,8 @@ class ReloadAnalysis(MethodView):
     def get(self):
         ''' GET method for afc config
         '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__}::{inspect.stack()[0][3]}()")
         LOGGER.debug('getting analysisRequest')
         user_id = auth(roles=['AP', 'Analysis', 'Admin'])
         user = User.query.filter_by(id=user_id).first()
@@ -534,6 +540,8 @@ class AboutCSRF(MethodView):
     def get(self):
         ''' GET method for About
         '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
         resp = flask.make_response()
         about_content = "about_csrf.html"
@@ -657,6 +665,8 @@ class Phase1Analysis(MethodView):
 
             :param request_type: 'PointAnalysis', 'ExclusionZoneAnalysis', or 'HeatmapAnalysis'
         '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
         user_id = auth(roles=['Analysis'])
         user = User.query.filter_by(id=user_id).first()
@@ -721,6 +731,8 @@ class AnalysisKmlResult(MethodView):
 
     def get(self, task_id):
         ''' GET method for KML Result '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
         task = run.AsyncResult(task_id)
         LOGGER.debug('state: %s', task.state)
@@ -760,6 +772,8 @@ class AnalysisStatus(MethodView):
 
     def get(self, task_id):
         ''' GET method for Analysis Status '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
         task = run.AsyncResult(task_id)
 

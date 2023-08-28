@@ -33,6 +33,7 @@ import sqlite3
 import subprocess
 import sys
 import time
+from bs4 import BeautifulSoup
 from deepdiff import DeepDiff
 from multiprocessing.pool import Pool
 from string import Template
@@ -43,6 +44,9 @@ from _wfa_types import *
 
 AFC_URL_SUFFIX = '/fbrat/ap-afc/'
 AFC_REQ_NAME = 'availableSpectrumInquiry'
+AFC_WEBUI_URL_SUFFIX = '/fbrat/ratapi/v1/'
+AFC_WEBUI_REQ_NAME = 'availableSpectrumInquirySec'
+AFC_WEBUI_TOKEN = 'about_csrf'
 headers = {'content-type': 'application/json'}
 
 AFC_TEST_DB_FILENAME = 'afc_input.sqlite3'
@@ -91,12 +95,20 @@ class TestCfg(dict):
 
         new_req_json = json.loads(get_req.encode('utf-8'))
         new_req = json.dumps(new_req_json, sort_keys=True)
-        params_data = {
-            'conn_type':self['conn_type'],
-            'debug':self['debug'],
-            'edebug':cfg['elaborated_debug'],
-            'gui':self['gui']
-            }
+        if (self['webui'] is False):
+            params_data = {
+                'conn_type':self['conn_type'],
+                'debug':self['debug'],
+                'edebug':cfg['elaborated_debug'],
+                'gui':self['gui']
+                }
+        else:
+            # emulating request calll from webui
+            params_data = {
+                'debug':'True',
+                'edebug':cfg['elaborated_debug'],
+                'gui':'True'
+                }
         if (self['cache'] == False):
             params_data['nocache'] = 'True'
 
@@ -384,24 +396,37 @@ def get_md5(fname):
     return hash_md5.hexdigest()
 
 
-def _send_recv(cfg, req_data):
+def _send_recv(cfg, req_data, ssn=None):
     """Send AFC request and receiver it's response"""
-    app_log.debug(f"_send_recv()")
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
 
     new_req_json = json.loads(req_data.encode('utf-8'))
     new_req = json.dumps(new_req_json, sort_keys=True)
-    params_data = {
-        'conn_type':cfg['conn_type'],
-        'debug':cfg['debug'],
-        'edebug':cfg['elaborated_debug'],
-        'gui':cfg['gui']
-        }
-    if (cfg['cache'] == False):
-        params_data['nocache'] = 'True'
+    if (cfg['webui'] is False):
+        params_data = {
+            'conn_type':cfg['conn_type'],
+            'debug':cfg['debug'],
+            'edebug':cfg['elaborated_debug'],
+            'gui':cfg['gui']
+            }
+        if (cfg['cache'] == False):
+            params_data['nocache'] = 'True'
+        post_func = requests.post
+    else:
+        # emulating request call from webui
+        params_data = {
+            'debug':'True',
+            'gui':'True'
+            }
+        headers['Accept-Encoding'] = 'gzip, defalte'
+        headers['Referer'] = cfg['base_url'] + 'fbrat/www/index.html'
+        headers['X-Csrf-Token'] = cfg['token']
+        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
+                      f"Cookies: {requests.utils.dict_from_cookiejar(ssn.cookies)}")
+        post_func = ssn.post
 
     ser_cert=()
     cli_certs=None
-    app_log.debug(f"--- {cfg['ca_cert']}")
     if ((cfg['prot'] == AFC_PROT_NAME and
         cfg['verif'] == True) or (cfg['ca_cert'])):
 
@@ -427,7 +452,7 @@ def _send_recv(cfg, req_data):
     app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
     try:
-        rawresp = requests.post(
+        rawresp = post_func(
             cfg['url_path'],
             params=params_data,
             data=new_req,
@@ -458,7 +483,106 @@ def _send_recv(cfg, req_data):
                 resp = rawresp.json()
                 break
 
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
+                  f" Resp status: {rawresp.status_code}")
     return resp
+
+def _send_recv_token(cfg, ssn):
+    """Making login, open session and getting CSRF token"""
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
+
+    token = ''
+    ser_cert=()
+    cli_certs=None
+    app_log.debug(f"=== ser {type(ser_cert)}")
+    if ((cfg['prot'] == AFC_PROT_NAME and
+        cfg['verif'] == True) or (cfg['ca_cert'])):
+
+        # add mtls certificates if explicitly provided
+        if not isinstance(cfg['cli_cert'], type(None)):
+            cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
+
+        # add tls certificates if explicitly provided
+        if not isinstance(cfg['ca_cert'], type(None)):
+            ser_cert="".join(cfg['ca_cert'])
+            cfg['verif']=True
+        else:
+            os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
+            app_log.debug(f"REQUESTS_CA_BUNDLE "
+                f"{os.environ.get('REQUESTS_CA_BUNDLE')}")
+            if "REQUESTS_CA_BUNDLE" in os.environ:
+                ser_cert="".join(os.environ.get('REQUESTS_CA_BUNDLE'))
+                cfg['verif']=True
+            else:
+                app_log.error(f"Missing CA certificate while forced.")
+                return token
+
+    app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
+
+    # get login
+    ssn.headers.update({
+           'Accept-Encoding': 'gzip, defalte'
+          })
+    url_login = cfg['base_url'] + 'fbrat/user/sign-in'
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
+                  f"===> URL {url_login}\n"
+                  f"===> Status {ssn.headers}\n"
+                  f"===> Cookies: {ssn.cookies}\n")
+
+    try:
+        rawresp = ssn.get(url_login,
+                          stream=False,
+                          cert=cli_certs,
+                          verify=ser_cert if cfg['verif'] else False)
+    except (requests.exceptions.HTTPError,
+            requests.exceptions.ConnectionError) as err:
+        app_log.error(f"{err}")
+        return token
+    soup = BeautifulSoup(rawresp.text, 'html.parser')
+    inp_tkn = soup.find('input',id='csrf_token')
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
+                  f"<--- Status {rawresp.status_code}\n"
+                  f"<--- Headers {rawresp.headers}\n"
+                  f"<--- Cookies: {ssn.cookies}\n"
+                  f"<--- Input: {inp_tkn}\n")
+    token = inp_tkn.get('value')
+
+    # fetch username and password from test db
+    con = sqlite3.connect(cfg['db_filename'])
+    cur = con.cursor()
+    cur.execute('SELECT * FROM %s\n' % TBL_USERS_NAME)
+    found_user = cur.fetchall()
+    con.close()
+    found_json = json.loads(found_user[0][1])
+    app_log.debug(f"Found Users: {found_json['username']}")
+
+    form_data = {
+        'next':'/',
+        'reg_next':'/',
+        'csrf_token':token,
+        'username':found_json['username'],
+        'password':found_json['password']
+        }
+    ssn.headers.update({
+           'Content-Type': 'application/x-www-form-urlencoded',
+           'Referer': url_login
+          })
+    try:
+        rawresp = ssn.post(url_login,
+                           data=form_data,
+                           stream=False,
+                           cert=cli_certs,
+                           verify=ser_cert if cfg['verif'] else False)
+    except (requests.exceptions.HTTPError,
+            requests.exceptions.ConnectionError) as err:
+        app_log.error(f"{err}")
+        return token
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
+                  f"<--- Status {rawresp.status_code}\n"
+                  f"<--- Headers {rawresp.headers}\n"
+                  f"<--- Cookies: {ssn.cookies}\n")
+
+    return token
 
 
 def make_db(filename):
@@ -1425,6 +1549,13 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
     all_test_res = AFC_OK
     accum_secs = 0
 
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() "
+                  f"{type(cfg['webui'])} ")
+    ssn = None
+    if cfg['webui'] is True:
+        ssn = requests.Session()
+        cfg['token'] = _send_recv_token(cfg, ssn)
+
     for test_case in test_cases:
         # Default reset test_res value
         test_res = AFC_OK
@@ -1440,7 +1571,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         app_log.debug(f"{inspect.stack()[0][3]}() {request_data}")
 
         before_ts = time.monotonic()
-        resp = _send_recv(cfg, json.dumps(request_data))
+        resp = _send_recv(cfg, json.dumps(request_data), ssn)
         tm_secs = time.monotonic() - before_ts
         res=f"id {test_case} name {req_id} status $status time {tm_secs:.1f}"
         res_template = Template(res)
@@ -1448,6 +1579,8 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         if isinstance(resp, type(None)):
             test_res = AFC_ERR
             all_test_res = AFC_ERR
+        elif cfg['webui'] is True:
+            pass
         else:
             json_lookup('availabilityExpireTime', resp, '0')
             upd_data = json.dumps(resp, sort_keys=True)
@@ -1718,8 +1851,14 @@ def parse_run_test_args(cfg):
             # update URL if not the default protocol
             cfg['url_path'] = cfg['prot'] + '://'
 
-        cfg['url_path'] += str(cfg['addr'][0]) + ':' + str(cfg['port']) +\
-                           AFC_URL_SUFFIX + AFC_REQ_NAME
+        cfg['url_path'] += str(cfg['addr'][0]) + ':' + str(cfg['port'])
+        cfg['base_url'] = cfg['url_path'] + '/'
+        if cfg['webui'] is False:
+            cfg['url_path'] += AFC_URL_SUFFIX + AFC_REQ_NAME
+        else:
+            cfg['url_token'] = cfg['url_path'] + AFC_WEBUI_URL_SUFFIX +\
+                               AFC_WEBUI_TOKEN
+            cfg['url_path'] += AFC_URL_SUFFIX + AFC_WEBUI_REQ_NAME
     return AFC_OK
 
 
@@ -1799,6 +1938,8 @@ def make_arg_parser():
     args_parser.add_argument('--gui', action='store_true',
                          help="during a request make files "
                               "with details for debugging.\n")
+    args_parser.add_argument('--webui', action='store_true',
+                         help="during a request make files\n")
     args_parser.add_argument('--log', type=set_log_level,
                          default='info', dest='log_level',
                          help="<info|debug|warn|err|crit> - set "
