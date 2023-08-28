@@ -848,10 +848,14 @@ class RatAfc(MethodView):
 
 class RatAfcSec(RatAfc):
     def get(self):
+        LOGGER.debug(f"({threading.get_native_id()})"
+                    f" {self.__class__}::{inspect.stack()[0][3]}()")
         user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
         return super().get()
 
     def post(self):
+        LOGGER.debug(f"({threading.get_native_id()})"
+                    f" {self.__class__}::{inspect.stack()[0][3]}()")
         user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
         return super().post()
 
