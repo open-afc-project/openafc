@@ -1,5 +1,5 @@
 # Test user configuration
-Test user can chose **TEST_US** as a region in the AFC Config tab.  The admin needs to create AP with NRA of **TEST_FCC** for the test user to use in the query.
+Test user can chose from **TEST_US** **TEST_CA** or **TEST_BR** in the drop down in the Virtual AP tab.  The corresponding config for these test regsions should first be set in AFC Config tab by the admin.
 
 # New User Registration
 New user can request an account on the web page. Filling out the webform to request access to the Broadcom AFC website will send an email to the AFC Admin email alias e.g. afc-admin@broadcom.com.
@@ -33,12 +33,33 @@ ABOUT_CONTENT='your-private-template.html'
 
 ```
 
-Alternative, the values above can be set as environment variables in the rat_server container
+An alternative is to set the values above as environment variables in the rat_server container.
+Third option is to put the values in a json file eg.
+{
+    "USE_CAPTCHA":"True",
+    "CAPTCHA_SECRET":"somevalue"
+    "CAPTCHA_SITEKEY":"somevalue"
+    "CAPTCHA_VERIFY":"https://www.google.com/recaptcha/api/siteverify",
 
+    "MAIL_SERVER":"smtp.gmail.com",
+    "MAIL_PORT":"465",
+    "MAIL_USE_TLS":"False",
+    "MAIL_USE_SSL":"True",
+    "MAIL_USERNAME":"afc-management-email-address"
+    "MAIL_PASSWORD":"password",
+
+    "REGISTRATION_DEST_EMAIL":"where-the-registration-email-is-sent"
+    "REGISTRATION_DEST_PDL_EMAIL":"group-where-the-registration-email-is-sent"
+    "REGISTRATION_SRC_EMAIL":"afc-management-email-address"
+    "REGISTRATION_APPROVE_LINK":"approval link to include in email"
+    "ABOUT_CONTENT":"your-private-template.html"
+}
+The path for this json file can be passed to container via environment variable RATAPI_ARG, and the file itself can be passed as a secret
+
+The content of the about page can customized in src/ratapi/ratapi/templates/priv_about.html
 Withour your private template, a generic template is presented where the user can enter email,name,and organization.
-Once submitted, the afc server will send email to address specified above. SEND_MAIL must be true.  Details of mail server, port, email account, and password needs to be provided.
+Once submitted, the afc server will send email to address specified above. Details of mail server, port, email account, and password needs to be provided.
 Additional content of the about page can be put in a private template specified in ABOUT_CONTENT
 
 When USE_CAPTCHA is set, captcha is used on the about page to prevent robots from submitting requests.
 
-The content of the about page can customized in src/ratapi/ratapi/templates/priv_about.html

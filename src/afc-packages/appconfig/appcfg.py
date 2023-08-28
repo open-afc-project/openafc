@@ -114,18 +114,20 @@ class ObjstConfig(ObjstConfigBase):
                 raise InvalidEnvVar("Invalid AFC_OBJST_SCHEME env var.")
 
 
-class OIDCConfigurator(object):
+class SecretConfigurator(object):
 
-    def __init__(self):
-        # OIDC default configurations
-        self.OIDC_LOGIN = False
-        self.OIDC_CLIENT_ID = ""
-        self.OIDC_CLIENT_SECRET = ""
-        self.OIDC_DISCOVERY_URL = ""
+    def __init__(self, secret_env, bool_attr, str_attr, int_attr):
+        attr = bool_attr + str_attr + int_attr
 
-        bool_attr = ['OIDC_LOGIN']
-        str_attr = ['OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'OIDC_DISCOVERY_URL']
-        attr = bool_attr + str_attr
+        # Initialize to false and empty
+        for k in bool_attr:
+            setattr(self, k, False)
+
+        for k in str_attr:
+            setattr(self, k, "")
+
+        for k in str_attr:
+            setattr(self, k, 0)
 
         # load priv config if available.
         try:
@@ -150,16 +152,48 @@ class OIDCConfigurator(object):
             if ret:
                 setattr(self, k, ret)
 
+        # override int config with environment variables
+        for k in str_attr:
+            ret = os.getenv(k)
+            if ret:
+                setattr(self, k, int(ret))
+
         # Override values from config with secret file
-        if self.OIDC_LOGIN:
-            OIDC_ARG=os.getenv('OIDC_ARG')
-            if OIDC_ARG:
-                import json
-                with open(OIDC_ARG) as oidc_config:
-                    data = json.load(oidc_config)
-                    self.OIDC_CLIENT_SECRET=data['OIDC_CLIENT_SECRET']
-                    self.OIDC_CLIENT_ID=data['OIDC_CLIENT_ID']
-                    self.OIDC_DISCOVERY_URL=data['OIDC_DISCOVERY_URL']
+        secret_file = os.getenv(secret_env)
+        if secret_file:
+            import json
+            with open(secret_file) as secret_content:
+                data = json.load(secret_content)
+                for k in bool_attr:
+                    if k in data:
+                        setattr(self, k, data[k].lower() == 'true')
+                for k in str_attr:
+                    if k in data:
+                        setattr(self, k, data[k])
+                for k in int_attr:
+                    if k in data:
+                        setattr(self, k, int(data[k]))
+
+
+class OIDCConfigurator(SecretConfigurator):
+    def __init__(self):
+        oidc_bool_attr = ['OIDC_LOGIN']
+        oidc_str_attr = ['OIDC_CLIENT_ID', 'OIDC_CLIENT_SECRET', 'OIDC_DISCOVERY_URL']
+        oidc_env = 'OIDC_ARG'
+        super().__init__(oidc_env, oidc_bool_attr, oidc_str_attr, [])
+
+
+class RatApiConfigurator(SecretConfigurator):
+    def __init__(self):
+        ratapi_bool_attr = ['MAIL_USE_TLS', 'MAIL_USE_SSL', 'USE_CAPTCHA']
+        ratapi_str_attr = ['REGISTRATION_APPROVE_LINK', 'REGISTRATION_DEST_EMAIL',
+                    'REGISTRATION_DEST_PDL_EMAIL', 'REGISTRATION_SRC_EMAIL',
+                    'MAIL_PASSWORD', 'MAIL_USERNAME', 'MAIL_SERVER', 'CAPTCHA_SECRET',
+                    'CAPTCHA_SITEKEY', 'CAPTCHA_VERIFY']
+        ratapi_int_attr = ['MAIL_PORT']
+        ratapi_env = 'RATAPI_ARG'
+        super().__init__(ratapi_env, ratapi_bool_attr, ratapi_str_attr, ratapi_int_attr)
+
 
 # Msghnd configuration interfaces
 
