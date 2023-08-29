@@ -126,7 +126,7 @@ class SecretConfigurator(object):
         for k in str_attr:
             setattr(self, k, "")
 
-        for k in str_attr:
+        for k in int_attr:
             setattr(self, k, 0)
 
         # load priv config if available.
