@@ -153,7 +153,7 @@ class SecretConfigurator(object):
                 setattr(self, k, ret)
 
         # override int config with environment variables
-        for k in str_attr:
+        for k in int_attr:
             ret = os.getenv(k)
             if ret:
                 setattr(self, k, int(ret))
