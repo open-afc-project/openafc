@@ -90,7 +90,7 @@ def rulesetIdToRegionStr(rulesetId):
     rulesetId = rulesetId.upper()
     try:
         if rulesetId.startswith("DEMO_") or  rulesetId.startswith("TEST_"):
-            if(rulesets().contains(rulesetId)):
+            if rulesetId in rulesets():
                 return rulesetId
 
         return map[rulesetId]
