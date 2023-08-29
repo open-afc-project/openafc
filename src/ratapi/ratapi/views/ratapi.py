@@ -25,6 +25,7 @@ import gevent
 import datetime
 import requests
 import appcfg
+import threading
 from flask.views import MethodView
 import werkzeug.exceptions
 from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
@@ -36,6 +37,7 @@ from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from afcmodels.aaa import User, AccessPointDeny, AFCConfig, MTLS
 from afcmodels.base import db
 from .auth import auth
+from appcfg import ObjstConfig
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -43,13 +45,13 @@ LOGGER.setLevel(appcfg.AFC_RATAPI_LOG_LEVEL)
 
 #: All views under this API blueprint
 module = flask.Blueprint('ratapi-v1', 'ratapi')
-baseRegions =  ['US', 'CA', 'BR']
+baseRegions =  ['US', 'CA', 'BR', 'GB']
 
 def regions():
     return baseRegions + list(map(lambda s: 'DEMO_'+ s, baseRegions)) + list(map(lambda s: 'TEST_'+ s, baseRegions))
 
 def rulesets():
-    return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'BRAZIL_RULESETID'] + list(map(lambda s: 'DEMO_'+ s, baseRegions)) + list(map(lambda s: 'TEST_'+ s, baseRegions))
+    return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'BRAZIL_RULESETID','UNITEDKINGDOM_RULESETID'] + list(map(lambda s: 'DEMO_'+ s, baseRegions)) + list(map(lambda s: 'TEST_'+ s, baseRegions))
 
 
 # after 1.4 use Ruleset ID
@@ -63,7 +65,9 @@ def regionStrToRulesetId(region_str):
        'DEFAULT':'US_47_CFR_PART_15_SUBPART_E',
        'US':'US_47_CFR_PART_15_SUBPART_E',
        'CA':'CA_RES_DBS-06',
-       'BR':'BRAZIL_RULESETID'
+       'BR':'BRAZIL_RULESETID',
+       'GB':'UNITEDKINGDOM_RULESETID'
+
     }
     region_str = region_str.upper()
     try:
@@ -79,12 +83,14 @@ def rulesetIdToRegionStr(rulesetId):
     map = {
         'US_47_CFR_PART_15_SUBPART_E':'US',
         'CA_RES_DBS-06':'CA',
-        'BRAZIL_RULESETID':'BR'
+        'BRAZIL_RULESETID':'BR',
+        'UNITEDKINGDOM_RULESETID':'GB'
+
     }
     rulesetId = rulesetId.upper()
     try:
         if rulesetId.startswith("DEMO_") or  rulesetId.startswith("TEST_"):
-            if(rulesets().contains(rulesetId)):
+            if rulesetId in rulesets():
                 return rulesetId
 
         return map[rulesetId]
@@ -127,6 +133,9 @@ class GuiConfig(MethodView):
     def get(self):
         ''' GET for gui config
         '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__.__name__}::{inspect.stack()[0][3]}()"
+                     f" {flask.request.cookies}")
 
         # Figure out the current server version
         try:
@@ -325,6 +334,8 @@ class ReloadAnalysis(MethodView):
     def get(self):
         ''' GET method for afc config
         '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__}::{inspect.stack()[0][3]}()")
         LOGGER.debug('getting analysisRequest')
         user_id = auth(roles=['AP', 'Analysis', 'Admin'])
         user = User.query.filter_by(id=user_id).first()
@@ -534,6 +545,8 @@ class AboutCSRF(MethodView):
     def get(self):
         ''' GET method for About
         '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
         resp = flask.make_response()
         about_content = "about_csrf.html"
@@ -657,6 +670,8 @@ class Phase1Analysis(MethodView):
 
             :param request_type: 'PointAnalysis', 'ExclusionZoneAnalysis', or 'HeatmapAnalysis'
         '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
         user_id = auth(roles=['Analysis'])
         user = User.query.filter_by(id=user_id).first()
@@ -721,6 +736,8 @@ class AnalysisKmlResult(MethodView):
 
     def get(self, task_id):
         ''' GET method for KML Result '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
         task = run.AsyncResult(task_id)
         LOGGER.debug('state: %s', task.state)
@@ -760,6 +777,8 @@ class AnalysisStatus(MethodView):
 
     def get(self, task_id):
         ''' GET method for Analysis Status '''
+        LOGGER.debug(f"({threading.get_native_id()})"
+                     f" {self.__class__.__name__}::{inspect.stack()[0][3]}()")
 
         task = run.AsyncResult(task_id)
 

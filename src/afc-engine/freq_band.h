@@ -21,9 +21,9 @@ class FreqBandClass
 		void setStartFreqMHz(int startFreqMHzVal) { startFreqMHz = startFreqMHzVal; }
 		void setStopFreqMHz(int stopFreqMHzVal) { stopFreqMHz = stopFreqMHzVal; }
 
-		std::string getName() { return name; }
-		int getStartFreqMHz() { return startFreqMHz; }
-		int getStopFreqMHz() { return stopFreqMHz; }
+		std::string getName() const { return name; }
+		int getStartFreqMHz() const { return startFreqMHz; }
+		int getStopFreqMHz() const { return stopFreqMHz; }
 
 	private:
 		std::string name;

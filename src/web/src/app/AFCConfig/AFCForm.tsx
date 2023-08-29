@@ -2,7 +2,7 @@ import * as React from "react";
 import { FormGroup, InputGroup, TextInput, InputGroupText, FormSelect, FormSelectOption, ActionGroup, Checkbox, Button, AlertActionCloseButton, Alert, Gallery, GalleryItem, Card, CardBody, Modal, TextArea, ClipboardCopy, ClipboardCopyVariant, Tooltip, TooltipPosition, Radio, CardHead, PageSection } from "@patternfly/react-core";
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import { AFCConfigFile, PenetrationLossModel, PolarizationLossModel, BodyLossModel, AntennaPatternState, DefaultAntennaType, UserAntennaPattern, RatResponse, PropagationModel, APUncertainty, ITMParameters, FSReceiverFeederLoss, FSReceiverNoise, FreqRange, CustomPropagation, ChannelResponseAlgorithm } from "../Lib/RatApiTypes";
-import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, exportCache, getRegions, getAllowedRanges } from "../Lib/RatApi";
+import { getDefaultAfcConf, guiConfig, getAfcConfigFile, putAfcConfigFile, importCache, getRegions, getAllowedRanges } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Limit, getDeniedRegionsCsvFile } from "../Lib/Admin";
 import { AllowedRangesDisplay, getDefaultRangesByRegion } from './AllowedRangesForm'
@@ -82,7 +82,7 @@ export class AFCForm extends React.Component<
 
     private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
     private setUlsRegion = (n: string) => {
-       // this.setState({ config: Object.assign(this.state.config, { regionStr: n }) });
+        // this.setState({ config: Object.assign(this.state.config, { regionStr: n }) });
         // region changed by user, reload the coresponding configuration for that region
         getAfcConfigFile(n).then(
             res => {
@@ -186,6 +186,14 @@ export class AFCForm extends React.Component<
                 if (propModel.win2ConfidenceCombined! < 0 || propModel.win2ConfidenceCombined! > 100) return err();
                 if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
                 break;
+            case "Ofcom Propagation Model":
+                if (propModel.itmConfidence < 0 || propModel.itmConfidence > 100) return err();
+                if (propModel.itmReliability < 0 || propModel.itmReliability > 100) return err();
+                if (propModel.win2ConfidenceCombined < 0 || propModel.win2ConfidenceCombined > 100) return err();
+                if (propModel.p2108Confidence < 0 || propModel.p2108Confidence > 100) return err();
+                if (propModel.buildingSource != "LiDAR" && propModel.buildingSource != "B-Design3D" && propModel.buildingSource != "None") return err();
+                if (propModel.terrainSource != "SRTM (30m)") return err("Invalid terrain source.");
+                break;
             default:
                 return err();
         }
@@ -267,7 +275,7 @@ export class AFCForm extends React.Component<
     private getConfig = () => JSON.stringify(this.state.config);
 
     private export = () =>
-        new Blob([JSON.stringify(Object.assign(exportCache(), { afcConfig: this.state.config }))], {
+        new Blob([JSON.stringify(Object.assign({afcConfig: this.state.config }))], {
             type: "application/json"
         });
 

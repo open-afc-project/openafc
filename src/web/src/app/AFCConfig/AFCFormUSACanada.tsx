@@ -258,6 +258,10 @@ export class AFCFormUSACanada extends React.Component<
                 return <>
                     <FormSelectOption key="Brazilian Land Cover" value="rat_transfer/nlcd/br/landcover-for-brazil.tbd.tif" label="Land Cover of Brazil (TBD)" />
                 </>
+            case 'GB':
+                return <>
+                    <FormSelectOption key="Corine Land Cover" value="rat_transfer/nlcd/eu/U2018_CLC2012_V2020_20u1_resampled.tif" label="Corine Land Cover" />
+                </>
             case "US":
             default:
                 return <>
@@ -275,6 +279,8 @@ export class AFCFormUSACanada extends React.Component<
                 return 'rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif';
             case "BR":
                 return 'rat_transfer/nlcd/br/landcover-for-brazil.tbd.tif'
+            case 'GB':
+                return 'rat_transfer/nlcd/eu/U2018_CLC2012_V2020_20u1_resampled.tif'
             case "US":
             default:
                 return 'rat_transfer/nlcd/nlcd_production';
@@ -533,7 +539,8 @@ export class AFCFormUSACanada extends React.Component<
             {(this.props.config.propagationModel.kind === "ITM with no building data"
                 || this.props.config.propagationModel.kind == "FCC 6GHz Report & Order"
                 || this.props.config.propagationModel.kind == "ISED DBS-06"
-                || this.props.config.propagationModel.kind == "Brazilian Propagation Model") &&
+                || this.props.config.propagationModel.kind == "Brazilian Propagation Model"
+                || this.props.config.propagationModel.kind == "Ofcom Propagation Model") &&
                 <GalleryItem>
                     <FormGroup
                         label="AP Propagation Environment"
