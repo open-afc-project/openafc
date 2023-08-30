@@ -50,13 +50,17 @@ http {
         #ssl_stapling on;
         #ssl_stapling_verify on;
 
-
         server_name _;
         set $afc_https_enforce ${AFC_ENFORCE_HTTPS};
+        # To enforce check mTLS set AFC_ENFORCE_MTLS to the value "true"
+        # otherwise it is optional
+        set $afc_mtls_status ${AFC_ENFORCE_MTLS};
 
         if ($should_redirect = 1) {
             return 301 https://$host$request_uri;
         }
+
+        set $afc_mtls_enforce ${AFC_ENFORCE_MTLS};
 
         location /fbrat/ap-afc/availableSpectrumInquirySec {
            #if ($ssl_client_verify != SUCCESS) {
@@ -83,9 +87,13 @@ http {
         }
 
         location /fbrat/ap-afc/availableSpectrumInquiry {
-           #if ($ssl_client_verify != SUCCESS) {
-           #    return 403;
-           #}
+            if ($ssl_client_verify != SUCCESS) {
+                set $afc_mtls_status "${afc_mtls_status}_false";
+            }
+            # check if mtls is enforced and ssl_client_verify is not success
+            if ($afc_mtls_status = true_false) {
+                return 403;
+            }
             # disable buffering for latency
             proxy_buffering off;
             # response to a request
