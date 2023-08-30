@@ -5,7 +5,6 @@
 # a copy of which is included with this software program
 #
 
-
 FROM alpine:3.18
 
 # True if enabled (default is True)
@@ -57,8 +56,11 @@ COPY rcache/requirements.txt /wd
 RUN pip3 install  --root-user-action=ignore -r /wd/requirements.txt
 COPY rcache/rcache_app.py rcache/rcache_app.py rcache/rcache_db_async.py \
     rcache/rcache_service.py /wd/
+COPY tools/rcache/rcache_tool.py /wd
+RUN chmod a+x /wd/rcache_tool.py
 
 ENTRYPOINT uvicorn rcache_app:app --host 0.0.0.0 --port ${RCACHE_PORT} \
     ${RCACHE_UVICORN_PARAMS}
 
-HEALTHCHECK CMD curl -f http://localhost:${RCACHE_PORT}/healthcheck || exit 1
+HEALTHCHECK --start-period=20s \
+    CMD curl -f http://localhost:${RCACHE_PORT}/healthcheck || exit 1

@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-fastapi
-uvicorn
-alembic
 asyncpg
+fastapi
+tabulate
+uvicorn
