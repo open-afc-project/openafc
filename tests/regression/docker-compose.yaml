@@ -22,6 +22,8 @@ services:
       - ${VOL_H_NGNX:-/tmp}:${VOL_C_NGNX:-/dummyngnx}
     environment:
       - AFC_ENFORCE_HTTPS=${AFC_ENFORCE_HTTPS:-TRUE}
+      # set to true if required to enforce mTLS check
+      - AFC_ENFORCE_MTLS=false
       - AFC_MSGHND_NAME=msghnd
       - AFC_MSGHND_PORT=8000
       - AFC_WEBUI_NAME=rat_server

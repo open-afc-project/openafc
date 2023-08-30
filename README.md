@@ -368,6 +368,8 @@ services:
       - AFC_MSGHND_PORT=8000
       - AFC_WEBUI_NAME=rat_server
       - AFC_WEBUI_PORT=80
+      # set AFC_ENFORCE_MTLS if required to enforce mTLS check
+      - AFC_ENFORCE_MTLS=true
     depends_on:
       - msghnd
       - rat_server
