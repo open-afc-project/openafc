@@ -30,6 +30,7 @@ This also contains all lidar tiles where each city has a subdirectory with tiles
 * **globe:** contains NOAA GLOBE (1km resolution) terrain database.
 * **3dep:** The 1_arcsec subdirectory (one currently used) contains 1arcsec (=30m) 3DEP terrain database files
 * **nlcd:** contains nlcd_2019_land_cover_I48_20210604_resample.zip (referred to as "Production NLCD" in AFC Config UI) and federated_nlcd.zip (referred to as "WFA Test NLCD" in AFC Config UI) files. This is used to determine RLAN/FS morphology (i.e. Urban, Suburban or Rural) to pick the appropriate path/clutter loss model. In addition, it is used to determine the appropriate P.452 Rural clutter category.
+* **clc:** Corine Land Cover is land categorization over the EU used to determine RLAN/FS morphology. 
 * **itudata:** contains two ITU maps that are used by the ITM path loss model. 1) Radio Climate map (TropoClim.txt) and 2) Surface Refractivity map (N050.txt)
 
 ### **Location or procedure to download/acquire these databases**
@@ -42,6 +43,7 @@ This also contains all lidar tiles where each city has a subdirectory with tiles
 * **globe:** https://ngdc.noaa.gov/mgg/topo/globe.html
 * **3dep:** https://data.globalchange.gov/dataset/usgs-national-elevation-dataset-ned-1-arc-second
 * **nlcd:** original file nlcd_2019_land_cover_I48_20210604 was downloaded from [link](https://www.mrlc.gov/data?f%5B0%5D=category%3Aland%20cover) (download NLCD 2019 Land Cover (CONUS)). Usig gdal utilties this file was translated to nlcd_2019_land_cover_I48_20210604_resample.zip so that the 1-arcsec tiles matchup with 1-arcsec 3DEP tiles. The federated_nlcd.zip file was obtained by using other gdal utilities to convert federated's many files to one file covering CONUS.
+* **clc:** Download from the [Copernicus](https://land.copernicus.eu/pan-european/corine-land-cover/clc2018) website  (download the GeoTIFF data). Login required.
 * **itudata:** Radio Climate map from ITU-R Rec, P.617-3 (https://www.itu.int/rec/R-REC-P.617-3-201309-S/en) and Surface Refractivity map from ITU-R Rec, P.452-17 (https://www.itu.int/rec/R-REC-P.452-17-202109-I/en)
 
 ### **Licences and Source Citations**
@@ -80,6 +82,22 @@ Creative Commons Attribution 4.0 International (CC BY) License (https://creative
 
 Center for International Earth Science Information Network - CIESIN - Columbia University. 2018. Gridded Population of the World, Version 4 (GPWv4): Population Density, Revision 11. Palisades, New York: NASA Socioeconomic Data and Applications Center (SEDAC). https://doi.org/10.7927/H49C6VHW 
 
+#### **Corine Land Cover**
+
+Access to data is based on a principle of full, open and free access as established by the Copernicus data and information policy Regulation (EU) No 1159/2013 of 12 July 2013. This regulation establishes registration and licensing conditions for GMES/Copernicus users and can be found [here](http://eur-lex.europa.eu/legal-content/EN/TXT/?uri=CELEX%3A32013R1159)
+
+Free, full and open access to this data set is made on the conditions that:
+
+1. When distributing or communicating Copernicus dedicated data and Copernicus service information to the public, users shall inform the public of the source of that data and information.
+2.  Users shall make sure not to convey the impression to the public that the user's activities are officially endorsed by the Union.
+3.  Where that data or information has been adapted or modified, the user shall clearly state this.
+4.  The data remain the sole property of the European Union. Any information and data produced in the framework of the action shall be the sole property of the European Union. Any communication and publication by the beneficiary shall acknowledge that the data were produced “with funding by the European Union”.
+
+
+Reference:
+
+&copy;European Union, Copernicus Land Monitoring Service 2018, European Environment Agency (EEA)
+
 ## **Database Update**
 
 ### **Expected update frequency of each database file**
@@ -92,6 +110,7 @@ Center for International Earth Science Information Network - CIESIN - Columbia U
 * **globe:** every few years (whenever a new database is available)
 * **3dep:** every few years (whenever a new database is available)
 * **nlcd:** every few years (whenever a new database is available)
+* **clc:** every few years (whenever a new database is available)
 * **itudata:** these haven't been updated for a long time but can be updated if new maps are generated.
 
 ### **Database update procedure**
@@ -103,6 +122,7 @@ Center for International Earth Science Information Network - CIESIN - Columbia U
 * **globe:** download database and put in the proper directory
 * **3dep:** download database and put in the proper directory
 * **nlcd:** download database, run proper gdal utilties to orient the tiles matching 3DEP 1-arcsec tiles and put in the proper directory
+* **clc:** download database, run proper gdal scripts (open-afc/tools/geo_converters) to convert the data categorization mapping and coordinate system and put in the proper directory
 
 ## **Database Processing/Format**
 ### **Processing done (in any) on the original database to convert it to a format usable by afc-engine**

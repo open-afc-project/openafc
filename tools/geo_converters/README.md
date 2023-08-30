@@ -39,6 +39,7 @@ License, a copy of which is included with this software program.
     - [NLCD land usage files](#nlcd_routine)
     - [NOOA land usage files](#noaa_routine)
     - [Canada land usage files](#canada_land_usage_routine)
+    - [Corine land cover files](#corine_land_cover_files)
 - [*proc_gdal* - creating LiDAR files](#proc_gdal)
 
 ## General considerations <a name="general_considerations"/>
@@ -252,7 +253,10 @@ Source data for these files released in different forms:
 
 * NOAA files - contain (as of time of this writing) more recent and detailed land usage data for Hawaii, Puerto Rico, Virgin Islands. These files also have map projection (not geodetic) coordinate system, also they have different land usage codes (that need to be translated to NLCD land usage codes).
 
-* Canada land usage file - covers entire Canada, uses map projection coordinate system and yet anther land usage codes.
+* Canada land usage file - covers entire Canada, uses map projection coordinate system and yet another land usage codes.
+
+* Corine land cover files - covers the EU, uses map projection coordinate system and (suprise) another set of land usage codes.
+
 
 `nlcd_wgs84.py` script converts NLCD data files from the source format to one, used by AFC Engine.
 
@@ -270,7 +274,7 @@ Options:
 |--bottom **MIN_LAT**|Optional lower crop boundary. **MIN_LAT** is north-positive latitude in degrees|
 |--left **MIN_LON**|Optional left crop boundary. **MIN_LON** is east-positive longitude in degrees|
 |--right **MAX_LON**|Optional right crop boundary. **MAX_LON** is east-positive longitude in degrees|
-|--encoding **ENCODING**|Translate land codes from given encoding (as of time of this writing - 'noaa' or 'canada'). All encodings defined in *nlcd_wgs84.yaml* file|
+|--encoding **ENCODING**|Translate land codes from given encoding (as of time of this writing - 'noaa', 'canada', or 'corine'). All encodings defined in *nlcd_wgs84.yaml* file|
 |--format **FORMAT**|Output file format (short) name. By default guessed from output file extension. See [GDAL Raster Drivers](https://gdal.org/drivers/raster/index.html) for more information|
 |--format_param **NAME=VALUE**|Set output format option. See [GDAL Raster Drivers](https://gdal.org/drivers/raster/index.html) for more information|
 |--resampling **METHOD**|Resampling method to use. Default for land usage is 'nearest'. See [gdalwarp -r](https://gdal.org/programs/gdalwarp.html#cmdoption-gdalwarp-r) for more details|
@@ -737,6 +741,25 @@ Takes ~50 minutes on 8 CPUs. YMMV
 4. Converting tiles in *tiled_canada_lc_wgs84_tif* directory to PNG. Result in *tiled_canada_lc_wgs84_png* directory:  
 `to_png.py --out_dir tiled_canada_lc_wgs84_png 'tiled_canada_lc_wgs84_tif/*.tif'`
 Takes ~4 minutes om 8 CPU. YMMV
+
+### Corine land cover files <a name="corine_land_cover_files"/>
+The Corine land cover is the database from the Copernicus program of the EU space program. It provides land classification over the EU.
+
+1. Downloading source. From [the CLC 2018](https://land.copernicus.eu/pan-european/corine-land-cover/clc2018) page, download the GeoTIFF version of the data (login required). Unzip to *corine_lc_sources* folder
+
+2. Converting Corine land cover sources (that use map projection coordinate system) in *corine_lc_sources* to TIFF files in WGS84 coordinate system and with the land cover mapping in the `.yaml` file applied to put in the same format as the NLCD data:
+```
+nlcd_wgs84.py --encoding corine --pixels_per_degree 3600 \ 
+    --format_param COMPRESS=PACKBITS corine_lc_sources/DATA/U2018_CLC2018_V2020_20u1.tif \
+    corine_lc_sources/DATA/U2018_CLC2018_V2020_20u1_resampled.tif
+```
+
+3. Tiling the Corine land cover (if necessary) to a director *tiled_corine_lc_wgs84_tif*:
+```
+tiler.py --format_param COMPRESS=PACKBITS --remove_value 0 \
+    --tile_pattern 'tiled_corine_lc_wgs84_tif/{lat_hem}{lat_u:02}{lon_hem}{lon_l:03}.tif' \
+    corine_lc_sources/Data/U2018_CLC2018_V2020_20u1_resampled.tif
+```
 
 ## *proc_gdal* - creating LiDAR files <a name="proc_gdal"/>
 This directory contains undigested, but very important files that convert LiDAR files from source format (as downloaded from https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities/ ) to form, compatible with AFC Engine (two-band geodetic raster files and their index .csv files)

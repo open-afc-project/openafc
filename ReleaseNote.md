@@ -1,6 +1,37 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-784*|
+| :- | :- |
+|**Date**|**08/25/2023**|
+
+## **Issues Addressed**
+ * Jira OA-784: Integrate EU's Corine Land Cover Database
+
+## **Interface Changes**
+
+ * OA-784: Added Corine Land Cover to AFC Config GUI. This file was reformatted using the updated script on Github (nlcd_wgs84.py) to align with 1arcsec 3dep data as well as an updated map conversion on Github (nlcd_wgs84.yaml) that includes the CLC-to-NLCD conversion (proposed as attached to the jira ticket). This file needs to be placed at rat_transfer/nlcd/eu/U2018_CLC2012_V2020_20u1_resampled.tif
+ * Note that the tiles in the CLC database do not line up with the SRTM data, they are off by 0.5 arcseconds. They are lined up with 1arcsec 3DEP but 3DEP is not used in Europe.
+ * SRTM has bins [-0.5, 0.5, 1.5, 2.5 ....] arcseconds, so that the bin center lies on integer arcseconds vs. CLC has bins [0, 1, 2, 3, 4, ...] arcseconds so the bin center is on half integer arcseconds. 
+ * Since the data is still accurate and we don’t necessarily need to align with SRTM database, for now, we left this as is but in future, we can reformat the database to align with 1arcsecond SRTM.
+
+ * To generate the U2018_CLC2012_V2020_20u1_resampled.tif, please follow the steps in database_readme file on Github as well as the readme under tools/geo_converters/ (please see below as well).
+
+* Below are the details of the changes to the OpenAFC geo_converters tool to be able to convert the Corine Land Cover database to the NLCD format.
+* 1.	Added a new encoding from Corine to NLCD in the nlcd_wgs84.yaml as documented in the OA-784 JIRA Ticket.
+* 2.	Added a new GDAL data type to the _DATA_SIZE struct (line 215 of nlcd_wgs84.py). The data type for the CLC data is an 8 bit signed integer, GDT_Int8, which is new in GDAL version 3.7.0 and was not previously defined in the python code. I've added this definition.
+* 3.	Updated the geo_converters README.md to include instructions for converting the CLC database to the NLCD format with WGS84 coordinate system required by OpenAFC. Followed the schema of the other instructions.
+
+* FYI, the original and the resampled clc files can be found on Google Drive: https://drive.google.com/drive/folders/11D_FmyPuFYL7PakZ763fcTQ6qTT4rXDM
+
+## **Testing Done**
+ * Did an end-to-end UK test (as attached to OA-785) and confirmed getting expected results.
+
+
+## **Open Issues** 
+ * 
+
+## **Version and Date**
 |Version|**OA-800*|
 | :- | :- |
 |**Date**|**08/24/2023**|
@@ -27,6 +58,7 @@
 
 ## **Open Issues** 
  * OA-784 will be submitted separately.
+
 
 ## **Version and Date**
 |Version|3.8.6.0|

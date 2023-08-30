@@ -232,3 +232,144 @@ encodings:
             19:
                 description: "Snow and Ice"
                 target_code: 12
+    corine:
+        codes:
+            1:
+                description: "Continuous urban fabric"
+                target_code: 24
+            2:
+                description: "Discontinuous urban fabric"
+                target_code: 23
+            3:
+                description: "Industrial or commercial units"
+                target_code: 22
+            4:
+                description: "Road and rail networks and associated land"
+                target_code: 22
+            5:
+                description: "Port areas"
+                target_code: 22
+            6:
+                description: "Airports"
+                target_code: 22
+            7:
+                description: "Mineral extraction sites"
+                target_code: 21
+            8:
+                description: "Dump sites"
+                target_code: 21
+            9:
+                description: "Construction sites"
+                target_code: 21
+            10:
+                description: "Green urban areas"
+                target_code: 21
+            11:
+                description: "Sport and leisure facilities"
+                target_code: 22
+            12:
+                description: "Non-irrigated arable land"
+                target_code: 82
+            13:
+                description: "Permanently irrigated land"
+                target_code: 82
+            14:
+                description: "Rice fields"
+                target_code: 82
+            15:
+                description: "Vineyards"
+                target_code: 82
+            16:
+                description: "Fruit trees and berry plantations"
+                target_code: 82
+            17:
+                description: "Olive groves"
+                target_code: 82
+            18:
+                description: "Pastures"
+                target_code: 81
+            19:
+                description: "Annual crops associated with permanent crops"
+                target_code: 82
+            20:
+                description: "Complex cultivation patterns"
+                target_code: 82
+            21:
+                description: "Land principally occupied by agriculture with significant areas of natural vegetation"
+                target_code: 82
+            22:
+                description: "Agro-forestry areas"
+                target_code: 41
+            23:
+                description: "Broad-leaved forest"
+                target_code: 41
+            24:
+                description: "Coniferous forest"
+                target_code: 42
+            25:
+                description: "Mixed forest"
+                target_code: 43
+            26:
+                description: "Natural grasslands"
+                target_code: 71
+            27:
+                description: "Moors and heathland"
+                target_code: 52
+            28:
+                description: "Sclerophyllous vegetation"
+                target_code: 52
+            29:
+                description: "Transitional woodland-shrub"
+                target_code: 52
+            30:
+                description: "Beaches - dunes - sands"
+                target_code: 31
+            31:
+                description: "Bare rocks"
+                target_code: 31
+            32:
+                description: "Sparsely vegetated areas"
+                target_code: 31
+            33:
+                description: "Burnt areas"
+                target_code: 31
+            34:
+                description: "Glaciers and perpetual snow"
+                target_code: 12
+            35:
+                description: "Inland marshes"
+                target_code: 95
+            36:
+                description: "Peat bogs"
+                target_code: 95
+            37:
+                description: "Salt marshes"
+                target_code: 95
+            38:
+                description: "Salines"
+                target_code: 95
+            39:
+                description: "Intertidal flats"
+                target_code: 31
+            40:
+                description: "Water courses"
+                target_code: 11
+            41:
+                description: "Water bodies"
+                target_code: 11
+            42:
+                description: "Coastal lagoons"
+                target_code: 11
+            43:
+                description: "Estuaries"
+                target_code: 11
+            44:
+                description: "Sea and ocean"
+                target_code: 11
+            48:
+                description: "No data"
+                target_code: 0
+            -128:
+                description: "No data"
+                target_code: 0
+
