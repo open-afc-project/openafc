@@ -30,45 +30,6 @@ LOGGER = logging.getLogger(__name__)
 #: Current file path
 owndir = os.path.abspath(os.path.dirname(__file__))
 
-class RatApiConfigurator(object):
-
-    def __init__(self):
-        bool_attr = ['MAIL_USE_TLS', 'MAIL_USE_SSL', 'USE_CAPTCHA', 'SEND_MAIL']
-        str_attr = ['REGISTRATION_APPROVE_LINK', 'REGISTRATION_DEST_EMAIL',
-                    'REGISTRATION_DEST_PDL_EMAIL', 'REGISTRATION_SRC_EMAIL',
-                    'MAIL_PASSWORD', 'MAIL_USERNAME', 'MAIL_SERVER', 'CAPTCHA_SECRET',
-                    'CAPTCHA_SITEKEY', 'CAPTCHA_VERIFY']
-        int_attr = ['MAIL_PORT']
-        attr = bool_attr + str_attr + int_attr
-
-        # load priv config if available.
-        try:
-           from ratapi import priv_config
-           for k in attr:
-               val = getattr(priv_config, k, None)
-               if not val is None:
-                   setattr(self, k, val)
-        except:
-           priv_config = None
-
-        # override boolean config with environment variables
-        for k in bool_attr:
-            # Override with environment variables
-            ret = os.getenv(k)
-            if ret:
-                setattr(self, k, (ret.lower() == 'true'))
-
-        # override string config with environment variables
-        for k in str_attr:
-            ret = os.getenv(k)
-            if ret:
-                setattr(self, k, ret)
-
-        # override int config
-        for k in int_attr:
-            ret = os.getenv(k)
-            if ret:
-                setattr(self, k, int(ret))
 
 def create_app(config_override=None):
     ''' Build up a WSGI application for this server.
@@ -93,7 +54,7 @@ def create_app(config_override=None):
     flaskapp.config.from_object(appcfg.BrokerConfigurator())
     flaskapp.config.from_object(appcfg.ObjstConfig())
     flaskapp.config.from_object(appcfg.OIDCConfigurator())
-    flaskapp.config.from_object(RatApiConfigurator())
+    flaskapp.config.from_object(appcfg.RatApiConfigurator())
 
     # initial override from system config
     config_path = BaseDirectory.load_first_config('fbrat', 'ratapi.conf')

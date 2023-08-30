@@ -452,7 +452,11 @@ class Limits(MethodView):
         ''' get eirp limit '''
         try:
             limits = aaa.Limit.query.filter_by(id=0).first()
-            return flask.jsonify(limit=float(limits.min_eirp), enforce=limits.enforce)
+            if limits:
+                return flask.jsonify(limit=float(limits.min_eirp), enforce=limits.enforce)
+            else:
+                return flask.make_response('Min Eirp not configured', 404)
+
         except IntegrityError:
             raise exceptions.BadRequest("DB Error")
 
