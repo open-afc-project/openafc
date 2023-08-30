@@ -52,7 +52,7 @@ from urllib.parse import urlparse
 from .ratapi import rulesets
 from typing import Any, Dict, NamedTuple, Optional
 from rcache_models import RcacheClientSettings
-from rcache_client import ReqCacheClient
+from rcache_client import RcacheClient
 
 LOGGER = logging.getLogger(__name__)
 
@@ -323,7 +323,7 @@ def get_rcache():
     """ Returns RcacheClient instance for given app instance"""
     if not hasattr(flask.g, "rcache"):
         if rcache_settings.enabled:
-            flask.g.rcache = ReqCacheClient(rcache_settings, rmq_receiver=True)
+            flask.g.rcache = RcacheClient(rcache_settings, rmq_receiver=True)
             flask.g.rcache.connect(db=True, rmq=True)
         else:
             flask.g.rcache = None

@@ -27,7 +27,7 @@ import time
 from typing import cast, Dict, List, Optional, Set
 
 from uls_service_common import *
-from rcache_client import ReqCacheClient
+from rcache_client import RcacheClient
 from rcache_models import LatLonRect, RcacheClientSettings
 
 # Default value for --download_script
@@ -489,8 +489,8 @@ def main(argv: List[str]) -> None:
             enabled=args.rcache_enabled and bool(args.rcache_url),
             service_url=args.rcache_url)
     rcache_settings.validate_for(rcache=True)
-    rcache: Optional[ReqCacheClient] = \
-        ReqCacheClient(rcache_settings) if rcache_settings.enabled else None
+    rcache: Optional[RcacheClient] = \
+        RcacheClient(rcache_settings) if rcache_settings.enabled else None
 
     status_storage.write_milestone(StatusStorage.S.ServiceStart)
 

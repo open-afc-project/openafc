@@ -19,7 +19,7 @@ from fst import DataIf
 import defs
 import afctask
 from rcache_models import RcacheClientSettings
-from rcache_client import ReqCacheClient
+from rcache_client import RcacheClient
 
 LOGGER = get_task_logger(__name__)
 
@@ -39,7 +39,7 @@ conf = WorkerConfig()
 rcache_settings = RcacheClientSettings()
 # In this validation rcache is True to handle 'update_on_send' case
 rcache_settings.validate_for(rmq=True, rcache=True)
-rcache = ReqCacheClient(rcache_settings, rmq_receiver=False) \
+rcache = RcacheClient(rcache_settings, rmq_receiver=False) \
     if rcache_settings.enabled else None
 
 LOGGER.info('Celery Broker: %s', conf.BROKER_URL)
