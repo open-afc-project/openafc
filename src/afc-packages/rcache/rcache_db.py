@@ -10,19 +10,19 @@
 # pylint: disable=too-many-branches
 
 import sqlalchemy as sa
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, cast, Dict, List, Optional, Tuple
 import urllib.parse
 
 from rcache_common import dp, error, error_if, FailOnError, get_module_logger
 from rcache_models import DbRespState, DbRecord
 
-__all__ = ["ReqCacheDb"]
+__all__ = ["RcacheDb"]
 
 # Logger for this module
 LOGGER = get_module_logger()
 
 
-class ReqCacheDb:
+class RcacheDb:
     """ Base/synchronous part of cache pPostgres database handling
 
     Public attributes:
@@ -60,7 +60,7 @@ class ReqCacheDb:
             """
             self.dsn = \
                 urllib.parse.urlunsplit(
-                    urllib.parse.urlsplit(dsn).\
+                    urllib.parse.urlsplit(dsn).
                     _replace(path=f"/{self.ROOT_DB_NAME}"))
             self._engine: Any = None
             self.conn: Any = None
@@ -75,7 +75,7 @@ class ReqCacheDb:
                     # Connection failed
                     self._engine.dispose()
 
-        def __enter__(self) -> "ReqCacheDb._RootDb":
+        def __enter__(self) -> "RcacheDb._RootDb":
             """ Context entry """
             return self
 
@@ -138,8 +138,10 @@ class ReqCacheDb:
 
     def check_server(self) -> bool:
         """ True if database server can be connected """
-        with FailOnError(False), \
-                self._RootDb(self.rcache_db_dsn) as rdb:
+        error_if(not self.rcache_db_dsn,
+                 "AFC Response Cache URL was not specified")
+        assert self.rcache_db_dsn is not None
+        with FailOnError(False), self._RootDb(self.rcache_db_dsn) as rdb:
             rdb.conn.execute("SELECT 1")
             return True
         return False
@@ -162,7 +164,8 @@ class ReqCacheDb:
                     self._engine.dispose()
                     self._engine = None
                 error_if(not self.rcache_db_dsn,
-                         "AFC Request Cache URL was not specified")
+                         "AFC Response Cache URL was not specified")
+                assert self.rcache_db_dsn is not None
                 engine = self._create_sync_engine(self.rcache_db_dsn)
                 if recreate_db:
                     with self._RootDb(self.rcache_db_dsn) as rdb:
@@ -176,7 +179,7 @@ class ReqCacheDb:
                 try:
                     with engine.connect():
                         pass
-                except sa.exc.SQLAlchemyError as ex:
+                except sa.exc.SQLAlchemyError:
                     with self._RootDb(self.rcache_db_dsn) as rdb:
                         try:
                             rdb.conn.execute("COMMIT")
@@ -223,10 +226,10 @@ class ReqCacheDb:
                     self._engine.dispose()
                     self._engine = None
                 error_if(not self.rcache_db_dsn,
-                         "AFC Request Cache URL was not specified")
+                         "AFC Response Cache URL was not specified")
                 engine = self._create_engine(self.rcache_db_dsn)
                 dsn_parts = urllib.parse.urlsplit(self.rcache_db_dsn)
-                self.db_name = dsn_parts.path.strip("/")
+                self.db_name = cast(str, dsn_parts.path).strip("/")
                 self._read_metadata()
                 with engine.connect():
                     pass
@@ -300,7 +303,7 @@ class ReqCacheDb:
     def _create_engine(self, dsn) -> Any:
         """ Creates SqlAlchemy engine
 
-        Overloaded in ReqCacheDbAsync to create asynchronous engine
+        Overloaded in RcacheDbAsync to create asynchronous engine
 
         Returns Engine object
         """
@@ -309,7 +312,7 @@ class ReqCacheDb:
     def _create_sync_engine(self, dsn) -> Any:
         """ Creates synchronous SqlAlchemy engine
 
-        Overloaded in ReqCacheDbAsync to create asynchronous engine
+        Overloaded in RcacheDbAsync to create asynchronous engine
 
         Returns Engine object
         """

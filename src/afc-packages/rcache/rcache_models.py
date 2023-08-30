@@ -18,14 +18,16 @@ from typing import Any, Dict, List, Optional
 
 from rcache_common import dp
 
-__all__ = ["AfcReqRespKey", "DbRecord", "DbRespState", "IfDbExists",
+__all__ = ["AfcReqRespKey", "DbPk", "DbRecord", "DbRespState", "IfDbExists",
            "LatLonRect", "RatapiAfcConfig", "RatapiRulesetIds",
            "RcacheClientSettings", "RcacheInvalidateReq",
-           "RcacheServiceSettings", "RcacheSpatialInvalidateReq",
-           "RcacheUpdateReq", "RmqReqRespKey"]
+           "RcacheInvalidateSetState", "RcacheServiceSettings",
+           "RcacheSpatialInvalidateReq", "RcacheStatus", "RcacheUpdateReq",
+           "RmqReqRespKey"]
 
 # Format of response expiration time
 RESP_EXPIRATION_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+
 
 # What to do if cache database exists on RCache service startup
 class IfDbExists(enum.Enum):
@@ -77,6 +79,7 @@ class RcacheServiceSettings(pydantic.BaseSettings):
             None,
             title="RestAPI URL to retrieve AFC Config for given Ruleset ID")
 
+    @classmethod
     @pydantic.root_validator(pre=True)
     def _remove_empty(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """ Removes empty entries """
@@ -115,6 +118,7 @@ class RcacheClientSettings(pydantic.BaseSettings):
             title="True to update cache from worker (on sending response), "
             "False to update cache on msghnd (on receiving response)")
 
+    @classmethod
     @pydantic.root_validator(pre=True)
     def _remove_empty(cls, values: Dict[str, Any]) -> Dict[str, Any]:
         """ Removes empty entries """
@@ -172,6 +176,12 @@ class RcacheSpatialInvalidateReq(pydantic.BaseModel):
         pydantic.Field(..., title="List of rectangles, containing changed FSs")
 
 
+class RcacheInvalidateSetState(pydantic.BaseModel):
+    """ Enable/disable invalidation """
+    enabled: bool = \
+        pydantic.Field(..., title="Enable/disable Rcache invalidation """)
+
+
 class AfcReqRespKey(pydantic.BaseModel):
     """ Information about single computed result, used in request cache update
     request """
@@ -191,6 +201,39 @@ class RcacheUpdateReq(pydantic.BaseModel):
     """ RCache REST API cache update request """
     req_resp_keys: List[AfcReqRespKey] = \
         pydantic.Field(..., title="Computation results to add to cache")
+
+
+class RcacheStatus(pydantic.BaseModel):
+    """ Rcache service status information """
+    up_time: datetime.timedelta = pydantic.Field(..., title="Service up time")
+    db_connected: bool = \
+        pydantic.Field(..., title="Database successfully connected")
+    all_tasks_running: bool = \
+        pydantic.Field(..., title="All tasks running (none crashed)")
+    cache_size: int = \
+        pydantic.Field(
+            ...,
+            title="Total number of cache entries (including invalidated)")
+    update_queue_len: int = \
+        pydantic.Field(..., title="Number of pending records in update queue")
+    update_count: int = \
+        pydantic.Field(..., title="Number of updates written to database")
+    avg_update_write_rate: float = \
+        pydantic.Field(..., title="Average number of update writes per second")
+    avg_update_queue_len: float = \
+        pydantic.Field(..., title="Average number of pending update records")
+    invalidation_enabled: bool = \
+        pydantic.Field(..., title="Invalidation enabled")
+    num_invalidated: int = \
+        pydantic.Field(..., title="Number of records awaiting precomputation")
+    num_precomputed: int = \
+        pydantic.Field(..., title="Number of initiated precomputations")
+    active_precomputations: int = \
+        pydantic.Field(..., title="Number of active precomputations")
+    avg_precomputation_rate: float = \
+        pydantic.Field(
+            ...,
+            title="Average number precomputations initiated per per second")
 
 
 class AfcReqCertificationId(pydantic.BaseModel):
@@ -243,6 +286,7 @@ class AfcReqLocation(pydantic.BaseModel):
     radialPolygon: Optional[AfcReqRadialPolygon] = \
         pydantic.Field(None, title="Optional radial polygon descriptor")
 
+    @classmethod
     @pydantic.root_validator()
     def one_definition(cls, v: Dict[str, Any]) -> Dict[str, Any]:
         """ Verifies that exactly one type of AP location is specified """
@@ -250,7 +294,7 @@ class AfcReqLocation(pydantic.BaseModel):
                 (0 if v.get("linearPolygon") is None else 1) +
                 (0 if v.get("radialPolygon") is None else 1)) != 1:
             raise ValueError(
-                "Not exactly one AFC Request locati0on definition found")
+                "Not exactly one AFC Request location definition found")
         return v
 
     def center(self) -> AFcReqPoint:
@@ -310,13 +354,14 @@ class AfcRespAvailableSpectrumInquiryResponse(pydantic.BaseModel):
             "if response unsuccessful")
     response: AfcRespResponse = pydantic.Field(None, title="Response status")
 
-
+    @classmethod
     @pydantic.validator('availabilityExpireTime')
     def check_expiration_time_format(cls, v: Optional[str]) -> Optional[str]:
         """ Checks validity of 'availabilityExpireTime' """
         if v is not None:
             datetime.datetime.strptime(v, RESP_EXPIRATION_FORMAT)
         return v
+
 
 class AfcRespAvailableSpectrumInquiryResponseMessage(pydantic.BaseModel):
     """ Interesting part of AFC Response's
@@ -345,10 +390,37 @@ class RmqReqRespKey(pydantic.BaseModel):
 DbRespState = enum.Enum("DbRespState", ["Valid", "Invalid", "Precomp"])
 
 
+class DbPk(pydantic.BaseModel):
+    """ Fields that comprise database primary key """
+    serial_number: str = pydantic.Field(..., title="Device serial number")
+    rulesets: str = pydantic.Field(..., title="Concatenated ruleset IDs")
+    cert_ids: str = pydantic.Field(..., title="Concatenated certification IDs")
+
+    @classmethod
+    def from_req(
+            cls,
+            req_pydantic:
+            Optional[AfcReqAvailableSpectrumInquiryRequestMessage] = None,
+            req_str: Optional[str] = None) -> "DbPk":
+        if req_pydantic is None:
+            req_pydantic = \
+                AfcReqAvailableSpectrumInquiryRequestMessage.parse_raw(req_str)
+        first_request = req_pydantic.availableSpectrumInquiryRequests[0]
+        return \
+            DbPk(
+                serial_number=first_request.deviceDescriptor.serialNumber,
+                rulesets="|".join(cert.rulesetId for cert in
+                                  first_request.deviceDescriptor.
+                                  certificationId),
+                cert_ids="|".join(cert.id for cert in
+                                  first_request.deviceDescriptor.
+                                  certificationId))
+
+
 class DbRecord(pydantic.BaseModel):
     """ Database record in Pydantic representation
 
-    Structure must be kept in sync with one, defined in rcache_db.ReqCacheDb()
+    Structure must be kept in sync with one, defined in rcache_db.RcacheDb()
     """
     serial_number: str = pydantic.Field(..., title="Device serial number")
     rulesets: str = pydantic.Field(..., title="Concatenated ruleset IDs")
@@ -379,28 +451,26 @@ class DbRecord(pydantic.BaseModel):
                 rrk.afc_resp).availableSpectrumInquiryResponses[0]
         if resp.response.responseCode != 0:
             return None
-        req = \
+        req_pydantic = \
             AfcReqAvailableSpectrumInquiryRequestMessage.parse_raw(
-                rrk.afc_req).availableSpectrumInquiryRequests[0]
-        center = req.location.center()
+                rrk.afc_req)
+        pk = DbPk.from_req(req_pydantic=req_pydantic)
+        center = \
+            req_pydantic.availableSpectrumInquiryRequests[0].location.center()
         return \
             DbRecord(
-                serial_number=req.deviceDescriptor.serialNumber,
-                rulesets="|".join(cert.rulesetId for cert in
-                                  req.deviceDescriptor.certificationId),
-                cert_ids="|".join(cert.id for cert in
-                                  req.deviceDescriptor.certificationId),
+                **pk.dict(),
                 state=DbRespState.Valid.name,
                 config_ruleset=resp.rulesetId,
                 lat_deg=center.latitude,
                 lon_deg=center.longitude,
                 last_update=datetime.datetime.now(),
                 req_cfg_digest=rrk.req_cfg_digest,
-                validity_period_sec=None \
-                    if resp.availabilityExpireTime is None \
-                    else (datetime.datetime.strptime(
-                        resp.availabilityExpireTime, RESP_EXPIRATION_FORMAT) -
-                          datetime.datetime.utcnow()).total_seconds(),
+                validity_period_sec=None
+                if resp.availabilityExpireTime is None
+                else (datetime.datetime.strptime(
+                      resp.availabilityExpireTime, RESP_EXPIRATION_FORMAT) -
+                      datetime.datetime.utcnow()).total_seconds(),
                 request=rrk.afc_req,
                 response=rrk.afc_resp)
 
@@ -433,6 +503,9 @@ class DbRecord(pydantic.BaseModel):
                     f"database and in the {class_name} have different " \
                     f"types: {str(table.c[idx].type)} and {field_type} " \
                     f"respectively"
+        if set(c.name for c in table.c if c.primary_key) != \
+                set(DbPk.schema()["properties"].keys()):
+            return "Different primary key composition in database and DbPk"
         return None
 
     def get_patched_response(self) -> str:
