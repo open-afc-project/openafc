@@ -71,6 +71,11 @@ ENV AFC_WORKER_CELERY_OPTS=${AFC_WORKER_CELERY_OPTS:-"rat_1"}
 ENV AFC_WORKER_CELERY_LOG=${AFC_WORKER_CELERY_LOG:-WARNING}
 ENV AFC_WORKER_ENG_TOUT=${AFC_WORKER_ENG_TOUT:-600}
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
+
+# True to update Rcache by AFC Response sender (Worker), False to update by
+# AFC REsponse receiver (MsgHandler, RatAPI)
+ENV RCACHE_UPDATE_ON_SEND=True
+
 WORKDIR /wd
 ENV PGPORT=5432
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
