@@ -7,7 +7,7 @@
 #
 
 # pylint: disable=wrong-import-order, logging-fstring-interpolation
-# pylint: disable=too-many-arguments
+# pylint: disable=too-many-arguments, too-many-branches, too-many-nested-blocks
 
 import pika
 import pydantic
@@ -18,12 +18,12 @@ from typing import List, NamedTuple, Optional, Set
 from rcache_common import error, FailOnError, get_module_logger
 from rcache_models import RmqReqRespKey
 
-__all__ = ["ReqCacheRmq"]
+__all__ = ["RcacheRmq"]
 
 LOGGER = get_module_logger()
 
 
-class ReqCacheRmq:
+class RcacheRmq:
     """ RabbitMQ synchronous sender/receiver
 
     Public attributes:
@@ -34,7 +34,7 @@ class ReqCacheRmq:
     _connection -- Stuff pertinent to synchronous connection
     """
     # Exchange name
-    EXCHANGE_NAME = "ReqCacheExchange"
+    EXCHANGE_NAME = "RcacheExchange"
 
     # Number of reconnection attempts if connection is lost
     RECONNECT_ATTEMPTS = 3
@@ -55,7 +55,7 @@ class ReqCacheRmq:
             self._conn_params = pika.URLParameters(self.rmq_dsn)
         except pika.exceptions.AMQPError as ex:
             error(f"RabbitMQ URL '{self.rmq_dsn}' has invalid syntax: {ex}")
-        self._connection: Optional["ReqCacheRmq._Connection"] = None
+        self._connection: Optional["RcacheRmq._Connection"] = None
         self.rx_queue_name = \
             "afc_response_queue_" + \
             "".join(random.choices(string.ascii_uppercase + string.digits,
@@ -203,7 +203,8 @@ class ReqCacheRmq:
                 finally:
                     if timer_id is not None:
                         try:
-                            self._connection.connection.remove_timeout(timer_id)
+                            self._connection.connection.remove_timeout(
+                                timer_id)
                         except pika.exceptions.AMQPError:
                             pass
                         timer_id = None

@@ -6,7 +6,7 @@
 # a copy of which is included with this software program
 #
 
-# pylint: disable=wrong-import-order, too-many-arguments
+# pylint: disable=wrong-import-order, too-many-arguments, invalid-name
 
 import pydantic
 import sys
@@ -16,33 +16,33 @@ from rcache_common import error, error_if, get_module_logger, \
     include_stack_to_error_log, set_error_exception
 
 try:
-    from rcache_db import ReqCacheDb
+    from rcache_db import RcacheDb
 except ImportError:
     pass
 
 try:
     from rcache_models import AfcReqRespKey, LatLonRect, RcacheClientSettings
-    from rcache_rcache import ReqCacheRcache
+    from rcache_rcache import RcacheRcache
 except ImportError:
     pass
 
 try:
-    from rcache_rmq import ReqCacheRmq
+    from rcache_rmq import RcacheRmq
 except ImportError:
     pass
 
 
-__all__ = ["ReqCacheClient"]
+__all__ = ["RcacheClient"]
 
 LOGGER = get_module_logger()
 
 
-class ReqCacheClient:
+class RcacheClient:
     """ Response Cache - related code that executes on other containers
 
     Private attributes:
-    _rcache_db      -- Optional ReqCacheDb object - for making DB lookups
-                       (needed on Message Handler and RatApi)
+    _rcache_db      -- Optional RcacheDb object - for making DB lookups (needed
+                       on Message Handler and RatApi)
     _rcache_rmq     -- Optional RabbitMQ server AMQP URI (Needed on Message
                        Handler, RatApi, Worker)
     _rmq_receiver   -- True if for RabbitMQ receiver, False for transmitter,
@@ -66,27 +66,27 @@ class ReqCacheClient:
         set_error_exception(RuntimeError)
         include_stack_to_error_log(True)
 
-        self._rcache_db: Optional[ReqCacheDb] = None
+        self._rcache_db: Optional[RcacheDb] = None
         if client_settings.enabled and \
                 (client_settings.postgres_dsn is not None):
             assert "rcache_db" in sys.modules
-            self._rcache_db = ReqCacheDb(client_settings.postgres_dsn)
+            self._rcache_db = RcacheDb(client_settings.postgres_dsn)
 
-        self._rcache_rmq: Optional[ReqCacheRmq] = None
+        self._rcache_rmq: Optional[RcacheRmq] = None
         if client_settings.enabled and \
                 (client_settings.rmq_dsn is not None):
             assert "rcache_rmq" in sys.modules
             error_if(rmq_receiver is None,
                      "'rmq_receiver' parameter should be specified")
-            self._rcache_rmq = ReqCacheRmq(client_settings.rmq_dsn)
+            self._rcache_rmq = RcacheRmq(client_settings.rmq_dsn)
             self._rmq_receiver = rmq_receiver
         self._update_on_send = client_settings.update_on_send
 
-        self._rcache_rcache: Optional[ReqCacheRcache] = None
+        self._rcache_rcache: Optional[RcacheRcache] = None
         if client_settings.enabled and \
                 (client_settings.service_url is not None):
             assert "rcache_rcache" in sys.modules
-            self._rcache_rcache = ReqCacheRcache(client_settings.service_url)
+            self._rcache_rcache = RcacheRcache(client_settings.service_url)
 
     def connect(self, db: bool = False, rmq: bool = False) -> None:
         """ Connect to other services

@@ -7,24 +7,26 @@
 #
 
 # pylint: disable=wrong-import-order, invalid-name, too-many-arguments
-# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-instance-attributes, too-few-public-methods
 
 import aiohttp
 import asyncio
+import datetime
 import http
 import json
 import math
 import pydantic
 from queue import Queue
-from typing import Any, Dict, List, Optional, Tuple, Union
+import traceback
+from typing import Any, Dict, Optional, Set, Tuple, Union
 
 from rcache_common import dp, error_if, get_module_logger
-from rcache_db_async import ReqCacheDbAsync
-from rcache_models import AfcReqRespKey, RcacheUpdateReq, DbRecord, \
+from rcache_db_async import RcacheDbAsync
+from rcache_models import AfcReqRespKey, RcacheUpdateReq, DbPk, DbRecord, \
     RatapiAfcConfig, RatapiRulesetIds, RcacheInvalidateReq, LatLonRect, \
-    RcacheSpatialInvalidateReq
+    RcacheSpatialInvalidateReq, RcacheStatus
 
-__all__ = ["ReqCacheService"]
+__all__ = ["RcacheService"]
 
 # Module logger
 LOGGER = get_module_logger()
@@ -35,30 +37,81 @@ DEFAULT_MAX_MAX_LINK_DISTANCE_KM = 130.
 # Number of degrees per kilometer
 DEGREES_PER_KM = 1 / (60 * 1.852)
 
+# Default length of averaging window
+AVERAGING_WINDOW_SIZE = 10
 
-class ReqCacheService:
+
+class Ema:
+    """ Exponential moving average for some value or its rate
+
+    Public attributes:
+    ema -- Current average value
+
+    Private attributes:
+    _weight     -- Weighting factor (2/(window_length+1)
+    _is_rate    -- True if rate is averaged, False if value
+    _prev_value -- Previous value
+    """
+    def __init__(self, win_size: int, is_rate: bool) -> None:
+        """ Constructor
+
+        Arguments:
+        win_length -- Window length
+        is_rate    -- True for rate averaging, False for value averaging
+        """
+        self._weight = 2 / (win_size + 1)
+        self._is_rate = is_rate
+        self.ema: float = 0
+        self._prev_value: float = 0
+
+    def periodic_update(self, new_value: float) -> None:
+        """ Update with new value """
+        measured_value = new_value
+        if self._is_rate:
+            measured_value -= self._prev_value
+        self._prev_value = new_value
+        self.ema += self._weight * (measured_value - self.ema)
+
+
+class RcacheService:
     """ Manager of all server-side actions
 
-    Arguments:
-    _precompute_quota     -- Maximum number of precomputing requests in flight
-    _afc_req_url          -- REST API URL to send requests for precomputation.
-                             None for no precomputation
-    _rulesets_url         -- REST API URL for getting list of active Ruleset
-                             IDs. None to use default maximum AP FS distance
-    _config_retrieval_url -- REST API URL for retrieving AFC Config by Ruleset
-                             ID. None to use default maximum AP FS distance
-    _db                   -- Database manager
-    _update_queue         -- Queue for arrived update requests
-    _invalidation_queue   -- Queue for arrived invalidation requests
-    _precompute_event     -- Event that triggers precomputing task (set on
-                             invalidations and update requests)
-    _precomputer_session  -- Precomputer's aiohttp session for parallel update
-                             requests
+    Private attributes:
+    _start_time                  -- When service started
+    _precompute_quota            -- Maximum number of precomputing requests in
+                                    flight
+    _afc_req_url                 -- REST API URL to send requests for
+                                    precomputation. None for no precomputation
+    _rulesets_url                -- REST API URL for getting list of active
+                                    Ruleset IDs. None to use default maximum
+                                    AP FS distance
+    _config_retrieval_url        -- REST API URL for retrieving AFC Config by
+                                    Ruleset ID. None to use default maximum
+                                    AP FS distance
+    _db                          -- Database manager
+    _db_connected_event          -- Set after db connected
+    _update_queue                -- Queue for arrived update requests
+    _invalidation_queue          -- Queue for arrived invalidation requests
+    _precompute_event            -- Event that triggers precomputing task (set
+                                    on invalidations and update requests)
+    _main_tasks                  -- Set of top level tasks
+    _precomputer_subtasks        -- References that keep individual precomputer
+                                    tasks out of oblivion
+    _invalidation_enabled_event  -- Set when invalidation enabled. May be
+                                    cleared for test purposes
+    _updated_count               -- Number of processed updates
+    _precompute_count            -- Number of initiated precomputations
+    _updated_rate_ema            -- Average rate of database write
+    _update_queue_size_ema       -- Average length of update queue
+    _precomputation_rate_ema     -- Average rate of initiated precomputations
+    _all_tasks_running           -- True while no tasks crashed
     """
     def __init__(self, rcache_db_dsn: str, precompute_quota: int,
                  afc_req_url: Optional[str], rulesets_url: Optional[str],
                  config_retrieval_url: Optional[str]) -> None:
-        self._db = ReqCacheDbAsync(rcache_db_dsn)
+        self._start_time = datetime.datetime.now()
+        self._db = RcacheDbAsync(rcache_db_dsn)
+        self._db_connected_event = asyncio.Event()
         self._afc_req_url = afc_req_url
         self._rulesets_url = rulesets_url.rstrip("/") if rulesets_url else None
         self._config_retrieval_url = config_retrieval_url.rstrip("/") \
@@ -68,19 +121,37 @@ class ReqCacheService:
             asyncio.Queue()
         self._update_queue: Queue[AfcReqRespKey] = asyncio.Queue()
         self._precompute_event = asyncio.Event()
-        self._precompute_quota = precompute_quota
-        self._precomputer_session = \
-            aiohttp.ClientSession(connector=aiohttp.TCPConnector(limit=0))
-        asyncio.create_task(self._invalidator_task())
-        asyncio.create_task(self._updater_task())
-        asyncio.create_task(self._precomputer_task())
+        self._precompute_event.set()
+        self._precompute_quota = 0
+        self.set_precompute_quota(precompute_quota)
+        self._main_tasks: Set[asyncio.Task] = set()
+        for worker in (self._invalidator_worker, self._updater_worker,
+                       self._precomputer_worker, self._averager_worker):
+            self._main_tasks.add(asyncio.create_task(worker()))
+        self._precomputer_subtasks: Set[asyncio.Task] = set()
+        self._invalidation_enabled_event = asyncio.Event()
+        self._invalidation_enabled_event.set()
+        self._updated_count = 0
+        self._precompute_count = 0
+        self._updated_rate_ema = Ema(win_size=AVERAGING_WINDOW_SIZE,
+                                     is_rate=True)
+        self._update_queue_len_ema = Ema(win_size=AVERAGING_WINDOW_SIZE,
+                                         is_rate=False)
+        self._precomputation_rate_ema = Ema(win_size=AVERAGING_WINDOW_SIZE,
+                                            is_rate=True)
+        self._all_tasks_running = True
 
     def check_db_server(self) -> bool:
         """ Check if database server can be connected to """
         return self._db.check_server()
 
+    def healthy(self) -> bool:
+        """ Service is in healthy status """
+        return self._all_tasks_running and \
+            self._db_connected_event.is_set()
+
     async def connect_db(self, create_if_absent=False, recreate_db=False,
-                   recreate_tables=False) -> None:
+                         recreate_tables=False) -> None:
         """ Connect to database """
         if create_if_absent or recreate_db or recreate_tables:
             self._db.create_db(recreate_db=recreate_db,
@@ -88,10 +159,26 @@ class ReqCacheService:
         await self._db.connect()
         err = DbRecord.check_db_table(self._db.table)
         error_if(err, f"Request cache database has unexpected format: {err}")
+        self._db_connected_event.set()
 
-    def disconnect_db(self) -> None:
-        """ Disconnect from database """
-        self._db.disconnect()
+    async def shutdown(self) -> None:
+        """ Shut service down """
+        while self._main_tasks:
+            task = self._main_tasks.pop()
+            task.cancel()
+        while self._precomputer_subtasks:
+            task = self._precomputer_subtasks.pop()
+            task.cancel()
+        await self._db.disconnect()
+
+    def precompute_quota(self) -> int:
+        """ Returns current precompute quota """
+        return self._precompute_quota
+
+    def set_precompute_quota(self, quota: int) -> None:
+        """ Sets precompute quota """
+        error_if(quota < 0, f"Precompute quota of {quota} si invalid")
+        self._precompute_quota = quota
 
     def update(self, cache_update_req: RcacheUpdateReq) -> None:
         """ Enqueue arrived update requests """
@@ -105,77 +192,157 @@ class ReqCacheService:
         """ Enqueue arrived invalidation requests """
         self._invalidation_queue.put_nowait(invalidation_req)
 
-    async def _updater_task(self) -> None:
-        """ Cache updater task """
-        while True:
-            update_bulk: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
-            rrk = await self._update_queue.get()
+    def set_invalidation_state(self, enabled: bool) -> None:
+        """ Enables/disables invalidation """
+        if enabled:
+            self._invalidation_enabled_event.set()
+        else:
+            self._invalidation_enabled_event.clear()
+
+    async def get_status(self) -> RcacheStatus:
+        """ Returns service status """
+        return \
+            RcacheStatus(
+                up_time=datetime.datetime.now() - self._start_time,
+                db_connected=self._db_connected_event.is_set(),
+                all_tasks_running=self._all_tasks_running,
+                cache_size=await self._db.get_cache_size()
+                if self._db_connected_event.is_set() else -1,
+                update_queue_len=self._update_queue.qsize(),
+                update_count=self._updated_count,
+                avg_update_write_rate=round(self._updated_rate_ema.ema, 2),
+                avg_update_queue_len=round(self._update_queue_len_ema.ema, 2),
+                invalidation_enabled=self._invalidation_enabled_event.is_set(),
+                num_invalidated=await self._db.get_num_invalid_reqs()
+                if self._db_connected_event.is_set() else 0,
+                num_precomputed=self._precompute_count,
+                active_precomputations=len(self._precomputer_subtasks),
+                avg_precomputation_rate=round(
+                    self._precomputation_rate_ema.ema, 3))
+
+    async def _updater_worker(self) -> None:
+        """ Cache updater task worker """
+        try:
+            await self._db_connected_event.wait()
             while True:
-                try:
-                    dr = DbRecord.from_req_resp_key(rrk)
-                except pydantic.ValidationError as ex:
-                    LOGGER.error(f"Invalid format of cache update data: {ex}")
-                else:
-                    if dr is not None:
-                        row_dict = dr.dict()
-                        update_bulk[self._db.get_pk(row_dict)] = row_dict
-                if (len(update_bulk) == self._db.max_update_records()) or \
-                        self._update_queue.empty():
-                    break
+                update_bulk: Dict[Tuple[Any, ...], Dict[str, Any]] = {}
                 rrk = await self._update_queue.get()
-            if update_bulk:
-                await self._db.update_cache(list(update_bulk.values()))
-                self._precompute_event.set()
+                while True:
+                    try:
+                        dr = DbRecord.from_req_resp_key(rrk)
+                    except pydantic.ValidationError as ex:
+                        LOGGER.error(
+                            f"Invalid format of cache update data: {ex}")
+                    else:
+                        if dr is not None:
+                            row_dict = dr.dict()
+                            update_bulk[self._db.get_pk(row_dict)] = row_dict
+                    if (len(update_bulk) == self._db.max_update_records()) or \
+                            self._update_queue.empty():
+                        break
+                    rrk = await self._update_queue.get()
+                if update_bulk:
+                    await self._db.update_cache(list(update_bulk.values()))
+                    self._updated_count += len(update_bulk)
+                    self._precompute_event.set()
+        except asyncio.CancelledError:
+            return
+        except BaseException as ex:
+            self._all_tasks_running = False
+            LOGGER.error(f"Updater task unexpectedly aborted:\n"
+                         f"{''.join(traceback.format_exception(ex))}")
 
-    async def _invalidator_task(self) -> None:
-        """ Cache invalidator task """
-        while True:
-            req = await self._invalidation_queue.get()
-            if isinstance(req, RcacheInvalidateReq):
-                if req.ruleset_ids is None:
-                    await self._db.invalidate()
+    async def _invalidator_worker(self) -> None:
+        """ Cache invalidator task worker """
+        try:
+            await self._db_connected_event.wait()
+            while True:
+                req = await self._invalidation_queue.get()
+                await self._invalidation_enabled_event.wait()
+                if isinstance(req, RcacheInvalidateReq):
+                    if req.ruleset_ids is None:
+                        await self._db.invalidate()
+                    else:
+                        for ruleset_id in req.ruleset_ids:
+                            await self._db.invalidate(ruleset_id)
                 else:
-                    for ruleset_id in req.ruleset_ids:
-                        await self._db.invalidate(ruleset_id)
-            else:
-                assert isinstance(req, RcacheSpatialInvalidateReq)
-                max_link_distance_deg = \
-                    await self._get_max_max_link_distance_deg()
-                for rect in req.tiles:
-                    lon_reduction = \
-                        max(math.cos(
-                            math.radians((rect.min_lat + rect.max_lat) / 2)),
-                            1/180)
-                    await self._db.spatial_invalidate(
-                        LatLonRect(
-                            min_lat=rect.min_lat - max_link_distance_deg,
-                            max_lat=rect.max_lat + max_link_distance_deg,
-                            min_lon=rect.min_lon -
-                            max_link_distance_deg / lon_reduction,
-                            max_lon=rect.max_lon +
-                            max_link_distance_deg / lon_reduction))
-            self._precompute_event.set()
+                    assert isinstance(req, RcacheSpatialInvalidateReq)
+                    max_link_distance_deg = \
+                        await self._get_max_max_link_distance_deg()
+                    for rect in req.tiles:
+                        lon_reduction = \
+                            max(math.cos(
+                                math.radians(
+                                    (rect.min_lat + rect.max_lat) / 2)),
+                                1/180)
+                        await self._db.spatial_invalidate(
+                            LatLonRect(
+                                min_lat=rect.min_lat - max_link_distance_deg,
+                                max_lat=rect.max_lat + max_link_distance_deg,
+                                min_lon=rect.min_lon -
+                                max_link_distance_deg / lon_reduction,
+                                max_lon=rect.max_lon +
+                                max_link_distance_deg / lon_reduction))
+                self._precompute_event.set()
+        except asyncio.CancelledError:
+            return
+        except BaseException as ex:
+            self._all_tasks_running = False
+            LOGGER.error(f"Invalidator task unexpectedly aborted:\n"
+                         f"{''.join(traceback.format_exception(ex))}")
 
-    async def _precomputer_task(self) -> None:
-        """ Precomputer task """
+    async def _single_precompute_worker(self, req: str) -> None:
+        """ Single request precomputer subtask worker """
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.post(self._afc_req_url,
+                                        json=json.loads(req)) as resp:
+                    if resp.ok:
+                        return
+            await self._db.delete(DbPk.from_req(req_str=req))
+        except (asyncio.CancelledError,
+                aiohttp.client_exceptions.ServerDisconnectedError):
+            # Frankly, it's beyond my understanding why ServerDisconnectedError
+            # happens before shutdown initiated by uvicorn in Compose
+            # environment...)
+            return
+        except BaseException as ex:
+            LOGGER.error(f"Precomputation subtask for request '{req}' "
+                         f"unexpectedly aborted:\n"
+                         f"{''.join(traceback.format_exception(ex))}")
+
+    async def _precomputer_worker(self) -> None:
+        """ Precomputer task worker """
         if self._afc_req_url is None:
             return
-        while True:
-            await self._precompute_event.wait()
-            self._precompute_event.clear()
-            remaining_quota = \
-                self._precompute_quota - await self._db.num_precomputing()
-            if remaining_quota <= 0:
-                continue
-            invalid_reqs = \
-                await self._db.get_invalid_reqs(limit=remaining_quota)
-            if not invalid_reqs:
-                continue
-            self._precompute_event.set()
-            for req in invalid_reqs:
-                asyncio.create_task(
-                    self._precomputer_session.post(
-                        self._afc_req_url, json=json.loads(req)))
+        try:
+            await self._db_connected_event.wait()
+            await self._db.reset_precomputations()
+            while True:
+                await self._precompute_event.wait()
+                self._precompute_event.clear()
+                remaining_quota = \
+                    self._precompute_quota - await self._db.num_precomputing()
+                if remaining_quota <= 0:
+                    continue
+                invalid_reqs = \
+                    await self._db.get_invalid_reqs(limit=remaining_quota)
+                if not invalid_reqs:
+                    continue
+                self._precompute_event.set()
+                for req in invalid_reqs:
+                    self._precompute_count += 1
+                    task = \
+                        asyncio.create_task(
+                            self._single_precompute_worker(req))
+                    self._precomputer_subtasks.add(task)
+                    task.add_done_callback(self._precomputer_subtasks.discard)
+        except asyncio.CancelledError:
+            return
+        except BaseException as ex:
+            self._all_tasks_running = False
+            LOGGER.error(f"Precomputer task unexpectedly aborted:\n"
+                         f"{''.join(traceback.format_exception(ex))}")
 
     async def _get_max_max_link_distance_deg(self) -> float:
         """ Retrieves maximum AP-FS distance in unit of latitude degrees """
@@ -210,3 +377,20 @@ class ReqCacheService:
         LOGGER.error(f"Default maximum maxinkDistance of "
                      f"{DEFAULT_MAX_MAX_LINK_DISTANCE_KM}km will be used")
         return DEFAULT_MAX_MAX_LINK_DISTANCE_KM * DEGREES_PER_KM
+
+    async def _averager_worker(self) -> None:
+        """ Averager task worker """
+        try:
+            while True:
+                await asyncio.sleep(1)
+                self._update_queue_len_ema.periodic_update(
+                    self._update_queue.qsize())
+                self._updated_rate_ema.periodic_update(self._updated_count)
+                self._precomputation_rate_ema.periodic_update(
+                    self._precompute_count)
+        except asyncio.CancelledError:
+            return
+        except BaseException as ex:
+            self._all_tasks_running = False
+            LOGGER.error(f"Averager task unexpectedly aborted:\n"
+                         f"{''.join(traceback.format_exception(ex))}")

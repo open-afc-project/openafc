@@ -1,10 +1,12 @@
-""" Sending requests to ReqCacher service """
+""" Sending requests to Rcache service """
 #
 # Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
+
+# pylint: disable=wrong-import-order
 
 import pydantic
 import requests
@@ -15,7 +17,7 @@ from rcache_models import AfcReqRespKey, RcacheUpdateReq, \
     RcacheInvalidateReq, LatLonRect, RcacheSpatialInvalidateReq
 
 
-class ReqCacheRcache:
+class RcacheRcache:
     """ Communicates with Request cache service
 
     Private attributes:

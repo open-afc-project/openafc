@@ -69,7 +69,7 @@ services:
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
 
@@ -88,7 +88,7 @@ services:
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
     dns_search: [.]
@@ -131,7 +131,6 @@ services:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
-      - RCACHE_UPDATE_ON_SEND=${RCACHE_UPDATE_ON_SEND}
     depends_on:
       - ratdb
       - rmq
@@ -196,7 +195,7 @@ services:
     environment:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_PORT=${RCACHE_PORT}
-      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
       - RCACHE_AFC_REQ_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
       - RCACHE_RULESETS_URL=http://rat_server/fbrat/ratapi/v1/GetRulesetIDs
       - RCACHE_CONFIG_RETRIEVAL_URL=http://rat_server/fbrat/ratapi/v1/GetAfcConfigByRulesetID

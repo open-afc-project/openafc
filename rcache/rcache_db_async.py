@@ -15,13 +15,13 @@ import sqlalchemy.dialects.postgresql as sa_pg
 from typing import Any, Dict, List, Optional
 
 from rcache_common import dp, error, error_if, FailOnError
-from rcache_db import ReqCacheDb
-from rcache_models import DbRespState
+from rcache_db import RcacheDb
+from rcache_models import DbRespState, LatLonRect, DbPk
 
-__all__ = ["ReqCacheDbAsync"]
+__all__ = ["RcacheDbAsync"]
 
 
-class ReqCacheDbAsync(ReqCacheDb):
+class RcacheDbAsync(RcacheDb):
     """ Asynchronous work with database, used in Request cache service """
 
     # Name of Postgres asynchronous driver (to use in DSN)
@@ -34,6 +34,12 @@ class ReqCacheDbAsync(ReqCacheDb):
         rcache_db_dsn -- Postgres database connection string
         """
         super().__init__(rcache_db_dsn)
+
+    async def disconnect(self) -> None:
+        """ Disconnect database """
+        if self._engine:
+            await self._engine.dispose()
+            self._engine = None
 
     async def connect(self, fail_on_error=True) -> bool:
         """ Connect to database, that is assumed to be existing
@@ -73,14 +79,14 @@ class ReqCacheDbAsync(ReqCacheDb):
         """
         if not rows:
             return
-        assert self._engine
+        assert self._engine is not None
         assert len(rows) <= self.max_update_records()
         try:
-            ins = sa_pg.insert(self.table).values(rows).\
-                on_conflict_do_update(
+            ins = sa_pg.insert(self.table).values(rows)
+            ins = ins.on_conflict_do_update(
                     index_elements=[c.name
                                     for c in self.table.c if c.primary_key],
-                    set_={c.name: c
+                    set_={c.name: ins.excluded[c.name]
                           for c in self.table.c if not c.primary_key})
             async with self._engine.begin() as conn:
                 await conn.execute(ins)
@@ -106,13 +112,13 @@ class ReqCacheDbAsync(ReqCacheDb):
         except sa.exc.SQLAlchemyError as ex:
             error(f"Cache database invalidation failed: {ex}")
 
-    async def spatial_invalidate(self, rect: "ReqCacheDbAsync.Rect") -> None:
+    async def spatial_invalidate(self, rect: LatLonRect) -> None:
         """ Spatial invalidation
 
         Arguments:
         rect -- Lat/lon rectangle to invalidate
         """
-        assert self._engine
+        assert self._engine is not None
         c_lat = self.table.c.lat_deg
         c_lon = self.table.c.lon_deg
         try:
@@ -130,27 +136,41 @@ class ReqCacheDbAsync(ReqCacheDb):
         except sa.exc.SQLAlchemyError as ex:
             error(f"Cache database spatial invalidation failed: {ex}")
 
-    async def num_precomputing(self) -> int:
-        """ Return number of requests currently being precomputed """
+    async def reset_precomputations(self) -> None:
+        """ Mark records in precomputation state as invalid """
         assert self._engine
         try:
-            sel = sa.select([sa.func.count()]).\
-                where(self.table.c.state == DbRespState.Invalid.name)
+            upd = sa.update(self.table).\
+                where(self.table.c.state == DbRespState.Precomp.name).\
+                values(state=DbRespState.Invalid.name)
+            async with self._engine.begin() as conn:
+                await conn.execute(upd)
+        except sa.exc.SQLAlchemyError as ex:
+            error(f"Cache database unprecomputation failed: {ex}")
+
+    async def num_precomputing(self) -> int:
+        """ Return number of requests currently being precomputed """
+        assert self._engine is not None
+        try:
+            sel = sa.select([sa.func.count()]).select_from(self.table).\
+                where(self.table.c.state == DbRespState.Precomp.name)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
-                return rp.scalar()
+                return rp.fetchone()[0]
         except sa.exc.SQLAlchemyError as ex:
             error(f"Cache database spatial precomputing count query failed: "
                   f"{ex}")
+        return 0  # Will never happen. Appeasing MyPy
 
     async def get_invalid_reqs(self, limit: int) -> List[str]:
-        """ Return list of invalidated requests
+        """ Return list of invalidated requests, marking them as being
+        precomputed
 
         Arguments:
         limit -- Maximum number of requests to return
         Returns list of requests as strings
         """
-        assert self._engine
+        assert self._engine is not None
         try:
             sq = sa.select([self.table.c.serial_number,
                             self.table.c.rulesets,
@@ -168,6 +188,43 @@ class ReqCacheDbAsync(ReqCacheDb):
                 return [row[0] for row in rp]
         except sa.exc.SQLAlchemyError as ex:
             error(f"Cache database invalidated query failed: {ex}")
+        return 0  # Will never happen. Appeasing MyPy
+
+    async def get_num_invalid_reqs(self) -> int:
+        """ Returns number of invalidated records """
+        assert self._engine is not None
+        try:
+            sel = sa.select([sa.func.count()]).select_from(self.table).\
+                where(self.table.c.state == DbRespState.Invalid.name)
+            async with self._engine.begin() as conn:
+                rp = await conn.execute(sel)
+                return rp.fetchone()[0]
+        except sa.exc.SQLAlchemyError as ex:
+            error(f"Cache database invalidated count query failed: {ex}")
+        return 0  # Will never happen. Appeasing MyPy
+
+    async def get_cache_size(self) -> int:
+        """ Returns total number entries in cache (including nonvalid) """
+        assert self._engine is not None
+        try:
+            sel = sa.select([sa.func.count()]).select_from(self.table)
+            async with self._engine.begin() as conn:
+                rp = await conn.execute(sel)
+                return rp.fetchone()[0]
+        except sa.exc.SQLAlchemyError as ex:
+            error(f"Cache database size query failed: {ex}")
+        return 0  # Will never happen. Appeasing MyPy
+
+    async def delete(self, pk: DbPk) -> None:
+        """ Delete row by primary key """
+        try:
+            d = sa.delete(self.table)
+            for k, v in pk.dict().items():
+                d = d.where(self.table.c[k] == v)
+                async with self._engine.begin() as conn:
+                    await conn.execute(d)
+        except sa.exc.SQLAlchemyError as ex:
+            error(f"Cache database removal failed: {ex}")
 
     def _create_engine(self, dsn) -> Any:
         """ Creates asynchronous SqlAlchemy engine """

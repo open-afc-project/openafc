@@ -22,7 +22,7 @@ from afcmodels.base import db
 from afcmodels.aaa import User
 import als
 from rcache_models import RcacheClientSettings
-from rcache_client import ReqCacheClient
+from rcache_client import RcacheClient
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)

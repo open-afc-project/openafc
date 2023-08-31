@@ -1,0 +1,17 @@
+#
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns 
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# This is an addendum to main docker-compose.yaml that adds rcache_tool serice
+# that contains rcache_tool.py
+
+services:
+  rcache_tool:
+    image: rcache_tool:${TAG:-latest}
+    environment:
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+    dns_search: [.]
