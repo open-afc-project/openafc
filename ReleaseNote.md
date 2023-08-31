@@ -1,6 +1,25 @@
 # Release Note
 
 ## **Version and Date**
+|Version|3.8.7.0|
+| :- | :- |
+|**Date**|**08/31/2023**|
+|compiled server's version is TBD | git tag 3.8.7.0|
+
+## **Issues Addressed**
+* Jira OA-795-rcache_tool
+* Jira OA-813-add-option-to-enforce-m-tls-check
+* Jira OA-784-converting-corine-land-cover-to-nlcd-format
+* Jira OA-806_about_secrets
+* Jira OA-812_cache_in_afc_config
+* Jira OA-811_TEST_config_broken
+* Jira OA-785-ui-changes-for-ofcom
+* Jira OA-809-afc-tests-to-simulate-webui-afc-request
+* Jira OA-798-upgrade-nginx-and-postgres-version-misc-fixes
+* Jira OA-730-health-check-live-ready-design-and-implementatio
+
+
+## **Version and Date**
 |Version|**OA-784*|
 | :- | :- |
 |**Date**|**08/25/2023**|
