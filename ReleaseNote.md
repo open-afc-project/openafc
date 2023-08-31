@@ -4,7 +4,7 @@
 |Version|3.8.7.0|
 | :- | :- |
 |**Date**|**08/31/2023**|
-|compiled server's version is TBD | git tag 3.8.7.0|
+|compiled server's version is c0a3cff | git tag 3.8.7.0|
 
 ## **Issues Addressed**
 * Jira OA-795-rcache_tool
