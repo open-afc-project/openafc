@@ -55,6 +55,17 @@ int main(int argc, char **argv) { // Accepts input from command line
 		// Set constant parameters
 		afcManager.setConstInputs(tempDir);
 
+		// Import configuration from the GUI
+		LOGGER_DEBUG(logger) << "AFC Engine is importing configuration...";
+		try {
+			afcManager.importConfigAFCjson(configFilePath, tempDir);
+		}
+		catch (std::exception &err) {
+			throw std::runtime_error(
+					ErrStream() << "Failed to import configuration from GUI: " << err.what()
+					);
+		}
+
 		// Import user inputs from the GUI
 		LOGGER_DEBUG(logger) << "AFC Engine is importing user inputs...";
 		try {
@@ -63,17 +74,6 @@ int main(int argc, char **argv) { // Accepts input from command line
 		catch (std::exception &err) {
 			throw std::runtime_error(
 					ErrStream() << "Failed to import user inputs from GUI: " << err.what()
-					);
-		}
-
-		// Import user configuration from the GUI
-		LOGGER_DEBUG(logger) << "AFC Engine is importing configuration...";
-		try {
-			afcManager.importConfigAFCjson(configFilePath, tempDir);
-		}
-		catch (std::exception &err) {
-			throw std::runtime_error(
-					ErrStream() << "Failed to import configuration from GUI: " << err.what()
 					);
 		}
 

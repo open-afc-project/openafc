@@ -587,6 +587,9 @@ AfcManager::AfcManager()
 	_scanres_ht = quietNaN;
 	_indoorFixedHeightAMSL = false;
 
+	_maxVerticalUncertainty = quietNaN;
+	_maxHorizontalUncertaintyDistance = quietNaN;
+
 	_scanPointBelowGroundMethod = CConst::TruncateScanPointBelowGroundMethod;
 
 	_minEIRP_dBm = quietNaN;
@@ -1816,6 +1819,9 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 		double verticalUncertainty = elevationObj["verticalUncertainty"].toDouble();
 		if (verticalUncertainty < 0.0) {
 			_invalidParams << "verticalUncertainty";
+		} else if (verticalUncertainty > _maxVerticalUncertainty) {
+			LOGGER_WARN(logger) << "GENERAL FAILURE: verticalUncertainty = " << verticalUncertainty << " exceeds max value of " << _maxVerticalUncertainty;
+			_invalidParams << "verticalUncertainty";
 		}
 		double centerHeight = elevationObj["height"].toDouble();
 
@@ -1844,6 +1850,10 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 					_invalidParams << "minorAxis";
 				}
 				if (majorAxis < 0.0) {
+			        LOGGER_WARN(logger) << "GENERAL FAILURE: majorAxis < 0";
+					_invalidParams << "majorAxis";
+				} else if (2*majorAxis > _maxHorizontalUncertaintyDistance) {
+			        LOGGER_WARN(logger) << "GENERAL FAILURE: 2*majorAxis = " << 2*majorAxis << " exceeds max value of " << _maxHorizontalUncertaintyDistance;
 					_invalidParams << "majorAxis";
 				}
 			}
@@ -1891,6 +1901,29 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			centerLongitude = sumLon / _rlanLinearPolygon.size();
 			centerLatitude  = sumLat / _rlanLinearPolygon.size();
 
+			double cosLat = cos(centerLatitude*M_PI/180.0);
+			double maxHorizDistSq = 0.0;
+			for(i=0; i< (int) _rlanLinearPolygon.size(); i++) {
+				double lon_i = _rlanLinearPolygon[i].second;
+				double lat_i = _rlanLinearPolygon[i].first;
+				for(int j=i+1; j< (int) _rlanLinearPolygon.size()+1; j++) {
+					double jj = j % _rlanLinearPolygon.size();
+					double lon_j = _rlanLinearPolygon[jj].second;
+					double lat_j = _rlanLinearPolygon[jj].first;
+					double deltaX = (lon_j - lon_i)*(M_PI/180.0)*cosLat*CConst::earthRadius;
+					double deltaY = (lat_j - lat_i)*(M_PI/180.0)*CConst::earthRadius;
+					double distSq = deltaX*deltaX + deltaY*deltaY;
+					if (distSq > maxHorizDistSq) {
+						maxHorizDistSq = distSq;
+					}
+				}
+			}
+
+			if (maxHorizDistSq > _maxHorizontalUncertaintyDistance*_maxHorizontalUncertaintyDistance) {
+				LOGGER_WARN(logger) << "GENERAL FAILURE: Linear polygon contains vertices with separation distance that exceeds max value of " << _maxHorizontalUncertaintyDistance;
+				_invalidParams << "outerBoundary";
+			}
+
 			_rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
 			_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, verticalUncertainty);
 		} else if (hasRadialPolygonFlag) {
@@ -1917,6 +1950,34 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 
 			double centerLatitude = centerObj["latitude"].toDouble();
 			double centerLongitude = centerObj["longitude"].toDouble();
+
+			double cosLat = cos(centerLatitude*M_PI/180.0);
+			double maxHorizDistSq = 0.0;
+			for(int i=0; i< (int) _rlanRadialPolygon.size(); i++) {
+				double angle_i = _rlanRadialPolygon[i].second;
+				double length_i = _rlanRadialPolygon[i].first;
+				double x_i = length_i*sin(angle_i*M_PI/360.0);
+				double y_i = length_i*cos(angle_i*M_PI/360.0);
+				for(int j=i+1; j< (int) _rlanRadialPolygon.size()+1; j++) {
+					double jj = j % _rlanRadialPolygon.size();
+					double angle_j = _rlanRadialPolygon[jj].second;
+					double length_j = _rlanRadialPolygon[jj].first;
+					double x_j = length_j*sin(angle_j*M_PI/360.0);
+					double y_j = length_j*cos(angle_j*M_PI/360.0);
+
+					double deltaX = x_j - x_i;
+					double deltaY = y_j - y_i;
+					double distSq = deltaX*deltaX + deltaY*deltaY;
+					if (distSq > maxHorizDistSq) {
+						maxHorizDistSq = distSq;
+					}
+				}
+			}
+
+			if (maxHorizDistSq > _maxHorizontalUncertaintyDistance*_maxHorizontalUncertaintyDistance) {
+				LOGGER_WARN(logger) << "GENERAL FAILURE: Radial polygon contains vertices with separation distance that exceeds max value of " << _maxHorizontalUncertaintyDistance;
+				_invalidParams << "outerBoundary";
+			}
 
 			_rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
 			_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, verticalUncertainty);
@@ -2319,6 +2380,18 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_scanres_ht = uncertaintyObj["height"].toDouble();
 	} else {
 		_scanres_ht = 5.0;
+	}
+
+	if (uncertaintyObj.contains("maxVerticalUncertainty") && !uncertaintyObj["maxVerticalUncertainty"].isUndefined()) {
+		_maxVerticalUncertainty = uncertaintyObj["maxVerticalUncertainty"].toDouble();
+	} else {
+		_maxVerticalUncertainty = 50.0;
+	}
+
+	if (uncertaintyObj.contains("maxHorizontalUncertaintyDistance") && !uncertaintyObj["maxHorizontalUncertaintyDistance"].isUndefined()) {
+		_maxHorizontalUncertaintyDistance = uncertaintyObj["maxHorizontalUncertaintyDistance"].toDouble();
+	} else {
+		_maxHorizontalUncertaintyDistance = 650.0;
 	}
 
 	if (jsonObj.contains("ulsDatabaseList") && !jsonObj["ulsDatabaseList"].isUndefined()) {
