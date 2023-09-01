@@ -11,5 +11,7 @@ FROM postgis/postgis:14-3.3
 
 ENV POSTGRES_PASSWORD=postgres
 ENV POSTGRES_HOST_AUTH_METHOD=trust
+ENV AFC_BULKDB_CONNS=${AFC_BULKDB_CONNS:-1000}
+ENTRYPOINT docker-entrypoint.sh postgres -c max_connections=$AFC_BULKDB_CONNS
 HEALTHCHECK --start-period=20s --interval=10s --timeout=5s \
     CMD pg_isready -U postgres || exit 1
