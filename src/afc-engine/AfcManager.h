@@ -260,6 +260,9 @@ class AfcManager
 		double _scanres_xy, _scanres_ht;
 		bool _indoorFixedHeightAMSL;
 
+		double _maxVerticalUncertainty;
+		double _maxHorizontalUncertaintyDistance;
+
 		// Method used to treat RLAN uncertainty region scan points that have an AGL height less than _minRlanHeightAboveTerrain
 		// DiscardScanPointBelowGroundMethod : Discard these scan points
 		// TruncateScanPointBelowGroundMethod : Set the AGL height if these scan points to _minRlanHeightAboveTerrain
