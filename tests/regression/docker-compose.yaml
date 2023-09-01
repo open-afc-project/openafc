@@ -119,7 +119,7 @@ services:
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_SCHEME=HTTP
       # worker params
-      - AFC_WORKER_CELERY_OPTIONS=rat_1 rat_2
+      - AFC_WORKER_CELERY_OPTS=rat_1 rat_2
       # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
