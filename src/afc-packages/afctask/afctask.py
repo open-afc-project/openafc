@@ -25,7 +25,8 @@ class Task():
     STAT_SUCCESS = "SUCCESS"
     STAT_FAILURE = "FAILURE"
 
-    def __init__(self, task_id, dataif, hash_val=None, history_dir=None):
+    def __init__(self, task_id, dataif, hash_val=None, history_dir=None,
+                 is_internal_request=False):
         LOGGER.debug(f"Task.__init__() {task_id}")
         self.__dataif = dataif
         self.__task_id = task_id
@@ -34,7 +35,8 @@ class Task():
             'history_dir': history_dir,
             'hash': hash_val,
             'runtime_opts': None,
-            'exit_code': 0
+            'exit_code': 0,
+            'is_internal_request': is_internal_request
             }
 
     def get(self):

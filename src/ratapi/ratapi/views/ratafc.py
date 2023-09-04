@@ -29,6 +29,7 @@ from flask.views import MethodView
 import werkzeug.exceptions
 import threading
 import inspect
+from typing import NamedTuple, Optional
 import six
 from appcfg import RatafcMsghndCfgIface, AFC_RATAPI_LOG_LEVEL
 from hchecks import RmqHealthcheck
@@ -188,6 +189,155 @@ def _translate_afc_error(error_msg):
         raise VersionNotSupportedException()
 
 
+class VendorExtensionFilter:
+    """ Filters Vendor Extensions from Messages and requests/responses
+    according to type-specific whitelists
+
+    Private attributes:
+    _whitelist_dict -- Dictionary of whitelists, indexed by (nonpartial)
+                       whitelist types
+    """
+    class _WhitelistType(NamedTuple):
+        """ Whitelist type """
+        # True for message, False for request/response, None for both
+        is_message: Optional[bool] = None
+        # True for input (request), false for output(response), None for both
+        is_input: Optional[bool] = None
+        # True for GUI, False for non-GUI, None for both
+        is_gui: Optional[bool] = None
+        # True for internal, False for external, None for both
+        is_internal: Optional[bool] = None
+
+        def is_partial(self):
+            """ True for partial whitelist type that has fields set to None """
+            return any(getattr(self, attr) is None for attr in self._fields)
+
+    class _Whitelist:
+        """ Whitelist for a message/request/response type(s)
+
+        Public attributes:
+        extensions -- Set of allowed extension IDs
+
+        Private attributes
+        _partial_type -- Specifies type(s) of messages/resuests/response this
+                          whitelist is for
+        """
+        def __init__(self, extensions, partial_type):
+            """ Constructor
+
+            Arguments:
+            extensions   -- Sequence of whitelisted extensions
+            partial_type -- Type(s) of messages/resuests/response this
+                             whitelist is for
+            """
+            assert isinstance(extensions, list)
+            self._partial_type = partial_type
+            self.extensions = set(extensions)
+
+        def is_for(self, whitelist_type):
+            """ True if this whilelist is for messages/requests/responses
+            specified by nonpartial whitelist type """
+            assert not whitelist_type.is_partial()
+            for attr in whitelist_type._fields:
+                value = getattr(whitelist_type, attr)
+                if getattr(self._partial_type, attr) not in (None, value):
+                    return False
+            return True
+
+    # List of whilelists. Better be in some config file of course...
+    # More than one whitelist for a nonpartial type is allowed
+    _whitelists = \
+        [_Whitelist(
+            ["OpenAfcOverrideAfcConfig"],
+            _WhitelistType(is_input=True, is_message=False, is_internal=True)),
+         _Whitelist(
+             ["rlanAntenna"],
+             _WhitelistType(is_input=True, is_message=False)),
+         _Whitelist(
+             ["openAfc.redBlackData", "openAfc.mapinfo"],
+             _WhitelistType(is_input=False, is_message=False, is_gui=True))]
+
+    def __init__(self):
+        """ Constructor """
+        # Maps whitelist types to sets of allowed extensions
+        self._whitelist_dict = {}
+        for is_message in (True, False):
+            for is_input in (True, False):
+                for is_gui in (True, False):
+                    for is_internal in (True, False):
+                        whitelist_type = \
+                            self._WhitelistType(
+                                is_input=is_input, is_message=is_message,
+                                is_gui=is_gui, is_internal=is_internal)
+                        # Ensure that no attributes were omitted
+                        assert not whitelist_type.is_partial()
+                        # Finding whitelist for key
+                        for wl in self._whitelists:
+                            if wl.is_for(whitelist_type):
+                                self._whitelist_dict.setdefault(
+                                    whitelist_type, set()).\
+                                    update(wl.extensions)
+
+    def filter(self, json_dict, is_input, is_gui, is_internal):
+        """ Filtering out nonwhitelisted vendor extensions
+
+        Arguments:
+        json_dict   -- Dictionary made of message
+        is_input    -- True for input (request), False for output (Response)
+        is_gui      -- True for GUI
+        is_internal -- True for internal
+        """
+        if not isinstance(json_dict, dict):
+            return
+        # First filtering message
+        self._filter_ext_list(
+            json_dict,
+            self._WhitelistType(is_message=True, is_input=is_input,
+                                is_gui=is_gui, is_internal=is_internal))
+        # Filtering individual requests/responses
+        for req_resp in \
+                json_dict.get("availableSpectrumInquiryRequests" if is_input
+                              else "availableSpectrumInquiryResponses", []):
+            self._filter_ext_list(
+                req_resp,
+                self._WhitelistType(is_message=False, is_input=is_input,
+                                    is_gui=is_gui, is_internal=is_internal))
+
+    def _filter_ext_list(self, container, whitelist_type):
+        """ Drops extensions that not passed whitelist
+
+        Arguments:
+        container      -- Dictionary that (may) contain "vendorExtensions"
+                          list. Modified inplace
+        whitelist_type -- Type of whitelist to apply
+        """
+        if not isinstance(container, dict):
+            return
+        extensions = container.get("vendorExtensions")
+        if extensions is None:
+            return
+        assert not whitelist_type.is_partial()
+        allowed_extensions = self._whitelist_dict.get(whitelist_type)
+        if not allowed_extensions:
+            del container["vendorExtensions"]
+            return
+        idx = 0
+        while idx < len(extensions):
+            if extensions[idx]["extensionId"] not in allowed_extensions:
+                extensions.pop(idx)
+            else:
+                idx += 1
+        if not extensions:
+            del container["vendorExtensions"]
+
+
+def get_vendor_extension_filter():
+    """ Returns VendorExtensionFilter instance for given app instance"""
+    if not hasattr(flask.g, "vendor_extension_filter"):
+        flask.g.vendor_extension_filter = VendorExtensionFilter()
+    return flask.g.vendor_extension_filter
+
+
 def _get_vendor_extension(json_dict, ext_id):
     """ Retrieves given extension from JSON dictionary
 
@@ -258,7 +408,7 @@ def success_done(t):
                                       "analysisResponse.json.gz")) as hfile:
             hfile.write(resp_data)
     LOGGER.debug('resp_data size={}'.format(sys.getsizeof(resp_data)))
-    resp_data = zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
+    resp_json = json.loads(zlib.decompress(resp_data, 16 + zlib.MAX_WBITS))
 
     if task_stat['runtime_opts'] & RNTM_OPT_GUI:
         # Add the map data file (if it is generated) into a vendor extension
@@ -280,7 +430,6 @@ def success_done(t):
                 kmz_data = kmz_data.encode('base64')
             if isinstance(kmz_data, bytes):
                 kmz_data = kmz_data.decode('iso-8859-1')
-            resp_json = json.loads(resp_data)
             existingExtensions = resp_json["availableSpectrumInquiryResponses"][0].get("vendorExtensions");
             if(existingExtensions == None):
                 resp_json["availableSpectrumInquiryResponses"][0]["vendorExtensions"] = [{
@@ -298,8 +447,11 @@ def success_done(t):
                         "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None
                     }
                 })
-            resp_data = json.dumps(resp_json)
-
+    get_vendor_extension_filter().filter(
+        resp_json, is_input=False,
+        is_gui=bool(task_stat['runtime_opts'] & RNTM_OPT_GUI),
+        is_internal=bool(task_stat['is_internal_request']))
+    resp_data = json.dumps(resp_json)
     resp = flask.make_response(resp_data)
     resp.content_type = 'application/json'
     LOGGER.debug("returning data: %s", resp.data)
@@ -431,28 +583,6 @@ class RatAfc(MethodView):
         return self._auth_cert_id(cert_id, ruleset)
 
 
-    def __filter(self, url, json):
-        """ Check correspondence of URL to request file.
-        Return true if the request should be filtered."""
-        urlp = urlparse(url)
-        if urlp.path.endswith("/availableSpectrumInquiryInternal"):
-            # It's internal test
-            return False
-        if "availableSpectrumInquiryRequests" not in json:
-            # No requests in the json
-            return False
-        requests = json["availableSpectrumInquiryRequests"]
-        for request in requests:
-            if "vendorExtensions" not in request:
-                break
-            extensions = request["vendorExtensions"]
-            for extension in extensions:
-                if "extensionId" not in extension:
-                    break;
-                if (extension["extensionId"] == "OpenAfcOverrideAfcConfig"):
-                    return True
-        return False
-
     def get(self):
         ''' GET method for Analysis Status '''
         task_id = flask.request.args['task_id']
@@ -493,11 +623,12 @@ class RatAfc(MethodView):
         dataif = DataIf()
 
         try:
-            if self.__filter(flask.request.url, flask.request.json):
-                LOGGER.debug(f"({threading.get_native_id()})"
-                             f" {self.__class__}::{inspect.stack()[0][3]}()"
-                             f" request filtered out")
-                raise RuntimeError("Wrong analysisRequest.json from {}".format(flask.request.url))
+            is_internal_request = urlparse(flask.request.url).path.\
+                endswith("/availableSpectrumInquiryInternal")
+            is_gui = flask.request.args.get('gui') == 'True'
+            get_vendor_extension_filter().filter(
+                json_dict=flask.request.json, is_input=True, is_gui=is_gui,
+                is_internal=is_internal_request)
             # start request
             args = flask.request.json
             # check request version
@@ -596,8 +727,7 @@ class RatAfc(MethodView):
                     edebug_opt = flask.request.args.get('edebug')
                     if edebug_opt == 'True':
                         runtime_opts |= RNTM_OPT_SLOW_DBG
-                    gui_opt = flask.request.args.get('gui')
-                    if gui_opt == 'True':
+                    if is_gui:
                         runtime_opts |= RNTM_OPT_GUI
                     opt = flask.request.args.get('nocache')
                     if opt == 'True':
@@ -679,6 +809,7 @@ class RatAfc(MethodView):
                         self._start_processing(
                             dataif=dataif,
                             req_info=list(req_infos.values())[0],
+                            is_internal_request=is_internal_request,
                             use_tasks=True)
                     # Async request can't be multi
                     return flask.jsonify(taskId=task.getId(),
@@ -687,7 +818,8 @@ class RatAfc(MethodView):
                     self._compute_responses(
                         dataif=dataif, use_tasks=use_tasks,
                         req_infos={k: v for k, v in req_infos.items()
-                                   if k not in responses}))
+                                   if k not in responses},
+                        is_internal_request=is_internal_request))
 
             # Preparing responses for requests
             for req_info in req_infos.values():
@@ -735,6 +867,9 @@ class RatAfc(MethodView):
                 {"requestId": missing_id,
                  "rulesetId": "Unknown",
                  "response": {"responseCode": -1}})
+        get_vendor_extension_filter().filter(
+            json_dict=results, is_input=False, is_gui=is_gui,
+            is_internal=is_internal_request)
         als.als_afc_response(req_id=als_req_id, resp=results)
 
         LOGGER.debug("Final results: %s", str(results))
@@ -773,7 +908,8 @@ class RatAfc(MethodView):
             return ret
         return get_rcache().lookup_responses(cached_keys)
 
-    def _start_processing(self, dataif, req_info, use_tasks=False):
+    def _start_processing(self, dataif, req_info, is_internal_request,
+                          use_tasks=False):
         """ Initiates processing on remote worker
         If 'use_tasks' - returns created Task
         """
@@ -805,30 +941,37 @@ class RatAfc(MethodView):
         if use_tasks:
             return afctask.Task(task_id=task_id, dataif=dataif,
                                 hash_val=req_info.req_cfg_hash,
-                                history_dir=req_info.history_dir)
+                                history_dir=req_info.history_dir,
+                                is_internal_request=is_internal_request)
         return None
 
-    def _compute_responses(self, dataif, use_tasks, req_infos):
+    def _compute_responses(self, dataif, use_tasks, req_infos,
+                           is_internal_request):
         """ Prepares worker tasks and waits their completion
 
         Arguments:
-        dataif    -- Objstore handle (used only if RCache not used)
-        use_tasks -- True to use task-based communication with worker, False to
-                     use RabbitMQ-based communication
-        req_infos -- Dictionary of ReqInfo objects, indexed by request/config
-                     hashes
+        dataif              -- Objstore handle (used only if RCache not used)
+        use_tasks           -- True to use task-based communication with
+                               worker, False to use RabbitMQ-based
+                               communication
+        req_infos           -- Dictionary of ReqInfo objects, indexed by
+                               request/config hashes
+        is_internal_request -- True for internal request massage, False for
+                               external request message
         Returns dictionary of found responses (as strings), indexed by
         request/config hashes
         """
         tasks = {}
         for req_cfg_hash, req_info in req_infos.items():
             tasks[req_cfg_hash] = \
-                self._start_processing(dataif=dataif, req_info=req_info,
-                                  use_tasks=use_tasks)
+                self._start_processing(
+                    dataif=dataif, req_info=req_info, use_tasks=use_tasks,
+                    is_internal_request=is_internal_request)
         if use_tasks:
             ret = {}
             for req_cfg_hash, task in tasks.items():
-                task_stat = task.wait(timeout=RatafcMsghndCfgIface().get_ratafc_tout())
+                task_stat = \
+                    task.wait(timeout=RatafcMsghndCfgIface().get_ratafc_tout())
                 ret[req_cfg_hash] = \
                     response_map[task_stat['status']](task).data
             return ret
