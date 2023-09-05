@@ -120,8 +120,8 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "APUncertainty": {
         "points_per_degree": 3600,
         "height": 5,
-        "maxVerticalUncertainty": 20,
-        "maxHorizontalUncertaintyDistance" : 150
+        "maxVerticalUncertainty": 100,
+        "maxHorizontalUncertaintyDistance" : 650
     },
     "ITMParameters": {
         "polarization": "Vertical",
@@ -219,8 +219,8 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "APUncertainty": {
         "points_per_degree": 3600,
         "height": 5,
-        "maxVerticalUncertainty": 20,
-        "maxHorizontalUncertaintyDistance" : 150
+        "maxVerticalUncertainty": 100,
+        "maxHorizontalUncertaintyDistance" : 650
     },
     "ITMParameters": {
         "polarization": "Vertical",
@@ -318,8 +318,8 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     "APUncertainty": {
         "points_per_degree": 3600,
         "height": 5,
-        "maxVerticalUncertainty": 20,
-        "maxHorizontalUncertaintyDistance" : 150
+        "maxVerticalUncertainty": 100,
+        "maxHorizontalUncertaintyDistance" : 650
     },
     "ITMParameters": {
         "polarization": "Vertical",
@@ -415,8 +415,8 @@ const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
     "APUncertainty": {
         "points_per_degree": 3600,
         "height": 5,
-        "maxVerticalUncertainty": 20,
-        "maxHorizontalUncertaintyDistance" : 150
+        "maxVerticalUncertainty": 100,
+        "maxHorizontalUncertaintyDistance" : 650
     },
     "ITMParameters": {
         "polarization": "Vertical",
