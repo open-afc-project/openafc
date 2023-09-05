@@ -78,6 +78,10 @@ class ObjIntLocalFS(ObjInt):
     def __unlock(self, sem):
         sem.release()
         sem.close()
+        try:
+            sem.unlink()
+        except:
+            pass
 
     def write(self, data):
         self.__mkdir_local(os.path.dirname(self._file_name))
