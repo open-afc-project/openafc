@@ -4,12 +4,12 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-all: aep.so
+all: libaep.so
 
 CXXFLAGS=-Wall -D_GNU_SOURCE -fPIC -DNO_GOOGLE_LINK -O2
 #CXXFLAGS=-Wall -D_GNU_SOURCE -fPIC -DNO_GOOGLE_LINK -O0 -g
 
-aep.so: aep.o
+libaep.so: aep.o
 	g++ -rdynamic -shared -o $@ $^ #-lgoogle_cloud_cpp_storage
 
 clean:

@@ -185,7 +185,6 @@ typedef struct fe_t
 	fe_t *next, *down;
 	char *name;
 	int64_t size;
-	char *slink_to;
 } fe_t;
 
 typedef struct
@@ -194,7 +193,7 @@ typedef struct
 	FILE file;
 	DIR dir;
 	off_t off;
-	char tpath[AEP_PATH_MAX];
+	char *tpath;
 	struct dirent dirent;
 	fe_t *readdir_p;
 } data_fd_t;
@@ -215,8 +214,9 @@ static char *cache_path;
 static uint64_t max_cached_file_size;
 static uint64_t max_cached_size;
 static uint32_t aep_debug = 0;
-static char *ae_mountpoint; /* The path in which afc-engine seeking for static data */
-static char *real_mountpoint; /* The path in which static data really is */
+static char *ae_mountpoint = NULL; /* The path in which afc-engine seeking for static data */
+static size_t strlen_ae_mountpoint;
+static char *real_mountpoint = NULL; /* The path in which static data really is */
 static bool aep_use_gs = false;
 static int logfile = -1;
 static volatile int64_t *cache_size;
@@ -236,6 +236,14 @@ static ssize_t read_remote_data_gs(void *destv, size_t size, char *tpath, off_t 
 static int init_gs();
 static void reduce_cache(uint64_t size);
 static bool fd_is_remote(int fd);
+
+/* free string allocated by realpath() in is_remote_file() */
+static inline void free_tpath(char *tpath)
+{
+	if (tpath) {
+		free(tpath - strlen_ae_mountpoint);
+	}
+}
 
 static inline void prn_statistic()
 {
@@ -653,9 +661,7 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	} else {
 		sem_post(sem);
 		sem_close(sem);
-		ret = read_remote_data(destv, size,
-			data_fd->fe->slink_to ? data_fd->fe->slink_to : data_fd->tpath,
-			data_fd->off);
+		ret = read_remote_data(destv, size, data_fd->tpath, data_fd->off);
 		aep_assert(ret >= 0, "read_data(%s) read_remote_data", fakepath)
 	}
 	//dbg("read_data %s done", data_fd->tpath);
@@ -721,24 +727,8 @@ static int fd_add(char *tpath)
 #endif
 	data_fd->readdir_p = NULL;
 	data_fd->dir.fd = fd;
-	strncpy(data_fd->tpath, tpath, AEP_PATH_MAX);
-	if (fe->size < 0) {
-		/* It's softlink */
-		char tmp[AEP_PATH_MAX];	/* path to the linked file */
-		struct stat statbuf;
-
-		/* save path of the soft link in fakepath */
-		strncpy(fakepath, ae_mountpoint, AEP_PATH_MAX);
-		strncat(fakepath, tpath, AEP_PATH_MAX - strlen(fakepath));
-
-		aep_assert(readlink(fakepath, tmp, AEP_PATH_MAX) >= 0, "fd_add():readlink()");
-		fe->slink_to = (char*)malloc(strlen(tmp + strlen(ae_mountpoint)) + 1);
-		aep_assert(fe->slink_to, "malloc");
-		orig_stat(tmp, &statbuf);
-		data_fd->fe->size = statbuf.st_size;
-		strncpy(fe->slink_to, (char*) tmp + strlen(ae_mountpoint),
-			strlen(tmp + strlen(ae_mountpoint)) + 1);
-	}
+	free_tpath(data_fd->tpath); /* new std::map is zeroed */
+	data_fd->tpath = tpath;
 	dbg("fd_add(%s) %d done", tpath, fd);
 	return fd;
 }
@@ -754,7 +744,10 @@ static void fd_rm(const int fd, bool closeit)
 	data_fd_t *data_fd = fd_get_data_fd(fd);
 
 	dbg("fd_rm(%d)", fd);
-	if (data_fd && data_fd->fe) {
+	if (!data_fd) {
+		return;
+	}
+	if (data_fd->fe) {
 		if (data_fd->fe->size) {
 			files_open_set(data_fd->tpath, -1);
 		}
@@ -762,9 +755,8 @@ static void fd_rm(const int fd, bool closeit)
 			orig_close(fd);
 		}
 	}
-	if (data_fd) {
-		data_fds.erase(fd);
-	}
+	free_tpath(data_fd->tpath);
+	data_fds.erase(fd);
 	dbg("fd_rm(%d) done", fd);
 }
 
@@ -798,16 +790,32 @@ static inline void fd_set_dbg_name(const int fd, const char *tpath)
 
 static bool is_remote_file(const char *path, char **tpath)
 {
-	dbg("is_remote_file(%s)", path);
+	char *rpath = NULL;
+
 	if (!path) {
 		*tpath = (char*) path;
 		return false;
 	}
 
-	if (strncmp(path, ae_mountpoint, strlen(ae_mountpoint)) == 0) {
-		*tpath = (char*) path + strlen(ae_mountpoint);
-		return true;
+	rpath = realpath(path, rpath);
+	if (!rpath) {
+		*tpath = (char*) path;
+		return false;
 	}
+
+	if (strncmp(rpath, ae_mountpoint, strlen_ae_mountpoint) == 0) {
+		if (strlen(rpath) == strlen_ae_mountpoint || rpath[strlen_ae_mountpoint] == '/') {
+			*tpath = (char*) rpath + strlen_ae_mountpoint;
+			dbgd("is_remote_file(%s -> %s)", path, *tpath);
+			return true;
+		} else {
+			free(rpath);
+			*tpath = (char*) path;
+			dbgo("is_remote_file(%s)", *tpath);
+			return false;
+		}
+	}
+	free(rpath);
 	*tpath = (char*) path;
 	return false;
 }
@@ -881,16 +889,17 @@ void __attribute__((constructor)) aep_init(void)
 			}
 		}
 	}
-	real_mountpoint = getenv("AFC_AEP_REAL_MOUNTPOINT");
-	aep_assert(real_mountpoint, "AFC_AEP_REAL_MOUNTPOINT env var is not defined");
-	if (real_mountpoint[strlen(real_mountpoint) - 1] == '/') {
-		real_mountpoint[strlen(real_mountpoint) - 1] = '\0';
-	}
-	ae_mountpoint = getenv("AFC_AEP_ENGINE_MOUNTPOINT");
-	aep_assert(ae_mountpoint, "AFC_AEP_ENGINE_MOUNTPOINT env var is not defined");
-	if (ae_mountpoint[strlen(ae_mountpoint) - 1] == '/') {
-		ae_mountpoint[strlen(ae_mountpoint) - 1] = '\0';
-	}
+	tmp = getenv("AFC_AEP_REAL_MOUNTPOINT");
+	aep_assert(tmp, "AFC_AEP_REAL_MOUNTPOINT env var is not defined");
+	real_mountpoint = realpath(tmp, real_mountpoint);
+	aep_assert(real_mountpoint, "AFC_AEP_REAL_MOUNTPOINT env var path does not exist");
+
+	tmp = getenv("AFC_AEP_ENGINE_MOUNTPOINT");
+	aep_assert(tmp, "AFC_AEP_ENGINE_MOUNTPOINT env var is not defined");
+	ae_mountpoint = realpath(tmp, ae_mountpoint);
+	aep_assert(ae_mountpoint, "AFC_AEP_ENGINE_MOUNTPOINT env var path does not exist");
+	strlen_ae_mountpoint = strlen(ae_mountpoint);
+
 	if (getenv("AFC_AEP_GS")) {
 		aep_use_gs = true;
 		init_gs();
@@ -1239,6 +1248,7 @@ int access(const char *pathname, int mode)
 		fe = find_fe(tpath);
 		ret = fe ? 0 : -1;
 		dbgd("access(%s, %d) %d", tpath, mode, ret);
+		free_tpath(tpath);
 	} else {
 		ret = orig_access(pathname, mode);
 		dbgo("access(%s, %d) %d", pathname, mode, ret);
@@ -1278,6 +1288,7 @@ long int syscall(long int __sysno, ...)
 			fe = find_fe(tpath);
 			if (!fe) {
 				dbgd("SYS_statx(%s) -1", tpath);
+				free_tpath(tpath);
 				return -1;
 			}
 
@@ -1290,6 +1301,7 @@ long int syscall(long int __sysno, ...)
 			} else {
 				st->stx_mode = S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO;
 			}
+			free_tpath(tpath);
 			return 0;
 		} else {
 			orig_syscall_t orig = (orig_syscall_t) dlsym(RTLD_NEXT, "syscall");
@@ -1544,8 +1556,7 @@ static int download_file_nfs(data_fd_t *data_fd, char *dest)
 	unsigned int us;
 
 	strncpy(realpath, real_mountpoint, AEP_PATH_MAX);
-	strncat(realpath, data_fd->fe->slink_to ? data_fd->fe->slink_to : data_fd->tpath,
-		AEP_PATH_MAX - strlen(realpath));
+	strncat(realpath, data_fd->tpath, AEP_PATH_MAX - strlen(realpath));
 
 	starttime(&tv);
 	if ((output = orig_open(dest, O_CREAT | O_RDWR)) < 0) {
