@@ -1806,6 +1806,16 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			}
 		}
 
+		if (_rlanType == RLANType::RLAN_INDOOR) {
+			_bodyLossDB = _bodyLossIndoorDB;
+		} else {
+			_buildingType = CConst::noBuildingType;
+			_confidenceBldg2109 = 0.0;
+			_fixedBuildingLossFlag = false;
+			_fixedBuildingLossValue = 0.0;
+			_bodyLossDB = _bodyLossOutdoorDB;
+		}
+
 		QString rlanHeightType = elevationObj["heightType"].toString();
 
 		if (rlanHeightType == "AMSL") {
@@ -1850,10 +1860,10 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 					_invalidParams << "minorAxis";
 				}
 				if (majorAxis < 0.0) {
-			        LOGGER_WARN(logger) << "GENERAL FAILURE: majorAxis < 0";
+					LOGGER_WARN(logger) << "GENERAL FAILURE: majorAxis < 0";
 					_invalidParams << "majorAxis";
 				} else if (2*majorAxis > _maxHorizontalUncertaintyDistance) {
-			        LOGGER_WARN(logger) << "GENERAL FAILURE: 2*majorAxis = " << 2*majorAxis << " exceeds max value of " << _maxHorizontalUncertaintyDistance;
+					LOGGER_WARN(logger) << "GENERAL FAILURE: 2*majorAxis = " << 2*majorAxis << " exceeds max value of " << _maxHorizontalUncertaintyDistance;
 					_invalidParams << "majorAxis";
 				}
 			}
@@ -2603,34 +2613,25 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_removeMobile = false;
 	}
 
-	if (_rlanType == RLANType::RLAN_INDOOR) {
-		// Check what the building penetration type is (right ehre it is ITU-R P.2109)
-		if (buildingLoss["kind"].toString() == "ITU-R Rec. P.2109") {
-			_fixedBuildingLossFlag = false;
+	// Check what the building penetration type is (right ehre it is ITU-R P.2109)
+	if (buildingLoss["kind"].toString() == "ITU-R Rec. P.2109") {
+		_fixedBuildingLossFlag = false;
 
-			if (buildingLoss["buildingType"].toString() == "Traditional") {
-				_buildingType = CConst::traditionalBuildingType;
-			} else if (buildingLoss["buildingType"].toString() == "Efficient") {
-				_buildingType = CConst::thermallyEfficientBuildingType;
-			}
-			_confidenceBldg2109 = buildingLoss["confidence"].toDouble() / 100.0;
-
-			// User uses a fixed value for building loss
-		} else if (buildingLoss["kind"].toString() == "Fixed Value") {
-			_fixedBuildingLossFlag = true;
-			_fixedBuildingLossValue = buildingLoss["value"].toDouble();
-			_buildingType = CConst::noBuildingType;
-			_confidenceBldg2109 = 0.0;
-		} else {
-			throw std::runtime_error("ERROR: Invalid buildingLoss[\"kind\"]");
+		if (buildingLoss["buildingType"].toString() == "Traditional") {
+			_buildingType = CConst::traditionalBuildingType;
+		} else if (buildingLoss["buildingType"].toString() == "Efficient") {
+			_buildingType = CConst::thermallyEfficientBuildingType;
 		}
-		_bodyLossDB = _bodyLossIndoorDB;
-	} else {
+		_confidenceBldg2109 = buildingLoss["confidence"].toDouble() / 100.0;
+
+		// User uses a fixed value for building loss
+	} else if (buildingLoss["kind"].toString() == "Fixed Value") {
+		_fixedBuildingLossFlag = true;
+		_fixedBuildingLossValue = buildingLoss["value"].toDouble();
 		_buildingType = CConst::noBuildingType;
 		_confidenceBldg2109 = 0.0;
-		_fixedBuildingLossFlag = false;
-		_fixedBuildingLossValue = 0.0;
-		_bodyLossDB = _bodyLossOutdoorDB;
+	} else {
+		throw std::runtime_error("ERROR: Invalid buildingLoss[\"kind\"]");
 	}
 
 	/**************************************************************************************/
