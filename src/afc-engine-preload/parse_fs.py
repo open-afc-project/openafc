@@ -54,17 +54,14 @@ def parse_dir(path, tab, outfile):
     for dire in os.scandir(path):
         if dire.is_dir(follow_symlinks=False):
             dirs.append(dire)
-        elif dire.is_file(follow_symlinks=True) and dire.stat(follow_symlinks=True).st_size > 0:
+        elif dire.is_file(follow_symlinks=False) and dire.stat(follow_symlinks=False).st_size > 0:
             files.append(dire)
     dirs.sort(key=sort_key)
     files.sort(key=sort_key)
     for dire in dirs:
         parse_dir(dire.path, tab + 1, outfile)
     for dire in files:
-        if dire.is_symlink():
-            write_obj(dire.name, -1, tab + 1, outfile)
-        else:
-            write_obj(dire.name, dire.stat().st_size, tab + 1, outfile)
+        write_obj(dire.name, dire.stat().st_size, tab + 1, outfile)
 
 if __name__ == '__main__':
     if len(sys.argv) <= 2 or not os.path.isdir(sys.argv[1]):
