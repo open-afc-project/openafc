@@ -1359,10 +1359,15 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			inquiredChannelsArray = requestObj["inquiredChannels"].toArray();
 		}
 
+		double minDesiredPower;
 		if (!optionalParams.contains("minDesiredPower")) {
-			_minEIRP_dBm = requestObj["minDesiredPower"].toDouble();
+			minDesiredPower = requestObj["minDesiredPower"].toDouble();
 		} else {
-			_minEIRP_dBm = quietNaN;
+			minDesiredPower = quietNaN;
+		}
+
+		if ((!std::isnan(minDesiredPower)) && (minDesiredPower > _minEIRP_dBm)) {
+			_minEIRP_dBm = minDesiredPower;
 		}
 
 		QJsonArray vendorExtensionArray;
@@ -2420,18 +2425,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_ulsDatabaseList.push_back(std::make_tuple("FSDATA", dbfile));
 	}
 
-	double cfgMinEIRP;
 	if (jsonObj.contains("minEIRP") && !jsonObj["minEIRP"].isUndefined()) {
-		cfgMinEIRP = jsonObj["minEIRP"].toDouble();
+		_minEIRP_dBm = jsonObj["minEIRP"].toDouble();
 	} else {
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): minEIRP is missing.");
 	}
 
-	if (std::isnan(_minEIRP_dBm)) {
-		_minEIRP_dBm = cfgMinEIRP;
-	} else if (cfgMinEIRP > _minEIRP_dBm) {
-		_minEIRP_dBm = cfgMinEIRP;
-	}
 	_maxEIRP_dBm = jsonObj["maxEIRP"].toDouble();
 
 	if (jsonObj.contains("minPSD") && !jsonObj["minPSD"].isUndefined()) {
