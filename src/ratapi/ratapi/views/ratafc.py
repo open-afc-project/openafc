@@ -244,18 +244,24 @@ class VendorExtensionFilter:
                     return False
             return True
 
-    # List of whilelists. Better be in some config file of course...
-    # More than one whitelist for a nonpartial type is allowed
-    _whitelists = \
-        [_Whitelist(
-            ["OpenAfcOverrideAfcConfig"],
+    # List of whilelists. Only nonempty whitelists are presented
+    # It is OK for more than one whitelist to cover some type
+    # It is OK to add more whitelists (e.g. for different whitelist types)
+    _whitelists = [
+        # Allowed vendor extensions for individual requests from AFC services
+        # (NOT from APs)
+        _Whitelist(
+            ["openAfc.overrideAfcConfig"],
             _WhitelistType(is_input=True, is_message=False, is_internal=True)),
-         _Whitelist(
-             ["rlanAntenna"],
-             _WhitelistType(is_input=True, is_message=False)),
-         _Whitelist(
-             ["openAfc.redBlackData", "openAfc.mapinfo"],
-             _WhitelistType(is_input=False, is_message=False, is_gui=True))]
+        # Allowed vendor extensions for individual requests received from APs
+        _Whitelist(
+            ["rlanAntenna"],
+            _WhitelistType(is_input=True, is_message=False)),
+        # Allowed vendor extensions for individual responses sent to AFC Web
+        # GUI
+        _Whitelist(
+            ["openAfc.redBlackData", "openAfc.mapinfo"],
+            _WhitelistType(is_input=False, is_message=False, is_gui=True))]
 
     def __init__(self):
         """ Constructor """

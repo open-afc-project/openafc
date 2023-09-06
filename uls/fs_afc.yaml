@@ -59,7 +59,7 @@ req_pattern: |
                 "minDesiredPower": 24,
                 "vendorExtensions": [
                     {
-                        "extensionId": "OpenAfcOverrideAfcConfig",
+                        "extensionId": "openAfc.overrideAfcConfig",
                         "parameters": {
                             "ulsDatabase": null
                         }

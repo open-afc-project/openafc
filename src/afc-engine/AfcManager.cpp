@@ -1988,7 +1988,7 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			}
 
 			std::string extensionId = vendorExtensionObj["extensionId"].toString().toStdString();
-			if (extensionId == "OpenAfcOverrideAfcConfig") {
+			if (extensionId == "openAfc.overrideAfcConfig") {
 				AfcManager::_uls = parametersObj["ulsDatabase"].toString().toStdString();
 			}
 		}

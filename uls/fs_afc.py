@@ -231,7 +231,7 @@ def main(argv: List[str]) -> None:
     argument_parser.add_argument(
         "--server_url", metavar="URL", required=True,
         help="URL of AFC Service to use (should accept "
-        "OpenAfcOverrideAfcConfig Vendor Extension)")
+        "openAfc.overrideAfcConfig Vendor Extension)")
     argument_parser.add_argument(
         "--region", metavar="REGION", action="append", default=[],
         help="Region to run tests for. This parameter may be specified "
