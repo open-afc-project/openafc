@@ -587,6 +587,9 @@ AfcManager::AfcManager()
 	_scanres_ht = quietNaN;
 	_indoorFixedHeightAMSL = false;
 
+	_maxVerticalUncertainty = quietNaN;
+	_maxHorizontalUncertaintyDistance = quietNaN;
+
 	_scanPointBelowGroundMethod = CConst::TruncateScanPointBelowGroundMethod;
 
 	_minEIRP_dBm = quietNaN;
@@ -1356,10 +1359,15 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			inquiredChannelsArray = requestObj["inquiredChannels"].toArray();
 		}
 
+		double minDesiredPower;
 		if (!optionalParams.contains("minDesiredPower")) {
-			_minEIRP_dBm = requestObj["minDesiredPower"].toDouble();
+			minDesiredPower = requestObj["minDesiredPower"].toDouble();
 		} else {
-			_minEIRP_dBm = quietNaN;
+			minDesiredPower = quietNaN;
+		}
+
+		if ((!std::isnan(minDesiredPower)) && (minDesiredPower > _minEIRP_dBm)) {
+			_minEIRP_dBm = minDesiredPower;
 		}
 
 		QJsonArray vendorExtensionArray;
@@ -1803,6 +1811,16 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			}
 		}
 
+		if (_rlanType == RLANType::RLAN_INDOOR) {
+			_bodyLossDB = _bodyLossIndoorDB;
+		} else {
+			_buildingType = CConst::noBuildingType;
+			_confidenceBldg2109 = 0.0;
+			_fixedBuildingLossFlag = false;
+			_fixedBuildingLossValue = 0.0;
+			_bodyLossDB = _bodyLossOutdoorDB;
+		}
+
 		QString rlanHeightType = elevationObj["heightType"].toString();
 
 		if (rlanHeightType == "AMSL") {
@@ -1815,6 +1833,9 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 
 		double verticalUncertainty = elevationObj["verticalUncertainty"].toDouble();
 		if (verticalUncertainty < 0.0) {
+			_invalidParams << "verticalUncertainty";
+		} else if (verticalUncertainty > _maxVerticalUncertainty) {
+			LOGGER_WARN(logger) << "GENERAL FAILURE: verticalUncertainty = " << verticalUncertainty << " exceeds max value of " << _maxVerticalUncertainty;
 			_invalidParams << "verticalUncertainty";
 		}
 		double centerHeight = elevationObj["height"].toDouble();
@@ -1844,6 +1865,10 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 					_invalidParams << "minorAxis";
 				}
 				if (majorAxis < 0.0) {
+					LOGGER_WARN(logger) << "GENERAL FAILURE: majorAxis < 0";
+					_invalidParams << "majorAxis";
+				} else if (2*majorAxis > _maxHorizontalUncertaintyDistance) {
+					LOGGER_WARN(logger) << "GENERAL FAILURE: 2*majorAxis = " << 2*majorAxis << " exceeds max value of " << _maxHorizontalUncertaintyDistance;
 					_invalidParams << "majorAxis";
 				}
 			}
@@ -1891,6 +1916,29 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			centerLongitude = sumLon / _rlanLinearPolygon.size();
 			centerLatitude  = sumLat / _rlanLinearPolygon.size();
 
+			double cosLat = cos(centerLatitude*M_PI/180.0);
+			double maxHorizDistSq = 0.0;
+			for(i=0; i< (int) _rlanLinearPolygon.size(); i++) {
+				double lon_i = _rlanLinearPolygon[i].second;
+				double lat_i = _rlanLinearPolygon[i].first;
+				for(int j=i+1; j< (int) _rlanLinearPolygon.size()+1; j++) {
+					double jj = j % _rlanLinearPolygon.size();
+					double lon_j = _rlanLinearPolygon[jj].second;
+					double lat_j = _rlanLinearPolygon[jj].first;
+					double deltaX = (lon_j - lon_i)*(M_PI/180.0)*cosLat*CConst::earthRadius;
+					double deltaY = (lat_j - lat_i)*(M_PI/180.0)*CConst::earthRadius;
+					double distSq = deltaX*deltaX + deltaY*deltaY;
+					if (distSq > maxHorizDistSq) {
+						maxHorizDistSq = distSq;
+					}
+				}
+			}
+
+			if (maxHorizDistSq > _maxHorizontalUncertaintyDistance*_maxHorizontalUncertaintyDistance) {
+				LOGGER_WARN(logger) << "GENERAL FAILURE: Linear polygon contains vertices with separation distance that exceeds max value of " << _maxHorizontalUncertaintyDistance;
+				_invalidParams << "outerBoundary";
+			}
+
 			_rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
 			_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, verticalUncertainty);
 		} else if (hasRadialPolygonFlag) {
@@ -1917,6 +1965,34 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 
 			double centerLatitude = centerObj["latitude"].toDouble();
 			double centerLongitude = centerObj["longitude"].toDouble();
+
+			double cosLat = cos(centerLatitude*M_PI/180.0);
+			double maxHorizDistSq = 0.0;
+			for(int i=0; i< (int) _rlanRadialPolygon.size(); i++) {
+				double angle_i = _rlanRadialPolygon[i].second;
+				double length_i = _rlanRadialPolygon[i].first;
+				double x_i = length_i*sin(angle_i*M_PI/360.0);
+				double y_i = length_i*cos(angle_i*M_PI/360.0);
+				for(int j=i+1; j< (int) _rlanRadialPolygon.size()+1; j++) {
+					double jj = j % _rlanRadialPolygon.size();
+					double angle_j = _rlanRadialPolygon[jj].second;
+					double length_j = _rlanRadialPolygon[jj].first;
+					double x_j = length_j*sin(angle_j*M_PI/360.0);
+					double y_j = length_j*cos(angle_j*M_PI/360.0);
+
+					double deltaX = x_j - x_i;
+					double deltaY = y_j - y_i;
+					double distSq = deltaX*deltaX + deltaY*deltaY;
+					if (distSq > maxHorizDistSq) {
+						maxHorizDistSq = distSq;
+					}
+				}
+			}
+
+			if (maxHorizDistSq > _maxHorizontalUncertaintyDistance*_maxHorizontalUncertaintyDistance) {
+				LOGGER_WARN(logger) << "GENERAL FAILURE: Radial polygon contains vertices with separation distance that exceeds max value of " << _maxHorizontalUncertaintyDistance;
+				_invalidParams << "outerBoundary";
+			}
 
 			_rlanLLA = std::make_tuple(centerLatitude, centerLongitude, centerHeight);
 			_rlanUncerts_m = std::make_tuple(quietNaN, quietNaN, verticalUncertainty);
@@ -2321,6 +2397,18 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_scanres_ht = 5.0;
 	}
 
+	if (uncertaintyObj.contains("maxVerticalUncertainty") && !uncertaintyObj["maxVerticalUncertainty"].isUndefined()) {
+		_maxVerticalUncertainty = uncertaintyObj["maxVerticalUncertainty"].toDouble();
+	} else {
+		_maxVerticalUncertainty = 50.0;
+	}
+
+	if (uncertaintyObj.contains("maxHorizontalUncertaintyDistance") && !uncertaintyObj["maxHorizontalUncertaintyDistance"].isUndefined()) {
+		_maxHorizontalUncertaintyDistance = uncertaintyObj["maxHorizontalUncertaintyDistance"].toDouble();
+	} else {
+		_maxHorizontalUncertaintyDistance = 650.0;
+	}
+
 	if (jsonObj.contains("ulsDatabaseList") && !jsonObj["ulsDatabaseList"].isUndefined()) {
 		QJsonArray ulsDatabaseArray = jsonObj["ulsDatabaseList"].toArray();
 		for (QJsonValue ulsDatabaseVal : ulsDatabaseArray) {
@@ -2337,18 +2425,12 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_ulsDatabaseList.push_back(std::make_tuple("FSDATA", dbfile));
 	}
 
-	double cfgMinEIRP;
 	if (jsonObj.contains("minEIRP") && !jsonObj["minEIRP"].isUndefined()) {
-		cfgMinEIRP = jsonObj["minEIRP"].toDouble();
+		_minEIRP_dBm = jsonObj["minEIRP"].toDouble();
 	} else {
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): minEIRP is missing.");
 	}
 
-	if (std::isnan(_minEIRP_dBm)) {
-		_minEIRP_dBm = cfgMinEIRP;
-	} else if (cfgMinEIRP > _minEIRP_dBm) {
-		_minEIRP_dBm = cfgMinEIRP;
-	}
 	_maxEIRP_dBm = jsonObj["maxEIRP"].toDouble();
 
 	if (jsonObj.contains("minPSD") && !jsonObj["minPSD"].isUndefined()) {
@@ -2530,34 +2612,25 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_removeMobile = false;
 	}
 
-	if (_rlanType == RLANType::RLAN_INDOOR) {
-		// Check what the building penetration type is (right ehre it is ITU-R P.2109)
-		if (buildingLoss["kind"].toString() == "ITU-R Rec. P.2109") {
-			_fixedBuildingLossFlag = false;
+	// Check what the building penetration type is (right ehre it is ITU-R P.2109)
+	if (buildingLoss["kind"].toString() == "ITU-R Rec. P.2109") {
+		_fixedBuildingLossFlag = false;
 
-			if (buildingLoss["buildingType"].toString() == "Traditional") {
-				_buildingType = CConst::traditionalBuildingType;
-			} else if (buildingLoss["buildingType"].toString() == "Efficient") {
-				_buildingType = CConst::thermallyEfficientBuildingType;
-			}
-			_confidenceBldg2109 = buildingLoss["confidence"].toDouble() / 100.0;
-
-			// User uses a fixed value for building loss
-		} else if (buildingLoss["kind"].toString() == "Fixed Value") {
-			_fixedBuildingLossFlag = true;
-			_fixedBuildingLossValue = buildingLoss["value"].toDouble();
-			_buildingType = CConst::noBuildingType;
-			_confidenceBldg2109 = 0.0;
-		} else {
-			throw std::runtime_error("ERROR: Invalid buildingLoss[\"kind\"]");
+		if (buildingLoss["buildingType"].toString() == "Traditional") {
+			_buildingType = CConst::traditionalBuildingType;
+		} else if (buildingLoss["buildingType"].toString() == "Efficient") {
+			_buildingType = CConst::thermallyEfficientBuildingType;
 		}
-		_bodyLossDB = _bodyLossIndoorDB;
-	} else {
+		_confidenceBldg2109 = buildingLoss["confidence"].toDouble() / 100.0;
+
+		// User uses a fixed value for building loss
+	} else if (buildingLoss["kind"].toString() == "Fixed Value") {
+		_fixedBuildingLossFlag = true;
+		_fixedBuildingLossValue = buildingLoss["value"].toDouble();
 		_buildingType = CConst::noBuildingType;
 		_confidenceBldg2109 = 0.0;
-		_fixedBuildingLossFlag = false;
-		_fixedBuildingLossValue = 0.0;
-		_bodyLossDB = _bodyLossOutdoorDB;
+	} else {
+		throw std::runtime_error("ERROR: Invalid buildingLoss[\"kind\"]");
 	}
 
 	/**************************************************************************************/

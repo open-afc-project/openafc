@@ -1,6 +1,28 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-814*|
+| :- | :- |
+|**Date**|**09/05/2023**|
+
+## **Issues Addressed**
+ * Jira OA-814: Feature: add a configurable parameter to restrict the RLAN's height and horizontal uncertainty region
+
+## **Interface Changes**
+ * There are two new parameters in afc-config.json (see example file attached to jira ticket)
+ * See below:
+ * "APUncertainty":{"points_per_degree":3600,"height":5,"maxVerticalUncertainty":100,"maxHorizontalUncertaintyDistance":650}
+ * Changed the order of sending the json files to the engine: first afc-config.json followed by request.json. A few changes were needed here to make sure this was done properly.
+
+## **Testing Done**
+ * Confirmed that the default afc-config of all Regions have these 2 new parameters with the correct default values. (Need to 'reset form to default'first)
+ * Ran FSP1 when these parameters were set to "maxVerticalUncertainty":100,"maxHorizontalUncertaintyDistance":650 and confirmed getting correct results
+ * Ran FSP1 with "maxVerticalUncertainty":1 and another one with "maxHorizontalUncertaintyDistance":6 and got the correct error message from engine (indicating that the height uncertainty or major-axis are invalid).
+
+## **Open Issues** 
+ * 
+
+## **Version and Date**
 |Version|3.8.7.0|
 | :- | :- |
 |**Date**|**08/31/2023**|
