@@ -1594,7 +1594,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
                 res=res_template.substitute(status="Ok")
             else:
                 for line in diffs:
-                    app_log.error(f"  Difference: {line}")
+                    app_log.error(f"  Difference for {req_id}: {line}")
                 app_log.error(hash_obj.hexdigest())
                 test_res = AFC_ERR
 
