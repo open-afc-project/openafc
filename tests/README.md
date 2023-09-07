@@ -261,6 +261,21 @@ How to build a docker image for testing from sources. As a result there is a doc
 cd <open-afc path>
 docker build -f tests/Dockerfile -t afc_test .
 ```
+
+## How to send an email with test results
+
+Current implementation provides ability to send an mail with tests results in attached file. By default it uses Google mail server "smtp.gmail.com", port 465.
+It is required to provide output file (option --outfile <filename>) to collect tests results and to attach to the email.
+```
+cd <open-afc path>/tests
+./afc_tests.py --cmd run --addr <ip addr> --port <port> --ca_cert tmp.bundle.pem 
+--cli_key tmp_cli.key.pem --cli_cert tmp_cli.bundle.pem ----email_from <sender email> --email_to <recipient email> --email_pwd <password> --outfile res.csv
+```
+Use of Google mail server required to make certain configurations to email account.
+One alternative to permit less secure application access by the following link.
+https://www.google.com/settings/security/lesssecureapps
+Another alternative to enable 2-step verification on a Google account and configure it App passwords.
+
 <br /><br />
 
 

@@ -33,6 +33,13 @@ import sqlite3
 import subprocess
 import sys
 import time
+
+import smtplib, ssl
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 from bs4 import BeautifulSoup
 from deepdiff import DeepDiff
 from multiprocessing.pool import Pool
@@ -394,6 +401,45 @@ def get_md5(fname):
         for chunk in iter(lambda: f.read(4096), b""):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
+
+
+def create_email_attachment(filename):
+    part = None
+    with open(filename, "rb") as attachment:
+        # Add file as application/octet-stream
+        # Email client can usually download this automatically as attachment
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(attachment.read())
+        # Add header as key/value pair to attachment part
+        encoders.encode_base64(part)
+        part.add_header( "Content-Disposition", f"attachment; filename= {filename}",)
+        return part
+
+
+def send_email(cfg):
+    """Send an email to predefined adress using gmail smtp server"""
+    sender = cfg['email_from']
+    recipient = cfg['email_to']
+    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
+                  f" from: {sender}, to: {recipient}")
+    context = ssl.create_default_context()
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+        server.login(sender, cfg['email_pwd'])
+
+        body = f"Please find attached responses."
+
+        message = MIMEMultipart("alternative")
+        message['Subject'] = f"AFC test results"
+        message['From'] = sender
+        message['To'] = recipient
+        if not isinstance(cfg['email_cc'], type(None)):
+            message['Cc'] = cfg['email_cc']
+
+        # Turn these into plain/html MIMEText objects
+        message.attach(MIMEText(body, "plain"))
+        message.attach(create_email_attachment(cfg['outfile'][0]))
+
+        server.sendmail(sender, recipient, message.as_string())
 
 
 def _send_recv(cfg, req_data, ssn=None):
@@ -1521,9 +1567,9 @@ def test_report(fname, runtimedata, testnumdata, testvectordata,
     # Test results output args
     data_names = ['Date', 'Test Number', 'Test Vector', 'Running Time',
                   'Test Result', 'Response data']
-    data = {'Date': [ts_time], 'Test Number': [testnumdata],
-            'Test Vector': [testvectordata], 'Running Time': [runtimedata],
-            'Test Result': [test_result], 'Response data': [upd_data]}
+    data = {'Date': ts_time, 'Test Number': testnumdata,
+            'Test Vector': testvectordata, 'Running Time': runtimedata,
+            'Test Result': test_result, 'Response data': upd_data}
     with open(fname, "a") as f:
         file_writer = csv.DictWriter(f, fieldnames=data_names)
         if os.stat(fname).st_size == 0: file_writer.writeheader()
@@ -1594,7 +1640,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
                 res=res_template.substitute(status="Ok")
             else:
                 for line in diffs:
-                    app_log.error(f"  Difference for {req_id}: {line}")
+                    app_log.error(f"  Difference: {line}")
                 app_log.error(hash_obj.hexdigest())
                 test_res = AFC_ERR
 
@@ -1607,13 +1653,17 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         app_log.info(res)
 
         # For saving test results option
-        if isinstance(cfg['outfile'], list):
+        if not isinstance(cfg['outfile'], type(None)):
             test_report(cfg['outfile'][0], float(tm_secs),
                         test_case, req_id,
                         ("PASS" if test_res == AFC_OK else "FAIL"),
                         upd_data)
 
     app_log.info(f"Total testcases runtime : {round(accum_secs, 1)} secs")
+
+    if not isinstance(cfg['outfile'], type(None)):
+        send_email(cfg)
+
     return all_test_res
 
 
@@ -1921,8 +1971,8 @@ def make_arg_parser():
                          help="<verif> - skip SSL verification "
                               "on post request.\n")
     args_parser.add_argument('--outfile', nargs=1, type=str,
-                         help="<filename> - set filename for test "
-                              "results output.\n")
+                         help="<filename> - set filename for output "
+                              "of tests results.\n")
     args_parser.add_argument('--outpath', nargs=1, type=str,
                          help="<filepath> - set path to output filename for "
                               "results output.\n")
@@ -1982,6 +2032,14 @@ def make_arg_parser():
     args_parser.add_argument('--prefix_cmd', nargs='*', type=str,
                          help="hook to call currently provided command before "
                          "main command specified by --cmd option.\n")
+    args_parser.add_argument('--email_from', type=str,
+                         help="<email address> - set sender email.\n")
+    args_parser.add_argument('--email_to', type=str,
+                         help="<email address> - set receiver email.\n")
+    args_parser.add_argument('--email_cc', type=str,
+                         help="<email address> - set receiver of cc email.\n")
+    args_parser.add_argument('--email_pwd', type=str,
+                         help="<filename> - set sender email password.\n")
 
     args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?',
         help="run - run test from DB and compare.\n"
