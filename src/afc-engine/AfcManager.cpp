@@ -1966,7 +1966,6 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			double centerLatitude = centerObj["latitude"].toDouble();
 			double centerLongitude = centerObj["longitude"].toDouble();
 
-			double cosLat = cos(centerLatitude*M_PI/180.0);
 			double maxHorizDistSq = 0.0;
 			for(int i=0; i< (int) _rlanRadialPolygon.size(); i++) {
 				double angle_i = _rlanRadialPolygon[i].second;

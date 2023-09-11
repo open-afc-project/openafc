@@ -24,6 +24,7 @@ PRTABLEClass::PRTABLEClass()
 	numQ = -1;
 	numOneOverKs = -1;
 	oneOverKsValList = (double *) NULL;
+	QValList = (double *) NULL;
 };
 
 PRTABLEClass::PRTABLEClass(std::string tableFileVal) : tableFile(tableFileVal)
