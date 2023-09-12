@@ -1,0 +1,30 @@
+# Prepare and Run test:
+1. Install Python3 and python module dependencies
+2. Copy certificate and key to cert/ (dummy files are in git). These are needed for mtls.
+3. Create your token and credentials json files.  Instructions are found here: _https://developers.google.com/sheets/api/quickstart/python_
+4. Populate proper values in config.json [see below]
+5. ./runAllTests.sh <csvfile> <results-dir> <dbfile> <configfile> <email>
+   - csvfile: downloaded google sheet in csv format
+   - results-dir: where the result logs are kept.
+   - dbfile is the sqlite3 db to track already run requests.
+   - email: "To" email
+   - configfile: json file which has among configurations, 
+      the gmail account information + key/certificates. [see below]
+
+   The requests are recorded in the db, and will be skipped next time the command is run. 
+   You need to clear the sqlite3 db if you want to run everything all over again: rm <dbfile>
+
+6. Optional: The user can choose to pick which request and response file to send: 
+python3 send_mail.py --req <request-json-file> --resp <resp-json-file> --recvr <receiver-email> --conf config.json
+Optional: --cc_email <email> can be used for cc
+
+# Config file format:
+```
+{
+"sender_email":"sender@your-inc","password":"your-email-app-password","port":"465",
+"cert":"path-to-cert", "key":"path-to-key","cc_email":"your-cc@your-inc", "afc_query":"query uri","start_row":"somerow"
+}
+```
+query_uri is the uri for the query, eg. _https://afc.broadcom.com/fbrat/ap-afc/availableSpectrumInquiry_
+Password for your email can be set up differently depending on which email service.  For gmail, you will need to log into your google account to set it up
+Optional fields: cc_email, start_row
