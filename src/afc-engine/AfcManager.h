@@ -228,6 +228,8 @@ class AfcManager
 		void createChannelList();
 		bool containsChannel(const std::vector<FreqBandClass>& freqBandList, int chanStartFreqMHz, int chanStopFreqMHz);
 		// Returns 1 is successful, 0 of cfi invalid
+		std::vector<std::pair<int,int>> calculateOverlapBandList(const std::vector<FreqBandClass>& freqBandList, int chanStartFreqMHz, int chanStopFreqMHz);
+
 
 		void fixFSTerrain();
 		CConst::PropEnvEnum computePropEnv(double lonDeg, double latDeg, CConst::NLCDLandCatEnum &nlcdLandCat, bool errorFlag = true) const;

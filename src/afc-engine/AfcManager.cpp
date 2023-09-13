@@ -11175,28 +11175,30 @@ void AfcManager::createChannelList()
 			return;
 		}
 
-		if (containsChannel(_allowableFreqBandList, inquiredStartFreqMHz, inquiredStopFreqMHz)) {
-			int numChan;
+		std::vector<std::pair<int,int>> overlapBandList = calculateOverlapBandList(_allowableFreqBandList, inquiredStartFreqMHz, inquiredStopFreqMHz);
 
-			numChan = 0;
+		if (overlapBandList.size()) {
+			int numChan = 0;
 
-			int startFreq = inquiredStartFreqMHz;
-			int stopFreq = startFreq + _inquiredFrequencyResolutionMHz;
-			while(stopFreq <= inquiredStopFreqMHz) {
-				ChannelStruct channel;
-				channel.startFreqMHz = startFreq;
-				channel.stopFreqMHz = stopFreq;
-				channel.operatingClass = -1;
-				channel.index = -1;
-				channel.availability = GREEN; // Everything initialized to GREEN
-				channel.eirpLimit_dBm = 0;
-				channel.type = INQUIRED_FREQUENCY;
-				_channelList.push_back(channel);
-				numChan++;
-				totalNumChan++;
+			for(int segIdx=0; segIdx<(int) overlapBandList.size(); ++segIdx) {
+				int startFreq = overlapBandList[segIdx].first;
+				int stopFreq = startFreq + _inquiredFrequencyResolutionMHz;
+				while(stopFreq <= overlapBandList[segIdx].second) {
+					ChannelStruct channel;
+					channel.startFreqMHz = startFreq;
+					channel.stopFreqMHz = stopFreq;
+					channel.operatingClass = -1;
+					channel.index = -1;
+					channel.availability = GREEN; // Everything initialized to GREEN
+					channel.eirpLimit_dBm = 0;
+					channel.type = INQUIRED_FREQUENCY;
+					_channelList.push_back(channel);
+					numChan++;
+					totalNumChan++;
 
-				startFreq = stopFreq;
-				stopFreq = startFreq + _inquiredFrequencyResolutionMHz;
+					startFreq = stopFreq;
+					stopFreq = startFreq + _inquiredFrequencyResolutionMHz;
+				}
 			}
 
 			if (numChan == 0) {
@@ -11325,6 +11327,79 @@ bool AfcManager::containsChannel(const std::vector<FreqBandClass>& freqBandList,
 	bool containsFlag = (segmentList.size() == 0);
 
 	return(containsFlag);
+}
+/**************************************************************************************/
+
+/**************************************************************************************/
+/* AfcManager::calculateOverlapBandList()                                                      */
+/**************************************************************************************/
+std::vector<std::pair<int,int>> AfcManager::calculateOverlapBandList(const std::vector<FreqBandClass>& freqBandList, int chanStartFreqMHz, int chanStopFreqMHz)
+{
+	std::vector<std::pair<int,int>> overlapBandList;
+
+	for(auto& freqBand : freqBandList) {
+		int bandStart = freqBand.getStartFreqMHz();
+		int bandStop  = freqBand.getStopFreqMHz();
+		int overlapStart = std::max(bandStart, chanStartFreqMHz);
+		int overlapStop  = std::min(bandStop,  chanStopFreqMHz);
+
+		if (overlapStart < overlapStop) {
+			int segIdxA = -1;
+			int segIdxB = -1;
+			for(int segIdx=overlapBandList.size()-1; (segIdx >= 0)&&(segIdxA==-1); --segIdx) {
+				if (overlapBandList[segIdx].first <= overlapStart) {
+					segIdxA = segIdx;
+				}
+			}
+			for(int segIdx=0; segIdx < ((int) overlapBandList.size())&&(segIdxB==-1); ++segIdx) {
+				if (overlapBandList[segIdx].second >= overlapStop) {
+					segIdxB = segIdx;
+				}
+			}
+			if ((segIdxA==-1) && (segIdxB == -1)) {
+				overlapBandList.clear();
+				overlapBandList.push_back(std::make_pair(overlapStart, overlapStop));
+			} else if (segIdxA==-1) {
+				if (segIdxB) {
+					overlapBandList.erase(overlapBandList.begin(), overlapBandList.begin()+segIdxB);
+				}
+				if (overlapStop < overlapBandList[0].first) {
+					overlapBandList.insert(overlapBandList.begin(), std::make_pair(overlapStart, overlapStop));
+				} else {
+					overlapBandList[0].first = overlapStart;
+				}
+			} else if (segIdxB==-1) {
+				if (segIdxA+1 < (int) overlapBandList.size()) {
+					overlapBandList.erase(overlapBandList.begin()+segIdxA+1, overlapBandList.end());
+				}
+				if (overlapStart > overlapBandList[segIdxA].second) {
+					overlapBandList.push_back(std::make_pair(overlapStart, overlapStop));
+				} else {
+					overlapBandList[segIdxA].second = overlapStop;
+				}
+			} else if (segIdxA < segIdxB) {
+				int startEraseIdx;
+				int stopEraseIdx;
+				if (overlapStart > overlapBandList[segIdxA].second) {
+					startEraseIdx = segIdxA+1;
+				} else {
+					startEraseIdx = segIdxA;
+					overlapStart = overlapBandList[segIdxA].first;
+				}
+				if (overlapStop < overlapBandList[segIdxB].first) {
+					stopEraseIdx = segIdxB-1;
+				} else {
+					stopEraseIdx = segIdxB;
+					overlapStop = overlapBandList[segIdxB].second;
+				}
+				overlapBandList.erase(overlapBandList.begin()+startEraseIdx, overlapBandList.begin()+stopEraseIdx+1);
+				overlapBandList.insert(overlapBandList.begin()+startEraseIdx, std::make_pair(overlapStart, overlapStop));
+
+			}
+		}
+	}
+
+	return(overlapBandList);
 }
 /**************************************************************************************/
 
