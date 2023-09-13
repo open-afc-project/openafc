@@ -65,8 +65,8 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
 
         this.state = {
             isModalOpen: false,
-            status: props.config.kind === "Error" ? "Error" : undefined,
-            message: props.config.kind === "Error" ? "AFC config file could not be loaded" : "",
+            status: (props.config.kind === "Error" && hasRole("AP")) ? "Error" : undefined,
+            message: (props.config.kind === "Error" && hasRole("AP"))? "AFC config file could not be loaded" : "",
             submitting: false,
             location: {
                 elevation: {},
@@ -426,7 +426,7 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                                 maxWidth="40.0rem"
                                 content={
                                     <>
-                                        <p>The following Serial Number and Certification ID pair can be used for any rulesetID:
+                                        <p>The following Serial Number and Certification ID pair can be used for any rulesetID: </p>
                                             <ul style={{ listStyleType: "none" }} >
                                                 <li>Serial Number=TestSerialNumber</li>
 
@@ -435,7 +435,6 @@ export class RatAfcForm extends React.Component<RatAfcFormParams, RatAfcFormStat
                                             Note that this device is certified as an indoor Access Point and as such if in the AP request message,
                                             the indoorDeployment field is set to Unknow or if it is missing, it will be treated as indoor
                                             (i.e. BEL will be applied). If the indoorDeployment field is set to Outdoor, no BEL will be applied.
-                                        </p>
                                     </>
                                 }
                             >

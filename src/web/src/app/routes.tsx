@@ -11,6 +11,7 @@ import { UserAccountPage } from "./UserAccount/UserAccount";
 import { getUsers, getMinimumEIRP, } from "./Lib/Admin";
 import { Replay } from "./Replay/Replay"
 import { getLastUsedRegionFromCookie } from "./Lib/Utils";
+import { hasRole, isLoggedIn } from "./Lib/User";
 
 /**
  * routes.tsx: definition of app routes
@@ -270,69 +271,6 @@ const routes: IAppRoute[] = [
     path: "/support"    // not pointed to anywhere
   },
   {
-    component: RatAfc,
-    exact: true,
-    icon: null,
-    label: "RAT AFC AP",
-    path: "/ap-afc"
-  },
-  {
-    component: MobileAP,
-    exact: true,
-    icon: null,
-    label: "Mobile AP",
-    path: "/mobile-ap"
-  },
-  {
-    component: AFCConfig,
-    exact: true,
-    icon: null,
-    label: "AFC Configuration",
-    path: "/afc-config"
-  },
-  {
-    component: Convert,
-    exact: true,
-    icon: null,
-    label: "File Conversion",
-    path: "/convert"
-  },
-  {
-    component: ExclusionZone,
-    exact: true,
-    icon: null,
-    label: "Exclusion Zone",
-    path: "/exclusion-zone"
-  },
-  {
-    component: HeatMap,
-    exact: true,
-    icon: null,
-    label: "Heat Map",
-    path: "/heat-map"
-  },
-  {
-    component: Admin,
-    exact: true,
-    icon: null,
-    label: "Administrator",
-    path: "/admin"
-  },
-  {
-    component: MTLSPage,
-    exact: true,
-    icon: null,
-    label: "MTLS",
-    path: "/mtls"
-  },
-  {
-    component: DRListPage,
-    exact: true,
-    icon: null,
-    label: "Denied Rules",
-    path: "/deniedRules"
-  },
-  {
     component: UserAccountPage,
     exact: true,
     icon: null,
@@ -353,6 +291,52 @@ const AppRoutes = () => (
     {routes.map(({ path, exact, component }, idx) => (
       <Route path={path} exact={exact} component={component} key={idx} />
     ))}
+
+    { isLoggedIn() && (hasRole("Trial") || hasRole("AP")) ? (
+        <Route path="/ap-afc" exact={true} component={RatAfc}></Route>
+    ) :
+    ( <Route path="/ap-afc" exact={true} component={Dashboard}></Route> ) }
+
+    { isLoggedIn() && hasRole("AP") ? (
+        <Route path="/mobile-ap" exact={true} component={MobileAP}></Route>
+    ) :
+    ( <Route path="/mobile-ap" exact={true} component={Dashboard}></Route> ) }
+
+    { isLoggedIn() && (hasRole("AP") || hasRole("Analysis") || hasRole("Admin")) ? (
+        <Route path="/afc-config" exact={true} component={AFCConfig}></Route>
+    ) :
+    ( <Route path="/afc-config" exact={true} component={Dashboard}></Route> ) }
+
+    { isLoggedIn() && hasRole("Admin") ? (
+        <Route path="/convert" exact={true} component={Convert}></Route>
+    ) :
+    ( <Route path="/convert" exact={true} component={Dashboard}></Route> ) }
+
+    { isLoggedIn() && hasRole("Analysis") ? (
+        <Route path="/exclusion-zone" exact={true} component={ExclusionZone}></Route>
+    ) :
+    ( <Route path="/exclusion-zone" exact={true} component={Dashboard}></Route> ) }
+
+    { isLoggedIn() && hasRole("Analysis") ? (
+        <Route path="/heat-map" exact={true} component={HeatMap}></Route>
+    ) :
+    ( <Route path="/heat-map" exact={true} component={Dashboard}></Route> ) }
+
+    { isLoggedIn() && hasRole("Admin") ? (
+        <Route path="/admin" exact={true} component={Admin}></Route>
+    ) :
+    ( <Route path="/admin" exact={true} component={Dashboard}></Route> ) }
+
+    { isLoggedIn() && hasRole("Admin") ? (
+        <Route path="/mtls" exact={true} component={MTLSPage}></Route>
+    ) :
+    ( <Route path="/mtls" exact={true} component={Dashboard}></Route> ) }
+
+    { isLoggedIn() && hasRole("Admin") ? (
+        <Route path="/deniedRules" exact={true} component={DRListPage}></Route>
+    ) :
+    ( <Route path="/deniedRules" exact={true} component={Dashboard}></Route> ) }
+
     <Route path="/replay" exact={true} component={Replay}></Route>
     <Redirect exact={true} from="/" to="/dashboard" />
     <Redirect exact={true} from="www" to="/dashboard" />

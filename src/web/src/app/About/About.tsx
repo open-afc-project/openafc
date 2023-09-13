@@ -15,7 +15,6 @@ export class About extends React.Component {
 
 
     onChange = (value) => {
-        console.log("On change:", value);
         this.setState({token:value});
     }
 

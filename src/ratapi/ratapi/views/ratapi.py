@@ -199,6 +199,7 @@ class GuiConfig(MethodView):
             about_login_url=about_login_url,
             about_sitekey=about_sitekey if about_sitekey else None,
             about_csrf=flask.url_for('ratapi-v1.AboutCSRF'),
+            app_name=flask.current_app.config['USER_APP_NAME'],
             version=serververs,
         )
         return resp
@@ -474,11 +475,7 @@ class About(MethodView):
         '''
 
         resp = flask.make_response()
-        try:
-            about_content = flask.current_app.config['ABOUT_CONTENT']
-        except:
-            about_content = "about.html"
-
+        about_content = "about.html"
         resp.data = flask.render_template(about_content)
         resp.content_type = 'text/html'
         return resp

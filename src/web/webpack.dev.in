@@ -24,7 +24,7 @@ module.exports = merge(common, {
   plugins: [
     new HtmlWebpackPlugin({
       template: "@ADD_DIST_LIB_SOURCECOPY@/src/index.html",
-      title: 'RLAN AFC Tool Development'
+      title: 'AFC Development'
     }),
     new HardSourceWebpackPlugin({
       // Either an absolute path or relative to webpack's options.context.

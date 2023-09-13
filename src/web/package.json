@@ -1,10 +1,9 @@
 {
   "name": "fbrat-web",
   "version": "0.0.0",
-  "description": "FB AFC Tool Web GUI",
+  "description": "AFC Web GUI",
   "license": "The use of this software shall be governed by the terms and conditions of the OpenAFC Project License.",
   "main": "index.js",
-  "repository": "https://scm.rkf-engineering.com/svn/facebook_rlan_afc/",
   "private": true,
   "scripts": {
     "build": "webpack --config webpack.prod.js --display minimal",

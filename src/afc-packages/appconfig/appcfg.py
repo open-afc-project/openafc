@@ -35,7 +35,7 @@ SQLALCHEMY_DATABASE_URI = None  # Must be set in app config
 SQLALCHEMY_TRACK_MODIFICATIONS = False  # Avoids SQLAlchemy warning
 
 # Flask-User settings
-USER_APP_NAME = "RLAN AFC Tool"  # Shown in and email templates and page footers
+USER_APP_NAME = "AFC"  # Shown in and email templates and page footers
 USER_ENABLE_EMAIL = True  # Enable email authentication
 USER_ENABLE_CONFIRM_EMAIL = False # Disable email confirmation
 USER_ENABLE_USERNAME = True  # Enable username authentication
@@ -189,7 +189,7 @@ class RatApiConfigurator(SecretConfigurator):
         ratapi_str_attr = ['REGISTRATION_APPROVE_LINK', 'REGISTRATION_DEST_EMAIL',
                     'REGISTRATION_DEST_PDL_EMAIL', 'REGISTRATION_SRC_EMAIL',
                     'MAIL_PASSWORD', 'MAIL_USERNAME', 'MAIL_SERVER', 'CAPTCHA_SECRET',
-                    'CAPTCHA_SITEKEY', 'CAPTCHA_VERIFY']
+                    'CAPTCHA_SITEKEY', 'CAPTCHA_VERIFY', 'USER_APP_NAME']
         ratapi_int_attr = ['MAIL_PORT']
         ratapi_env = 'RATAPI_ARG'
         super().__init__(ratapi_env, ratapi_bool_attr, ratapi_str_attr, ratapi_int_attr)

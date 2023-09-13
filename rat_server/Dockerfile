@@ -66,6 +66,12 @@ COPY rat_server/httpd.conf /usr/local/apache2/conf/
 COPY rat_server/httpd-default.conf rat_server/httpd-info.conf rat_server/httpd-vhosts.conf \
 rat_server/httpd-mpm.conf rat_server/httpd-ssl.conf /usr/local/apache2/conf/extra/
 COPY rat_server/fbrat.wsgi /usr/local/apache2/fbrat.wsgi
+RUN mkdir /wd/private
+COPY rat_server/copy-private.sh private* /wd/private/
+RUN chmod +x /wd/private/copy-private.sh
+RUN /wd/private/copy-private.sh
+RUN rm -rf /wd/private
+
 RUN mkdir -p /usr/share/ca-certificates/certs
 COPY rat_server/http.key rat_server/http.crt /usr/share/ca-certificates/certs/
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs

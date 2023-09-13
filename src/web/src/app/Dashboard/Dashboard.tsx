@@ -5,6 +5,7 @@ import {
   Card,
   CardBody
 } from "@patternfly/react-core";
+import { guiConfig } from "../Lib/RatApi";
 
 /**
  * Dashboard.tsx: application splash page. Currently empty
@@ -17,7 +18,7 @@ import {
 const Dashboard: React.FunctionComponent = () => {
   return (
     <PageSection>
-        <Title size={"xl"}>RLAN AFC Tool</Title>
+        <Title size={"xl"}>{guiConfig.app_name}</Title>
         <Card><CardBody>Navigate between pages using the sidebar menu.</CardBody></Card>
     </PageSection>
   );

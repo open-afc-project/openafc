@@ -18,6 +18,7 @@ import { clone } from "../Lib/Utils";
 import Measure from "react-measure";
 import { Limit } from "../Lib/Admin";
 import { rotate, meterOffsetToDeg } from "../Lib/Utils"
+import { hasRole } from "../Lib/User";
 
 
 /**
@@ -181,8 +182,8 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 maxEirp: 30,
                 extraWarning: undefined,
                 extraWarningTitle: undefined,
-                status: "Error",
-                err: error("AFC config was not loaded properly. Try refreshing the page."),
+                status: hasRole("AP") ? "Error": undefined,
+                err: hasRole("AP")? error("AFC config was not loaded properly. Try refreshing the page."):undefined,
                 mapState: {
                     isModalOpen: false,
                     val: mapProps.geoJson,
@@ -421,7 +422,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
     render() {
         return (
             <PageSection id="ap-afc-page">
-                <Title size="lg">RAT AFC AP</Title>
+                <Title size="lg">AFC AP</Title>
                 <Card>
                     <CardBody>
                         <RatAfcForm ref={this.changeMapLocationChild}

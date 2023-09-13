@@ -85,7 +85,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
 
   const Header = (
     <PageHeader
-      logo="RLAN AFC Tool"
+      logo={guiConfig.app_name}
       logoProps={logoProps}
       topNav={topNav}
       toolbar={guiConfig.version === "API NOT LOADED" ? "API NOT LOADED" : <AppInfo />}
@@ -149,7 +149,7 @@ const AppLayout: React.FunctionComponent<IAppLayout> = ({ children }) => {
               to="/ap-afc"
               activeClassName="pf-m-current">Virtual AP</NavLink>
           </NavItem>}
-        {(hasRole("AP") || hasRole("Analysis")) &&
+        {(hasRole("AP") || hasRole("Analysis") || hasRole("Admin")) &&
           <NavItem
             id="AFCConfig-link"
             itemId={"afc-config"}>

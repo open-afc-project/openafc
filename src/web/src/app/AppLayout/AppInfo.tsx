@@ -52,9 +52,10 @@ class AppInfo extends React.Component<{}, { isModalOpen: boolean, expanded: stri
                     isOpen={isModalOpen}
                     onClose={this.handleModalToggle}
                     trademark="The use of this software shall be governed by the terms and conditions of the OpenAFC Project License."
-                    brandImageSrc=""
+                    brandImageSrc="images/logo.png"
                     brandImageAlt="Logo"
-                    productName="RLAN AFC Tool"
+                    backgroundImageSrc='images/background.png'
+                    productName={guiConfig.app_name}
                 >
                     <TextContent id="parametersList">
                         <TextList component="dl">

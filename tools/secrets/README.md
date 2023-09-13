@@ -251,6 +251,5 @@ stringData:
             "DEST_PDL_EMAIL": null,
             "SRC_EMAIL": null,
             "APPROVE_LINK": null,
-            "ABOUT_CONTENT": null
         }
 ```

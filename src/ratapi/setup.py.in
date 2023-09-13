@@ -13,7 +13,7 @@ setuptools.setup(
     url='http://www.rkf-eng.com/',
     license='Redistributable, no modification',
 
-    description='Facebook RLAN AFC Tool',
+    description='AFC',
     package_dir={
         '': '@DIST_LIB_PACKAGE_DIR_ESCAPED@'
     },

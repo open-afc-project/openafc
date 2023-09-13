@@ -7394,7 +7394,7 @@ void AfcManager::runPointAnalysis()
 		fkml->writeStartElement("kml");
 		fkml->writeAttribute("xmlns", "http://www.opengis.net/kml/2.2");
 		fkml->writeStartElement("Document");
-		fkml->writeTextElement("name", "FB RLAN AFC");
+		fkml->writeTextElement("name", "AFC");
 		fkml->writeTextElement("open", "1");
 		fkml->writeTextElement("description", "Display Point Analysis Results");
 
@@ -9056,7 +9056,7 @@ void AfcManager::runScanAnalysis()
 		fkml->writeStartElement("kml");
 		fkml->writeAttribute("xmlns", "http://www.opengis.net/kml/2.2");
 		fkml->writeStartElement("Document");
-		fkml->writeTextElement("name", "FB RLAN AFC");
+		fkml->writeTextElement("name", "AFC");
 		fkml->writeTextElement("open", "1");
 		fkml->writeTextElement("description", "Display Point Analysis Results");
 
@@ -10210,7 +10210,7 @@ void AfcManager::writeKML()
 	fkml->writeStartElement("kml");
 	fkml->writeAttribute("xmlns", "http://www.opengis.net/kml/2.2");
 	fkml->writeStartElement("Document");
-	fkml->writeTextElement("name", "FB RLAN AFC");
+	fkml->writeTextElement("name", "AFC");
 	fkml->writeTextElement("open", "1");
 	fkml->writeTextElement("description", "Display Exclusion Zone Analysis Results");
 	fkml->writeStartElement("Style");
