@@ -92,6 +92,8 @@ paths:
                     responseCode]
     response_desc: [availableSpectrumInquiryResponses, 0, response,
                     shortDescription]
+    response_supp: [availableSpectrumInquiryResponses, 0, response,
+                    supplementalInfo]
 
 # List of statuses to be considered successful. Each element may include 'code'
 # (for a value of response/responseCode) and/or 'desc_substr' for substring of

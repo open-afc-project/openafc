@@ -39,7 +39,7 @@ ENV RCACHE_PRECOMPUTE_QUOTA=10
 # ENV RCACHE_CONFIG_RETRIEVAL_URL
 
 # Additional command line parameters for uvicorn
-ENV RCACHE_UVICORN_PARAMS=--no-access-log
+ENV RCACHE_UVICORN_PARAMS="--no-access-log --log-level info"
 
 WORKDIR /wd
 

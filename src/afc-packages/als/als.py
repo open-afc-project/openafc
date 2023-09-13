@@ -78,6 +78,9 @@ TOPIC_NAME_REGEX = re.compile(r"^[_a-zA-Z][0-9a-zA-Z_]{,62}$")
 # True for Python 3, False for Python 2
 IS_PY3 = sys.version_info.major == 3
 
+# Maximum um message size (default maximum of 1MB is way too small for GUI AFC
+# Requests)
+MAX_MSG_SIZE = (1 << 20) * 10
 
 def to_bytes(s):
     """ Converts string to bytes """
@@ -219,7 +222,9 @@ arg_dscs = [
     # SSL. File name for CRL certificate expiration check
     ArgDsc("ALS_KAFKA_CLIENT_SSL_CRLFILE", "ssl_crlfile"),
     # SSL. Available ciphers in OpenSSL cipher list format
-    ArgDsc("ALS_KAFKA_CLIENT_SSL_CIPHERS", "ssl_ciphers")]
+    ArgDsc("ALS_KAFKA_CLIENT_SSL_CIPHERS", "ssl_ciphers"),
+    # Maximum message size
+    ArgDsc("ALS_KAFKA_MAX_REQUEST_SIZE", "max_request_size", type_conv=int)]
 
 
 class Als:

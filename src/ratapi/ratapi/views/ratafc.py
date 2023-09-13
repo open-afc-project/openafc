@@ -25,6 +25,7 @@ import datetime
 import zlib
 import hashlib
 import uuid
+import copy
 from flask.views import MethodView
 import werkzeug.exceptions
 import threading
@@ -370,7 +371,7 @@ def fail_done(t):
     error_data = None
     with dataif.open(os.path.join("/responses", t.getId(), "engine-error.txt")) as hfile:
         try:
-            error_data = str(hfile.read())
+            error_data = hfile.read().decode("utf-8", errors="replace")
         except:
             LOGGER.debug("engine-error.txt not found")
         else:
@@ -413,7 +414,7 @@ def success_done(t):
         with dataif.open(os.path.join(task_stat['history_dir'],
                                       "analysisResponse.json.gz")) as hfile:
             hfile.write(resp_data)
-    LOGGER.debug('resp_data size={}'.format(sys.getsizeof(resp_data)))
+    LOGGER.debug('resp_data size=%d', sys.getsizeof(resp_data))
     resp_json = json.loads(zlib.decompress(resp_data, 16 + zlib.MAX_WBITS))
 
     if task_stat['runtime_opts'] & RNTM_OPT_GUI:
@@ -436,22 +437,12 @@ def success_done(t):
                 kmz_data = kmz_data.encode('base64')
             if isinstance(kmz_data, bytes):
                 kmz_data = kmz_data.decode('iso-8859-1')
-            existingExtensions = resp_json["availableSpectrumInquiryResponses"][0].get("vendorExtensions");
-            if(existingExtensions == None):
-                resp_json["availableSpectrumInquiryResponses"][0]["vendorExtensions"] = [{
-                    "extensionId": "openAfc.mapinfo",
-                    "parameters": {
-                        "kmzFile": kmz_data if kmz_data else None,
-                        "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None
-                    }
-                }]
-            else:
-                 resp_json["availableSpectrumInquiryResponses"][0]["vendorExtensions"].append({
-                    "extensionId": "openAfc.mapinfo",
-                    "parameters": {
-                        "kmzFile": kmz_data if kmz_data else None,
-                        "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None
-                    }
+            resp_json["availableSpectrumInquiryResponses"][0].setdefault("vendorExtensions", []).append({
+                "extensionId": "openAfc.mapinfo",
+                "parameters": {
+                    "kmzFile": kmz_data if kmz_data else None,
+                    "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None
+                }
                 })
     get_vendor_extension_filter().filter(
         resp_json, is_input=False,
@@ -521,6 +512,9 @@ class ReqInfo(NamedTuple):
     # AFC Engine computation options
     runtime_opts: int
 
+    # Task ID. Objstore directory name for AFC Engine artifacts
+    task_id: str
+
 
 class RatAfc(MethodView):
     ''' RAT AFC resources
@@ -529,8 +523,8 @@ class RatAfc(MethodView):
         ''' Authenticate certification id. Return new indoor value
             for bell application
         '''
-        LOGGER.debug(f"({threading.get_native_id()})"
-                     f" {self.__class__}::{inspect.stack()[0][3]}()")
+        LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
+                     self.__class__, inspect.stack()[0][3])
         indoor_certified = True
 
         certId = CertId.query.filter_by(certification_id=cert_id).first()
@@ -543,9 +537,10 @@ class RatAfc(MethodView):
         now = datetime.datetime.now()
         delta = now - certId.refreshed_at
         if delta.days > 1:
-            LOGGER.debug(f"({threading.get_native_id()})"
-                     f" {self.__class__}::{inspect.stack()[0][3]}()"
-                     f" stale CertId {certId.certification_id}")
+            LOGGER.debug("(%d) %s::%s() stale CertId %s",
+                         threading.get_native_id(),
+                         self.__class__, inspect.stack()[0][3],
+                         certId.certification_id)
 
         if not certId.location & certId.OUTDOOR:
             raise DeviceUnallowedException("Outdoor operation not allowed")
@@ -560,11 +555,11 @@ class RatAfc(MethodView):
         ''' Authenticate an access point. If must match the serial_number and
             certification_id in the database to be valid
         '''
-        LOGGER.debug(f"({threading.get_native_id()})"
-                     f" {self.__class__}::{inspect.stack()[0][3]}()"
-                     f" Starting auth_ap,serial: {serial_number};"
-                     f" prefix: {prefix}; certId: {cert_id};"
-                     f" ruleset {rulesets}; version {version}")
+        LOGGER.debug("(%d) %s::%s()Starting auth_ap,serial: %s; prefix: %s; "
+                     "certId: %s ruleset %s; version %s",
+                     threading.get_native_id(),
+                     self.__class__, inspect.stack()[0][3],
+                     serial_number, prefix, cert_id, rulesets, version)
 
         deny_ap = AccessPointDeny.query.filter_by(serial_number=serial_number).\
                   filter_by(certification_id=cert_id).first()
@@ -592,9 +587,8 @@ class RatAfc(MethodView):
     def get(self):
         ''' GET method for Analysis Status '''
         task_id = flask.request.args['task_id']
-        LOGGER.debug(f"({threading.get_native_id()})"
-                     f" {self.__class__}::{inspect.stack()[0][3]}()"
-                     f" task_id={task_id}")
+        LOGGER.debug("(%d) %s::%s() task_id=%s", threading.get_native_id(),
+                     self.__class__, inspect.stack()[0][3], task_id)
 
         dataif = DataIf()
         t = afctask.Task(task_id, dataif, RatafcMsghndCfgIface().get_ratafc_tout())
@@ -611,9 +605,10 @@ class RatAfc(MethodView):
                 # 'PROGRESS' is task.state value, not task.result['status']
                 return response_map[afctask.Task.STAT_PROGRESS](t)
             else:  # The task yet not started
-                LOGGER.debug(f"({threading.get_native_id()})"
-                             f" {self.__class__}::{inspect.stack()[0][3]}()"
-                             f" not ready state: {task_stat['status']}")
+                LOGGER.debug("(%d) %s::%s() not ready state: %s",
+                             threading.get_native_id(),
+                             self.__class__, inspect.stack()[0][3],
+                             task_stat['status'])
                 return flask.make_response(
                     flask.json.dumps(dict(percent=0, message='Pending...')),
                     202)
@@ -621,8 +616,8 @@ class RatAfc(MethodView):
     def post(self):
         ''' POST method for RAT AFC
         '''
-        LOGGER.debug(f"({threading.get_native_id()})"
-                     f" {self.__class__}::{inspect.stack()[0][3]}()")
+        LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
+                     self.__class__, inspect.stack()[0][3])
         als_req_id = als.als_afc_req_id()
         results = {"availableSpectrumInquiryResponses": []}
         request_ids = set()
@@ -650,9 +645,9 @@ class RatAfc(MethodView):
                 set([r["requestId"]
                      for r in args["availableSpectrumInquiryRequests"]])
 
-            LOGGER.debug(f"({threading.get_native_id()})"
-                         f" {self.__class__}::{inspect.stack()[0][3]}()"
-                         f" Running AFC analysis with params: {args}")
+            LOGGER.debug("(%d) %s::%s() Running AFC analysis with params: %s",
+                         threading.get_native_id(),
+                         self.__class__, inspect.stack()[0][3], args)
             request_type = 'AP-AFC'
 
             use_tasks = (get_rcache() is None) or \
@@ -670,9 +665,10 @@ class RatAfc(MethodView):
             for req_idx, request in enumerate(requests):
                 try:
                     # authenticate
-                    LOGGER.debug(f"({threading.get_native_id()})"
-                                 f" {self.__class__}::{inspect.stack()[0][3]}()"
-                                 f" Request: {request}")
+                    LOGGER.debug("(%d) %s::%s() Request: %s",
+                                 threading.get_native_id(),
+                                 self.__class__, inspect.stack()[0][3],
+                                 request)
                     individual_request = \
                         request["availableSpectrumInquiryRequests"][0]
                     prefix = None
@@ -740,9 +736,10 @@ class RatAfc(MethodView):
                         runtime_opts |= RNTM_OPT_NOCACHE
                     if use_tasks:
                         runtime_opts |= RNTM_OPT_AFCENGINE_HTTP_IO
-                    LOGGER.debug(f"({threading.get_native_id()})"
-                                 f" {self.__class__}::{inspect.stack()[0][3]}()"
-                                 f" runtime {runtime_opts}")
+                    LOGGER.debug("(%d) %s::%s() runtime %d",
+                                 threading.get_native_id(),
+                                 self.__class__, inspect.stack()[0][3],
+                                 runtime_opts)
 
                     # Retrieving config
                     config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
@@ -784,7 +781,8 @@ class RatAfc(MethodView):
                             request=request, config_str=config_str,
                             config_path=config_path, region=region,
                             history_dir=history_dir, request_type=request_type,
-                            runtime_opts=runtime_opts)
+                            runtime_opts=runtime_opts,
+                            task_id=str(uuid.uuid4()))
                 except AP_Exception as e:
                     results["availableSpectrumInquiryResponses"].append(
                         {"requestId": individual_request["requestId"],
@@ -798,7 +796,7 @@ class RatAfc(MethodView):
 
             # Creating 'responses' - dictionary of responses as JSON strings,
             # indexed by request/config hashes
-            # Firts looking up ijn the cache
+            # First looking up in the cache
             responses = self._cache_lookup(dataif=dataif, req_infos=req_infos)
 
             # Computing the responses not found in cache
@@ -817,7 +815,8 @@ class RatAfc(MethodView):
                             req_info=list(req_infos.values())[0],
                             is_internal_request=is_internal_request,
                             use_tasks=True)
-                    # Async request can't be multi
+                    # No ALS logging for config/response (request is logged
+                    # though). Can be fixed if anybody cares
                     return flask.jsonify(taskId=task.getId(),
                                          taskState=task.get()["status"])
                 responses.update(
@@ -834,14 +833,14 @@ class RatAfc(MethodView):
                     # No response for request
                     continue
                 dataAsJson = json.loads(response)
-                engine_result_ext = \
-                    _get_vendor_extension(dataAsJson,
-                                          "openAfc.used_data") or {}
-                uls_id = engine_result_ext.get("openAfc.uls_id", uls_id)
-                geo_id = engine_result_ext.get("openAfc.geo_id", geo_id)
                 actualResult = dataAsJson.get(
                     "availableSpectrumInquiryResponses")
                 if actualResult is not None:
+                    engine_result_ext = \
+                        _get_vendor_extension(actualResult[0],
+                                              "openAfc.used_data") or {}
+                    uls_id = engine_result_ext.get("openAfc.uls_id", uls_id)
+                    geo_id = engine_result_ext.get("openAfc.geo_id", geo_id)
                     actualResult[0]["requestId"] = req_info.request_id
                     results["availableSpectrumInquiryResponses"].append(
                         actualResult[0])
@@ -869,14 +868,32 @@ class RatAfc(MethodView):
                 request_ids - \
                 set(r["requestId"] for r in
                     results["availableSpectrumInquiryResponses"]):
+            response_info = {"responseCode": -1}
+            req_info_l = [ri for ri in req_infos.values()
+                          if ri.request_id == missing_id]
+            if req_info_l:
+                response_info["shortDescription"] = \
+                    f"AFC general failure. Task ID {req_info_l[0].task_id}"
             results["availableSpectrumInquiryResponses"].append(
                 {"requestId": missing_id,
                  "rulesetId": "Unknown",
-                 "response": {"responseCode": -1}})
+                 "response": response_info})
+
+        # Removing internal vendor extensions    
         get_vendor_extension_filter().filter(
             json_dict=results, is_input=False, is_gui=is_gui,
             is_internal=is_internal_request)
+        
+        # Logging response to ALS
         als.als_afc_response(req_id=als_req_id, resp=results)
+
+        # Logginfg failed requests
+        for result in results["availableSpectrumInquiryResponses"]:
+            if result["response"]["responseCode"] != 0:
+                LOGGER.error(
+                    f"AFC Failure on request {result['requestId']}: "
+                    f"{result['response'].get('shortDescription', '')} "
+                    f"{result['response'].get('supplementalInfo', '')}")
 
         LOGGER.debug("Final results: %s", str(results))
         resp = flask.make_response(flask.json.dumps(results), 200)
@@ -934,9 +951,8 @@ class RatAfc(MethodView):
                 with dataif.open(os.path.join(req_info.history_dir, fname)) \
                         as hfile:
                     hfile.write(content.encode("utf-8"))
-        task_id = str(uuid.uuid4())
         build_task(dataif=dataif, request_type=req_info.request_type,
-                   task_id=task_id, hash_val=req_info.req_cfg_hash,
+                   task_id=req_info.task_id, hash_val=req_info.req_cfg_hash,
                    config_path=req_info.config_path if use_tasks else None,
                    history_dir=req_info.history_dir,
                    runtime_opts=req_info.runtime_opts,
@@ -945,7 +961,7 @@ class RatAfc(MethodView):
                    request_str=None if use_tasks else request_str,
                    config_str=None if use_tasks else req_info.config_str)
         if use_tasks:
-            return afctask.Task(task_id=task_id, dataif=dataif,
+            return afctask.Task(task_id=req_info.task_id, dataif=dataif,
                                 hash_val=req_info.req_cfg_hash,
                                 history_dir=req_info.history_dir,
                                 is_internal_request=is_internal_request)
@@ -997,14 +1013,14 @@ class RatAfc(MethodView):
 
 class RatAfcSec(RatAfc):
     def get(self):
-        LOGGER.debug(f"({threading.get_native_id()})"
-                    f" {self.__class__}::{inspect.stack()[0][3]}()")
+        LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
+                     self.__class__, inspect.stack()[0][3])
         user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
         return super().get()
 
     def post(self):
-        LOGGER.debug(f"({threading.get_native_id()})"
-                    f" {self.__class__}::{inspect.stack()[0][3]}()")
+        LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
+                     self.__class__, inspect.stack()[0][3])
         user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
         return super().post()
 

@@ -82,7 +82,11 @@ def dp(*args, **kwargs):
     if args and kwargs:
         msg = msg.format(**kwargs)
     fi = inspect.getframeinfo(inspect.currentframe().f_back)
-    print("DP %s()@%d: %s" % (fi.function, fi.lineno, msg))
+    timetag = datetime.datetime.now()
+    print(
+        f"DP {timetag.hour:02}:{timetag.minute:02}:{timetag.second:02}."
+        f"{timetag.microsecond // 1000:02} {fi.function}()@{fi.lineno}: {msg}",
+        flush=True)
 
 
 def error(msg: str) -> None:
@@ -2862,25 +2866,26 @@ class KafkaConsumerParams:
     passed to constructor - defaults are used
 
     Attributes:
-    bootstrap_servers   -- List of 'server[:port]' Kafka server addresses
-    client_id           -- Client ID to use in Kafka logs
-    security_procol     -- "SSL" or 'PLAINTEXT'
-    ssl_keyfile         -- Client private key file
-    ssl_check_hostname  -- True to verify server identity. Default (None) is
-                           True
-    ssl_cafile          -- CA file for certificate verification. Default
-                           (None) is None
-    ssl_certfile        -- Client certificate PEM file name. Default (None) is
-                           None
-    ssl_crlfile         -- File name for CRL certificate expiration check.
-                           Default (None) is None
-    ssl_ciphers         -- Available ciphers in OpenSSL cipher list format.
-                           Default (None) is None
-    enable_auto_commit  -- True if auto commit enabled
-    group_id            -- Consumer group ID
+    bootstrap_servers         -- List of 'server[:port]' Kafka server addresses
+    client_id                 -- Client ID to use in Kafka logs
+    security_procol           -- "SSL" or 'PLAINTEXT'
+    ssl_keyfile               -- Client private key file
+    ssl_check_hostname        -- True to verify server identity. Default (None)
+                                 is True
+    ssl_cafile                -- CA file for certificate verification. Default
+                                 (None) is None
+    ssl_certfile              -- Client certificate PEM file name. Default
+                                 (None) is None
+    ssl_crlfile               -- File name for CRL certificate expiration
+                                 check. Default (None) is None
+    ssl_ciphers               -- Available ciphers in OpenSSL cipher list
+                                 format. Default (None) is None
+    enable_auto_commit        -- True if auto commit enabled
+    group_id                  -- Consumer group ID
+    max_partition_fetch_bytes -- Maximum message length
 
-    servers             -- Value of --kafka_servers. Converted to
-                           'bootstrap_servers' in constructor
+    servers                   -- Value of --kafka_servers. Converted to
+                                 'bootstrap_servers' in constructor
     """
     def __init__(self, **kwargs) -> None:
         self.client_id: Optional[str] = None
@@ -2891,6 +2896,7 @@ class KafkaConsumerParams:
         self.ssl_crlfile: Optional[str] = None
         self.ssl_ciphers: Optional[str] = None
         self.ssl_check_hostname: Optional[bool] = None
+        self.max_partition_fetch_bytes: Optional[int] = None
         self.servers: Optional[str] = None
         for k, v in kwargs.items():
             assert k in self.__dict__
@@ -3566,6 +3572,9 @@ def main(argv: List[str]) -> None:
     switches_kafka.add_argument(
         "--kafka_ssl_ciphers", metavar="CIPHERS",
         help="Available ciphers in OpenSSL cipher list format")
+    switches_kafka.add_argument(
+        "--kafka_max_partition_fetch_bytes", metavar="SIZE_IN_BYTES", type=int,
+        help="Maximum size of Kafka message (default is 1MB)")
 
     switches_als_db = argparse.ArgumentParser(add_help=False)
     switches_als_db.add_argument(

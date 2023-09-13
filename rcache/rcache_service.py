@@ -14,6 +14,7 @@ import asyncio
 import datetime
 import http
 import json
+import logging
 import math
 import pydantic
 from queue import Queue
@@ -30,9 +31,10 @@ __all__ = ["RcacheService"]
 
 # Module logger
 LOGGER = get_module_logger()
+LOGGER.setLevel(logging.INFO)
 
 # Default maximum distance between FS ands AP in kilometers
-DEFAULT_MAX_MAX_LINK_DISTANCE_KM = 130.
+DEFAULT_MAX_MAX_LINK_DISTANCE_KM = 200.
 
 # Number of degrees per kilometer
 DEGREES_PER_KM = 1 / (60 * 1.852)
@@ -259,16 +261,25 @@ class RcacheService:
             while True:
                 req = await self._invalidation_queue.get()
                 await self._invalidation_enabled_event.wait()
+                invalid_before = await self._report_invalidation()
                 if isinstance(req, RcacheInvalidateReq):
                     if req.ruleset_ids is None:
                         await self._db.invalidate()
+                        await self._report_invalidation(
+                            "Complete invalidation", invalid_before)
                     else:
                         for ruleset_id in req.ruleset_ids:
                             await self._db.invalidate(ruleset_id)
+                            invalid_before = \
+                                await self._report_invalidation(
+                                    f"AFC Config for ruleset '{ruleset_id}' "
+                                    f"invalidation", invalid_before)
                 else:
                     assert isinstance(req, RcacheSpatialInvalidateReq)
+                    max_link_distance_km = \
+                        await self._get_max_max_link_distance_km()
                     max_link_distance_deg = \
-                        await self._get_max_max_link_distance_deg()
+                        max_link_distance_km * DEGREES_PER_KM
                     for rect in req.tiles:
                         lon_reduction = \
                             max(math.cos(
@@ -283,6 +294,12 @@ class RcacheService:
                                 max_link_distance_deg / lon_reduction,
                                 max_lon=rect.max_lon +
                                 max_link_distance_deg / lon_reduction))
+                        invalid_before = \
+                            await self._report_invalidation(
+                                f"Spatial invalidation for tile "
+                                f"<{rect.short_str()}> with clearance of "
+                                f"{max_link_distance_km}km",
+                                invalid_before)
                 self._precompute_event.set()
         except asyncio.CancelledError:
             return
@@ -291,10 +308,30 @@ class RcacheService:
             LOGGER.error(f"Invalidator task unexpectedly aborted:\n"
                          f"{''.join(traceback.format_exception(ex))}")
 
+    async def _report_invalidation(
+            self, dsc: Optional[str] = None,
+            invalid_before: Optional[int] = None) -> int:
+        """ Make a log record on invalidation, compute invalid count
+
+        Argumentsa:
+        dsc            -- Invalidation description. None to not make log print
+        invalid_before -- Number of invalid records before operation. Might be
+                          None if dsc is None
+        Returns number of invalid records after operation
+        """
+        ret = await self._db.get_num_invalid_reqs()
+        if dsc is not None:
+            assert invalid_before is not None
+            LOGGER.info(f"{dsc}: {invalid_before} invalidated before "
+                        f"operation, {ret} invalidated after operation, "
+                        f"increase of {ret - invalid_before}")
+        return ret
+
     async def _single_precompute_worker(self, req: str) -> None:
         """ Single request precomputer subtask worker """
         try:
             async with aiohttp.ClientSession() as session:
+                assert self._afc_req_url is not None
                 async with session.post(self._afc_req_url,
                                         json=json.loads(req)) as resp:
                     if resp.ok:
@@ -344,7 +381,7 @@ class RcacheService:
             LOGGER.error(f"Precomputer task unexpectedly aborted:\n"
                          f"{''.join(traceback.format_exception(ex))}")
 
-    async def _get_max_max_link_distance_deg(self) -> float:
+    async def _get_max_max_link_distance_km(self) -> float:
         """ Retrieves maximum AP-FS distance in unit of latitude degrees """
         if (self._rulesets_url is not None) and \
                 (self._config_retrieval_url is not None):
@@ -369,14 +406,14 @@ class RcacheService:
                         if (ret is None) or (maxLinkDistance > ret):
                             ret = maxLinkDistance
                 if ret is not None:
-                    return ret * DEGREES_PER_KM
+                    return ret
             except aiohttp.ClientError as ex:
                 LOGGER.error(f"Error retrieving maximum maxLinkDistance: {ex}")
             except pydantic.ValidationError as ex:
                 LOGGER.error(f"Error decoding response: {ex}")
         LOGGER.error(f"Default maximum maxinkDistance of "
                      f"{DEFAULT_MAX_MAX_LINK_DISTANCE_KM}km will be used")
-        return DEFAULT_MAX_MAX_LINK_DISTANCE_KM * DEGREES_PER_KM
+        return DEFAULT_MAX_MAX_LINK_DISTANCE_KM
 
     async def _averager_worker(self) -> None:
         """ Averager task worker """

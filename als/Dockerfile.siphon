@@ -39,6 +39,8 @@ ENV KAFKA_SSL_CRLFILE=
 # True/yes/1/+ to check server hostname against certificate, False/no/0/- to
 # not to. Default is to check
 ENV KAFKA_SSL_CHECK_HOSTNAME=True
+# Maximum message size (default is 1MB)
+ENV KAFKA_MAX_REQUEST_SIZE=
 # PostgreSQL server hostname
 ENV POSTGRES_HOST=localhost
 # PostgreSQL server port
@@ -80,6 +82,7 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_ssl_cafile=$KAFKA_SSL_CAFILE \
     --kafka_ssl_certfile=$KAFKA_SSL_CERTFILE \
     --kafka_ssl_crlfile=$KAFKA_SSL_CRLFILE \
+    --kafka_max_partition_fetch_bytes=$KAFKA_MAX_REQUEST_SIZE \
     --init_postgres=postgresql://${POSTGRES_INIT_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_INIT_DB}${POSTGRES_INIT_OPTIONS} \
     --init_postgres_password=$POSTGRES_INIT_PASSWORD \
     --if_exists=$INIT_IF_EXISTS \

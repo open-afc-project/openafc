@@ -595,7 +595,14 @@ def main(argv: List[str]) -> None:
                     update_uls_file(uls_dir=args.ext_db_dir,
                                     uls_file=os.path.basename(new_uls_file),
                                     symlink=args.ext_db_symlink)
-                    if rcache:
+                    if rcache and db_diff.diff_tiles:
+                        tile_list = \
+                            "<" + \
+                            ">, <".join(tile.short_str() for tile in
+                                        db_diff.diff_tiles[: 1000]) + \
+                            ">"
+                        logging.info(f"Requesting invalidation of the "
+                                     f"following tiles: {tile_list}")
                         rcache.rcache_spatial_invalidate(
                             tiles=db_diff.diff_tiles)
 

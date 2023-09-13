@@ -67,6 +67,7 @@ services:
       # ALS params
       - ALS_KAFKA_SERVER_ID=rat_server
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
@@ -86,6 +87,7 @@ services:
       # ALS params
       - ALS_KAFKA_SERVER_ID=msghnd
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
@@ -144,6 +146,7 @@ services:
     environment:
       - KAFKA_ADVERTISED_HOST=${ALS_KAFKA_SERVER_}
       - KAFKA_CLIENT_PORT=${ALS_KAFKA_CLIENT_PORT_}
+      - KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
     dns_search: [.]
 
   als_siphon:
@@ -153,6 +156,7 @@ services:
       - KAFKA_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       - POSTGRES_HOST=bulk_postgres
       - INIT_IF_EXISTS=skip
+      - KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
     depends_on:
       - als_kafka
       - bulk_postgres
@@ -188,6 +192,7 @@ services:
     environment:
       - ALS_KAFKA_SERVER_ID=cert_db
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
 
   rcache:
     image: public.ecr.aws/w9v6y1o0/openafc/rcache-image:${TAG:-latest}

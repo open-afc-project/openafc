@@ -9,6 +9,7 @@
 
 # pylint: disable=wrong-import-order, too-many-statements, too-many-branches
 # pylint: disable=invalid-name, too-many-locals, logging-fstring-interpolation
+# pylint: disable=too-many-nested-blocks
 
 import argparse
 import concurrent.futures
@@ -67,6 +68,9 @@ RESPONSE_CODE_PATH_KEY = "response_code"
 
 # Config subkey in response description in AFC Response JSON
 RESPONSE_DESC_PATH_KEY = "response_desc"
+
+# Config subkey in response description in AFC Response JSON
+RESPONSE_SUPP_PATH_KEY = "response_supp"
 
 # Config subkey for descrition substring of statuses to ignore
 SUCCESS_STATUSES_KEY = "success_statuses"
@@ -216,6 +220,27 @@ def do_request(req: Dict[str, Any], url: str, timeout_sec: float) \
                               start_time).total_seconds()))
 
 
+class ReqInfo(NamedTuple):
+    """ Request information - request itself and stuff for its prettyprinting
+    """
+    # Point name (City)
+    name: str
+    # Point region (Country Code)
+    region: str
+    # AFC Request for point in form of JSON dictionary
+    req: Dict[str, Any]
+    # Point latitude in north-positive degrees
+    lat: float
+    # Point longitude in east-positive degrees
+    lon: float
+
+    def point_info(self) -> str:
+        """ Point information for messages """
+        return f"{self.name} ({self.region} @ " \
+            f"{abs(self.lat)}{'N' if self.lat >= 0 else 'S'}, " \
+            f"{abs(self.lon)}{'E' if self.lon >= 0 else 'W'})"
+
+
 def main(argv: List[str]) -> None:
     """Do the job.
 
@@ -340,8 +365,6 @@ def main(argv: List[str]) -> None:
     max_workers = args.parallel if args.parallel is not None \
         else config[DEFAULT_PARALLEL_KEY]
 
-    ReqInfo = NamedTuple("ReqInfo", [("name", str), ("region", str),
-                                     ("req", Dict[str, Any])])
     success = False
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) \
             as executor:
@@ -372,21 +395,25 @@ def main(argv: List[str]) -> None:
                             do_request, req=req, url=args.server_url,
                             timeout_sec=request_timeout_sec
                             )] = ReqInfo(name=point[POINT_NAME_KEY],
-                                         region=region, req=req)
+                                         region=region, req=req,
+                                         lat=point[POINT_COORD_DICT_KEY][
+                                             POINT_COORD_LAT_KEY],
+                                         lon=point[POINT_COORD_DICT_KEY][
+                                             POINT_COORD_LON_KEY])
             # Processing finished requests
             for future in concurrent.futures.as_completed(future_to_req_info):
                 req_info = future_to_req_info[future]
                 try:
                     exception = future.exception()
                     error_if(exception is not None,
-                             f"Request '{req_info.name}' ended with "
+                             f"Request '{req_info.point_info()}' ended with "
                              f"exception: {exception}")
                     response_info: Optional[ResponseInfo] = future.result()
                     assert response_info is not None
                     error_if(response_info.timeout,
-                             f"Request '{req_info.name}' timed out")
+                             f"Request '{req_info.point_info()}' timed out")
                     error_if(response_info.status_code != http.HTTPStatus.OK,
-                             f"Request '{req_info.name}' timed out ended with "
+                             f"Request '{req_info.point_info()}' ended with "
                              f"status code {response_info.status_code}")
                     response_code = \
                         json_retrieve(json_obj=response_info.afc_response,
@@ -394,6 +421,9 @@ def main(argv: List[str]) -> None:
                     response_desc = \
                         json_retrieve(json_obj=response_info.afc_response,
                                       path=paths[RESPONSE_DESC_PATH_KEY])
+                    response_supp = \
+                        json_retrieve(json_obj=response_info.afc_response,
+                                      path=paths[RESPONSE_SUPP_PATH_KEY])
                     for ss in config[SUCCESS_STATUSES_KEY]:
                         if (STATUS_CODE_KEY in ss) and \
                                 (ss[STATUS_CODE_KEY] != response_code):
@@ -404,15 +434,22 @@ def main(argv: List[str]) -> None:
                             continue
                         break
                     else:
-                        response_desc_msg = \
-                            "" if response_desc is None \
-                            else f" ({response_desc})"
-                        error(f"Request '{req_info.name}' ended with "
-                                 f"AFC response code "
-                                 f"{response_code}{response_desc_msg}")
-                    logging.info(f"Request '{req_info.name}'"
-                                 f"({req_info.region}) successfully completed "
-                                 f"in {response_info.duration_sec} seconds")
+                        response_desc_msg = ""
+                        if response_desc or response_supp:
+                            response_desc_msg = \
+                                " (" + \
+                                ", ".join(str(v) for v in
+                                          [response_desc, response_supp]
+                                          if v) + \
+                                ")"
+                        error(f"Request '{req_info.point_info()}' ended with "
+                              f"AFC response code "
+                              f"{response_code}{response_desc_msg}")
+                    success_verdict = "successfully completed" \
+                        if response_code == 0 else "failed without prejudice"
+                    logging.info(
+                        f"Request '{req_info.point_info()}' {success_verdict} "
+                        f"in {response_info.duration_sec} seconds")
                 except KeyboardInterrupt:
                     break
                 except:  # noqa

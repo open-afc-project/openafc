@@ -10,6 +10,7 @@
 # pylint: disable=wrong-import-order, global-statement, unnecessary-pass
 
 import fastapi
+import logging
 import pydantic
 import uvicorn
 import sys
@@ -24,6 +25,7 @@ from rcache_service import RcacheService
 __all__ = ["app"]
 
 LOGGER = get_module_logger()
+LOGGER.setLevel(logging.INFO)
 
 # Parameters (passed via environment variables)
 settings = RcacheServiceSettings()
@@ -60,6 +62,7 @@ app = fastapi.FastAPI()
 async def startup() -> None:
     """ App startup event handler """
     set_dp_printer(fastapi.logger.logger.error)
+    logging.basicConfig(level=logging.INFO)
     if not settings.enabled:
         return
     service = get_service()
@@ -152,4 +155,4 @@ async def set_precompute_quota(
 
 if __name__ == "__main__":
     # Autonomous startup
-    uvicorn.run(app, host="0.0.0.0", port=settings.port)
+    uvicorn.run(app, host="0.0.0.0", port=settings.port, log_level="info")

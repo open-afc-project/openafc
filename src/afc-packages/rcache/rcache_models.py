@@ -29,8 +29,8 @@ __all__ = ["AfcReqRespKey", "DbPk", "DbRecord", "DbRespState", "IfDbExists",
 RESP_EXPIRATION_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 
 
-# What to do if cache database exists on RCache service startup
 class IfDbExists(enum.Enum):
+    """ What to do if cache database exists on RCache service startup """
     # Leave as is (default)
     leave = "leave"
     # Completely recreate (extra stuff, like alembic, will be removed)
@@ -160,6 +160,25 @@ class LatLonRect(pydantic.BaseModel):
         pydantic.Field(..., title="Minimum longitude in east-positive degrees")
     max_lon: float = \
         pydantic.Field(..., title="Maximum longitude in east-positive degrees")
+
+    def short_str(self) -> str:
+        """ Condensed string representation """
+        parts: List[str] = []
+        for min_val, max_val, pos_semi, neg_semi in \
+                [(self.min_lat, self.max_lat, "N", "S"),
+                 (self.min_lon, self.max_lon, "E", "W")]:
+            if (min_val * max_val) >= 0:
+                # Same hemisphere
+                parts.append(
+                    f"[{min(abs(min_val), abs(max_val))}-"
+                    f"{max(abs(min_val), abs(max_val))}]"
+                    f"{pos_semi if (min_val + max_val) >= 0 else neg_semi}")
+            else:
+                # Different hemispheres
+                parts.append(
+                    f"[{abs(min_val)}{neg_semi}-"
+                    f"{abs(max_val)}{pos_semi}]")
+        return ", ".join(parts)
 
 
 class RcacheInvalidateReq(pydantic.BaseModel):
@@ -402,6 +421,7 @@ class DbPk(pydantic.BaseModel):
             req_pydantic:
             Optional[AfcReqAvailableSpectrumInquiryRequestMessage] = None,
             req_str: Optional[str] = None) -> "DbPk":
+        """ Create self from either string or pydantic request message """
         if req_pydantic is None:
             req_pydantic = \
                 AfcReqAvailableSpectrumInquiryRequestMessage.parse_raw(req_str)
