@@ -39,7 +39,9 @@ python3 prune_db.py  --csv prune.csv --db test.db
 The test.db is the database
 prune csv is the file listing the UID to remove
 Format is as follows:
-\# UID
+```
+"UID"
 first_uid
 second_uid
 ...
+```
