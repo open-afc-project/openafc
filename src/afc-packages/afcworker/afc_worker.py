@@ -162,7 +162,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
         except subprocess.CalledProcessError as error:
             with open(os.path.join(tmpdir, "engine-error.txt"),
                       encoding="utf-8", errors="replace") as infile:
-                error_msg = infile.read().strip()
+                error_msg = infile.read(1000).strip()
             LOGGER.error(
                 f"run(): afc-engine crashed. Task ID={task_id}, error "
                 f"message:\n{error_msg}")
