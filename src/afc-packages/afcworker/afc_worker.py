@@ -18,6 +18,8 @@ from appcfg import BrokerConfigurator
 from fst import DataIf
 import defs
 import afctask
+import als
+import json
 from rcache_models import RcacheClientSettings
 from rcache_client import RcacheClient
 
@@ -127,6 +129,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
         tmp_objdir = os.path.join("/responses", task_id)
         retcode = 0
         success = False
+        timeout = False
 
         # run the AFC Engine
         try:
@@ -148,6 +151,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
             try:
                 retcode = proc.wait(timeout=int(conf.AFC_WORKER_ENG_TOUT))
             except Exception as e:
+                timeout = True
                 LOGGER.error(f"run(): afc-engine timeout "
                              f"{conf.AFC_WORKER_ENG_TOUT} error {type(e)}")
                 raise subprocess.CalledProcessError(retcode, cmd)
@@ -156,16 +160,31 @@ def run(prot, host, port, request_type, task_id, hash_val,
             success = True
 
         except subprocess.CalledProcessError as error:
-            with open(os.path.join(tmpdir, "engine-error.txt"), "rb") as infile:
-                error_b = infile.read()
-            with dataif.open(os.path.join(tmp_objdir, "engine-error.txt")) as hfile:
-                with open(os.path.join(tmpdir, "engine-error.txt"), "rb") as infile:
-                    hfile.write(error_b)
-
+            with open(os.path.join(tmpdir, "engine-error.txt"),
+                      encoding="utf-8", errors="replace") as infile:
+                error_msg = infile.read().strip()
             LOGGER.error(
                 f"run(): afc-engine crashed. Task ID={task_id}, error "
-                f"message:\n"
-                f"{error_b.decode('utf-8', errors='replace').strip()}")
+                f"message:\n{error_msg}")
+            try:
+                if use_tasks:
+                    with dataif.open(os.path.join("/responses", hash_val,
+                                                  "analysisRequest.json")) \
+                            as hfile:
+                        request_str = \
+                                hfile.read().decode("utf-8", errors="replace")
+                    with dataif.open(config_path) as hfile:
+                        config_str = \
+                                hfile.read().decode("utf-8", errors="replace")
+                als.als_initialize()
+                als.als_json_log("afc_engine_crash",
+                                 {"task_id": task_id, "error_msg": error_msg,
+                                  "timeout": timeout,
+                                  "request": json.loads(request_str),
+                                  "config": json.loads(config_str)})
+            except Exception as ex:
+                LOGGER.error(
+                    f"Failed to make ALS report on engine crash: {ex}")
         else:
             LOGGER.info('finished with task computation')
 
