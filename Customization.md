@@ -1,3 +1,8 @@
+Copyright © 2022 Broadcom. All rights reserved. The term "Broadcom"
+refers solely to the Broadcom Inc. corporate affiliate that owns
+the software below.
+This work is licensed under the OpenAFC Project License, a copy of which is included with this software program.
+
 # About Page Customization
 Custom configuration can be done via environment variables or via json file.
 ## Environment Variables
@@ -25,7 +30,7 @@ MAIL_PASSWORD = "password"
 ```
 
 ### Mail configuration
-Mail configuration specifies where email are sent, and what email acount is used to send them.
+Mail configuration specifies where email are sent, and what email account is used to send them.
 This is required for a functional About page to handle access requests submitted via the web form.
 
 ```

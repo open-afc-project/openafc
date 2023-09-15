@@ -35,7 +35,7 @@ rat_server:
         environment:
         - OIDC_ARG=/localpath/oidc.json
 ```
-### Use Json file
+### Use Environment Variables
 The alternative method is to use environment variables to pass each parameter, e.g.
 
 For example, docker-compose.yaml:
@@ -46,7 +46,7 @@ OIDC_CLIENT_SECRET = 'my_secret_string'
 OIDC_DISCOVERY_URL = 'https://accounts.mycompany.com'
 ```
 
-Note that the path must be accessible to the httpd which runs under fbrat
+Note that the path must be accessible to the httpd which runs as fbrat username and fbrat group
 ```
 chown -R 1003:1003 /localpath
 ```
