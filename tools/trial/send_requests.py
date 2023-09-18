@@ -18,13 +18,9 @@ import json
 import os
 from email.message import EmailMessage
 
-def send_mail(file, outfile, email, config_data, server, req_id, requester):
-    sender_email = config_data['sender_email']
+time_val = 40
+def send_mail(file, outfile, email, cc_email, server, req_id, requester, sender_email):
     receiver_email = email
-    try:
-        cc_email = config_data['cc_email']
-    except:
-        cc_email = ""
 
     body = f"Hello there,\nPlease find attached response for AFC trial requested with\n"
     body += f"Unique Request ID: {req_id}\nRequester: {requester}\n"
@@ -36,6 +32,7 @@ def send_mail(file, outfile, email, config_data, server, req_id, requester):
 
     message = EmailMessage()
     message['Subject'] = f"[Broadcom AFC Trials] Response for request id: {req_id}"
+
     message['From'] = sender_email
     message['To'] = receiver_email
     message['Cc'] = cc_email
@@ -65,19 +62,6 @@ def run_test(uid, requester, res, email, config_data):
     outfilename = f'{res}/UID_{uid}.json'
     print ("Sending request UID = %s" %uid)
 
-    # Send to requester if no override provided
-    if not email:
-       email = requester
-
-    if email:
-        # Create a secure SSL context
-        context = ssl.create_default_context()
-        port = int(config_data['port'])
-        server =  smtplib.SMTP_SSL("smtp.gmail.com", port, context=context)
-        password = config_data['password']
-        server.login(config_data['sender_email'], password)
-    else:
-        server = None
 
     with open(filename) as f:
         data = f.read().replace('\n', '').replace('\r', '').encode()
@@ -98,7 +82,7 @@ def run_test(uid, requester, res, email, config_data):
         try:
             del filtered_response["availableSpectrumInquiryResponses"][0]["vendorExtensions"]
         except KeyError:
-            print ("No vendor entension!")
+            pass
         except IndexError:
             print ("Unknown response format!")
 
@@ -106,7 +90,18 @@ def run_test(uid, requester, res, email, config_data):
         fout.write(json.dumps(filtered_response, indent=1))
 
         fout.close()
-        send_mail(filename, outfilename, email, config_data, server, uid, requester)
+        print("Email UID %s to %s" %(uid, email))
+        # Send to requester if no override provided
+        if not email:
+           email = requester
+
+        # Create a secure SSL context
+        context = ssl.create_default_context()
+        port = int(config_data['port'])
+        server =  smtplib.SMTP_SSL("smtp.gmail.com", port, context=context)
+        password = config_data['password']
+        server.login(sender_email, password)
+        send_mail(filename, outfilename, email, cc_email, server, uid, requester, sender_email)
 
 def init_db(conn):
     # create cursor object
@@ -125,69 +120,85 @@ def init_db(conn):
              TIMESTAMP     TEXT     NOT NULL);''')
         print("Table created successfully")
 
-parser = argparse.ArgumentParser(description='Read and parse request json')
-parser.add_argument('--csv', type=str, required=True,
-                    help='request csv file name')
-parser.add_argument('--res', type=str, required=True,
-                    help='result directory')
-parser.add_argument('--db', type=str, required=True,
-                    help='result directory')
-parser.add_argument('--config', type=str, required=True,
-                    help='result directory')
-parser.add_argument('--email', type=str, required=False,
-                    help='To email address')
-args = parser.parse_args()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Read and parse request json')
+    parser.add_argument('--csv', type=str, required=True,
+                        help='request csv file name')
+    parser.add_argument('--res', type=str, required=True,
+                        help='result directory')
+    parser.add_argument('--db', type=str, required=True,
+                        help='result directory')
+    parser.add_argument('--config', type=str, required=True,
+                        help='result directory')
+    parser.add_argument('--email', type=str, required=False,
+                        help='To email address')
+    args = parser.parse_args()
 
-if not os.path.exists(args.res):
-    print ("Make result directory %s " %args.res)
-    os.mkdir(args.res)
+    if not os.path.exists(args.res):
+        print ("Make result directory %s " %args.res)
+        os.mkdir(args.res)
 
-req_file = args.csv
-indir = os.path.dirname(req_file)
+    req_file = args.csv
+    indir = os.path.dirname(req_file)
 
-if not dir:
-   indir = os.getcwd()
+    if not dir:
+       indir = os.getcwd()
 
-conn = sqlite3.connect(args.db)
-print ("Opened database %s successfully" %args.db)
+    conn = sqlite3.connect(args.db)
+    print ("Opened database %s successfully" %args.db)
 
-conf_file = args.config
-f = open(conf_file)
-config_data = json.load(f)
-if args.email:
-    email = args.email
-else:
-    email = None
+    conf_file = args.config
+    f = open(conf_file)
+    config_data = json.load(f)
+    if args.email:
+        email = args.email
+    else:
+        email = None
 
-f.close()
+    sender_email = config_data['sender_email']
 
-# initialize db if not already exists.
-init_db(conn)
-
-# run tests.
-with open(req_file, 'r') as csv_file:
-    reader = csv.DictReader(csv_file)
-    i = 2
+    # optional cc_email in config.json
     try:
-        start_row = int(config_data['start_row'])
+        cc_email = config_data['cc_email']
     except:
-        start_row = 2
+        cc_email = ""
 
-    for row in reader:
-        ts = row['Timestamp']
-        uid = row['Unique request ID'] + f'_R{i}'
-        requester = row['Email address']
-        i = i+1
-        list = conn.execute("SELECT * from REQUESTS WHERE UID=?", (uid,)).fetchall()
-        if list == [] and i > start_row: 
-            print("Querying for uid %s" %uid)
-            conn.execute("INSERT INTO REQUESTS (TIMESTAMP,UID) \
-                VALUES (?, ?)", (ts, uid));
-            conn.commit()
-            run_test(uid, requester, args.res, email, config_data)
+    try:
+        dry_run = (config_data['dry_run'].lower() == "true")
+    except:
+        dry_run = False
 
-        else:
-            print("Ignore existing uid %s" %uid)
+    f.close()
 
+    # initialize db if not already exists.
+    init_db(conn)
 
-conn.close()
+    # run tests.
+    with open(req_file, 'r') as csv_file:
+        reader = csv.DictReader(csv_file)
+        i = 2
+        try:
+            start_row = int(config_data['start_row'])
+        except:
+            start_row = 2
+
+        for row in reader:
+            ts = row['Timestamp']
+            uid = row['Unique request ID'] + f'_R{i}'
+            requester = row['Email address']
+            i = i+1
+            list = conn.execute("SELECT * from REQUESTS WHERE UID=?", (uid,)).fetchall()
+            if list == [] and i > start_row:
+                print("Querying for uid %s" %uid)
+                run_test(uid, requester, args.res, email, config_data)
+
+                # if not dry run, update db to avoid running same req again
+                if not dry_run:
+                    conn.execute("INSERT INTO REQUESTS (TIMESTAMP,UID) \
+                        VALUES (?, ?)", (ts, uid));
+                    conn.commit()
+
+            else:
+                print("Ignore existing uid %s" %uid)
+
+    conn.close()

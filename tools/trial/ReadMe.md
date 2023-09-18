@@ -22,9 +22,26 @@ Optional: --cc_email <email> can be used for cc
 ```
 {
 "sender_email":"sender@your-inc","password":"your-email-app-password","port":"465",
-"cert":"path-to-cert", "key":"path-to-key","cc_email":"your-cc@your-inc", "afc_query":"query uri","start_row":"somerow"
+"cert":"path-to-cert", "key":"path-to-key","cc_email":"your-cc@your-inc", "afc_query":"query uri","start_row":"somerow","dry_run":"true/false"
 }
 ```
 query_uri is the uri for the query, eg. _https://afc.broadcom.com/fbrat/ap-afc/availableSpectrumInquiry_
 Password for your email can be set up differently depending on which email service.  For gmail, you will need to log into your google account to set it up
 Optional fields: cc_email, start_row
+    cc_email: cc email
+    start_row: start requesting from this row in the spread sheet
+    dry_run: "true" or "false".  If true, the completed requests won't be put in the database, and will be repeated in next run
+
+
+# Prune test database
+requests that are completed won't be repeated in next run.  This is done by insert the UID in a database.  To re-run all queries, delete the database.  To prune selectively some UID in the database, use prune_db.py e.g.
+python3 prune_db.py  --csv prune.csv --db test.db
+The test.db is the database
+prune csv is the file listing the UID to remove
+Format is as follows:
+```
+"UID"
+first_uid
+second_uid
+...
+```

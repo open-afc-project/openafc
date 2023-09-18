@@ -13,6 +13,7 @@ from email.mime.text import MIMEText
 from email.message import EmailMessage
 import json
 import argparse
+from send_requests import send_mail
 ##### 
 ### configurations
 ### config file is in json of this format:
@@ -37,14 +38,16 @@ req_file = args.req
 resp_file = args.resp
 conf_file = args.config
 cc_email = args.cc_email
-
+if not cc_email:
+    cc_email = ""
 f = open(req_file)
 req_data = json.load(f)['availableSpectrumInquiryRequests'][0]
 req_id = req_data['requestId']
-
 f.close()
+
 f = open(conf_file)
 config_data = json.load(f)
+f.close()
 password = config_data['password']
 sender_email = config_data['sender_email']
 port = int(config_data['port'])
@@ -54,23 +57,5 @@ context = ssl.create_default_context()
 
 with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
     server.login(sender_email, password)
-    body = f"Please find attached response for {req_id}"
+    send_mail(req_file, resp_file, receiver_email, cc_email, server, req_id, sender_email, sender_email)
 
-    message = EmailMessage()
-    message['Subject'] = f"[Broadcom AFC Trials] Response for request id: {req_id}"
-    message['From'] = sender_email
-    message['To'] = receiver_email
-    if cc_email:
-        message['Cc'] = cc_email
-    else:
-       cc_email = ""
-
-    message.add_alternative(body)
-    with open(req_file, "rb") as attachment:
-        message.add_attachment(attachment.read(), maintype='application',
-               subtype='octet-stream', filename=req_file)
-    with open(resp_file, "rb") as attachment:
-        message.add_attachment(attachment.read(), maintype='application',
-               subtype='octet-stream', filename=resp_file)
-
-    server.sendmail(sender_email, [receiver_email, cc_email], message.as_string())
