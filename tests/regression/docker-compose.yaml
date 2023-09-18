@@ -133,11 +133,16 @@ services:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
+      # ALS params
+      - ALS_KAFKA_SERVER_ID=worker
+      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
     depends_on:
       - ratdb
       - rmq
       - objst
       - rcache
+      - als_kafka
     dns_search: [.]
 
   als_kafka:
