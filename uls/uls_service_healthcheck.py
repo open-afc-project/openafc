@@ -134,7 +134,7 @@ def email_if_needed(status_storage: StatusStorage, args: Any) -> None:
     reg_data_changes = \
         status_storage.read_reg_data_changes(StatusStorage.S.RegionUpdate)
     regions: Set[str] = set()
-    for reg_hr in (args.region_update_max_age_alarm or []):
+    for reg_hr in ((args.region_update_max_age_alarm or "").split(",") or []):
         if not reg_hr:
             continue
         error_if(":" not in reg_hr,
@@ -221,12 +221,13 @@ def main(argv: List[str]) -> None:
         f"'{DEFAULT_STATUS_DIR}'")
     argument_parser.add_argument(
         "--smtp_info", metavar="SMTP_CREDENTIALS_FILE",
+        type=docker_arg_type(str),
         help="SMTP credentials file. For its structure - see "
         "NOTIFIER_MAIL.json secret in one of files in tools/secrets/templates "
         "directory. If parameter not specified or secret file is empty - no "
         "alarm/beacon emails will be sent")
     argument_parser.add_argument(
-        "--email_to", metavar="EMAIL",
+        "--email_to", metavar="EMAIL", type=docker_arg_type(str),
         help="Email address to send alarms/beacons to. If parameter not "
         "specified - no alarm/beacon emails will be sent")
     argument_parser.add_argument(
@@ -274,11 +275,10 @@ def main(argv: List[str]) -> None:
         help="Send email alarm if no download attempts were succeeded for "
         "this number of hours")
     argument_parser.add_argument(
-        "--region_update_max_age_alarm", metavar="REG:HOURS", action="append",
-        default=[], type=docker_arg_type(str),
-        help="Send alarm email if data for given region (e.g. 'US', 'CA', "
-        "etc.) was not updated for given number of hours. This parameter may "
-        "be specified more than once")
+        "--region_update_max_age_alarm",
+        metavar="REG1:HOURS1[,REG2:HOURS2...]", type=docker_arg_type(str),
+        help="Send alarm email if data for given regions (e.g. 'US', 'CA', "
+        "etc.) were not updated for given number of hours")
     argument_parser.add_argument(
         "--verbose", nargs="?", metavar="[YES/NO]", const=True,
         type=docker_arg_type(bool, default=False),
