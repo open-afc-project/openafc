@@ -1132,7 +1132,7 @@ std::vector<std::tuple<int, int>> *RlanRegionClass::calcScanPointVirtices(int **
 /******************************************************************************************/
 /**** FUNCTION: RlanRegionClass::calcMinAOB()                                          ****/
 /******************************************************************************************/
-double RlanRegionClass::calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec F, arma::vec ptg, arma::vec& minLoc)
+double RlanRegionClass::calcMinAOB(PolygonClass *poly, double polyResolution, arma::vec& F, arma::vec& ptg, arma::vec& minLoc)
 {
     double minAOB;
 

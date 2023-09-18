@@ -1,6 +1,25 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-810*|
+| :- | :- |
+|**Date**|**09/13/2023**|
+
+## **Issues Addressed**
+ * Jira OA-810: Resolve Coverity issues as of 08/31/23
+ * Jira OA-824: Report Success when request is for frequencies overlapping non-allowed bands
+
+## **Interface Changes**
+ * 
+
+## **Testing Done**
+ * Ran FSP1 and confirmed getting same results as previously
+ * Ran FSP1 but with frequency request of 5925-7125 and got same results as before
+
+## **Open Issues** 
+ * OA-810: The last coverity item (41765 FORWARD_NULL RlanRegion.cpp) is still unresolved per the last coverity report. Broadcom was going to look into this.
+
+## **Version and Date**
 |Version|**OA-814*|
 | :- | :- |
 |**Date**|**09/05/2023**|

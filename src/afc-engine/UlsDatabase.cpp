@@ -469,7 +469,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
                     ((RectDeniedRegionClass *) ras)->addRect(rect2lon1, rect2lon2, rect2lat1, rect2lat2);
                 }
             }
-                break;
+				break;
             case DeniedRegionClass::circleGeometry:
             case DeniedRegionClass::horizonDistGeometry:
             {
@@ -498,21 +498,25 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb>& db, std::vecto
                     /**************************************************************************/
                 }
             }
-                break;
-            default:
-                CORE_DUMP;
-                break;
+				break;
+			default:
+				break;
         }
-        double startFreq = rasQueryRes.value(ras_startFreqMHzIdx).isNull() ? quietNaN
-                      : rasQueryRes.value(ras_startFreqMHzIdx).toDouble()*1.0e6; // Convert MHz to Hz
-        double stopFreq = rasQueryRes.value(ras_stopFreqMHzIdx).isNull() ? quietNaN
-                      : rasQueryRes.value(ras_stopFreqMHzIdx).toDouble()*1.0e6; // Convert MHz to Hz
 
-        ras->setStartFreq(startFreq);
-        ras->setStopFreq(stopFreq);
-		ras->setType(DeniedRegionClass::RASType);
+		if (ras) {
+        	double startFreq = rasQueryRes.value(ras_startFreqMHzIdx).isNull() ? quietNaN
+                      	: rasQueryRes.value(ras_startFreqMHzIdx).toDouble()*1.0e6; // Convert MHz to Hz
+        	double stopFreq = rasQueryRes.value(ras_stopFreqMHzIdx).isNull() ? quietNaN
+                      	: rasQueryRes.value(ras_stopFreqMHzIdx).toDouble()*1.0e6; // Convert MHz to Hz
 
-        deniedRegionList.push_back(ras);
+        	ras->setStartFreq(startFreq);
+        	ras->setStopFreq(stopFreq);
+			ras->setType(DeniedRegionClass::RASType);
+
+        	deniedRegionList.push_back(ras);
+		} else {
+  			CORE_DUMP;
+		}
 	}
 	LOGGER_DEBUG(logger) << "READ " << numRAS << " entries from database ";
 	/**************************************************************************************/
