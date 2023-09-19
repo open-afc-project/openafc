@@ -322,7 +322,7 @@ class UlsFileChecker:
             return True
         diff_percent = \
             round(
-                100 if db_diff.diff_len == 0 else
+                100 if db_diff.new_len == 0 else
                 ((db_diff.diff_len * 100) / db_diff.new_len),
                 3)
         if diff_percent > self._max_change_percent:
