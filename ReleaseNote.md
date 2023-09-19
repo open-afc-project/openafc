@@ -1,6 +1,24 @@
 # Release Note
 
 ## **Version and Date**
+|Version|3.8.8.0|
+| :- | :- |
+|**Date**|**09/19/2023**|
+|compiled server's version is TBD | git tag 3.8.8.0|
+
+## **Issues Addressed**
+* Jira OA-838-unchanged-uls-database-detected-as-fully-changed
+* Jira OA-835-save-engine-crash-info-to-als
+* Jira OA-834-parameterizing-uls_downloader-healthcheck
+* Jira OA-837-removal-of-Canada-and-Brazil-points-from-ULS-checklist
+* Jira OA-810-resolve-coverity-issues-as-of-08-31-23
+* Jira OA-832_trial_tool_enhance
+* Jira OA-815-vendor-extension-filtering
+* Jira OA-814-feature-add-a-configurable-parameter-to-restrict-the-rla-ns-height-and-horizontal-uncertainty-region
+* Jira OA-823-issues-with-aep-and-1-arcsec-wgs-84
+* Jira OA-821-objst-out-of-memory-message
+
+## **Version and Date**
 |Version|**OA-810*|
 | :- | :- |
 |**Date**|**09/13/2023**|
