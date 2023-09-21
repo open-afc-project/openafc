@@ -432,7 +432,8 @@ def main(argv: List[str]) -> None:
         "Default is TRUE")
     argument_parser.add_argument(
         "--delay_hr", metavar="DELAY_HR", type=docker_arg_type(float),
-        help="Delay before invocation in hours. Default is no delay")
+        help="Delay before invocation in hours. Default is no delay. Ignored "
+        "if --run_omce specified")
     argument_parser.add_argument(
         "--interval_hr", metavar="INTERVAL_HR", default=DEFAULT_INTERVAL_HR,
         type=docker_arg_type(float, default=DEFAULT_INTERVAL_HR),
@@ -494,7 +495,7 @@ def main(argv: List[str]) -> None:
 
     status_storage.write_milestone(StatusStorage.S.ServiceStart)
 
-    if args.delay_hr:
+    if args.delay_hr and (not args.run_once):
         logging.info(f"Delaying by {args.delay_hr} hours")
         time.sleep(args.delay_hr * 3600)
 

@@ -505,9 +505,16 @@ services:
   uls_downloader:
     image: public.ecr.aws/w9v6y1o0/openafc/uls-downloader:${TAG:-latest}
     restart: always
+    environment:
+      - ULS_STATE_DIR=${VOL_C_ULS_STATE}
+      - ULS_AFC_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
+      - ULS_DELAY_HR=1
+      # Rcache parameters
+      - RCACHE_ENABLED=${RCACHE_ENABLED}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
     volumes:
       - ${VOL_H_DB}/ULS_Database:/ULS_Database
-      - uls_downloader_state:/uls_downloader_state
+      - uls_downloader_state:${VOL_C_ULS_STATE}
     secrets:
       - NOTIFIER_MAIL.json
     healthcheck:
@@ -609,6 +616,9 @@ ALS_KAFKA_SERVER_=als_kafka
 
 # Symlink pointing to current ULS database
 ULS_CURRENT_DB_SYMLINK=FS_LATEST.sqlite3
+
+# Directory where to ULS status volume is mounted
+VOL_C_ULS_STATE=/uls_downloader_state
 
 
 # -= RCACHE SERVICE CONFIGURATION STUFF =-

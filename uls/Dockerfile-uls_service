@@ -43,7 +43,7 @@ RUN chmod +x /wd/uls_service.py /wd/uls_service_healthcheck.py wd/fsid_tool.py w
 
 FROM alpine:3.17
 
-# DOWNLOADER SERVICE ARAMETERS
+# DOWNLOADER SERVICE PARAMETERS
 
 # Run downloader script on nioce (lowered) priority. Default is to use normal
 # priority
@@ -62,7 +62,7 @@ ENV ULS_EXT_DB_DIR=/ULS_Database
 ENV ULS_CURRENT_DB_SYMLINK=FS_LATEST.sqlite3
 
 # Persistent state directory
-ENV ULS_STATE_DIR=/uls_downloader_state
+# ENV ULS_STATE_DIR
 
 # Deklay first download by given number of hours
 # ENV ULS_DELAY_HR
@@ -179,7 +179,7 @@ ENTRYPOINT /wd/uls_service.py \
 
 HEALTHCHECK --interval=2h --timeout=2m --retries=3 \
     CMD /wd/uls_service_healthcheck.py \
-    --status_dir=/uls_downloader_state \
+    --status_dir=$ULS_STATE_DIR \
     --download_attempt_max_age_health_hr=$ULS_HEALTH_ATTEMPT_MAX_AGE_HR \
     --download_success_max_age_health_hr=$ULS_HEALTH_SUCCESS_MAX_AGE_HR \
     --update_max_age_health_hr=$ULS_HEALTH_UPDATE_MAX_AGE_HR \

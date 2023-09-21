@@ -175,6 +175,7 @@ services:
     image: public.ecr.aws/w9v6y1o0/openafc/uls-downloader:${TAG:-latest}
     restart: always
     environment:
+      - ULS_STATE_DIR=${VOL_C_ULS_STATE}
       - ULS_AFC_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
       - ULS_DELAY_HR=1
       # Rcache parameters
@@ -182,7 +183,7 @@ services:
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
     volumes:
       - ${VOL_H_DB}/ULS_Database:/ULS_Database
-      - uls_downloader_state:/uls_downloader_state
+      - uls_downloader_state:${VOL_C_ULS_STATE}
     secrets:
       - NOTIFIER_MAIL.json
     dns_search: [.]
