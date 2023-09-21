@@ -523,7 +523,7 @@ class About(MethodView):
                 recipients.append(dest_pdl_email)
  
             mail = Mail(flask.current_app)
-            msg = Message(f"Afc Access Request by {email}",
+            msg = Message(f"AFC Access Request by {email}",
                           sender=src_email,
                           recipients=recipients)
 

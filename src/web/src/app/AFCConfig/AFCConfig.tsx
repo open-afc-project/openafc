@@ -48,7 +48,7 @@ class AFCConfig extends React.Component<{
     constructor(props: Readonly<{ limit: RatResponse<Limit>; frequencyBands: RatResponse<FreqRange[]>; ulsFiles: RatResponse<string[]>; afcConf: RatResponse<AFCConfigFile>; antennaPatterns: RatResponse<string[]>; regions: RatResponse<string[]>}>) {
         super(props);
         //@ts-ignore
-       var lastRegFromCookie = getLastUsedRegionFromCookie();
+        var lastRegFromCookie = getLastUsedRegionFromCookie();
 
         const state: AFCState = {
             config: getDefaultAfcConf(lastRegFromCookie), isModalOpen: false, messageValue: "", messageTitle: "",
@@ -56,18 +56,31 @@ class AFCConfig extends React.Component<{
             antennaPatterns: [],
             regions: []
         };
+
         if (props.afcConf.kind === "Success") {
-            if (props.afcConf.result.version === guiConfig.version) {
+            let incompatible = false;
+            // if stored configurations do not have fields present in default, it's incompatible.
+            if (props.afcConf.result.version !== guiConfig.version) {
+                for ( var p in state.config) {
+                    if ( ! state.config.hasOwnProperty( p ) ) continue;
+                    if ( ! props.afcConf.result.hasOwnProperty( p ) ) {
+                        incompatible = true;
+                        logger.error("Could not load most recent AFC Config Defaults.",
+                            "Missing parameters. Current version " + guiConfig.version + " Incompatible version " + props.afcConf.result.version);
+                        Object.assign(state, {
+                            config: getDefaultAfcConf(lastRegFromCookie),
+                            messageType: "Warn",
+                            messageTitle: "Invalid Config Version",
+                            messageValue: "The current version (" + guiConfig.version + ") is not compatible with the loaded configuration. The loaded configuration was created for version " + props.afcConf.result.version + ". The default configuration has been loaded instead. To resolve this AFC Config will need to be updated below.",
+                        });
+                        break;
+                    }
+                }
+            }
+
+            if (! incompatible) {
                 Object.assign(state, { config: props.afcConf.result });
-            } else {
-                logger.error("Could not load most recent AFC Config Defaults.",
-                    "Expected version " + guiConfig.version + ", but got " + props.afcConf.result.version);
-                Object.assign(state, { 
-                    config: getDefaultAfcConf(lastRegFromCookie), 
-                    messageType: "Warn",
-                    messageTitle: "Invalid Config Version",
-                    messageValue: "The current version (" + guiConfig.version + ") is not compatible with the loaded configuration. The loaded configuration was created for version " + props.afcConf.result.version + ". The default configuration has been loaded instead. To resolve this AFC Config will need to be updated below.",
-                });
+                state.config.version = guiConfig.version
             }
         } else {
             logger.error("Could not load most recent AFC Config Defaults.",
