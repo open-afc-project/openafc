@@ -3530,6 +3530,11 @@ def convert_bool_arg(s):
     raise ValueError(f"Wrong boolean value: '{s}'")
 
 
+def convert_opt_int_arg(s):
+    """ Converts given string to optional integer """
+    return int(s) if s else None
+
+
 def main(argv: List[str]) -> None:
     """Do the job.
 
@@ -3573,7 +3578,8 @@ def main(argv: List[str]) -> None:
         "--kafka_ssl_ciphers", metavar="CIPHERS",
         help="Available ciphers in OpenSSL cipher list format")
     switches_kafka.add_argument(
-        "--kafka_max_partition_fetch_bytes", metavar="SIZE_IN_BYTES", type=int,
+        "--kafka_max_partition_fetch_bytes", metavar="SIZE_IN_BYTES",
+        type=convert_opt_int_arg,
         help="Maximum size of Kafka message (default is 1MB)")
 
     switches_als_db = argparse.ArgumentParser(add_help=False)
