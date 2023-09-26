@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "afc-int.fullname" . }}-als-siphon
+  labels:
+    {{- include "afc-int.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount.als_siphon }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "afc-int.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "afc-int.selectorLabels" . | nindent 8 }}
+        afc: als-siphon
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "afc-int.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-als-siphon
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.als_siphon.repository }}:{{ .Values.image.als_siphon.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.als_siphon.pullPolicy }}
+          env:
+            - name: KAFKA_SERVERS
+              value: "{{ include "afc-int.fullname" . }}-als-kafka:{{ .Values.service.als_kafka.port }}"
+            - name: POSTGRES_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_HOST
+            - name: INIT_IF_EXISTS
+              value: {{ .Values.deployments.als_siphon.init_if_exists | quote }}
+            - name: KAFKA_MAX_REQUEST_SIZE
+              value: {{ .Values.service.als_kafka.max_request_size | quote | replace ":" "" }}
+            - name: POSTGRES_INIT_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_INIT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_ALS_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_ALS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+            - name: POSTGRES_LOG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_USER
+            - name: POSTGRES_LOG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: POSTGRES_PASSWORD
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      imagePullSecrets:
+        - name: brcm-artifactory-secret
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

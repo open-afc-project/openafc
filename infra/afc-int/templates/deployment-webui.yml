@@ -47,7 +47,7 @@ spec:
           #     path: /
           #     port: http
           volumeMounts:
-            - mountPath: "/mnt/nfs"
+            - mountPath: {{ .Values.deployments.global.mountPath | quote }}
               name: cont-confs
             - name: webui-rat-api-secret
               mountPath: /etc/xdg/fbrat/ratapi.conf
@@ -64,12 +64,29 @@ spec:
             - name: AFC_OBJST_PORT
               value: {{ .Values.service.objst.fileStoragePort | quote }}
             - name: AFC_OBJST_SCHEME
-              value: "HTTP"
+              value: {{ .Values.service.objst.scheme | quote }}
             # ALS params
             - name: ALS_KAFKA_SERVER_ID
               value: webui
             - name: ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
-              value: "{{ .Values.service.kafka.loadBalancerIP }}:{{ .Values.service.kafka.port }}"
+              value: "{{ include "afc-int.fullname" . }}-als-kafka:{{ .Values.service.als_kafka.port }}"
+            - name: ALS_KAFKA_MAX_REQUEST_SIZE
+              value: {{ .Values.service.als_kafka.max_request_size | quote | replace ":" "" }}
+            # Rcache parameters
+            - name: RCACHE_ENABLED
+              value: {{ .Values.service.rcache.is_enabled | quote }}
+            - name: RCACHE_POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-secret
+                  key: RCACHE_POSTGRES_DSN
+            - name: RCACHE_SERVICE_URL
+              value: "http://{{ include "afc-int.fullname" . }}-rcache:{{ .Values.service.rcache.port }}"
+            - name: RCACHE_RMQ_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: rmq-rcache-secret
+                  key: RCACHE_RMQ_DSN
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:

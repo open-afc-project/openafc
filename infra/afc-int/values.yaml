@@ -8,6 +8,7 @@ replicaCount:
   rmq: 1
   worker: 10
   webui: 1
+  rcache: 1
 
 image:
   msghnd:
@@ -15,29 +16,44 @@ image:
     repository: wcc-afc-docker-virtual.usw2.packages.broadcom.com/afc-msghnd
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.2.0"
+    #tag: "3.8.8.0"
   webui:
     #repository: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server
     repository: wcc-afc-docker-virtual.usw2.packages.broadcom.com/afc-server
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.2.0"
+    #tag: "3.8.8.0"
   objst:
     repository: public.ecr.aws/w9v6y1o0/openafc/objstorage-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.2.0"
+    #tag: "3.8.8.0"
   worker:
     #repository: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker
     repository: wcc-afc-docker-virtual.usw2.packages.broadcom.com/afc-worker
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.2.0"
+    #tag: "3.8.8.0"
   rmq:
     repository: public.ecr.aws/w9v6y1o0/openafc/rmq-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.2.0"
+    #tag: "3.8.8.0"
+  rcache:
+    repository: public.ecr.aws/w9v6y1o0/openafc/rcache-image
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.8.0"
+  als_kafka:
+    repository: public.ecr.aws/w9v6y1o0/openafc/als-kafka-image
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.8.0"
+  als_siphon:
+    repository: public.ecr.aws/w9v6y1o0/openafc/als-siphon-image
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.8.0"
 
 
 imagePullSecrets: []
@@ -87,11 +103,24 @@ service:
     historyViewPort: 4999
     loadBalancerIP: 10.255.128.215
     scheme: "HTTP"
-  kafka:
-    type: LoadBalancer
+  als_kafka:
+    type: ClusterIP
     port: 9092
-    loadBalancerIP: 10.255.128.216
+    max_request_size: ":10485760" # ":" is a part of workaroud of this bug in helm https://github.com/helm/helm/issues/1707
+  rcache:
+    type: ClusterIP
+    port: 8000
+    is_enabled: "TRUE"
 
+deployments:
+  global:
+    mountPath: "/mnt/nfs"
+  als_siphon:
+    init_if_exists: "skip"
+  worker:
+    afc_aep_enable: "1"
+    afc_aep_debug: "1"
+    afc_aep_real_mountpoint_relative: "rat_transfer/3dep/1_arcsec"
 
 ingress:
   enabled: false

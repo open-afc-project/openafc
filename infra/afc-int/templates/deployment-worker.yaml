@@ -43,24 +43,48 @@ spec:
           #     path: /
           #     port: rmqp
           volumeMounts:
-            - mountPath: "/mnt/nfs"
+            - mountPath: {{ .Values.deployments.global.mountPath | quote }}
               name: cont-confs
           env:
-            # RabbitMQ server name:
-            - name: BROKER_TYPE
-              value: "external"
-            - name: BROKER_FQDN
-              value: {{ .Values.service.rmq.loadBalancerIP }}
             # Filestorage params:
             - name: AFC_OBJST_HOST
               value: {{ .Values.service.objst.loadBalancerIP }}
             - name: AFC_OBJST_PORT
               value: {{ .Values.service.objst.fileStoragePort | quote }}
             - name: AFC_OBJST_SCHEME
-              value: "HTTP"
+              value: {{ .Values.service.objst.scheme | quote }}
             # celery params
-            - name: CELERY_OPTIONS
+            - name: AFC_WORKER_CELERY_OPTS
               value: "rat_worker"
+            # RabbitMQ server name:
+            - name: BROKER_TYPE
+              value: "external"
+            - name: BROKER_FQDN
+              value: {{ .Values.service.rmq.loadBalancerIP }}
+            # afc-engine preload lib params
+            - name: AFC_AEP_ENABLE
+              value: {{ .Values.deployments.worker.afc_aep_enable | quote }}
+            - name: AFC_AEP_DEBUG
+              value: {{ .Values.deployments.worker.afc_aep_debug | quote }}
+            - name: AFC_AEP_REAL_MOUNTPOINT
+              value: "{{ .Values.deployments.global.mountPath }}/{{ .Values.deployments.worker.afc_aep_real_mountpoint_relative}}"
+            # Rcache parameters
+            - name: RCACHE_ENABLED
+              value: {{ .Values.service.rcache.is_enabled | quote }}
+            - name: RCACHE_SERVICE_URL
+              value: "http://{{ include "afc-int.fullname" . }}-rcache:{{ .Values.service.rcache.port }}"
+            - name: RCACHE_RMQ_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: rmq-rcache-secret
+                  key: RCACHE_RMQ_DSN
+            # ALS params
+            - name: ALS_KAFKA_SERVER_ID
+              value: worker
+            - name: ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
+              value: "{{ include "afc-int.fullname" . }}-als-kafka:{{ .Values.service.als_kafka.port }}"
+            - name: ALS_KAFKA_MAX_REQUEST_SIZE
+              value: {{ .Values.service.als_kafka.max_request_size | quote | replace ":" "" }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       volumes:

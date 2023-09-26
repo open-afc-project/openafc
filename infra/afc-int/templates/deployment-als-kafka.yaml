@@ -1,12 +1,12 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "afc-int.fullname" . }}-objst
+  name: {{ include "afc-int.fullname" . }}-als-kafka
   labels:
     {{- include "afc-int.labels" . | nindent 4 }}
 spec:
   {{- if not .Values.autoscaling.enabled }}
-  replicas: {{ .Values.replicaCount.objst }}
+  replicas: {{ .Values.replicaCount.als_kafka }}
   {{- end }}
   selector:
     matchLabels:
@@ -19,7 +19,7 @@ spec:
       {{- end }}
       labels:
         {{- include "afc-int.selectorLabels" . | nindent 8 }}
-        afc: objst
+        afc: als-kafka
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
@@ -29,35 +29,34 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: {{ .Chart.Name }}-als-kafka
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
-          image:  "{{ .Values.image.objst.repository }}:{{ .Values.image.objst.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.image.objst.pullPolicy }}
+          image: "{{ .Values.image.als_kafka.repository }}:{{ .Values.image.als_kafka.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.als_kafka.pullPolicy }}
           ports:
-            - name: afc-objst-port
-              containerPort: {{ .Values.service.objst.fileStoragePort }}
+            - name: als-kafka-port
+              containerPort: {{ .Values.service.als_kafka.port | int }}
               protocol: TCP
-            - name: afc-objst-hist
-              containerPort: {{ .Values.service.objst.historyViewPort }}
-              protocol: TCP
-          volumeMounts:
-            - mountPath: {{ .Values.deployments.global.mountPath | quote }}
-              name: cont-confs
+          # livenessProbe:
+          #   httpGet:
+          #     path: /fbrat/www/index.html
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
           env:
-            # Filestorage params:
-            - name: AFC_OBJST_PORT
-              value: {{ .Values.service.objst.fileStoragePort | quote }}
-            - name: AFC_OBJST_HIST_PORT
-              value: {{ .Values.service.objst.historyViewPort | quote }}
-            - name: AFC_OBJST_LOCAL_DIR
-              value: "{{ .Values.deployments.global.mountPath }}/storage"
+            - name: KAFKA_ADVERTISED_HOST
+              value: {{ include "afc-int.fullname" . }}-als-kafka
+            - name: KAFKA_CLIENT_PORT
+              value: {{ .Values.service.als_kafka.port | quote }}
+            - name: KAFKA_MAX_REQUEST_SIZE
+              value: {{ .Values.service.als_kafka.max_request_size | quote | replace ":" "" }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      volumes:
-        - name: cont-confs
-          persistentVolumeClaim:
-            claimName: cont-confs-claim
+      imagePullSecrets:
+        - name: brcm-artifactory-secret
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
