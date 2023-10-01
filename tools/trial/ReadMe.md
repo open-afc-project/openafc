@@ -2,14 +2,19 @@
 1. Install Python3 and python module dependencies
 2. Copy certificate and key to cert/ (dummy files are in git). These are needed for mtls.
 3. Create your token and credentials json files.  Instructions are found here: _https://developers.google.com/sheets/api/quickstart/python_
+   - Note: credentials represent you app.  Token is generated when you login when running the script
+     for the first time.  Token has your private info from the login, so keep it private.
+     Due to need for popping up a browser and login, first time you run this script should be on
+     a setup when a browser can start, e.g. your laptop
 4. Populate proper values in config.json [see below]
 5. ./runAllTests.sh <csvfile> <results-dir> <dbfile> <configfile> <email>
    - csvfile: downloaded google sheet in csv format
    - results-dir: where the result logs are kept.
-   - dbfile is the sqlite3 db to track already run requests.
-   - email: "To" email
+   - dbfile is the sqlite3 db to track already run requests.  This prevents the same requests from
+     being run again next time
    - configfile: json file which has among configurations, 
       the gmail account information + key/certificates. [see below]
+   - email (optional): "To" email.  If not provided, the email will be sent to the requester.
 
    The requests are recorded in the db, and will be skipped next time the command is run. 
    You need to clear the sqlite3 db if you want to run everything all over again: rm <dbfile>
