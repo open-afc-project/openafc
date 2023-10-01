@@ -1,0 +1,423 @@
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+
+# Parameter file for afc_load_tool.py.
+# Contains request/response pattern, region coordinates, REST APi, etc.
+---
+# Defaults for various parameters
+defaults:
+    # Range of point indices
+    idx_range: "0-1000000"
+
+    # Number of AFC requests per message
+    batch: 1
+
+    # Number of simultaneous requests
+    parallel: 20
+
+    # Initial backoff window in seconds
+    backoff: 0.1
+
+    # Number of retries
+    retries: 5
+
+    # Status printing period (in number of requests)
+    status_period: 1000
+
+    # Number of individual requests to send by `load` subcommand
+    count: 1000000
+
+
+# Area to make requests in. Must lie completely inside the country, defined by
+# deviceDescriptor/certificationId/0/rulesetId of request pattern
+region:
+    # Grid (number of points in one direction) of generated coordinates
+    grid_size: 100000
+
+    # Minimum latitude in north-positive degrees
+    min_lat: 33
+
+    # Maximum latitude in north-positive degrees
+    max_lat: 48
+
+    # Minimum longitude in east-positive degrees
+    min_lon: -116
+
+    # Maximum longitude in east-positive degrees
+    max_lon: -95
+
+    # Ruleset ID (identifies region)
+    rulesest_id: US_47_CFR_PART_15_SUBPART_E
+
+    # Certification ID (must be registered with given Rulsest ID)
+    cert_id: FCCID-FSP43
+
+# Paths inside requests, responses and other dictionaries
+paths:
+    # Request list in AFC Request message
+    reqs_in_msg: ["availableSpectrumInquiryRequests"]
+
+    # Request ID inside AFC Request
+    id_in_req: ["requestId"]
+
+    # AP serial number inside AFC Request
+    serial_in_req: ["deviceDescriptor", "serialNumber"]
+
+    # Ruleset (region definition) inside AFC Request
+    ruleset_in_req: ["deviceDescriptor", "certificationId", 0, "rulesetId"]
+
+    # Certification ID inside AFC Request
+    cert_in_req: ["deviceDescriptor", "certificationId", 0, "id"]
+
+    # Latitude inside AFC Request
+    lat_in_req: ["location", "ellipse", "center", "latitude"]
+
+    # Longitude inside AFC Request
+    lon_in_req: ["location", "ellipse", "center", "longitude"]
+
+    # List of responses inside AFC Response message
+    resps_in_msg: ["availableSpectrumInquiryResponses"]
+
+    # Request ID inside AFC Response
+    id_in_resp: ["requestId"]
+
+    # Ruleset (region definition) inside AFC Request
+    ruleset_in_resp: ["rulesetId"]
+
+    # Response code insire AFC Response
+    response_in_resp: ["response"]
+
+    # Response code insire AFC Response
+    code_in_resp: ["response", "responseCode"]
+
+    # Variable channels inside AFC Response
+    var_chans_in_resp: ["availableChannelInfo", 0, "channelCfi"]
+
+    # Variable powers inside ASFC Response
+    var_pwrs_in_resp: ["availableChannelInfo", 0, "maxEirp"]
+
+
+# Pattern for AFC messages
+req_msg_pattern: |
+    {
+        "availableSpectrumInquiryRequests": [
+            {
+                "inquiredChannels": [
+                    { "globalOperatingClass": 131 },
+                    { "globalOperatingClass": 132 },
+                    { "globalOperatingClass": 133 },
+                    { "globalOperatingClass": 134 },
+                    { "globalOperatingClass": 136 }
+                ],
+                "deviceDescriptor": {
+                    "serialNumber": "XXX",
+                    "certificationId": [
+                        {
+                            "rulesetId": "XXX",
+                            "id": "XXX"
+                        }
+                    ]
+                },
+                "inquiredFrequencyRange": [
+                    {"lowFrequency": 5925, "highFrequency": 6425},
+                    {"lowFrequency": 6525, "highFrequency": 6875}
+                ],
+                "location": {
+                    "indoorDeployment": 2,
+                    "elevation": {
+                      "verticalUncertainty": 10,
+                      "heightType": "AGL",
+                      "height": 83
+                    },
+                    "ellipse": {
+                        "center": {
+                            "latitude": 39.792935,
+                            "longitude": -105.018517
+                        },
+                        "orientation": 45,
+                        "minorAxis": 50,
+                        "majorAxis": 50
+                    }
+                },
+                "requestId": "XXX"
+            }
+        ],
+        "version": "1.4"
+    }
+
+# Pattern for AFC Responses used to Rcache prefill
+resp_msg_pattern: |
+    {
+        "availableSpectrumInquiryResponses": [
+            {
+                "availabilityExpireTime": "2043-08-11T16:45:44Z",
+                "availableChannelInfo": [
+                    {
+                        "channelCfi": [],
+                        "globalOperatingClass": 131,
+                        "maxEirp": []
+                    },
+                    {
+                        "channelCfi": [3, 11, 19, 27, 35, 43, 51, 59, 67],
+                        "globalOperatingClass": 132,
+                        "maxEirp": [-2.3, -2.3, 19.7, 34.8, 34.4, 34.5, 17.1,
+                                    31.2, 25.8]
+                    },
+                    {
+                        "channelCfi": [7, 23, 39, 55, 71, 87, 135, 151, 167 ],
+                        "globalOperatingClass": 133,
+                        "maxEirp": [0.7, 21.8, 36, 20.2, 28.9, 36, 27.3, 32.5,
+                                    20.1]
+                    },
+                    {
+                        "channelCfi": [15, 47, 79, 143],
+                        "globalOperatingClass": 134,
+                        "maxEirp": [3.8, 23.1, 32, 30.4]
+                    },
+                    {
+                        "channelCfi": [2],
+                        "globalOperatingClass": 136,
+                        "maxEirp": [22.4]
+                    }
+                ],
+                "availableFrequencyInfo": [
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 5945,
+                            "lowFrequency": 5925
+                        },
+                        "maxPsd": 9.4
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 5965,
+                            "lowFrequency": 5945
+                        },
+                        "maxPsd": -18.4
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6025,
+                            "lowFrequency": 5965
+                        },
+                        "maxPsd": -18.3
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6045,
+                            "lowFrequency": 6025
+                        },
+                        "maxPsd": 7.9
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6065,
+                            "lowFrequency": 6045
+                        },
+                        "maxPsd": 8
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6085,
+                            "lowFrequency": 6065
+                        },
+                        "maxPsd": 18.8
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6105,
+                            "lowFrequency": 6085
+                        },
+                        "maxPsd": 22.9
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6125,
+                            "lowFrequency": 6105
+                        },
+                        "maxPsd": 18.3
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6165,
+                            "lowFrequency": 6125
+                        },
+                        "maxPsd": 18.4
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6185,
+                            "lowFrequency": 6165
+                        },
+                        "maxPsd": 18.5
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6205,
+                            "lowFrequency": 6185
+                        },
+                        "maxPsd": 1.1
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6245,
+                            "lowFrequency": 6205
+                        },
+                        "maxPsd": 15.1
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6265,
+                            "lowFrequency": 6245
+                        },
+                        "maxPsd": 15.2
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6305,
+                            "lowFrequency": 6265
+                        },
+                        "maxPsd": 9.8
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6325,
+                            "lowFrequency": 6305
+                        },
+                        "maxPsd": 20.9
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6345,
+                            "lowFrequency": 6325
+                        },
+                        "maxPsd": 21
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6425,
+                            "lowFrequency": 6345
+                        },
+                        "maxPsd": 22.9
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6565,
+                            "lowFrequency": 6525
+                        },
+                        "maxPsd": 22.9
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6585,
+                            "lowFrequency": 6565
+                        },
+                        "maxPsd": 21.4
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6605,
+                            "lowFrequency": 6585
+                        },
+                        "maxPsd": 21.5
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6625,
+                            "lowFrequency": 6605
+                        },
+                        "maxPsd": 8.2
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6645,
+                            "lowFrequency": 6625
+                        },
+                        "maxPsd": 8.3
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6665,
+                            "lowFrequency": 6645
+                        },
+                        "maxPsd": 11.2
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6685,
+                            "lowFrequency": 6665
+                        },
+                        "maxPsd": 13.4
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6705,
+                            "lowFrequency": 6685
+                        },
+                        "maxPsd": 22.9
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6725,
+                            "lowFrequency": 6705
+                        },
+                        "maxPsd": 19.3
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6765,
+                            "lowFrequency": 6725
+                        },
+                        "maxPsd": 15.6
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6805,
+                            "lowFrequency": 6765
+                        },
+                        "maxPsd": 12.5
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6845,
+                            "lowFrequency": 6805
+                        },
+                        "maxPsd": 1.2
+                    },
+                    {
+                        "frequencyRange": {
+                            "highFrequency": 6865,
+                            "lowFrequency": 6845
+                        },
+                        "maxPsd": 22.9
+                    }
+                ],
+                "requestId": "XXX",
+                "response": {"responseCode": 0, "shortDescription": "Success"},
+                "rulesetId": "XXX"
+            }
+        ],
+        "version": "1.4"
+    }
+
+# List of 20MHz channels, used for generation of variable part of AFC Response
+# used for Rcache prefill
+channels_20mhz: [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61,
+                 65, 69, 73, 77, 81, 85, 89, 93, 117, 121, 125, 129, 133, 137,
+                 141, 145, 149, 153, 157, 161, 165, 169, 173, 177, 181]
+
+# Various necessary REST APIs
+rest_api:
+    # Get config by RulestID (thgat passed as part of URL)
+    get_config:
+        url: http://rat_server/fbrat/ratapi/v1/GetAfcConfigByRulesetID/
+
+    # Add records to Rcache
+    update_rcache:
+        url: http://rcache:8000/update
+
+    # Make AFC Request
+    afc_req:
+        url: http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry
