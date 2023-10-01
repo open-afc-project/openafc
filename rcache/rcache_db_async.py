@@ -16,7 +16,7 @@ from typing import Any, Dict, List, Optional
 
 from rcache_common import dp, error, error_if, FailOnError
 from rcache_db import RcacheDb
-from rcache_models import DbRespState, LatLonRect, DbPk
+from rcache_models import ApDbRespState, FuncSwitch, LatLonRect, ApDbPk
 
 __all__ = ["RcacheDbAsync"]
 
@@ -82,12 +82,12 @@ class RcacheDbAsync(RcacheDb):
         assert self._engine is not None
         assert len(rows) <= self.max_update_records()
         try:
-            ins = sa_pg.insert(self.table).values(rows)
+            ins = sa_pg.insert(self.ap_table).values(rows)
             ins = ins.on_conflict_do_update(
                     index_elements=[c.name
-                                    for c in self.table.c if c.primary_key],
+                                    for c in self.ap_table.c if c.primary_key],
                     set_={c.name: ins.excluded[c.name]
-                          for c in self.table.c if not c.primary_key})
+                          for c in self.ap_table.c if not c.primary_key})
             async with self._engine.begin() as conn:
                 await conn.execute(ins)
         except sa.exc.SQLAlchemyError as ex:
@@ -102,11 +102,11 @@ class RcacheDbAsync(RcacheDb):
         """
         assert self._engine
         try:
-            upd = sa.update(self.table).\
-                where(self.table.c.state == DbRespState.Valid.name).\
-                values(state=DbRespState.Invalid.name)
+            upd = sa.update(self.ap_table).\
+                where(self.ap_table.c.state == ApDbRespState.Valid.name).\
+                values(state=ApDbRespState.Invalid.name)
             if ruleset:
-                upd = upd.where(self.table.c.config_ruleset == ruleset)
+                upd = upd.where(self.ap_table.c.config_ruleset == ruleset)
             async with self._engine.begin() as conn:
                 await conn.execute(upd)
         except sa.exc.SQLAlchemyError as ex:
@@ -119,18 +119,18 @@ class RcacheDbAsync(RcacheDb):
         rect -- Lat/lon rectangle to invalidate
         """
         assert self._engine is not None
-        c_lat = self.table.c.lat_deg
-        c_lon = self.table.c.lon_deg
+        c_lat = self.ap_table.c.lat_deg
+        c_lon = self.ap_table.c.lon_deg
         try:
-            upd = sa.update(self.table).\
-                where((self.table.c.state == DbRespState.Valid.name) &
+            upd = sa.update(self.ap_table).\
+                where((self.ap_table.c.state == ApDbRespState.Valid.name) &
                       (c_lat >= rect.min_lat) & (c_lat <= rect.max_lat) &
                       (((c_lon >= rect.min_lon) & (c_lon <= rect.max_lon)) |
                        ((c_lon >= (rect.min_lon - 360)) &
                         (c_lon <= (rect.max_lon - 360))) |
                        ((c_lon >= (rect.min_lon + 360)) &
                         (c_lon <= (rect.max_lon + 360))))).\
-                values(state=DbRespState.Invalid.name)
+                values(state=ApDbRespState.Invalid.name)
             async with self._engine.begin() as conn:
                 await conn.execute(upd)
         except sa.exc.SQLAlchemyError as ex:
@@ -140,9 +140,9 @@ class RcacheDbAsync(RcacheDb):
         """ Mark records in precomputation state as invalid """
         assert self._engine
         try:
-            upd = sa.update(self.table).\
-                where(self.table.c.state == DbRespState.Precomp.name).\
-                values(state=DbRespState.Invalid.name)
+            upd = sa.update(self.ap_table).\
+                where(self.ap_table.c.state == ApDbRespState.Precomp.name).\
+                values(state=ApDbRespState.Invalid.name)
             async with self._engine.begin() as conn:
                 await conn.execute(upd)
         except sa.exc.SQLAlchemyError as ex:
@@ -152,8 +152,8 @@ class RcacheDbAsync(RcacheDb):
         """ Return number of requests currently being precomputed """
         assert self._engine is not None
         try:
-            sel = sa.select([sa.func.count()]).select_from(self.table).\
-                where(self.table.c.state == DbRespState.Precomp.name)
+            sel = sa.select([sa.func.count()]).select_from(self.ap_table).\
+                where(self.ap_table.c.state == ApDbRespState.Precomp.name)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
                 return rp.fetchone()[0]
@@ -172,17 +172,17 @@ class RcacheDbAsync(RcacheDb):
         """
         assert self._engine is not None
         try:
-            sq = sa.select([self.table.c.serial_number,
-                            self.table.c.rulesets,
-                            self.table.c.cert_ids]).\
-                where(self.table.c.state == DbRespState.Invalid.name).\
+            sq = sa.select([self.ap_table.c.serial_number,
+                            self.ap_table.c.rulesets,
+                            self.ap_table.c.cert_ids]).\
+                where(self.ap_table.c.state == ApDbRespState.Invalid.name).\
                 limit(limit)
-            upd = sa.update(self.table).\
-                values({"state": DbRespState.Precomp.name}).\
-                where(sa.tuple_(self.table.c.serial_number,
-                                self.table.c.rulesets,
-                                self.table.c.cert_ids).in_(sq)).\
-                returning(self.table.c.request)
+            upd = sa.update(self.ap_table).\
+                values({"state": ApDbRespState.Precomp.name}).\
+                where(sa.tuple_(self.ap_table.c.serial_number,
+                                self.ap_table.c.rulesets,
+                                self.ap_table.c.cert_ids).in_(sq)).\
+                returning(self.ap_table.c.request)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(upd)
                 return [row[0] for row in rp]
@@ -194,8 +194,8 @@ class RcacheDbAsync(RcacheDb):
         """ Returns number of invalidated records """
         assert self._engine is not None
         try:
-            sel = sa.select([sa.func.count()]).select_from(self.table).\
-                where(self.table.c.state == DbRespState.Invalid.name)
+            sel = sa.select([sa.func.count()]).select_from(self.ap_table).\
+                where(self.ap_table.c.state == ApDbRespState.Invalid.name)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
                 return rp.fetchone()[0]
@@ -207,7 +207,7 @@ class RcacheDbAsync(RcacheDb):
         """ Returns total number entries in cache (including nonvalid) """
         assert self._engine is not None
         try:
-            sel = sa.select([sa.func.count()]).select_from(self.table)
+            sel = sa.select([sa.func.count()]).select_from(self.ap_table)
             async with self._engine.begin() as conn:
                 rp = await conn.execute(sel)
                 return rp.fetchone()[0]
@@ -215,16 +215,46 @@ class RcacheDbAsync(RcacheDb):
             error(f"Cache database size query failed: {ex}")
         return 0  # Will never happen. Appeasing MyPy
 
-    async def delete(self, pk: DbPk) -> None:
+    async def delete(self, pk: ApDbPk) -> None:
         """ Delete row by primary key """
         try:
-            d = sa.delete(self.table)
+            d = sa.delete(self.ap_table)
             for k, v in pk.dict().items():
-                d = d.where(self.table.c[k] == v)
+                d = d.where(self.ap_table.c[k] == v)
                 async with self._engine.begin() as conn:
                     await conn.execute(d)
         except sa.exc.SQLAlchemyError as ex:
             error(f"Cache database removal failed: {ex}")
+
+    async def get_switch(self, sw: FuncSwitch) -> bool:
+        """ Gets value of given switch """
+        if self.SWITCHES_TABLE_NAME not in self.metadata.tables:
+            return True
+        try:
+            table = self.metadata.tables[self.SWITCHES_TABLE_NAME]
+            sel = sa.select([table.c.state]).where(table.c.name == sw.name)
+            async with self._engine.begin() as conn:
+                rp = await conn.execute(sel)
+                v = rp.first()
+                return True if v is None else v[0]
+        except sa.exc.SQLAlchemyError as ex:
+            error(f"Error reading switch value for '{sw.name}': {ex}")
+        return True  # Will never happen. Appeasing MyPy
+
+    async def set_switch(self, sw: FuncSwitch, state: bool) -> None:
+        """ Sets value of given switch """
+        error_if(self.SWITCHES_TABLE_NAME not in self.metadata.tables,
+                 f"Table '{self.SWITCHES_TABLE_NAME}' not found in "
+                 f"'{self.db_name}' database")
+        try:
+            table = self.metadata.tables[self.SWITCHES_TABLE_NAME]
+            ins = sa_pg.insert(table).values(name=sw.name, state=state)
+            ins = ins.on_conflict_do_update(index_elements=["name"],
+                                            set_={"state": state})
+            async with self._engine.begin() as conn:
+                await conn.execute(ins)
+        except sa.exc.SQLAlchemyError as ex:
+            error(f"Switch setting upsert failed: {ex}")
 
     def _create_engine(self, dsn) -> Any:
         """ Creates asynchronous SqlAlchemy engine """

@@ -14,6 +14,8 @@ License, a copy of which is included with this software program.
 - [REST API](#rest_api)
 - [`rcache_tool.py` - test and manipulation tool](#rcache_tool)
 - [Database schema](#db_schema)
+  - [Rcache table](#rcache_table)
+  - [Switches table](#switches_table)
 
 ## Operation overview <a name="overview"/>
 
@@ -123,10 +125,46 @@ List of available subcommands may be obtained with
 Help on individual subcommand parameters may be obtained with  
 `./rcache_tool.py help SUBCOMMAND`
 
+Some practical use cases (all examples assumed to be executed from rcache container, so rcache service location is guessed automagically):
+
+- **Print service status**. Once:  
+  `./rcache_tool.py status`  
+  ... and once per second (e.g. in parallel with some test):
+  `./rcache_tool.py status --interval 1`  
+
+- **Disable cache invalidation** (e.g. by ULS downloader). Useful to prevent ULS Downloader's influence on performance testing:  
+  `./rcache_tool.py invalidate --disable`  
+  ... and re-enable it back:  
+  `./rcache_tool.py invalidate --enable`  
+  ***Restoring original state is essential, as enable/disable state is persisted in database***
+
+- **Invalidate all cache** *AND* prevent precomputer from its re-validation:  
+  `./rcache_tool.py precompute --disable`  
+  `./rcache_tool.py invalidate --all`  
+  ... and restore precomputation back:  
+  `./rcache_tool.py precompute --enable`  
+  ***Restoring original state is essential, as enable/disable state is persisted in database***
+
+- **Disable cacheing**:  
+  `./rcache_tool.py precompute --disable`  
+  `./rcache_tool.py update --disable`  
+  `./rcache_tool.py invalidate --all`  
+  ... and restore status quo ante:  
+  `./rcache_tool.py precompute --enable`  
+  `./rcache_tool.py update --enable`  
+  ***Restoring original state is essential, as enable/disable state is persisted in database***
+
+- **Do Rcache update stress test** (`afc_load_tool.py` also can do it), parallel writing from 20 streams:  
+  `./rcache_tool.py mass_fill --max_idx 1000000 --threads 20`
+
 
 ## Database schema<a name="db_schema"/>
 
-Rcache uses database, consisting of a single table named `aps` (as each row represent data on a single AP). Here is the schema of this database:
+Rcache uses database, consisting of two tables.
+
+### Rcache table <a name="rcache_table">
+
+Table name is `aps`, each of its rows represent data on a single AP. It has following columns:
 
 |Column|Is<br>primary<br>key|Has<br>index|Data<br>type|Comment|
 |------|--------------------|------------|------------|-------|
@@ -142,3 +180,12 @@ Rcache uses database, consisting of a single table named `aps` (as each row repr
 |validity_period_sec|No|No|Float|Validity period of original response. Used to compute expiration time of response retrieved from cache|
 |request|No|No|String|AFC Request as string. Used for precomputation|
 |response|No|No|String|AFC Response as string. The meat of all this story|
+
+### Switches table <a name="switches_table">
+
+Table name is `switches`, each of its rows represent enable/disable setting. It has following columns:
+
+|Column|Comment|
+|------|-------|
+|name|Setting name. This is a primary key. As of time of this writing, names were: *Update*, *Invalidate*, *Precompute*|
+|state|*True* if enabled, *False* if disabled. Default is *True*|

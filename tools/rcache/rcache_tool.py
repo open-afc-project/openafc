@@ -29,9 +29,9 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import urllib.parse
 
 from rcache_common import dp, error, error_if
-from rcache_models import AfcReqRespKey, DbRecord, DbRespState, LatLonRect, \
-    RcacheInvalidateReq, RcacheInvalidateSetState, \
-    RcacheSpatialInvalidateReq, RcacheStatus, RcacheUpdateReq
+from rcache_models import AfcReqRespKey, ApDbRecord, ApDbRespState, \
+    LatLonRect, RcacheInvalidateReq, RcacheSpatialInvalidateReq, \
+    RcacheStatus, RcacheUpdateReq
 
 # Environment variable with connection string to Postgres DB
 POSTGRES_DSN_ENV = "RCACHE_POSTGRES_DSN"
@@ -378,8 +378,8 @@ async def fill_worker(args: Any, reporter: Reporter,
     req_queue  -- Queue with requests
     """
     end = False
+    batch: List[AfcReqRespKey] = []
     while not end:
-        batch: List[AfcReqRespKey] = []
         item = await req_queue.get()
         if item is None:
             end = True
@@ -419,6 +419,7 @@ async def fill_worker(args: Any, reporter: Reporter,
                     backoff_window *= 2
         for _ in range(len(batch)):
             reporter.bump(success=errmsg is None)
+        batch = []
         if errmsg:
             print(errmsg)
 
@@ -463,7 +464,7 @@ async def lookup_worker(postgres_dsn: str, metadata: Optional[sa.MetaData],
                 scheme=f"{dsn_parts.scheme}+{ASYNC_DRIVER_NAME}"))
     async_engine = None if dry else sa_async.create_async_engine(async_dsn)
     dry_result = \
-        [DbRecord.from_req_resp_key(RrkGen.rrk(idx)).dict()
+        [ApDbRecord.from_req_resp_key(RrkGen.rrk(idx)).dict()
          for idx in range(batch_size)] if dry else None
     done = 0
     while done < count:
@@ -475,7 +476,7 @@ async def lookup_worker(postgres_dsn: str, metadata: Optional[sa.MetaData],
         if dry:
             assert dry_result is not None
             result = \
-                [DbRecord.parse_obj(dry_result[idx]).get_patched_response()
+                [ApDbRecord.parse_obj(dry_result[idx]).get_patched_response()
                  for idx in range(len(batch))]
         else:
             assert async_engine is not None
@@ -487,10 +488,10 @@ async def lookup_worker(postgres_dsn: str, metadata: Optional[sa.MetaData],
                 try:
                     s = sa.select(table).\
                         where((table.c.req_cfg_digest.in_(list(batch))) &
-                              (table.c.state == DbRespState.Valid.name))
+                              (table.c.state == ApDbRespState.Valid.name))
                     async with async_engine.connect() as conn:
                         rp = await conn.execute(s)
-                    result = [DbRecord.parse_obj(rec).get_patched_response()
+                    result = [ApDbRecord.parse_obj(rec).get_patched_response()
                               for rec in rp]
                     break
                 except sa.exc.SQLAlchemyError as ex:
@@ -544,8 +545,7 @@ async def do_invalidate(args: Any) -> None:
         error_if(args.all or args.tile or args.ruleset or
                  (args.enable and args.disable),
                  "Incompatible parameters")
-        invalidate_req = RcacheInvalidateSetState(enabled=args.enable).dict()
-        path = "set_invalidation_state"
+        path = f"invalidation_state/{json.dumps(bool(args.enable))}"
     elif args.all:
         error_if(args.tile or args.ruleset, "Incompatible parameters")
         invalidate_req = RcacheInvalidateReq().dict()
@@ -581,28 +581,47 @@ async def do_invalidate(args: Any) -> None:
     else:
         error("No invalidation type parameters specified")
     async with aiohttp.ClientSession() as session:
-        async with session.post(rcache_url(args, path), json=invalidate_req) \
-                as resp:
+        kwargs = {}
+        if invalidate_req:
+            kwargs["json"] = invalidate_req
+        async with session.post(rcache_url(args, path), **kwargs) as resp:
             error_if(not resp.ok,
                      f"Operation failed: {await resp.text()}")
 
 
-async def do_precompute_quota(args: Any) -> None:
-    """ Execute "precompute_quota" command.
+async def do_precompute(args: Any) -> None:
+    """ Execute "precompute" command.
 
     Arguments:
     args -- Parsed command line arguments
     """
+    if args.enable or args.disable:
+        error_if((args.quota is not None) or (args.enable and args.disable),
+                 "Only one parameter should be specified")
+        path = "precomputation_state"
+        value = bool(args.enable)
+    elif args.quota is not None:
+        path = "precomputation_quota"
+        value = args.quota
+    else:
+        error("At least one parameter should be specified")
     async with aiohttp.ClientSession() as session:
-        if args.QUOTA:
-            async with session.post(
-                    rcache_url(args, f"precompute_quota/{args.QUOTA}")) \
-                    as resp:
-                error_if(not resp.ok, "Operation failed")
-        else:
-            async with session.get(rcache_url(args, "precompute_quota")) \
-                    as resp:
-                print(f"{await resp.json()}")
+        async with session.post(rcache_url(args, f"{path}/{value}")) as resp:
+            error_if(not resp.ok, f"Operation failed: {await resp.text()}")
+
+
+async def do_update(args: Any) -> None:
+    """ Execute "update" command.
+
+    Arguments:
+    args -- Parsed command line arguments
+    """
+    error_if(args.enable == args.disable,
+             "Exactly one parameter should be specified")
+    async with aiohttp.ClientSession() as session:
+        async with session.post(
+                rcache_url(args, f"update_state/{bool(args.enable)}")) as resp:
+            error_if(not resp.ok, f"Operation failed: {await resp.text()}")
 
 
 async def do_status(args: Any) -> None:
@@ -724,7 +743,8 @@ def main(argv: List[str]) -> None:
     parser_invalidate.add_argument(
         "--enable", action="store_true",
         help="Signal rcache service to enable cache invalidation (after it "
-        "was previously disabled)")
+        "was previously disabled). All invalidation requests accumulated "
+        "while disabled are fulfilled")
     parser_invalidate.add_argument(
         "--disable", action="store_true",
         help="Signal rcache service to disable cache invalidation")
@@ -743,16 +763,33 @@ def main(argv: List[str]) -> None:
     parser_invalidate.set_defaults(func=do_invalidate)
     parser_invalidate.set_defaults(is_async=True)
 
-    parser_precompute_quota = subparsers.add_parser(
-        "precompute_quota", parents=[switches_rcache],
-        help="Get/set precompute quota (maximum number of simultaneous "
-        "precomputations")
-    parser_precompute_quota.add_argument(
-        "QUOTA", nargs="?", type=int,
-        help="If specified - sets precompute quota, otherwise - prints "
-        "precompute quota")
-    parser_precompute_quota.set_defaults(func=do_precompute_quota)
-    parser_precompute_quota.set_defaults(is_async=True)
+    parser_precompute = subparsers.add_parser(
+        "precompute", parents=[switches_rcache],
+        help="Set precomputation parameters")
+    parser_precompute.add_argument(
+        "--enable", action="store_true",
+        help="Enable precomputation after it was previously disabled")
+    parser_precompute.add_argument(
+        "--disable", action="store_true",
+        help="Disable precomputation (e.g. for development purposes)")
+    parser_precompute.add_argument(
+        "--quota", metavar="N", type=int,
+        help="Set precompute quota - maximum number of simultaneous "
+        "precomputation requests")
+    parser_precompute.set_defaults(func=do_precompute)
+    parser_precompute.set_defaults(is_async=True)
+
+    parser_update = subparsers.add_parser(
+        "update", parents=[switches_rcache],
+        help="Enables/disables cache update")
+    parser_update.add_argument(
+        "--enable", action="store_true",
+        help="Enable update after it was previously disabled")
+    parser_update.add_argument(
+        "--disable", action="store_true",
+        help="Disable update. All update requests are dropped until emable")
+    parser_update.set_defaults(func=do_update)
+    parser_update.set_defaults(is_async=True)
 
     parser_status = subparsers.add_parser(
         "status", parents=[switches_rcache],
@@ -791,6 +828,8 @@ def main(argv: List[str]) -> None:
             asyncio.run(args.func(args))
         else:
             args.func(args)
+    except SystemExit as ex:
+        sys.exit(1 if isinstance(ex.code, str) else ex.code)
     except KeyboardInterrupt:
         print("^C")
         sys.exit(1)

@@ -11,15 +11,13 @@
 
 import fastapi
 import logging
-import pydantic
 import uvicorn
 import sys
 from typing import Annotated, Optional
 
 from rcache_common import dp, get_module_logger, set_dp_printer
 from rcache_models import IfDbExists, RcacheServiceSettings, RcacheUpdateReq, \
-    RcacheInvalidateReq, RcacheInvalidateSetState, \
-    RcacheSpatialInvalidateReq, RcacheStatus
+    RcacheInvalidateReq, RcacheSpatialInvalidateReq, RcacheStatus
 from rcache_service import RcacheService
 
 __all__ = ["app"]
@@ -116,12 +114,58 @@ async def update(
     service.update(update_req)
 
 
-@app.post("/invalidation_state")
+@app.post("/invalidation_state/{enabled}")
 async def set_invalidation_state(
-        req: RcacheInvalidateSetState,
+            enabled: Annotated[
+                bool,
+                fastapi.Path(
+                    title="true/false to enable/disable invalidation")],
         service: RcacheService = fastapi.Depends(get_service)) -> None:
     """ Enable/disable invalidation """
-    service.set_invalidation_state(req.enabled)
+    await service.set_invalidation_enabled(enabled)
+
+
+@app.get("/invalidation_state")
+async def get_invalidation_state(
+        service: RcacheService = fastapi.Depends(get_service)) -> bool:
+    """ Return invalidation enabled state """
+    return await service.get_invalidation_enabled()
+
+
+@app.post("/precomputation_state/{enabled}")
+async def set_precomputation_state(
+            enabled: Annotated[
+                bool,
+                fastapi.Path(
+                    title="true/false to enable/disable precomputation")],
+        service: RcacheService = fastapi.Depends(get_service)) -> None:
+    """ Enable/disable precomputation """
+    await service.set_precomputation_enabled(enabled)
+
+
+@app.get("/precomputation_state")
+async def get_precomputation_state(
+        service: RcacheService = fastapi.Depends(get_service)) -> bool:
+    """ Return precomputation enabled state """
+    return await service.get_precomputation_enabled()
+
+
+@app.post("/update_state/{enabled}")
+async def setupdate_state(
+            enabled: Annotated[
+                bool,
+                fastapi.Path(
+                    title="true/false to enable/disable update")],
+        service: RcacheService = fastapi.Depends(get_service)) -> None:
+    """ Enable/disable update """
+    await service.set_update_enabled(enabled)
+
+
+@app.get("/update_state")
+async def get_precomputation_state(
+        service: RcacheService = fastapi.Depends(get_service)) -> bool:
+    """ Return update enabled state """
+    return await service.get_update_enabled()
 
 
 @app.get("/status")
@@ -132,15 +176,15 @@ async def get_service_status(
     return await service.get_status()
 
 
-@app.get("/precompute_quota")
+@app.get("/precomputation_quota")
 async def get_precompute_quota(
             service: RcacheService = fastapi.Depends(get_service)) -> int:
     """ Returns current precomputation quota (maximum number of simultaneously
     running precomputations) """
-    return service.precompute_quota()
+    return service.precompute_quota
 
 
-@app.post("/precompute_quota/{quota}")
+@app.post("/precomputation_quota/{quota}")
 async def set_precompute_quota(
             quota: Annotated[
                 int,
@@ -150,7 +194,7 @@ async def set_precompute_quota(
             service: RcacheService = fastapi.Depends(get_service)) -> None:
     """ Sets new precomputation quota (maximum number of simultaneously running
     precomputations) """
-    return service.set_precompute_quota(quota)
+    service.precompute_quota = quota
 
 
 if __name__ == "__main__":

@@ -18,14 +18,15 @@ import logging
 import math
 import pydantic
 from queue import Queue
+import time
 import traceback
 from typing import Any, Dict, Optional, Set, Tuple, Union
 
 from rcache_common import dp, error_if, get_module_logger
 from rcache_db_async import RcacheDbAsync
-from rcache_models import AfcReqRespKey, RcacheUpdateReq, DbPk, DbRecord, \
-    RatapiAfcConfig, RatapiRulesetIds, RcacheInvalidateReq, LatLonRect, \
-    RcacheSpatialInvalidateReq, RcacheStatus
+from rcache_models import AfcReqRespKey, RcacheUpdateReq, ApDbPk, ApDbRecord, \
+    FuncSwitch, RatapiAfcConfig, RatapiRulesetIds, RcacheInvalidateReq, \
+    LatLonRect, RcacheSpatialInvalidateReq, RcacheStatus
 
 __all__ = ["RcacheService"]
 
@@ -79,34 +80,35 @@ class RcacheService:
     """ Manager of all server-side actions
 
     Private attributes:
-    _start_time                  -- When service started
-    _precompute_quota            -- Maximum number of precomputing requests in
-                                    flight
-    _afc_req_url                 -- REST API URL to send requests for
-                                    precomputation. None for no precomputation
-    _rulesets_url                -- REST API URL for getting list of active
-                                    Ruleset IDs. None to use default maximum
-                                    AP FS distance
-    _config_retrieval_url        -- REST API URL for retrieving AFC Config by
-                                    Ruleset ID. None to use default maximum
-                                    AP FS distance
-    _db                          -- Database manager
-    _db_connected_event          -- Set after db connected
-    _update_queue                -- Queue for arrived update requests
-    _invalidation_queue          -- Queue for arrived invalidation requests
-    _precompute_event            -- Event that triggers precomputing task (set
-                                    on invalidations and update requests)
-    _main_tasks                  -- Set of top level tasks
-    _precomputer_subtasks        -- References that keep individual precomputer
-                                    tasks out of oblivion
-    _invalidation_enabled_event  -- Set when invalidation enabled. May be
-                                    cleared for test purposes
-    _updated_count               -- Number of processed updates
-    _precompute_count            -- Number of initiated precomputations
-    _updated_rate_ema            -- Average rate of database write
-    _update_queue_size_ema       -- Average length of update queue
-    _precomputation_rate_ema     -- Average rate of initiated precomputations
-    _all_tasks_running           -- True while no tasks crashed
+    _start_time                    -- When service started
+    _precompute_quota              -- Maximum number of precomputing requests
+                                      in flight
+    _afc_req_url                   -- REST API URL to send requests for
+                                      precomputation. None for no
+                                      precomputation
+    _rulesets_url                  -- REST API URL for getting list of active
+                                      Ruleset IDs. None to use default maximum
+                                      AP FS distance
+    _config_retrieval_url          -- REST API URL for retrieving AFC Config by
+                                      Ruleset ID. None to use default maximum
+                                      AP FS distance
+    _db                            -- Database manager
+    _db_connected_event            -- Set after db connected
+    _update_queue                  -- Queue for arrived update requests
+    _invalidation_queue            -- Queue for arrived invalidation requests
+    _precompute_event              -- Event that triggers precomputing task
+                                      (set on invalidations and update
+                                      requests)
+    _main_tasks                    -- Set of top level tasks
+    _precomputer_subtasks          -- References that keep individual
+                                      precomputer tasks out of oblivion
+    _updated_count                 -- Number of processed updates
+    _precompute_count              -- Number of initiated precomputations
+    _updated_rate_ema              -- Average rate of database write
+    _update_queue_size_ema         -- Average length of update queue
+    _precomputation_rate_ema       -- Average rate of initiated precomputations
+    _all_tasks_running             -- True while no tasks crashed
+    _schedule_lag_ema              -- Average scheduling delay
     """
     def __init__(self, rcache_db_dsn: str, precompute_quota: int,
                  afc_req_url: Optional[str], rulesets_url: Optional[str],
@@ -125,14 +127,12 @@ class RcacheService:
         self._precompute_event = asyncio.Event()
         self._precompute_event.set()
         self._precompute_quota = 0
-        self.set_precompute_quota(precompute_quota)
+        self.precompute_quota = precompute_quota
         self._main_tasks: Set[asyncio.Task] = set()
         for worker in (self._invalidator_worker, self._updater_worker,
                        self._precomputer_worker, self._averager_worker):
             self._main_tasks.add(asyncio.create_task(worker()))
         self._precomputer_subtasks: Set[asyncio.Task] = set()
-        self._invalidation_enabled_event = asyncio.Event()
-        self._invalidation_enabled_event.set()
         self._updated_count = 0
         self._precompute_count = 0
         self._updated_rate_ema = Ema(win_size=AVERAGING_WINDOW_SIZE,
@@ -142,6 +142,43 @@ class RcacheService:
         self._precomputation_rate_ema = Ema(win_size=AVERAGING_WINDOW_SIZE,
                                             is_rate=True)
         self._all_tasks_running = True
+        self._schedule_lag_ema = Ema(win_size=AVERAGING_WINDOW_SIZE,
+                                     is_rate=False)
+
+    async def get_invalidation_enabled(self) -> bool:
+        """ Current invalidation enabled state """
+        return await self._db.get_switch(FuncSwitch.Invalidate)
+
+    async def set_invalidation_enabled(self, value: bool) -> None:
+        """ Enables/disables invalidation """
+        await self._db.set_switch(FuncSwitch.Invalidate, value)
+
+    async def get_precomputation_enabled(self) -> bool:
+        """ Current precomputation enabled state """
+        return await self._db.get_switch(FuncSwitch.Precompute)
+
+    async def set_precomputation_enabled(self, value: bool) -> None:
+        """ Enables/disables precomputation """
+        await self._db.set_switch(FuncSwitch.Precompute, value)
+
+    async def get_update_enabled(self) -> bool:
+        """ Current update enabled state """
+        return await self._db.get_switch(FuncSwitch.Update)
+
+    async def set_update_enabled(self, value: bool) -> None:
+        """ Enables/disables update """
+        await self._db.set_switch(FuncSwitch.Update, value)
+
+    @property
+    def precompute_quota(self) -> int:
+        """ Returns current precompute quota """
+        return self._precompute_quota
+
+    @precompute_quota.setter
+    def precompute_quota(self, value: int) -> None:
+        """ Sets precompute quota """
+        error_if(value < 0, f"Precompute quota of {value} is invalid")
+        self._precompute_quota = value
 
     def check_db_server(self) -> bool:
         """ Check if database server can be connected to """
@@ -159,7 +196,7 @@ class RcacheService:
             self._db.create_db(recreate_db=recreate_db,
                                recreate_tables=recreate_db)
         await self._db.connect()
-        err = DbRecord.check_db_table(self._db.table)
+        err = ApDbRecord.check_db_table(self._db.ap_table)
         error_if(err, f"Request cache database has unexpected format: {err}")
         self._db_connected_event.set()
 
@@ -173,15 +210,6 @@ class RcacheService:
             task.cancel()
         await self._db.disconnect()
 
-    def precompute_quota(self) -> int:
-        """ Returns current precompute quota """
-        return self._precompute_quota
-
-    def set_precompute_quota(self, quota: int) -> None:
-        """ Sets precompute quota """
-        error_if(quota < 0, f"Precompute quota of {quota} si invalid")
-        self._precompute_quota = quota
-
     def update(self, cache_update_req: RcacheUpdateReq) -> None:
         """ Enqueue arrived update requests """
         for rrk in cache_update_req.req_resp_keys:
@@ -194,33 +222,33 @@ class RcacheService:
         """ Enqueue arrived invalidation requests """
         self._invalidation_queue.put_nowait(invalidation_req)
 
-    def set_invalidation_state(self, enabled: bool) -> None:
-        """ Enables/disables invalidation """
-        if enabled:
-            self._invalidation_enabled_event.set()
-        else:
-            self._invalidation_enabled_event.clear()
-
     async def get_status(self) -> RcacheStatus:
         """ Returns service status """
+        num_invalid_entries = await self._db.get_num_invalid_reqs() \
+            if self._db_connected_event.is_set() else -1
         return \
             RcacheStatus(
                 up_time=datetime.datetime.now() - self._start_time,
                 db_connected=self._db_connected_event.is_set(),
                 all_tasks_running=self._all_tasks_running,
-                cache_size=await self._db.get_cache_size()
+                invalidation_enabled=await self.get_invalidation_enabled(),
+                precomputation_enabled=await self.get_precomputation_enabled(),
+                update_enabled=await self.get_update_enabled(),
+                precomputation_quota=self._precompute_quota,
+                num_valid_entries=(max(0,
+                                       await self._db.get_cache_size() -
+                                       num_invalid_entries))
                 if self._db_connected_event.is_set() else -1,
+                num_invalid_entries=num_invalid_entries,
                 update_queue_len=self._update_queue.qsize(),
                 update_count=self._updated_count,
                 avg_update_write_rate=round(self._updated_rate_ema.ema, 2),
                 avg_update_queue_len=round(self._update_queue_len_ema.ema, 2),
-                invalidation_enabled=self._invalidation_enabled_event.is_set(),
-                num_invalidated=await self._db.get_num_invalid_reqs()
-                if self._db_connected_event.is_set() else 0,
                 num_precomputed=self._precompute_count,
                 active_precomputations=len(self._precomputer_subtasks),
                 avg_precomputation_rate=round(
-                    self._precomputation_rate_ema.ema, 3))
+                    self._precomputation_rate_ema.ema, 3),
+                avg_schedule_lag=round(self._schedule_lag_ema.ema, 3))
 
     async def _updater_worker(self) -> None:
         """ Cache updater task worker """
@@ -231,19 +259,20 @@ class RcacheService:
                 rrk = await self._update_queue.get()
                 while True:
                     try:
-                        dr = DbRecord.from_req_resp_key(rrk)
+                        dr = ApDbRecord.from_req_resp_key(rrk)
                     except pydantic.ValidationError as ex:
                         LOGGER.error(
                             f"Invalid format of cache update data: {ex}")
                     else:
                         if dr is not None:
                             row_dict = dr.dict()
-                            update_bulk[self._db.get_pk(row_dict)] = row_dict
+                            update_bulk[self._db.get_ap_pk(row_dict)] = \
+                                row_dict
                     if (len(update_bulk) == self._db.max_update_records()) or \
                             self._update_queue.empty():
                         break
                     rrk = await self._update_queue.get()
-                if update_bulk:
+                if update_bulk and await self.get_update_enabled():
                     await self._db.update_cache(list(update_bulk.values()))
                     self._updated_count += len(update_bulk)
                     self._precompute_event.set()
@@ -260,7 +289,8 @@ class RcacheService:
             await self._db_connected_event.wait()
             while True:
                 req = await self._invalidation_queue.get()
-                await self._invalidation_enabled_event.wait()
+                while not await self.get_invalidation_enabled():
+                    await asyncio.sleep(1)
                 invalid_before = await self._report_invalidation()
                 if isinstance(req, RcacheInvalidateReq):
                     if req.ruleset_ids is None:
@@ -322,8 +352,8 @@ class RcacheService:
         ret = await self._db.get_num_invalid_reqs()
         if dsc is not None:
             assert invalid_before is not None
-            LOGGER.info(f"{dsc}: {invalid_before} invalidated before "
-                        f"operation, {ret} invalidated after operation, "
+            LOGGER.info(f"{dsc}: {invalid_before} was invalidated before "
+                        f"operation, {ret} is invalidated after operation, "
                         f"increase of {ret - invalid_before}")
         return ret
 
@@ -336,7 +366,7 @@ class RcacheService:
                                         json=json.loads(req)) as resp:
                     if resp.ok:
                         return
-            await self._db.delete(DbPk.from_req(req_str=req))
+            await self._db.delete(ApDbPk.from_req(req_str=req))
         except (asyncio.CancelledError,
                 aiohttp.client_exceptions.ServerDisconnectedError):
             # Frankly, it's beyond my understanding why ServerDisconnectedError
@@ -356,6 +386,8 @@ class RcacheService:
             await self._db_connected_event.wait()
             await self._db.reset_precomputations()
             while True:
+                while not await self.get_precomputation_enabled():
+                    await asyncio.sleep(1)
                 await self._precompute_event.wait()
                 self._precompute_event.clear()
                 remaining_quota = \
@@ -419,7 +451,10 @@ class RcacheService:
         """ Averager task worker """
         try:
             while True:
+                timetag = time.time()
                 await asyncio.sleep(1)
+                self._schedule_lag_ema.periodic_update(
+                    time.time() - timetag - 1)
                 self._update_queue_len_ema.periodic_update(
                     self._update_queue.qsize())
                 self._updated_rate_ema.periodic_update(self._updated_count)
