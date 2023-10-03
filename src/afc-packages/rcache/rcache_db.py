@@ -95,6 +95,8 @@ class RcacheDb:
     # Name of enable/disable switches table in database
     SWITCHES_TABLE_NAME = "switches"
 
+    # All table names
+    ALL_TABLE_NAMES = [AP_TABLE_NAME, SWITCHES_TABLE_NAME]
 
     def __init__(self, rcache_db_dsn: Optional[str] = None) -> None:
         """ Constructor
@@ -202,15 +204,11 @@ class RcacheDb:
                     if recreate_tables:
                         with engine.connect() as conn:
                             conn.execute("COMMIT")
-                            conn.execute(
-                                f'DROP TABLE IF EXISTS "{self.AP_TABLE_NAME}"')
-                            conn.execute(
-                                f'DROP TABLE IF EXISTS '
-                                f'"{self.SWITCHES_TABLE_NAME}"')
-                    if not sa.inspect(engine).has_table(self.AP_TABLE_NAME):
-                        self.metadata.create_all(engine)
-                    else:
-                        self._read_metadata()
+                            for table_name in self.ALL_TABLE_NAMES:
+                                conn.execute(
+                                    f'DROP TABLE IF EXISTS "{table_name}"')
+                    self.metadata.create_all(engine)
+                    self._read_metadata()
                 except sa.exc.SQLAlchemyError as ex:
                     error(f"Unable to (re)create tables in the database "
                           f"'{self.db_name}': {ex}")
@@ -290,11 +288,11 @@ class RcacheDb:
                 pass
             metadata = sa.MetaData()
             metadata.reflect(bind=engine)
-            for table_name in (self.AP_TABLE_NAME, self.SWITCHES_TABLE_NAME):
+            for table_name in self.ALL_TABLE_NAMES:
                 error_if(
                     table_name not in metadata.tables,
-                    f"Table '{table_name}' not present in the database in "
-                    f"database '{self.rcache_db_dsn}'")
+                    f"Table '{table_name}' not present in the database "
+                    f"'{self.rcache_db_dsn}'")
             self.metadata = metadata
             self._update_ap_table()
         except sa.exc.SQLAlchemyError as ex:
