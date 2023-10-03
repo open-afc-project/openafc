@@ -260,6 +260,10 @@ docker build . -t rmq -f rabbitmq/Dockerfile
 
 docker build . -t dispatcher -f dispatcher/Dockerfile
 
+docker build . -t cert_db -f cert_db/Dockerfile
+
+docker build . -t rcache -f rcache/Dockerfile
+
 cd als && docker build . -t als_siphon   -f Dockerfile.siphon; cd ../
 cd als && docker build . -t als_kafka    -f Dockerfile.kafka; cd ../
 cd bulk_postgres && docker build . -t bulk_postgres -f Dockerfile; cd ../
@@ -370,6 +374,10 @@ services:
       - AFC_WEBUI_PORT=80
       # set AFC_ENFORCE_MTLS if required to enforce mTLS check
       - AFC_ENFORCE_MTLS=true
+      # Filestorage params:
+      - AFC_OBJST_HOST=objst
+      - AFC_OBJST_PORT=5000
+      - AFC_OBJST_SCHEME=HTTP
     depends_on:
       - msghnd
       - rat_server
@@ -405,6 +413,7 @@ services:
       # ALS params
       - ALS_KAFKA_SERVER_ID=rat_server
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
@@ -424,6 +433,7 @@ services:
       # ALS params
       - ALS_KAFKA_SERVER_ID=msghnd
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
@@ -469,12 +479,12 @@ services:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
-      - RCACHE_UPDATE_ON_SEND=${RCACHE_UPDATE_ON_SEND}
     depends_on:
       - ratdb
       - rmq
       - objst
       - rcache
+      - als_kafka
     dns_search: [.]
 
   als_kafka:
@@ -483,6 +493,7 @@ services:
     environment:
       - KAFKA_ADVERTISED_HOST=${ALS_KAFKA_SERVER_}
       - KAFKA_CLIENT_PORT=${ALS_KAFKA_CLIENT_PORT_}
+      - KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
     dns_search: [.]
 
   als_siphon:
@@ -492,10 +503,10 @@ services:
       - KAFKA_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       - POSTGRES_HOST=bulk_postgres
       - INIT_IF_EXISTS=skip
+      - KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
     depends_on:
       - als_kafka
       - bulk_postgres
-      - rcache
     dns_search: [.]
 
   bulk_postgres:
@@ -517,12 +528,19 @@ services:
       - uls_downloader_state:${VOL_C_ULS_STATE}
     secrets:
       - NOTIFIER_MAIL.json
-    healthcheck:
-      test: ["CMD", "/wd/uls_service_healthcheck.py", "--status_dir=/uls_downloader_state", "--smtp_info=${VOL_C_SECRETS}/NOTIFIER_MAIL.json"]
-      interval: 1h
-      timeout: 1m
-      retries: 3
     dns_search: [.]
+
+  cert_db:
+    image: public.ecr.aws/w9v6y1o0/openafc/cert_db:${TAG:-latest}
+    depends_on:
+      - ratdb
+    links:
+      - ratdb
+      - als_kafka
+    environment:
+      - ALS_KAFKA_SERVER_ID=cert_db
+      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
 
   rcache:
     image: public.ecr.aws/w9v6y1o0/openafc/rcache-image:${TAG:-latest}
@@ -570,38 +588,11 @@ VOL_H_DB=/opt/afc/databases/rat_transfer
 # Container's static DB root dir
 VOL_C_DB=/mnt/nfs/rat_transfer
 
-# AFC service external PORTs configuration
-# syntax: 
-# [IP]:<port | portN-portM>
-# like 172.31.11.188:80-180
-# where: 
-#  IP is  172.31.11.188
-#  port range is 80-180
+# http port
+EXT_PORT=80
 
-# Here we configuring range of external ports to be used by the service 
-# docker-compose randomly uses one port from the range
-
-# Note 1:
-# The IP arrdess can be skipped if there is only one external 
-# IP address (i.e. 80-180 w/o IP address is acceptable as well)
-
-# Note 2:
-# range of ports can be skipped . and just one port is acceptable as well 
-# all these valuase are acaptable:
-# PORT=172.31.11.188:80-180
-# PORT=172.31.11.188:80
-# PORT=80-180
-# PORT=80
-
-
-# apach https ports range
-EXT_PORT=172.31.11.188:80-180
-
-# apach https host ports range
-EXT_PORT_S=172.31.11.188:443-543
-
-# nginx external (host's) ports range.
-EXT_MTLS_PORT=172.31.11.188:544-644
+# https host port
+EXT_PORT_S=443
 
 # -= ALS CONFIGURATION STUFF =-
 
@@ -611,6 +602,8 @@ ALS_KAFKA_CLIENT_PORT_=9092
 # ALS Kafka server host name
 ALS_KAFKA_SERVER_=als_kafka
 
+# Maximum ALS message size (default 1MB is too tight for GUI AFC Response)
+ALS_KAFKA_MAX_REQUEST_SIZE_=10485760
 
 # -= FS(ULS) DOWNLOADER CONFIGURATION STUFF =-
 
@@ -626,10 +619,6 @@ VOL_C_ULS_STATE=/uls_downloader_state
 # True (1, t, on, y, yes) to enable use of Rcache. False (0, f, off, n, no) to
 # use legacy file-based cache. Default is True
 RCACHE_ENABLED=True
-
-# True to update Rcache by AFC Response senter (Worker), False to update by
-# AFC REsponse receiver (MsgHandler, RatAPI). This parameter used by sender
-RCACHE_UPDATE_ON_SEND=True
 
 # Port Rcache service listens os
 RCACHE_PORT=8000
