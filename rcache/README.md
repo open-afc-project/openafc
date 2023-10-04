@@ -145,7 +145,7 @@ Some practical use cases (all examples assumed to be executed from rcache contai
   `./rcache_tool.py precompute --enable`  
   ***Restoring original state is essential, as enable/disable state is persisted in database***
 
-- **Disable cacheing**:  
+- **Disable caching**:  
   `./rcache_tool.py precompute --disable`  
   `./rcache_tool.py update --disable`  
   `./rcache_tool.py invalidate --all`  

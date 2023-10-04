@@ -13,7 +13,8 @@ import sqlalchemy as sa
 from typing import Any, cast, Dict, List, Optional, Tuple
 import urllib.parse
 
-from rcache_common import dp, error, error_if, FailOnError, get_module_logger
+from rcache_common import dp, error, error_if, FailOnError, \
+    get_module_logger, safe_dsn
 from rcache_models import ApDbRespState, ApDbRecord
 
 __all__ = ["RcacheDb"]
@@ -69,7 +70,8 @@ class RcacheDb:
                 self.conn = self._engine.connect()
             except sa.exc.SQLAlchemyError as ex:
                 error(
-                    f"Can't connect to root database '{self.dsn}': {ex}")
+                    f"Can't connect to root database '{safe_dsn(self.dsn)}': "
+                    f"{ex}")
             finally:
                 if (self.conn is None) and (self._engine is not None):
                     # Connection failed
@@ -292,11 +294,12 @@ class RcacheDb:
                 error_if(
                     table_name not in metadata.tables,
                     f"Table '{table_name}' not present in the database "
-                    f"'{self.rcache_db_dsn}'")
+                    f"'{safe_dsn(self.rcache_db_dsn)}'")
             self.metadata = metadata
             self._update_ap_table()
         except sa.exc.SQLAlchemyError as ex:
-            error(f"Can't connect to database '{self.rcache_db_dsn}': {ex}")
+            error(f"Can't connect to database "
+                  f"'{safe_dsn(self.rcache_db_dsn)}': {ex}")
         finally:
             if engine is not None:
                 engine.dispose()
@@ -331,5 +334,5 @@ class RcacheDb:
         try:
             return sa.create_engine(dsn)
         except sa.exc.SQLAlchemyError as ex:
-            error(f"Invalid database DSN: '{dsn}': {ex}")
+            error(f"Invalid database DSN: '{safe_dsn(dsn)}': {ex}")
         return None  # Will never happen, appeasing pylint
