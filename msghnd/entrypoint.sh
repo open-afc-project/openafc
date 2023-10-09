@@ -35,7 +35,7 @@ gunicorn \
 --pid "${AFC_MSGHND_PID}" \
 --workers "${AFC_MSGHND_WORKERS}" \
 --timeout "${AFC_MSGHND_TIMEOUT}" \
---access-logfile "${AFC_MSGHND_ACCESS_LOG}" \
+${AFC_MSGHND_ACCESS_LOG:+--access-logfile "$AFC_MSGHND_ACCESS_LOG"} \
 --error-logfile "${AFC_MSGHND_ERROR_LOG}" \
 --log-level "${AFC_MSGHND_LOG_LEVEL}" \
 --worker-class gevent \

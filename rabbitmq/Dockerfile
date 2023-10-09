@@ -1,5 +1,11 @@
 FROM rabbitmq:3.12.2-alpine
+
+# LOG level for console output (debug, info, warning, error, critical, none)
+ENV RMQ_LOG_CONSOLE_LEVEL=warning
+
 COPY rabbitmq/rabbitmq.conf /etc/rabbitmq/
+RUN echo log.console.level=$RMQ_LOG_CONSOLE_LEVEL >> /etc/rabbitmq/rabbitmq.conf
+
 COPY rabbitmq/definitions.json /etc/rabbitmq/
 # Add debugging env if configured
 ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}

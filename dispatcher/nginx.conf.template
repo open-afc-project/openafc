@@ -106,6 +106,8 @@ http {
             # keep connections open by changing it's header
             proxy_http_version 1.1;
             proxy_set_header   "Connection" "";
+            access_log off;
+            log_not_found off;
         }
 
         # forbid internal tests

@@ -689,6 +689,7 @@ chown 999:999 /var/databases/pgdata
 |BROKER_PWD |`celery`|rat-server,msghnd,worker | password used for AFC RMQ service|
 |BROKER_FQDN|`localhost`|rat-server,msghnd,worker | IP/domain name of AFC RMQ service|
 |BROKER_PORT|`5672`|rat-server,msghnd,worker | port of AFC RMQ service|
+|RMQ_LOG_CONSOLE_LEVEL|warning|rmq|RabbitMQ console log level (debug, info, warning, error, critical, none)|
 | **AFC Object Storage** |||please read [objst README.md](/objstorage/README.md)|
 |AFC_OBJST_HOST|`0.0.0.0`|objst,rat-server,msghnd,worker|file storage service host domain/IP|
 |AFC_OBJST_PORT|`5000`|objst,rat-server,msghnd,worker|file storage service port|
@@ -705,7 +706,7 @@ chown 999:999 /var/databases/pgdata
 |AFC_MSGHND_PID|`/run/gunicorn/openafc_app.pid`|msghnd| a filename to use for the PID file|
 |AFC_MSGHND_WORKERS|`20`|msghnd| the number of worker processes for handling requests|
 |AFC_MSGHND_TIMEOUT|`180`|msghnd| workers silent for more than this many seconds are killed and restarted|
-|AFC_MSGHND_ACCESS_LOG|`/proc/self/fd/2`|msghnd| the Access log file to write to|
+|AFC_MSGHND_ACCESS_LOG||msghnd| the Access log file to write to. Default to don't. Use `/proc/self/fd/2` for console|
 |AFC_MSGHND_ERROR_LOG|`/proc/self/fd/2`|msghnd| the Error log file to write to|
 |AFC_MSGHND_LOG_LEVEL|`info`|msghnd| The granularity of Error log outputs (values are 'debug', 'info', 'warning', 'error', 'critical'|
 | **worker settings**|||please read [afc-engine-preload README.md](/src/afc-engine-preload/README.md)|

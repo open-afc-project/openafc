@@ -51,6 +51,7 @@ client = Celery(
     'fbrat',
     broker=conf.BROKER_URL,
     task_ignore_result=True,
+    broker_pool_limit=0
 )
 
 @client.task(ignore_result=True)
