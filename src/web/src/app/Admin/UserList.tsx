@@ -30,7 +30,6 @@ interface UserTableProps {
     onDelete: (id: number) => void,
     onRoleAdd: (id: number) => void,
     onRoleRemove: (id: number) => void,
-    onAPEdit: (id: number) => void,
     onUserEdit: (id: number) => void,
     users: UserModel[]
 }
@@ -62,10 +61,6 @@ export class UserTable extends React.Component<UserTableProps, {}> {
     actionResolver(data: any, extraData: any) {
 
         return [
-            {
-                title: "Edit APs",
-                onClick: (event: any, rowId: number, rowData: any, extra: any) => this.props.onAPEdit(rowData.id)
-            },
             {
                 title: "Edit User",
                 onClick: (event: any, rowId: number, rowData: any, extra: any) => this.props.onUserEdit(rowData.id)
