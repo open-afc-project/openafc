@@ -54,22 +54,27 @@ Service implemented in `uls/uls_service.py` script that has the following functi
   - How much database changed since previous time
   - If it can be used for AFC Computations without errors
 - If integrity check passed and database differs from previous - copies it to destination directory and retargets the symlink that points to current FS Database. This symlink is used by rest of AFC to work with FS data
-- Notifies Response Rcache service on where there were changes - to invalidate affected cached responses and initiate precomputation
+- Notifies Rcache service on where there were changes - to invalidate affected cached responses and initiate precomputation
 
-`uls/uls_service.py` is controlled by command line parameters, some of which passed to container via environment variables. Table below summarizes these parameters and environment variables, other just hardcoded in *uls/Dockerfile-uls_service*:
+`uls/uls_service.py` is controlled by command line parameters, most of which can be passed via environment variables. Most of default values defined in *uls_service.py*, but some defined in *Dockerfile-uls_service*). **It is recommended to run this script without parameters** (some exception can be found in [Troubleshooting](#troubleshooting) section.
+
+
+soTable below summarizes these parameters and environment variables:
 
 |Parameter|Environment variable|Default|Comment|
 |---------|-----------------------|-------|-------|
-|--download_script **SCRIPT**|||Download script. Currently */mnt/nfs/rat_transfer/daily_uls_parse/daily_uls_parse.py* (*src/ratapi/ratapi/daily_uls_parse.py* in sources), hardcoded in *uls/Dockerfile-uls_service*|
+|--download_script **SCRIPT**|ULS_DOWNLOAD_SCRIPT|/mnt/nfs/rat_transfer/<br>daily_uls_parse/<br>daily_uls_parse.py|Download script|
 |--download_script_args **ARGS**|ULS_DOWNLOAD_SCRIPT_ARGS||Additional (besides *--region*) arguments for *daily_uls_parse.py*|
 |--region **REG1:REG2...**|ULS_DOWNLOAD_REGION||Colon-separated list of country codes (such as US, CA, BR) to download. Default to download all supported countries|
-|--result_dir **DIR**|||Directory where to *daily_uls_parse.py* puts downloaded database. Currently */mnt/nfs/rat_transfer/ULS_Database/*, hardcoded in *uls/Dockerfile-uls_service*|
-|--temp_dir **DIR**|||Directory where to *daily_uls_parse.py* puts temporary files. Currently */mnt/nfs/rat_transfer/daily_uls_parse/temp/*, hardcoded in *uls/Dockerfile-uls_service*|
-|--ext_db_dir **DIR**|ULS_EXT_DB_DIR|/ULS_Database|Directory where to resulting database should be placed (copied from script's result directory)|
+|--result_dir **DIR**|ULS_RESULT_DIR|/mnt/nfs/rat_transfer/<br>ULS_Database/|Directory where to *daily_uls_parse.py* puts downloaded database|
+|--temp_dir **DIR**|ULS_TEMP_DIR|/mnt/nfs/rat_transfer/<br>daily_uls_parse/temp/|Directory where to *daily_uls_parse.py* puts temporary files|
+|--ext_db_dir **DIR**|ULS_EXT_DB_DIR|/rat_transfer/ULS_Database<br>*Defined in dockerfile*|Directory where to resulting database should be placed (copied from script's result directory)|
 |--ext_db_symlink **FILENAME**|ULS_CURRENT_DB_SYMLINK|FS_LATEST.sqlite3|Name of symlink in resulting directory that should be retargeted at newly downloaded database|
-|--fsid_file **FILEPATH**||/mnt/nfs/rat_transfer/<br>daily_uls_parse/<br>data_files/fsid_table.csv|Full name of file with existing FSIDs, used by *daily_uls_parse.py*. Between downloads this data is stored in FS Database|
-|--status_dir **DIR**|ULS_STATE_DIR||Directory where service script saves its status information (such as time of last download, time of last download success, time of last database update, etc.), that is subsequently used by healthcheck script|
-|--check_ext_files **BASE_URL:SUBDIR:FILENAME[,FILENAME...]**|||Certain files used by *daily_uls_parse.py* should be identical to certain files on the Internet. Comparison performed by *uls_service.py*, this parameter specifies what to compare. This parameter may be specified several times and currently hardcoded in *uls/Dockerfile-uls_service*|
+|--fsid_file **FILEPATH**|ULS_FSID_FILE|/mnt/nfs/rat_transfer/<br>daily_uls_parse/<br>data_files/fsid_table.csv|Full name of file with existing FSIDs, used by *daily_uls_parse.py*. Between downloads this data is stored in FS Database|
+|--ext_ras_database **FILENAME**|ULS_EXT_RAS_DATABASE|rat_transfer/RAS_Database/<br>RASdatabase.dat<br>*Defined in dockerfile*|Name of externally maintained 'RAS database' (.csv file with restricted areas)|
+|--ras_database **FILENAME**|ULS_RAS_DATABASE|/mnt/nfs/rat_transfer<br>/daily_uls_parse/data_files<br>/RASdatabase.dat|Where from *daily_uls_parse.py* reads RAS database|
+|--status_dir **DIR**|ULS_STATUS_DIR||Directory where service script saves its status information (such as time of last download, time of last download success, time of last database update, etc.), that is subsequently used by healthcheck script|
+|--check_ext_files **BASE_URL:SUBDIR:FILENAME[,FILENAME...][;...**|ULS_CHECK_EXT_FILES|"https://raw.githubusercontent.com<br>/Wireless-Innovation-Forum/<br>6-GHz-AFC/main/data/common_data:<br>raw_wireless_innovation_forum_files:<br>antenna_model_diameter_gain.csv,<br>billboard_reflector.csv,<br>category_b1_antennas.csv,<br>high_performance_antennas.csv,<br>fcc_fixed_service_channelization.csv,<br>transmit_radio_unit_architecture.csv|Certain files used by *daily_uls_parse.py* should be identical to certain files on the Internet. Comparison performed by *uls_service.py*, this parameter specifies what to compare. Several such group may be specified semicolon-separated. This parameter may be specified several times and currently hardcoded in *uls/Dockerfile-uls_service*|
 |--max_change_percent **PERCENT**|ULS_MAX_CHANGE_PERCENT|10|Downloaded FS Database fails integrity check if it differs from previous by more than this percent of number of paths. If absent/empty - this check is not performed|
 |--afc_url **URL**|ULS_AFC_URL||REST API URL (in *rat_server*/*msghnd*) to use for AFC computation with custom FS database as part of AFS Database integrity check. If absent/empty - this check is not performed| 
 |--afc_parallel **N**|ULS_AFC_PARALLEL|1|Number of parallel AFC Requests to schedule while testing FS Database on *rat_server*/*msghnd*|
@@ -78,9 +83,10 @@ Service implemented in `uls/uls_service.py` script that has the following functi
 |--delay_hr **HOURS**|ULS_DELAY_HR|0|Delay (in hours) before first download attempt. Makes sense to be nonzero in regression testing, to avoid overloading system with unrelated stuff. Ignored if --run_once specified|
 |--interval_hr **HOURS**|ULS_INTERVAL_HR|4|Interval in hours between download attempts|
 |--timeout_hr **HOURS**|ULS_TIMEOUT_HR|1|Timeout in hours for *daily_uls_parse.py*|
-|--nice **[TRUE/FALSE]**|ULS_NICE|FALSE|TRUE to execute download on lowered priority|
-|--run_once **[TRUE/FALSE]**||FALSE|TRUE to run once. Default is to run periodically|
-|--verbose **[TRUE/FALSE]**||FALSE|TRUE to print more (not used as of time of this writing)|
+|--nice|ULS_NICE|*Defined in Dockerfile*|Execute download on lowered priority. Values for environment variable: TRUE/FALSE|
+|--run_once|ULS_RUN_ONCE||Run once (default is to run periodically). Values for environment variable: TRUE/FALSE|
+|--verbose|||Print more (not used as of time of this writing)|
+|--force|||Force FS database update even if it is not changed and bypassing database validity checks (e.g. to overrule them)|
 
 
 ## Service healthcheck <a name="healthcheck"/>
@@ -95,7 +101,7 @@ Healthcheck script makes its conclusion based on when there was last successful 
 
 Healthcheck script invocation periodicity, timeout etc. is controlled by parameters in `HEALTHCHECK` clause of *uls/Dockerfile-uls_service*. Looks like they can't be parameterized for setting from outside, so they are hardcoded.
 
-*service_healthcheck.py* is controlled by command line parameters, that can be set via environment variables:
+*service_healthcheck.py* is controlled by command line parameters, that can be set via environment variables.  **It is recommended to run this script without parameters**
 
 Environment variables starting with *ULS_HEALTH_* control pronouncing container health, starting with *ULS_ALARM_* control sending emails (both alarm and beacon).
 
@@ -136,11 +142,8 @@ All scripts mentioned below (and above) are located in */wd* directory in contai
 
 ### Redownload <a name="redownload">
 
-Current download command might be seen (at least in Compose environment) as:  
-`$ docker inspect NAME_OF_DOWNLOADER_CONTAINER | grep uls_service.py`  
-Naturally, `docker inspect` command should be performed outside of container.
-
-Two results will appear, (one from `Args[1]`, another from `Config[Entrypoint][2]`), any may be used. It is recommended to supply command line with `--run_once` parameter (to circumvent initial delay and subsequent loop)
+In FS downloader container issue command:  
+`/wd/uls_service.py --force --run_once`
 
 ### `fs_db_diff.py` FS Database comparison tool <a name="fs_db_diff">
 

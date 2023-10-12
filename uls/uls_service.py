@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ULS data download control service
+""" ULS data download control service """
 
 # Copyright (C) 2022 Broadcom. All rights reserved.
 # The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
@@ -18,6 +18,7 @@ import datetime
 import glob
 import logging
 import os
+import pydantic
 import shutil
 import sqlalchemy as sa
 import subprocess
@@ -29,29 +30,6 @@ from typing import cast, Dict, List, Optional, Set
 from uls_service_common import *
 from rcache_client import RcacheClient
 from rcache_models import LatLonRect, RcacheClientSettings
-
-# Default value for --download_script
-DEFAULT_DOWNLOAD_SCRIPT = \
-    "/mnt/nfs/rat_transfer/daily_uls_parse/daily_uls_parse.py"
-
-# Default value for --result_dir
-DEFAULT_RESULT_DIR = "/mnt/nfs/rat_transfer/ULS_Database/"
-
-# Default value for --interval_hr
-DEFAULT_INTERVAL_HR = 4.
-
-# Default value for --timeout_hr
-DEFAULT_TIMEOUT_HR = 1.
-
-# Default value for --ext_db_dir
-DEFAULT_EXTERNAL_DB_DIR = "/ULS_Database"
-
-# Default value for --ext_db_symlink
-DEFAULT_CURRENT_DB_SYMLINK = "FS_LATEST.sqlite3"
-
-# Default value for --fsid_file
-DEFAULT_FSID_INTERNAL_FILE = \
-    "/mnt/nfs/rat_transfer/daily_uls_parse/data_files/fsid_table.csv"
 
 # Filemask for ULS databases
 ULS_FILEMASK = "*.sqlite3"
@@ -74,44 +52,127 @@ FS_DB_DIFF = os.path.join(os.path.dirname(__file__), "fs_db_diff.py")
 # Name of FS AFC test script
 FS_AFC = os.path.join(os.path.dirname(__file__), "fs_afc.py")
 
+# Healthcheck script
+HEALTHCHECK_SCRIPT = os.path.join(os.path.dirname(__file__),
+                                  "uls_service_healthcheck.py")
+
+
+class Settings(pydantic.BaseSettings):
+    """ Arguments from command lines - with their default values """
+    download_script: str = \
+        pydantic.Field(
+            "/mnt/nfs/rat_transfer/daily_uls_parse/daily_uls_parse.py",
+            env="ULS_DOWNLOAD_SCRIPT")
+    download_script_args: Optional[str] = \
+        pydantic.Field(None, env="ULS_DOWNLOAD_SCRIPT_ARGS")
+    region: Optional[str] = \
+        pydantic.Field(None, env="ULS_DOWNLOAD_REGION")
+    result_dir: str = \
+        pydantic.Field(
+            "/mnt/nfs/rat_transfer/ULS_Database/", env="ULS_RESULT_DIR")
+    temp_dir: str = \
+        pydantic.Field(
+            "/mnt/nfs/rat_transfer/daily_uls_parse/temp/", env="ULS_TEMP_DIR")
+    ext_db_dir: str = pydantic.Field(..., env="ULS_EXT_DB_DIR")
+    ext_db_symlink: str = pydantic.Field(..., env="ULS_CURRENT_DB_SYMLINK")
+    fsid_file: str = \
+        pydantic.Field(
+            "/mnt/nfs/rat_transfer/daily_uls_parse/data_files/fsid_table.csv",
+            env="ULS_FSID_FILE")
+    ext_ras_database: str = pydantic.Field(..., env="ULS_EXT_RAS_DATABASE")
+    ras_database: str = \
+        pydantic.Field(
+            "/mnt/nfs/rat_transfer/daily_uls_parse/data_files/RASdatabase.dat",
+            env="ULS_RAS_DATABASE")
+    status_dir: str = pydantic.Field(DEFAULT_STATUS_DIR, env="ULS_STATUS_DIR")
+    check_ext_files: Optional[List[str]] = \
+        pydantic.Field(
+            "https://raw.githubusercontent.com/Wireless-Innovation-Forum/"
+            "6-GHz-AFC/main/data/common_data"
+            ":raw_wireless_innovation_forum_files"
+            ":antenna_model_diameter_gain.csv,billboard_reflector.csv,"
+            "category_b1_antennas.csv,high_performance_antennas.csv,"
+            "fcc_fixed_service_channelization.csv,"
+            "transmit_radio_unit_architecture.csv",
+            env="ULS_CHECK_EXT_FILES")
+    max_change_percent: Optional[float] = \
+        pydantic.Field(10., env="ULS_MAX_CHANGE_PERCENT")
+    afc_url: Optional[str] = pydantic.Field(None, env="ULS_AFC_URL")
+    afc_parallel: Optional[int] = pydantic.Field(None, env="ULS_AFC_PARALLEL")
+    rcache_url: Optional[str] = pydantic.Field(None, env="RCACHE_SERVICE_URL")
+    rcache_enabled: bool = pydantic.Field(True, env="RCACHE_ENABLED")
+    delay_hr: float = pydantic.Field(0., env="ULS_DELAY_HR")
+    interval_hr: float = pydantic.Field(4, env="ULS_INTERVAL_HR")
+    timeout_hr: float = pydantic.Field(1, env="ULS_TIMEOUT_HR")
+    nice: bool = pydantic.Field(False, env="ULS_NICE")
+    verbose: bool = pydantic.Field(False)
+    run_once: bool = pydantic.Field(False, env="ULS_RUN_ONCE")
+    force: bool = pydantic.Field(False)
+
+    @pydantic.validator("check_ext_files", pre=True)
+    @classmethod
+    def check_ext_files_str_to_list(cls, v: Any) -> Any:
+        """ Converts string value of 'check_ext_files' from environment from
+        string to list """
+        return [v] if isinstance(v, str) else v
+
+    @pydantic.root_validator(pre=True)
+    @classmethod
+    def remove_empty(cls, v: Any) -> Any:
+        """ Prevalidator that removes empty values (presumably from environment
+        variables) to force use of defaults
+        """
+        if not isinstance(v, dict):
+            return v
+        for key, value in list(v.items()):
+            if value is None:
+                del v[key]
+        return v
+
 
 class ProcessingException(Exception):
     """ ULS processing exception """
     pass
 
 
-def print_args(args: Any) -> None:
+def print_args(settings: Settings) -> None:
     """ Print invocation parameters to log """
     logging.info("ULS downloader started with the following parameters")
-    logging.info(f"ULS download script: {args.download_script}")
-    logging.info(f"Download regions: {args.region if args.region else 'All'}")
+    logging.info(f"ULS download script: {settings.download_script}")
+    logging.info(f"Download regions: "
+                 f"{settings.region if settings.region else 'All'}")
     logging.info(f"Additional ULS download script arguments: "
-                 f"{args.download_script_args}")
+                 f"{settings.download_script_args}")
     logging.info(f"Directory where ULS download script puts downloaded file: "
-                 f"{args.result_dir}")
+                 f"{settings.result_dir}")
     logging.info(f"Temporary directory of ULS download script, cleaned before "
-                 f"downloading: {args.temp_dir}")
+                 f"downloading: {settings.temp_dir}")
     logging.info(f"Ultimate downloaded file destination directory: "
-                 f"{args.ext_db_dir}")
+                 f"{settings.ext_db_dir}")
     logging.info(f"Symlink pointing to current ULS file: "
-                 f"{args.ext_db_symlink}")
+                 f"{settings.ext_db_symlink}")
+    logging.info(f"RAS database: {settings.ext_ras_database}")
+    logging.info(f"Where from ULS script reads RAS database: "
+                 f"{settings.ras_database}")
     logging.info(f"FSID file location expected by ULS download script: "
-                 f"{args.fsid_file}")
+                 f"{settings.fsid_file}")
     logging.info(f"ULS download service state storage directory: "
-                 f"{args.status_dir}")
-    mcp = "Unspecified" if args.max_change_percent is None \
-        else f"{args.max_change_percent}%"
+                 f"{settings.status_dir}")
+    mcp = "Unspecified" if settings.max_change_percent is None \
+        else f"{settings.max_change_percent}%"
     logging.info(f"Limit on paths changed since previous: {mcp}")
-    logging.info(f"AFC Service URL to use for database validity check: "
-                 f"{'Unspecified' if args.afc_url is None else args.afc_url}")
-    logging.info(f"ULS download interval in hours: {args.interval_hr}")
+    logging.info(
+        f"AFC Service URL to use for database validity check: "
+        f"{'Unspecified' if settings.afc_url is None else settings.afc_url}")
+    logging.info(f"ULS download interval in hours: {settings.interval_hr}")
     logging.info(f"ULS download script maximum duration in hours: "
-                 f"{args.timeout_hr}")
+                 f"{settings.timeout_hr}")
     logging.info(f"Rcache spatial invalidation: "
-                 f"{'enabled' if args.rcache_enabled else 'disabled'}")
-    logging.info(f"Rcache URL: {args.rcache_url}")
-    logging.info(f"Run: {'Once' if args.run_once else 'Indefinitely'}")
-    logging.info(f"Print debug info: {'Yes' if args.verbose else 'No'}")
+                 f"{'Enabled' if settings.rcache_enabled else 'Disabled'}")
+    logging.info(f"Rcache URL: {settings.rcache_url}")
+    logging.info(f"Print debug info: {'Yes' if settings.verbose else 'No'}")
+    logging.info(f"Run: {'Once' if settings.run_once else 'Indefinitely'}")
+    logging.info(f"Update forced: {'Yes' if settings.force else 'No'}")
 
 
 def extract_fsid_table(uls_file: str, fsid_file: str) -> None:
@@ -187,6 +248,8 @@ def update_uls_file(uls_dir: str, uls_file: str, symlink: str) -> None:
     os.symlink(uls_file, temp_symlink_name)
     subprocess.check_call(["mv", "-fT", temp_symlink_name,
                            os.path.join(uls_dir, symlink)])
+    logging.info(f"FS database symlink '{os.path.join(uls_dir, symlink)}' "
+                 f"now points to '{uls_file}'")
 
 
 def update_region_change_times(status_storage: StatusStorage,
@@ -213,23 +276,25 @@ class DbDiff:
 
     Public attributes:
     valid        -- True if difference is valid
-    has_previous -- True if previous database exists
     prev_len     -- Number of paths in previous database
     new_len      -- Number of paths in new database
     diff_len     -- Number of different paths
+    ras_diff_len -- Number of different RAS entries
     diff_tiles   -- Tiles containing receivers of different paths
     """
-    def __init__(self, prev_filename: Optional[str], new_filename: str) \
+    def __init__(self, prev_filename: str, new_filename: str) \
             -> None:
-        self.has_previous = (prev_filename is not None) and \
-            os.path.isfile(prev_filename)
+        """ Constructor
+
+        Arguments:
+        prev_filename -- Previous file name
+        new_filename  -- New filename
+        """
         self.valid = False
         self.prev_len = 0
         self.new_len = 0
         self.diff_len = 0
         self.diff_tiles: List[LatLonRect] = []
-        if not self.has_previous:
-            return
         logging.info("Getting differences with previous database")
         try:
             p = subprocess.run(
@@ -241,7 +306,8 @@ class DbDiff:
             return
         m = re.search(r"Paths in DB1:\s+(?P<db1>\d+)(.|\n)+"
                       r"Paths in DB2:\s+(?P<db2>\d+)(.|\n)+"
-                      r"Different paths:\s+(?P<diff>\d+)(.|\n)+",
+                      r"Different paths:\s+(?P<diff>\d+)(.|\n)+"
+                      r"Different RAS entries:\s+(?P<ras_diff>\d+)(.|\n)+",
                       cast(str, p.stdout))
         if m is None:
             logging.error(
@@ -250,6 +316,7 @@ class DbDiff:
         self.prev_len = int(cast(str, m.group("db2")))
         self.new_len = int(cast(str, m.group("db2")))
         self.diff_len = int(cast(str, m.group("diff")))
+        self.ras_diff_len = int(cast(str, m.group("ras_diff")))
         for m in re.finditer(
                 r"Difference in tile "
                 r"\[(?P<min_lat>[0-9.]+)-(?P<max_lat>[0-9.]+)\]"
@@ -269,6 +336,7 @@ class DbDiff:
             f"{os.path.basename(prev_filename)} has {self.prev_len} paths, "
             f"{os.path.basename(new_filename)} has {self.new_len} paths, "
             f"difference is in {self.diff_len} paths, "
+            f"{self.ras_diff_len} RAS entries, "
             f"{len(self.diff_tiles)} tiles")
         self.valid = True
 
@@ -303,17 +371,18 @@ class UlsFileChecker:
         self._afc_parallel = afc_parallel
         self._regions: List[str] = regions or []
 
-    def valid(self, new_filename: str, db_diff: DbDiff) -> bool:
+    def valid(self, new_filename: str, db_diff: Optional[DbDiff]) -> bool:
         """ Checks validity of given database """
         return self._check_diff(db_diff) and self._check_afc(new_filename)
 
-    def _check_diff(self, db_diff: DbDiff) -> bool:
+    def _check_diff(self, db_diff: Optional[DbDiff]) -> bool:
         """ Checks amount of difference since previous database """
-        if not db_diff.has_previous:
+        if db_diff is None:
             return True
         if not db_diff.valid:
             return False
-        if (db_diff.diff_len == 0) != (len(db_diff.diff_tiles) == 0):
+        if ((db_diff.diff_len == 0) and (db_diff.ras_diff_len)) != \
+                (len(db_diff.diff_tiles) == 0):
             logging.error(f"Inconsistent indication of database difference: "
                           f"difference is in {db_diff.diff_len} paths, "
                           f"but in {len(db_diff.diff_tiles)} tiles")
@@ -360,289 +429,316 @@ def main(argv: List[str]) -> None:
         description="ULS data download control service")
     argument_parser.add_argument(
         "--download_script", metavar="ULS_PARSER_SCRIPT",
-        default=DEFAULT_DOWNLOAD_SCRIPT,
-        type=docker_arg_type(str, default=DEFAULT_DOWNLOAD_SCRIPT),
-        help=f"ULS download script. Default is '{DEFAULT_DOWNLOAD_SCRIPT}'")
+        help=f"ULS download script{env_help(Settings, 'download_script')}")
     argument_parser.add_argument(
-        "--download_script_args", metavar="ARGS", type=docker_arg_type(str),
-        help="Optional additional arguments to pass to ULS download script")
+        "--download_script_args", metavar="ARGS",
+        help=f"Optional additional arguments to pass to ULS download script"
+        f"{env_help(Settings, 'download_script_args')}")
     argument_parser.add_argument(
-        "--region", metavar="REG1[:REG2[:REG3...]]", type=docker_arg_type(str),
-        help="Colon-separated list of regions to download. Default is all "
-        "regions ('US:CA' as of time of this writing")
+        "--region", metavar="REG1[:REG2[:REG3...]]",
+        help=f"Colon-separated list of regions to download. Default is all "
+        f"regions{env_help(Settings, 'region')}")
     argument_parser.add_argument(
-        "--result_dir", metavar="RESULT_DIR", default=DEFAULT_RESULT_DIR,
-        type=docker_arg_type(str, default=DEFAULT_RESULT_DIR),
-        help=f"Directory where ULS download script puts resulting database. "
-        f"Default is '{DEFAULT_RESULT_DIR}'")
+        "--result_dir", metavar="RESULT_DIR",
+        help=f"Directory where ULS download script puts resulting database"
+        f"{env_help(Settings, 'result_dir')}")
     argument_parser.add_argument(
         "--temp_dir", metavar="TEMP_DIR",
-        type=docker_arg_type(str),
-        help="Directory containing downloader's temporary files (cleared "
-        "before downloading)")
+        help=f"Directory containing downloader's temporary files (cleared "
+        f"before downloading){env_help(Settings, 'temp_dir')}")
     argument_parser.add_argument(
         "--ext_db_dir", metavar="EXTERNAL_DATABASE_DIR",
-        default=DEFAULT_EXTERNAL_DB_DIR,
-        type=docker_arg_type(str, default=DEFAULT_EXTERNAL_DB_DIR),
-        help=f"Directory where new ULS databases should be copied. Default is "
-        f"'{DEFAULT_EXTERNAL_DB_DIR}'")
+        help=f"Directory where new ULS databases should be copied"
+        f"{env_help(Settings, 'ext_db_dir')}")
     argument_parser.add_argument(
         "--ext_db_symlink", metavar="CURRENT_DATABASE_SYMLINK",
-        default=DEFAULT_CURRENT_DB_SYMLINK,
-        type=docker_arg_type(str, default=DEFAULT_CURRENT_DB_SYMLINK),
-        help=f"Symlink in database directory that points to current database. "
-        f"Default is '{DEFAULT_CURRENT_DB_SYMLINK}'")
+        help=f"Symlink in database directory that points to current database"
+        f"{env_help(Settings, 'ext_db_symlink')}")
+    argument_parser.add_argument(
+        "--ext_ras_database", metavar="FILENAME",
+        help=f"Externally maintained RAS 'database' file"
+        f"{env_help(Settings, 'ext_ras_database')}")
+    argument_parser.add_argument(
+        "--ras_database", metavar="FILENAME",
+        help=f"Where from downloader scripts reads RAS 'database'"
+        f"{env_help(Settings, 'ras_database')}")
     argument_parser.add_argument(
         "--fsid_file", metavar="FSID_FILE",
-        default=DEFAULT_FSID_INTERNAL_FILE,
-        type=docker_arg_type(str, default=DEFAULT_FSID_INTERNAL_FILE),
-        help=f"FSID file where ULS downloader is expected to read/update it. "
-        f"Default is '{DEFAULT_FSID_INTERNAL_FILE}'")
+        help=f"FSID file where ULS downloader is expected to read/update it"
+        f"{env_help(Settings, 'fsid_file')}")
     argument_parser.add_argument(
-        "--status_dir", metavar="STATUS_DIR", default=DEFAULT_STATUS_DIR,
-        type=docker_arg_type(str, default=DEFAULT_STATUS_DIR),
+        "--status_dir", metavar="STATUS_DIR",
         help=f"Directory where this (control) script places its status "
-        f"information - for use by healthcheck script. Default is "
-        f"'{DEFAULT_STATUS_DIR}'")
+        f"information - for use by healthcheck script"
+        f"{env_help(Settings, 'status_dir')}")
     argument_parser.add_argument(
-        "--check_ext_files", metavar="BASE_URL:SUBDIR:FILENAME[,FILENAME...]",
+        "--check_ext_files", metavar="BASE_URL:SUBDIR:FILENAME[,...][;...]",
         action="append", default=[],
-        help="Verify that given files at given location match files at given "
-        "subdirectory of ULS downloader script. This parameter may be "
-        "specified several times")
+        help=f"Verify that given files at given location match files at given "
+        f"subdirectory of ULS downloader script, several such "
+        f"semicolon-separated groups may be specified (e.g. in environment "
+        f"variable){env_help(Settings, 'check_ext_files')}")
     argument_parser.add_argument(
         "--max_change_percent", metavar="MAX_CHANGE_PERCENT",
-        type=docker_arg_type(float),
-        help="Maximum allowed change since previous database in percents")
+        help=f"Maximum allowed change since previous database in percents"
+        f"{env_help(Settings, 'max_change_percent')}")
     argument_parser.add_argument(
-        "--afc_url", metavar="URL", type=docker_arg_type(str),
-        help="URL for making trial AFC Requests with new database")
+        "--afc_url", metavar="URL",
+        help=f"URL for making trial AFC Requests with new database"
+        f"{env_help(Settings, 'afc_url')}")
     argument_parser.add_argument(
-        "--afc_parallel", metavar="NUMBER", type=docker_arg_type(int),
+        "--afc_parallel", metavar="NUMBER",
         help=f"Number of parallel AFC Request to make during verifying new "
-        f"database against AFC Engine. Default see in config file of "
-        f"'{FS_AFC}'")
+        f"database against AFC Engine{env_help(Settings, 'afc_parallel')}")
     argument_parser.add_argument(
-        "--rcache_url", metavar="URL", type=docker_arg_type(str),
-        help="URL for spatial invalidation")
+        "--rcache_url", metavar="URL",
+        help=f"URL for spatial invalidation{env_help(Settings, 'rcache_url')}")
     argument_parser.add_argument(
         "--rcache_enabled", metavar="TRUE/FALSE",
-        type=docker_arg_type(bool, default=True), default=True,
-        help="FALSE to disable spatial invalidation (even if URL specified). "
-        "Default is TRUE")
+        help=f"FALSE to disable spatial invalidation (even if URL specified)"
+        f"{env_help(Settings, 'rcache_enabled')}")
     argument_parser.add_argument(
-        "--delay_hr", metavar="DELAY_HR", type=docker_arg_type(float),
-        help="Delay before invocation in hours. Default is no delay. Ignored "
-        "if --run_omce specified")
+        "--delay_hr", metavar="DELAY_HR",
+        help=f"Delay before invocation in hours"
+        f"{env_help(Settings, 'delay_hr')}")
     argument_parser.add_argument(
-        "--interval_hr", metavar="INTERVAL_HR", default=DEFAULT_INTERVAL_HR,
-        type=docker_arg_type(float, default=DEFAULT_INTERVAL_HR),
-        help=f"Download interval in hours. Default is {DEFAULT_INTERVAL_HR}")
+        "--interval_hr", metavar="INTERVAL_HR",
+        help=f"Download interval in hours{env_help(Settings, 'interval_hr')}")
     argument_parser.add_argument(
-        "--timeout_hr", metavar="TIMEOUT_HR", default=DEFAULT_TIMEOUT_HR,
-        type=docker_arg_type(float, default=DEFAULT_TIMEOUT_HR),
-        help=f"Download script execution timeout in hours. Default is "
-        f"{DEFAULT_INTERVAL_HR}")
+        "--timeout_hr", metavar="TIMEOUT_HR",
+        help=f"Download script execution timeout in hours"
+        f"{env_help(Settings, 'timeout_hr')}")
     argument_parser.add_argument(
-        "--nice", nargs="?", metavar="[YES/NO]", const=True,
-        type=docker_arg_type(bool, default=False),
-        help="Run download script on nice (low) priority")
+        "--nice", action="store_true",
+        help=f"Run download script on nice (low) priority"
+        f"{env_help(Settings, 'nice')}")
     argument_parser.add_argument(
-        "--run_once", nargs="?", metavar="[YES/NO]", const=True,
-        type=docker_arg_type(bool, default=False),
-        help="Run download once and exit")
+        "--verbose", action="store_true",
+        help=f"Print detailed log information{env_help(Settings, 'verbose')}")
     argument_parser.add_argument(
-        "--verbose", nargs="?", metavar="[YES/NO]", const=True,
-        type=docker_arg_type(bool, default=False),
-        help="Print detailed log information")
+        "--run_once", action="store_true",
+        help=f"Run download once and exit{env_help(Settings, 'run_once')}")
+    argument_parser.add_argument(
+        "--force", action="store_true",
+        help=f"Force database update even if it is not noticeably changed or "
+        f"not passed validity check{env_help(Settings, 'force')}")
 
-    args = argument_parser.parse_args(argv)
+    settings: Settings = \
+        cast(Settings, merge_args(settings_class=Settings,
+                                  args=argument_parser.parse_args(argv)))
 
-    setup_logging(verbose=args.verbose)
+    try:
+        setup_logging(verbose=settings.verbose)
 
-    print_args(args)
+        print_args(settings)
 
-    status_storage = StatusStorage(status_dir=args.status_dir)
-    if status_storage.read_milestone(StatusStorage.S.ServiceBirth) is None:
-        status_storage.write_milestone(StatusStorage.S.ServiceBirth)
+        status_storage = StatusStorage(status_dir=settings.status_dir)
+        if status_storage.read_milestone(StatusStorage.S.ServiceBirth) is None:
+            status_storage.write_milestone(StatusStorage.S.ServiceBirth)
 
-    error_if(not os.path.isfile(args.download_script),
-             f"Download script '{args.download_script}' not found")
-    error_if(not os.path.isdir(args.ext_db_dir),
-             f"External database directory '{args.ext_db_dir}' not found")
+        error_if(not os.path.isfile(settings.download_script),
+                 f"Download script '{settings.download_script}' not found")
+        error_if(
+            not os.path.isdir(settings.ext_db_dir),
+            f"External database directory '{settings.ext_db_dir}' not found")
 
-    ext_params_file_checker = \
-        ExtParamFilesChecker(
-            ext_files_arg=args.check_ext_files,
-            script_dir=os.path.dirname(args.download_script),
-            status_storage=status_storage)
+        ext_params_file_checker = \
+            ExtParamFilesChecker(
+                ext_files_arg=settings.check_ext_files,
+                script_dir=os.path.dirname(settings.download_script),
+                status_storage=status_storage)
 
-    current_uls_file = os.path.join(args.ext_db_dir, args.ext_db_symlink)
+        current_uls_file = os.path.join(settings.ext_db_dir,
+                                        settings.ext_db_symlink)
 
-    uls_file_checker = \
-        UlsFileChecker(
-            max_change_percent=args.max_change_percent, afc_url=args.afc_url,
-            afc_parallel=args.afc_parallel,
-            regions=None if args.region is None else args.region.split(":"))
+        uls_file_checker = \
+            UlsFileChecker(
+                max_change_percent=settings.max_change_percent,
+                afc_url=settings.afc_url, afc_parallel=settings.afc_parallel,
+                regions=None if settings.region is None
+                else settings.region.split(":"))
 
-    rcache_settings = \
-        RcacheClientSettings(
-            enabled=args.rcache_enabled and bool(args.rcache_url),
-            service_url=args.rcache_url)
-    rcache_settings.validate_for(rcache=True)
-    rcache: Optional[RcacheClient] = \
-        RcacheClient(rcache_settings) if rcache_settings.enabled else None
+        rcache_settings = \
+            RcacheClientSettings(
+                enabled=settings.rcache_enabled and bool(settings.rcache_url),
+                service_url=settings.rcache_url)
+        rcache_settings.validate_for(rcache=True)
+        rcache: Optional[RcacheClient] = \
+            RcacheClient(rcache_settings) if rcache_settings.enabled else None
 
-    status_storage.write_milestone(StatusStorage.S.ServiceStart)
+        status_storage.write_milestone(StatusStorage.S.ServiceStart)
 
-    if args.delay_hr and (not args.run_once):
-        logging.info(f"Delaying by {args.delay_hr} hours")
-        time.sleep(args.delay_hr * 3600)
+        if settings.delay_hr and (not settings.run_once):
+            logging.info(f"Delaying by {settings.delay_hr} hours")
+            time.sleep(settings.delay_hr * 3600)
 
-    # Temporary name of new ULS database in external directory
-    temp_uls_file_name: Optional[str] = None
+        if settings.run_once:
+            logging.info("Running healthcheck script")
+            subprocess.run([sys.executable, HEALTHCHECK_SCRIPT,
+                            "--force_success"],
+                           timeout=200, check=True)
 
-    while True:
-        logging.info("Starting ULS download")
-        download_start_time = datetime.datetime.now()
-        status_storage.write_milestone(StatusStorage.S.DownloadStart)
-        try:
-            if os.path.islink(current_uls_file):
-                logging.info(
-                    f"Current database: '{os.readlink(current_uls_file)}'")
+        # Temporary name of new ULS database in external directory
+        temp_uls_file_name: Optional[str] = None
 
-            extract_fsid_table(uls_file=current_uls_file,
-                               fsid_file=args.fsid_file)
-
-            # Clear some directories from stuff left from previous downloads
-            for dir_to_clean in [args.result_dir, args.temp_dir]:
-                if dir_to_clean and os.path.isdir(dir_to_clean):
-                    subprocess.run(f"rm -rf {dir_to_clean}/*", shell=True,
-                                   timeout=100, check=True)
-
-            logging.info("Checking if external parameter files changed")
-            ext_params_file_checker.check()
-
-            # Issue download script
-            cmdline_args: List[str] = []
-            if args.nice and (os.name == "posix"):
-                cmdline_args.append("nice")
-            cmdline_args.append(args.download_script)
-            if args.region:
-                cmdline_args += ["--region", args.region]
-            if args.download_script_args:
-                cmdline_args.append(args.download_script_args)
-            logging.info(f"Starting {' '.join(cmdline_args)}")
-            subprocess.run(
-                args=" ".join(cmdline_args) if args.download_script_args
-                else cmdline_args,
-                check=True, shell=bool(args.download_script_args),
-                cwd=os.path.dirname(args.download_script),
-                timeout=args.timeout_hr * 3600)
-
-            # Find out name of new ULS file
-            uls_files = glob.glob(os.path.join(args.result_dir, ULS_FILEMASK))
-            if len(uls_files) < 1:
-                raise ProcessingException(
-                    "ULS file not generated by ULS downloader")
-            if len(uls_files) > 1:
-                raise ProcessingException(
-                    f"More than one {ULS_FILEMASK} file generated by ULS "
-                    f"downloader. What gives?")
-
-            # Check what regions were updated
-            new_uls_file = uls_files[0]
-            logging.info(f"ULS file '{new_uls_file}' created. It will undergo "
-                         f"some inspection")
-            new_uls_identity = get_uls_identity(new_uls_file)
-            if new_uls_identity is None:
-                raise ProcessingException(
-                    "Generated ULS file does not contain identity information")
-            status_storage.write_milestone(StatusStorage.S.DownloadSuccess)
-
-            updated_regions = set(new_uls_identity.keys())
-            if os.path.isfile(current_uls_file):
-                for current_region, current_identity in \
-                        (get_uls_identity(current_uls_file) or {}).items():
-                    if current_identity and \
-                            (new_uls_identity.get(current_region) ==
-                             current_identity):
-                        updated_regions.remove(current_region)
-
-            # If anything was updated - do the update routine
-            if updated_regions:
-                # Embed updated FSID table to the new database
-                logging.info("Embedding FSID table")
-                subprocess.run(
-                    [FSID_TOOL, "embed", new_uls_file, args.fsid_file],
-                    check=True)
-
-                temp_uls_file_name = \
-                    os.path.join(args.ext_db_dir,
-                                 "temp_" + os.path.basename(new_uls_file))
-                # Copy new ULS file to external directory
-                shutil.copy2(new_uls_file, temp_uls_file_name)
-
-                db_diff = DbDiff(prev_filename=current_uls_file,
-                                 new_filename=temp_uls_file_name)
-                if uls_file_checker.valid(new_filename=temp_uls_file_name,
-                                          db_diff=db_diff):
-                    # Renaming database
-                    permanent_uls_file_name = \
-                        os.path.join(args.ext_db_dir,
-                                     os.path.basename(new_uls_file))
-                    os.rename(temp_uls_file_name, permanent_uls_file_name)
-                    # Retargeting symlink
-                    update_uls_file(uls_dir=args.ext_db_dir,
-                                    uls_file=os.path.basename(new_uls_file),
-                                    symlink=args.ext_db_symlink)
-                    if rcache and db_diff.diff_tiles:
-                        tile_list = \
-                            "<" + \
-                            ">, <".join(tile.short_str() for tile in
-                                        db_diff.diff_tiles[: 1000]) + \
-                            ">"
-                        logging.info(f"Requesting invalidation of the "
-                                     f"following tiles: {tile_list}")
-                        rcache.rcache_spatial_invalidate(
-                            tiles=db_diff.diff_tiles)
-
-                    # Update data change times (for health checker)
-                    update_region_change_times(
-                        status_storage=status_storage,
-                        all_regions=list(new_uls_identity.keys()),
-                        updated_regions=updated_regions)
-
-                    status_storage.write_milestone(
-                        StatusStorage.S.SqliteUpdate)
-            else:
-                logging.info("FS data is identical to previous. No update "
-                             "will be done")
-        except (OSError, subprocess.SubprocessError, ProcessingException) \
-                as ex:
-            logging.error(f"Download failed: {ex}")
-        finally:
+        while True:
+            logging.info("Starting ULS download")
+            download_start_time = datetime.datetime.now()
+            status_storage.write_milestone(StatusStorage.S.DownloadStart)
             try:
-                if temp_uls_file_name and os.path.isfile(temp_uls_file_name):
-                    os.unlink(temp_uls_file_name)
-            except OSError as ex:
-                logging.error(f"Attempt to remove temporary ULS database "
-                              f"'{temp_uls_file_name}' failed: {ex}")
+                has_previous = os.path.islink(current_uls_file)
+                if has_previous:
+                    logging.info(
+                        f"Current database: '{os.readlink(current_uls_file)}'")
 
-        # Prepare to sleep
-        download_duration_sec = \
-            (datetime.datetime.now() - download_start_time).total_seconds()
-        logging.info(f"Download took {download_duration_sec // 60} minutes")
-        if args.run_once:
-            break
-        remaining_seconds = \
-            max(0, args.interval_hr * 3600 - download_duration_sec)
-        if remaining_seconds:
-            next_attempt_at = \
-                (datetime.datetime.now() +
-                 datetime.timedelta(seconds=remaining_seconds)).isoformat()
-            logging.info(f"Next download at {next_attempt_at}")
-            time.sleep(remaining_seconds)
+                extract_fsid_table(uls_file=current_uls_file,
+                                   fsid_file=settings.fsid_file)
+
+                # Clear some directories from stuff left from previous
+                # downloads
+                for dir_to_clean in [settings.result_dir, settings.temp_dir]:
+                    if dir_to_clean and os.path.isdir(dir_to_clean):
+                        subprocess.run(f"rm -rf {dir_to_clean}/*", shell=True,
+                                       timeout=100, check=True)
+
+                logging.info("Copying RAS database")
+                shutil.copyfile(settings.ext_ras_database,
+                                settings.ras_database)
+
+                logging.info("Checking if external parameter files changed")
+                ext_params_file_checker.check()
+
+                # Issue download script
+                cmdline_args: List[str] = []
+                if settings.nice and (os.name == "posix"):
+                    cmdline_args.append("nice")
+                cmdline_args.append(settings.download_script)
+                if settings.region:
+                    cmdline_args += ["--region", settings.region]
+                if settings.download_script_args:
+                    cmdline_args.append(settings.download_script_args)
+                logging.info(f"Starting {' '.join(cmdline_args)}")
+                subprocess.run(
+                    args=" ".join(cmdline_args)
+                    if settings.download_script_args else cmdline_args,
+                    check=True, shell=bool(settings.download_script_args),
+                    cwd=os.path.dirname(settings.download_script),
+                    timeout=settings.timeout_hr * 3600)
+
+                # Find out name of new ULS file
+                uls_files = glob.glob(os.path.join(settings.result_dir,
+                                                   ULS_FILEMASK))
+                if len(uls_files) < 1:
+                    raise ProcessingException(
+                        "ULS file not generated by ULS downloader")
+                if len(uls_files) > 1:
+                    raise ProcessingException(
+                        f"More than one {ULS_FILEMASK} file generated by ULS "
+                        f"downloader. What gives?")
+
+                # Check what regions were updated
+                new_uls_file = uls_files[0]
+                logging.info(f"ULS file '{new_uls_file}' created. It will "
+                             f"undergo some inspection")
+                new_uls_identity = get_uls_identity(new_uls_file)
+                if new_uls_identity is None:
+                    raise ProcessingException(
+                        "Generated ULS file does not contain identity "
+                        "information")
+                status_storage.write_milestone(StatusStorage.S.DownloadSuccess)
+
+                updated_regions = set(new_uls_identity.keys())
+                if has_previous:
+                    for current_region, current_identity in \
+                            (get_uls_identity(current_uls_file) or {}).items():
+                        if current_identity and \
+                                (new_uls_identity.get(current_region) ==
+                                 current_identity):
+                            updated_regions.remove(current_region)
+
+                # If anything was updated - do the update routine
+                if updated_regions or settings.force:
+                    # Embed updated FSID table to the new database
+                    logging.info("Embedding FSID table")
+                    subprocess.run(
+                        [FSID_TOOL, "embed", new_uls_file, settings.fsid_file],
+                        check=True)
+
+                    temp_uls_file_name = \
+                        os.path.join(settings.ext_db_dir,
+                                     "temp_" + os.path.basename(new_uls_file))
+                    # Copy new ULS file to external directory
+                    shutil.copy2(new_uls_file, temp_uls_file_name)
+
+                    db_diff = DbDiff(prev_filename=current_uls_file,
+                                     new_filename=temp_uls_file_name) \
+                        if has_previous else None
+                    if settings.force or \
+                            uls_file_checker.valid(
+                                new_filename=temp_uls_file_name,
+                                db_diff=db_diff):
+                        # Renaming database
+                        permanent_uls_file_name = \
+                            os.path.join(settings.ext_db_dir,
+                                         os.path.basename(new_uls_file))
+                        os.rename(temp_uls_file_name, permanent_uls_file_name)
+                        # Retargeting symlink
+                        update_uls_file(
+                            uls_dir=settings.ext_db_dir,
+                            uls_file=os.path.basename(new_uls_file),
+                            symlink=settings.ext_db_symlink)
+                        if rcache and (db_diff is not None) and \
+                                db_diff.diff_tiles:
+                            tile_list = \
+                                "<" + \
+                                ">, <".join(tile.short_str() for tile in
+                                            db_diff.diff_tiles[: 1000]) + \
+                                ">"
+                            logging.info(f"Requesting invalidation of the "
+                                         f"following tiles: {tile_list}")
+                            rcache.rcache_spatial_invalidate(
+                                tiles=db_diff.diff_tiles)
+
+                        # Update data change times (for health checker)
+                        update_region_change_times(
+                            status_storage=status_storage,
+                            all_regions=list(new_uls_identity.keys()),
+                            updated_regions=updated_regions)
+
+                        status_storage.write_milestone(
+                            StatusStorage.S.SqliteUpdate)
+                else:
+                    logging.info("FS data is identical to previous. No update "
+                                 "will be done")
+            except (OSError, subprocess.SubprocessError, ProcessingException) \
+                    as ex:
+                logging.error(f"Download failed: {ex}")
+            finally:
+                try:
+                    if temp_uls_file_name and \
+                            os.path.isfile(temp_uls_file_name):
+                        os.unlink(temp_uls_file_name)
+                except OSError as ex:
+                    logging.error(f"Attempt to remove temporary ULS database "
+                                  f"'{temp_uls_file_name}' failed: {ex}")
+
+            # Prepare to sleep
+            download_duration_sec = \
+                (datetime.datetime.now() - download_start_time).total_seconds()
+            logging.info(
+                f"Download took {download_duration_sec // 60} minutes")
+            if settings.run_once:
+                break
+            remaining_seconds = \
+                max(0, settings.interval_hr * 3600 - download_duration_sec)
+            if remaining_seconds:
+                next_attempt_at = \
+                    (datetime.datetime.now() +
+                     datetime.timedelta(seconds=remaining_seconds)).isoformat()
+                logging.info(f"Next download at {next_attempt_at}")
+                time.sleep(remaining_seconds)
+    except KeyboardInterrupt:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

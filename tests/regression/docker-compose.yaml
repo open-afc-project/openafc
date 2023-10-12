@@ -182,7 +182,7 @@ services:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
     volumes:
-      - ${VOL_H_DB}/ULS_Database:/ULS_Database
+      - ${VOL_H_DB}:/rat_transfer
       - uls_downloader_state:${VOL_C_ULS_STATE}
     secrets:
       - NOTIFIER_MAIL.json

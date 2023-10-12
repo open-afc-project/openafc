@@ -27,7 +27,7 @@ cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_BUILD_TYPE=Ulsprocessor
 ninja -j$(nproc --all --ignore=2) install
 
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
-RUN apk add py3-sqlalchemy py3-numpy py3-yaml
+RUN apk add py3-sqlalchemy py3-numpy py3-yaml py3-pydantic=~1.10
 
 RUN mkdir -p /mnt/nfs/rat_transfer/daily_uls_parse/data_files \
             /mnt/nfs/rat_transfer/daily_uls_parse/temp \
@@ -45,33 +45,54 @@ FROM alpine:3.17
 
 # DOWNLOADER SERVICE PARAMETERS
 
-# Run downloader script on nioce (lowered) priority. Default is to use normal
-# priority
+# Where to directory with ULS databases is mapped
+ENV ULS_EXT_DB_DIR=/rat_transfer/ULS_Database
+
+# Symlink that points to recent ULS database
+ENV ULS_CURRENT_DB_SYMLINK=FS_LATEST.sqlite3
+
+# Name of RAS database (as mapped from external storage)
+ENV ULS_EXT_RAS_DATABASE=/rat_transfer/RAS_Database/RASdatabase.dat
+
+# File name from where daily_uls_parse.py reads RAS database
+# ENV ULS_RAS_DATABASE
+
+# YES to run downloader script on nice (lowered) priority, NO to use normal
+# priority (this is default)
 ENV ULS_NICE=YES
 
-# Additional argfuments (besides --region) to pass to daily_uls_parse.py
+# Download script
+# ENV ULS_DOWNLOAD_SCRIPT
+
+# Additional arguments (besides --region) to pass to daily_uls_parse.py
 # ENV ULS_DOWNLOAD_SCRIPT_ARGS
 
 # Colon separated list of regions to download. Default - all of them
 # ENV ULS_DOWNLOAD_REGION
 
-# Where to directory with ULS databases is mapped
-ENV ULS_EXT_DB_DIR=/ULS_Database
+# Directory where script puts downloaded database
+# ENV ULS_RESULT_DIR
 
-# Symlink that points to recent ULS database
-ENV ULS_CURRENT_DB_SYMLINK=FS_LATEST.sqlite3
+# Directory where download script puts temporary files
+# ENV ULS_TEMP_DIR
+
+# FSID file location used by daily_uls_parse.py
+# ENV ULS_FSID_FILE
 
 # Persistent state directory
-# ENV ULS_STATE_DIR
+# ENV ULS_STATUS_DIR
 
-# Deklay first download by given number of hours
+# External files to check: BASE_URL1:SUBDIR1:FILENAME[,FILENAME...];BASE_URL2...
+# ENV ULS_CHECK_EXT_FILES
+
+# Delay first download by given number of hours
 # ENV ULS_DELAY_HR
 
 # Download interval in hours
-ENV ULS_INTERVAL_HR=4
+# ENV ULS_INTERVAL_HR
 
 # Maximum allowed change since previous download in percents
-ENV ULS_MAX_CHANGE_PERCENT=10
+# ENV ULS_MAX_CHANGE_PERCENT
 
 # URL to use for testing new ULS database against AFC Service
 # ENV ULS_AFC_URL
@@ -81,10 +102,13 @@ ENV ULS_MAX_CHANGE_PERCENT=10
 # ENV ULS_AFC_PARALLEL
 
 # Download maximum duration in hours
-ENV ULS_TIMEOUT_HR=1
+# ENV ULS_TIMEOUT_HR
+
+# YES to run download once, NO to run periodically (this is default)
+# ENV ULS_RUN_ONCE
 
 # True if Rcache enabled, False if not
-ENV RCACHE_ENABLED=TRUE
+# ENV RCACHE_ENABLED
 
 # URL of Rcache service
 # ENV RCACHE_SERVICE_URL
@@ -140,7 +164,7 @@ ENV RCACHE_ENABLED=TRUE
 # given number of hours.
 # Format is REG1:HOURS1,REG2:HOURS2... where REG... is region code (US, CA, BR
 # as of time of this writing).
-# If not specified, data age will not trigger alarm emeil sending
+# If not specified, data age will not trigger alarm email sending
 # ENV ULS_ALARM_REG_UPD_MAX_AGE_HR
 
 # Optional note of where from is email. If specified - used as part of email
@@ -156,38 +180,7 @@ RUN pip3 install --use-pep517 --root-user-action=ignore \
 
 WORKDIR /wd
 
-ENTRYPOINT /wd/uls_service.py \
-    --download_script=/mnt/nfs/rat_transfer/daily_uls_parse/daily_uls_parse.py \
-    --download_script_args=$ULS_DOWNLOAD_SCRIPT_ARGS \
-    --region=$ULS_DOWNLOAD_REGION \
-    --result_dir=/mnt/nfs/rat_transfer/ULS_Database/ \
-    --temp_dir=/mnt/nfs/rat_transfer/daily_uls_parse/temp/ \
-    --ext_db_dir=$ULS_EXT_DB_DIR \
-    --ext_db_symlink=$ULS_CURRENT_DB_SYMLINK \
-    --fsid_file=/mnt/nfs/rat_transfer/daily_uls_parse/data_files/fsid_table.csv \
-    --status_dir=$ULS_STATE_DIR \
-    --check_ext_files=https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data:raw_wireless_innovation_forum_files:antenna_model_diameter_gain.csv,billboard_reflector.csv,category_b1_antennas.csv,high_performance_antennas.csv,fcc_fixed_service_channelization.csv,transmit_radio_unit_architecture.csv \
-    --max_change_percent=$ULS_MAX_CHANGE_PERCENT \
-    --afc_url=$ULS_AFC_URL \
-    --afc_parallel=$ULS_AFC_PARALLEL \
-    --rcache_enabled=$RCACHE_ENABLED \
-    --rcache_url=$RCACHE_SERVICE_URL \
-    --delay_hr=$ULS_DELAY_HR \
-    --interval_hr=$ULS_INTERVAL_HR \
-    --timeout_hr=$ULS_TIMEOUT_HR \
-    --nice=$ULS_NICE
+ENTRYPOINT /wd/uls_service.py
 
 HEALTHCHECK --interval=2h --timeout=2m --retries=3 \
-    CMD /wd/uls_service_healthcheck.py \
-    --status_dir=$ULS_STATE_DIR \
-    --download_attempt_max_age_health_hr=$ULS_HEALTH_ATTEMPT_MAX_AGE_HR \
-    --download_success_max_age_health_hr=$ULS_HEALTH_SUCCESS_MAX_AGE_HR \
-    --update_max_age_health_hr=$ULS_HEALTH_UPDATE_MAX_AGE_HR \
-    --smtp_info=$ULS_ALARM_SMTP_INFO \
-    --email_to=$ULS_ALARM_EMAIL_TO \
-    --email_sender_location=$ULS_ALARM_SENDER_LOCATION \
-    --alarm_email_interval_hr=$ULS_ALARM_ALARM_INTERVAL_HR \
-    --beacon_email_interval_hr=$ULS_ALARM_BEACON_INTERVAL_HR \
-    --download_attempt_max_age_alarm_hr=$ULS_ALARM_ATTEMPT_MAX_AGE_HR \
-    --download_success_max_age_alarm_hr=$ULS_ALARM_SUCCESS_MAX_AGE_HR \
-    --region_update_max_age_alarm=$ULS_ALARM_REG_UPD_MAX_AGE_HR || exit 1
+    CMD /wd/uls_service_healthcheck.py || exit 1

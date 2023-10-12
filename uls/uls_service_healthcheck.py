@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# ULS data download control service healthcheck
+""" ULS data download control service healthcheck """
 
 # Copyright (C) 2022 Broadcom. All rights reserved.
 # The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
@@ -9,27 +9,60 @@
 
 # pylint: disable=unused-wildcard-import, wrong-import-order, wildcard-import
 # pylint: disable=logging-fstring-interpolation, invalid-name, too-many-locals
-# pylint: disable=too-many-branches
+# pylint: disable=too-many-branches, too-few-public-methods
 
 import argparse
 import datetime
 import email.mime.text
 import logging
 import os
+import pydantic
 import smtplib
 import sys
-from typing import Any, List, Optional, Set, Union
+from typing import Any, cast, List, Optional, Set, Union
 
 from uls_service_common import *
 
-# Default value for download_attempt_max_age_health_hr
-DEFAULT_ATTEMPT_AGE_HR = 6.
 
-# Default value for download_success_max_age_health_hr
-DEFAULT_SUCCESS_AGE_HR = 8.
+class Settings(pydantic.BaseSettings):
+    """ Arguments from command lines - with their default values """
 
-# Default value for --update_max_age_health_hr
-DEFAULT_UPDATE_AGE_HR = 40.
+    status_dir: str = pydantic.Field(DEFAULT_STATUS_DIR, env="ULS_STATUS_DIR")
+    smtp_info: Optional[str] = pydantic.Field(None, env="ULS_ALARM_SMTP_INFO")
+    email_to: Optional[str] = pydantic.Field(None, env="ULS_ALARM_EMAIL_TO")
+    email_sender_location: Optional[str] = \
+        pydantic.Field(None, env="ULS_ALARM_SENDER_LOCATION")
+    alarm_email_interval_hr: Optional[float] = \
+        pydantic.Field(None, env="ULS_ALARM_ALARM_INTERVAL_HR")
+    beacon_email_interval_hr: Optional[str] = \
+        pydantic.Field(None, env="ULS_ALARM_BEACON_INTERVAL_HR")
+    download_attempt_max_age_health_hr: Optional[float] = \
+        pydantic.Field(6, env="ULS_HEALTH_ATTEMPT_MAX_AGE_HR")
+    download_success_max_age_health_hr: Optional[float] = \
+        pydantic.Field(8, env="ULS_HEALTH_SUCCESS_MAX_AGE_HR")
+    update_max_age_health_hr: Optional[float] = \
+        pydantic.Field(40, env="ULS_HEALTH_UPDATE_MAX_AGE_HR")
+    download_attempt_max_age_alarm_hr: Optional[float] = \
+        pydantic.Field(None, env="ULS_ALARM_ATTEMPT_MAX_AGE_HR")
+    download_success_max_age_alarm_hr: Optional[float] = \
+        pydantic.Field(None, env="ULS_ALARM_SUCCESS_MAX_AGE_HR")
+    region_update_max_age_alarm: Optional[str] = \
+        pydantic.Field(None, env="ULS_ALARM_REG_UPD_MAX_AGE_HR")
+    verbose: bool = pydantic.Field(False)
+    force_success: bool = pydantic.Field(False)
+
+    @pydantic.root_validator(pre=True)
+    @classmethod
+    def remove_empty(cls, v: Any) -> Any:
+        """ Prevalidator that removes empty values (presumably from environment
+        variables) to force use of defaults
+        """
+        if not isinstance(v, dict):
+            return v
+        for key, value in list(v.items()):
+            if value is None:
+                del v[key]
+        return v
 
 
 def send_email_smtp(smtp_info_filename: Optional[str], to: Optional[str],
@@ -104,37 +137,37 @@ def expired(event_td: Optional[datetime.datetime],
         datetime.timedelta(hours=max_age_hr)
 
 
-def email_if_needed(status_storage: StatusStorage, args: Any) -> None:
+def email_if_needed(status_storage: StatusStorage, settings: Any) -> None:
     """ Send alarm/beacon emails if needed
 
     Arguments:
     status_storage -- status storage
-    args           -- Parsed command line arguments (with timeouts and email
-                      parameters)
+    settings       -- Settings object
     """
-    if (args.alarm_email_interval_hr is None) and \
-            (args.beacon_email_interval_hr is None):
+    if (settings.alarm_email_interval_hr is None) and \
+            (settings.beacon_email_interval_hr is None):
         return
     service_birth = status_storage.read_milestone(StatusStorage.S.ServiceBirth)
     problems: List[str] = []
     if expired(
             event_td=status_storage.read_milestone(
                 StatusStorage.S.DownloadStart) or service_birth,
-            max_age_hr=args.download_attempt_max_age_alarm_hr):
+            max_age_hr=settings.download_attempt_max_age_alarm_hr):
         problems.append(
             f"AFC ULS database download attempts were not taken for more than "
-            f"{args.download_attempt_max_age_alarm_hr} hours")
+            f"{settings.download_attempt_max_age_alarm_hr} hours")
     if expired(
             event_td=status_storage.read_milestone(
                 StatusStorage.S.DownloadSuccess) or service_birth,
-            max_age_hr=args.download_success_max_age_alarm_hr):
+            max_age_hr=settings.download_success_max_age_alarm_hr):
         problems.append(
             f"AFC ULS database download attempts were not succeeded for more "
-            f"than {args.download_attempt_max_age_alarm_hr} hours")
+            f"than {settings.download_attempt_max_age_alarm_hr} hours")
     reg_data_changes = \
         status_storage.read_reg_data_changes(StatusStorage.S.RegionUpdate)
     regions: Set[str] = set()
-    for reg_hr in ((args.region_update_max_age_alarm or "").split(",") or []):
+    for reg_hr in ((settings.region_update_max_age_alarm or "").split(",")
+                   or []):
         if not reg_hr:
             continue
         error_if(":" not in reg_hr,
@@ -159,21 +192,21 @@ def email_if_needed(status_storage: StatusStorage, args: Any) -> None:
         problems.append("External parameters files synchronization problems:")
         problems += [("  " + efp) for efp in external_files_problems]
 
-    loc = args.email_sender_location
+    loc = settings.email_sender_location
     if problems:
         message_subject = "AFC ULS Service encountering problems"
         nl = "\n"
         message_body = \
             (f"AFC ULS download service {('at ' + loc) if loc else ''} "
              f"encountered the following problems:\n{nl.join(problems)}\n\n")
-        email_interval_hr = args.alarm_email_interval_hr
+        email_interval_hr = settings.alarm_email_interval_hr
         email_milestone = StatusStorage.S.AlarmSent
     else:
         message_subject = "AFC ULS Service works fine"
         message_body = \
             (f"AFC ULS download service {('at ' + loc) if loc else ''} "
              f"works fine\n\n")
-        email_interval_hr = args.beacon_email_interval_hr
+        email_interval_hr = settings.beacon_email_interval_hr
         email_milestone = StatusStorage.S.BeaconSent
 
     if not expired(
@@ -201,8 +234,9 @@ def email_if_needed(status_storage: StatusStorage, args: Any) -> None:
         message_body += \
             (f"ULS data for region '{reg}' last time updated in: "
              f"{'Unknown' if et is None else et.isoformat()}")
-    send_email_smtp(smtp_info_filename=args.smtp_info, to=args.email_to,
-                    subject=message_subject, body=message_body)
+    send_email_smtp(smtp_info_filename=settings.smtp_info,
+                    to=settings.email_to, subject=message_subject,
+                    body=message_body)
     status_storage.write_milestone(email_milestone)
 
 
@@ -215,113 +249,117 @@ def main(argv: List[str]) -> None:
     argument_parser = argparse.ArgumentParser(
         description="ULS data download control service healthcheck")
     argument_parser.add_argument(
-        "--status_dir", metavar="STATUS_DIR", default=DEFAULT_STATUS_DIR,
-        type=docker_arg_type(str, default=DEFAULT_STATUS_DIR),
-        help=f"Directory with control script status information. Default is "
-        f"'{DEFAULT_STATUS_DIR}'")
+        "--status_dir", metavar="STATUS_DIR",
+        help=f"Directory with control script status information"
+        f"{env_help(Settings, 'status_dir')}")
     argument_parser.add_argument(
         "--smtp_info", metavar="SMTP_CREDENTIALS_FILE",
-        type=docker_arg_type(str),
-        help="SMTP credentials file. For its structure - see "
-        "NOTIFIER_MAIL.json secret in one of files in tools/secrets/templates "
-        "directory. If parameter not specified or secret file is empty - no "
-        "alarm/beacon emails will be sent")
+        help=f"SMTP credentials file. For its structure - see "
+        f"NOTIFIER_MAIL.json secret in one of files in "
+        f"tools/secrets/templates directory. If parameter not specified or "
+        f"secret file is empty - no alarm/beacon emails will be sent"
+        f"{env_help(Settings, 'smtp_info')}")
     argument_parser.add_argument(
-        "--email_to", metavar="EMAIL", type=docker_arg_type(str),
-        help="Email address to send alarms/beacons to. If parameter not "
-        "specified - no alarm/beacon emails will be sent")
+        "--email_to", metavar="EMAIL",
+        help=f"Email address to send alarms/beacons to. If parameter not "
+        f"specified - no alarm/beacon emails will be sent"
+        f"{env_help(Settings, 'email_to')}")
     argument_parser.add_argument(
         "--email_sender_location", metavar="TEXT",
-        type=docker_arg_type(str),
-        help="Information on whereabouts of service that sent alarm/beacon "
-        "email")
+        help=f"Information on whereabouts of service that sent alarm/beacon "
+        f"email{env_help(Settings, 'email_sender_location')}")
     argument_parser.add_argument(
         "--alarm_email_interval_hr", metavar="HOURS",
-        type=docker_arg_type(float),
-        help="Minimum interval (in hours) between alarm emails. Default is to "
-        "not send alarm emails")
+        help=f"Minimum interval (in hours) between alarm emails. Default is "
+        f"to not send alarm emails"
+        f"{env_help(Settings, 'alarm_email_interval_hr')}")
     argument_parser.add_argument(
         "--beacon_email_interval_hr", metavar="HOURS",
-        type=docker_arg_type(float),
-        help="Interval (in hours) between beacon (everything is OK) email "
-        "messages. Default is to not send beacon emails")
+        help=f"Interval (in hours) between beacon (everything is OK) email "
+        f"messages. Default is to not send beacon emails"
+        f"{env_help(Settings, 'beacon_email_interval_hr')}")
     argument_parser.add_argument(
         "--download_attempt_max_age_health_hr", metavar="HOURS",
-        default=DEFAULT_ATTEMPT_AGE_HR,
-        type=docker_arg_type(float, default=DEFAULT_ATTEMPT_AGE_HR),
         help=f"Pronounce service unhealthy if no download attempts were made "
-        f"for this number of hours. Default is {DEFAULT_ATTEMPT_AGE_HR}")
+        f"for this number of hour"
+        f"{env_help(Settings, 'download_attempt_max_age_health_hr')}")
     argument_parser.add_argument(
         "--download_success_max_age_health_hr", metavar="HOURS",
-        default=DEFAULT_SUCCESS_AGE_HR,
-        type=docker_arg_type(float, default=DEFAULT_SUCCESS_AGE_HR),
         help=f"Pronounce service unhealthy if no download attempts were "
-        "succeeded for this number of hours. Default is "
-        f"{DEFAULT_SUCCESS_AGE_HR}")
+        f"succeeded for this number of hours"
+        f"{env_help(Settings, 'download_success_max_age_health_hr')}")
     argument_parser.add_argument(
         "--update_max_age_health_hr", metavar="HOURS",
-        default=DEFAULT_UPDATE_AGE_HR,
-        type=docker_arg_type(float, default=DEFAULT_UPDATE_AGE_HR),
         help=f"Pronounce service unhealthy if no ULS updates were made for "
-        f"this number of hours. Default is {DEFAULT_UPDATE_AGE_HR}")
+        f"this number of hours"
+        f"{env_help(Settings, 'update_max_age_health_hr')}")
     argument_parser.add_argument(
         "--download_attempt_max_age_alarm_hr", metavar="HOURS",
-        type=docker_arg_type(float),
-        help="Send email alarm if no download attempts were made for this "
-        "number of hours")
+        help=f"Send email alarm if no download attempts were made for this "
+        f"number of hours"
+        f"{env_help(Settings, 'download_attempt_max_age_alarm_hr')}")
     argument_parser.add_argument(
         "--download_success_max_age_alarm_hr", metavar="HOURS",
-        type=docker_arg_type(float),
-        help="Send email alarm if no download attempts were succeeded for "
-        "this number of hours")
+        help=f"Send email alarm if no download attempts were succeeded for "
+        f"this number of hours"
+        f"{env_help(Settings, 'download_success_max_age_alarm_hr')}")
     argument_parser.add_argument(
         "--region_update_max_age_alarm",
-        metavar="REG1:HOURS1[,REG2:HOURS2...]", type=docker_arg_type(str),
-        help="Send alarm email if data for given regions (e.g. 'US', 'CA', "
-        "etc.) were not updated for given number of hours")
+        metavar="REG1:HOURS1[,REG2:HOURS2...]",
+        help=f"Send alarm email if data for given regions (e.g. 'US', 'CA', "
+        f"etc.) were not updated for given number of hours"
+        f"{env_help(Settings, 'region_update_max_age_alarm')}")
     argument_parser.add_argument(
-        "--verbose", nargs="?", metavar="[YES/NO]", const=True,
-        type=docker_arg_type(bool, default=False),
-        help="Print detailed log information")
+        "--verbose", action="store_true",
+        help=f"Print detailed log information{env_help(Settings, 'verbose')}")
+    argument_parser.add_argument(
+        "--force_success", action="store_true",
+        help="Don't return error exit code if container found to be unhealthy")
 
-    args = argument_parser.parse_args(argv)
+    settings: Settings = \
+        cast(Settings, merge_args(settings_class=Settings,
+                                  args=argument_parser.parse_args(argv)))
 
-    setup_logging(verbose=args.verbose)
+    setup_logging(verbose=settings.verbose)
 
-    status_storage = StatusStorage(status_dir=args.status_dir)
+    status_storage = StatusStorage(status_dir=settings.status_dir)
 
     status_storage.write_milestone(StatusStorage.S.HealthCheck)
 
-    email_if_needed(status_storage=status_storage, args=args)
+    email_if_needed(status_storage=status_storage, settings=settings)
 
     last_start = status_storage.read_milestone(StatusStorage.S.ServiceStart)
     if last_start is None:
         logging.error("ULS downloader service not started")
-        sys.exit(1)
+        if not settings.force_success:
+            sys.exit(1)
 
     if expired(event_td=status_storage.read_milestone(
                StatusStorage.S.DownloadStart),
-               max_age_hr=args.download_attempt_max_age_health_hr):
+               max_age_hr=settings.download_attempt_max_age_health_hr):
         logging.error(f"Last download attempt happened more than "
-                      f"{args.download_attempt_max_age_health_hr} hours ago "
-                      f"or not at all")
-        sys.exit(1)
+                      f"{settings.download_attempt_max_age_health_hr} hours "
+                      f"ago or not at all")
+        if not settings.force_success:
+            sys.exit(1)
 
     if expired(event_td=status_storage.read_milestone(
                StatusStorage.S.DownloadSuccess),
-               max_age_hr=args.download_success_max_age_health_hr):
+               max_age_hr=settings.download_success_max_age_health_hr):
         logging.error(f"Last download success happened more than "
-                      f"{args.download_success_max_age_health_hr} hours ago "
-                      f"or not at all")
-        sys.exit(1)
+                      f"{settings.download_success_max_age_health_hr} hours "
+                      f"ago or not at all")
+        if not settings.force_success:
+            sys.exit(1)
 
     if expired(event_td=status_storage.read_milestone(
                StatusStorage.S.SqliteUpdate),
-               max_age_hr=args.update_max_age_health_hr):
+               max_age_hr=settings.update_max_age_health_hr):
         logging.error(f"Last time ULS database was updated happened more than "
-                      f"{args.update_max_age_health_hr} hours ago "
+                      f"{settings.update_max_age_health_hr} hours ago "
                       f"or not at all")
-        sys.exit(1)
+        if not settings.force_success:
+            sys.exit(1)
 
 
 if __name__ == "__main__":
