@@ -18,3 +18,5 @@ WsgiDAV==4.1.0
 typeguard==2.13.3
 celery==5.2.7
 kafka-python==2.0.2
+Werkzeug==2.3.3
+gevent==23.9.1

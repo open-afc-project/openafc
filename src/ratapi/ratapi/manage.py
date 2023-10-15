@@ -24,6 +24,7 @@ from .db.generators import shp_to_spatialite, spatialite_to_raster
 from prettytable import PrettyTable
 from flask_script import Manager, Command, Option, commands
 from . import cmd_utils
+import als
 
 LOGGER = logging.getLogger(__name__)
 
@@ -865,16 +866,16 @@ class CertIdSweep(Command):
               'content-type': 'application/x-www-form-urlencoded',
               'user-agent': 'rat_server/1.0'
             }
-                                                                                 
-            with requests.get(url, headers, stream=True) as r:
+            try:
+              with requests.get(url, headers, stream=True) as r:
                 r.raise_for_status()
+
                 local_filename = "/tmp/SD6_list.csv"
                 with open(local_filename, 'wb') as f:
                     for chunk in r.iter_content(chunk_size=8192): 
                         f.write(chunk)
 
-
-            with open(local_filename, newline='') as csvfile:
+              with open(local_filename, newline='') as csvfile:
                 rdr = csv.reader(csvfile, delimiter=',')
                 for row in rdr:
                     try:
@@ -901,7 +902,14 @@ class CertIdSweep(Command):
                     except:
                         # ignore badly formatted rows
                         pass
+                als.als_json_log('cert_db', {'action':'sweep', \
+'country':'CA', 'status':'success'})
                 db.session.commit()  # pylint: disable=no-member
+            except:
+                als.als_json_log('cert_db', {'action':'sweep', \
+'country':'CA', 'status':'failed download'})
+                self.mailAlert(flaskapp, 'CA', 'none')
+
 
     def sweep_fcc_id(self, flaskapp):
         from afcmodels.aaa import CertId
@@ -931,8 +939,9 @@ class CertIdSweep(Command):
               'user-agent': 'rat_server/1.0'
             }
 
-            resp = requests.post(url, headers=headers, data=data)
-            if resp.status_code == 200:
+            try:
+              resp = requests.post(url, headers=headers, data=data)
+              if resp.status_code == 200:
                 try:
                     from xml.etree import ElementTree
                     tree = ElementTree.fromstring(resp.content)
@@ -952,13 +961,39 @@ class CertIdSweep(Command):
                             ruleset.cert_ids.append(cert)
                             db.session.add(cert)
 
+                    als.als_json_log('cert_db', {'action':'sweep', \
+'country':'US', 'status':'success'})
                 except:
                     raise RuntimeError("Bad XML in Cert Id download")
-            else:
+              else:
                 raise RuntimeError("Bad Cert Id download")
-            db.session.commit()  # pylint: disable=no-member
+              db.session.commit()  # pylint: disable=no-member
+            except:
+                als.als_json_log('cert_db', {'action':'sweep', \
+'country':'US', 'status':'failed download'})
+                self.mailAlert(flaskapp, 'US', str(location))
+
+
+    def mailAlert(self, flaskapp, country, other):
+        import flask
+        from flask_mail import Mail, Message
+
+        with flaskapp.app_context():
+            src_email = flask.current_app.config['REGISTRATION_SRC_EMAIL']
+            dest_email = flask.current_app.config['REGISTRATION_DEST_PDL_EMAIL']
+
+            mail = Mail(flask.current_app)
+            msg = Message(f"AFC CertId download failure",
+                          sender=src_email,
+                          recipients=[dest_email])
+            msg.body = f'''Fail to download CertId for country: {country} info {other}'''
+            mail.send(msg)
+
+
 
     def __call__(self, flaskapp, country):
+        als.als_json_log('cert_db', {'action':'sweep', 'country':country,
+'status':'starting'})
         if country == "US":
             # first sweep SD (outdoor) entries, then sweep ID list.
             self.sweep_fcc_sd(flaskapp)
