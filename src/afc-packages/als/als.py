@@ -25,7 +25,7 @@ try:
     import kafka
     import kafka.errors
 except ImportError as ex:
-    import_failure = str(ex)
+    import_failure = repr(ex)
 
 # Topic name for AFC request/response logging
 ALS_TOPIC = "ALS"
@@ -278,7 +278,7 @@ class Als:
                 LOGGER.error(
                     "Parameter environment variable '%s' has invalid value of "
                     "'%s': %s",
-                    argdsc.env_var, os.environ.get(argdsc.env_var), str(ex))
+                    argdsc.env_var, os.environ.get(argdsc.env_var), repr(ex))
                 break
         self._server_id = kwargs["client_id"] = \
             (client_id or kwargs.get("client_id", "Unknown")) + \
@@ -319,7 +319,7 @@ class Als:
             except kafka.errors.KafkaError as ex:
                 LOGGER.error(
                     "Kafka ALS server connection initialization error: %s",
-                    str(ex))
+                    repr(ex))
                 return False
 
     @property
@@ -416,6 +416,21 @@ class Als:
                  (JSON_LOG_FIELD_TIME, timetag()),
                  (JSON_LOG_FIELD_DATA, json.dumps(record))])
         self._producer.send(topic=topic, value=to_bytes(json.dumps(json_dict)))
+
+    def flush(self, timeout_sec):
+        """ Flush pending messages (if any)
+
+        Arguments:
+        timeout_sec -- timeout in seconds, None to wait for completion
+        Returns True on success, False on timeout
+        """
+        if not self.connected:
+            return True
+        try:
+            self._producer.flush(timeout=timeout_sec)
+            return True
+        except kafka.errors.KafkaTimeoutError:
+            return False
 
     def _flush_afc_configs(self, req_id):
         """ Send all AFC Config records, collected for given request
@@ -586,3 +601,19 @@ def als_json_log(topic, record):
     """
     if _als_instance is not None:
         _als_instance.json_log(topic, record)
+
+
+def als_flush(timeout_sec = 2):
+    """ Flush pending messages (if any)
+
+    Usually it is not needed, but if last log ALS/JSON write was made
+    immediately before program exit, some records might become lost.
+    Hence it might be beneficial to call this function before script end
+
+    Arguments:
+    timeout_sec -- timeout in seconds, None to wait for completion
+    Returns True on success, False on timeout
+    """
+    if _als_instance is not None:
+        return _als_instance.flush(timeout_sec=timeout_sec)
+    return True
