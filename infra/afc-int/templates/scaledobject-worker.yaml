@@ -1,0 +1,18 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ include "afc-int.fullname" . }}-worker-so
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: {{ include "afc-int.fullname" . }}-worker
+  pollingInterval: 5 # Optional. Default: 30 seconds
+  cooldownPeriod: 300 # Optional. Default: 300 seconds
+  triggers:
+    - type: rabbitmq
+      metadata:
+        queueName: celery
+        mode: QueueLength
+        value: "2"
+      authenticationRef:
+        name: {{ include "afc-int.fullname" . }}-worker-trigger

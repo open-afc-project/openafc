@@ -3,10 +3,10 @@
 # Declare variables to be passed into your templates.
 
 replicaCount:
-  msghnd: 1
+  msghnd: 7 # todo: fix after autoscaling enablement for msqhnd
   objst: 1
   rmq: 1
-  worker: 10
+  worker: 1
   webui: 1
   rcache: 1
 

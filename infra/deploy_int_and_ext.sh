@@ -3,6 +3,11 @@
 kubectl config use-context $(kubectl config get-contexts | grep 'int' | awk '{print $2}')
 kubectl get all
 
+helm repo add bitnami https://charts.bitnami.com/bitnami
+helm repo add kedacore https://kedacore.github.io/charts
+helm repo update
+helm install keda kedacore/keda --namespace keda --create-namespace
+
 helm install test-internal afc-int/ -f afc-int/values.yaml
 
 while [ "$(kubectl get service | grep webui | awk '{print $4}')" == "<pending>" ]; do
