@@ -89,7 +89,7 @@ spec:
             - name: AFC_MSGHND_WORKERS
               value: {{ .Values.service.msghnd.threads_per_pod | quote }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.resources.msghnd | nindent 12 }}
       volumes:
         - name: msghnd-rat-api-secret
           secret:

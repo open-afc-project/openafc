@@ -77,7 +77,7 @@ spec:
                   name: postgres-secret
                   key: POSTGRES_PASSWORD
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.resources.als_siphon | nindent 12 }}
       imagePullSecrets:
         - name: brcm-artifactory-secret
       {{- with .Values.nodeSelector }}

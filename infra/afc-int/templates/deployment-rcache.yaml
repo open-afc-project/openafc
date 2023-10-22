@@ -64,7 +64,7 @@ spec:
             - name: RCACHE_CONFIG_RETRIEVAL_URL
               value: "http://{{ .Values.service.webui.loadBalancerIP }}/fbrat/ratapi/v1/GetAfcConfigByRulesetID"
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.resources.rcache | nindent 12 }}
       imagePullSecrets:
         - name: brcm-artifactory-secret
       {{- with .Values.nodeSelector }}

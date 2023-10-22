@@ -54,7 +54,7 @@ spec:
             - name: KAFKA_MAX_REQUEST_SIZE
               value: {{ .Values.service.als_kafka.max_request_size | quote | replace ":" "" }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.resources.als_kafka | nindent 12 }}
       imagePullSecrets:
         - name: brcm-artifactory-secret
       {{- with .Values.nodeSelector }}

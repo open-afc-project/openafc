@@ -53,7 +53,7 @@ spec:
             - name: AFC_OBJST_LOCAL_DIR
               value: "{{ .Values.deployments.global.mountPath }}/storage"
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.resources.objst | nindent 12 }}
       volumes:
         - name: cont-confs
           persistentVolumeClaim:

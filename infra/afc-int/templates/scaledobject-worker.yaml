@@ -6,6 +6,7 @@ metadata:
 spec:
   scaleTargetRef:
     name: {{ include "afc-int.fullname" . }}-worker
+  minReplicaCount: 2
   pollingInterval: 5 # Optional. Default: 30 seconds
   cooldownPeriod: 300 # Optional. Default: 300 seconds
   triggers:

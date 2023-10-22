@@ -86,7 +86,7 @@ spec:
             - name: ALS_KAFKA_MAX_REQUEST_SIZE
               value: {{ .Values.service.als_kafka.max_request_size | quote | replace ":" "" }}
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.resources.worker | nindent 12 }}
       volumes:
         - name: cont-confs
           persistentVolumeClaim:

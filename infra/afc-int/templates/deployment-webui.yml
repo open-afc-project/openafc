@@ -88,7 +88,7 @@ spec:
                   name: rmq-rcache-secret
                   key: RCACHE_RMQ_DSN
           resources:
-            {{- toYaml .Values.resources | nindent 12 }}
+            {{- toYaml .Values.resources.webui | nindent 12 }}
       volumes:
         - name: cont-confs
           persistentVolumeClaim:
