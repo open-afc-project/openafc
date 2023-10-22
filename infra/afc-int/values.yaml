@@ -124,7 +124,7 @@ deployments:
     afc_aep_enable: "1"
     afc_aep_debug: "1"
     afc_aep_real_mountpoint_relative: "rat_transfer/3dep/1_arcsec"
-    celery_concurrent: 4
+    celery_concurrent: 1
 
 ingress:
   enabled: false

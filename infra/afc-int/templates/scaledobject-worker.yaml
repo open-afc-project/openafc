@@ -14,6 +14,6 @@ spec:
       metadata:
         queueName: celery
         mode: QueueLength
-        value: "2"
+        value: {{ .Values.deployments.worker.celery_concurrency | quote }}
       authenticationRef:
         name: {{ include "afc-int.fullname" . }}-worker-trigger

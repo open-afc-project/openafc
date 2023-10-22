@@ -56,6 +56,8 @@ spec:
             # celery params
             - name: AFC_WORKER_CELERY_OPTS
               value: "rat_worker"
+            - name: AFC_WORKER_CELERY_CONCURRENCY
+              value: {{ .Values.deployments.worker.celery_concurrency | quote }}
             # RabbitMQ server name:
             - name: BROKER_TYPE
               value: "external"
