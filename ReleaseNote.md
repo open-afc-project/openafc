@@ -1,6 +1,38 @@
 # Release Note
 
 ## **Version and Date**
+## **Version and Date**
+|Version|3.8.9.0|
+| :- | :- |
+|**Date**|**10/24/2023**|
+|compiled server's version is TBD | git tag 3.8.9.0|
+
+## **Issues Addressed**
+* Jira Oa 859 custom docker repo name (#689)
+* Jira OA-865 flush als entries from rat-manage-api command (#698)
+* Jira OA-867 celery concurrency configurable via AFC_WORKER_CELERY_CONCURRENCY (#700)
+* Jira Oa 863 set up correct requests for all pods (#699)
+* Bump @babel/traverse from 7.8.0 to 7.23.2 in /src/web (#697)
+* Bump urllib3 from 1.26.17 to 1.26.18 in /msghnd (#696)
+* Bump urllib3 from 1.26.17 to 1.26.18 in /rat_server (#695)
+* Jira OA-850. Remove passwords from rcache logs (#684)
+* Bump word-wrap from 1.2.3 to 1.2.5 in /src/web (#683)
+* Bump semver from 5.7.1 to 5.7.2 in /src/web (#589)
+* Jira OA-849. Rcache creates absent tables in database (#682)
+* Bump urllib3 from 1.26.12 to 1.26.17 in /msghnd (#680)
+* Bump gevent from 23.7.0 to 23.9.1 in /rat_server (#674)
+* Jira OA-847 Update trial tools documentation (#676)
+* Jira OA-846 Rcache bugfixes (#679)
+* Jira OA-845 AFC load tool (#678)
+* Jira OA-848. Removal of tests/regression/pipe from git (#677)
+* Jira OA-822 initial als-kafka als-siphon and r-cache support in helm charts. Also incrementing release in helm charts to 3.8.8.0 (#675)
+* Jira OA-843. Fixing empty --kafka_max_partition_fetch_bytes value behavior (#670)
+* Jira OA-844 make cookie secure and http only (#671)
+* Jira OA-825 update nlcd dir in regr afc-config to use production version. (#669)
+* Jira OA 841. Readme for ULS downloader (#667)
+* Jira OA-840 check afc config compability by comparing fields (#666)
+
+
 |Version|3.8.8.0|
 | :- | :- |
 |**Date**|**09/19/2023**|
