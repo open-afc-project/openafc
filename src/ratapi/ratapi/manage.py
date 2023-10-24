@@ -1566,7 +1566,10 @@ def main():
     manager.add_command('cert_id', CertificationId())
     manager.add_command('cfg', Config())
 
-    manager.run()
+    try:
+        manager.run()
+    finally:
+        als.als_flush()
 
 if __name__ == '__main__':
     sys.exit(main())
