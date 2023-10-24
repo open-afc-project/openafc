@@ -6,35 +6,29 @@
 # a copy of which is included with this software program
 #
 
+PRIV_REPO="${PRIV_REPO:=110738915961.dkr.ecr.us-east-1.amazonaws.com}"
+PUB_REPO="${PUB_REPO:=public.ecr.aws/w9v6y1o0/openafc}"
 
-# TODO:  centos deprecated D4B="public.ecr.aws/w9v6y1o0/openafc/centos-build-image"         # CentOS dev image name
-# TODO:  centos deprecated PRINST="public.ecr.aws/w9v6y1o0/openafc/centos-preinstall-image" # preinst image name
+SRV="${PRIV_REPO}/afc-server"                                         # server image
+MSGHND="${PRIV_REPO}/afc-msghnd"                             # msghnd image
+OBJST="${PUB_REPO}/objstorage-image"                         # object storage
+RATDB=${PUB_REPO}"/ratdb-image"                                  # ratdb image
+RMQ="${PUB_REPO}/rmq-image"                                        # rabbitmq image
+DISPATCHER="${PUB_REPO}/dispatcher-image"               # dispatcher image
+ALS_SIPHON="${PUB_REPO}/als-siphon-image"               # ALS Siphon image
+ALS_KAFKA="${PUB_REPO}/als-kafka-image"                   # Kafka for ALS
+BULK_POSTGRES="${PUB_REPO}/bulk-postgres-image" # PostgreSQL for bulk stuff (ALS, req cache, etc.)
+RCACHE="${PUB_REPO}/rcache-image"                             # Request cache
 
+WORKER=${PRIV_REPO}"/afc-worker"                                    # msghnd image
+WORKER_AL_D4B="${PUB_REPO}/worker-al-build-image" # Alpine worker build img
+WORKER_AL_PRINST="${PUB_REPO}/worker-al-preinstall" # Alpine worker preinst
 
-# TODO: deprecated MSGHND_PRINST="public.ecr.aws/w9v6y1o0/openafc/centos-msghnd-preinstall" # msghnd preinstall image name
-SRV="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server"    # server image
-MSGHND="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd" # msghnd image
-OBJST="public.ecr.aws/w9v6y1o0/openafc/objstorage-image"         # object storage
-RATDB="public.ecr.aws/w9v6y1o0/openafc/ratdb-image"              # ratdb image
-RMQ="public.ecr.aws/w9v6y1o0/openafc/rmq-image"                  # rabbitmq image
-DISPATCHER="public.ecr.aws/w9v6y1o0/openafc/dispatcher-image"    # dispatcher image
-ALS_SIPHON="public.ecr.aws/w9v6y1o0/openafc/als-siphon-image"    # ALS Siphon image
-ALS_KAFKA="public.ecr.aws/w9v6y1o0/openafc/als-kafka-image"      # Kafka for ALS
-BULK_POSTGRES="public.ecr.aws/w9v6y1o0/openafc/bulk-postgres-image" # PostgreSQL for bulk stuff (ALS, req cache, etc.)
-RCACHE="public.ecr.aws/w9v6y1o0/openafc/rcache-image"   # Request cache
+ULS_UPDATER=${PRIV_REPO}"/uls-updater"                # ULS Updater image
+ULS_DOWNLOADER="${PUB_REPO}/uls-downloader" # ULS Downloader image
 
-WORKER="110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker"  # msghnd image
-WORKER_AL_D4B="public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image" # Alpine worker build img
-WORKER_AL_PRINST="public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall" # Alpine worker preinst
-
-ULS_UPDATER="110738915961.dkr.ecr.us-east-1.amazonaws.com/uls-updater" # ULS Updater image
-ULS_DOWNLOADER="public.ecr.aws/w9v6y1o0/openafc/uls-downloader" # ULS Downloader image
-
-CERT_DB="public.ecr.aws/w9v6y1o0/openafc/cert_db" # CERT DB image
+CERT_DB="${PUB_REPO}/cert_db"                    # CERT DB image
 RTEST_DI="rtest"                                                 # regression tests image
-
-# TODO: deprecated, will be removed in future release
-PRINST_WRKR_DI="public.ecr.aws/w9v6y1o0/openafc/centos-worker-preinstall" # worker preinst image name
 
 
 # FUNCS
@@ -90,29 +84,33 @@ docker_build_and_push() {
     fi
   fi
 }
-
-docker_login() {
-# TODO: currently it is hardcoded to login into openAFC repo
-# should be implemented in more generic way
-  aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/w9v6y1o0
-  check_ret $?
-  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 110738915961.dkr.ecr.us-east-1.amazonaws.com
+docker_login () {
+  pub_repo_login=${1}
+  priv_repo_login=${2}
+  if test ${pub_repo_login}; then
+    err "FAIL \"${pub_repo_login}" not defined"; exit $?
+  fi
+  if test ${priv_repo_login}; then
+    err "FAIL \"${priv_repo_login}" not defined"; exit $?
+  fi
+  "${pub_repo_login}" && "${priv_repo_login}"
   check_ret $?
 }
+
 
 build_dev_server() {
   wd=${1}       # full path to the afc project dir
   tag=${2}      # tag to be used for new docker images
   push=${3:-1}  # whether push new docker images into repo [0/1]
-
   # cd to a work dir
   cd ${wd}
   # get last git commit hash number
   BUILDREV=`git rev-parse --short HEAD`
 
-  if [ ${push} -eq 1 ]; then
-    docker_login
-  fi
+# if login if docker push required
+#  if [ ${push} -eq 1 ]; then
+#    docker_login "${pub_repo_login}" "${priv_repo_login}"
+#  fi
 
   # build regression test docker image
   cd ${wd}
