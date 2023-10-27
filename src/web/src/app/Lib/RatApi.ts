@@ -224,9 +224,9 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     },
     "ITMParameters": {
         "polarization": "Vertical",
-        "ground": "Average Ground",
+        "ground": "Good Ground",
         "dielectricConst": 25,
-        "conductivity": 0.005,
+        "conductivity": 0.02,
         "minSpacing": 30,
         "maxPoints": 1500
     },
@@ -323,9 +323,9 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     },
     "ITMParameters": {
         "polarization": "Vertical",
-        "ground": "Average Ground",
+        "ground": "Good Ground",
         "dielectricConst": 25,
-        "conductivity": 0.005,
+        "conductivity": 0.02,
         "minSpacing": 30,
         "maxPoints": 1500
     },
@@ -420,9 +420,9 @@ const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
     },
     "ITMParameters": {
         "polarization": "Vertical",
-        "ground": "Average Ground",
+        "ground": "Good Ground",
         "dielectricConst": 25,
-        "conductivity": 0.005,
+        "conductivity": 0.02,
         "minSpacing": 30,
         "maxPoints": 1500
     },

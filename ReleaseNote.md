@@ -1,6 +1,22 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-866*|
+| :- | :- |
+|**Date**|**10/25/2023**|
+
+## **Issues Addressed**
+ * Jira OA-866: AFC Config GUI's ITM Parameter's Ground Type can't be changed 
+
+## **Interface Changes**
+ * 
+
+## **Testing Done**
+ * Confirmed that ITM Parameter's Ground Type can be changed from AFC Config UI and it appears correctly in afc-config.json
+
+## **Open Issues** 
+ * 
+## **Version and Date**
 ## **Version and Date**
 |Version|3.8.9.0|
 | :- | :- |

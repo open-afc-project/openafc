@@ -95,19 +95,19 @@ export class AFCFormUSACanada extends React.Component<
     }
 
     private setPenetrationLoss = (x: PenetrationLossModel) => {
-        const conf = this.props.config;
+        const conf = { ...this.props.config };
         conf.buildingPenetrationLoss = x;
         this.props.updateConfig(conf);
     }
 
     private setPolarizationLoss = (x: PolarizationLossModel) => {
-        const conf = this.props.config;
+        const conf = { ...this.props.config };
         conf.polarizationMismatchLoss = x;
         this.props.updateConfig(conf);
     }
 
     private setBodyLoss = (x: BodyLossModel) => {
-        const conf = this.props.config;
+        const conf = { ...this.props.config };
         conf.bodyLoss = x;
         this.props.updateConfig(conf);
     }
@@ -188,19 +188,19 @@ export class AFCFormUSACanada extends React.Component<
     }
 
     private setAPUncertainty = (x: APUncertainty) => {
-        const conf = this.props.config;
+        const conf = { ...this.props.config };
         conf.APUncertainty = x;
         this.props.updateConfig(conf);
     }
 
     private setITMParams = (x: ITMParameters) => {
-        const conf = this.props.config;
+        const conf = { ...this.props.config };
         conf.ITMParameters = x;
         this.props.updateConfig(conf);
     }
 
     private setUseClutter = (x: boolean) => {
-        const conf = this.props.config;
+        const conf = { ...this.props.config };
         //If changing to true, and was false, and there is no clutter model, use the defaults
         if (x && !conf.clutterAtFS && !conf.fsClutterModel) {
             conf.fsClutterModel = { maxFsAglHeight: 6, p2108Confidence: 5 };
@@ -594,7 +594,7 @@ export class AFCFormUSACanada extends React.Component<
                 </GalleryItem>}
             {this.props.config.propagationModel.kind != "FSPL" ?
                 <GalleryItem>
-                    <ITMParametersForm data={this.props.config.ITMParameters} onChange={this.setITMParams} />
+                    <ITMParametersForm data={{...this.props.config.ITMParameters}} onChange={this.setITMParams} />
                 </GalleryItem>
                 : false}
             <GalleryItem>
