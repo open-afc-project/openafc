@@ -82,7 +82,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     },
     "buildingPenetrationLoss": {
         "kind": "Fixed Value",
-        "value": 20.5
+        "value": 0
     },
     "receiverFeederLoss": {
         "IDU": 3,
@@ -94,11 +94,11 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
         "noiseFloorList": [-110, -109.5]
     },
     "threshold": -6,
-    "maxLinkDistance": 130,
+    "maxLinkDistance": 200,
     "maxEIRP": 36,
     "minEIRP": 21,
 
-    "minPSD": 8,
+    "minPSD": -100,
     "propagationModel": {
         "kind": "FCC 6GHz Report & Order",
         "win2ConfidenceCombined": 16,
@@ -115,7 +115,7 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
         "terrainSource": "3DEP (30m)"
     },
     "propagationEnv": "NLCD Point",
-    "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
+    "ulsDatabase": "FS_LATEST.sqlite3",
     "regionStr": "US",
     "APUncertainty": {
         "points_per_degree": 3600,
@@ -137,8 +137,8 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
         "p2108Confidence": 5,
         "maxFsAglHeight": 6
     },
-    "nlcdFile": "rat_transfer/nlcd/nlcd_wfa",
-    "enableMapInVirtualAp": false,
+    "nlcdFile": "rat_transfer/nlcd/nlcd_production",
+    "enableMapInVirtualAp": true,
     "channelResponseAlgorithm": "psd",
     "visibilityThreshold": -6,
     "version": guiConfig.version,
@@ -151,10 +151,10 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "indoorFixedHeightAMSL": false,
     "reportUnavailableSpectrum": true,
     "reportUnavailPSDdBPerMHz": -40,
-    "inquiredFrequencyResolutionMHz": 20,
+    "inquiredFrequencyResolutionMHz": 1,
     "srtmDir": "rat_transfer/srtm3arcsecondv003",
     "depDir": "rat_transfer/3dep/1_arcsec",
-    "roundPSDEIRPFlag": false,
+    "roundPSDEIRPFlag": true,
 });
 
 const defaultAfcConfCanada: () => AFCConfigFile = () => ({
@@ -214,7 +214,7 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
         "rlanITMTxClutterMethod": "FORCE_TRUE",
     },
     "propagationEnv": "NLCD Point",
-    "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
+    "ulsDatabase": "FS_LATEST.sqlite3",
     "regionStr": "CA",
     "APUncertainty": {
         "points_per_degree": 3600,
@@ -313,7 +313,7 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
         "terrainSource": "SRTM (30m)"
     },
     "propagationEnv": "Population Density Map",
-    "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
+    "ulsDatabase": "FS_LATEST.sqlite3",
     "regionStr": "BR",
     "APUncertainty": {
         "points_per_degree": 3600,
@@ -410,7 +410,7 @@ const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
         "terrainSource": "SRTM (30m)"
     },
     "propagationEnv": "NLCD Point",
-    "ulsDatabase": "CONUS_ULS_LATEST.sqlite3",
+    "ulsDatabase": "FS_LATEST.sqlite3",
     "regionStr": "GB",
     "APUncertainty": {
         "points_per_degree": 3600,

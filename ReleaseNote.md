@@ -823,7 +823,7 @@ from shared BOX account: https://broadcom.ent.box.com/folder/151997790033?v=OPEN
  * OA-631: fixed the bug at the interface.
 
 ## **Testing Done**
- * When doing 'reset to default' of AFC Config, confirmed that this parameter is set properly: "nlcdFile":"rat_transfer/nlcd/nlcd_wfa"
+ * When doing 'reset to default' of AFC Config, confirmed that this parameter is set properly: "nlcdFile":"rat_transfer/nlcd/nlcd_production"
 
 ## **Open Issues** 
 * None
