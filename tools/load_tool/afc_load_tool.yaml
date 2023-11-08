@@ -34,7 +34,7 @@ defaults:
 # deviceDescriptor/certificationId/0/rulesetId of request pattern
 region:
     # Grid (number of points in one direction) of generated coordinates
-    grid_size: 100000
+    grid_size: 10000
 
     # Minimum latitude in north-positive degrees
     min_lat: 33
@@ -417,6 +417,22 @@ rest_api:
     # Add records to Rcache
     update_rcache:
         url: http://rcache:8000/update
+
+    # Protect Rcache
+    protect_rcache:
+        url: http://rcache:8000/invalidation_state/false
+
+    # Unprotect Rcache
+    unprotect_rcache:
+        url: http://rcache:8000/invalidation_state/true
+
+    # Invalidate Rcache
+    invalidate_rcache:
+        url: http://rcache:8000/invalidate
+
+    # Rcache status
+    rcache_status:
+        url: http://rcache:8000/status
 
     # Make AFC Request
     afc_req:

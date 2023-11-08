@@ -12,6 +12,7 @@
 # pylint: disable=too-few-public-methods, logging-fstring-interpolation
 # pylint: disable=too-many-instance-attributes, broad-exception-caught
 # pylint: disable=too-many-branches, too-many-nested-blocks
+# pylint: disable=too-many-statements
 
 import argparse
 from collections.abc import Iterable, Iterator
@@ -34,7 +35,7 @@ import subprocess
 import sys
 import time
 import traceback
-from typing import Any, List, Dict, NamedTuple, Optional, Tuple, Union
+from typing import Any, cast, List, Dict, NamedTuple, Optional, Tuple, Union
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -277,8 +278,19 @@ class Config(Iterable):
                 if isinstance(attr, str) else f"{self._path}[{attr}]")
 
 
+def run_docker(args: List[str]) -> str:
+    """ Runs docker with given parameters, returns stdout content """
+    try:
+        return subprocess.check_output(["docker"] + args, text=True)
+    except subprocess.CalledProcessError as ex:
+        error(f"Failed to run 'docker {' '.join(args)}': {repr(ex)}. Please "
+              "specify all hosts explicitly")
+    return ""  # Unreachable code to make pylint happy
+
+
 def get_url(base_url: str, param_host: Optional[str],
-            param_comp_prj: Optional[str], purpose: str) -> str:
+            param_comp_prj: Optional[str], purpose: str,
+            service_cache: Optional[Dict[str, str]] = None) -> str:
     """ Construct URL from base URL in config and command line host or compose
     project name
 
@@ -286,6 +298,8 @@ def get_url(base_url: str, param_host: Optional[str],
     base_url       -- Base URL from config
     param_host     -- Optional host name from command line parameter
     param_comp_prj -- Optional name of running compose
+    service_cache  -- Optional dictionary for storing results of service IP
+                      lookups
     Returns actionable URL with host either specified or retrieved from compose
     container inspection and tail from base URL
     """
@@ -301,64 +315,58 @@ def get_url(base_url: str, param_host: Optional[str],
     if param_comp_prj is None:
         return base_url
 
-    name_offset: Optional[int] = None
-    container: Optional[str] = None
     service = base_parts.netloc.split(":")[0]
-    try:
-        docker_ps = \
-            subprocess.check_output(["docker", "ps"], encoding="latin1",
-                                    errors="ignore")
-    except subprocess.CalledProcessError as ex:
-        error(f"Failed to run `docker ps`: {repr(ex)}. Please specify all "
-              f"hosts explicitly")
-    for line in docker_ps.splitlines():
-        if name_offset is None:
-            name_offset = line.find("NAMES")
-            error_if(name_offset < 0,
-                     "Unsupported structure of 'docker ps' output. Please "
-                     "specify all hosts explicitly")
-            continue
-        assert name_offset is not None
-        for names in re.split(r",\s*", line[name_offset:]):
-            m = re.search(r"(%s_(.+)_\d+)" % re.escape(param_comp_prj),
-                         names)
-            if m and (m.group(2) == service):
-                container = m.group(1)
+    service_ip = (service_cache or {}).get(service)
+    if service_ip is None:
+        name_offset: Optional[int] = None
+        container: Optional[str] = None
+        for line in run_docker(["ps"]).splitlines():
+            if name_offset is None:
+                name_offset = line.find("NAMES")
+                error_if(name_offset < 0,
+                         "Unsupported structure of 'docker ps' output. Please "
+                         "specify all hosts explicitly")
+                continue
+            assert name_offset is not None
+            for names in re.split(r",\s*", line[name_offset:]):
+                m = re.search(r"(%s_(.+)_\d+)" % re.escape(param_comp_prj),
+                              names)
+                if m and (m.group(2) == service):
+                    container = m.group(1)
+                    break
+            if container:
                 break
-        if container:
-            break
-    else:
-        error(f"Service name '{param_comp_prj}_{service}_*' not found. Please "
-              f"specify host/URL for {purpose} explicitly")
-    assert container is not None
-    try:
-        inspect_str = \
-            subprocess.check_output(["docker", "inspect", container],
-                                    encoding="utf-8", errors="ignore")
-    except subprocess.CalledProcessError as ex:
-        error(f"Failed to run 'docker inspect {container}': {repr(ex)}. "
-              f"Please specify host/URL for {purpose} explicitly")
-    try:
-        inspect_dict = json.loads(inspect_str)
-    except json.JSONDecodeError as ex:
-        error(f"Error parsing 'docker inspect {container}' output: "
-              f"{repr(ex)}. Please specify host/URL for {purpose} explicitly")
-    try:
-        for net_name, net_info in \
-                inspect_dict[0]["NetworkSettings"]["Networks"].items():
-            if net_name.endswith("_default"):
-                return \
-                    urllib.parse.urlunparse(
-                        base_parts._replace(
-                            netloc=net_info["IPAddress"] +
-                            base_parts.netloc[len(service):]))
-        error(f"Default network not found in {container}. Please specify "
-              f"host/URL for {purpose} explicitly")
-    except (AttributeError, LookupError) as ex:
-        error(f"Unsupported structure of  'docker inspect {container}' "
-              f"output: {repr(ex)}. Please specify host/URL for {purpose} "
-              f"explicitly")
-    return ""  # Unreachable code. Appeasing pylint
+        else:
+            error(f"Service name '{param_comp_prj}_{service}_*' not found. "
+                  f"Please specify host/URL for {purpose} explicitly")
+        assert container is not None
+
+        try:
+            inspect_dict = json.loads(run_docker(["inspect", container]))
+        except json.JSONDecodeError as ex:
+            error(f"Error parsing 'docker inspect {container}' output: "
+                  f"{repr(ex)}. Please specify host/URL for {purpose} "
+                  f"explicitly")
+        try:
+            for net_name, net_info in \
+                    inspect_dict[0]["NetworkSettings"]["Networks"].items():
+                if net_name.endswith("_default"):
+                    service_ip = net_info["IPAddress"]
+                    break
+            else:
+                error(f"Default network not found in {container}. Please "
+                      f"specify host/URL for {purpose} explicitly")
+        except (AttributeError, LookupError) as ex:
+            error(f"Unsupported structure of  'docker inspect {container}' "
+                  f"output: {repr(ex)}. Please specify host/URL for {purpose} "
+                  f"explicitly")
+    assert service_ip is not None
+    if service_cache is not None:
+        service_cache[service] = service_ip
+    return \
+        urllib.parse.urlunparse(
+            base_parts._replace(
+                netloc=service_ip + base_parts.netloc[len(service):]))
 
 
 def path_get(obj: Any, path: List[Union[str, int]]) -> Any:
@@ -655,7 +663,7 @@ WorkerReqInfo = \
 WorkerResultInfo = \
     NamedTuple("WorkerResultInfo",
                [
-                # Reques indices
+                # Request indices
                 ("req_indices", List[int]),
                 # Retries made (0 - from first attempt)
                 ("retries", int),
@@ -663,6 +671,32 @@ WorkerResultInfo = \
                 ("result_data", Optional[bytes]),
                 # Error message for failed requests, None for succeeded
                 ("error_msg", Optional[str])])
+
+
+class StatusPrinter:
+    """ Prints status on a single line:
+
+    Private attributes:
+    _prev_len -- Length of previously printed line
+    """
+    def __init__(self) -> None:
+        """ Constructor
+
+        Arguments:
+        enabled -- True if status print is enabled
+        """
+        self._prev_len = 0
+
+    def pr(self, s: Optional[str] = None) -> None:
+        """ Print string (if given) or cleans up after previous print """
+        if s is None:
+            if self._prev_len:
+                print(" " * self._prev_len, flush=True)
+                self._prev_len = 0
+        else:
+            print(s + " " * (max(0, self._prev_len - len(s))), end="\r",
+                  flush=True)
+            self._prev_len = len(s)
 
 
 class ResultsProcessor:
@@ -678,8 +712,7 @@ class ResultsProcessor:
                           print status (except in the end)
     _rest_data_handler -- Generator/interpreter of REST request/response data
     _num_workers       -- Number of worker processes
-    _prev_printed_len  -- Length of previously printed message for single-line
-                          printing
+    _status_printer    -- StatusPrinter
     """
     def __init__(
             self, total_requests: int,
@@ -705,7 +738,7 @@ class ResultsProcessor:
         self._status_period = status_period
         self._num_workers = num_workers
         self._rest_data_handler = rest_data_handler
-        self._prev_printed_len = 0
+        self._status_printer = StatusPrinter()
 
     def process(self) -> None:
         """ Keep processing results until all worker will stop """
@@ -714,11 +747,13 @@ class ResultsProcessor:
         requests_failed = 0
         retries = 0
 
-        def status_message() -> str:
-            elapsed = datetime.datetime.now() - start_time
+        def status_message(eta: bool) -> str:
+            """ Returns status message (with or without ETA) """
+            now = datetime.datetime.now()
+            elapsed = now - start_time
             elapsed_sec = elapsed.total_seconds()
             elapsed_str = re.sub(r"\.\d*$", "", str(elapsed))
-            return \
+            ret = \
                 f"{requests_sent} requests sent " \
                 f"({requests_sent * 100 / self._total_requests:.1f}%), " \
                 f"{requests_failed} failed " \
@@ -726,6 +761,15 @@ class ResultsProcessor:
                 f"{retries} retries made. " \
                 f"{elapsed_str} elapsed, rate is " \
                 f"{requests_sent / (elapsed_sec or 1E-3):.1f} req/sec"
+            if eta and elapsed_sec and requests_sent:
+                total_duration = \
+                    datetime.timedelta(
+                        seconds=self._total_requests * elapsed_sec /
+                        requests_sent)
+                eta_dt = start_time + total_duration
+                ret += f". ETA: {eta_dt.strftime('%X')} " \
+                    f"(in {int((eta_dt - now).total_seconds()) // 60} minutes)"
+            return ret
 
         while True:
             result_info = self._result_queue.get()
@@ -745,15 +789,15 @@ class ResultsProcessor:
                     error_msg = f"Error decoding message " \
                         f"{result_info.result_data!r}: {repr(ex)}"
             if error_msg:
-                self._print(
+                self._status_printer.pr()
+                logging.error(
                     f"Request with indices "
                     f"({', '.join(str(i) for i in result_info.req_indices)}) "
-                    f"failed: {error_msg}",
-                    newline=True, is_error=True)
+                    f"failed: {error_msg}")
 
             for idx, error_msg in error_map.items():
-                self._print(f"Request {idx} failed: {error_msg}",
-                            newline=True, is_error=True)
+                self._status_printer.pr()
+                logging.error(f"Request {idx} failed: {error_msg}")
 
             prev_sent = requests_sent
             requests_sent += len(result_info.req_indices)
@@ -766,8 +810,9 @@ class ResultsProcessor:
             if self._status_period and \
                     ((prev_sent // self._status_period) !=
                      (requests_sent // self._status_period)):
-                self._print(status_message(), newline=False, is_error=False)
-        self._print(status_message(), newline=True, is_error=False)
+                self._status_printer.pr(status_message(eta=True))
+        self._status_printer.pr()
+        logging.info(status_message(eta=False))
 
     def _print(self, s: str, newline: bool, is_error: bool) -> None:
         """ Print message
@@ -777,21 +822,17 @@ class ResultsProcessor:
         newline -- True to go to new line, False to remain on same line
         """
         if newline:
-            if self._prev_printed_len:
-                print(" " * self._prev_printed_len, end="\r")
-                self._prev_printed_len = 0
+            self._status_printer.pr()
             (logging.error if is_error else logging.info)(s)
         else:
-            print(s + " " * (max(0, self._prev_printed_len - len(s))),
-                  end="\r", flush=True)
-            self._prev_printed_len = len(s)
+            self._status_printer.pr(s)
 
 
 def rest_api_worker(
         url: str, retries: int, backoff: float, dry: bool,
         req_queue: "multiprocessing.Queue[Optional[WorkerReqInfo]]",
         result_queue: "multiprocessing.Queue[Optional[WorkerResultInfo]]",
-        dry_result_data: Optional[bytes]) -> None:
+        dry_result_data: Optional[bytes], use_requests: bool) -> None:
     """ REST API process worker function
 
     Arguments:
@@ -804,8 +845,11 @@ def rest_api_worker(
                     operation
     result_queue -- Result queue. Elements are WorkerResultInfo for
                     operation results, None to signal that worker finished
+    use_requests -- True to use requests, False to use urllib.request
     """
     try:
+        session: Optional[requests.Session] = \
+            requests.Session() if use_requests and (not dry) else None
         while True:
             req_info = req_queue.get()
             if req_info is None:
@@ -818,26 +862,48 @@ def rest_api_worker(
                 attempts = 1
             else:
                 result_data = None
-                req = urllib.request.Request(url)
-                req.add_header("Content-Type",
-                               "application/json; charset=utf-8")
-                req.add_header('Content-Length', str(len(req_info.req_data)))
-
-                attempts = 0
-                while True:
-                    attempts += 1
-                    try:
-                        with urllib.request.urlopen(req,
-                                                    req_info.req_data) as f:
-                            result_data = f.read()
-                        break
-                    except (urllib.error.HTTPError, urllib.error.URLError,
-                            urllib.error.ContentTooShortError) as ex:
-                        if attempts > retries:
-                            error_msg = repr(ex)
+                last_error: Optional[str] = None
+                for attempt in range(retries + 1):
+                    if use_requests:
+                        assert session is not None
+                        try:
+                            resp = \
+                                session.post(
+                                    url=url, data=req_info.req_data,
+                                    headers={"Content-Type":
+                                             "application/json; charset=utf-8",
+                                             "Content-Length":
+                                             str(len(req_info.req_data))},
+                                    timeout=30)
+                            if not resp.ok:
+                                last_error = \
+                                    f"{resp.status_code}: {resp.reason}"
+                                continue
+                            result_data = resp.content
                             break
+                        except requests.RequestException as ex:
+                            last_error = repr(ex)
+                    else:
+                        req = urllib.request.Request(url)
+                        req.add_header("Content-Type",
+                                       "application/json; charset=utf-8")
+                        req.add_header("Content-Length",
+                                       str(len(req_info.req_data)))
+
+                        try:
+                            with urllib.request.urlopen(req,
+                                                        req_info.req_data,
+                                                        timeout=30) as f:
+                                result_data = f.read()
+                            break
+                        except (urllib.error.HTTPError, urllib.error.URLError,
+                                urllib.error.ContentTooShortError) as ex:
+                            last_error = repr(ex)
                     time.sleep(
-                        random.uniform(0, (1 << (attempts - 1)) * backoff))
+                        random.uniform(0, (1 << attempt)) * backoff)
+                else:
+                    error_msg = last_error
+                attempts = attempt + 1
             result_queue.put(
                 WorkerResultInfo(
                     req_indices=req_info.req_indices, retries=attempts - 1,
@@ -907,7 +973,8 @@ def producer_worker(
 
 def run(rest_data_handler: RestDataHandlerBase, url: str, parallel: int,
         backoff: int, retries: int, dry: bool, batch: int, min_idx: int,
-        max_idx: int, status_period: int, count: Optional[int] = None) -> None:
+        max_idx: int, status_period: int, count: Optional[int] = None,
+        use_requests: bool = False) -> None:
     """ Run the operation
 
     Arguments:
@@ -925,28 +992,34 @@ def run(rest_data_handler: RestDataHandlerBase, url: str, parallel: int,
     count             -- Optional count of requests to send. None means that
                          requests will be sent sequentially according to range.
                          If specified - request indices will be randomized
+    use_requests      -- Use requests to send requests (default is to use
+                         urllib.request)
     """
+    error_if(use_requests and ("requests" not in sys.modules),
+             "'requests' Python3 module have to be installed to use "
+             "'--no_reconnect' option")
     logging.info(f"URL: {'N/A' if dry else url}")
-    logging.info(f"Streame: {parallel}")
+    logging.info(f"Streams: {parallel}")
     logging.info(f"Backoff: {backoff} sec, {retries} retries")
     logging.info(f"Index range: {min_idx:_} - {max_idx:_}")
     logging.info(f"Batch size: {batch}")
     logging.info(f"Requests to send: "
                  f"{(max_idx - min_idx) if count is None else count:_}")
+    logging.info(f"Nonreconnect mode: {use_requests}")
     if status_period:
         logging.info(f"Intermediate status is printed every "
                      f"{status_period} requests sent")
     else:
-        logging.info(f"Intermediate status is not printed")
+        logging.info("Intermediate status is not printed")
     req_queue: "multiprocessing.Queue[Optional[WorkerReqInfo]]" = \
         multiprocessing.Queue()
     result_queue: "multiprocessing.Queue[Optional[WorkerResultInfo]]" = \
         multiprocessing.Queue()
     results_processor = \
         ResultsProcessor(
-            total_requests=max_idx-min_idx, result_queue=result_queue,
-            num_workers=parallel, status_period=status_period,
-            rest_data_handler=rest_data_handler)
+            total_requests=count if count is not None else (max_idx-min_idx),
+            result_queue=result_queue, num_workers=parallel,
+            status_period=status_period, rest_data_handler=rest_data_handler)
     workers: List[multiprocessing.Process] = []
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
     try:
@@ -958,7 +1031,8 @@ def run(rest_data_handler: RestDataHandlerBase, url: str, parallel: int,
                             "dry": dry, "req_queue": req_queue,
                             "result_queue": result_queue,
                             "dry_result_data":
-                            rest_data_handler.dry_result_data(batch)}))
+                            rest_data_handler.dry_result_data(batch),
+                            "use_requests": use_requests}))
             workers[-1].start()
         workers.append(
             multiprocessing.Process(
@@ -989,22 +1063,41 @@ def do_preload(cfg: Config, args: Any) -> None:
         afc_config = {}
         update_rcache_url = ""
     else:
+        service_cache: Dict[str, str] = {}
+        if args.protect_cache:
+            try:
+                with urllib.request.urlopen(
+                        urllib.request.Request(
+                            get_url(base_url=cfg.rest_api.protect_rcache.url,
+                                    param_host=args.rcache,
+                                    param_comp_prj=args.comp_proj,
+                                    purpose="Rcache invalidate",
+                                    service_cache=service_cache),
+                            method="POST"),
+                        timeout=30):
+                    pass
+            except (urllib.error.HTTPError, urllib.error.URLError) as ex:
+                error(f"Error attempting to protect Rcache from invalidation "
+                      f"using protect_rcache.url: {repr(ex)}")
+
         get_config_url = \
             get_url(base_url=cfg.rest_api.get_config.url,
                     param_host=args.rat_server,
                     param_comp_prj=args.comp_proj,
-                    purpose="AFC Config retrieval")
+                    purpose="AFC Config retrieval",
+                    service_cache=service_cache)
         update_rcache_url = \
             get_url(base_url=cfg.rest_api.update_rcache.url,
                     param_host=args.rcache,
-                    param_comp_prj=args.comp_proj, purpose="Rcache preload")
+                    param_comp_prj=args.comp_proj, purpose="Rcache preload",
+                    service_cache=service_cache)
         try:
             get_config_url += cfg.region.rulesest_id
-            with urllib.request.urlopen(get_config_url) as f:
+            with urllib.request.urlopen(get_config_url, timeout=30) as f:
                 afc_config_str = f.read().decode('utf-8')
         except (urllib.error.HTTPError, urllib.error.URLError) as ex:
             error(f"Error retrieving AFC Config for Ruleset ID "
-                  f"'{cfg.region.rulesest_id}' using URL get_config_url : "
+                  f"'{cfg.region.rulesest_id}' using URL get_config.url : "
                   f"{repr(ex)}")
         try:
             afc_config = json.loads(afc_config_str)
@@ -1017,7 +1110,56 @@ def do_preload(cfg: Config, args: Any) -> None:
                                                  afc_config=afc_config),
         url=update_rcache_url, parallel=args.parallel, backoff=args.backoff,
         retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
-        max_idx=max_idx, status_period=args.status_period)
+        max_idx=max_idx, status_period=args.status_period,
+        use_requests=args.no_reconnect)
+
+    logging.info("Waiting for updates to flush to DB")
+    start_time = datetime.datetime.now()
+    start_queue_len: Optional[int] = None
+    prev_queue_len: Optional[int] = None
+    status_printer = StatusPrinter()
+    rcache_status_url = \
+        get_url(base_url=cfg.rest_api.rcache_status.url,
+                param_host=args.rcache, param_comp_prj=args.comp_proj,
+                purpose="Rcache status retrieval", service_cache=service_cache)
+    while True:
+        try:
+            with urllib.request.urlopen(rcache_status_url, timeout=30) as f:
+                rcache_status = json.loads(f.read())
+        except (urllib.error.HTTPError, urllib.error.URLError) as ex:
+            error(f"Error retrieving Rcache status "
+                  f"'{cfg.region.rulesest_id}' using URL get_config.url : "
+                  f"{repr(ex)}")
+        queue_len: int = rcache_status["update_queue_len"]
+        if not rcache_status["update_queue_len"]:
+            status_printer.pr()
+            break
+        if start_queue_len is None:
+            start_queue_len = prev_queue_len = queue_len
+        elif (args.status_period is not None) and \
+                ((cast(int, prev_queue_len) - queue_len) >=
+                 args.status_period):
+            now = datetime.datetime.now()
+            elapsed_sec = (now - start_time).total_seconds()
+            written = start_queue_len - queue_len
+            total_duration = \
+                datetime.timedelta(
+                    seconds=start_queue_len * elapsed_sec / written)
+            eta_dt = start_time + total_duration
+            status_printer.pr(
+                f"{queue_len} records not yet written. "
+                f"Write rate {written / elapsed_sec:.2f} rec/sec. "
+                f"ETA {eta_dt.strftime('%X')} (in "
+                f"{int((eta_dt - now).total_seconds()) // 60} minutes)")
+        time.sleep(1)
+    status_printer.pr()
+    now = datetime.datetime.now()
+    elapsed_sec = (now - start_time).total_seconds()
+    elapsed_str = re.sub(r"\.\d*$", "", str((now - start_time)))
+    msg = f"Flushing took {elapsed_str}"
+    if start_queue_len is not None:
+        msg += f". Flush rate {start_queue_len / elapsed_sec: .2f} rec/sec"
+    logging.info(msg)
 
 
 def do_load(cfg: Config, args: Any) -> None:
@@ -1027,17 +1169,76 @@ def do_load(cfg: Config, args: Any) -> None:
     cfg  -- Config object
     args -- Parsed command line arguments
     """
-    afc_url = \
-        "" if args.dry \
-        else get_url(base_url=cfg.rest_api.afc_req.url, param_host=args.afc,
-                     param_comp_prj=args.comp_proj, purpose="AFC Server")
+    if args.dry:
+        afc_url = ""
+    elif args.localhost:
+        error_if(not args.comp_proj, "--comp_proj parameter must be specified")
+        m = re.search(r"0\.0\.0\.0:(\d+)->%d/tcp.*%s_dispatcher_\d+" %
+                      (80 if args.localhost == "http" else 443,
+                       re.escape(args.comp_proj)),
+                      run_docker(["ps"]))
+        error_if(
+            not m,
+            "AFC port not found. Please specify AFC server address explicitly")
+        assert m is not None
+        afc_url = \
+            get_url(base_url=cfg.rest_api.afc_req.url,
+                    param_host=f"localhost:{m.group(1)}",
+                    param_comp_prj=args.comp_proj, purpose="AFC Server")
+    else:
+        afc_url = \
+            get_url(base_url=cfg.rest_api.afc_req.url, param_host=args.afc,
+                    param_comp_prj=args.comp_proj, purpose="AFC Server")
+    if args.no_cache:
+        parsed_afc_url = urllib.parse.urlparse(afc_url)
+        afc_url = \
+            parsed_afc_url._replace(
+                query="&".join(
+                    p for p in [parsed_afc_url.query, "nocache=True"] if p)).\
+            geturl()
 
     min_idx, max_idx = get_idx_range(args.idx_range)
 
     run(rest_data_handler=LoadRestDataHandler(cfg=cfg), url=afc_url,
         parallel=args.parallel, backoff=args.backoff, retries=args.retries,
         dry=args.dry, batch=args.batch, min_idx=min_idx, max_idx=max_idx,
-        status_period=args.status_period, count=args.count)
+        status_period=args.status_period, count=args.count,
+        use_requests=args.no_reconnect)
+
+
+def do_cache(cfg: Config, args: Any) -> None:
+    """ Execute "cache" command.
+
+    Arguments:
+    cfg  -- Config object
+    args -- Parsed command line arguments
+    """
+    error_if(args.protect and args.unprotect,
+             "--protect and --unprotect are mutually exclusive")
+    error_if(not(args.protect or args.unprotect or args.invalidate),
+             "Nothing to do")
+    service_cache: Dict[str, str] = {}
+    json_data: Any
+    for arg, attr, json_data, purpose in \
+            [("protect", "protect_rcache", None, "Rcache protect"),
+             ("invalidate", "invalidate_rcache", {}, "Rcache invalidate"),
+             ("unprotect", "unprotect_rcache", None, "Rcache unprotect")]:
+        try:
+            if not getattr(args, arg):
+                continue
+            data: Optional[bytes] = None
+            url = get_url(base_url=getattr(cfg.rest_api, attr).url,
+                          param_host=args.rcache,
+                          param_comp_prj=args.comp_proj,
+                          purpose=purpose, service_cache=service_cache)
+            req = urllib.request.Request(url, method="POST")
+            if json_data is not None:
+                data = json.dumps(json_data).encode(encoding="ascii")
+                req.add_header("Content-Type", "application/json")
+            urllib.request.urlopen(req, data, timeout=30)
+        except (urllib.error.HTTPError, urllib.error.URLError) as ex:
+            error(f"Error attempting to perform {purpose} using "
+                  f"rest_api.{attr}.url: {repr(ex)}")
 
 
 def do_help(cfg: Config, args: Any) -> None:
@@ -1088,11 +1289,6 @@ def main(argv: List[str]) -> None:
         help=f"Maximum number of retries before giving up. Default is "
         f"{cfg.defaults.retries}")
     switches_common.add_argument(
-        "--comp_proj", metavar="PROJ_NAME",
-        help="Docker compose project name. Used to determine hosts to send "
-        "API calls to. If not specified hostnames should be specified "
-        "explicitly")
-    switches_common.add_argument(
         "--dry", action="store_true",
         help="Dry run to estimate overhead")
     switches_common.add_argument(
@@ -1100,6 +1296,22 @@ def main(argv: List[str]) -> None:
         default=cfg.defaults.status_period,
         help=f"How often to print status information. Default is once in "
         f"{cfg.defaults.status_period} requests. 0 means no status print")
+    switches_common.add_argument(
+        "--no_reconnect", action="store_true",
+        help="Do not reconnect on each request (requires 'requests' Python3 "
+        "library to be installed: 'pip install requests'")
+
+    switches_compose = argparse.ArgumentParser(add_help=False)
+    switches_compose.add_argument(
+        "--comp_proj", metavar="PROJ_NAME",
+        help="Docker compose project name. Used to determine hosts to send "
+        "API calls to. If not specified hostnames should be specified "
+        "explicitly")
+
+    switches_rcache = argparse.ArgumentParser(add_help=False)
+    switches_rcache.add_argument(
+        "--rcache", metavar="[PROTOCOL://]HOST[:port]",
+        help="Rcache server. May also be determined by means of '--comp_proj'")
 
     # Top level parser
     argument_parser = argparse.ArgumentParser(
@@ -1115,7 +1327,8 @@ def main(argv: List[str]) -> None:
                                                 metavar="SUBCOMMAND")
 
     parser_preload = subparsers.add_parser(
-        "preload", parents=[switches_common],
+        "preload",
+        parents=[switches_common, switches_compose, switches_rcache],
         help="Fill rcache with (fake) responses")
     parser_preload.add_argument(
         "--rat_server", metavar="[PROTOCOL://]HOST[:port][path][params]",
@@ -1123,14 +1336,14 @@ def main(argv: List[str]) -> None:
         "from 'rest_api.get_config' of config file. By default determined by "
         "means of '--comp_proj'")
     parser_preload.add_argument(
-        "--rcache", metavar="[PROTOCOL://]HOST[:port][path][params]",
-        help="Rcache server to prefill. Unspecified parts are taken from "
-        "'rest_api.update_rcache' of config file. By default determined by "
-        "means of '--comp_proj'")
+        "--protect_cache", action="store_true",
+        help="Protect Rcache from invalidation (e.g. by ULS downloader). "
+        "Protection persists in rcache database, see 'rcache' subcommand on "
+        "how to unprotect")
     parser_preload.set_defaults(func=do_preload)
 
     parser_load = subparsers.add_parser(
-        "load", parents=[switches_common],
+        "load", parents=[switches_common, switches_compose],
         help="Do load test")
     parser_load.add_argument(
         "--afc", metavar="[PROTOCOL://]HOST[:port][path][params]",
@@ -1138,9 +1351,34 @@ def main(argv: List[str]) -> None:
         "from 'rest_api.afc_req' of config file. By default determined by "
         "means of '--comp_proj'")
     parser_load.add_argument(
+        "--localhost", nargs="?", choices=["http", "https"], const="http",
+        help="If --afc not specified, default is to send requests to msghnd "
+        "container (bypassing nginx container). This flag causes requests to "
+        "be sent to external http/https AFC port on localhost. If protocol "
+        "not specified http is assumed")
+    parser_load.add_argument(
         "--count", metavar="NUM_REQS", type=int, default=cfg.defaults.count,
         help=f"Number of requests to send. Default is {cfg.defaults.count}")
+    parser_load.add_argument(
+        "--no_cache", action="store_true",
+        help="Don't use rcache, force each request to be computed")
     parser_load.set_defaults(func=do_load)
+
+    parser_cache = subparsers.add_parser(
+        "cache", parents=[switches_compose, switches_rcache],
+        help="Do something with response cache")
+    parser_cache.add_argument(
+        "--protect", action="store_true",
+        help="Protect rcache from invalidation (e.g. by background ULS "
+        "downloader). This action persists in rcache database, it need to be "
+        "explicitly undone with --unprotect")
+    parser_cache.add_argument(
+        "--unprotect", action="store_true",
+        help="Allows rcache invalidation")
+    parser_cache.add_argument(
+        "--invalidate", action="store_true",
+        help="Invalidate cache (invalidation must be enabled)")
+    parser_cache.set_defaults(func=do_cache)
 
     # Subparser for 'help' command
     parser_help = subparsers.add_parser(

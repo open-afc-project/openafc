@@ -202,7 +202,8 @@ class RcacheRmq:
                     pika_exception = ex
                     break
                 finally:
-                    if timer_id is not None:
+                    if (timer_id is not None) and \
+                            (self._connection is not None):
                         try:
                             self._connection.connection.remove_timeout(
                                 timer_id)

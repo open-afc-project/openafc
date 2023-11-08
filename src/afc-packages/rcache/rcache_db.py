@@ -33,10 +33,10 @@ class RcacheDb:
                       object is used for Alembic
     db_name        -- Database name. None before connect()
     ap_table       -- Table object for AP table. None before connect()
+    ap_pk_columns  -- Tuple of primary key's names. None when 'table' is None
 
     Private attributes:
     _engine        -- SqlAlchemy Engine object. None before connect()
-    _ap_pk_columns -- Tuple of primary key's names. None when 'table' is None
     """
 
     class _RootDb:
@@ -142,7 +142,7 @@ class RcacheDb:
             if self.rcache_db_dsn else None
         self._engine: Any = None
         self.ap_table: Optional[sa.Table] = None
-        self._ap_pk_columns: Optional[Tuple[str, ...]] = None
+        self.ap_pk_columns: Optional[Tuple[str, ...]] = None
 
     def max_update_records(self) -> int:
         """ Maximum number of records in one update """
@@ -306,13 +306,13 @@ class RcacheDb:
 
     def get_ap_pk(self, row: Dict[str, Any]) -> Tuple:
         """ Return primary key tuple for given AP row dictionary """
-        assert self._ap_pk_columns is not None
-        return tuple(row[c] for c in self._ap_pk_columns)
+        assert self.ap_pk_columns is not None
+        return tuple(row[c] for c in self.ap_pk_columns)
 
     def _update_ap_table(self) -> None:
         """ Reads 'table' and index columns from current metadata """
         self.ap_table = self.metadata.tables[self.AP_TABLE_NAME]
-        self._ap_pk_columns = \
+        self.ap_pk_columns = \
             tuple(c.name for c in self.ap_table.c if c.primary_key)
 
     def _create_engine(self, dsn) -> Any:

@@ -43,6 +43,11 @@ DEGREES_PER_KM = 1 / (60 * 1.852)
 # Default length of averaging window
 AVERAGING_WINDOW_SIZE = 10
 
+# Maximum number of rows to invalidate at a time (None if all)
+# Currently used for complete/ruleset invalidation and not for spatial one (as
+# there is, probably, no need to)
+INVALIDATION_CHUNK_SIZE = 1000
+
 
 class Ema:
     """ Exponential moving average for some value or its rate
@@ -294,12 +299,16 @@ class RcacheService:
                 invalid_before = await self._report_invalidation()
                 if isinstance(req, RcacheInvalidateReq):
                     if req.ruleset_ids is None:
-                        await self._db.invalidate()
+                        while await self._db.invalidate(
+                                limit=INVALIDATION_CHUNK_SIZE):
+                            pass
                         await self._report_invalidation(
                             "Complete invalidation", invalid_before)
                     else:
                         for ruleset_id in req.ruleset_ids:
-                            await self._db.invalidate(ruleset_id)
+                            while await self._db.invalidate(
+                                    ruleset_id, limit=INVALIDATION_CHUNK_SIZE):
+                                pass
                             invalid_before = \
                                 await self._report_invalidation(
                                     f"AFC Config for ruleset '{ruleset_id}' "

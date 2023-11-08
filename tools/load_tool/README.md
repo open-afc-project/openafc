@@ -105,7 +105,8 @@ Parameters:
 |--status_period **N**|1000|Once in what number of requests to print intermediate statistics. 0 to not at all|
 |--dry||Don't actually send anything to servers. Useful to determine overhead of this script itself|
 |--comp_proj **PROJ**||Docker Compose project name (part before service name in container names) to use to determine IPs of services being used (*msghnd* for this subcommand)|
-|--afc **HOST[:PORT]**|msghnd:8000|IP Address (and port, if not 80) to send AFC Requests to|
+|--afc **HOST[:PORT]**|msghnd:8000|IP Address (and port, if not 80) to send AFC Requests to. If neither it not --localhost specified, requests will be sent to msghnd, determined by means of --comp_proj|
+|--localhost [http|https]||Send AFC requests to AFC http(default) or https port of AFC, running on localhost with project, specified by --comp_proj|
 
 
 ## Usage example <a name="examples"/>
@@ -144,11 +145,14 @@ Now, preloading rcache, using default parameters from config file:
 `$ afc_load_tool.py preload --comp_proj fs936724_l2`  
 In this command compose project name was used.
 
-Now, doing load test with default parameters from config file (USA, 20 streams, one request per message, status every 1000 requests, send one million requests, etc.):  
-`$ afc_load_tool.py load --afc localhost:374`  
-In this command external AFC port was used.  
-Alternative way of doing same thing - send requests to *msghnd* directly:  
-`$ afc_load_tool.py load --comp_proj fs936724_l2`  
+Now, doing load test with default parameters from config file (USA, 20 streams, one request per message, status every 1000 requests, send one million requests, etc.):
+  - Send AFC requests to HTTP port of AFC server on current host:  
+    `$ afc_load_tool.py load --comp_proj fs936724_l2 --localhost`
+  - Send AFC requests to *msghnd* service (bypassing *dispatcher* service):  
+    `$ afc_load_tool.py load --comp_proj fs936724_l2`
+  - Send AFC requests to explicitly specified server (still - local host in this case):  
+    `$ afc_load_tool.py load --afc localhost:374`  
+    In this case external AFC port (see `docker ps` output above) was used.
 
 Upon completion of testing it is recommended to re-enable cache invalidation:  
 `$ docker exec fs936724_l2_rcache_tool_1 /wd/rcache_tool.py invalidate --enable`  

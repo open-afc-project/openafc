@@ -84,33 +84,52 @@ class RcacheDbAsync(RcacheDb):
         try:
             ins = sa_pg.insert(self.ap_table).values(rows)
             ins = ins.on_conflict_do_update(
-                    index_elements=[c.name
-                                    for c in self.ap_table.c if c.primary_key],
-                    set_={c.name: ins.excluded[c.name]
-                          for c in self.ap_table.c if not c.primary_key})
+                    index_elements=self.ap_pk_columns,
+                    set_={col_name: ins.excluded[col_name]
+                          for col_name in self.ap_table.columns.keys()
+                          if col_name not in self.ap_pk_columns})
             async with self._engine.begin() as conn:
                 await conn.execute(ins)
         except sa.exc.SQLAlchemyError as ex:
             error(f"Cache database upsert failed: {ex}")
 
-    async def invalidate(self, ruleset: Optional[str] = None) -> None:
+    async def invalidate(self, ruleset: Optional[str] = None,
+                         limit: Optional[int] = None) -> int:
         """ Invalidate cache - completely or for given config
 
         Arguments:
         ruleset -- None for complete invalidation, ruleset ID for config-based
                    invalidation
+        limit   -- Optional maximum number of rows to invalidate (10000000
+                   rows invalidates for half an hour!)
+        Returns number of rows invalidated
         """
         assert self._engine
         try:
             upd = sa.update(self.ap_table).\
-                where(self.ap_table.c.state == ApDbRespState.Valid.name).\
                 values(state=ApDbRespState.Invalid.name)
             if ruleset:
                 upd = upd.where(self.ap_table.c.config_ruleset == ruleset)
+            if limit is None:
+                upd = \
+                    upd.where(
+                        self.ap_table.c.state == ApDbRespState.Valid.name)
+            else:
+                pk_columns = [self.ap_table.c[col_name]
+                              for col_name in self.ap_pk_columns]
+                upd = \
+                    upd.where(
+                        sa.tuple_(*pk_columns).in_(
+                            sa.select(pk_columns).
+                            where(self.ap_table.c.state ==
+                                  ApDbRespState.Valid.name).
+                            limit(limit)))
             async with self._engine.begin() as conn:
-                await conn.execute(upd)
+                rp = await conn.execute(upd)
+                return rp.rowcount
         except sa.exc.SQLAlchemyError as ex:
             error(f"Cache database invalidation failed: {ex}")
+        return 0  # Will never happen
 
     async def spatial_invalidate(self, rect: LatLonRect) -> None:
         """ Spatial invalidation

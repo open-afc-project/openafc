@@ -166,7 +166,6 @@ def safe_dsn(dsn: Optional[str]) -> Optional[str]:
     try:
         parsed = urllib.parse.urlparse(dsn)
         if not parsed.password:
-            dp("No password")
             return dsn
         return \
             urllib.parse.urlunparse(
