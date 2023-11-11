@@ -30,6 +30,7 @@ class Settings(pydantic.BaseSettings):
     status_dir: str = pydantic.Field(DEFAULT_STATUS_DIR, env="ULS_STATUS_DIR")
     smtp_info: Optional[str] = pydantic.Field(None, env="ULS_ALARM_SMTP_INFO")
     email_to: Optional[str] = pydantic.Field(None, env="ULS_ALARM_EMAIL_TO")
+    beacon_email_to: Optional[str] = pydantic.Field(None, env="ULS_BEACON_EMAIL_TO")
     email_sender_location: Optional[str] = \
         pydantic.Field(None, env="ULS_ALARM_SENDER_LOCATION")
     alarm_email_interval_hr: Optional[float] = \
@@ -105,7 +106,9 @@ def send_email_smtp(smtp_info_filename: Optional[str], to: Optional[str],
     msg = email.mime.text.MIMEText(body)
     msg["Subject"] = subject
     msg["From"] = login_kwargs["user"]
+    to_list = to.split(",")
     msg["To"] = to
+
     try:
         smtp = smtplib.SMTP_SSL(**smtp_kwargs) if credentials.get("USE_SSL") \
             else smtplib.SMTP(**smtp_kwargs)
@@ -113,7 +116,7 @@ def send_email_smtp(smtp_info_filename: Optional[str], to: Optional[str],
             smtp.starttls()  # No idea how it would work without key/cert
         else:
             smtp.login(**login_kwargs)
-        smtp.sendmail(msg["From"], [msg["To"]], msg.as_string())
+        smtp.sendmail(msg["From"], to_list, msg.as_string())
         smtp.quit()
     except smtplib.SMTPException as ex:
         error(f"Email send failure: {ex}")
@@ -149,6 +152,7 @@ def email_if_needed(status_storage: StatusStorage, settings: Any) -> None:
         return
     service_birth = status_storage.read_milestone(StatusStorage.S.ServiceBirth)
     problems: List[str] = []
+    email_to = settings.email_to
     if expired(
             event_td=status_storage.read_milestone(
                 StatusStorage.S.DownloadStart) or service_birth,
@@ -208,6 +212,8 @@ def email_if_needed(status_storage: StatusStorage, settings: Any) -> None:
              f"works fine\n\n")
         email_interval_hr = settings.beacon_email_interval_hr
         email_milestone = StatusStorage.S.BeaconSent
+        if settings.beacon_email_to:
+            email_to = settings.beacon_email_to
 
     if not expired(
             event_td=status_storage.read_milestone(email_milestone),
@@ -235,7 +241,7 @@ def email_if_needed(status_storage: StatusStorage, settings: Any) -> None:
             (f"ULS data for region '{reg}' last time updated in: "
              f"{'Unknown' if et is None else et.isoformat()}")
     send_email_smtp(smtp_info_filename=settings.smtp_info,
-                    to=settings.email_to, subject=message_subject,
+                    to=email_to, subject=message_subject,
                     body=message_body)
     status_storage.write_milestone(email_milestone)
 
@@ -264,6 +270,11 @@ def main(argv: List[str]) -> None:
         help=f"Email address to send alarms/beacons to. If parameter not "
         f"specified - no alarm/beacon emails will be sent"
         f"{env_help(Settings, 'email_to')}")
+    argument_parser.add_argument(
+        "--beacon_email_to", metavar="BEACON_EMAIL",
+        help=f"Email address to send beacon information  notification to. If parameter not "
+        f"specified - alarm email_to will used "
+        f"{env_help(Settings, 'beacon_email_to')}")
     argument_parser.add_argument(
         "--email_sender_location", metavar="TEXT",
         help=f"Information on whereabouts of service that sent alarm/beacon "

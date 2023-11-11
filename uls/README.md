@@ -115,6 +115,7 @@ Parameters are:
 |--update_max_age_health_hr **HR**|ULS_HEALTH_UPDATE_MAX_AGE_HR|40|Age of last FS data change in hours enough to pronounce container as unhealthy|
 |--smtp_info **FILEPATH**|ULS_ALARM_SMTP_INFO||Name of secret file with SMTP credentials for sending emails. If empty/unspecified no emails being sent|
 |--email_to **EMAIL**|ULS_ALARM_EMAIL_TO||Whom to send alarm email. If empty/unspecified no emails being sent|
+|--info_email_to **EMAIL**|ULS_BEACON_EMAIL_TO||Whom to send beacon information email. If empty/unspecified uses alarm email|
 |--email_sender_location **COMMENT**|ULS_ALARM_SENDER_LOCATION||Note on sending service location to use in email. Optional|
 |--alarm_email_interval_hr **HR**|ULS_ALARM_ALARM_INTERVAL_HR||Minimum interval in hours between alarm emails (emails on something that went wrong). If empty/unspecified no alarm emails being sent|
 |--download_attempt_max_age_alarm_hr **HR**|ULS_ALARM_ATTEMPT_MAX_AGE_HR||Minimum age in hours of last download attempt to send alarm email. If empty/unspecified - not checked|

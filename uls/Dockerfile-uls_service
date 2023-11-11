@@ -141,6 +141,9 @@ ENV ULS_NICE=YES
 
 # Email to send messages to. If not specified no emails will be sent
 # ENV ULS_ALARM_EMAIL_TO
+#
+# Email to send beacon information messages to. If not specified alarm email will be used
+# ENV ULS_BEACON_EMAIL_TO
 
 # Minimum interval (in hours) of alarm message (message on something that went
 # wrong) sending. If not specified no alarm emails will be sent
