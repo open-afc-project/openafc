@@ -116,11 +116,17 @@ export class AFCForm extends React.Component<
         if (!model.ulsDatabase) return err();
         if (!model.propagationEnv) return err();
 
-        if (!(model.minEIRP <= model.maxEIRP)) return err();
+        if (!(model.minEIRPIndoor <= model.maxEIRP) || !(model.minEIRPOutdoor <= model.maxEIRP) ) return err();
 
-        if (this.props.limit.enforce && model.minEIRP < this.props.limit.limit || model.maxEIRP < this.props.limit.limit) {
-            return err("EIRP value must be at least " + this.props.limit.limit + " dBm")
+        if (this.props.limit.indoorEnforce && model.minEIRPIndoor < this.props.limit.indoorLimit || model.maxEIRP < this.props.limit.indoorLimit) {
+            return err("Indoor EIRP value must be at least " + this.props.limit.indoorLimit + " dBm")
         }
+
+        if (this.props.limit.outdoorEnforce && model.minEIRPOutdoor < this.props.limit.outdoorLimit || model.maxEIRP < this.props.limit.outdoorLimit) {
+            return err("Outdoor EIRP value must be at least " + this.props.limit.outdoorLimit + " dBm")
+        }
+
+
 
         if (!(model.maxLinkDistance >= 1)) return err();
 

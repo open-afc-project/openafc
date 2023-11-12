@@ -96,8 +96,8 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "threshold": -6,
     "maxLinkDistance": 200,
     "maxEIRP": 36,
-    "minEIRP": 21,
-
+    "minEIRPIndoor": 21,
+    "minEIRPOutdoor": -100,
     "minPSD": -100,
     "propagationModel": {
         "kind": "FCC 6GHz Report & Order",
@@ -193,8 +193,8 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "threshold": -6,
     "maxLinkDistance": 150,
     "maxEIRP": 36,
-    "minEIRP": 21,
-
+    "minEIRPIndoor": 21,
+    "minEIRPOutdoor": -100,
     "minPSD": 8,
     "propagationModel": {
         "kind": "ISED DBS-06",
@@ -294,8 +294,8 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     "threshold": -6,
     "maxLinkDistance": 130,
     "maxEIRP": 36,
-    "minEIRP": 21,
-
+    "minEIRPIndoor": 21,
+    "minEIRPOutdoor": -100,
     "minPSD": 8,
     "propagationModel": {
         "kind": "Brazilian Propagation Model",
@@ -391,8 +391,8 @@ const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
     "threshold": -6,
     "maxLinkDistance": 130,
     "maxEIRP": 36,
-    "minEIRP": 21,
-
+    "minEIRPIndoor": 21,
+    "minEIRPOutdoor": -100,
     "minPSD": 8,
     "propagationModel": {
         "kind": "Ofcom Propagation Model",

@@ -53,7 +53,8 @@ export class AFCFormUSACanada extends React.Component<
 
     }
 
-    private setMinEIRP = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { minEIRP: n }));
+    private setMinEIRPIndoor = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { minEIRPIndoor: n }));
+    private setMinOutdoorEIRP = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { minEIRPOutdoor: n }));
     private setMaxEIRP = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { maxEIRP: n }));
     private setMinPSD = (n: number) => this.props.updateConfig(Object.assign(this.props.config, { minPSD: n }));
     private setFeederLoss = (f: FSReceiverFeederLoss) => this.props.updateConfig(Object.assign(this.props.config, { receiverFeederLoss: f }));
@@ -290,16 +291,31 @@ export class AFCFormUSACanada extends React.Component<
     render = () =>
         <>
             <GalleryItem>
-                <FormGroup label={this.props.limit.enforce ? "AP Min. EIRP (Min: " + this.props.limit.limit + " dBm)" : "AP Min. EIRP"} fieldId="horizontal-form-min-eirp">
+                <FormGroup label={this.props.limit.indoorEnforce ? "AP Min. Indoor EIRP (Min: " + this.props.limit.indoorLimit + " dBm)" : "AP Min. Indoor EIRP"} fieldId="horizontal-form-min-eirp">
                     <InputGroup>
                         <TextInput
-                            value={this.props.config.minEIRP}
-                            onChange={x => this.setMinEIRP(Number(x))}
+                            value={this.props.config.minEIRPIndoor}
+                            onChange={x => this.setMinEIRPIndoor(Number(x))}
                             type="number"
                             step="any"
                             id="horizontal-form-min-eirp"
                             name="horizontal-form-min-eirp"
-                            isValid={this.props.limit.enforce ? this.props.config.minEIRP <= this.props.config.maxEIRP && this.props.config.minEIRP >= this.props.limit.limit : this.props.config.minEIRP <= this.props.config.maxEIRP}
+                            isValid={this.props.limit.indoorEnforce ? this.props.config.minEIRPIndoor <= this.props.config.maxEIRP && this.props.config.minEIRPIndoor >= this.props.limit.indoorLimit : this.props.config.minEIRPIndoor <= this.props.config.maxEIRP}
+                            style={{ textAlign: "right" }}
+                        />
+                        <InputGroupText>dBm</InputGroupText>
+                    </InputGroup>
+                </FormGroup>
+                <FormGroup label={this.props.limit.outdoorEnforce ? "AP Min. Outdoor EIRP (Min: " + this.props.limit.outdoorLimit + " dBm)" : "AP Min. Outdoor EIRP"} fieldId="horizontal-form-min-eirp">
+                    <InputGroup>
+                        <TextInput
+                            value={this.props.config.minEIRPOutdoor}
+                            onChange={x => this.setMinOutdoorEIRP(Number(x))}
+                            type="number"
+                            step="any"
+                            id="horizontal-form-min-eirp"
+                            name="horizontal-form-min-eirp"
+                            isValid={this.props.limit.outdoorEnforce ? this.props.config.minEIRPOutdoor <= this.props.config.maxEIRP && this.props.config.minEIRPOutdoor >= this.props.limit.outdoorLimit : this.props.config.minEIRPOutdoor <= this.props.config.maxEIRP}
                             style={{ textAlign: "right" }}
                         />
                         <InputGroupText>dBm</InputGroupText>
@@ -316,7 +332,10 @@ export class AFCFormUSACanada extends React.Component<
                             step="any"
                             id="horizontal-form-max-eirp"
                             name="horizontal-form-max-eirp"
-                            isValid={this.props.limit.enforce ? this.props.config.minEIRP <= this.props.config.maxEIRP && this.props.config.maxEIRP >= this.props.limit.limit : this.props.config.minEIRP <= this.props.config.maxEIRP}
+                            isValid={(this.props.limit.indoorEnforce || this.props.limit.outdoorEnforce) ? 
+                                this.props.config.minEIRPIndoor <= this.props.config.maxEIRP && this.props.config.maxEIRP >= this.props.limit.indoorLimit 
+                                && this.props.config.minEIRPOutdoor <= this.props.config.maxEIRP && this.props.config.maxEIRP >= this.props.limit.outdoorLimit 
+                                 : this.props.config.minEIRPIndoor <= this.props.config.maxEIRP &&  this.props.config.minEIRPOutdoor <= this.props.config.maxEIRP }
                             style={{ textAlign: "right" }}
                         />
                         <InputGroupText>dBm</InputGroupText>

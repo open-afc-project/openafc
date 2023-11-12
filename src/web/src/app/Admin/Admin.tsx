@@ -1,5 +1,5 @@
 import * as React from "react";
-import { PageSection, Card, CardHead, CardBody, CardHeader, Modal, Button, FormGroup, FormSelect, FormSelectOption, Alert, AlertActionCloseButton, InputGroup } from "@patternfly/react-core";
+import { PageSection, Card, CardHead, CardBody, CardHeader, Modal, Button, FormGroup, FormSelect, FormSelectOption, Alert, AlertActionCloseButton, InputGroup, Gallery, GalleryItem } from "@patternfly/react-core";
 import { UserTable } from "./UserList";
 import { Role, UserState } from "../Lib/User";
 import { getUsers, addUserRole, deleteUser, removeUserRole, setMinimumEIRP, Limit } from "../Lib/Admin";
@@ -65,7 +65,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
       logger.error(props.users);
 
     const userList = props.users.kind === "Success" ? props.users.result : [];
-    const apiLimit = props.limit.kind === "Success" ? props.limit.result : new Limit(false, 18);
+    const apiLimit = props.limit.kind === "Success" ? props.limit.result : new Limit(false, false, 18, -102);
     const apiFreqBands = props.frequencyBands.kind === "Success" ? props.frequencyBands.result : [];
     const regionsList = props.regions.kind === "Success" ? props.regions.result : ["US"];
 
@@ -185,10 +185,27 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
   private handleRemoveRoleModalToggle = (id?: number) => this.setState(s => ({ userId: id, removeRoleModalOpen: !s.removeRoleModalOpen }));
   private handleDeleteModalToggle = (id?: number) => this.setState(s => ({ userId: id, deleteModalOpen: !s.deleteModalOpen }));
   private handleUserModalToggle = (id?: number) => this.setState(s => ({ userId: id, userModalOpen: !s.userModalOpen }));
-  private handleMinEIRP = (minEIRP: number) => this.setState({ limit: { ...this.state.limit, limit: minEIRP } });
-  private submitMinEIRP = (limit: number | boolean) => {
-    setMinimumEIRP(limit).then((res) => {
-      let successMessage = limit === false ? "Minimum EIRP removed." : "Minimum EIRP set to " + limit + " dBm.";
+  private updateEnforceLimit = (value: boolean, isIndoor: boolean) => {
+    let newState = { ...this.state.limit };
+    if (isIndoor) {
+      newState.indoorEnforce = value;
+    } else {
+      newState.outdoorEnforce = value;
+    }
+    this.setState({ limit: newState });
+  }
+  private updateEirpLimit = (value: number, isIndoor: boolean) => {
+    let newState = { ...this.state.limit };
+    if (isIndoor) {
+      newState.indoorLimit = value;
+    } else {
+      newState.outdoorLimit = value;
+    }
+    this.setState({ limit: newState });
+  }
+  private submitMinEIRP = () => {
+    setMinimumEIRP(this.state.limit).then((res) => {
+      let successMessage = "Updated minimum EIRP values";
       if (res.kind == "Success") {
         this.setState({ messageSuccess: successMessage, messageError: undefined });
       } else {
@@ -200,7 +217,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
   private removeFreqBand = (index: number) => {
     const { frequencyBands } = this.state;
     frequencyBands.splice(index, 1);
-    this.setState({ frequencyBands: frequencyBands, frequencyBandsNeedSaving: true  })
+    this.setState({ frequencyBands: frequencyBands, frequencyBandsNeedSaving: true })
   }
 
   private addNewBand = () => {
@@ -254,7 +271,7 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
     return (
       <Table aria-label="freq-table" actionResolver={(a, b) => this.actionResolver(a, b)}
         variant={TableVariant.compact} cells={cols as any}
-        rows={this.state.frequencyBands.map((fr, idx)=> freqBandToRow(fr,idx))}
+        rows={this.state.frequencyBands.map((fr, idx) => freqBandToRow(fr, idx))}
 
       >
         <TableHeader />
@@ -269,25 +286,45 @@ export class Admin extends React.Component<{ users: RatResponse<UserModel[]>, re
         <Card>
           <CardHead><CardHeader>Limits</CardHeader></CardHead>
           <CardBody>
-            {this.state.limit.enforce ?
-              <>
-                <input id="limitEnabled" type="checkbox" checked={this.state.limit.enforce} onChange={(e) => this.setState({ limit: { ...this.state.limit, enforce: e.target.checked } })} />
-                <label htmlFor="limitEnabled">Use Minimum EIRP value</label>
-                <br />
-                <label htmlFor="min_EIRP">Minimum EIRP value</label>
-                <br />
-                <input value={this.state.limit.limit} onChange={(event) => this.handleMinEIRP(Number(event.target.value))} id="min_EIRP" type="number" />dBm
-                <Button style={{ marginLeft: "10px" }} onClick={() => this.submitMinEIRP(this.state.limit.limit)}> Save</Button>
-              </> :
-
-              <>
-                <input id="limitEnabled" type="checkbox" checked={this.state.limit.enforce} onChange={(e) => this.setState({ limit: { ...this.state.limit, enforce: e.target.checked } })} />
-                <label htmlFor="limitEnabled">Use Minimum EIRP value</label>
-                <br />
-                <Button onClick={() => this.submitMinEIRP(false)}> Save</Button>
-              </>
-            }
-
+            <Gallery>
+              <GalleryItem>
+                {this.state.limit.indoorEnforce ?
+                  <>
+                    <input id="limitEnabled" type="checkbox" checked={this.state.limit.indoorEnforce} onChange={(e) => this.updateEnforceLimit(e.target.checked, true)} />
+                    <label htmlFor="limitEnabled">Use Minimum Indoor EIRP values</label>
+                    <br />
+                    <label htmlFor="min_Indoor_EIRP">Minimum Indoor EIRP value</label>
+                    <br />
+                    <input value={this.state.limit.indoorLimit} onChange={(event) => this.updateEirpLimit(Number(event.target.value), true)}
+                      id="min__Indoor_EIRP" type="number" />dBm
+                  </> :
+                  <>
+                    <input id="limitEnabledIndoor" type="checkbox" checked={this.state.limit.indoorEnforce} onChange={(e) => this.updateEnforceLimit(e.target.checked, true)} />
+                    <label htmlFor="limitEnabledIndoor">Use Minimum indoor EIRP value</label>
+                    <br />
+                  </>
+                }
+              </GalleryItem>
+              <GalleryItem>
+                {this.state.limit.outdoorEnforce ?
+                  <>
+                    <input id="limitEnabled" type="checkbox" checked={this.state.limit.outdoorEnforce} onChange={(e) => this.updateEnforceLimit(e.target.checked, false)} />
+                    <label htmlFor="limitEnabled">Use Minimum outdoor EIRP values</label>
+                    <br />
+                    <label htmlFor="min_outdoor_EIRP">Minimum outdoor EIRP value</label>
+                    <br />
+                    <input value={this.state.limit.outdoorLimit} onChange={(event) => this.updateEirpLimit(Number(event.target.value), false) }
+                      id="min__outdoor_EIRP" type="number" />dBm
+                  </> :
+                  <>
+                    <input id="limitEnabledOutdoor" type="checkbox" checked={this.state.limit.outdoorEnforce} onChange={(e) => this.updateEnforceLimit(e.target.checked, false)} />
+                    <label htmlFor="limitEnabledOutdoor">Use Minimum outdoor EIRP value</label>
+                    <br />
+                  </>
+                }
+              </GalleryItem>
+            </Gallery>
+            <Button onClick={() => this.submitMinEIRP()}> Save</Button>
           </CardBody>
 
         </Card>

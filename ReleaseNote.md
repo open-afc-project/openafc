@@ -1,6 +1,24 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**OA-852*|
+| :- | :- |
+|**Date**|**11/09/2023**|
+
+## **Issues Addressed**
+ * Jira OA-852: Add minEIRP indoor vs. outdoor in AFC Config
+
+## **Interface Changes**
+ * 
+
+## **Testing Done**
+ * Confirmed that can set parameters in Admin's page and that is enforced correctly in AFC Config.
+ * Ran tests with indoor vs. outdoor AP and confirmed that the corresponding min EIRP was used.
+
+## **Open Issues** 
+ *
+
+## **Version and Date**
 |Version|**OA-866*|
 | :- | :- |
 |**Date**|**10/25/2023**|

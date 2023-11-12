@@ -154,22 +154,31 @@ class MTLS(db.Model):
 
 class Limit(db.Model):
     ''' entry for limits '''
-
+    # this table is ready to expand to hold different limits if needed, but the init method would need to be 
+    # upgraded to have more than a boolean for indoor/outdoor eirp mins.
+    
     __tablename__ = 'limits'
     __table_args__ = (
-        db.UniqueConstraint('min_eirp'),
-    )
+         db.UniqueConstraint('name', name="limits_name_unique"),
+     )
     #only one set of limits currently
     id = db.Column(db.Integer(), primary_key=True)
     # Application data fields
-    min_eirp = db.Column(db.Numeric(50))
-
+    limit = db.Column(db.Numeric(50))
     enforce = db.Column(db.Boolean())
+    name = db.Column(db.String(64))
 
-    def __init__(self, min_eirp):
-        self.id = 0
-        self.min_eirp = min_eirp
-        self.enforce = True
+    def __init__(self, min_eirp, enforce, isOutdoor):
+        if not isOutdoor:
+            self.id = 0
+            self.limit = min_eirp
+            self.enforce = enforce
+            self.name = "Indoor Min EIRP"
+        else:
+            self.id = 1
+            self.limit = min_eirp
+            self.enforce = enforce
+            self.name = "Outdoor Min EIRP"
 
 class AFCConfig(db.Model):
     ''' entry for AFC Config '''

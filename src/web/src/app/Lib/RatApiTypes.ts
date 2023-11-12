@@ -34,7 +34,8 @@ export interface AFCConfigFile {
     freqBands: FreqRange[]
     version: string,
     maxEIRP: number,
-    minEIRP: number,
+    minEIRPIndoor: number,
+    minEIRPOutdoor: number, 
     minPSD: number,
     ulsDatabase: string,
     buildingPenetrationLoss: PenetrationLossModel,

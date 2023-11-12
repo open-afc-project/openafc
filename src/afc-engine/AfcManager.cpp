@@ -592,6 +592,8 @@ AfcManager::AfcManager()
 
 	_scanPointBelowGroundMethod = CConst::TruncateScanPointBelowGroundMethod;
 
+	_minEIRPIndoor_dBm = quietNaN;
+	_minEIRPOutdoor_dBm = quietNaN;
 	_minEIRP_dBm = quietNaN;
 	_maxEIRP_dBm = quietNaN;
 	_minPSD_dBmPerMHz = quietNaN;
@@ -1366,10 +1368,6 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 			minDesiredPower = quietNaN;
 		}
 
-		if ((!std::isnan(minDesiredPower)) && (minDesiredPower > _minEIRP_dBm)) {
-			_minEIRP_dBm = minDesiredPower;
-		}
-
 		QJsonArray vendorExtensionArray;
 		if (!optionalParams.contains("vendorExtensions")) {
 			vendorExtensionArray = requestObj["vendorExtensions"].toArray();
@@ -1813,12 +1811,22 @@ void AfcManager::importGUIjsonVersion1_4(const QJsonObject &jsonObj)
 
 		if (_rlanType == RLANType::RLAN_INDOOR) {
 			_bodyLossDB = _bodyLossIndoorDB;
+		    if ((!std::isnan(minDesiredPower)) && (minDesiredPower > _minEIRPIndoor_dBm)) {
+			    _minEIRP_dBm = minDesiredPower;
+		    } else {
+			    _minEIRP_dBm = _minEIRPIndoor_dBm;
+			}
 		} else {
 			_buildingType = CConst::noBuildingType;
 			_confidenceBldg2109 = 0.0;
 			_fixedBuildingLossFlag = false;
 			_fixedBuildingLossValue = 0.0;
 			_bodyLossDB = _bodyLossOutdoorDB;
+		    if ((!std::isnan(minDesiredPower)) && (minDesiredPower > _minEIRPOutdoor_dBm)) {
+			    _minEIRP_dBm = minDesiredPower;
+		    } else {
+			    _minEIRP_dBm = _minEIRPOutdoor_dBm;
+			}
 		}
 
 		QString rlanHeightType = elevationObj["heightType"].toString();
@@ -2424,10 +2432,16 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_ulsDatabaseList.push_back(std::make_tuple("FSDATA", dbfile));
 	}
 
-	if (jsonObj.contains("minEIRP") && !jsonObj["minEIRP"].isUndefined()) {
-		_minEIRP_dBm = jsonObj["minEIRP"].toDouble();
+	if (jsonObj.contains("minEIRPIndoor") && !jsonObj["minEIRPIndoor"].isUndefined()) {
+		_minEIRPIndoor_dBm = jsonObj["minEIRPIndoor"].toDouble();
 	} else {
-		throw std::runtime_error("AfcManager::importConfigAFCjson(): minEIRP is missing.");
+		throw std::runtime_error("AfcManager::importConfigAFCjson(): minEIRPIndoor is missing.");
+	}
+
+	if (jsonObj.contains("minEIRPOutdoor") && !jsonObj["minEIRPOutdoor"].isUndefined()) {
+		_minEIRPOutdoor_dBm = jsonObj["minEIRPOutdoor"].toDouble();
+	} else {
+		throw std::runtime_error("AfcManager::importConfigAFCjson(): minEIRPOutdoor is missing.");
 	}
 
 	_maxEIRP_dBm = jsonObj["maxEIRP"].toDouble();
@@ -10785,7 +10799,8 @@ void AfcManager::printUserInputs()
 
 		// inputGc.writeRow({ "ULS_DATABASE", _inputULSDatabaseStr } );
 		inputGc.writeRow({ "AP/CLIENT_PROPAGATION_ENVIRO", CConst::strPropEnvMethodList->type_to_str(_propEnvMethod) });
-		inputGc.writeRow({ "AP/CLIENT_MIN_EIRP (DBM)", f2s(_minEIRP_dBm) } );
+		inputGc.writeRow({ "AP/CLIENT_MIN_EIRP_INDOOR (DBM)", f2s(_minEIRPIndoor_dBm) } );
+		inputGc.writeRow({ "AP/CLIENT_MIN_EIRP_OUTDOOR (DBM)", f2s(_minEIRPOutdoor_dBm) } );
 		inputGc.writeRow({ "AP/CLIENT_MAX_EIRP (DBM)", f2s(_maxEIRP_dBm) } );
 
 		inputGc.writeRow({ "BUILDING_PENETRATION_LOSS_MODEL", _buildingLossModel.toStdString() });

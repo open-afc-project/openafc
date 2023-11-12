@@ -1,5 +1,5 @@
 import { guiConfig, getCSRF } from "./RatApi";
-import { UserModel, success, error, AccessPointModel, AccessPointListModel, FreqRange, DeniedRegion, ExclusionCircle, ExclusionTwoRect, ExclusionRect, ExclusionHorizon } from "./RatApiTypes";
+import { UserModel, success, error, AccessPointModel, AccessPointListModel, FreqRange, DeniedRegion, ExclusionCircle, ExclusionTwoRect, ExclusionRect, ExclusionHorizon, MTLSModel } from "./RatApiTypes";
 import { logger } from "./Logger";
 import { Role, retrieveUserData } from "./User";
 import { Rect } from "react-konva";
@@ -13,11 +13,15 @@ import { RatResponse } from "./RatApiTypes";
 */
 
 export class Limit {
-    enforce: boolean;
-    limit: number;
-    constructor(enforce: boolean, limit: number) {
-        this.enforce = enforce;
-        this.limit = limit;
+    indoorEnforce: boolean;
+    outdoorEnforce: boolean;
+    indoorLimit: number;
+    outdoorLimit: number;
+    constructor(enforceIndoor: boolean, enforceOutdoor:boolean, indoorLimit: number, outdoorLimit: number) {
+        this.indoorEnforce = enforceIndoor;
+        this.outdoorEnforce = enforceOutdoor;
+        this.indoorLimit = indoorLimit;
+        this.outdoorLimit = outdoorLimit;
     }
 }
 
@@ -44,7 +48,7 @@ export const getMinimumEIRP = () =>
  * Sets the Minimum EIRP value.
  * @param limit the new EIRP value 
  */
-export const setMinimumEIRP = async (limit: number | boolean) => {
+export const setMinimumEIRP = async (limit: Limit) => {
     let csrf_token = await(getCSRF());
     return (fetch(guiConfig.admin_url.replace("-1", "eirp_min"), {
         method: "PUT",
@@ -54,7 +58,7 @@ export const setMinimumEIRP = async (limit: number | boolean) => {
     })
         .then(async res => {
             if (res.ok) {
-                return success((await res.json()).limit as number | boolean)
+                return success((await res.json()).limit as Limit)
             } else {
                 return error(res.statusText, res.status, res);
             }
