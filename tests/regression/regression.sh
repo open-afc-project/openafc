@@ -19,6 +19,9 @@ ALS_SIPHON="${PUB_REPO}/als-siphon-image"               # ALS Siphon image
 ALS_KAFKA="${PUB_REPO}/als-kafka-image"                   # Kafka for ALS
 BULK_POSTGRES="${PUB_REPO}/bulk-postgres-image" # PostgreSQL for bulk stuff (ALS, req cache, etc.)
 RCACHE="${PUB_REPO}/rcache-image"                             # Request cache
+GRAFANA="${PUB_REPO}/grafana-image"                           # Grafana
+PROMETHEUS="${PUB_REPO}/prometheus-image"                     # Prometheus
+CADVISOR="${PUB_REPO}/cadvisor-image"                         # Cadvisor
 
 WORKER=${PRIV_REPO}"/afc-worker"                                    # msghnd image
 WORKER_AL_D4B="${PUB_REPO}/worker-al-build-image" # Alpine worker build img
@@ -166,6 +169,11 @@ build_dev_server() {
 
   # Build Request Cache
   docker_build_and_push ${wd}/rcache/Dockerfile ${RCACHE}:${tag} ${push} &
+
+  # Build Prometheus-related images
+  cd ${wd}/prometheus && docker_build_and_push Dockerfile-prometheus ${PROMETHEUS}:${tag} ${push} &
+  cd ${wd}/prometheus && docker_build_and_push Dockerfile-cadvisor ${CADVISOR}:${tag} ${push} &
+  cd ${wd}/prometheus && docker_build_and_push Dockerfile-prometheus ${GRAFANA}:${tag} ${push} &
 
   msg "wait for all images to be built"
   wait

@@ -1,0 +1,33 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Cadvisor dockerfile
+
+FROM gcr.io/cadvisor/cadvisor:v0.47.2
+
+# Housekeeping interval
+ENV CADVISOR_HOUSEKEEPING_INTERVAL=5s
+
+# Metrics - comma separated list of metric groups (see
+# https://github.com/google/cadvisor/blob/master/docs/storage/prometheus.md for
+# more details)
+ENV CADVISOR_METRICS=cpu,memory,process,sched
+
+# Additional arguments
+ENV CADVISOR_ADDITIONAL_ARGS=
+
+ENTRYPOINT /usr/bin/cadvisor \
+    -logtostderr \
+    -docker_only=true \
+    -store_container_labels=false \
+    -housekeeping_interval=$CADVISOR_HOUSEKEEPING_INTERVAL \
+    -enable_metrics=$CADVISOR_METRICS \
+    -enable_load_reader=true \
+    $CADVISOR_ADDITIONAL_ARGS
+
+HEALTHCHECK CMD \
+    wget --quiet --tries=1 --spider http://localhost:8080/healthz || exit 1

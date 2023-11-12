@@ -1,0 +1,46 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+FROM ubuntu/prometheus:2.46.0-22.04_stable
+
+# Database directory. May be mapped to something external for persistence.
+# Evaluated in entrypoint.sh (i.e. not baked-in)
+ENV PROMETHEUS_DATA=/prometheus/data
+
+# Comma separated list of target definition files from. Evaluated in
+# entrypoint.sh (i.e. not baked-in)
+ENV PROMETHEUS_TARGETS=targets/dynamic.json
+
+# Scrape interval. Must have unit suffix (e.g. 15s for 15 seconds, 1m for one
+# minute, etc.) By default taken from prometheus.yml (15 seconds as of time of
+# this writing)
+# ENV PROMETHEUS_SCRAPE_INTERVAL
+
+# Scrape timeout. Must be smaller than scrape interval. Must have unit suffix
+# (e.g. 10s for 10 seconds, 1m for one minute, etc.) By default taken from
+# prometheus.yml (10 seconds as of time of this writing)
+# ENV PROMETHEUS_SCRAPE_TIMEOUT
+
+# PERSISTING PROMETHEUS DATA
+# Prometheus database is at /prometheus/data inside the container. It can be'
+# persisted if mapped to some external directory
+
+RUN apt update
+RUN apt upgrade -y
+RUN apt install -y curl
+
+WORKDIR /prometheus
+
+COPY prometheus.yml /prometheus/
+COPY prometheus_targets/ /prometheus/targets
+COPY prometheus_entrypoint.sh /prometheus
+RUN chmod +x /prometheus/prometheus_entrypoint.sh
+
+ENTRYPOINT ["./prometheus_entrypoint.sh"]
+
+HEALTHCHECK CMD curl --fail http://localhost:9090/-/healthy || exit 1
+

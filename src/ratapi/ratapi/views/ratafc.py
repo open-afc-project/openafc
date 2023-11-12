@@ -55,6 +55,7 @@ from .ratapi import rulesets
 from typing import Any, Dict, NamedTuple, Optional
 from rcache_models import RcacheClientSettings
 from rcache_client import RcacheClient
+import prometheus_utils
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(AFC_RATAPI_LOG_LEVEL)
@@ -1053,6 +1054,10 @@ class ReadinessCheck(MethodView):
         return flask.make_response(msg, 200)
 
 
+class PrometheusMetrics(MethodView):
+    def get(self):
+        return prometheus_utils.multiprocess_flask_metrics()
+
 # registration of default runtime options
 
 module.add_url_rule('/availableSpectrumInquirySec',
@@ -1067,6 +1072,10 @@ module.add_url_rule('/availableSpectrumInquiryInternal',
 module.add_url_rule('/healthy', view_func=HealthCheck.as_view('HealthCheck'))
 
 module.add_url_rule('/ready', view_func=ReadinessCheck.as_view('ReadinessCheck'))
+
+if prometheus_utils.multiprocess_prometheus_configured():
+    module.add_url_rule(
+        '/metrics', view_func=PrometheusMetrics.as_view('PrometheusMetrics'))
 
 # Local Variables:
 # mode: Python

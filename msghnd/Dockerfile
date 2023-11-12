@@ -60,6 +60,13 @@ LABEL revision="afc-msghnd"
 WORKDIR /wd
 EXPOSE 8000
 COPY msghnd/entrypoint.sh /
+
+# Prometheus stuff
+COPY gunicorn/config.py /wd/gunicorn_config.py
+# Directory for Prometheus's multiprocess housekeeping
+ENV PROMETHEUS_MULTIPROC_DIR=/wd/prometheus_multiproc_dir
+RUN mkdir -p $PROMETHEUS_MULTIPROC_DIR
+
 # Add debugging env if configured
 ARG AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 COPY msghnd/devel.sh /wd/

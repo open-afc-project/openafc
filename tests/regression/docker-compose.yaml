@@ -214,6 +214,34 @@ services:
       - bulk_postgres
     dns_search: [.]
 
+  grafana:
+    image: public.ecr.aws/w9v6y1o0/openafc/grafana-image:${TAG:-latest}
+    restart: always
+    depends_on:
+      - prometheus
+      - bulk_postgres
+    dns_search: [.]
+
+  prometheus:
+    image: public.ecr.aws/w9v6y1o0/openafc/prometheus-image:${TAG:-latest}
+    restart: always
+    environment:
+      - PROMETHEUS_TARGETS=targets/dynamic.json,targets/cadvisor.json
+    depends_on:
+      - cadvisor
+    dns_search: [.]
+
+  cadvisor:
+    image:  public.ecr.aws/w9v6y1o0/openafc/cadvisor-image:${TAG:-latest}
+    restart: always
+    volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:rw
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+    - /dev/disk/:/dev/disk:ro
+    dns_search: [.]
+
 volumes:
   uls_downloader_state:
 
