@@ -21,8 +21,6 @@ from fst import DataIf
 from afcmodels.base import db
 from afcmodels.aaa import User
 import als
-from rcache_models import RcacheClientSettings
-from rcache_client import RcacheClient
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -129,12 +127,6 @@ def create_app(config_override=None):
                     als.als_json_log('user_access', {'action':'login', 'user':flask.request.form['username'], 'from':flask.request.remote_addr, 'status':'success'})
 
             return response
-
-    @flaskapp.teardown_appcontext
-    def disconnect_rcache(exc):
-        rcache = flask.g.pop("rcache", None)
-        if rcache:
-            rcache.disconnect()
 
     # Check configuration
     state_path = flaskapp.config['STATE_ROOT_PATH']

@@ -8,12 +8,14 @@
 
 import collections
 import datetime
+import gc
 import json
 import logging
 import os
 import re
 import sys
 import threading
+import time
 
 # pylint: disable=global-statement
 
@@ -348,7 +350,7 @@ class Als:
         """
         if not self._try_connect():
             return
-        self._producer.send(
+        self._send(
             topic=ALS_TOPIC, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_REQUEST, data=req))
 
@@ -363,7 +365,7 @@ class Als:
         if not self._try_connect():
             return
         self._flush_afc_configs(req_id)
-        self._producer.send(
+        self._send(
             topic=ALS_TOPIC, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_RESPONSE, data=resp))
 
@@ -415,7 +417,7 @@ class Als:
                  (JSON_LOG_FIELD_SERVER_ID, self._server_id),
                  (JSON_LOG_FIELD_TIME, timetag()),
                  (JSON_LOG_FIELD_DATA, json.dumps(record))])
-        self._producer.send(topic=topic, value=to_bytes(json.dumps(json_dict)))
+        self._send(topic=topic, value=to_bytes(json.dumps(json_dict)))
 
     def flush(self, timeout_sec):
         """ Flush pending messages (if any)
@@ -474,10 +476,27 @@ class Als:
                  (ALS_FIELD_ULS_ID, uls_id)])
         if req_indices:
             extra_fields[ALS_FIELD_REQ_INDICES] = req_indices
-        self._producer.send(
+        self._send(
             topic=ALS_TOPIC, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_CONFIG, data=config_text,
                                   extra_fields=extra_fields))
+
+    def _send(self, topic, key=None, value=None):
+        """ KafkaProducer's send() method with exceptions caught """
+        gc_called = False
+        while True:
+            try:
+                self._producer.send(topic=topic, key=key, value=value)
+                return
+            except kafka.errors.KafkaError as ex:
+                if gc_called or \
+                        (not isinstance(ex, kafka.errors.KafkaTimeoutError)):
+                    LOGGER.error(
+                        "Error sending to topic '%s': %s", topic, repr(ex))
+                    break
+                time.sleep(0.1)
+                gc.collect()
+                gc_called = True
 
     def _als_key(self, req_id):
         """ ALS record key for given request ID """

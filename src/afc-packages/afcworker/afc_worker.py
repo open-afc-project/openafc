@@ -243,6 +243,4 @@ def run(prot, host, port, request_type, task_id, hash_val,
             LOGGER.debug('afc-engine terminated')
         if os.path.exists(tmpdir):
             shutil.rmtree(tmpdir)
-        if rcache:
-            rcache.disconnect()
         LOGGER.info('Worker resources cleaned up')

@@ -27,7 +27,7 @@ except ImportError:
     pass
 
 try:
-    from rcache_rmq import RcacheRmq
+    from rcache_rmq import RcacheRmq, RcacheRmqConnection
 except ImportError:
     pass
 
@@ -88,30 +88,6 @@ class RcacheClient:
             assert "rcache_rcache" in sys.modules
             self._rcache_rcache = RcacheRcache(client_settings.service_url)
 
-    def connect(self, db: bool = False, rmq: bool = False) -> None:
-        """ Connect to other services
-
-        Arguments:
-        db  -- Connect to database
-        rmq -- Connect to RabbitMQ. Not actually needed, as connection attempt
-               will anyway happen and at initialization point neither vhost nor
-               RMQ user are created
-        """
-        if db:
-            assert self._rcache_db is not None
-            self._rcache_db.connect()
-        if rmq:
-            assert self._rcache_rmq is not None
-            assert self._rmq_receiver is not None
-            self._rcache_rmq.connect(as_receiver=self._rmq_receiver)
-
-    def disconnect(self) -> None:
-        """ Disconnect from whatever it is connected to """
-        if self._rcache_db:
-            self._rcache_db.disconnect()
-        if self._rcache_rmq:
-            self._rcache_rmq.disconnect()
-
     def lookup_responses(self, req_cfg_digests: List[str]) -> Dict[str, str]:
         """ Lookup responses in Postgres cache database
 
@@ -121,13 +97,7 @@ class RcacheClient:
         Returns dictionary of found responses, indexed by lookup keys
         """
         assert self._rcache_db is not None
-        return self._rcache_db.lookup(req_cfg_digests)
-
-    def rmq_rx_queue_name(self) -> str:
-        """ Returns RX queue name """
-        assert self._rcache_rmq is not None
-        self._rcache_rmq.connect(as_receiver=True)
-        return self._rcache_rmq.rx_queue_name
+        return self._rcache_db.lookup(req_cfg_digests, try_reconnect=True)
 
     def rmq_send_response(self, queue_name: str, req_cfg_digest: str,
                           request: str, response: Optional[str]) \
@@ -141,10 +111,12 @@ class RcacheClient:
         response       -- Response as string. None on failure
         """
         assert self._rcache_rmq is not None
-        self._rcache_rmq.send_response(
-            queue_name=queue_name, req_cfg_digest=req_cfg_digest,
-            request=None if self._update_on_send else request,
-            response=response)
+        with self._rcache_rmq.create_connection(tx_queue_name=queue_name) \
+                as rmq_conn:
+            rmq_conn.send_response(
+                req_cfg_digest=req_cfg_digest,
+                request=None if self._update_on_send else request,
+                response=response)
         if self._update_on_send and response:
             assert self._rcache_rcache is not None
             try:
@@ -154,21 +126,31 @@ class RcacheClient:
             except pydantic.ValidationError as ex:
                 error(f"Invalid arguments syntax: '{ex}'")
 
-    def rmq_receive_responses(self, req_cfg_digests: List[str],
+    def rmq_create_rx_connection(self) -> RcacheRmqConnection:
+        """ Creates RcacheRmqConnection.
+
+        Must be called before opposite side starts transmitting. Object being
+        returned is a context manager (may be used with 'with', or should be
+        explicitly closed with its close() method
+        """
+        assert self._rcache_rmq is not None
+        return self._rcache_rmq.create_connection()
+
+    def rmq_receive_responses(self, rx_connection: RcacheRmqConnection,
+                              req_cfg_digests: List[str],
                               timeout_sec: float) -> Dict[str, Optional[str]]:
         """ Receiver ARC responses from RabbitMQ queue
 
         Arguments:
+        rx_connection   -- Previously created
         req_cfg_digests -- List of expected request/config digests
         timeout_sec     -- RX timeout in seconds
         Returns dictionary of responses (as strings), indexed by request/config
         digests. Failed responses represented by Nones
         """
         assert self._rcache_rmq is not None
-        rrks = \
-            self._rcache_rmq.receive_responses(
-                    req_cfg_digests=req_cfg_digests,
-                    timeout_sec=timeout_sec)
+        rrks = rx_connection.receive_responses(req_cfg_digests=req_cfg_digests,
+                                               timeout_sec=timeout_sec)
         assert rrks is not None
         to_update = \
             [AfcReqRespKey.from_orm(rrk) for rrk in rrks

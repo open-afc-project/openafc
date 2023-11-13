@@ -231,12 +231,11 @@ class RcacheDb:
                             status
         Returns True on success, Fail on failure (if fail_on_error is False)
         """
+        if self._engine:
+            return True
         engine: Any = None
         with FailOnError(fail_on_error):
             try:
-                if self._engine:
-                    self._engine.dispose()
-                    self._engine = None
                 error_if(not self.rcache_db_dsn,
                          "AFC Response Cache URL was not specified")
                 engine = self._create_engine(self.rcache_db_dsn)
@@ -259,25 +258,39 @@ class RcacheDb:
             self._engine.dispose()
             self._engine = None
 
-    def lookup(self, req_cfg_digests: List[str]) -> Dict[str, str]:
+    def lookup(self, req_cfg_digests: List[str],
+               try_reconnect = False) -> Dict[str, str]:
         """ Request cache lookup
 
         Arguments:
         req_cfg_digests -- List of request/config digests
+        try_reconnect   -- On failure try reconnect
         Returns Dictionary of found requests, indexed by request/config digests
         """
         assert (self._engine is not None) and (self.ap_table is not None)
         s = sa.select([self.ap_table]).\
             where((self.ap_table.c.req_cfg_digest.in_(req_cfg_digests)) &
                   (self.ap_table.c.state == ApDbRespState.Valid.name))
-        try:
-            with self._engine.connect() as conn:
-                rp = conn.execute(s)
-                return {rec.req_cfg_digest:
-                        ApDbRecord.parse_obj(rec).get_patched_response()
-                        for rec in rp}
-        except sa.exc.SQLAlchemyError as ex:
-            error(f"Error querying '{self.db_name}: {ex}")
+        retry = False
+        while True:
+            if try_reconnect and (self._engine is None):
+                self.connect()
+            assert self._engine is not None
+            try:
+                with self._engine.connect() as conn:
+                    rp = conn.execute(s)
+                    return {rec.req_cfg_digest:
+                            ApDbRecord.parse_obj(rec).get_patched_response()
+                            for rec in rp}
+            except sa.exc.SQLAlchemyError as ex:
+                if retry or (not try_reconnect):
+                    error(f"Error querying '{self.db_name}: {ex}")
+                retry = True
+                try:
+                    self.disconnect()
+                except sa.exc.SQLAlchemyError:
+                    self._engine = None
+                assert self._engine is None
         return {}  # Will never happen, appeasing pylint
 
     def _read_metadata(self) -> None:

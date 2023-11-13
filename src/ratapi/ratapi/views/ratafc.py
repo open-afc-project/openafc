@@ -468,17 +468,8 @@ response_map = {
 rcache_settings = RcacheClientSettings()
 # In this validation rcache is True to handle 'not update_on_send' case
 rcache_settings.validate_for(db=True, rmq=True, rcache=True)
-
-
-def get_rcache():
-    """ Returns RcacheClient instance for given app instance"""
-    if not hasattr(flask.g, "rcache"):
-        if rcache_settings.enabled:
-            flask.g.rcache = RcacheClient(rcache_settings, rmq_receiver=True)
-            flask.g.rcache.connect(db=True, rmq=True)
-        else:
-            flask.g.rcache = None
-    return flask.g.rcache
+rcache = RcacheClient(rcache_settings, rmq_receiver=True) \
+    if rcache_settings.enabled else None
 
 
 class ReqInfo(NamedTuple):
@@ -651,7 +642,7 @@ class RatAfc(MethodView):
                          self.__class__, inspect.stack()[0][3], args)
             request_type = 'AP-AFC'
 
-            use_tasks = (get_rcache() is None) or \
+            use_tasks = (rcache is None) or \
                 (flask.request.args.get('conn_type') == 'async') or \
                 (flask.request.args.get('gui') == 'True')
 
@@ -917,7 +908,7 @@ class RatAfc(MethodView):
                      (RNTM_OPT_GUI | RNTM_OPT_NOCACHE))]
         if not cached_keys:
             return {}
-        if get_rcache() is None:
+        if rcache is None:
             ret = {}
             for req_cfg_hash in cached_keys:
                 try:
@@ -930,10 +921,10 @@ class RatAfc(MethodView):
                 ret[req_cfg_hash] = \
                     zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
             return ret
-        return get_rcache().lookup_responses(cached_keys)
+        return rcache.lookup_responses(cached_keys)
 
     def _start_processing(self, dataif, req_info, is_internal_request,
-                          use_tasks=False):
+                          rcache_queue=None, use_tasks=False):
         """ Initiates processing on remote worker
         If 'use_tasks' - returns created Task
         """
@@ -957,8 +948,7 @@ class RatAfc(MethodView):
                    config_path=req_info.config_path if use_tasks else None,
                    history_dir=req_info.history_dir,
                    runtime_opts=req_info.runtime_opts,
-                   rcache_queue=None if use_tasks
-                   else get_rcache().rmq_rx_queue_name(),
+                   rcache_queue=rcache_queue,
                    request_str=None if use_tasks else request_str,
                    config_str=None if use_tasks else req_info.config_str)
         if use_tasks:
@@ -984,33 +974,37 @@ class RatAfc(MethodView):
         Returns dictionary of found responses (as strings), indexed by
         request/config hashes
         """
-        tasks = {}
-        for req_cfg_hash, req_info in req_infos.items():
-            tasks[req_cfg_hash] = \
-                self._start_processing(
-                    dataif=dataif, req_info=req_info, use_tasks=use_tasks,
-                    is_internal_request=is_internal_request)
-        if use_tasks:
-            ret = {}
-            for req_cfg_hash, task in tasks.items():
-                task_stat = \
-                    task.wait(timeout=RatafcMsghndCfgIface().get_ratafc_tout())
-                ret[req_cfg_hash] = \
-                    response_map[task_stat['status']](task).data
+        with (contextlib.null_context()
+              if use_tasks else rcache.rmq_create_rx_connection()) as rmq_conn:
+            tasks = {}
+            for req_cfg_hash, req_info in req_infos.items():
+                tasks[req_cfg_hash] = \
+                    self._start_processing(
+                        dataif=dataif, req_info=req_info, use_tasks=use_tasks,
+                        is_internal_request=is_internal_request,
+                        rcache_queue=rmq_conn.rx_queue_name())
+            if use_tasks:
+                ret = {}
+                for req_cfg_hash, task in tasks.items():
+                    task_stat = \
+                        task.wait(timeout=RatafcMsghndCfgIface().get_ratafc_tout())
+                    ret[req_cfg_hash] = \
+                        response_map[task_stat['status']](task).data
+                return ret
+            ret = \
+                rcache.rmq_receive_responses(
+                    rx_connection=rmq_conn,
+                    req_cfg_digests=req_infos.keys(),
+                    timeout_sec=RatafcMsghndCfgIface().get_ratafc_tout())
+            for req_cfg_hash, response in ret.items():
+                req_info = req_infos[req_cfg_hash]
+                if (not response) or (not req_info.history_dir):
+                    continue
+                with dataif.open(os.path.join(req_info.history_dir,
+                                              "analysisResponse.json.gz")) \
+                        as hfile:
+                    hfile.write(zlib.compress(response.encode("utf-8")))
             return ret
-        ret = \
-            get_rcache().rmq_receive_responses(
-                req_cfg_digests=req_infos.keys(),
-                timeout_sec=RatafcMsghndCfgIface().get_ratafc_tout())
-        for req_cfg_hash, response in ret.items():
-            req_info = req_infos[req_cfg_hash]
-            if (not response) or (not req_info.history_dir):
-                continue
-            with dataif.open(os.path.join(req_info.history_dir,
-                                          "analysisResponse.json.gz")) \
-                    as hfile:
-                hfile.write(zlib.compress(response.encode("utf-8")))
-        return ret
 
 class RatAfcSec(RatAfc):
     def get(self):

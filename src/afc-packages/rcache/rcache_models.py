@@ -428,6 +428,7 @@ class ApDbPk(pydantic.BaseModel):
             req_str: Optional[str] = None) -> "ApDbPk":
         """ Create self from either string or pydantic request message """
         if req_pydantic is None:
+            assert req_str is not None
             req_pydantic = \
                 AfcReqAvailableSpectrumInquiryRequestMessage.parse_raw(req_str)
         first_request = req_pydantic.availableSpectrumInquiryRequests[0]
