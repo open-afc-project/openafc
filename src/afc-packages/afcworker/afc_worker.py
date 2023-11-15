@@ -53,6 +53,7 @@ client = Celery(
     task_ignore_result=True,
     broker_pool_limit=0,
     task_acks_late=True,
+    worker_prefetch_multiplier=1,
 )
 
 @client.task(ignore_result=True)
