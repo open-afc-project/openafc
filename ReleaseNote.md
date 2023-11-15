@@ -1,4 +1,23 @@
 # Release Note
+## **Version and Date**
+|Version|3.8.10.0|
+| :- | :- |
+|**Date**|**11/15/2023**|
+|compiled server's version is TBD | git tag 3.8.10.0|
+
+## **Issues Addressed**
+* Jira  Oa 875 changing worker celery configuration for autoscaling (#719)
+* Jira  Bump axios from 0.21.4 to 1.6.0 in /src/web (#716)
+* Jira  OA-873. Prometheus-based performance optimizations (#718)
+* Jira  Oa 852 add min eirp indoor vs outdoor in afc config (#717)
+* Jira  OA-854. Adding Prometheus (#712)
+* Jira  Bump browserify-sign from 4.0.4 to 4.2.2 in /src/web (#707)
+* Jira  OA-874 Information email for successful download (#714)
+* Jira  OA-877 Rcache and load test utility improvements and bugfixes (#709)
+* Jira  OA-872 update default config (#711)
+* Jira  Fix requirements if running cert_db with rcache turned on (#710)
+* Jira  Oa 866 afc config gu is itm parameters ground type cant be changed (#706)
+* Jira  Bump werkzeug from 2.3.6 to 3.0.1 in /src/afc-packages/afcobjst (#705)
 
 ## **Version and Date**
 |Version|**OA-852*|
@@ -39,7 +58,7 @@
 |Version|3.8.9.0|
 | :- | :- |
 |**Date**|**10/24/2023**|
-|compiled server's version is TBD | git tag 3.8.9.0|
+|compiled server's version is 1e7b681e | git tag 3.8.9.0|
 
 ## **Issues Addressed**
 * Jira Oa 859 custom docker repo name (#689)
