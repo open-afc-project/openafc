@@ -3,7 +3,7 @@
 |Version|3.8.10.0|
 | :- | :- |
 |**Date**|**11/15/2023**|
-|compiled server's version is TBD | git tag 3.8.10.0|
+|compiled server's version is fb1fa75 | git tag 3.8.10.0|
 
 ## **Issues Addressed**
 * Jira  Oa 875 changing worker celery configuration for autoscaling (#719)
