@@ -13,16 +13,16 @@ ENV PROMETHEUS_DATA=/prometheus/data
 
 # Comma separated list of target definition files from. Evaluated in
 # entrypoint.sh (i.e. not baked-in)
-ENV PROMETHEUS_TARGETS=targets/dynamic.json
+ENV PROMETHEUS_TARGETS=targets/cadvisor.json,targets/msghnd.json
 
 # Scrape interval. Must have unit suffix (e.g. 15s for 15 seconds, 1m for one
-# minute, etc.) By default taken from prometheus.yml (15 seconds as of time of
+# minute, etc.) By default taken from prometheus.yml (5 seconds as of time of
 # this writing)
 # ENV PROMETHEUS_SCRAPE_INTERVAL
 
 # Scrape timeout. Must be smaller than scrape interval. Must have unit suffix
 # (e.g. 10s for 10 seconds, 1m for one minute, etc.) By default taken from
-# prometheus.yml (10 seconds as of time of this writing)
+# prometheus.yml (2 seconds as of time of this writing)
 # ENV PROMETHEUS_SCRAPE_TIMEOUT
 
 # PERSISTING PROMETHEUS DATA

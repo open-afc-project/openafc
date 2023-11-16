@@ -267,15 +267,14 @@ class RcacheDb:
         try_reconnect   -- On failure try reconnect
         Returns Dictionary of found requests, indexed by request/config digests
         """
-        assert (self._engine is not None) and (self.ap_table is not None)
-        s = sa.select([self.ap_table]).\
-            where((self.ap_table.c.req_cfg_digest.in_(req_cfg_digests)) &
-                  (self.ap_table.c.state == ApDbRespState.Valid.name))
         retry = False
         while True:
             if try_reconnect and (self._engine is None):
                 self.connect()
-            assert self._engine is not None
+            assert (self._engine is not None) and (self.ap_table is not None)
+            s = sa.select([self.ap_table]).\
+                where((self.ap_table.c.req_cfg_digest.in_(req_cfg_digests)) &
+                      (self.ap_table.c.state == ApDbRespState.Valid.name))
             try:
                 with self._engine.connect() as conn:
                     rp = conn.execute(s)
