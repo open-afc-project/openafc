@@ -974,7 +974,7 @@ class RatAfc(MethodView):
         Returns dictionary of found responses (as strings), indexed by
         request/config hashes
         """
-        with (contextlib.null_context()
+        with (contextlib.nullcontext()
               if use_tasks else rcache.rmq_create_rx_connection()) as rmq_conn:
             tasks = {}
             for req_cfg_hash, req_info in req_infos.items():
@@ -982,7 +982,8 @@ class RatAfc(MethodView):
                     self._start_processing(
                         dataif=dataif, req_info=req_info, use_tasks=use_tasks,
                         is_internal_request=is_internal_request,
-                        rcache_queue=rmq_conn.rx_queue_name())
+                        rcache_queue=None if use_tasks
+                        else rmq_conn.rx_queue_name())
             if use_tasks:
                 ret = {}
                 for req_cfg_hash, task in tasks.items():
