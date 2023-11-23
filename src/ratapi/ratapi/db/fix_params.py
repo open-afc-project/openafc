@@ -418,7 +418,7 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                     else:
                                         fwdGain = Gtypical
                                     r[fwdAntDiameterStr] = D
-    
+ 
                             if (antType == 'Ant') and (fwdGain == ''):
                                 matchFlagFwdGain = True
                             else:
@@ -486,8 +486,14 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
     
                             matchi = matchmap[ri]
     
+                            # R2-AIP-14 (a)
                             if matchFlagFwdHeight:
-                                r[fwdHeightStr] = '42.5'
+                                if prNum == 0:
+                                    r[fwdHeightStr] = '42.5'
+                                elif (antType == 'Ant'):
+                                    r[fwdHeightStr] = '8.5'
+                                else:
+                                    r[fwdHeightStr] = '7.0'
                                 if matchi != -1:
                                     m = csmap[keyv][matchi]
     
@@ -497,7 +503,13 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                                             r[fwdHeightStr] = str(m_retHeightAGL)
     
                             if matchFlagRetHeight:
-                                r[retHeightStr] = '42.5'
+                                if prNum == 0:
+                                    r[retHeightStr] = '42.5'
+                                elif (antType == 'Ant'):
+                                    r[retHeightStr] = '8.5'
+                                else:
+                                    r[retHeightStr] = '7.0'
+
                                 if matchi != -1:
                                     m = csmap[keyv][matchi]
     

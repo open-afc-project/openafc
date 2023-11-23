@@ -244,6 +244,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
     int numAntUnmatch = 0;
     int numMissingRxAntHeight = 0;
     int numMissingTxAntHeight = 0;
+    int numMissingPRAntHeight = 0;
     int numFreqAssignedMissing = 0;
     int numUnableGetBandwidth = 0;
     int numFreqUpperBandMissing = 0;
@@ -673,6 +674,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     }
                 }
 
+                // R2-AIP-14-b
                 if (std::isnan(rxAnt.heightToCenterRAAT)) {
                     rxAnt.heightToCenterRAAT = -1.0;
                     numMissingRxAntHeight++;
@@ -686,6 +688,18 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                 } else if (txAnt.heightToCenterRAAT < 1.5) {
                     txAnt.heightToCenterRAAT = 1.5;
                 }
+
+                int prIdx;
+                for(prIdx=0; prIdx<prAntList.size(); ++prIdx) {
+                    UlsAntenna &prAnt = prAntList[prIdx];
+                    if (std::isnan(prAnt.heightToCenterRAAT)) {
+                        prAnt.heightToCenterRAAT = -1.0;
+                        numMissingPRAntHeight++;
+                    } else if (prAnt.heightToCenterRAAT < 1.5) {
+                        prAnt.heightToCenterRAAT = 1.5;
+                    }
+				}
+
 
                 // now that we have everything, ensure that inputs have what we need
                 anomalousReason.append(UlsFunctionsClass::hasNecessaryFields(e, path, rxLoc, txLoc, rxAnt, txAnt, txHeader, prLocList, prAntList, removeMobile));
@@ -945,6 +959,7 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
     std::cout << "US Num Antenna Not Matched: " << numAntUnmatch << std::endl;
     std::cout << "US NUM Missing Rx Antenna Height: " << numMissingRxAntHeight << std::endl;
     std::cout << "US NUM Missing Tx Antenna Height: " << numMissingTxAntHeight << std::endl;
+    std::cout << "US NUM Missing PR Antenna Height: " << numMissingPRAntHeight << std::endl;
 
     std::cout << "US Num Frequency Assigned Missing: "   << numFreqAssignedMissing  << std::endl;
     std::cout << "US Num Unable To Get Bandwidth: "      << numUnableGetBandwidth   << std::endl;

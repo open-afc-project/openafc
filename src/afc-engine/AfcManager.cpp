@@ -7299,7 +7299,7 @@ void AfcManager::runPointAnalysis()
 #if DEBUG_AFC
 	// std::vector<int> fsidTraceList{2128, 3198, 82443};
 	// std::vector<int> fsidTraceList{64324};
-	std::vector<int> fsidTraceList{8177};
+	std::vector<int> fsidTraceList{91179};
 	std::string pathTraceFile = "path_trace.csv.gz";
 #endif
 

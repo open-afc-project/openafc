@@ -1,4 +1,24 @@
 # Release Note
+# Release Note
+
+## **Version and Date**
+|Version|**OA-878*|
+| :- | :- |
+|**Date**|**11/22/2023**|
+
+## **Issues Addressed**
+ * Jira OA-878: Fix Passive Site AGL Height when it is low
+
+## **Interface Changes**
+ * Please use the updated WFA Test Vector FS database (from 11/21/23) from here https://drive.google.com/file/d/1ugLfPP4CM7Ix0Ct6iCqb0FoofsUxn0Uc/view?usp=drive_link
+
+## **Testing Done**
+ * Compared WFA Test Vector FS database with this change against the previous one (04/21/23) and there were 12 new FS links were added - all had < 3m passive site AGL height.
+
+## **Open Issues** 
+ * 
+
+
 ## **Version and Date**
 |Version|3.8.10.0|
 | :- | :- |

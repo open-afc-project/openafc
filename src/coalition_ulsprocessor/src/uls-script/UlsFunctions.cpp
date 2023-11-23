@@ -134,9 +134,8 @@ QString UlsFunctionsClass::hasNecessaryFields(const UlsEmission &e, UlsPath path
     }
 
     int prIdx;
-    for(prIdx=0; prIdx<std::min(prLocList.size(),prAntList.size()); ++prIdx) {
+    for(prIdx=0; prIdx<prLocList.size(); ++prIdx) {
         const UlsLocation &prLoc = prLocList[prIdx];
-        const UlsAntenna &prAnt = prAntList[prIdx];
 
         // check lat/lon degree for pr
         if (isnan(prLoc.latitudeDeg) || isnan(prLoc.longitudeDeg)) {
@@ -148,13 +147,6 @@ QString UlsFunctionsClass::hasNecessaryFields(const UlsEmission &e, UlsPath path
         }
         if(prLoc.longitudeDirection != 'E' && prLoc.longitudeDirection != 'W') {
             failReason.append( "Invalid passive repeater longitude direction, ");
-        }
-        // check recievers height to center RAAT
-        if(isnan(prAnt.heightToCenterRAAT) || prAnt.heightToCenterRAAT <= 0) {
-            failReason.append( "Invalid passive repeater height to center RAAT, ");
-        }
-        if(prAnt.heightToCenterRAAT < 3) {
-            failReason.append( "Passive repeater height to center RAAT is < 3m, ");
         }
     }
 
