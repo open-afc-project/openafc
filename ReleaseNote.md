@@ -1,5 +1,16 @@
 # Release Note
-# Release Note
+## **Version and Date**
+Version|3.8.11.0|
+| :- | :- |
+|**Date**|**11/29/2023**|
+|compiled server's version is tbd | git tag 3.8.11.0|
+
+## **Issues Addressed**
+* Jira  OA-882 Switching from Alpine 3.17 to 3.18 (#724)
+* Jira  OA-883. afc_load_tools.py improvements (#725)
+* Jira  Oa 878 fix passive site agl height when it is low (#723)
+* Jira  OA-881. Fixes crashes on no-rcache operation (#722)
+* Jira  OA-877. Rcache and Prometheus bugfixes (#721)
 
 ## **Version and Date**
 |Version|**OA-878*|
