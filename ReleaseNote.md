@@ -3,7 +3,7 @@
 Version|3.8.11.0|
 | :- | :- |
 |**Date**|**11/29/2023**|
-|compiled server's version is tbd | git tag 3.8.11.0|
+|compiled server's version is f0626a4 | git tag 3.8.11.0|
 
 ## **Issues Addressed**
 * Jira  OA-882 Switching from Alpine 3.17 to 3.18 (#724)
