@@ -225,8 +225,6 @@ services:
   prometheus:
     image: public.ecr.aws/w9v6y1o0/openafc/prometheus-image:${TAG:-latest}
     restart: always
-    environment:
-      - PROMETHEUS_TARGETS=targets/dynamic.json,targets/cadvisor.json
     depends_on:
       - cadvisor
     dns_search: [.]
@@ -240,6 +238,10 @@ services:
     - /sys:/sys:ro
     - /var/lib/docker/:/var/lib/docker:ro
     - /dev/disk/:/dev/disk:ro
+    dns_search: [.]
+
+  nginxexporter:
+    image: public.ecr.aws/w9v6y1o0/openafc/nginxexporter-image:${TAG:-latest}
     dns_search: [.]
 
 volumes:

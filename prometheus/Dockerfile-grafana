@@ -8,3 +8,5 @@
 # Grafana dockerfile (for future expansion)
 
 FROM grafana/grafana-oss:10.2.0-ubuntu
+
+EXPOSE 3000/tcp

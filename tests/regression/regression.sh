@@ -22,6 +22,7 @@ RCACHE="${PUB_REPO}/rcache-image"                             # Request cache
 GRAFANA="${PUB_REPO}/grafana-image"                           # Grafana
 PROMETHEUS="${PUB_REPO}/prometheus-image"                     # Prometheus
 CADVISOR="${PUB_REPO}/cadvisor-image"                         # Cadvisor
+NGINXEXPORTER="${PUB_REPO}/nginxexporter-image"               # Nginx-exporter
 
 WORKER=${PRIV_REPO}"/afc-worker"                                    # msghnd image
 WORKER_AL_D4B="${PUB_REPO}/worker-al-build-image" # Alpine worker build img
@@ -173,6 +174,7 @@ build_dev_server() {
   # Build Prometheus-related images
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-prometheus ${PROMETHEUS}:${tag} ${push} &
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-cadvisor ${CADVISOR}:${tag} ${push} &
+  cd ${wd}/prometheus && docker_build_and_push Dockerfile-cadvisor ${NGINXEXPORTER}:${tag} ${push} &
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-prometheus ${GRAFANA}:${tag} ${push} &
 
   msg "wait for all images to be built"

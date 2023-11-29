@@ -20,6 +20,8 @@ ENV CADVISOR_METRICS=cpu,memory,process,sched
 # Additional arguments
 ENV CADVISOR_ADDITIONAL_ARGS=
 
+EXPOSE 9090
+
 ENTRYPOINT /usr/bin/cadvisor \
     -logtostderr \
     -docker_only=true \
