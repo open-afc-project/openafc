@@ -182,8 +182,8 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                 maxEirp: 30,
                 extraWarning: undefined,
                 extraWarningTitle: undefined,
-                status: hasRole("AP") ? "Error": undefined,
-                err: hasRole("AP")? error("AFC config was not loaded properly. Try refreshing the page."):undefined,
+                status: hasRole("AP") ? "Error" : undefined,
+                err: hasRole("AP") ? error("AFC config was not loaded properly. Try refreshing the page.") : undefined,
                 mapState: {
                     isModalOpen: false,
                     val: mapProps.geoJson,
@@ -302,9 +302,9 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
             const resp = await spectrumInquiryRequest(request);
             return this.processResponse(resp, request, rlanLoc);
         } catch (error) {
-            this.setState({status: "Error", err: {description: "Unable to sumbit request: "+error,kind:"Error",body: error}})
+            this.setState({ status: "Error", err: { description: "Unable to sumbit request: " + error, kind: "Error", body: error } })
         }
-     
+
     }
 
     private getLatLongFromRequest(request: AvailableSpectrumInquiryRequest): { lat: number, lng: number } | undefined {
@@ -326,22 +326,22 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
             return undefined
     }
 
-    private processResponse(resp: RatResponse<AvailableSpectrumInquiryResponseMessage>, request?: AvailableSpectrumInquiryRequest,rlanLoc? ) {
+    private processResponse(resp: RatResponse<AvailableSpectrumInquiryResponseMessage>, request?: AvailableSpectrumInquiryRequest, rlanLoc?) {
         if (resp.kind == "Success") {
             const response = resp.result.availableSpectrumInquiryResponses[0];
             if (response.response.responseCode === 0) {
                 const minEirp = request?.minDesiredPower || this.state.minEirp;
 
-                if (!!rlanLoc){
+                if (!!rlanLoc) {
                     this.setState({
                         status: "Success",
                         response: response,
-                        mapCenter:rlanLoc,
+                        mapCenter: rlanLoc,
                         clickedMapPoint: { latitude: rlanLoc.lat, longitude: rlanLoc.lng },
                         minEirp: minEirp,
                         fullJsonResponse: JSON.stringify(resp.result, (k, v) => (k == "kmzFile") ? "Removed binary data" : v, 2),
                     })
-                }else{
+                } else {
                     this.setState({
                         status: "Success",
                         response: response,
@@ -386,10 +386,8 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                                     coordinates: [rasterizeEllipse(request.location.ellipse, 32)]
                                 }
                             });
-
+                        this.setMapState({ val: geojson.geoJson, valid: true, versionId: this.state.mapState.versionId + 1 })
                     }
-                    this.setMapState({ val: geojson.geoJson, valid: true, versionId: this.state.mapState.versionId + 1 })
-
                 }
             }
         } else if (!resp.kind || resp.kind == "Error") {
@@ -413,8 +411,8 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
             this.setState({ sendDirectModalOpen: false, status: "Info" });
             return spectrumInquiryRequestByString("1.3", jsonString)
                 .then(resp => this.processResponse(resp))
-                .catch(error =>  
-                    this.setState({status: "Error", err: {description: "Unable to sumbit request: "+error,kind:"Error",body: error}}))
+                .catch(error =>
+                    this.setState({ status: "Error", err: { description: "Unable to sumbit request: " + error, kind: "Error", body: error } }))
         }
     }
 
@@ -438,7 +436,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
                                 <Modal key={"directSendModal"} title="Direct Send Request"
                                     isLarge={true}
                                     isOpen={this.state.sendDirectModalOpen}
-                                    onClose={() =>  this.showDirectSendModal(false)}
+                                    onClose={() => this.showDirectSendModal(false)}
                                     actions={[
                                         <Button key="sendDirect-close" variant="secondary" onClick={() => this.showDirectSendModal(false)}>Close</Button>,
                                         <Button key="sendDirect-send" variant="primary" onClick={() => this.sendDirect(this.state.sendDirectValue)}>Send</Button>

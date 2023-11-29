@@ -1,4 +1,16 @@
 # Release Note
+
+## **Version and Date**
+|Version|OA-880
+| :- | :- |
+|**Date**|**11/29/2023**|
+
+## **Issues Addressed**
+* Jira  Oa 880 fix-error-thrown-when-map-is-displayed-but-no-map-data-is-generated-due-to-configuration
+
+## **Testing Done**
+ * Manually replicated failing case with different show map configuration used in request than shown on page 
+
 ## **Version and Date**
 Version|3.8.11.0|
 | :- | :- |
