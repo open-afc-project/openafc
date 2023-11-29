@@ -673,6 +673,72 @@ WorkerResultInfo = \
                 ("error_msg", Optional[str])])
 
 
+# Message from Tick worker for EMA rate computation
+TickInfo = NamedTuple("TickInfo", [("tick", int)])
+
+# Type for result queue items
+ResultQueueDataType = Optional[Union[WorkerResultInfo, TickInfo]]
+
+
+class RateEma:
+    """ Exponential Moving Average for rate of change
+
+    Public attributes:
+    rate_ema -- Rate Average computed on last tick
+
+    Private attributes:
+    _worker     -- Tick worker process (generates TickInfo once per second)
+    _weight     -- Weight for EMA computation
+    _prev_value -- Value on previous tick
+    """
+    def __init__(self,
+                 result_queue: "multiprocessing.Queue[ResultQueueDataType]",
+                 win_size: float = 20) \
+            -> None:
+        """ Constructor
+
+        Arguments:
+        result_queue -- Queue for tick worker to put TickInfo objects
+        win_size     -- Averaging window size in seconds
+        """
+        self._worker = \
+            multiprocessing.Process(target=RateEma._tick_worker,
+                                    kwargs={"result_queue": result_queue})
+        self._worker.start()
+        self._weight = 2 / (win_size + 1)
+        self.rate_ema: float = 0
+        self._prev_value = 0
+
+    def on_tick(self, new_value: int) -> None:
+        """ Call on arrival of TickInfo message
+
+        Arguments:
+        new_value - Measured data value on this tick
+        """
+        increment = new_value - self._prev_value
+        self._prev_value = new_value
+        self.rate_ema += self._weight * (increment - self.rate_ema)
+
+    def stop(self) -> None:
+        """ Stops tick worker """
+        self._worker.terminate()
+
+    @classmethod
+    def _tick_worker(
+            cls, result_queue: "multiprocessing.Queue[ResultQueueDataType]") \
+            -> None:
+        """ Tick worker process
+
+        Arguments:
+        result_queue -- Queue to put TickInfo to
+        """
+        count = 0
+        while True:
+            time.sleep(1)
+            count += 1
+            result_queue.put(TickInfo(tick=count))
+
+
 class StatusPrinter:
     """ Prints status on a single line:
 
@@ -705,20 +771,22 @@ class ResultsProcessor:
     Private attributes:
     _total_requests    -- Total number of individual requests (not batches)
                           that will be executed
-    _result_queue      -- Queue with execution results, Nones for completed
-                          workers
+    _result_queue      -- Queue with execution results, second ticks, Nones for
+                          completed workers
     _status_period     -- Period of status printing (in terms of request
                           count), e.g. 1000 for once in 1000 requests, 0 to not
                           print status (except in the end)
     _rest_data_handler -- Generator/interpreter of REST request/response data
     _num_workers       -- Number of worker processes
+    _rate_ema          -- Rate averager
     _status_printer    -- StatusPrinter
     """
     def __init__(
             self, total_requests: int,
-            result_queue: "multiprocessing.Queue[Optional[WorkerResultInfo]]",
+            result_queue: "multiprocessing.Queue[ResultQueueDataType]",
             num_workers: int, status_period: int,
-            rest_data_handler: RestDataHandlerBase) -> None:
+            rest_data_handler: RestDataHandlerBase,
+            rate_ema: RateEma) -> None:
         """ Constructor
 
         Arguments:
@@ -738,6 +806,7 @@ class ResultsProcessor:
         self._status_period = status_period
         self._num_workers = num_workers
         self._rest_data_handler = rest_data_handler
+        self._rate_ema = rate_ema
         self._status_printer = StatusPrinter()
 
     def process(self) -> None:
@@ -753,66 +822,75 @@ class ResultsProcessor:
             elapsed = now - start_time
             elapsed_sec = elapsed.total_seconds()
             elapsed_str = re.sub(r"\.\d*$", "", str(elapsed))
+            rate = self._rate_ema.rate_ema if eta \
+                else (requests_sent / (elapsed_sec or 1E-3))
             ret = \
+                f"{'Progress: ' if eta else ''}" \
                 f"{requests_sent} requests sent " \
                 f"({requests_sent * 100 / self._total_requests:.1f}%), " \
                 f"{requests_failed} failed " \
                 f"({requests_failed * 100 / (requests_sent or 1):.1f}%), " \
                 f"{retries} retries made. " \
-                f"{elapsed_str} elapsed, rate is " \
-                f"{requests_sent / (elapsed_sec or 1E-3):.1f} req/sec"
+                f"{elapsed_str} elapsed, rate is {rate:.1f} req/sec"
             if eta and elapsed_sec and requests_sent:
                 total_duration = \
                     datetime.timedelta(
                         seconds=self._total_requests * elapsed_sec /
                         requests_sent)
                 eta_dt = start_time + total_duration
-                ret += f". ETA: {eta_dt.strftime('%X')} " \
-                    f"(in {int((eta_dt - now).total_seconds()) // 60} minutes)"
+                tta_sec = int((eta_dt - now).total_seconds())
+                tta = f"{tta_sec // 60} minutes" if tta_sec >= 60 else \
+                    f"{tta_sec} seconds"
+                ret += f". ETA: {eta_dt.strftime('%X')} (in {tta})"
             return ret
 
-        while True:
-            result_info = self._result_queue.get()
-            if result_info is None:
-                self._num_workers -= 1
-                if self._num_workers == 0:
-                    break
-                continue
-            error_msg = result_info.error_msg
-            error_map: Dict[int, str] = {}
-            if error_msg is None:
-                try:
-                    error_map = \
-                        self._rest_data_handler.make_error_map(
-                            result_data=result_info.result_data)
-                except Exception as ex:
-                    error_msg = f"Error decoding message " \
-                        f"{result_info.result_data!r}: {repr(ex)}"
-            if error_msg:
-                self._status_printer.pr()
-                logging.error(
-                    f"Request with indices "
-                    f"({', '.join(str(i) for i in result_info.req_indices)}) "
-                    f"failed: {error_msg}")
+        try:
+            while True:
+                result_info = self._result_queue.get()
+                if result_info is None:
+                    self._num_workers -= 1
+                    if self._num_workers == 0:
+                        break
+                    continue
+                if isinstance(result_info, TickInfo):
+                    self._rate_ema.on_tick(requests_sent)
+                    continue
+                error_msg = result_info.error_msg
+                error_map: Dict[int, str] = {}
+                if error_msg is None:
+                    try:
+                        error_map = \
+                            self._rest_data_handler.make_error_map(
+                                result_data=result_info.result_data)
+                    except Exception as ex:
+                        error_msg = f"Error decoding message " \
+                            f"{result_info.result_data!r}: {repr(ex)}"
+                if error_msg:
+                    self._status_printer.pr()
+                    logging.error(
+                        f"Request with indices "
+                        f"({', '.join(str(i) for i in result_info.req_indices)}) "
+                        f"failed: {error_msg}")
 
-            for idx, error_msg in error_map.items():
-                self._status_printer.pr()
-                logging.error(f"Request {idx} failed: {error_msg}")
+                for idx, error_msg in error_map.items():
+                    self._status_printer.pr()
+                    logging.error(f"Request {idx} failed: {error_msg}")
 
-            prev_sent = requests_sent
-            requests_sent += len(result_info.req_indices)
-            retries += result_info.retries
-            if result_info.error_msg:
-                requests_failed += len(result_info.req_indices)
-            else:
-                requests_failed += len(error_map)
+                prev_sent = requests_sent
+                requests_sent += len(result_info.req_indices)
+                retries += result_info.retries
+                if result_info.error_msg:
+                    requests_failed += len(result_info.req_indices)
+                else:
+                    requests_failed += len(error_map)
 
-            if self._status_period and \
-                    ((prev_sent // self._status_period) !=
-                     (requests_sent // self._status_period)):
-                self._status_printer.pr(status_message(eta=True))
-        self._status_printer.pr()
-        logging.info(status_message(eta=False))
+                if self._status_period and \
+                        ((prev_sent // self._status_period) !=
+                         (requests_sent // self._status_period)):
+                    self._status_printer.pr(status_message(eta=True))
+        finally:
+            self._status_printer.pr()
+            logging.info(status_message(eta=False))
 
     def _print(self, s: str, newline: bool, is_error: bool) -> None:
         """ Print message
@@ -936,7 +1014,7 @@ def producer_worker(
     Arguments:
     batch             -- Batch size (number of requests per POST)
     min_idx           -- Minimum request index
-    max_idx           -- Afremaximum request index
+    max_idx           -- Aftremaximum request index
     count             -- Optional count of requests to send. None means that
                          requests will be sent sequentially according to range.
                          If specified - request indices will be randomized
@@ -986,7 +1064,7 @@ def run(rest_data_handler: RestDataHandlerBase, url: str, parallel: int,
     dry               -- True to dry run
     batch             -- Batch size (number of requests per POST)
     min_idx           -- Minimum request index
-    max_idx           -- Afremaximum request index
+    max_idx           -- Aftermaximum request index
     status_period     -- Period (in terms of count) of status message prints (0
                          to not at all)
     count             -- Optional count of requests to send. None means that
@@ -1013,15 +1091,11 @@ def run(rest_data_handler: RestDataHandlerBase, url: str, parallel: int,
         logging.info("Intermediate status is not printed")
     req_queue: "multiprocessing.Queue[Optional[WorkerReqInfo]]" = \
         multiprocessing.Queue()
-    result_queue: "multiprocessing.Queue[Optional[WorkerResultInfo]]" = \
+    result_queue: "multiprocessing.Queue[ResultQueueDataType]" = \
         multiprocessing.Queue()
-    results_processor = \
-        ResultsProcessor(
-            total_requests=count if count is not None else (max_idx-min_idx),
-            result_queue=result_queue, num_workers=parallel,
-            status_period=status_period, rest_data_handler=rest_data_handler)
     workers: List[multiprocessing.Process] = []
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
+    rate_ema: Optional[RateEma] = None
     try:
         for _ in range(parallel):
             workers.append(
@@ -1042,7 +1116,15 @@ def run(rest_data_handler: RestDataHandlerBase, url: str, parallel: int,
                         "rest_data_handler": rest_data_handler,
                         "req_queue": req_queue}))
         workers[-1].start()
+        rate_ema = RateEma(result_queue)
         signal.signal(signal.SIGINT, original_sigint_handler)
+        results_processor = \
+            ResultsProcessor(
+                total_requests=count if count is not None
+                else (max_idx - min_idx),
+                result_queue=result_queue, num_workers=parallel,
+                status_period=status_period,
+                rest_data_handler=rest_data_handler, rate_ema=rate_ema)
         results_processor.process()
         for worker in workers:
             worker.join()
@@ -1050,6 +1132,8 @@ def run(rest_data_handler: RestDataHandlerBase, url: str, parallel: int,
         for worker in workers:
             if worker.is_alive():
                 worker.terminate()
+        if rate_ema:
+            rate_ema.stop()
 
 
 def do_preload(cfg: Config, args: Any) -> None:
@@ -1097,7 +1181,7 @@ def do_preload(cfg: Config, args: Any) -> None:
                 afc_config_str = f.read().decode('utf-8')
         except (urllib.error.HTTPError, urllib.error.URLError) as ex:
             error(f"Error retrieving AFC Config for Ruleset ID "
-                  f"'{cfg.region.rulesest_id}' using URL get_config.url : "
+                  f"'{cfg.region.rulesest_id}' using URL get_config.url: "
                   f"{repr(ex)}")
         try:
             afc_config = json.loads(afc_config_str)
@@ -1353,7 +1437,7 @@ def main(argv: List[str]) -> None:
     parser_load.add_argument(
         "--localhost", nargs="?", choices=["http", "https"], const="http",
         help="If --afc not specified, default is to send requests to msghnd "
-        "container (bypassing nginx container). This flag causes requests to "
+        "container (bypassing Nginx container). This flag causes requests to "
         "be sent to external http/https AFC port on localhost. If protocol "
         "not specified http is assumed")
     parser_load.add_argument(
