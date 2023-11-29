@@ -61,7 +61,7 @@ ARG AFC_WORKER_UID=${AFC_WORKER_UID}
 RUN /wd/devel.sh
 RUN rm -f /wd/devel.sh /wd/ddd.tar.gz
 
-FROM alpine:3.17
+FROM alpine:3.18
 COPY --from=install_image / /
 
 LABEL revision="afc-worker-al"

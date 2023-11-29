@@ -9,7 +9,7 @@
 # Kafka and puts them to PostgreSQL+PostGIS database (optionally creating
 # necessary database before operation)
 
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 WORKDIR /usr/app
 

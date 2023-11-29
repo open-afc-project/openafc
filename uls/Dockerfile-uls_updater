@@ -39,7 +39,7 @@ RUN apk add py3-sqlalchemy py3-numpy
 COPY uls/uls-docker-entrypoint.sh /wd/
 RUN chmod +x /wd/uls-docker-entrypoint.sh
 
-FROM alpine:3.17
+FROM alpine:3.18
 COPY --from=install_image / /
 
 WORKDIR /wd

@@ -6,7 +6,7 @@
 #
 # Install required packages
 #
-FROM alpine:3.17 as cert_db.preinstall
+FROM alpine:3.18 as cert_db.preinstall
 ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
 apk add --update --no-cache py3-sqlalchemy py3-cryptography py3-numpy \
@@ -20,7 +20,7 @@ RUN echo "AFC_APP_TYPE = 'cert_db'" >> /etc/xdg/fbrat/ratapi.conf
 #
 # Build Message Handler application
 #
-FROM alpine:3.17 as cert_db.build
+FROM alpine:3.18 as cert_db.build
 COPY --from=cert_db.preinstall / /
 # Development env
 RUN apk add --update --no-cache cmake ninja
@@ -37,7 +37,7 @@ ninja -j$(nproc) install
 #
 # Install FCCID_DB application
 #
-FROM alpine:3.17 as cert_db.install
+FROM alpine:3.18 as cert_db.install
 COPY --from=cert_db.preinstall / /
 COPY --from=cert_db.build /wd/__install /usr/
 COPY src/afc-packages /wd/afc-packages

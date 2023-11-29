@@ -5,6 +5,6 @@ if [ -e /wd/private/images ]; then
 fi
 
 if [ -e /wd/private/templates ]; then
-    cp -R /wd/private/templates/*   /usr/lib/python3.10/site-packages/ratapi/templates/
+    cp -R /wd/private/templates/*   /usr/lib/python3.11/site-packages/ratapi/templates/
 fi
 

@@ -6,7 +6,7 @@
 #
 # Install required packages
 #
-FROM httpd:2.4.55-alpine as rat_server.preinstall
+FROM httpd:2.4.58-alpine as rat_server.preinstall
 ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
 apk add --update --no-cache py3-six py3-numpy py3-cryptography py3-sqlalchemy \
@@ -21,7 +21,7 @@ RUN echo "AFC_APP_TYPE = 'server'" >> /etc/xdg/fbrat/ratapi.conf
 #
 # Build Message Handler application
 #
-FROM httpd:2.4.55-alpine as rat_server.build
+FROM httpd:2.4.58-alpine as rat_server.build
 COPY --from=rat_server.preinstall / /
 # Development env
 RUN apk add --update --no-cache build-base cmake ninja yarn \
@@ -43,10 +43,10 @@ ninja -j$(nproc) install
 #
 # Install Message Handler application
 #
-FROM httpd:2.4.55-alpine as install_image
+FROM httpd:2.4.58-alpine as install_image
 COPY --from=rat_server.preinstall / /
 COPY --from=rat_server.build /wd/__install /usr/
-COPY --from=rat_server.build /usr/lib/python3.10/site-packages/mod_wsgi /usr/lib/python3.10/site-packages/mod_wsgi
+COPY --from=rat_server.build /usr/lib/python3.11/site-packages/mod_wsgi /usr/lib/python3.11/site-packages/mod_wsgi
 #
 COPY src/afc-packages /wd/afc-packages
 RUN pip3 install --use-pep517 --root-user-action=ignore \
