@@ -9,6 +9,7 @@ GeoAlchemy2==0.12.5
 kafka-python==2.0.2
 lz4==4.3.2
 postgis==1.0.4
+prometheus-client==0.17.1
 psycopg2-binary==2.9.5
 pyparsing==3.0.9
 python-dateutil==2.8.2

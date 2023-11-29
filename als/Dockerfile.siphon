@@ -13,6 +13,7 @@ FROM python:3.11-slim
 
 WORKDIR /usr/app
 
+RUN mkdir -p -m 777 /usr/app
 COPY requirements.txt /usr/app/
 RUN /usr/local/bin/python3 -m pip install --upgrade pip
 RUN pip3 install --no-cache-dir -r requirements.txt
@@ -65,13 +66,12 @@ ENV POSTGRES_LOG_OPTIONS=
 # What to do if database being created already exists: 'skip', 'drop'. Default
 # is to fail
 ENV INIT_IF_EXISTS=skip
-# True/yes/1/+ to print siphon progress/heartbeat information to stdout,
-# False/no/0/- to not to. Default is not to print
-ENV SIPHON_PROGRESS=false
+# Port to serve Prometheus metrics on (none/empty is to not serve)
+ENV SIPHON_PROMETHEUS_PORT=8080
 
-COPY als_siphon.py /usr/app
+COPY als_siphon.py als_query.py als_tool.py /usr/app/
+RUN chmod a+x /usr/app/*.py
 COPY ALS.sql /usr/app
-COPY als_query.py /usr/app
 
 ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_servers=$KAFKA_SERVERS \
@@ -90,6 +90,6 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --als_postgres_password=$POSTGRES_ALS_PASSWORD \
     --log_postgres=postgresql://${POSTGRES_LOG_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_LOG_DB}${POSTGRES_LOG_OPTIONS} \
     --log_postgres_password=$POSTGRES_LOG_PASSWORD \
-    --progress=$SIPHON_PROGRESS \
+    --prometheus_port=$SIPHON_PROMETHEUS_PORT \
     --if_exists=$INIT_IF_EXISTS \
     --als_sql /usr/app/ALS.sql

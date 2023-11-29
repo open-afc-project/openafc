@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Tool for moving data from Kafka to PostgreSQL/PostGIS database
+"""Tool for moving data from Kafka to PostgreSQL/PostGIS database """
 
 # Copyright (C) 2022 Broadcom. All rights reserved.
 # The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
@@ -16,7 +16,6 @@
 from abc import ABC, abstractmethod
 import argparse
 from collections.abc import Iterable
-import copy
 import enum
 import datetime
 import dateutil.tz                                  # type: ignore
@@ -31,9 +30,12 @@ import logging
 import lz4.frame                                    # type: ignore
 import math
 import os
+import prometheus_client                            # type: ignore
+import random
 import re
 import sqlalchemy as sa                             # type: ignore
 import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
+import string
 import sys
 from typing import Any, Dict, Generic, List, NamedTuple, Optional, Set, \
     Tuple, Type, TypeVar, Union
@@ -272,6 +274,88 @@ def get_month_idx() -> int:
     """ Computes month index """
     d = datetime.datetime.now()
     return (d.year - 2022) * 12 + (d.month - 1)
+
+
+class Metrics:
+    """ Wrapper around collection of Prometheus metrics
+
+    Private attributes:
+    _metrics -- Dictionary of _metric objects, indexed by metric name
+    """
+    # Value for 'id' label of all metrics
+    INSTANCE_ID = \
+        "".join(random.choices(string.ascii_uppercase + string.digits, k=10))
+
+    class MetricDef(NamedTuple):
+        """ Metric definition """
+        # Metric type ("Counter", "Summary", "Histogram" or "Info"
+        metric_type: str
+        # Metric name
+        name: str
+        # Metric description
+        dsc: str
+        # Optional list of additional labels (bnesides 'id'
+        labels: Optional[List[str]] = None
+
+    class _Metric:
+        """ Metric wrapper.
+
+        Holds metric object, its call operator returns value that 'labels()',
+        of wrapped metric returns
+
+        Private attributes:
+        _metric -- Metric objects
+        _labels -- List of additional (besides 'id') label names
+        """
+        def __init__(self, metric_def: "Metrics.MetricDef") -> None:
+            """ Constructor
+
+            Arguments:
+            metric_def -- Metric definition
+            """
+            metric_class = getattr(prometheus_client, metric_def.metric_type)
+            assert metric_class is not None
+            self._labels: List[str] = metric_def.labels or []
+            self._metric = metric_class(metric_def.name, metric_def.dsc,
+                                        ["id"] + self._labels)
+
+        def __call__(self, *args, **kwargs) -> Any:
+            """ Returns output value of 'labels()' of wrapped metric.
+
+            Arguments are values of additional labels
+            """
+            assert (len(args) + len(kwargs)) == len(self._labels)
+            return self._metric.labels(
+                Metrics.INSTANCE_ID,
+                *[self._arg_to_str(arg) for arg in args],
+                **{arg_name: self._arg_to_str(arg_value)
+                   for arg_name, arg_value in kwargs.items()})
+
+        def _arg_to_str(self, arg: Any) -> str:
+            """ Somehow onvert argument value to string """
+            if isinstance(arg, bytes):
+                return arg.decode(encoding="utf-8", errors="backslashreplace")
+            return str(arg)
+
+    def __init__(self,
+                 metric_defs: List[Union["Metrics.MetricDef", Tuple]]) -> None:
+        """ Constructor
+
+        Arguments:
+        metric_def -- List of metric definitions
+        """
+        self._metrics: Dict[str, "Metrics._Metric"] = {}
+        for md in metric_defs:
+            if not isinstance(md, self._Metric):
+                md = self.MetricDef(*md)
+                assert md.name not in self._metrics
+                self._metrics[md.name] = self._Metric(md)
+
+    def __getattr__(self, name: str) -> Any:
+        """ Metric lookup by name as attribute """
+        metric = self._metrics.get(name)
+        assert metric is not None
+        return metric
 
 
 class BytesUtils:
@@ -607,7 +691,7 @@ class KafkaPositions:
         _queue   -- Heap queue of offset information objects
         _catalog -- Catalog of offset information objects by offset
         """
-        def __init__(self):
+        def __init__(self) -> None:
             """ Constructor """
             self._queue: List["KafkaPositions.OffsetInfo"] = []
             self._catalog: Dict[int, "KafkaPositions.OffsetInfo"] = {}
@@ -650,7 +734,7 @@ class KafkaPositions:
             """ Debug print representation """
             return f"<{self._catalog}>"
 
-    def __init__(self):
+    def __init__(self) -> None:
         """ Constructor """
         self._topics: Dict[str, Dict[int,
                                      "KafkaPositions.PartitionOffsets"]] = {}
@@ -906,7 +990,7 @@ class AlsMessageBundle:
                 if self._configs else None}
 
     def request_count(self) -> int:
-        """ Number of container requests """
+        """ Number of contained requests """
         assert self._request_msg is not None
         try:
             return \
@@ -1055,7 +1139,7 @@ class AlsMessageBundle:
         return isinstance(other, self.__class__) and \
             (self._message_key == other._message_key)
 
-    def __del__(self):
+    def __del__(self) -> None:
         """ Destructor (marks ALS messages as processed """
         for als_position in self._als_positions:
             self._kafka_positions.mark_processed(als_position)
@@ -1246,7 +1330,7 @@ class Lookups:
     Private attributes:
     _lookups -- List of registered LookupBase objects
     """
-    def __init__(self):
+    def __init__(self) -> None:
         """ Constructor """
         self._lookups: List["LookupBase"] = []
 
@@ -2800,22 +2884,26 @@ class IncompleteAlsBundles:
         self._bundle_map: Dict[AlsMessageKeyType, AlsMessageBundle] = {}
 
     def add_message(self, message_key: AlsMessageKeyType, message: AlsMessage,
-                    kafka_position: KafkaPosition) -> None:
+                    kafka_position: KafkaPosition) -> bool:
         """ Adds ALS message
 
         Arguments:
         message_key    -- Kafka message key
         message        -- AlsMessage
         kafka_position -- Message's position in Kafka queue
+        Returns True if new bundle was created
         """
+        ret = False
         bundle = self._bundle_map.get(message_key)
         if bundle is None:
+            ret = True
             bundle = AlsMessageBundle(message_key=message_key,
                                       kafka_positions=self._kafka_positions)
             heapq.heappush(self._bundle_queue, bundle)
             self._bundle_map[message_key] = bundle
         bundle.update(message, kafka_position)
         heapq.heapify(self._bundle_queue)
+        return ret
 
     def get_oldest_bundle(self) -> Optional[AlsMessageBundle]:
         """ Get the oldest bundle (None if collection is empty) """
@@ -2906,7 +2994,8 @@ class KafkaConsumerParams:
         self.auto_offset_reset = "earliest"
 
         self.bootstrap_servers: List[str] = \
-            self.servers.split(",") if self.servers else [DEFAULT_KAFKA_SERVER]
+            self.servers.split(",") if (self.servers is not None) \
+            else [DEFAULT_KAFKA_SERVER]
         self.servers = None
 
         self.client_id = self.client_id or DEFAULT_KAFKA_CLIENT_ID
@@ -3024,119 +3113,32 @@ class Siphon:
     """ Siphon (Kafka reader / DB updater
 
     Private attributes:
-    _adb                     -- AlsDatabase object or None
-    _ldb                     -- LogsDatabase object or None
-    _kafka_client            -- KafkaClient consumer wrapper object
-    _decode_error_writer     -- Decode error table writer
-    _lookups                 -- Lookup collection
-    _cert_lookup             -- Certificates' lookup
-    _afc_config_lookup       -- AFC Configs lookup
-    _afc_server_lookup       -- AFC Server name lookup
-    _customer_lookup         -- Customer name lookup
-    _uls_lookup              -- ULS ID lookup
-    _geo_data_lookup         -- Geodetic Data ID lookup
-    _dev_desc_updater        -- DeviceDescriptor table updater
-    _location_updater        -- Location table updater
-    _compressed_json_updater -- Compressed JSON table updater
-    _max_eirp_updater        -- Maximum EIRP table updater
-    _max_psd_updater         -- Maximum PSD table updater
-    _req_resp_updater        -- Request/Response table updater
-    _rx_envelope_updater     -- AFC Request envelope table updater
-    _tx_envelope_updater     -- AFC Response envelope tabgle updater
-    _req_resp_assoc_updater  -- Request/Response to Message association table
-                                updater
-    _afc_message_updater     -- Message table updater
-    _kafka_positions         -- Nonprocessed Kafka positions' collection
-    _als_bundles             -- Incomplete ALS Bundler collection
-    _report_progress         -- True to report progress periodically
-    _progress_info           -- ProgressInfo object with cumulative statistics
-    _prev_progress_info      -- None or previously reported ProgressInfo
+    _adb                        -- AlsDatabase object or None
+    _ldb                        -- LogsDatabase object or None
+    _kafka_client               -- KafkaClient consumer wrapper object
+    _decode_error_writer        -- Decode error table writer
+    _lookups                    -- Lookup collection
+    _cert_lookup                -- Certificates' lookup
+    _afc_config_lookup          -- AFC Configs lookup
+    _afc_server_lookup          -- AFC Server name lookup
+    _customer_lookup            -- Customer name lookup
+    _uls_lookup                 -- ULS ID lookup
+    _geo_data_lookup            -- Geodetic Data ID lookup
+    _dev_desc_updater           -- DeviceDescriptor table updater
+    _location_updater           -- Location table updater
+    _compressed_json_updater    -- Compressed JSON table updater
+    _max_eirp_updater           -- Maximum EIRP table updater
+    _max_psd_updater            -- Maximum PSD table updater
+    _req_resp_updater           -- Request/Response table updater
+    _rx_envelope_updater        -- AFC Request envelope table updater
+    _tx_envelope_updater        -- AFC Response envelope tabgle updater
+    _req_resp_assoc_updater     -- Request/Response to Message association
+                                   table updater
+    _afc_message_updater        -- Message table updater
+    _kafka_positions            -- Nonprocessed Kafka positions' collection
+    _als_bundles                -- Incomplete ALS Bundler collection
+    _metrics                    -- Collection of Prometheus metrics
     """
-    class ProgressInfo:
-        """ Progress information
-
-        Public attributes:
-        kafka_received      -- Number of Kafka messages received
-        kafka_polls         -- Number of Kafka polls
-        als_received        -- Number of ALS messages (all types) received
-        log_processed       -- Number of JSON logs received and processed
-        als_written         -- Number of ALS bundles written to DB
-        als_retired         -- Number of ALS bundles retired (aged incomplete)
-        als_format_failures -- Number of ALS JSON format failures
-        log_format_failures -- Number of JSON Log format failures
-        timetag             -- Time of creation or last report generation
-        """
-        def __init__(self) -> None:
-            """ Constructor """
-            self.kafka_received: int = 0
-            self.kafka_polls: int = 0
-            self.als_received: int = 0
-            self.log_processed: int = 0
-            self.als_written: int = 0
-            self.als_retired: int = 0
-            self.als_format_failures: int = 0
-            self.log_format_failures: int = 0
-            self.timetag: datetime.datetime = datetime.datetime.now()
-
-        def report(self, prev: Optional["Siphon.ProgressInfo"],
-                   als_bundles: IncompleteAlsBundles) -> str:
-            """ Progress report
-
-            Arguments:
-            prev        -- ProgressInfo used at previous report generation or
-                           None
-            als_bundles -- IncompleteAlsBundles object
-            Returns progress report string
-            """
-            self.timetag = datetime.datetime.now()
-            age_sec = 0 if prev is None \
-                else (self.timetag - prev.timetag).total_seconds()
-            ret = \
-                f"{datetime.datetime.now()}. " \
-                f"Kafka {self.kafka_received} msg in {self.kafka_polls} polls"
-            if prev:
-                ret += \
-                    f" ({self.rate(prev, 'kafka_received', age_sec)} msg/s, " \
-                    f"{self.rate(prev, 'kafka_polls', age_sec)} poll/s)"
-            ret += \
-                f"\nALS {self.als_received} msg received, " \
-                f"{self.als_written} DB writes, {self.als_retired} retires"
-            if prev:
-                ret += \
-                    f" ({self.rate(prev, 'als_received', age_sec)} msg/s, " \
-                    f"{self.rate(prev, 'als_written', age_sec)} DB/s, " \
-                    f"{self.rate(prev, 'als_retired', age_sec)} ret/s)"
-            ret += \
-                f"\nALS incomplete {als_bundles.get_incomplete_count()}, " \
-                f"{self.als_retired} retired"
-            if prev:
-                ret += f" ({self.rate(prev, 'als_retired', age_sec)} retire/s"
-            ret += f"\nLogs {self.log_processed}"
-            if prev:
-                ret += \
-                    f" ({self.rate(prev, 'log_processed', age_sec)} log/s)"
-            ret += f"\nErr {self.als_format_failures} ALS, " \
-                f"{self.log_format_failures} Log"
-            if prev:
-                ret += \
-                    f" ({self.rate(prev, 'als_format_failures', age_sec)} " \
-                    f"ALS err/s, " \
-                    f"{self.rate(prev, 'log_format_failures', age_sec)} " \
-                    f"log err/s)"
-            return ret
-
-        def rate(self, prev: "Siphon.ProgressInfo", attr: str,
-                 duration_sec: float) -> float:
-            """ Per-second difference in value of given attribute
-
-            Arguments:
-            prev         -- ProgressReport object with previous values
-            attr         -- Atribute of interest
-            duration_sec -- Time elapsed in seconds
-            Returns per-second change
-            """
-            return (getattr(self, attr) - getattr(prev, attr)) / duration_sec
-
     # Number of messages fetched from Kafka in single access
     KAFKA_MAX_RECORDS = 1000
     # Kafka server access timeout if system is idle
@@ -3145,21 +3147,42 @@ class Siphon:
     ALS_MAX_AGE_SEC = 1000
     # Maximum number of message bundles to write to database
     ALS_MAX_MESSAGE_UPDATE = 1000
-    # Progress Report Interval in seconds
-    PROGRESS_REPORT_INTERVAL_SEC = 5
 
     def __init__(self, adb: Optional[AlsDatabase], ldb: Optional[LogsDatabase],
-                 kafka_client: KafkaClient, report_progress: bool) -> None:
+                 kafka_client: KafkaClient) -> None:
         """ Constructor
 
         Arguments:
         adb             -- AlsDatabase object or None
         ldb             -- LogsDatabase object or None
         kafka_client    -- KafkaClient
-        report_progress -- True to report progress periodically
         """
         error_if(not (adb or ldb),
                  "Neither ALS nor Logs database specified. Nothing to do")
+        self._metrics = \
+            Metrics([("Counter", "siphon_kafka_polls",
+                      "Number of Kafka polls"),
+                     ("Counter", "siphon_als_received",
+                      "Number of ALS records received from Kafka"),
+                     ("Counter", "siphon_als_malformed",
+                      "Number of malformed ALS records received from Kafka"),
+                     ("Counter", "siphon_log_received",
+                      "Number of LOG records received from Kafka", ["topic"]),
+                     ("Counter", "siphon_log_malformed",
+                      "Number of malformed LOG records received from Kafka",
+                      ["topic"]),
+                     ("Counter", "siphon_afc_msg_received",
+                      "Number of AFC Request messages received"),
+                     ("Counter", "siphon_afc_msg_completed",
+                      "Number of completed AFC Request messages"),
+                     ("Counter", "siphon_afc_req_completed",
+                      "Number of completed AFC Requests"),
+                     ("Counter", "siphon_afc_msg_dropped",
+                      "Number of incomplete AFC Request messages"),
+                     ("Gauge", "siphon_afc_msg_in_progress",
+                      "Number of AFC Request messages awaiting completion"),
+                     ("Gauge", "siphon_comitted_offsets",
+                      "Comitted Kafka offsets", ["topic", "partition"])])
         self._adb = adb
         self._ldb = ldb
         self._kafka_client = kafka_client
@@ -3227,31 +3250,23 @@ class Siphon:
         self._kafka_positions = KafkaPositions()
         self._als_bundles = \
             IncompleteAlsBundles(kafka_positions=self._kafka_positions)
-        self._report_progress = report_progress
-        self._progress_info = self.ProgressInfo()
-        self._prev_progress_info: Optional["Siphon.ProgressInfo"] = None
 
     def main_loop(self) -> None:
         """ Read/write loop """
         busy = True
         while True:
-            self._print_progress_report()
             kafka_messages_by_topic = \
                 self._kafka_client.poll(
                     timeout_ms=0 if busy else self.KAFKA_IDLE_TIMEOUT_MS,
                     max_records=self.KAFKA_MAX_RECORDS)
-            self._progress_info.kafka_received += \
-                sum(len(msgs) for msgs in kafka_messages_by_topic.values())
-            self._progress_info.kafka_polls += 1
+            self._metrics.siphon_kafka_polls().inc()
 
             busy = bool(kafka_messages_by_topic)
             for topic, kafka_messages in kafka_messages_by_topic.items():
                 if topic == ALS_KAFKA_TOPIC:
-                    self._progress_info.als_received += len(kafka_messages)
                     self._read_als_kafka_messages(kafka_messages)
                 else:
                     self._process_log_kafka_messages(topic, kafka_messages)
-                    self._progress_info.log_processed += len(kafka_messages)
             if self._adb:
                 busy |= self._write_als_messages()
                 busy |= self._timeout_als_messages()
@@ -3268,14 +3283,18 @@ class Siphon:
         """
         for kafka_message in kafka_messages:
             self._kafka_positions.add(kafka_message.position)
+            self._metrics.siphon_als_received().inc()
             try:
                 assert kafka_message.key is not None
-                self._als_bundles.add_message(
-                    message_key=kafka_message.key,
-                    message=AlsMessage(raw_msg=kafka_message.value),
-                    kafka_position=kafka_message.position)
+                if self._als_bundles.add_message(
+                        message_key=kafka_message.key,
+                        message=AlsMessage(raw_msg=kafka_message.value),
+                        kafka_position=kafka_message.position):
+                    self._metrics.siphon_afc_msg_received().inc()
+                    self._metrics.siphon_afc_msg_in_progress().set(
+                        self._als_bundles.get_incomplete_count())
             except (AlsProtocolError, JsonFormatError) as ex:
-                self._progress_info.als_format_failures += 1
+                self._metrics.siphon_als_malformed().inc()
                 self._decode_error_writer.write_decode_error(
                     msg=ex.msg, line=ex.code_line, data=ex.data)
                 self._kafka_positions.mark_processed(
@@ -3292,6 +3311,7 @@ class Siphon:
         """
         records: List[LogsDatabase.Record] = []
         for kafka_message in kafka_messages:
+            self._metrics.siphon_log_received(topic).inc()
             self._kafka_positions.add(kafka_message.position)
             try:
                 log_message = json.loads(kafka_message.value)
@@ -3303,10 +3323,11 @@ class Siphon:
                         log=json.loads(log_message["jsonData"])))
             except (json.JSONDecodeError, LookupError, TypeError, ValueError) \
                     as ex:
-                self._progress_info.log_format_failures += 1
+                self._metrics.siphon_log_malformed(topic).inc()
                 logging.error(
-                    f"Can't decode log message '{kafka_message.value}': {ex}")
-        if records:
+                    f"Can't decode log message '{kafka_message.value!r}': "
+                    f"{repr(ex)}")
+        if records and (self._ldb is not None):
             transaction: Optional[Any] = None
             try:
                 transaction = self._ldb.conn.begin()
@@ -3331,13 +3352,17 @@ class Siphon:
                         max_bundles=self.ALS_MAX_MESSAGE_UPDATE)))
             if not data_dict:
                 return False
+            req_count = \
+                sum(bundle.request_count() for bundle in data_dict.values())
             transaction = self._adb.conn.begin()
             self._afc_message_updater.update_db(data_dict, month_idx=month_idx)
             transaction.commit()
+            self._metrics.siphon_afc_msg_completed().inc(len(data_dict))
+            self._metrics.siphon_afc_req_completed().inc(req_count)
+            self._metrics.siphon_afc_msg_in_progress().set(
+                self._als_bundles.get_incomplete_count())
             transaction = None
-            self._progress_info.als_written += len(data_dict)
         except JsonFormatError as ex:
-            self._progress_info.als_format_failures += 1
             if transaction is not None:
                 transaction.rollback()
                 transaction = None
@@ -3361,12 +3386,12 @@ class Siphon:
                     (oldest_bundle.last_update() > boundary):
                 break
             ret = True
-            self._progress_info.als_retired += 1
             self._als_bundles.remove_oldest_bundle()
             self._decode_error_writer.write_decode_error(
                 "Incomplete message bundle removed",
                 line=LineNumber.current(),
                 data=oldest_bundle.dump())
+            self._metrics.siphon_afc_msg_dropped().inc()
         return ret
 
     def _commit_kafka_offsets(self) -> bool:
@@ -3375,20 +3400,12 @@ class Siphon:
         completed_offsets = self._kafka_positions.get_processed_offsets()
         if not completed_offsets:
             return False
+        for topic, partitions in completed_offsets.items():
+            for partition, offset in partitions.items():
+                self._metrics.siphon_comitted_offsets(topic, partition).\
+                    set(offset)
         self._kafka_client.commit(completed_offsets)
         return True
-
-    def _print_progress_report(self) -> None:
-        """ Report progress if it's time """
-        if not self._report_progress or \
-                ((datetime.datetime.now() -
-                  self._progress_info.timetag).total_seconds() <
-                 self.PROGRESS_REPORT_INTERVAL_SEC):
-            return
-        print(self._progress_info.report(prev=self._prev_progress_info,
-                                         als_bundles=self._als_bundles),
-              flush=True)
-        self._prev_progress_info = copy.copy(self._progress_info)
 
 
 def read_sql_file(sql_file: str) -> str:
@@ -3470,6 +3487,8 @@ def do_siphon(args: Any) -> None:
     Arguments:
     args -- Parsed command line arguments
     """
+    if args.prometheus_port is not None:
+        prometheus_client.start_http_server(args.prometheus_port)
     adb = AlsDatabase(arg_conn_str=args.als_postgres,
                       arg_password=args.als_postgres_password) \
         if args.als_postgres else None
@@ -3487,8 +3506,7 @@ def do_siphon(args: Any) -> None:
                 topic_regex_str=ALS_KAFKA_TOPIC if not ldb
                 else (f"^(?!.*{ALS_KAFKA_TOPIC}).*$" if not adb else ".+"),
                 resubscribe_interval_s=5)
-        siphon = Siphon(adb=adb, ldb=ldb, kafka_client=kafka_client,
-                        report_progress=args.progress)
+        siphon = Siphon(adb=adb, ldb=ldb, kafka_client=kafka_client)
         siphon.main_loop()
     finally:
         if adb is not None:
@@ -3520,7 +3538,7 @@ def do_help(args: Any) -> None:
         args.subparsers.choices[args.subcommand].print_help()
 
 
-def convert_bool_arg(s):
+def convert_bool_arg(s) -> bool:
     """ Converts given string to boolean """
     s = s.lower()
     if s in ("true", "yes", "on", "1", "+"):
@@ -3530,7 +3548,7 @@ def convert_bool_arg(s):
     raise ValueError(f"Wrong boolean value: '{s}'")
 
 
-def convert_opt_int_arg(s):
+def convert_opt_int_arg(s) -> Optional[int]:
     """ Converts given string to optional integer """
     return int(s) if s else None
 
@@ -3650,10 +3668,8 @@ def main(argv: List[str]) -> None:
 
     switches_siphon = argparse.ArgumentParser(add_help=False)
     switches_siphon.add_argument(
-        "--progress",
-        metavar="[true/yes/on/1/+ or false/no/off/0/-]", nargs="?",
-        const=True, default=None, type=convert_bool_arg,
-        help="Print progress information")
+        "--prometheus_port", metavar="PORT", type=convert_opt_int_arg,
+        help="Port to serve Prometheus metrics on")
 
     # Top level parser
     argument_parser = argparse.ArgumentParser(
