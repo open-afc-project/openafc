@@ -4,7 +4,7 @@
 // This work is licensed under the OpenAFC Project License, a copy of which is
 // included with this software program.
 
-// Schemaa of AFC Request/response/config log database
+// Schema of AFC Request/response/config log database
 // This file is a DBML source code for visualizing database scheme in dbdiagram.io
 
 // Table, containing a record for each request messgae/response message/config(s) set
@@ -270,7 +270,7 @@ Ref max_eirp_request_response_digest_ref: max_eirp.(request_response_digest, mon
 table afc_server [headercolor: #4B82B0] {
   afc_server_id serial
   month_idx smallint
-  afc_server_name text [unique]
+  afc_server_name text
 
   indexes {
     (afc_server_id, month_idx) [pk]

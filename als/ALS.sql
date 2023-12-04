@@ -149,7 +149,7 @@ CREATE TABLE "max_eirp" (
 CREATE TABLE "afc_server" (
   "afc_server_id" serial,
   "month_idx" smallint,
-  "afc_server_name" text UNIQUE,
+  "afc_server_name" text,
   PRIMARY KEY ("afc_server_id", "month_idx")
 );
 

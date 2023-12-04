@@ -269,7 +269,6 @@ def jdt(dt: Any) -> datetime.datetime:
         raise TypeError(f"Unexpected '{dt}'. Should be datetime")
     return dt
 
-
 def get_month_idx() -> int:
     """ Computes month index """
     d = datetime.datetime.now()
@@ -3424,6 +3423,9 @@ def read_sql_file(sql_file: str) -> str:
         replacer, content, flags=re.DOTALL | re.MULTILINE)
 
 
+ALS_PATCH = ["ALTER TABLE afc_server DROP CONSTRAINT IF EXISTS "
+             "afc_server_afc_server_name_key;"]
+
 def do_init_db(args: Any) -> None:
     """Execute "init" command.
 
@@ -3440,11 +3442,12 @@ def do_init_db(args: Any) -> None:
             error(f"Connection to {InitialDatabase.name_for_logs()} database "
                   f"failed: {ex}")
         nothing_done = True
-        for conn_str, password, sql_file, template, db_class, sql_required in \
+        for conn_str, password, sql_file, template, db_class, sql_required, \
+                patch in \
                 [(args.als_postgres, args.als_postgres_password, args.als_sql,
-                  args.als_template, AlsDatabase, True),
+                  args.als_template, AlsDatabase, True, ALS_PATCH),
                  (args.log_postgres, args.log_postgres_password, args.log_sql,
-                  args.log_template, LogsDatabase, False)]:
+                  args.log_template, LogsDatabase, False, [])]:
             if not (conn_str or sql_file or template):
                 continue
             nothing_done = False
@@ -3467,6 +3470,9 @@ def do_init_db(args: Any) -> None:
                 databases.add(db)
                 if created and sql_file:
                     db.engine.execute(sa.text(read_sql_file(sql_file)))
+                if not created:
+                    for cmd in patch:
+                        db.engine.execute(sa.text(cmd))
             except sa.exc.SQLAlchemyError as ex:
                 error(f"{db_class.name_for_logs()} database initialization "
                       f"failed: {ex}")
