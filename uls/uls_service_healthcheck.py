@@ -30,12 +30,13 @@ class Settings(pydantic.BaseSettings):
     status_dir: str = pydantic.Field(DEFAULT_STATUS_DIR, env="ULS_STATUS_DIR")
     smtp_info: Optional[str] = pydantic.Field(None, env="ULS_ALARM_SMTP_INFO")
     email_to: Optional[str] = pydantic.Field(None, env="ULS_ALARM_EMAIL_TO")
-    beacon_email_to: Optional[str] = pydantic.Field(None, env="ULS_BEACON_EMAIL_TO")
+    beacon_email_to: Optional[str] = \
+        pydantic.Field(None, env="ULS_BEACON_EMAIL_TO")
     email_sender_location: Optional[str] = \
         pydantic.Field(None, env="ULS_ALARM_SENDER_LOCATION")
     alarm_email_interval_hr: Optional[float] = \
         pydantic.Field(None, env="ULS_ALARM_ALARM_INTERVAL_HR")
-    beacon_email_interval_hr: Optional[str] = \
+    beacon_email_interval_hr: Optional[float] = \
         pydantic.Field(None, env="ULS_ALARM_BEACON_INTERVAL_HR")
     download_attempt_max_age_health_hr: Optional[float] = \
         pydantic.Field(6, env="ULS_HEALTH_ATTEMPT_MAX_AGE_HR")

@@ -270,7 +270,7 @@ class Db:
     def fetchall(self) -> "Iterator[Record]":
         """ Iterator that reads all records of FSID table """
         try:
-            for db_row in self._conn.execute(sa.select([self._fsid_table])).\
+            for db_row in self._conn.execute(sa.select(self._fsid_table)).\
                     fetchall():
                 yield Record(data_dict=db_row._mapping, is_csv=False)
         except sa.exc.SQLAlchemyError as ex:

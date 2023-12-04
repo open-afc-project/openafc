@@ -219,7 +219,7 @@ class FsPath:
         if self._tiles is not None:
             self._tiles |= self._tiles_from_record(fs_row, FS_COORD_FIELDS)
         if fs_row[FS_PR_FIELD]:
-            sel = sa.select([pr_table]).\
+            sel = sa.select(pr_table).\
                 where(pr_table.c[PR_FSID_FIELD] == self.fsid).\
                 order_by(pr_table.c[PR_ORDER_FIELD])
             for pr_row in conn.execute(sel):
@@ -545,7 +545,7 @@ class Db:
     def all_fs_rows(self) -> "Iterator[sa.engine.RowProxy]":
         """ Iterator that reads all FS Path rows """
         try:
-            for fs_row in self.conn.execute(sa.select([self.fs_table])).\
+            for fs_row in self.conn.execute(sa.select(self.fs_table)).\
                     fetchall():
                 yield fs_row
         except sa.exc.SQLAlchemyError as ex:
@@ -557,7 +557,7 @@ class Db:
         try:
             ret = \
                 self.conn.execute(
-                    sa.select([self.fs_table]).
+                    sa.select(self.fs_table).
                     where(self.fs_table.c[FS_FSID_FIELD] == fsid)).first()
             error_if(
                 ret is None,
@@ -575,7 +575,7 @@ class Db:
         if self.ras_table is None:
             return
         try:
-            for fs_row in self.conn.execute(sa.select([self.ras_table])).\
+            for fs_row in self.conn.execute(sa.select(self.ras_table)).\
                     fetchall():
                 yield fs_row
         except sa.exc.SQLAlchemyError as ex:
