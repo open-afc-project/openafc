@@ -174,8 +174,8 @@ build_dev_server() {
   # Build Prometheus-related images
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-prometheus ${PROMETHEUS}:${tag} ${push} &
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-cadvisor ${CADVISOR}:${tag} ${push} &
-  cd ${wd}/prometheus && docker_build_and_push Dockerfile-cadvisor ${NGINXEXPORTER}:${tag} ${push} &
-  cd ${wd}/prometheus && docker_build_and_push Dockerfile-prometheus ${GRAFANA}:${tag} ${push} &
+  cd ${wd}/prometheus && docker_build_and_push Dockerfile-nginxexporter ${NGINXEXPORTER}:${tag} ${push} &
+  cd ${wd}/prometheus && docker_build_and_push Dockerfile-grafana ${GRAFANA}:${tag} ${push} &
 
   msg "wait for all images to be built"
   wait
