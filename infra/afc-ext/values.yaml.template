@@ -10,7 +10,7 @@ image:
     repository: wcc-afc-docker-virtual.usw2.packages.broadcom.com/dispatcher-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.11.0"
+    #tag: "3.8.12.0"
 
 imagePullSecrets: []
 nameOverride: "afc-app"

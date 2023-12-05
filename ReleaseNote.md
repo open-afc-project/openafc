@@ -1,5 +1,17 @@
 # Release Note
+## **Version and Date**
+Version|3.8.12.0|
+| :- | :- |
+|**Date**|**12/05/2023**|
+|compiled server's version is f0626a4 | git tag 3.8.12.0|
 
+## **Issues Addressed**
+* Jira  OA-891. Fixing ALS Siphon crash on month rollover (#731)
+* Jira  OA-892. ULS Downloader crash in healthcheck (#732)
+* Jira  Oa 880 fix error thrown when map is displayed but no map data is generated due to configuration (#729)
+* Jira  OA 884 ALS Siphon Prometheus metrics (#726)
+* Jira OA-885. Adding Nginx and ALS Siphon Prometheus metrics (#727)
+  
 ## **Version and Date**
 |Version|OA-880
 | :- | :- |
