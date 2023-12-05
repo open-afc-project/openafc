@@ -3,7 +3,7 @@
 Version|3.8.12.0|
 | :- | :- |
 |**Date**|**12/05/2023**|
-|compiled server's version is f0626a4 | git tag 3.8.12.0|
+|compiled server's version is 9a9034a | git tag 3.8.12.0|
 
 ## **Issues Addressed**
 * Jira  OA-891. Fixing ALS Siphon crash on month rollover (#731)
