@@ -1092,17 +1092,21 @@ void AfcManager::initializeDatabases()
 		if (_nlcdFile.empty()) {
 			throw std::runtime_error("AfcManager::initializeDatabases(): _nlcdFile not defined.");
 		}
-		std::string nlcdPattern, nlcdDirectory;
 		auto nlcdFileInfo = QFileInfo(QString::fromStdString(_nlcdFile));
 		if (nlcdFileInfo.isDir()) {
-			nlcdPattern = "*";
-			nlcdDirectory = _nlcdFile;
+			// Directory with multiple (but not too many) NLCD files
+			cgNlcd.reset(new CachedGdal<uint8_t>(_nlcdFile, "nlcd",
+				GdalNameMapperDirect::make_unique("*", _nlcdFile)));
+		} else if (_nlcdFile.find("{")) {
+			// Tiled NLCD files
+			auto nlcdPattern = nlcdFileInfo.fileName().toStdString();
+			auto nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
+			cgNlcd.reset(new CachedGdal<uint8_t>(nlcdDirectory, "nlcd",
+				GdalNameMapperPattern::make_unique(nlcdPattern, nlcdDirectory)));
 		} else {
-			nlcdPattern = nlcdFileInfo.fileName().toStdString();
-			nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
+			// Single NLCD file
+			cgNlcd.reset(new CachedGdal<uint8_t>(_nlcdFile, "nlcd"));
 		}
-		cgNlcd.reset(new CachedGdal<uint8_t>(nlcdDirectory, "nlcd",
-			GdalNameMapperDirect::make_unique(nlcdPattern, nlcdDirectory)));
 		cgNlcd->setNoData(0);
 		/**********************************************************************************/
 	} else if (_propEnvMethod == CConst::popDensityMapPropEnvMethod) {
@@ -2278,9 +2282,21 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	_regionPolygonFileList = SearchPaths::forReading("data", "rat_transfer/population/" + QString::fromStdString(_regionStr) + ".kml", true).toStdString();
 
 	if (jsonObj.contains("nlcdFile") && !jsonObj["nlcdFile"].isUndefined()) {
-		_nlcdFile = SearchPaths::forReading("data", jsonObj["nlcdFile"].toString(), true).toStdString();
+		// NLCD filename may contain pattern, chop it temporarily then append back again
+		auto tail = jsonObj["nlcdFile"].toString();
+		auto fileInfo = QFileInfo(tail);
+		auto baseName = fileInfo.fileName();
+		if (baseName.contains('{')) {
+			tail = fileInfo.dir().path();
+		} else {
+			baseName = "";
+		}
+	 	_nlcdFile = SearchPaths::forReading("data", tail, true).toStdString();
+		if (baseName != "") {
+			_nlcdFile += (QDir::separator() + baseName).toStdString();
+		}
 	} else {
-		_nlcdFile = SearchPaths::forReading("data", "rat_transfer/nlcd/nlcd_production/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
+	 	_nlcdFile = SearchPaths::forReading("data", "rat_transfer/nlcd/nlcd_production/nlcd_2019_land_cover_l48_20210604_resample.tif", true).toStdString();
 	}
 
 	if (jsonObj.contains("rainForestFile") && !jsonObj["rainForestFile"].isUndefined()) {

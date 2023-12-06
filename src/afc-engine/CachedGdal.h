@@ -43,16 +43,25 @@
  * Creation of GDAL data source object (template parameter is pixel data type,
  * second constructor parameter is data set name, not used internally but useful
  * for logging, etc.) for various GDAL sources:
- *
- * - NLCD data (monolithic file with 1-byte data):
+ * 
+ * - NLCD data (land usage information). May come in several forms:
+ *   - Single file:
  *	nlcd = CachedGdal<uint8_t> nlcd("nlcd/federated_nlcd.tif", "nlcd");
+ *   - Directory with several files (not many, otherwise startup will be slow):
+ *  nlcd = CachedGdal<uint8_t>("nlcd/nlcd_production", "nlcd",
+ *  	GdalNameMapperDirect::make_unique("*.tif", "nlcd/nlcd_production"));
+ *   - Direcory with tiled NLCD files (pixels numbered from top left corner):
+ *  nlcd = CachedGdal<uint8_t>("tiled_nlcd/nlcd_production", "nlcd",
+ *  	GdalNameMapperPattern::make_unique(
+ * 			"nlcd_production_{latHem:ns}{latDegCeil:02}{lonHem:ew}{lonDegFloor:03}.tif",
+ *  		"tiled_nlcd/nlcd_production"));
  *
  * - Single LiDAR file data (monolithic 2-band file with 32-bit float data):
  *	lidar = CachedGdal<float>("San_Francisco_20080708-11/san_francisco_ca_0_01.tif,
  *		"LiDAR", nullptr, 2);
  *
- * - 3DEP tiled data (tile files with 32-bit float data. Coordinate system
- * needs slight improvement):
+ * - 3DEP tiled data (tile files with 32-bit float data, pixels numbered from
+ *   top left corner):
  *	dep = CachedGdal<float>("3dep\1_arcsec", "3dep",
  *		GdalNameMapperPattern::make_unique(
  *		"USGS_1_{latHem:ns}{latDegCeil:}{lonHem:ew}{lonDegFloor:}*.tif")));
@@ -61,8 +70,9 @@
  *		{t->roundPpdToMultipleOf(1.); t->setMarginsOutsideDeg(1.);})
  *
  * - SRTM data (tile files with 16-bit integer data, margins are half-pixel
- * wide). In previous implementation coordinate system was shifted by half a
- * pixes down and right. This initialization doesn't do this shift:
+ *   wide, pixels numbered from bottom left corner). In previous implementation
+ *   coordinate system was shifted by half a pixes down and right. This
+ *   initialization doesn't do this shift:
  *	srtm = CachedGdal<int16_t>("srtm3arcsecondv003", "srtm",
  *		GdalNameMapperPattern::make_unique(
  *		"{latHem:NS}{latDegFloor:02}{lonHem:EW}{lonDegFloor:03}.hgt"));
@@ -160,9 +170,8 @@
 #include <vector>
 
 /** @file
- * Unified GDAL geospatial data access module. Will be cached and fast, for now
- * - brute force and not so fast
- */
+ * Unified GDAL geospatial data access module */
+
 /** Abstract base class that handles everything but pixel data */
 class CachedGdalBase : private boost::noncopyable {
 public:

@@ -13,6 +13,37 @@ Version|3.8.12.0|
 * Jira OA-885. Adding Nginx and ALS Siphon Prometheus metrics (#727)
   
 ## **Version and Date**
+|Version|OA-890
+| :- | :- |
+|**Date**|**12/06/2023**|
+
+## **Issues Addressed**
+* Jira  AFC Engine support for tiled NLCD
+This change adds (provisional!) support for tiled NLCD (land usage) files. Comments on how to programmatically initialize it put to module comments in CachedGdal.h
+Suppose we have directory with tiled NLCD files named "rat_transfer/tiled_nlcd/nlcd_production", containing files like
+nlcd_production_n19w155.tif nlcd_production_n33w113.tif ...
+prepared in a way that pixels are numbered from top left corner (like 3DEP files).
+then AFC config file should contain the following clause:
+`"nlcdFile": "rat_transfer/tiled_nlcd/nlcd_production/nlcd_production_{latHem:ns}{latDegCeil:02}{lonHem:ew}{lonDegFloor:03}.tif"`
+
+## **Testing Done**
+
+Tested with on tiled NLCD on test FSP43 - result is identical to nontiled NLCD result (except for expiration date of course)
+
+## **Version and Date**
+Version|3.8.12.0|
+| :- | :- |
+|**Date**|**12/05/2023**|
+|compiled server's version is 9a9034a | git tag 3.8.12.0|
+
+## **Issues Addressed**
+* Jira  OA-891. Fixing ALS Siphon crash on month rollover (#731)
+* Jira  OA-892. ULS Downloader crash in healthcheck (#732)
+* Jira  Oa 880 fix error thrown when map is displayed but no map data is generated due to configuration (#729)
+* Jira  OA 884 ALS Siphon Prometheus metrics (#726)
+* Jira OA-885. Adding Nginx and ALS Siphon Prometheus metrics (#727)
+  
+## **Version and Date**
 |Version|OA-880
 | :- | :- |
 |**Date**|**11/29/2023**|
