@@ -19,6 +19,7 @@ from collections.abc import Iterable, Iterator
 import copy
 import datetime
 import hashlib
+import http
 import inspect
 import json
 import logging
@@ -35,7 +36,8 @@ import subprocess
 import sys
 import time
 import traceback
-from typing import Any, cast, List, Dict, NamedTuple, Optional, Tuple, Union
+from typing import Any, Callable, cast, List, Dict, NamedTuple, Optional, \
+    Tuple, Union
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -565,7 +567,7 @@ class RestDataHandlerBase:
         unused_argument(result_data)
         return {}
 
-    def dry_result_data(self, batch: int) -> bytes:
+    def dry_result_data(self, batch: Optional[int]) -> bytes:
         """ Virtual method returning bytes string to pass to make_error_map on
         dry run. This default implementation returns empty string """
         unused_argument(batch)
@@ -640,18 +642,19 @@ class LoadRestDataHandler(RestDataHandlerBase):
                     str(path_get(resp, paths.response_in_resp))
         return ret
 
-    def dry_result_data(self, batch: int) -> bytes:
+    def dry_result_data(self, batch: Optional[int]) -> bytes:
         """ Returns byte string, containing AFC Response to parse on dry run
         """
+        assert batch is not None
         resp_msg = json.loads(self.cfg.resp_msg_pattern)
         path_set(resp_msg, self.cfg.paths.resps_in_msg,
                  path_get(resp_msg, self.cfg.paths.resps_in_msg) * batch)
         return json.dumps(resp_msg).encode("utf-8")
 
 
-# REST API Request data and supplementary information
-WorkerReqInfo = \
-    NamedTuple("WorkerReqInfo",
+# POST Worker request data and supplementary information
+PostWorkerReqInfo = \
+    NamedTuple("PostWorkerReqInfo",
                [
                 # Request indices, contained in REST API request data
                 ("req_indices", List[int]),
@@ -659,18 +662,27 @@ WorkerReqInfo = \
                 ("req_data", bytes)])
 
 
-# REST API request results
-WorkerResultInfo = \
-    NamedTuple("WorkerResultInfo",
+# GET Worker request data and supplementary information
+GetWorkerReqInfo = \
+    NamedTuple("GetWorkerReqInfo",
                [
-                # Request indices
-                ("req_indices", List[int]),
-                # Retries made (0 - from first attempt)
-                ("retries", int),
-                # REST API Response data (None if error or N/A)
-                ("result_data", Optional[bytes]),
-                # Error message for failed requests, None for succeeded
-                ("error_msg", Optional[str])])
+                # Number of GET requests to send
+                ("num_gets", int)])
+
+
+# REST API request results
+class WorkerResultInfo(NamedTuple):
+    """ Data, returned by REST API workers in resault queue """
+    # Retries made (0 - from first attempt)
+    retries: int
+    # CPU consumed in nanoseconds
+    cpu_consumed_ns: int
+    # Request indices. None for netload
+    req_indices: Optional[List[int]] = None
+    # REST API Response data (None if error or N/A)
+    result_data: Optional[bytes] = None
+    # Error message for failed requests, None for succeeded
+    error_msg: Optional[str] = None
 
 
 # Message from Tick worker for EMA rate computation
@@ -680,48 +692,25 @@ TickInfo = NamedTuple("TickInfo", [("tick", int)])
 ResultQueueDataType = Optional[Union[WorkerResultInfo, TickInfo]]
 
 
-class RateEma:
-    """ Exponential Moving Average for rate of change
-
-    Public attributes:
-    rate_ema -- Rate Average computed on last tick
+class Ticker:
+    """ Second ticker (used for EMA computations). Puts TickInfo to result
+    queue
 
     Private attributes:
-    _worker     -- Tick worker process (generates TickInfo once per second)
-    _weight     -- Weight for EMA computation
-    _prev_value -- Value on previous tick
+    _worker -- Tick worker process (generates TickInfo once per second)
     """
     def __init__(self,
-                 result_queue: "multiprocessing.Queue[ResultQueueDataType]",
-                 win_size: float = 20) \
+                 result_queue: "multiprocessing.Queue[ResultQueueDataType]") \
             -> None:
         """ Constructor
 
         Arguments:
         result_queue -- Queue for tick worker to put TickInfo objects
-        win_size     -- Averaging window size in seconds
         """
         self._worker = \
-            multiprocessing.Process(target=RateEma._tick_worker,
+            multiprocessing.Process(target=Ticker._tick_worker,
                                     kwargs={"result_queue": result_queue})
         self._worker.start()
-        self._weight = 2 / (win_size + 1)
-        self.rate_ema: float = 0
-        self._prev_value = 0
-
-    def on_tick(self, new_value: int) -> None:
-        """ Call on arrival of TickInfo message
-
-        Arguments:
-        new_value - Measured data value on this tick
-        """
-        increment = new_value - self._prev_value
-        self._prev_value = new_value
-        self.rate_ema += self._weight * (increment - self.rate_ema)
-
-    def stop(self) -> None:
-        """ Stops tick worker """
-        self._worker.terminate()
 
     @classmethod
     def _tick_worker(
@@ -737,6 +726,42 @@ class RateEma:
             time.sleep(1)
             count += 1
             result_queue.put(TickInfo(tick=count))
+
+    def stop(self) -> None:
+        """ Stops tick worker """
+        self._worker.terminate()
+
+
+class RateEma:
+    """ Exponential Moving Average for rate of change
+
+    Public attributes:
+    rate_ema -- Rate Average computed on last tick
+
+    Private attributes:
+    _weight     -- Weight for EMA computation
+    _prev_value -- Value on previous tick
+    """
+    def __init__(self, win_size_sec: float = 20) -> None:
+        """ Constructor
+
+        Arguments:
+        result_queue -- Queue for tick worker to put TickInfo objects
+        win_size_sec -- Averaging window size in seconds
+        """
+        self._weight = 2 / (win_size_sec + 1)
+        self.rate_ema: float = 0
+        self._prev_value: float = 0
+
+    def on_tick(self, new_value: float) -> None:
+        """ Call on arrival of TickInfo message
+
+        Arguments:
+        new_value - Measured data value on this tick
+        """
+        increment = new_value - self._prev_value
+        self._prev_value = new_value
+        self.rate_ema += self._weight * (increment - self.rate_ema)
 
 
 class StatusPrinter:
@@ -769,27 +794,30 @@ class ResultsProcessor:
     """ Prints important summary of request execution results
 
     Private attributes:
-    _total_requests    -- Total number of individual requests (not batches)
-                          that will be executed
-    _result_queue      -- Queue with execution results, second ticks, Nones for
-                          completed workers
-    _status_period     -- Period of status printing (in terms of request
-                          count), e.g. 1000 for once in 1000 requests, 0 to not
-                          print status (except in the end)
-    _rest_data_handler -- Generator/interpreter of REST request/response data
-    _num_workers       -- Number of worker processes
-    _rate_ema          -- Rate averager
-    _status_printer    -- StatusPrinter
+    _netload             -- True for netload testing, False for preload/load
+                            testing
+    _total_requests      -- Total number of individual requests (not batches)
+                            that will be executed
+    _result_queue        -- Queue with execution results, second ticks, Nones
+                            for completed workers
+    _status_period       -- Period of status printing (in terms of request
+                            count), e.g. 1000 for once in 1000 requests, 0 to
+                            not print status (except in the end)
+    _rest_data_handler   -- Generator/interpreter of REST request/response
+                            data. None for netload test
+    _num_workers         -- Number of worker processes
+    _status_printer      -- StatusPrinter
     """
     def __init__(
-            self, total_requests: int,
+            self, netload: bool, total_requests: int,
             result_queue: "multiprocessing.Queue[ResultQueueDataType]",
             num_workers: int, status_period: int,
-            rest_data_handler: RestDataHandlerBase,
-            rate_ema: RateEma) -> None:
+            rest_data_handler: Optional[RestDataHandlerBase]) -> None:
         """ Constructor
 
         Arguments:
+        netload           -- True for netload testing, False for preload/load
+                             testing
         total_requests    -- Total number of individual requests (not batches)
                              that will be executed
         result_queue      -- Queue with execution results, Nones for completed
@@ -801,20 +829,23 @@ class ResultsProcessor:
         rest_data_handler -- Generator/interpreter of REST request/response
                              data
         """
+        self._netload = netload
         self._total_requests = total_requests
         self._result_queue = result_queue
         self._status_period = status_period
         self._num_workers = num_workers
         self._rest_data_handler = rest_data_handler
-        self._rate_ema = rate_ema
         self._status_printer = StatusPrinter()
 
     def process(self) -> None:
         """ Keep processing results until all worker will stop """
         start_time = datetime.datetime.now()
-        requests_sent = 0
-        requests_failed = 0
-        retries = 0
+        requests_sent: int = 0
+        requests_failed: int = 0
+        retries: int = 0
+        cpu_consumed_ns: int = 0
+        req_rate_ema = RateEma()
+        cpu_consumption_ema = RateEma()
 
         def status_message(eta: bool) -> str:
             """ Returns status message (with or without ETA) """
@@ -822,16 +853,19 @@ class ResultsProcessor:
             elapsed = now - start_time
             elapsed_sec = elapsed.total_seconds()
             elapsed_str = re.sub(r"\.\d*$", "", str(elapsed))
-            rate = self._rate_ema.rate_ema if eta \
+            req_rate = req_rate_ema.rate_ema if eta \
                 else (requests_sent / (elapsed_sec or 1E-3))
+            cpu_consumption = cpu_consumption_ema.rate_ema if eta \
+                else (cpu_consumed_ns * 1e-9 / (elapsed_sec or 1E-3))
             ret = \
                 f"{'Progress: ' if eta else ''}" \
                 f"{requests_sent} requests sent " \
                 f"({requests_sent * 100 / self._total_requests:.1f}%), " \
                 f"{requests_failed} failed " \
-                f"({requests_failed * 100 / (requests_sent or 1):.1f}%), " \
+                f"({requests_failed * 100 / (requests_sent or 1):.3f}%), " \
                 f"{retries} retries made. " \
-                f"{elapsed_str} elapsed, rate is {rate:.1f} req/sec"
+                f"{elapsed_str} elapsed, rate is {req_rate:.1f} req/sec, " \
+                f"CPU consumption is {cpu_consumption:.3f}"
             if eta and elapsed_sec and requests_sent:
                 total_duration = \
                     datetime.timedelta(
@@ -853,36 +887,47 @@ class ResultsProcessor:
                         break
                     continue
                 if isinstance(result_info, TickInfo):
-                    self._rate_ema.on_tick(requests_sent)
+                    req_rate_ema.on_tick(requests_sent)
+                    cpu_consumption_ema.on_tick(cpu_consumed_ns * 1e-9)
                     continue
                 error_msg = result_info.error_msg
-                error_map: Dict[int, str] = {}
-                if error_msg is None:
-                    try:
-                        error_map = \
-                            self._rest_data_handler.make_error_map(
-                                result_data=result_info.result_data)
-                    except Exception as ex:
-                        error_msg = f"Error decoding message " \
-                            f"{result_info.result_data!r}: {repr(ex)}"
                 if error_msg:
                     self._status_printer.pr()
+                    if self._netload:
+                        indices_clause = ""
+                    else:
+                        assert result_info.req_indices is not None
+                        indices = \
+                            ", ".join(str(i) for i in result_info.req_indices)
+                        indices_clause = f" with indices ({indices})"
                     logging.error(
-                        f"Request with indices "
-                        f"({', '.join(str(i) for i in result_info.req_indices)}) "
-                        f"failed: {error_msg}")
+                        f"Request{indices_clause} failed: {error_msg}")
 
-                for idx, error_msg in error_map.items():
-                    self._status_printer.pr()
-                    logging.error(f"Request {idx} failed: {error_msg}")
+                error_map: Dict[int, str] = {}
+                if self._rest_data_handler is not None:
+                    if error_msg is None:
+                        try:
+                            error_map = \
+                                self._rest_data_handler.make_error_map(
+                                    result_data=result_info.result_data)
+                        except Exception as ex:
+                            error_msg = f"Error decoding message " \
+                                f"{result_info.result_data!r}: {repr(ex)}"
+                    for idx, error_msg in error_map.items():
+                        self._status_printer.pr()
+                        logging.error(f"Request {idx} failed: {error_msg}")
 
                 prev_sent = requests_sent
-                requests_sent += len(result_info.req_indices)
+                num_requests = \
+                    1 if self._netload \
+                    else len(cast(List[int], result_info.req_indices))
+                requests_sent += num_requests
                 retries += result_info.retries
                 if result_info.error_msg:
-                    requests_failed += len(result_info.req_indices)
+                    requests_failed += num_requests
                 else:
                     requests_failed += len(error_map)
+                cpu_consumed_ns += result_info.cpu_consumed_ns
 
                 if self._status_period and \
                         ((prev_sent // self._status_period) !=
@@ -906,30 +951,31 @@ class ResultsProcessor:
             self._status_printer.pr(s)
 
 
-def rest_api_worker(
+def post_req_worker(
         url: str, retries: int, backoff: float, dry: bool,
-        req_queue: "multiprocessing.Queue[Optional[WorkerReqInfo]]",
-        result_queue: "multiprocessing.Queue[Optional[WorkerResultInfo]]",
+        post_req_queue: multiprocessing.Queue,
+        result_queue: "multiprocessing.Queue[ResultQueueDataType]",
         dry_result_data: Optional[bytes], use_requests: bool) -> None:
-    """ REST API process worker function
+    """ REST API POST worker
 
     Arguments:
-    url          -- REST API URL
+    url          -- REST API URL to send POSTs to
     retries      -- Number of retries
     backoff      -- Initial backoff window in seconds
     dry          -- True to dry run
-    req_queue    -- Request queue. Elements are WorkerReqInfo objects
+    req_queue    -- Request queue. Elements are PostWorkerReqInfo objects
                     corresponding to single REST API post or None to stop
                     operation
-    result_queue -- Result queue. Elements are WorkerResultInfo for
+    result_queue -- Result queue. Elements added are WorkerResultInfo for
                     operation results, None to signal that worker finished
     use_requests -- True to use requests, False to use urllib.request
     """
     try:
         session: Optional[requests.Session] = \
             requests.Session() if use_requests and (not dry) else None
+        prev_proc_time_ns = time.process_time_ns()
         while True:
-            req_info = req_queue.get()
+            req_info: PostWorkerReqInfo = post_req_queue.get()
             if req_info is None:
                 result_queue.put(None)
                 return
@@ -948,10 +994,11 @@ def rest_api_worker(
                             resp = \
                                 session.post(
                                     url=url, data=req_info.req_data,
-                                    headers={"Content-Type":
-                                             "application/json; charset=utf-8",
-                                             "Content-Length":
-                                             str(len(req_info.req_data))},
+                                    headers={
+                                        "Content-Type":
+                                        "application/json; charset=utf-8",
+                                        "Content-Length":
+                                        str(len(req_info.req_data))},
                                     timeout=30)
                             if not resp.ok:
                                 last_error = \
@@ -967,25 +1014,112 @@ def rest_api_worker(
                                        "application/json; charset=utf-8")
                         req.add_header("Content-Length",
                                        str(len(req_info.req_data)))
-
                         try:
-                            with urllib.request.urlopen(req,
-                                                        req_info.req_data,
-                                                        timeout=30) as f:
+                            with urllib.request.urlopen(
+                                    req, req_info.req_data, timeout=30) as f:
                                 result_data = f.read()
                             break
                         except (urllib.error.HTTPError, urllib.error.URLError,
-                                urllib.error.ContentTooShortError) as ex:
+                                urllib.error.ContentTooShortError, OSError) \
+                                as ex:
                             last_error = repr(ex)
                     time.sleep(
                         random.uniform(0, (1 << attempt)) * backoff)
                 else:
                     error_msg = last_error
                 attempts = attempt + 1
+            new_proc_time_ns = time.process_time_ns()
             result_queue.put(
                 WorkerResultInfo(
                     req_indices=req_info.req_indices, retries=attempts - 1,
-                    result_data=result_data, error_msg=error_msg))
+                    result_data=result_data, error_msg=error_msg,
+                    cpu_consumed_ns=new_proc_time_ns - prev_proc_time_ns))
+            prev_proc_time_ns = new_proc_time_ns
+    except Exception as ex:
+        logging.error(f"Worker failed: {repr(ex)}\n"
+                      f"{traceback.format_exc()}")
+        result_queue.put(None)
+
+
+def get_req_worker(
+        url: str, expected_code: Optional[int], retries: int, backoff: float,
+        dry: bool, get_req_queue: multiprocessing.Queue,
+        result_queue: "multiprocessing.Queue[ResultQueueDataType]",
+        use_requests: bool) -> None:
+    """ REST API POST worker
+
+    Arguments:
+    url           -- REST API URL to send POSTs to
+    expected_code -- None or expected non-200 statsus code
+    retries       -- Number of retries
+    backoff       -- Initial backoff window in seconds
+    dry           -- True to dry run
+    req_queue     -- Request queue. Elements are GetWorkerReqInfo objects
+                     corresponding to bumch of single REST API GETs or None to
+                     stop operation
+    result_queue  -- Result queue. Elements added are WorkerResultInfo for
+                     operation results, None to signal that worker finished
+    use_requests  -- True to use requests, False to use urllib.request
+    """
+    try:
+        if expected_code is None:
+            expected_code = http.HTTPStatus.OK.value
+        prev_proc_time_ns = time.process_time_ns()
+        session: Optional[requests.Session] = \
+            requests.Session() if use_requests and (not dry) else None
+        while True:
+            req_info: GetWorkerReqInfo = get_req_queue.get()
+            if req_info is None:
+                result_queue.put(None)
+                return
+            for _ in range(req_info.num_gets):
+                error_msg = None
+                if dry:
+                    attempts = 1
+                else:
+                    last_error: Optional[str] = None
+                    for attempt in range(retries + 1):
+                        if use_requests:
+                            assert session is not None
+                            try:
+                                resp = session.get(url=url, timeout=30)
+                                if resp.status_code != expected_code:
+                                    last_error = \
+                                        f"{resp.status_code}: {resp.reason}"
+                                    continue
+                                break
+                            except requests.RequestException as ex:
+                                last_error = repr(ex)
+                        else:
+                            req = urllib.request.Request(url)
+                            status_code: Optional[int] = None
+                            status_reason: str = ""
+                            try:
+                                with urllib.request.urlopen(req, timeout=30):
+                                    pass
+                                status_code = http.HTTPStatus.OK.value
+                                status_reason = http.HTTPStatus.OK.name
+                            except urllib.error.HTTPError as http_ex:
+                                status_code = http_ex.code
+                                status_reason = http_ex.reason
+                            except (urllib.error.URLError,
+                                    urllib.error.ContentTooShortError) as ex:
+                                last_error = repr(ex)
+                            if status_code is not None:
+                                if status_code == expected_code:
+                                    break
+                                last_error = f"{status_code}: {status_reason}"
+                        time.sleep(
+                            random.uniform(0, (1 << attempt)) * backoff)
+                    else:
+                        error_msg = last_error
+                    attempts = attempt + 1
+                new_proc_time_ns = time.process_time_ns()
+                result_queue.put(
+                    WorkerResultInfo(
+                        retries=attempts - 1, error_msg=error_msg,
+                        cpu_consumed_ns=new_proc_time_ns - prev_proc_time_ns))
+                prev_proc_time_ns = new_proc_time_ns
     except Exception as ex:
         logging.error(f"Worker failed: {repr(ex)}\n"
                       f"{traceback.format_exc()}")
@@ -1006,15 +1140,16 @@ def get_idx_range(idx_range_arg: str) -> Tuple[int, int]:
 
 
 def producer_worker(
-        min_idx: int, max_idx: int, count: Optional[int], batch: int,
-        parallel: int, dry: bool, rest_data_handler: RestDataHandlerBase,
-        req_queue: "multiprocessing.Queue[Optional[WorkerReqInfo]]") -> None:
-    """ Producer (request queue filler), moved into separate process
+        count: Optional[int], batch: int, parallel: int,
+        req_queue: multiprocessing.Queue, netload: bool = False,
+        min_idx: Optional[int] = None, max_idx: Optional[int] = None,
+        rest_data_handler: Optional[RestDataHandlerBase] = None) -> None:
+    """ POST Producer (request queue filler)
 
     Arguments:
-    batch             -- Batch size (number of requests per POST)
-    min_idx           -- Minimum request index
-    max_idx           -- Aftremaximum request index
+    batch             -- Batch size (number of requests per queue element)
+    min_idx           -- Minimum request index. None for netload
+    max_idx           -- Aftremaximum request index. None for netload
     count             -- Optional count of requests to send. None means that
                          requests will be sent sequentially according to range.
                          If specified - request indices will be randomized
@@ -1024,24 +1159,32 @@ def producer_worker(
     req_queue         -- Requests queue to fill
     """
     try:
-        if count is not None:
+        if netload:
+            assert count is not None
             for min_count in range(0, count, batch):
-                req_indices = [random.randrange(min_idx, max_idx)
-                               for _ in range(min(count - min_count, batch))]
                 req_queue.put(
-                    WorkerReqInfo(
+                    GetWorkerReqInfo(num_gets=min(count - min_count, batch)))
+        elif count is not None:
+            assert (min_idx is not None) and (max_idx is not None) and \
+                (rest_data_handler is not None)
+            for min_count in range(0, count, batch):
+                req_indices = \
+                    [random.randrange(min_idx, max_idx)
+                     for _ in range(min(count - min_count, batch))]
+                req_queue.put(
+                    PostWorkerReqInfo(
                         req_indices=req_indices,
-                        req_data=b'' if dry else
-                        rest_data_handler.make_req_data(req_indices)))
+                        req_data=rest_data_handler.make_req_data(req_indices)))
         else:
+            assert (min_idx is not None) and (max_idx is not None) and \
+                (rest_data_handler is not None)
             for min_req_idx in range(min_idx, max_idx, batch):
                 req_indices = list(range(min_req_idx,
                                          min(min_req_idx + batch, max_idx)))
                 req_queue.put(
-                    WorkerReqInfo(
+                    PostWorkerReqInfo(
                         req_indices=req_indices,
-                        req_data=b'' if dry else
-                        rest_data_handler.make_req_data(req_indices)))
+                        req_data=rest_data_handler.make_req_data(req_indices)))
     except Exception as ex:
         error(f"Producer terminated: {repr(ex)}")
     finally:
@@ -1049,24 +1192,33 @@ def producer_worker(
             req_queue.put(None)
 
 
-def run(rest_data_handler: RestDataHandlerBase, url: str, parallel: int,
-        backoff: int, retries: int, dry: bool, batch: int, min_idx: int,
-        max_idx: int, status_period: int, count: Optional[int] = None,
+def run(
+        url: str, parallel: int, backoff: int, retries: int, dry: bool,
+        status_period: int, batch: int,
+        rest_data_handler: Optional[RestDataHandlerBase] = None,
+        netload_target: Optional[str] = None,
+        expected_code: Optional[int] = None, min_idx: Optional[int] = None,
+        max_idx: Optional[int] = None, count: Optional[int] = None,
         use_requests: bool = False) -> None:
-    """ Run the operation
+    """ Run the POST operation
 
     Arguments:
-    rest_data_handler -- REST API payload data generator/interpreter
-    url               -- REST API URL to send POSTs to
+    rest_data_handler -- REST API payload data generator/interpreter. None for
+                         netload
+    url               -- REST API URL to send POSTs to (GET in case of netload)
     parallel          -- Number of worker processes to use
     backoff           -- Initial size of backoff windows in seconds
     retries           -- Number of retries
     dry               -- True to dry run
-    batch             -- Batch size (number of requests per POST)
-    min_idx           -- Minimum request index
-    max_idx           -- Aftermaximum request index
     status_period     -- Period (in terms of count) of status message prints (0
                          to not at all)
+    batch             -- Batch size (number of requests per elemen of request
+                         queue)
+    netload_target    -- None for POST test, tested destination for netload
+                         test
+    expected_code     -- None or non-200 netloat test HTTP status code
+    min_idx           -- Minimum request index. None fo rnetload test
+    max_idx           -- Aftermaximum request index. None for netload test
     count             -- Optional count of requests to send. None means that
                          requests will be sent sequentially according to range.
                          If specified - request indices will be randomized
@@ -1076,55 +1228,70 @@ def run(rest_data_handler: RestDataHandlerBase, url: str, parallel: int,
     error_if(use_requests and ("requests" not in sys.modules),
              "'requests' Python3 module have to be installed to use "
              "'--no_reconnect' option")
+    total_requests = count if count is not None \
+        else (cast(int, max_idx) - cast(int, min_idx))
+    if netload_target:
+        logging.info(f"Netload test of {netload_target}")
     logging.info(f"URL: {'N/A' if dry else url}")
     logging.info(f"Streams: {parallel}")
     logging.info(f"Backoff: {backoff} sec, {retries} retries")
-    logging.info(f"Index range: {min_idx:_} - {max_idx:_}")
-    logging.info(f"Batch size: {batch}")
-    logging.info(f"Requests to send: "
-                 f"{(max_idx - min_idx) if count is None else count:_}")
+    if not netload_target:
+        logging.info(f"Index range: {min_idx:_} - {max_idx:_}")
+        logging.info(f"Batch size: {batch}")
+    logging.info(f"Requests to send: {total_requests:_}")
     logging.info(f"Nonreconnect mode: {use_requests}")
     if status_period:
         logging.info(f"Intermediate status is printed every "
                      f"{status_period} requests sent")
     else:
         logging.info("Intermediate status is not printed")
-    req_queue: "multiprocessing.Queue[Optional[WorkerReqInfo]]" = \
-        multiprocessing.Queue()
+    if dry:
+        logging.info("Dry mode")
+    req_queue: multiprocessing.Queue = multiprocessing.Queue()
     result_queue: "multiprocessing.Queue[ResultQueueDataType]" = \
         multiprocessing.Queue()
     workers: List[multiprocessing.Process] = []
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
-    rate_ema: Optional[RateEma] = None
+    ticker: Optional[Ticker] = None
     try:
+        req_worker_kwargs: Dict[str, Any] = {
+            "url": url, "backoff": backoff, "retries": retries,
+            "dry": dry, "result_queue": result_queue,
+            "use_requests": use_requests}
+        req_worker: Callable
+        if netload_target:
+            req_worker = get_req_worker
+            req_worker_kwargs["get_req_queue"] = req_queue
+            req_worker_kwargs["expected_code"] = expected_code
+        else:
+            assert rest_data_handler is not None
+            req_worker = post_req_worker
+            req_worker_kwargs["post_req_queue"] = req_queue
+            req_worker_kwargs["dry_result_data"] = \
+                rest_data_handler.dry_result_data(batch)
         for _ in range(parallel):
             workers.append(
-                multiprocessing.Process(
-                    target=rest_api_worker,
-                    kwargs={"url": url, "backoff": backoff, "retries": retries,
-                            "dry": dry, "req_queue": req_queue,
-                            "result_queue": result_queue,
-                            "dry_result_data":
-                            rest_data_handler.dry_result_data(batch),
-                            "use_requests": use_requests}))
+                multiprocessing.Process(target=req_worker,
+                                        kwargs=req_worker_kwargs))
             workers[-1].start()
         workers.append(
             multiprocessing.Process(
                 target=producer_worker,
-                kwargs={"min_idx": min_idx, "max_idx": max_idx, "count": count,
-                        "batch": batch, "parallel": parallel, "dry": dry,
+                kwargs={"netload": netload_target is not None,
+                        "min_idx": min_idx, "max_idx": max_idx,
+                        "count": count, "batch": batch,
+                        "parallel": parallel,
                         "rest_data_handler": rest_data_handler,
                         "req_queue": req_queue}))
         workers[-1].start()
-        rate_ema = RateEma(result_queue)
+        ticker = Ticker(result_queue)
         signal.signal(signal.SIGINT, original_sigint_handler)
         results_processor = \
             ResultsProcessor(
-                total_requests=count if count is not None
-                else (max_idx - min_idx),
-                result_queue=result_queue, num_workers=parallel,
-                status_period=status_period,
-                rest_data_handler=rest_data_handler, rate_ema=rate_ema)
+                netload=netload_target is not None,
+                total_requests=total_requests, result_queue=result_queue,
+                num_workers=parallel, status_period=status_period,
+                rest_data_handler=rest_data_handler)
         results_processor.process()
         for worker in workers:
             worker.join()
@@ -1132,8 +1299,8 @@ def run(rest_data_handler: RestDataHandlerBase, url: str, parallel: int,
         for worker in workers:
             if worker.is_alive():
                 worker.terminate()
-        if rate_ema:
-            rate_ema.stop()
+        if ticker:
+            ticker.stop()
 
 
 def do_preload(cfg: Config, args: Any) -> None:
@@ -1145,7 +1312,7 @@ def do_preload(cfg: Config, args: Any) -> None:
     """
     if args.dry:
         afc_config = {}
-        update_rcache_url = ""
+        worker_url = ""
     else:
         service_cache: Dict[str, str] = {}
         if args.protect_cache:
@@ -1155,7 +1322,7 @@ def do_preload(cfg: Config, args: Any) -> None:
                             get_url(base_url=cfg.rest_api.protect_rcache.url,
                                     param_host=args.rcache,
                                     param_comp_prj=args.comp_proj,
-                                    purpose="Rcache invalidate",
+                                    purpose="Rcache",
                                     service_cache=service_cache),
                             method="POST"),
                         timeout=30):
@@ -1168,12 +1335,12 @@ def do_preload(cfg: Config, args: Any) -> None:
             get_url(base_url=cfg.rest_api.get_config.url,
                     param_host=args.rat_server,
                     param_comp_prj=args.comp_proj,
-                    purpose="AFC Config retrieval",
+                    purpose="Rat Server",
                     service_cache=service_cache)
-        update_rcache_url = \
+        worker_url = \
             get_url(base_url=cfg.rest_api.update_rcache.url,
                     param_host=args.rcache,
-                    param_comp_prj=args.comp_proj, purpose="Rcache preload",
+                    param_comp_prj=args.comp_proj, purpose="Rcache",
                     service_cache=service_cache)
         try:
             get_config_url += cfg.region.rulesest_id
@@ -1192,58 +1359,92 @@ def do_preload(cfg: Config, args: Any) -> None:
 
     run(rest_data_handler=PreloadRestDataHandler(cfg=cfg,
                                                  afc_config=afc_config),
-        url=update_rcache_url, parallel=args.parallel, backoff=args.backoff,
+        url=worker_url, parallel=args.parallel, backoff=args.backoff,
         retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
         max_idx=max_idx, status_period=args.status_period,
         use_requests=args.no_reconnect)
 
-    logging.info("Waiting for updates to flush to DB")
-    start_time = datetime.datetime.now()
-    start_queue_len: Optional[int] = None
-    prev_queue_len: Optional[int] = None
-    status_printer = StatusPrinter()
-    rcache_status_url = \
-        get_url(base_url=cfg.rest_api.rcache_status.url,
-                param_host=args.rcache, param_comp_prj=args.comp_proj,
-                purpose="Rcache status retrieval", service_cache=service_cache)
-    while True:
-        try:
-            with urllib.request.urlopen(rcache_status_url, timeout=30) as f:
-                rcache_status = json.loads(f.read())
-        except (urllib.error.HTTPError, urllib.error.URLError) as ex:
-            error(f"Error retrieving Rcache status "
-                  f"'{cfg.region.rulesest_id}' using URL get_config.url : "
-                  f"{repr(ex)}")
-        queue_len: int = rcache_status["update_queue_len"]
-        if not rcache_status["update_queue_len"]:
-            status_printer.pr()
-            break
-        if start_queue_len is None:
-            start_queue_len = prev_queue_len = queue_len
-        elif (args.status_period is not None) and \
-                ((cast(int, prev_queue_len) - queue_len) >=
-                 args.status_period):
-            now = datetime.datetime.now()
-            elapsed_sec = (now - start_time).total_seconds()
-            written = start_queue_len - queue_len
-            total_duration = \
-                datetime.timedelta(
-                    seconds=start_queue_len * elapsed_sec / written)
-            eta_dt = start_time + total_duration
-            status_printer.pr(
-                f"{queue_len} records not yet written. "
-                f"Write rate {written / elapsed_sec:.2f} rec/sec. "
-                f"ETA {eta_dt.strftime('%X')} (in "
-                f"{int((eta_dt - now).total_seconds()) // 60} minutes)")
-        time.sleep(1)
-    status_printer.pr()
-    now = datetime.datetime.now()
-    elapsed_sec = (now - start_time).total_seconds()
-    elapsed_str = re.sub(r"\.\d*$", "", str((now - start_time)))
-    msg = f"Flushing took {elapsed_str}"
-    if start_queue_len is not None:
-        msg += f". Flush rate {start_queue_len / elapsed_sec: .2f} rec/sec"
-    logging.info(msg)
+    if not args.dry:
+        logging.info("Waiting for updates to flush to DB")
+        start_time = datetime.datetime.now()
+        start_queue_len: Optional[int] = None
+        prev_queue_len: Optional[int] = None
+        status_printer = StatusPrinter()
+        rcache_status_url = \
+            get_url(base_url=cfg.rest_api.rcache_status.url,
+                    param_host=args.rcache, param_comp_prj=args.comp_proj,
+                    purpose="Rcache", service_cache=service_cache)
+        while True:
+            try:
+                with urllib.request.urlopen(rcache_status_url,
+                                            timeout=30) as f:
+                    rcache_status = json.loads(f.read())
+            except (urllib.error.HTTPError, urllib.error.URLError) as ex:
+                error(f"Error retrieving Rcache status "
+                      f"'{cfg.region.rulesest_id}' using URL get_config.url : "
+                      f"{repr(ex)}")
+            queue_len: int = rcache_status["update_queue_len"]
+            if not rcache_status["update_queue_len"]:
+                status_printer.pr()
+                break
+            if start_queue_len is None:
+                start_queue_len = prev_queue_len = queue_len
+            elif (args.status_period is not None) and \
+                    ((cast(int, prev_queue_len) - queue_len) >=
+                     args.status_period):
+                now = datetime.datetime.now()
+                elapsed_sec = (now - start_time).total_seconds()
+                written = start_queue_len - queue_len
+                total_duration = \
+                    datetime.timedelta(
+                        seconds=start_queue_len * elapsed_sec / written)
+                eta_dt = start_time + total_duration
+                status_printer.pr(
+                    f"{queue_len} records not yet written. "
+                    f"Write rate {written / elapsed_sec:.2f} rec/sec. "
+                    f"ETA {eta_dt.strftime('%X')} (in "
+                    f"{int((eta_dt - now).total_seconds()) // 60} minutes)")
+            time.sleep(1)
+        status_printer.pr()
+        now = datetime.datetime.now()
+        elapsed_sec = (now - start_time).total_seconds()
+        elapsed_str = re.sub(r"\.\d*$", "", str((now - start_time)))
+        msg = f"Flushing took {elapsed_str}"
+        if start_queue_len is not None:
+            msg += f". Flush rate {start_queue_len / elapsed_sec: .2f} rec/sec"
+        logging.info(msg)
+
+
+def get_afc_worker_url(args: Any, base_url: str, purpose: str) \
+        -> str:
+    """ REST API URL to AFC server
+
+    Arguments:
+    cfg      -- Config object
+    base_url -- Base URL from config
+    purpose  -- URL purpose for error messages
+    Returns REST API URL
+    """
+    if args.localhost:
+        error_if(not args.comp_proj,
+                 "--comp_proj parameter must be specified")
+        m = re.search(r"0\.0\.0\.0:(\d+)->%d/tcp.*%s_dispatcher_\d+" %
+                      (80 if args.localhost == "http" else 443,
+                       re.escape(args.comp_proj)),
+                      run_docker(["ps"]))
+        error_if(not m,
+                 "AFC port not found. Please specify AFC server address "
+                 "explicitly and remove --localhost switch")
+        assert m is not None
+        ret = \
+            get_url(base_url=base_url,
+                    param_host=f"localhost:{m.group(1)}",
+                    param_comp_prj=args.comp_proj, purpose=purpose)
+    else:
+        ret = \
+            get_url(base_url=base_url, param_host=args.afc,
+                    param_comp_prj=args.comp_proj, purpose=purpose)
+    return ret
 
 
 def do_load(cfg: Config, args: Any) -> None:
@@ -1254,38 +1455,67 @@ def do_load(cfg: Config, args: Any) -> None:
     args -- Parsed command line arguments
     """
     if args.dry:
-        afc_url = ""
-    elif args.localhost:
-        error_if(not args.comp_proj, "--comp_proj parameter must be specified")
-        m = re.search(r"0\.0\.0\.0:(\d+)->%d/tcp.*%s_dispatcher_\d+" %
-                      (80 if args.localhost == "http" else 443,
-                       re.escape(args.comp_proj)),
-                      run_docker(["ps"]))
-        error_if(
-            not m,
-            "AFC port not found. Please specify AFC server address explicitly")
-        assert m is not None
-        afc_url = \
-            get_url(base_url=cfg.rest_api.afc_req.url,
-                    param_host=f"localhost:{m.group(1)}",
-                    param_comp_prj=args.comp_proj, purpose="AFC Server")
+        worker_url = ""
     else:
-        afc_url = \
-            get_url(base_url=cfg.rest_api.afc_req.url, param_host=args.afc,
-                    param_comp_prj=args.comp_proj, purpose="AFC Server")
-    if args.no_cache:
-        parsed_afc_url = urllib.parse.urlparse(afc_url)
-        afc_url = \
-            parsed_afc_url._replace(
+        worker_url = \
+            get_afc_worker_url(args=args, base_url=cfg.rest_api.afc_req.url,
+                               purpose="AFC Server")
+    if args.no_cache and (not args.dry):
+        parsed_worker_url = urllib.parse.urlparse(worker_url)
+        worker_url = \
+            parsed_worker_url._replace(
                 query="&".join(
-                    p for p in [parsed_afc_url.query, "nocache=True"] if p)).\
-            geturl()
-
+                    p for p in [parsed_worker_url.query, "nocache=True"]
+                    if p)).geturl()
     min_idx, max_idx = get_idx_range(args.idx_range)
-
-    run(rest_data_handler=LoadRestDataHandler(cfg=cfg), url=afc_url,
+    run(rest_data_handler=LoadRestDataHandler(cfg=cfg), url=worker_url,
         parallel=args.parallel, backoff=args.backoff, retries=args.retries,
         dry=args.dry, batch=args.batch, min_idx=min_idx, max_idx=max_idx,
+        status_period=args.status_period, count=args.count,
+        use_requests=args.no_reconnect)
+
+
+def do_netload(cfg: Config, args: Any) -> None:
+    """ Execute "netload" command.
+
+    Arguments:
+    cfg  -- Config object
+    args -- Parsed command line arguments
+    """
+    expected_code: Optional[int] = None
+    worker_url = ""
+    if not args.dry:
+        if args.target is None:
+            if args.localhost and (not args.rcache):
+                args.target = "dispatcher"
+            elif args.afc and (not (args.localhost or args.rcache)):
+                args.target = "msghnd"
+            elif args.target and (not (args.localhost or args.afc)):
+                args.target = "rcache"
+            else:
+                error("'--target' argument must be explicitly specified")
+        if args.target == "rcache":
+            worker_url = \
+                get_url(base_url=cfg.rest_api.rcache_get.url,
+                        param_host=args.rcache,
+                        param_comp_prj=args.comp_proj, purpose="Rcache")
+            expected_code = cfg.rest_api.rcache_get.get("code")
+        elif args.target == "msghnd":
+            worker_url = \
+                get_url(base_url=cfg.rest_api.msghnd_get.url,
+                        param_host=args.afc,
+                        param_comp_prj=args.comp_proj, purpose="msghnd")
+            expected_code = cfg.rest_api.msghnd_get.get("code")
+        else:
+            assert args.target == "dispatcher"
+            worker_url = \
+                get_afc_worker_url(
+                    args=args, base_url=cfg.rest_api.dispatcher_get.url,
+                    purpose="dispatcher")
+            expected_code = cfg.rest_api.dispatcher_get.get("code")
+    run(netload_target=args.target, url=worker_url,
+        parallel=args.parallel, backoff=args.backoff, retries=args.retries,
+        dry=args.dry, batch=1000, expected_code=expected_code,
         status_period=args.status_period, count=args.count,
         use_requests=args.no_reconnect)
 
@@ -1351,17 +1581,9 @@ def main(argv: List[str]) -> None:
 
     switches_common = argparse.ArgumentParser(add_help=False)
     switches_common.add_argument(
-        "--idx_range", metavar="[FROM-]TO", default=cfg.defaults.idx_range,
-        help=f"Range of AP indices. FROM is initial index (0 if omitted), TO "
-        f"is 'afterlast' index. Default is '{cfg.defaults.idx_range}'")
-    switches_common.add_argument(
         "--parallel", metavar="N", type=int, default=cfg.defaults.parallel,
         help=f"Number of requests to execute in parallel. Default is "
         f"{cfg.defaults.parallel}")
-    switches_common.add_argument(
-        "--batch", metavar="N", type=int, default=cfg.defaults.batch,
-        help=f"Number of requests in one REST API call. Default is "
-        f"{cfg.defaults.batch}")
     switches_common.add_argument(
         "--backoff", metavar="SECONDS", type=float,
         default=cfg.defaults.backoff,
@@ -1374,7 +1596,7 @@ def main(argv: List[str]) -> None:
         f"{cfg.defaults.retries}")
     switches_common.add_argument(
         "--dry", action="store_true",
-        help="Dry run to estimate overhead")
+        help="Dry run (no communication with server) to estimate overhead")
     switches_common.add_argument(
         "--status_period", metavar="N", type=int,
         default=cfg.defaults.status_period,
@@ -1384,6 +1606,34 @@ def main(argv: List[str]) -> None:
         "--no_reconnect", action="store_true",
         help="Do not reconnect on each request (requires 'requests' Python3 "
         "library to be installed: 'pip install requests'")
+
+    switches_req = argparse.ArgumentParser(add_help=False)
+    switches_req.add_argument(
+        "--idx_range", metavar="[FROM-]TO", default=cfg.defaults.idx_range,
+        help=f"Range of AP indices. FROM is initial index (0 if omitted), TO "
+        f"is 'afterlast' index. Default is '{cfg.defaults.idx_range}'")
+    switches_req.add_argument(
+        "--batch", metavar="N", type=int, default=cfg.defaults.batch,
+        help=f"Number of requests in one REST API call. Default is "
+        f"{cfg.defaults.batch}")
+
+    switches_count = argparse.ArgumentParser(add_help=False)
+    switches_count.add_argument(
+        "--count", metavar="NUM_REQS", type=int, default=cfg.defaults.count,
+        help=f"Number of requests to send. Default is {cfg.defaults.count}")
+
+    switches_afc = argparse.ArgumentParser(add_help=False)
+    switches_afc.add_argument(
+        "--afc", metavar="[PROTOCOL://]HOST[:port][path][params]",
+        help="AFC Server to send requests to. Unspecified parts are taken "
+        "from 'rest_api.afc_req' of config file. By default determined by "
+        "means of '--comp_proj'")
+    switches_afc.add_argument(
+        "--localhost", nargs="?", choices=["http", "https"], const="http",
+        help="If --afc not specified, default is to send requests to msghnd "
+        "container (bypassing Nginx container). This flag causes requests to "
+        "be sent to external http/https AFC port on localhost. If protocol "
+        "not specified http is assumed")
 
     switches_compose = argparse.ArgumentParser(add_help=False)
     switches_compose.add_argument(
@@ -1412,7 +1662,8 @@ def main(argv: List[str]) -> None:
 
     parser_preload = subparsers.add_parser(
         "preload",
-        parents=[switches_common, switches_compose, switches_rcache],
+        parents=[switches_common, switches_req, switches_compose,
+                 switches_rcache],
         help="Fill rcache with (fake) responses")
     parser_preload.add_argument(
         "--rat_server", metavar="[PROTOCOL://]HOST[:port][path][params]",
@@ -1427,26 +1678,26 @@ def main(argv: List[str]) -> None:
     parser_preload.set_defaults(func=do_preload)
 
     parser_load = subparsers.add_parser(
-        "load", parents=[switches_common, switches_compose],
+        "load",
+        parents=[switches_common, switches_req, switches_count,
+                 switches_compose, switches_afc],
         help="Do load test")
-    parser_load.add_argument(
-        "--afc", metavar="[PROTOCOL://]HOST[:port][path][params]",
-        help="AFC Server to send requests to. Unspecified parts are taken "
-        "from 'rest_api.afc_req' of config file. By default determined by "
-        "means of '--comp_proj'")
-    parser_load.add_argument(
-        "--localhost", nargs="?", choices=["http", "https"], const="http",
-        help="If --afc not specified, default is to send requests to msghnd "
-        "container (bypassing Nginx container). This flag causes requests to "
-        "be sent to external http/https AFC port on localhost. If protocol "
-        "not specified http is assumed")
-    parser_load.add_argument(
-        "--count", metavar="NUM_REQS", type=int, default=cfg.defaults.count,
-        help=f"Number of requests to send. Default is {cfg.defaults.count}")
     parser_load.add_argument(
         "--no_cache", action="store_true",
         help="Don't use rcache, force each request to be computed")
     parser_load.set_defaults(func=do_load)
+
+    parser_network = subparsers.add_parser(
+        "netload",
+        parents=[switches_common, switches_count, switches_compose,
+                 switches_afc, switches_rcache],
+        help="Network load test by repeatedly querying health endpoints")
+    parser_network.add_argument(
+        "--target", choices=["dispatcher", "msghnd", "rcache"],
+        help="What to test. If omitted then guess is attempted: 'dispatcher' "
+        "if --localhost specified, 'msghnd' if --afc without --localhost is "
+        "specified, 'rcache' if --rcache is specified")
+    parser_network.set_defaults(func=do_netload)
 
     parser_cache = subparsers.add_parser(
         "cache", parents=[switches_compose, switches_rcache],

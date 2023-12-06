@@ -437,3 +437,16 @@ rest_api:
     # Make AFC Request
     afc_req:
         url: http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry
+
+    # Msghnd endpoint to use for network load test
+    msghnd_get:
+        url: http://msghnd:8000/fbrat/ap-afc/healthy
+
+    # Rcache endpoint to use for network load test
+    rcache_get:
+        url: http://rcache:8000/healthcheck
+
+    # Nginx endpoint to use for network load test
+    dispatcher_get:
+        url: http://dispatcher:80/fbrat/ratapi/v1/GetAfcConfigByRulesetID
+        code: 404
