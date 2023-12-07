@@ -57,5 +57,4 @@ Werkzeug==2.3.3
 WsgiDAV==4.1.0
 WTForms==3.0.1
 python_dateutil==2.8.2
-kafka-python==2.0.2
 pika==1.3.2

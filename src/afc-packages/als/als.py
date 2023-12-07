@@ -4,30 +4,40 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-""" AFC and JSON logging to PostgreSQL """
+""" AFC and JSON logging to PostgreSQL
+
+This module uses Kafka producer client from Confluent.
+Overview-level documentation may be found here:
+https://github.com/confluentinc/confluent-kafka-python
+API documentation may be found here:
+https://docs.confluent.io/platform/current/clients/confluent-kafka-python/html/
+Configuration parameters may be found here:
+https://docs.confluent.io/platform/current/installation/configuration/
+and here:
+https://docs.confluent.io/platform/current/clients/confluent-kafka-python/\
+html/index.html#kafka-client-configuration
+"""
+
+# pylint: disable=invalid-name, too-many-arguments, global-statement
+# pylint: disable=broad-exception-caught
 
 import collections
 import datetime
-import gc
 import json
 import logging
 import os
 import re
-import sys
 import threading
-import time
-
-# pylint: disable=global-statement
+from typing import Any, Callable, cast, Dict, List, Optional, Tuple, Union
 
 LOGGER = logging.getLogger(__name__)
 
-import_failure = None
+import_failure: Optional[str] = None
 try:
     import dateutil.tz
-    import kafka
-    import kafka.errors
-except ImportError as ex:
-    import_failure = repr(ex)
+    import confluent_kafka
+except ImportError as exc:
+    import_failure = repr(exc)
 
 # Topic name for AFC request/response logging
 ALS_TOPIC = "ALS"
@@ -71,42 +81,44 @@ JSON_LOG_FIELD_TIME = "time"
 # JSON data field of JSON log record
 JSON_LOG_FIELD_DATA = "jsonData"
 
+# Once in this number of times Producer.poll() is called (to prevent send
+# report accumulation)
+POLL_PERIOD = 100
+
 # Delay between connection attempts
 CONNECT_ATTEMPT_INTERVAL = datetime.timedelta(seconds=10)
 
 # Regular expression for topic name check (Postgre requirement to table names)
 TOPIC_NAME_REGEX = re.compile(r"^[_a-zA-Z][0-9a-zA-Z_]{,62}$")
 
-# True for Python 3, False for Python 2
-IS_PY3 = sys.version_info.major == 3
-
 # Maximum um message size (default maximum of 1MB is way too small for GUI AFC
 # Requests)
 MAX_MSG_SIZE = (1 << 20) * 10
 
-def to_bytes(s):
+
+def to_bytes(s: Optional[str]) -> Optional[bytes]:
     """ Converts string to bytes """
     if s is None:
         return None
-    return s.encode("utf-8") if IS_PY3 else s
+    return s.encode("utf-8")
 
 
-def to_str(s):
+def to_str(s: Optional[Union[bytes, str]]) -> Optional[str]:
     """ Converts bytes to string """
     if (s is None) or isinstance(s, str):
         return s
-    return s.decode("utf-8", errors="backslashreplace") if IS_PY3 else s
+    return s.decode("utf-8", errors="backslashreplace")
 
 
-def timetag():
+def timetag() -> str:
     """ Timetag with timezone """
     return datetime.datetime.now(tz=dateutil.tz.tzlocal()).isoformat()
 
 
-def random_hex(n):
+def random_hex(n: int) -> str:
     """ Generates strongly random n-byte sequence and returns its hexadecimal
     representation """
-    return "".join("%02X" % (b if IS_PY3 else ord(b)) for b in os.urandom(n))
+    return "".join(f"{b:02X}" for b in os.urandom(n))
 
 
 class ArgDsc:
@@ -120,8 +132,10 @@ class ArgDsc:
     _required       -- True if this parameter required for KafkaProducer
                        initialization and its absence will lead to no logging
     """
-    def __init__(self, env_var, arg, type_conv=str, list_separator=None,
-                 required=False, default=None):
+    def __init__(self, env_var: str, arg: str,
+                 type_conv: Callable[[str], Any] = str,
+                 list_separator: Optional[str] = None,
+                 required: bool = False, default: Any = None) -> None:
         """ Constructor
 
         Arguments:
@@ -142,11 +156,11 @@ class ArgDsc:
         self._default = default
 
     @property
-    def env_var(self):
+    def env_var(self) -> str:
         """ Name of environment variable """
         return self._env_var
 
-    def from_env(self, kwargs):
+    def from_env(self, kwargs: Dict[str, Any]) -> bool:
         """ Tries to read argument from environment
 
         Arguments:
@@ -166,7 +180,7 @@ class ArgDsc:
         return True
 
     @classmethod
-    def str_or_int_type_conv(cls, str_val):
+    def str_or_int_type_conv(cls, str_val: str) -> Union[str, int]:
         """ Type converter for argument that can be string or integer """
         try:
             return int(str_val)
@@ -174,7 +188,7 @@ class ArgDsc:
             return str_val
 
     @classmethod
-    def bool_type_conv(cls, str_val):
+    def bool_type_conv(cls, str_val: str) -> bool:
         """ Type converter for boolean argument """
         if str_val.lower() in ("+", "1", "yes", "true", "on"):
             return True
@@ -184,49 +198,35 @@ class ArgDsc:
 
 
 # Descriptors of KafkaProducer arguments
-arg_dscs = [
+arg_dscs: List[ArgDsc] = [
     # Default value for stem part of "client_id" parameter passed to
     # KafkaProducer and server ID used in messages
-    ArgDsc("ALS_KAFKA_SERVER_ID", "client_id"),
+    ArgDsc("ALS_KAFKA_SERVER_ID", "client.id"),
     # Comma-separated list of Kafka (bootstrap) servers in form of 'hostname'
     # or 'hostname:port' (default port is 9092). If not specified ALS logging
     # is not performed
-    ArgDsc("ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS", "bootstrap_servers",
-           list_separator=",", required=True),
+    ArgDsc("ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS", "bootstrap.servers",
+           required=True),
     # Number of Kafka confirmations before operation completion.
-    # Valid values: '0' (fire and forget), '1', 'all'. Default is 0 (different
-    # from correspondent KafkaProducer constructor parameter - which is 1)
+    # Valid values: '0' (fire and forget), '1', 'all')
     ArgDsc("ALS_KAFKA_CLIENT_ACKS", "acks",
-           type_conv=ArgDsc.str_or_int_type_conv, default=0),
+           type_conv=ArgDsc.str_or_int_type_conv, default=1),
     # Number of retries. Default is 0
-    ArgDsc("ALS_KAFKA_CLIENT_RETRIES", "retries", type_conv=int),
+    ArgDsc("ALS_KAFKA_CLIENT_RETRIES", "retries", type_conv=int, default=5),
     # Time to wait for batching. Default is 0 (send immediately)
-    ArgDsc("ALS_KAFKA_CLIENT_LINGER_MS", "linger_ms", type_conv=int),
+    ArgDsc("ALS_KAFKA_CLIENT_LINGER_MS", "linger.ms", type_conv=int),
     # Request timeout in milliseconds. Default is 30000
-    ArgDsc("ALS_KAFKA_CLIENT_REQUEST_TIMEOUT_MS", "request_timeout_ms",
+    ArgDsc("ALS_KAFKA_CLIENT_REQUEST_TIMEOUT_MS", "request.timeout.ms",
            type_conv=int),
     # Maximum number of unconfirmed requests in flight. Default is 5
     ArgDsc("ALS_KAFKA_CLIENT_MAX_UNCONFIRMED_REQS",
-           "max_in_flight_requests_per_connection", type_conv=int),
+           "max.in.flight.requests.per.connection", type_conv=int),
     # Security protocol: 'PLAINTEXT', 'SSL' (hope we do not need SASL_...).
     # Default is 'PLAINTEXT'
-    ArgDsc("ALS_KAFKA_CLIENT_SECURITY_PROTOCOL", "security_protocol"),
-    # SSL. 'True' ('yes,', '1', '+') to check Kafka server identity,
-    # 'False' ('no, '-', '0') to not check. Default is to check
-    ArgDsc("ALS_KAFKA_CLIENT_SSL_CHECK_HOSTNAME", "ssl_check_hostname",
-           type_conv=ArgDsc.bool_type_conv),
+    ArgDsc("ALS_KAFKA_CLIENT_SECURITY_PROTOCOL", "security.protocol"),
     # SSL. CA file for certificate verification
-    ArgDsc("ALS_KAFKA_CLIENT_SSL_CAFILE", "ssl_cafile"),
-    # SSL. Client certificate PEM file name
-    ArgDsc("ALS_KAFKA_CLIENT_SSL_CERTFILE", "ssl_certfile"),
-    # SSL. Client private key file
-    ArgDsc("ALS_KAFKA_CLIENT_SSL_KEYFILE", "ssl_keyfile"),
-    # SSL. File name for CRL certificate expiration check
-    ArgDsc("ALS_KAFKA_CLIENT_SSL_CRLFILE", "ssl_crlfile"),
-    # SSL. Available ciphers in OpenSSL cipher list format
-    ArgDsc("ALS_KAFKA_CLIENT_SSL_CIPHERS", "ssl_ciphers"),
     # Maximum message size
-    ArgDsc("ALS_KAFKA_MAX_REQUEST_SIZE", "max_request_size", type_conv=int)]
+    ArgDsc("ALS_KAFKA_MAX_REQUEST_SIZE", "message.max.bytes", type_conv=int)]
 
 
 class Als:
@@ -247,10 +247,10 @@ class Als:
                         (config, customer, geo_version, uls_id)->
                         request_indices
     _req_idx         -- Request message index
-    _lock            -- Lock that guards thread-unsafe stuff
-    _last_attempt    -- Datetime of last connection attempt
+    _send_count      -- Number of sent records
     """
-    def __init__(self, client_id=None, consolidate_configs=True):
+    def __init__(self, client_id: Optional[str] = None,
+                 consolidate_configs: bool = True) -> None:
         """ Constructor
 
         Arguments:
@@ -262,13 +262,13 @@ class Als:
         consolidate_configs -- False to send configs as they arrive, True to
                                collect them and then send consolidated
         """
-        self._producer = None
-        self._config_cache = {} if consolidate_configs else None
+        self._producer: Optional[confluent_kafka.Producer] = None
+        self._config_cache: \
+            Optional[Dict[str, Dict[Tuple[str, str, str, str], List[int]]]] = \
+            {} if consolidate_configs else None
         self._req_idx = 0
         self._lock = threading.Lock()
-        self._producer_kwargs = None
-        self._last_attempt = None
-        kwargs = {}
+        kwargs: Dict[str, Any] = {}
         has_parameters = True
         for argdsc in arg_dscs:
             try:
@@ -282,9 +282,11 @@ class Als:
                     "'%s': %s",
                     argdsc.env_var, os.environ.get(argdsc.env_var), repr(ex))
                 break
-        self._server_id = kwargs["client_id"] = \
-            (client_id or kwargs.get("client_id", "Unknown")) + \
+        self._server_id: str = \
+            cast(str, (client_id or kwargs.get("client.id", "Unknown"))) + \
             "_" + random_hex(10)
+        self._send_count = 0
+        kwargs["client.id"] = self._server_id
         if not has_parameters:
             LOGGER.warning(
                 "Parameters for Kafka ALS server connection not specified. "
@@ -295,52 +297,28 @@ class Als:
                          "No ALS/JSON logging will be performed",
                          import_failure)
             return
-        self._producer_kwargs = kwargs
-        self._try_connect()
-
-    def _try_connect(self):
-        """ Tryeing to connect Kafka server, returns True if connection
-        established
-        """
-        if self._producer is not None:
-            return True
-        if self._producer_kwargs is None:
-            return False
         with self._lock:
-            if self._producer is not None:
-                return True
-            if (self._last_attempt is not None) and \
-                    ((datetime.datetime.now() - self._last_attempt) <
-                     CONNECT_ATTEMPT_INTERVAL):
-                return False
-            self._last_attempt = datetime.datetime.now()
             try:
-                self._producer = kafka.KafkaProducer(**self._producer_kwargs)
-                LOGGER.info("Kafka server successfully connected")
-                return True
-            except kafka.errors.KafkaError as ex:
+                self._producer = \
+                    confluent_kafka.Producer(kwargs)
+                LOGGER.info("Kafka ALS server connection created")
+            except confluent_kafka.KafkaException as ex:
                 LOGGER.error(
                     "Kafka ALS server connection initialization error: %s",
-                    repr(ex))
-                return False
+                    repr(ex.args[0]))
 
     @property
-    def initialized(self):
+    def initialized(self) -> bool:
         """ True if KafkaProducer initialization was successful """
         return self._producer is not None
 
-    @property
-    def connected(self):
-        """ True if Kafka server connected """
-        return self.initialized and self._producer.bootstrap_connected
-
-    def afc_req_id(self):
+    def afc_req_id(self) -> str:
         """ Returns Als-instance unique request ID """
         with self._lock:
             self._req_idx += 1
             return str(self._req_idx)
 
-    def afc_request(self, req_id, req):
+    def afc_request(self, req_id: str, req: Dict[str, Any]) -> None:
         """ Send AFC Request
 
         Arguments:
@@ -348,13 +326,13 @@ class Als:
                   returned by req_id())
         req    -- Request message JSON dictionary
         """
-        if not self._try_connect():
+        if self._producer is None:
             return
         self._send(
             topic=ALS_TOPIC, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_REQUEST, data=req))
 
-    def afc_response(self, req_id, resp):
+    def afc_response(self, req_id: str, resp: Dict[str, Any]) -> None:
         """ Send AFC Response
 
         Arguments:
@@ -362,19 +340,20 @@ class Als:
                   returned by req_id())
         resp   -- Response message as JSON dictionary
         """
-        if not self._try_connect():
+        if self._producer is None:
             return
         self._flush_afc_configs(req_id)
         self._send(
             topic=ALS_TOPIC, key=self._als_key(req_id),
             value=self._als_value(data_type=ALS_DT_RESPONSE, data=resp))
 
-    def afc_config(self, req_id, config_text, customer, geo_data_version,
-                   uls_id, req_indices=None):
+    def afc_config(self, req_id: str, config_text: str, customer: str,
+                   geo_data_version: str, uls_id: str,
+                   req_indices: Optional[list[int]] = None) -> None:
         """ Send or cache AFC Config
 
         Arguments:
-        req_id --           Unique for this Als object instance request ID
+        req_id --           Unique for this AlS object instance request ID
                             string (e.g. returned by req_id())
         config_text      -- Config file contents
         customer         -- Customer name
@@ -384,7 +363,7 @@ class Als:
                             within message to which this information is
                             related. None if to all
         """
-        if not self._try_connect():
+        if self._producer is None:
             return
         if (self._config_cache is None) or (req_indices is None):
             self._send_afc_config(
@@ -395,11 +374,11 @@ class Als:
             with self._lock:
                 indices_for_config = \
                     self._config_cache.setdefault(req_id, {}).\
-                        setdefault((config_text, customer,
-                                    geo_data_version, uls_id), [])
+                    setdefault(
+                        (config_text, customer, geo_data_version, uls_id), [])
                 indices_for_config += req_indices
 
-    def json_log(self, topic, record):
+    def json_log(self, topic: str, record: Any) -> None:
         """ Send JSON log record
 
         Arguments
@@ -407,10 +386,10 @@ class Als:
                   which this log will be placed
         record -- JSON dictionary with record data
         """
+        if self._producer is None:
+            return
         assert topic != ALS_TOPIC
         assert TOPIC_NAME_REGEX.match(topic)
-        if not self._try_connect():
-            return
         json_dict = \
             collections.OrderedDict(
                 [(JSON_LOG_FIELD_VERSION, JSON_LOG_VERSION),
@@ -419,22 +398,18 @@ class Als:
                  (JSON_LOG_FIELD_DATA, json.dumps(record))])
         self._send(topic=topic, value=to_bytes(json.dumps(json_dict)))
 
-    def flush(self, timeout_sec):
+    def flush(self, timeout_sec: float) -> bool:
         """ Flush pending messages (if any)
 
         Arguments:
         timeout_sec -- timeout in seconds, None to wait for completion
         Returns True on success, False on timeout
         """
-        if not self.connected:
+        if self._producer is None:
             return True
-        try:
-            self._producer.flush(timeout=timeout_sec)
-            return True
-        except kafka.errors.KafkaTimeoutError:
-            return False
+        return self._producer.flush(timeout=timeout_sec) == 0
 
-    def _flush_afc_configs(self, req_id):
+    def _flush_afc_configs(self, req_id: str) -> None:
         """ Send all AFC Config records, collected for given request
 
         Arguments:
@@ -455,8 +430,9 @@ class Als:
                 geo_data_version=geo_data_version, uls_id=uls_id,
                 req_indices=indices if len(configs) != 1 else None)
 
-    def _send_afc_config(self, req_id, config_text, customer, geo_data_version,
-                         uls_id, req_indices):
+    def _send_afc_config(self, req_id: str, config_text: str, customer: str,
+                         geo_data_version: str, uls_id: str,
+                         req_indices: Optional[List[int]]) -> None:
         """ Actual AFC Config sending
 
         Arguments:
@@ -469,7 +445,7 @@ class Als:
                             within message to which this information is
                             related. None if to all
         """
-        extra_fields = \
+        extra_fields: Dict[str, Any] = \
             collections.OrderedDict(
                 [(ALS_FIELD_CUSTOMER, customer),
                  (ALS_FIELD_GEO_DATA, geo_data_version),
@@ -481,28 +457,29 @@ class Als:
             value=self._als_value(data_type=ALS_DT_CONFIG, data=config_text,
                                   extra_fields=extra_fields))
 
-    def _send(self, topic, key=None, value=None):
+    def _send(self, topic: str, key: Optional[bytes] = None,
+              value: Optional[bytes] = None) -> None:
         """ KafkaProducer's send() method with exceptions caught """
-        gc_called = False
-        while True:
+        assert self._producer is not None
+        self._send_count += 1
+        if (self._send_count % POLL_PERIOD) == 0:
             try:
-                self._producer.send(topic=topic, key=key, value=value)
-                return
-            except kafka.errors.KafkaError as ex:
-                if gc_called or \
-                        (not isinstance(ex, kafka.errors.KafkaTimeoutError)):
-                    LOGGER.error(
-                        "Error sending to topic '%s': %s", topic, repr(ex))
-                    break
-                time.sleep(0.1)
-                gc.collect()
-                gc_called = True
+                self._producer.poll(0)
+            except confluent_kafka.KafkaException:
+                pass
+        try:
+            self._producer.produce(topic=topic, key=key, value=value)
+        except confluent_kafka.KafkaException as ex:
+            LOGGER.error(
+                "Error sending to topic '%s': %s", topic,
+                repr(ex.args[0]))
 
-    def _als_key(self, req_id):
+    def _als_key(self, req_id: str) -> bytes:
         """ ALS record key for given request ID """
-        return to_bytes("%s|%s" % (self._server_id, req_id))
+        return cast(bytes, to_bytes(f"{self._server_id}|{req_id}"))
 
-    def _als_value(self, data_type, data, extra_fields=None):
+    def _als_value(self, data_type: str, data: Union[str, Dict[str, Any]],
+                   extra_fields: Optional[Dict[str, Any]] = None):
         """ ALS record value
 
         Arguments:
@@ -527,12 +504,13 @@ class Als:
 # STATIC INTERFACE FOR THIS MODULE FUNCTIONALITY
 
 # Als instance creation lock
-_als_instance_lock = threading.Lock()
+_als_instance_lock: threading.Lock = threading.Lock()
 # Als instance, built after first initialization
-_als_instance = None
+_als_instance: Optional[Als] = None
 
 
-def als_initialize(client_id=None, consolidate_configs=True):
+def als_initialize(client_id: Optional[str] = None,
+                   consolidate_configs: bool = True) -> None:
     """ Initialization
     May be called several times, but all nonfirst calls are ignored
 
@@ -545,7 +523,8 @@ def als_initialize(client_id=None, consolidate_configs=True):
     consolidate_configs -- False to send configs as they arrive, True to
                            collect them and then send consolidated
     """
-    global _als_instance, _als_instance_lock
+    global _als_instance
+    global _als_instance_lock
     if _als_instance is not None:
         return
     with _als_instance_lock:
@@ -554,22 +533,17 @@ def als_initialize(client_id=None, consolidate_configs=True):
                                 consolidate_configs=consolidate_configs)
 
 
-def als_is_initialized():
+def als_is_initialized() -> bool:
     """ True if ALS was successfully initialized """
-    return (_als_instance is not None) and _als_instance.initialized()
+    return (_als_instance is not None) and _als_instance.initialized
 
 
-def als_is_connected():
-    """ True if Kafka server connected """
-    return (_als_instance is not None) and _als_instance.connected
-
-
-def als_afc_req_id():
+def als_afc_req_id() -> Optional[str]:
     """ Returns Als-instance unique request ID """
     return _als_instance.afc_req_id() if _als_instance is not None else None
 
 
-def als_afc_request(req_id, req):
+def als_afc_request(req_id: str, req: Dict[str, Any]) -> None:
     """ Send AFC Request
 
     Arguments:
@@ -580,7 +554,7 @@ def als_afc_request(req_id, req):
         _als_instance.afc_request(req_id, req)
 
 
-def als_afc_response(req_id, resp):
+def als_afc_response(req_id: str, resp: Dict[str, Any]) -> None:
     """ Send AFC Response
 
     Arguments:
@@ -591,8 +565,9 @@ def als_afc_response(req_id, resp):
         _als_instance.afc_response(req_id, resp)
 
 
-def als_afc_config(req_id, config_text, customer, geo_data_version, uls_id,
-                   req_indices=None):
+def als_afc_config(req_id: str, config_text: str, customer: str,
+                   geo_data_version: str, uls_id: str,
+                   req_indices: Optional[List[int]] = None) -> None:
     """ Send AFC Config
 
     Arguments:
@@ -610,7 +585,7 @@ def als_afc_config(req_id, config_text, customer, geo_data_version, uls_id,
                                  geo_data_version, uls_id, req_indices)
 
 
-def als_json_log(topic, record):
+def als_json_log(topic: str, record: Any):
     """ Send JSON log record
 
     Arguments
@@ -622,7 +597,7 @@ def als_json_log(topic, record):
         _als_instance.json_log(topic, record)
 
 
-def als_flush(timeout_sec = 2):
+def als_flush(timeout_sec: float = 2) -> bool:
     """ Flush pending messages (if any)
 
     Usually it is not needed, but if last log ALS/JSON write was made
