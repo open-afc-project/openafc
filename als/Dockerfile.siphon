@@ -9,14 +9,19 @@
 # Kafka and puts them to PostgreSQL+PostGIS database (optionally creating
 # necessary database before operation)
 
-FROM python:3.11-slim
-
-WORKDIR /usr/app
+FROM alpine:3.18
 
 RUN mkdir -p -m 777 /usr/app
+WORKDIR /usr/app
+
+RUN apk add --update --no-cache python3=~3.11 py3-sqlalchemy=~1.4 py3-pip \
+    py3-psycopg2 py3-pydantic=~1.10 py3-alembic py3-lz4
+
+RUN apk add --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing/ \
+    py3-confluent-kafka
+
 COPY requirements.txt /usr/app/
-RUN /usr/local/bin/python3 -m pip install --upgrade pip
-RUN pip3 install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir --root-user-action=ignore -r requirements.txt
 
 ENV PYTHONPATH=/usr/app
 ENV PATH=$PATH:/usr/app
@@ -33,13 +38,6 @@ ENV KAFKA_SECURITY_PROTOCOL=
 ENV KAFKA_SSL_KEYFILE=
 # SSL CA (Certificate Authority) file
 ENV KAFKA_SSL_CAFILE=
-# SSL Certificate file
-ENV KAFKA_SSL_CERTFILE=
-# SSL Certificate revocation file
-ENV KAFKA_SSL_CRLFILE=
-# True/yes/1/+ to check server hostname against certificate, False/no/0/- to
-# not to. Default is to check
-ENV KAFKA_SSL_CHECK_HOSTNAME=True
 # Maximum message size (default is 1MB)
 ENV KAFKA_MAX_REQUEST_SIZE=
 # PostgreSQL server hostname
@@ -78,10 +76,7 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_client_id=$KAFKA_CLIENT_ID \
     --kafka_security_protocol=$KAFKA_SECURITY_PROTOCOL \
     --kafka_ssl_keyfile=$KAFKA_SSL_KEYFILE \
-    --kafka_ssl_check_hostname=$KAFKA_SSL_CHECK_HOSTNAME \
     --kafka_ssl_cafile=$KAFKA_SSL_CAFILE \
-    --kafka_ssl_certfile=$KAFKA_SSL_CERTFILE \
-    --kafka_ssl_crlfile=$KAFKA_SSL_CRLFILE \
     --kafka_max_partition_fetch_bytes=$KAFKA_MAX_REQUEST_SIZE \
     --init_postgres=postgresql://${POSTGRES_INIT_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_INIT_DB}${POSTGRES_INIT_OPTIONS} \
     --init_postgres_password=$POSTGRES_INIT_PASSWORD \

@@ -16,6 +16,7 @@
 from abc import ABC, abstractmethod
 import argparse
 from collections.abc import Iterable
+import confluent_kafka
 import enum
 import datetime
 import dateutil.tz                                  # type: ignore
@@ -24,8 +25,6 @@ import hashlib
 import heapq
 import inspect
 import json
-import kafka                                        # type: ignore
-import kafka.errors                                 # type: ignore
 import logging
 import lz4.frame                                    # type: ignore
 import math
@@ -37,8 +36,8 @@ import sqlalchemy as sa                             # type: ignore
 import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
 import string
 import sys
-from typing import Any, Dict, Generic, List, NamedTuple, Optional, Set, \
-    Tuple, Type, TypeVar, Union
+from typing import Any, Callable, Dict, Generic, List, NamedTuple, Optional, \
+    Set, Tuple, Type, TypeVar, Union
 import uuid
 
 # This script version
@@ -269,6 +268,7 @@ def jdt(dt: Any) -> datetime.datetime:
         raise TypeError(f"Unexpected '{dt}'. Should be datetime")
     return dt
 
+
 def get_month_idx() -> int:
     """ Computes month index """
     d = datetime.datetime.now()
@@ -293,8 +293,10 @@ class Metrics:
         name: str
         # Metric description
         dsc: str
-        # Optional list of additional labels (bnesides 'id'
+        # Optional list of additional labels (besides 'id')
         labels: Optional[List[str]] = None
+        # Optional bucket list for histogram
+        buckets: Optional[List[float]] = None
 
     class _Metric:
         """ Metric wrapper.
@@ -315,8 +317,12 @@ class Metrics:
             metric_class = getattr(prometheus_client, metric_def.metric_type)
             assert metric_class is not None
             self._labels: List[str] = metric_def.labels or []
-            self._metric = metric_class(metric_def.name, metric_def.dsc,
-                                        ["id"] + self._labels)
+            kwargs: Dict[str, Any] = {}
+            if metric_def.buckets is not None:
+                kwargs["buckets"] = metric_def.buckets
+            self._metric = \
+                metric_class(metric_def.name, metric_def.dsc,
+                             ["id"] + self._labels, **kwargs)
 
         def __call__(self, *args, **kwargs) -> Any:
             """ Returns output value of 'labels()' of wrapped metric.
@@ -621,11 +627,13 @@ class InitialDatabase(DatabaseBase):
         with self.engine.connect() as conn:
             try:
                 if if_exists == self.IfExists.Drop:
-                    conn.execute("commit")
-                    conn.execute(f'drop database if exists "{db_name}"')
-                conn.execute("commit")
+                    conn.execute(sa.text("commit"))
+                    conn.execute(
+                        sa.text(f'drop database if exists "{db_name}"'))
+                conn.execute(sa.text("commit"))
                 template_clause = f' template "{template}"' if template else ""
-                conn.execute(f'create database "{db_name}"{template_clause}')
+                conn.execute(
+                    sa.text(f'create database "{db_name}"{template_clause}'))
                 logging.info(f"Database '{db_name}' successfully created")
                 return True
             except sa.exc.ProgrammingError:
@@ -633,7 +641,6 @@ class InitialDatabase(DatabaseBase):
                     raise
                 engine = self.create_engine(arg_conn_str=conn_str,
                                             arg_password=password)
-                engine.execute("select 1")
                 engine.dispose()
                 logging.info(
                     f"Already existing database '{db_name}' will be used")
@@ -642,8 +649,8 @@ class InitialDatabase(DatabaseBase):
     def drop_db(self, db_name: str) -> None:
         """ Drop given database """
         with self.engine.connect() as conn:
-            conn.execute("commit")
-            conn.execute(f'drop database "{db_name}"')
+            conn.execute(sa.text("commit"))
+            conn.execute(sa.text(f'drop database "{db_name}"'))
 
 
 # Fully qualified position in Kafka queue on certain Kafka cluster
@@ -1454,7 +1461,7 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
             return
         by_key: Dict[Tuple[LookupKey, int], LookupValue] = {}
         try:
-            for row in self._adb.conn.execute(sa.select([self._table])):
+            for row in self._adb.conn.execute(sa.select(self._table)):
                 key = (self._key_from_row(row),
                        row[AlsTableBase.MONTH_IDX_COL_NAME])
                 value = by_key.get(key)
@@ -2947,77 +2954,18 @@ class IncompleteAlsBundles:
         return ret
 
 
-class KafkaConsumerParams:
-    """ Kafka consumer constructor parameters.
-    Subset of the whole set of consumer parameters. Values set to None are not
-    passed to constructor - defaults are used
-
-    Attributes:
-    bootstrap_servers         -- List of 'server[:port]' Kafka server addresses
-    client_id                 -- Client ID to use in Kafka logs
-    security_procol           -- "SSL" or 'PLAINTEXT'
-    ssl_keyfile               -- Client private key file
-    ssl_check_hostname        -- True to verify server identity. Default (None)
-                                 is True
-    ssl_cafile                -- CA file for certificate verification. Default
-                                 (None) is None
-    ssl_certfile              -- Client certificate PEM file name. Default
-                                 (None) is None
-    ssl_crlfile               -- File name for CRL certificate expiration
-                                 check. Default (None) is None
-    ssl_ciphers               -- Available ciphers in OpenSSL cipher list
-                                 format. Default (None) is None
-    enable_auto_commit        -- True if auto commit enabled
-    group_id                  -- Consumer group ID
-    max_partition_fetch_bytes -- Maximum message length
-
-    servers                   -- Value of --kafka_servers. Converted to
-                                 'bootstrap_servers' in constructor
-    """
-    def __init__(self, **kwargs) -> None:
-        self.client_id: Optional[str] = None
-        self.security_protocol: Optional[str] = None
-        self.ssl_keyfile: Optional[str] = None
-        self.ssl_cafile: Optional[str] = None
-        self.ssl_certfile: Optional[str] = None
-        self.ssl_crlfile: Optional[str] = None
-        self.ssl_ciphers: Optional[str] = None
-        self.ssl_check_hostname: Optional[bool] = None
-        self.max_partition_fetch_bytes: Optional[int] = None
-        self.servers: Optional[str] = None
-        for k, v in kwargs.items():
-            assert k in self.__dict__
-            setattr(self, k, v)
-        self.enable_auto_commit = False
-        self.group_id = "ALS"
-        self.auto_offset_reset = "earliest"
-
-        self.bootstrap_servers: List[str] = \
-            self.servers.split(",") if (self.servers is not None) \
-            else [DEFAULT_KAFKA_SERVER]
-        self.servers = None
-
-        self.client_id = self.client_id or DEFAULT_KAFKA_CLIENT_ID
-        if self.client_id.endswith("@"):
-            self.client_id = self.client_id[:-1] + \
-                "".join(f"{b:02X}" for b in os.urandom(10))
-
-    def constructor_kwargs(self) -> Dict[str, Any]:
-        """ Kwargs to pass to constructor. Only keys with values are used """
-        return \
-            {k: v for k, v in self.__dict__.items() if v not in ("", None)}
-
-
 class KafkaClient:
-    """ Wrapper over KafkaConsumer
+    """ Wrapper over confluent_kafka.Consumer object
 
     Private attributes:
-    _consumer                -- KafkaConsumer object
-    _topic_regex_str         -- Regex string on what topics to subscribe
+    _consumer                -- confluent_kafka.Consumer object
     _subscribed_topics       -- Set of currently subscribed topics
     _resubscribe_interval    -- Minimum time interval before subscription
                                 checks
     _last_subscription_check -- Moment when subscription was last time checked
+    _subscribe_als           -- True if ALS topic should be subscribed
+    _subscribe_log           -- True if log topics should be subscribed
+    _metrics                 -- Metric collection
     """
     # Kafka message data
     MessageInfo = \
@@ -3030,30 +2978,84 @@ class KafkaClient:
              # Message raw value
              ("value", bytes)])
 
-    def __init__(self, consumer_params: KafkaConsumerParams,
-                 topic_regex_str: str, resubscribe_interval_s: int) -> None:
+    class _ArgDsc(NamedTuple):
+        """ confluent_kafka.Consumer() config argument descriptor """
+        # confluent_kafka.Consumer() parameter
+        config: str
+
+        # Correspondent command line parameter (if any)
+        cmdline: Optional[str] = None
+
+        # Default value
+        default: Any = None
+
+        def get_value(self, args: Any) -> Any:
+            """ Returns value for parameter (from command line or default)
+
+            Arguments:
+            args -- Parsed command line object
+            Returns None or parameter value
+            """
+            assert (self.cmdline is not None) or (self.default is not None)
+            ret: Any = None
+            if self.cmdline is not None:
+                assert hasattr(args, self.cmdline)
+                ret = getattr(args, self.cmdline)
+            return ret if ret is not None else self.default
+
+    # Supported confluent_kafka.Consumer() config arguments
+    _ARG_DSCS = [
+        _ArgDsc(config="bootstrap.servers", cmdline="kafka_servers"),
+        _ArgDsc(config="client.id", cmdline="kafka_client_id"),
+        _ArgDsc(config="security.protocol", cmdline="kafka_security_protocol"),
+        _ArgDsc(config="ssl.keystore.location", cmdline="kafka_ssl_keyfile"),
+        _ArgDsc(config="ssl.truststore.location", cmdline="kafka_ssl_cafile"),
+        _ArgDsc(config="ssl.cipher.suites", cmdline="kafka_ssl_ciphers"),
+        _ArgDsc(config="max.partition.fetch.bytes",
+                cmdline="kafka_max_partition_fetch_bytes"),
+        _ArgDsc(config="enable.auto.commit", default=True),
+        _ArgDsc(config="group.id", default="ALS"),
+        _ArgDsc(config="auto.offset.reset", default="earliest")]
+
+    def __init__(self, args: Any, subscribe_als: bool, subscribe_log: bool,
+                 resubscribe_interval_s: int) -> None:
         """ Constructor
 
         Arguments:
-        consumer_params        -- KafkaConsumerParams object - Kafka server
-                                  consumer connection parameters
-        topic_regex_str        -- Regex string on what topics to subscribe
+        args                   -- Parsed command line parameters
+        subscribe_als          -- True if ALS topic should be subscribed
+        subscribe_log          -- True if log topics should be subscribed
         resubscribe_interval_s -- How often (interval in seconds)
                                   subscription_check() will actually check
                                   subscription. 0 means - on each call.
         """
-        self._consumer = \
-            kafka.KafkaConsumer(**consumer_params.constructor_kwargs())
-        self._topic_regex_str = topic_regex_str
+        config: Dict[str, Any] = {}
+        for ad in self._ARG_DSCS:
+            v = ad.get_value(args)
+            if v is not None:
+                config[ad.config] = v
+        if config.get("client.id", "").endswith("@"):
+            config["client.id"] = config["client.id"][:-1] + \
+                "".join(f"{b:02X}" for b in os.urandom(10))
+        try:
+            self._consumer = confluent_kafka.Consumer(config)
+        except confluent_kafka.KafkaException as ex:
+            logging.error(f"Error creating Kafka Consumer: {ex.args[0].str}")
+            raise
+        self._subscribe_als = subscribe_als
+        self._subscribe_log = subscribe_log
         self._resubscribe_interval = \
             datetime.timedelta(seconds=resubscribe_interval_s)
         self._subscribed_topics: Set[str] = set()
         self._last_subscription_check = \
             datetime.datetime.now() - self._resubscribe_interval
-
-    def connected(self) -> bool:
-        """ True if Kafka server connected """
-        return self._consumer.bootstrap_connected()
+        self._metrics = \
+            Metrics([("Gauge", "siphon_fetched_offsets",
+                      "Fetched Kafka offsets", ["topic", "partition"]),
+                     ("Counter", "siphon_kafka_errors",
+                      "Messages delivered with errors", ["topic", "code"]),
+                     ("Gauge", "siphon_comitted_offsets",
+                      "Comitted Kafka offsets", ["topic", "partition"])])
 
     def subscription_check(self) -> None:
         """ If it's time - check if new matching topics arrived and resubscribe
@@ -3061,51 +3063,90 @@ class KafkaClient:
         if (datetime.datetime.now() - self._last_subscription_check) < \
                 self._resubscribe_interval:
             return
-        topic_regex = re.compile(self._topic_regex_str)
-        current_topics = \
-            {t for t in self._consumer.topics() if topic_regex.match(t)}
-        if current_topics <= self._subscribed_topics:
-            return
-        self._subscribed_topics = current_topics
-        self._consumer.subscribe(pattern=self._topic_regex_str)
-        self._last_subscription_check = datetime.datetime.now()
+        try:
+            current_topics: Set[str] = set()
+            for topic in self._consumer.list_topics().topics.keys():
+                if (self._subscribe_als and (topic == ALS_KAFKA_TOPIC)) or \
+                        (self._subscribe_log and
+                         (not topic.startswith("__"))):
+                    current_topics.add(topic)
+            if current_topics <= self._subscribed_topics:
+                return
+            self._consumer.subscribe(list(current_topics))
+            self._subscribed_topics = current_topics
+            self._last_subscription_check = datetime.datetime.now()
+        except confluent_kafka.KafkaException as ex:
+            logging.error(f"Topic subscription error: {ex.args[0].str}")
+            raise
 
-    def poll(self, timeout_ms: int, max_records: int,
-             update_offsets: bool = True) \
+    def poll(self, timeout_ms: int, max_records: int) \
             -> Dict[str, List["KafkaClient.MessageInfo"]]:
         """ Poll for new messages
 
         Arguments:
         timeout_ms     -- Poll timeout in milliseconds. 0 to return immediately
         max_records    -- Maximum number of records to poll
-        update_offsets -- Mark message are read
         Returns by-topic dictionary of MessageInfo objects
         """
-        result = \
-            self._consumer.poll(timeout_ms=timeout_ms, max_records=max_records,
-                                update_offsets=update_offsets)
-        ret: Dict[str, List["KafkaClient.MessageInfo"]] = {}
-        for topic_partition, messages in result.items():
-            ret[topic_partition.topic] = \
-                [self.MessageInfo(
-                    position=KafkaPosition(
-                        topic=topic_partition.topic,
-                        partition=topic_partition.partition, offset=m.offset),
-                    key=m.key, value=m.value) for m in messages]
+        timeout_s = timeout_ms / 1000
+        try:
+            fetched_offsets: Dict[Tuple[str, int], int] = {}
+            ret: Dict[str, List["KafkaClient.MessageInfo"]] = {}
+            start_time = datetime.datetime.now()
+            for _ in range(max_records):
+                message = self._consumer.poll(timeout_s)
+                if (message is None) or \
+                        ((datetime.datetime.now() -
+                          start_time).total_seconds() > timeout_s):
+                    break
+                kafka_error = message.error()
+                topic = message.topic()
+                if kafka_error is not None:
+                    self._metrics.siphon_kafka_errors(
+                        message.topic() or "None",
+                        str(kafka_error.code())).inc()
+                else:
+                    partition = message.partition()
+                    offset = message.offset()
+                    ret.setdefault(message.topic(), []).\
+                        append(
+                            self.MessageInfo(
+                                position=KafkaPosition(
+                                    topic=topic, partition=partition,
+                                    offset=offset),
+                                key=message.key(),
+                                value=message.value()))
+                    previous_offset = \
+                        fetched_offsets.setdefault((topic, partition), -1)
+                    fetched_offsets[(topic, partition)] = \
+                        max(previous_offset, offset)
+        except confluent_kafka.KafkaException as ex:
+            logging.error(f"Message fetch error: {ex.args[0].str}")
+            raise
+        for (topic, partition), offset in fetched_offsets.items():
+            self._metrics.siphon_fetched_offsets(str(topic),
+                                                 str(partition)).set(offset)
         return ret
 
     def commit(self, positions: Dict[str, Dict[int, int]]) -> None:
         """ Commit given message positions
 
         Arguments:
-        positions -- By-topic then by-partition maximum commited offsets
+        positions -- By-topic then by-partition maximum committed offsets
         """
-        offsets: Dict[kafka.TopicPartition, kafka.OffsetAndMetadata] = {}
-        for topic, partitions in positions.items():
-            for partition, offset in partitions.items():
-                offsets[kafka.TopicPartition(topic, partition)] = \
-                    kafka.OffsetAndMetadata(offset, None)
-        self._consumer.commit(offsets)
+        offsets: List[confluent_kafka.TopicPartition] = []
+        for topic, offset_dict in positions.items():
+            for partition, offset in offset_dict.items():
+                offsets.append(
+                    confluent_kafka.TopicPartition(
+                        topic=topic, partition=partition, offset=offset + 1))
+                self._metrics.siphon_comitted_offsets(topic,
+                                                      partition).set(offset)
+        try:
+            self._consumer.commit(offsets=offsets)
+        except confluent_kafka.KafkaException as ex:
+            logging.error(f"Offset commit error: {ex.args[0].str}")
+            raise
 
 
 class Siphon:
@@ -3144,8 +3185,8 @@ class Siphon:
     KAFKA_IDLE_TIMEOUT_MS = 1000
     # Maximum age (time since last update) of ALS Bundle
     ALS_MAX_AGE_SEC = 1000
-    # Maximum number of message bundles to write to database
-    ALS_MAX_MESSAGE_UPDATE = 1000
+    # Maximum number of requests in bundles to write to database
+    ALS_MAX_REQ_UPDATE = 5000
 
     def __init__(self, adb: Optional[AlsDatabase], ldb: Optional[LogsDatabase],
                  kafka_client: KafkaClient) -> None:
@@ -3179,9 +3220,7 @@ class Siphon:
                      ("Counter", "siphon_afc_msg_dropped",
                       "Number of incomplete AFC Request messages"),
                      ("Gauge", "siphon_afc_msg_in_progress",
-                      "Number of AFC Request messages awaiting completion"),
-                     ("Gauge", "siphon_comitted_offsets",
-                      "Comitted Kafka offsets", ["topic", "partition"])])
+                      "Number of AFC Request messages awaiting completion")])
         self._adb = adb
         self._ldb = ldb
         self._kafka_client = kafka_client
@@ -3348,7 +3387,7 @@ class Siphon:
             data_dict = \
                 dict(
                     enumerate(self._als_bundles.fetch_assembled(
-                        max_bundles=self.ALS_MAX_MESSAGE_UPDATE)))
+                        max_requests=self.ALS_MAX_REQ_UPDATE)))
             if not data_dict:
                 return False
             req_count = \
@@ -3399,10 +3438,6 @@ class Siphon:
         completed_offsets = self._kafka_positions.get_processed_offsets()
         if not completed_offsets:
             return False
-        for topic, partitions in completed_offsets.items():
-            for partition, offset in partitions.items():
-                self._metrics.siphon_comitted_offsets(topic, partition).\
-                    set(offset)
         self._kafka_client.commit(completed_offsets)
         return True
 
@@ -3424,7 +3459,8 @@ def read_sql_file(sql_file: str) -> str:
 
 
 ALS_PATCH = ["ALTER TABLE afc_server DROP CONSTRAINT IF EXISTS "
-             "afc_server_afc_server_name_key;"]
+             "afc_server_afc_server_name_key"]
+
 
 def do_init_db(args: Any) -> None:
     """Execute "init" command.
@@ -3442,6 +3478,7 @@ def do_init_db(args: Any) -> None:
             error(f"Connection to {InitialDatabase.name_for_logs()} database "
                   f"failed: {ex}")
         nothing_done = True
+        patch: List[str]
         for conn_str, password, sql_file, template, db_class, sql_required, \
                 patch in \
                 [(args.als_postgres, args.als_postgres_password, args.als_sql,
@@ -3468,11 +3505,12 @@ def do_init_db(args: Any) -> None:
                         password=password)
                 db = db_class(arg_conn_str=conn_str, arg_password=password)
                 databases.add(db)
-                if created and sql_file:
-                    db.engine.execute(sa.text(read_sql_file(sql_file)))
-                if not created:
-                    for cmd in patch:
-                        db.engine.execute(sa.text(cmd))
+                with db.engine.connect() as conn:
+                    if created and sql_file:
+                        conn.execute(sa.text(read_sql_file(sql_file)))
+                    if not created:
+                        for cmd in patch:
+                            conn.execute(sa.text(cmd))
             except sa.exc.SQLAlchemyError as ex:
                 error(f"{db_class.name_for_logs()} database initialization "
                       f"failed: {ex}")
@@ -3502,16 +3540,10 @@ def do_siphon(args: Any) -> None:
                        arg_password=args.log_postgres_password) \
         if args.log_postgres else None
     try:
-        kafka_params = \
-            KafkaConsumerParams(
-                **{arg[6:]: value for arg, value in args.__dict__.items()
-                   if arg.startswith("kafka_")})
         kafka_client = \
-            KafkaClient(
-                consumer_params=kafka_params,
-                topic_regex_str=ALS_KAFKA_TOPIC if not ldb
-                else (f"^(?!.*{ALS_KAFKA_TOPIC}).*$" if not adb else ".+"),
-                resubscribe_interval_s=5)
+            KafkaClient(args=args, subscribe_als=adb is not None,
+                        subscribe_log=ldb is not None,
+                        resubscribe_interval_s=5)
         siphon = Siphon(adb=adb, ldb=ldb, kafka_client=kafka_client)
         siphon.main_loop()
     finally:
@@ -3544,19 +3576,46 @@ def do_help(args: Any) -> None:
         args.subparsers.choices[args.subcommand].print_help()
 
 
-def convert_bool_arg(s) -> bool:
-    """ Converts given string to boolean """
-    s = s.lower()
-    if s in ("true", "yes", "on", "1", "+"):
-        return True
-    if s in ("false", "no", "off", "0", "-"):
-        return False
-    raise ValueError(f"Wrong boolean value: '{s}'")
+def docker_arg_type(final_type: Callable[[Any], Any], default: Any = None,
+                    required: bool = False) -> Callable[[str], Any]:
+    """ Generator of argument converter for Docker environment
 
+    Empty argument value passed from environment-variable-initialized argument
+    (e.g. from Docker) should be treated as nonspecified. Boolean values
+    passed from environment-variable-initialized argument should also be
+    treated specially
 
-def convert_opt_int_arg(s) -> Optional[int]:
-    """ Converts given string to optional integer """
-    return int(s) if s else None
+    Arguments:
+    final_type -- Type converter for nonempty argument
+    default    -- Default value for empty argument
+    required   -- True if argument is required (can't be empty)
+    Returns argument converter function
+    """
+    assert (not required) or (default is None)
+
+    def arg_converter(arg: str) -> Any:
+        """ Type conversion function that will be used by argparse """
+        try:
+            if arg in ("", None):
+                if required:
+                    raise ValueError("Parameter is required")
+                return default
+            if final_type == bool:
+                if arg.lower() in ("yes", "true", "+", "1"):
+                    return True
+                if arg.lower() in ("no", "false", "-", "0"):
+                    return False
+                raise \
+                    argparse.ArgumentTypeError(
+                        "Wrong representation for boolean argument")
+            return final_type(arg)
+        except Exception as ex:
+            raise \
+                argparse.ArgumentTypeError(
+                    f"Command line argument '{arg}' has invalid format: "
+                    f"{repr(ex)}")
+
+    return arg_converter
 
 
 def main(argv: List[str]) -> None:
@@ -3569,47 +3628,38 @@ def main(argv: List[str]) -> None:
     switches_kafka = argparse.ArgumentParser(add_help=False)
     switches_kafka.add_argument(
         "--kafka_servers", "-k", metavar="SERVER[:PORT][,SERVER2[:PORT2]...]",
+        type=docker_arg_type(str, default=DEFAULT_KAFKA_SERVER),
         help=f"Comma-separated Kafka bootstrap server(s). Default is "
         f"'{DEFAULT_KAFKA_SERVER}'")
     switches_kafka.add_argument(
         "--kafka_client_id", metavar="CLIENT_ID[@]",
+        type=docker_arg_type(str, default=DEFAULT_KAFKA_CLIENT_ID),
         help=f"ID of this instance to be used in Kafka logs. If ends with "
         f"'@' - supplemented with random string (to achieve uniqueness). "
         f"Default is '{DEFAULT_KAFKA_CLIENT_ID}'")
     switches_kafka.add_argument(
         "--kafka_security_protocol", choices=["", "PLAINTEXT", "SSL"],
+        type=docker_arg_type(str, default="PLAINTEXT"),
         help="Security protocol to use. Default is 'PLAINTEXT'")
     switches_kafka.add_argument(
-        "--kafka_ssl_keyfile", metavar="FILENAME",
+        "--kafka_ssl_keyfile", metavar="FILENAME", type=docker_arg_type(str),
         help="Client private key file for SSL authentication")
     switches_kafka.add_argument(
-        "--kafka_ssl_check_hostname",
-        metavar="[true/yes/on/1/+ or false/no/off/0/-]", nargs="?",
-        const=True, default=None, type=convert_bool_arg,
-        help="Match Kafka server name with its certificate. true/yes/on/1/+ "
-        "for yes, false/no/off/0/- for no. Default (if switch is omitted or "
-        "has no value) is yes")
-    switches_kafka.add_argument(
-        "--kafka_ssl_cafile", metavar="FILENAME",
+        "--kafka_ssl_cafile", metavar="FILENAME", type=docker_arg_type(str),
         help="CA file for certificate verification")
     switches_kafka.add_argument(
-        "--kafka_ssl_certfile", metavar="FILENAME",
-        help="Client certificate PEM file name")
-    switches_kafka.add_argument(
-        "--kafka_ssl_crlfile", metavar="FILENAME",
-        help="File name for CRL certificate expiration check")
-    switches_kafka.add_argument(
-        "--kafka_ssl_ciphers", metavar="CIPHERS",
+        "--kafka_ssl_ciphers", metavar="CIPHERS", type=docker_arg_type(str),
         help="Available ciphers in OpenSSL cipher list format")
     switches_kafka.add_argument(
         "--kafka_max_partition_fetch_bytes", metavar="SIZE_IN_BYTES",
-        type=convert_opt_int_arg,
+        type=docker_arg_type(int),
         help="Maximum size of Kafka message (default is 1MB)")
 
     switches_als_db = argparse.ArgumentParser(add_help=False)
     switches_als_db.add_argument(
         "--als_postgres",
         metavar="[driver://][user][@host][:port][/database][?...]",
+        type=docker_arg_type(str),
         help=f"ALS Database connection string. If some part (driver, user, "
         f"host port database) is missing - it is taken from the default "
         f"connection string (which is '{AlsDatabase.default_conn_str()}'. "
@@ -3618,12 +3668,14 @@ def main(argv: List[str]) -> None:
         f"#LIBPQ-CONNSTRING for details")
     switches_als_db.add_argument(
         "--als_postgres_password", metavar="PASSWORD",
+        type=docker_arg_type(str),
         help="Password to use for ALS Database connection")
 
     switches_log_db = argparse.ArgumentParser(add_help=False)
     switches_log_db.add_argument(
         "--log_postgres",
         metavar="[driver://][user][@host][:port][/database][?...]",
+        type=docker_arg_type(str),
         help=f"Log Database connection string. If some part (driver, user, "
         f"host port database) is missing - it is taken from the default "
         f"connection string (which is '{LogsDatabase.default_conn_str()}'. "
@@ -3632,12 +3684,14 @@ def main(argv: List[str]) -> None:
         f"#LIBPQ-CONNSTRING for details. Default is not use log database")
     switches_log_db.add_argument(
         "--log_postgres_password", metavar="PASSWORD",
+        type=docker_arg_type(str),
         help="Password to use for Log Database connection")
 
     switches_init = argparse.ArgumentParser(add_help=False)
     switches_init.add_argument(
         "--init_postgres",
         metavar="[driver://][user][@host][:port][/database][?...]",
+        type=docker_arg_type(str),
         help=f"Connection string to initial database used as a context for "
         "other databases' creation. If some part (driver, user, host port "
         f"database) is missing - it is taken from the default connection "
@@ -3647,34 +3701,36 @@ def main(argv: List[str]) -> None:
         f"#LIBPQ-CONNSTRING for details")
     switches_init.add_argument(
         "--init_postgres_password", metavar="PASSWORD",
+        type=docker_arg_type(str),
         help="Password to use for initial database connection")
     switches_init.add_argument(
-        "--if_exists", choices=["skip", "drop"], default="exc",
+        "--if_exists", choices=["skip", "drop"],
+        type=docker_arg_type(str, default="exc"),
         help="What to do if database already exist: nothing (skip) or "
         "recreate (drop). Default is to fail")
     switches_init.add_argument(
-        "--als_template", metavar="DB_NAME",
+        "--als_template", metavar="DB_NAME", type=docker_arg_type(str),
         help="Template database (e.g. bearer of required extensions) to use "
         "for ALS database creation. E.g. postgis/postgis image strangely "
         "assigns Postgis extension on 'template_postgis' database instead of "
         "on default 'template0/1'")
     switches_init.add_argument(
-        "--log_template", metavar="DB_NAME",
+        "--log_template", metavar="DB_NAME", type=docker_arg_type(str),
         help="Template database to use for JSON Logs database creation")
     switches_init.add_argument(
-        "--als_sql", metavar="SQL_FILE",
+        "--als_sql", metavar="SQL_FILE", type=docker_arg_type(str),
         help="SQL command file that creates tables, relations, etc. in ALS "
         "database. If neither this parameter nor --als_postgres is specified "
         "ALS database is not being created")
     switches_init.add_argument(
-        "--log_sql", metavar="SQL_FILE",
+        "--log_sql", metavar="SQL_FILE", type=docker_arg_type(str),
         help="SQL command file that creates tables, relations, etc. in JSON "
         "log database. By default database created (if --log_postgres is "
         "specified) empty")
 
     switches_siphon = argparse.ArgumentParser(add_help=False)
     switches_siphon.add_argument(
-        "--prometheus_port", metavar="PORT", type=convert_opt_int_arg,
+        "--prometheus_port", metavar="PORT", type=docker_arg_type(int),
         help="Port to serve Prometheus metrics on")
 
     # Top level parser
@@ -3726,6 +3782,13 @@ def main(argv: List[str]) -> None:
             f"{os.path.basename(__file__)}. %(levelname)s: %(message)s"))
     logging.getLogger().addHandler(console_handler)
     logging.getLogger().setLevel(logging.INFO)
+
+    if args.func != do_help:
+        logging.info("Arguments:")
+        for arg, value in \
+                sorted(args.__dict__.items(), key=lambda kvp: kvp[0]):
+            if (arg != "func") and (value is not None):
+                logging.info(f"    {arg}: {value}")
 
     # Do the needful
     args.func(args)
