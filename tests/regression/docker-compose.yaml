@@ -227,6 +227,7 @@ services:
     restart: always
     depends_on:
       - cadvisor
+      - nginxexporter
     dns_search: [.]
 
   cadvisor:
@@ -242,6 +243,9 @@ services:
 
   nginxexporter:
     image: public.ecr.aws/w9v6y1o0/openafc/nginxexporter-image:${TAG:-latest}
+    restart: always
+    depends_on:
+      - dispatcher
     dns_search: [.]
 
 volumes:

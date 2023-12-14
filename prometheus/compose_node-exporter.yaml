@@ -11,6 +11,7 @@
 services:
   node_exporter:
     image: bitnami/node-exporter:1.6.1-debian-11-r78
+    restart: always
     command:
       - --path.rootfs=/host
     volumes:
