@@ -15,7 +15,7 @@ qt5-qtbase armadillo minizip libgeotiff qt5-qtbase-sqlite libbsd gdal \
 # celery deps:
 py3-click py3-click-plugins py3-wcwidth py3-six py3-tz tzdata
 
-COPY msghnd/requirements.txt /wd/
+COPY worker/requirements.txt /wd/
 RUN pip3 install --root-user-action=ignore -r /wd/requirements.txt
 
 FROM alpine:3.18
