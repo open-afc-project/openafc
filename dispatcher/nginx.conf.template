@@ -38,6 +38,9 @@ http {
         listen [::]:80 ipv6only=on;
         listen 443 ssl;
         listen [::]:443 ipv6only=on ssl;
+
+        server_name ${AFC_SERVER_NAME};
+        
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_prefer_server_ciphers on;
         ssl_certificate /certificates/servers/server.cert.pem;
@@ -50,7 +53,23 @@ http {
         #ssl_stapling on;
         #ssl_stapling_verify on;
 
-        server_name _;
+        # ignoring attempts to establish a session with a client that requests a wrong host name
+        set $reject_request 0;
+        set $afc_server_name ${AFC_SERVER_NAME};
+
+        if ($host != $server_name) {
+            set $reject_request 1;
+        }
+        # ... but not in case of a wildcard
+        if ($afc_server_name = "_") {
+            set $reject_request 0;
+        }
+        # we won't return any response to the client in case of rejection, just close the connection
+        if ($reject_request) {
+            return 444;
+        }
+        
+        # To enforce check HTTPS set AFC_ENFORCE_HTTPS to the value "true"
         set $afc_https_enforce ${AFC_ENFORCE_HTTPS};
         # To enforce check mTLS set AFC_ENFORCE_MTLS to the value "true"
         # otherwise it is optional

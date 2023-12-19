@@ -367,6 +367,7 @@ services:
     volumes:
       - ${VOL_H_NGNX:-/tmp}:${VOL_C_NGNX:-/dummyngnx}
     environment:
+      - AFC_SERVER_NAME=${AFC_SERVER_NAME:-_}
       - AFC_ENFORCE_HTTPS=${AFC_ENFORCE_HTTPS:-TRUE}
       - AFC_MSGHND_NAME=msghnd
       - AFC_MSGHND_PORT=8000
@@ -580,6 +581,8 @@ secrets:
 # --------------------------------------------------- #
 
 # -= MUST BE defined =-
+# Hostname for AFC server
+AFC_SERVER_NAME="_"
 # Wether to forward all http requests to https
 AFC_ENFORCE_HTTPS=TRUE
 
@@ -727,6 +730,7 @@ chown 999:999 /var/databases/pgdata
 |AFC_WEBUI_NAME|rat_server|dispatcher|WebUI service hostname|
 |AFC_WEBUI_PORT|80|dispatcher|WebUI service HTTP Port|
 |AFC_ENFORCE_HTTPS|TRUE|dispatcher|Wether to enforce forwarding of HTTP requests to HTTPS. TRUE - for enable, everything else - to disable|
+|AFC_SERVER_NAME|"_"|dispatcher|Hostname of the AFC Server, for example - "openafc.tip.build". "_" - will accept any hostname (but this is not secure)|
 | **RCACHE settings** ||||
 |RCACHE_ENABLED|TRUE|rcache, rat_server, msghnd, worker, uls_downloader|TRUE if Rcache enabled, FALSE to use legacy objstroage response cache|
 |RCACHE_POSTGRES_DSN|Must be set|rcache, rat_server, msghnd|Connection string to Rcache Postgres database|

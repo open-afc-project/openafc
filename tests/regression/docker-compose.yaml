@@ -21,6 +21,7 @@ services:
     volumes:
       - ${VOL_H_NGNX:-/tmp}:${VOL_C_NGNX:-/dummyngnx}
     environment:
+      - AFC_SERVER_NAME=${AFC_SERVER_NAME:-_}
       - AFC_ENFORCE_HTTPS=${AFC_ENFORCE_HTTPS:-TRUE}
       # set to true if required to enforce mTLS check
       - AFC_ENFORCE_MTLS=false

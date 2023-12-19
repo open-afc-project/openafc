@@ -87,6 +87,7 @@ affinity: {}
 
 env_template:
   dispatcher:
+    afc_server_name: _
     afc_enforce_https: False
     afc_msghnd_name: %AFC_MSGHND_NAME%
     afc_msghnd_port: %AFC_MSGHND_PORT%

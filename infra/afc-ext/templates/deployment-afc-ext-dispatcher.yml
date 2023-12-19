@@ -57,6 +57,8 @@ spec:
               mountPath: /certificates/servers/server.key.pem
               subPath: server.key.pem
           env:
+            - name: AFC_SERVER_NAME
+              value: {{ .Values.env_template.dispatcher.afc_server_name | quote }}
             - name: AFC_ENFORCE_HTTPS
               value: {{ .Values.env_template.dispatcher.afc_enforce_https | quote }}
             - name: AFC_MSGHND_NAME
