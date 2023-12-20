@@ -30,7 +30,7 @@ RUN pip3 install --use-pep517 --root-user-action=ignore \
     && rm -rf /wd/afc-packages
 
 COPY tools/rcache/rcache_tool.py /wd
-COPY tools/load_tool/afc_load_tool.* /wd
+COPY tools/load_tool/afc_load_tool.* /wd/
 RUN chmod a+x /wd/rcache_tool.py /wd/afc_load_tool.py
 
 CMD sleep infinity
