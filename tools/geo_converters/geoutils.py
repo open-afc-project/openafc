@@ -525,6 +525,7 @@ def warp(src: str, dst: str, resampling: str,
          dst_geoid: Optional[str] = None,
          out_format: Optional[str] = None,
          format_params: Optional[List[str]] = None,
+         data_type: Optional[str] = None,
          center_lon_180: bool = False,
          overwrite: bool = False,
          quiet: bool = False) -> Tuple[bool, Optional[str]]:
@@ -545,6 +546,7 @@ def warp(src: str, dst: str, resampling: str,
     out_format     -- Optional output format (for cases when it can't be
                       discerned from extension)
     format_params  -- Optional list of format parameters
+    data_type      -- Optional name of data type in resulting file
     center_lon_180 -- True to center result around 180 longitude
     overwrite      -- True to overwrite resulting file
     quiet          -- True to print nothing but return messages as part of
@@ -592,6 +594,8 @@ def warp(src: str, dst: str, resampling: str,
         exec_args += ["-of", out_format]
     for fp in (format_params or []):
         exec_args += ["-co", fp]
+    if data_type:
+        exec_args += ["-ot", data_type]
     if center_lon_180:
         exec_args += ["--config", "CENTER_LONG", "180"]
     if overwrite:

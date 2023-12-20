@@ -26,6 +26,7 @@ License, a copy of which is included with this software program.
   - [*to_wgs84.py* - change coordinate system](#to_wgs84)
   - [*to_png.py* - converts files to PNG format](#to_png)
   - [*tiler.py* - cuts source files to 1x1 degree tiles](#tiler)
+  - [*make_population_db.py* - converts population density image to SQLite for load test](#make_population_db)
 - [Conversion routines](#conversion_routines)
   - [Geoids](#geoid_rouitines)
     - [USA geoids](#usa_geoids_routines)
@@ -434,6 +435,9 @@ Here `FILES` specify names of source files that need to be tiled (filenames may 
 |--threads [-]**N**[%]|How many CPUs to use (if positive), leave unused (if negative) or percent of CPUs (if followed by %)|
 |--nice|Lower priority (on Windows required `psutil` Python module)|
 
+### *make_population_db.py* - converts population density image to SQLite for load test <a name="make_population_db"/>
+
+Prepares population database for `tools/load_test/afc_load_test.py`. Documented in *tools/load_test/RREADME.md*
 
 ## Conversion routines <a name="conversion_routines"/>
 

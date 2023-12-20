@@ -9,12 +9,14 @@ License, a copy of which is included with this software program.
  - [Overview](#overview)
  - [Requests, messages](#requests)
  - [Prerequisites](#prerequisites)
+ - [Population Database preparation](#population_db)
  - [Config file](#config)
  - [`afc_load_tool.py`](#tool)
    - [`preload` subcommand](#preload)
    - [`load` subcommand](#load)
    - [`netload` subcommand](#netload)
    - [`cache` subcommand](#cache)
+   - [`afc_config` subcommand](#afc_config)
  - [Usage example](#examples)
 
 ## Overview <a name="overview"/>
@@ -43,6 +45,30 @@ Besides, it has the following dependencies that are not part of Python distribut
    Typically it's already installed. If not - it can be installed with **`pip install pyyaml`** (this works even on Alpine)
  - **requests** module. Optional (used for `--no-reconnect` switch).  
    Also typically is already installed. If not - it can be installed with **`pip install requests`** (this works even on Alpine)
+
+## Population Database preparation <a name="population_db"/>
+
+`load` subcommand may distribute request location proportional to population (to test AFC Engine performance in noncached mode). It does this by means of `--population <DATABASE_NAME>` switch, where `DATABASE_NAME` is a name of SQLite3 file.
+
+This SQLite file (population database) is prepared from some population density GDAL-compatible 'image' file (e.g. for USA from [2020 1X1 km population density map](https://data.worldpop.org/GIS/Population_Density/Global_2000_2020_1km/2020/USA/usa_pd_2020_1km.tif) taken from [WorldPop Hub](https://hub.worldpop.org/geodata/summary?id=39730). YMMV)
+
+Population database is prepared from source GDAL-compatible image file by means of *tools/geo_converters/make_population_db.py* script. This script requires GDAL libraries and utilities to be installed, so most likely one may want to run it from the container. Image for container may be built with *tools/geo_converters/Dockerfile*. To avoid muddling explanation with file mappings, access rights, etc., following text will assume that this script executed without (or completely within) the container.
+
+General format:
+
+`make_population_db.py [OPTIONS] SRC_IMAGE_FILE DST_DATABASE_FILE`
+
+Where options are:
+
+|Option|Meaning|
+|------|-------|
+|--resolution **ARC_SECONDS**|Resolution of resulting database in latitude/longitude seconds. Default is 60, which, as of time of this writing, seems pretty adequate|
+|--center_lon_180|Better be set for countries (like USA) that exist in both east and west hemispheres. Should be determined automagically, but does not, sorry|
+|--overwrite|Overwrite target database file if it exists|
+
+Example:
+
+`make_population_db.py --center_lon_180 usa_pd_2020_1km.tif usa_pd.sqlite3`
 
 
 ## Config file <a name="config"/>
@@ -120,12 +146,15 @@ Parameters:
 |--localhost [http\|https]||Send AFC requests to AFC http (default) or https port of AFC server (dispatcher service), running on localhost with project, specified by --comp_proj|
 |--no_reconnect||Every sender process establishes permanent connection to target server and sends AFC Request messages over this connection. Requires `requests` Python module to be installed. Default is to establish connection on every update request send (which is closer to real life, but slows things and lead to different set of artifacts))|
 |--no_cache||Forces recomputation of each AFC Request|
+|--req **FIELD1=VALUE1[,FIELD2=VALUE2...]**||Modify AFC Request field(s). Top level is request (not message), path to deep fields is dot-separated (e.g. *location.elevation.height*), Several comma-separated fields may be specified and/or this switch may be specified several times|
+|--population **POPULATION_DB_FILE**||Choose positions according to population density. **POPULATION_DB_FILE** is an SQLite3 file, prepared with `make_population_db.py` (see [chapter](#population_db) on it). Note that use of this parameter may lead to positions outside the shore, that AFC Engine treats as incorrect - that's life...|
+|--random||Chose points randomly - according to population database (if `--population` specified) or within region rectangle in config file. Useful fro AFC Engine (`--no_cache`) testing|
 
 
 ### `netload` subcommand <a name="netload"/>
 
 Makes repeated GET requests on dispatcher, msghnd, or rcache service.  
-Note that report unit for this subcommand is message, whereas for `preload` and `load` commands unit is request (with a single message containing *bacth* number of requests).
+Note that report unit for this subcommand is message, whereas for `preload` and `load` commands unit is request (with a single message containing *batch* number of requests).
 
 Parameters:
 
@@ -159,46 +188,71 @@ Parameters:
 |--unprotect||Remove Rcache protection from invalidation (normal mode of Rcache operation)|
 |--invalidate||Invalidate rcache. If one need to force AFC Engine, `--no_cache` option of `load` command looks like better alternative`|
 
+
+### `afc_config` subcommand <a name="afc_config"/>
+
+Modify field(s) in AFC Config for current region, that will be used in subsequent tests (makes sense for AFC Engine, i.e. no cache, test)
+
+Parameters:
+
+|Parameter|Meaning|
+|---------|-------|
+|--comp_proj **PROJ**|Docker Compose project name (part before service name in container names) to use to determine IPs of services being used|
+|**FIELD1=VALUE1** [**FIELD2=VALUE2**...]|Fields to modify. For deep fields, path specified as comma-separated sequence of keys (e.g. *freqBands.0.startFreqMHz*)|
+
+
 ## Usage example <a name="examples"/>
 
 ```
 $ docker ps
 CONTAINER ID   IMAGE        ...        PORTS                                                                              NAMES
 ...
-acffe87ff12c   public.ecr.aw...        0.0.0.0:374->80/tcp, :::374->80/tcp, 0.0.0.0:458->443/tcp, :::452->443/tcp         fs936724_l2_dispatcher_1
-bce6e9629ef1   110738915961....        80/tcp, 443/tcp                                                                    fs936724_l2_rat_server_1
-7f76bdee65d8   110738915961....        8000/tcp                                                                           fs936724_l2_msghnd_1
-152dd3a42ce7   110738915961....                                                                                           fs936724_l2_worker_1
-d102db21067d   public.ecr.aw...                                                                                           fs936724_l2_cert_db_1
-987115a71c95   public.ecr.aw...                                                                                           fs936724_l2_als_siphon_1
-08e1ec3248d2   public.ecr.aw...                                                                                           fs936724_l2_rcache_1
-803e9b266310   public.ecr.aw...        5432/tcp                                                                           fs936724_l2_ratdb_1
-7ba8ce112cae   public.ecr.aw...        5432/tcp                                                                           fs936724_l2_bulk_postgres_1
-92fd56d4db75   public.ecr.aw...                                                                                           fs936724_l2_objst_1
-a5c680bb32b6   rcache_tool:f...                                                                                           fs936724_l2_rcache_tool_1
-871849a6e841   public.ecr.aw...        9092/tcp                                                                           fs936724_l2_als_kafka_1
-efea7249498f   public.ecr.aw...                                                                                           fs936724_l2_uls_downloader_1
-b3903f7c2d92   public.ecr.aw...        4369/tcp, 5671-5672/tcp, 15691-15692/tcp, 25672/tcp                                fs936724_l2_rmq_1
+acffe87ff12c   public.ecr.aw...        0.0.0.0:374->80/tcp, :::374->80/tcp, 0.0.0.0:458->443/tcp, :::452->443/tcp         foo_l2_dispatcher_1
+bce6e9629ef1   110738915961....        80/tcp, 443/tcp                                                                    foo_l2_rat_server_1
+7f76bdee65d8   110738915961....        8000/tcp                                                                           foo_l2_msghnd_1
+152dd3a42ce7   110738915961....                                                                                           foo_l2_worker_1
+d102db21067d   public.ecr.aw...                                                                                           foo_l2_cert_db_1
+987115a71c95   public.ecr.aw...                                                                                           foo_l2_als_siphon_1
+08e1ec3248d2   public.ecr.aw...                                                                                           foo_l2_rcache_1
+803e9b266310   public.ecr.aw...        5432/tcp                                                                           foo_l2_ratdb_1
+7ba8ce112cae   public.ecr.aw...        5432/tcp                                                                           foo_l2_bulk_postgres_1
+92fd56d4db75   public.ecr.aw...                                                                                           foo_l2_objst_1
+a5c680bb32b6   rcache_tool:f...                                                                                           foo_l2_rcache_tool_1
+871849a6e841   public.ecr.aw...        9092/tcp                                                                           foo_l2_als_kafka_1
+efea7249498f   public.ecr.aw...                                                                                           foo_l2_uls_downloader_1
+b3903f7c2d92   public.ecr.aw...        4369/tcp, 5671-5672/tcp, 15691-15692/tcp, 25672/tcp                                foo_l2_rmq_1
 ...
 ```
 
-Important piece of information here is the **Docker compose project name** - common prefix of container names: *fs936724_l2*
+Important piece of information here is the **Docker compose project name** - common prefix of container names: *foo_l2*
 
 Now, preloading rcache, using default parameters from config file (these parameters will be printed) and protecting it from invalidation:  
-`$ afc_load_tool.py preload --comp_proj fs936724_l2 --protect_cache`  
-In this command abovementioned compose project name *fs936724_l2* was used.
+`$ afc_load_tool.py preload --comp_proj foo_l2 --protect_cache`  
+In this command abovementioned compose project name *foo_l2* was used.
 
 Now, doing load test with default parameters from config file (these parameters will be printed)):
   - Send AFC requests to HTTP port of AFC server on current host (i.e. to *dispatcher* service):  
-    `$ afc_load_tool.py load --comp_proj fs936724_l2 --localhost`
+    `$ afc_load_tool.py load --comp_proj foo_l2 --localhost`
   - Send AFC requests to *msghnd* service (bypassing *dispatcher* service):  
-    `$ afc_load_tool.py load --comp_proj fs936724_l2`
+    `$ afc_load_tool.py load --comp_proj foo_l2`
   - Send AFC requests to explicitly specified server *foo.bar*:  
     `$ afc_load_tool.py load --afc foo.bar:80`
 
-Test AFC Server (*dispatcher* service) network performance:
-`$ afc_load_tool.py netload --comp_proj fs936724_l2 --target dispatcher`  
-
-
 Upon completion of testing it is recommended to re-enable cache invalidation:  
-`$  afc_load_tool.py cache --comp_proj fs936724_l2 --unprotect`  
+`$  afc_load_tool.py cache --comp_proj foo_l2 --unprotect`  
+
+Test AFC Server (*dispatcher* service) network performance (no `preload` or Rcache protection needed):
+`$ afc_load_tool.py netload --comp_proj foo_l2 --target dispatcher`  
+
+Test AFC Engine (no `preload` or Rcache protection needed):
+  - Set Max Link Distance to 200km:  
+    `$ afc_load_tool.py afc_config --comp_proj foo_l2 maxLinkDistance=200`
+  - Do population-density-based testing. No batching to evaluate performance of single AFC, small report interval because AFC Engine is slo-o-o-o-ow, multistream to speed up statistics gathering:  
+    `$ afc_load_tool.py load --random --population usa_pd.sqlite3 --comp_proj foo_l2 \`  
+    `   --localhost --status_period 1 --batch 1 --parallel 10 --retries 0 --no_cache`  
+    Note that this test will create some position with 'invalid coordinates' (AFC error code 103) - that's because some positions are generated 'off shore`. This is known problem and it would **not** be dealt with.
+  - Ditto, but with large uncertainty:  
+    `$ afc_load_tool.py load --random --population usa_pd.sqlite3 --comp_proj foo_l2 \`  
+    `   --localhost --status_period 1 --batch 1 --parallel 10 --retries 0 --no_cache \`  
+    `   --req location.elevation.verticalUncertainty=30,location.elevation.height=300 \`  
+    `   --req location.ellipse.minorAxis=150,location.ellipse.majorAxis=150`

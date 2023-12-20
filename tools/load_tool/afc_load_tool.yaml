@@ -98,6 +98,10 @@ paths:
     # Variable powers inside ASFC Response
     var_pwrs_in_resp: ["availableChannelInfo", 0, "maxEirp"]
 
+    # Maximum link distance (distance to FSs to take into account) inside
+    # AFC Config
+    link_distance_in_cfg: ["maxLinkDistance"]
+
 
 # Pattern for AFC messages
 req_msg_pattern: |
@@ -450,3 +454,19 @@ rest_api:
     dispatcher_get:
         url: http://dispatcher:80/fbrat/ratapi/v1/GetAfcConfigByRulesetID
         code: 404
+
+# Stuff for working with ratdb
+ratdb:
+    # Database service
+    service: ratdb
+
+    # Database name
+    dbname: fbrat
+
+    # Database username
+    username: postgres
+
+    # Update AFC Config by regionStr
+    update_config_by_id: >-
+        UPDATE "AFCConfig" SET config = '{afc_config}'
+        WHERE config->>'regionStr' = '{region_str}'

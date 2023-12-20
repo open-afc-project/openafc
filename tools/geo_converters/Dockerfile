@@ -19,6 +19,7 @@ COPY geoutils.py /usr/app/
 COPY dir_md5.py g8l_info_schema.json /usr/app/
 COPY nlcd_wgs84.py nlcd_wgs84.yaml /usr/app/
 COPY tiler.py to_wgs84.py lidar_merge.py to_png.py /usr/app/
+COPY make_population_db.py /usr/app/
 
 # If container is created on Windows 'chmod' is necessary. No harm on *nix
 RUN chmod a+x /usr/app/*.py

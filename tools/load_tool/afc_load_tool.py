@@ -17,6 +17,7 @@
 import argparse
 from collections.abc import Iterable, Iterator
 import copy
+import csv
 import datetime
 import hashlib
 import http
@@ -32,6 +33,7 @@ except ImportError:
     pass
 import re
 import signal
+import sqlite3
 import subprocess
 import sys
 import time
@@ -290,18 +292,107 @@ def run_docker(args: List[str]) -> str:
     return ""  # Unreachable code to make pylint happy
 
 
+class ServiceDiscovery:
+    """ Container and IP discovery for services
+
+    Private attributes:
+    _compose_project -- Compose project name
+    _containers      -- Dictionary of _ContainerInfo object, indexed by service
+                        name. None before first access
+    """
+    class _ContainerInfo:
+        """ Information about single service
+
+        Public attributes:
+        name -- Container name
+        ip   -- Container IP (if known) or None
+        """
+        def __init__(self, name: str) -> None:
+            self.name = name
+            self.ip: Optional[str] = None
+
+    def __init__(self, compose_project: str) -> None:
+        """ Constructor
+
+        Arguments:
+        compose_project -- Docker compose project name
+        """
+        self._compose_project = compose_project
+        self._containers: \
+            Optional[Dict[str, "ServiceDiscovery._ContainerInfo"]] = None
+
+    def get_container(self, service: str) -> str:
+        """ Returns container name for given service name """
+        ci = self._get_cont_info(service)
+        return ci.name
+
+    def get_ip(self, service: str) -> str:
+        """ Returns container IP for given service name """
+        ci = self._get_cont_info(service)
+        if ci.ip:
+            return ci.ip
+        try:
+            inspect_dict = json.loads(run_docker(["inspect", ci.name]))
+        except json.JSONDecodeError as ex:
+            error(f"Error parsing 'docker inspect {ci.name}' output: "
+                  f"{repr(ex)}")
+        try:
+            for net_name, net_info in \
+                    inspect_dict[0]["NetworkSettings"]["Networks"].items():
+                if net_name.endswith("_default"):
+                    ci.ip = net_info["IPAddress"]
+                    break
+            else:
+                error(f"Default network not found in container '{ci.name}'")
+        except (AttributeError, LookupError) as ex:
+            error(f"Unsupported structure of  'docker inspect {ci.name}' "
+                  f"output: {repr(ex)}")
+        assert ci.ip is not None
+        return ci.ip
+
+    def _get_cont_info(self, service: str) \
+            -> "ServiceDiscovery._ContainerInfo":
+        """ Returns _ContainerInfo object for given service name """
+        if self._containers is None:
+            self._containers = {}
+            name_offset: Optional[int] = None
+            for line in run_docker(["ps"]).splitlines():
+                if name_offset is None:
+                    name_offset = line.find("NAMES")
+                    error_if(name_offset < 0,
+                             "Unsupported structure of 'docker ps' output")
+                    continue
+                assert name_offset is not None
+                for names in re.split(r",\s*", line[name_offset:]):
+                    m = re.search(r"(%s_(.+)_\d+)" %
+                                  re.escape(self._compose_project),
+                                  names)
+                    if m:
+                        self._containers[m.group(2)] = \
+                            self._ContainerInfo(name=m.group(1))
+        error_if(not self._containers,
+                 f"No running containers found for compose project "
+                 f"'{self._compose_project}'")
+        ret = self._containers.get(service)
+        error_if(ret is None,
+                 f"Service name '{service}' not found among containers of "
+                 f"compose project '{self._compose_project}'")
+        assert ret is not None
+        return ret
+
+
 def get_url(base_url: str, param_host: Optional[str],
-            param_comp_prj: Optional[str], purpose: str,
-            service_cache: Optional[Dict[str, str]] = None) -> str:
+            service_discovery: Optional[ServiceDiscovery]) -> str:
     """ Construct URL from base URL in config and command line host or compose
     project name
 
     Arguments:
-    base_url       -- Base URL from config
-    param_host     -- Optional host name from command line parameter
-    param_comp_prj -- Optional name of running compose
-    service_cache  -- Optional dictionary for storing results of service IP
-                      lookups
+    base_url           -- Base URL from config
+    param_host         -- Optional host name from command line parameter
+    service_discovery  -- Optional ServiceDiscovery object. None means that
+                          service discovery is not possible (--comp_proj was
+                          not specified) and hostname must be provided
+                          explicitly
     Returns actionable URL with host either specified or retrieved from compose
     container inspection and tail from base URL
     """
@@ -314,61 +405,46 @@ def get_url(base_url: str, param_host: Optional[str],
                         for field in base_parts._fields
                         if getattr(param_parts, field)}
         return urllib.parse.urlunparse(base_parts._replace(**replacements))
-    if param_comp_prj is None:
+    if service_discovery is None:
         return base_url
-
     service = base_parts.netloc.split(":")[0]
-    service_ip = (service_cache or {}).get(service)
-    if service_ip is None:
-        name_offset: Optional[int] = None
-        container: Optional[str] = None
-        for line in run_docker(["ps"]).splitlines():
-            if name_offset is None:
-                name_offset = line.find("NAMES")
-                error_if(name_offset < 0,
-                         "Unsupported structure of 'docker ps' output. Please "
-                         "specify all hosts explicitly")
-                continue
-            assert name_offset is not None
-            for names in re.split(r",\s*", line[name_offset:]):
-                m = re.search(r"(%s_(.+)_\d+)" % re.escape(param_comp_prj),
-                              names)
-                if m and (m.group(2) == service):
-                    container = m.group(1)
-                    break
-            if container:
-                break
-        else:
-            error(f"Service name '{param_comp_prj}_{service}_*' not found. "
-                  f"Please specify host/URL for {purpose} explicitly")
-        assert container is not None
-
-        try:
-            inspect_dict = json.loads(run_docker(["inspect", container]))
-        except json.JSONDecodeError as ex:
-            error(f"Error parsing 'docker inspect {container}' output: "
-                  f"{repr(ex)}. Please specify host/URL for {purpose} "
-                  f"explicitly")
-        try:
-            for net_name, net_info in \
-                    inspect_dict[0]["NetworkSettings"]["Networks"].items():
-                if net_name.endswith("_default"):
-                    service_ip = net_info["IPAddress"]
-                    break
-            else:
-                error(f"Default network not found in {container}. Please "
-                      f"specify host/URL for {purpose} explicitly")
-        except (AttributeError, LookupError) as ex:
-            error(f"Unsupported structure of  'docker inspect {container}' "
-                  f"output: {repr(ex)}. Please specify host/URL for {purpose} "
-                  f"explicitly")
-    assert service_ip is not None
-    if service_cache is not None:
-        service_cache[service] = service_ip
     return \
         urllib.parse.urlunparse(
             base_parts._replace(
-                netloc=service_ip + base_parts.netloc[len(service):]))
+                netloc=service_discovery.get_ip(service) +
+                base_parts.netloc[len(service):]))
+
+
+def ratdb(cfg: Config, command: str, service_discovery: ServiceDiscovery) \
+        -> Union[int, List[Dict[str, Any]]]:
+    """ Executes SQL statement in ratdb
+
+    Arguments:
+    cfg               -- Config object
+    command           -- SQL command to execute
+    service_discovery -- ServiceDiscovery object
+    Returns number of affected records for INSERT/UPDATE/DELETE, list of row
+    dictionaries on SELECT
+    """
+    cont = service_discovery.get_container(cfg.ratdb.service)
+    result = run_docker(["exec", cont, "psql", "-U", cfg.ratdb.username,
+                         "-d", cfg.ratdb.dbname, "--csv", "-c", command])
+    if command.upper().startswith("SELECT "):
+        try:
+            return list(csv.DictReader(result.splitlines()))
+        except csv.Error as ex:
+            error(f"CSV parse error on output of '{command}': {repr(ex)}")
+    for begin, pattern in [("INSERT ", r"INSERT\s+\d+\s+(\d+)"),
+                           ("UPDATE ", r"UPDATE\s+(\d+)"),
+                           ("DELETE ", r"DELETE\s+(\d+)")]:
+        if command.upper().startswith(begin):
+            m = re.search(pattern, result)
+            error_if(not m,
+                     f"Can't fetch result of '{command}'")
+            assert m is not None
+            return int(m.group(1))
+    error(f"Unknown SQL command '{command}'")
+    return 0    # Unreachable code, appeasing pylint
 
 
 def path_get(obj: Any, path: List[Union[str, int]]) -> Any:
@@ -421,21 +497,37 @@ class AfcReqRespGenerator:
     _paths            -- Copy of cfg.paths
     _req_msg_pattern  -- AFC Request message pattern as JSON dictionary
     _resp_msg_pattern -- AFC Response message pattern as JSON dictionary
-    _grid_size        -- Copy of cfg.region.grid_dize
+    _grid_size        -- Copy of cfg.region.grid_size
     _min_lat          -- Copy of cfg.region.min_lat
     _max_lat          -- Copy of cfg.region.max_lat
     _min_lon          -- Copy of cfg.region.min_lon
     _max_lon          -- Copy of cfg.region.max_lon
     _channels_20mhz   -- Copy of cfg._channels_20mhz
+    _randomize        -- True to choose AP positions randomly (uniformly or
+                         according to population density). False to use request
+                         index (to make caching possible)
+    _population_db    -- Population density database name. None for uniform
+    _db_conn          -- None or SQLite3 connection
+    _db_cur           -- None or SQLite3 cursor
+
     """
-    def __init__(self, cfg: Config) -> None:
+    def __init__(self, cfg: Config, randomize: bool,
+                 population_db: Optional[str],
+                 req_msg_pattern: Optional[Dict[str, Any]]) -> None:
         """ Constructor
 
         Arguments:
-        cfg -- Config object
+        cfg             -- Config object
+        randomize       -- True to choose AP positions randomly (uniformly or
+                           according to population density). False to use
+                           request index (to make caching possible)
+        population_db   -- Population density database name. None for uniform
+        req_msg_pattern -- Optional Request message pattern to use instead of
+                           default
         """
         self._paths = cfg.paths
-        self._req_msg_pattern = json.loads(cfg.req_msg_pattern)
+        self._req_msg_pattern = \
+            req_msg_pattern or json.loads(cfg.req_msg_pattern)
         self._resp_msg_pattern = json.loads(cfg.resp_msg_pattern)
         path_set(path_get(self._req_msg_pattern, self._paths.reqs_in_msg)[0],
                  self._paths.ruleset_in_req, cfg.region.rulesest_id)
@@ -449,6 +541,10 @@ class AfcReqRespGenerator:
         self._min_lon = cfg.region.min_lon
         self._max_lon = cfg.region.max_lon
         self._channels_20mhz = cfg.channels_20mhz
+        self._randomize = randomize
+        self._population_db = population_db
+        self._db_conn: Optional[sqlite3.Connection] = None
+        self._db_cur: Optional[sqlite3.Cursor] = None
 
     def request_msg(self, req_indices=Union[int, List[int]]) -> Dict[str, Any]:
         """ Generate AFC Request message for given request index range
@@ -474,16 +570,9 @@ class AfcReqRespGenerator:
             path_set(req, self._paths.id_in_req, self._req_id(req_idx,
                                                               idx_in_msg))
             path_set(req, self._paths.serial_in_req, self._serial(req_idx))
-            path_set(
-                req, self._paths.lat_in_req,
-                self._min_lat +
-                (req_idx // self._grid_size) *
-                (self._max_lat - self._min_lat) / self._grid_size)
-            path_set(
-                req, self._paths.lon_in_req,
-                self._min_lon +
-                (req_idx % self._grid_size) *
-                (self._max_lon - self._min_lon) / self._grid_size)
+            lat, lon = self._get_position(req_idx=req_idx)
+            path_set(req, self._paths.lat_in_req, lat)
+            path_set(req, self._paths.lon_in_req, lon)
             reqs.append(req)
         path_set(msg, self._paths.reqs_in_msg, reqs)
         return msg
@@ -531,18 +620,61 @@ class AfcReqRespGenerator:
         """ AP Serial Number for given request index """
         return f"AFC_LOAD_{req_idx:08}"
 
+    def _get_position(self, req_idx: int) -> Tuple[float, float]:
+        """ Returns (lat_deg, lon_deg) position for given request index """
+        if self._population_db is None:
+            if self._randomize:
+                return (random.uniform(self._min_lat, self._max_lat),
+                        random.uniform(self._min_lon, self._max_lon))
+            return (self._min_lat +
+                    (req_idx // self._grid_size) *
+                    (self._max_lat - self._min_lat) / self._grid_size,
+                    (req_idx % self._grid_size) *
+                    (self._max_lon - self._min_lon) / self._grid_size)
+        if self._db_conn is None:
+            self._db_conn = \
+                sqlite3.connect(f"file:{self._population_db}?mode=ro",
+                                uri=True)
+            self._db_cur = self._db_conn.cursor()
+        assert self._db_cur is not None
+        cumulative_density = random.uniform(0, 1) if self._randomize \
+            else req_idx / (self._grid_size * self._grid_size)
+        rows = \
+            self._db_cur.execute(
+                f"SELECT min_lat, max_lat, min_lon, max_lon "
+                f"FROM population_density "
+                f"WHERE cumulative_density >= {cumulative_density} "
+                f"ORDER BY cumulative_density "
+                f"LIMIT 1")
+        min_lat, max_lat, min_lon, max_lon = rows.fetchall()[0]
+        if self._randomize:
+            return (random.uniform(min_lat, max_lat),
+                    random.uniform(min_lon, max_lon))
+        return ((min_lat + max_lat) / 2, (min_lon + max_lon) / 2)
+
 
 class RestDataHandlerBase:
     """ Base class for generate/process REST API request/response data payloads
     """
-    def __init__(self, cfg: Config) -> None:
+    def __init__(self, cfg: Config, randomize: bool = False,
+                 population_db: Optional[str] = None,
+                 req_msg_pattern: Optional[Dict[str, Any]] = None) -> None:
         """ Constructor
 
         Arguments:
-        cfg -- Config object
+        cfg             -- Config object
+        randomize       -- True to choose AP positions randomly (uniformly or
+                           according to population density). False to use
+                           request index (to make caching possible)
+        population_db   -- Population density database name. None for uniform
+        req_msg_pattern -- Optional Request message pattern to use instead of
+                           default
         """
         self.cfg = cfg
-        self.afc_req_resp_gen = AfcReqRespGenerator(cfg)
+        self.afc_req_resp_gen = \
+            AfcReqRespGenerator(
+                cfg=cfg, randomize=randomize, population_db=population_db,
+                req_msg_pattern=req_msg_pattern)
 
     def make_req_data(self, req_indices: List[int]) -> bytes:
         """ Abstract method that generates REST API POST data payload
@@ -571,7 +703,7 @@ class RestDataHandlerBase:
         """ Virtual method returning bytes string to pass to make_error_map on
         dry run. This default implementation returns empty string """
         unused_argument(batch)
-        return b''
+        return b""
 
 
 class PreloadRestDataHandler(RestDataHandlerBase):
@@ -581,11 +713,21 @@ class PreloadRestDataHandler(RestDataHandlerBase):
     Private attributes:
     _hash_base -- MD5 hash computed over AFC Config, awaiting AFC Request tail
     """
-    def __init__(self, cfg: Config, afc_config: Dict[str, Any]) -> None:
+    def __init__(self, cfg: Config, afc_config: Dict[str, Any],
+                 req_msg_pattern: Optional[Dict[str, Any]] = None) -> None:
+        """ Constructor
+
+        Arguments:
+        cfg             -- Config object
+        afc_config      -- AFC Config that will be used in request hash
+                           computation
+        req_msg_pattern -- Optional Request message pattern to use instead of
+                           default
+        """
         self._hash_base = hashlib.md5()
         self._hash_base.update(json.dumps(afc_config,
                                           sort_keys=True).encode("utf-8"))
-        super().__init__(cfg)
+        super().__init__(cfg=cfg, req_msg_pattern=req_msg_pattern)
 
     def make_req_data(self, req_indices: List[int]) -> bytes:
         """ Generates REST API POST payload (RcacheUpdateReq - see
@@ -613,6 +755,24 @@ class PreloadRestDataHandler(RestDataHandlerBase):
 class LoadRestDataHandler(RestDataHandlerBase):
     """ REST API data handler for 'load' operation - i.e. AFC Request/Response
     messages """
+    def __init__(self, cfg: Config, randomize: bool,
+                 population_db: Optional[str],
+                 req_msg_pattern: Optional[Dict[str, Any]] = None) -> None:
+        """ Constructor
+
+        Arguments:
+        cfg             -- Config object
+        randomize       -- True to choose AP positions randomly (uniformly or
+                           according to population density). False to use
+                           request index (to make caching possible)
+        population_db   -- Population density database name. None for uniform
+        req_msg_pattern -- Optional Request message pattern to use instead of
+                           default
+        """
+        super().__init__(cfg=cfg, randomize=randomize,
+                         population_db=population_db,
+                         req_msg_pattern=req_msg_pattern)
+
     def make_req_data(self, req_indices: List[int]) -> bytes:
         """ Generates REST API POST payload (AFC Request message)
 
@@ -672,7 +832,7 @@ GetWorkerReqInfo = \
 
 # REST API request results
 class WorkerResultInfo(NamedTuple):
-    """ Data, returned by REST API workers in resault queue """
+    """ Data, returned by REST API workers in result queue """
     # Retries made (0 - from first attempt)
     retries: int
     # CPU consumed in nanoseconds
@@ -839,6 +999,7 @@ class ResultsProcessor:
 
     def process(self) -> None:
         """ Keep processing results until all worker will stop """
+        parallel = self._num_workers
         start_time = datetime.datetime.now()
         requests_sent: int = 0
         requests_failed: int = 0
@@ -853,10 +1014,17 @@ class ResultsProcessor:
             elapsed = now - start_time
             elapsed_sec = elapsed.total_seconds()
             elapsed_str = re.sub(r"\.\d*$", "", str(elapsed))
-            req_rate = req_rate_ema.rate_ema if eta \
-                else (requests_sent / (elapsed_sec or 1E-3))
+            global_req_rate = requests_sent / elapsed_sec if elapsed_sec else 0
             cpu_consumption = cpu_consumption_ema.rate_ema if eta \
-                else (cpu_consumed_ns * 1e-9 / (elapsed_sec or 1E-3))
+                else (cpu_consumed_ns * 1e-9 / elapsed_sec if elapsed_sec
+                      else 0)
+            if global_req_rate:
+                req_duration = parallel / global_req_rate
+                req_duration_str = \
+                    f"{req_duration:.3g} sec" if req_duration > 0.1 \
+                    else f"{req_duration * 1000:.3g} ms"
+            else:
+                req_duration_str = "<unknown>"
             ret = \
                 f"{'Progress: ' if eta else ''}" \
                 f"{requests_sent} requests sent " \
@@ -864,8 +1032,10 @@ class ResultsProcessor:
                 f"{requests_failed} failed " \
                 f"({requests_failed * 100 / (requests_sent or 1):.3f}%), " \
                 f"{retries} retries made. " \
-                f"{elapsed_str} elapsed, rate is {req_rate:.1f} req/sec, " \
-                f"CPU consumption is {cpu_consumption:.3f}"
+                f"{elapsed_str} elapsed, " \
+                f"CPU consumption is {cpu_consumption:.3f}, " \
+                f"rate is {global_req_rate:.3f} req/sec " \
+                f"(avg req proc time {req_duration_str})"
             if eta and elapsed_sec and requests_sent:
                 total_duration = \
                     datetime.timedelta(
@@ -875,7 +1045,9 @@ class ResultsProcessor:
                 tta_sec = int((eta_dt - now).total_seconds())
                 tta = f"{tta_sec // 60} minutes" if tta_sec >= 60 else \
                     f"{tta_sec} seconds"
-                ret += f". ETA: {eta_dt.strftime('%X')} (in {tta})"
+                ret += f", current rate is " \
+                    f"{req_rate_ema.rate_ema:.3f} req/sec. " \
+                    f"ETA: {eta_dt.strftime('%X')} (in {tta})"
             return ret
 
         try:
@@ -959,16 +1131,16 @@ def post_req_worker(
     """ REST API POST worker
 
     Arguments:
-    url          -- REST API URL to send POSTs to
-    retries      -- Number of retries
-    backoff      -- Initial backoff window in seconds
-    dry          -- True to dry run
-    req_queue    -- Request queue. Elements are PostWorkerReqInfo objects
-                    corresponding to single REST API post or None to stop
-                    operation
-    result_queue -- Result queue. Elements added are WorkerResultInfo for
-                    operation results, None to signal that worker finished
-    use_requests -- True to use requests, False to use urllib.request
+    url            -- REST API URL to send POSTs to
+    retries        -- Number of retries
+    backoff        -- Initial backoff window in seconds
+    dry            -- True to dry run
+    post_req_queue -- Request queue. Elements are PostWorkerReqInfo objects
+                      corresponding to single REST API post or None to stop
+                      operation
+    result_queue   -- Result queue. Elements added are WorkerResultInfo for
+                      operation results, None to signal that worker finished
+    use_requests   -- True to use requests, False to use urllib.request
     """
     try:
         session: Optional[requests.Session] = \
@@ -999,7 +1171,7 @@ def post_req_worker(
                                         "application/json; charset=utf-8",
                                         "Content-Length":
                                         str(len(req_info.req_data))},
-                                    timeout=30)
+                                    timeout=180)
                             if not resp.ok:
                                 last_error = \
                                     f"{resp.status_code}: {resp.reason}"
@@ -1016,7 +1188,7 @@ def post_req_worker(
                                        str(len(req_info.req_data)))
                         try:
                             with urllib.request.urlopen(
-                                    req, req_info.req_data, timeout=30) as f:
+                                    req, req_info.req_data, timeout=180) as f:
                                 result_data = f.read()
                             break
                         except (urllib.error.HTTPError, urllib.error.URLError,
@@ -1050,12 +1222,12 @@ def get_req_worker(
 
     Arguments:
     url           -- REST API URL to send POSTs to
-    expected_code -- None or expected non-200 statsus code
+    expected_code -- None or expected non-200 status code
     retries       -- Number of retries
     backoff       -- Initial backoff window in seconds
     dry           -- True to dry run
-    req_queue     -- Request queue. Elements are GetWorkerReqInfo objects
-                     corresponding to bumch of single REST API GETs or None to
+    get_req_queue -- Request queue. Elements are GetWorkerReqInfo objects
+                     corresponding to bunch of single REST API GETs or None to
                      stop operation
     result_queue  -- Result queue. Elements added are WorkerResultInfo for
                      operation results, None to signal that worker finished
@@ -1192,8 +1364,7 @@ def producer_worker(
             req_queue.put(None)
 
 
-def run(
-        url: str, parallel: int, backoff: int, retries: int, dry: bool,
+def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
         status_period: int, batch: int,
         rest_data_handler: Optional[RestDataHandlerBase] = None,
         netload_target: Optional[str] = None,
@@ -1212,12 +1383,12 @@ def run(
     dry               -- True to dry run
     status_period     -- Period (in terms of count) of status message prints (0
                          to not at all)
-    batch             -- Batch size (number of requests per elemen of request
+    batch             -- Batch size (number of requests per element of request
                          queue)
     netload_target    -- None for POST test, tested destination for netload
                          test
-    expected_code     -- None or non-200 netloat test HTTP status code
-    min_idx           -- Minimum request index. None fo rnetload test
+    expected_code     -- None or non-200 netload test HTTP status code
+    min_idx           -- Minimum request index. None for netload test
     max_idx           -- Aftermaximum request index. None for netload test
     count             -- Optional count of requests to send. None means that
                          requests will be sent sequentially according to range.
@@ -1303,6 +1474,171 @@ def run(
             ticker.stop()
 
 
+def wait_rcache_flush(cfg: Config, args: Any,
+                      service_discovery: Optional[ServiceDiscovery]) -> None:
+    """ Waiting for rcache preload stuff flushing to DB
+
+    Arguments:
+    cfg               -- Config object
+    args              -- Parsed command line arguments
+    service_discovery -- Optional ServiceDiscovery object
+    """
+    logging.info("Waiting for updates to flush to DB")
+    start_time = datetime.datetime.now()
+    start_queue_len: Optional[int] = None
+    prev_queue_len: Optional[int] = None
+    status_printer = StatusPrinter()
+    rcache_status_url = \
+        get_url(base_url=cfg.rest_api.rcache_status.url,
+                param_host=args.rcache, service_discovery=service_discovery)
+    while True:
+        try:
+            with urllib.request.urlopen(rcache_status_url, timeout=30) as f:
+                rcache_status = json.loads(f.read())
+        except (urllib.error.HTTPError, urllib.error.URLError) as ex:
+            error(f"Error retrieving Rcache status '{cfg.region.rulesest_id}' "
+                  f"using URL get_config.url : {repr(ex)}")
+        queue_len: int = rcache_status["update_queue_len"]
+        if not rcache_status["update_queue_len"]:
+            status_printer.pr()
+            break
+        if start_queue_len is None:
+            start_queue_len = prev_queue_len = queue_len
+        elif (args.status_period is not None) and \
+                ((cast(int, prev_queue_len) - queue_len) >=
+                 args.status_period):
+            now = datetime.datetime.now()
+            elapsed_sec = (now - start_time).total_seconds()
+            written = start_queue_len - queue_len
+            total_duration = \
+                datetime.timedelta(
+                    seconds=start_queue_len * elapsed_sec / written)
+            eta_dt = start_time + total_duration
+            status_printer.pr(
+                f"{queue_len} records not yet written. "
+                f"Write rate {written / elapsed_sec:.2f} rec/sec. "
+                f"ETA {eta_dt.strftime('%X')} (in "
+                f"{int((eta_dt - now).total_seconds()) // 60} minutes)")
+        time.sleep(1)
+    status_printer.pr()
+    now = datetime.datetime.now()
+    elapsed_sec = (now - start_time).total_seconds()
+    elapsed_str = re.sub(r"\.\d*$", "", str((now - start_time)))
+    msg = f"Flushing took {elapsed_str}"
+    if start_queue_len is not None:
+        msg += f". Flush rate {start_queue_len / elapsed_sec: .2f} rec/sec"
+    logging.info(msg)
+
+
+def get_afc_config(cfg: Config, args: Any,
+                   service_discovery: Optional[ServiceDiscovery]) \
+        -> Dict[str, Any]:
+    """ Retrieve AFC Config for configured Ruleset ID
+
+    Arguments:
+    cfg                -- Config object
+    args               -- Parsed command line arguments
+    service_discovery  -- Optional ServiceDiscovery object
+    Returns AFC Config as dictionary
+    """
+    get_config_url = \
+        get_url(base_url=cfg.rest_api.get_config.url,
+                param_host=getattr(args, "rat_server", None),
+                service_discovery=service_discovery)
+    try:
+        get_config_url += cfg.region.rulesest_id
+        with urllib.request.urlopen(get_config_url, timeout=30) as f:
+            afc_config_str = f.read().decode('utf-8')
+    except (urllib.error.HTTPError, urllib.error.URLError) as ex:
+        error(f"Error retrieving AFC Config for Ruleset ID "
+              f"'{cfg.region.rulesest_id}' using URL get_config.url: "
+              f"{repr(ex)}")
+    try:
+        return json.loads(afc_config_str)
+    except json.JSONDecodeError as ex:
+        error(f"Error decoding AFC Config JSON: {repr(ex)}")
+        return {}  # Unreachable code to appease pylint
+
+
+def patch_json(patch_arg: Optional[List[str]], json_dict: Dict[str, Any],
+               data_type: str) -> Dict[str, Any]:
+    """ Modify JSON object with patches from command line
+
+    Arguments:
+    patch_arg -- Optional list of FIELD1=VALUE1[,FIELD2=VALUE2...] patches
+    json_dict -- JSON dictionary to modify
+    data_type -- Patch of what - to be used in error messages
+    returns modified dictionary
+    """
+    if not patch_arg:
+        return json_dict
+    ret = copy.deepcopy(json_dict)
+    for patches in patch_arg:
+        for patch in patches.split(","):
+            error_if("=" not in patch,
+                     f"Invalid syntax: {data_type} setting '{patch}' doesn't "
+                     f"have '='")
+            field, value = patch.split("=", 1)
+            super_obj: Any = None
+            obj: Any = ret
+            last_idx: Any = None
+            idx: Any
+            for idx in field.split("."):
+                super_obj = obj
+                if re.match(r"^\d+$", idx):
+                    int_idx = int(idx)
+                    error_if(not isinstance(obj, list),
+                             f"Integer index '{idx}' in {data_type} setting "
+                             f"'{patch}' is applied to nonlist entity")
+                    error_if(not (0 <= int_idx < len(obj)),
+                             f"Integer index '{idx}' in {data_type} setting "
+                             f"'{patch}' is outside of [0, {len(obj)}[ valid "
+                             f"range")
+                    idx = int_idx
+                else:
+                    error_if(not isinstance(obj, dict),
+                             f"Key '{idx}' in {data_type} setting '{patch}' "
+                             f"can't be applied to nondictionary entity")
+                    error_if(idx not in obj,
+                             f"Key '{idx}' of setting '{patch}' not found in "
+                             f"{data_type}")
+                obj = obj[idx]
+                last_idx = idx
+            error_if(isinstance(obj, (list, dict)),
+                     f"'{field}' of {data_type} setting '{patch}' does not "
+                     f"address scalar value")
+            try:
+                if isinstance(obj, int):
+                    try:
+                        super_obj[last_idx] = int(value)
+                    except ValueError:
+                        super_obj[last_idx] = float(value)
+                elif isinstance(obj, float):
+                    super_obj[last_idx] = float(value)
+                else:
+                    super_obj[last_idx] = value
+            except (TypeError, ValueError):
+                error(f"'{value}' of {data_type} setting '{patch}' has "
+                      f"invalid type")
+    return ret
+
+
+def patch_req(cfg: Config, args_req: Optional[List[str]]) -> Dict[str, Any]:
+    """ Get AFC Request pattern, patched according to --req switch
+
+    Arguments:
+    cfg      -- Config object
+    args_req -- Optional --req switch value
+    Returns patched AFC Request pattern
+    """
+    req_msg_dict = json.loads(cfg.req_msg_pattern)
+    req_dict = path_get(obj=req_msg_dict, path=cfg.paths.reqs_in_msg)[0]
+    req_dict = patch_json(patch_arg=args_req, json_dict=req_dict,
+                          data_type="AFC Request")
+    path_set(obj=req_msg_dict, path=cfg.paths.reqs_in_msg, value=[req_dict])
+    return req_msg_dict
+
+
 def do_preload(cfg: Config, args: Any) -> None:
     """ Execute "preload" command.
 
@@ -1314,16 +1650,15 @@ def do_preload(cfg: Config, args: Any) -> None:
         afc_config = {}
         worker_url = ""
     else:
-        service_cache: Dict[str, str] = {}
+        service_discovery = None if args.comp_proj is None \
+            else ServiceDiscovery(compose_project=args.comp_proj)
         if args.protect_cache:
             try:
                 with urllib.request.urlopen(
                         urllib.request.Request(
                             get_url(base_url=cfg.rest_api.protect_rcache.url,
                                     param_host=args.rcache,
-                                    param_comp_prj=args.comp_proj,
-                                    purpose="Rcache",
-                                    service_cache=service_cache),
+                                    service_discovery=service_discovery),
                             method="POST"),
                         timeout=30):
                     pass
@@ -1331,98 +1666,37 @@ def do_preload(cfg: Config, args: Any) -> None:
                 error(f"Error attempting to protect Rcache from invalidation "
                       f"using protect_rcache.url: {repr(ex)}")
 
-        get_config_url = \
-            get_url(base_url=cfg.rest_api.get_config.url,
-                    param_host=args.rat_server,
-                    param_comp_prj=args.comp_proj,
-                    purpose="Rat Server",
-                    service_cache=service_cache)
         worker_url = \
             get_url(base_url=cfg.rest_api.update_rcache.url,
                     param_host=args.rcache,
-                    param_comp_prj=args.comp_proj, purpose="Rcache",
-                    service_cache=service_cache)
-        try:
-            get_config_url += cfg.region.rulesest_id
-            with urllib.request.urlopen(get_config_url, timeout=30) as f:
-                afc_config_str = f.read().decode('utf-8')
-        except (urllib.error.HTTPError, urllib.error.URLError) as ex:
-            error(f"Error retrieving AFC Config for Ruleset ID "
-                  f"'{cfg.region.rulesest_id}' using URL get_config.url: "
-                  f"{repr(ex)}")
-        try:
-            afc_config = json.loads(afc_config_str)
-        except json.JSONDecodeError as ex:
-            error(f"Error decoding AFC Config JSON: {repr(ex)}")
+                    service_discovery=service_discovery)
+
+        afc_config = get_afc_config(cfg=cfg, args=args,
+                                    service_discovery=service_discovery)
 
     min_idx, max_idx = get_idx_range(args.idx_range)
 
-    run(rest_data_handler=PreloadRestDataHandler(cfg=cfg,
-                                                 afc_config=afc_config),
+    run(rest_data_handler=PreloadRestDataHandler(
+            cfg=cfg, afc_config=afc_config,
+            req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
         max_idx=max_idx, status_period=args.status_period,
         use_requests=args.no_reconnect)
 
     if not args.dry:
-        logging.info("Waiting for updates to flush to DB")
-        start_time = datetime.datetime.now()
-        start_queue_len: Optional[int] = None
-        prev_queue_len: Optional[int] = None
-        status_printer = StatusPrinter()
-        rcache_status_url = \
-            get_url(base_url=cfg.rest_api.rcache_status.url,
-                    param_host=args.rcache, param_comp_prj=args.comp_proj,
-                    purpose="Rcache", service_cache=service_cache)
-        while True:
-            try:
-                with urllib.request.urlopen(rcache_status_url,
-                                            timeout=30) as f:
-                    rcache_status = json.loads(f.read())
-            except (urllib.error.HTTPError, urllib.error.URLError) as ex:
-                error(f"Error retrieving Rcache status "
-                      f"'{cfg.region.rulesest_id}' using URL get_config.url : "
-                      f"{repr(ex)}")
-            queue_len: int = rcache_status["update_queue_len"]
-            if not rcache_status["update_queue_len"]:
-                status_printer.pr()
-                break
-            if start_queue_len is None:
-                start_queue_len = prev_queue_len = queue_len
-            elif (args.status_period is not None) and \
-                    ((cast(int, prev_queue_len) - queue_len) >=
-                     args.status_period):
-                now = datetime.datetime.now()
-                elapsed_sec = (now - start_time).total_seconds()
-                written = start_queue_len - queue_len
-                total_duration = \
-                    datetime.timedelta(
-                        seconds=start_queue_len * elapsed_sec / written)
-                eta_dt = start_time + total_duration
-                status_printer.pr(
-                    f"{queue_len} records not yet written. "
-                    f"Write rate {written / elapsed_sec:.2f} rec/sec. "
-                    f"ETA {eta_dt.strftime('%X')} (in "
-                    f"{int((eta_dt - now).total_seconds()) // 60} minutes)")
-            time.sleep(1)
-        status_printer.pr()
-        now = datetime.datetime.now()
-        elapsed_sec = (now - start_time).total_seconds()
-        elapsed_str = re.sub(r"\.\d*$", "", str((now - start_time)))
-        msg = f"Flushing took {elapsed_str}"
-        if start_queue_len is not None:
-            msg += f". Flush rate {start_queue_len / elapsed_sec: .2f} rec/sec"
-        logging.info(msg)
+        wait_rcache_flush(cfg=cfg, args=args,
+                          service_discovery=service_discovery)
 
 
-def get_afc_worker_url(args: Any, base_url: str, purpose: str) \
-        -> str:
+def get_afc_worker_url(args: Any, base_url: str,
+                       service_discovery: Optional[ServiceDiscovery]) -> str:
     """ REST API URL to AFC server
 
     Arguments:
-    cfg      -- Config object
-    base_url -- Base URL from config
-    purpose  -- URL purpose for error messages
+    cfg               -- Config object
+    base_url          -- Base URL from config
+    service_discovery -- Optional ServiceDiscovery object
     Returns REST API URL
     """
     if args.localhost:
@@ -1436,19 +1710,17 @@ def get_afc_worker_url(args: Any, base_url: str, purpose: str) \
                  "AFC port not found. Please specify AFC server address "
                  "explicitly and remove --localhost switch")
         assert m is not None
-        ret = \
-            get_url(base_url=base_url,
-                    param_host=f"localhost:{m.group(1)}",
-                    param_comp_prj=args.comp_proj, purpose=purpose)
+        ret = get_url(base_url=base_url,
+                      param_host=f"localhost:{m.group(1)}",
+                      service_discovery=service_discovery)
     else:
-        ret = \
-            get_url(base_url=base_url, param_host=args.afc,
-                    param_comp_prj=args.comp_proj, purpose=purpose)
+        ret = get_url(base_url=base_url, param_host=args.afc,
+                      service_discovery=service_discovery)
     return ret
 
 
 def do_load(cfg: Config, args: Any) -> None:
-    """ Execute "load" command.
+    """ Execute "load" command
 
     Arguments:
     cfg  -- Config object
@@ -1457,21 +1729,26 @@ def do_load(cfg: Config, args: Any) -> None:
     if args.dry:
         worker_url = ""
     else:
+        service_discovery = None if args.comp_proj is None \
+            else ServiceDiscovery(compose_project=args.comp_proj)
         worker_url = \
             get_afc_worker_url(args=args, base_url=cfg.rest_api.afc_req.url,
-                               purpose="AFC Server")
-    if args.no_cache and (not args.dry):
-        parsed_worker_url = urllib.parse.urlparse(worker_url)
-        worker_url = \
-            parsed_worker_url._replace(
-                query="&".join(
-                    p for p in [parsed_worker_url.query, "nocache=True"]
-                    if p)).geturl()
+                               service_discovery=service_discovery)
+        if args.no_cache:
+            parsed_worker_url = urllib.parse.urlparse(worker_url)
+            worker_url = \
+                parsed_worker_url._replace(
+                    query="&".join(
+                        p for p in [parsed_worker_url.query, "nocache=True"]
+                        if p)).geturl()
+
     min_idx, max_idx = get_idx_range(args.idx_range)
-    run(rest_data_handler=LoadRestDataHandler(cfg=cfg), url=worker_url,
-        parallel=args.parallel, backoff=args.backoff, retries=args.retries,
-        dry=args.dry, batch=args.batch, min_idx=min_idx, max_idx=max_idx,
-        status_period=args.status_period, count=args.count,
+    run(rest_data_handler=LoadRestDataHandler(
+            cfg=cfg, randomize=args.random, population_db=args.population,
+            req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
+        url=worker_url, parallel=args.parallel, backoff=args.backoff,
+        retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
+        max_idx=max_idx, status_period=args.status_period, count=args.count,
         use_requests=args.no_reconnect)
 
 
@@ -1485,6 +1762,8 @@ def do_netload(cfg: Config, args: Any) -> None:
     expected_code: Optional[int] = None
     worker_url = ""
     if not args.dry:
+        service_discovery = None if args.comp_proj is None \
+            else ServiceDiscovery(compose_project=args.comp_proj)
         if args.target is None:
             if args.localhost and (not args.rcache):
                 args.target = "dispatcher"
@@ -1498,20 +1777,20 @@ def do_netload(cfg: Config, args: Any) -> None:
             worker_url = \
                 get_url(base_url=cfg.rest_api.rcache_get.url,
                         param_host=args.rcache,
-                        param_comp_prj=args.comp_proj, purpose="Rcache")
+                        service_discovery=service_discovery)
             expected_code = cfg.rest_api.rcache_get.get("code")
         elif args.target == "msghnd":
             worker_url = \
                 get_url(base_url=cfg.rest_api.msghnd_get.url,
                         param_host=args.afc,
-                        param_comp_prj=args.comp_proj, purpose="msghnd")
+                        service_discovery=service_discovery)
             expected_code = cfg.rest_api.msghnd_get.get("code")
         else:
             assert args.target == "dispatcher"
             worker_url = \
                 get_afc_worker_url(
                     args=args, base_url=cfg.rest_api.dispatcher_get.url,
-                    purpose="dispatcher")
+                    service_discovery=service_discovery)
             expected_code = cfg.rest_api.dispatcher_get.get("code")
     run(netload_target=args.target, url=worker_url,
         parallel=args.parallel, backoff=args.backoff, retries=args.retries,
@@ -1531,28 +1810,52 @@ def do_cache(cfg: Config, args: Any) -> None:
              "--protect and --unprotect are mutually exclusive")
     error_if(not(args.protect or args.unprotect or args.invalidate),
              "Nothing to do")
-    service_cache: Dict[str, str] = {}
+    service_discovery = None if args.comp_proj is None \
+        else ServiceDiscovery(compose_project=args.comp_proj)
     json_data: Any
-    for arg, attr, json_data, purpose in \
-            [("protect", "protect_rcache", None, "Rcache protect"),
-             ("invalidate", "invalidate_rcache", {}, "Rcache invalidate"),
-             ("unprotect", "unprotect_rcache", None, "Rcache unprotect")]:
+    for arg, attr, json_data in \
+            [("protect", "protect_rcache", None),
+             ("invalidate", "invalidate_rcache", {}),
+             ("unprotect", "unprotect_rcache", None)]:
         try:
             if not getattr(args, arg):
                 continue
             data: Optional[bytes] = None
             url = get_url(base_url=getattr(cfg.rest_api, attr).url,
                           param_host=args.rcache,
-                          param_comp_prj=args.comp_proj,
-                          purpose=purpose, service_cache=service_cache)
+                          service_discovery=service_discovery)
             req = urllib.request.Request(url, method="POST")
             if json_data is not None:
                 data = json.dumps(json_data).encode(encoding="ascii")
                 req.add_header("Content-Type", "application/json")
             urllib.request.urlopen(req, data, timeout=30)
         except (urllib.error.HTTPError, urllib.error.URLError) as ex:
-            error(f"Error attempting to perform {purpose} using "
+            error(f"Error attempting to perform cache {arg} using "
                   f"rest_api.{attr}.url: {repr(ex)}")
+
+
+def do_afc_config(cfg: Config, args: Any) -> None:
+    """ Execute "afc_config" command.
+
+    Arguments:
+    cfg  -- Config object
+    args -- Parsed command line arguments
+    """
+    service_discovery = ServiceDiscovery(compose_project=args.comp_proj)
+    afc_config = get_afc_config(cfg=cfg, args=args,
+                                service_discovery=service_discovery)
+    afc_config_str = \
+        json.dumps(
+            patch_json(patch_arg=args.FIELD_VALUE, json_dict=afc_config,
+                       data_type="AFC Config"))
+    result = \
+        ratdb(
+            cfg=cfg,
+            command=cfg.ratdb.update_config_by_id.format(
+                afc_config=afc_config_str, region_str=afc_config["regionStr"]),
+            service_discovery=service_discovery)
+    error_if(not(isinstance(result, int) and result > 0),
+             "AFC Config update failed")
 
 
 def do_help(cfg: Config, args: Any) -> None:
@@ -1616,6 +1919,14 @@ def main(argv: List[str]) -> None:
         "--batch", metavar="N", type=int, default=cfg.defaults.batch,
         help=f"Number of requests in one REST API call. Default is "
         f"{cfg.defaults.batch}")
+    switches_req.add_argument(
+        "--req", metavar="FIELD1=VALUE1[,FIELD2=VALUE2...]", action="append",
+        default=[],
+        help="Change field(s) in request body (compared to req_msg_pattern "
+        "in config file). FIELD is dot-separated path to field inside request "
+        "(e.g. 'location.ellipse.majorAxis'), VALUE is a field value. Several "
+        "comma-separated settings may be specified, also this parameter may "
+        "be specified several times")
 
     switches_count = argparse.ArgumentParser(add_help=False)
     switches_count.add_argument(
@@ -1634,6 +1945,13 @@ def main(argv: List[str]) -> None:
         "container (bypassing Nginx container). This flag causes requests to "
         "be sent to external http/https AFC port on localhost. If protocol "
         "not specified http is assumed")
+
+    switches_rat = argparse.ArgumentParser(add_help=False)
+    switches_rat.add_argument(
+        "--rat_server", metavar="[PROTOCOL://]HOST[:port][path][params]",
+        help="Server to request config from. Unspecified parts are taken "
+        "from 'rest_api.get_config' of config file. By default determined by "
+        "means of '--comp_proj'")
 
     switches_compose = argparse.ArgumentParser(add_help=False)
     switches_compose.add_argument(
@@ -1666,11 +1984,6 @@ def main(argv: List[str]) -> None:
                  switches_rcache],
         help="Fill rcache with (fake) responses")
     parser_preload.add_argument(
-        "--rat_server", metavar="[PROTOCOL://]HOST[:port][path][params]",
-        help="Server to request config from. Unspecified parts are taken "
-        "from 'rest_api.get_config' of config file. By default determined by "
-        "means of '--comp_proj'")
-    parser_preload.add_argument(
         "--protect_cache", action="store_true",
         help="Protect Rcache from invalidation (e.g. by ULS downloader). "
         "Protection persists in rcache database, see 'rcache' subcommand on "
@@ -1680,11 +1993,21 @@ def main(argv: List[str]) -> None:
     parser_load = subparsers.add_parser(
         "load",
         parents=[switches_common, switches_req, switches_count,
-                 switches_compose, switches_afc],
+                 switches_compose, switches_afc, switches_rat],
         help="Do load test")
     parser_load.add_argument(
         "--no_cache", action="store_true",
         help="Don't use rcache, force each request to be computed")
+    parser_load.add_argument(
+        "--population", metavar="POPULATION_DB_FILE",
+        help="Select AP positions proportionally to population density from "
+        "given database (prepared with "
+        "tools/geo_converters/make_population_db.py). Positions are random, "
+        "so no rcache will help")
+    parser_load.add_argument(
+        "--random", action="store_true",
+        help="Choose AP positions randomly (makes sense only in noncached "
+        "mode)")
     parser_load.set_defaults(func=do_load)
 
     parser_network = subparsers.add_parser(
@@ -1715,7 +2038,18 @@ def main(argv: List[str]) -> None:
         help="Invalidate cache (invalidation must be enabled)")
     parser_cache.set_defaults(func=do_cache)
 
-    # Subparser for 'help' command
+    parser_afc_config = subparsers.add_parser(
+        "afc_config", help="Modify AFC Config")
+    parser_afc_config.add_argument(
+        "--comp_proj", metavar="PROJ_NAME", required=True,
+        help="Docker compose project name. This parameter is mandatory")
+    parser_afc_config.add_argument(
+        "FIELD_VALUE", nargs="+",
+        help="One or more FIELD=VALUE clauses, where FIELD is a field name in "
+        "AFC Config, deep field may be specified in dot-separated for m (e.g. "
+        "'freqBands.0.startFreqMHz'). VALUE is new field value")
+    parser_afc_config.set_defaults(func=do_afc_config)
+
     parser_help = subparsers.add_parser(
         "help", add_help=False,
         help="Prints help on given subcommand")
