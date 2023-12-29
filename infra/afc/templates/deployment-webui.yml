@@ -1,0 +1,112 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-{{ .Values.service.webui.hostname }}
+  labels:
+    {{- include "afc.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount.webui }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "afc.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "afc.selectorLabels" . | nindent 8 }}
+        afc: webui
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "afc.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-{{ .Values.service.webui.hostname }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.webui.repository }}:{{ .Values.image.webui.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.webui.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.webui.port }}
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /fbrat/www/index.html
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          volumeMounts:
+            - mountPath: {{ .Values.deployments.global.mountPath | quote }}
+              name: cont-confs
+            - name: {{ .Chart.Name }}-webui-rat-api-secret
+              mountPath: /etc/xdg/fbrat/ratapi.conf
+              subPath: ratapi.conf
+          env:
+            # RabbitMQ server name:
+            - name: BROKER_TYPE
+              value: "external"
+            - name: BROKER_FQDN
+              value: {{ .Values.service.rmq.hostname | quote }}
+            # Filestorage params:
+            - name: AFC_OBJST_HOST
+              value: {{ .Values.service.objst.hostname | quote }}
+            - name: AFC_OBJST_PORT
+              value: {{ .Values.service.objst.fileStoragePort | quote }}
+            - name: AFC_OBJST_SCHEME
+              value: {{ .Values.service.objst.scheme | quote }}
+            # ALS params
+            - name: ALS_KAFKA_SERVER_ID
+              value: {{ .Values.service.webui.hostname | quote }}
+            - name: ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
+              value: "{{ .Values.service.als_kafka.hostname }}:{{ .Values.service.als_kafka.port }}"
+            - name: ALS_KAFKA_MAX_REQUEST_SIZE
+              value: {{ .Values.service.als_kafka.max_request_size | quote | replace ":" "" }}
+            # Rcache parameters
+            - name: RCACHE_ENABLED
+              value: {{ .Values.service.rcache.is_enabled | quote }}
+            - name: RCACHE_POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Chart.Name }}-postgres-secret
+                  key: RCACHE_POSTGRES_DSN
+            - name: RCACHE_SERVICE_URL
+              value: "http://{{ .Values.service.rcache.hostname }}:{{ .Values.service.rcache.port }}"
+            - name: RCACHE_RMQ_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Chart.Name }}-rmq-rcache-secret
+                  key: RCACHE_RMQ_DSN
+          resources:
+            {{- toYaml .Values.resources.webui | nindent 12 }}
+      volumes:
+        - name: cont-confs
+          persistentVolumeClaim:
+            claimName: cont-confs-claim
+        - name: {{ .Chart.Name }}-webui-rat-api-secret
+          secret:
+            secretName: {{ .Chart.Name }}-webui-rat-api-secret
+      imagePullSecrets:
+        - name: container-repo-secret
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

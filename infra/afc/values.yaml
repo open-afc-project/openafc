@@ -1,0 +1,193 @@
+# Default values for afc.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount:
+  msghnd: 1
+  objst: 1
+  rmq: 1
+  worker: 1
+  webui: 1
+  rcache: 1
+  als_kafka: 1
+  als_siphon: 1
+
+
+image:
+  msghnd:
+    repository: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.12.0"
+  webui:
+    repository: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.12.0"
+  objst:
+    repository: public.ecr.aws/w9v6y1o0/openafc/objstorage-image
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.12.0"
+  worker:
+    repository: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.12.0"
+  rmq:
+    repository: public.ecr.aws/w9v6y1o0/openafc/rmq-image
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.12.0"
+  rcache:
+    repository: public.ecr.aws/w9v6y1o0/openafc/rcache-image
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.12.0"
+  als_kafka:
+    repository: public.ecr.aws/w9v6y1o0/openafc/als-kafka-image
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.12.0"
+  als_siphon:
+    repository: public.ecr.aws/w9v6y1o0/openafc/als-siphon-image
+    pullPolicy: Always
+    # Overrides the image tag whose default is the chart appVersion.
+    #tag: "3.8.12.0"
+
+
+imagePullSecrets: []
+nameOverride: "afc-app"
+#fullnameOverride: "afc-chart"
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+service:
+  msghnd:
+    hostname: msghnd
+    type: ClusterIP
+    port: 80
+    containerPort: 8000
+    threads_per_pod: 2
+  webui:
+    hostname: webui
+    type: ClusterIP
+    port: 80
+  rmq:
+    hostname: rmq
+    type: ClusterIP
+    port: 5672
+  objst:
+    hostname: objst
+    type: ClusterIP
+    fileStoragePort: 5000
+    historyViewPort: 4999
+    scheme: "HTTP"
+  als_kafka:
+    hostname: als-kafka
+    type: ClusterIP
+    port: 9092
+    max_request_size: ":10485760" # ":" is a part of workaroud of this bug in helm https://github.com/helm/helm/issues/1707
+  rcache:
+    hostname: rcache
+    type: ClusterIP
+    port: 8000
+    is_enabled: "TRUE"
+  ingress_ngnix:
+    hostname: ""
+
+deployments:
+  global:
+    mountPath: "/mnt/nfs"
+  als_siphon:
+    name: als-siphon
+    init_if_exists: "skip"
+  worker:
+    name: worker
+    afc_aep_enable: "1"
+    afc_aep_debug: "1"
+    afc_aep_real_mountpoint_relative: "rat_transfer/3dep/1_arcsec"
+    celery_concurrency: 2
+    queue_length: 3
+
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+    # kubernetes.io/ingress.class: nginx
+    # kubernetes.io/tls-acme: "true"
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+  tls: []
+  #  - secretName: chart-example-tls
+  #    hosts:
+  #      - chart-example.local
+
+resources:
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+  msghnd:
+    requests:
+      memory: 1200Mi
+  objst:
+    requests:
+      memory: 500Mi
+  rmq:
+    requests:
+      memory: 200Mi
+  worker:
+    requests:
+      memory: 4500Mi
+  webui:
+    requests:
+      memory: 200Mi
+  rcache:
+    requests:
+      memory: 100Mi
+  als_kafka:
+    requests:
+      memory: 500Mi
+  als_siphon:
+    requests:
+      memory: 100Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 1
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
