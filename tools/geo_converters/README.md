@@ -45,18 +45,18 @@ License, a copy of which is included with this software program.
 
 ## General considerations <a name="general_considerations"/>
 
-This chapter describes peculiarities, common to all scripts.
+This chapter describes characteristics of all scripts.
 
 ### Running scripts: standalone vs Docker (dependencies) <a name="docker"/>
 
-Geodetic File Converter scripts described here all may be run standalone - and examples for doing this will be provided.
+All Geodetic File Converter scripts described here may be run standalone - and examples for doing this will be provided.
 
 However some of them require GDAL - sometimes GDAL utilities, sometimes Python GDAL libraries. GDAL utilities are  hard to install. GDAL Python bindings even harder to install. So, while running standalone is more convenient, Docker may need to be resorted to (Dockerfile is provided).
 
 Here are scripts' dependencies that require separate installation:
 
 |Script|GDAL utilities?|GDAL Python bindings?|Other dependencies|
-|------|---------------|----------------------------------------|
+|------|---------------|---------------------|-------------------|
 |dir_md5.py|No|No|jsonschema(optional)|
 |lidar_merge.py|Yes|No||
 |nlcd_wgs84.py|Yes|For non-NLCD sources|pyyaml|
@@ -66,11 +66,8 @@ Here are scripts' dependencies that require separate installation:
 
 Since files operated upon are located 'in the outer world' (outside the container's file system) proper use of mapping (`-v`, `--user` and `--group_add` in `docker run` command line), absolute paths etc. is necessary (refer Docker manuals/gurus for proper instruction).
 
-`afc_tool.py` that is out of the scope of this document (and even may not will be a part of this distribution) may be used to simplify running scripts from docker. Compare (note the use of `^` before all 'out-of-container' file names):
-```
-afc_tool.py docker_run geo_converters to_wgs84.py --resampling cubic ^a.tif ^b.tif
-```
-and equivalent full form:  
+For example, the `to_wgs84.py`(see more detail later) utility can be run with: 
+
 ```
 docker run --rm -it --user 16256:16256 --group-add 16256 --group-add 20 --group-add 970 \
   --group-add 1426 --group-add 3167 --group-add 3179 --group-add 3186 --group-add 3199 \
@@ -80,15 +77,13 @@ docker run --rm -it --user 16256:16256 --group-add 16256 --group-add 20 --group-
 
 ### GDAL version selection <a name="gdal"/>
 
-GDAL (set of libraries and utilities that do the job in almost all scripts here) is constantly improving - both in capabilities and in reliability. And GDAL is an 'industry standard' without any viable alternatives.
-
-To put it another way, GDAL is still painfully slow and has a lot of bugs. So it makes sense to use as late (stable) version as possible. As of time of this writing the latest version is 3.6.3 and it is much better than, say, 3.4.1.
+GDAL (set of libraries and utilities that do the job in almost all scripts here) is constantly improving - both in capabilities and in reliability, So it makes sense to use as late (stable) version as possible. As of time of this writing the latest version is 3.6.3.
 
 GDAL version may be checked with `gdalinfo --version`
 
 ### Performance (`--threads`, `--nice`, conversion order) <a name="performance"/>
 
-Geodetic data conversion (performed mainly by means of `gdal_transform` and `gdalwarp` utilities) is a painfully slow process, so all scripts presented here support parallelization. It is controlled by `--threads` parameter that has following forms:
+Geodetic data conversion (performed mainly by means of `gdal_transform` and `gdalwarp` utilities) is a slow process, so all scripts presented here support parallelization. It is controlled by `--threads` parameter that has following forms:
 
 |Form|Action|
 |----|------|
@@ -99,9 +94,9 @@ Geodetic data conversion (performed mainly by means of `gdal_transform` and `gda
 
 Note that `gdal_transform` and `gdalwarp` on large files use a lot of memory, so using too much CPUs will cause thrashing (excessive swapping). So it may make sense to limit the number of CPUs.
 
-All scripts have `--nice` parameter to lower its priority (and thus do not impede user-interacting processes). On Windows it only works if 'psutil' Python module is installed. Not sure it will help against thrashing though.
+All scripts have `--nice` parameter to lower its priority (and thus do not impede user-interacting processes). On Windows it only works if 'psutil' Python module is installed. 
 
-`gdalwarp` (used by `to_wgs84.py` and `nlcd_wgs84.py`) works especially slow on large (e.g. 20GB) files. Hence LiDAR conversion process first slices source data to tiles then runs `to_wgs84.py` to apply geoids). This is not always possible though, so `nlcd_wgs84.py` works painfully slow (and using single CPU) on CONUS and Canada files and there is nothing that can be done about it (except for waiting for future GDAL releases).
+`gdalwarp` (used by `to_wgs84.py` and `nlcd_wgs84.py`) works especially slow on large (e.g. 20GB) files. Hence LiDAR conversion process first slices source data to tiles then runs `to_wgs84.py` to apply geoids. This is not always possible though, for example,  `nlcd_wgs84.py` operates on monolithic files for CONUS and Canada and there is nothing that can be done to improve speed. 
 
 
 ### Ctrl-C <a name="ctrlc"/>
@@ -120,7 +115,7 @@ If this behavior is undesirable (e.g. if conversion parameter or source data has
 
 Raster geospatial files (those that contain heights, land usage, population density, etc.) are, essentially image files (usually TIFF or PNG) with some metadata. Geospatial data is encoded as pixel values (data stored in pixel may be signed/unsigned int8/16/32/64, float 32/64, complex int/float of those sizes). Pixel size (distance between adjacent pixels) and alignment on degree mesh might be essential.
 
-By default GDAL keeps pixel size and alignment during conversions - and it works well in many cases. In some cases however (e.f. when converting from MAP data - as in case of land usage source files or when pixels are slightly off their intended positions) pixel size and alignment should be specified/corrected explicitly (this is named resampling - more on it later). Here are command line parameters for setting/changing pixel size:
+By default GDAL keeps pixel size and alignment during conversions - and it works well in many cases. In some cases however (e.g. when converting from MAP data - as in case of land usage source files or when pixels are slightly off their intended positions) pixel size and alignment should be specified/corrected explicitly (this is named resampling - more on it later). Here are command line parameters for setting/changing pixel size:
 
 |Parameter|Meaning|
 |---------|-------|
@@ -130,38 +125,32 @@ By default GDAL keeps pixel size and alignment during conversions - and it works
 
 ### Cropping/realigning (`--top`, `--bottom`, `--left`, `--right`, `--round_pixels_to_degree`) <a name="crop_realign"/>
 
-As of time of this writing some geospatial data (specifically - land usage) is represented by a large files that cover some region (e.g. CONUS, Canada, Alaska, Hawaii, etc.). Problem may occur if such files intersect (as CONUS and uncropped Alaska do, despite there is no CONUS data on Alaska file).
+As of time of this writing some geospatial data (specifically - land usage) is represented by a large files that cover some region (e.g. CONUS, Canada, Alaska, Hawaii, etc.). Problems may occur if such files intersect (as CONUS and uncropped Alaska do, despite no CONUS data on Alaska file).
 
 While large geospatial files are being gradually phased out (in favor of 1X1 degree tile files), as an intermediate solution it is possible to crop source file(s) to avoid intersection. This may be made with `--top MAXLAT`, `--bottom MINLAT`, `--left MINLON`, `--right MAXLON` parameters that set a crop values (MINLAT/MAXLAT are signed, north-positive degrees, MINLON/MAXLON are signed east-positive degrees).
 
 It is not necessary to set all of them - some boundaries may be left as is.
 
-Also pixels in file may be not aligned on degree mesh. While it can't be fixed directly, there is a `--round_pixels_to_degree` that extends boundary to next whole degree. Resulting pixels became degree-aligned on left/top boundaries, alignment on other boundaries may be achieved by setting pixel size (see chapter on pixel size parameters above).
+Also pixels in file may be not aligned on degree mesh. While it can't be fixed directly, there is a `--round_pixels_to_degree` option that extends boundaries to the next whole degree. Resulting pixels are degree-aligned on the left/top boundaries, alignment on other boundaries may be achieved by setting pixel size (see chapter on pixel size parameters above).
 
 ### Geoids (`--src_geoid`, `--dst_geoid`, order of operations) <a name="geoids"/>
 
-Geoid is a surface, perpendicular to vertical (lead line). Calm water surface is an example of geoid, albeit geoids are, usually, present more interests over the land.
+Geoid is a surface, perpendicular to vertical (lead line). Calm water surface is an example of geoid. There are infinitely many geoids, but there is just one geoid that goes through a particular point in space. For USA and Canada such point in space is Father Point, in Rimouski, Canada, so their geoids are compatible. Yet Earth shape changes, surveying techniques improve  and so each country has many releases of its geoid models (GEOID96, GEOID99, ... GEOID12B, GEOID18 for USA, HTv2 1997, 2002, 2010).
 
-Clearly there are infinitely many geoids, but there is just one geoid that goes through a particular point in space. For USA and Canada such point in space is Father Point, in Rimouski, Canada, so their geoids are compatible. Yet Earth shape changes, surveying techniques improve  and so each country has many releases of its geoid models (GEOID96, GEOID99, ... GEOID12B, GEOID18 for USA, HTv2 1997, 2002, 2010).
+Geoids are GDAL files (usually with .gtx extension, albeit .bin and .byn extensions also happen). Contiguous countries (like Canada) usually have single-file geoid models covers it all, while noncontiguous countries (like USA) have multifile geoid models that cover its various parts.
 
-Geoids are GDAL files (usually with .gtx extension, albeit .bin and .byn extensions also happen). Contiguous countries (like Canada) usually have single-file geoid models covers it all, noncontiguous countries (like USA) have multifile geoid models that cover its various parts.
+The AFC Engine expects all heights (in particular - terrain and building heights) to be expressed relative to the WGS84 ellipsoid. There is a perfect sense in it - it makes computation simple and closed (not depending on any external parameters). However, all raw terrain data contains the geoidal heights (heights relative to geoid). 
 
-AFC Engine expects all heights (in particular - terrain and building heights) to be expressed relative to WGS84 ellipsoid. There is a perfect sense in it - it makes computation simple and closed (not depending on any external parameters).
-
-All terrain data have contain geoidal heights (heights relative to geoid). There is a perfect sense in it - surface of constant geoidal height is horizontal (perpendicular to the lead). Unfortunately geoidal heights are very inconvenient for making computations.
-
-Even though terrain heights are geoidal, AFC Engine treats them as ellipsoidal, that is delusional.
-
-`to_wgs84.py` script allows to convert heights from geoidal to WGS84 by specifying geoid model for source data with `--src_geoid` parameter. Since geoid model may be multifile, its name may be filename of mask, e.g. `--src_geoid 'g2018?0.gtx'`. Note the quotes around name - they prevent shell to glob it.
+To reconcile these differences, the  `to_wgs84.py` script converts heights from geoidal to WGS84 by specifying the geoid model for source data with `--src_geoid` parameter. Since geoid models may be multifile, its name may be a filename of mask, e.g. `--src_geoid 'g2018?0.gtx'`. Note the quotes around name - they prevent the shell from globbing it.
 
 If many files are converted, different files may need to have different geoid models, so `--src_geoid` switch may be used several times e.g.:
 
 ```
 --src_geoid 'g2018?0.gtx' --src_geoid 'g2012b?0.gtx' --src_geoid HT2_2010v70.gtx
 ```
-Here preferable in USA is GEOID18, wherever it does not cover (e.g. Hawaii) - GEOID12B, in Canada - HTv2 of 2010).
 
-Also there is a `--dst_geoid` that makes *resulting* heights to be relative to given geoid. This parameter is for creation of delusional output data compatible with delusional dataset, containing heights relative to given geoid. This might be useful for compatibility cross-testing, but better not to be used for production purposes.
+For North America data, where the GEOID18 model is preferred over CONUS, GEOID12B wherever it doesn't cover (e.g. Hawaii), and HTv2 for Canada.
+
 
 Important performance observation. If `to_wgs84.py` source files are not in WGS84 geodetic (latitude/longitude) coordinate system - it is better to **first convert them into WGS84 geodetic coordinate system (with `to_wgs84.py`) and then, with a separate run of `to_wgs84.py ... --src_geoid ...` convert heights to WGS84**. Doing both conversion in one swoop involves geoid backprojection which is either impossible (which manifests itself with funny error messages) or extremely (hundreds of times) slower.
 
@@ -169,9 +158,9 @@ Important performance observation. If `to_wgs84.py` source files are not in WGS8
 
 Changing pixel sizes, cropping, applying geoids, changing of coordinate system changes pixel values in geospatial file so that resulting values are somehow computed from source values of 'surrounding pixels'.
 
-This process is named **resampling** and it is may be performed per many various methods (`nearest`, `bilinear`, `cubic`, `cubicspline`, `lanczos`, `average`, `rms`, `mode`, `max`, `min`, `med`, `Q1`, `Q3`, `sum` - whatever it all means).
+This process is named **resampling** and it is may be performed per many various methods (`nearest`, `bilinear`, `cubic`, `cubicspline`, `lanczos`, `average`, `rms`, `mode`, `max`, `min`, `med`, `Q1`, `Q3`, etc.).
 
-Resampling to use may be specified by `--resampling METHOD` parameter.
+The resampling method used is be specified by `--resampling METHOD` parameter.
 
 By default for byte source or destination data (e.g. land usage) `nearest` method is used, for all other cases `cubic` method is used.
 
@@ -184,9 +173,9 @@ GeoTiff files (files with .tif, .hgt, .bil extensions) are big. Sometimes too bi
 |Option|Meaning|
 |------|-------|
 |--format_param COMPRESS=PACKBITS|Makes land usage files 10 time smaller without performance penalty. Also useful on terrain files with lots of NoData or sea|
-|--format_param COMPRESS=LZW|Works well on terrain files (compress ratio 2-3 times), but slows things down. Might be a good tradeoff when working with behemoth LiDAR files on tight disk space|
+|--format_param COMPRESS=LZW|Works well on terrain files (compress ratio 2-3 times), but slows things down. Might be a good tradeoff when working with large LiDAR files on tight disk space|
 |--format_param COMPRESS=ZSTD|Works better and faster than LZW. Reportedly not universally available|
-|--format_param BIGTIFF=YES|Sometimes conversion fails if resulting file is too big (in this case error message appeals to use BIGTIFF=YES), this parameter enables BigTiff mode|
+|--format_param BIGTIFF=YES|Sometimes conversions fail if the resulting file is too big (in this case error message appeals to use BIGTIFF=YES), this parameter enables BigTiff mode|
 |--format_param BIGTIFF=IF_NEEDED|Enabled BigTiff mode if file expected to require it. Doesn't work well with compression|
 
 ### PNG data representation (`--scale`, `--no_data`, `--data_type`) <a name="png_representation"/>
@@ -254,14 +243,14 @@ Source data for these files released in different forms:
 
 * NOAA files - contain (as of time of this writing) more recent and detailed land usage data for Hawaii, Puerto Rico, Virgin Islands. These files also have map projection (not geodetic) coordinate system, also they have different land usage codes (that need to be translated to NLCD land usage codes).
 
-* Canada land usage file - covers entire Canada, uses map projection coordinate system and yet another land usage codes.
+* Canada land usage file - covers entire Canada, uses map projection coordinate system and another land usage codes.
 
-* Corine land cover files - covers the EU, uses map projection coordinate system and (suprise) another set of land usage codes.
+* Corine land cover files - covers the EU, uses map projection coordinate system and another set of land usage codes.
 
 
 `nlcd_wgs84.py` script converts NLCD data files from the source format to one, used by AFC Engine.
 
-There is a *nlcd_wgs84.yaml* file that accompanies this script. It defines NLCD encoding properties (code meaning and colors) and other encodings (code meaning and translation to NLCD). Presence of this file in same directory as `nlcd_wgsm4.py` is mandatory.
+There is a *nlcd_wgs84.yaml* file that accompanies this script. It defines NLCD encoding properties (code meaning and colors) and other encodings (code meaning and translation to NLCD). Presence of this file in same directory as `nlcd_wgs84.py` is mandatory.
 
 `nlcd_wgs84.py [options] SOURCE_FILE DEST_FILE`
 
@@ -285,13 +274,13 @@ Options:
 
 ### *lidar_merge.py* - flattens lidar files <a name="lidar_merge"/>
 
-LiDAR files (misnomer, as most other terrain files are also obtained by LiDARs. Whatever) are high-resolution (one meter for USA) surface model (contain both terrain and rooftops) for urban agglomerations. Their original representation is complicated multilevel directory structure (which is a product of `proc_lidar` script - but that's a different story).
+LiDAR files are high-resolution (one meter for USA) surface models that contain both terrain and building data. Their original representation is a complicated multilevel directory structure (which is a product of `proc_lidar` script).
 
 `lidar_merge.py` converts mentioned multilevel structure into flat geospatial files (one file per agglomeration).
 
 `lidar_merge.py [options] SRC_DIR DST_DIR`
 
-Here `SRC_DIR` is a root of multilevel structure (contains pert-agglomeration .csv files), `DST_DIR` is a directory for resulting flat files. Options are:
+Here `SRC_DIR` is a root of multilevel structure (contains per-agglomeration .csv files), `DST_DIR` is a directory for resulting flat files. Options are:
 
 |Option|Function|
 |------|--------|
@@ -313,7 +302,7 @@ All land usage and some terrain source files are in map projection coordinate sy
 
 Some source files are in geodetic coordinate system that is not WGS84.
 
-`to_wgs84.py` script converts source files to ones with WGS84 horizontal (latitude/longitude) and vertical (heights relative to WGSD84 - where applicable) coordinate systems. In certain cases it may convert both vertical and horizontal coordinate systems in one swoop, but this is **not recommended** as performance degrades dramatically (as it involves geoid backprojection - don't ask...). Instead it is recommended to fix horizontal coordinate system (if needed) first and then vertical (if needed).
+`to_wgs84.py` script converts source files to ones with WGS84 horizontal (latitude/longitude) and vertical (heights relative to WGS84 ellipsoid - where applicable) coordinate systems. In certain cases it may convert both vertical and horizontal coordinate systems in one swoop, but this is **not recommended** as performance degrades dramatically. Instead it is recommended to fix horizontal coordinate system (if needed) first and then vertical (if needed).
 
 `to_wgs84.py [options] FILES`
 
@@ -424,7 +413,7 @@ Here `FILES` specify names of source files that need to be tiled (filenames may 
 |--right **MAX_LON**|Optional right crop boundary. **MAX_LON** is east-positive longitude in degrees|
 |--margin **NUM_PIXELS**|Makes outer margin **NUM_PIXELS** wide around created tiles|
 |--no_data **VALUE**|Value to use as NoData. By default - same as in source for 1-byte pixels (e.g. land usage, 65535 for 2-byte pixels|
-|--scale **SRC_MIN SRC MAX DST_MIN DST_MAX**|Maps source data to destination in a way tat [**SRC_MIN**, **SRC_MAX**] interval maps to [**DST_MIN**, **DST_MAX**]. Default is identical no mapping for 1-byte target data, -1000 0 0 1000 for 2-byte target and integer source data (keeping 1 m resolution), -1000 0 0 5000 for 2-byte target and floating point source data (20cm resolution)|
+|--scale **SRC_MIN SRC MAX DST_MIN DST_MAX**|Maps source data to destination in a way that [**SRC_MIN**, **SRC_MAX**] interval maps to [**DST_MIN**, **DST_MAX**]. Default is identical no mapping for 1-byte target data, -1000 0 0 1000 for 2-byte target and integer source data (keeping 1 m resolution), -1000 0 0 5000 for 2-byte target and floating point source data (20cm resolution)|
 |--data_type **DATA_TYPE**|Pixel data type. See [gdal_translate -ot](https://gdal.org/programs/gdal_translate.html#cmdoption-gdal_translate-ot) fro more details||
 |--format **FORMAT**|Output file format (short) name. By default guessed from output file extension. See [GDAL Raster Drivers](https://gdal.org/drivers/raster/index.html) for more information|
 |--format_param **NAME=VALUE**|Set output format option. See [GDAL Raster Drivers](https://gdal.org/drivers/raster/index.html) for more information|
@@ -437,27 +426,25 @@ Here `FILES` specify names of source files that need to be tiled (filenames may 
 
 ### *make_population_db.py* - converts population density image to SQLite for load test <a name="make_population_db"/>
 
-Prepares population database for `tools/load_test/afc_load_test.py`. Documented in *tools/load_test/RREADME.md*
+Prepares population database for `tools/load_test/afc_load_test.py`. Documented in `tools/load_test/README.md`.
 
 ## Conversion routines <a name="conversion_routines"/>
 
-For sake of simplicity, all examples will be in non-Docker form. Also for sake of simplicity `--threads` and `--nice` will be omitted.
+For sake of simplicity, all examples will be in non-Docker form (i.e. assumes either being run inside the docker container, or the relevant GDAL modules are available). Also for sake of simplicity `--threads` and `--nice` will be omitted.
 
 All arguments containing wildcard, etc. are in single quotes. This is not necessary for positional parameters in non-Docker operation, yet for Docker operation it is always necessary, so it is done to simplify switching to Docker. Feel free to omit them for positional parameters.
 
-As of time of thsi writing by-region storage of geodetic files was not implemented yet. Hence proper naming (prefixing) of final files is not covered here. Maybe some day...
 
 ### Geoids <a name="geoid_rouitines/">
 
 #### USA geoids <a name="usa_geoids_routines"/>
 
-Most recent USA geoid is GEOID18, it only covers CONUS and Puerto Rico. Previous geoid is GEOID12B, it covers CONUS, Alaska, Guam, Hawaii, Guam, Hawaii, Puerto Rico.
+The most recent USA geoid is GEOID18, it only covers CONUS and Puerto Rico. Previous geoid is GEOID12B, it covers CONUS, Alaska, Guam, Hawaii, Guam, Hawaii, Puerto Rico.
 
 1. *GEOID18*
    - Download from [Geoid 18 Data](https://vdatum.noaa.gov/download.php) as [NGS data (.bin) zip](https://www.myfloridagps.com/Geoid/NGS.zip)
    - CONUS: `gdal_translate -of GTX g2018u0.bin usa_ge_prd_g2018u0.gtx`
    - Puerto Rico: `gdal_translate -of GTX g2018p0.bin usa_ge_prd_g2018p0.gtx`
-
 2. *GEOID12B*
    - Download from [NOAA/NOS's VDatum: Download VDatum](https://vdatum.noaa.gov/download.php) as [GEOID12B](https://vdatum.noaa.gov/download/data/vdatum_GEOID12B.zip).
    - vdatum/core/geoid12b/g2012ba0.gtx for Alaska -> usa_ge_prd_g2012ba0.gtx
@@ -472,7 +459,6 @@ Most recent USA geoid is GEOID18, it only covers CONUS and Puerto Rico. Previous
 Most recent Canada geoid is HTv2, Epoch 2010.
 
 - Download from [Geoid Models](https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/data-donnees/geoid.php?locale=en) (registration required) as [HTv2.0, GeoTIFF, 2010](https://webapp.csrs-scrs.nrcan-rncan.gc.ca/geod/process/download-helper.php?file_id=HT2_2010_tif)
-     
 - Convert to .gtx: `gdal_translate -of GTX HT2_2010v70.tif can_ge_prd_HT2_2010v70.gtx`
 
 #### World geoids <a name="world_geoids_routines"/>
@@ -482,22 +468,46 @@ EGM1996 (aka EGM96) is rather small (low resolution), EGM2008 (aka EGM08) is rat
 1. *EGM1996*
    - Download from [NOAA/NOS's VDatum: Download VDatum](https://vdatum.noaa.gov/download.php) as [EGM1996](https://vdatum.noaa.gov/download/data/vdatum_EGM1996.zip).
    - vdatum/core/egm1996/egm1996.gtx -> wrd_ge_prd_egm1996.gtx
-
 2. *EGM2008*
    - Download from [NOAA/NOS's VDatum: Download VDatum](https://vdatum.noaa.gov/download.php) as [EGM1996](https://vdatum.noaa.gov/download/data/vdatum_EGM2008.zip).
    - vdatum/core/egm1996/egm2008.gtx -> wrd_ge_prd_egm2008.gtx
+
+
+#### Geoid directory structure
+
+The next sections assume the geoid files are in the following directory structure:
+```
+GEIOD_DIR
+├── wrd_ge
+│   └── wrd_ge_prd_egm2008.gtx
+│   └── wrd_ge_prd_egm1996.gtx
+├── usa_ge
+│   ├── usa_ge_prd_g2012ba0.gtx
+│   ├── usa_ge_prd_g2012bg0.gtx
+│   ├── usa_ge_prd_g2012bh0.gtx
+│   ├── usa_ge_prd_g2012bp0.gtx
+│   ├── usa_ge_prd_g2012bs0.gtx
+│   ├── usa_ge_prd_g2012bu0.gtx
+│   ├── usa_ge_prd_g2018p0.gtx
+│   └── usa_ge_prd_g2018u0.gtx
+└── can_ge
+    └── can_ge_prd_HT2_2010v70.gtx
+```
+
+Other organization is possible, but the commands in the subsequent sections would need to be modified accordingly.
 
 ### USA/Canada/Mexico 3DEP terrain model <a name="3dep_routine"/>
 
 This terrain model is a set of 1x1 degree tile files, horizontal coordinate system is WGS84, heights are geoidal (since USA and Canada geoids tied to same point, any of them might be used)
 
-1. Download from [Rockyweb FTP server](https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/1/TIFF/current/) From all downloaded stuff only USGS_1_*.tif files are needed. They should be put to single directory (let it be *DOWNLOAD_DIR*)
-
-2. Convert 3DEP files in *DOWNLOAD_DIR* to WGS84 horizontal coordinates (leaving heights geoidal). Result is in *3dep_wgs84_geoidal_tif*:  
-`to_wgs84.py --out_dir 3dep_wgs84_geoidal_tif 'DOWNLOAD_DIR/*.tif`  
+1. Download from [Rockyweb FTP server](https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/1/TIFF/current/) (only USGS_1_*.tif files are needed). They should be put to single directory (let it be `DOWNLOAD_DIR`)
+2. Convert 3DEP files in `DOWNLOAD_DIR` to WGS84 horizontal coordinates (leaving heights geoidal). Result is in `3dep_wgs84_geoidal_tif` directory:  
+```
+to_wgs84.py --out_dir 3dep_wgs84_geoidal_tif 'DOWNLOAD_DIR/*.tif
+```  
 Takes ~40 minutes on 8 CPUs. YMMV
 
-3. Convert heights of files in *3dep_wgs84_geoidal_tif* to ellipsoidal. Result in *3dep_wgs84_tif*  
+3. Convert heights of files in `3dep_wgs84_geoidal_tif` to ellipsoidal. Result in `3dep_wgs84_tif`  
 ```
 to_wgs84.py --src_geoid 'GEOID_DIR/usa_ge/usa_ge_prd_g2018?0.gtx' \
     --src_geoid 'GEOID_DIR/usa_ge/usa_ge_prd_g2012b?0.gtx' \
@@ -508,8 +518,10 @@ to_wgs84.py --src_geoid 'GEOID_DIR/usa_ge/usa_ge_prd_g2018?0.gtx' \
 Some Mexican tiles will be dropped, as they are not covered by USA or Canada geoids
 Takes ~1.5 hours on 8 CPUs. YMMV
 
-4. Convert TIFF tiles in *3dep_wgs84_tif* to PNG tiles in *3dep_wgs84_png*  
-`to_png.py --out_dir 3dep_wgs84_png '3dep_wgs84_tif/*.tif'`
+4. Convert TIFF tiles in `3dep_wgs84_tif` to PNG tiles in `3dep_wgs84_png`  
+```
+to_png.py --out_dir 3dep_wgs84_png '3dep_wgs84_tif/*.tif'
+```
 Takes 13 minutes on 8 CPUa. YMMV
 
 
@@ -522,28 +534,29 @@ GLOBE is global terrain model of 30 arcsecond resolution that covers entire Eart
 Let's create combined tiled global terrain model.
 
 1. Download Globe files from [Get Data Tiles-Global Land One-km Base Elevation Project | NCEI](https://www.ngdc.noaa.gov/mgg/topo/gltiles.html) as [All Tiles in One .zip file](https://www.ngdc.noaa.gov/mgg/topo/DATATILES/elev/all10g.zip)   
-  Unpack files to *all10* directory
-
-2. Download header files for Globe files from [Topography and Digital Terrain Data | NCEI](https://www.ngdc.noaa.gov/mgg/topo/elev/esri/hdr/) - to the same *all10* directory
-
-3. SRTM data - finding source data to download is not that easy (albeit probably possible). Assume we have them in *srtm_geoidal_hgt* directory.
-
-4. Ascribe coordinate system to GLOBE files in *all10* and convert them to .tif. Result in *globe_geoidal_tif*:  
+  Unpack files to `all10` directory
+2. Download header files for Globe files from [Topography and Digital Terrain Data | NCEI](https://www.ngdc.noaa.gov/mgg/topo/elev/esri/hdr/) - to the same `all10` directory
+3. SRTM data - finding source data to download is not that easy (albeit probably possible). Assume we have them in `srtm_geoidal_hgt` directory.
+4. Ascribe coordinate system to GLOBE files in `all10` and convert them to .tif. Result in `globe_geoidal_tif`:  
 ```
 mkdir globe_geoidal_tif
 for fn in all10/???? ; do gdal_translate -a_srs '+proj=longlat +datum=WGS84' $fn globe_geoidal_tif/${fn##*/}.tif ; done
 ```  
 Takes ~1 minute. YMMV
 
-5. Convert heights of files in *globe_geoidal_tif* directory to ellipsoidal. Result in *globe_wgs84_tif*:  
-   `to_wgs84.py --src_geoid GEOID_DIR/wrd_ge/wrd_ge_prd_egm2008.gtx --out_dir globe_wgs84_tif 'globe_geoidal_tif/*.tif'`  
+5. Convert heights of files in `globe_geoidal_tif` directory to ellipsoidal. Result in `globe_wgs84_tif`:
+```
+to_wgs84.py --src_geoid GEOID_DIR/wrd_ge/wrd_ge_prd_egm2008.gtx --out_dir globe_wgs84_tif 'globe_geoidal_tif/*.tif'
+```  
 Takes ~1 minute on 8 CPUs. YMMV
 
-6. Convert heights of SRTM in *srtm_geoidal_hgt* directory to WGS84. Result in *wgs84_tif* directory:  
-   `to_wgs84.py --src_geoid GEOID_DIR/wrd_ge/wrd_ge_prd_egm2008.gtx --out_ext .tif --out_dir wgs84_tif 'srtm_geoidal_hgt/*.hgt'`  
+6. Convert heights of SRTM in `srtm_geoidal_hgt` directory to WGS84. Result in `wgs84_tif` directory:  
+```
+to_wgs84.py --src_geoid GEOID_DIR/wrd_ge/wrd_ge_prd_egm2008.gtx --out_ext .tif --out_dir wgs84_tif 'srtm_geoidal_hgt/*.hgt'
+```  
 Takes ~40 minutes on 8 CPUs. YMMV
 
-7. Add GLOBE tiles to the north of 60N to *wgs84_tif* directory:  
+7. Add GLOBE tiles to the north of 60N to `wgs84_tif` directory:  
 ```
 tiler.py --bottom 60 --margin 1 \
     --tile_pattern 'wgs84_tif/{LAT_HEM}{lat_d:02}{LON_HEM}{lon_l:03}_globe.tif' \
@@ -551,7 +564,7 @@ tiler.py --bottom 60 --margin 1 \
 ```  
 Takes ~8 minutes on 8 CPUs. YMMV
 
-8. Add GLOBE tiles to the south of 567S to *wgs84_tif* directory:  
+8. Add GLOBE tiles to the south of 567S to `wgs84_tif` directory:  
 ```
 tiler.py --top=-56 --margin 1 \
     --tile_pattern 'wgs84_tif/{LAT_HEM}{lat_d:02}{LON_HEM}{lon_l:03}_globe.tif' \
@@ -559,21 +572,25 @@ tiler.py --top=-56 --margin 1 \
 ```
 Takes ~9 minutes on 8 CPUs. YMMV
 
-9. Convert TIFF files in *wgs84_tif* directory to PNG in *wgs84_png*:  
-   `to_png.py --data_type UInt16 --out_dir wgs84_png 'wgs84_tif/*.tif'`  
+9. Convert TIFF files in `wgs84_tif` directory to PNG in `wgs84_png`:
+```
+to_png.py --data_type UInt16 --out_dir wgs84_png 'wgs84_tif/*.tif'
+```  
 Takes ~45 minutes on 8 CPUs. YMMV
 
 
 ### High resolution terrain data (aka LiDAR)  <a name="lidar_routine">
 
-Assume LiDAR files (multilevel set of 2-band TIFF files, indexed by .csv files) is in *proc_lidar* directory. Let's convert it to tiles.
+Assume LiDAR files (multilevel set of 2-band TIFF files, indexed by .csv files) is in `proc_lidar` directory. Let's convert it to tiles.
 
-1. Convert LiDARS to set of per-agglomeration TIFF files with geoidal heights. Result in *lidar_geoidal_tif* directory:  
-  `lidar_merge.py --format_param BIGTIFF=YES --format_param COMPRESS=ZSTD proc_lidar lidar_geoidal_tif`  
+1. Convert LiDARS to set of per-agglomeration TIFF files with geoidal heights. Result in `lidar_geoidal_tif` directory:  
+```
+lidar_merge.py --format_param BIGTIFF=YES --format_param COMPRESS=ZSTD proc_lidar lidar_geoidal_tif
+```  
   Here ZSTD compression was used to save disk space, albeit it makes conversion process slower.  
   Takes 2.5 hours on 8 CPUs. YMMV
 
-2. Tile lidars in *lidar_geoidal_tif*. Result is in *tiled_lidar_geoidal_tif* directory:  
+2. Tile lidars in `lidar_geoidal_tif`. Result is in `tiled_lidar_geoidal_tif` directory:  
 ```
 tiler.py --format_param BIGTIFF=YES --format_param COMPRESS=ZSTD --margin 2 \
     --tile_pattern 'tiled_lidar_geoidal_tif/{lat_hem}{lat_u:02}{lon_hem}{lon_l:03}.tif' \
@@ -581,7 +598,7 @@ tiler.py --format_param BIGTIFF=YES --format_param COMPRESS=ZSTD --margin 2 \
 ```   
   Takes 5 hours on 8 CPUs. YMMV
 
-3. Convert geoidal heights of tiles in *tiled_lidar_geoidal_tif* to ellipsoidal. Result in *tiled_lidar_wgs84_tif* directory:  
+3. Convert geoidal heights of tiles in `tiled_lidar_geoidal_tif` to ellipsoidal. Result in `tiled_lidar_wgs84_tif` directory:  
 ```
 to_wgs84.py --format_param BIGTIFF=YES --format_param COMPRESS=ZSTD --remove_src \
     --src_geoid 'GEOID_DIR/usa_ge/usa_ge_prd_g2018?0.gtx' \
@@ -592,7 +609,7 @@ to_wgs84.py --format_param BIGTIFF=YES --format_param COMPRESS=ZSTD --remove_src
 ```  
 Takes ***22 hours on 16 CPUs (probably ~45 hours on 8CPUs)***. YMMV
 
-4. Convert TIF files in *tiled_lidar_wgs84_tif* directory to PNG files in *tiled_lidar_wgs84_png* directory:  
+4. Convert TIF files in `tiled_lidar_wgs84_tif` directory to PNG files in `tiled_lidar_wgs84_png` directory:  
 `to_png.py --out_dir tiled_lidar_wgs84_png 'tiled_lidar_wgs84_tif/*'`  
 Takes ~8 hours on 8 CPUs. YMMV
 
@@ -601,7 +618,7 @@ Takes ~8 hours on 8 CPUs. YMMV
 
 CDSM is a surface (rooftop/treetop) model that covers canada up to 61N latitude.It can be downloaded from [Canadian Digital Surface Model 2000](https://open.canada.ca/data/en/dataset/768570f8-5761-498a-bd6a-315eb6cc023d) page as [Cloud Optimized GeoTIFF of the CDSM](https://datacube-prod-data-public.s3.ca-central-1.amazonaws.com/store/elevation/cdem-cdsm/cdsm/cdsm-canada-dem.tif)
 
-1. Converting *cdsm-canada-dem.tif* to WGS84 horizontal coordinate system (leaving heights geoidal) to *dsm-canada-dem_wgs84_geoidal.tif*  
+1. Converting `cdsm-canada-dem.tif` to WGS84 horizontal coordinate system (leaving heights geoidal) to `cdsm-canada-dem_wgs84_geoidal.tif`  
 ```
 to_wgs84.py --pixels_per_degree 3600 --round_boundaries_to_degree \
     --format_param BIGTIFF=YES --format_param COMPRESS=PACKBITS \
@@ -609,7 +626,7 @@ to_wgs84.py --pixels_per_degree 3600 --round_boundaries_to_degree \
 ```  
 Takes ~3 hours. YMMV
 
-2. Tiling *dsm-canada-dem_wgs84_geoidal.tif* to *tiled_wgs84_geoidal_tif/can_rt_n<lat>w<lon>.tif*  
+2. Tiling `dsm-canada-dem_wgs84_geoidal.tif` to `tiled_wgs84_geoidal_tif/can_rt_n<lat>w<lon>.tif`  
 ```
 tiler.py --margin 1 --format_param COMPRESS=PACKBITS \
     --tile_pattern 'tiled_wgs84_geoidal_tif/{lat_hem}{lat_u:02}{lon_hem}{lon_l:03}.tif' \
@@ -618,7 +635,7 @@ tiler.py --margin 1 --format_param COMPRESS=PACKBITS \
 Lot of tiles contain nothing but NoData - they are dropped.
 Takes ~1 hour on 8 CPUs. YMMV
 
-3. Converting heights of files in *tiled_wgs84_geoidal_tif* to ellipsoidal, result in *tiled_wgs84_tif*. Geoids are under GEOID_DIR, using Canada HTv2 geoid
+3. Converting heights of files in `tiled_wgs84_geoidal_tif` to ellipsoidal, result in `tiled_wgs84_tif`. Geoids are under `GEOID_DIR`, using Canada HTv2 geoid
 ```
 to_wgs84.py --src_geoid GEOID_DIR/can_ge/can_ge_prd_HT2_2010v70.gtx \
     --extend_geoid_coverage 0.001 \
@@ -626,23 +643,22 @@ to_wgs84.py --src_geoid GEOID_DIR/can_ge/can_ge_prd_HT2_2010v70.gtx \
 ```  
 Takes ~10 minutes on 8 CPU. YMMV
 
-4. Converting tiff tiles in *tiled_wgs84_tif* to png, result in *tiled_wgs84_png*  
+4. Converting tiff tiles in `tiled_wgs84_tif` to png, result in `tiled_wgs84_png`  
 `to_png.py --out_dir tiled_wgs84_png 'tiled_wgs84_tif/*.tif'`  
 Takes ~3 minutes on 8 CPU. YMMV
 
 ### Land usage files <a name="land_usage_routines">
 
-The biggest issue with land usage files is to catch 'em all.
+The biggest issue with land usage files is to catch 'em all. Different institutions that manage land categorization for an area have different category definitions. The AFC engine requires tiles defined in the NLCD format, and the mapping to NLCD must be contained in the `nlcd_wgs84.yaml` file. 
 
 #### NLCD land usage files <a name="nlcd_routine"/>
 
 1. Downloading sources.
    - CONUS 2019. From [Data | Multi-Resolution Land Characteristics (MLRC) Consortium. Pick 'Land Cover' and 'CONUS'](https://www.mrlc.gov/data?f%5B0%5D=category%3ALand%20Cover&f%5B1%5D=region%3Aconus) download [NLCD 2019 Land Cover (CONUS)](https://s3-us-west-2.amazonaws.com/mrlc/nlcd_2019_land_cover_l48_20210604.zip)  
-     Unpack to *nlcd_sources* folder
+     Unpack to `nlcd_sources` folder
    - Alaska 2016. From [Data | Multi-Resolution Land Characteristics (MLRC) Consortium. Pick 'Land Cover' and 'Alaska'](https://www.mrlc.gov/data?f%5B0%5D=category%3ALand%20Cover&f%5B1%5D=region%3Aalaska) download [NLCD 2016 Land Cover (ALASKA)](https://s3-us-west-2.amazonaws.com/mrlc/NLCD_2016_Land_Cover_AK_20200724.zip)  
-     Unpack to *nlcd_sources* folder
-
-2. Converting NLCD sources (that use map projection coordinate system) in *nlcd_sources* to TIFF files with WGS84 coordinate system. Result in *nlcd_wgs84_tif*
+     Unpack to `nlcd_sources` folder
+2. Converting NLCD sources (that use map projection coordinate system) in `nlcd_sources` to TIFF files with WGS84 coordinate system. Result in `nlcd_wgs84_tif`
   - CONUS 2019  
 ```
 nlcd_wgs84.py --pixels_per_degree 3600 \
@@ -660,7 +676,7 @@ nlcd_wgs84.py --pixels_per_degree 3600 --bottom 53 \
 ```
 Takes ~9 minutes. YMMV
 
-3. Tiling files in *nlcd_wgs84_tif*, result in *tiled_nlcd_wgs84_tif*:  
+3. Tiling files in `nlcd_wgs84_tif`, result in `tiled_nlcd_wgs84_tif`:  
 ```
 tiler.py --format_param COMPRESS=PACKBITS --remove_value 0 \
     --tile_pattern 'tiled_nlcd_wgs84_tif/{lat_hem}{lat_u:02}{lon_hem}{lon_l:03}.tif' \
@@ -668,15 +684,17 @@ tiler.py --format_param COMPRESS=PACKBITS --remove_value 0 \
 ```  
 Takes ~13 minutes on 8 CPUs. YMMV
 
-4. Converting tiles in *tiled_nlcd_wgs84_tif* directory to PNG. Result in *tiled_nlcd_wgs84_png* directory:  
-`to_png.py --out_dir tiled_nlcd_wgs84_png 'tiled_nlcd_wgs84_tif/*.tif'`  
+4. Converting tiles in `tiled_nlcd_wgs84_tif` directory to PNG. Result in `tiled_nlcd_wgs84_png` directory:  
+```
+to_png.py --out_dir tiled_nlcd_wgs84_png 'tiled_nlcd_wgs84_tif/*.tif'
+```  
 Takes ~3 minutes on 8 CPUs. YMMV
 
 #### NOOA land usage files <a name="noaa_routine"/>
 
 1. Downloading sources:
-   - Guam 2016. From [C-CAP Land Cover files for Guam](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/guam/) download [guam_2016_ccap_hr_land_cover20180328.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/guam/guam_2016_ccap_hr_land_cover20180328.img) to *noaa_sources* directory
-   - Hawaii 2005-2011. From [C-CAP Land Cover files for Hawaii](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/hi/) download to *noaa_sources* directory:
+   - Guam 2016. From [C-CAP Land Cover files for Guam](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/guam/) download [guam_2016_ccap_hr_land_cover20180328.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/guam/guam_2016_ccap_hr_land_cover20180328.img) to `noaa_sources` directory
+   - Hawaii 2005-2011. From [C-CAP Land Cover files for Hawaii](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/hi/) download to `noaa_sources` directory:
      - [hi_hawaii_2005_ccap_hr_land_cover.ige](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/hi/hi_hawaii_2005_ccap_hr_land_cover.ige)
      - [hi_hawaii_2010_ccap_hr_land_cover20150120.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/hi/hi_hawaii_2010_ccap_hr_land_cover20150120.img)
      - [hi_kahoolawe_2005_ccap_hr_land_cover.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/hi/hi_kahoolawe_2005_ccap_hr_land_cover.img)
@@ -686,21 +704,20 @@ Takes ~3 minutes on 8 CPUs. YMMV
      - [hi_molokai_2010_ccap_hr_land_cover20150102.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/hi/hi_molokai_2010_ccap_hr_land_cover20150102.img)
      - [hi_niihau_2010_ccap_hr_land_cover20140930.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/hi/hi_niihau_2010_ccap_hr_land_cover20140930.img)
      - [hi_oahu_2011_ccap_hr_land_cover20140619.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/hi/hi_oahu_2011_ccap_hr_land_cover20140619.img)
-   - Puerto Rico 2010. From [C-CAP Land Cover files for Puerto Rico](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/pr/) download to *noaa_sources* directory
+   - Puerto Rico 2010. From [C-CAP Land Cover files for Puerto Rico](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/pr/) download to `noaa_sources` directory
      - [pr_2010_ccap_hr_land_cover20170214.ige](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/pr/pr_2010_ccap_hr_land_cover20170214.ige)
      - [pr_2010_ccap_hr_land_cover20170214.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/pr/pr_2010_ccap_hr_land_cover20170214.img) 
-   - US Virgin Islands 2012. From [C-CAP Land Cover files for US Virgin Islands](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/usvi/) download to *noaa_sources* directory:
+   - US Virgin Islands 2012. From [C-CAP Land Cover files for US Virgin Islands](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/usvi/) download to `noaa_sources` directory:
      - [usvi_stcroix_2012_ccap_hr_land_cover20150910.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/usvi/usvi_stcroix_2012_ccap_hr_land_cover20150910.img)
      - [usvi_stjohn_2012_ccap_hr_land_cover20140915.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/usvi/usvi_stjohn_2012_ccap_hr_land_cover20140915.img)
      - [usvi_stthomas_2012_ccap_hr_land_cover20150914.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/usvi/usvi_stthomas_2012_ccap_hr_land_cover20150914.img)
-   - American Samoa 2009-2010. From [C-CAP Land Cover files for American Samoa](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/as/) download to *noaa_sources* directory:
+   - American Samoa 2009-2010. From [C-CAP Land Cover files for American Samoa](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/as/) download to `noaa_sources` directory:
      - [as_east_manua_2010_ccap_hr_land_cover.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/as/as_east_manua_2010_ccap_hr_land_cover.img)
      - [as_rose_atoll_2009_ccap_hr_land_cover.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/as/as_rose_atoll_2009_ccap_hr_land_cover.img)
      - [as_swains_island_2010_ccap_hr_land_cover.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/as/as_swains_island_2010_ccap_hr_land_cover.img)
      - [as_tutuila_2010_ccap_hr_land_cover.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/as/as_tutuila_2010_ccap_hr_land_cover.img)
      - [https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/as/as_west_manua_2010_ccap_hr_land_cover.img](https://chs.coast.noaa.gov/htdata/raster1/landcover/bulkdownload/hires/as/as_west_manua_2010_ccap_hr_land_cover.img)
-
-2. Converting NOAA sources (that use map projection coordinate system) in *noaa_sources* to TIFF files with WGS84 coordinate system. Result in *noaa_wgs84_tif*:  
+2. Converting NOAA sources (that use map projection coordinate system) in `noaa_sources` to TIFF files with WGS84 coordinate system. Result in `noaa_wgs84_tif`:  
 ```
 for path_fn_ext in noaa_sources/*.img ; do fn_ext=${path_fn_ext##*/} ; fn=${fn_ext%.*} ; \
     nlcd_wgs84.py --encoding noaa --pixels_per_degree 3600 \
@@ -709,7 +726,7 @@ for path_fn_ext in noaa_sources/*.img ; do fn_ext=${path_fn_ext##*/} ; fn=${fn_e
 ```
 Takes ~12 minutes on 8 CPUs. YMMV
 
-3. Tiling files in *noaa_wgs84_tif*, result in *tiled_noaa_wgs84_tif*:  
+3. Tiling files in `noaa_wgs84_tif`, result in `tiled_noaa_wgs84_tif`:  
 ```
 tiler.py --format_param COMPRESS=PACKBITS --remove_value 0 \
     --tile_pattern 'tiled_noaa_wgs84_tif/{lat_hem}{lat_u:02}{lon_hem}{lon_l:03}.tif' \
@@ -717,15 +734,14 @@ tiler.py --format_param COMPRESS=PACKBITS --remove_value 0 \
 ```
 Takes ~10 seconds on 8 CPUs. YMMV
 
-4. Converting tiles in *tiled_noaa_wgs84_tif* directory to PNG. Result in *tiled_noaa_wgs84_png* directory:  
+4. Converting tiles in `tiled_noaa_wgs84_tif` directory to PNG. Result in `tiled_noaa_wgs84_png` directory:  
 `to_png.py --out_dir tiled_noaa_wgs84_png 'tiled_noaa_wgs84_tif/*.tif'`  
 Takes ~2 seconds on 8 CPUs. YMMV
 
 ### Canada land usage files <a name="canada_land_usage_routine"/>
 1. Downloading source. From [2015 Land Cover of Canada - Open Government Portal](https://www.mrlc.gov/data?f%5B0%5D=category%3ALand%20Cover&f%5B1%5D=region%3Aconus) download [https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip)  
-  Unpack to *canada_lc_sources* folder
-
-2. Converting Canada land cover sources (that use map projection coordinate system) in *canada_lc_sources* to TIFF files with WGS84 coordinate system. Result in *canada_lc_wgs84_tif*:  
+  Unpack to `canada_lc_sources` folder
+2. Converting Canada land cover sources (that use map projection coordinate system) in `canada_lc_sources` to TIFF files with WGS84 coordinate system. Result in `canada_lc_wgs84_tif`:  
 ```
 nlcd_wgs84.py --encoding noaa --pixels_per_degree 3600 \
     --format_param BIGTIFF=YES --format_param COMPRESS=PACKBITS \
@@ -734,7 +750,7 @@ nlcd_wgs84.py --encoding noaa --pixels_per_degree 3600 \
 ```  
 Takes ***12.5 hours***. Of them 20 minutes was spent on 8 CPUs and the rest - on single CPU. YMMV
 
-3. Tiling Canada land cover file in *canada_lc_wgs84_tif*, result in *tiled_canada_lc_wgs84_tif*:  
+3. Tiling Canada land cover file in `canada_lc_wgs84_tif`, result in `tiled_canada_lc_wgs84_tif`:  
 ```
 tiler.py --format_param COMPRESS=PACKBITS --remove_value 0 \
     --tile_pattern 'tiled_canada_lc_wgs84_tif/{lat_hem}{lat_u:02}{lon_hem}{lon_l:03}.tif' \
@@ -742,23 +758,24 @@ tiler.py --format_param COMPRESS=PACKBITS --remove_value 0 \
 ```  
 Takes ~50 minutes on 8 CPUs. YMMV
 
-4. Converting tiles in *tiled_canada_lc_wgs84_tif* directory to PNG. Result in *tiled_canada_lc_wgs84_png* directory:  
-`to_png.py --out_dir tiled_canada_lc_wgs84_png 'tiled_canada_lc_wgs84_tif/*.tif'`
+4. Converting tiles in `tiled_canada_lc_wgs84_tif` directory to PNG. Result in `tiled_canada_lc_wgs84_png` directory:  
+```
+to_png.py --out_dir tiled_canada_lc_wgs84_png 'tiled_canada_lc_wgs84_tif/*.tif'
+```
 Takes ~4 minutes om 8 CPU. YMMV
 
 ### Corine land cover files <a name="corine_land_cover_files"/>
 The Corine land cover is the database from the Copernicus program of the EU space program. It provides land classification over the EU.
 
-1. Downloading source. From [the CLC 2018](https://land.copernicus.eu/pan-european/corine-land-cover/clc2018) page, download the GeoTIFF version of the data (login required). Unzip to *corine_lc_sources* folder
-
-2. Converting Corine land cover sources (that use map projection coordinate system) in *corine_lc_sources* to TIFF files in WGS84 coordinate system and with the land cover mapping in the `.yaml` file applied to put in the same format as the NLCD data:
+1. Downloading source. From [the CLC 2018](https://land.copernicus.eu/pan-european/corine-land-cover/clc2018) page, download the GeoTIFF version of the data (login required). Unzip to `corine_lc_sources` folder
+2. Converting Corine land cover sources (that use map projection coordinate system) in `corine_lc_sources` to TIFF files in WGS84 coordinate system and with the land cover mapping in the `.yaml` file applied to put in the same format as the NLCD data:
 ```
 nlcd_wgs84.py --encoding corine --pixels_per_degree 3600 \ 
     --format_param COMPRESS=PACKBITS corine_lc_sources/DATA/U2018_CLC2018_V2020_20u1.tif \
     corine_lc_sources/DATA/U2018_CLC2018_V2020_20u1_resampled.tif
 ```
 
-3. Tiling the Corine land cover (if necessary) to a director *tiled_corine_lc_wgs84_tif*:
+3. Tiling the Corine land cover (if necessary) to a directory `tiled_corine_lc_wgs84_tif`:
 ```
 tiler.py --format_param COMPRESS=PACKBITS --remove_value 0 \
     --tile_pattern 'tiled_corine_lc_wgs84_tif/{lat_hem}{lat_u:02}{lon_hem}{lon_l:03}.tif' \
@@ -766,4 +783,4 @@ tiler.py --format_param COMPRESS=PACKBITS --remove_value 0 \
 ```
 
 ## *proc_gdal* - creating LiDAR files <a name="proc_gdal"/>
-This directory contains undigested, but very important files that convert LiDAR files from source format (as downloaded from https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities/ ) to form, compatible with AFC Engine (two-band geodetic raster files and their index .csv files)
+This directory contains undigested, but very important files that convert LiDAR files from source format (as downloaded from https://rockyweb.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities/ ) to a format compatible with the AFC Engine (two-band geodetic raster files and their index .csv files)
