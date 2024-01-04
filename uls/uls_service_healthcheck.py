@@ -167,7 +167,7 @@ def email_if_needed(status_storage: StatusStorage, settings: Any) -> None:
             max_age_hr=settings.download_success_max_age_alarm_hr):
         problems.append(
             f"AFC ULS database download attempts were not succeeded for more "
-            f"than {settings.download_attempt_max_age_alarm_hr} hours")
+            f"than {settings.download_success_max_age_alarm_hr} hours")
     reg_data_changes = \
         status_storage.read_reg_data_changes(StatusStorage.S.RegionUpdate)
     regions: Set[str] = set()
