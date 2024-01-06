@@ -30,12 +30,12 @@ defaults:
     count: 1000000
 
 
-# Area to make requests in. Must lie completely inside the country, defined by
-# deviceDescriptor/certificationId/0/rulesetId of request pattern
-region:
-    # Grid (number of points in one direction) of generated coordinates
-    grid_size: 10000
 
+# Request position generation stuff
+# By default (in non-population mode) requests are made in rectangle, defined
+# by min/max_lat/lon. In nonrandom (cache testing) mode positions are selected
+# in nodes of grid that is grid_size X grid_size
+region:
     # Minimum latitude in north-positive degrees
     min_lat: 33
 
@@ -47,6 +47,13 @@ region:
 
     # Maximum longitude in east-positive degrees
     max_lon: -95
+
+    # Grid (number of points in one direction) of generated coordinates
+    grid_size: 10000
+
+    # Formula for random height. May use 'r' value that is random, uniformly
+    # distributed in [0, 1] segment
+    random_height: 2 + r * r * 100
 
     # Ruleset ID (identifies region)
     rulesest_id: US_47_CFR_PART_15_SUBPART_E
@@ -76,6 +83,9 @@ paths:
 
     # Longitude inside AFC Request
     lon_in_req: ["location", "ellipse", "center", "longitude"]
+
+    # Height inside AFC Request
+    height_in_req: ["location", "elevation", "height"]
 
     # List of responses inside AFC Response message
     resps_in_msg: ["availableSpectrumInquiryResponses"]
