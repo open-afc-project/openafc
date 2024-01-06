@@ -1,5 +1,13 @@
 # Release Note
 ## **Version and Date**
+|Version|767-uls-downloader-crash-on-catafl_ltaf_maritime_tx
+| :- | :- |
+|**Date**|**01/04/2024**|
+
+## **Issues Addressed**
+* Remove downloading of FS TX files for Canada.
+
+## **Version and Date**
 Version|3.8.12.0|
 | :- | :- |
 |**Date**|**12/05/2023**|
