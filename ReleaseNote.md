@@ -4,7 +4,7 @@
 Version|3.8.13.0|
 | :- | :- |
 |**Date**|**01/05/2023**|
-|compiled server's version is TBD | git tag 3.8.13.0|
+|compiled server's version is 12969ba | git tag 3.8.13.0|
 
 ## **Issues Addressed**
 * issue 773. afc_load_tool.py improvements (#774)
