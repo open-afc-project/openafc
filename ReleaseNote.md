@@ -1,4 +1,33 @@
 # Release Note
+
+## **Version and Date**
+Version|3.8.13.0|
+| :- | :- |
+|**Date**|**01/05/2023**|
+|compiled server's version is TBD | git tag 3.8.13.0|
+
+## **Issues Addressed**
+* issue 773. afc_load_tool.py improvements (#774)
+* issue 767 uls downloader crash on catafl ltaf maritime tx (#771)
+* Issue 763 - updating readme with cleaned up language (#770)
+* Issue 768. Wrong diagnostics on ULS download fail (#769)
+* issue 764 refactor infra to be more generic (#765)
+* adding Permissions-Policy and Feature-Policy headers (#761)
+* issue 764758 move security headers from webui to dispatcher (#759)
+* Issue752. Fixing absent trailing slash in COPY to directory (#753)
+* Issue750. Add randomization and population to AFC load tool (#751)
+* enabling Secure and SameSite=Lax sttributes for session cookie (#756)
+* issue 748 Adding AFC_SERVER_NAME variable for hostname configurability (#749)
+* Issue 746 Fixing restart and dependency of prometheus-related services (#747)
+* Issue 744 Fixing wrong requirements.txt used in worker image (#745)
+* Issue 742: Setting rat_server base image to httpd:2.4.58-alpine3.18 (#743)
+* Issue 740: WAR for Externally managed environments when PEP 668 breaks pip (#741)
+* Issue 738: Switch ALS Siphon to Confluent Kafka (#739)
+* Jira OA-896 Switching from kafka-python to confluent-kafka on client side (#736)
+* Jira OA-893. afc_load_tool.py enhancements (#735)
+* Jira OA-890. Support for tiled NLCD (#730)
+* Jira OA-895 fix-cadvisor-nginxexporter-grafana-containers (#734)
+
 ## **Version and Date**
 |Version|767-uls-downloader-crash-on-catafl_ltaf_maritime_tx
 | :- | :- |
