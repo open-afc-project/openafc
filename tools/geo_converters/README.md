@@ -274,6 +274,8 @@ Options:
 
 ### *lidar_merge.py* - flattens lidar files <a name="lidar_merge"/>
 
+_**Note:** this script represents work still in progress. Not currently used for production OpenAFC._
+
 LiDAR files are high-resolution (one meter for USA) surface models that contain both terrain and building data. Their original representation is a complicated multilevel directory structure (which is a product of `proc_lidar` script).
 
 `lidar_merge.py` converts mentioned multilevel structure into flat geospatial files (one file per agglomeration).
@@ -336,6 +338,8 @@ Here `FILES` may be:
 |--nice|Lower priority (on Windows required `psutil` Python module)|
 
 ### *to_png.py* - converts files to PNG format <a name="to_png"/>
+
+_**Note:** this script represents work still in progress. Not currently used for production OpenAFC._
 
 Convert source files to PNG. PNG is special as it may only contain 1 or 2 byte unsigned integer pixel data. To represent heights (that may be negative and sub-meter) it requires offsetting and scaling.
 
@@ -426,7 +430,7 @@ Here `FILES` specify names of source files that need to be tiled (filenames may 
 
 ### *make_population_db.py* - converts population density image to SQLite for load test <a name="make_population_db"/>
 
-Prepares population database for `tools/load_test/afc_load_test.py`. Documented in `tools/load_test/README.md`.
+Prepares population database for `tools/load_test/afc_load_test.py`. Fully documented in `tools/load_test/README.md`; however, the docker container here (which contains the appropriate GDAL bindings) should be used to run this script.
 
 ## Conversion routines <a name="conversion_routines"/>
 
@@ -522,7 +526,7 @@ Takes ~1.5 hours on 8 CPUs. YMMV
 ```
 to_png.py --out_dir 3dep_wgs84_png '3dep_wgs84_tif/*.tif'
 ```
-Takes 13 minutes on 8 CPUa. YMMV
+Takes 13 minutes on 8 CPUs. YMMV. _The conversion to PNG is in progress. Skip this step for now._
 
 
 ### Coarse SRTM/GLOBE world terrain <a name="coarse_terrain_routine">
@@ -576,14 +580,16 @@ Takes ~9 minutes on 8 CPUs. YMMV
 ```
 to_png.py --data_type UInt16 --out_dir wgs84_png 'wgs84_tif/*.tif'
 ```  
-Takes ~45 minutes on 8 CPUs. YMMV
+Takes ~45 minutes on 8 CPUs. YMMV. _The conversion to PNG is in progress. Skip this step for now._
 
 
 ### High resolution terrain data (aka LiDAR)  <a name="lidar_routine">
 
 Assume LiDAR files (multilevel set of 2-band TIFF files, indexed by .csv files) is in `proc_lidar` directory. Let's convert it to tiles.
 
-1. Convert LiDARS to set of per-agglomeration TIFF files with geoidal heights. Result in `lidar_geoidal_tif` directory:  
+_**Note:** the first two steps are a work in progress. For the time being skip to step three._
+
+1.  Convert LiDARS to set of per-agglomeration TIFF files with geoidal heights. Result in `lidar_geoidal_tif` directory:  
 ```
 lidar_merge.py --format_param BIGTIFF=YES --format_param COMPRESS=ZSTD proc_lidar lidar_geoidal_tif
 ```  
@@ -611,7 +617,7 @@ Takes ***22 hours on 16 CPUs (probably ~45 hours on 8CPUs)***. YMMV
 
 4. Convert TIF files in `tiled_lidar_wgs84_tif` directory to PNG files in `tiled_lidar_wgs84_png` directory:  
 `to_png.py --out_dir tiled_lidar_wgs84_png 'tiled_lidar_wgs84_tif/*'`  
-Takes ~8 hours on 8 CPUs. YMMV
+Takes ~8 hours on 8 CPUs. YMMV. _The conversion to PNG is in progress. Skip this step for now._
 
 
 ### Canada CDSM surface model <a name="cdsm_routine">
@@ -645,7 +651,7 @@ Takes ~10 minutes on 8 CPU. YMMV
 
 4. Converting tiff tiles in `tiled_wgs84_tif` to png, result in `tiled_wgs84_png`  
 `to_png.py --out_dir tiled_wgs84_png 'tiled_wgs84_tif/*.tif'`  
-Takes ~3 minutes on 8 CPU. YMMV
+Takes ~3 minutes on 8 CPU. YMMV. _The conversion to PNG is in progress. Skip this step for now._
 
 ### Land usage files <a name="land_usage_routines">
 
@@ -688,7 +694,7 @@ Takes ~13 minutes on 8 CPUs. YMMV
 ```
 to_png.py --out_dir tiled_nlcd_wgs84_png 'tiled_nlcd_wgs84_tif/*.tif'
 ```  
-Takes ~3 minutes on 8 CPUs. YMMV
+Takes ~3 minutes on 8 CPUs. YMMV. _The conversion to PNG is in progress. Skip this step for now._
 
 #### NOOA land usage files <a name="noaa_routine"/>
 
@@ -736,7 +742,7 @@ Takes ~10 seconds on 8 CPUs. YMMV
 
 4. Converting tiles in `tiled_noaa_wgs84_tif` directory to PNG. Result in `tiled_noaa_wgs84_png` directory:  
 `to_png.py --out_dir tiled_noaa_wgs84_png 'tiled_noaa_wgs84_tif/*.tif'`  
-Takes ~2 seconds on 8 CPUs. YMMV
+Takes ~2 seconds on 8 CPUs. YMMV. _The conversion to PNG is in progress. Skip this step for now._
 
 ### Canada land usage files <a name="canada_land_usage_routine"/>
 1. Downloading source. From [2015 Land Cover of Canada - Open Government Portal](https://www.mrlc.gov/data?f%5B0%5D=category%3ALand%20Cover&f%5B1%5D=region%3Aconus) download [https://ftp.maps.canada.ca/pub/nrcan_rncan/Land-cover_Couverture-du-sol/canada-landcover_canada-couverture-du-sol/CanadaLandcover2015.zip)  
@@ -762,7 +768,7 @@ Takes ~50 minutes on 8 CPUs. YMMV
 ```
 to_png.py --out_dir tiled_canada_lc_wgs84_png 'tiled_canada_lc_wgs84_tif/*.tif'
 ```
-Takes ~4 minutes om 8 CPU. YMMV
+Takes ~4 minutes om 8 CPU. YMMV. _The conversion to PNG is in progress. Skip this step for now._
 
 ### Corine land cover files <a name="corine_land_cover_files"/>
 The Corine land cover is the database from the Copernicus program of the EU space program. It provides land classification over the EU.
