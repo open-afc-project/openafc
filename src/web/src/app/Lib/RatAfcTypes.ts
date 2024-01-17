@@ -131,3 +131,9 @@ export interface OperatingClass {
     include: OperatingClassIncludeType,
     channels?: number[]
 }
+
+// A single channel for the heat map inquiry
+export interface InquiredChannel {
+    channelCfi: number,
+    globalOperatingClass: number
+}

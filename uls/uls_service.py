@@ -19,6 +19,7 @@ import glob
 import logging
 import os
 import pydantic
+import shlex
 import shutil
 import sqlalchemy as sa
 import subprocess
@@ -371,8 +372,18 @@ class UlsFileChecker:
         self._afc_parallel = afc_parallel
         self._regions: List[str] = regions or []
 
-    def valid(self, new_filename: str, db_diff: Optional[DbDiff]) -> bool:
-        """ Checks validity of given database """
+    def valid(self, base_dir: str, new_filename: str,
+              db_diff: Optional[DbDiff]) -> bool:
+        """ Checks validity of given database
+
+        Arguments:
+        base_dir     -- Directory, containing database being checked. This
+                        argument is currently unused
+        new_filename -- Database being checked. Should have exactly same path
+                        as required in AFC Config
+        db_diff      -- None or difference from previous database
+        Returns True if check passed
+        """
         return self._check_diff(db_diff) and self._check_afc(new_filename)
 
     def _check_diff(self, db_diff: Optional[DbDiff]) -> bool:
@@ -402,17 +413,24 @@ class UlsFileChecker:
         return True
 
     def _check_afc(self, new_filename: str) -> bool:
-        """ Checks new database against AFC Service """
+        """ Checks new database against AFC Service
+
+        Arguments:
+        new_filename -- Database being checked. Should have exactly same path
+                        as required in AFC Config
+        Returns True if test passed
+        """
         if self._afc_url is None:
             return True
         logging.info("Testing new FS database on AFC Service")
-        try:
-            subprocess.run(
-                [FS_AFC, "--server_url", self._afc_url] +
+        args = [FS_AFC, "--server_url", self._afc_url] + \
                 (["--parallel", str(self._afc_parallel)]
-                 if self._afc_parallel is not None else []) +
-                [f"--region={r}" for r in self._regions] +
-                [os.path.basename(new_filename)], check=True, timeout=30 * 60)
+                 if self._afc_parallel is not None else []) + \
+               [f"--region={r}" for r in self._regions] + \
+               [new_filename]
+        logging.debug(" ".join(shlex.quote(arg) for arg in args))
+        try:
+            subprocess.run(args, check=True, timeout=30 * 60)
         except (subprocess.SubprocessError, OSError) as ex:
             logging.error(f"AFC Service test failed: {ex}")
             return False
@@ -448,11 +466,14 @@ def main(argv: List[str]) -> None:
         f"before downloading){env_help(Settings, 'temp_dir')}")
     argument_parser.add_argument(
         "--ext_db_dir", metavar="EXTERNAL_DATABASE_DIR",
-        help=f"Directory where new ULS databases should be copied"
-        f"{env_help(Settings, 'ext_db_dir')}")
+        help=f"Directory where new ULS databases should be copied. If "
+        f"--ext_db_symlink contains path, this parameter is root directory "
+        f"for this path{env_help(Settings, 'ext_db_dir')}")
     argument_parser.add_argument(
         "--ext_db_symlink", metavar="CURRENT_DATABASE_SYMLINK",
-        help=f"Symlink in database directory that points to current database"
+        help=f"Symlink in database directory (specified with --ext_db_dir) "
+        f"that points to current database. May contain path - if so, this "
+        f"path is used for AFC Config override during database validity check"
         f"{env_help(Settings, 'ext_db_symlink')}")
     argument_parser.add_argument(
         "--ext_ras_database", metavar="FILENAME",
@@ -538,9 +559,12 @@ def main(argv: List[str]) -> None:
 
         error_if(not os.path.isfile(settings.download_script),
                  f"Download script '{settings.download_script}' not found")
+        full_ext_db_dir = \
+            os.path.join(settings.ext_db_dir,
+                         os.path.dirname(settings.ext_db_symlink))
         error_if(
-            not os.path.isdir(settings.ext_db_dir),
-            f"External database directory '{settings.ext_db_dir}' not found")
+            not os.path.isdir(full_ext_db_dir),
+            f"External database directory '{full_ext_db_dir}' not found")
 
         ext_params_file_checker = \
             ExtParamFilesChecker(
@@ -665,9 +689,11 @@ def main(argv: List[str]) -> None:
                         check=True)
 
                     temp_uls_file_name = \
-                        os.path.join(settings.ext_db_dir,
+                        os.path.join(full_ext_db_dir,
                                      "temp_" + os.path.basename(new_uls_file))
                     # Copy new ULS file to external directory
+                    logging.debug(
+                        f"Copying '{new_uls_file}' to '{temp_uls_file_name}'")
                     shutil.copy2(new_uls_file, temp_uls_file_name)
 
                     db_diff = DbDiff(prev_filename=current_uls_file,
@@ -675,18 +701,21 @@ def main(argv: List[str]) -> None:
                         if has_previous else None
                     if settings.force or \
                             uls_file_checker.valid(
-                                new_filename=temp_uls_file_name,
+                                base_dir=settings.ext_db_dir,
+                                new_filename=os.path.join(
+                                    os.path.dirname(settings.ext_db_symlink),
+                                    os.path.basename(temp_uls_file_name)),
                                 db_diff=db_diff):
                         # Renaming database
                         permanent_uls_file_name = \
-                            os.path.join(settings.ext_db_dir,
+                            os.path.join(full_ext_db_dir,
                                          os.path.basename(new_uls_file))
                         os.rename(temp_uls_file_name, permanent_uls_file_name)
                         # Retargeting symlink
                         update_uls_file(
-                            uls_dir=settings.ext_db_dir,
+                            uls_dir=full_ext_db_dir,
                             uls_file=os.path.basename(new_uls_file),
-                            symlink=settings.ext_db_symlink)
+                            symlink=os.path.basename(settings.ext_db_symlink))
                         if rcache and (db_diff is not None) and \
                                 db_diff.diff_tiles:
                             tile_list = \
@@ -717,6 +746,7 @@ def main(argv: List[str]) -> None:
                 try:
                     if temp_uls_file_name and \
                             os.path.isfile(temp_uls_file_name):
+                        logging.debug(f"Removing '{temp_uls_file_name}'")
                         os.unlink(temp_uls_file_name)
                 except OSError as ex:
                     logging.error(f"Attempt to remove temporary ULS database "

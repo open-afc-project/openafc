@@ -259,7 +259,7 @@ class Db:
                     self._metadata.remove(self._fsid_table)
                 self._fsid_table = sa.Table(FSID_TABLE_NAME, self._metadata,
                                             *Record.db_columns())
-                self._metadata.create_all(self._conn)
+                self._metadata.create_all(self._engine)
             except sa.exc.SQLAlchemyError as ex:
                 error(f"Error recreating FSID table in FS database "
                       f"'{self._database_file}': {ex}")

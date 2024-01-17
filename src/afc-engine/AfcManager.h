@@ -126,14 +126,11 @@ class AfcManager
 		// Read configuration parameters for AFC
 		void importConfigAFCjson(const std::string &inputJSONpath, const std::string &tempDir);
 
-		/* create OGR layer for generateExclusionZoneJson, generateMapDataGeoJson, generateHeatmap */
+		/* create OGR layer for generateExclusionZoneJson, generateMapDataGeoJson, */
 		OGRLayer* createGeoJSONLayer(const char *tmpPath,  GDALDataset **dataSet);
 
 		// create JSON object for exclusion zone to be sent to GUI
 		QJsonDocument generateExclusionZoneJson();
-
-		// create JSON object for heat map to be sent to GUI
-		QJsonDocument generateHeatmap();
 
 		// create JSON object for new AFC specification
 		QJsonDocument generateRatAfcJson();
@@ -144,6 +141,9 @@ class AfcManager
 		// add denied regions to OGR layer
 		void addDeniedRegions(OGRLayer *layer);
 
+		// add heatmap to OGR layer
+		void addHeatmap(OGRLayer *layer);
+
 		// Export calculations and FS locations in geoJSON format for GUI
 		void exportGUIjson(const QString &exportJsonPath, const std::string& tempDir);
 
@@ -153,7 +153,7 @@ class AfcManager
 		// Print the user inputs for testing and debugging
 		void printUserInputs();
 
-		ULSClass *findULSID(int ulsID, int dbIdx);
+		ULSClass *findULSID(int ulsID, int dbIdx, int& ulsIdx);
 
 		// ***** Perform AFC Engine computations *****
 		void compute(); // Computes all the necessary losses and stores them into the output member variables below
@@ -173,7 +173,6 @@ class AfcManager
 		void clearData();
 		void clearULSList();
 
-		void readPopulationGrid();  // Reads the population density
 		void readULSData(const std::vector<std::tuple<std::string, std::string>>& ulsDatabaseList, PopGridClass *popGrid, int linkDirection,
 				double minFreq, double maxFreq, bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
 				const double& minLat=-90, const double& maxLat=90, const double& minLon=-180, const double& maxLon=180); // Reads a database for FS stations information
@@ -216,6 +215,9 @@ class AfcManager
 
 		void computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &psdFreqRangeList); // Compute list of psdSegments for each inquired frequency range
 
+    void defineHeatmapColors();
+    std::string getHeatmapColor(double itonVal, bool indoorFlag, bool hexFlag);
+
 	private:
 
 		void importGUIjsonVersion1_4(const QJsonObject &jsonObj);
@@ -238,10 +240,27 @@ class AfcManager
 		/**************************************************************************************/
 		/* Input Parameters                                                                   */
 		/**************************************************************************************/
+		std::string _srtmDir;                   // Directory that contains SRTM terrain height files
+		std::string _cdsmDir;                   // Directory that contains CDSM (Canadian Digital Surface Model) height files
+		std::string _depDir;                    // Directory that contains 3DEP terrain height files
+		std::string _globeDir;                  // Directory that contains NOAA GLOBE terrain data files
+		std::string _lidarDir;                  // Directory that contains LiDAR multiband raster files.
+
+		std::string _regionDir;                 // Directory that contains polygons for each simulation region
+
+		std::string _worldPopulationFile;       // GDAL file (tiff) containing population density data
+		std::string _nlcdFile;                  // GDAL file contining NLCD data
+		std::string _rainForestFile;            // KML file contining rain forest polygon
+		std::string _nfaTableFile;              // File containing near field adjustment tabular data described in R2-AIP-17
+		std::string _radioClimateFile;          // ITU radio climate data
+		std::string _surfRefracFile;            // ITU surface refractivity data
+
+		std::vector<std::tuple<std::string, std::string>> _ulsDatabaseList;
+		// List of tuples where each tuple contains database name and database sqlite file name.
+
 		std::string _analysisType;              // Parsed Analysis Type: "AP-AFC", "ExclusionZoneAnalysis", "HeatmapAnalysis";
 		std::string _stateRoot;                 // Parsed path of fbrat state root
 		std::string _mntPath;                   // Parsed path to share with GeoData and config data"
-		std::string _uls;                       // Ignore ULS from afc-config.json, use this ULS.
 		bool _createKmz;
 		bool _createDebugFiles;
 		bool _createSlowDebugFiles;
@@ -290,7 +309,7 @@ class AfcManager
 		QString _rulesetId;
 		QString _guiJsonVersion;
 
-		std::vector<std::pair<int, int>> _inquiredFrquencyRangesMHz = std::vector<std::pair<int, int>>(); // list of low-high frequencies in MHz
+		std::vector<std::pair<int, int>> _inquiredFrequencyRangesMHz = std::vector<std::pair<int, int>>(); // list of low-high frequencies in MHz
 
 		// first part of pair is global operating class and the second is a list of the channel indicies for that operating class
 		std::vector<std::pair<int, std::vector<int>>> _inquiredChannels = std::vector<std::pair<int, std::vector<int>>>(); 
@@ -330,9 +349,6 @@ class AfcManager
 		bool _winner2UseGroundDistanceFlag;     // If set, use ground distance in winner2 model
 		bool _fsplUseGroundDistanceFlag;        // If set, use ground distance for FSPL
 
-		std::vector<std::tuple<std::string, std::string>> _ulsDatabaseList;
-		// List of tuples where each tuple contains database name and database sqlite file name.
-
 		QString _inputULSDatabaseStr;           // ULS Database being used
 
 		CConst::PropEnvMethodEnum _propEnvMethod; // Method for determining propagation environment (e.g. Population Density Map)
@@ -357,22 +373,26 @@ class AfcManager
 		double _exclusionZoneRLANBWHz;          // RLAN bandwidth (Hz) to use for Exclusion Zone Analysis
 		double _exclusionZoneRLANEIRPDBm;       // RLAN EIRP (dBm) to use for Exclusion Zone Analysis
 
-		double _heatmapRLANBWHz;                   // RLAN bandwidth (Hz) to use for Heatmap Analysis
-		int _heatmapRLANChanIdx;                // RLAN channel Index to use for Heatmap Analysis
 		double _heatmapMinLon;                  // Min Lon for region in which Heatmap Analysis is performed
 		double _heatmapMaxLon;                  // Max Lon for region in which Heatmap Analysis is performed
 		double _heatmapMinLat;                  // Min Lat for region in which Heatmap Analysis is performed
 		double _heatmapMaxLat;                  // Max Lat for region in which Heatmap Analysis is performed
 		double _heatmapRLANSpacing;             // Maximum spacing (m) between points in Heatmap Analysis
 		std::string _heatmapIndoorOutdoorStr;   // Can be: "Indoor", "Outdoor", "Database"
+		std::string _heatmapAnalysisStr;        // Can be: "iton", "availability"
+		int _heatmapFSID;                       // Set to FSID for single FS analysis, -1 otherwise
+
+        std::vector<int> _heatmapColorList;     // Color list for Heatmap Analysis
+        std::vector<double> _heatmapIndoorThrList;  // I/N threshold list for indoor RLAN in Heatmap Analysis
+        std::vector<double> _heatmapOutdoorThrList; // I/N threshold list for indoor RLAN in Heatmap Analysis
 
 		double _heatmapRLANIndoorEIRPDBm;       // RLAN Indoor EIRP (dBm) to use for Heatmap Analysis
-		QString _heatmapRLANIndoorHeightType;   // Above Mean Sea Level (AMSL), Above Ground Level (AGL) for Indoor RLAN's
+		std::string _heatmapRLANIndoorHeightType;   // Above Mean Sea Level (AMSL), Above Ground Level (AGL) for Indoor RLAN's
 		double _heatmapRLANIndoorHeight;        // RLAN Indoor Height (m) to use for Heatmap Analysis
 		double _heatmapRLANIndoorHeightUncertainty;  // RLAN Indoor Height Uncertainty (m) to use for Heatmap Analysis
 
 		double _heatmapRLANOutdoorEIRPDBm;      // RLAN Outdoor EIRP (dBm) to use for Heatmap Analysis
-		QString _heatmapRLANOutdoorHeightType;   // Above Mean Sea Level (AMSL), Above Ground Level (AGL) for OutIndoor RLAN's
+		std::string _heatmapRLANOutdoorHeightType;   // Above Mean Sea Level (AMSL), Above Ground Level (AGL) for OutIndoor RLAN's
 		double _heatmapRLANOutdoorHeight;       // RLAN Outdoor Height (m) to use for Heatmap Analysis
 		double _heatmapRLANOutdoorHeightUncertainty; // RLAN Outdoor Height Uncertainty (m) to use for Heatmap Analysis
 
@@ -397,11 +417,6 @@ class AfcManager
 		/**************************************************************************************/
 		/* Constant Parameters                                                                */
 		/**************************************************************************************/
-		std::string _srtmDir;                   // Directory that contain SRTM terrain height files
-		std::string _cdsmDir;                   // Directory that contain CDSM (Canadian Digital Surface Model) height files
-		std::string _depDir;                   // Directory that contain 3DEP terrain height files
-		QString _globeDir;                  // Directory that contains NOAA GLOBE data files
-		QString _lidarDir;                      // Directory that contain LiDAR multiband raster files.
 		bool _useBDesignFlag = false;           // Force use B-Design3D building data in Manhattan
 		bool _useLiDAR = false;                 // flag to enable use of LiDAR files for computation
 		bool _use3DEP = false;                  // flag to enable use of 3DEP 10m terrain data
@@ -433,24 +448,11 @@ class AfcManager
 		std::vector <OpClass::OpClass> _opClass;
 		std::vector <OpClass::OpClass> _psdOpClassList;
 
-		std::string _popDensityFile;            // File contining population density data
-		double _popDensityResLon;               // Population density file resolution for longitude
-		double _popDensityResLat;               // Population density file resolution for latitude
-		double _popDensityMinLon;               // Population density minimum longitude
-		int _popDensityNumLon;                  // Population density number of longitude
-		double _popDensityMinLat;               // Population density minimum latitude
-		int _popDensityNumLat;                  // Population density number of latitude
-
 		std::string _regionStr;                 // Comma separated list of names of regions in sim, corresp to pop density file
-		std::string _worldPopulationFile;       // GDAL file (tiff) containing population density data
 		std::string _regionPolygonFileList;     // Comma separated list of KML files, one for each region in simulation
 		std::vector<PolygonClass *> _regionPolygonList; // Polygon list, multiple polygons for each region
 		double _regionPolygonResolution;   // Resolution to use for polygon vertices, 1.0e-5 corresp to 1.11m, should not have to change
-		std::string _rainForestFile;            // KML file contining rain forest polygon
 		PolygonClass *_rainForestPolygon;       // Polygon that defines rain forest region
-		std::string _nlcdFile;                  // GDAL file contining NLCD data
-		std::string _radioClimateFile;           // ITU radio climate data
-		std::string _surfRefracFile;             // ITU surface refractivity data
 
 		double _densityThrUrban;                // Population density threshold above which region is considered URBAN
 		double _densityThrSuburban;             // Population density above this thr and below urban thr is SUBURBAN
@@ -514,7 +516,6 @@ class AfcManager
 
 		ITUDataClass *_ituData;
 		NFAClass *_nfa;
-		std::string _nfaTableFile;               // File containing near field adjustment tabular data described in R2-AIP-17
 		PRTABLEClass *_prTable;
 		std::string _prTableFile;               // File containing passive repeater tabular data described in WINNF-TS-1014-V1.2.0-App02
 		/**************************************************************************************/
@@ -540,6 +541,10 @@ class AfcManager
 		double _heatmapMinIToNDB;                  // Min I/N in _heatmapIToNDB
 		double _heatmapMaxIToNDB;                  // Max I/N in _heatmapIToNDB
 		double _heatmapIToNThresholdDB;            // I/N threshold value used to determine colors in heatmap graphical desplay
+		double _heatmapMaxRLANHeightAGL;           // Max AGL RLAN height over gridpoints in heatmap analysis
+		Vector3 _heatmapRLANCenterPosn;            // Center gridpoint in heatmap analysis
+		double _heatmapRLANCenterLon;             // Longitude of center gridpoint in heatmap analysis
+		double _heatmapRLANCenterLat;             // Latitude of center gridpoint in heatmap analysis
 
 		std::vector<std::string> statusMessageList; // List of messages regarding run status to send to GUI
 		CConst::ResponseCodeEnum _responseCode;

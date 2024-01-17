@@ -17,7 +17,8 @@ export interface OperatingClassFormParams {
         num: number,
         include: OperatingClassIncludeType,
         channels?: number[]
-    }) => void
+    }) => void,
+    allowOnlyOneChannel?: boolean
 }
 
 export interface OperatingClassFormState {
@@ -25,6 +26,7 @@ export interface OperatingClassFormState {
     include?: OperatingClassIncludeType,
     channels?: number[],
     allChannels: number[],
+    allowOnlyOneChannel: boolean
 
 }
 
@@ -35,6 +37,7 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
         this.state = {
             allChannels: this.generateChannelIndicesForOperatingClassNum(props.operatingClass.num),
             num: this.props.operatingClass.num,
+            allowOnlyOneChannel: this.props.allowOnlyOneChannel ?? false
         };
     }
 
@@ -123,25 +126,29 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
     private onChannelSelected(isChecked, selection) {
         var selectedChannel = Number(selection);
 
-        if (isChecked && !this.props.operatingClass.channels) {
-            this.setChannels([selectedChannel]);
+        if (this.state.allowOnlyOneChannel) {
+            this.setChannels([selectedChannel])
         } else {
-            var prevSelections = this.props.operatingClass.channels!.slice();
 
-            if (isChecked) {
-                if (prevSelections.includes(selectedChannel)) {
-                    return; // already there do nothing
-                } else {
-                    prevSelections.push(selectedChannel);
-                    this.setChannels(prevSelections.sort((a, b) => a - b))
-                }
-            } else { //remove if present
-                if (prevSelections.includes(selectedChannel)) {
-                    this.setChannels(prevSelections.filter(x => x != selection))
+            if (isChecked && !this.props.operatingClass.channels) {
+                this.setChannels([selectedChannel]);
+            } else {
+                var prevSelections = this.props.operatingClass.channels!.slice();
+
+                if (isChecked) {
+                    if (prevSelections.includes(selectedChannel)) {
+                        return; // already there do nothing
+                    } else {
+                        prevSelections.push(selectedChannel);
+                        this.setChannels(prevSelections.sort((a, b) => a - b))
+                    }
+                } else { //remove if present
+                    if (prevSelections.includes(selectedChannel)) {
+                        this.setChannels(prevSelections.filter(x => x != selection))
+                    }
                 }
             }
         }
-
     }
 
     private isChannelSelected(c: number) {
@@ -154,34 +161,47 @@ export class OperatingClassForm extends React.PureComponent<OperatingClassFormPa
     render() {
         return (<><GalleryItem key={this.props.operatingClass.num} >
             <FormGroup label={this.humanNames[this.props.operatingClass.num]} fieldId={"horizontal-form-height-opClass" + this.props.operatingClass.num}>
-                <FormGroup fieldId={"horizontal-form-height-opClass-Rbs" + this.props.operatingClass.num}>
-                    <Radio id={this.AddIdToString("rbIncludeNone")} name={this.AddIdToString("includeGrp")} label="None"
-                        isChecked={this.props.operatingClass.include == OperatingClassIncludeType.None}
-                        onChange={isChecked => isChecked && this.setInclude(OperatingClassIncludeType.None)}
-                    />
-                    <Radio id={this.AddIdToString("rbIncludeSome")} name={this.AddIdToString("includeGrp")} label="Some"
-                        isChecked={this.props.operatingClass.include == OperatingClassIncludeType.Some}
-                        onChange={isChecked => isChecked && this.setInclude(OperatingClassIncludeType.Some)}
-                    />
-                    <Radio id={this.AddIdToString("rbIncludeAll")} name={this.AddIdToString("includeGrp")} label="All"
-                        isChecked={this.props.operatingClass.include == OperatingClassIncludeType.All}
-                        onChange={isChecked => isChecked && this.setInclude(OperatingClassIncludeType.All)}
-                    />
-                </FormGroup>
+                {!this.state.allowOnlyOneChannel &&
+                    <FormGroup fieldId={"horizontal-form-height-opClass-Rbs" + this.props.operatingClass.num}>
+                        <Radio id={this.AddIdToString("rbIncludeNone")} name={this.AddIdToString("includeGrp")} label="None"
+                            isChecked={this.props.operatingClass.include == OperatingClassIncludeType.None}
+                            onChange={isChecked => isChecked && this.setInclude(OperatingClassIncludeType.None)}
+                        />
+                        <Radio id={this.AddIdToString("rbIncludeSome")} name={this.AddIdToString("includeGrp")} label="Some"
+                            isChecked={this.props.operatingClass.include == OperatingClassIncludeType.Some}
+                            onChange={isChecked => isChecked && this.setInclude(OperatingClassIncludeType.Some)}
+                        />
+                        <Radio id={this.AddIdToString("rbIncludeAll")} name={this.AddIdToString("includeGrp")} label="All"
+                            isChecked={this.props.operatingClass.include == OperatingClassIncludeType.All}
+                            onChange={isChecked => isChecked && this.setInclude(OperatingClassIncludeType.All)}
+                        />
+                    </FormGroup>
+                }
                 <FormGroup
                     fieldId={"horizontal-form-height-opClass-channelList" + this.props.operatingClass.num}
                     id={"cbList" + this.props.operatingClass.num}
                 >
                     {
                         this.props.operatingClass.include == OperatingClassIncludeType.Some &&
-                        this.state.allChannels.map((v, _) =>
-                            <Checkbox
-                                id={this.AddIdToString("cbChannel") + String(v)}
-                                key={this.AddIdToString("cbChannel") + String(v)}
-                                value={String(v)} label={String(v)}
-                                isChecked={this.isChannelSelected(v)}
-                                onChange={(isChecked, e) => this.onChannelSelected(isChecked, v)}
-                            />
+                        this.state.allChannels.map((v, _) => {
+                            return (!this.state.allowOnlyOneChannel ?
+                                <Checkbox
+                                    id={this.AddIdToString("cbChannel") + String(v)}
+                                    key={this.AddIdToString("cbChannel") + String(v)}
+                                    value={String(v)} label={String(v)}
+                                    isChecked={this.isChannelSelected(v)}
+                                    onChange={(isChecked, e) => this.onChannelSelected(isChecked, v)}
+                                />
+                                :
+                                <Radio
+                                    id={this.AddIdToString("cbChannel") + String(v)}
+                                    key={this.AddIdToString("cbChannel") + String(v)}
+                                    name={"single-channel-select"}
+                                    value={String(v)} label={String(v)}
+                                    isChecked={this.isChannelSelected(v)}
+                                    onChange={(isChecked, e) => this.onChannelSelected(isChecked, v)}
+                                />)
+                        }
                         )
                     }
                 </FormGroup>

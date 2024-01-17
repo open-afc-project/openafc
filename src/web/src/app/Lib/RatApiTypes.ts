@@ -37,7 +37,6 @@ export interface AFCConfigFile {
     minEIRPIndoor: number,
     minEIRPOutdoor: number, 
     minPSD: number,
-    ulsDatabase: string,
     buildingPenetrationLoss: PenetrationLossModel,
     polarizationMismatchLoss: PolarizationLossModel,
     receiverFeederLoss: FSReceiverFeederLoss,
@@ -69,10 +68,19 @@ export interface AFCConfigFile {
     reportUnavailableSpectrum?: boolean,
     reportUnavailPSDdBPerMHz?: number,
     inquiredFrequencyResolutionMHz?: number,
-    srtmDir?:string,
-    depDir?:string,
-    cdsmDir?:string,
-    rainForestFile?:string,
+    globeDir: string,
+    srtmDir:string,
+    depDir:string,
+    cdsmDir:string,
+    rainForestFile:string,
+    fsDatabaseFile: string,
+    lidarDir: string,
+    regionDir: string,
+    worldPopulationFile: string,
+    nfaTableFile: string,
+    prTableFile: string,
+    radioClimateFile: string,
+    surfRefracFile: string,
     cdsmLOSThr?:number,
     roundPSDEIRPFlag?: boolean,
 }
@@ -354,7 +362,17 @@ export enum IndoorOutdoorType {
     INDOOR = "Indoor",
     OUTDOOR = "Outdoor",
     ANY = "Any",
-    BUILDING = "Selected per Building Data"
+    BUILDING = "Database"
+}
+
+export enum HeatMapAnalysisType {
+    ItoN = "iton",
+    EIRP = "availability"
+}
+
+export enum HeatMapFsIdType {
+    All = "All",
+    Single = "Single"
 }
 
 interface SpectrumSpec {

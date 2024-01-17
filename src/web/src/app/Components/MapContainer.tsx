@@ -310,7 +310,13 @@ class MapContainer extends React.Component<MapProps>  {
                 const points: { lat: number, lng: number }[] = a.feature.getGeometry().getArray()[0].getArray().map((x: any) => x.toJSON())
                 const lat = points.map(x => x.lat).reduce((x, y) => x + y) / points.length;
                 const lng = points.map(x => x.lng).reduce((x, y) => x + y) / points.length;
-                const content = "<p>I/N: " + a.feature.getProperty("ItoN").toFixed(2) + "</p><p>" + (a.feature.getProperty("indoor") === "Y" ? "Indoors" : "Outdoors") + "</p>"
+                let content = "<p>&lt; minEIRP</p>";
+                if(!!a.feature.getProperty("ItoN")){
+                    content = "<p>I/N: " + a.feature.getProperty("ItoN").toFixed(2) + "</p><p>" + (a.feature.getProperty("indoor") === "Y" ? "Indoors" : "Outdoors") + "</p>"
+                }
+                if(!!a.feature.getProperty("eirpLimit")){
+                    content = "<p>EIRP Limit: " + a.feature.getProperty("eirpLimit") + "</p><p>" + (a.feature.getProperty("indoor") === "Y" ? "Indoors" : "Outdoors") + "</p>"
+                }
                 const infoAnchor = { lat: lat, lng: lng };
                 if (this.infoWindow) {
                     this.infoWindow.setContent(content);

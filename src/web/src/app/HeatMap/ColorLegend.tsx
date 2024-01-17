@@ -1,5 +1,6 @@
 import * as React from "react";
 import { Card, CardHeader, CardBody } from "@patternfly/react-core";
+import { HeatMapAnalysisType } from "../Lib/RatApiTypes";
 
 /**
  * ColorLegend.tsx: Graphical element that shows colors displayed on heatmap
@@ -13,16 +14,16 @@ import { Card, CardHeader, CardBody } from "@patternfly/react-core";
  * @returns the color of the tile as a CSS color
  */
 export const getColor = (val: number, threshold: number) => (
-    val < threshold - 20 ? "White" :
-    val < threshold ? "Gray" :
-    val < threshold + 3 ? "Blue" :
-    val < threshold + 6 ? "DarkBlue" :
-    val < threshold + 9 ? "Green" :
-    val < threshold + 12 ? "DarkGreen" :
-    val < threshold + 15 ? "Yellow" :
-    val < threshold + 18 ? "Orange" :
-    val < threshold + 21 ? "Red" :
-    "Maroon"
+    val < threshold - 20 ? "LightGray" :
+        val < threshold ? "Gray" :
+            val < threshold + 3 ? "Blue" :
+                val < threshold + 6 ? "DarkBlue" :
+                    val < threshold + 9 ? "Green" :
+                        val < threshold + 12 ? "DarkGreen" :
+                            val < threshold + 15 ? "Yellow" :
+                                val < threshold + 18 ? "Orange" :
+                                    val < threshold + 21 ? "Red" :
+                                        "Maroon"
 )
 
 /**
@@ -46,17 +47,38 @@ const colorValues = (threshold: number) => [
  * Legend which shows gain values accociated with different colors on the heat map
  * @param threshold relative value to shift color values by
  */
-export const ColorLegend: React.FunctionComponent<{ threshold: number }> = (props) => (
+export const ColorLegend: React.FunctionComponent<{ threshold: number, analysisType: HeatMapAnalysisType }> = (props) => (
     <Card>
+
         <CardHeader>
-            I/N Legend (dB)
+            {props.analysisType === HeatMapAnalysisType.ItoN ? <>I/N Legend (dB)</> : <>EIRP Legend (dBm)</>}
         </CardHeader>
         <CardBody>
-            {colorValues(props.threshold || -6).map((val, i) => 
-                <div key={i} style={{ height: "30px", width: "200px", backgroundColor: val.color }}>
-                    <div style={{ height: "30px", width: "75px", backgroundColor: "White", borderRightStyle: "solid" }}>{val.label}</div>
-                </div>
-            )}
+            <div key={100} style={{ height: "30px", width: "600px", backgroundColor: "Black" }}>
+                <div style={{ height: "30px", width: "300px", backgroundColor: "White", borderRightStyle: "solid" }}>Denied region</div>
+            </div>
+            <div key={101} style={{ height: "30px", width: "600px", backgroundColor: "White" }}>
+                <div style={{ height: "30px", width: "300px", backgroundColor: "White", borderRightStyle: "solid" }}>No restriction</div>
+            </div>
+            {props.analysisType === HeatMapAnalysisType.ItoN &&
+                colorValues(props.threshold || -6).map((val, i) =>
+                    <div key={i} style={{ height: "30px", width: "600px", backgroundColor: val.color }}>
+                        <div style={{ height: "30px", width: "300px", backgroundColor: "White", borderRightStyle: "solid" }}>{val.label}</div>
+                    </div>
+                )}
+            {props.analysisType === HeatMapAnalysisType.EIRP &&
+                <>
+                    <div key={200} style={{ height: "30px", width: "600px", backgroundColor: "Green" }}>
+                        <div style={{ height: "30px", width: "300px", backgroundColor: "White", borderRightStyle: "solid" }}>maxEIRP is met</div>
+                    </div>
+                    <div key={201} style={{ height: "30px", width: "600px", backgroundColor: "Yellow" }}>
+                        <div style={{ height: "30px", width: "300px", backgroundColor: "White", borderRightStyle: "solid" }}>minEIRP &lt;= EIRP &lt; maxEIRP</div>
+                    </div>
+                    <div key={202} style={{ height: "30px", width: "600px", backgroundColor: "Red" }}>
+                        <div style={{ height: "30px", width: "300px", backgroundColor: "White", borderRightStyle: "solid" }}>EIRP &lt; minEIRP</div>
+                    </div>
+                </>
+                }
         </CardBody>
     </Card>
 );

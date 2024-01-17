@@ -33,7 +33,8 @@ export class AFCForm extends React.Component<
         isModalOpen: boolean,
         messageSuccess: string | undefined,
         messageError: string | undefined,
-        antennaPatternData: AntennaPatternState
+        antennaPatternData: AntennaPatternState,
+        fsDatabaseDirectory: string,
     }
 > {
 
@@ -58,7 +59,8 @@ export class AFCForm extends React.Component<
             isModalOpen: false,
             antennaPatternData: {
                 defaultAntennaPattern: config.ulsDefaultAntennaType,
-            }
+            },
+            fsDatabaseDirectory: "rat_transfer/ULS_Database/"
 
         }
     }
@@ -80,9 +82,8 @@ export class AFCForm extends React.Component<
         })
     }
 
-    private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { ulsDatabase: n }) });
+    private setUlsDatabase = (n: string) => this.setState({ config: Object.assign(this.state.config, { fsDatabaseFile: n }) });
     private setUlsRegion = (n: string) => {
-        // this.setState({ config: Object.assign(this.state.config, { regionStr: n }) });
         // region changed by user, reload the coresponding configuration for that region
         getAfcConfigFile(n).then(
             res => {
@@ -113,10 +114,10 @@ export class AFCForm extends React.Component<
         if (model.ITMParameters.maxPoints < 100 || model.ITMParameters.maxPoints > 10000) return err('Path Max Points must be between 100 and 10000')
 
 
-        if (!model.ulsDatabase) return err();
+        if (!model.fsDatabaseFile) return err();
         if (!model.propagationEnv) return err();
 
-        if (!(model.minEIRPIndoor <= model.maxEIRP) || !(model.minEIRPOutdoor <= model.maxEIRP) ) return err();
+        if (!(model.minEIRPIndoor <= model.maxEIRP) || !(model.minEIRPOutdoor <= model.maxEIRP)) return err();
 
         if (this.props.limit.indoorEnforce && model.minEIRPIndoor < this.props.limit.indoorLimit || model.maxEIRP < this.props.limit.indoorLimit) {
             return err("Indoor EIRP value must be at least " + this.props.limit.indoorLimit + " dBm")
@@ -281,7 +282,7 @@ export class AFCForm extends React.Component<
     private getConfig = () => JSON.stringify(this.state.config);
 
     private export = () =>
-        new Blob([JSON.stringify(Object.assign({afcConfig: this.state.config }))], {
+        new Blob([JSON.stringify(Object.assign({ afcConfig: this.state.config }))], {
             type: "application/json"
         });
 
@@ -386,16 +387,16 @@ export class AFCForm extends React.Component<
                                     <OutlinedQuestionCircleIcon />
                                 </Tooltip>
                                 <FormSelect
-                                    value={this.state.config.ulsDatabase}
+                                    value={this.state.config.fsDatabaseFile}
                                     onChange={x => this.setUlsDatabase(x)}
                                     id="horizontal-form-uls-db"
                                     name="horizontal-form-uls-db"
-                                    isValid={!!this.state.config.ulsDatabase}
+                                    isValid={!!this.state.config.fsDatabaseFile}
                                     style={{ textAlign: "right" }}
                                 >
                                     <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select an FS Database" />
                                     {this.props.ulsFiles.map((option: string) => (
-                                        <FormSelectOption key={option} value={option} label={option} />
+                                        <FormSelectOption key={option} value={this.state.fsDatabaseDirectory + option} label={option} />
                                     ))}
                                 </FormSelect>
                             </FormGroup>

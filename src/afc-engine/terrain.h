@@ -43,13 +43,13 @@ struct LidarRegionStruct {
 class TerrainClass
 {
 	public:
-		TerrainClass(QString lidarDir, std::string cdsmDir, std::string srtmDir, std::string depDir, QString globeDir,
+		TerrainClass(std::string lidarDir, std::string cdsmDir, std::string srtmDir, std::string depDir, std::string globeDir,
 				double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon,
 				double terrainMinLatBldg, double terrainMinLonBldg, double terrainMaxLatBldg, double terrainMaxLonBldg,
 				int maxLidarRegionLoadVal);
 		~TerrainClass();
 
-		void readLidarInfo(QDir lidarDir);
+		void readLidarInfo(std::string lidarDir);
 		void readLidarData(double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon);
 		int getLidarRegion(double lonDeg, double latDeg) const;
 		void loadLidarRegion(int lidarRegionIdx);

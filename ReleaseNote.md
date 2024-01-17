@@ -37,6 +37,24 @@ Version|3.8.13.0|
 * Remove downloading of FS TX files for Canada.
 
 ## **Version and Date**
+|Version|**OA-221*|
+| :- | :- |
+|**Date**|**01/04/2024**|
+
+## **Issues Addressed**
+ * Jira OA-249: Bring back Heatmap
+ * Jira OA-221: Create pre-defined constants for file-paths in one place
+
+## **Interface Changes**
+ * OA-221: Updated afc-config.json with all the path directories required by the engine to do its computations
+
+## **Testing Done**
+ * Re-ran FSP-1 in Virtual AP and confirmed getting same response as before.
+ * Ran Heatmap analysis with various configurations and confirmed getting proper response. 
+
+## **Open Issues** 
+ * Add Heatmap analysis to Regression Tests.
+
 Version|3.8.12.0|
 | :- | :- |
 |**Date**|**12/05/2023**|

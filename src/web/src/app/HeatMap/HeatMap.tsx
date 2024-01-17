@@ -20,8 +20,8 @@ import {
   ClipboardCopyVariant
 } from "@patternfly/react-core";
 import { MapContainer, MapProps } from "../Components/MapContainer";
-import { HeatMapResult, Bounds, GeoJson, error, success, HeatMapRequest, IndoorOutdoorType } from "../Lib/RatApiTypes";
-import { cacheItem, getCacheItem, runHeatMap } from "../Lib/RatApi";
+import { HeatMapResult, Bounds, GeoJson, error, success, HeatMapRequest, IndoorOutdoorType, HeatMapFsIdType, HeatMapAnalysisType } from "../Lib/RatApiTypes";
+import { cacheItem, getCacheItem, heatMapRequestObject } from "../Lib/RatApi";
 import { HeatMapForm, HeatMapFormData } from "./HeatMapForm";
 import { logger } from "../Lib/Logger";
 import { ColorLegend, getColor } from "./ColorLegend";
@@ -30,6 +30,9 @@ import { AnalysisProgress } from "../Components/AnalysisProgress";
 import LoadLidarBounds from "../Components/LoadLidarBounds";
 import LoadRasBounds from "../Components/LoadRasBounds";
 import { Limit } from "../Lib/Admin";
+import { spectrumInquiryRequestByString } from "../Lib/RatAfcApi"
+import { VendorExtension, AvailableSpectrumInquiryRequest } from "../Lib/RatAfcTypes";
+import { fromPer } from "../Lib/Utils";
 
 /**
  * HeatMap.tsx: Page used for graphical heatmap. Includes map display, channels, and spectrums
@@ -90,7 +93,9 @@ class HeatMap extends React.Component<{},
       message: string
     },
     isModalOpen: boolean,
-    limit: Limit
+    limit: Limit,
+    rulesetIds: string[],
+    submittedAnalysisType?: HeatMapAnalysisType
   }> {
 
   handleJsonChange: (value: any) => void;
@@ -109,7 +114,8 @@ class HeatMap extends React.Component<{},
   constructor(props: any) {
     super(props);
 
-    const apiLimit = props.limit.kind === "Success" ? props.limit.result : new Limit(false, 18);
+    const apiLimit = props.limit.kind === "Success" ? props.limit.result : new Limit(false, false, 18, 18);
+    const rulesetIds = props.rulesetIds.kind === "Success" ? props.rulesetIds.result : [];
     // set the default start state, but load from cache if available
     this.state = {
       limit: apiLimit,
@@ -136,7 +142,8 @@ class HeatMap extends React.Component<{},
         percent: 0,
         message: "No Task Started"
       },
-      isModalOpen: false
+      isModalOpen: false,
+      rulesetIds: rulesetIds
     };
 
     this.minItoN = Number.NaN;
@@ -225,7 +232,7 @@ class HeatMap extends React.Component<{},
 
   private formSubmitted(form: HeatMapFormData) {
     if (!this.state.selectionRectangle)
-      return Promise.resolve(error("No Bouding Box Specified", undefined, "Specifiy a bounding box to submit a request"));
+      return Promise.resolve(error("No Bounding Box Specified", undefined, "Specifiy a bounding box to submit a request"));
     const validBounds = [...([
       this.validN,
       this.validE,
@@ -289,7 +296,7 @@ class HeatMap extends React.Component<{},
       // display warning if something was changed
       if (stringHeight !== "") {
         logger.warn("Height was not at least 1 m above terrain, so it was truncated to fit AFC requirement");
-        this.setState({ extraWarningTitle: "Truncated Height", extraWarning: `The AP height has been truncated so that its minimum height is 1m above the terrain. The new height is ${stringHeight}`});
+        this.setState({ extraWarningTitle: "Truncated Height", extraWarning: `The AP height has been truncated so that its minimum height is 1m above the terrain. The new height is ${stringHeight}` });
       }
 
 
@@ -311,43 +318,47 @@ class HeatMap extends React.Component<{},
         form.indoorOutdoor.height = newHeight;
         form.indoorOutdoor.heightUncertainty = newUncertainty;
         logger.warn("Height was not at least 1 m above terrain, so it was truncated to fit AFC requirement");
-        this.setState({ extraWarningTitle: "Truncated Height", extraWarning: `The AP height has been truncated so that its minimum height is 1m above the terrain. The new height is ${newHeight}+/-${newUncertainty}m`});
+        this.setState({ extraWarningTitle: "Truncated Height", extraWarning: `The AP height has been truncated so that its minimum height is 1m above the terrain. The new height is ${newHeight}+/-${newUncertainty}m` });
       }
     }
 
     logger.info("running heat map: ", this.state);
-    this.setState({ messageType: "info", messageTitle: "Processing", messageValue: "", progress: { percent: 0, message: "Submitting..." } });
+    this.setState({ messageType: "info", messageTitle: "Processing", messageValue: "", progress: { percent: 0, message: "Submitting..." }, submittedAnalysisType: form.analysis });
 
-    let taskCanceled = false;
-    this.cancelTask = () => {
-      taskCanceled = true;
-      this.cancelTask = undefined;
-      this.setState({ canCancelTask: false });
-    }
-    this.setState({ canCancelTask: true });
+    //Build request
+    let extension = generateVendorExtension(form, this.state.spacing!, this.state.selectionRectangle!);
 
-    return runHeatMap({
-      indoorOutdoor: form.indoorOutdoor,
-      bandwidth: form.bandwidth,
-      centerFrequency: form.centerFrequency,
-      spacing: this.state.spacing!,
-      bounds: this.state.selectionRectangle!,
-    }, () => taskCanceled, (prog) => this.setState({ progress: prog }))
+    let dummyRequest = heatMapRequestObject(extension, form.certificationId, form.serialNumber)
+
+    return spectrumInquiryRequestByString("1.4", JSON.stringify(dummyRequest))
       .then((r) => {
-        // update map here
         logger.info(r);
         if (r.kind === "Success") {
-          this.minItoN = r.result.minItoN;
-          this.maxItoN = r.result.maxItoN;
-          this.ItoNthreshold = r.result.threshold;
-          this.heatMapStyle.set("HMAP", (feature: any) => ({ strokeWeight: 0, fillColor: getColor(feature.getProperty("ItoN"), this.ItoNthreshold), zIndex: 5 }));
-          this.setMapState({ val: r.result.geoJson, versionId: this.state.mapState.versionId + 1 })
-          this.setState({
-            canCancelTask: false,
-            messageType: r.result.statusMessageList.length ? "warning" : undefined,
-            messageTitle: r.result.statusMessageList.length ? "Status messages" : "",
-            messageValue: r.result.statusMessageList.length ? r.result.statusMessageList.join("\n") : ""
-          });
+          const response = r.result.availableSpectrumInquiryResponses[0];
+          if (response.vendorExtensions
+            && response.vendorExtensions.length > 0
+            && response.vendorExtensions.findIndex(x => x.extensionId == "openAfc.mapinfo") >= 0) {
+            //Get the KML file and load it into the state.kml parameters; get the GeoJson if present
+            let kml_filename = response.vendorExtensions.find(x => x.extensionId == "openAfc.mapinfo")?.parameters["kmzFile"];
+            if (!!kml_filename) {
+              //this.setKml(kml_filename)
+            }
+            let geoJsonData = response.vendorExtensions.find(x => x.extensionId == "openAfc.mapinfo")?.parameters["geoJsonFile"];
+            let centerLat = (this.state.selectionRectangle!.north + this.state.selectionRectangle!.south) / 2
+            let centerLon = (this.state.selectionRectangle!.east + this.state.selectionRectangle!.west) / 2
+
+            if (!!geoJsonData) {
+              let geojson = JSON.parse(geoJsonData);
+              this.ItoNthreshold = geojson.threshold;
+              this.maxItoN = geojson.maxItoN;
+              this.minItoN = geojson.minItoN;
+              //this.heatMapStyle.set("HMAP", (feature: any) => ({ strokeWeight: 0, fillColor: feature.getProperty("ItoN"), zIndex: 5 }));
+              this.heatMapStyle.set("HMAP", (feature: any) => ({ strokeWeight: 0, fillColor: feature.getProperty("fill"), "fill-opacity": feature.getProperty("fill-opacity"), zIndex: 5 }));
+              this.setMapState({ val: geojson.geoJson as GeoJson, valid: true, versionId: this.state.mapState.versionId + 1 })
+              this.setState({ canCancelTask: false, messageType: undefined, messageTitle: "", messageValue: "", mapCenter: { lng: centerLon, lat: centerLat } });
+
+            }
+          }
           return success("Request completed successfully");
         } else {
           logger.error(r);
@@ -363,7 +374,7 @@ class HeatMap extends React.Component<{},
 
   private heatMapStyle = new Map<string, React.CSSProperties | ((feature: any) => React.CSSProperties)>([[
     "HMAP",
-    (feature: any) => ({ strokeWeight: 0, fillColor: getColor(feature.getProperty("ItoN"), -6), zIndex: 5 })
+    (feature: any) => ({ strokeWeight: 0, fillColor: feature.getProperty("fill"), "fill-opacity": feature.getProperty("fill-opacity"), zIndex: 5 })
   ], [
     "BLDB",
     // @ts-ignore
@@ -384,10 +395,10 @@ class HeatMap extends React.Component<{},
 
   private copyPaste(formData: HeatMapRequest, updateCallback: (v: HeatMapRequest) => void) {
     this.formUpdateCallback = updateCallback;
-    formData.bounds = this.state.selectionRectangle;
-    formData.spacing = this.state.spacing;
+    formData.bounds = this.state.selectionRectangle!;
+    formData.spacing = this.state.spacing!;
     this.paramValue = formData;
-    this.setState({isModalOpen: true});
+    this.setState({ isModalOpen: true });
   }
 
   private getParamsText = () => this.paramValue ? JSON.stringify(this.paramValue) : "";
@@ -508,14 +519,14 @@ class HeatMap extends React.Component<{},
               <br />
               <Title size="md">Simulation Parameters</Title>
               <br />
-              <HeatMapForm limit={this.state.limit} onSubmit={(a: HeatMapFormData) => this.formSubmitted(a)} onCopyPaste={(form, callback) => this.copyPaste(form, callback)} />
+              <HeatMapForm limit={this.state.limit} rulesetIds={this.state.rulesetIds} onSubmit={(a: HeatMapFormData) => this.formSubmitted(a)} onCopyPaste={(form, callback) => this.copyPaste(form, callback)} />
               {this.state.canCancelTask && <>
                 {" "}<Button variant="secondary" onClick={this.cancelTask}>Cancel</Button>
               </>
               }
               {" "}<LoadLidarBounds currentGeoJson={this.state.mapState.val} onLoad={data => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })} />
-                   <LoadRasBounds currentGeoJson={this.state.mapState.val} onLoad={data => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })} />
-                   
+              <LoadRasBounds currentGeoJson={this.state.mapState.val} onLoad={data => this.setMapState({ val: data, versionId: this.state.mapState.versionId + 1 })} />
+
             </Expandable>
           </CardBody>
         </Card>
@@ -536,7 +547,9 @@ class HeatMap extends React.Component<{},
           </Alert>
         </>)}
         <br />
-        <ColorLegend threshold={this.ItoNthreshold} />
+        {!!this.state.submittedAnalysisType &&
+          <ColorLegend threshold={this.ItoNthreshold} analysisType={this.state.submittedAnalysisType} />
+        }
         <br />
         <div style={{ width: "100%" }}>
           <MapContainer
@@ -554,11 +567,68 @@ class HeatMap extends React.Component<{},
 }
 
 // if any of the bounds are not defined then propogate the undefined
-const correctBounds = (rect?: Bounds): Bounds => (!rect ||
+const correctBounds = (rect?: Bounds): Bounds | undefined => (!rect ||
   [rect.north, rect.south, rect.east, rect.west]
     .map(x => !Number.isFinite(x))
     .reduce((a, b) => a || b)
   ? undefined : rect
 )
 
+
 export { HeatMap };
+
+function generateVendorExtension(form: HeatMapFormData, spacing: number, location: Bounds) {
+  let v: VendorExtension = {
+    extensionId: "openAfc.heatMap",
+    parameters: {
+      type: "heatmap",
+      inquiredChannel: form.inquiredChannel,
+      MinLon: location.west,
+      MaxLon: location.east,
+      MinLat: location.south,
+      MaxLat: location.north,
+      RLANSpacing: spacing,
+      analysis: form.analysis,
+      fsIdType: form.fsIdType,
+    }
+  }
+
+  if (form.fsIdType === HeatMapFsIdType.Single) {
+    v.parameters["fsId"] = form.fsId;
+  }
+
+  switch (form.indoorOutdoor.kind) {
+    case IndoorOutdoorType.INDOOR:
+      v.parameters.IndoorOutdoorStr = IndoorOutdoorType.INDOOR;
+      v.parameters.RLANIndoorEIRPDBm = form.indoorOutdoor.EIRP
+      v.parameters.RLANIndoorHeightType = form.indoorOutdoor.heightType;
+      v.parameters.RLANIndoorHeight = form.indoorOutdoor.height
+      v.parameters.RLANIndoorHeightUncertainty = form.indoorOutdoor.heightUncertainty;
+      break;
+    case IndoorOutdoorType.OUTDOOR:
+      v.parameters.IndoorOutdoorStr = IndoorOutdoorType.OUTDOOR;
+      v.parameters.RLANOutdoorEIRPDBm = form.indoorOutdoor.EIRP
+      v.parameters.RLANOutdoorHeightType = form.indoorOutdoor.heightType;
+      v.parameters.RLANOutdoorHeight = form.indoorOutdoor.height
+      v.parameters.RLANOutdoorHeightUncertainty = form.indoorOutdoor.heightUncertainty;
+      break;
+    case IndoorOutdoorType.ANY:
+      // Is this used?
+      break;
+    case IndoorOutdoorType.BUILDING:
+      v.parameters.IndoorOutdoorStr = IndoorOutdoorType.BUILDING;
+      v.parameters.RLANIndoorEIRPDBm = form.indoorOutdoor.in.EIRP
+      v.parameters.RLANIndoorHeightType = form.indoorOutdoor.in.heightType;
+      v.parameters.RLANIndoorHeight = form.indoorOutdoor.in.height
+      v.parameters.RLANIndoorHeightUncertainty = form.indoorOutdoor.in.heightUncertainty;
+      v.parameters.RLANOutdoorEIRPDBm = form.indoorOutdoor.out.EIRP
+      v.parameters.RLANOutdoorHeightType = form.indoorOutdoor.out.heightType;
+      v.parameters.RLANOutdoorHeight = form.indoorOutdoor.out.height
+      v.parameters.RLANOutdoorHeightUncertainty = form.indoorOutdoor.out.heightUncertainty;
+
+  }
+
+  return v;
+
+}
+

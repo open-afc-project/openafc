@@ -32,13 +32,13 @@ namespace {
 /******************************************************************************************/
 /**** FUNCTION: TerrainClass::TerrainClass()                                           ****/
 /******************************************************************************************/
-TerrainClass::TerrainClass(QString lidarDir, std::string cdsmDir, std::string srtmDir, std::string depDir, QString globeDir,
+TerrainClass::TerrainClass(std::string lidarDir, std::string cdsmDir, std::string srtmDir, std::string depDir, std::string globeDir,
 		double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon,
 		double terrainMinLatBldg, double terrainMinLonBldg, double terrainMaxLatBldg, double terrainMaxLonBldg,
 		int maxLidarRegionLoadVal) :
 	maxLidarRegionLoad(maxLidarRegionLoadVal), gdalDirectMode(false)
 {
-	if (!lidarDir.isEmpty())
+	if (!lidarDir.empty())
 	{
 		LOGGER_INFO(logger) << "Loading building+terrain data from " << lidarDir;
 		readLidarInfo(lidarDir);
@@ -90,8 +90,8 @@ TerrainClass::TerrainClass(QString lidarDir, std::string cdsmDir, std::string sr
 		});
 
 	// GLOBE data is always loaded as final fallback
-	cgGlobe.reset(new CachedGdal<int16_t>(globeDir.toStdString(), "globe",
-		GdalNameMapperDirect::make_unique("*.bil", globeDir.toStdString())));
+	cgGlobe.reset(new CachedGdal<int16_t>(globeDir, "globe",
+		GdalNameMapperDirect::make_unique("*.bil", globeDir)));
 	cgGlobe->setNoData(0);
 
 	numLidar = (long long) 0;
@@ -350,10 +350,10 @@ void TerrainClass::readLidarData(double terrainMinLat, double terrainMinLon, dou
 /******************************************************************************************/
 /**** TerrainClass::readLidarInfo()                                                    ****/
 /******************************************************************************************/
-void TerrainClass::readLidarInfo(QDir lidarDir)
+void TerrainClass::readLidarInfo(std::string lidarDir)
 {
 
-	QDir lDir(lidarDir);
+	QDir lDir(QString::fromStdString(lidarDir));
 	auto lidarCityNames = lDir.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
 	for (int i = 0; i < lidarCityNames.size(); i++)
 	{

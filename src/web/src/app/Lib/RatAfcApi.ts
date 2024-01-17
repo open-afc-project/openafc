@@ -126,3 +126,7 @@ export const sampleRequestObject: AvailableSpectrumInquiryRequest = {
         { lowFrequency: 5925000000, highFrequency: 6425000000 }
     ]
 }
+
+
+
+
