@@ -11,14 +11,22 @@ import {
   InputGroupText,
   InputGroup,
   Gallery,
-  GalleryItem
+  GalleryItem,
+  Tooltip,
+  Chip,
+  ChipGroup,
+  TooltipPosition,
+  Radio
 } from "@patternfly/react-core";
-import { HeightType, IndoorOutdoorType, HeatMapRequest, RatResponse } from "../Lib/RatApiTypes";
+import { HeightType, IndoorOutdoorType, HeatMapRequest, RatResponse, HeatMapAnalysisType, HeatMapFsIdType } from "../Lib/RatApiTypes";
 import { getCacheItem, cacheItem } from "../Lib/RatApi";
 import { logger } from "../Lib/Logger";
 import { Timer } from "../Components/Timer";
 import { letin } from "../Lib/Utils";
 import { Limit } from "../Lib/Admin";
+import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
+import { CertificationId, InquiredChannel, OperatingClass, OperatingClassIncludeType } from "../Lib/RatAfcTypes";
+import { OperatingClassForm } from "../Components/OperatingClassForm";
 
 /**
 * HeatMapForm.tsx: form for capturing paramaters for heat map and validating them
@@ -29,8 +37,12 @@ import { Limit } from "../Lib/Admin";
  * Interface definition of form data
  */
 export interface HeatMapFormData {
-  bandwidth: number,
-  centerFrequency: number,
+  serialNumber: string,
+  certificationId: CertificationId[],
+  inquiredChannel: InquiredChannel,
+  analysis: HeatMapAnalysisType,
+  fsIdType: HeatMapFsIdType,
+  fsId?: number
   indoorOutdoor: {
     kind: IndoorOutdoorType.INDOOR | IndoorOutdoorType.OUTDOOR | IndoorOutdoorType.ANY,
     EIRP: number,
@@ -57,26 +69,33 @@ export interface HeatMapFormData {
 /**
  * Form component for filling in heat map parameters
  */
-export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: HeatMapFormData) => Promise<RatResponse<string>>, onCopyPaste?: (formData: HeatMapRequest, updateCallback: (v: HeatMapRequest) => void) => void },
+export class HeatMapForm extends React.Component<{
+  limit: Limit, rulesetIds: string[],
+  onSubmit: (a: HeatMapFormData) => Promise<RatResponse<string>>, onCopyPaste?: (formData: HeatMapFormData, updateCallback: (v: HeatMapFormData) => void) => void
+},
   {
     height: { kind: "s", val?: number } | { kind: "b", in?: number, out?: number },
     heightType: { kind: "s", val?: HeightType } | { kind: "b", in?: HeightType, out?: HeightType },
     heightCert: { kind: "s", val?: number } | { kind: "b", in?: number, out?: number },
     insideOutside: IndoorOutdoorType,
     eirp: { kind: "s", val?: number } | { kind: "b", in?: number, out?: number },
-    bandwidth?: number,
-    centerFrequency?: number,
     mesgType?: "info" | "danger",
     mesgTitle?: string,
-    mesgBody?: string
+    mesgBody?: string,
+    serialNumber?: string,
+    certificationId: CertificationId[],
+    newCertificationId?: string,
+    newCertificationRulesetId?: string,
+    rulesetIds: string[];
+    operatingClasses: OperatingClass[],
+    inquiredChannel?: InquiredChannel,
+    analysisType: HeatMapAnalysisType,
+    fsIdType: HeatMapFsIdType,
+    fsId?: number
+
   }> {
 
   private static heightTypes: string[] = [HeightType.AGL.toString(), HeightType.AMSL.toString()];
-  private static inOutDoors: [string , string][] = [
-    ["INDOOR", IndoorOutdoorType.INDOOR.toString()], 
-    ["OUTDOOR", IndoorOutdoorType.OUTDOOR.toString()], 
-    ["BUILDING", IndoorOutdoorType.BUILDING.toString()]
-  ];
   private static bandwidths: number[] = [20, 40, 80, 160];
   private static startingFreq = 5945;
   private static centerFrequencies: Map<number, number[]> = new Map([
@@ -86,7 +105,7 @@ export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: 
     [160, Array(7).fill(0).map((_, i) => i * 160 + HeatMapForm.startingFreq + 80)]
   ]);
 
-  constructor(props: Readonly<{limit : Limit, onSubmit: (a: HeatMapFormData) => Promise<RatResponse<string>>; }>) {
+  constructor(props: Readonly<{ limit: Limit, onSubmit: (a: HeatMapFormData) => Promise<RatResponse<string>>; rulesetIds: string[] }>) {
     super(props);
     this.state = {
       height: { kind: "s", val: undefined },
@@ -94,11 +113,41 @@ export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: 
       heightCert: { kind: "s", val: undefined },
       insideOutside: IndoorOutdoorType.INDOOR,
       eirp: { kind: "s", val: undefined },
-      bandwidth: undefined,
-      centerFrequency: undefined,
-      mesgType: undefined
-    };
-  }
+      mesgType: undefined,
+      serialNumber: "HeatMapSerialNumber",
+      certificationId: [{ id: "HeatMapCertificationId", rulesetId: "US_47_CFR_PART_15_SUBPART_E" }],
+      rulesetIds: this.props.rulesetIds,
+      operatingClasses: [
+        {
+          num: 131,
+          include: OperatingClassIncludeType.Some
+        },
+        {
+          num: 132,
+          include: OperatingClassIncludeType.Some
+        },
+        {
+          num: 133,
+          include: OperatingClassIncludeType.Some
+        },
+        {
+          num: 134,
+          include: OperatingClassIncludeType.Some
+        },
+        {
+          num: 136,
+          include: OperatingClassIncludeType.Some
+        },
+        {
+          num: 137,
+          include: OperatingClassIncludeType.Some
+        }
+      ],
+      analysisType: HeatMapAnalysisType.ItoN,
+      fsIdType: HeatMapFsIdType.All
+    }
+  };
+
 
   componentDidMount() {
     const st = getCacheItem("heatMapForm");
@@ -113,41 +162,53 @@ export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: 
   }
 
   private validHeight = (s: { kind: "s", val?: number } | { kind: "b", in?: number, out?: number }) =>
-    (this.state.insideOutside === IndoorOutdoorType.BUILDING ?
-      s.kind === "b" && [Number.isFinite(s.in!), Number.isFinite(s.out!)]
-      : s.kind === "s" && [Number.isFinite(s.val!)]);
+  (this.state.insideOutside === IndoorOutdoorType.BUILDING ?
+    s.kind === "b" && [Number.isFinite(s.in!), Number.isFinite(s.out!)]
+    : s.kind === "s" && [Number.isFinite(s.val!)]);
   private validHeightType = (s: { kind: "s", val?: HeightType } | { kind: "b", in?: HeightType, out?: HeightType }) =>
-    (this.state.insideOutside === IndoorOutdoorType.BUILDING ?
-      s.kind === "b" && [!!s.in, !!s.out]
-      : s.kind === "s" && [!!s.val]);
+  (this.state.insideOutside === IndoorOutdoorType.BUILDING ?
+    s.kind === "b" && [!!s.in, !!s.out]
+    : s.kind === "s" && [!!s.val]);
   private validHeightCert = (s: { kind: "s", val?: number } | { kind: "b", in?: number, out?: number }) => {
-    if(this.state.insideOutside === IndoorOutdoorType.BUILDING) {
+    if (this.state.insideOutside === IndoorOutdoorType.BUILDING) {
       return s.kind === "b" && [Number.isFinite(s.in!) && s.in! >= 0, Number.isFinite(s.out!) && s.out! >= 0];
     }
-    else { 
+    else {
       return s.kind === "s" && Number.isFinite(s.val!) && [s.val! >= 0];
     }
-  
+
   }
   private validInOut = (s?: string) => !!s;
   private validEirp = (s: { kind: "s", val?: number } | { kind: "b", in?: number, out?: number }) => {
-    if(this.state.insideOutside === IndoorOutdoorType.BUILDING) {
-      if(this.props.limit.enforce) {
-        return s.kind === "b" && [Number.isFinite(s.in!) && s.in! >= this.props.limit.limit, Number.isFinite(s.out!) && s.out! >= this.props.limit.limit];
-      } else {
-        return s.kind === "b" && [Number.isFinite(s.in!), Number.isFinite(s.out!)];
-      }
-    } else {
-        if(this.props.limit.enforce) {
-          return s.kind === "s" && Number.isFinite(s.val!) && [s.val! >= this.props.limit.limit];
+    if (this.state.analysisType === HeatMapAnalysisType.ItoN) {
+      if (this.state.insideOutside === IndoorOutdoorType.BUILDING) {
+        if (this.props.limit.indoorEnforce) {
+          return s.kind === "b" && [Number.isFinite(s.in!) && s.in! >= this.props.limit.indoorLimit, Number.isFinite(s.out!) && s.out! >= this.props.limit.indoorLimit];
         } else {
-            return s.kind === "s" && [Number.isFinite(s.val!)]; 
+          return s.kind === "b" && [Number.isFinite(s.in!), Number.isFinite(s.out!)];
         }
+      } else if (this.state.insideOutside === IndoorOutdoorType.INDOOR) {
+
+        if (this.props.limit.indoorEnforce) {
+          return s.kind === "s" && Number.isFinite(s.val!) && [s.val! >= this.props.limit.indoorLimit];
+        } else {
+          return s.kind === "s" && [Number.isFinite(s.val!)];
+        }
+      }
+      else if (this.state.insideOutside === IndoorOutdoorType.OUTDOOR) {
+
+        if (this.props.limit.outdoorEnforce) {
+          return s.kind === "s" && Number.isFinite(s.val!) && [s.val! >= this.props.limit.outdoorLimit];
+        } else {
+          return s.kind === "s" && [Number.isFinite(s.val!)];
+        }
+      } else {
+        return true;
+      }
+    }else{
+      return true;
     }
   }
-  private validBandwidth = (s?: number) => s !== undefined && Number.isFinite(s);
-  private validCenterFreq = (s?: number) => s !== undefined && Number.isFinite(s);
-
   private submit = () => {
     const allValid = [true].concat(
       this.validHeight(this.state.height),
@@ -155,8 +216,10 @@ export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: 
       this.validHeightCert(this.state.heightCert),
       [this.validInOut(this.state.insideOutside)],
       this.validEirp(this.state.eirp),
-      [this.validBandwidth(this.state.bandwidth)],
-      [this.validCenterFreq(this.state.centerFrequency)]
+      [!!this.state.inquiredChannel],
+      [!!this.state.serialNumber],
+      [!!this.state.certificationId && this.state.certificationId.length > 0],
+      [this.state.fsIdType === HeatMapFsIdType.All || (this.state.fsIdType === HeatMapFsIdType.Single && !!this.state.fsId)]
     ).reduce((p, c) => p && c);
 
     if (!allValid) {
@@ -203,10 +266,15 @@ export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: 
       };
     this.setState({ mesgType: "info" });
     this.props.onSubmit({
-      bandwidth: this.state.bandwidth!,
-      centerFrequency: this.state.centerFrequency!,
-      indoorOutdoor: inout
-    } as unknown as any)
+      inquiredChannel: this.state.inquiredChannel,
+      indoorOutdoor: inout,
+      certificationId: this.state.certificationId,
+      serialNumber: this.state.serialNumber,
+      analysis: this.state.analysisType,
+      fsIdType: this.state.fsIdType,
+      fsId: this.state.fsId,
+
+    } as HeatMapFormData as any)
       .then(res => {
         this.setState({ mesgType: undefined });
       })
@@ -269,17 +337,30 @@ export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: 
       // @ts-ignore
       heightUncertainty: this.state.heightCert.val
     }, inout => ({
-    bandwidth: this.state.bandwidth!,
-    centerFrequency: this.state.centerFrequency!,
-    indoorOutdoor: inout
-  })) as HeatMapRequest, this.setParams);
 
-  private setParams = (v: HeatMapRequest) => {
-    this.setState({
-      bandwidth: v.bandwidth,
-      centerFrequency: v.centerFrequency
-    });
+      indoorOutdoor: inout,
+      analysis: this.state.analysisType,
+      certificationId: this.state.certificationId,
+      fsIdType: this.state.fsIdType,
+      fsId: this.state.fsId,
+      inquiredChannel: this.state.inquiredChannel,
+      serialNumber: this.state.serialNumber,
 
+    })) as HeatMapFormData, this.setParams);
+
+  private setParams = (v: HeatMapFormData) => {
+    let newState = {
+      analysisType: v.analysis,
+      certificationId: v.certificationId,
+      fsIdType: v.fsIdType,
+      inquiredChannel: v.inquiredChannel,
+      serialNumber: v.serialNumber,
+    }
+    if (v.fsIdType === HeatMapFsIdType.Single) {
+      newState["fsId"] = v.fsId
+    }
+    this.setState(newState);
+    this.updateOperatingClass({ num: v.inquiredChannel.globalOperatingClass, include: OperatingClassIncludeType.Some, channels: [v.inquiredChannel.channelCfi] }, 0)
     if (v.indoorOutdoor.kind === IndoorOutdoorType.BUILDING) {
       this.setState({
         insideOutside: v.indoorOutdoor.kind,
@@ -299,10 +380,153 @@ export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: 
     }
   }
 
+  deleteCertificationId(currentCid: string): void {
+    const copyOfcertificationId = this.state.certificationId.filter(x => x.id != currentCid);
+    this.setState({ certificationId: copyOfcertificationId });
+  }
+  addCertificationId(newCertificationId: CertificationId): void {
+    const copyOfcertificationId = this.state.certificationId.slice();
+    copyOfcertificationId.push({ id: newCertificationId.id, rulesetId: newCertificationId.rulesetId });
+    this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: this.props.rulesetIds[0] });
+  }
+
+  resetCertificationId(newCertificationId: CertificationId): void {
+    const copyOfcertificationId = [{ id: newCertificationId.id, rulesetId: newCertificationId.rulesetId }];
+    this.setState({ certificationId: copyOfcertificationId, newCertificationId: '', newCertificationRulesetId: this.props.rulesetIds[0] });
+  }
+
+  updateOperatingClass(x: { num: number; include: OperatingClassIncludeType; channels?: number[] | undefined; }, i: number): void {
+    let ocs = this.state.operatingClasses.map(oc => {
+      if (oc.num == x.num) {
+        return { num: x.num, include: OperatingClassIncludeType.Some, channels: x.channels }
+      } else {
+        return { num: oc.num, include: OperatingClassIncludeType.Some, channels: [] }
+      }
+    })
+    if (!!x.channels && x.channels.length >= 1) {
+      this.setState({ inquiredChannel: { globalOperatingClass: x.num, channelCfi: x.channels[0] }, operatingClasses: ocs })
+    } else {
+      this.setState({ inquiredChannel: undefined, operatingClasses: ocs })
+    }
+  }
+
   render() {
 
     return (<>
       <Gallery gutter="sm">
+        <GalleryItem>
+          <FormGroup
+            label="Serial Number"
+            fieldId="horizontal-form-name"
+            helperText="Must be unique for every AP"
+          >
+            {" "}<Tooltip
+              position={TooltipPosition.top}
+              enableFlip={true}
+              className="fs-feeder-loss-tooltip"
+              maxWidth="40.0rem"
+              content={
+                <>
+                  <p>The following Serial Number and Certification ID pair can be used for any rulesetID:</p>
+                  <ul style={{ listStyleType: "none" }} >
+                    <li>Serial Number=HeatMapSerialNumber</li>
+
+                    <li>CertificationId=HeatMapCertificationId</li>
+                  </ul>
+                </>
+              }
+            >
+              <OutlinedQuestionCircleIcon />
+            </Tooltip>
+            <TextInput
+              value={this.state.serialNumber}
+              type="text"
+              id="horizontal-form-name"
+              aria-describedby="horizontal-form-name-helper"
+              name="horizontal-form-name"
+              onChange={x => this.setState({ serialNumber: x })}
+              isValid={!!this.state.serialNumber}
+              style={{ textAlign: "right" }}
+            />
+          </FormGroup>
+        </GalleryItem>
+        <GalleryItem>
+          <FormGroup
+            label="Certification Id"
+            fieldId="horizontal-form-certification-id"
+            helperTextInvalid="Provide at least one Certification Id"
+            // helperTextInvalidIcon={<ExclamationCircleIcon />} //This is not supported in our version of Patternfly
+            validated={this.state.certificationId.length > 0 ? "success" : "error"}
+          >
+            {" "}<Tooltip
+              position={TooltipPosition.top}
+              enableFlip={true}
+              className="fs-feeder-loss-tooltip"
+              maxWidth="40.0rem"
+              content={
+                <>
+                  <p>The following Serial Number and Certification ID pair can be used for any rulesetID: </p>
+                  <ul style={{ listStyleType: "none" }} >
+                    <li>Serial Number=HeatMapSerialNumber</li>
+
+                    <li>CertificationId=HeatMapCertificationId</li>
+                  </ul>
+                </>
+              }
+            >
+              <OutlinedQuestionCircleIcon />
+            </Tooltip>
+            <ChipGroup aria-orientation="vertical"
+            >
+              {this.state.certificationId.map(currentCid => (
+                <Chip width="100%" key={currentCid.id} onClick={() => this.deleteCertificationId(currentCid.id)}>
+                  {currentCid.rulesetId + " " + currentCid.id}
+                </Chip>
+              ))}
+            </ChipGroup>
+            <div>
+              {" "}<Button key="add-certificationId" variant="tertiary"
+                onClick={() => this.addCertificationId({
+                  id: this.state.newCertificationId!,
+                  rulesetId: this.state.newCertificationRulesetId!
+                })}>
+                +
+              </Button>
+            </div>
+            <div>
+              <FormSelect
+                label="Ruleset"
+                value={this.state.newCertificationRulesetId}
+                onChange={x => this.setState({ newCertificationRulesetId: x })}
+                type="text"
+                step="any"
+                id="horizontal-form-certification-nra"
+                name="horizontal-form-certification-nra"
+                style={{ textAlign: "left" }}
+                placeholder="Ruleset"
+              >
+                {
+                  this.props.rulesetIds.map((x) => (
+                    <FormSelectOption label={x} key={x} value={x} />
+                  ))
+                }
+                <FormSelectOption label="Unknown RS - For Testing only" value={"UNKNOWN_RS"} key={"unknown"} />
+              </FormSelect>
+
+              <TextInput
+                label="Id"
+                value={this.state.newCertificationId}
+                onChange={x => this.setState({ newCertificationId: x })}
+                type="text"
+                step="any"
+                id="horizontal-form-certification-list"
+                name="horizontal-form-certification-list"
+                style={{ textAlign: "left" }}
+                placeholder="Id"
+              />
+            </div>
+          </FormGroup>
+        </GalleryItem>
         <GalleryItem>
           <FormGroup label="Indoor/Outdoor" fieldId="horizontal-form-indoor-outdoor">
             <InputGroup>
@@ -316,10 +540,10 @@ export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: 
                 style={{ textAlign: "right" }}
               >
                 <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select device environment" />
-                {HeatMapForm.inOutDoors.map(([option, label]) => (
-                  <FormSelectOption isDisabled={false} key={label} value={label} label={label} />
-                ))}
-              </FormSelect>
+                <FormSelectOption isDisabled={false} key={IndoorOutdoorType.INDOOR} value={IndoorOutdoorType.INDOOR} label={"Indoor"} />
+                <FormSelectOption isDisabled={false} key={IndoorOutdoorType.OUTDOOR} value={IndoorOutdoorType.OUTDOOR} label={"Outdoor"} />
+                <FormSelectOption isDisabled={false} key={IndoorOutdoorType.BUILDING} value={IndoorOutdoorType.BUILDING} label={"Selected per Building Data"} />
+               </FormSelect>
             </InputGroup>
           </FormGroup>
         </GalleryItem>
@@ -483,102 +707,129 @@ export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: 
               </FormGroup> </>
           }
         </GalleryItem>
-        <GalleryItem>
-          {this.state.eirp.kind === "s" ?
-            <FormGroup label={this.props.limit.enforce ? "RLAN EIRP (Min: " + this.props.limit.limit  + " dBm)": "RLAN EIRP"} fieldId="horizontal-form-eirp">
-              <InputGroup>
-                <TextInput
-                  value={this.state.eirp.val}
-                  onChange={x => this.setState({ eirp: { kind: "s", val: Number(x) } })}
-                  type="number"
-                  step="any"
-                  id="horizontal-form-eirp"
-                  name="horizontal-form-eirp"
-                  isValid={this.validEirp(this.state.eirp)[0]}
-                  style={{ textAlign: "right" }}
-                />
-                <InputGroupText>dBm</InputGroupText>
-              </InputGroup>
-            </FormGroup> : <>
-              <FormGroup label={this.props.limit.enforce ? "Indoor RLAN EIRP (Min: " + this.props.limit.limit  + " dBm)": "Indoor RLAN EIRP"} fieldId="horizontal-form-eirp-in">
+        {this.state.analysisType === HeatMapAnalysisType.ItoN &&
+          <GalleryItem>
+            {this.state.eirp.kind === "s" ?
+              <FormGroup label={this.props.limit.indoorEnforce ? "RLAN EIRP (Min: " + this.props.limit.indoorLimit + " dBm)" : "RLAN EIRP"} fieldId="horizontal-form-eirp">
                 <InputGroup>
                   <TextInput
-                    value={this.state.eirp.in}
-                    // @ts-ignore
-                    onChange={x => this.setState({ eirp: { kind: "b", in: Number(x), out: this.state.eirp.out } })}
+                    value={this.state.eirp.val}
+                    onChange={x => this.setState({ eirp: { kind: "s", val: Number(x) } })}
                     type="number"
                     step="any"
-                    id="horizontal-form-eirp-in"
-                    name="horizontal-form-eirp-in"
+                    id="horizontal-form-eirp"
+                    name="horizontal-form-eirp"
                     isValid={this.validEirp(this.state.eirp)[0]}
                     style={{ textAlign: "right" }}
                   />
                   <InputGroupText>dBm</InputGroupText>
                 </InputGroup>
-              </FormGroup>
-              <FormGroup label={this.props.limit.enforce ? "Outdoor RLAN EIRP (Min: " + this.props.limit.limit  + " dBm)": "Outdoor RLAN EIRP"} fieldId="horizontal-form-eirp-out">
-                <InputGroup>
-                  <TextInput
-                    value={this.state.eirp.out}
-                    // @ts-ignore
-                    onChange={x => this.setState({ eirp: { kind: "b", out: Number(x), in: this.state.eirp.in } })}
-                    type="number"
-                    step="any"
-                    id="horizontal-form-eirp-out"
-                    name="horizontal-form-eirp-out"
-                    isValid={this.validEirp(this.state.eirp)[1]}
-                    style={{ textAlign: "right" }}
-                  />
-                  <InputGroupText>dBm</InputGroupText>
-                </InputGroup>
-              </FormGroup>
-            </>
-          }
-        </GalleryItem>
+              </FormGroup> : <>
+                <FormGroup label={this.props.limit.indoorEnforce ? "Indoor RLAN EIRP (Min: " + this.props.limit.indoorLimit + " dBm)" : "Indoor RLAN EIRP"} fieldId="horizontal-form-eirp-in">
+                  <InputGroup>
+                    <TextInput
+                      value={this.state.eirp.in}
+                      // @ts-ignore
+                      onChange={x => this.setState({ eirp: { kind: "b", in: Number(x), out: this.state.eirp.out } })}
+                      type="number"
+                      step="any"
+                      id="horizontal-form-eirp-in"
+                      name="horizontal-form-eirp-in"
+                      isValid={this.validEirp(this.state.eirp)[0]}
+                      style={{ textAlign: "right" }}
+                    />
+                    <InputGroupText>dBm</InputGroupText>
+                  </InputGroup>
+                </FormGroup>
+                <FormGroup label={this.props.limit.outdoorEnforce ? "Outdoor RLAN EIRP (Min: " + this.props.limit.outdoorLimit + " dBm)" : "Outdoor RLAN EIRP"} fieldId="horizontal-form-eirp-out">
+                  <InputGroup>
+                    <TextInput
+                      value={this.state.eirp.out}
+                      // @ts-ignore
+                      onChange={x => this.setState({ eirp: { kind: "b", out: Number(x), in: this.state.eirp.in } })}
+                      type="number"
+                      step="any"
+                      id="horizontal-form-eirp-out"
+                      name="horizontal-form-eirp-out"
+                      isValid={this.validEirp(this.state.eirp)[1]}
+                      style={{ textAlign: "right" }}
+                    />
+                    <InputGroupText>dBm</InputGroupText>
+                  </InputGroup>
+                </FormGroup>
+              </>
+            }
+          </GalleryItem>
+        }
         <GalleryItem>
-          <FormGroup label="RLAN Bandwidth" fieldId="horizontal-form-bandwidth">
+          <FormGroup label="Analysis Type" fieldId="horizontal-form-analysis-type">
             <InputGroup>
               <FormSelect
-                value={this.state.bandwidth}
+                value={this.state.analysisType}
                 // @ts-ignore
-                onChange={x => this.setState({ bandwidth: Number.parseInt(x), centerFrequency: undefined })}
-                id="horzontal-form-bandwidth"
-                name="horizontal-form-bandwidth"
-                isValid={this.validBandwidth(this.state.bandwidth)}
+                onChange={x => this.setState({ analysisType: x })}
+                id="horizontal-form-analysis-type"
+                name="horizontal-form-analysis-type"
                 style={{ textAlign: "right" }}
               >
-                <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select bandwidth" />
-                {HeatMapForm.bandwidths.map((option) => (
-                  <FormSelectOption isDisabled={false} key={option} value={option} label={String(option)} />
-                ))}
+                <FormSelectOption isDisabled={false} key={"eirp"} value={HeatMapAnalysisType.EIRP} label="Availability (EIRP)" />
+                <FormSelectOption isDisabled={false} key={"iton"} value={HeatMapAnalysisType.ItoN} label="I/N" />
               </FormSelect>
-              <InputGroupText>MHz</InputGroupText>
             </InputGroup>
           </FormGroup>
         </GalleryItem>
         <GalleryItem>
-          <FormGroup label="RLAN Center Frequency" fieldId="horizontal-form-centfreq">
-            <InputGroup>
-              <FormSelect
-                value={this.state.centerFrequency}
-                // @ts-ignore
-                onChange={x => this.setState({ centerFrequency: Number.parseInt(x) })}
-                id="horzontal-form-centfreq"
-                name="horizontal-form-centfreq"
-                isValid={this.validCenterFreq(this.state.centerFrequency)}
-                style={{ textAlign: "right" }}
-                isDisabled={!this.state.bandwidth}
-              >
-                <FormSelectOption isDisabled={true} key={undefined} value={undefined} label="Select center frequency" />
-                {(HeatMapForm.centerFrequencies.get(this.state.bandwidth || 0) || []).map((option) => (
-                  <FormSelectOption isDisabled={false} key={option} value={option} label={String(option)} />
-                ))}
-              </FormSelect>
-              <InputGroupText>MHz</InputGroupText>
-            </InputGroup>
+          <FormGroup label="FS Ids" fieldId="horizontal-form-fs-id">
+            <Radio
+              id="radio-fs-all"
+              key="radio-fs-all"
+              name="radio-fs"
+              label="All FS Ids"
+              value={HeatMapFsIdType.All}
+              isChecked={this.state.fsIdType === HeatMapFsIdType.All}
+              onChange={(isChecked, e) => { if (isChecked) { this.setState({ fsIdType: HeatMapFsIdType.All }) } }}
+            />
+            <br />
+            <Radio
+              id="radio-fs-single"
+              key="radio-fs-single"
+              name="radio-fs"
+              label="Specify FS Id"
+              value={HeatMapFsIdType.Single}
+              isChecked={this.state.fsIdType === HeatMapFsIdType.Single}
+              onChange={(isChecked, e) => { if (isChecked) { this.setState({ fsIdType: HeatMapFsIdType.Single }) } }}
+            />
+            <br />
+            {this.state.fsIdType === HeatMapFsIdType.Single ?
+              <TextInput
+                label="FS Id to Check"
+                value={this.state.fsId}
+                onChange={x => !isNaN(+x) ? this.setState({ fsId: Number(x) }) : this.setState({ fsId: undefined })}
+                type="number"
+                id="horizontal-form-fs-id-single"
+                name="horizontal-form-fs-id-single"
+                style={{ textAlign: "left" }}
+                placeholder="FS Id"
+              />
+              :
+              <></>
+            }
           </FormGroup>
         </GalleryItem>
       </Gallery>
+      <FormGroup label="Inquired Channel(s)" fieldId="horizontal-form-operating-class" className="inquiredChannelsSection">
+        <Gallery className="nestedGallery" width={"1200px"} >
+          {this.state.operatingClasses.map(
+            (e, i) => (
+              <OperatingClassForm key={i}
+                operatingClass={e}
+                onChange={x => this.updateOperatingClass(x, i)}
+                allowOnlyOneChannel={true}
+              ></OperatingClassForm>
+            )
+          )}
+        </Gallery>
+      </FormGroup>
       <br />
       <React.Fragment>
         {this.state.mesgType && this.state.mesgType !== "info" && (
@@ -598,4 +849,5 @@ export class HeatMapForm extends React.Component<{ limit : Limit, onSubmit: (a: 
       </>
     </>);
   }
+
 }

@@ -61,7 +61,7 @@ req_pattern: |
                     {
                         "extensionId": "openAfc.overrideAfcConfig",
                         "parameters": {
-                            "ulsDatabase": null
+                            "fsDatabaseFile": null
                         }
                     }
                 ]
@@ -87,7 +87,7 @@ paths:
     coordinates: [availableSpectrumInquiryRequests, 0, location, ellipse,
                   center]
     fs_database: [availableSpectrumInquiryRequests, 0, vendorExtensions, 0,
-                  parameters, ulsDatabase]
+                  parameters, fsDatabaseFile]
     response_code: [availableSpectrumInquiryResponses, 0, response,
                     responseCode]
     response_desc: [availableSpectrumInquiryResponses, 0, response,

@@ -172,13 +172,13 @@ export class AFCFormUSACanada extends React.Component<
             if (x.kind === "Brazilian Propagation Model" && x.buildingSource === "None") {
                 delete x.win2ConfidenceNLOS;
             }
-            if (x.kind !== "ISED DBS-06" && !!conf.cdsmDir) {
-                delete conf.cdsmDir;
+            if (x.kind !== "ISED DBS-06" ) {
+                conf.cdsmDir = "";
             }
             if (x.kind === "ISED DBS-06") {
                 if (x.surfaceDataSource === 'None') {
-                    delete conf.cdsmDir;
-                } else if (!conf.cdsmDir) {
+                    conf.cdsmDir = "";
+                } else if (conf.cdsmDir === "") {
                     conf.cdsmDir = "rat_transfer/cdsm/3ov4_arcsec_wgs84";
                 }
             }

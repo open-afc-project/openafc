@@ -68,8 +68,8 @@ soTable below summarizes these parameters and environment variables:
 |--region **REG1:REG2...**|ULS_DOWNLOAD_REGION||Colon-separated list of country codes (such as US, CA, BR) to download. Default to download all supported countries|
 |--result_dir **DIR**|ULS_RESULT_DIR|/mnt/nfs/rat_transfer/<br>ULS_Database/|Directory where to *daily_uls_parse.py* puts downloaded database|
 |--temp_dir **DIR**|ULS_TEMP_DIR|/mnt/nfs/rat_transfer/<br>daily_uls_parse/temp/|Directory where to *daily_uls_parse.py* puts temporary files|
-|--ext_db_dir **DIR**|ULS_EXT_DB_DIR|/rat_transfer/ULS_Database<br>*Defined in dockerfile*|Directory where to resulting database should be placed (copied from script's result directory)|
-|--ext_db_symlink **FILENAME**|ULS_CURRENT_DB_SYMLINK|FS_LATEST.sqlite3|Name of symlink in resulting directory that should be retargeted at newly downloaded database|
+|--ext_db_dir **DIR**|ULS_EXT_DB_DIR|/*Defined in dockerfile*|Directory where to resulting database should be placed (copied from script's result directory). May be only initial part of path, rest being in `--ext_db_symlink`|
+|--ext_db_symlink **FILENAME**|ULS_CURRENT_DB_SYMLINK|rat_transfer/ULS_Database/<br>FS_LATEST.sqlite3<br>*Defined in dockerfile*|Name of symlink in resulting directory that should be retargeted at newly downloaded database. May contain path - same that should be used in AFC Config|
 |--fsid_file **FILEPATH**|ULS_FSID_FILE|/mnt/nfs/rat_transfer/<br>daily_uls_parse/<br>data_files/fsid_table.csv|Full name of file with existing FSIDs, used by *daily_uls_parse.py*. Between downloads this data is stored in FS Database|
 |--ext_ras_database **FILENAME**|ULS_EXT_RAS_DATABASE|rat_transfer/RAS_Database/<br>RASdatabase.dat<br>*Defined in dockerfile*|Name of externally maintained 'RAS database' (.csv file with restricted areas)|
 |--ras_database **FILENAME**|ULS_RAS_DATABASE|/mnt/nfs/rat_transfer<br>/daily_uls_parse/data_files<br>/RASdatabase.dat|Where from *daily_uls_parse.py* reads RAS database|
@@ -176,7 +176,8 @@ Points, countries and AFC Request pattern are specified in `/wd/fs_afc.yaml` (`u
 
 General format of this script invocation is:
 
-`$ ./fs_afc.py --server_url $ULS_AFC_URL [PARAMETERS] FS_DATABASE`
+`$ ./fs_afc.py --server_url $ULS_AFC_URL [PARAMETERS] FS_DATABASE`  
+Here `FS_DATABASE` may have path - same as should b eused in AFC Config.
 
 Parameters are:
 

@@ -263,8 +263,11 @@ class VendorExtensionFilter:
         # GUI
         _Whitelist(
             ["openAfc.redBlackData", "openAfc.mapinfo"],
-            _WhitelistType(is_input=False, is_message=False, is_gui=True))]
-
+            _WhitelistType(is_input=False, is_message=False, is_gui=True)),
+        _Whitelist(
+            ["openAfc.heatMap"],
+            _WhitelistType(is_input=True, is_gui=True))]
+ 
     def __init__(self):
         """ Constructor """
         # Maps whitelist types to sets of allowed extensions
@@ -418,33 +421,33 @@ def success_done(t):
     LOGGER.debug('resp_data size=%d', sys.getsizeof(resp_data))
     resp_json = json.loads(zlib.decompress(resp_data, 16 + zlib.MAX_WBITS))
 
-    if task_stat['runtime_opts'] & RNTM_OPT_GUI:
-        # Add the map data file (if it is generated) into a vendor extension
-        kmz_data = None
-        try:
-            with dataif.open(os.path.join("/responses", t.getId(), "results.kmz")) as hfile:
-                kmz_data = hfile.read()
-        except:
-            pass
-        map_data = None
-        try:
-            with dataif.open(os.path.join("/responses", t.getId(), "mapData.json.gz")) as hfile:
-                map_data = hfile.read()
-        except:
-            pass
-        if kmz_data or map_data:
-            # TODO: temporary support python2 where kmz_data is of type str
-            if isinstance(kmz_data, str):
-                kmz_data = kmz_data.encode('base64')
-            if isinstance(kmz_data, bytes):
-                kmz_data = kmz_data.decode('iso-8859-1')
-            resp_json["availableSpectrumInquiryResponses"][0].setdefault("vendorExtensions", []).append({
-                "extensionId": "openAfc.mapinfo",
-                "parameters": {
-                    "kmzFile": kmz_data if kmz_data else None,
-                    "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None
-                }
-                })
+    # if task_stat['runtime_opts'] & RNTM_OPT_GUI:
+    # Add the map data file (if it is generated) into a vendor extension
+    kmz_data = None
+    try:
+        with dataif.open(os.path.join("/responses", t.getId(), "results.kmz")) as hfile:
+            kmz_data = hfile.read()
+    except:
+        pass
+    map_data = None
+    try:
+        with dataif.open(os.path.join("/responses", t.getId(), "mapData.json.gz")) as hfile:
+            map_data = hfile.read()
+    except:
+        pass
+    if kmz_data or map_data:
+        # TODO: temporary support python2 where kmz_data is of type str
+        if isinstance(kmz_data, str):
+            kmz_data = kmz_data.encode('base64')
+        if isinstance(kmz_data, bytes):
+            kmz_data = kmz_data.decode('iso-8859-1')
+        resp_json["availableSpectrumInquiryResponses"][0].setdefault("vendorExtensions", []).append({
+            "extensionId": "openAfc.mapinfo",
+            "parameters": {
+                "kmzFile": kmz_data if kmz_data else None,
+                "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None
+            }
+            })
     get_vendor_extension_filter().filter(
         resp_json, is_input=False,
         is_gui=bool(task_stat['runtime_opts'] & RNTM_OPT_GUI),
@@ -570,6 +573,12 @@ class RatAfc(MethodView):
         if cert_id == "TestCertificationId" \
            and serial_number == "TestSerialNumber":
             return True
+
+        if cert_id == "HeatMapCertificationId" \
+           and serial_number == "HeatMapSerialNumber":
+            return True
+        
+
 
         # Assume that once we got here, we already trim the cert_obj list down
         # to only one entry for the country we're operating in

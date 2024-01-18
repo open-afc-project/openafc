@@ -14,9 +14,9 @@ OIDC relies on an identity provider outside of the AFC server to verify the user
 
 Background on OIDC can be found here: https://openid.net/connect/
 
-## **OIDC Configuration **
+## OIDC Configuration
 ### Use Json file
-The preferred method is to use an oidc config file in json format, e.g.:
+The preferred method is to use an oidc config file in json format, e.g. file oidc.json :
 ```
 {
     "OIDC_LOGIN":"True",
@@ -25,8 +25,8 @@ The preferred method is to use an oidc config file in json format, e.g.:
     "OIDC_DISCOVERY_URL":"https://accounts.mycompany.com"
 }
 ```
-The path to the config file can be put in a mounted file, passed to the container via environment variable OIDC_ARG. This can be done via docker-compose file, or secrets
-For example, docker-compose.yaml:
+
+And in docker-compose.yaml:
 ```
 rat_server:
         volumes:
@@ -34,6 +34,14 @@ rat_server:
 
         environment:
         - OIDC_ARG=/localpath/oidc.json
+```
+In the above, OIDC_CLIENT_ID and OIDC_CLIENT_SECRET are the information which your server needs to present to the identity server to verify a user.  OIDC_DISCOVERY_URL is the url which returns various urls needed for verification.  One example of such discovery url is https://accounts.google.com/.well-known/openid-configuration
+
+The path to the config file can be put in a mounted file, passed to the container via environment variable OIDC_ARG. This can be done via docker-compose file, or secrets
+
+Note that the path must be accessible to the httpd which runs as fbrat username and fbrat group
+```
+chown -R 1003:1003 /localpath
 ```
 ### Use Environment Variables
 The alternative method is to use environment variables to pass each parameter, e.g.
@@ -46,10 +54,6 @@ OIDC_CLIENT_SECRET = 'my_secret_string'
 OIDC_DISCOVERY_URL = 'https://accounts.mycompany.com'
 ```
 
-Note that the path must be accessible to the httpd which runs as fbrat username and fbrat group
-```
-chown -R 1003:1003 /localpath
-```
 
 More information on creating your own google cloud account can be found here:
 https://cloud.google.com/apigee/docs/hybrid/v1.3/precog-gcpaccount
@@ -61,6 +65,6 @@ With OIDC method, the user acounts are stored in the identity server which maint
 To facilitate switching real (non test) accounts, when a user logs in for the first time via OIDC, and the email address from the OIDC identity server matches an existing user in the database, that existing account is converted while retaining all roles. Thus, when logging in via WEB GUI, the user has the same access as before the switch.
 
 ## **Switching from OIDC to non OIDC login method**
-Accounts that are maintained exclusively by OIDC identity provider are not maintained locally, so they cannot be logged in via the WEB GUI unless the admin modify the password. Accounts created via CLI can be logged in using the same password used in the CLI to create them.
+Accounts that are maintained exclusively by OIDC identity provider are not maintained locally. So, after the switch to non OIDC, they cannot be logged in via the WEB GUI unless the admin modify the password. Accounts created via CLI can be logged in using the same password used in the CLI to create them.
 
 In non OIDC, any account's  password can be modified by the admin.  This is true even for accounts that were maintained by OIDC.  However, note that the newly modified password is not recognised by OIDC, and if switched back to OIDC mode again, the password used by the OIDC identity server must be used to login.

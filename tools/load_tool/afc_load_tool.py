@@ -12,7 +12,7 @@
 # pylint: disable=too-few-public-methods, logging-fstring-interpolation
 # pylint: disable=too-many-instance-attributes, broad-exception-caught
 # pylint: disable=too-many-branches, too-many-nested-blocks
-# pylint: disable=too-many-statements
+# pylint: disable=too-many-statements, eval-used
 
 import argparse
 from collections.abc import Iterable, Iterator
@@ -502,10 +502,13 @@ class AfcReqRespGenerator:
     _max_lat          -- Copy of cfg.region.max_lat
     _min_lon          -- Copy of cfg.region.min_lon
     _max_lon          -- Copy of cfg.region.max_lon
+    _default_height   -- AP height to use when there is no randomization
     _channels_20mhz   -- Copy of cfg._channels_20mhz
     _randomize        -- True to choose AP positions randomly (uniformly or
                          according to population density). False to use request
                          index (to make caching possible)
+    _random_height    -- Formula for random height in string form. Evaluated
+                         with 'r' local value, randomly distributed in [0, 1]
     _population_db    -- Population density database name. None for uniform
     _db_conn          -- None or SQLite3 connection
     _db_cur           -- None or SQLite3 cursor
@@ -540,8 +543,13 @@ class AfcReqRespGenerator:
         self._max_lat = cfg.region.max_lat
         self._min_lon = cfg.region.min_lon
         self._max_lon = cfg.region.max_lon
+        self._default_height = \
+            path_get(
+                path_get(self._req_msg_pattern, self._paths.reqs_in_msg)[0],
+                self._paths.height_in_req)
         self._channels_20mhz = cfg.channels_20mhz
         self._randomize = randomize
+        self._random_height = cfg.region.random_height
         self._population_db = population_db
         self._db_conn: Optional[sqlite3.Connection] = None
         self._db_cur: Optional[sqlite3.Cursor] = None
@@ -570,9 +578,10 @@ class AfcReqRespGenerator:
             path_set(req, self._paths.id_in_req, self._req_id(req_idx,
                                                               idx_in_msg))
             path_set(req, self._paths.serial_in_req, self._serial(req_idx))
-            lat, lon = self._get_position(req_idx=req_idx)
+            lat, lon, height = self._get_position(req_idx=req_idx)
             path_set(req, self._paths.lat_in_req, lat)
             path_set(req, self._paths.lon_in_req, lon)
+            path_set(req, self._paths.height_in_req, height)
             reqs.append(req)
         path_set(msg, self._paths.reqs_in_msg, reqs)
         return msg
@@ -620,17 +629,23 @@ class AfcReqRespGenerator:
         """ AP Serial Number for given request index """
         return f"AFC_LOAD_{req_idx:08}"
 
-    def _get_position(self, req_idx: int) -> Tuple[float, float]:
-        """ Returns (lat_deg, lon_deg) position for given request index """
+    def _get_position(self, req_idx: int) -> Tuple[float, float, float]:
+        """ Returns (lat_deg, lon_deg, height_m) position for given request
+        index """
+        height = \
+            eval(self._random_height, None, {"r": random.uniform(0, 1)}) \
+            if self._randomize else self._default_height
         if self._population_db is None:
             if self._randomize:
                 return (random.uniform(self._min_lat, self._max_lat),
-                        random.uniform(self._min_lon, self._max_lon))
+                        random.uniform(self._min_lon, self._max_lon),
+                        height)
             return (self._min_lat +
                     (req_idx // self._grid_size) *
                     (self._max_lat - self._min_lat) / self._grid_size,
                     (req_idx % self._grid_size) *
-                    (self._max_lon - self._min_lon) / self._grid_size)
+                    (self._max_lon - self._min_lon) / self._grid_size,
+                    height)
         if self._db_conn is None:
             self._db_conn = \
                 sqlite3.connect(f"file:{self._population_db}?mode=ro",
@@ -649,8 +664,8 @@ class AfcReqRespGenerator:
         min_lat, max_lat, min_lon, max_lon = rows.fetchall()[0]
         if self._randomize:
             return (random.uniform(min_lat, max_lat),
-                    random.uniform(min_lon, max_lon))
-        return ((min_lat + max_lat) / 2, (min_lon + max_lon) / 2)
+                    random.uniform(min_lon, max_lon), height)
+        return ((min_lat + max_lat) / 2, (min_lon + max_lon) / 2, height)
 
 
 class RestDataHandlerBase:
@@ -843,6 +858,8 @@ class WorkerResultInfo(NamedTuple):
     result_data: Optional[bytes] = None
     # Error message for failed requests, None for succeeded
     error_msg: Optional[str] = None
+    # Optional request data
+    req_data: Optional[bytes] = None
 
 
 # Message from Tick worker for EMA rate computation
@@ -966,13 +983,15 @@ class ResultsProcessor:
     _rest_data_handler   -- Generator/interpreter of REST request/response
                             data. None for netload test
     _num_workers         -- Number of worker processes
+    _err_dir             -- None or directory for failed requests
     _status_printer      -- StatusPrinter
     """
     def __init__(
             self, netload: bool, total_requests: int,
             result_queue: "multiprocessing.Queue[ResultQueueDataType]",
             num_workers: int, status_period: int,
-            rest_data_handler: Optional[RestDataHandlerBase]) -> None:
+            rest_data_handler: Optional[RestDataHandlerBase],
+            err_dir: Optional[str]) -> None:
         """ Constructor
 
         Arguments:
@@ -988,6 +1007,7 @@ class ResultsProcessor:
                              not print status (except in the end)
         rest_data_handler -- Generator/interpreter of REST request/response
                              data
+        err_dir           -- None or directory for failed requests
         """
         self._netload = netload
         self._total_requests = total_requests
@@ -995,6 +1015,7 @@ class ResultsProcessor:
         self._status_period = status_period
         self._num_workers = num_workers
         self._rest_data_handler = rest_data_handler
+        self._err_dir = err_dir
         self._status_printer = StatusPrinter()
 
     def process(self) -> None:
@@ -1099,6 +1120,19 @@ class ResultsProcessor:
                     requests_failed += num_requests
                 else:
                     requests_failed += len(error_map)
+                if self._err_dir and result_info.req_data and \
+                        (result_info.error_msg or error_map):
+                    try:
+                        filename = \
+                            os.path.join(
+                                self._err_dir,
+                                datetime.datetime.now().strftime(
+                                    "err_req_%y%m%d_%H%M%S_%f.json"))
+                        with open(filename, "wb") as f:
+                            f.write(result_info.req_data)
+                    except OSError as ex:
+                        error(f"Failed to write failed request file "
+                              f"'{filename}': {repr(ex)}")
                 cpu_consumed_ns += result_info.cpu_consumed_ns
 
                 if self._status_period and \
@@ -1127,20 +1161,22 @@ def post_req_worker(
         url: str, retries: int, backoff: float, dry: bool,
         post_req_queue: multiprocessing.Queue,
         result_queue: "multiprocessing.Queue[ResultQueueDataType]",
-        dry_result_data: Optional[bytes], use_requests: bool) -> None:
+        dry_result_data: Optional[bytes], use_requests: bool,
+        return_requests: bool = False) -> None:
     """ REST API POST worker
 
     Arguments:
-    url            -- REST API URL to send POSTs to
-    retries        -- Number of retries
-    backoff        -- Initial backoff window in seconds
-    dry            -- True to dry run
-    post_req_queue -- Request queue. Elements are PostWorkerReqInfo objects
-                      corresponding to single REST API post or None to stop
-                      operation
-    result_queue   -- Result queue. Elements added are WorkerResultInfo for
-                      operation results, None to signal that worker finished
-    use_requests   -- True to use requests, False to use urllib.request
+    url             -- REST API URL to send POSTs to
+    retries         -- Number of retries
+    backoff         -- Initial backoff window in seconds
+    dry             -- True to dry run
+    post_req_queue  -- Request queue. Elements are PostWorkerReqInfo objects
+                       corresponding to single REST API post or None to stop
+                       operation
+    result_queue    -- Result queue. Elements added are WorkerResultInfo for
+                       operation results, None to signal that worker finished
+    use_requests    -- True to use requests, False to use urllib.request
+    return_requests -- True to return requests in WorkerResultInfo
     """
     try:
         session: Optional[requests.Session] = \
@@ -1205,7 +1241,9 @@ def post_req_worker(
                 WorkerResultInfo(
                     req_indices=req_info.req_indices, retries=attempts - 1,
                     result_data=result_data, error_msg=error_msg,
-                    cpu_consumed_ns=new_proc_time_ns - prev_proc_time_ns))
+                    cpu_consumed_ns=new_proc_time_ns - prev_proc_time_ns,
+                    req_data=req_info.req_data if return_requests and (not dry)
+                    else None))
             prev_proc_time_ns = new_proc_time_ns
     except Exception as ex:
         logging.error(f"Worker failed: {repr(ex)}\n"
@@ -1218,7 +1256,7 @@ def get_req_worker(
         dry: bool, get_req_queue: multiprocessing.Queue,
         result_queue: "multiprocessing.Queue[ResultQueueDataType]",
         use_requests: bool) -> None:
-    """ REST API POST worker
+    """ REST API GET worker
 
     Arguments:
     url           -- REST API URL to send POSTs to
@@ -1370,7 +1408,7 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
         netload_target: Optional[str] = None,
         expected_code: Optional[int] = None, min_idx: Optional[int] = None,
         max_idx: Optional[int] = None, count: Optional[int] = None,
-        use_requests: bool = False) -> None:
+        use_requests: bool = False, err_dir: Optional[str] = None) -> None:
     """ Run the POST operation
 
     Arguments:
@@ -1395,6 +1433,7 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
                          If specified - request indices will be randomized
     use_requests      -- Use requests to send requests (default is to use
                          urllib.request)
+    err_dir           -- None or directory for failed requests
     """
     error_if(use_requests and ("requests" not in sys.modules),
              "'requests' Python3 module have to be installed to use "
@@ -1413,7 +1452,7 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
     logging.info(f"Nonreconnect mode: {use_requests}")
     if status_period:
         logging.info(f"Intermediate status is printed every "
-                     f"{status_period} requests sent")
+                     f"{status_period} requests completed")
     else:
         logging.info("Intermediate status is not printed")
     if dry:
@@ -1424,6 +1463,11 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
     workers: List[multiprocessing.Process] = []
     original_sigint_handler = signal.signal(signal.SIGINT, signal.SIG_IGN)
     ticker: Optional[Ticker] = None
+    if err_dir:
+        try:
+            os.makedirs(err_dir, exist_ok=True)
+        except OSError as ex:
+            error(f"Failed to create directory '{err_dir}': {repr(ex)}")
     try:
         req_worker_kwargs: Dict[str, Any] = {
             "url": url, "backoff": backoff, "retries": retries,
@@ -1440,6 +1484,7 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
             req_worker_kwargs["post_req_queue"] = req_queue
             req_worker_kwargs["dry_result_data"] = \
                 rest_data_handler.dry_result_data(batch)
+            req_worker_kwargs["return_requests"] = err_dir is not None
         for _ in range(parallel):
             workers.append(
                 multiprocessing.Process(target=req_worker,
@@ -1462,7 +1507,7 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
                 netload=netload_target is not None,
                 total_requests=total_requests, result_queue=result_queue,
                 num_workers=parallel, status_period=status_period,
-                rest_data_handler=rest_data_handler)
+                rest_data_handler=rest_data_handler, err_dir=err_dir)
         results_processor.process()
         for worker in workers:
             worker.join()
@@ -1561,24 +1606,27 @@ def get_afc_config(cfg: Config, args: Any,
 
 
 def patch_json(patch_arg: Optional[List[str]], json_dict: Dict[str, Any],
-               data_type: str) -> Dict[str, Any]:
+               data_type: str, new_type: Optional[str] = None) \
+        -> Dict[str, Any]:
     """ Modify JSON object with patches from command line
 
     Arguments:
     patch_arg -- Optional list of FIELD1=VALUE1[,FIELD2=VALUE2...] patches
     json_dict -- JSON dictionary to modify
     data_type -- Patch of what - to be used in error messages
+    new_type  -- None or type of new values for previously nonexisted keys
     returns modified dictionary
     """
     if not patch_arg:
         return json_dict
     ret = copy.deepcopy(json_dict)
     for patches in patch_arg:
-        for patch in patches.split(","):
+        for patch in patches.split(";"):
             error_if("=" not in patch,
                      f"Invalid syntax: {data_type} setting '{patch}' doesn't "
                      f"have '='")
             field, value = patch.split("=", 1)
+            new_key = False
             super_obj: Any = None
             obj: Any = ret
             last_idx: Any = None
@@ -1599,27 +1647,47 @@ def patch_json(patch_arg: Optional[List[str]], json_dict: Dict[str, Any],
                     error_if(not isinstance(obj, dict),
                              f"Key '{idx}' in {data_type} setting '{patch}' "
                              f"can't be applied to nondictionary entity")
-                    error_if(idx not in obj,
-                             f"Key '{idx}' of setting '{patch}' not found in "
-                             f"{data_type}")
+                    if idx not in obj:
+                        error_if(not new_type,
+                                 f"Key '{idx}' of setting '{patch}' not found "
+                                 f"in {data_type}")
+                        obj[idx] = {}
+                        new_key = True
                 obj = obj[idx]
                 last_idx = idx
-            error_if(isinstance(obj, (list, dict)),
-                     f"'{field}' of {data_type} setting '{patch}' does not "
-                     f"address scalar value")
+            error_if(
+                (isinstance(obj, dict) and (not new_key)) or
+                (isinstance(obj, list) and (not value.startswith("["))),
+                f"'{field}' of {data_type} setting '{patch}' does not address "
+                f"scalar value")
             try:
-                if isinstance(obj, int):
+                if isinstance(obj, int) or (new_key and (new_type == "int")):
                     try:
                         super_obj[last_idx] = int(value)
                     except ValueError:
+                        if new_key and (new_type == "int"):
+                            raise
                         super_obj[last_idx] = float(value)
-                elif isinstance(obj, float):
+                elif isinstance(obj, float) or \
+                        (new_key and (new_type == "float")):
                     super_obj[last_idx] = float(value)
+                elif isinstance(obj, bool) or \
+                        (new_key and (new_type == "bool")):
+                    if value.lower() in ("1", "y", "t", "yes", "true", "+"):
+                        super_obj[last_idx] = True
+                    elif value.lower() in ("0", "n", "f", "no", "false", "-"):
+                        super_obj[last_idx] = False
+                    else:
+                        raise TypeError(f"'{value}' is bot a valid boolean "
+                                        "representation")
+                elif isinstance(obj, list) or \
+                        (new_key and (new_type == "list")):
+                    super_obj[last_idx] = json.loads(value)
                 else:
                     super_obj[last_idx] = value
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, json.JSONDecodeError) as ex:
                 error(f"'{value}' of {data_type} setting '{patch}' has "
-                      f"invalid type")
+                      f"invalid type/formatting: {repr(ex)}")
     return ret
 
 
@@ -1749,7 +1817,7 @@ def do_load(cfg: Config, args: Any) -> None:
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
         max_idx=max_idx, status_period=args.status_period, count=args.count,
-        use_requests=args.no_reconnect)
+        use_requests=args.no_reconnect, err_dir=args.err_dir)
 
 
 def do_netload(cfg: Config, args: Any) -> None:
@@ -1847,7 +1915,7 @@ def do_afc_config(cfg: Config, args: Any) -> None:
     afc_config_str = \
         json.dumps(
             patch_json(patch_arg=args.FIELD_VALUE, json_dict=afc_config,
-                       data_type="AFC Config"))
+                       new_type=args.new, data_type="AFC Config"))
     result = \
         ratdb(
             cfg=cfg,
@@ -1920,13 +1988,14 @@ def main(argv: List[str]) -> None:
         help=f"Number of requests in one REST API call. Default is "
         f"{cfg.defaults.batch}")
     switches_req.add_argument(
-        "--req", metavar="FIELD1=VALUE1[,FIELD2=VALUE2...]", action="append",
+        "--req", metavar="FIELD1=VALUE1[;FIELD2=VALUE2...]", action="append",
         default=[],
         help="Change field(s) in request body (compared to req_msg_pattern "
         "in config file). FIELD is dot-separated path to field inside request "
-        "(e.g. 'location.ellipse.majorAxis'), VALUE is a field value. Several "
-        "comma-separated settings may be specified, also this parameter may "
-        "be specified several times")
+        "(e.g. 'location.ellipse.majorAxis'), VALUE is a field value, if "
+        "field value is list - it should be surrounded by [] and formatted as "
+        "in JSON. Several semicolon-separated settings may be specified, also "
+        "this parameter may be specified several times")
 
     switches_count = argparse.ArgumentParser(add_help=False)
     switches_count.add_argument(
@@ -1980,7 +2049,7 @@ def main(argv: List[str]) -> None:
 
     parser_preload = subparsers.add_parser(
         "preload",
-        parents=[switches_common, switches_req, switches_compose,
+        parents=[switches_common, switches_rat, switches_req, switches_compose,
                  switches_rcache],
         help="Fill rcache with (fake) responses")
     parser_preload.add_argument(
@@ -1993,7 +2062,7 @@ def main(argv: List[str]) -> None:
     parser_load = subparsers.add_parser(
         "load",
         parents=[switches_common, switches_req, switches_count,
-                 switches_compose, switches_afc, switches_rat],
+                 switches_compose, switches_afc],
         help="Do load test")
     parser_load.add_argument(
         "--no_cache", action="store_true",
@@ -2004,6 +2073,9 @@ def main(argv: List[str]) -> None:
         "given database (prepared with "
         "tools/geo_converters/make_population_db.py). Positions are random, "
         "so no rcache will help")
+    parser_load.add_argument(
+        "--err_dir", metavar="DIRECTORY",
+        help="Directory for offending JSON AFC Requests")
     parser_load.add_argument(
         "--random", action="store_true",
         help="Choose AP positions randomly (makes sense only in noncached "
@@ -2039,15 +2111,22 @@ def main(argv: List[str]) -> None:
     parser_cache.set_defaults(func=do_cache)
 
     parser_afc_config = subparsers.add_parser(
-        "afc_config", help="Modify AFC Config")
+        "afc_config", parents=[switches_rat], help="Modify AFC Config")
     parser_afc_config.add_argument(
         "--comp_proj", metavar="PROJ_NAME", required=True,
         help="Docker compose project name. This parameter is mandatory")
     parser_afc_config.add_argument(
+        "--new", metavar="VALUE_TYPE",
+        choices=["str", "int", "float", "bool", "list"],
+        help="Allow creation of new AFC Config keys (requires respective "
+        "changes in AFC Engine). Created keys will be of given type")
+    parser_afc_config.add_argument(
         "FIELD_VALUE", nargs="+",
         help="One or more FIELD=VALUE clauses, where FIELD is a field name in "
         "AFC Config, deep field may be specified in dot-separated for m (e.g. "
-        "'freqBands.0.startFreqMHz'). VALUE is new field value")
+        "'freqBands.0.startFreqMHz'). VALUE is new field value, if field "
+        "value is list - it should be surrounded by [] and formatted as in "
+        "JSON")
     parser_afc_config.set_defaults(func=do_afc_config)
 
     parser_help = subparsers.add_parser(
