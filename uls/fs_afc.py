@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Makes AFC Requests with custom FS database
+""" Makes AFC Requests with custom FS database """
 
 # Copyright (C) 2022 Broadcom. All rights reserved.
 # The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
@@ -278,7 +278,8 @@ def main(argv: List[str]) -> None:
         "--failed_json", metavar="FILENAME",
         help="Write json that caused fail to file")
     argument_parser.add_argument(
-        "FS_DATABASE", help="FS (aka ULS) database (.sqlite3 file) to use")
+        "FS_DATABASE", help="FS (aka ULS) database (.sqlite3 file) to use. "
+        "Should have exactly same path as AFC Config requires")
 
     if not argv:
         argument_parser.print_help()

@@ -46,10 +46,11 @@ FROM alpine:3.18
 # DOWNLOADER SERVICE PARAMETERS
 
 # Where to directory with ULS databases is mapped
-ENV ULS_EXT_DB_DIR=/rat_transfer/ULS_Database
+ENV ULS_EXT_DB_DIR=/
 
-# Symlink that points to recent ULS database
-ENV ULS_CURRENT_DB_SYMLINK=FS_LATEST.sqlite3
+# Symlink that points to recent ULS database. May include path, that is used to
+# override fsDatabaseFile in AFC Config
+ENV ULS_CURRENT_DB_SYMLINK=rat_transfer/ULS_Database/FS_LATEST.sqlite3
 
 # Name of RAS database (as mapped from external storage)
 ENV ULS_EXT_RAS_DATABASE=/rat_transfer/RAS_Database/RASdatabase.dat

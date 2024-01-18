@@ -5,6 +5,8 @@ import { logger } from "./Logger";
 import { delay } from "./Utils";
 import { hasRole } from "./User";
 import { resolve } from "path";
+import { AvailableSpectrumInquiryRequest, CertificationId, VendorExtension } from "./RatAfcTypes";
+
 
 /**
  * RatApi.ts: member values and functions for utilizing server ratpi services
@@ -115,13 +117,13 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
         "terrainSource": "3DEP (30m)"
     },
     "propagationEnv": "NLCD Point",
-    "ulsDatabase": "FS_LATEST.sqlite3",
+    "fsDatabaseFile": "rat_transfer/ULS_Database/FS_LATEST.sqlite3",
     "regionStr": "US",
     "APUncertainty": {
         "points_per_degree": 3600,
         "height": 5,
         "maxVerticalUncertainty": 100,
-        "maxHorizontalUncertaintyDistance" : 650
+        "maxHorizontalUncertaintyDistance": 650
     },
     "ITMParameters": {
         "polarization": "Vertical",
@@ -152,8 +154,18 @@ const defaultAfcConf: () => AFCConfigFile = () => ({
     "reportUnavailableSpectrum": true,
     "reportUnavailPSDdBPerMHz": -40,
     "inquiredFrequencyResolutionMHz": 1,
+    "globeDir": "rat_transfer/globe",
     "srtmDir": "rat_transfer/srtm3arcsecondv003",
     "depDir": "rat_transfer/3dep/1_arcsec",
+    "cdsmDir": "",
+    "lidarDir": "rat_transfer/proc_lidar_2019",
+    "nfaTableFile": "rat_transfer/nfa/nfa_table_data.csv",
+    "prTableFile": "rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv",
+    "radioClimateFile": "rat_transfer/itudata/TropoClim.txt",
+    "surfRefracFile": "rat_transfer/itudata/N050.TXT",
+    "rainForestFile": "",
+    "regionDir": "rat_transfer/population",
+    "worldPopulationFile": "rat_transfer/population/gpw_v4_population_density_rev11_2020_30_sec.tif",
     "roundPSDEIRPFlag": true,
 });
 
@@ -214,13 +226,13 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
         "rlanITMTxClutterMethod": "FORCE_TRUE",
     },
     "propagationEnv": "NLCD Point",
-    "ulsDatabase": "FS_LATEST.sqlite3",
+    "fsDatabaseFile": "rat_transfer/ULS_Database/FS_LATEST.sqlite3",
     "regionStr": "CA",
     "APUncertainty": {
         "points_per_degree": 3600,
         "height": 5,
         "maxVerticalUncertainty": 100,
-        "maxHorizontalUncertaintyDistance" : 650
+        "maxHorizontalUncertaintyDistance": 650
     },
     "ITMParameters": {
         "polarization": "Vertical",
@@ -236,7 +248,6 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
         "p2108Confidence": 5,
         "maxFsAglHeight": 6
     },
-    "nlcdFile": "rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif",
     "enableMapInVirtualAp": false,
     "channelResponseAlgorithm": "pwr",
     "visibilityThreshold": -6,
@@ -254,6 +265,16 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     "srtmDir": "rat_transfer/srtm3arcsecondv003",
     "depDir": "rat_transfer/3dep/1_arcsec_wgs84",
     "cdsmDir": "rat_transfer/cdsm/3ov4_arcsec_wgs84",
+    "globeDir": "rat_transfer/globe",
+    "lidarDir": "rat_transfer/proc_lidar_2019",
+    "nfaTableFile": "rat_transfer/nfa/nfa_table_data.csv",
+    "prTableFile": "rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv",
+    "radioClimateFile": "rat_transfer/itudata/TropoClim.txt",
+    "surfRefracFile": "rat_transfer/itudata/N050.TXT",
+    "rainForestFile": "",
+    "nlcdFile": "rat_transfer/nlcd/ca/landcover-2020-classification_resampled.tif",
+    "regionDir": "rat_transfer/population",
+    "worldPopulationFile": "rat_transfer/population/gpw_v4_population_density_rev11_2020_30_sec.tif",
     "cdsmLOSThr": 0.5,
     "roundPSDEIRPFlag": false,
 });
@@ -313,13 +334,13 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
         "terrainSource": "SRTM (30m)"
     },
     "propagationEnv": "Population Density Map",
-    "ulsDatabase": "FS_LATEST.sqlite3",
+    "fsDatabaseFile": "rat_transfer/ULS_Database/FS_LATEST.sqlite3",
     "regionStr": "BR",
     "APUncertainty": {
         "points_per_degree": 3600,
         "height": 5,
         "maxVerticalUncertainty": 100,
-        "maxHorizontalUncertaintyDistance" : 650
+        "maxHorizontalUncertaintyDistance": 650
     },
     "ITMParameters": {
         "polarization": "Vertical",
@@ -353,6 +374,17 @@ const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
     "srtmDir": "rat_transfer/srtm1arcsecond_wgs84",
     "rainForestFile": "rat_transfer/population/Brazil_AmazonRainForest.kml",
     "roundPSDEIRPFlag": false,
+    "depDir": "rat_transfer/3dep/1_arcsec_wgs84",
+    "cdsmDir": "rat_transfer/cdsm/3ov4_arcsec_wgs84",
+    "globeDir": "rat_transfer/globe",
+    "lidarDir": "rat_transfer/proc_lidar_2019",
+    "nfaTableFile": "rat_transfer/nfa/nfa_table_data.csv",
+    "prTableFile": "rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv",
+    "radioClimateFile": "rat_transfer/itudata/TropoClim.txt",
+    "surfRefracFile": "rat_transfer/itudata/N050.TXT",
+    "regionDir": "rat_transfer/population",
+    "worldPopulationFile": "rat_transfer/population/gpw_v4_population_density_rev11_2020_30_sec.tif",
+
 });
 
 const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
@@ -410,13 +442,13 @@ const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
         "terrainSource": "SRTM (30m)"
     },
     "propagationEnv": "NLCD Point",
-    "ulsDatabase": "FS_LATEST.sqlite3",
+    "fsDatabaseFile": "rat_transfer/ULS_Database/FS_LATEST.sqlite3",
     "regionStr": "GB",
     "APUncertainty": {
         "points_per_degree": 3600,
         "height": 5,
         "maxVerticalUncertainty": 100,
-        "maxHorizontalUncertaintyDistance" : 650
+        "maxHorizontalUncertaintyDistance": 650
     },
     "ITMParameters": {
         "polarization": "Vertical",
@@ -449,6 +481,18 @@ const defaultAfcConfUnitedKingdom: () => AFCConfigFile = () => ({
     "inquiredFrequencyResolutionMHz": 20,
     "srtmDir": "rat_transfer/srtm1arcsecond_wgs84",
     "roundPSDEIRPFlag": false,
+    "depDir": "rat_transfer/3dep/1_arcsec_wgs84",
+    "cdsmDir": "rat_transfer/cdsm/3ov4_arcsec_wgs84",
+    "globeDir": "rat_transfer/globe",
+    "lidarDir": "rat_transfer/proc_lidar_2019",
+    "nfaTableFile": "rat_transfer/nfa/nfa_table_data.csv",
+    "prTableFile": "rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv",
+    "radioClimateFile": "rat_transfer/itudata/TropoClim.txt",
+    "surfRefracFile": "rat_transfer/itudata/N050.TXT",
+    "rainForestFile": "",
+    "regionDir": "rat_transfer/population",
+    "worldPopulationFile": "rat_transfer/population/gpw_v4_population_density_rev11_2020_30_sec.tif",
+
 });
 
 
@@ -565,8 +609,8 @@ export const getAboutAfc = (): Promise<RatResponse<string>> => (
     })
 )
 
-export const setAboutAfc = async (name: string, email: string, org:string, token:string ): Promise<RatResponse<string>> => {
-    let csrf_token = await(getCSRF());
+export const setAboutAfc = async (name: string, email: string, org: string, token: string): Promise<RatResponse<string>> => {
+    let csrf_token = await (getCSRF());
     return (fetch(guiConfig.about_url, {
         method: "POST",
         headers: {
@@ -714,7 +758,7 @@ export const getAllowedRanges = () =>
 
 // Update all the frequency ranges to a new set
 export const updateAllAllowedRanges = async (allRanges: FreqRange[]) => {
-    let csrf_token = await(getCSRF());
+    let csrf_token = await (getCSRF());
     return (fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
         method: "PUT",
         headers: {
@@ -747,7 +791,7 @@ export const updateAllowedRanges = async (regionStr: string, conf: FreqRange[]) 
         let updated = allRanges.filter((s) => s.region != regionStr).concat(conf);
         Promise.resolve(updated);
     }).then(async (newData) => {
-        let csrf_token = await(getCSRF());
+        let csrf_token = await (getCSRF());
         return (fetch(guiConfig.admin_url.replace('-1', 'frequency_range'), {
             method: "PUT",
             headers: {
@@ -771,8 +815,8 @@ export const updateAllowedRanges = async (regionStr: string, conf: FreqRange[]) 
 
 
 
-
-
+// The following are part of the original way that results were posted and polled to the server.
+// Could be deleted but would need to tear out all the references in the older code too
 /**
  * Helper method in request polling
  * @param url URL to fetch
@@ -869,7 +913,7 @@ function analysisContinuation<T>(isCanceled?: () => boolean, status?: (progress:
  * @returns Analysis results or error
  */
 export const phase1Analysis = async (params: PAWSRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<AnalysisResults>> => {
-    let csrf_token = await(getCSRF());
+    let csrf_token = await (getCSRF());
     return (fetch(guiConfig.rat_api_analysis.replace("p_request_type", "PointAnalysis"), {
         method: "POST",
         headers: {
@@ -894,7 +938,7 @@ export const phase1Analysis = async (params: PAWSRequest, isCanceled?: () => boo
  * @returns Exclusion zone result or error
  */
 export const runExclusionZone = async (params: ExclusionZoneRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void, setKml?: (kml: Blob) => void): Promise<RatResponse<ExclusionZoneResult>> => {
-    let csrf_token = await(getCSRF());
+    let csrf_token = await (getCSRF());
     return (fetch(guiConfig.rat_api_analysis.replace("p_request_type", "ExclusionZoneAnalysis"), {
         method: "POST",
         headers: {
@@ -918,7 +962,7 @@ export const runExclusionZone = async (params: ExclusionZoneRequest, isCanceled?
  * @returns Heat map result or error
  */
 export const runHeatMap = async (params: HeatMapRequest, isCanceled?: () => boolean, status?: (progress: { percent: number, message: string }) => void): Promise<RatResponse<HeatMapResult>> => {
-    let csrf_token = await(getCSRF());
+    let csrf_token = await (getCSRF());
     return (fetch(guiConfig.rat_api_analysis.replace("p_request_type", "HeatmapAnalysis"), {
         method: "POST",
         headers: {
@@ -940,7 +984,7 @@ export const runHeatMap = async (params: HeatMapRequest, isCanceled?: () => bool
  * @returns Success: number of rows in ULS file that could not be converted. Error: information on why file could not be converted
  */
 export const ulsFileConvert = async (fileName: string): Promise<RatResponse<{ invalidRows: number, errors: string[] }>> => {
-    let csrf_token = await(getCSRF());
+    let csrf_token = await (getCSRF());
     return (fetch(guiConfig.uls_convert_url.replace("p_uls_file", fileName), {
         method: "POST",
         headers: { 'X-CSRF-Token': csrf_token },
@@ -1006,6 +1050,8 @@ function ulsParseContinuation(isCanceled?: () => boolean, status?: (progress: { 
     }
 }
 
+// End old code
+
 /**
  * Cache an item in the global application cache
  * @param key address to store at
@@ -1065,3 +1111,43 @@ export const getCSRF = (): Promise<string> => (
             return ("");
         })
 )
+
+
+export const heatMapRequestObject = (v: VendorExtension, certificationId: CertificationId[], serialNumber: string): AvailableSpectrumInquiryRequest => {
+    let d =
+    {
+        deviceDescriptor: {
+            certificationId:certificationId,
+            serialNumber: serialNumber
+        },
+        inquiredChannels: [
+
+        ],
+        inquiredFrequencyRange: [
+            {
+                highFrequency: 6321,
+                lowFrequency: 6320
+            }
+        ],
+        location: {
+            elevation: {
+                height: 7,
+                heightType: "AGL",
+                verticalUncertainty: 0
+            },
+            ellipse: {
+                center: {
+                    latitude: 40.3965175101759,
+                    longitude: -74.2415393201817
+                },
+                majorAxis: 0,
+                minorAxis: 0,
+                orientation: 0
+            },
+            indoorDeployment: 0
+        },
+        requestId: "0",
+        vendorExtensions: [v]
+    }
+    return d;
+}

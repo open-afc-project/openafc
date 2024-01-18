@@ -836,7 +836,7 @@ This will wipe out existing users, e.g. user acounts need to be manually recreat
 rat-manage-api db-upgrade
 ```
 ## Managing user account
-Users can be removed. User roles can be added and removed.
+Users can be created and removed. User roles can be added and removed.
 Remove user with user remove command, e.g.:
 ```
 rat-manage-api user remove user@mycompany.com
@@ -846,9 +846,14 @@ Update user roles with user update command, e.g.:
 ```
 rat-manage-api user update --role Admin --role AP --role Analysis --email "user@mycompany.com"
 ```
+Create user with user create command.  If org argument is not given, the organization can be derived from the username if it's given in the form of an email address e.g.:
+```
+rat-manage-api user create --role Admin --role AP --role Analysis --org mycompany.com "username" "mypassword'
+
+```
 ## User roles
 Roles are: Super, admin, AP, Admin, Analysis, Trial
-"Super" is a new role, which allows access rights to all organizations, as opposed to "Admin", which is limited to one organization.  When upgrade from older system without "Super", you will need to decide which users to be assigned role of "Super" and update their roles via the user update command.
+"Super" is the highest level role, which allows access rights to all organizations, as opposed to "Admin", which is limited to one organization.  When upgrade from older system without "Super", you will need to decide which users to be assigned role of "Super" and update their roles via the user update command.
 
 ## MTLS
 Vanilla installation comes with placeholder file for client certificate bundle.

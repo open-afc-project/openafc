@@ -76,16 +76,19 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
         urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Stations_Data_Extracts.csv',          regionDataDir + '/SD.csv')
         urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Passive_Repeater_data_extract.csv',   regionDataDir + '/PP.csv')
         urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Passive_Reflectors_Data_Extract.csv', regionDataDir + '/PR.csv')
-        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/SMS_TAFL_Files/TAFL_LTAF_Fixe.zip',   'TAFL_LTAF_Fixe.zip')
-        zip_file = zipfile.ZipFile("TAFL_LTAF_Fixe.zip") # zip object
-        zip_file.extractall(regionDataDir) 
-        zip_file.close() 
-        if os.path.isfile(regionDataDir + '/TAFL_LTAF_Fixe.csv'):
-            os.rename(regionDataDir + '/TAFL_LTAF_Fixe.csv', regionDataDir + '/TA.csv')
-        elif os.path.isfile(regionDataDir + '/IC_TAFL_File_fixed.csv'):
-            os.rename(regionDataDir + '/IC_TAFL_File_fixed.csv', regionDataDir + '/TA.csv')
-        else:
-            raise Exception('ERROR: Unable to process CA file {}'.format("TAFL_LTAF_Fixe.zip"))
+
+
+        # Not processing transmitters for CA
+        # urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/SMS_TAFL_Files/TAFL_LTAF_Fixe.zip',   'TAFL_LTAF_Fixe.zip')
+        # zip_file = zipfile.ZipFile("TAFL_LTAF_Fixe.zip") # zip object
+        # zip_file.extractall(regionDataDir) 
+        # zip_file.close() 
+        # if os.path.isfile(regionDataDir + '/TAFL_LTAF_Fixe.csv'):
+        #     os.rename(regionDataDir + '/TAFL_LTAF_Fixe.csv', regionDataDir + '/TA.csv')
+        # elif os.path.isfile(regionDataDir + '/IC_TAFL_File_fixed.csv'):
+        #     os.rename(regionDataDir + '/IC_TAFL_File_fixed.csv', regionDataDir + '/TA.csv')
+        # else:
+        #     raise Exception('ERROR: Unable to process CA file {}'.format("TAFL_LTAF_Fixe.zip"))
 
         cmd = 'echo "Antenna Manufacturer,Antenna Model Number,Antenna Gain [dBi],Antenna Diameter,Beamwidth [deg],Last Updated,Pattern Type,Pattern Azimuth [deg],Pattern Attenuation [dB]" >| ' + regionDataDir + '/AP.csv'
         os.system(cmd)

@@ -1,5 +1,60 @@
 # Release Note
+
 ## **Version and Date**
+Version|3.8.13.0|
+| :- | :- |
+|**Date**|**01/05/2023**|
+|compiled server's version is 12969ba | git tag 3.8.13.0|
+
+## **Issues Addressed**
+* issue 773. afc_load_tool.py improvements (#774)
+* issue 767 uls downloader crash on catafl ltaf maritime tx (#771)
+* Issue 763 - updating readme with cleaned up language (#770)
+* Issue 768. Wrong diagnostics on ULS download fail (#769)
+* issue 764 refactor infra to be more generic (#765)
+* adding Permissions-Policy and Feature-Policy headers (#761)
+* issue 764758 move security headers from webui to dispatcher (#759)
+* Issue752. Fixing absent trailing slash in COPY to directory (#753)
+* Issue750. Add randomization and population to AFC load tool (#751)
+* enabling Secure and SameSite=Lax sttributes for session cookie (#756)
+* issue 748 Adding AFC_SERVER_NAME variable for hostname configurability (#749)
+* Issue 746 Fixing restart and dependency of prometheus-related services (#747)
+* Issue 744 Fixing wrong requirements.txt used in worker image (#745)
+* Issue 742: Setting rat_server base image to httpd:2.4.58-alpine3.18 (#743)
+* Issue 740: WAR for Externally managed environments when PEP 668 breaks pip (#741)
+* Issue 738: Switch ALS Siphon to Confluent Kafka (#739)
+* Jira OA-896 Switching from kafka-python to confluent-kafka on client side (#736)
+* Jira OA-893. afc_load_tool.py enhancements (#735)
+* Jira OA-890. Support for tiled NLCD (#730)
+* Jira OA-895 fix-cadvisor-nginxexporter-grafana-containers (#734)
+
+## **Version and Date**
+|Version|767-uls-downloader-crash-on-catafl_ltaf_maritime_tx
+| :- | :- |
+|**Date**|**01/04/2024**|
+
+## **Issues Addressed**
+* Remove downloading of FS TX files for Canada.
+
+## **Version and Date**
+|Version|**OA-221*|
+| :- | :- |
+|**Date**|**01/04/2024**|
+
+## **Issues Addressed**
+ * Jira OA-249: Bring back Heatmap
+ * Jira OA-221: Create pre-defined constants for file-paths in one place
+
+## **Interface Changes**
+ * OA-221: Updated afc-config.json with all the path directories required by the engine to do its computations
+
+## **Testing Done**
+ * Re-ran FSP-1 in Virtual AP and confirmed getting same response as before.
+ * Ran Heatmap analysis with various configurations and confirmed getting proper response. 
+
+## **Open Issues** 
+ * Add Heatmap analysis to Regression Tests.
+
 Version|3.8.12.0|
 | :- | :- |
 |**Date**|**12/05/2023**|

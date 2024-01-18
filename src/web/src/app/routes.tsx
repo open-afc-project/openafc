@@ -153,15 +153,20 @@ const ExclusionZone = () => {
   );
 }
 
+
+const heatMapResolves = async () => ({
+  limit: await getMinimumEIRP(),
+  rulesetIds: await getRulesetIds()
+})
 const getHeatMapModuleAsync = () => {
   return () => import(/* webpackChunkName: "heatMap" */ "./HeatMap/HeatMap");
 }
 const HeatMap = () => {
   return (
-    <DynamicImport load={getHeatMapModuleAsync()} resolve={limitResolves()}>
+    <DynamicImport load={getHeatMapModuleAsync()} resolve={heatMapResolves()}>
       {(Component: any, resolve) => {
         return Component === null ? <PageSection><Card><CardHeader>Loading...</CardHeader></Card></PageSection>
-          : <Component.HeatMap limit={resolve.limit} />
+          : <Component.HeatMap limit={resolve.limit} rulesetIds={resolve.rulesetIds} />
       }}
     </DynamicImport>
   );

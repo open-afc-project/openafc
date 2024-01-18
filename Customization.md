@@ -4,7 +4,7 @@ the software below.
 This work is licensed under the OpenAFC Project License, a copy of which is included with this software program.
 
 # About Page Customization
-Custom configuration can be done via environment variables or via json file.
+When a user first enter the webpage without loggin in, the about screen can be accessed on the navigation menu on the left side.  The about screen instructs the user of next steps to gain an account.  About page customization can be done via environment variables or via json file.
 ## Environment Variables
 ### Captcha
 Captcha configuration is needed if Captcha is to be enabled in the About page to protect the
@@ -19,7 +19,7 @@ CAPTCHA_VERIFY='url-to-verify-captcha'
 ```
 
 ### Optional Mail Server Configuration
-If not, specified, a local server implementation which does not use any encryption, is used.
+If not, specified, a local server implementation is used, which does not use any encryption.
 ```
 MAIL_SERVER= 'smtp.gmail.com'
 MAIL_PORT= 465
@@ -30,7 +30,7 @@ MAIL_PASSWORD = "password"
 ```
 
 ### Mail configuration
-Mail configuration specifies where email are sent, and what email account is used to send them.
+Mail configuration specifies where email are sent, and what email account is used to send them.  This is used by the AFC server to send notifications to the admin when a new user signs up. 
 This is required for a functional About page to handle access requests submitted via the web form.
 
 ```
@@ -91,7 +91,7 @@ private/
     templates/
     images/
 Under templates: various templates that can be used to customize various web form, for eg.
-    about.html: this can be customized to give detail instruction regarding the signup process
+    about.html: This is the page the user can access first to sign up as a new user.  This can be customized to give more detail sign up instruction
     flask_user_layout.html: to customize the login page for the non-OIDC method.
 Under images: the files here customize various images of the web page.
     logo.png: the company logo on the Information (i) page

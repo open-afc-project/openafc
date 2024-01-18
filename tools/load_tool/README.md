@@ -120,8 +120,8 @@ Parameters:
 |--status_period **N**|1000|Once in what number of requests to print intermediate statistics. 0 to not at all|
 |--dry||Don't actually send anything to servers. Useful to determine overhead of this script itself|
 |--comp_proj **PROJ**||Docker Compose project name (part before service name in container names) to use to determine IPs of services being used (*rat_server* and *rcache* for this subcommand)|
-|--rat_server **HOST[:PORT]**|rat_server|IP Address and/or of rat_server service. If not specified rat_service of compose project, specified by --comp_proj is used|
-|--rcache **HOST:PORT**|rcache:8000|IP Address and/or port of rcache service. If not specified rcache of compose project, specified by --comp_proj is used|
+|--rat_server **HOST[:PORT]**|rat_server|IP Address and maybe port of rat_server service. If not specified rat_service of compose project, specified by --comp_proj is used|
+|--rcache **HOST:PORT**|rcache:8000|IP Address and port of rcache service. If not specified rcache of compose project, specified by --comp_proj is used|
 |--protect_cache||Protect rcache from invalidation (by ULS downloader - not doing so may divert some requests to AFC Engine during `load` and thus degrade performance). Cache may be unprotected with `cache --unprotect` subcommand|
 |--no_reconnect||Every sender process establishes permanent connection to Rcache service and sends Rcache update requests over this connection. Requires `requests` Python module to be installed. Default is to establish connection on every update request send|
 
@@ -142,13 +142,14 @@ Parameters:
 |--status_period **N**|1000|Once in what number of requests to print intermediate statistics. 0 to not at all|
 |--dry||Don't actually send anything to servers. Useful to determine overhead of this script itself|
 |--comp_proj **PROJ**||Docker Compose project name (part before service name in container names) to use to determine IPs of services being used (*msghnd* for this subcommand)|
-|--afc **HOST[:PORT]**|msghnd:8000|IP Address and/or port of service to send AFC Requests to. If neither it not `--localhost` specified, requests will be sent to msghnd, determined by means of --comp_proj|
+|--afc **HOST[:PORT]**|msghnd:8000|IP Address andm aybe port of service to send AFC Requests to. If neither it not `--localhost` specified, requests will be sent to msghnd, determined by means of --comp_proj|
 |--localhost [http\|https]||Send AFC requests to AFC http (default) or https port of AFC server (dispatcher service), running on localhost with project, specified by --comp_proj|
 |--no_reconnect||Every sender process establishes permanent connection to target server and sends AFC Request messages over this connection. Requires `requests` Python module to be installed. Default is to establish connection on every update request send (which is closer to real life, but slows things and lead to different set of artifacts))|
 |--no_cache||Forces recomputation of each AFC Request|
-|--req **FIELD1=VALUE1[,FIELD2=VALUE2...]**||Modify AFC Request field(s). Top level is request (not message), path to deep fields is dot-separated (e.g. *location.elevation.height*), Several comma-separated fields may be specified and/or this switch may be specified several times|
+|--req **FIELD1=VALUE1[;FIELD2=VALUE2...]**||Modify AFC Request field(s). Top level is request (not message), path to deep fields is dot-separated (e.g. *location.elevation.height*), Several semicolon-separated fields may be specified (don't forget to quote such parameter) and/or this switch may be specified several times. Value may be numeric, string or list (enclosed in [] and formatted per JSON rules)|
 |--population **POPULATION_DB_FILE**||Choose positions according to population density. **POPULATION_DB_FILE** is an SQLite3 file, prepared with `make_population_db.py` (see [chapter](#population_db) on it). Note that use of this parameter may lead to positions outside the shore, that AFC Engine treats as incorrect - that's life...|
 |--random||Chose points randomly - according to population database (if `--population` specified) or within region rectangle in config file. Useful fro AFC Engine (`--no_cache`) testing|
+|--err_dir **DIRECTORY**||Directory to write failed AFC Request messages to. By default errors are reported, but failed requests are not logged|
 
 
 ### `netload` subcommand <a name="netload"/>
@@ -167,8 +168,8 @@ Parameters:
 |--status_period **N**|1000|Once in what number of requests to print intermediate statistics. 0 to not at all|
 |--dry||Don't actually send anything to servers. Useful to determine overhead of this script itself|
 |--comp_proj **PROJ**||Docker Compose project name (part before service name in container names) to use to determine IPs of services being used|
-|--afc **HOST[:PORT]**||IP Address and/or port of target msghnd or dispatcher service. If neither it not `--localhost` specified, requests will be sent to msghnd, determined by means of --comp_proj|
-|--rcache **HOST:PORT**||IP Address and/or port, of rcache service.. If not specified rat_service of compose project, specified by --comp_proj is used|
+|--afc **HOST[:PORT]**||IP Address and maybe port of target msghnd or dispatcher service. If neither it not `--localhost` specified, requests will be sent to msghnd, determined by means of --comp_proj|
+|--rcache **HOST:PORT**|rcache:8000|IP Address and port of rcache service.. If not specified rat_service of compose project, specified by --comp_proj is used|
 |--localhost [http\|https]||Access AFC server (i.e. dispatcher service) using http(default) or https of compose project specified by --comp_proj|
 |--no_reconnect||Every sender process establishes permanent connection to target server and sends AFC Request messages over this connection. Requires `requests` Python module to be installed. Default is to establish connection on every update request send (which is closer to real life, but slows things and lead to different set of artifacts))|
 |--target dispatcher\|msghnd\|rcache\||Guess attempt|What service to access. If not specified - attempt to guess is made (*dispatcher* if `--localhost`, *msghnd* if `--afc`, *rcache* if `--rcache`|
@@ -183,7 +184,7 @@ Parameters:
 |Parameter|Default<br>in Config|Meaning|
 |---------|--------------------|-------|
 |--comp_proj **PROJ**||Docker Compose project name (part before service name in container names) to use to determine IPs of services being used|
-|--rcache **HOST:PORT**|rcache:8000|IP Address and/or port, of rcache service.. If not specified rat_service of compose project, specified by --comp_proj is used|
+|--rcache **HOST:PORT**|rcache:8000|IP Address and port of rcache service.. If not specified rat_service of compose project, specified by --comp_proj is used|
 |--protect||Protect rcache from invalidation (by ULS downloader - not doing so may divert some requests to AFC Engine during `load` and thus degrade performance)|
 |--unprotect||Remove Rcache protection from invalidation (normal mode of Rcache operation)|
 |--invalidate||Invalidate rcache. If one need to force AFC Engine, `--no_cache` option of `load` command looks like better alternative`|
@@ -198,6 +199,7 @@ Parameters:
 |Parameter|Meaning|
 |---------|-------|
 |--comp_proj **PROJ**|Docker Compose project name (part before service name in container names) to use to determine IPs of services being used|
+|--rat_server **HOST[:PORT]**|rat_server|IP Address and maybe port of rat_server service. If not specified rat_service of compose project, specified by --comp_proj is used|
 |**FIELD1=VALUE1** [**FIELD2=VALUE2**...]|Fields to modify. For deep fields, path specified as comma-separated sequence of keys (e.g. *freqBands.0.startFreqMHz*)|
 
 
@@ -254,5 +256,5 @@ Test AFC Engine (no `preload` or Rcache protection needed):
   - Ditto, but with large uncertainty:  
     `$ afc_load_tool.py load --random --population usa_pd.sqlite3 --comp_proj foo_l2 \`  
     `   --localhost --status_period 1 --batch 1 --parallel 10 --retries 0 --no_cache \`  
-    `   --req location.elevation.verticalUncertainty=30,location.elevation.height=300 \`  
-    `   --req location.ellipse.minorAxis=150,location.ellipse.majorAxis=150`
+    `   --req "location.elevation.verticalUncertainty=30;location.elevation.height=300" \`  
+    `   --req "location.ellipse.minorAxis=150;location.ellipse.majorAxis=150"`

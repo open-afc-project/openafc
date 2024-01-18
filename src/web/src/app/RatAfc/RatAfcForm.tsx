@@ -15,7 +15,7 @@ import { ifNum } from "../Lib/Utils";
 import { LocationForm } from "./LocationForm";
 import { Limit } from "../Lib/Admin";
 import { OperatingClass, OperatingClassIncludeType } from "../Lib/RatAfcTypes";
-import { OperatingClassForm } from "./OperatingClassForm";
+import { OperatingClassForm } from "../Components/OperatingClassForm";
 import { InquiredFrequencyForm } from "./InquiredFrequencyForm";
 import { hasRole } from "../Lib/User";
 import { VendorExtensionForm } from "./VendorExtensionForm";
