@@ -290,6 +290,7 @@ public:
 	ColDouble buildingPenetrationDb;	// Building penetration loss dB
 	ColDouble offBoresight;				// Angle beween RX beam and direction to scanpoint
 	ColDouble rxGainDb;					// RX Gain DB (loss due to antenna diagram)
+	ColDouble discriminationGainDb;     // Discrimination gain
 	ColEnum txPropEnv;					// TX Propagation environment
 	ColEnum nlcdTx;						// Land use at RLAN
 	ColStr pathClutterTxModel;			// Path Clutter TX model
@@ -335,6 +336,7 @@ public:
 		buildingPenetrationDb(this, "BuildingPenetrationDb"),
 		offBoresight(this, "OffBoresightDeg"),
 		rxGainDb(this, "RxGainDb"),
+		discriminationGainDb(this, "DiscrGainDb"),
 		txPropEnv(this, "TxPropEnv", propEnvNames),
 		nlcdTx(this, "TxLandUse", nlcdLandCatNames),
 		pathClutterTxModel(this, "TxClutterModel"),
@@ -5899,9 +5901,6 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 			}
 
 		}
-		if (_terrainDataModel) {
-			_terrainDataModel->setGdalDirectMode(prevGdalDirectMode);
-		}
 
 		LOGGER_INFO(logger) << "TOTAL NUM VALID ULS: " << numValid;
 		LOGGER_INFO(logger) << "TOTAL NUM IGNORE ULS (invalid data):" << numIgnoreInvalid;
@@ -5925,6 +5924,13 @@ void AfcManager::readULSData(const std::vector<std::tuple<std::string, std::stri
 
 		delete ulsDatabase;
 	}
+	if (_terrainDataModel) {
+		_terrainDataModel->setGdalDirectMode(prevGdalDirectMode);
+	}
+
+	// _ulsList is expected to be sorted by ID (used in findULSID() )
+	_ulsList->sort([](ULSClass *const &l, ULSClass *const &r) {return l->getID() < r->getID();});
+
 
 	return;
 }
@@ -7501,18 +7507,6 @@ void AfcManager::runPointAnalysis()
 
 	_rlanPointing = _rlanRegion->computePointing(_rlanAzimuthPointing, _rlanElevationPointing);
 
-	// Sorting by distance from AP
-	double cosLatSq = cos(_rlanRegion->getCenterLatitude() / 180.0 * M_PI);
-	cosLatSq *= cosLatSq;
-	_ulsList->sort(
-		[this, cosLatSq](ULSClass *const &l, ULSClass *const &r) {
-			double latDistL = l->getRxLatitudeDeg() - _rlanRegion->getCenterLatitude();
-			double latDistR = r->getRxLatitudeDeg() - _rlanRegion->getCenterLatitude();
-			double lonDistL = l->getRxLongitudeDeg() - _rlanRegion->getCenterLongitude();
-			double lonDistR = r->getRxLongitudeDeg() - _rlanRegion->getCenterLongitude();
-			return (latDistL * latDistL + lonDistL * lonDistL * cosLatSq) <
-				(latDistR * latDistR + lonDistR * lonDistR * cosLatSq);
-		});
 
 	/**************************************************************************************/
 	/* Get Uncertainty Region Scan Points                                                 */
@@ -7520,6 +7514,9 @@ void AfcManager::runPointAnalysis()
 	/* For scan point scanPtIdx, numRlanHt[scanPtIdx] heights are considered.             */
 	/**************************************************************************************/
 	std::vector<LatLon> scanPointList = _rlanRegion->getScan(_scanRegionMethod, _scanres_xy, _scanres_points_per_degree);
+
+	// Sorting ULS most-interferable-first
+	std::vector<ULSClass *> sortedUlsList (getSortedUls());
 
 	double heightUncertainty = _rlanRegion->getHeightUncertainty();
 	int NHt = (int) ceil(heightUncertainty / _scanres_ht);
@@ -8242,14 +8239,14 @@ void AfcManager::runPointAnalysis()
 	/**************************************************************************************/
 
 	int ulsIdx;
-	double *eirpLimitList = (double *) malloc(_ulsList->getSize()*sizeof(double));
-	bool *ulsFlagList   = (bool *) malloc(_ulsList->getSize()*sizeof(bool));
-	for (ulsIdx = 0; ulsIdx < _ulsList->getSize(); ++ulsIdx) {
+	double *eirpLimitList = (double *) malloc(sortedUlsList.size()*sizeof(double));
+	bool *ulsFlagList   = (bool *) malloc(sortedUlsList.size()*sizeof(bool));
+	for (ulsIdx = 0; ulsIdx < (int)sortedUlsList.size(); ++ulsIdx) {
 		eirpLimitList[ulsIdx] = _maxEIRP_dBm;
 		ulsFlagList[ulsIdx] = false;
 	}
 
-	int totNumProc = _ulsList->getSize();
+	int totNumProc = (int)sortedUlsList.size();
 
 	int numPct = 100;
 
@@ -8257,10 +8254,10 @@ void AfcManager::runPointAnalysis()
 
 	bool cont = true;
 	int numProc = 0;
-	for (ulsIdx = 0; (ulsIdx < _ulsList->getSize())&&(cont); ++ulsIdx)
+	for (ulsIdx = 0; (ulsIdx < (int)sortedUlsList.size())&&(cont); ++ulsIdx)
 	{
-		LOGGER_DEBUG(logger) << "considering ULSIdx: " << ulsIdx << '/' << _ulsList->getSize();
-		ULSClass *uls = (*_ulsList)[ulsIdx];
+		LOGGER_DEBUG(logger) << "considering ULSIdx: " << ulsIdx << '/' << sortedUlsList.size();
+		ULSClass *uls = sortedUlsList[ulsIdx];
 
 #if 0
 		// For debugging, identifies anomalous ULS entries
@@ -8603,6 +8600,7 @@ void AfcManager::runPointAnalysis()
 													eirpGc.buildingPenetrationDb = buildingPenetrationDB;
 													eirpGc.offBoresight = angleOffBoresightDeg;
 													eirpGc.rxGainDb = rxGainDB;
+													eirpGc.discriminationGainDb = rlanDiscriminationGainDB;
 													eirpGc.txPropEnv = rlanPropEnv[scanPtIdx];
 													eirpGc.nlcdTx = rlanNlcdLandCat[scanPtIdx];
 													eirpGc.pathClutterTxModel = pathClutterTxModelStr;
@@ -8915,7 +8913,7 @@ void AfcManager::runPointAnalysis()
 					tstr = strdup(ctime(&t2));
 					strtok(tstr, "\n");
 
-					LOGGER_DEBUG(logger) << numProc << " [" << ulsIdx+1 << " / " <<  _ulsList->getSize() << "] FSID = " << uls->getID()
+					LOGGER_DEBUG(logger) << numProc << " [" << ulsIdx+1 << " / " << sortedUlsList.size() << "] FSID = " << uls->getID()
 						<< " DIV_IDX = " << divIdx << " SEG_IDX = " << segIdx << " " << tstr << " Elapsed Time = " << (t2-t1);
 
 					free(tstr);
@@ -8976,7 +8974,7 @@ void AfcManager::runPointAnalysis()
 		}
 		fkml->writeTextElement("visibility", visibilityStr.c_str());
 
-		for (ulsIdx = 0; ulsIdx < _ulsList->getSize(); ulsIdx++) {
+		for (ulsIdx = 0; ulsIdx < (int)sortedUlsList.size(); ulsIdx++) {
 			bool useFlag = ulsFlagList[ulsIdx];
 
 			if (useFlag) {
@@ -8989,7 +8987,7 @@ void AfcManager::runPointAnalysis()
 				}
 			}
 			if ((useFlag) && (fkml)) {
-				ULSClass *uls = (*_ulsList)[ulsIdx];
+				ULSClass *uls = sortedUlsList[ulsIdx];
 				std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 
 				fkml->writeStartElement("Folder");
@@ -9110,7 +9108,7 @@ void AfcManager::runPointAnalysis()
 		fkml->writeEndElement(); // Folder
 	}
 
-	for (ulsIdx = 0; ulsIdx < _ulsList->getSize(); ulsIdx++) {
+	for (ulsIdx = 0; ulsIdx < (int)sortedUlsList.size(); ulsIdx++) {
 		if(ulsFlagList[ulsIdx]) {
 			_ulsIdxList.push_back(ulsIdx); // Store the ULS indices that are used in analysis
 		}
@@ -9186,6 +9184,51 @@ void AfcManager::runPointAnalysis()
 	free(eirpLimitList);
 	free(ulsFlagList);
 }
+
+// Returns _ulsList content, sorted in by decreasing of crude interference
+// (computed from free-space path loss and off-bearing gain only)
+std::vector<ULSClass *> AfcManager::getSortedUls()
+{
+	std::vector<ULSClass *> ret;
+	for (auto ulsIdx = 0; ulsIdx < _ulsList->getSize(); ++ulsIdx) {
+		ret.push_back((*_ulsList)[ulsIdx]);
+	}
+
+	// AP ECEF coordinates
+	Vector3 apEcef =
+		EcefModel::fromGeodetic(
+			GeodeticCoord::fromLatLon(
+				_rlanRegion->getCenterLatitude(), _rlanRegion->getCenterLongitude(),
+				_rlanRegion->getCenterHeightAMSL() / 1000.));
+	// Maps ULS IDs to sort keys
+	std::map<int, double> sortKeys;
+	for (auto &uls: ret) {
+		auto ulsRxEcef = EcefModel::fromGeodetic(GeodeticCoord::fromLatLon(uls->getRxLatitudeDeg(), uls->getRxLongitudeDeg(), 0));
+		auto ulsCenterFreqHz = (uls->getStartFreq() + uls->getStopFreq()) / 2;
+		auto ulsAntennaPointing = uls->getAntennaPointing();
+		auto lineOfSightVectorKm = ulsRxEcef - apEcef;
+		double distKm = lineOfSightVectorKm.len();
+
+		// The more pathloss the less the interference
+		double pathLoss = 20.0 * log((4 * M_PI * ulsCenterFreqHz * distKm * 1000) / CConst::c) / log(10.0);
+		auto interferenceScore = pathLoss;
+
+		// The more discrimination gain the more the interference
+		double angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+		std::string rxAntennaSubModelStrDummy;
+		double discriminationGainDb = uls->computeRxGain(angleOffBoresightDeg, 0, ulsCenterFreqHz, rxAntennaSubModelStrDummy, 0);
+		interferenceScore -= discriminationGainDb;
+
+		sortKeys[uls->getID()] = interferenceScore;
+	}
+	std::sort(
+		ret.begin(), ret.end(),
+		[sortKeys](ULSClass *const &l, ULSClass *const &r) {
+			return sortKeys.at(l->getID()) < sortKeys.at(r->getID());
+		});
+	return ret;
+}
+
 /******************************************************************************************/
 
 /******************************************************************************************/

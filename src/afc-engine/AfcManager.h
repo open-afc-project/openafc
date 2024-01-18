@@ -223,6 +223,7 @@ class AfcManager
 		void importGUIjsonVersion1_4(const QJsonObject &jsonObj);
 
 		void runPointAnalysis();
+		std::vector<ULSClass *> getSortedUls();
 		void runScanAnalysis();
 		void runExclusionZoneAnalysis();
 		void runHeatmapAnalysis();
