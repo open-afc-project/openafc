@@ -1,14 +1,52 @@
 #!/bin/sh
 
+# Check if an argument was provided
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 [-dev|-stg|-prd|-prod]"
+    exit 1
+fi
+
+# Argument handling
+case $1 in
+    -dev)
+        arg="dev"
+        LOAD_BALANCER_IP="10.255.0.24"
+        PROJECT_ID="wcc-enterprise-afc-dev"
+        ;;
+    -stg)
+        arg="stg"
+        LOAD_BALANCER_IP="10.255.16.24"
+        PROJECT_ID="wcc-enterprise-afc-stg"
+        ;;
+    -prd|-prod)
+        arg="prd"
+        LOAD_BALANCER_IP="10.255.8.24"
+        PROJECT_ID="wcc-enterprise-afc-prd"
+        ;;
+    *)
+        echo "Invalid argument: $1"
+        echo "Usage: $0 [-dev|-stg|-prd]"
+        exit 1
+        ;;
+esac
+
 kubectl config use-context $(kubectl config get-contexts | grep 'int' | awk '{print $2}')
 kubectl get all
 
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add kedacore https://kedacore.github.io/charts
+helm repo add external-secrets https://charts.external-secrets.io
 helm repo update
+helm install external-secrets \
+   external-secrets/external-secrets \
+    -n external-secrets \
+    --create-namespace \
+    --set installCRDs=true
 helm install keda kedacore/keda --namespace keda --create-namespace
 
-helm install test-internal afc-int/ -f afc-int/values.yaml
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=external-secrets-webhook -n external-secrets --timeout=90s
+
+helm install test-internal afc-int/ -f afc-int/values-$arg.yaml
 
 while [ "$(kubectl get service | grep webui | awk '{print $4}')" == "<pending>" ]; do
     echo "Waiting for webui service to get External-IP"
@@ -62,9 +100,21 @@ cat afc-ext/values.yaml.template | \
     sed "s/%AFC_OBJST_PORT%/$AFC_OBJST_PORT/g" | \
     sed "s/%AFC_OBJST_HIST_PORT%/$AFC_OBJST_HIST_PORT/g" | \
     sed "s/%AFC_RMQ_NAME%/$AFC_RMQ_IP/g" | \
-    sed "s/%AFC_RMQ_PORT%/$AFC_RMQ_PORT/g" > afc-ext/values.yaml
+    sed "s/%AFC_RMQ_PORT%/$AFC_RMQ_PORT/g" | \
+    sed "s/%SECRET_STORE_PROJ_ID%/$PROJECT_ID/g" | \
+    sed "s/%LOAD_BALANCER_IP%/$LOAD_BALANCER_IP/g" > afc-ext/values.yaml
 
 kubectl config use-context $(kubectl config get-contexts | grep 'ext' | awk '{print $2}')
 kubectl get all
+
+helm repo add external-secrets https://charts.external-secrets.io
+helm repo update
+helm install external-secrets \
+   external-secrets/external-secrets \
+    -n external-secrets \
+    --create-namespace \
+    --set installCRDs=true
+
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=external-secrets-webhook -n external-secrets --timeout=90s
 
 helm install test-external afc-ext/ -f afc-ext/values.yaml
