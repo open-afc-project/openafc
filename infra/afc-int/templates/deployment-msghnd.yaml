@@ -49,7 +49,7 @@ spec:
           volumeMounts:
             - name: msghnd-rat-api-secret
               mountPath: /etc/xdg/fbrat/ratapi.conf
-              subPath: ratapi.conf
+              subPath: msghnd-ratapi 
           env:
             # RabbitMQ server name:
             - name: BROKER_TYPE
@@ -76,15 +76,15 @@ spec:
             - name: RCACHE_POSTGRES_DSN
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secret
-                  key: RCACHE_POSTGRES_DSN
+                  name: rcache-postgres-dsn-secret
+                  key: rcache-postgres-dsn
             - name: RCACHE_SERVICE_URL
               value: "http://{{ include "afc-int.fullname" . }}-rcache:{{ .Values.service.rcache.port }}"
             - name: RCACHE_RMQ_DSN
               valueFrom:
                 secretKeyRef:
                   name: rmq-rcache-secret
-                  key: RCACHE_RMQ_DSN
+                  key: rcache-rmq-dsn
             # own msghnd parameters
             - name: AFC_MSGHND_WORKERS
               value: {{ .Values.service.msghnd.threads_per_pod | quote }}
@@ -93,7 +93,7 @@ spec:
       volumes:
         - name: msghnd-rat-api-secret
           secret:
-            secretName: {{ .Release.Name }}-msghnd-rat-api-secret
+            secretName: msghnd-rat-api-secret
       imagePullSecrets:
         - name: brcm-artifactory-secret
       {{- with .Values.nodeSelector }}

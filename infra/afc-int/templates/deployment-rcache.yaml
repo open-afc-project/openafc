@@ -55,8 +55,8 @@ spec:
             - name: RCACHE_POSTGRES_DSN
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secret
-                  key: RCACHE_POSTGRES_DSN
+                  name: rcache-postgres-dsn-secret
+                  key: rcache-postgres-dsn
             - name: RCACHE_AFC_REQ_URL
               value: "http://{{ .Values.service.msghnd.loadBalancerIP }}:{{ .Values.service.msghnd.port }}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True"
             - name: RCACHE_RULESETS_URL

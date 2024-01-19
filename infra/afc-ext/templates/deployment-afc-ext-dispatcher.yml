@@ -52,10 +52,10 @@ spec:
           volumeMounts:
             - name: dispatcher-server-cert-secret
               mountPath: /certificates/servers/server.cert.pem
-              subPath: server.cert.pem
+              subPath: server-cert-pem
             - name: dispatcher-server-key-secret
               mountPath: /certificates/servers/server.key.pem
-              subPath: server.key.pem
+              subPath: server-key-pem
           env:
             - name: AFC_SERVER_NAME
               value: {{ .Values.env_template.dispatcher.afc_server_name | quote }}
@@ -88,10 +88,10 @@ spec:
       volumes:
         - name: dispatcher-server-cert-secret
           secret:
-            secretName: {{ .Release.Name }}-dispatcher-server-cert-secret
+            secretName: dispatcher-server-cert-secret
         - name: dispatcher-server-key-secret
           secret:
-            secretName: {{ .Release.Name }}-dispatcher-server-key-secret
+            secretName: dispatcher-server-key-secret
       imagePullSecrets:
         - name: brcm-artifactory-secret
       {{- with .Values.nodeSelector }}

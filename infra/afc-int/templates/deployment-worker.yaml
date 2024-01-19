@@ -79,7 +79,7 @@ spec:
               valueFrom:
                 secretKeyRef:
                   name: rmq-rcache-secret
-                  key: RCACHE_RMQ_DSN
+                  key: rcache-rmq-dsn
             # ALS params
             - name: ALS_KAFKA_SERVER_ID
               value: worker

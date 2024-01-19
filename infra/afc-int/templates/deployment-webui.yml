@@ -51,7 +51,7 @@ spec:
               name: cont-confs
             - name: webui-rat-api-secret
               mountPath: /etc/xdg/fbrat/ratapi.conf
-              subPath: ratapi.conf
+              subPath: webui-rat-api
           env:
             # RabbitMQ server name:
             - name: BROKER_TYPE
@@ -78,15 +78,15 @@ spec:
             - name: RCACHE_POSTGRES_DSN
               valueFrom:
                 secretKeyRef:
-                  name: postgres-secret
-                  key: RCACHE_POSTGRES_DSN
+                  name: rcache-postgres-dsn-secret
+                  key: rcache-postgres-dsn
             - name: RCACHE_SERVICE_URL
               value: "http://{{ include "afc-int.fullname" . }}-rcache:{{ .Values.service.rcache.port }}"
             - name: RCACHE_RMQ_DSN
               valueFrom:
                 secretKeyRef:
                   name: rmq-rcache-secret
-                  key: RCACHE_RMQ_DSN
+                  key: rcache-rmq-dsn
           resources:
             {{- toYaml .Values.resources.webui | nindent 12 }}
       volumes:
@@ -95,7 +95,7 @@ spec:
             claimName: cont-confs-claim
         - name: webui-rat-api-secret
           secret:
-            secretName: {{ .Release.Name }}-webui-rat-api-secret
+            secretName: webui-rat-api-secret
       imagePullSecrets:
         - name: brcm-artifactory-secret
       {{- with .Values.nodeSelector }}
