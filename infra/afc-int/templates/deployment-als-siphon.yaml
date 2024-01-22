@@ -76,7 +76,7 @@ spec:
           resources:
             {{- toYaml .Values.resources.als_siphon | nindent 12 }}
       imagePullSecrets:
-        - name: brcm-artifactory-secret
+        - name: container-repo-secret
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -56,7 +56,7 @@ spec:
           resources:
             {{- toYaml .Values.resources.als_kafka | nindent 12 }}
       imagePullSecrets:
-        - name: brcm-artifactory-secret
+        - name: container-repo-secret
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
