@@ -13,7 +13,8 @@ fi
 case "$AFC_DEVEL_ENV" in
   "devel")
     echo "Running debug profile" 
-    echo "AFC_WORKER_CELERY_OPTIONS = ${AFC_WORKER_CELERY_OPTS}"
+    echo "AFC_WORKER_CELERY_OPTS = ${AFC_WORKER_CELERY_OPTS}"
+    echo "AFC_WORKER_CELERY_WORKERS = ${AFC_WORKER_CELERY_WORKERS}"
     echo "AFC_WORKER_CELERY_LOG = ${AFC_WORKER_CELERY_LOG}"
     echo "AFC_WORKER_ENG_TOUT = ${AFC_WORKER_ENG_TOUT}"
     echo "AFC_WORKER_CELERY_CONCURRENCY = ${AFC_WORKER_CELERY_CONCURRENCY}"
@@ -62,6 +63,6 @@ else
     export AFC_ENGINE="/usr/bin/afc-engine"
 fi
 
-celery multi start $AFC_WORKER_CELERY_OPTS -A afc_worker --concurrency=$AFC_WORKER_CELERY_CONCURRENCY --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$AFC_WORKER_CELERY_LOG &
+celery multi start $AFC_WORKER_CELERY_WORKERS $AFC_WORKER_CELERY_OPTS -A afc_worker --concurrency=$AFC_WORKER_CELERY_CONCURRENCY --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$AFC_WORKER_CELERY_LOG &
 
 sleep infinity

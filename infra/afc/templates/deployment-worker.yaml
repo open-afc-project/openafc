@@ -54,8 +54,10 @@ spec:
             - name: AFC_OBJST_SCHEME
               value: {{ .Values.service.objst.scheme | quote }}
             # celery params
-            - name: AFC_WORKER_CELERY_OPTS
+            - name: AFC_WORKER_CELERY_WORKERS
               value: "rat_worker"
+            - name: AFC_WORKER_CELERY_OPTS
+              value: ""
             - name: AFC_WORKER_CELERY_CONCURRENCY
               value: {{ .Values.deployments.worker.celery_concurrency | quote }}
             # RabbitMQ server name:
