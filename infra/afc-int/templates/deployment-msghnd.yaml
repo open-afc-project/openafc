@@ -95,7 +95,7 @@ spec:
           secret:
             secretName: msghnd-rat-api-secret
       imagePullSecrets:
-        - name: brcm-artifactory-secret
+        - name: container-repo-secret
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

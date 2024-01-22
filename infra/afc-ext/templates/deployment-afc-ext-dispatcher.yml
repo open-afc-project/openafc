@@ -93,7 +93,7 @@ spec:
           secret:
             secretName: dispatcher-server-key-secret
       imagePullSecrets:
-        - name: brcm-artifactory-secret
+        - name: container-repo-secret
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
