@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "afc-int.fullname" . }}-als-kafka
+  name: {{ .Chart.Name }}-{{ .Values.service.als_kafka.hostname }}
   labels:
     {{- include "afc-int.labels" . | nindent 4 }}
 spec:
@@ -29,7 +29,7 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}-als-kafka
+        - name: {{ .Chart.Name }}-{{ .Values.service.als_kafka.hostname }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.als_kafka.repository }}:{{ .Values.image.als_kafka.tag | default .Chart.AppVersion }}"
@@ -48,7 +48,7 @@ spec:
           #     port: http
           env:
             - name: KAFKA_ADVERTISED_HOST
-              value: {{ include "afc-int.fullname" . }}-als-kafka
+              value: {{ .Values.service.als_kafka.hostname | quote }}
             - name: KAFKA_CLIENT_PORT
               value: {{ .Values.service.als_kafka.port | quote }}
             - name: KAFKA_MAX_REQUEST_SIZE

@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "afc-int.fullname" . }}-als-siphon
+  name: {{ .Chart.Name }}-{{ .Values.deployments.als_siphon.name }}
   labels:
     {{- include "afc-int.labels" . | nindent 4 }}
 spec:
@@ -29,14 +29,14 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}-als-siphon
+        - name: {{ .Chart.Name }}-{{ .Values.deployments.als_siphon.name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.als_siphon.repository }}:{{ .Values.image.als_siphon.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.als_siphon.pullPolicy }}
           env:
             - name: KAFKA_SERVERS
-              value: "{{ include "afc-int.fullname" . }}-als-kafka:{{ .Values.service.als_kafka.port }}"
+              value: "{{ .Values.service.als_kafka.hostname }}:{{ .Values.service.als_kafka.port }}"
             - name: POSTGRES_HOST
               value: {{ .Values.managed_service.postgres.host | quote }}
             - name: INIT_IF_EXISTS
@@ -46,32 +46,32 @@ spec:
             - name: POSTGRES_INIT_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-user-secret
+                  name: {{ .Chart.Name }}-postgres-user-secret
                   key: postgres-user 
             - name: POSTGRES_INIT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-password-secret
+                  name: {{ .Chart.Name }}-postgres-password-secret
                   key: postgres-password
             - name: POSTGRES_ALS_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-user-secret
+                  name: {{ .Chart.Name }}-postgres-user-secret
                   key: postgres-user
             - name: POSTGRES_ALS_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-password-secret
+                  name: {{ .Chart.Name }}-postgres-password-secret
                   key: postgres-password
             - name: POSTGRES_LOG_USER
               valueFrom:
                 secretKeyRef:
-                  name: postgres-user-secret
+                  name: {{ .Chart.Name }}-postgres-user-secret
                   key: postgres-user
             - name: POSTGRES_LOG_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: postgres-password-secret
+                  name: {{ .Chart.Name }}-postgres-password-secret
                   key: postgres-password
           resources:
             {{- toYaml .Values.resources.als_siphon | nindent 12 }}

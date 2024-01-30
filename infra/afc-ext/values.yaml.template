@@ -39,6 +39,7 @@ securityContext: {}
   # runAsUser: 1000
 service:
   dispatcher:
+    hostname: dispatcher
     type: LoadBalancer
     httpPort: 80
     httpsPort: 443
@@ -97,13 +98,8 @@ env_template:
   dispatcher:
     afc_server_name: _
     afc_enforce_https: False
-    afc_msghnd_name: %AFC_MSGHND_NAME%
-    afc_msghnd_port: %AFC_MSGHND_PORT%
-    afc_webui_name: %AFC_WEBUI_NAME%
-    afc_webui_port: %AFC_WEBUI_PORT%
+    afc_int_ingress_nginx_ip: %AFC_INT_INGRESS_NGINX_IP%
+    afc_int_ingress_nginx_port: %AFC_INT_INGRESS_NGINX_PORT%
     afc_rmq_name: %AFC_RMQ_NAME%
     afc_rmq_port: %AFC_RMQ_PORT%
-    afc_objst_host: %AFC_OBJST_HOST%
-    afc_objst_stor_port: %AFC_OBJST_PORT%
-    afc_objst_hist_port: %AFC_OBJST_HIST_PORT%
     afc_objst_scheme: "HTTP"

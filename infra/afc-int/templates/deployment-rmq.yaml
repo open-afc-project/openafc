@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "afc-int.fullname" . }}-rmq
+  name: {{ .Chart.Name }}-{{ .Values.service.rmq.hostname }}
   labels:
     {{- include "afc-int.labels" . | nindent 4 }}
 spec:
@@ -29,7 +29,7 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: {{ .Chart.Name }}-{{ .Values.service.rmq.hostname }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image:  "{{ .Values.image.rmq.repository }}:{{ .Values.image.rmq.tag  | default .Chart.AppVersion }}"

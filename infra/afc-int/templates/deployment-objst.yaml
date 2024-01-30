@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "afc-int.fullname" . }}-objst
+  name: {{ .Chart.Name }}-{{ .Values.service.objst.hostname }}
   labels:
     {{- include "afc-int.labels" . | nindent 4 }}
 spec:
@@ -29,7 +29,7 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: {{ .Chart.Name }}-{{ .Values.service.objst.hostname }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image:  "{{ .Values.image.objst.repository }}:{{ .Values.image.objst.tag | default .Chart.AppVersion }}"
@@ -57,7 +57,7 @@ spec:
       volumes:
         - name: cont-confs
           persistentVolumeClaim:
-            claimName: cont-confs-claim
+            claimName: {{ .Values.deployments.global.pvc.name }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

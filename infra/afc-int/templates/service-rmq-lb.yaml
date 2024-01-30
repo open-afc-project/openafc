@@ -1,11 +1,15 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ .Values.service.rmq.hostname | quote }}
+  name: "{{ .Values.service.rmq.hostname }}-lb"
+  annotations:
+    cloud.google.com/load-balancer-type: "Internal"
+    networking.gke.io/internal-load-balancer-allow-global-access: "true"
   labels:
     {{- include "afc-int.labels" . | nindent 4 }}
 spec:
-  type: {{ .Values.service.rmq.type }}
+  type: "LoadBalancer"
+  loadBalancerIP: {{ .Values.service.rmq.loadBalancerIP }}
   ports:
     - port: {{ .Values.service.rmq.port }}
       targetPort: rmqp

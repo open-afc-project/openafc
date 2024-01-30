@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "afc-int.fullname" . }}-worker
+  name: {{ .Chart.Name }}-{{ .Values.deployments.worker.name }}
   labels:
     {{- include "afc-int.labels" . | nindent 4 }}
 spec:
@@ -29,7 +29,7 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}
+        - name: {{ .Chart.Name }}-{{ .Values.deployments.worker.name }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.worker.repository }}:{{ .Values.image.worker.tag | default .Chart.AppVersion }}"
@@ -48,7 +48,7 @@ spec:
           env:
             # Filestorage params:
             - name: AFC_OBJST_HOST
-              value: {{ .Values.service.objst.loadBalancerIP }}
+              value: {{ .Values.service.objst.hostname | quote }}
             - name: AFC_OBJST_PORT
               value: {{ .Values.service.objst.fileStoragePort | quote }}
             - name: AFC_OBJST_SCHEME
@@ -62,7 +62,7 @@ spec:
             - name: BROKER_TYPE
               value: "external"
             - name: BROKER_FQDN
-              value: {{ .Values.service.rmq.loadBalancerIP }}
+              value: {{ .Values.service.rmq.hostname | quote }}
             # afc-engine preload lib params
             - name: AFC_AEP_ENABLE
               value: {{ .Values.deployments.worker.afc_aep_enable | quote }}
@@ -74,17 +74,17 @@ spec:
             - name: RCACHE_ENABLED
               value: {{ .Values.service.rcache.is_enabled | quote }}
             - name: RCACHE_SERVICE_URL
-              value: "http://{{ include "afc-int.fullname" . }}-rcache:{{ .Values.service.rcache.port }}"
+              value: "http://{{ .Values.service.rcache.hostname }}:{{ .Values.service.rcache.port }}"
             - name: RCACHE_RMQ_DSN
               valueFrom:
                 secretKeyRef:
-                  name: rmq-rcache-secret
+                  name: {{ .Chart.Name }}-rmq-rcache-secret
                   key: rcache-rmq-dsn
             # ALS params
             - name: ALS_KAFKA_SERVER_ID
-              value: worker
+              value: {{ .Values.deployments.worker.name | quote }}
             - name: ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
-              value: "{{ include "afc-int.fullname" . }}-als-kafka:{{ .Values.service.als_kafka.port }}"
+              value: "{{ .Values.service.als_kafka.hostname }}:{{ .Values.service.als_kafka.port }}"
             - name: ALS_KAFKA_MAX_REQUEST_SIZE
               value: {{ .Values.service.als_kafka.max_request_size | quote | replace ":" "" }}
           resources:
@@ -92,7 +92,7 @@ spec:
       volumes:
         - name: cont-confs
           persistentVolumeClaim:
-            claimName: cont-confs-claim
+            claimName: {{ .Values.deployments.global.pvc.name }}
       imagePullSecrets:
         - name: container-repo-secret
       {{- with .Values.nodeSelector }}

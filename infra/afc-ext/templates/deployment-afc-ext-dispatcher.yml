@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "afc-ext.fullname" . }}-dispatcher
+  name: {{ .Chart.Name }}-{{ .Values.service.dispatcher.hostname }}
   labels:
     {{- include "afc-ext.labels" . | nindent 4 }}
 spec:
@@ -29,17 +29,17 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}-dispatcher
+        - name: {{ .Chart.Name }}-{{ .Values.service.dispatcher.hostname }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.dispatcher.repository }}:{{ .Values.image.dispatcher.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: 80
+              containerPort: {{ .Values.service.dispatcher.httpPort }}
               protocol: TCP
             - name: https
-              containerPort: 443
+              containerPort: {{ .Values.service.dispatcher.httpsPort }}
               protocol: TCP
           # livenessProbe:
           #   httpGet:
@@ -50,10 +50,10 @@ spec:
           #     path: /
           #     port: http
           volumeMounts:
-            - name: dispatcher-server-cert-secret
+            - name: {{ .Chart.Name }}-dispatcher-server-cert-secret
               mountPath: /certificates/servers/server.cert.pem
               subPath: server-cert-pem
-            - name: dispatcher-server-key-secret
+            - name: {{ .Chart.Name }}-dispatcher-server-key-secret
               mountPath: /certificates/servers/server.key.pem
               subPath: server-key-pem
           env:
@@ -62,36 +62,32 @@ spec:
             - name: AFC_ENFORCE_HTTPS
               value: {{ .Values.env_template.dispatcher.afc_enforce_https | quote }}
             - name: AFC_MSGHND_NAME
-              value: {{ .Values.env_template.dispatcher.afc_msghnd_name | quote }}
+              value: {{ .Values.env_template.dispatcher.afc_int_ingress_nginx_ip | quote }}
             - name: AFC_MSGHND_PORT
-              value: {{ .Values.env_template.dispatcher.afc_msghnd_port | quote }}
+              value: {{ .Values.env_template.dispatcher.afc_int_ingress_nginx_port | quote }}
             - name: AFC_WEBUI_NAME
-              value: {{ .Values.env_template.dispatcher.afc_webui_name | quote }}
+              value: {{ .Values.env_template.dispatcher.afc_int_ingress_nginx_ip | quote }}
             - name: AFC_WEBUI_PORT
-              value: {{ .Values.env_template.dispatcher.afc_webui_port | quote }}
+              value: {{ .Values.env_template.dispatcher.afc_int_ingress_nginx_port | quote }}
             - name: BROKER_FQDN
               value: {{ .Values.env_template.dispatcher.afc_rmq_name | quote }}
             - name: BROKER_PORT
               value: {{ .Values.env_template.dispatcher.afc_rmq_port | quote }}
             - name: AFC_OBJST_HOST
-              value: {{ .Values.env_template.dispatcher.afc_objst_host | quote }}
+              value: {{ .Values.env_template.dispatcher.afc_int_ingress_nginx_ip | quote }}
             - name: AFC_OBJST_PORT
-              value: {{ .Values.env_template.dispatcher.afc_objst_stor_port | quote }}
+              value: {{ .Values.env_template.dispatcher.afc_int_ingress_nginx_port | quote }}
             - name: AFC_OBJST_SCHEME
               value: {{ .Values.env_template.dispatcher.afc_objst_scheme | quote }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
-      # volumes:
-      #   - name: cont-confs
-      #     persistentVolumeClaim:
-      #       claimName: cont-confs-claim
       volumes:
-        - name: dispatcher-server-cert-secret
+        - name: {{ .Chart.Name }}-dispatcher-server-cert-secret
           secret:
-            secretName: dispatcher-server-cert-secret
-        - name: dispatcher-server-key-secret
+            secretName: {{ .Chart.Name }}-dispatcher-server-cert-secret
+        - name: {{ .Chart.Name }}-dispatcher-server-key-secret
           secret:
-            secretName: dispatcher-server-key-secret
+            secretName: {{ .Chart.Name }}-dispatcher-server-key-secret
       imagePullSecrets:
         - name: container-repo-secret
       {{- with .Values.nodeSelector }}
