@@ -47,8 +47,24 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 # **Introduction**
 
 This document describes the procedure for submitting the source code changes to the TIP's openAFC github project. Procedure described in this document requires access to TIP's openAFC project and knowledge of the GIT usage. Please contact support@telecominfraproject.com in case you need access to the openAFC project.
+
 Github.com can be referred for [details of alternate procedures for creating the pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests), developers can use any of these methods but need to include change description as part of pull requests  description.
 
+OpenAFC conforms to all the requirements from FCC per [6GHz Report & Order](https://docs.fcc.gov/public/attachments/DOC-363490A1.pdf) and FCC 47 CFR Part 15.407 for unlicensed standard power devices in the 6 GHz band.
+
+In addition, OpenAFC fully conforms to WinnForum’s Functional Requirements for the U.S. 6 GHz Band under the Control of an AFC System in WINNF-TS-1014-V1.4.0 ([https://6ghz.wirelessinnovation.org/baseline-standards](https://6ghz.wirelessinnovation.org/baseline-standards)). This includes some of the implementation details – for example correction of FS parameters in the ULS database, FS antenna pattern, FS noise power and feederloss to use, calculation of near-field adjustment factor, calculation of interference to FS links with passive sites and diversity receivers, path loss models and their parameters, etc.
+Finally, OpenAFC fully conforms to the implementation details specified in [WFA SUT Test Plan v1.5](https://www.wi-fi.org/file/afc-specification-and-test-plans).
+
+OpenAFC software deployment consists of multiple containers, and it can be deployed on a standalone system for test and development purposes via the provided docker-compose based solution.  Instructions on how to build the containers and a sample docker-compose.yaml can be found in the [OpenAFC Engine Server usage in Docker Environment](#afc-engine-build-in-docker).
+
+OpenAFC software can also be deployed for production using the Kubernetes framework. Please refer to the readme-kubernetes.md for the instructions.
+
+The sample docker-compose.yaml assumes that the required databases (e.g. terrain, landcover, winnforum databases, etc.) have been obtained and placed in an accessible folder according to the information in [database_readme.md](https://github.com/Telecominfraproject/open-afc/blob/main/database_readme.md
+) on Github.
+	
+Many of the components have additional README files inside folders that describe the additional configuration for each component.  Default values are provided either inside the component or in the sample files that will work to stand up the system.
+
+Note that this sample does not provide working SSL certificates for authentication to the server.
 
 <br /><br />
 
