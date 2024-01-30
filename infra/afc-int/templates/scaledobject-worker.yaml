@@ -1,11 +1,12 @@
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:
-  name: {{ include "afc-int.fullname" . }}-worker-so
+  name: {{ .Chart.Name }}-{{ .Values.deployments.worker.name }}-so
   namespace: default
 spec:
   scaleTargetRef:
-    name: {{ include "afc-int.fullname" . }}-worker
+    name: {{ .Chart.Name }}-{{ .Values.deployments.worker.name }}
+    namespace: default
   minReplicaCount: 2
   pollingInterval: 5 # Optional. Default: 30 seconds
   cooldownPeriod: 300 # Optional. Default: 300 seconds
@@ -16,4 +17,4 @@ spec:
         mode: QueueLength
         value: {{ .Values.deployments.worker.queue_length | quote }}
       authenticationRef:
-        name: {{ include "afc-int.fullname" . }}-worker-trigger
+        name: {{ .Chart.Name }}-{{ .Values.deployments.worker.name }}-trigger

@@ -1,15 +1,11 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "afc-int.fullname" . }}-objst
-  annotations:
-    cloud.google.com/load-balancer-type: "Internal"
-    networking.gke.io/internal-load-balancer-allow-global-access: "true"
+  name: {{ .Values.service.objst.hostname | quote }}
   labels:
     {{- include "afc-int.labels" . | nindent 4 }}
 spec:
   type: {{ .Values.service.objst.type }}
-  loadBalancerIP: {{ .Values.service.objst.loadBalancerIP }}
   ports:
     - port: {{ .Values.service.objst.fileStoragePort }}
       targetPort: afc-objst-port

@@ -9,13 +9,13 @@
 
   {{- if eq .Values.service.msghnd.type "LoadBalancer" }}
   echo "Fetching LoadBalancer IP for msghnd..."
-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "afc-int.fullname" . }}-msghnd --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ .Chart.Name }}-{{ .Values.service.msghnd.hostname }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
   echo http://$SERVICE_IP:{{ .Values.service.msghnd.port }}
   {{- end }}
 
   {{- if eq .Values.service.webui.type "LoadBalancer" }}
   echo "Fetching LoadBalancer IP for webui..."
-  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "afc-int.fullname" . }}-webui --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ .Chart.Name }}-{{ .Values.service.webui.hostname }} --template "{{"{{ range (index .status.loadBalancer.ingress 0) }}{{.}}{{ end }}"}}")
   echo http://$SERVICE_IP:{{ .Values.service.webui.port }}
   {{- end }}
 

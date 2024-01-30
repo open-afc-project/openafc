@@ -1,0 +1,38 @@
+#!/bin/sh
+
+helm uninstall ingress-nginx --namespace=ingress-nginx
+helm uninstall keda --namespace=keda
+helm uninstall external-secrets --namespace=external-secrets
+helm uninstall prometheus --namespace=prometheus
+helm uninstall grafana --namespace=prometheus
+helm uninstall prometheus-adapter --namespace=prometheus
+helm uninstall prometheus-kube-state-metrics --namespace=prometheus
+helm uninstall prometheus-node-exporter --namespace=prometheus
+helm uninstall prometheus-pushgateway --namespace=prometheus
+helm uninstall prometheus-server --namespace=prometheus
+helm uninstall prometheus-alertmanager --namespace=prometheus
+helm uninstall prometheus-operator --namespace=prometheus
+helm uninstall test-internal
+helm uninstall test-external
+
+kubectl get all | awk '{print $1}' | grep \/ | sort -u | xargs kubectl delete
+kubectl get all | awk '{print $1}' | grep \/ | sort -u | xargs kubectl delete #yep, twice
+kubectl get apiservice -A | awk '{print $1}' | grep metrics | sort -u | xargs kubectl delete apiservice
+kubectl get SecretStore | awk '{print $1}' | grep -v "NAME" | sort -u | xargs -I% kubectl delete SecretStore %
+kubectl get ExternalSecret | awk '{print $1}' | grep -v "NAME" | sort -u | xargs -I% kubectl delete ExternalSecret %
+kubectl get all --namespace external-secrets | awk '{print $1}' | grep \/ | sort -u | xargs kubectl delete --namespace external-secrets
+kubectl get all --namespace=keda | awk '{print $1}' | grep \/ | sort -u | xargs kubectl delete --namespace keda
+kubectl get all --namespace=ingress-nginx | awk '{print $1}' | grep \/ | sort -u | xargs kubectl delete --namespace=ingress-nginx
+kubectl get all --namespace=prometheus | awk '{print $1}' | grep \/ | sort -u | xargs kubectl delete --namespace=prometheus
+kubectl get ingress -A | grep -v NAME | awk '{print "kubectl --namespace=" $1 " delete ingress " $2}' | sh
+kubectl get secret -A | grep -v "NAME" | grep -v "container-repo-secret" | grep -v "gcpsm-secret" | awk '{print "kubectl --namespace=" $1 " delete secret " $2}' | sh
+kubectl get validatingwebhookconfigurations -A | grep -v NAME | awk '{print $1}' | xargs -I% kubectl delete -A ValidatingWebhookConfiguration %
+kubectl delete sc b-ssd
+
+kubectl get replicaset --namespace=gmp-system | awk '{print $1}' | grep -v NAME |sort -u | awk '{print "replicaset/"$1}' | xargs kubectl delete --namespace=gmp-system
+kubectl get pods --namespace=gmp-system | awk '{print "pod/"$1}' | grep -v NAME | xargs kubectl delete --namespace=gmp-system
+kubectl get all --namespace=gmp-system | awk '{print $1}' | grep \/ | sort -u | xargs kubectl delete --namespace=gmp-system
+
+kubectl get replicaset --namespace=kube-system | awk '{print $1}' | grep -v NAME |sort -u | awk '{print "replicaset/"$1}' | xargs kubectl delete --namespace=kube-system
+kubectl get pods --namespace=kube-system | awk '{print "pod/"$1}' | grep -v NAME | xargs kubectl delete --namespace=kube-system
+kubectl get all --namespace=kube-system | awk '{print $1}' | grep \/ | sort -u | xargs kubectl delete --namespace=kube-system

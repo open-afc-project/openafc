@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "afc-int.fullname" . }}-msghnd
+  name: {{ .Chart.Name }}-{{ .Values.service.msghnd.hostname }}
   labels:
     {{- include "afc-int.labels" . | nindent 4 }}
 spec:
@@ -29,7 +29,7 @@ spec:
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
-        - name: {{ .Chart.Name }}-msghnd
+        - name: {{ .Chart.Name }}-{{ .Values.service.msghnd.hostname }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.msghnd.repository }}:{{ .Values.image.msghnd.tag | default .Chart.AppVersion }}"
@@ -47,7 +47,7 @@ spec:
           #     path: /
           #     port: http
           volumeMounts:
-            - name: msghnd-rat-api-secret
+            - name: {{ .Chart.Name }}-msghnd-rat-api-secret
               mountPath: /etc/xdg/fbrat/ratapi.conf
               subPath: msghnd-ratapi 
           env:
@@ -55,19 +55,19 @@ spec:
             - name: BROKER_TYPE
               value: "external"
             - name: BROKER_FQDN
-              value: {{ .Values.service.rmq.loadBalancerIP }}
+              value: {{ .Values.service.rmq.hostname | quote }}
             # Filestorage params:
             - name: AFC_OBJST_HOST
-              value: {{ .Values.service.objst.loadBalancerIP }}
+              value: {{ .Values.service.objst.hostname | quote }}
             - name: AFC_OBJST_PORT
               value: {{ .Values.service.objst.fileStoragePort | quote }}
             - name: AFC_OBJST_SCHEME
               value: {{ .Values.service.objst.scheme | quote }}
             # ALS params
             - name: ALS_KAFKA_SERVER_ID
-              value: msghnd
+              value: {{ .Values.service.msghnd.hostname | quote }}
             - name: ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS
-              value: "{{ include "afc-int.fullname" . }}-als-kafka:{{ .Values.service.als_kafka.port }}"
+              value: "{{ .Values.service.als_kafka.hostname }}:{{ .Values.service.als_kafka.port }}"
             - name: ALS_KAFKA_MAX_REQUEST_SIZE
               value: {{ .Values.service.als_kafka.max_request_size | quote | replace ":" "" }}
             # Rcache parameters
@@ -76,14 +76,14 @@ spec:
             - name: RCACHE_POSTGRES_DSN
               valueFrom:
                 secretKeyRef:
-                  name: rcache-postgres-dsn-secret
+                  name: {{ .Chart.Name }}-rcache-postgres-dsn-secret
                   key: rcache-postgres-dsn
             - name: RCACHE_SERVICE_URL
-              value: "http://{{ include "afc-int.fullname" . }}-rcache:{{ .Values.service.rcache.port }}"
+              value: "http://{{ .Values.service.rcache.hostname }}:{{ .Values.service.rcache.port }}"
             - name: RCACHE_RMQ_DSN
               valueFrom:
                 secretKeyRef:
-                  name: rmq-rcache-secret
+                  name: {{ .Chart.Name }}-rmq-rcache-secret
                   key: rcache-rmq-dsn
             # own msghnd parameters
             - name: AFC_MSGHND_WORKERS
@@ -91,9 +91,9 @@ spec:
           resources:
             {{- toYaml .Values.resources.msghnd | nindent 12 }}
       volumes:
-        - name: msghnd-rat-api-secret
+        - name: {{ .Chart.Name }}-msghnd-rat-api-secret
           secret:
-            secretName: msghnd-rat-api-secret
+            secretName: {{ .Chart.Name }}-msghnd-rat-api-secret
       imagePullSecrets:
         - name: container-repo-secret
       {{- with .Values.nodeSelector }}
