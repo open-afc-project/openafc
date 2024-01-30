@@ -43,7 +43,12 @@ from typing import Any, Callable, cast, List, Dict, NamedTuple, Optional, \
 import urllib.error
 import urllib.parse
 import urllib.request
-import yaml
+
+has_yaml = True
+try:
+    import yaml
+except ImportError:
+    has_yaml = False
 
 
 def dp(*args, **kwargs) -> None:  # pylint: disable=invalid-name
@@ -95,13 +100,15 @@ def unused_argument(arg: Any) -> None:  # pylint: disable=unused-argument
 
 
 def yaml_load(yaml_s: str) -> Any:
-    """ YAML dictionary for given YAML content """
+    """ YAML/JSON dictionary for given YAML/JSON content """
     kwargs: Dict[str, Any] = {}
-    if hasattr(yaml, "CLoader"):
-        kwargs["Loader"] = yaml.CLoader
-    elif hasattr(yaml, "FullLoader"):
-        kwargs["Loader"] = yaml.FullLoader
-    return yaml.load(yaml_s, **kwargs)
+    if has_yaml:
+        if hasattr(yaml, "CLoader"):
+            kwargs["Loader"] = yaml.CLoader
+        elif hasattr(yaml, "FullLoader"):
+            kwargs["Loader"] = yaml.FullLoader
+        return yaml.load(yaml_s, **kwargs)
+    return json.loads(yaml_s)
 
 
 class Config(Iterable):
@@ -112,8 +119,12 @@ class Config(Iterable):
     _path -- Path to node ("foo.bar.42.baz") for use in error messages
     """
 
+    JSON_EXT = ".json"
+    YAML_EXT = ".yaml"
+
     # Default config file name
-    DEFAULT_CONFIG = os.path.splitext(__file__)[0] + ".yaml"
+    DEFAULT_CONFIG = \
+        os.path.splitext(__file__)[0] + (YAML_EXT if has_yaml else JSON_EXT)
 
     def __init__(
             self, argv: Optional[List[str]] = None,
@@ -174,7 +185,8 @@ class Config(Iterable):
                 yaml_s = f.read()
             try:
                 config_yaml_dict = yaml_load(yaml_s)
-            except yaml.YAMLError as ex:
+            except (yaml.YAMLError if has_yaml else json.JSONDecodeError) \
+                    as ex:
                 error(f"Error reading '{config}': {repr(ex)}")
             error_if(not isinstance(config_yaml_dict, dict),
                      f"Content of config file '{config}' is not a dictionary")
@@ -251,6 +263,10 @@ class Config(Iterable):
         for key, value in self._data.items():
             yield (key, self._subitem(value=value, attr=key))
 
+    def data(self) -> Union[List[Any], Dict[str, Any]]:
+        """ Returns underlying data structure """
+        return self._data
+
     def __iter__(self) -> Iterator:
         """ Iterator over node subitems """
         if isinstance(self._data, list):
@@ -285,7 +301,9 @@ class Config(Iterable):
 def run_docker(args: List[str]) -> str:
     """ Runs docker with given parameters, returns stdout content """
     try:
-        return subprocess.check_output(["docker"] + args, text=True)
+        return \
+            subprocess.check_output(["docker"] + args, universal_newlines=True,
+                                    encoding="utf-8")
     except subprocess.CalledProcessError as ex:
         error(f"Failed to run 'docker {' '.join(args)}': {repr(ex)}. Please "
               "specify all hosts explicitly")
@@ -850,7 +868,7 @@ class WorkerResultInfo(NamedTuple):
     """ Data, returned by REST API workers in result queue """
     # Retries made (0 - from first attempt)
     retries: int
-    # CPU consumed in nanoseconds
+    # CPU consumed in nanoseconds. Negative if not available
     cpu_consumed_ns: int
     # Request indices. None for netload
     req_indices: Optional[List[int]] = None
@@ -1029,16 +1047,24 @@ class ResultsProcessor:
         req_rate_ema = RateEma()
         cpu_consumption_ema = RateEma()
 
-        def status_message(eta: bool) -> str:
-            """ Returns status message (with or without ETA) """
+        def status_message(intermediate: bool) -> str:
+            """ Returns status message (intermediate or final) """
             now = datetime.datetime.now()
             elapsed = now - start_time
             elapsed_sec = elapsed.total_seconds()
             elapsed_str = re.sub(r"\.\d*$", "", str(elapsed))
             global_req_rate = requests_sent / elapsed_sec if elapsed_sec else 0
-            cpu_consumption = cpu_consumption_ema.rate_ema if eta \
-                else (cpu_consumed_ns * 1e-9 / elapsed_sec if elapsed_sec
-                      else 0)
+
+            cpu_consumption: float
+            if cpu_consumed_ns < 0:
+                cpu_consumption = -1
+            elif intermediate:
+                cpu_consumption = cpu_consumption_ema.rate_ema
+            elif elapsed_sec:
+                cpu_consumption = cpu_consumed_ns * 1e-9 / elapsed_sec
+            else:
+                cpu_consumption = 0
+
             if global_req_rate:
                 req_duration = parallel / global_req_rate
                 req_duration_str = \
@@ -1047,17 +1073,18 @@ class ResultsProcessor:
             else:
                 req_duration_str = "<unknown>"
             ret = \
-                f"{'Progress: ' if eta else ''}" \
-                f"{requests_sent} requests sent " \
+                f"{'Progress: ' if intermediate else ''}" \
+                f"{requests_sent} requests completed " \
                 f"({requests_sent * 100 / self._total_requests:.1f}%), " \
                 f"{requests_failed} failed " \
                 f"({requests_failed * 100 / (requests_sent or 1):.3f}%), " \
                 f"{retries} retries made. " \
                 f"{elapsed_str} elapsed, " \
-                f"CPU consumption is {cpu_consumption:.3f}, " \
                 f"rate is {global_req_rate:.3f} req/sec " \
                 f"(avg req proc time {req_duration_str})"
-            if eta and elapsed_sec and requests_sent:
+            if cpu_consumption >= 0:
+                ret += f", CPU consumption is {cpu_consumption:.3f}"
+            if intermediate and elapsed_sec and requests_sent:
                 total_duration = \
                     datetime.timedelta(
                         seconds=self._total_requests * elapsed_sec /
@@ -1138,10 +1165,10 @@ class ResultsProcessor:
                 if self._status_period and \
                         ((prev_sent // self._status_period) !=
                          (requests_sent // self._status_period)):
-                    self._status_printer.pr(status_message(eta=True))
+                    self._status_printer.pr(status_message(intermediate=True))
         finally:
             self._status_printer.pr()
-            logging.info(status_message(eta=False))
+            logging.info(status_message(intermediate=False))
 
     def _print(self, s: str, newline: bool, is_error: bool) -> None:
         """ Print message
@@ -1181,7 +1208,8 @@ def post_req_worker(
     try:
         session: Optional[requests.Session] = \
             requests.Session() if use_requests and (not dry) else None
-        prev_proc_time_ns = time.process_time_ns()
+        has_proc_time = hasattr(time, "process_time_ns")
+        prev_proc_time_ns = time.process_time_ns() if has_proc_time else 0
         while True:
             req_info: PostWorkerReqInfo = post_req_queue.get()
             if req_info is None:
@@ -1236,12 +1264,13 @@ def post_req_worker(
                 else:
                     error_msg = last_error
                 attempts = attempt + 1
-            new_proc_time_ns = time.process_time_ns()
+            new_proc_time_ns = time.process_time_ns() if has_proc_time else 0
             result_queue.put(
                 WorkerResultInfo(
                     req_indices=req_info.req_indices, retries=attempts - 1,
                     result_data=result_data, error_msg=error_msg,
-                    cpu_consumed_ns=new_proc_time_ns - prev_proc_time_ns,
+                    cpu_consumed_ns=(new_proc_time_ns - prev_proc_time_ns)
+                    if has_proc_time else -1,
                     req_data=req_info.req_data if return_requests and (not dry)
                     else None))
             prev_proc_time_ns = new_proc_time_ns
@@ -1274,7 +1303,8 @@ def get_req_worker(
     try:
         if expected_code is None:
             expected_code = http.HTTPStatus.OK.value
-        prev_proc_time_ns = time.process_time_ns()
+        has_proc_time = hasattr(time, "process_time_ns")
+        prev_proc_time_ns = time.process_time_ns() if has_proc_time else 0
         session: Optional[requests.Session] = \
             requests.Session() if use_requests and (not dry) else None
         while True:
@@ -1324,11 +1354,13 @@ def get_req_worker(
                     else:
                         error_msg = last_error
                     attempts = attempt + 1
-                new_proc_time_ns = time.process_time_ns()
+                new_proc_time_ns = \
+                    time.process_time_ns() if has_proc_time else 0
                 result_queue.put(
                     WorkerResultInfo(
                         retries=attempts - 1, error_msg=error_msg,
-                        cpu_consumed_ns=new_proc_time_ns - prev_proc_time_ns))
+                        cpu_consumed_ns=(new_proc_time_ns - prev_proc_time_ns)
+                        if has_proc_time else -1))
                 prev_proc_time_ns = new_proc_time_ns
     except Exception as ex:
         logging.error(f"Worker failed: {repr(ex)}\n"
@@ -1926,6 +1958,20 @@ def do_afc_config(cfg: Config, args: Any) -> None:
              "AFC Config update failed")
 
 
+def do_json_config(cfg: Config, args: Any) -> None:
+    """ Execute "afc_config" command.
+
+    Arguments:
+    cfg  -- Config object
+    args -- Parsed command line arguments
+    """
+    s = json.dumps(cfg.data(), indent=2)
+    filename = args.JSON_CONFIG if args.JSON_CONFIG else \
+        (os.path.splitext(Config.DEFAULT_CONFIG)[0] + Config.JSON_EXT)
+    with open(filename, "w", encoding="utf-8") as f:
+        f.write(s)
+
+
 def do_help(cfg: Config, args: Any) -> None:
     """ Execute "help" command.
 
@@ -2040,9 +2086,14 @@ def main(argv: List[str]) -> None:
     argument_parser.add_argument(
         "--config", metavar="[+]CONFIG_FILE", action="append", default=[],
         help=f"Config file. Default has same name and directory as this "
-        f"script, but has '.yaml' extension (i.e. {Config.DEFAULT_CONFIG}). "
-        f"May be specified several times (in which case values are merged "
-        f"together). If prefixed with '+' - joined to the default config")
+        f"script, but has "
+        f"'{Config.YAML_EXT if has_yaml else Config.JSON_EXT}' extension "
+        f"(i.e. {Config.DEFAULT_CONFIG}). May be specified several times (in "
+        f"which case values are merged together). If prefixed with '+' - "
+        "joined to the default config. Note that this script is accompanied "
+        f"with default YAML config. On YAML-less Python it should be "
+        f"converted to JSON (with 'json_config' subcommand) on some YAML-ed "
+        f"system and copied to YAML-less one")
 
     subparsers = argument_parser.add_subparsers(dest="subcommand",
                                                 metavar="SUBCOMMAND")
@@ -2128,6 +2179,16 @@ def main(argv: List[str]) -> None:
         "value is list - it should be surrounded by [] and formatted as in "
         "JSON")
     parser_afc_config.set_defaults(func=do_afc_config)
+
+    parser_json_config = subparsers.add_parser(
+        "json_config",
+        help="Convert config file from YAML to JSON for use on YAML-less "
+        "systems")
+    parser_json_config.add_argument(
+        "JSON_CONFIG", nargs="?",
+        help=f"JSON file to create. By default - same as source YAML file, "
+        f"but with {Config.JSON_EXT} extension")
+    parser_json_config.set_defaults(func=do_json_config)
 
     parser_help = subparsers.add_parser(
         "help", add_help=False,
