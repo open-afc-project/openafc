@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Values.deployments.global.pvc.name }}
+spec:
+  accessModes:
+    - {{ .Values.deployments.global.pvc.accessMode }}
+  storageClassName: {{ .Values.managed_service.nfs.storageClass.name | quote }}
+  resources:
+    requests:
+      storage: {{ .Values.deployments.global.pvc.size }}
