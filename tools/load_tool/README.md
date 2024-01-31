@@ -17,6 +17,7 @@ License, a copy of which is included with this software program.
    - [`netload` subcommand](#netload)
    - [`cache` subcommand](#cache)
    - [`afc_config` subcommand](#afc_config)
+   - [`json_config` subcommand](#json_config)
  - [Usage example](#examples)
 
 ## Overview <a name="overview"/>
@@ -26,6 +27,8 @@ License, a copy of which is included with this software program.
 Several instances of this script can be used simultaneously (e.g. from different locations), however this script does not (yet?) contain means for orchestration and statistics aggregation of this use case.
 
 The major AFC performance bottleneck is AFC computations, so in order to avoid test results to be determined by this slowest component, this script has an ability to **preload** response cache with (fake) results so that subsequent load test would use these fake results and not be constrained by AFC computations' performance.
+
+This script requires Python 3.6+. It is desirable to have **pyyaml** module installed, however this requirement may be circumvented (by converting YAML config file to JSON e.g. with `json_config` subcommand or by some online converter - and then using this JSON config file on system without **pyyaml** module installed).
 
 ## Requests, messages <a name="requests"/>
 
@@ -73,7 +76,7 @@ Example:
 
 ## Config file <a name="config"/>
 
-Some important constants used by script are stored outside, in config file. This is YAML file, by default having same name and location as script (except that it has *.yaml* extension).
+Some important constants used by script are stored outside, in config file. This is YAML (or JSON) file, by default having same name and location as script, with *.yaml* extension (on systems without **pyyaml** Python module installed - with *.json* extension).
 
 File content is, hopefully, self-descriptive, so here is just a brief overview of its sections.
 
@@ -89,11 +92,14 @@ File content is, hopefully, self-descriptive, so here is just a brief overview o
 
 It is possible to use several merged together config files - e.g. have one full config file and several config files with default and/or regional parameters.
 
+This script is provided with default config file in YAML format (as it is more human-readable and allows for comments). On system without **pyyaml** Python m,odulke installed installed JSON config files are to be used. Conversion may be performed with `json_config` subcommand (that, of course, should be performed on system with pyyaml installed) or with some online tool.
+
+Since JSON is a subset of YAML (i.e. every valid JSON file is valid YAML file), JSON config files may also be used on system with pyyaml inatalled (however note that default config file name on such systems is having *.yaml* extension).
+
 ## `afc_load_tool.py` <a name="tool"/>
 
-General invocation format:
-
-`afc_load_tool.py [--config [+]FILENAME.yaml] ... load|preload [PARAMETERS]`
+General invocation format:  
+`afc_load_tool.py [--config [+]FILENAME] ... SUBCOMMAND [PARAMETERS]`
 
 `--config` may be specified several times or not at all (in which case default one will be used). If config filename prefixed with `+`, it is used as an addition (not instead of) the default config. E.g.  
 `afc_load_tool.py --config +brazil.yaml] ... preload`  
@@ -150,6 +156,7 @@ Parameters:
 |--population **POPULATION_DB_FILE**||Choose positions according to population density. **POPULATION_DB_FILE** is an SQLite3 file, prepared with `make_population_db.py` (see [chapter](#population_db) on it). Note that use of this parameter may lead to positions outside the shore, that AFC Engine treats as incorrect - that's life...|
 |--random||Chose points randomly - according to population database (if `--population` specified) or within region rectangle in config file. Useful fro AFC Engine (`--no_cache`) testing|
 |--err_dir **DIRECTORY**||Directory to write failed AFC Request messages to. By default errors are reported, but failed requests are not logged|
+|--ramp_up **SECONDS**|Gradually increase load (starting streams one by one instead of all at once) for this time|
 
 
 ### `netload` subcommand <a name="netload"/>
@@ -202,6 +209,15 @@ Parameters:
 |--rat_server **HOST[:PORT]**|rat_server|IP Address and maybe port of rat_server service. If not specified rat_service of compose project, specified by --comp_proj is used|
 |**FIELD1=VALUE1** [**FIELD2=VALUE2**...]|Fields to modify. For deep fields, path specified as comma-separated sequence of keys (e.g. *freqBands.0.startFreqMHz*)|
 
+
+### `json_config` subcommand <a name="json_config"/>
+
+Convert YAML config file to JSON format. This command should be executed on system with **pyyaml** Python module installed. However resulting JSON file may be used on system without **pyyaml** installed. Of course, conversion may also be performed with some online tool.
+
+Invocation:  
+`afc_load_tool.py [--config [+]FILENAME.yaml] ... json_config [JSON_FILE]`
+
+Here `json_file`, if specified, is resulting file name. By default it has same file name and directory as script, but *.json* extension.
 
 ## Usage example <a name="examples"/>
 
