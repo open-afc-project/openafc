@@ -26,6 +26,7 @@ import zlib
 import hashlib
 import uuid
 import copy
+import platform
 from flask.views import MethodView
 import werkzeug.exceptions
 import threading
@@ -55,10 +56,18 @@ from .ratapi import rulesets
 from typing import Any, Dict, NamedTuple, Optional
 from rcache_models import RcacheClientSettings
 from rcache_client import RcacheClient
-import prometheus_utils
+import prometheus_client
 
 LOGGER = logging.getLogger(__name__)
 LOGGER.setLevel(AFC_RATAPI_LOG_LEVEL)
+
+# Metrics for autoscaling
+prometheus_metric_flask_afc_waiting_reqs = \
+    prometheus_client.Gauge('msghnd_flask_afc_waiting_reqs',
+                            'Number of requests waiting for afc engine',
+                            ['host'], multiprocess_mode='sum')
+prometheus_metric_flask_afc_waiting_reqs = \
+    prometheus_metric_flask_afc_waiting_reqs.labels(host=platform.node())
 
 # We want to dynamically trim this this list e.g.
 # via environment variable, for the current deployment
@@ -967,6 +976,7 @@ class RatAfc(MethodView):
                                 is_internal_request=is_internal_request)
         return None
 
+    @prometheus_metric_flask_afc_waiting_reqs.track_inprogress()
     def _compute_responses(self, dataif, use_tasks, req_infos,
                            is_internal_request):
         """ Prepares worker tasks and waits their completion
@@ -1058,10 +1068,6 @@ class ReadinessCheck(MethodView):
         return flask.make_response(msg, 200)
 
 
-class PrometheusMetrics(MethodView):
-    def get(self):
-        return prometheus_utils.multiprocess_flask_metrics()
-
 # registration of default runtime options
 
 module.add_url_rule('/availableSpectrumInquirySec',
@@ -1076,10 +1082,6 @@ module.add_url_rule('/availableSpectrumInquiryInternal',
 module.add_url_rule('/healthy', view_func=HealthCheck.as_view('HealthCheck'))
 
 module.add_url_rule('/ready', view_func=ReadinessCheck.as_view('ReadinessCheck'))
-
-if prometheus_utils.multiprocess_prometheus_configured():
-    module.add_url_rule(
-        '/metrics', view_func=PrometheusMetrics.as_view('PrometheusMetrics'))
 
 # Local Variables:
 # mode: Python
