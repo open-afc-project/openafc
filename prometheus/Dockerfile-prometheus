@@ -11,10 +11,6 @@ FROM ubuntu/prometheus:2.46.0-22.04_stable
 # Evaluated in entrypoint.sh (i.e. not baked-in)
 ENV PROMETHEUS_DATA=/prometheus/data
 
-# Comma separated list of target definition files from. Evaluated in
-# entrypoint.sh (i.e. not baked-in)
-ENV PROMETHEUS_TARGETS=targets/cadvisor.json,targets/msghnd.json,targets/als_siphon.json,targets/nginx.json
-
 # Scrape interval. Must have unit suffix (e.g. 15s for 15 seconds, 1m for one
 # minute, etc.) By default taken from prometheus.yml (5 seconds as of time of
 # this writing)
@@ -36,7 +32,6 @@ RUN apt install -y curl
 WORKDIR /prometheus
 
 COPY prometheus.yml /prometheus/
-COPY prometheus_targets/ /prometheus/targets
 COPY prometheus_entrypoint.sh /prometheus
 RUN chmod +x /prometheus/prometheus_entrypoint.sh
 

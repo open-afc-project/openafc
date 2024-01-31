@@ -1,9 +1,0 @@
-[
-  {
-    "targets": [ "msghnd:8000" ],
-    "labels": {
-      "job": "msghnd",
-      "__metrics_path__": "/fbrat/metrics"
-    }
-  }
-]
