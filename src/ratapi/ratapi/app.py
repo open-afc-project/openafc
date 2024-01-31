@@ -16,17 +16,36 @@ import datetime
 import logging
 import flask
 import requests
+import platform
 from sqlalchemy import exc
 from fst import DataIf
 from afcmodels.base import db
 from afcmodels.aaa import User
 import als
+import prometheus_utils
+import prometheus_client
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
 
 #: Current file path
 owndir = os.path.abspath(os.path.dirname(__file__))
+
+# Metrics for autoscaling
+prometheus_metric_flask_workers = \
+    prometheus_client.Gauge('msghnd_flask_workers',
+                            'Total number of Flask workers in container',
+                            ['host'], multiprocess_mode='max')
+prometheus_metric_flask_workers.labels(host=platform.node())
+prometheus_metric_flask_workers = \
+    prometheus_metric_flask_workers.labels(host=platform.node()).\
+    set(os.environ.get('AFC_MSGHND_WORKERS', 0))
+prometheus_metric_flask_active_reqs = \
+    prometheus_client.Gauge('msghnd_flask_active_reqs',
+                            'Number of currently processed Flask requests',
+                            ['host'], multiprocess_mode='sum')
+prometheus_metric_flask_active_reqs = \
+    prometheus_metric_flask_active_reqs.labels(host=platform.node())
 
 
 def create_app(config_override=None):
@@ -352,6 +371,20 @@ def create_app(config_override=None):
         views.paws.create_handler(flaskapp, '/paws')
         flaskapp.add_url_rule('/paws', 'paws.browse',
                               view_func=redirector('browse.index', code=302))
+    if ('AFC_MSGHND_WORKERS' in os.environ) and \
+            (prometheus_utils.multiprocess_prometheus_configured()):
+        flaskapp.add_url_rule(
+            '/metrics', view_func=prometheus_utils.multiprocess_flask_metrics)
+
+        @flaskapp.before_request
+        def inc_active_counter_metric():
+            prometheus_metric_flask_active_reqs.inc()
+
+        @flaskapp.after_request
+        def dec_active_counter_metric(response):
+            prometheus_metric_flask_active_reqs.dec()
+            return response
+
     flaskapp.register_blueprint(views.ratapi.module, url_prefix='/ratapi/v1')
     flaskapp.register_blueprint(views.ratafc.module, url_prefix='/ap-afc')
     flaskapp.register_blueprint(views.auth.module, url_prefix='/auth')
