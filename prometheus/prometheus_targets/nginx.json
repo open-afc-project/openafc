@@ -1,8 +1,0 @@
-[
-  {
-    "targets": [ "nginxexporter:9113" ],
-    "labels": {
-      "job": "nginx_exporter"
-    }
-  }
-]

@@ -7,8 +7,6 @@
 #
 # Runs prometheus with parameter specified over environment
 
-sed -i "s@TARGETS_REPLACEME@$PROMETHEUS_TARGETS@g" prometheus.yml
-
 if [ "$PROMETHEUS_SCRAPE_INTERVAL" != "" ]
 then
   sed -i "s/scrape_interval:\\s*[0-9]\\+./scrape_interval: $PROMETHEUS_SCRAPE_INTERVAL/g" prometheus.yml
