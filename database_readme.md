@@ -315,19 +315,17 @@ gdalwarp -te $minLon $minLat $maxLon $maxLat $fin $fout
 ```
 
 
-## **Database Usage (TO BE UPDATED)**
+## **Database Usage **
 
 ### **Expected location of post-processed database on the AFC server**
 There are three category of databases: Dynamic, Static and ULS.
 1. **Dynamic:**
 * These are assets that are subject to change more frequenty than Static, either by the user interacting with the GUI (AFC Config) uploading files (AntennaPatterns), or another asset that may change in the future
-* Live under /var/lib/fbrat
-* Examples are: afc_config, AntennaPatterns and analysis responses
-* Note that the were moved to Object storage by default
+* These are stored via the Object Storage component by default
 
 2. **Static:**
 * These are the assets that are not expected to change for at least a year (and some for many years)
-* Live under /mnt/nfs/rat_transfer
+* Appear in the containers under /mnt/nfs/rat_transfer
 * Examples are: Terrain (3DEP, SRTM, Globe), Building (LiDAR, Multiband-BDesign3D), NLCD, Population Density
 * Below are the database directories under /mnt/nfs/rat_transfer
   * **ULS_Database:** Fallback (static) ULS_Database in case an active ULS_Database under fbrat is missing
@@ -343,11 +341,60 @@ There are three category of databases: Dynamic, Static and ULS.
 
 3. **ULS (note: WIP):**
 * These are the supporting files for the ULS Script Parser that download, process, and create the new ULS files
-* Live under /mnt/nfs/rat_transfer/daily_uls_parse/data_files
+* Live under /mnt/nfs/rat_transfer/daily_uls_parse/data_files.  
   * **WIP:** Functionality built into API
   * Data for yesterdaysDB (used to retain FSID from day to day) and highest known FSID (to avoid collision, FSIDs are not reused currently) are stored here.
 
+## Mappings for use in OpenAFC
+OpenAFC containers needs several mappings to work properly.  Assuming that you are using /var/databases on your host to store the databases, you can select either option 1 here (which is assumed in the docker compose shown in the main README) or set mappings individually as shown in 2-6.   
 
-### **Configuration options to change the location of the database**
-TBD
+1) All databases in one folder - map to /mnt/nfs/rat_transfer
+      ```
+      /var/databases:/mnt/nfs/rat_transfer
+      ```
+      Those databases are:
+      - 3dep
+      - daily_uls_parse
+      - databases
+      - globe
+      - itudata
+      - nlcd
+      - population
+      - proc_gdal
+      - proc_lidar_2019
+      - RAS_Database
+      - srtm3arcsecondv003
+      - ULS_Database
+      - nfa
+      - pr
+
+
+2) LiDAR Databases to /mnt/nfs/rat_transfer/proc_lidar_2019
+      ```
+      /var/databases/proc_lidar_2019:/mnt/nfs/rat_transfer/proc_lidar_2019
+      ```
+3) RAS database to /mnt/nfs/rat_transfer/RAS_Database
+      ```
+      /var/databases/RAS_Database:/mnt/nfs/rat_transfer/RAS_Database
+      ```
+4) Actual ULS Databases to /mnt/nfs/rat_transfer/ULS_Database
+      ```
+      /var/databases/ULS_Database:/mnt/nfs/rat_transfer/ULS_Database
+      ```
+5) Folder with daily ULS Parse data /mnt/nfs/rat_transfer/daily_uls_parse
+      ```
+      /var/databases/daily_uls_parse:/mnt/nfs/rat_transfer/daily_uls_parse
+      ```
+6) Folder with AFC Config data /mnt/nfs/afc_config (now can be moved to Object Storage by default)
+      ```
+      /var/afc_config:/mnt/nfs/afc_config
+      ```
+**NB: All or almost all files and folders should be owned by user and group 1003 (currently - fbrat)**
+
+This can be applied via following command (mind the real location of these folders on your host system):
+
+```
+chown -R 1003:1003 /var/databases /var/afc_config
+```
+
 

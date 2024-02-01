@@ -70,172 +70,34 @@ Note that this sample does not provide working SSL certificates for authenticati
 
 # **Contributing**
 
-All contributions are welcome to this project.
+All contributions are paused while we evaluate a new process for maintaining changes.
 
-## How to contribute
-
-* **File an issue** - if you found a bug, want to request an enhancement, or want to implement something (bug fix or feature).
-* **Send a pull request** - if you want to contribute code. Please be sure to file an issue first.
-
-## Pull request best practices
-
-We want to accept your pull requests. Please follow these steps:
-
-### Step 1: File an issue
-
-Before writing any code, please file a Jira ticket [here](https://telecominfraproject.atlassian.net/jira/software/c/projects/OA/issues) stating the problem you want to solve or the feature you want to implement. This allows us to give you feedback before you spend any time writing code. There may be a known limitation that can't be addressed, or a bug that has already been fixed in a different way. The jira ticket allows us to communicate and figure out if it's worth your time to write a bunch of code for the project.
-
-### Step 2: Clone OpenAFC GitHub repository
-
-OpenAFC source repository can be cloned using the below command.
-```
-git clone git@github.com:Telecominfraproject/open-afc.git
-```
-This will create your own copy of our repository.
-[about remote repositories](https://docs.github.com/en/get-started/getting-started-with-git/about-remote-repositories)
-
-### Step 3: Create a temporary branch
-
-Create a temporary branch for making your changes.
-Keep a separate branch for each issue/feature you want to address .
-```
-git checkout -b <JIRA-ID>-branch_name
-```
-
-Highly desirable to use branch name from Jira title, or use meaningful branch name reflecting the actual changes
-```
-eg. git checkout -b OA-146-update-readme-md-to-reflect-jira-and-branch-creation-procedure
-```
-
-### Step 4: Commit your changes
-As you develop code, commit your changes into your local feature branch.
-Please make sure to include the issue number you're addressing in your commit message.
-This helps us out by allowing us to track which issue/feature your commit relates to.
-Below command will commit your changes to the local branch.
-Note to use JIRA-ID at the beginning of commit message.
-```
-git commit -a -m "<JIRA-ID>  desctiption of the change  ..."
-```
-### Step 5: Rebase
-
-Before sending a pull request, rebase against upstream, such as:
-
-```
-git fetch origin
-git rebase origin
-```
-This will add your changes on top of what's already in upstream, minimizing merge issues.
-
-### Step 6: Run the tests
-
-Make sure that all regression tests are passing before submitting a pull request.
-
-### Step 7: Push your branch to GitHub
-
-Push code to your remote feature branch.
-Below command will push your local branch along with the changes to OpenAFC GitHub.
-```
-git push -u origin <JIRA-ID>-branch_name
-```
- > NOTE: The push can include several commits (not only one), but these commits should be related to the same logical change/issue fix/new feature originally described in the [Step 1](#step-1-file-an-issue).
-
-### Step 8: Send the pull request
-
-Send the pull request from your feature branch to us.
-
-#### Change Description
-
-
-When submitting a pull request, please use the following template to submit the change description, risks and validations done after making the changes
-(not a book, but an info required to understand the change/scenario/risks/test coverage)
-
-- JIRA-ID number (from [Step 1](#step-1-file-an-issue)). A brief description of issue(s) being fixed and likelihood/frequency/severity of the issue, or description of new feature if it is a new feature.
-- Reproduction procedure: Details of how the issue could be reproduced / procedure to reproduce the issue.
-Description of Change:  A detailed description of what the change is and assumptions / decisions made
-- Risks: Low, Medium or High and reasoning for the same.
-- Fix validation procedure:
-  - Description of validations done after the fix.
-  - Required regression tests: Describe what additional tests should be done to ensure no regressions in other functionalities.
-  - Sanity test results as described in the [Step 6](#step-6-run-the-tests)
-
-> NOTE: Keep in mind that we like to see one issue addressed per pull request, as this helps keep our git history clean and we can more easily track down issues.
-
-<br /><br />
 <br /><br />
 
 # **How to Build**
-# AFC Engine build in docker setup
+# AFC Engine build in docker and compose setup
 
 ## Installing docker engine
-Docker engine instructions specific to your OS are available on [official website](https://docs.docker.com/engine/install/)
+Docker engine instructions specific to your OS are available on the [Docker official website](https://docs.docker.com/engine/install/)
 
-## Building the Docker image
-(Building the Docker image with build environment can be omitted once we have Docker registry)
+## Building the Docker images
 
 ### Prerequisites:
 
-Currently, all the prerequisites (except docker installation) are situated in [OpenAFC project's GitHub](https://github.com/Telecominfraproject/open-afc). All you need is to clone OpenAFC locally to your working directory and start all following commands from there.
-In this doc we assume to work in directory /tmp/work
+Currently, all the prerequisites to build the containers for the system (except docker installation) are situated in this repository. All you need is to clone OpenAFC locally to your working directory and start all following commands from there.
 
-### Building Docker image from Dockerfile (can be omitted once we have Docker registry)
+In order to run the system, you will need to construct a data volume and make it available to the containers. See [database_readme.md](database_readme.md) for details on what data is required.
 
-This can take some time
+### Building Docker image from Dockerfiles
 
-```
-docker build . -t afc-build -f worker/Dockerfile
-```
-
-### Pulling the Docker image from Docker registry
-
-Not available. Possibly will be added later.
-
-## Building OpenAFC engine
-
-Building and runnig building and running afc-engine as standalone application.
-
-**NB:** "-v" option maps the folder of the real machine into the insides of the docker container.
-
-&quot;-v /tmp/work/open-afc:/wd/afc&quot; means that contents of &quot;/tmp/work/open-afc&quot; folder will be available inside of container in /wd/afc/
-
-
-goto the project dir
-```
-cd open-afc
-```
-
-run shell of alpine docker-for-build shell
-```
-docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image:latest ash
-```
-
-inside the container's shell, execute:
-```
-mkdir -p -m 777 /wd/afc/build && BUILDREV=offlinebuild && cd /wd/afc/build && cmake -DCMAKE_INSTALL_PREFIX=/wd/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd/afc && ninja -j$(nproc) install
-```
-Now the afc-engine is ready: 
-```
-[@wcc-afc-01 work/dimar/open-afc] > ls -l build/src/afc-engine/afc-engine
--rwxr-xr-x. 1 dr942120 dr942120 4073528 Mar  8 04:03 build/src/afc-engine/afc-engine
-```
-run it from the default worker container:
-```
-docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc -v /opt/afc/databases/rat_transfer:/mnt/nfs/rat_transfer 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:my_tag sh
-```
-inside the worker container execute the afc-engine app
-```
-./afc/build/src/afc-engine/afc-engine
-```
-
-
-# **OpenAFC Engine Server usage in Docker Environment**
-# AFC Engine build in docker
-
-## Building Docker Container OpenAFC engine server
 There is a script that builds all container used by the AFC service.
 This script is used by automatic test infrastructure. Please check [tests/regression](/tests/regression/) dir.
 
+This script uses two environment variables PRIV_REPO and PUB_REPO to determine what repository to push images to. These values default to those used by the regression test infrastructure, but you should define them to refer to your repository. Note that the script 
+
 ### Using scripts from the code base
-to rebuild all containers use this scripts:
+
+To rebuild and tag all containers in your local docker repository, use this script:
 ```
 cd open-afc
 tests/regression/build_imgs.sh `pwd` my_tag 0
@@ -244,25 +106,13 @@ after the build, check all new containers:
 ```
 docker images | grep my_tag
 ```
-these containes are used by [tests/regression/run_srvr.sh](/tests/regression/run_srvr.sh)
-to run server using test infra scrips, please check and update [.env](/tests/regression/.env) used by [docker-compose.yaml](/tests/regression/docker-compose.yaml)
-1. update path to host's AFC static data directory (where nlcd, 3dep, lidar and other stuff exists)
-2. update port variables values
-3. comment out tls/mtls vars if simple http connection is used
-```
-./tests/regression/run_srvr.sh `pwd` my_tag
-```
-
+these containers are used by [tests/regression/run_srvr.sh](/tests/regression/run_srvr.sh)
 
 ### To 'manually' build containers one by one:
 ```
 cd open-afc
 
 docker build . -t rat_server -f rat_server/Dockerfile
-
-docker build . -t worker -f worker/Dockerfile
-
-docker build . -t uls_updater -f uls/Dockerfile-uls_updater
 
 docker build . -t uls_service -f uls/Dockerfile-uls_service
 
@@ -291,15 +141,64 @@ docker build . -t worker-preinst -f worker/Dockerfile.preinstall
 
 docker build . -t worker-build -f worker/Dockerfile.build
 ```
-to build the worker using local preq containers insted of public:
+to build the worker using local preq containers:
 ```
 docker build . -t worker -f worker/Dockerfile --build-arg PRINST_NAME=worker-preinst --build-arg PRINST_TAG=local --build-arg BLD_NAME=worker-build  --build-arg BLD_TAG=local
+```
+### Prometheus Monitoring images
+If you wish to use [Prometheus](https://prometheus.io/) to montitor your system, you can build these images
+```
+cd prometheus && docker build . -t  Dockerfile-prometheus -t prometheus-image ; cd ../
+cd /prometheus && docker build . Dockerfile-cadvisor -t cadvisor-image ; cd ../
+cd /prometheus && docker build . Dockerfile-nginxexporter -t nginxexporter-image  ; cd ../
+cd /prometheus && docker build . Dockerfile-grafana -t grafana-image ; cd ../
 ```
 
 Once built, docker images are usable as usual docker image.
 
+## Building OpenAFC engine
+
+If you wish to build or run the engine component outside of the entire OpenAFC system, you can build the docker images that are needed for only that component.
+
+**NB:** "-v" option in docker maps the folder of the real machine into the insides of the docker container.
+
+&quot;-v /tmp/work/open-afc:/wd/afc&quot; means that contents of &quot;/tmp/work/open-afc&quot; folder will be available inside of container in /wd/afc/
+
+
+goto the project dir
+```
+cd open-afc
+```
+If you have not already, build the worker build image
+```
+docker build . -t worker-build -f worker/Dockerfile.build
+```
+
+run shell of alpine docker-for-build shell
+```
+docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc worker-build:latest ash
+```
+
+inside the container's shell, execute:
+```
+mkdir -p -m 777 /wd/afc/build && BUILDREV=offlinebuild && cd /wd/afc/build && cmake -DCMAKE_INSTALL_PREFIX=/wd/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd/afc && ninja -j$(nproc) install
+```
+Now the afc-engine is ready: 
+```
+[@wcc-afc-01 work/dimar/open-afc] > ls -l build/src/afc-engine/afc-engine
+-rwxr-xr-x. 1 dr942120 dr942120 4073528 Mar  8 04:03 build/src/afc-engine/afc-engine
+```
+run it from the default worker container:
+```
+docker run --rm -it --user `id -u`:`id -g` --group-add `id -G | sed "s/ / --group-add /g"` -v `pwd`:/wd/afc -v /opt/afc/worker:latest sh
+```
+inside the worker container execute the afc-engine app
+```
+./afc/build/src/afc-engine/afc-engine
+```
+
 ## Prereqs
-Significant to know that the container needs several mappings to work properly:
+OpenAFC containers needs several mappings to work properly.  Assuming that you are using /var/databases on your host to store the databases, you can select either option 1 here (which is assumed in the docker compose shown below) or set mappings individually as shown in 2-6.   
 
 1) All databases in one folder - map to /mnt/nfs/rat_transfer
       ```
@@ -350,32 +249,28 @@ This can be applied via following command (mind the real location of these folde
 chown -R 1003:1003 /var/databases /var/afc_config
 ```
 
-**Please post comment or open issue with request to get access to the openAFC database initial archive.**
-
-It also needs access to the PostgreSQL 9 Database server with _fbrat_ database with special structure. (see [separate](#postgresql-structure) paragraph)
-
-Default access to the database is described in the puppet files. However you can change it by overriding the default config (located in _/etc/xdg/fbrat/ratapi.conf_ or changing corresponding puppet variables).
-
 ## docker-compose
 
 You would probably like to use docker-compose for setting up everything together - in this case feel free to use following docker-compose.yaml file as reference.
-also check [docker-compose.yaml](/tests/regression/docker-compose.yaml) and [.env](/tests/regression/.env) files from tests/regression directory, which are used by OpenAFC CI  
+also check [docker-compose.yaml](/tests/regression/docker-compose.yaml) and [.env](/tests/regression/.env) files from tests/regression directory, which are used by OpenAFC CI.
+
+Note that the image tags here are the ones from the [manual build](#to-manually-build-containers-one-by-one) not the ones used by the [script build](#using-scripts-from-the-code-base).
 
 ```
 version: '3.2'
 services:
   ratdb:
-    image: public.ecr.aws/w9v6y1o0/openafc/ratdb-image:${TAG:-latest}
+    image: ratdb:${TAG:-latest}
     restart: always
     dns_search: [.]
 
   rmq:
-    image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:${TAG:-latest}
+    image: rmq:${TAG:-latest}
     restart: always
     dns_search: [.]
 
   dispatcher:
-    image: public.ecr.aws/w9v6y1o0/openafc/dispatcher-image:${TAG:-latest}
+    image: dispatcher:${TAG:-latest}
     restart: always
     ports:
       - "${EXT_PORT}:80"
@@ -385,12 +280,12 @@ services:
     environment:
       - AFC_SERVER_NAME=${AFC_SERVER_NAME:-_}
       - AFC_ENFORCE_HTTPS=${AFC_ENFORCE_HTTPS:-TRUE}
+      # set to true if required to enforce mTLS check
+      - AFC_ENFORCE_MTLS=false
       - AFC_MSGHND_NAME=msghnd
       - AFC_MSGHND_PORT=8000
       - AFC_WEBUI_NAME=rat_server
       - AFC_WEBUI_PORT=80
-      # set AFC_ENFORCE_MTLS if required to enforce mTLS check
-      - AFC_ENFORCE_MTLS=true
       # Filestorage params:
       - AFC_OBJST_HOST=objst
       - AFC_OBJST_PORT=5000
@@ -401,7 +296,7 @@ services:
     dns_search: [.]
 
   rat_server:
-    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server:${TAG:-latest}
+    image: rat_server:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       - ./pipe:/pipe
@@ -433,12 +328,12 @@ services:
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
 
   msghnd:
-    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd:${TAG:-latest}
+    image: msghnd:${TAG:-latest}
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
@@ -453,7 +348,7 @@ services:
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
     dns_search: [.]
@@ -467,14 +362,15 @@ services:
       - rcache
 
   objst:
-    image: public.ecr.aws/w9v6y1o0/openafc/objstorage-image:${TAG:-latest}
+    image: objst:${TAG:-latest}
     environment:
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_HIST_PORT=4999
       - AFC_OBJST_LOCAL_DIR=/storage
     dns_search: [.]
+
   worker:
-    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:${TAG:-latest}
+    image: worker:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       - ./pipe:/pipe
@@ -496,6 +392,10 @@ services:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
+      # ALS params
+      - ALS_KAFKA_SERVER_ID=worker
+      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
     depends_on:
       - ratdb
       - rmq
@@ -505,7 +405,7 @@ services:
     dns_search: [.]
 
   als_kafka:
-    image: public.ecr.aws/w9v6y1o0/openafc/als-kafka-image:${TAG:-latest}
+    image: als-kafka:${TAG:-latest}
     restart: always
     environment:
       - KAFKA_ADVERTISED_HOST=${ALS_KAFKA_SERVER_}
@@ -514,7 +414,7 @@ services:
     dns_search: [.]
 
   als_siphon:
-    image: public.ecr.aws/w9v6y1o0/openafc/als-siphon-image:${TAG:-latest}
+    image: als-siphon:${TAG:-latest}
     restart: always
     environment:
       - KAFKA_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
@@ -541,14 +441,15 @@ services:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
     volumes:
-      - ${VOL_H_DB}/ULS_Database:/ULS_Database
+      - ${VOL_H_DB}/ULS_Database:/rat_transfer/ULS_Database
+      - ${VOL_H_DB}/RAS_Database:/rat_transfer/RAS_Database
       - uls_downloader_state:${VOL_C_ULS_STATE}
     secrets:
       - NOTIFIER_MAIL.json
     dns_search: [.]
 
   cert_db:
-    image: public.ecr.aws/w9v6y1o0/openafc/cert_db:${TAG:-latest}
+    image: cert_db:${TAG:-latest}
     depends_on:
       - ratdb
     links:
@@ -560,17 +461,51 @@ services:
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
 
   rcache:
-    image: public.ecr.aws/w9v6y1o0/openafc/rcache-image:${TAG:-latest}
+    image: rcache:${TAG:-latest}
     restart: always
     environment:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_PORT=${RCACHE_PORT}
-      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres:/rcache
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
       - RCACHE_AFC_REQ_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
       - RCACHE_RULESETS_URL=http://rat_server/fbrat/ratapi/v1/GetRulesetIDs
       - RCACHE_CONFIG_RETRIEVAL_URL=http://rat_server/fbrat/ratapi/v1/GetAfcConfigByRulesetID
     depends_on:
       - bulk_postgres
+    dns_search: [.]
+
+  grafana:
+    image: grafana-image:${TAG:-latest}
+    restart: always
+    depends_on:
+      - prometheus
+      - bulk_postgres
+    dns_search: [.]
+
+  prometheus:
+    image: prometheus-image:${TAG:-latest}
+    restart: always
+    depends_on:
+      - cadvisor
+      - nginxexporter
+    dns_search: [.]
+
+  cadvisor:
+    image:  cadvisor-image:${TAG:-latest}
+    restart: always
+    volumes:
+    - /:/rootfs:ro
+    - /var/run:/var/run:rw
+    - /sys:/sys:ro
+    - /var/lib/docker/:/var/lib/docker:ro
+    - /dev/disk/:/dev/disk:ro
+    dns_search: [.]
+
+  nginxexporter:
+    image: nginxexporter-image:${TAG:-latest}
+    restart: always
+    depends_on:
+      - dispatcher
     dns_search: [.]
 
 volumes:
@@ -585,6 +520,7 @@ secrets:
         file: ${VOL_H_SECRETS}/REGISTRATION.json
     REGISTRATION_CAPTCHA.json:
         file: ${VOL_H_SECRETS}/REGISTRATION_CAPTCHA.json
+
 
 ```
 `.env` file used with the docker-compose.yaml. please read comments in the file and update it accordingly 
@@ -603,15 +539,46 @@ AFC_SERVER_NAME="_"
 AFC_ENFORCE_HTTPS=TRUE
 
 # Host static DB root dir
-VOL_H_DB=/opt/afc/databases/rat_transfer
-# Container's static DB root dir
+VOL_H_DB=/var/databases/rat_transfer
+
+# Container's static DB root dir (dont change it !)
 VOL_C_DB=/mnt/nfs/rat_transfer
 
-# http port
+#RAT user to be used in containers
+UID=1003
+GID=1003
+
+# AFC service external PORTs configuration
+# syntax:
+# [IP]:<port | portN-portM>
+# like 172.31.11.188:80-180
+# where:
+#  IP is  172.31.11.188
+#  port range is 80-180
+
+# Here we configuring range of external ports to be used by the service
+# docker-compose randomly uses one port from the range
+
+# Note 1:
+# The IP arrdess can be skipped if there is only one external
+# IP address (i.e. 80-180 w/o IP address is acceptable as well)
+
+# Note 2:
+# range of ports can be skipped . and just one port is acceptable as well
+
+# all these valuase are acaptable:
+# PORT=172.31.11.188:80-180
+# PORT=172.31.11.188:80
+# PORT=80-180
+# PORT=80
+
+
+# http ports range
 EXT_PORT=80
 
-# https host port
+# https host ports range
 EXT_PORT_S=443
+
 
 # -= ALS CONFIGURATION STUFF =-
 
@@ -623,6 +590,7 @@ ALS_KAFKA_SERVER_=als_kafka
 
 # Maximum ALS message size (default 1MB is too tight for GUI AFC Response)
 ALS_KAFKA_MAX_REQUEST_SIZE_=10485760
+
 
 # -= FS(ULS) DOWNLOADER CONFIGURATION STUFF =-
 
@@ -654,25 +622,28 @@ VOL_H_SECRETS=../../tools/secrets/empty_secrets
 VOL_C_SECRETS=/run/secrets
 
 
+
 # -= OPTIONAL =-
-# to work without tls/mtls,remove these variables from here  
-# if you have tls/mtls configuration, keep configuration 
+# to work without tls/mtls,remove these variables from here
+# if you have tls/mtls configuration, keep configuration
 # files in these host volumes
 VOL_H_SSL=./ssl
-VOL_C_SSL=/etc/httpd/certs
+VOL_C_SSL=/usr/share/ca-certificates/certs
 VOL_H_NGNX=./ssl/nginx
 VOL_C_NGNX=/certificates/servers
+
 
 ```
 
 
-Just create this file on the same level with Dockerfile (don't forget to update paths to resources accordingly) and you are almost ready.
+Just create this file on the same level with Dockerfile and you are almost ready. Verify that the VOL_H_DB setting in the .env file is pointing at your host directory with the databases.
+
 Just run in this folder following command and it is done:
 ```
 docker-compose up -d
 ```
 
-Keep in mind that on the first run it will build and pull all the needed containers and it can take some time (based on your machine power)
+Keep in mind that on the first run it will build and pull all the needed containers and it can take some time (based on your machine power).  You may want to do a build (see [Building Docker image from Dockerfiles](#building-docker-image-from-dockerfiles))
 
 After the initial start of the server we recommend to stop it and then start again using these commands:
 ```
@@ -691,12 +662,51 @@ To force rebuild it completely use _--no-cache_ option:
 docker-compose build --no-cache
 ```
 
-**NB: the postgres:9 container requires the folder /mnt/nfs/pgsql/data to be owned by it's internal user and group _postgres_, which both have id 999.**
+**NB: the postgres container requires the folder /mnt/nfs/pgsql/data to be owned by it's internal user and group _postgres_, which both have id 999.**
 
 You can achieve it this way  (mind the real location of these folders on your host system):
 ```
 chown 999:999 /var/databases/pgdata
 ```
+## Initial configuration and first user
+
+On the first start of the PostgreSQL server there are some initial steps to do. First to create the database. Its default name now is **fbrat**. If you are using compose script described above, everything will be done automatically to prepare the database for intialization.
+
+After that, once OpenAFC server is started, you need to create DB structure for the user database. This can be done using a _rat-manage-api_ utility.
+
+```
+rat-manage-api db-create
+```
+
+If you do it with the server which is run thru the docker-compose script described above, you can do it using this command:
+```
+docker-compose exec rat_server rat-manage-api db-create
+```
+### Initial Super Administrator account
+
+Once done with database and starting the server, you need to create default administrative user to handle your server from WebUI. It is done from the server console using the _rat-manage-api_ utility.
+
+If you are running from the compose file described above, you first need to get the OpenAFC server console.
+```
+docker-compose exec rat_server bash
+```
+it will return something like this:
+```
+[root@149372a2ac05 wd]#
+```
+this means you are in.
+
+By default, the login uses non OIDC login method which manages user accounts locally.  You can use the following command to create an administrator for your OpenAFC server.
+
+```
+rat-manage-api user create --role Super --role Admin --role AP --role Analysis admin "Enter Your Password Here"
+```
+
+Once done, you can authorize with this user and password in WebUI.
+To exit the console press Ctrl+D or type the 'exit' command.
+
+If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Login.md)
+
 
 ## **Environment variables**
 |Name|Default val|Container|Notes
@@ -780,23 +790,9 @@ Following the example to use RabbitMQ service in docker-compose.
     restart: always
 ```
 
-## PostgreSQL structure
+## Managing the PostgreSQL database for users
 
-On the first start of the PostgreSQL server there are some initial steps to do. First to create the database. Its default name now is **fbrat**. If you are using compose script described above, everything will be done automatically.
-
-After that, once OpenAFC server is started, you need to create DB structure for the user database. This can be done using a _rat-manage-api_ utility.
-
-```
-rat-manage-api db-create
-```
-
-If you do it with the server which is run thru the docker-compose script described above, you can do it using this command:
-```
-docker-compose exec server rat-manage-api db-create
-```
-
-### Upgrade PostgreSQL
-
+### Upgrading PostgresSQL
 When PostgreSQL is upgraded the pgdata should be converted to be compatible with the new PostgreSQL version. It can be done by tools/db_tools/update_db.sh script.
 ```
 tools/db_tools/update_db.sh [pgdata_dir] [postgres_password] [old_postgres_version] [new_postgres_version]
@@ -808,31 +804,6 @@ Example: convert db which was created by PostgreSQL version 9.6 to be used by Po
 ```
 sudo tools/db_tools/update_db.sh ./pgdata qwerty 9.6 14.7
 ```
-
-## Initial Super Administrator account
-
-Once done with database and starting the server, you need to create default administrative user to handle your server from WebUI. It is done from the server console using the _rat-manage-api_ utility.
-
-If you are running from the compose file described above, you first need to get the OpenAFC server console.
-```
-docker-compose exec server bash
-```
-it will return something like this:
-```
-[root@149372a2ac05 wd]#
-```
-this means you are in.
-
-By default, the login uses non OIDC login method which manages user accounts locally.  You can use the following command to create an administrator for your OpenAFC server.
-
-```
-rat-manage-api user create --role Super --role Admin --role AP --role Analysis admin "Enter Your Password Here"
-```
-
-Once done, you can authorize with this user and password in WebUI.
-To exit the console press Ctrl+D or type the 'exit' command.
-
-If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Login.md)
 
 ### Note for an existing user database
 
@@ -852,7 +823,7 @@ This will wipe out existing users, e.g. user acounts need to be manually recreat
 ```
 rat-manage-api db-upgrade
 ```
-## Managing user account
+## Managing user accounts
 Users can be created and removed. User roles can be added and removed.
 Remove user with user remove command, e.g.:
 ```
@@ -899,45 +870,4 @@ Happy usage!
 
 ## ULS database update automation
 
-ULS Database needs (preferrably daily) updates to be up-to-date with regulators requirements. So there is a set of scripts in the uls/ folder which automates this activity.
-
-Prerequisites:
-- Set up and running Jenkins server
-- At least one of jenkins executors have access to the folder where the ULS database is stored (in our example it will be "/var/databases/ULS_Database") should it be the executor on the same server where the afc engine runs or it should have access to the folder thru NFS - it is up to your choice. It should have a 'uls' label to make this pipeline run on it.
-- SSH key for (at least) read only access to this github repository
-
-First Log in to your Jenkins WebUI and create a new Pipeline (Dashboard -> + New Item)
-On the next screen set up the the name of the project (for example "ULS Update") and choose "Pipeline" option and click OK.
-
-On the next screen there are a lot of buttons for configuration and set up, most of them are up to you.
-
-It is essential to do following configuration:
-
-    1. Check option "This project is parameterized".A button "Add parameter" will appear.
-    2. Add parameter of type "Credentials Parameter". Give it name "GITHUB_CREDS_ID" (without quotes) and "SSH username with private key" as a Credential type. Check the option "Required" and set as a default value the credential mentioned in prerequisites.
-    3. In the same section add another parameter. Now of type "String Parameter" with name "ULS_FOLDER" and default value mentioned in prereqisites (in this example - "/var/databases/ULS_Database")
-    4. In section Pipeline choose option "Pipeline script form SCM".
-        4.1 In SCM Type choose GIT.
-        4.2 In repository specify the ssh path to repository (in our case - "git@github.com:Telecominfraproject/open-afc.git"). In credentials Dropdown menu choose the valid credetials to this repository.
-        4.3 In "Branches to build" use "*/main" (without quotes)
-        4.4 In "Script Path" specify the path from github repository root to jenkinsfile ( uls/ULS_updater.Jenkinsfile )
-
-
-All the other configurations are up to you, but it is recommended to use following options:
-
-Check option "Do not allow concurrent builds"
-
-In Build Triggers section choose "Build Periodically" option and as a schedule type following:
-```cron
-H H/24 * * *
-```
-This will make ULS update run once every 24 hours.
-
-After that choose "Poll SCM" and in schedule type following:
-```cron
-H/5 * * * *
-```
-
-this will make jenkins to check changes in SCM and run the update if any change in Pipeline had happened.
-
-And click "Save". That's it! If everything is done right, after the next run of this pipeline, the new ULS Database will appear in the ULS_Database folder.
+ULS Database needs (preferrably daily) updates to be up-to-date with regulators requirements.  See [README in uls](uls/README.md "ULS Service ReadMe") for instructions and configuration.  The docker compose given above will create a container that runs the daily ULS update service.

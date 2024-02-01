@@ -132,7 +132,6 @@ build_dev_server() {
 
   # build of ULS dockers
   EXT_ARGS="--build-arg BLD_TAG=${tag} --build-arg PRINST_TAG=${tag} --build-arg BLD_NAME=${WORKER_AL_D4B} --build-arg PRINST_NAME=${WORKER_AL_PRINST} --build-arg BUILDREV=${BUILDREV}"
-  docker_build_and_push ${wd}/uls/Dockerfile-uls_updater ${ULS_UPDATER}:${tag} ${push} "${EXT_ARGS}" &
   docker_build_and_push ${wd}/uls/Dockerfile-uls_service ${ULS_DOWNLOADER}:${tag} ${push} "${EXT_ARGS}" &
 
   # build msghnd  (flask + gunicorn)
