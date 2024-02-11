@@ -176,17 +176,19 @@ services:
     image: public.ecr.aws/w9v6y1o0/openafc/uls-downloader:${TAG:-latest}
     restart: always
     environment:
-      - ULS_STATE_DIR=${VOL_C_ULS_STATE}
       - ULS_AFC_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
       - ULS_DELAY_HR=1
+      - ULS_SERVICE_STATE_DB_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
+      - ULS_PROMETHEUS_PORT=8000
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
     volumes:
       - ${VOL_H_DB}:/rat_transfer
-      - uls_downloader_state:${VOL_C_ULS_STATE}
     secrets:
       - NOTIFIER_MAIL.json
+    depends_on:
+      - bulk_postgres
     dns_search: [.]
 
   cert_db:
@@ -248,9 +250,6 @@ services:
     depends_on:
       - dispatcher
     dns_search: [.]
-
-volumes:
-  uls_downloader_state:
 
 secrets:
     NOTIFIER_MAIL.json:

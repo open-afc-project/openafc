@@ -30,6 +30,9 @@ scrape_configs:
   - job_name: nginxexporter
     static_configs:
       - targets: [nginxexporter:9113]
+  - job_name: uls_downloader
+    static_configs:
+      - targets: [uls_downloader:8000]
   - job_name: cadvisor
     static_configs:
       - targets: [cadvisor:8080]

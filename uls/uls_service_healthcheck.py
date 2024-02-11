@@ -10,24 +10,30 @@
 # pylint: disable=unused-wildcard-import, wrong-import-order, wildcard-import
 # pylint: disable=logging-fstring-interpolation, invalid-name, too-many-locals
 # pylint: disable=too-many-branches, too-few-public-methods
+# pylint: disable=too-many-statements
 
 import argparse
 import datetime
 import email.mime.text
+import json
 import logging
 import os
 import pydantic
 import smtplib
+import sqlalchemy as sa
 import sys
-from typing import Any, cast, List, Optional, Set, Union
+from typing import Any, cast, List, NamedTuple, Optional, Set, Union
 
 from uls_service_common import *
+from uls_service_state_db import AlarmType, CheckType, DownloaderMilestone, \
+    LogType, safe_dsn, StateDb
 
 
 class Settings(pydantic.BaseSettings):
     """ Arguments from command lines - with their default values """
 
-    status_dir: str = pydantic.Field(DEFAULT_STATUS_DIR, env="ULS_STATUS_DIR")
+    service_state_db_dsn: str = \
+        pydantic.Field(..., env="ULS_SERVICE_STATE_DB_DSN")
     smtp_info: Optional[str] = pydantic.Field(None, env="ULS_ALARM_SMTP_INFO")
     email_to: Optional[str] = pydantic.Field(None, env="ULS_ALARM_EMAIL_TO")
     beacon_email_to: Optional[str] = \
@@ -52,6 +58,7 @@ class Settings(pydantic.BaseSettings):
         pydantic.Field(None, env="ULS_ALARM_REG_UPD_MAX_AGE_HR")
     verbose: bool = pydantic.Field(False)
     force_success: bool = pydantic.Field(False)
+    print_email: bool = pydantic.Field(False)
 
     @pydantic.root_validator(pre=True)
     @classmethod
@@ -141,35 +148,50 @@ def expired(event_td: Optional[datetime.datetime],
         datetime.timedelta(hours=max_age_hr)
 
 
-def email_if_needed(status_storage: StatusStorage, settings: Any) -> None:
+def email_if_needed(state_db: StateDb, settings: Any) -> None:
     """ Send alarm/beacon emails if needed
 
     Arguments:
-    status_storage -- status storage
-    settings       -- Settings object
+    state_db    -- StateDb object
+    settings    -- Settings object
     """
     if (settings.alarm_email_interval_hr is None) and \
             (settings.beacon_email_interval_hr is None):
         return
-    service_birth = status_storage.read_milestone(StatusStorage.S.ServiceBirth)
-    problems: List[str] = []
+    service_birth = \
+        state_db.read_milestone(DownloaderMilestone.ServiceBirth).get(None)
+
+    ProblemInfo = \
+        NamedTuple("ProblemInfo",
+                   [("alarm_type", AlarmType), ("alarm_reason", str),
+                    ("message", str)])
+
+    problems: List[ProblemInfo] = []
     email_to = settings.email_to
     if expired(
-            event_td=status_storage.read_milestone(
-                StatusStorage.S.DownloadStart) or service_birth,
+            event_td=state_db.read_milestone(
+                DownloaderMilestone.DownloadStart).get(None, service_birth),
             max_age_hr=settings.download_attempt_max_age_alarm_hr):
         problems.append(
-            f"AFC ULS database download attempts were not taken for more than "
-            f"{settings.download_attempt_max_age_alarm_hr} hours")
+            ProblemInfo(
+                alarm_type=AlarmType.MissingMilestone,
+                alarm_reason=DownloaderMilestone.DownloadStart.name,
+                message=f"AFC ULS database download attempts were not taken "
+                f"for more than {settings.download_attempt_max_age_alarm_hr} "
+                f"hours"))
     if expired(
-            event_td=status_storage.read_milestone(
-                StatusStorage.S.DownloadSuccess) or service_birth,
+            event_td=state_db.read_milestone(
+                DownloaderMilestone.DownloadSuccess).get(None, service_birth),
             max_age_hr=settings.download_success_max_age_alarm_hr):
         problems.append(
-            f"AFC ULS database download attempts were not succeeded for more "
-            f"than {settings.download_success_max_age_alarm_hr} hours")
+            ProblemInfo(
+                alarm_type=AlarmType.MissingMilestone,
+                alarm_reason=DownloaderMilestone.DownloadSuccess.name,
+                message=f"AFC ULS database download attempts were not "
+                f"succeeded for more than "
+                f"{settings.download_success_max_age_alarm_hr} hours"))
     reg_data_changes = \
-        status_storage.read_reg_data_changes(StatusStorage.S.RegionUpdate)
+        state_db.read_milestone(DownloaderMilestone.RegionChanged)
     regions: Set[str] = set()
     for reg_hr in ((settings.region_update_max_age_alarm or "").split(",")
                    or []):
@@ -185,66 +207,108 @@ def email_if_needed(status_storage: StatusStorage, settings: Any) -> None:
         except ValueError:
             error(f"Invalid value for hours in '--region_update_max_age_alarm "
                   f"{reg_hr}'")
-        if expired(event_td=reg_data_changes.get(reg) or service_birth,
+        if expired(event_td=reg_data_changes.get(reg, service_birth),
                    max_age_hr=max_age_hr):
             problems.append(
-                f"No new data for region '{reg}' were downloaded for more "
-                f"than {max_age_hr} hours")
-
-    external_files_problems = \
-        ExtParamFilesChecker(status_storage=status_storage).get_problems()
-    if external_files_problems:
-        problems.append("External parameters files synchronization problems:")
-        problems += [("  " + efp) for efp in external_files_problems]
+                ProblemInfo(
+                    alarm_type=AlarmType.MissingMilestone,
+                    alarm_reason=DownloaderMilestone.RegionChanged.name,
+                    message=f"No new data for region '{reg}' were downloaded "
+                    f"for more than {max_age_hr} hours"))
+    check_prefixes = \
+        {CheckType.ExtParams: "External parameters synchronization problem",
+         CheckType.FsDatabase: "FS database validity check problem"}
+    for check_type, check_infos in state_db.read_check_results().items():
+        prefix = check_prefixes[check_type]
+        for check_info in check_infos:
+            if check_info.errmsg is None:
+                continue
+            problems.append(
+                ProblemInfo(
+                    alarm_type=AlarmType.FailedCheck,
+                    alarm_reason=check_type.name,
+                    message=f"{prefix}: {check_info.errmsg}"))
 
     loc = settings.email_sender_location
+
+    alarms_cleared = False
     if problems:
         message_subject = "AFC ULS Service encountering problems"
         nl = "\n"
         message_body = \
             (f"AFC ULS download service {('at ' + loc) if loc else ''} "
-             f"encountered the following problems:\n{nl.join(problems)}\n\n")
+             f"encountered the following problems:\n"
+             f"{nl.join(problem.message for problem in problems)}\n\n")
         email_interval_hr = settings.alarm_email_interval_hr
-        email_milestone = StatusStorage.S.AlarmSent
+        email_milestone = DownloaderMilestone.AlarmSent
     else:
-        message_subject = "AFC ULS Service works fine"
+        if state_db.read_alarm_reasons():
+            alarms_cleared = True
+            message_subject = "AFC FS Service problems resolved"
+        else:
+            message_subject = "AFC FS Service works fine"
         message_body = \
-            (f"AFC ULS download service {('at ' + loc) if loc else ''} "
+            (f"AFC FS download service {('at ' + loc) if loc else ''} "
              f"works fine\n\n")
         email_interval_hr = settings.beacon_email_interval_hr
-        email_milestone = StatusStorage.S.BeaconSent
+        email_milestone = DownloaderMilestone.BeaconSent
         if settings.beacon_email_to:
             email_to = settings.beacon_email_to
 
-    if not expired(
-            event_td=status_storage.read_milestone(email_milestone),
-            max_age_hr=email_interval_hr):
+    if (not alarms_cleared) and \
+            (not expired(
+                event_td=state_db.read_milestone(email_milestone).get(None),
+                max_age_hr=email_interval_hr)):
         return
 
     message_body += "Overall service state is as follows:\n"
     for state, heading in \
-            [(StatusStorage.S.ServiceBirth,
+            [(DownloaderMilestone.ServiceBirth,
               "First time service was started in: "),
-             (StatusStorage.S.ServiceStart,
+             (DownloaderMilestone.ServiceStart,
               "Last time service was started in: "),
-             (StatusStorage.S.DownloadStart,
-              "Last ULS download attempt was taken in: "),
-             (StatusStorage.S.DownloadSuccess,
-              "Last ULS download attempt succeeded in: "),
-             (StatusStorage.S.SqliteUpdate,
+             (DownloaderMilestone.DownloadStart,
+              "Last FS download attempt was taken in: "),
+             (DownloaderMilestone.DownloadSuccess,
+              "Last FS download attempt succeeded in: "),
+             (DownloaderMilestone.DbUpdated,
               "Last time ULS database was updated in: ")]:
-        et = status_storage.read_milestone(state)
+        et = state_db.read_milestone(state).get(None)
         message_body += \
-            f"{heading}{'Unknown' if et is None else et.isoformat()}\n"
-    for reg in sorted(set(reg_data_changes.keys() | regions)):
+            f"{heading}{'Unknown' if et is None else et.isoformat()}"
+        if et is not None:
+            message_body += f" ({datetime.datetime.now() - et} ago)"
+        message_body += "\n"
+
+    for reg in sorted(set(cast(str, r) for r in reg_data_changes.keys()) |
+                      regions):
         et = reg_data_changes.get(reg)
         message_body += \
-            (f"ULS data for region '{reg}' last time updated in: "
+            (f"FS data for region '{reg}' last time updated in: "
              f"{'Unknown' if et is None else et.isoformat()}")
-    send_email_smtp(smtp_info_filename=settings.smtp_info,
-                    to=email_to, subject=message_subject,
-                    body=message_body)
-    status_storage.write_milestone(email_milestone)
+        if et is not None:
+            message_body += f" ({datetime.datetime.now() - et} ago)"
+        message_body += "\n"
+    if email_milestone == DownloaderMilestone.AlarmSent:
+        log_info = state_db.read_last_log(log_type=LogType.Last)
+        if log_info:
+            message_body += \
+                f"\nDownload log of {log_info.timestamp.isoformat()}:\n" + \
+                f"{log_info.text}\n"
+
+    if settings.print_email:
+        print(f"SUBJECT: {message_subject}\nBody:\n{message_body}")
+    else:
+        send_email_smtp(smtp_info_filename=settings.smtp_info,
+                        to=email_to, subject=message_subject,
+                        body=message_body)
+        state_db.write_milestone(email_milestone)
+
+    alarm_reasons: Dict[AlarmType, Set[str]] = {}
+    for problem in problems:
+        alarm_reasons.setdefault(problem.alarm_type, set()).\
+            add(problem.alarm_reason)
+    state_db.write_alarm_reasons(alarm_reasons)
 
 
 def main(argv: List[str]) -> None:
@@ -256,9 +320,10 @@ def main(argv: List[str]) -> None:
     argument_parser = argparse.ArgumentParser(
         description="ULS data download control service healthcheck")
     argument_parser.add_argument(
-        "--status_dir", metavar="STATUS_DIR",
-        help=f"Directory with control script status information"
-        f"{env_help(Settings, 'status_dir')}")
+        "--service_state_db_dsn", metavar="STATE_DB_DSN",
+        help=f"Connection string to database containing FS service state "
+        f"(that is used by healthcheck script)"
+        f"{env_help(Settings, 'service_state_db_dsn')}")
     argument_parser.add_argument(
         "--smtp_info", metavar="SMTP_CREDENTIALS_FILE",
         help=f"SMTP credentials file. For its structure - see "
@@ -273,8 +338,8 @@ def main(argv: List[str]) -> None:
         f"{env_help(Settings, 'email_to')}")
     argument_parser.add_argument(
         "--beacon_email_to", metavar="BEACON_EMAIL",
-        help=f"Email address to send beacon information  notification to. If parameter not "
-        f"specified - alarm email_to will used "
+        help=f"Email address to send beacon information  notification to. If "
+        f"parameter not specified - alarm email_to will used "
         f"{env_help(Settings, 'beacon_email_to')}")
     argument_parser.add_argument(
         "--email_sender_location", metavar="TEXT",
@@ -327,6 +392,9 @@ def main(argv: List[str]) -> None:
     argument_parser.add_argument(
         "--force_success", action="store_true",
         help="Don't return error exit code if container found to be unhealthy")
+    argument_parser.add_argument(
+        "--print_email", action="store_true",
+        help="Print email instead of sending it (for debug purposes)")
 
     settings: Settings = \
         cast(Settings, merge_args(settings_class=Settings,
@@ -334,44 +402,46 @@ def main(argv: List[str]) -> None:
 
     setup_logging(verbose=settings.verbose)
 
-    status_storage = StatusStorage(status_dir=settings.status_dir)
+    set_error_exit_params(log_level=logging.ERROR)
+    if settings.force_success:
+        set_error_exit_params(exit_code=00)
 
-    status_storage.write_milestone(StatusStorage.S.HealthCheck)
+    state_db = StateDb(db_dsn=settings.service_state_db_dsn)
+    try:
+        state_db.connect()
+    except sa.exc.SQLAlchemyError as ex:
+        error(f"Can't connect to FS downloader state database "
+              f"{safe_dsn(settings.service_state_db_dsn)}: {repr(ex)}")
 
-    email_if_needed(status_storage=status_storage, settings=settings)
+    state_db.write_milestone(DownloaderMilestone.Healthcheck)
 
-    last_start = status_storage.read_milestone(StatusStorage.S.ServiceStart)
-    if last_start is None:
-        logging.error("ULS downloader service not started")
-        if not settings.force_success:
-            sys.exit(1)
+    email_if_needed(state_db=state_db, settings=settings)
 
-    if expired(event_td=status_storage.read_milestone(
-               StatusStorage.S.DownloadStart),
-               max_age_hr=settings.download_attempt_max_age_health_hr):
-        logging.error(f"Last download attempt happened more than "
-                      f"{settings.download_attempt_max_age_health_hr} hours "
-                      f"ago or not at all")
-        if not settings.force_success:
-            sys.exit(1)
+    last_start = state_db.read_milestone(DownloaderMilestone.ServiceStart)
+    error_if(last_start is None, "FS downloader service not started")
 
-    if expired(event_td=status_storage.read_milestone(
-               StatusStorage.S.DownloadSuccess),
-               max_age_hr=settings.download_success_max_age_health_hr):
-        logging.error(f"Last download success happened more than "
-                      f"{settings.download_success_max_age_health_hr} hours "
-                      f"ago or not at all")
-        if not settings.force_success:
-            sys.exit(1)
+    error_if(
+        expired(event_td=state_db.read_milestone(
+                DownloaderMilestone.DownloadStart).get(None),
+                max_age_hr=settings.download_attempt_max_age_health_hr),
+        f"Last download attempt happened more than "
+        f"{settings.download_attempt_max_age_health_hr} hours ago or not at "
+        f"all")
 
-    if expired(event_td=status_storage.read_milestone(
-               StatusStorage.S.SqliteUpdate),
-               max_age_hr=settings.update_max_age_health_hr):
-        logging.error(f"Last time ULS database was updated happened more than "
-                      f"{settings.update_max_age_health_hr} hours ago "
-                      f"or not at all")
-        if not settings.force_success:
-            sys.exit(1)
+    error_if(
+        expired(event_td=state_db.read_milestone(
+                DownloaderMilestone.DownloadSuccess).get(None),
+                max_age_hr=settings.download_success_max_age_health_hr),
+        f"Last download success happened more than "
+        f"{settings.download_success_max_age_health_hr} hours ago or not at "
+        f"all")
+
+    error_if(
+        expired(event_td=state_db.read_milestone(
+                DownloaderMilestone.DbUpdated).get(None),
+                max_age_hr=settings.update_max_age_health_hr),
+        f"Last time FS database was updated happened more than "
+        f"{settings.update_max_age_health_hr} hours ago or not at all")
 
 
 if __name__ == "__main__":

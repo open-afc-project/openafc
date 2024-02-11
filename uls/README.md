@@ -10,6 +10,9 @@ License, a copy of which is included with this software program.
 - [On importance of FS Database continuity](#continuity)
 - [FS Downloader service script](#service)
 - [Service healthcheck](#healthcheck)
+- [Service state](#service_state)
+  - [State database](#state_database)
+  - [Prometheus metrics](#metrics)
 - [Troubleshooting](#troubleshooting)
   - [Results of last download](#results_location)
   - [Redownload](#redownload)
@@ -73,7 +76,11 @@ soTable below summarizes these parameters and environment variables:
 |--fsid_file **FILEPATH**|ULS_FSID_FILE|/mnt/nfs/rat_transfer/<br>daily_uls_parse/<br>data_files/fsid_table.csv|Full name of file with existing FSIDs, used by *daily_uls_parse.py*. Between downloads this data is stored in FS Database|
 |--ext_ras_database **FILENAME**|ULS_EXT_RAS_DATABASE|rat_transfer/RAS_Database/<br>RASdatabase.dat<br>*Defined in dockerfile*|Name of externally maintained 'RAS database' (.csv file with restricted areas)|
 |--ras_database **FILENAME**|ULS_RAS_DATABASE|/mnt/nfs/rat_transfer<br>/daily_uls_parse/data_files<br>/RASdatabase.dat|Where from *daily_uls_parse.py* reads RAS database|
-|--status_dir **DIR**|ULS_STATUS_DIR||Directory where service script saves its status information (such as time of last download, time of last download success, time of last database update, etc.), that is subsequently used by healthcheck script|
+|--service_state_db_dsn<br>**CONNECTION_STRING**|ULS_SERVICE_STATE_DB_DSN||Connection string to state database. It contains FS service state that is used by healthcheck script. This parameter is mandatory|
+|--service_state_db_create_if_absent|ULS_SERVICE_STATE_DB_CREATE_IF_ABSENT|True|Create state database if absent|
+|--service_state_db_recreate|ULS_SERVICE_STATE_DB_RECREATE|False|Recreate state database if it exists|
+|--prometheus_port **PORT**|ULS_PROMETHEUS_PORT||Port to serve Prometheus metrics on (default is to not serve)|
+|--statsd_server **HOST[:PORT]**|ULS_STATSD_SERVER||StatsD server to send metrics to. Default is to not send|
 |--check_ext_files **BASE_URL:SUBDIR:FILENAME[,FILENAME...][;...**|ULS_CHECK_EXT_FILES|"https://raw.githubusercontent.com<br>/Wireless-Innovation-Forum/<br>6-GHz-AFC/main/data/common_data:<br>raw_wireless_innovation_forum_files:<br>antenna_model_diameter_gain.csv,<br>billboard_reflector.csv,<br>category_b1_antennas.csv,<br>high_performance_antennas.csv,<br>fcc_fixed_service_channelization.csv,<br>transmit_radio_unit_architecture.csv|Certain files used by *daily_uls_parse.py* should be identical to certain files on the Internet. Comparison performed by *uls_service.py*, this parameter specifies what to compare. Several such group may be specified semicolon-separated. This parameter may be specified several times and currently hardcoded in *uls/Dockerfile-uls_service*|
 |--max_change_percent **PERCENT**|ULS_MAX_CHANGE_PERCENT|10|Downloaded FS Database fails integrity check if it differs from previous by more than this percent of number of paths. If absent/empty - this check is not performed|
 |--afc_url **URL**|ULS_AFC_URL||REST API URL (in *rat_server*/*msghnd*) to use for AFC computation with custom FS database as part of AFS Database integrity check. If absent/empty - this check is not performed| 
@@ -85,7 +92,7 @@ soTable below summarizes these parameters and environment variables:
 |--timeout_hr **HOURS**|ULS_TIMEOUT_HR|1|Timeout in hours for *daily_uls_parse.py*|
 |--nice|ULS_NICE|*Defined in Dockerfile*|Execute download on lowered priority. Values for environment variable: TRUE/FALSE|
 |--run_once|ULS_RUN_ONCE||Run once (default is to run periodically). Values for environment variable: TRUE/FALSE|
-|--verbose|||Print more (not used as of time of this writing)|
+|--verbose|||Print more detailed (for debug purposes)|
 |--force|||Force FS database update even if it is not changed and bypassing database validity checks (e.g. to overrule them)|
 
 
@@ -109,7 +116,7 @@ Parameters are:
 
 |Parameter|Environment variable|Default|Comment|
 |---------|-----------------------|-------|-------|
-|--status_dir **DIR**|ULS_STATE_DIR||Directory where service leaves its state data. Better be persistent (i.e. mapped from some Compose/Kubernetes volume)|
+|--service_state_db_dsn<br>**CONNECTION_STRING**|ULS_SERVICE_STATE_DB_DSN||Connection string to state database. This parameter is mandatory|
 |--download_attempt_max_age_health_hr **HR**|ULS_HEALTH_ATTEMPT_MAX_AGE_HR|6|Age of last download attempt in hours, enough to pronounce container as unhealthy|
 |--download_success_max_age_health_hr **HR**|ULS_HEALTH_SUCCESS_MAX_AGE_HR|8|Age of last successful download in hours, enough to pronounce container as unhealthy|
 |--update_max_age_health_hr **HR**|ULS_HEALTH_UPDATE_MAX_AGE_HR|40|Age of last FS data change in hours enough to pronounce container as unhealthy|
@@ -122,6 +129,115 @@ Parameters are:
 |--download_success_max_age_alarm_hr **HR**|ULS_ALARM_SUCCESS_MAX_AGE_HR||Minimum age in hours of last successful download attempt to send alarm email. If empty/unspecified - not checked|
 |--region_update_max_age_alarm **REG1:HR1,REG2:HR2...**|ULS_ALARM_REG_UPD_MAX_AGE_HR||Per-region (`US`, `CA`, `BR`...) minimum age of last data change to send alarm email. Not checked for unspecified countries|
 |--beacon_email_interval_hr **HR**|ULS_ALARM_BEACON_INTERVAL_HR||Interval in hours between beacon emails (emails that contain status information even if everything goes well). If empty/unspecified - no beacon emails is being sent|
+|--verbose||Print mode detailed information (for debug purposes)|
+|--force_success||Return success exit code even if errors were found (used when healthcheck script called from `--run_once` service script - only to send alarm/beacon emails)|
+|--print_email||Print email instead of sending it (for debug purposes)|
+
+## Service state <a name="service_state">
+
+`uls_service.py` provides its state (what and when was accomplished, what problems were encountered) to two places: state database (for use by healthcheck script that pronounces container health status and may send alarm/beacon emails) and, optionally, to Prometheus (that may provide this state to Grafana for nice display and/or use its alarm facility to notify about problems).
+
+So there are two facilities that may send alarms (healthcheck script and Prometheus). As of time of this writing Prometheus alarms not yet ready, so it is healthcheck script that is currently responsible for alarms - but ultimately it will change.
+
+State database contains more information than needed for pronouncement service as health or sending alarm. It is intended to be a source of information for investigation of problem reasons.
+
+### State database <a name="state_database">
+
+State database stored PostgreSQL server. Since it is disposable, it is assumed to be *bulk_postgres* server. As of time of this writing, database name is *fs_state*. This database has the following tables:
+
+#### `milestone` table
+
+Contains dates when milestones were last passed. There are following milestones:
+
+|Milestone|Meaning|
+|---------|-------|
+|ServiceBirth|`uls_service.py` started for the first time (since state database creation)|
+|ServiceStart|`uls_service.py` started|
+|DownloadStart|FS download script started|
+|DownloadSuccess|FS download script completed successfully|
+|RegionChanged|Region (country) FS data changed. This milestone is per-region|
+|DbUpdated|FS database file successfully updated (after being downloaded, found to be different from previous, successfully passed checks)|
+|ExtParamsChecked|External parameter files successfully checked|
+|Healthcheck|Healthcheck script ran|
+|BeaconSent|Beacon email sent|
+|AlarmSent|Alarm email sent|
+
+Table structure:
+
+|Column|Type|Content|
+|------|----|-------|
+|milestone|enum|Milestone name (see table above)|
+|region|string or null|Region name for region-specific milestones, null for region-inspecific milestones|
+|timestamp|datetime|When milestone was last reached|
+
+#### `checks` table
+
+Contains information about passed checks. As of time of this writing there are following types of check:
+
+|Check Type|Meaning|Check Item|
+|----------|-------|----------|
+|ExtParams|Files that should be in sync with their external prototypes|File name|
+|FsDatabase|FS Database validity tests|Individual tests|
+
+Table structure:
+
+|Column|Type|Content|
+|------|----|-------|
+|check_type|enum|Type of check (see table above)|
+|check_item|string|Individual check item (see table above)|
+|errmsg|string or null|Null if check passed, error message if not|
+|timestamp|datetime|When check was performed|
+
+#### `logs` table
+
+Contains one last log of FS script and subsequent actions for each log type. There are following log types
+
+|Log Type|Meaning|
+|--------|-------|
+|Last|Log of last FS download run|
+|LastFailed|Log of last failed FS download|
+|LastCompleted|Log of last successful FS download|
+
+Table structure:
+
+|Column|Type|Content|
+|------|----|-------|
+|log_type|enum|Log type (see table above)|
+|text|string|Log text|
+|timestamp|datetime|When log was collected|
+
+#### `alarms` table
+
+Contains set of alarms sent in most recent alarm message. There are following types of alarms:
+
+|Alarm type|Meaning|Reason column|
+|----------|-------|-------------|
+|MissingMilestone|Milestone was not reached for too long|Milestone name (see chapter on milestones above)|
+|FailedCheck|Failed check|Type of failed check (see chapter on checks above)|
+
+Table structure:
+
+|Column|Type|Content|
+|------|----|-------|
+|alarm_type|enum|Alarm type (see table above)|
+|alarm_reason|string|Alarm reason (see table above)|
+|timestamp|datetime|When alarm was sent
+
+### Prometheus metrics <a name="metrics">
+
+When FS downloader service runs continuously, it may serve Prometheus metrics in a normal way (at `/metrics` over HTTP through specified port). However service is executed in run-once mode - this is not possible, in this case it may send metrics to some push gateway, of which StatsD was arbitrarily chosen (as it also might be used by Gunicorn). Which one (if any) is chosen is configured through `--prometheus_port` and `--statsd_server`. Here are metrics being served:
+
+All metrics are gauges. Time metrics contain seconds since the epoch (January 1, 1970, UTC)
+
+|Metric|Label|Meaning|
+|------|-----|-------|
+|fs_download_started||Seconds since the epoch of last time FS downloader script started|
+|fs_download_succeeded||Seconds since the epoch of last time FS downloader script succeeded|
+|fs_download_database_updated||Seconds since the epoch of last time FS database file was updated|
+|fs_download_region_changed|region|Seconds since the epoch of last time region data was updated|
+|fs_download_check_passed|check_type|1 if last time check of given type was succeeded, 0 otherwise|
+
+Since StatsD does not support labels, hey are appended to metric names (e.g. `fs_download_region_changed_US` instead of `fs_download_region_changed{region="US")`).
 
 
 ## Troubleshooting <a name="troubleshooting"/>
@@ -177,7 +293,7 @@ Points, countries and AFC Request pattern are specified in `/wd/fs_afc.yaml` (`u
 General format of this script invocation is:
 
 `$ ./fs_afc.py --server_url $ULS_AFC_URL [PARAMETERS] FS_DATABASE`  
-Here `FS_DATABASE` may have path - same as should b eused in AFC Config.
+Here `FS_DATABASE` may have path - same as should be used in AFC Config.
 
 Parameters are:
 
