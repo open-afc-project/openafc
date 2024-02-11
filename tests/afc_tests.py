@@ -1322,7 +1322,9 @@ def _parse_tests_dev_desc(sheet, fp_new, rows):
                             sheet.cell(row = i, column = INDOOR_DEPL_CLM).value,
                             sheet.cell(row = i, column = SER_NBR_CLM).value,
                             sheet.cell(row = i, column = RULESET_CLM).value,
-                            sheet.cell(row = i, column = ID_CLM).value)
+                            sheet.cell(row = i, column = ID_CLM).value,
+                            True)
+
         fp_new.write(res_str+'\n')
     return res_str
 
@@ -1400,23 +1402,24 @@ def _parse_tests_all(sheet, fp_new, rows, test_ident):
             cell = sheet.cell(row = i, column = CHANNEL_CFI_136)
             if cell.value is not None:
                 res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+            res_str += '}, '
+            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_137)
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
+            cell = sheet.cell(row = i, column = CHANNEL_CFI_137)
+            if cell.value is not None:
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
             res_str += '}' + REQ_INQ_CHA_FOOTER + ' '
             #
             # Device descriptor
             #
             res_str += REQ_DEV_DESC_HEADER
 
-            indoor_deploy = sheet.cell(row = i, column = 6)
-            if "indoor" in indoor_deploy.lower():
-                location = "1"
-            else:
-                location = "2"
-
             res_str += build_device_desc(
                                 sheet.cell(row = i, column = INDOOR_DEPL_CLM).value,
                                 sheet.cell(row = i, column = SER_NBR_CLM).value,
                                 sheet.cell(row = i, column = RULESET_CLM).value,
-                                sheet.cell(row = i, column = ID_CLM).value)
+                                sheet.cell(row = i, column = ID_CLM).value,
+                                False)
             res_str += ','
             #
             # Inquired Frequency Range
@@ -1532,6 +1535,12 @@ def parse_tests(cfg):
         app_log.debug('Sheet title: %s', sh.title)
         app_log.debug('rows %d, cols %d\n', sh.max_row, sh.max_column)
 
+    # Look for request sheet
+    for s in range(len(wb.sheetnames)):
+       if wb.sheetnames[s] == "Availability Requests":
+           break
+
+    wb.active = s
     sheet = wb.active
     nbr_rows = sheet.max_row
     app_log.debug('Rows range 1 - %d', nbr_rows + 1)
