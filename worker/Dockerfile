@@ -5,8 +5,8 @@
 # a copy of which is included with this software program
 
 # default value of args
-ARG BLD_TAG=3.8.13.0
-ARG PRINST_TAG=3.8.13.0
+ARG BLD_TAG=3.8.14.0
+ARG PRINST_TAG=3.8.14.0
 ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image
 ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall
 
@@ -67,7 +67,7 @@ COPY --from=install_image / /
 LABEL revision="afc-worker-al"
 ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
 ENV AFC_WORKER_USER=${AFC_WORKER_USER}
-ENV AFC_WORKER_CELERY_OPTS=${AFC_WORKER_CELERY_OPTS:-"rat_1"}
+ENV AFC_WORKER_CELERY_WORKERS=${AFC_WORKER_CELERY_WORKERS:-"rat_1"}
 ENV AFC_WORKER_CELERY_LOG=${AFC_WORKER_CELERY_LOG:-WARNING}
 ENV AFC_WORKER_ENG_TOUT=${AFC_WORKER_ENG_TOUT:-600}
 ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
@@ -81,4 +81,5 @@ ENV PGPORT=5432
 ENV XDG_DATA_DIRS=$XDG_DATA_DIRS:/usr/local/share:/usr/share:/usr/share/fbrat:/mnt/nfs
 CMD ["/docker-entrypoint.sh"]
 HEALTHCHECK --interval=20s --timeout=3s --retries=3 \
-    CMD celery -A afc_worker inspect ping || exit 1
+    CMD for celery_worker in ${AFC_WORKER_CELERY_WORKERS} ; do \
+    celery -A afc_worker status -d $celery_worker@$(hostname) || exit 1 ; done

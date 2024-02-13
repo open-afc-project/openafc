@@ -6,10 +6,11 @@
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 
+include:
+- template: Security/Secret-Detection.gitlab-ci.yml
 # container_scanning:
 #   variables:
 #     DOCKER_IMAGE: ...
 #     DOCKER_USER: ...
 #     DOCKER_PASSWORD: ...
-include:
 - template: Jobs/Container-Scanning.gitlab-ci.yml

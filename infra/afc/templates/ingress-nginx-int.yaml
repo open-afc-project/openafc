@@ -1,0 +1,89 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: afc-ingress
+  annotations:
+    # Use annotations to configure specific ingress-nginx behaviors like SSL, timeouts, etc.
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      if ($request_uri = "/") {
+        return 301 $scheme://$http_host/fbrat;
+      }
+    # Add other necessary annotations based on your specific requirements.
+spec:
+  ingressClassName: nginx
+  rules:
+  #- host: {{ .Values.service.ingress_ngnix.hostname | quote }}
+  - http:
+      paths:
+      # should be behind auth or mTLS
+      - path: /fbrat/ap-afc/availableSpectrumInquirySec
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.service.webui.hostname | quote }}
+            port:
+              number: {{ .Values.service.webui.port }}
+      # should be behind auth or mTLS
+      - path: /fbrat/ap-afc/availableSpectrumInquiry
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.service.msghnd.hostname | quote }}
+            port:
+               number: {{ .Values.service.msghnd.port }}
+      # should be accessible only from internal network
+      #
+      # - path: /fbrat/ap-afc/availableSpectrumInquiryInternal
+      #   pathType: Prefix
+      #   backend:
+      #     service:
+      #       name: {{ .Values.service.msghnd.hostname | quote }}
+      #       port:
+      #         number: {{ .Values.service.msghnd.port }}
+      #
+      # --------------------------------------------------------------------
+      # need to forbid webdav methods other than GET
+      #
+      # - path: /fbrat/ratapi/v1/files
+      #   pathType: Prefix
+      #   backend:
+      #     service:
+      #       name: {{ .Values.service.webui.hostname | quote }}
+      #       port:
+      #         number: {{ .Values.service.webui.port }}
+      #
+      # --------------------------------------------------------------------
+      # should be accessible only from internal network
+      #
+      # - path: /fbrat/ratapi/v1/GetAfcConfigByRulesetID
+      #   pathType: Prefix
+      #   backend:
+      #     service:
+      #       name: {{ .Values.service.msghnd.hostname | quote }}
+      #       port:
+      #         number: {{ .Values.service.msghnd.port }}
+      #
+      # --------------------------------------------------------------------
+      # should be accessible only from internal network
+      #
+      # - path: /fbrat/ratapi/v1/GetRulesetIDs
+      #   pathType: Prefix
+      #   backend:
+      #     service:
+      #       name: {{ .Values.service.msghnd.hostname | quote }}
+      #       port:
+      #         number: {{ .Values.service.msghnd.port }}
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: {{ .Values.service.webui.hostname | quote }}
+            port:
+              number: {{ .Values.service.webui.port }}
+      # Add other paths as needed.
+  # Add TLS configuration if you're using HTTPS.
+#   tls:
+#   - hosts:
+#     - {{ .Values.service.ingress_ngnix.hostname | quote }}
+#     secretName: your-tls-secret

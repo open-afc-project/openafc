@@ -1,0 +1,19 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: {{ .Chart.Name }}-{{ .Values.deployments.worker.name }}-so
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: {{ .Chart.Name }}-{{ .Values.deployments.worker.name }}
+  minReplicaCount: 2
+  pollingInterval: 5 # Optional. Default: 30 seconds
+  cooldownPeriod: 300 # Optional. Default: 300 seconds
+  triggers:
+    - type: rabbitmq
+      metadata:
+        queueName: celery
+        mode: QueueLength
+        value: {{ .Values.deployments.worker.queue_length | quote }}
+      authenticationRef:
+        name: {{ .Chart.Name }}-{{ .Values.deployments.worker.name }}-trigger
