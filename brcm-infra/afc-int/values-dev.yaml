@@ -19,44 +19,44 @@ image:
     repository: wcc-afc-docker-virtual.usw2.packages.broadcom.com/afc-msghnd
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.13.0"
+    #tag: "brcm-3.8.14.0.1"
   webui:
     #repository: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server
     repository: wcc-afc-docker-virtual.usw2.packages.broadcom.com/afc-server
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.13.0"
+    #tag: "brcm-3.8.14.0.1"
   objst:
     repository: public.ecr.aws/w9v6y1o0/openafc/objstorage-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.13.0"
+    #tag: "brcm-3.8.14.0.1"
   worker:
     #repository: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker
     repository: wcc-afc-docker-virtual.usw2.packages.broadcom.com/afc-worker
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.13.0"
+    #tag: "brcm-3.8.14.0.1"
   rmq:
     repository: public.ecr.aws/w9v6y1o0/openafc/rmq-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.13.0"
+    #tag: "brcm-3.8.14.0.1"
   rcache:
     repository: public.ecr.aws/w9v6y1o0/openafc/rcache-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.13.0"
+    #tag: "brcm-3.8.14.0.1"
   als_kafka:
     repository: public.ecr.aws/w9v6y1o0/openafc/als-kafka-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.13.0"
+    #tag: "brcm-3.8.14.0.1"
   als_siphon:
     repository: public.ecr.aws/w9v6y1o0/openafc/als-siphon-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.13.0"
+    #tag: "brcm-3.8.14.0.1"
 
 
 imagePullSecrets: []
@@ -96,6 +96,8 @@ service:
     hostname: webui
     type: ClusterIP
     port: 80
+    ratapi_env_file_path: /dev/ratapi_env.cfg
+    oidc_env_file_path: /dev/oidc_env.cfg
   rmq:
     hostname: rmq
     type: ClusterIP

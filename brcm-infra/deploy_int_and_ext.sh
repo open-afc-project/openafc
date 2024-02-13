@@ -48,7 +48,7 @@ helm install external-secrets \
     --create-namespace \
     --set installCRDs=true
 
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=external-secrets-webhook -n external-secrets --timeout=300s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=external-secrets-webhook -n external-secrets
 
 helm install keda kedacore/keda --namespace keda --create-namespace
 

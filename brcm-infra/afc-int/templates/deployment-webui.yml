@@ -52,6 +52,12 @@ spec:
             - name: {{ .Chart.Name }}-webui-rat-api-secret
               mountPath: /etc/xdg/fbrat/ratapi.conf
               subPath: webui-rat-api
+            - name: {{ .Chart.Name }}-webui-ratapi-env-secret
+              mountPath: {{ .Values.service.webui.ratapi_env_file_path }}
+              subPath: ratapi-env
+            - name: {{ .Chart.Name }}-webui-oidc-env-secret
+              mountPath: {{ .Values.service.webui.oidc_env_file_path }}
+              subPath: oidc-env
           env:
             # RabbitMQ server name:
             - name: BROKER_TYPE
@@ -87,6 +93,11 @@ spec:
                 secretKeyRef:
                   name: {{ .Chart.Name }}-rmq-rcache-secret
                   key: rcache-rmq-dsn
+            # OIDC and Captcha
+            - name: OIDC_ARG
+              value: {{ .Values.service.webui.oidc_env_file_path }}
+            - name: RATAPI_ARG
+              value: {{ .Values.service.webui.ratapi_env_file_path }}
           resources:
             {{- toYaml .Values.resources.webui | nindent 12 }}
       volumes:
@@ -96,6 +107,12 @@ spec:
         - name: {{ .Chart.Name }}-webui-rat-api-secret
           secret:
             secretName: {{ .Chart.Name }}-webui-rat-api-secret
+        - name: {{ .Chart.Name }}-webui-ratapi-env-secret
+          secret:
+            secretName: {{ .Chart.Name }}-webui-ratapi-env-secret
+        - name: {{ .Chart.Name }}-webui-oidc-env-secret
+          secret:
+            secretName: {{ .Chart.Name }}-webui-oidc-env-secret
       imagePullSecrets:
         - name: container-repo-secret
       {{- with .Values.nodeSelector }}
