@@ -1,4 +1,26 @@
 # Release Note
+## **Version and Date**
+Version|3.8.14.0|
+| :- | :- |
+|**Date**|**02/01/2023**|
+|compiled server's version is TBD | git tag 3.8.14.0|
+
+## **Issues Addressed**
+* issue 773. afc_load_tool.py improvements (#774)
+* Issue 809. Prometheus config reorganization (#810)
+* Issue 792. Msghnd load metrics to assist autoscaling (#796)
+* Issue 807. Adding --ramp_up to load tool and some other small enhancements (#808)
+* Issue 806. Improving afc_load_tool compatibility with bare systems (#805)
+* Issue 799 - update the project details (#800)
+* Issue 797. Worker healthcheck (#798)
+* Issue 789 - add a readme for the proc_gdal directory (#790)
+* Issue 791 Documentation for customization (#795)
+* Issue 793. Fixing geo_converters image base (#794)
+* Issue 775. Takes off-bearing gain into account in FS sorting in runPointAnalysis() (#776)
+* Issue Oa 249 heatmap gui (#772)
+* Issue 782. Decomissioning als_tool.py (#783)
+* Update database_readme.md (#781)
+* Issue 779 - add notes about unused functions and steps in the geo_converters readme (#780)
 
 ## **Version and Date**
 Version|3.8.13.0|

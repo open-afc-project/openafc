@@ -11,3 +11,10 @@ sast:
   stage: test
 include:
 - template: Security/SAST.gitlab-ci.yml
+- template: Security/Secret-Detection.gitlab-ci.yml
+# container_scanning:
+#   variables:
+#     DOCKER_IMAGE: ...
+#     DOCKER_USER: ...
+#     DOCKER_PASSWORD: ...
+- template: Jobs/Container-Scanning.gitlab-ci.yml
