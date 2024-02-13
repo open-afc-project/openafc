@@ -96,8 +96,8 @@ externalSecret:
 
 env_template:
   dispatcher:
-    afc_server_name: _
-    afc_enforce_https: False
+    afc_server_name: test.afc.broadcom.com
+    afc_enforce_https: True
     afc_int_ingress_nginx_ip: %AFC_INT_INGRESS_NGINX_IP%
     afc_int_ingress_nginx_port: %AFC_INT_INGRESS_NGINX_PORT%
     afc_rmq_name: %AFC_RMQ_NAME%
