@@ -6,15 +6,30 @@
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
 stages:
-- test
-sast:
-  stage: test
-include:
-- template: Security/SAST.gitlab-ci.yml
-- template: Security/Secret-Detection.gitlab-ci.yml
-# container_scanning:
-#   variables:
-#     DOCKER_IMAGE: ...
-#     DOCKER_USER: ...
-#     DOCKER_PASSWORD: ...
-- template: Jobs/Container-Scanning.gitlab-ci.yml
+  - build
+
+docker-build:
+  image: docker:24.0.5
+  # services:
+  #   - docker:19.03.12-dind
+  stage: build
+  script:
+    - docker info
+    # - docker build -t my-image-name:${CI_COMMIT_REF_SLUG} .
+    # - docker push my-image-name:${CI_COMMIT_REF_SLUG}
+
+
+
+# stages:
+# - test
+# sast:
+#   stage: test
+# include:
+# - template: Security/SAST.gitlab-ci.yml
+# - template: Security/Secret-Detection.gitlab-ci.yml
+# # container_scanning:
+# #   variables:
+# #     DOCKER_IMAGE: ...
+# #     DOCKER_USER: ...
+# #     DOCKER_PASSWORD: ...
+# - template: Jobs/Container-Scanning.gitlab-ci.yml
