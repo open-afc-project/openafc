@@ -5,19 +5,22 @@
 # Container Scanning customization: https://docs.gitlab.com/ee/user/application_security/container_scanning/#customizing-the-container-scanning-settings
 # Note that environment variables can be set in several places
 # See https://docs.gitlab.com/ee/ci/variables/#cicd-variable-precedence
-stages:
-  - build
 
-docker-build:
-  image: docker:24.0.5
-  # services:
-  #   - docker:19.03.12-dind
-  stage: build
-  script:
-    - docker info
-    # - docker build -t my-image-name:${CI_COMMIT_REF_SLUG} .
-    # - docker push my-image-name:${CI_COMMIT_REF_SLUG}
-
+# vp890322 ----------------------------------------------------------------------------------------------------------------------------------------------------
+# commenting until further configuration
+# stages:
+#   - build
+#
+# docker-build:
+#   image: docker:24.0.5
+#   # services:
+#   #   - docker:19.03.12-dind
+#   stage: build
+#   script:
+#     - docker info
+#     # - docker build -t my-image-name:${CI_COMMIT_REF_SLUG} .
+#     # - docker push my-image-name:${CI_COMMIT_REF_SLUG}
+# end vp890322 ----------------------------------------------------------------------------------------------------------------------------------------------------
 
 
 # stages:
