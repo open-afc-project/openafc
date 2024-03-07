@@ -391,8 +391,9 @@ def storeDataIdentities(sqlFile, identityDict):
 def daily_uls_parse(state_root, interactive):
     startTime = datetime.datetime.now()
     nameTime =  startTime.isoformat().replace(":", '_')
-    if includeUnii8:
-        nameTime +=  "_inclUnii8"
+
+    nameTime += "_UniiUS" + uniiStr.replace(":","")
+
     temp = "/temp"
 
     root = state_root + "/daily_uls_parse"# root so path is consisent
@@ -740,8 +741,6 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if runULSProcessorFlag:
         mode = "proc_uls"
-        if includeUnii8:
-            mode += "_include_unii8"
         if combineAntennaRegionFlag:
             mode += "_ca"
 
@@ -756,6 +755,7 @@ def daily_uls_parse(state_root, interactive):
                                              root + '/antenna_model_map.csv', \
                                              fullPathTempDir + '/fcc_fixed_service_channelization.csv', \
                                              fullPathTempDir + '/transmit_radio_unit_architecture.csv', \
+                                             uniiStr, \
                                              mode]) 
         except Exception as e: 
             logFile.write('ERROR: ULS processor error:')
@@ -961,20 +961,46 @@ def daily_uls_parse(state_root, interactive):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Process FS link data for AFC.')
     parser.add_argument('-i',   '--interactive', action='store_true')
-    parser.add_argument('-u8',  '--unii8', action='store_true')
     parser.add_argument('-ca',  '--combine_antenna_region', action='store_true')
     parser.add_argument('-wfa', '--wfa', action='store_true')
+    parser.add_argument('-unii_us',  '--unii_us', default='5:7', help='":" separated list of unii bands for US')
 
     parser.add_argument('-r',  '--region', default='US:CA', help='":" separated list of regions')
 
     args = parser.parse_args()
     interactive = args.interactive
-    includeUnii8 = args.unii8
+
+    uniiStr = args.unii_us
+
+    includeUnii5US = False
+    includeUnii6US = False
+    includeUnii7US = False
+    includeUnii8US = False
+    uniiList = uniiStr.split(':')
+    for u in uniiList:
+        if u == '5':
+            includeUnii5US = True
+        elif u == '6':
+            includeUnii6US = True
+        elif u == '7':
+            includeUnii7US = True
+        elif u == '8':
+            includeUnii8US = True
+        else:
+            raise Exception('ERROR: Unrecognized unii band: ' + u )
+
     combineAntennaRegionFlag = args.combine_antenna_region
     wfaFlag = args.wfa
 
     print("Interactive = " + str(interactive))
-    print("Include UNII-8 = " + str(includeUnii8))
+    print("Include UNII-5 US = " + str(includeUnii5US))
+    print("Include UNII-6 US = " + str(includeUnii6US))
+    print("Include UNII-7 US = " + str(includeUnii7US))
+    print("Include UNII-8 US = " + str(includeUnii8US))
+
+    if not (includeUnii5US or includeUnii6US or includeUnii7US or includeUnii8US):
+        raise Exception('ERROR: No UNII-Bands specified for US')
+
     print("Combine Antenna Region = " + str(combineAntennaRegionFlag))
     print("Region = " + args.region)
     print("WFA = " + str(wfaFlag))

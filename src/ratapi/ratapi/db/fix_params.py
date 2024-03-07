@@ -163,10 +163,10 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
             if region == 'US':
                 if (highFreq > unii5StartFreqMHz) and (lowFreq < unii5StopFreqMHz):
                     uniiband = 5
-                elif (highFreq > unii7StartFreqMHz) and (lowFreq < unii7StopFreqMHz):
-                    uniiband = 7
                 elif (highFreq > unii6StartFreqMHz) and (lowFreq < unii6StopFreqMHz):
                     uniiband = 6
+                elif (highFreq > unii7StartFreqMHz) and (lowFreq < unii7StopFreqMHz):
+                    uniiband = 7
                 elif (highFreq > unii8StartFreqMHz) and (lowFreq < unii8StopFreqMHz):
                     uniiband = 8
                 else:
@@ -328,12 +328,14 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                 if keyv[0] == 'US':
                     if (keyv[2] == 5):
                         Fc_unii = (unii5StartFreqMHz + unii5StopFreqMHz)*0.5e6
+                    elif (keyv[2] == 6):
+                        Fc_unii = (unii6StartFreqMHz + unii6StopFreqMHz)*0.5e6
                     elif (keyv[2] == 7):
                         Fc_unii = (unii7StartFreqMHz + unii7StopFreqMHz)*0.5e6
                     elif (keyv[2] == 8):
                         Fc_unii = (unii8StartFreqMHz + unii8StopFreqMHz)*0.5e6
                     else:
-                        sys.exit('ERROR in fix_params.py: freq found not in UNII-5, UNII-7, UNII-8')
+                        sys.exit('ERROR in fix_params.py: freq found not in UNII-5, UNII-6, UNII-7, UNII-8')
     
                     for prNum in range(numPR+1):
     
@@ -380,12 +382,14 @@ def fixParams(inputPath, outputPath, logFile, backwardCompatiblePR):
                             if (antType == 'Ant') and (r[fwdGainStrULS].strip() == ''):
                                 if (keyv[2] == 5):
                                     fwdGain = 38.8
+                                elif (keyv[2] == 6):
+                                    fwdGain = 39.5
                                 elif (keyv[2] == 7):
                                     fwdGain = 39.5
                                 elif (keyv[2] == 8):
                                     fwdGain = 39.5
                                 else:
-                                    sys.exit('ERROR in fix_params.py: freq found not in UNII-5, UNII-7, UNII-8')
+                                    sys.exit('ERROR in fix_params.py: freq found not in UNII-5, UNII-6, UNII-7, UNII-8')
     
                                 # 6 ft converted to m
                                 r[fwdAntDiameterStr] = 6*12*2.54/100

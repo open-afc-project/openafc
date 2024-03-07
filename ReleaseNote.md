@@ -1,5 +1,28 @@
 # Release Note
 ## **Version and Date**
+
+## **Version and Date**
+|Version|**823*|
+| :- | :- |
+|**Date**|**02/29/2024**|
+
+## **Issues Addressed**
+ * 823: Add option to include UNII-6 FS in FS downloader
+ * This allows flexibility to specify unii bands to include for US.
+ * This change is not expected to impact to call of this function operationally.
+
+## **Interface Changes**
+ * 
+
+## **Testing Done**
+ * Compared the latest WFA test vector ULS against a newly generated one and they matched.
+ * Generated a ULS for unii-6&7 in the US and confirmed it contained unii-6&8 links only.
+
+## **Open Issues** 
+ * 
+
+
+
 Version|3.8.14.0|
 | :- | :- |
 |**Date**|**02/01/2023**|
