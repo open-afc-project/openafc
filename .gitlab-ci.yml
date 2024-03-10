@@ -90,8 +90,8 @@ build_job:
     # now need to init submodules
     - cd "${WD}"
     - git submodule update --init --recursive
-    - WD="${WD}/open-afc"
-    - echo "WD=${WD}" >> $CI_PROJECT_DIR/vars.env
+    # - WD="${WD}/open-afc"
+    # - echo "WD=${WD}" >> $CI_PROJECT_DIR/vars.env
 
     # generate  regression dir path
     - REGRD=tests/regression_${RAND}
