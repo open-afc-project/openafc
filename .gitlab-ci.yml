@@ -102,7 +102,7 @@ build_job:
     # it is done the name of dir is used by docker-compose to create service name
     - cp -r "${WD}/${REGRD_ORIG}/." "${WD}/${REGRD}/"
     # build regr test images
-    - sh "${WD}/${REGRD}/build_imgs.sh" ${WD} ${RAND} ${PUSH_DI}
+    - bash "${WD}/${REGRD}/build_imgs.sh" ${WD} ${RAND} ${PUSH_DI}
   artifacts:
     reports:
       dotenv: $CI_PROJECT_DIR/vars.env
