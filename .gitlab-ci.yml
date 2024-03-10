@@ -36,19 +36,19 @@
 # end vp890322 ----------------------------------------------------------------------------------------------------------------------------------------------------
 
 stages:          # List of stages for jobs, and their order of execution
-  - upstream_updt
+  # - upstream_updt
   - getsrc
   - build
   # - test
 
-upstream_updt_job:
-  stage: upstream_updt
-  environment: production
-  before_script:
-  script:
-  rules:
-    - if: '($CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_REF_NAME == "main")'
-      when: always
+# upstream_updt_job:
+#   stage: upstream_updt
+#   environment: production
+#   before_script:
+#   script:
+#   rules:
+#     - if: '($CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_REF_NAME == "main")'
+#       when: always
 
 # This job runs to create dir with unique name
 # that includes sources that will be validated
