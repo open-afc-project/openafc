@@ -10,7 +10,8 @@
 # commenting until further configuration
 # stages:
 #   - build
-#
+#   - test
+
 # docker-build:
 #   image: docker:24.0.5
 #   # services:
@@ -20,11 +21,7 @@
 #     - docker info
 #     # - docker build -t my-image-name:${CI_COMMIT_REF_SLUG} .
 #     # - docker push my-image-name:${CI_COMMIT_REF_SLUG}
-# end vp890322 ----------------------------------------------------------------------------------------------------------------------------------------------------
-
-
-# stages:
-# - test
+#
 # sast:
 #   stage: test
 # include:
@@ -36,3 +33,100 @@
 # #     DOCKER_USER: ...
 # #     DOCKER_PASSWORD: ...
 # - template: Jobs/Container-Scanning.gitlab-ci.yml
+# end vp890322 ----------------------------------------------------------------------------------------------------------------------------------------------------
+
+stages:          # List of stages for jobs, and their order of execution
+  - upstream_updt
+  - getsrc
+  - build
+  # - test
+
+upstream_updt_job:
+  stage: upstream_updt
+  environment: production
+  before_script:
+  script:
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_REF_NAME == "main")'
+      when: always
+
+# This job runs to create dir with unique name
+# that includes sources that will be validated
+getsrc_job:
+  stage: getsrc
+  rules:
+    - if: '($CI_PIPELINE_SOURCE != "schedule")'
+  script:
+    - echo "create random number"
+    - RAND=`date +"D_%d_%m_%y_T_%H_%M_%S_TZ_%Z"`_hash_`git rev-parse --short HEAD` && echo ${RAND}
+    - echo "RAND=${RAND}" >> $CI_PROJECT_DIR/vars.env
+
+    - echo "generate workdir which includes random number"
+    - WD=/home/gitlab-runner/afc/test/wccafc-dev_${RAND}
+    - echo "WD=${WD}" >> $CI_PROJECT_DIR/vars.env
+
+    - echo "rsync sources"
+    # - CURRENT_HOST=`hostname -A|sed 's/ *//g'`
+    # - echo "CURRENT_HOST=${CURRENT_HOST}" >> $CI_PROJECT_DIR/vars.env
+    - echo "cmd rsync -raz --delete ./ ${WD}"
+    - rsync -raz --delete ./ ${WD}/
+    # - echo "CURRENT_HOST = ${CURRENT_HOST}"
+  artifacts:
+    reports:
+      dotenv: $CI_PROJECT_DIR/vars.env
+
+# Building regression test images
+build_job:
+  stage: build
+  rules:
+    - if: '($CI_PIPELINE_SOURCE != "schedule")'
+  variables:
+    PUSH_DI: 0
+  script:
+
+    ######## git clone sources ##############
+    # main repo already cloned and copied to:
+    # /opt/afc/test/wccafc-dev_$RAND
+    # now need to init submodules
+    - cd "${WD}"
+    - git submodule update --init --recursive
+    - WD="${WD}/open-afc"
+    - echo "WD=${WD}" >> $CI_PROJECT_DIR/vars.env
+
+    # generate  regression dir path
+    - REGRD=tests/regression_${RAND}
+    - REGRD_ORIG=tests/regression
+    - echo "REGRD=${REGRD}" >> $CI_PROJECT_DIR/vars.env
+
+    # create regression dir which includes rand
+    # it is done the name of dir is used by docker-compose to create service name
+    - cp -r "${WD}/${REGRD_ORIG}/." "${WD}/${REGRD}/"
+    # build regr test images
+    - sh "${WD}/${REGRD}/build_imgs.sh" ${WD} ${RAND} ${PUSH_DI}
+  artifacts:
+    reports:
+      dotenv: $CI_PROJECT_DIR/vars.env
+
+#Running tests
+# test_job:
+#   stage: test
+#   rules:
+#     - if: '($CI_PIPELINE_SOURCE != "schedule")'
+#   variables:
+#     RUN_FROM_RAND: 1
+#   before_script:
+#     # temp for test
+#     - cp "/var/lib/gitlab-runner/template_regrtest/.env" ${WD}/${REGRD}
+
+#     # start dev srvr
+#     - sh "${WD}/${REGRD}/run_srvr.sh" ${WD} ${RAND} ${RUN_FROM_RAND}
+#   script:
+#     # get dev srvr port num
+#     - TEST_PORT=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 80 |sed 's/.*://'`
+
+#     # run tests
+#     - sh "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} `hostname -A|sed 's/ *//g'` ${TEST_PORT} http
+#   after_script:
+#     # stop dev srvr
+#     - sh "${WD}/${REGRD}/stop_srvr.sh" ${WD} ${RAND}
+
