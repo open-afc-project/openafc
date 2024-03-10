@@ -108,25 +108,25 @@ build_job:
       dotenv: $CI_PROJECT_DIR/vars.env
 
 #Running tests
-# test_job:
-#   stage: test
-#   rules:
-#     - if: '($CI_PIPELINE_SOURCE != "schedule")'
-#   variables:
-#     RUN_FROM_RAND: 1
-#   before_script:
-#     # temp for test
-#     - cp "/var/lib/gitlab-runner/template_regrtest/.env" ${WD}/${REGRD}
+test_job:
+  stage: test
+  rules:
+    - if: '($CI_PIPELINE_SOURCE != "schedule")'
+  variables:
+    RUN_FROM_RAND: 1
+  before_script:
+    # temp for test
+    - cp "/var/lib/gitlab-runner/template_regrtest/.env" ${WD}/${REGRD}
 
-#     # start dev srvr
-#     - sh "${WD}/${REGRD}/run_srvr.sh" ${WD} ${RAND} ${RUN_FROM_RAND}
-#   script:
-#     # get dev srvr port num
-#     - TEST_PORT=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 80 |sed 's/.*://'`
+    # start dev srvr
+    - sh "${WD}/${REGRD}/run_srvr.sh" ${WD} ${RAND} ${RUN_FROM_RAND}
+  script:
+    # get dev srvr port num
+    - TEST_PORT=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 80 |sed 's/.*://'`
 
-#     # run tests
-#     - sh "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} `hostname -A|sed 's/ *//g'` ${TEST_PORT} http
-#   after_script:
-#     # stop dev srvr
-#     - sh "${WD}/${REGRD}/stop_srvr.sh" ${WD} ${RAND}
+    # run tests
+    - sh "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} `hostname -A|sed 's/ *//g'` ${TEST_PORT} http
+  after_script:
+    # stop dev srvr
+    - sh "${WD}/${REGRD}/stop_srvr.sh" ${WD} ${RAND}
 
