@@ -119,14 +119,14 @@ test_job:
     - cp "/var/lib/gitlab-runner/template_regrtest/.env" ${WD}/${REGRD}
 
     # start dev srvr
-    - sh "${WD}/${REGRD}/run_srvr.sh" ${WD} ${RAND} ${RUN_FROM_RAND}
+    -bash "${WD}/${REGRD}/run_srvr.sh" ${WD} ${RAND} ${RUN_FROM_RAND}
   script:
     # get dev srvr port num
     - TEST_PORT=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 80 |sed 's/.*://'`
 
     # run tests
-    - sh "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} `hostname -A|sed 's/ *//g'` ${TEST_PORT} http
+    -bash "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} `hostname -A|sed 's/ *//g'` ${TEST_PORT} http
   after_script:
     # stop dev srvr
-    - sh "${WD}/${REGRD}/stop_srvr.sh" ${WD} ${RAND}
+    -bash "${WD}/${REGRD}/stop_srvr.sh" ${WD} ${RAND}
 
