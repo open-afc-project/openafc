@@ -116,7 +116,7 @@ test_job:
     RUN_FROM_RAND: 1
   before_script:
     # temp for test
-    - cp "/var/lib/gitlab-runner/template_regrtest/.env" ${WD}/${REGRD}
+    # - cp "/var/lib/gitlab-runner/template_regrtest/.env" ${WD}/${REGRD}
 
     # start dev srvr
     - bash "${WD}/${REGRD}/run_srvr.sh" ${WD} ${RAND} ${RUN_FROM_RAND}
