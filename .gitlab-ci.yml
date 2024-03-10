@@ -39,7 +39,7 @@ stages:          # List of stages for jobs, and their order of execution
   # - upstream_updt
   - getsrc
   - build
-  # - test
+  - test
 
 # upstream_updt_job:
 #   stage: upstream_updt
