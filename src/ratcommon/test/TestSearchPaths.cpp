@@ -1,9 +1,6 @@
 // 
 
 #include "../SearchPaths.h"
-#include "rkfunittest/UnitTestCoreApp.h"
-#include "rkfunittest/UnitTestHelpers.h"
-#include "rkfunittest/FileTestHelpers.h"
 #include <memory>
 
 using namespace FileTestHelpers;

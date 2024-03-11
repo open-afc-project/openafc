@@ -1,6 +1,5 @@
 // 
 
-#include "rkfunittest/UnitTestHelpers.h"
 #include "../SqlConnectionDefinition.h"
 #include "../SqlScopedConnection.h"
 #include "../SqlHelpers.h"

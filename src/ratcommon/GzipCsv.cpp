@@ -10,7 +10,7 @@
 #include "GzipCsv.h"
 #include "FileHelpers.h"
 #include <boost/lexical_cast.hpp>
-#include <rkflogging/Logging.h>
+#include <afclogging/Logging.h>
 #include <stdexcept>
 
 namespace {

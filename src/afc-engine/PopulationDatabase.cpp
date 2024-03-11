@@ -5,16 +5,16 @@
 #include <QSqlDriver>
 #include <QSqlResult>
 #include <QSqlError>
-#include <rkfsql/SqlConnectionDefinition.h>
-#include <rkfsql/SqlExceptionDb.h>
-#include <rkfsql/SqlScopedConnection.h>
-#include <rkfsql/SqlTransaction.h>
-#include <rkfsql/SqlPreparedQuery.h>
-#include <rkfsql/SqlTable.h>
-#include <rkfsql/SqlSelect.h>
-#include <rkfsql/SqlTransaction.h>
-#include <rkflogging/Logging.h>
-#include "rkflogging/ErrStream.h"
+#include <afcsql/SqlConnectionDefinition.h>
+#include <afcsql/SqlExceptionDb.h>
+#include <afcsql/SqlScopedConnection.h>
+#include <afcsql/SqlTransaction.h>
+#include <afcsql/SqlPreparedQuery.h>
+#include <afcsql/SqlTable.h>
+#include <afcsql/SqlSelect.h>
+#include <afcsql/SqlTransaction.h>
+#include <afclogging/Logging.h>
+#include "afclogging/ErrStream.h"
 
 namespace 
 {

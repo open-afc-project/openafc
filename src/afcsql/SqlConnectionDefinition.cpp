@@ -4,7 +4,7 @@
 #include <QDebug>
 #include "SqlConnectionDefinition.h"
 #include "ratcommon/TextHelpers.h"
-#include "rkflogging/Logging.h"
+#include "afclogging/Logging.h"
 #include "SqlError.h"
 
 namespace{

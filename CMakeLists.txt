@@ -7,7 +7,6 @@ endif()
 
 # Debug includes RatapiDebug, WebDebug
 # Release includes RatapiRelease, WebRelease
-# DebugWithTest includes RatapiDebug, WebDebug
 # EngineDebug
 # EngineRelease
 # RatapiDebug
@@ -20,7 +19,6 @@ if(NOT CMAKE_BUILD_TYPE)
 endif()
 
 if ("${CMAKE_BUILD_TYPE}" STREQUAL "Debug" OR
-    "${CMAKE_BUILD_TYPE}" STREQUAL "DebugWithTest" OR
     "${CMAKE_BUILD_TYPE}" STREQUAL "RelWithDebInfo")
     set(OPENAFC_BUILD_TYPE "EngineDebug" "RatapiDebug" "WebDebug")
 elseif ("${CMAKE_BUILD_TYPE}" STREQUAL "Release")
@@ -212,15 +210,6 @@ if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
     find_package(Boost 1.54 REQUIRED COMPONENTS log program_options regex system thread)
     add_definitions("-DBOOST_ALL_DYN_LINK")
 
-
-    if (CMAKE_BUILD_TYPE STREQUAL "DebugWithTest")
-      find_package(GTest 1.6 REQUIRED)
-      # Run tests with CTest
-      include(CTest)
-      enable_testing()
-      # Alias "check" target for verbose test run
-      add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND} -C ${CMAKE_BUILD_TYPE} --verbose)
-    endif()
 endif()
 
 

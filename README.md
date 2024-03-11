@@ -46,7 +46,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 
 # **Introduction**
 
-This document describes the procedure for submitting the source code changes to the TIP's openAFC github project. Procedure described in this document requires access to TIP's openAFC project and knowledge of the GIT usage. Please contact support@telecominfraproject.com in case you need access to the openAFC project.
+This document describes the procedure for submitting the source code changes to the openAFC github project. Procedure described in this document requires access to the openAFC project and knowledge of the GIT usage. Please contact TBD@TBD.com in case you need access to the openAFC project.
 
 Github.com can be referred for [details of alternate procedures for creating the pull requests](https://docs.github.com/en/pull-requests/collaborating-with-pull-requests/proposing-changes-to-your-work-with-pull-requests/about-pull-requests), developers can use any of these methods but need to include change description as part of pull requests  description.
 

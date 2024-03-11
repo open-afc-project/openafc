@@ -13,9 +13,9 @@
 
 #include "denied_region.h"
 
-#include "rkflogging/ErrStream.h"
-#include "rkflogging/Logging.h"
-#include "rkflogging/LoggingConfig.h"
+#include "afclogging/ErrStream.h"
+#include "afclogging/Logging.h"
+#include "afclogging/LoggingConfig.h"
 
 namespace
 {

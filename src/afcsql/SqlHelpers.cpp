@@ -4,7 +4,7 @@
 
 #include "SqlHelpers.h"
 #include "SqlError.h"
-#include "rkflogging/Logging.h"
+#include "afclogging/Logging.h"
 #include <QSqlDriver>
 #include <QSqlField>
 #include <QDateTime>

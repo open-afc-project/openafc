@@ -1,7 +1,7 @@
 // 
 
 #include "FileHelpers.h"
-#include "rkflogging/ErrStream.h"
+#include "afclogging/ErrStream.h"
 #include <QFile>
 #include <QFileInfo>
 #include <QDir>

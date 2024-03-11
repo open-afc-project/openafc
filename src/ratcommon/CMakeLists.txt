@@ -11,11 +11,7 @@ set(TARGET_LIBS ${TARGET_LIBS} ${TGT_NAME} PARENT_SCOPE)
 configure_file(RatVersion.h.in RatVersion.h @ONLY)
 configure_file(RatVersion.cpp.in RatVersion.cpp @ONLY)
 
-target_link_libraries(${TGT_NAME} PUBLIC rkflogging)
+target_link_libraries(${TGT_NAME} PUBLIC afclogging)
 target_link_libraries(${TGT_NAME} PUBLIC Qt5::Core)
 target_link_libraries(${TGT_NAME} PUBLIC Qt5::Network)
 target_link_libraries(${TGT_NAME} PUBLIC minizip)
-
-if (CMAKE_BUILD_TYPE STREQUAL "DebugWithTest")
-  add_subdirectory(test)
-endif()

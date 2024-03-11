@@ -2,7 +2,7 @@
 #include "SqlTransaction.h"
 #include "SqlError.h"
 #include "SqlHelpers.h"
-#include "rkflogging/Logging.h"
+#include "afclogging/Logging.h"
 #include <QSqlDatabase>
 
 namespace {

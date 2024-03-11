@@ -2,7 +2,7 @@
 #include <limits>
 #include <sstream>
 #include <stdexcept>
-#include <rkflogging/Logging.h>
+#include <afclogging/Logging.h>
 
 namespace 
 {

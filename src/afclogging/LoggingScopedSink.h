@@ -1,6 +1,6 @@
 
-#ifndef SRC_RKFLOGGING_LOGGINGSCOPEDSINK_H_
-#define SRC_RKFLOGGING_LOGGINGSCOPEDSINK_H_
+#ifndef SRC_AFCLOGGING_LOGGINGSCOPEDSINK_H_
+#define SRC_AFCLOGGING_LOGGINGSCOPEDSINK_H_
 
 #include <boost/log/sinks.hpp>
 #include <boost/shared_ptr.hpp>
@@ -27,4 +27,4 @@ class ScopedSink {
 
 } // End namespace
 
-#endif /* SRC_RKFLOGGING_LOGGINGSCOPEDSINK_H_ */
+#endif /* SRC_AFCLOGGING_LOGGINGSCOPEDSINK_H_ */

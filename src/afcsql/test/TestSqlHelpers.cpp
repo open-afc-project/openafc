@@ -1,8 +1,6 @@
 // 
 
 #include "../SqlHelpers.h"
-#include "rkfunittest/UnitTestHelpers.h"
-#include "rkfunittest/GtestShim.h"
 #include <QSqlDatabase>
 #include <QDateTime>
 

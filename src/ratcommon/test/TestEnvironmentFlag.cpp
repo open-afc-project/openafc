@@ -1,5 +1,4 @@
 #include "../EnvironmentFlag.h"
-#include "rkfunittest/GtestShim.h"
 
 class TestEnvironmentFlag : public testing::Test {
     virtual void SetUp() override {

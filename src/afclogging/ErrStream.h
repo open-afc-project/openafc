@@ -1,9 +1,9 @@
 // 
 
-#ifndef SRC_RKFLOGGING_ERRSTREAM_H_
-#define SRC_RKFLOGGING_ERRSTREAM_H_
+#ifndef SRC_AFCLOGGING_ERRSTREAM_H_
+#define SRC_AFCLOGGING_ERRSTREAM_H_
 
-#include "rkflogging_export.h"
+#include "afclogging_export.h"
 #include "QtStream.h"
 #include <sstream>
 
@@ -17,7 +17,7 @@ class QString;
  * throw std::logic_error(ErrStream() << "some message: " << errCode);
  * @endcode
  */
-class RKFLOGGING_EXPORT ErrStream {
+class AFCLOGGING_EXPORT ErrStream {
 public:
     /** Initialize to an empty string.
      */
@@ -70,4 +70,4 @@ private:
     std::ostringstream _str;
 };
 
-#endif /* SRC_RKFLOGGING_ERRSTREAM_H_ */
+#endif /* SRC_AFCLOGGING_ERRSTREAM_H_ */

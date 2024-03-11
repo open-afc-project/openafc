@@ -7462,8 +7462,7 @@ void AfcManager::compute()
 		runHeatmapAnalysis();
 #if DEBUG_AFC
 	} else if (_analysisType == "test_itm") {
-		runTestITM("path_trace_rkf.csv");
-		runTestITM("path_trace_qcom.csv");
+		runTestITM("path_trace_afc.csv");
 	} else if (_analysisType == "test_winner2") {
 		runTestWinner2("w2_alignment.csv", "w2_alignment_afc.csv");
 	} else if (_analysisType == "test_aciFn") {

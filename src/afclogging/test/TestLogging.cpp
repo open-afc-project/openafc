@@ -2,7 +2,6 @@
 
 #include "../Logging.h"
 #include "../LoggingConfig.h"
-#include "rkfunittest/GtestShim.h"
 #include <memory>
 #include <iostream>
 

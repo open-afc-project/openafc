@@ -14,7 +14,7 @@
 # define LOGGER_DEBUG(a) qDebug()
 # define LOGGER_ERROR(a) qDebug()
 #else
-#include "rkflogging/Logging.h"
+#include "afclogging/Logging.h"
 #endif
 #include "data_if.h"
 

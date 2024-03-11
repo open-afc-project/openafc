@@ -5,7 +5,7 @@
 #include <QStringList>
 #include <QDebug>
 #include "SqlValueMap.h"
-#include "rkflogging/ErrStream.h"
+#include "afclogging/ErrStream.h"
 
 namespace{
 /** Determine if a value is floating point.

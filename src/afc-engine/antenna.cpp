@@ -1,6 +1,5 @@
 /******************************************************************************************/
 /**** FILE: antenna.cpp                                                                ****/
-/**** Michael Mandell 9/16/03                                                          ****/
 /******************************************************************************************/
 
 #include <iostream>
@@ -18,8 +17,8 @@
 #include "global_fn.h"
 #include "list.h"
 #include "lininterp.h"
-#include "rkflogging/Logging.h"
-#include "rkflogging/ErrStream.h"
+#include "afclogging/Logging.h"
+#include "afclogging/ErrStream.h"
 #include "AfcDefinitions.h"
 
 // Logger for all instances of class
