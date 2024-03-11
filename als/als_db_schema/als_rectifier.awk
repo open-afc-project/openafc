@@ -8,6 +8,12 @@
 
 BEGIN {
 	print "/*"
+	print " * Copyright (C) 2022 Broadcom. All rights reserved."
+	print " * The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate"
+	print " * that owns the software below."
+	print " * This work is licensed under the OpenAFC Project License, a copy of which is"
+	print " * included with this software program."
+	print " *"
 	print " * This file creates ALS (AFC Request/Response/Config Logging System) database on PostgreSQL+PostGIS server"
 	print " * This file is generated, direct editing is not recommended."
 	print " * Intended maintenance sequence is as follows:"
