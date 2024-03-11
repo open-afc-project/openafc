@@ -81,7 +81,7 @@ build_job:
   rules:
     - if: '($CI_PIPELINE_SOURCE != "schedule")'
   variables:
-    PUSH_DI: 0
+    PUSH_DI: 1
   script:
 
     ######## git clone sources ##############
