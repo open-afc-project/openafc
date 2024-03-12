@@ -62,7 +62,7 @@ getsrc_job:
     - echo "RAND=${RAND}" >> $CI_PROJECT_DIR/vars.env
 
     - echo "generate workdir which includes random number"
-    - WD=/home/gitlab-runner/afc/test/wccafc-dev_${RAND}
+    - WD=/opt/afc/work/gitlab-runner/test/wccafc-dev_${RAND}
     - echo "WD=${WD}" >> $CI_PROJECT_DIR/vars.env
 
     - echo "rsync sources"
