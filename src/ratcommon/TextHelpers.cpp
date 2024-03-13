@@ -1,7 +1,7 @@
 // 
 
 #include "TextHelpers.h"
-#include "rkflogging/ErrStream.h"
+#include "afclogging/ErrStream.h"
 #include <cerrno>
 #include <cmath>
 #include <QStringList>

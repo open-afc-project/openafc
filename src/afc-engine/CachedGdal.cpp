@@ -9,7 +9,7 @@
 #include <assert.h>
 #include <boost/filesystem.hpp>
 #include <fnmatch.h>
-#include <rkflogging/Logging.h>
+#include <afclogging/Logging.h>
 #include <sstream>
 #include <stdexcept>
 

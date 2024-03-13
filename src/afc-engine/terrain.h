@@ -15,9 +15,9 @@
 #include <map>
 #include <memory>
 // Loggers
-#include "rkflogging/ErrStream.h"
-#include "rkflogging/Logging.h"
-#include "rkflogging/LoggingConfig.h"
+#include "afclogging/ErrStream.h"
+#include "afclogging/Logging.h"
+#include "afclogging/LoggingConfig.h"
 #include "CachedGdal.h"
 
 // Use lidar files that have been pre-processed to have:

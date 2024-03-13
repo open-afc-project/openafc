@@ -1,6 +1,6 @@
 #include "GdalHelpers.h"
 #include "MultiGeometryIterable.h"
-#include "rkflogging/ErrStream.h"
+#include "afclogging/ErrStream.h"
 #include <ogr_feature.h>
 #include <memory>
 #include <exception>

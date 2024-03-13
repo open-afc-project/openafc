@@ -10,8 +10,8 @@
 #include <QStringList>
 #include <QSqlQuery>
 #include <exception>
-#include <rkfsql/SqlScopedConnection.h>
-#include <rkfsql/SqlExceptionDb.h>
+#include <afcsql/SqlScopedConnection.h>
+#include <afcsql/SqlExceptionDb.h>
 
 #include "denied_region.h"
 #include "antenna.h"

@@ -1,7 +1,7 @@
 // 
 
 #include "ZipWriter.h"
-#include "rkflogging/ErrStream.h"
+#include "afclogging/ErrStream.h"
 #include <QFileInfo>
 #include <QDateTime>
 #include <minizip/zip.h>

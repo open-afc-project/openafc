@@ -1,7 +1,6 @@
 // 
 
 #include "../PostSet.h"
-#include "rkfunittest/GtestShim.h"
 
 namespace{
 class BadCls{

@@ -868,8 +868,10 @@ class WorkerResultInfo(NamedTuple):
     """ Data, returned by REST API workers in result queue """
     # Retries made (0 - from first attempt)
     retries: int
-    # CPU consumed in nanoseconds. Negative if not available
-    cpu_consumed_ns: int
+    # CPU time consumed by worker in nanoseconds. Negative if not available
+    worker_cpu_consumed_ns: int
+    # Time consumed in processing of current request in second
+    req_time_spent_sec: float
     # Request indices. None for netload
     req_indices: Optional[List[int]] = None
     # REST API Response data (None if error or N/A)
@@ -1038,12 +1040,12 @@ class ResultsProcessor:
 
     def process(self) -> None:
         """ Keep processing results until all worker will stop """
-        parallel = self._num_workers
         start_time = datetime.datetime.now()
         requests_sent: int = 0
         requests_failed: int = 0
         retries: int = 0
         cpu_consumed_ns: int = 0
+        time_spent_sec: float = 0
         req_rate_ema = RateEma()
         cpu_consumption_ema = RateEma()
 
@@ -1065,13 +1067,13 @@ class ResultsProcessor:
             else:
                 cpu_consumption = 0
 
-            if global_req_rate:
-                req_duration = parallel / global_req_rate
+            if requests_sent:
+                req_duration = time_spent_sec / requests_sent
                 req_duration_str = \
                     f"{req_duration:.3g} sec" if req_duration > 0.1 \
                     else f"{req_duration * 1000:.3g} ms"
             else:
-                req_duration_str = "<unknown>"
+                req_duration_str = "unknown"
             ret = \
                 f"{'Progress: ' if intermediate else ''}" \
                 f"{requests_sent} requests completed " \
@@ -1091,8 +1093,15 @@ class ResultsProcessor:
                         requests_sent)
                 eta_dt = start_time + total_duration
                 tta_sec = int((eta_dt - now).total_seconds())
-                tta = f"{tta_sec // 60} minutes" if tta_sec >= 60 else \
-                    f"{tta_sec} seconds"
+                tta: str
+                if tta_sec < 60:
+                    tta = f"{tta_sec} seconds"
+                elif tta_sec < 3600:
+                    tta = f"{tta_sec // 60} minutes"
+                else:
+                    tta_minutes = tta_sec // 60
+                    tta = \
+                        f"{tta_minutes // 60} hours {tta_minutes % 60} minutes"
                 ret += f", current rate is " \
                     f"{req_rate_ema.rate_ema:.3f} req/sec. " \
                     f"ETA: {eta_dt.strftime('%X')} (in {tta})"
@@ -1160,7 +1169,8 @@ class ResultsProcessor:
                     except OSError as ex:
                         error(f"Failed to write failed request file "
                               f"'{filename}': {repr(ex)}")
-                cpu_consumed_ns += result_info.cpu_consumed_ns
+                cpu_consumed_ns += result_info.worker_cpu_consumed_ns
+                time_spent_sec += result_info.req_time_spent_sec
 
                 if self._status_period and \
                         ((prev_sent // self._status_period) !=
@@ -1189,7 +1199,7 @@ def post_req_worker(
         post_req_queue: multiprocessing.Queue,
         result_queue: "multiprocessing.Queue[ResultQueueDataType]",
         dry_result_data: Optional[bytes], use_requests: bool,
-        return_requests: bool = False) -> None:
+        return_requests: bool = False, delay_sec: float = 0) -> None:
     """ REST API POST worker
 
     Arguments:
@@ -1204,8 +1214,10 @@ def post_req_worker(
                        operation results, None to signal that worker finished
     use_requests    -- True to use requests, False to use urllib.request
     return_requests -- True to return requests in WorkerResultInfo
+    delay_sec       -- Delay start by this number of seconds
     """
     try:
+        time.sleep(delay_sec)
         session: Optional[requests.Session] = \
             requests.Session() if use_requests and (not dry) else None
         has_proc_time = hasattr(time, "process_time_ns")
@@ -1216,6 +1228,7 @@ def post_req_worker(
                 result_queue.put(None)
                 return
 
+            start_time = datetime.datetime.now()
             error_msg = None
             if dry:
                 result_data = dry_result_data
@@ -1269,8 +1282,11 @@ def post_req_worker(
                 WorkerResultInfo(
                     req_indices=req_info.req_indices, retries=attempts - 1,
                     result_data=result_data, error_msg=error_msg,
-                    cpu_consumed_ns=(new_proc_time_ns - prev_proc_time_ns)
+                    worker_cpu_consumed_ns=(new_proc_time_ns -
+                                            prev_proc_time_ns)
                     if has_proc_time else -1,
+                    req_time_spent_sec=(datetime.datetime.now() - start_time).
+                    total_seconds(),
                     req_data=req_info.req_data if return_requests and (not dry)
                     else None))
             prev_proc_time_ns = new_proc_time_ns
@@ -1312,6 +1328,7 @@ def get_req_worker(
             if req_info is None:
                 result_queue.put(None)
                 return
+            start_time = datetime.datetime.now()
             for _ in range(req_info.num_gets):
                 error_msg = None
                 if dry:
@@ -1359,8 +1376,12 @@ def get_req_worker(
                 result_queue.put(
                     WorkerResultInfo(
                         retries=attempts - 1, error_msg=error_msg,
-                        cpu_consumed_ns=(new_proc_time_ns - prev_proc_time_ns)
-                        if has_proc_time else -1))
+                        worker_cpu_consumed_ns=(new_proc_time_ns -
+                                                prev_proc_time_ns)
+                        if has_proc_time else -1,
+                        req_time_spent_sec=(datetime.datetime.now() -
+                                            start_time).
+                        total_seconds(),))
                 prev_proc_time_ns = new_proc_time_ns
     except Exception as ex:
         logging.error(f"Worker failed: {repr(ex)}\n"
@@ -1440,7 +1461,9 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
         netload_target: Optional[str] = None,
         expected_code: Optional[int] = None, min_idx: Optional[int] = None,
         max_idx: Optional[int] = None, count: Optional[int] = None,
-        use_requests: bool = False, err_dir: Optional[str] = None) -> None:
+        use_requests: bool = False, err_dir: Optional[str] = None,
+        ramp_up: Optional[float] = None, randomize: Optional[bool] = None,
+        population_db: Optional[str] = None) -> None:
     """ Run the POST operation
 
     Arguments:
@@ -1466,6 +1489,11 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
     use_requests      -- Use requests to send requests (default is to use
                          urllib.request)
     err_dir           -- None or directory for failed requests
+    ramp_up           -- Ramp up parallel streams for this number of seconds
+    randomize         -- True to random points, False for predefined points,
+                         None if irrelevant. Only used in banner printing
+    population_db     -- Population database file name or None. Only used for
+                         banner printing
     """
     error_if(use_requests and ("requests" not in sys.modules),
              "'requests' Python3 module have to be installed to use "
@@ -1482,13 +1510,24 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
         logging.info(f"Batch size: {batch}")
     logging.info(f"Requests to send: {total_requests:_}")
     logging.info(f"Nonreconnect mode: {use_requests}")
+    if ramp_up is not None:
+        logging.info(f"Ramp up for: {ramp_up} seconds")
     if status_period:
         logging.info(f"Intermediate status is printed every "
                      f"{status_period} requests completed")
     else:
         logging.info("Intermediate status is not printed")
+    if err_dir:
+        logging.info(f"Directory for failed requests: {err_dir}")
+    if randomize is not None:
+        logging.info(
+            f"Point selection is {'random' if randomize else 'predefined'}")
+    if population_db:
+        logging.info(f"Point density chosen according to population database: "
+                     f"{population_db}")
     if dry:
         logging.info("Dry mode")
+
     req_queue: multiprocessing.Queue = multiprocessing.Queue()
     result_queue: "multiprocessing.Queue[ResultQueueDataType]" = \
         multiprocessing.Queue()
@@ -1517,10 +1556,14 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
             req_worker_kwargs["dry_result_data"] = \
                 rest_data_handler.dry_result_data(batch)
             req_worker_kwargs["return_requests"] = err_dir is not None
-        for _ in range(parallel):
+        for idx in range(parallel):
+            kwargs = dict(req_worker_kwargs)
+            if ramp_up is not None:
+                kwargs["delay_sec"] = \
+                    (idx * ramp_up / (parallel - 1)) if idx else 0
+
             workers.append(
-                multiprocessing.Process(target=req_worker,
-                                        kwargs=req_worker_kwargs))
+                multiprocessing.Process(target=req_worker, kwargs=kwargs))
             workers[-1].start()
         workers.append(
             multiprocessing.Process(
@@ -1849,7 +1892,9 @@ def do_load(cfg: Config, args: Any) -> None:
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
         max_idx=max_idx, status_period=args.status_period, count=args.count,
-        use_requests=args.no_reconnect, err_dir=args.err_dir)
+        use_requests=args.no_reconnect, err_dir=args.err_dir,
+        ramp_up=args.ramp_up, randomize=args.random,
+        population_db=args.population)
 
 
 def do_netload(cfg: Config, args: Any) -> None:
@@ -2131,6 +2176,10 @@ def main(argv: List[str]) -> None:
         "--random", action="store_true",
         help="Choose AP positions randomly (makes sense only in noncached "
         "mode)")
+    parser_load.add_argument(
+        "--ramp_up", metavar="SECONDS", type=float, default=0,
+        help="Ramp up streams for this number of seconds. Default is to start "
+        "all at once")
     parser_load.set_defaults(func=do_load)
 
     parser_network = subparsers.add_parser(
