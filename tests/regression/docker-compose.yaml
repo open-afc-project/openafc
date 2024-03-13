@@ -76,7 +76,7 @@ services:
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
 
   msghnd:
-    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd:${TAG:-latest}
+    image: ${PUB_REPO:-110738915961.dkr.ecr.us-east-1.amazonaws.com}/afc-msghnd:${TAG:-latest}
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
@@ -112,7 +112,7 @@ services:
       - AFC_OBJST_LOCAL_DIR=/storage
     dns_search: [.]
   worker:
-    image: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker:${TAG:-latest}
+    image: ${PUB_REPO:-110738915961.dkr.ecr.us-east-1.amazonaws.com}/afc-worker:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       - ./pipe:/pipe
