@@ -40,7 +40,7 @@ POSTGRES_DSN_ENV = "RCACHE_POSTGRES_DSN"
 RCACHE_URL_ENV = "RCACHE_SERVICE_URL"
 
 # Environment variable for localhost's port of Rcache service
-RCACHE_PORT_ENV = "RCACHE_PORT"
+RCACHE_PORT_ENV = "RCACHE_CLIENT_PORT"
 
 # Default number of simultaneous streams in mas operations
 DEFAULT_MASS_THREADS = 10

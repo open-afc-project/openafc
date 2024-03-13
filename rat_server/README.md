@@ -20,6 +20,6 @@ The configuration for the server is managed by the *.conf files in this director
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
-      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
 ```

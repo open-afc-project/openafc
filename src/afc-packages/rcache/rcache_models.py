@@ -50,7 +50,8 @@ class RcacheServiceSettings(pydantic.BaseSettings):
         pydantic.Field(
             True, title="Rcache enabled (False for legacy file-based cache")
 
-    port: int = pydantic.Field(..., title="Port this service listens on")
+    port: int = pydantic.Field(..., title="Port this service listens on",
+                               env="RCACHE_CLIENT_PORT")
     postgres_dsn: pydantic.PostgresDsn = \
         pydantic.Field(
             ...,

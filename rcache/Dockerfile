@@ -11,7 +11,7 @@ FROM alpine:3.18
 # ENV RCACHE_ENABLED=True
 
 # Port REST API service listen on
-# ENV RCACHE_PORT
+# ENV RCACHE_CLIENT_PORT
 
 # Connection string to Postgres DB
 # ENV RCACHE_POSTGRES_DSN=postgresql://[user[:password]]@host[:port]/database[?options]
@@ -59,8 +59,8 @@ COPY rcache/rcache_app.py rcache/rcache_app.py rcache/rcache_db_async.py \
 COPY tools/rcache/rcache_tool.py /wd
 RUN chmod a+x /wd/rcache_tool.py
 
-ENTRYPOINT uvicorn rcache_app:app --host 0.0.0.0 --port ${RCACHE_PORT} \
+ENTRYPOINT uvicorn rcache_app:app --host 0.0.0.0 --port ${RCACHE_CLIENT_PORT} \
     ${RCACHE_UVICORN_PARAMS}
 
 HEALTHCHECK --start-period=20s \
-    CMD curl -f http://localhost:${RCACHE_PORT}/healthcheck || exit 1
+    CMD curl -f http://localhost:${RCACHE_CLIENT_PORT}/healthcheck || exit 1

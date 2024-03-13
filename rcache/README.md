@@ -72,9 +72,9 @@ All Rcache service, Rcache client library and, to certain extent, Rcache tool ar
 |Name|Current value|Defined in|Images <br>using it|Meaning|
 |----|-------------|----------|---------------|-------|
 |<small>RCACHE_ENABLED</small>|True|`.env`|rcache,<br>msghnd,<br>rat_server,<br>worker,<br>uls_downloader|TRUE to use Rcache for synchronous non-GUI requests. FALSE to use legacy ObjStore-based cache|
-|<small>RCACHE_PORT</small>|8000|.env, <br>docker-compose.yaml,<br>tools/rcache/<br>Dockerfile|rcache,<br>rcache_tool|Port on which Rcache REST API service is listening. Also this port is a part of **RCACHE_SERVICE_URL** environment variable, passed to other containers (see below)|
+|<small>RCACHE_CLIENT_PORT</small>|8000|.env, <br>docker-compose.yaml,<br>tools/rcache/<br>Dockerfile|rcache,<br>rcache_tool|Port on which Rcache REST API service is listening. Also this port is a part of **RCACHE_SERVICE_URL** environment variable, passed to other containers (see below)|
 |<small>RCACHE_<br>POSTGRES_<br>DSN</small>|<small>postgresql://<br>postgres:postgres@<br>bulk_postgres/rcache</small>|docker-compose.yaml,<br>tools/rcache/<br>Dockerfile|rcache,<br>rat_server,<br>msghnd,<br>rcache_tool|Connection string to Postgres database that stores cache|
-|<small>RCACHE_<br>SERVICE_<br>URL</small>|<small>http://rcache:<br>$\{RCACHE_PORT\}</small>|docker-compose.yaml,<br>tools/rcache/<br>Dockerfile|msghnd,<br>rat_server,<br>worker,<br>uls_downloader,<br>rcache_tool|Rcache service REST API URL|
+|<small>RCACHE_<br>SERVICE_<br>URL</small>|<small>http://rcache:<br>$\{RCACHE_CLIENT_PORT\}</small>|docker-compose.yaml,<br>tools/rcache/<br>Dockerfile|msghnd,<br>rat_server,<br>worker,<br>uls_downloader,<br>rcache_tool|Rcache service REST API URL|
 |<small>RCACHE_RMQ_<br>DSN</small>|<small>amqp://rcache:rcache@<br>rmq:5672/rcache</small>|docker-compose.yaml|msghnd,<br>rat_server,<br>worker|RabbitMQ AMQP URL Worker uses to send and msghnd/rat_server to receive AFC Response. Note that user and vhost (rcache and rcache in this URL) should be properly configured in RabbitMQ service|
 |<small>RCACHE_AFC_<br>REQ_URL</small>|<small>http://msghnd:8000/<br>fbrat/ap-afc/<br>availableSpectrumInquiry?<br>nocache=True</small>|docker-compose.yaml|rcache|REST API Rcache service uses to launch precomputation requests. No precomputation if this environment variable empty or not defined|
 |<small>RCACHE_<br>RULESETS_<br>URL</small>|<small>http://rat_server/fbrat/<br>ratapi/v1/GetRulesetIDs</small>|docker-compose.yaml|rcache|REST API URL to request list of Ruleset IDs in use. If empty or not defined default AFC distance (130km as of time of this writing) is used for spatial invalidation|
@@ -104,7 +104,7 @@ Here is one possible way to reach this trove of knowledge (uppercase are values 
    `docker container inspect AFCPROJECTNAME_rcache_INSTANCEINDEX`
 3. Find `rcache` container IP in host file system:  
    In printed JSON it is at `[0]["NetworkSettings"]["Networks"][DEFAULTNETWORKNAME]["IPAddress"]`
-4. Do ssh or plink local port forwarding from your client machine to rcache container IP, port 8000 (or whatever `RCACHE_PORT` is set to):  
+4. Do ssh or plink local port forwarding from your client machine to rcache container IP, port 8000 (or whatever `RCACHE_CLIENT_PORT` is set to):  
   `SSHORPLINK -L LOCALPORT:RCACHEIPADDRESS:8000`
 4. On client machine browse to `localhost:LOCALPORT/redoc`
 

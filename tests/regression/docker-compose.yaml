@@ -72,7 +72,7 @@ services:
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
-      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
 
   msghnd:
@@ -92,7 +92,7 @@ services:
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
-      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
     dns_search: [.]
     depends_on:
@@ -132,7 +132,7 @@ services:
       - AFC_AEP_REAL_MOUNTPOINT=${VOL_C_DB}/3dep/1_arcsec
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
       # ALS params
       - ALS_KAFKA_SERVER_ID=worker
@@ -182,7 +182,7 @@ services:
       - ULS_PROMETHEUS_PORT=8000
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
     volumes:
       - ${VOL_H_DB}:/rat_transfer
     secrets:
@@ -208,7 +208,7 @@ services:
     restart: always
     environment:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_PORT=${RCACHE_PORT}
+      - RCACHE_CLIENT_PORT=${RCACHE_CLIENT_PORT}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
       - RCACHE_AFC_REQ_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
       - RCACHE_RULESETS_URL=http://rat_server/fbrat/ratapi/v1/GetRulesetIDs

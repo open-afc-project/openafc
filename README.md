@@ -329,7 +329,7 @@ services:
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
-      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
 
   msghnd:
@@ -349,7 +349,7 @@ services:
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
-      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
     dns_search: [.]
     depends_on:
@@ -390,7 +390,7 @@ services:
       - AFC_AEP_REAL_MOUNTPOINT=${VOL_C_DB}/3dep/1_arcsec
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
       # ALS params
       - ALS_KAFKA_SERVER_ID=worker
@@ -440,7 +440,7 @@ services:
       - ULS_PROMETHEUS_PORT=8000
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
     volumes:
       - ${VOL_H_DB}/ULS_Database:/rat_transfer/ULS_Database
       - ${VOL_H_DB}/RAS_Database:/rat_transfer/RAS_Database
@@ -465,7 +465,7 @@ services:
     restart: always
     environment:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
-      - RCACHE_PORT=${RCACHE_PORT}
+      - RCACHE_CLIENT_PORT=${RCACHE_CLIENT_PORT}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
       - RCACHE_AFC_REQ_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
       - RCACHE_RULESETS_URL=http://rat_server/fbrat/ratapi/v1/GetRulesetIDs
@@ -602,7 +602,7 @@ ULS_CURRENT_DB_SYMLINK=FS_LATEST.sqlite3
 RCACHE_ENABLED=True
 
 # Port Rcache service listens os
-RCACHE_PORT=8000
+RCACHE_CLIENT_PORT=8000
 
 
 # -= SECRETS STUFF =-
@@ -758,7 +758,7 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 |RCACHE_SERVICE_URL|Must be set|rat_server, msghnd, worker, uls_downloader|Rcache service REST API base URL|
 |RCACHE_RMQ_DSN|Must be set|rat_server, msghnd, worker|AMQP URL to RabbitMQ vhost that workers use to communicate computation result|
 |RCACHE_UPDATE_ON_SEND|TRUE|TRUE if worker sends result to Rcache server, FALSE if msghnd/rat_server|
-|RCACHE_PORT|8000|rcache|Rcache REST API port|
+|RCACHE_CLIENT_PORT|8000|rcache|Rcache REST API port|
 |RCACHE_AFC_REQ_URL||REST API Rcache precomputer uses to send invalidated AFC requests for precomputation. No precomputation if not set|
 |RCACHE_RULESETS_URL||REST API Rcache spatial invalidator uses to retrieve AFC Configs' rulesets. Default invalidation distance usd if not set|
 |RCACHE_CONFIG_RETRIEVAL_URL||REST API Rcache spatial invalidator uses to retrieve AFC Config by ruleset. Default invalidation distance usd if not set|
