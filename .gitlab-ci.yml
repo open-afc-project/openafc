@@ -56,6 +56,7 @@ getsrc_job:
   stage: getsrc
   rules:
     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main))'
+      when: always
   script:
     - echo "create random number"
     - RAND=`date +"D_%d_%m_%y_T_%H_%M_%S_TZ_%Z"`_hash_`git rev-parse --short HEAD` && echo ${RAND}
@@ -77,6 +78,7 @@ build_job:
   stage: build
   rules:
     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main))'
+      when: always
   variables:
     PUSH_DI: 0
   script:
@@ -107,6 +109,7 @@ test_job:
   stage: test
   rules:
     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main))'
+      when: always
   variables:
     RUN_FROM_RAND: 1
   before_script:
