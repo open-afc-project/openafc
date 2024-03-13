@@ -55,7 +55,7 @@ stages:          # List of stages for jobs, and their order of execution
 getsrc_job:
   stage: getsrc
   rules:
-    - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main))'
+    - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
       when: always
   script:
     - echo "create random number"
@@ -77,7 +77,7 @@ getsrc_job:
 build_job:
   stage: build
   rules:
-    - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main))'
+    - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
       when: always
   variables:
     PUSH_DI: 0
@@ -108,7 +108,7 @@ build_job:
 test_job:
   stage: test
   rules:
-    - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main))'
+    - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
       when: always
   variables:
     RUN_FROM_RAND: 1
