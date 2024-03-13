@@ -41,6 +41,8 @@ kubectl get all
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo add kedacore https://kedacore.github.io/charts
 helm repo add external-secrets https://charts.external-secrets.io
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
 helm repo update
 helm install external-secrets \
    external-secrets/external-secrets \
@@ -71,9 +73,11 @@ kubectl rollout status deployment/keda-admission-webhooks --namespace keda
 kubectl rollout status deployment/keda-operator --namespace keda
 kubectl rollout status deployment/keda-operator-metrics-apiserver --namespace keda
 
-kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
+kubectl create namespace prometheus
+kubectl create namespace monitoring
+helm install prometheus prometheus-community/prometheus --namespace prometheus
 
-#helm install test-internal afc-int/ -f afc-int/values-$arg.yaml
+kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
 
 if ! helm install test-internal afc-int/ -f afc-int/values-$arg.yaml; then
     echo "Helm install failed, exiting script."

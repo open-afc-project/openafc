@@ -3,7 +3,7 @@
 # Declare variables to be passed into your templates.
 
 replicaCount:
-  msghnd: 10 # todo: fix after autoscaling enablement for msghnd
+  msghnd: 1 # todo: fix after autoscaling enablement for msghnd
   objst: 1
   rmq: 1
   worker: 1
@@ -96,8 +96,8 @@ service:
     hostname: webui
     type: ClusterIP
     port: 80
-    ratapi_env_file_path: /dev/ratapi_env.cfg
-    oidc_env_file_path: /dev/oidc_env.cfg
+    ratapi_env_file_path: /etc/ratapi_env.cfg
+    oidc_env_file_path: /etc/oidc_env.cfg
   rmq:
     hostname: rmq
     type: ClusterIP
@@ -146,6 +146,8 @@ deployments:
       storageClassName: b-ssd
       accessMode: ReadWriteMany
       size: 2.5Ti
+    pv:
+      name: cont-confs
   als_siphon:
     name: als-siphon
     init_if_exists: "skip"
