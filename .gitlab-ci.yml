@@ -80,7 +80,7 @@ build_job:
     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
       when: always
   variables:
-    PUSH_DI: 1
+    PUSH_DI: 0
   before_script:
     - if [ "$PUSH_DI" = "1" ]; then echo $ARTIFACTORY_PASSWORD | docker login -u $ARTIFACTORY_USER --password-stdin $PRIV_REPO; fi
   script:
