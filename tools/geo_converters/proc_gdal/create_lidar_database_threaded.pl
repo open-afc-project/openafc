@@ -61,19 +61,19 @@ my $dataset;
 $dataset = "test";
 
 if ($dataset eq "2019") {
-    $sourceDir = "/run/media/dknopoff/rat_data/lidar_2019/rockyftp.cr.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities";
-    $destDir   = "/run/media/dknopoff/rat_data/proc_lidar_2019";
-    $tmpDir   = "/run/media/dknopoff/rat_data/create_lidar_database_tmp";
+    $sourceDir = "."; # set path to dataset
+    $destDir   = "."; # set path to destination directory
+    $tmpDir   = "."; # set path to tmp directory
     $name = "NGA_US_Cities";
 } elsif ($dataset eq "old") {
-    $sourceDir = "/run/media/mmandell/rkf_data/terrain/lidar/lidar_old";
-    $destDir   = "/run/media/mmandell/rkf_data/terrain/lidar/proc_lidar_old";
-    $tmpDir   = "/data/tmp/tmp/create_lidar_database_tmp";
+    $sourceDir = "."; # set path to dataset
+    $destDir   = "."; # set path to destination directory
+    $tmpDir   = "."; # set path to tmp directory
     $name = "old_lidar";
 } elsif ($dataset eq "test") {
-    $sourceDir = "/run/media/dknopoff/rkf_data/lidar_2019/rockyftp.cr.usgs.gov/vdelivery/Datasets/Staged/Elevation/Non_Standard_Contributed/NGA_US_Cities";
-    $destDir   = "/run/media/dknopoff/rkf_data/temp_out";
-    $tmpDir   = "/run/media/dknopoff/rkf_data/temp";
+    $sourceDir = "."; # set path to dataset
+    $destDir   = "."; # set path to destination directory
+    $tmpDir   = "."; # set path to tmp directory
     $name = "NGA_US_Cities";
 } else {
     die "ERROR: dataset set to illegal value: $dataset : $!\n";

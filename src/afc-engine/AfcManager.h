@@ -46,9 +46,9 @@
 #include "terrain.h"
 #include "CachedGdal.h"
 // Loggers
-#include "rkflogging/ErrStream.h"
-#include "rkflogging/Logging.h"
-#include "rkflogging/LoggingConfig.h"
+#include "afclogging/ErrStream.h"
+#include "afclogging/Logging.h"
+#include "afclogging/LoggingConfig.h"
 // rat common
 #include "ratcommon/SearchPaths.h"
 #include "ratcommon/CsvWriter.h"

@@ -25,8 +25,8 @@
 #include "uls.h"
 #include "EcefModel.h"
 
-#include "rkflogging/Logging.h"
-#include "rkflogging/ErrStream.h"
+#include "afclogging/Logging.h"
+#include "afclogging/ErrStream.h"
 #include "PopulationDatabase.h"
 #include "AfcDefinitions.h"
 

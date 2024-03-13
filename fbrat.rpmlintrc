@@ -18,4 +18,4 @@ addFilter(r'fbrat\..*: W: non-standard-uid /var/lib/fbrat fbrat')
 addFilter(r'fbrat\..*: W: non-standard-gid /var/lib/fbrat fbrat')
 
 # The statically-linked library calls exit
-addFilter(r'fbrat\..*: W: shared-lib-calls-exit /usr/lib64/librkfcrashdump.so.0.0.0 .*')
+addFilter(r'fbrat\..*: W: shared-lib-calls-exit /usr/lib64/libafccrashdump.so.0.0.0 .*')

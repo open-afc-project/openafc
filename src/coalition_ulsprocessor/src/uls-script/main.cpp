@@ -14,7 +14,10 @@
 #define VERSION "1.3.0"
 
 bool removeMobile = false;
-bool includeUnii8 = false;
+bool includeUnii5US = false;
+bool includeUnii6US = false;
+bool includeUnii7US = false;
+bool includeUnii8US = false;
 bool debugFlag    = false;
 bool combineAntennaRegionFlag = false;
 
@@ -52,8 +55,8 @@ int main(int argc, char **argv)
 
     printf("Coalition ULS Processing Tool Version %s\n", VERSION);
     printf("Copyright 2019 (C) RKF Engineering Solutions\n");
-    if (argc != 10) {
-        fprintf(stderr, "Syntax: %s [ULS file.csv] [Output FS File.csv] [Output RAS File.csv] [AntModelListFile.csv] [AntPrefixFile.csv] [AntModelMapFile.csv] [freqAssignmentFile] [transmitterModelListFile] [mode]\n", argv[0]);
+    if (argc != 11) {
+        fprintf(stderr, "Syntax: %s [ULS file.csv] [Output FS File.csv] [Output RAS File.csv] [AntModelListFile.csv] [AntPrefixFile.csv] [AntModelMapFile.csv] [freqAssignmentFile] [transmitterModelListFile] [uniiStr] [mode]\n", argv[0]);
         return -1;
     }
 
@@ -73,7 +76,8 @@ int main(int argc, char **argv)
     std::string antModelMapFile = argv[6];
     std::string freqAssignmentFile = argv[7];
     std::string transmitterModelListFile = argv[8];
-    std::string mode = argv[9];
+    std::string uniiStr = argv[9];
+    std::string mode = argv[10];
 
     FILE *fwarn;
     std::string warningFile = "warning_uls.txt";
@@ -87,34 +91,67 @@ int main(int argc, char **argv)
 
 	FreqAssignmentClass fccFreqAssignment(freqAssignmentFile);
 
+    std::string procPfx = "proc_uls";
+    std::string debugStr = "_debug";
+    std::string caStr = "_ca";
     if (mode == "test_antenna_model_map") {
         testAntennaModelMap(antennaModelMap, inputFile, outputFSFile);
         return 0;
     } else if (mode == "test_transmitter_model_map") {
         testTransmitterModelMap(transmitterModelMap, inputFile, outputFSFile);
         return 0;
-    } else if (mode == "proc_uls") {
-        // Do nothing
-    } else if (mode == "proc_uls_debug") {
-        debugFlag = true;
-    } else if (mode == "proc_uls_ca") {
-        combineAntennaRegionFlag = true;
-    } else if (mode == "proc_uls_include_unii8") {
-        includeUnii8 = true;
-    } else if (mode == "proc_uls_include_unii8_ca") {
-        includeUnii8 = true;
-        combineAntennaRegionFlag = true;
-    } else if (mode == "proc_uls_include_unii8_debug") {
-        includeUnii8 = true;
-        debugFlag = true;
+    } else if (mode.compare(0, procPfx.size(), procPfx) == 0) {
+        std::string modeStr = mode.substr(procPfx.size());
+        while(modeStr.size()) {
+            int n1 = modeStr.size();
+            if (modeStr.compare(0, debugStr.size(), debugStr) == 0) {
+                debugFlag = true;
+                modeStr = modeStr.substr(debugStr.size());
+            }
+            if (modeStr.compare(0, caStr.size(), caStr) == 0) {
+                combineAntennaRegionFlag = true;
+                modeStr = modeStr.substr(caStr.size());
+            }
+            int n2 = modeStr.size();
+            if (n1 == n2) {
+                fprintf(stderr, "ERROR: Invalid mode: %s\n", mode.c_str());
+                return -1;
+            }
+        }
     } else {
         fprintf(stderr, "ERROR: Invalid mode: %s\n", mode.c_str());
         return -1;
     }
 
+    std::vector<std::string> uniiList = split(uniiStr, ':');
+    for(int i=0; i<uniiList.size(); ++i) {
+        if (uniiList[i] == "5") {
+            includeUnii5US = true;
+        } else if (uniiList[i] == "6") {
+            includeUnii6US = true;
+        } else if (uniiList[i] == "7") {
+            includeUnii7US = true;
+        } else if (uniiList[i] == "8") {
+            includeUnii8US = true;
+        } else {
+            fprintf(stderr, "ERROR: Invalid uniiStr: %s\n", uniiStr.c_str());
+            return -1;
+        }
+    }
+
+    printf("Include UNII-5 US = %s\n", (includeUnii5US ? "true" : "false"));
+    printf("Include UNII-6 US = %s\n", (includeUnii6US ? "true" : "false"));
+    printf("Include UNII-7 US = %s\n", (includeUnii7US ? "true" : "false"));
+    printf("Include UNII-8 US = %s\n", (includeUnii8US ? "true" : "false"));
+
+    if (!(includeUnii5US || includeUnii6US || includeUnii7US || includeUnii8US)) {
+        fprintf(stderr, "ERROR: No UNII bands selected for US\n");
+        return -1;
+    }
+
     UlsFileReader r(inputFile.c_str(), fwarn, alignFederatedFlag, alignFederatedScale);
 
-    int maxNumPRUS = r.computeStatisticsUS(fccFreqAssignment, includeUnii8);
+    int maxNumPRUS = r.computeStatisticsUS(fccFreqAssignment, includeUnii5US, includeUnii6US, includeUnii7US, includeUnii8US);
     int maxNumPRCA = r.computeStatisticsCA(fwarn);
     int maxNumPassiveRepeater = (maxNumPRUS > maxNumPRCA ? maxNumPRUS : maxNumPRCA);
 
@@ -664,13 +701,16 @@ void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                     anomalousReason.append("NaN frequency value, ");
                 } else {
                     bool overlapUnii5 = (stopFreqBand > UlsFunctionsClass::unii5StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii5StopFreqMHz);
+                    bool overlapUnii6 = (stopFreqBand > UlsFunctionsClass::unii6StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii6StopFreqMHz);
                     bool overlapUnii7 = (stopFreqBand > UlsFunctionsClass::unii7StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii7StopFreqMHz);
                     bool overlapUnii8 = (stopFreqBand > UlsFunctionsClass::unii8StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii8StopFreqMHz);
 
-                    if (!(overlapUnii5 || overlapUnii7 || (includeUnii8 && overlapUnii8))) {
+                    if (!((includeUnii5US && overlapUnii5) || (includeUnii6US && overlapUnii6) || (includeUnii7US && overlapUnii7) || (includeUnii8US && overlapUnii8))) {
                         continue;
                     } else if (overlapUnii5 && overlapUnii7) {
                         anomalousReason.append("Band overlaps both Unii5 and Unii7, ");
+                    } else if (overlapUnii6 && overlapUnii8) {
+                        anomalousReason.append("Band overlaps both Unii6 and Unii8, ");
                     }
                 }
 
@@ -1029,10 +1069,12 @@ void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWr
                 bool overlapUnii7 = (stopFreq > UlsFunctionsClass::unii7StartFreqMHz) && (startFreq < UlsFunctionsClass::unii7StopFreqMHz);
                 bool overlapUnii8 = (stopFreq > UlsFunctionsClass::unii8StartFreqMHz) && (startFreq < UlsFunctionsClass::unii8StopFreqMHz);
 
-                if (!(overlapUnii5 || overlapUnii7 || overlapUnii6 || (includeUnii8 && overlapUnii8))) {
+                if (!(overlapUnii5 || overlapUnii6 || overlapUnii7 || overlapUnii8)) {
                     anomalousReason.append("Out of band, ");
                 } else if (overlapUnii5 && overlapUnii7) {
                     anomalousReason.append("Band overlaps both Unii5 and Unii7, ");
+                } else if (overlapUnii6 && overlapUnii8) {
+                    anomalousReason.append("Band overlaps both Unii6 and Unii8, ");
                 }
             }
 

@@ -1449,7 +1449,7 @@ void UlsFileReader::readTransmitterCA(const std::vector<std::string> &fieldList,
 /******************************************************************************************/
 /**** computeStatisticsUS                                                              ****/
 /******************************************************************************************/
-int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool includeUnii8)
+int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool includeUnii5, bool includeUnii6, bool includeUnii7, bool includeUnii8)
 {
     int n = 0;
     int maxNumSegment;
@@ -1578,10 +1578,11 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool
             if (!invalidFlag) {
                 // skip if no overlap UNII5 and 7
                 bool overlapUnii5 = (stopFreqBand > UlsFunctionsClass::unii5StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii5StopFreqMHz);
+                bool overlapUnii6 = (stopFreqBand > UlsFunctionsClass::unii6StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii6StopFreqMHz);
                 bool overlapUnii7 = (stopFreqBand > UlsFunctionsClass::unii7StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii7StopFreqMHz);
                 bool overlapUnii8 = (stopFreqBand > UlsFunctionsClass::unii8StartFreqMHz) && (startFreqBand < UlsFunctionsClass::unii8StopFreqMHz);
 
-                if (!(overlapUnii5 || overlapUnii7 || (includeUnii8 && overlapUnii8))) {
+                if (!((includeUnii5 && overlapUnii5) || (includeUnii6 && overlapUnii6) || (includeUnii7 && overlapUnii7) || (includeUnii8 && overlapUnii8))) {
                     invalidFlag = true;
                 }
             }

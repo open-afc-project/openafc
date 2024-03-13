@@ -104,7 +104,7 @@ public:
 
     std::unordered_set<std::string> authorizationNumberList;
 
-    int computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool includeUnii8);
+    int computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool includeUnii5, bool includeUnii6, bool includeUnii7, bool includeUnii8);
     int computeStatisticsCA(FILE *fwarn);
 
     QList<RASClass> RASList;

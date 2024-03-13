@@ -28,7 +28,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
 
 # **Introduction**
 
-This document describes the setup for testing environment to the TIP's openAFC github project.
+This document describes the setup for testing environment to the openAFC github project.
 In addition, describes the execution procedure for the tests.
 Please contact support@telecominfraproject.com in case you need access to the openAFC project.
 

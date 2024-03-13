@@ -4,7 +4,7 @@
 #include <QStandardPaths>
 #include <QDir>
 #include "SearchPaths.h"
-#include "rkflogging/Logging.h"
+#include "afclogging/Logging.h"
 
 namespace{
 /// Logger for all instances of class

@@ -1,8 +1,8 @@
 #include <chrono>
 
 #include "AfcManager.h"
-#include "rkflogging/QtStream.h"
-#include "rkflogging/LoggingConfig.h"
+#include "afclogging/QtStream.h"
+#include "afclogging/LoggingConfig.h"
 
 namespace
 {

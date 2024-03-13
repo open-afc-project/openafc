@@ -55,11 +55,13 @@ GLOBALOPERATINGCLASS_134 = 95
 CHANNEL_CFI_134 = 96
 GLOBALOPERATINGCLASS_136 = 97
 CHANNEL_CFI_136 = 98
+GLOBALOPERATINGCLASS_137 = 99
+CHANNEL_CFI_137 = 100
 
-MINDESIREDPOWER = 99
-VENDOREXTS = 100
-STANDALONE_VENDOREXTS = 101
-COMBINED_CLM = 102
+MINDESIREDPOWER = 101
+VENDOREXTS = 102
+STANDALONE_VENDOREXTS = 103
+COMBINED_CLM = 104
 
 REQ_INQUIRY_HEADER = '{"availableSpectrumInquiryRequests": ['
 REQ_INQUIRY_FOOTER = '],'
@@ -266,7 +268,7 @@ class AfcGeoCoordinates:
 
     def _append_ellipse_coordinates(self):
         res = ''
-        if (len(self.positions)):
+        if self.positions:
             res += REQ_LOC_CENTER + ''.join(map(str,self.positions)) + ','
         if hasattr(self, 'orientation'):
             res += ' ' + self.orientation + ','
@@ -274,7 +276,7 @@ class AfcGeoCoordinates:
             res += ' ' + self.minoraxis + ','
         if hasattr(self, 'majoraxis'):
             res += ' ' + self.majoraxis
-        if res[-1] == ',':
+        if res and res[-1] == ',':
             res = res[:-1]
         return res + REQ_LOC_ELLIP_FOOTER
 
@@ -316,25 +318,31 @@ class AfcGeoCoordinates:
         return res
 
 
-def build_device_desc(indoor_deploy, ser_nbr, ruleset_id, cert_id):
+def build_device_desc(indoor_deploy, ser_nbr, ruleset_id, cert_id, ins_location):
     _ser_nbr = ""
     _cert_id = ""
     if isinstance(ser_nbr, str):
         _ser_nbr = str(ser_nbr)
     if isinstance(cert_id, str):
         _cert_id = str(cert_id)
-    if not indoor_deploy:
-        location = "2"
-    elif "indoor" in indoor_deploy.lower():
-        location = "3"
-    else:                                   
-        location = "2"
 
-    return '{' + REQ_CERT_LOC + '"' + location + '",' +\
-           REQ_SER_NBR + '"' + _ser_nbr + '",' +\
+    ostr = "{"
+    if ins_location:
+        if not indoor_deploy:
+            location = "2"
+        elif "indoor" in indoor_deploy.lower():
+            location = "3"
+        else:
+            location = "2"
+
+        ostr +=  REQ_CERT_LOC + '"' + location + '",'
+
+    ostr += REQ_SER_NBR + '"' + _ser_nbr + '",' +\
            REQ_CERT_ID_HEADER + REQ_RULESET + '"' + str(ruleset_id) + '",' +\
            REQ_CERT_ID + '"' + _cert_id + '"' + REQ_CERT_ID_FOOTER +\
            REQ_DEV_DESC_FOOTER
+
+    return ostr
 
 # Local Variables:
 # mode: Python
