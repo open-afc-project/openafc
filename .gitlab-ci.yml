@@ -126,7 +126,7 @@ test_job:
     - TEST_PORT=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 80 |sed 's/.*://'`
 
     # run tests
-    - bash "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} `app-lvn-wcc-70.lvn.broadcom.net ${TEST_PORT} http
+    - bash "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} $CI_HOST_HOSTNAME ${TEST_PORT} http
   after_script:
     # stop dev srvr
     - bash "${WD}/${REGRD}/stop_srvr.sh" ${WD} ${RAND}
