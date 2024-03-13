@@ -16,6 +16,9 @@ spec:
       {{- with .Values.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
+        prometheus.io/scrape: 'true'
+        prometheus.io/path: '/fbrat/metrics'
+        prometheus.io/port: {{ .Values.service.msghnd.containerPort | quote }}
       {{- end }}
       labels:
         {{- include "afc-int.selectorLabels" . | nindent 8 }}

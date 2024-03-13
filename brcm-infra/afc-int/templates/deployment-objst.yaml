@@ -43,7 +43,7 @@ spec:
               protocol: TCP
           volumeMounts:
             - mountPath: {{ .Values.deployments.global.mountPath | quote }}
-              name: cont-confs
+              name: {{ .Values.deployments.global.pv.name }}
           env:
             # Filestorage params:
             - name: AFC_OBJST_PORT
@@ -55,7 +55,7 @@ spec:
           resources:
             {{- toYaml .Values.resources.objst | nindent 12 }}
       volumes:
-        - name: cont-confs
+        - name: {{ .Values.deployments.global.pv.name }}
           persistentVolumeClaim:
             claimName: {{ .Values.deployments.global.pvc.name }}
       {{- with .Values.nodeSelector }}

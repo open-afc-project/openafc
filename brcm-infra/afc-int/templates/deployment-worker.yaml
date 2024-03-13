@@ -44,7 +44,7 @@ spec:
           #     port: rmqp
           volumeMounts:
             - mountPath: {{ .Values.deployments.global.mountPath | quote }}
-              name: cont-confs
+              name: {{ .Values.deployments.global.pv.name }}
           env:
             # Filestorage params:
             - name: AFC_OBJST_HOST
@@ -90,7 +90,7 @@ spec:
           resources:
             {{- toYaml .Values.resources.worker | nindent 12 }}
       volumes:
-        - name: cont-confs
+        - name: {{ .Values.deployments.global.pv.name }}
           persistentVolumeClaim:
             claimName: {{ .Values.deployments.global.pvc.name }}
       imagePullSecrets:

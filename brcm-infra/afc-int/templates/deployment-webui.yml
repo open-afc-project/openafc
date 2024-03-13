@@ -48,7 +48,7 @@ spec:
           #     port: http
           volumeMounts:
             - mountPath: {{ .Values.deployments.global.mountPath | quote }}
-              name: cont-confs
+              name: {{ .Values.deployments.global.pv.name }}
             - name: {{ .Chart.Name }}-webui-rat-api-secret
               mountPath: /etc/xdg/fbrat/ratapi.conf
               subPath: webui-rat-api
@@ -101,7 +101,7 @@ spec:
           resources:
             {{- toYaml .Values.resources.webui | nindent 12 }}
       volumes:
-        - name: cont-confs
+        - name: {{ .Values.deployments.global.pv.name }}
           persistentVolumeClaim:
             claimName: {{ .Values.deployments.global.pvc.name }}
         - name: {{ .Chart.Name }}-webui-rat-api-secret
