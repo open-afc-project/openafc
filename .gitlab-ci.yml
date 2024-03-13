@@ -80,9 +80,10 @@ build_job:
     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
       when: always
   variables:
-    PUSH_DI: 0
+    PUSH_DI: 1
+  before_script:
+    - if [ "$PUSH_DI" = "1" ]; then echo $ARTIFACTORY_PASSWORD | docker login -u $ARTIFACTORY_USER --password-stdin $PRIV_REPO; fi
   script:
-
     ######## git clone sources ##############
     # main repo already cloned and copied to:
     # /opt/afc/work/gitlab-runner/test/wccafc-dev_$RAND
@@ -100,6 +101,8 @@ build_job:
     - cp -r "${WD}/${REGRD_ORIG}/." "${WD}/${REGRD}/"
     # build regr test images
     - bash "${WD}/${REGRD}/build_imgs.sh" ${WD} ${RAND} ${PUSH_DI}
+  after_script:
+    - if [ "$PUSH_DI" = "1" ]; then docker logout $PRIV_REPO; fi
   artifacts:
     reports:
       dotenv: $CI_PROJECT_DIR/vars.env
