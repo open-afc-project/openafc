@@ -66,8 +66,8 @@ getsrc_job:
     - echo "WD=${WD}" >> $CI_PROJECT_DIR/vars.env
 
     - echo "rsync sources"
-    - CURRENT_HOST=`hostname -A|sed 's/ *//g'`
-    - echo "CURRENT_HOST=${CURRENT_HOST}" >> $CI_PROJECT_DIR/vars.env
+    # - CURRENT_HOST=`hostname -A|sed 's/ *//g'`
+    # - echo "CURRENT_HOST=${CURRENT_HOST}" >> $CI_PROJECT_DIR/vars.env
     - echo "cmd rsync -raz --delete ./ ${WD}"
     - whoami
     - rsync -raz --delete ./ ${WD}/
