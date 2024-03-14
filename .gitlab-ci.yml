@@ -36,10 +36,30 @@
 # end vp890322 ----------------------------------------------------------------------------------------------------------------------------------------------------
 
 stages:          # List of stages for jobs, and their order of execution
-  # - upstream_updt
+  - merge_upstream
   - getsrc
   - build
   - test
+
+merge_upstream_changes:
+  stage: merge_upstream
+  rules:
+    - if: '($CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_REF_NAME == "main")'
+      when: always
+  script:
+    # - git config --global user.email "your_email@example.com"
+    # - git config --global user.name "Your Name"
+    - git remote add upstream https://github.com/Telecominfraproject/open-afc.git || true  # Prevents errors if the remote already exists
+    - git fetch upstream
+    - UPSTREAM_CHANGES=$(git log HEAD..upstream/main --oneline)  # Adjust 'upstream/master' as necessary
+    - |
+      if [ -n "$UPSTREAM_CHANGES" ]; then
+        git merge upstream/main  # Adjust 'upstream/master' as necessary
+        git push origin main  # Adjust the branch names as necessary
+      else
+        echo "No changes found in the upstream repository."
+      fi
+
 
 # upstream_updt_job:
 #   stage: upstream_updt
