@@ -49,7 +49,7 @@ merge_upstream_changes:
   script:
     # - git config --global user.email "your_email@example.com"
     # - git config --global user.name "Your Name"
-    - git remote add upstream https://github.com/Telecominfraproject/open-afc.git || true  # Prevents errors if the remote already exists
+    - git remote add upstream git@github.com:Telecominfraproject/open-afc.git
     - git fetch upstream
     - UPSTREAM_CHANGES=$(git log HEAD..upstream/main --oneline)  # Adjust 'upstream/master' as necessary
     - |
