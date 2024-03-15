@@ -47,8 +47,8 @@ merge_upstream_changes:
     - if: '($CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_REF_NAME == "main")'
       when: always
   script:
-    # - git config --global user.email "your_email@example.com"
-    # - git config --global user.name "Your Name"
+    - git config --global user.email "gitlab-runner@broadcom.com"
+    - git config --global user.name "GitLab Runner"
     - git remote add upstream git@github.com:Telecominfraproject/open-afc.git  || true   # Prevents errors if the remote already exists
     - git fetch upstream
     - UPSTREAM_CHANGES=$(git log HEAD..upstream/main --oneline)  # Adjust 'upstream/master' as necessary
