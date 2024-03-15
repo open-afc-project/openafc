@@ -1,4 +1,4 @@
-This work is licensed under the OpenAFC Project License, a copy of which is included with this software program.
+This work is licensed under the OpenAFC Project License, a copy of which is included in the LICENSE.txt file with this software program.
 
 <br />
 <br />
@@ -69,8 +69,102 @@ Note that this sample does not provide working SSL certificates for authenticati
 <br /><br />
 
 # **Contributing**
+All contributions are welcome to this project.
 
-All contributions are paused while we evaluate a new process for maintaining changes.
+## How to contribute
+
+* **File an issue** - if you found a bug, want to request an enhancement, or want to implement something (bug fix or feature).
+* **Send a pull request** - if you want to contribute code. Please be sure to file an issue first.
+
+## Pull request best practices
+
+We want to accept your pull requests. Please follow these steps:
+
+### Step 1: File an issue
+
+Before writing any code, please file an Issue ticket using this Github's repository's 'Issues' tab, stating the problem you want to solve or the feature you want to implement along with a high-level description of the resolution. This allows us to give you feedback before you spend any time writing code. There may be a known limitation that can't be addressed, or a bug that has already been fixed in a different way. The issue ticket allows us to communicate and figure out if it's worth your time to write a bunch of code for the project.
+
+### Step 2: Clone OpenAFC GitHub repository
+
+OpenAFC source repository can be cloned using the below command.
+```
+git clone git@github.com:Telecominfraproject/open-afc.git
+```
+This will create your own copy of our repository.
+[about remote repositories](https://docs.github.com/en/get-started/getting-started-with-git/about-remote-repositories)
+
+### Step 3: Create a temporary branch
+
+Create a temporary branch for making your changes.
+Keep a separate branch for each issue/feature you want to address .
+```
+git checkout -b <Issue ticket number>-branch_name
+```
+
+Highly desirable to use branch name from Issue ticket title, or use meaningful branch name reflecting the actual changes
+```
+eg. git checkout -b 146-update-readme-md-to-reflect-issueticket-and-branch-creation-procedure
+```
+### Step 4: Make your changes
+For changes to the C++ codes, once you're done with making your changes, run the clang-format using the instructions under tools/editing/.
+For changes to codes in other languages, follow the existing formatting in the file. 
+
+### Step 5: Commit your changes
+As you develop code, commit your changes into your local feature branch.
+Please make sure to include the issue number you're addressing in your commit message.
+This helps us out by allowing us to track which issue/feature your commit relates to.
+Below command will commit your changes to the local branch.
+Note to use Issue ticket number at the beginning of commit message.
+```
+git commit -a -m "<Issue ticket number>  desctiption of the change  ..."
+```
+### Step 6: Rebase
+
+Before sending a pull request, rebase against upstream, such as:
+
+```
+git fetch origin
+git rebase origin
+```
+This will add your changes on top of what's already in upstream, minimizing merge issues.
+
+### Step 7: Run the tests
+
+Run sufficient targetted tests on the change made to validate that the change works as expected. Please document and submit the test requests/results in the Issue ticket.
+
+This includes running the regression test framework available under the 'tests > regression' directory to verify your changes have not broken other portions of the system.
+Make sure that all regression tests are passing before submitting a pull request.
+
+### Step 8: Push your branch to GitHub
+
+Push code to your remote feature branch.
+Below command will push your local branch along with the changes to OpenAFC GitHub.
+```
+git push -u origin <Issue ticket number>-branch_name
+```
+ > NOTE: The push can include several commits (not only one), but these commits should be related to the same logical change/issue fix/new feature originally described in the [Step 1](#step-1-file-an-issue).
+
+### Step 9: Send the pull request
+
+Send the pull request from your feature branch to us.
+
+#### Change Description
+
+
+When submitting a pull request, please use the following template to submit the change description, risks and validations done after making the changes
+(not a book, but an info required to understand the change/scenario/risks/test coverage)
+
+- Issue ticket number (from [Step 1](#step-1-file-an-issue)). A brief description of issue(s) being fixed and likelihood/frequency/severity of the issue, or description of new feature if it is a new feature.
+- Reproduction procedure: Details of how the issue could be reproduced / procedure to reproduce the issue.
+Description of Change:  A detailed description of what the change is and assumptions / decisions made
+- Risks: Low, Medium or High and reasoning for the same.
+- Fix validation procedure:
+  - Description of validations done after the fix.
+  - Required regression tests: Describe what additional tests should be done to ensure no regressions in other functionalities.
+  - Sanity test results as described in the [Step 7](#step-7-run-the-tests)
+
+> NOTE: Keep in mind that we like to see one issue addressed per pull request, as this helps keep our git history clean and we can more easily track down issues.
+
 
 <br /><br />
 
