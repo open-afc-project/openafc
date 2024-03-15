@@ -8,10 +8,10 @@
 FROM alpine:3.18
 
 # Default Rcache service port
-ENV RCACHE_PORT=8000
+ENV RCACHE_CLIENT_PORT=8000
 
 # Default Rcache service root URL
-ENV RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+ENV RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
 
 # Default Rcache database connection string
 ENV RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache

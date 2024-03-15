@@ -1044,7 +1044,8 @@ def main(argv: List[str]) -> None:
         rcache_settings = \
             RcacheClientSettings(
                 enabled=settings.rcache_enabled and bool(settings.rcache_url),
-                service_url=settings.rcache_url)
+                service_url=settings.rcache_url, postgres_dsn=None,
+                rmq_dsn=None)
         rcache_settings.validate_for(rcache=True)
         rcache: Optional[RcacheClient] = \
             RcacheClient(rcache_settings) if rcache_settings.enabled else None

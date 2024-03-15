@@ -1,4 +1,4 @@
-OpenAFC Project License
+Project License Copyright 2019-2024, Meta; 2021-2024, Broadcom and Cisco; 2021-2024, TIP and its Contributors; all rights reserved.
 
 Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met:
 

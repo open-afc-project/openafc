@@ -50,7 +50,7 @@ spec:
             # R-Cache params
             - name: RCACHE_ENABLED
               value: {{ .Values.service.rcache.is_enabled | quote }}
-            - name: RCACHE_PORT
+            - name: RCACHE_CLIENT_PORT
               value: {{ .Values.service.rcache.port | quote }}
             - name: RCACHE_POSTGRES_DSN
               valueFrom:
