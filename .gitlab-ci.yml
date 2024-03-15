@@ -41,6 +41,8 @@ stages:          # List of stages for jobs, and their order of execution
   - build
   - test
 
+# This jobs checks for changes in upstream and pushes new changes if found.
+# It's running on schedule every 30 minutes.
 merge_upstream_changes:
   stage: merge_upstream
   rules:
@@ -58,16 +60,6 @@ merge_upstream_changes:
       else
         echo "No changes found in the upstream repository."
       fi
-
-
-# upstream_updt_job:
-#   stage: upstream_updt
-#   environment: production
-#   before_script:
-#   script:
-#   rules:
-#     - if: '($CI_PIPELINE_SOURCE == "schedule" && $CI_COMMIT_REF_NAME == "main")'
-#       when: always
 
 # This job runs to create dir with unique name
 # that includes sources that will be validated
