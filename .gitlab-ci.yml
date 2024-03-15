@@ -50,11 +50,11 @@ merge_upstream_changes:
     - git config --global user.email "gitlab-runner@broadcom.com"
     - git remote add upstream git@github.com:Telecominfraproject/open-afc.git  || true   # Prevents errors if the remote already exists
     - git fetch upstream
-    - UPSTREAM_CHANGES=$(git log HEAD..upstream/main --oneline)  # Adjust 'upstream/master' as necessary
+    - UPSTREAM_CHANGES=$(git log HEAD..upstream/main --oneline)
     - |
       if [ -n "$UPSTREAM_CHANGES" ]; then
-        git merge upstream/main  # Adjust 'upstream/master' as necessary
-        git push origin main  # Adjust the branch names as necessary
+        git merge upstream/main
+        git push origin main
       else
         echo "No changes found in the upstream repository."
       fi
