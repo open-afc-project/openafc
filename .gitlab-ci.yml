@@ -110,8 +110,8 @@ build_job:
     - cp -r "${WD}/${REGRD_ORIG}/." "${WD}/${REGRD}/"
     # build regr test images
     - bash "${WD}/${REGRD}/build_imgs.sh" ${WD} ${RAND} ${PUSH_DI}
-  after_script:
-    - if [ "$PUSH_DI" = "1" ]; then docker logout $PRIV_REPO; fi
+  # after_script:
+  #   - if [ "$PUSH_DI" = "1" ]; then docker logout $PRIV_REPO; fi
   artifacts:
     reports:
       dotenv: $CI_PROJECT_DIR/vars.env
