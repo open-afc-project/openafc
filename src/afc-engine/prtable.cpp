@@ -38,6 +38,12 @@ PRTABLEClass::PRTABLEClass(std::string tableFileVal) : tableFile(tableFileVal)
 /******************************************************************************************/
 PRTABLEClass::~PRTABLEClass()
 {
+	free(QValList);
+	free(oneOverKsValList);
+	for(int qIdx=0; qIdx<numQ; ++qIdx) {
+		free(prTable[qIdx]);
+	}
+	free(prTable);
 };
 /******************************************************************************************/
 

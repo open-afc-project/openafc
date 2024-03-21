@@ -17,8 +17,8 @@
 
 extern double qerfi(double q);
 
-QJsonArray jsonChannelData(const std::vector<ChannelStruct> &channelList);
-QJsonObject jsonSpectrumData(const std::vector<ChannelStruct> &channelList, const QJsonObject &deviceDesc, const double &startFreq);
+// QJsonArray jsonChannelData(const std::vector<ChannelStruct> &channelList);
+// QJsonObject jsonSpectrumData(const std::vector<ChannelStruct> &channelList, const QJsonObject &deviceDesc, const double &startFreq);
 
 std::string padStringFront(const std::string& s, const char& padder, const int& amount)
 {
@@ -373,6 +373,38 @@ public:
 	{}
 };
 
+class ExcThrParamClass {
+public:
+	double rlanDiscriminationGainDB;
+	double bodyLossDB;
+	std::string buildingPenetrationModelStr;
+	double buildingPenetrationCDF;
+	double buildingPenetrationDB;
+	double angleOffBoresightDeg;
+	std::string pathLossModelStr;
+	double pathLossCDF;
+	std::string pathClutterTxModelStr;
+	double pathClutterTxCDF;
+	double pathClutterTxDB;
+	std::string txClutterStr;
+	std::string pathClutterRxModelStr;
+	double pathClutterRxCDF;
+	double pathClutterRxDB;
+	std::string rxClutterStr;
+	double rxGainDB;
+	double discriminationGain;
+	std::string rxAntennaSubModelStr;
+	double nearFieldOffsetDB;
+	double spectralOverlapLossDB;
+	double polarizationLossDB;
+	double rxAntennaFeederLossDB;
+	double reflectorD0;
+	double reflectorD1;
+	double nearField_xdb;
+	double nearField_u;
+	double nearField_eff;
+};
+
 /** GZIP CSV for excThr */
 class ExThrGzipCsv : public GzipCsv {
 public:
@@ -600,7 +632,6 @@ AfcManager::AfcManager()
 	_maxEIRP_dBm = quietNaN;
 	_minPSD_dBmPerMHz = quietNaN;
 	_reportUnavailPSDdBmPerMHz = quietNaN;
-	_inquiredFrequencyResolutionMHz = -1;
 	_inquiredFrequencyMaxPSD_dBmPerMHz = quietNaN;
 	_rlanAzimuthPointing = quietNaN;
 	_rlanElevationPointing = quietNaN;
@@ -768,6 +799,18 @@ AfcManager::~AfcManager()
 		delete AfcManager::_dataIf;
 	}
 	delete _ulsList;
+
+	if (_ituData) {
+		delete _ituData;
+	}
+
+	if (_nfa) {
+		delete _nfa;
+	}
+
+	if (_prTable) {
+		delete _prTable;
+	}
 }
 /******************************************************************************************/
 
@@ -849,18 +892,36 @@ void AfcManager::initializeDatabases()
 		return;
 	}
 
+	/**************************************************************************************/
+	/* Compute ulsMinFreq, and ulsMaxFreq                                                 */
+	/**************************************************************************************/
 	int chanIdx;
-	double maxBandwidth = 0.0;
+	int ulsMinFreqMHz = 0;
+	int ulsMaxFreqMHz = 0;
 	for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 		ChannelStruct *channel = &(_channelList[chanIdx]);
-		double chanStartFreq = channel->startFreqMHz * 1.0e6;
-		double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-		double bandwidth = chanStopFreq - chanStartFreq;
-		if (bandwidth > maxBandwidth) { maxBandwidth = bandwidth; }
+		int minFreqMHz;
+		int maxFreqMHz;
+		int startFreqMHz = channel->freqMHzList.front();
+		int stopFreqMHz = channel->freqMHzList.back();
+		if ((channel->type == ChannelType::INQUIRED_CHANNEL)&&(_aciFlag)) {
+			minFreqMHz = 2*startFreqMHz - stopFreqMHz;
+			maxFreqMHz = 2*stopFreqMHz - startFreqMHz;
+		} else {
+			minFreqMHz = startFreqMHz;
+			maxFreqMHz = stopFreqMHz;
+		}
+		if ((ulsMinFreqMHz == 0) || (minFreqMHz < ulsMinFreqMHz)) {
+			ulsMinFreqMHz = minFreqMHz;
+		}
+		if ((ulsMaxFreqMHz == 0) || (maxFreqMHz > ulsMaxFreqMHz)) {
+			ulsMaxFreqMHz = maxFreqMHz;
+		}
 	}
 
-	double ulsMinFreq = _wlanMinFreq - (_aciFlag ? maxBandwidth : 0.0);
-	double ulsMaxFreq = _wlanMaxFreq + (_aciFlag ? maxBandwidth : 0.0);
+	double ulsMinFreq = ulsMinFreqMHz*1.0e6;
+	double ulsMaxFreq = ulsMaxFreqMHz*1.0e6;
+	/**************************************************************************************/
 
 	/**************************************************************************************/
 	/* Set Path Loss Model Parameters                                                     */
@@ -1106,8 +1167,6 @@ void AfcManager::initializeDatabases()
 	/**************************************************************************************/
 	/* Read ULS data                                                                      */
 	/**************************************************************************************/
-	//_ulsDataFile = "/home/ssmucny/ULS_23Jan2019_perlink_fixedwithbas.sqlite3";
-
 	if (_analysisType == "HeatmapAnalysis" || _analysisType == "AP-AFC" || _analysisType == "ScanAnalysis") {
 		readULSData(_ulsDatabaseList, _popGrid, 0, ulsMinFreq, ulsMaxFreq, _removeMobile, CConst::FixedSimulation, minLat, maxLat, minLon, maxLon);
 		readDeniedRegionData(_deniedRegionFile);
@@ -1123,6 +1182,8 @@ void AfcManager::initializeDatabases()
 		throw std::runtime_error(QString("Invalid analysis type: %1").arg(QString::fromStdString(_analysisType)).toStdString());
 	}
 	/**************************************************************************************/
+
+    splitFrequencyRanges();
 
 	/**************************************************************************************/
 	/* Convert confidences it gaussian thresholds                                         */
@@ -2717,13 +2778,6 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 		_reportUnavailPSDdBmPerMHz = quietNaN;
 	}
 	
-
-	if (jsonObj.contains("inquiredFrequencyResolutionMHz") && !jsonObj["inquiredFrequencyResolutionMHz"].isUndefined()) {
-		_inquiredFrequencyResolutionMHz = jsonObj["inquiredFrequencyResolutionMHz"].toInt();
-	} else {
-		_inquiredFrequencyResolutionMHz = 20;  // Default 20 MHz
-	}
-
 	if (jsonObj.contains("inquiredFrequencyMaxPSD_dBmPerMHz") && !jsonObj["inquiredFrequencyMaxPSD_dBmPerMHz"].isUndefined()) {
 		_inquiredFrequencyMaxPSD_dBmPerMHz = jsonObj["inquiredFrequencyMaxPSD_dBmPerMHz"].toInt();
 	} else {
@@ -3394,13 +3448,14 @@ QJsonDocument AfcManager::generateRatAfcJson()
 				if (    (chan.type == ChannelType::INQUIRED_CHANNEL)
 						&& (chan.operatingClass == operatingClass)
 				) {
-					if (chan.availability == BLACK) {
+					ChannelColor chanColor = std::get<2>(chan.segList[0]);
+					if (chanColor == BLACK) {
 						blackIndexArray.append(chan.index);
-					} else if (chan.availability == RED) {
+					} else if (chanColor == RED) {
 						redIndexArray.append(chan.index);
 					} else {
 						indexArray.append(chan.index);
-						double eirpVal = chan.eirpLimit_dBm;
+						double eirpVal = std::min(std::get<0>(chan.segList[0]), std::get<1>(chan.segList[0]));
 						if (_roundPSDEIRPFlag) {
 							// EIRP value rounded down to nearest multiple of 0.1 dB
 							eirpVal = std::floor(eirpVal*10)/10.0;
@@ -3809,7 +3864,7 @@ void AfcManager::exportGUIjson(const QString &exportJsonPath, const std::string&
 	if (_analysisType == "APAnalysis")
 	{
 		// if the request type is PAWS then we only return the spectrum data
-		outputDocument = QJsonDocument(jsonSpectrumData(_channelList, _deviceDesc, _wlanMinFreq));
+		// outputDocument = QJsonDocument(jsonSpectrumData(_channelList, _deviceDesc, _wlanMinFreq));
 
 		// Write PAWS outputs to JSON file
 		// QFile outputAnalysisFile(exportJsonPath);
@@ -4113,6 +4168,7 @@ void AfcManager::generateMapDataGeoJson(const std::string& tempDir)
 	LOGGER_DEBUG(logger) << "Output file written to " << mapDataFile->fileName().toStdString();
 }
 
+#if 0
 // Convert channel data into a valid JSON Object
 // represents the available channels for an analysis
 // returns a QJson array with channel data contained
@@ -4197,7 +4253,9 @@ QJsonArray jsonChannelData(const std::vector<ChannelStruct> &channelList)
 	}
 	return array;
 }
+#endif
 
+#if 0
 // Converts spectrum data into a valid PAWS response
 QJsonObject jsonSpectrumData(const std::vector<ChannelStruct> &channelList, const QJsonObject &deviceDesc, const double &startFreq)
 {
@@ -4290,6 +4348,7 @@ QJsonObject jsonSpectrumData(const std::vector<ChannelStruct> &channelList, cons
 
 	return result;
 }
+#endif
 
 /******************************************************************************************/
 /**** FUNCTION: AfcManager::getAngleFromDMS                                            ****/
@@ -6412,7 +6471,7 @@ double AfcManager::computeBuildingPenetration(CConst::BuildingTypeEnum buildingT
 /******************************************************************************************/
 /**** AfcManager::computePathLoss                                                      ****/
 /******************************************************************************************/
-void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx,
+void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, bool itmFSPLFlag, CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx,
 		CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
 		double distKm, double fsplDistKm, double win2DistKm, double frequency,
 		double txLongitudeDeg, double txLatitudeDeg, double txHeightM, double elevationAngleTxDeg,
@@ -6512,8 +6571,11 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 					throw std::runtime_error(ErrStream() << "ERROR: Invalid close in path loss model = " << _closeInPathLossModel);
 				}
 			}
-			else
-			{
+			else if (itmFSPLFlag) {
+				pathLoss = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
+				pathLossModelStr = "FSPL";
+				pathLossCDF = 0.5;
+			} else {
 				// Terrain propagation: Terrain + ITM
 				double frequencyMHz = 1.0e-6 * frequency;
 				// std::cerr << "PATHLOSS," << txLatitudeDeg << "," << txLongitudeDeg << "," << rxLatitudeDeg << "," << rxLongitudeDeg << std::endl;
@@ -6542,26 +6604,32 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 		}
 		else if ((propEnv == CConst::ruralPropEnv) || (propEnv == CConst::barrenPropEnv))
 		{
-			// Terrain propagation: Terrain + ITM
-			double frequencyMHz = 1.0e-6 * frequency;
-			int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
-			int radioClimate    = _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
-			int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
-			if (radioClimateTmp < radioClimate) {
-				radioClimate = radioClimateTmp;
-			}
-			double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
-			double u = _confidenceITM;
-			pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
-					true,
-					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
-					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
-			pathLossModelStr = "ITM_BLDG";
-			pathLossCDF = _confidenceITM;
+			if (itmFSPLFlag) {
+				pathLoss = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
+				pathLossModelStr = "FSPL";
+				pathLossCDF = 0.5;
+			} else {
+				// Terrain propagation: Terrain + ITM
+				double frequencyMHz = 1.0e-6 * frequency;
+				int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
+				int radioClimate    = _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
+				int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
+				if (radioClimateTmp < radioClimate) {
+					radioClimate = radioClimateTmp;
+				}
+				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
+				double u = _confidenceITM;
+				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
+						true,
+						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
+				pathLossModelStr = "ITM_BLDG";
+				pathLossCDF = _confidenceITM;
 
-			pathLossModelStr = "ITM_BLDG";
-			pathLossCDF = _confidenceITM;
+				pathLossModelStr = "ITM_BLDG";
+				pathLossCDF = _confidenceITM;
+			}
 		}
 		else
 		{
@@ -6636,29 +6704,35 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 			}
 			else
 			{
-				// Terrain propagation: Terrain + ITM
-				double frequencyMHz = 1.0e-6 * frequency;
-				// std::cerr << "PATHLOSS," << txLatitudeDeg << "," << txLongitudeDeg << "," << rxLatitudeDeg << "," << rxLongitudeDeg << std::endl;
-				int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
-				int radioClimate    = _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
-				int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
-				if (radioClimateTmp < radioClimate) {
-					radioClimate = radioClimateTmp;
-				}
-				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
+				if (itmFSPLFlag) {
+					pathLoss = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
+					pathLossModelStr = "FSPL";
+					pathLossCDF = 0.5;
+				} else {
+					// Terrain propagation: Terrain + ITM
+					double frequencyMHz = 1.0e-6 * frequency;
+					// std::cerr << "PATHLOSS," << txLatitudeDeg << "," << txLongitudeDeg << "," << rxLatitudeDeg << "," << rxLongitudeDeg << std::endl;
+					int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
+					int radioClimate    = _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
+					int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
+					if (radioClimateTmp < radioClimate) {
+						radioClimate = radioClimateTmp;
+					}
+					double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
 
-				/******************************************************************************************/
-				/**** NOTE: ITM based on signal loss, so higher confidence corresponds to higher loss. ****/
-				/******************************************************************************************/
-				double u = _confidenceITM;
+					/******************************************************************************************/
+					/**** NOTE: ITM based on signal loss, so higher confidence corresponds to higher loss. ****/
+					/******************************************************************************************/
+					double u = _confidenceITM;
 
-				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
+					pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
 						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
-				pathLossModelStr = "ITM";
-				pathLossCDF = _confidenceITM;
+					pathLossModelStr = "ITM";
+					pathLossCDF = _confidenceITM;
+				}
 
 				// ITU-R P.[CLUTTER] sec 3.2
 				double Ll = 23.5 + 9.6 * log(frequencyGHz) / log(10.0);
@@ -6685,23 +6759,29 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 		}
 		else if ((propEnv == CConst::ruralPropEnv) || (propEnv == CConst::barrenPropEnv))
 		{
-			// Terrain propagation: Terrain + ITM
-			double frequencyMHz = 1.0e-6 * frequency;
-			int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
-			int radioClimate    = _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
-			int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
-			if (radioClimateTmp < radioClimate) {
-				radioClimate = radioClimateTmp;
+			if (itmFSPLFlag) {
+				pathLoss = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
+				pathLossModelStr = "FSPL";
+				pathLossCDF = 0.5;
+			} else {
+				// Terrain propagation: Terrain + ITM
+				double frequencyMHz = 1.0e-6 * frequency;
+				int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
+				int radioClimate    = _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
+				int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
+				if (radioClimateTmp < radioClimate) {
+					radioClimate = radioClimateTmp;
+				}
+				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
+				double u = _confidenceITM;
+				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
+						false,
+						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
+						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
+						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
+				pathLossModelStr = "ITM";
+				pathLossCDF = _confidenceITM;
 			}
-			double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
-			double u = _confidenceITM;
-			pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
-					false,
-					QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
-					QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
-					distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
-			pathLossModelStr = "ITM";
-			pathLossCDF = _confidenceITM;
 
 			// ITU-R p.452 Clutter loss function
 			pathClutterTxDB = AfcManager::computeClutter452HtEl(txHeightM, distKm, elevationAngleTxDeg);
@@ -6820,23 +6900,29 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 			}
 
 			if ((propEnv == CConst::urbanPropEnv) || (propEnv == CConst::suburbanPropEnv)) {
-				// Terrain propagation: SRTM + ITM
-				double frequencyMHz = 1.0e-6*frequency;
-				int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
-				int radioClimate    = _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
-				int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
-				if (radioClimateTmp < radioClimate) {
-					radioClimate = radioClimateTmp;
-				}
-				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
-				double u = _confidenceITM;
-				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
+				if (itmFSPLFlag) {
+					pathLoss = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
+					pathLossModelStr = "FSPL";
+					pathLossCDF = 0.5;
+				} else {
+					// Terrain propagation: SRTM + ITM
+					double frequencyMHz = 1.0e-6*frequency;
+					int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
+					int radioClimate    = _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
+					int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
+					if (radioClimateTmp < radioClimate) {
+						radioClimate = radioClimateTmp;
+					}
+					double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
+					double u = _confidenceITM;
+					pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
 						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
-				pathLossModelStr = "ITM";
-				pathLossCDF = _confidenceITM;
+					pathLossModelStr = "ITM";
+					pathLossCDF = _confidenceITM;
+				}
 
 				if (rlanHasClutter) {
 					// ITU-R P.[CLUTTER] sec 3.2
@@ -6858,23 +6944,29 @@ void AfcManager::computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst
 				}
 
 			} else if ( (propEnv == CConst::ruralPropEnv) || (propEnv == CConst::barrenPropEnv) ) {
-				// Terrain propagation: SRTM + ITM
-				double frequencyMHz = 1.0e-6*frequency;
-				double u = _confidenceITM;
-				int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
-				int radioClimate	= _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
-				int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
-				if (radioClimateTmp < radioClimate) {
-					radioClimate = radioClimateTmp;
-				}
-				double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
-				pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
+				if (itmFSPLFlag) {
+					pathLoss = 20.0 * log((4 * M_PI * frequency * fsplDistKm * 1000) / CConst::c) / log(10.0);
+					pathLossModelStr = "FSPL";
+					pathLossCDF = 0.5;
+				} else {
+					// Terrain propagation: SRTM + ITM
+					double frequencyMHz = 1.0e-6*frequency;
+					double u = _confidenceITM;
+					int numPts = std::min(((int)floor(distKm*1000 / _itmMinSpacing)) + 1, _itmMaxNumPts);
+					int radioClimate	= _ituData->getRadioClimateValue(txLatitudeDeg, txLongitudeDeg);
+					int radioClimateTmp = _ituData->getRadioClimateValue(rxLatitudeDeg, rxLongitudeDeg);
+					if (radioClimateTmp < radioClimate) {
+						radioClimate = radioClimateTmp;
+					}
+					double surfaceRefractivity = _ituData->getSurfaceRefractivityValue((txLatitudeDeg+rxLatitudeDeg)/2, (txLongitudeDeg+rxLongitudeDeg)/2);
+					pathLoss = UlsMeasurementAnalysis::runPointToPoint(_terrainDataModel,
 						false,
 						QPointF(txLatitudeDeg, txLongitudeDeg), txHeightM,
 						QPointF(rxLatitudeDeg, rxLongitudeDeg), rxHeightM,
 						distKm, _itmEpsDielect, _itmSgmConductivity, surfaceRefractivity, frequencyMHz, radioClimate, _itmPolarization, u, _reliabilityITM, numPts, NULL, ITMProfilePtr);
-				pathLossModelStr = "ITM";
-				pathLossCDF = _confidenceITM;
+					pathLossModelStr = "ITM";
+					pathLossCDF = _confidenceITM;
+				}
 
 				if ( (rlanHasClutter) && (nlcdLandCatTx == CConst::noClutterNLCDLandCat) ) {
 					rlanHasClutter = false;
@@ -7445,12 +7537,18 @@ void AfcManager::compute()
 	}
 
 	// initialize all channels to max EIRP before computing
-	for (auto& channel : _channelList)
-		if (channel.type == INQUIRED_FREQUENCY) {
-			channel.eirpLimit_dBm = _inquiredFrequencyMaxPSD_dBmPerMHz + 10.0*log10((double) channel.bandwidth());
-		} else {
-			channel.eirpLimit_dBm = _maxEIRP_dBm;
+	for (auto& channel : _channelList) {
+		for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+            double segEIRP;
+			if (channel.type == INQUIRED_FREQUENCY) {
+				segEIRP = _inquiredFrequencyMaxPSD_dBmPerMHz + 10.0*log10((double) channel.bandwidth(freqSegIdx));
+			} else {
+				segEIRP = _maxEIRP_dBm;
+			}
+			std::get<0>(channel.segList[freqSegIdx]) = segEIRP;
+			std::get<1>(channel.segList[freqSegIdx]) = segEIRP;
 		}
+	}
 
 	if (_analysisType == "AP-AFC") {
 		runPointAnalysis();
@@ -7578,7 +7676,10 @@ void AfcManager::runPointAnalysis()
 	/**************************************************************************************/
 	/* Create excThrFile, useful for debugging                                            */
 	/**************************************************************************************/
-	ExThrGzipCsv excthrGc(_excThrFile);
+	ExThrGzipCsv *excthrGc = (ExThrGzipCsv *) NULL;
+    if (!_excThrFile.empty()) {
+		excthrGc = new ExThrGzipCsv(_excThrFile);
+	}
 
 	EirpGzipCsv eirpGc(_eirpGcFile);
 	/**************************************************************************************/
@@ -8147,13 +8248,17 @@ void AfcManager::runPointAnalysis()
 					int chanIdx;
 					for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 						ChannelStruct *channel = &(_channelList[chanIdx]);
-						if (channel->availability != BLACK) {
-							double chanStartFreq = channel->startFreqMHz * 1.0e6;
-							double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, dr->getStartFreq(), dr->getStopFreq(), false, CConst::psdSpectralAlgorithm);
-							if (hasOverlap) {
-								channel->availability = BLACK;
-								channel->eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+						for(int freqSegIdx=0; freqSegIdx<channel->segList.size(); ++freqSegIdx) {
+							if (std::get<2>(channel->segList[freqSegIdx]) != BLACK) {
+								double chanStartFreq = channel->freqMHzList[freqSegIdx]*1.0e6;
+								double chanStopFreq = channel->freqMHzList[freqSegIdx+1]* 1.0e6;
+								bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, dr->getStartFreq(), dr->getStopFreq(), false, CConst::psdSpectralAlgorithm);
+								if (hasOverlap) {
+									channel->segList[freqSegIdx] = std::make_tuple(
+										-std::numeric_limits<double>::infinity(),
+										-std::numeric_limits<double>::infinity(),
+										 BLACK);
+								}
 							}
 						}
 					}
@@ -8367,22 +8472,31 @@ void AfcManager::runPointAnalysis()
 						int chanIdx;
 						for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 							ChannelStruct *channel = &(_channelList[chanIdx]);
-							double chanStartFreq = channel->startFreqMHz * 1.0e6;
-							double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), _aciFlag, CConst::psdSpectralAlgorithm);
-							if (hasOverlap > 0.0) {
-								double eirpLimit_dBm;
-								if (std::isnan(_reportUnavailPSDdBmPerMHz)) {
-									eirpLimit_dBm = -std::numeric_limits<double>::infinity();
-									channel->availability = BLACK;
-								} else {
-									double bwMHz = (double) channel->bandwidth();
-									eirpLimit_dBm = _reportUnavailPSDdBmPerMHz + 10*log10(bwMHz);
-								}
-								channel->eirpLimit_dBm = eirpLimit_dBm;
+							ChannelType channelType = channel->type;
+							bool useACI = (channelType == INQUIRED_FREQUENCY ? false : _aciFlag);
+							for(int freqSegIdx=0; freqSegIdx<channel->segList.size(); ++freqSegIdx) {
+								ChannelColor chanColor = std::get<2>(channel->segList[freqSegIdx]);
+								if ( (chanColor != BLACK) ) {
+									double chanStartFreq = channel->freqMHzList[freqSegIdx] * 1.0e6;
+									double chanStopFreq = channel->freqMHzList[freqSegIdx+1] * 1.0e6;
+									bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), useACI, CConst::psdSpectralAlgorithm);
 
-								if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
-									eirpLimitList[ulsIdx] = eirpLimit_dBm;
+									if (hasOverlap) {
+										double eirpLimit_dBm;
+										if (std::isnan(_reportUnavailPSDdBmPerMHz)) {
+											eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+											std::get<2>(channel->segList[freqSegIdx]) = BLACK;
+										} else {
+											double bwMHz = (double) channel->bandwidth(freqSegIdx);
+											eirpLimit_dBm = _reportUnavailPSDdBmPerMHz + 10*log10(bwMHz);
+										}
+										std::get<0>(channel->segList[freqSegIdx]) = eirpLimit_dBm;
+										std::get<1>(channel->segList[freqSegIdx]) = eirpLimit_dBm;
+
+										if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
+											eirpLimitList[ulsIdx] = eirpLimit_dBm;
+										}
+									}
 								}
 							}
 						}
@@ -8451,174 +8565,411 @@ void AfcManager::runPointAnalysis()
 									rlanAngleOffBoresightRad = 0.0;
 									rlanDiscriminationGainDB = 0.0;
 								}
+								double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight[scanPtIdx];
 
 								if ((minRLANDist == -1.0) || (distKm*1000.0 < minRLANDist)) {
 									minRLANDist = distKm*1000.0;
 								}
 
 								int chanIdx;
+								std::vector<int> itmSegList;
+								std::vector<double> RxPowerDBW_0PLList[2];
+								std::vector<ExcThrParamClass> excThrParamList[2];
 								for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 									ChannelStruct *channel = &(_channelList[chanIdx]);
-									if ( (channel->availability != BLACK) && (channel->availability != RED) ) {
-										double chanStartFreq = channel->startFreqMHz * 1.0e6;
-										double chanStopFreq = channel->stopFreqMHz * 1.0e6;
-										bool useACI = (channel->type == INQUIRED_FREQUENCY ? false : _aciFlag);
-										CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel->type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
-										// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
-										double spectralOverlapLossDB;
-										bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), useACI, spectralAlgorithm);
-										if (hasOverlap) {
-											double bandwidth = chanStopFreq - chanStartFreq;
-											double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
+									ChannelType channelType = channel->type;
+									itmSegList.clear();
+									RxPowerDBW_0PLList[0].clear();
+									RxPowerDBW_0PLList[1].clear();
+									excThrParamList[0].clear();
+									excThrParamList[1].clear();
+									// First set state = 0.  When state = 0, FSPL is used in place of ITM.  In state = 0, go through all
+									// freq segments and if state=0 does not limit EIRP those segments are done.
+									// Identity list of segments for which state = 0 (FSPL in place of ITM) does limit EIRP and full Path loss calculation is required.
+									// Next set state = 1.  When state = 1, the full path loss model is used.
+									// For the range of frequencies where Path loss calculation is required, calculate path loss at min
+									// and max frequencies, then use linear interpoplation for intermediate frequencies.
+									bool contFlag = true;
+									int state = 0;
+                                    int freqSegIdx = 0;
+                                    int itmSegIdx = -1;
+                                    double itmStartPathLoss = quietNaN;
+                                    double itmStopPathLoss = quietNaN;
+                                    double itmStartFreqMHz = quietNaN;
+                                    double itmStopFreqMHz = quietNaN;
 
-											double maxEIRPdBm;
-											if (channel->type == INQUIRED_FREQUENCY) {
-												maxEIRPdBm = _inquiredFrequencyMaxPSD_dBmPerMHz + 10.0*log10((double) channel->bandwidth());
-											} else {
-												maxEIRPdBm = _maxEIRP_dBm;
-											}
+									while(contFlag) {
+										if (state == 1) {
+											freqSegIdx = itmSegList[itmSegIdx];
+										}
 
-											std::string buildingPenetrationModelStr;
-											double buildingPenetrationCDF;
-											double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF);
+										ChannelColor chanColor = std::get<2>(channel->segList[freqSegIdx]);
+										if ( (chanColor != BLACK) && (chanColor != RED) ) {
+											int chanStartFreqMHz = channel->freqMHzList[freqSegIdx];
+											int chanStopFreqMHz = channel->freqMHzList[freqSegIdx+1];
 
-											std::string txClutterStr;
-											std::string rxClutterStr;
-											std::string pathLossModelStr;
-											double pathLossCDF;
-											double pathLoss;
-											std::string pathClutterTxModelStr;
-											double pathClutterTxCDF;
-											double pathClutterTxDB;
-											std::string pathClutterRxModelStr;
-											double pathClutterRxCDF;
-											double pathClutterRxDB;
-											double rxGainDB;
-											double discriminationGain;
-											std::string rxAntennaSubModelStr;
-											double angleOffBoresightDeg;
-											double rxPowerDBW;
-											double I2NDB;
-											double marginDB;
-											double eirpLimit_dBm;
-											double nearFieldOffsetDB;
-											double nearField_xdb;
-											double nearField_u;
-											double nearField_eff;
-											double reflectorD0;
-											double reflectorD1;
+											bool useACI = (channelType == INQUIRED_FREQUENCY ? false : _aciFlag);
+											CConst::SpectralAlgorithmEnum spectralAlgorithm = (channelType == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
+											// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
+											double spectralOverlapLossDB;
+											bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreqMHz*1.0e6, chanStopFreqMHz*1.0e6, uls->getStartFreq(), uls->getStopFreq(), useACI, spectralAlgorithm);
+											if (hasOverlap) {
+												double rxPowerDBW_0PL[2];
+												ExcThrParamClass excThrParam[2];
+												double eirpLimit_dBm[2];
+												double bandwidthMHz = (double) channel->bandwidth(freqSegIdx);
+												int numBandEdge = (channelType == INQUIRED_FREQUENCY ? 2 : 1);
 
-											double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight[scanPtIdx];
-
-											// Trying Free Space Path Loss then (if not skipped) - configured Path Loss.
-											bool skip = false;
-											for (bool forceFspl : {true, false}) {
-												if (forceFspl && (fsplDistKm == 0)) {
-													// Possible if FSPL distance is horizontal. This should be extremely rare
-													continue;
+												double maxEIRPdBm;
+												if (channelType == INQUIRED_FREQUENCY) {
+													maxEIRPdBm = _inquiredFrequencyMaxPSD_dBmPerMHz + 10.0*log10(bandwidthMHz);
+												} else {
+													maxEIRPdBm = _maxEIRP_dBm;
 												}
-												computePathLoss((forceFspl || contains2D) ? CConst::FSPLPathLossModel : _pathLossModel, rlanPropEnv[scanPtIdx], fsPropEnv, rlanNlcdLandCat[scanPtIdx],
-														nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
-														rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
-														ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
-														pathLoss, pathClutterTxDB, pathClutterRxDB,
-														pathLossModelStr, pathLossCDF,
-														pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-														&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
+
+												for(int bandEdgeIdx=0; bandEdgeIdx<numBandEdge; ++bandEdgeIdx) {
+													double evalFreqMHz;
+                                                    if (channelType == INQUIRED_FREQUENCY) {
+														evalFreqMHz = (bandEdgeIdx == 0 ? chanStartFreqMHz : chanStopFreqMHz);
+													} else {
+														evalFreqMHz = (chanStartFreqMHz + chanStopFreqMHz)/2.0;
+													}
+													double evalFreqHz = evalFreqMHz*1.0e6;
+
+
+													if ((state == 0) && (fsplDistKm == 0)) {
+														// Possible if FSPL distance is horizontal. This should be extremely rare
+														continue;
+													}
+
+													double pathLoss;
+													double rxPowerDBW;
+													double I2NDB;
+													double marginDB;
+
+													if (state == 0) {
+														std::string buildingPenetrationModelStr;
+														double buildingPenetrationCDF;
+														double buildingPenetrationDB;
+
+														std::string txClutterStr;
+														std::string rxClutterStr;
+														std::string pathLossModelStr;
+														double pathLossCDF;
+														std::string pathClutterTxModelStr;
+														double pathClutterTxCDF;
+														double pathClutterTxDB;
+														std::string pathClutterRxModelStr;
+														double pathClutterRxCDF;
+														double pathClutterRxDB;
+														double rxGainDB;
+														double discriminationGain;
+														std::string rxAntennaSubModelStr;
+														double angleOffBoresightDeg;
+														double nearFieldOffsetDB;
+														double nearField_xdb;
+														double nearField_u;
+														double nearField_eff;
+														double reflectorD0;
+														double reflectorD1;
+
+														computePathLoss(contains2D ? CConst::FSPLPathLossModel : _pathLossModel, true, rlanPropEnv[scanPtIdx], fsPropEnv, rlanNlcdLandCat[scanPtIdx],
+																nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, evalFreqHz,
+																rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
+																ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
+																pathLoss, pathClutterTxDB, pathClutterRxDB,
+																pathLossModelStr, pathLossCDF,
+																pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
+																&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
 #if DEBUG_AFC
-														, uls->ITMHeightType
+																, uls->ITMHeightType
 #endif
-														);
+																);
+														buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, evalFreqHz, buildingPenetrationModelStr, buildingPenetrationCDF);
 
-												if (contains2D) {
-													angleOffBoresightDeg = minAngleOffBoresightDeg;
-												} else {
-													angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-												}
-												if (segIdx == numPR) {
-													rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, divIdx);
-												} else {
-													discriminationGain = uls->getPR(segIdx).computeDiscriminationGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, reflectorD0, reflectorD1);
-													rxGainDB = uls->getPR(segIdx).effectiveGain + discriminationGain;
-												}
-
-												nearFieldOffsetDB = 0.0;
-												nearField_xdb = quietNaN;
-												nearField_u = quietNaN;
-												nearField_eff = quietNaN;
-												if (segIdx == numPR) {
-													if (_nearFieldAdjFlag && (distKm*1000.0 < uls->getRxNearFieldDistLimit()) && (angleOffBoresightDeg < 90.0) ) {
-														bool unii5Flag = computeSpectralOverlapLoss((double *) NULL, uls->getStartFreq(), uls->getStopFreq(), 5925.0e6, 6425.0e6, false, CConst::psdSpectralAlgorithm);
-														double Fc;
-														if (unii5Flag) {
-															Fc = 6175.0e6;
+														if (contains2D) {
+															angleOffBoresightDeg = minAngleOffBoresightDeg;
 														} else {
-															Fc = 6700.0e6;
+															angleOffBoresightDeg = acos(ulsAntennaPointing.dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
 														}
-														nearField_eff = uls->getRxNearFieldAntEfficiency();
-														double D = uls->getRxNearFieldAntDiameter();
+														if (segIdx == numPR) {
+															rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, evalFreqHz, rxAntennaSubModelStr, divIdx);
+														} else {
+															discriminationGain = uls->getPR(segIdx).computeDiscriminationGain(angleOffBoresightDeg, elevationAngleRxDeg, evalFreqHz, reflectorD0, reflectorD1);
+															rxGainDB = uls->getPR(segIdx).effectiveGain + discriminationGain;
+														}
 
-														nearField_xdb = 10.0*log10(CConst::c*distKm*1000.0/(2*Fc*D*D));
-														nearField_u = (Fc*D*sin(angleOffBoresightDeg*M_PI/180.0)/CConst::c);
+														nearFieldOffsetDB = 0.0;
+														nearField_xdb = quietNaN;
+														nearField_u = quietNaN;
+														nearField_eff = quietNaN;
+														if (segIdx == numPR) {
+															if (_nearFieldAdjFlag && (distKm*1000.0 < uls->getRxNearFieldDistLimit()) && (angleOffBoresightDeg < 90.0) ) {
+																bool unii5Flag = computeSpectralOverlapLoss((double *) NULL, uls->getStartFreq(), uls->getStopFreq(), 5925.0e6, 6425.0e6, false, CConst::psdSpectralAlgorithm);
+																double Fc;
+																if (unii5Flag) {
+																	Fc = 6175.0e6;
+																} else {
+																	Fc = 6700.0e6;
+																}
+																nearField_eff = uls->getRxNearFieldAntEfficiency();
+																double D = uls->getRxNearFieldAntDiameter();
 
-														nearFieldOffsetDB = _nfa->computeNFA(nearField_xdb, nearField_u, nearField_eff);
+																nearField_xdb = 10.0*log10(CConst::c*distKm*1000.0/(2*Fc*D*D));
+																nearField_u = (Fc*D*sin(angleOffBoresightDeg*M_PI/180.0)/CConst::c);
+
+																nearFieldOffsetDB = _nfa->computeNFA(nearField_xdb, nearField_u, nearField_eff);
+															}
+														}
+
+														rxPowerDBW_0PL[bandEdgeIdx] = (maxEIRPdBm - 30.0) + rlanDiscriminationGainDB - _bodyLossDB - buildingPenetrationDB - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+														if (excthrGc) {
+															excThrParam[bandEdgeIdx].rlanDiscriminationGainDB = rlanDiscriminationGainDB;
+															excThrParam[bandEdgeIdx].bodyLossDB = _bodyLossDB;
+															excThrParam[bandEdgeIdx].buildingPenetrationModelStr = buildingPenetrationModelStr;
+															excThrParam[bandEdgeIdx].buildingPenetrationCDF = buildingPenetrationCDF;
+															excThrParam[bandEdgeIdx].buildingPenetrationDB = buildingPenetrationDB;
+															excThrParam[bandEdgeIdx].angleOffBoresightDeg = angleOffBoresightDeg;
+															excThrParam[bandEdgeIdx].pathLossModelStr = pathLossModelStr;
+															excThrParam[bandEdgeIdx].pathLossCDF = pathLossCDF;
+															excThrParam[bandEdgeIdx].pathClutterTxModelStr = pathClutterTxModelStr;
+															excThrParam[bandEdgeIdx].pathClutterTxCDF = pathClutterTxCDF;
+															excThrParam[bandEdgeIdx].pathClutterTxDB = pathClutterTxDB;
+															excThrParam[bandEdgeIdx].txClutterStr = txClutterStr;
+															excThrParam[bandEdgeIdx].pathClutterRxModelStr = pathClutterRxModelStr;
+															excThrParam[bandEdgeIdx].pathClutterRxCDF = pathClutterRxCDF;
+															excThrParam[bandEdgeIdx].pathClutterRxDB = pathClutterRxDB;
+															excThrParam[bandEdgeIdx].rxClutterStr = rxClutterStr;
+															excThrParam[bandEdgeIdx].rxGainDB = rxGainDB;
+															excThrParam[bandEdgeIdx].discriminationGain = discriminationGain;
+															excThrParam[bandEdgeIdx].rxAntennaSubModelStr = rxAntennaSubModelStr;
+															excThrParam[bandEdgeIdx].nearFieldOffsetDB = nearFieldOffsetDB;
+															excThrParam[bandEdgeIdx].spectralOverlapLossDB = spectralOverlapLossDB;
+															excThrParam[bandEdgeIdx].polarizationLossDB = _polarizationLossDB;
+															excThrParam[bandEdgeIdx].rxAntennaFeederLossDB = uls->getRxAntennaFeederLossDB();
+															excThrParam[bandEdgeIdx].nearField_xdb = nearField_xdb;
+															excThrParam[bandEdgeIdx].nearField_u = nearField_u;
+															excThrParam[bandEdgeIdx].nearField_eff = nearField_eff;
+															excThrParam[bandEdgeIdx].reflectorD0 = reflectorD0;
+															excThrParam[bandEdgeIdx].reflectorD1 = reflectorD1;
+														}
+													} else {
+														pathLoss = (itmStartPathLoss * (itmStopFreqMHz - evalFreqMHz) + itmStopPathLoss*(evalFreqMHz - itmStartFreqMHz))/(itmStopFreqMHz - itmStartFreqMHz);
+														rxPowerDBW_0PL[bandEdgeIdx] = RxPowerDBW_0PLList[bandEdgeIdx][itmSegIdx];
+														if (excthrGc) {
+															excThrParam[bandEdgeIdx] = excThrParamList[bandEdgeIdx][itmSegIdx];
+														}
+													}
+
+													rxPowerDBW = rxPowerDBW_0PL[bandEdgeIdx] - pathLoss;
+
+													I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
+
+													marginDB = _IoverN_threshold_dB - I2NDB;
+
+													eirpLimit_dBm[bandEdgeIdx] = maxEIRPdBm + marginDB;
+
+													if (eirpGc) {
+														eirpGc.callsign = uls->getCallsign();
+														eirpGc.pathNum = uls->getPathNumber();
+														eirpGc.ulsId = uls->getID();
+														eirpGc.segIdx = segIdx;
+														eirpGc.divIdx = divIdx;
+														eirpGc.scanLat = rlanCoord.latitudeDeg;
+														eirpGc.scanLon = rlanCoord.longitudeDeg;
+														eirpGc.scanAgl = rlanHtAboveTerrain;
+														eirpGc.scanAmsl = rlanCoord.heightKm * 1000.0;
+														eirpGc.scanPtIdx = scanPtIdx;
+														eirpGc.distKm = distKm;
+														eirpGc.elevationAngleTx = elevationAngleTxDeg;
+														eirpGc.channel = channel->index;
+														eirpGc.chanStartMhz = channel->freqMHzList[freqSegIdx];
+														eirpGc.chanEndMhz = channel->freqMHzList[freqSegIdx+1];
+														eirpGc.chanBwMhz = bandwidthMHz;
+														eirpGc.chanType = channelType;
+														eirpGc.eirpLimit = eirpLimit_dBm[bandEdgeIdx];
+														eirpGc.fspl = (state == 0);
+														eirpGc.pathLossDb = pathLoss;
+														eirpGc.configPathLossModel = _pathLossModel;
+														eirpGc.resultedPathLossModel = excThrParam[bandEdgeIdx].pathLossModelStr;
+														eirpGc.buildingPenetrationDb = excThrParam[bandEdgeIdx].buildingPenetrationDB;
+														eirpGc.offBoresight = excThrParam[bandEdgeIdx].angleOffBoresightDeg;
+														eirpGc.rxGainDb = excThrParam[bandEdgeIdx].rxGainDB;
+														eirpGc.discriminationGainDb = excThrParam[bandEdgeIdx].rlanDiscriminationGainDB;
+														eirpGc.txPropEnv = rlanPropEnv[scanPtIdx];
+														eirpGc.nlcdTx = rlanNlcdLandCat[scanPtIdx];
+														eirpGc.pathClutterTxModel = excThrParam[bandEdgeIdx].pathClutterTxModelStr;
+														eirpGc.pathClutterTxDb = excThrParam[bandEdgeIdx].pathClutterTxDB;
+														eirpGc.txClutter = excThrParam[bandEdgeIdx].txClutterStr;
+														eirpGc.rxPropEnv = fsPropEnv;
+														eirpGc.nlcdRx = nlcdLandCatRx;
+														eirpGc.pathClutterRxModel = excThrParam[bandEdgeIdx].pathClutterRxModelStr;
+														eirpGc.pathClutterRxDb = excThrParam[bandEdgeIdx].pathClutterRxDB;
+														eirpGc.rxClutter = excThrParam[bandEdgeIdx].rxClutterStr;
+														eirpGc.nearFieldOffsetDb = excThrParam[bandEdgeIdx].nearFieldOffsetDB;
+														eirpGc.spectralOverlapLossDb = spectralOverlapLossDB;
+														eirpGc.ulsAntennaFeederLossDb =  uls->getRxAntennaFeederLossDB();
+														eirpGc.rxPowerDbW = rxPowerDBW;
+														eirpGc.ulsNoiseLevelDbW = uls->getNoiseLevelDBW();
+														eirpGc.completeRow();
+													}
+
+													// Link budget calculations are written to the exceed threshold file if I2NDB exceeds _visibilityThreshold or 
+													// when link distance is less than _closeInDist.  If state==1, these links are always written.  If state==0.
+													// these links are written only if _printSkippedLinksFlag is set.
+													if ( excthrGc && (((state == 0)&&(_printSkippedLinksFlag))||(state==1))
+														&& (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) ) {
+														double d1;
+														double d2;
+														double pathDifference;
+														double fresnelIndex = -1.0;
+														double ulsWavelength = CConst::c / ((uls->getStartFreq() + uls->getStopFreq()) / 2);
+														if (ulsSegmentDistance != -1.0) {
+															const Vector3 ulsTxPos = (segIdx ? uls->getPR(segIdx-1).positionTx : uls->getTxPosition());
+															d1 = (ulsRxPos - rlanPosn).len() * 1000;
+															d2 = (ulsTxPos - rlanPosn).len() * 1000;
+															pathDifference = d1 + d2 - ulsSegmentDistance;
+															fresnelIndex = pathDifference / (ulsWavelength / 2);
+														} else {
+															d1 = (ulsRxPos - rlanPosn).len() * 1000;
+															d2 = -1.0;
+															pathDifference = -1.0;
+														}
+
+														std::string rxAntennaTypeStr;
+														if (segIdx == numPR) {
+														CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
+															if (ulsRxAntennaType == CConst::LUTAntennaType) {
+																rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
+															} else {
+																rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + excThrParam[bandEdgeIdx].rxAntennaSubModelStr;
+															}
+														} else {
+															if (uls->getPR(segIdx).type == CConst::backToBackAntennaPRType) {
+																CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getPR(segIdx).antennaType;
+																if (ulsRxAntennaType == CConst::LUTAntennaType) {
+																	rxAntennaTypeStr = std::string(uls->getPR(segIdx).antenna->get_strid());
+																} else {
+																	rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + excThrParam[bandEdgeIdx].rxAntennaSubModelStr;
+																}
+															} else {
+																rxAntennaTypeStr = "";
+															}
+														}
+
+														std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
+																_buildingType == CConst::noBuildingType ? "OUTDOOR" :
+																_buildingType == CConst::traditionalBuildingType ?  "TRADITIONAL" :
+																"THERMALLY_EFFICIENT");
+
+														excthrGc->fsid = uls->getID();
+														excthrGc->region = uls->getRegion();
+														excthrGc->dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
+														excthrGc->rlanPosnIdx = rlanHtIdx;
+														excthrGc->callsign = uls->getCallsign();
+														excthrGc->fsLon = uls->getRxLongitudeDeg();
+														excthrGc->fsLat = uls->getRxLatitudeDeg();
+														excthrGc->fsAgl = divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain();
+														excthrGc->fsTerrainHeight = uls->getRxTerrainHeight();
+														excthrGc->fsTerrainSource = _terrainDataModel->getSourceName(uls->getRxHeightSource());
+														excthrGc->fsPropEnv = ulsRxPropEnv;
+														excthrGc->numPr = uls->getNumPR();
+														excthrGc->divIdx = divIdx;
+														excthrGc->segIdx = segIdx;
+														excthrGc->segRxLon = ulsRxLongitude;
+														excthrGc->segRxLat = ulsRxLatitude;
+
+														if ((segIdx < numPR) && (uls->getPR(segIdx).type == CConst::billboardReflectorPRType)) {
+															PRClass& pr = uls->getPR(segIdx);
+															excthrGc->refThetaIn = pr.reflectorThetaIN;
+															excthrGc->refKs = pr.reflectorKS;
+															excthrGc->refQ = pr.reflectorQ;
+															excthrGc->refD0 = excThrParam[bandEdgeIdx].reflectorD0;
+															excthrGc->refD1 = excThrParam[bandEdgeIdx].reflectorD1;
+														}
+
+														excthrGc->rlanLon = rlanCoord.longitudeDeg;
+														excthrGc->rlanLat = rlanCoord.latitudeDeg;
+														excthrGc->rlanAgl =rlanCoord.heightKm * 1000.0 - rlanTerrainHeight[scanPtIdx];
+														excthrGc->rlanTerrainHeight = rlanTerrainHeight[scanPtIdx];
+														excthrGc->rlanTerrainSource = _terrainDataModel->getSourceName(rlanHeightSource[scanPtIdx]);
+														excthrGc->rlanPropEnv = CConst::strPropEnvList->type_to_str(rlanPropEnv[scanPtIdx]);
+														excthrGc->rlanFsDist = distKm;
+														excthrGc->rlanFsGroundDist = groundDistanceKm;
+														excthrGc->rlanElevAngle = elevationAngleTxDeg;
+														excthrGc->boresightAngle = excThrParam[bandEdgeIdx].angleOffBoresightDeg;
+														excthrGc->rlanTxEirp = maxEIRPdBm;
+														if (_rlanAntenna) {
+															excthrGc->rlanAntennaModel = _rlanAntenna->get_strid();
+															excthrGc->rlanAOB = rlanAngleOffBoresightRad*180.0/M_PI;
+														} else {
+															excthrGc->rlanAntennaModel = "";
+															excthrGc->rlanAOB = -1.0;
+														}
+														excthrGc->rlanDiscriminationGainDB = rlanDiscriminationGainDB;
+														excthrGc->bodyLoss = _bodyLossDB;
+														excthrGc->rlanClutterCategory = excThrParam[bandEdgeIdx].txClutterStr;
+														excthrGc->fsClutterCategory = excThrParam[bandEdgeIdx].rxClutterStr;
+														excthrGc->buildingType = bldgTypeStr;
+														excthrGc->buildingPenetration = excThrParam[bandEdgeIdx].buildingPenetrationDB;
+														excthrGc->buildingPenetrationModel = excThrParam[bandEdgeIdx].buildingPenetrationModelStr;
+														excthrGc->buildingPenetrationCdf = excThrParam[bandEdgeIdx].buildingPenetrationCDF;
+														excthrGc->pathLoss = pathLoss;
+														excthrGc->pathLossModel = excThrParam[bandEdgeIdx].pathLossModelStr;
+														excthrGc->pathLossCdf = excThrParam[bandEdgeIdx].pathLossCDF;
+														excthrGc->pathClutterTx = excThrParam[bandEdgeIdx].pathClutterTxDB;
+														excthrGc->pathClutterTxMode =  excThrParam[bandEdgeIdx].pathClutterTxModelStr;
+														excthrGc->pathClutterTxCdf = excThrParam[bandEdgeIdx].pathClutterTxCDF;
+														excthrGc->pathClutterRx = excThrParam[bandEdgeIdx].pathClutterRxDB;
+														excthrGc->pathClutterRxMode = excThrParam[bandEdgeIdx].pathClutterRxModelStr;
+														excthrGc->pathClutterRxCdf = excThrParam[bandEdgeIdx].pathClutterRxCDF;
+														excthrGc->rlanBandwidth = bandwidthMHz;
+														excthrGc->rlanStartFreq = chanStartFreqMHz;
+														excthrGc->rlanStopFreq = chanStopFreqMHz;
+														excthrGc->ulsStartFreq = uls->getStartFreq() * 1.0e-6;
+														excthrGc->ulsStopFreq = uls->getStopFreq() * 1.0e-6;
+														excthrGc->antType = rxAntennaTypeStr;
+														excthrGc->antCategory = CConst::strAntennaCategoryList->type_to_str(segIdx == numPR ? uls->getRxAntennaCategory() : uls->getPR(segIdx).antCategory);
+														excthrGc->antGainPeak = divIdx == 0 ? uls->getRxGain() : uls->getDiversityGain();
+
+														if (segIdx != numPR) {
+															excthrGc->prType = CConst::strPRTypeList->type_to_str(uls->getPR(segIdx).type);
+															excthrGc->prEffectiveGain = uls->getPR(segIdx).effectiveGain;
+															excthrGc->prDiscrinminationGain = excThrParam[bandEdgeIdx].discriminationGain;
+														}
+
+														excthrGc->fsGainToRlan = excThrParam[bandEdgeIdx].rxGainDB;
+														if (!std::isnan(excThrParam[bandEdgeIdx].nearField_xdb)) {
+															excthrGc->fsNearFieldXdb = excThrParam[bandEdgeIdx].nearField_xdb;
+														}
+														if (!std::isnan(excThrParam[bandEdgeIdx].nearField_u)) {
+															excthrGc->fsNearFieldU = excThrParam[bandEdgeIdx].nearField_u;
+														}
+														if (!std::isnan(excThrParam[bandEdgeIdx].nearField_eff)) {
+															excthrGc->fsNearFieldEff = excThrParam[bandEdgeIdx].nearField_eff;
+														}
+														excthrGc->fsNearFieldOffset = excThrParam[bandEdgeIdx].nearFieldOffsetDB;
+														excthrGc->spectralOverlapLoss = spectralOverlapLossDB;
+														excthrGc->polarizationLoss = _polarizationLossDB;
+														excthrGc->fsRxFeederLoss = uls->getRxAntennaFeederLossDB();
+														excthrGc->fsRxPwr = rxPowerDBW;
+														excthrGc->fsIN = I2NDB;
+														excthrGc->eirpLimit = eirpLimit_dBm[bandEdgeIdx];
+														excthrGc->fsSegDist = ulsSegmentDistance;
+														excthrGc->rlanCenterFreq = evalFreqMHz;
+														excthrGc->fsTxToRlanDist = d2;
+														excthrGc->pathDifference = pathDifference;
+														excthrGc->ulsWavelength = ulsWavelength * 1000;
+														excthrGc->fresnelIndex = fresnelIndex;
+
+														excthrGc->completeRow();
 													}
 												}
 
-												rxPowerDBW = (maxEIRPdBm - 30.0) + rlanDiscriminationGainDB - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB + nearFieldOffsetDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+												// Trying Free Space Path Loss then (if not skipped) - configured Path Loss.
+												bool skip;
 
-												I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
-
-												marginDB = _IoverN_threshold_dB - I2NDB;
-
-												eirpLimit_dBm = maxEIRPdBm + marginDB;
-
-												if (eirpGc) {
-													eirpGc.callsign = uls->getCallsign();
-													eirpGc.pathNum = uls->getPathNumber();
-													eirpGc.ulsId = uls->getID();
-													eirpGc.segIdx = segIdx;
-													eirpGc.divIdx = divIdx;
-													eirpGc.scanLat = rlanCoord.latitudeDeg;
-													eirpGc.scanLon = rlanCoord.longitudeDeg;
-													eirpGc.scanAgl = rlanHtAboveTerrain;
-													eirpGc.scanAmsl = rlanCoord.heightKm * 1000.0;
-													eirpGc.scanPtIdx = scanPtIdx;
-													eirpGc.distKm = distKm;
-													eirpGc.elevationAngleTx = elevationAngleTxDeg;
-													eirpGc.channel = channel->index;
-													eirpGc.chanStartMhz = channel->startFreqMHz;
-													eirpGc.chanEndMhz = channel->stopFreqMHz;
-													eirpGc.chanBwMhz = channel->stopFreqMHz - channel->startFreqMHz;
-													eirpGc.chanType = channel->type;
-													eirpGc.eirpLimit = eirpLimit_dBm;
-													eirpGc.fspl = forceFspl;
-													eirpGc.pathLossDb = pathLoss;
-													eirpGc.configPathLossModel = _pathLossModel;
-													eirpGc.resultedPathLossModel = pathLossModelStr;
-													eirpGc.buildingPenetrationDb = buildingPenetrationDB;
-													eirpGc.offBoresight = angleOffBoresightDeg;
-													eirpGc.rxGainDb = rxGainDB;
-													eirpGc.discriminationGainDb = rlanDiscriminationGainDB;
-													eirpGc.txPropEnv = rlanPropEnv[scanPtIdx];
-													eirpGc.nlcdTx = rlanNlcdLandCat[scanPtIdx];
-													eirpGc.pathClutterTxModel = pathClutterTxModelStr;
-													eirpGc.pathClutterTxDb = pathClutterTxDB;
-													eirpGc.txClutter = txClutterStr;
-													eirpGc.rxPropEnv = fsPropEnv;
-													eirpGc.nlcdRx = nlcdLandCatRx;
-													eirpGc.pathClutterRxModel = pathClutterRxModelStr;
-													eirpGc.pathClutterRxDb = pathClutterRxDB;
-													eirpGc.rxClutter = rxClutterStr;
-													eirpGc.nearFieldOffsetDb = nearFieldOffsetDB;
-													eirpGc.spectralOverlapLossDb = spectralOverlapLossDB;
-													eirpGc.ulsAntennaFeederLossDb =  uls->getRxAntennaFeederLossDB();
-													eirpGc.rxPowerDbW = rxPowerDBW;
-													eirpGc.ulsNoiseLevelDbW = uls->getNoiseLevelDBW();
-													eirpGc.completeRow();
-												}
-
-												if (forceFspl) {
+												if (state == 0) {
 													// Skipping further computation if Free Space path loss
 													// EIRP is larger than already established (hence
 													// configured path loss will be even larger),
@@ -8626,207 +8977,163 @@ void AfcManager::runPointAnalysis()
 													// configured path loss computation
 
 													// 1dB allowance to accommodate for amplifying clutters and other artifacts
-													if ((eirpLimit_dBm - 1) < channel->eirpLimit_dBm) {
-														continue;    // Proceed to configured path loss
+													if (contains2D) {
+														skip = false;
+													} else if (  ((eirpLimit_dBm[0] - 1) < std::get<0>(channel->segList[freqSegIdx]))
+                                                           	||((numBandEdge==2)&&((eirpLimit_dBm[1] - 1) < std::get<1>(channel->segList[freqSegIdx]))) ) {
+														itmSegList.push_back(freqSegIdx);
+														for(int bandEdgeIdx=0; bandEdgeIdx<numBandEdge; ++bandEdgeIdx) {
+															RxPowerDBW_0PLList[bandEdgeIdx].push_back(rxPowerDBW_0PL[bandEdgeIdx]);
+															if (excthrGc) {
+																excThrParamList[bandEdgeIdx].push_back(excThrParam[bandEdgeIdx]);
+															}
+														}
+														skip = true;
 													} else {
 														skip = true;
-														break;       // Skipping this scanpoint
 													}
+												} else {
+													skip = false;
 												}
-											}
 
-											// When _printSkippedLinksFlag set, links analyzed with FSPL that are skipped are still inserted into the exc_thr file.
-											// This is useful for testing and debugging.  Note that the extra printing impacts execution speed.  When _printSkippedLinksFlag is
-											// not set, skipped links are no inserted in the exc_thr file, so execution speed is not impacted.
-											if ((!_printSkippedLinksFlag) && (skip)) {
-												continue;
-											}
+												// When _printSkippedLinksFlag set, links analyzed with FSPL that are skipped are still inserted into the exc_thr file.
+												// This is useful for testing and debugging.  Note that the extra printing impacts execution speed.  When _printSkippedLinksFlag is
+												// not set, skipped links are no inserted in the exc_thr file, so execution speed is not impacted.
+												// if ((!_printSkippedLinksFlag) && (skip)) {
+												// 	continue;
+												// }
 
-											if (!skip) {
-												if ((contains2D)&&(!std::isnan(_reportUnavailPSDdBmPerMHz))) {
-													double clipeirpLimit_dBm = _reportUnavailPSDdBmPerMHz + 10*log10((double) channel->bandwidth());
-													if (eirpLimit_dBm < clipeirpLimit_dBm) {
-														eirpLimit_dBm = clipeirpLimit_dBm;
-													}
-												}
-												if (channel->type == ChannelType::INQUIRED_CHANNEL) {
-													if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
-														if (eirpLimit_dBm < _minEIRP_dBm) {
-															channel->eirpLimit_dBm = _minEIRP_dBm;
-															channel->availability = RED;
-														} else {
-															channel->eirpLimit_dBm = eirpLimit_dBm;
+												if (!skip) {
+													if ((contains2D)&&(!std::isnan(_reportUnavailPSDdBmPerMHz))) {
+														double clipeirpLimit_dBm = _reportUnavailPSDdBmPerMHz + 10*log10(bandwidthMHz);
+														for(int bandEdgeIdx=0; bandEdgeIdx<numBandEdge; ++bandEdgeIdx) {
+															if (eirpLimit_dBm[bandEdgeIdx] < clipeirpLimit_dBm) {
+																eirpLimit_dBm[bandEdgeIdx] = clipeirpLimit_dBm;
+															}
 														}
 													}
-													if ((eirpLimit_dBm < eirpLimitList[ulsIdx]) ) {
-														eirpLimitList[ulsIdx] = eirpLimit_dBm;
-													}
-												} else {
-													// INQUIRED_FREQUENCY
-													if ((channel->availability != RED) && (eirpLimit_dBm < channel->eirpLimit_dBm)) {
-														double psd = eirpLimit_dBm - 10.0*log((double) channel->bandwidth())/log(10.0);
-														if (psd < _minPSD_dBmPerMHz) {
-															channel->eirpLimit_dBm = _minPSD_dBmPerMHz + 10.0*log((double) channel->bandwidth())/log(10.0);
-															channel->availability = RED;
-														} else {
-															channel->eirpLimit_dBm = eirpLimit_dBm;
+													if (channelType == ChannelType::INQUIRED_CHANNEL) {
+														if ((std::get<2>(channel->segList[freqSegIdx]) != RED) && (eirpLimit_dBm[0] < std::get<0>(channel->segList[freqSegIdx]))) {
+															if (eirpLimit_dBm[0] < _minEIRP_dBm) {
+																channel->segList[freqSegIdx] = std::make_tuple(_minEIRP_dBm, _minEIRP_dBm, RED);
+															} else {
+																std::get<0>(channel->segList[freqSegIdx]) = eirpLimit_dBm[0];
+																std::get<1>(channel->segList[freqSegIdx]) = eirpLimit_dBm[0];
+															}
 														}
-													}
-												}
-											}
-
-											if ( excthrGc && (std::isnan(rxPowerDBW) || (I2NDB > _visibilityThreshold) || (distKm * 1000 < _closeInDist)) )
-											{
-												double d1;
-												double d2;
-												double pathDifference;
-												double fresnelIndex = -1.0;
-												double ulsWavelength = CConst::c / ((uls->getStartFreq() + uls->getStopFreq()) / 2);
-												if (ulsSegmentDistance != -1.0) {
-													const Vector3 ulsTxPos = (segIdx ? uls->getPR(segIdx-1).positionTx : uls->getTxPosition());
-													d1 = (ulsRxPos - rlanPosn).len() * 1000;
-													d2 = (ulsTxPos - rlanPosn).len() * 1000;
-													pathDifference = d1 + d2 - ulsSegmentDistance;
-													fresnelIndex = pathDifference / (ulsWavelength / 2);
-												} else {
-													d1 = (ulsRxPos - rlanPosn).len() * 1000;
-													d2 = -1.0;
-													pathDifference = -1.0;
-												}
-
-												std::string rxAntennaTypeStr;
-												if (segIdx == numPR) {
-													CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getRxAntennaType();
-													if (ulsRxAntennaType == CConst::LUTAntennaType) {
-														rxAntennaTypeStr = std::string(uls->getRxAntenna()->get_strid());
-													} else {
-														rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
-													}
-												} else {
-													if (uls->getPR(segIdx).type == CConst::backToBackAntennaPRType) {
-														CConst::ULSAntennaTypeEnum ulsRxAntennaType = uls->getPR(segIdx).antennaType;
-														if (ulsRxAntennaType == CConst::LUTAntennaType) {
-															rxAntennaTypeStr = std::string(uls->getPR(segIdx).antenna->get_strid());
-														} else {
-															rxAntennaTypeStr = std::string(CConst::strULSAntennaTypeList->type_to_str(ulsRxAntennaType)) + rxAntennaSubModelStr;
+														if ((eirpLimit_dBm[0] < eirpLimitList[ulsIdx]) ) {
+															eirpLimitList[ulsIdx] = eirpLimit_dBm[0];
 														}
 													} else {
-														rxAntennaTypeStr = "";
+														// INQUIRED_FREQUENCY
+														if (std::get<2>(channel->segList[freqSegIdx]) != RED) {
+                                                        	bool redFlag = true;
+															for(int bandEdgeIdx=0; bandEdgeIdx<numBandEdge; ++bandEdgeIdx) {
+																double bandEdgeVal = ((bandEdgeIdx == 0) ? std::get<0>(channel->segList[freqSegIdx]) : std::get<1>(channel->segList[freqSegIdx]));
+																if (eirpLimit_dBm[bandEdgeIdx] < bandEdgeVal) {
+																	if (bandEdgeIdx == 0) {
+																		std::get<0>(channel->segList[freqSegIdx]) = eirpLimit_dBm[bandEdgeIdx];
+																	} else {
+																		std::get<1>(channel->segList[freqSegIdx]) = eirpLimit_dBm[bandEdgeIdx];
+																	}
+																	bandEdgeVal = eirpLimit_dBm[bandEdgeIdx];
+																}
+																double psd = bandEdgeVal - 10.0*log(bandwidthMHz)/log(10.0);
+																if (psd > _minPSD_dBmPerMHz) {
+																	redFlag = false;
+																}
+															}
+															if (redFlag) {
+																double eirp_dBm = _minPSD_dBmPerMHz + 10.0*log10(bandwidthMHz);
+																channel->segList[freqSegIdx] = std::make_tuple(eirp_dBm, eirp_dBm, RED);
+															}
+														}
 													}
 												}
+											}
+										}
 
-												std::string bldgTypeStr = (_fixedBuildingLossFlag ? "INDOOR_FIXED" :
-														_buildingType == CConst::noBuildingType ? "OUTDOOR" :
-														_buildingType == CConst::traditionalBuildingType ?  "TRADITIONAL" :
-														"THERMALLY_EFFICIENT");
+                                        if (state == 0) {
+                                            freqSegIdx++;
+											if (freqSegIdx == channel->segList.size()) {
+												std::string txClutterStr;
+												std::string rxClutterStr;
+												std::string pathLossModelStr;
+												double pathLossCDF;
+												std::string pathClutterTxModelStr;
+												double pathClutterTxCDF;
+												double pathClutterTxDB;
+												std::string pathClutterRxModelStr;
+												double pathClutterRxCDF;
+												double pathClutterRxDB;
 
-												excthrGc.fsid = uls->getID();
-												excthrGc.region = uls->getRegion();
-												excthrGc.dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
-												excthrGc.rlanPosnIdx = rlanHtIdx;
-												excthrGc.callsign = uls->getCallsign();
-												excthrGc.fsLon = uls->getRxLongitudeDeg();
-												excthrGc.fsLat = uls->getRxLatitudeDeg();
-												excthrGc.fsAgl = divIdx == 0 ? uls->getRxHeightAboveTerrain() : uls->getDiversityHeightAboveTerrain();
-												excthrGc.fsTerrainHeight = uls->getRxTerrainHeight();
-												excthrGc.fsTerrainSource = _terrainDataModel->getSourceName(uls->getRxHeightSource());
-												excthrGc.fsPropEnv = ulsRxPropEnv;
-												excthrGc.numPr = uls->getNumPR();
-												excthrGc.divIdx = divIdx;
-												excthrGc.segIdx = segIdx;
-												excthrGc.segRxLon = ulsRxLongitude;
-												excthrGc.segRxLat = ulsRxLatitude;
+												int numItmSeg = itmSegList.size();
+												if ( (numItmSeg > 1) || ((numItmSeg > 0) && (channelType == ChannelType::INQUIRED_FREQUENCY)) ) {
+													if (channelType == ChannelType::INQUIRED_FREQUENCY) {
+														itmStartFreqMHz = channel->freqMHzList[itmSegList[0]];
+														itmStopFreqMHz = channel->freqMHzList[itmSegList[numItmSeg-1]+1];
+													} else {
+														itmStartFreqMHz = (channel->freqMHzList[itmSegList[0]] + channel->freqMHzList[itmSegList[0]+1])/2.0;
+														itmStopFreqMHz = (channel->freqMHzList[itmSegList[numItmSeg]] + channel->freqMHzList[itmSegList[numItmSeg]+1])/2.0;
+													}
 
-												if ((segIdx < numPR) && (uls->getPR(segIdx).type == CConst::billboardReflectorPRType)) {
-													PRClass& pr = uls->getPR(segIdx);
-													excthrGc.refThetaIn = pr.reflectorThetaIN;
-													excthrGc.refKs = pr.reflectorKS;
-													excthrGc.refQ = pr.reflectorQ;
-													excthrGc.refD0 = reflectorD0;
-													excthrGc.refD1 = reflectorD1;
-												}
+													computePathLoss(contains2D ? CConst::FSPLPathLossModel : _pathLossModel, false, rlanPropEnv[scanPtIdx], fsPropEnv, rlanNlcdLandCat[scanPtIdx],
+															nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, itmStartFreqMHz*1.0e6,
+															rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
+															ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
+															itmStartPathLoss, pathClutterTxDB, pathClutterRxDB,
+															pathLossModelStr, pathLossCDF,
+															pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
+															&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
+#if DEBUG_AFC
+															, uls->ITMHeightType
+#endif
+															);
 
-												excthrGc.rlanLon = rlanCoord.longitudeDeg;
-												excthrGc.rlanLat = rlanCoord.latitudeDeg;
-												excthrGc.rlanAgl =rlanCoord.heightKm * 1000.0 - rlanTerrainHeight[scanPtIdx];
-												excthrGc.rlanTerrainHeight = rlanTerrainHeight[scanPtIdx];
-												excthrGc.rlanTerrainSource = _terrainDataModel->getSourceName(rlanHeightSource[scanPtIdx]);
-												excthrGc.rlanPropEnv = CConst::strPropEnvList->type_to_str(rlanPropEnv[scanPtIdx]);
-												excthrGc.rlanFsDist = distKm;
-												excthrGc.rlanFsGroundDist = groundDistanceKm;
-												excthrGc.rlanElevAngle = elevationAngleTxDeg;
-												excthrGc.boresightAngle = angleOffBoresightDeg;
-												excthrGc.rlanTxEirp = maxEIRPdBm;
-												if (_rlanAntenna) {
-													excthrGc.rlanAntennaModel = _rlanAntenna->get_strid();
-													excthrGc.rlanAOB = rlanAngleOffBoresightRad*180.0/M_PI;
+													computePathLoss(contains2D ? CConst::FSPLPathLossModel : _pathLossModel, false, rlanPropEnv[scanPtIdx], fsPropEnv, rlanNlcdLandCat[scanPtIdx],
+															nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, itmStopFreqMHz*1.0e6,
+															rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
+															ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
+															itmStopPathLoss, pathClutterTxDB, pathClutterRxDB,
+															pathLossModelStr, pathLossCDF,
+															pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
+															&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
+#if DEBUG_AFC
+															, uls->ITMHeightType
+#endif
+															);
+                                                    state = 1;
+													itmSegIdx = 0;
+												} else if (numItmSeg == 1) {
+													itmStartFreqMHz = channel->freqMHzList[itmSegList[0]];
+													itmStopFreqMHz = channel->freqMHzList[itmSegList[0]+1];
+
+													computePathLoss(contains2D ? CConst::FSPLPathLossModel : _pathLossModel, false, rlanPropEnv[scanPtIdx], fsPropEnv, rlanNlcdLandCat[scanPtIdx],
+															nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, (itmStartFreqMHz+itmStopFreqMHz)*0.5e6,
+															rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
+															ulsRxLongitude, ulsRxLatitude, ulsRxHeightAGL, elevationAngleRxDeg,
+															itmStartPathLoss, pathClutterTxDB, pathClutterRxDB,
+															pathLossModelStr, pathLossCDF,
+															pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
+															&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
+#if DEBUG_AFC
+															, uls->ITMHeightType
+#endif
+															);
+
+													itmStopPathLoss = itmStartPathLoss;
+
+                                                    state = 1;
+													itmSegIdx = 0;
 												} else {
-													excthrGc.rlanAntennaModel = "";
-													excthrGc.rlanAOB = -1.0;
+													contFlag = false;
 												}
-												excthrGc.rlanDiscriminationGainDB = rlanDiscriminationGainDB;
-												excthrGc.bodyLoss = _bodyLossDB;
-												excthrGc.rlanClutterCategory = txClutterStr;
-												excthrGc.fsClutterCategory = rxClutterStr;
-												excthrGc.buildingType = bldgTypeStr;
-												excthrGc.buildingPenetration = buildingPenetrationDB;
-												excthrGc.buildingPenetrationModel = buildingPenetrationModelStr;
-												excthrGc.buildingPenetrationCdf = buildingPenetrationCDF;
-												excthrGc.pathLoss = pathLoss;
-												excthrGc.pathLossModel = pathLossModelStr;
-												excthrGc.pathLossCdf = pathLossCDF;
-												excthrGc.pathClutterTx = pathClutterTxDB;
-												excthrGc.pathClutterTxMode =  pathClutterTxModelStr;
-												excthrGc.pathClutterTxCdf = pathClutterTxCDF;
-												excthrGc.pathClutterRx = pathClutterRxDB;
-												excthrGc.pathClutterRxMode = pathClutterRxModelStr;
-												excthrGc.pathClutterRxCdf = pathClutterRxCDF;
-												excthrGc.rlanBandwidth = bandwidth * 1.0e-6;
-												excthrGc.rlanStartFreq = chanStartFreq * 1.0e-6;
-												excthrGc.rlanStopFreq = chanStopFreq * 1.0e-6;
-												excthrGc.ulsStartFreq = uls->getStartFreq() * 1.0e-6;
-												excthrGc.ulsStopFreq = uls->getStopFreq() * 1.0e-6;
-												excthrGc.antType = rxAntennaTypeStr;
-												excthrGc.antCategory = CConst::strAntennaCategoryList->type_to_str(segIdx == numPR ? uls->getRxAntennaCategory() : uls->getPR(segIdx).antCategory);
-												excthrGc.antGainPeak = divIdx == 0 ? uls->getRxGain() : uls->getDiversityGain();
-
-												if (segIdx != numPR) {
-													excthrGc.prType = CConst::strPRTypeList->type_to_str(uls->getPR(segIdx).type);
-													excthrGc.prEffectiveGain = uls->getPR(segIdx).effectiveGain;
-													excthrGc.prDiscrinminationGain = discriminationGain;
-												}
-
-												excthrGc.fsGainToRlan = rxGainDB;
-												if (!std::isnan(nearField_xdb)) {
-													excthrGc.fsNearFieldXdb = nearField_xdb;
-												}
-												if (!std::isnan(nearField_u)) {
-													excthrGc.fsNearFieldU = nearField_u;
-												}
-												if (!std::isnan(nearField_eff)) {
-													excthrGc.fsNearFieldEff = nearField_eff;
-												}
-												excthrGc.fsNearFieldOffset = nearFieldOffsetDB;
-												excthrGc.spectralOverlapLoss = spectralOverlapLossDB;
-												excthrGc.polarizationLoss = _polarizationLossDB;
-												excthrGc.fsRxFeederLoss = uls->getRxAntennaFeederLossDB();
-												excthrGc.fsRxPwr = rxPowerDBW;
-												excthrGc.fsIN = I2NDB;
-												excthrGc.eirpLimit = eirpLimit_dBm;
-												excthrGc.fsSegDist = ulsSegmentDistance;
-												excthrGc.rlanCenterFreq = chanCenterFreq;
-												excthrGc.fsTxToRlanDist = d2;
-												excthrGc.pathDifference = pathDifference;
-												excthrGc.ulsWavelength = ulsWavelength * 1000;
-												excthrGc.fresnelIndex = fresnelIndex;
-
-												excthrGc.completeRow();
 											}
-
-											if ((_printSkippedLinksFlag) && (skip)) {
-												continue;
+										} else {
+											itmSegIdx++;
+											if (itmSegIdx == itmSegList.size()) {
+												contFlag = false;
 											}
-
 										}
 									}
 								}
@@ -9163,25 +9470,32 @@ void AfcManager::runPointAnalysis()
 	int chanIdx;
 	for (chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
 		ChannelStruct *channel = &(_channelList[chanIdx]);
-
-		if ( (channel->type == ChannelType::INQUIRED_CHANNEL) && (channel->availability != BLACK) && (channel->availability != RED) ) {
-			if (channel->eirpLimit_dBm == _maxEIRP_dBm)
-			{
-				channel->availability = GREEN;
-			}
-			else if (channel->eirpLimit_dBm >= _minEIRP_dBm)
-			{
-				channel->availability = YELLOW;
-			}
-			else
-			{
-				channel->availability = RED;
+		for(int freqSegIdx=0; freqSegIdx<channel->segList.size(); ++freqSegIdx) {
+			ChannelColor chanColor = std::get<2>(channel->segList[freqSegIdx]);
+			if ( (channel->type == ChannelType::INQUIRED_CHANNEL) && (chanColor != BLACK) && (chanColor != RED) ) {
+				double chanEirpLimit = std::min(std::get<0>(channel->segList[freqSegIdx]), std::get<1>(channel->segList[freqSegIdx]));
+				if (chanEirpLimit == _maxEIRP_dBm)
+				{
+					std::get<2>(channel->segList[freqSegIdx]) = GREEN;
+				}
+				else if (chanEirpLimit >= _minEIRP_dBm)
+				{
+					std::get<2>(channel->segList[freqSegIdx]) = YELLOW;
+				}
+				else
+				{
+					std::get<2>(channel->segList[freqSegIdx]) = RED;
+				}
 			}
 		}
 	}
 
 	free(eirpLimitList);
 	free(ulsFlagList);
+
+	if (excthrGc) {
+		delete excthrGc;
+	}
 }
 
 // Returns _ulsList content, sorted in by decreasing of crude interference
@@ -9746,8 +10060,9 @@ void AfcManager::runScanAnalysis()
 			/* Initialize eirpLimit_dBm to _maxEIRP_dBm for all channels                          */
 			/**************************************************************************************/
 			for (auto& channel : _channelList) {
-				channel.eirpLimit_dBm = _maxEIRP_dBm;
-				channel.availability = GREEN;
+				for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+					channel.segList[freqSegIdx] = std::make_tuple(_maxEIRP_dBm, _maxEIRP_dBm, GREEN);
+				}
 			}
 			/**************************************************************************************/
 
@@ -9758,13 +10073,17 @@ void AfcManager::runScanAnalysis()
 				DeniedRegionClass *dr = _deniedRegionList[drIdx];
 				if (dr->intersect(rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, 0.0, rlanHtAboveTerrain)) {
 					for (auto& channel : _channelList) {
-						if (channel.availability != BLACK) {
-							double chanStartFreq = channel.startFreqMHz * 1.0e6;
-							double chanStopFreq = channel.stopFreqMHz * 1.0e6;
-							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, dr->getStartFreq(), dr->getStopFreq(), false, CConst::psdSpectralAlgorithm);
-							if (hasOverlap) {
-								channel.availability = BLACK;
-								channel.eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+						for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+							if (std::get<2>(channel.segList[freqSegIdx]) != BLACK) {
+								double chanStartFreq = channel.freqMHzList[freqSegIdx]*1.0e6;
+								double chanStopFreq = channel.freqMHzList[freqSegIdx+1]* 1.0e6;
+								bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, dr->getStartFreq(), dr->getStopFreq(), false, CConst::psdSpectralAlgorithm);
+								if (hasOverlap) {
+									channel.segList[freqSegIdx] = std::make_tuple(
+										-std::numeric_limits<double>::infinity(),
+										-std::numeric_limits<double>::infinity(),
+										 BLACK);
+								}
 							}
 						}
 					}
@@ -9821,61 +10140,65 @@ void AfcManager::runScanAnalysis()
 					/**************************************************************************************/
 
 					for (auto& channel : _channelList) {
-						if (channel.availability != BLACK) {
-							double chanStartFreq = channel.startFreqMHz * 1.0e6;
-							double chanStopFreq = channel.stopFreqMHz * 1.0e6;
-							bool useACI = (channel.type == INQUIRED_FREQUENCY ? false : _aciFlag);
-							CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel.type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
-							// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
-							double spectralOverlapLossDB;
-							bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), useACI, spectralAlgorithm);
+						for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+							if (std::get<2>(channel.segList[freqSegIdx]) != BLACK) {
+								double chanStartFreq = channel.freqMHzList[freqSegIdx]*1.0e6;
+								double chanStopFreq = channel.freqMHzList[freqSegIdx+1]* 1.0e6;
 
-							if (hasOverlap) {
-								// double bandwidth = chanStopFreq - chanStartFreq;
-								double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
+								bool useACI = (channel.type == INQUIRED_FREQUENCY ? false : _aciFlag);
+								CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel.type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
+								// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
+								double spectralOverlapLossDB;
+								bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), useACI, spectralAlgorithm);
 
-								std::string buildingPenetrationModelStr;
-								double buildingPenetrationCDF;
-								double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF);
+								if (hasOverlap) {
+									// double bandwidth = chanStopFreq - chanStartFreq;
+									double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
 
-								std::string txClutterStr;
-								std::string rxClutterStr;
-								std::string pathLossModelStr;
-								double pathLossCDF;
-								double pathLoss;
-								std::string pathClutterTxModelStr;
-								double pathClutterTxCDF;
-								double pathClutterTxDB;
-								std::string pathClutterRxModelStr;
-								double pathClutterRxCDF;
-								double pathClutterRxDB;
+									std::string buildingPenetrationModelStr;
+									double buildingPenetrationCDF;
+									double buildingPenetrationDB = computeBuildingPenetration(_buildingType, elevationAngleTxDeg, chanCenterFreq, buildingPenetrationModelStr, buildingPenetrationCDF);
 
-								computePathLoss(_pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
-										rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
-										uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
-										pathLoss, pathClutterTxDB, pathClutterRxDB,
-										pathLossModelStr, pathLossCDF,
-										pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
-										&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
+									std::string txClutterStr;
+									std::string rxClutterStr;
+									std::string pathLossModelStr;
+									double pathLossCDF;
+									double pathLoss;
+									std::string pathClutterTxModelStr;
+									double pathClutterTxCDF;
+									double pathClutterTxDB;
+									std::string pathClutterRxModelStr;
+									double pathClutterRxCDF;
+									double pathClutterRxDB;
+
+									computePathLoss(_pathLossModel, false, rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
+											rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
+											uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
+											pathLoss, pathClutterTxDB, pathClutterRxDB,
+											pathLossModelStr, pathLossCDF,
+											pathClutterTxModelStr, pathClutterTxCDF, pathClutterRxModelStr, pathClutterRxCDF,
+											&txClutterStr, &rxClutterStr, &(uls->ITMHeightProfile), &(uls->isLOSHeightProfile), &(uls->isLOSSurfaceFrac)
 #if DEBUG_AFC
-										, uls->ITMHeightType
+											, uls->ITMHeightType
 #endif
-										);
+											);
 
-								std::string rxAntennaSubModelStr;
-								double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
-								double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, 0);
+									std::string rxAntennaSubModelStr;
+									double angleOffBoresightDeg = acos(uls->getAntennaPointing().dot(-(lineOfSightVectorKm.normalized()))) * 180.0 / M_PI;
+									double rxGainDB = uls->computeRxGain(angleOffBoresightDeg, elevationAngleRxDeg, chanCenterFreq, rxAntennaSubModelStr, 0);
 
-								double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
+									double rxPowerDBW = (_maxEIRP_dBm - 30.0) - _bodyLossDB - buildingPenetrationDB - pathLoss - pathClutterTxDB - pathClutterRxDB + rxGainDB - spectralOverlapLossDB - _polarizationLossDB - uls->getRxAntennaFeederLossDB();
 
-								double I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
+									double I2NDB = rxPowerDBW - uls->getNoiseLevelDBW();
 
-								double marginDB = _IoverN_threshold_dB - I2NDB;
+									double marginDB = _IoverN_threshold_dB - I2NDB;
 
-								double eirpLimit_dBm = _maxEIRP_dBm + marginDB;
+									double eirpLimit_dBm = _maxEIRP_dBm + marginDB;
 
-								if (eirpLimit_dBm < channel.eirpLimit_dBm) {
-									channel.eirpLimit_dBm = eirpLimit_dBm;
+									if (eirpLimit_dBm < std::min(std::get<0>(channel.segList[freqSegIdx]), std::get<1>(channel.segList[freqSegIdx]))) {
+										std::get<0>(channel.segList[freqSegIdx]) = eirpLimit_dBm;
+										std::get<1>(channel.segList[freqSegIdx]) = eirpLimit_dBm;
+									}
 								}
 							}
 						}
@@ -9900,17 +10223,20 @@ void AfcManager::runScanAnalysis()
 			}
 
 			for (auto& channel : _channelList) {
-				if (channel.type == ChannelType::INQUIRED_CHANNEL) {
-					bwIdx = bw_index_map[channel.bandwidth()];
-					if (channel.availability == BLACK) {
-						numBlack[bwIdx]++;
-					} else if (channel.eirpLimit_dBm == _maxEIRP_dBm) {
-						numGreen[bwIdx]++;
-					}
-					else if (channel.eirpLimit_dBm >= _minEIRP_dBm) {
-						numYellow[bwIdx]++;
-					} else {
-						numRed[bwIdx]++;
+				for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+					if (channel.type == ChannelType::INQUIRED_CHANNEL) {
+						bwIdx = bw_index_map[channel.bandwidth(freqSegIdx)];
+                        double channelEirp = std::min(std::get<0>(channel.segList[freqSegIdx]), std::get<1>(channel.segList[freqSegIdx]));
+						if (std::get<2>(channel.segList[freqSegIdx]) == BLACK) {
+							numBlack[bwIdx]++;
+						} else if (channelEirp == _maxEIRP_dBm) {
+							numGreen[bwIdx]++;
+						}
+						else if (channelEirp >= _minEIRP_dBm) {
+							numYellow[bwIdx]++;
+						} else {
+							numRed[bwIdx]++;
+						}
 					}
 				}
 			}
@@ -9988,11 +10314,12 @@ void AfcManager::runExclusionZoneAnalysis()
 	std::string dbName = std::get<0>(_ulsDatabaseList[uls->getDBIdx()]);
 
 	ChannelStruct channel = _channelList[_exclusionZoneRLANChanIdx];
+	int freqSegIdx = 0;
 
-	double bandwidth = (channel.stopFreqMHz - channel.startFreqMHz)*1.0e6;
+	double bandwidth = (channel.bandwidth(freqSegIdx))*1.0e6;
 
-	double chanStopFreq = channel.stopFreqMHz*1.0e6;
-	double chanStartFreq = channel.startFreqMHz*1.0e6;
+	double chanStartFreq = channel.freqMHzList[freqSegIdx]*1.0e6;
+	double chanStopFreq = channel.freqMHzList[freqSegIdx+1]* 1.0e6;
 	bool useACI = (channel.type == INQUIRED_FREQUENCY ? false : _aciFlag);
 	CConst::SpectralAlgorithmEnum spectralAlgorithm = (channel.type == INQUIRED_FREQUENCY ? CConst::psdSpectralAlgorithm : _channelResponseAlgorithm);
 	// LOGGER_INFO(logger) << "COMPUTING SPECTRAL OVERLAP FOR FSID = " << uls->getID();
@@ -10300,7 +10627,7 @@ double AfcManager::computeIToNMargin(double d, double cc, double ss, ULSClass *u
 
 		double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-		computePathLoss(_pathLossModel, (rlanPropEnv == CConst::unknownPropEnv ? CConst::barrenPropEnv : rlanPropEnv), fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
+		computePathLoss(_pathLossModel, false, (rlanPropEnv == CConst::unknownPropEnv ? CConst::barrenPropEnv : rlanPropEnv), fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 				rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 				uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 				pathLoss, pathClutterTxDB, pathClutterRxDB,
@@ -10650,9 +10977,10 @@ void AfcManager::runHeatmapAnalysis()
 	}
 
 	ChannelStruct *channel = &(_channelList[0]);
+	int freqSegIdx = 0;
 
-	double chanStartFreq = channel->startFreqMHz*1.0e6;
-	double chanStopFreq = channel->stopFreqMHz*1.0e6;
+	double chanStartFreq = channel->freqMHzList[freqSegIdx]*1.0e6;
+	double chanStopFreq = channel->freqMHzList[freqSegIdx+1]* 1.0e6;
 	double chanCenterFreq = (chanStartFreq + chanStopFreq)/2;
 	double chanBandwidth  = chanStopFreq - chanStartFreq;
 	bool useACI = (channel->type == INQUIRED_FREQUENCY ? false : _aciFlag);
@@ -10684,7 +11012,7 @@ void AfcManager::runHeatmapAnalysis()
 	    ULSClass *uls = (*_ulsList)[ulsIdx];
 	    double spectralOverlapLossDB;
 	    bool hasOverlap = computeSpectralOverlapLoss(&spectralOverlapLossDB, chanStartFreq, chanStopFreq, uls->getStartFreq(), uls->getStopFreq(), useACI, spectralAlgorithm);
-	    if (hasOverlap > 0.0) {
+	    if (hasOverlap) {
 		    _ulsIdxList.push_back(ulsIdx); // Store the ULS indices that are used in analysis
 	    }
     }
@@ -10830,8 +11158,10 @@ void AfcManager::runHeatmapAnalysis()
 			int numRlanPosn = ((heightUncertainty == 0.0) ? 1 : 3);
 
 			double maxIToNDB = -std::numeric_limits<double>::infinity();
-			channel->availability = GREEN;
-			channel->eirpLimit_dBm = std::numeric_limits<double>::infinity();
+			channel->segList[freqSegIdx] = std::make_tuple(
+				std::numeric_limits<double>::infinity(),
+				std::numeric_limits<double>::infinity(), 
+				GREEN);
 
 			if (numRlanPosn) {
 				GeodeticCoord rlanCoord = rlanCoordList[0];
@@ -10845,11 +11175,13 @@ void AfcManager::runHeatmapAnalysis()
 			    for (drIdx = 0; drIdx < (int) _deniedRegionList.size(); ++drIdx) {
 				    DeniedRegionClass *dr = _deniedRegionList[drIdx];
 					if (dr->intersect(rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, 0.0, rlanHeightAGL)) {
-						if (channel->availability != BLACK) {
+						if (std::get<2>(channel->segList[freqSegIdx]) != BLACK) {
 							bool hasOverlap = computeSpectralOverlapLoss((double *) NULL, chanStartFreq, chanStopFreq, dr->getStartFreq(), dr->getStopFreq(), false, CConst::psdSpectralAlgorithm);
 							if (hasOverlap) {
-								channel->availability = BLACK;
-								channel->eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+								channel->segList[freqSegIdx] = std::make_tuple(
+									-std::numeric_limits<double>::infinity(),
+									-std::numeric_limits<double>::infinity(), 
+									BLACK);
 								maxIToNDB = std::numeric_limits<double>::infinity();
 							}
 						}
@@ -10885,8 +11217,10 @@ void AfcManager::runHeatmapAnalysis()
 #endif
 
                         if (distKmSquared <= exclusionDistKmSquared) {
-							channel->availability = BLACK;
-							channel->eirpLimit_dBm = -std::numeric_limits<double>::infinity();
+							channel->segList[freqSegIdx] = std::make_tuple(
+								-std::numeric_limits<double>::infinity(),
+								-std::numeric_limits<double>::infinity(), 
+								BLACK);
 							maxIToNDB = std::numeric_limits<double>::infinity();
 						} else if (distKmSquared < maxRadiusKmSquared) {
 
@@ -11005,7 +11339,7 @@ void AfcManager::runHeatmapAnalysis()
 
 									double rlanHtAboveTerrain = rlanCoord.heightKm * 1000.0 - rlanTerrainHeight;
 
-									computePathLoss(_pathLossModel, rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
+									computePathLoss(_pathLossModel, false, rlanPropEnv, fsPropEnv, nlcdLandCatTx, nlcdLandCatRx, distKm, fsplDistKm, win2DistKm, chanCenterFreq,
 													rlanCoord.longitudeDeg, rlanCoord.latitudeDeg, rlanHtAboveTerrain, elevationAngleTxDeg,
 													uls->getRxLongitudeDeg(), uls->getRxLatitudeDeg(), uls->getRxHeightAboveTerrain(), elevationAngleRxDeg,
 													pathLoss, pathClutterTxDB, pathClutterRxDB,
@@ -11912,7 +12246,6 @@ void AfcManager::printUserInputs()
 		if (!std::isnan(_reportUnavailPSDdBmPerMHz)) {
 			inputGc.writeRow({ "REPORT_UNAVAIL_PSD_DBM_PER_MHZ", f2s(_reportUnavailPSDdBmPerMHz) });
 		}
-		inputGc.writeRow({ "INQUIRED_FREQUENCY_RESOLUTION_MHZ", std::to_string(_inquiredFrequencyResolutionMHz) });
 		inputGc.writeRow({ "INQUIRED_FREQUENCY_MAX_PSD_DBM_PER_MHZ", f2s(_inquiredFrequencyMaxPSD_dBmPerMHz) });
 		inputGc.writeRow({ "VISIBILITY_THRESHOLD", f2s(_visibilityThreshold) } );
 		inputGc.writeRow({ "PRINT_SKIPPED_LINKS_FLAG", (_printSkippedLinksFlag ? "true" : "false" ) } );
@@ -12118,6 +12451,10 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 		_excThrFile = QDir(QString::fromStdString(tempDir)).filePath("exc_thr.csv.gz").toStdString();
 		_fsAnomFile = QDir(QString::fromStdString(tempDir)).filePath("fs_anom.csv.gz").toStdString();
 		_userInputsFile = QDir(QString::fromStdString(tempDir)).filePath("userInputs.csv.gz").toStdString();
+	} else {
+		_excThrFile = "";
+		_fsAnomFile = "";
+		_userInputsFile = "";
 	}
 	if (AfcManager::_createSlowDebugFiles) {
 		_eirpGcFile = QDir(QString::fromStdString(tempDir)).filePath("eirp.csv.gz").toStdString();
@@ -12134,62 +12471,81 @@ void AfcManager::setConstInputs(const std::string& tempDir)
 /**************************************************************************************/
 void AfcManager::computeInquiredFreqRangesPSD(std::vector<psdFreqRangeClass> &psdFreqRangeList)
 {
-	for(auto& freqRange : _inquiredFrequencyRangesMHz) {
-		auto startFreqMHz = freqRange.first;
-		auto stopFreqMHz = freqRange.second;
-		psdFreqRangeClass psdFreqRange;
-		psdFreqRange.freqMHzList.push_back(startFreqMHz);
+	for(auto& channel : _channelList) {
+		if (channel.type == INQUIRED_FREQUENCY) {
+			psdFreqRangeClass psdFreqRange;
+			for(int freqSegIdx=0; freqSegIdx<channel.segList.size(); ++freqSegIdx) {
+				if (freqSegIdx == 0) {
+					psdFreqRange.freqMHzList.push_back(channel.freqMHzList[0]);
+				}
+				int freqSegStartFreqMHz = channel.freqMHzList[freqSegIdx];
+				int freqSegStopFreqMHz = channel.freqMHzList[freqSegIdx+1];
+				ChannelColor chanColor = std::get<2>(channel.segList[freqSegIdx]);
+				if ( (chanColor != BLACK) && (chanColor != RED) ) {
+					double segEIRPLimitA = std::get<0>(channel.segList[freqSegIdx]);
+					double segEIRPLimitB = std::get<1>(channel.segList[freqSegIdx]);
+					double psdA = segEIRPLimitA - 10.0*log10((double) channel.bandwidth(freqSegIdx));
+					double psdB = segEIRPLimitB - 10.0*log10((double) channel.bandwidth(freqSegIdx));
 
-		int prevFreqMHz = startFreqMHz;
-		while(prevFreqMHz < stopFreqMHz) {
-			bool initFlag = true;
-			int nextFreqMHz = stopFreqMHz;
-			double minPSD;
-			int minNextFreq = stopFreqMHz;
-			for(auto& channel : _channelList) {
-				if ( (channel.type == INQUIRED_FREQUENCY) && (channel.availability != BLACK) && (channel.availability != RED) ) {
-					if ((channel.startFreqMHz <= prevFreqMHz) && (channel.stopFreqMHz > prevFreqMHz)) {
-						double psd = channel.eirpLimit_dBm - 10.0*log((double) channel.bandwidth())/log(10.0);
-						if (_roundPSDEIRPFlag) {
-							// PSD value rounded down to nearest multiple of 0.1 dB
-							psd = std::floor(psd*10)/10.0;
+					if (_roundPSDEIRPFlag) {
+						// PSD value rounded down to nearest multiple of 0.1 dB
+						psdA = std::floor(psdA*10)/10.0;
+						psdB = std::floor(psdB*10)/10.0;
+						double prevPSD = psdA;
+						int prevFreq = freqSegStartFreqMHz;
+						while(prevFreq < freqSegStopFreqMHz) {
+							if (prevPSD == psdB) {
+								psdFreqRange.freqMHzList.push_back(freqSegStopFreqMHz);
+								psdFreqRange.psd_dBm_MHzList.push_back(psdB);
+								prevPSD = psdB;
+								prevFreq = freqSegStopFreqMHz;
+							} else {
+								int n = (int) floor(fabs(psdB - prevPSD) / 0.1 + 0.5);
+								int m = freqSegStopFreqMHz - prevFreq;
+								double freqMHzVal = prevFreq + (m+n-1)/n;
+								double psdVal = (psdA*(freqSegStopFreqMHz - freqMHzVal) + psdB*(freqMHzVal - freqSegStartFreqMHz))
+									/ (freqSegStopFreqMHz-freqSegStartFreqMHz);
+								psdVal = std::floor(psdVal*10)/10.0;
+								double minPSD = std::min(prevPSD, psdVal);
+								psdFreqRange.freqMHzList.push_back(freqMHzVal);
+								psdFreqRange.psd_dBm_MHzList.push_back(minPSD);
+								prevPSD = psdVal;
+								prevFreq = freqMHzVal;
+							}
 						}
-						if ((initFlag) || (psd < minPSD)) {
-							minPSD = psd;
-						}
-						if (channel.stopFreqMHz < nextFreqMHz) {
-							nextFreqMHz = channel.stopFreqMHz;
-						}
-						initFlag = false;
-					} else if ((channel.startFreqMHz > prevFreqMHz) && (initFlag)) {
-						if (channel.startFreqMHz < minNextFreq) {
-							minNextFreq = channel.startFreqMHz;
+					} else {
+						double prevPSD = psdA;
+						if (prevPSD == psdB) {
+							psdFreqRange.freqMHzList.push_back(freqSegStopFreqMHz);
+							psdFreqRange.psd_dBm_MHzList.push_back(psdB);
+							prevPSD = psdB;
+						} else {
+							for(int freqMHzVal = freqSegStartFreqMHz+1; freqMHzVal<=freqSegStopFreqMHz; ++freqMHzVal) {
+								double psdVal = (psdA*(freqSegStopFreqMHz - freqMHzVal) + psdB*(freqMHzVal - freqSegStartFreqMHz))
+									/ (freqSegStopFreqMHz-freqSegStartFreqMHz);
+								double minPSD = std::min(prevPSD, psdVal);
+								psdFreqRange.freqMHzList.push_back(freqMHzVal);
+								psdFreqRange.psd_dBm_MHzList.push_back(minPSD);
+								prevPSD = psdVal;
+							}
 						}
 					}
+				} else {
+					psdFreqRange.freqMHzList.push_back(freqSegStopFreqMHz);
+					psdFreqRange.psd_dBm_MHzList.push_back(quietNaN);
 				}
 			}
-			if (initFlag) {
-				// throw std::runtime_error(std::string("Error computing PSD over inquired frequency range ")
-				//     + "[" + std::to_string(startFreqMHz) + "," + std::to_string(stopFreqMHz) + "]"
-				//     + ", problem at frequency " + std::to_string(prevFreqMHz)
-				// );
-				nextFreqMHz = minNextFreq;
-				minPSD = quietNaN;
-			}
-			psdFreqRange.freqMHzList.push_back(nextFreqMHz);
-			psdFreqRange.psd_dBm_MHzList.push_back(minPSD);
-			prevFreqMHz = nextFreqMHz;
-		}
 
-		int segIdx;
-		for(segIdx=psdFreqRange.psd_dBm_MHzList.size()-2; segIdx>=0; --segIdx) {
-			if (psdFreqRange.psd_dBm_MHzList[segIdx] == psdFreqRange.psd_dBm_MHzList[segIdx+1]) {
-				psdFreqRange.psd_dBm_MHzList.erase (psdFreqRange.psd_dBm_MHzList.begin()+segIdx+1);
-				psdFreqRange.freqMHzList.erase(psdFreqRange.freqMHzList.begin()+segIdx+1);
+			int segIdx;
+			for(segIdx=psdFreqRange.psd_dBm_MHzList.size()-2; segIdx>=0; --segIdx) {
+				if (psdFreqRange.psd_dBm_MHzList[segIdx] == psdFreqRange.psd_dBm_MHzList[segIdx+1]) {
+					psdFreqRange.psd_dBm_MHzList.erase (psdFreqRange.psd_dBm_MHzList.begin()+segIdx+1);
+					psdFreqRange.freqMHzList.erase(psdFreqRange.freqMHzList.begin()+segIdx+1);
+				}
 			}
-		}
 
-		psdFreqRangeList.push_back(psdFreqRange);
+			psdFreqRangeList.push_back(psdFreqRange);
+		}
 	}
 
 	return;
@@ -12204,6 +12560,11 @@ void AfcManager::createChannelList()
 	// add channel plan to channel list
 	int totalNumChan = 0;
 
+	/**********************************************************************************/
+	/* Check that inquired frequency ranges are valid and translate into sorted       */
+	/* list of disjoint segments.                                                     */
+	/**********************************************************************************/
+	std::vector<std::pair<int,int>> freqSegmentList;
 	for(auto& freqRange : _inquiredFrequencyRangesMHz) {
 		auto inquiredStartFreqMHz = freqRange.first;
 		auto inquiredStopFreqMHz = freqRange.second;
@@ -12217,34 +12578,34 @@ void AfcManager::createChannelList()
 		std::vector<std::pair<int,int>> overlapBandList = calculateOverlapBandList(_allowableFreqBandList, inquiredStartFreqMHz, inquiredStopFreqMHz);
 
 		if (overlapBandList.size()) {
-			int numChan = 0;
 
 			for(int segIdx=0; segIdx<(int) overlapBandList.size(); ++segIdx) {
 				int startFreq = overlapBandList[segIdx].first;
-				int stopFreq = startFreq + _inquiredFrequencyResolutionMHz;
-				while(stopFreq <= overlapBandList[segIdx].second) {
-					ChannelStruct channel;
-					channel.startFreqMHz = startFreq;
-					channel.stopFreqMHz = stopFreq;
-					channel.operatingClass = -1;
-					channel.index = -1;
-					channel.availability = GREEN; // Everything initialized to GREEN
-					channel.eirpLimit_dBm = 0;
-					channel.type = INQUIRED_FREQUENCY;
-					_channelList.push_back(channel);
-					numChan++;
-					totalNumChan++;
+				int stopFreq = overlapBandList[segIdx].second;
 
-					startFreq = stopFreq;
-					stopFreq = startFreq + _inquiredFrequencyResolutionMHz;
+				int idxA = 0;
+				bool overlapA;
+				while ((idxA < freqSegmentList.size())&&(startFreq > freqSegmentList[idxA].second)) {
+					idxA++;
 				}
-			}
+				overlapA = ((idxA < freqSegmentList.size()) && (startFreq >= freqSegmentList[idxA].first));
 
-			if (numChan == 0) {
-				LOGGER_DEBUG(logger) << "Inquired Freq Range: [" << inquiredStartFreqMHz << ", " << inquiredStopFreqMHz << "] contains no channels" << std::endl;
-				_responseCode = CConst::invalidValueResponseCode;
-				_invalidParams << "lowFrequency" << "highFrequency";
-				return;
+				int idxB = 0;
+				bool overlapB;
+				while ((idxB < freqSegmentList.size())&&(stopFreq > freqSegmentList[idxB].second)) {
+					idxB++;
+				}
+				overlapB = ((idxB < freqSegmentList.size()) && (stopFreq >= freqSegmentList[idxB].first));
+
+				int start = overlapA ? freqSegmentList[idxA].first  : startFreq;
+				int stop  = overlapB ? freqSegmentList[idxB].second : stopFreq;
+				int delStart = idxA;
+				int delStop  = overlapB ? idxB : idxB-1;
+
+				if (delStop >= delStart) {
+					freqSegmentList.erase (freqSegmentList.begin()+delStart, freqSegmentList.begin()+delStop+1);
+				}
+				freqSegmentList.insert(freqSegmentList.begin()+delStart, std::make_pair(start, stop));
 			}
 		} else {
 			// the start/stop frequencies are not valid
@@ -12252,6 +12613,33 @@ void AfcManager::createChannelList()
 			_responseCode = CConst::unsupportedSpectrumResponseCode;
 			return;
 		}
+	}
+	/**********************************************************************************/
+
+#if DEBUG_AFC && 0
+std::cout << "freqSegmentList contains:" << std::endl;
+for (int i=0; i<freqSegmentList.size(); i++)
+    std::cout << " [" << freqSegmentList[i].first << "," << freqSegmentList[i].second << "]" << std::endl;
+std::cout << '\n';
+#endif
+
+	if (freqSegmentList.size()) {
+		ChannelStruct channel;
+		channel.operatingClass = -1;
+		channel.index = -1;
+		channel.type = INQUIRED_FREQUENCY;
+
+		for(int segIdx=0; segIdx<(int) freqSegmentList.size(); ++segIdx) {
+
+			channel.freqMHzList.push_back(freqSegmentList[segIdx].first);
+			channel.freqMHzList.push_back(freqSegmentList[segIdx].second);
+
+			if (segIdx) {
+				channel.segList.push_back( std::make_tuple(0.0, 0.0, BLACK) ); // Between segments not used, initialized to BLACK
+			}
+			channel.segList.push_back( std::make_tuple(0.0, 0.0, GREEN) ); // Everything initialized to GREEN
+		}
+		_channelList.push_back(channel);
 	}
 
 	for(auto& channelPair : _inquiredChannels) {
@@ -12290,16 +12678,16 @@ void AfcManager::createChannelList()
 
 				if (includeChannel) {
 					ChannelStruct channel;
-					channel.startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);;
-					channel.stopFreqMHz = channel.startFreqMHz + opClass.bandWidth;
+					int startFreqMHz = (opClass.startFreq + 5 * cfi) - (opClass.bandWidth >> 1);
+					int stopFreqMHz = startFreqMHz + opClass.bandWidth;
+					channel.freqMHzList.push_back(startFreqMHz);
+					channel.freqMHzList.push_back(stopFreqMHz);
 
 					// Include channel if it is within the frequency bands in AFC config
-					if (containsChannel(_allowableFreqBandList, channel.startFreqMHz, channel.stopFreqMHz)) {
+					if (containsChannel(_allowableFreqBandList, startFreqMHz, stopFreqMHz)) {
 						channel.operatingClass = opClass.opClass;
 						channel.index = cfi;
-
-						channel.availability = GREEN; // Everything initialized to GREEN
-						channel.eirpLimit_dBm = 0;
+						channel.segList.push_back( std::make_tuple(0.0, 0.0, GREEN) ); // Everything initialized to GREEN
 						channel.type = ChannelType::INQUIRED_CHANNEL;
 						_channelList.push_back(channel);
 						numChan++;
@@ -12320,6 +12708,99 @@ void AfcManager::createChannelList()
 			_responseCode = CConst::missingParamResponseCode;
 			return;
 		}
+	}
+}
+/**************************************************************************************/
+
+/**************************************************************************************/
+/* AfcManager::splitFrequencyRanges()                                                 */
+/**************************************************************************************/
+void AfcManager::splitFrequencyRanges()
+{
+	std::set<int> fsChannelEdgesMhz;
+	for (int ulsIdx = 0; ulsIdx < _ulsList->getSize(); ++ulsIdx) {
+		auto uls = (*_ulsList)[ulsIdx];
+		fsChannelEdgesMhz.insert((int) floor( (uls->getStartFreq() + 1.0) * 1.0e-6));
+		fsChannelEdgesMhz.insert((int) ceil(  (uls->getStopFreq()  - 1.0) * 1.0e-6));
+	}
+
+	int drIdx;
+	for (drIdx = 0; drIdx < (int) _deniedRegionList.size(); ++drIdx) {
+		DeniedRegionClass *dr = _deniedRegionList[drIdx];
+		fsChannelEdgesMhz.insert((int) floor( (dr->getStartFreq() + 1.0) * 1.0e-6));
+		fsChannelEdgesMhz.insert((int) ceil(  (dr->getStopFreq()  - 1.0) * 1.0e-6));
+	}
+
+    int numFsFreq = fsChannelEdgesMhz.size();
+
+    if (numFsFreq == 0) {
+		return;
+	}
+	std::set<int>::iterator fsChannelEdgesMhzIt = fsChannelEdgesMhz.begin();
+    int minFsFreq = *std::next(fsChannelEdgesMhzIt, 0);
+    int maxFsFreq = *std::next(fsChannelEdgesMhzIt, numFsFreq-1);
+
+	for (int chanIdx = 0; chanIdx < (int) _channelList.size(); ++chanIdx) {
+        ChannelStruct *channel = &(_channelList[chanIdx]);
+		if (channel->type == INQUIRED_FREQUENCY) {
+			int segIdx = 0;
+			while(segIdx<channel->segList.size()) {
+				ChannelColor segColor = std::get<2>(channel->segList[segIdx]);
+				if (segColor != BLACK) {
+					int chanStartFreqMHz = channel->freqMHzList[segIdx];
+					int chanStopFreqMHz = channel->freqMHzList[segIdx+1];
+
+					int aIdx = -2;
+					int bIdx = -2;
+
+					if ((maxFsFreq <= chanStartFreqMHz) || (minFsFreq >= chanStopFreqMHz)) {
+						// Do nothing
+					} else {
+						aIdx = -1;
+						std::set<int>::iterator aIt = fsChannelEdgesMhzIt;
+						while(*aIt <= chanStartFreqMHz) {
+							aIdx++;
+							aIt++;
+						};
+						bIdx = numFsFreq;
+						std::set<int>::reverse_iterator bIt = fsChannelEdgesMhz.rbegin();
+						while(*bIt >= chanStopFreqMHz) {
+							bIdx--;
+							bIt++;
+						}
+						int numIns = bIdx - aIdx - 1;
+
+						if (numIns > 0) {
+							for(int insIdx=0; insIdx<numIns; ++insIdx) {
+								channel->freqMHzList.insert(channel->freqMHzList.begin()+segIdx+1+insIdx, *aIt);
+								channel->segList.insert(channel->segList.begin()+segIdx+insIdx, std::make_tuple(0.0, 0.0, GREEN) );
+									// Everything initialized to GREEN
+								aIt++;
+							}
+						}
+						segIdx+=numIns;
+					}
+				}
+				segIdx++;
+			}
+
+#if DEBUG_AFC && 0
+std::cout << "NUM_SEG: " << channel->segList.size() << std::endl;
+for(segIdx=0; segIdx<channel->segList.size(); ++segIdx) {
+ChannelColor segColor = std::get<2>(channel->segList[segIdx]);
+std::string colorStr;
+switch(segColor) {
+    case BLACK:  colorStr = "BLACK"; break;
+    case RED:    colorStr = "RED"; break;
+    case YELLOW: colorStr = "YELLOW"; break;
+    case GREEN:  colorStr = "GREEN"; break;
+    default: CORE_DUMP; break;
+}
+std::cout << "SEG " << segIdx << ": " << channel->freqMHzList[segIdx] << " - " << channel->freqMHzList[segIdx+1] << " " << colorStr << std::endl;
+}
+#endif
+
+	    }
 	}
 }
 /**************************************************************************************/

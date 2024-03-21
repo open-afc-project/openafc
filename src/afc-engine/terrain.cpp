@@ -23,6 +23,7 @@ std::atomic_llong TerrainClass::numCDSM;
 std::atomic_llong TerrainClass::numSRTM;
 std::atomic_llong TerrainClass::numGlobal;
 std::atomic_llong TerrainClass::numDEP;
+std::atomic_llong TerrainClass::numITM;
 
 namespace {
 	// Logger for all instances of class
@@ -98,6 +99,7 @@ TerrainClass::TerrainClass(std::string lidarDir, std::string cdsmDir, std::strin
 	numCDSM = (long long) 0;
 	numSRTM = (long long) 0;
 	numGlobal = (long long) 0;
+	numITM = (long long) 0;
 
 }
 /******************************************************************************************/
@@ -602,6 +604,7 @@ void TerrainClass::printStats()
 	LOGGER_INFO(logger) << "NUM_GLOBAL = " << numGlobal << "  ("
 		<< (double) (totalNumTerrain ? numGlobal*100.0/totalNumTerrain : 0.0)
 		<< " %)";
+	LOGGER_INFO(logger) << "NUM_ITM = " << numITM;
 }
 /******************************************************************************************/
 

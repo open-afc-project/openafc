@@ -64,17 +64,15 @@ enum ChannelType
 
 class ChannelStruct {
 	public:
-		ChannelColor availability;
 		ChannelType type;
-		double eirpLimit_dBm;
-		int startFreqMHz;
-		int stopFreqMHz;
+		std::vector<int> freqMHzList;
+		std::vector<std::tuple<double, double, ChannelColor>> segList;
 		int index;
 		int operatingClass;
 
-		int bandwidth() const
+		int bandwidth(int segIdx) const
 		{
-			return stopFreqMHz - startFreqMHz;
+			return freqMHzList[segIdx+1] - freqMHzList[segIdx];
 		}
 };
 
