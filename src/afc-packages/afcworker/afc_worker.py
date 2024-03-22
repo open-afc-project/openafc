@@ -38,7 +38,7 @@ class WorkerConfig(BrokerConfigurator):
 
 conf = WorkerConfig()
 
-rcache_settings = RcacheClientSettings()
+rcache_settings = RcacheClientSettings(postgres_dsn=None)
 # In this validation rcache is True to handle 'update_on_send' case
 rcache_settings.validate_for(rmq=True, rcache=True)
 rcache = RcacheClient(rcache_settings, rmq_receiver=False) \
