@@ -1,0 +1,208 @@
+# Package spec formatted according to best practices documented at
+# http://fedoraproject.org/wiki/How_to_create_an_RPM_package
+# http://fedoraproject.org/wiki/Packaging:Guidelines
+# https://fedoraproject.org/wiki/PackagingDrafts/ScriptletSnippets
+
+%bcond_without afcengine
+
+Name: @RPM_PKG_NAME@
+Version: @RPM_VERSION@
+Release: @RPM_RELEASE@%{?dist}
+License: Commercial
+Url: http://rkf-eng.com/facebook_rat
+Source0: %{name}-%{version}.tar.bz2
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+
+
+BuildRequires: cmake3 >= 3.1
+BuildRequires: ninja-build
+BuildRequires: make
+BuildRequires: devtoolset-11-gcc-c++ >= 11.2
+# Need rpm macros in python-devel
+BuildRequires: python-devel
+%if 0%{?fedora}
+BuildRequires: boost-devel >= 1.54
+%endif
+%if 0%{?rhel}
+BuildRequires: boost169-devel >= 1.54
+%endif
+BuildRequires: armadillo-devel >= 4.300
+BuildRequires: gdal-devel < 2.0
+BuildRequires: qt5-qtbase-devel >= 5.6
+BuildRequires: gtest-devel >= 1.6
+BuildRequires: systemd
+BuildRequires: selinux-policy-devel
+BuildRequires: selinux-policy-targeted, checkpolicy
+
+# Runtime requirements
+Requires: httpd
+Requires: mod_wsgi
+Requires: python-flask
+Requires: python-flask-script
+Requires: python-flask_jsonrpc
+Requires: python2-flask-sqlalchemy
+Requires: python2-flask-migrate
+Requires: python2-flask-user
+Requires: python-pyxdg
+Requires: python-cryptography
+Requires: python2-bcrypt
+Requires: python-blinker
+Requires: python-wsgidav
+Requires: python2-numpy
+Requires: python-sqlalchemy
+Requires: python-jwt
+Requires: python-prettytable
+Requires(post): policycoreutils, initscripts
+Requires(preun): policycoreutils, initscripts
+Requires(postun): policycoreutils
+Summary: Facebook RAT
+%description
+All non-data runtime files for the Facebook RLAN AFC Tool.
+
+%package devel
+Requires: %{name} = %{version}-%{release}
+%if 0%{?fedora}
+Requires: boost-devel >= 1.54
+%endif
+%if 0%{?rhel}
+Requires: boost169-devel >= 1.54
+%endif
+Requires: armadillo-devel >= 4.300
+Requires: gdal-devel < 2.0
+Requires: qt5-qtbase-devel >= 5.6
+Requires: gtest-devel >= 1.6
+Summary: Development files for the Facebook RAT
+%description devel
+Headers and development libraries for the Facebook RLAN AFC Tool.
+
+
+# Ninja macros not in CentOS
+%define __ninja %{_bindir}/ninja-build
+%define __ninja_common_opts -v %{?_smp_mflags}
+%define ninja_build \
+    %{__ninja} %{__ninja_common_opts}
+%define ninja_install \
+    DESTDIR=%{buildroot} %{__ninja} install %{__ninja_common_opts}
+# Install helpers
+%define mkdir %{_bindir}/mkdir -p
+%define install_bin %{_bindir}/install -D -m 755
+%define install_data %{_bindir}/install -D -m 644
+%define cmake_pkgdir %{_libdir}/cmake
+%define sysconfigdir %{_sysconfdir}/sysconfig
+%define xdg_confdir %{_sysconfdir}/xdg
+%define xdg_appdir %{_datadir}/applications
+
+###
+# Install config
+%define fbrat_groupname fbrat
+%define fbrat_username fbrat
+#: selinux modules
+%define selpackagedir %{_datadir}/selinux/packages
+%define selincludedir %{_datadir}/selinux/devel/include
+
+
+%prep
+%setup -q
+%mkdir build
+
+
+%build
+pushd build
+
+CMAKEARGS="\
+    -DSVN_LAST_REVISION=%{getenv:BUILDREV}
+    -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+    -DBUILD_AFCENGINE=%{?with_afcengine:ON}%{!?with_afcengine:OFF} \
+    -G Ninja"
+if [[ -d "/usr/include/boost169" ]]; then
+   CMAKEARGS="${CMAKEARGS} -DBOOST_INCLUDEDIR=/usr/include/boost169 -DBOOST_LIBRARYDIR=/usr/lib64/boost169"
+fi 
+%cmake3 ${CMAKEARGS} ..
+
+%ninja_build
+
+popd
+
+# build selinux modules
+make -C selinux -f /usr/share/selinux/devel/Makefile
+
+
+%install
+pushd build
+
+%ninja_install
+
+popd
+
+# SELinux module
+%install_data selinux/fbrat.pp %{buildroot}%{selpackagedir}/fbrat/fbrat.pp
+%install_data selinux/fbrat.if %{buildroot}%{selincludedir}/services/fbrat.if
+# System configuration
+%mkdir %{buildroot}%{xdg_confdir}/fbrat
+cat <<EOF >%{buildroot}%{xdg_confdir}/fbrat/ratapi.conf
+EOF
+# Home for the local account
+%mkdir %{buildroot}%{_sharedstatedir}/fbrat
+# Data containers
+%mkdir %{buildroot}%{_datadr}/fbrat/afc-engine
+
+:
+
+
+%check
+pushd build
+:
+
+
+%clean
+rm -rf %{buildroot}
+
+
+%files
+%defattr(-, root, root)
+%doc LICENSE.txt
+%{_bindir}/*
+%{_libdir}/lib*.so.*
+%{python2_sitelib}/ratapi*
+%{_datadir}/fbrat
+%{selpackagedir}/fbrat
+%dir %{xdg_confdir}/fbrat
+%config(noreplace) %{xdg_confdir}/fbrat/ratapi.conf
+%dir %attr(-, %{fbrat_username}, %{fbrat_groupname}) %{_sharedstatedir}/fbrat
+
+%post
+/sbin/ldconfig
+getent group %{fbrat_groupname} >/dev/null || groupadd -r %{fbrat_groupname}
+getent passwd %{fbrat_username} >/dev/null || useradd -r -g %{fbrat_groupname} -d %{_sharedstatedir}/fbrat -s /sbin/nologin -c "User for FBRAT WSGI" %{fbrat_username}
+if [ "$1" -le "1" ] ; then # First install
+    semodule -i %{selpackagedir}/fbrat/fbrat.pp 2>/dev/null || :
+    fixfiles -R fbrat restore
+fi
+
+%preun
+if [ "$1" -lt "1" ] ; then # Final removal
+    semodule -r fbrat 2>/dev/null || :
+    fixfiles -R fbrat restore
+fi
+
+%postun
+/sbin/ldconfig
+if [ "$1" -ge "1" ] ; then # Upgrade
+    semodule -i %{selpackagedir}/fbrat/fbrat.pp 2>/dev/null || :
+    fixfiles -R fbrat restore
+fi
+
+
+%files devel
+%defattr(-, root, root)
+%doc LICENSE.txt
+%{_includedir}/fbrat
+%{_libdir}/*.so
+%{cmake_pkgdir}/fbrat
+%{selincludedir}/services/*.if
+
+
+%changelog
+
+* @RPM_CHANGELOG_DATE@ RKF Support <support@rkf-eng.com> - @RPM_VERSION@-@RPM_RELEASE@
+- See corresponding Version Description Document for details.

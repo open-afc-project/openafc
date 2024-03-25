@@ -1,0 +1,136 @@
+:root {
+  --myApp-global--spacer--md: 30px;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+pre {
+  white-space: pre-wrap; /* Since CSS 2.1 */
+  white-space: -moz-pre-wrap; /* Mozilla, since 1999 */
+  white-space: -pre-wrap; /* Opera 4-6 */
+  white-space: -o-pre-wrap; /* Opera 7 */
+  word-wrap: break-word; /* Internet Explorer 5.5+ */
+}
+
+.app-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: var(--myApp-global--spacer--md);
+}
+
+.notification-container {
+  flex: 0 1 auto;
+}
+
+.pf-c-page__main {
+  background: #ededed;
+}
+
+#nav-list-simple {
+  height: 85hv;
+}
+
+#nav-footer {
+  padding-left: 10px;
+  padding-right: 10px;
+  padding-bottom: 5px;
+  padding-top: 10px;
+  color: gray;
+  height: inherit * 0.1;
+}
+
+.pf-c-tooltip__content {
+  text-align: left !important;
+}
+
+.slider {
+  -webkit-appearance: none;
+  width: 100%;
+  height: 15px;
+  border-radius: 5px;
+  background: #d3d3d3;
+  outline: none;
+  opacity: 0.7;
+  -webkit-transition: 0.2s;
+  transition: opacity 0.2s;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #004bed;
+  cursor: pointer;
+}
+
+.slider::-moz-range-thumb {
+  width: 25px;
+  height: 25px;
+  border-radius: 50%;
+  background: #004bed;
+  cursor: pointer;
+}
+
+#horizontal-form-certification-nra {
+  max-width: 50%;
+  display: inline;
+}
+
+#horizontal-form-certification-list {
+  max-width: 50%;
+  display: inline;
+}
+
+.nestedGallery {
+  border: 1px solid darkgray;
+}
+
+.inquiredChannelsSection {
+  margin-top: 20px;
+}
+
+.vendorParamsEntry {
+  width: 600px;
+}
+
+.lowerInline,
+.upperInline {
+  max-width: 40%;
+  display: inline;
+}
+
+.btnInline {
+  max-width: 15%;
+  display: inline;
+}
+
+.button-blue {
+  background-color: #1b52a7;
+  color: white;
+  border: 2px solid #0082ba;
+}
+
+.custom-tooltip {
+  background-color: white;
+}
+
+#aboutAccordion {
+  --pf-global--Color--100: white;
+  --pf-global--BackgroundColor--100: black;
+  --pf-c-accordion--BackgroundColor: black;
+  --pf-c-accordion__toggle--hover--BackgroundColor: darkgrey;
+  --pf-c-accordion__toggle--focus--BackgroundColor: darkgrey;
+  --pf-c-accordion__toggle--active--BackgroundColor: darkgrey;
+  --pf-c-accordion__expanded-content--Color: white;
+}
+
+#parametersList {
+  font-size: large;
+}

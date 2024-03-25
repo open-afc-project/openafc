@@ -1,0 +1,46 @@
+#include "winres.h"
+
+#if !defined(VS_VERSION_INFO)
+#define VS_VERSION_INFO 1
+#endif
+
+LANGUAGE    LANG_ENGLISH, SUBLANG_ENGLISH_US
+
+VS_VERSION_INFO VERSIONINFO
+    PRODUCTVERSION @WINRES_PRODUCT_VERSION_RES@
+    FILEVERSION @WINRES_FILE_VERSION_RES@
+    FILEFLAGSMASK VS_FFI_FILEFLAGSMASK
+#if !defined(NDEBUG)
+    FILEFLAGS VS_FF_DEBUG
+#else
+    FILEFLAGS 0
+#endif
+    FILEOS VOS_NT_WINDOWS32
+    FILETYPE VFT_DLL
+    FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040904B0" /* LANG_ENGLISH/SUBLANG_ENGLISH_US */
+        BEGIN
+            VALUE "CompanyName", "@WINRES_COMPANY_NAME_STR@\0"
+            VALUE "ProductName", "@WINRES_PRODUCT_NAME_STR@\0"
+            VALUE "ProductVersion", "@WINRES_PRODUCT_VERSION_STR@\0"
+            VALUE "InternalName", "@WINRES_INTERNAL_NAME_STR@\0"
+            VALUE "OriginalFilename", "@WINRES_ORIG_FILENAME@\0"
+            VALUE "FileDescription", "@WINRES_FILE_DESCRIPTION_STR@\0"
+            VALUE "FileVersion", "@WINRES_FILE_VERSION_STR@\0"
+            VALUE "Comments", "@WINRES_COMMENTS_STR@\0"
+        END
+    END
+    
+    BLOCK "VarFileInfo"
+    BEGIN
+        /* The following line should only be modified for localized versions. */
+        /* It consists of any number of WORD,WORD pairs, with each pair */
+        /* describing a language,codepage combination supported by the file. */
+        /* For example, a file might have values "0x409,1252" indicating that it */
+        /* supports English language (0x409) in the Windows ANSI codepage (1252). */
+        VALUE "Translation", 0x409, 1252
+    END
+END

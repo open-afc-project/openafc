@@ -1,0 +1,90 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Dockerfile for Siphon - als_siphon.py script that takes log records from
+# Kafka and puts them to PostgreSQL+PostGIS database (optionally creating
+# necessary database before operation)
+
+FROM alpine:3.18
+
+RUN mkdir -p -m 777 /usr/app
+WORKDIR /usr/app
+
+RUN apk add --update --no-cache python3=~3.11 py3-sqlalchemy=~1.4 py3-pip \
+    py3-psycopg2 py3-pydantic=~1.10 py3-alembic py3-lz4
+
+RUN apk add --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing/ \
+    py3-confluent-kafka
+
+COPY requirements.txt /usr/app/
+RUN pip3 install --no-cache-dir --root-user-action=ignore -r requirements.txt
+
+ENV PYTHONPATH=/usr/app
+ENV PATH=$PATH:/usr/app
+
+# Comma-separated list of Kafka (bootstrap) servers, each having 'host[:port]'
+# form. Port, if not specified, is 9092
+ENV KAFKA_SERVERS=localhost
+# Client ID to use in Kafka logs. If ends with '@' - suffixed by unique random
+# string
+ENV KAFKA_CLIENT_ID=siphon_@
+# 'SSL' or 'PLAINTEXT'. Default is 'PLAINTEXT'
+ENV KAFKA_SECURITY_PROTOCOL=
+# SSL keyfile
+ENV KAFKA_SSL_KEYFILE=
+# SSL CA (Certificate Authority) file
+ENV KAFKA_SSL_CAFILE=
+# Maximum message size (default is 1MB)
+ENV KAFKA_MAX_REQUEST_SIZE=
+# PostgreSQL server hostname
+ENV POSTGRES_HOST=localhost
+# PostgreSQL server port
+ENV POSTGRES_PORT=5432
+# Parameters (name, user, password, options) of initial database - database to
+# connect to to create other databases
+ENV POSTGRES_INIT_DB=postgres
+ENV POSTGRES_INIT_USER=postgres
+ENV POSTGRES_INIT_PASSWORD=postgres
+ENV POSTGRES_INIT_OPTIONS=
+# Parameters (name, user, password, options) of database for
+# Request/Response/Config logs
+ENV POSTGRES_ALS_DB=ALS
+ENV POSTGRES_ALS_USER=postgres
+ENV POSTGRES_ALS_PASSWORD=postgres
+ENV POSTGRES_ALS_OPTIONS=
+# Parameters (name, user, password, options) of database for JSON logs
+ENV POSTGRES_LOG_DB=AFC_LOGS
+ENV POSTGRES_LOG_USER=postgres
+ENV POSTGRES_LOG_PASSWORD=postgres
+ENV POSTGRES_LOG_OPTIONS=
+# What to do if database being created already exists: 'skip', 'drop'. Default
+# is to fail
+ENV INIT_IF_EXISTS=skip
+# Port to serve Prometheus metrics on (none/empty is to not serve)
+ENV SIPHON_PROMETHEUS_PORT=8080
+
+COPY als_siphon.py als_query.py /usr/app/
+RUN chmod a+x /usr/app/*.py
+COPY ALS.sql /usr/app
+
+ENTRYPOINT /usr/app/als_siphon.py init_siphon \
+    --kafka_servers=$KAFKA_SERVERS \
+    --kafka_client_id=$KAFKA_CLIENT_ID \
+    --kafka_security_protocol=$KAFKA_SECURITY_PROTOCOL \
+    --kafka_ssl_keyfile=$KAFKA_SSL_KEYFILE \
+    --kafka_ssl_cafile=$KAFKA_SSL_CAFILE \
+    --kafka_max_partition_fetch_bytes=$KAFKA_MAX_REQUEST_SIZE \
+    --init_postgres=postgresql://${POSTGRES_INIT_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_INIT_DB}${POSTGRES_INIT_OPTIONS} \
+    --init_postgres_password=$POSTGRES_INIT_PASSWORD \
+    --if_exists=$INIT_IF_EXISTS \
+    --als_postgres=postgresql://${POSTGRES_ALS_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_ALS_DB}${POSTGRES_ALS_OPTIONS} \
+    --als_postgres_password=$POSTGRES_ALS_PASSWORD \
+    --log_postgres=postgresql://${POSTGRES_LOG_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_LOG_DB}${POSTGRES_LOG_OPTIONS} \
+    --log_postgres_password=$POSTGRES_LOG_PASSWORD \
+    --prometheus_port=$SIPHON_PROMETHEUS_PORT \
+    --if_exists=$INIT_IF_EXISTS \
+    --als_sql /usr/app/ALS.sql

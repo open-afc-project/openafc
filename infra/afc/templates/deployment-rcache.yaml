@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Chart.Name }}-{{ .Values.service.rcache.hostname }}
+  labels:
+    {{- include "afc.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount.rcache }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "afc.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "afc.selectorLabels" . | nindent 8 }}
+        afc: rcache
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "afc.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-{{ .Values.service.rcache.hostname }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.rcache.repository }}:{{ .Values.image.rcache.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.rcache.pullPolicy }}
+          ports:
+            - name: rcache-port
+              containerPort: {{ .Values.service.rcache.port | int }}
+              protocol: TCP
+          # livenessProbe:
+          #   httpGet:
+          #     path: /fbrat/www/index.html
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          env:
+            # R-Cache params
+            - name: RCACHE_ENABLED
+              value: {{ .Values.service.rcache.is_enabled | quote }}
+            - name: RCACHE_CLIENT_PORT
+              value: {{ .Values.service.rcache.port | quote }}
+            - name: RCACHE_POSTGRES_DSN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Chart.Name }}-postgres-secret
+                  key: RCACHE_POSTGRES_DSN
+            - name: RCACHE_AFC_REQ_URL
+              value: "http://{{ .Values.service.msghnd.hostname }}:{{ .Values.service.msghnd.port }}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True"
+            - name: RCACHE_RULESETS_URL
+              value: "http://{{ .Values.service.msghnd.hostname }}/fbrat/ratapi/v1/GetRulesetIDs"
+            - name: RCACHE_CONFIG_RETRIEVAL_URL
+              value: "http://{{ .Values.service.msghnd.hostname }}/fbrat/ratapi/v1/GetAfcConfigByRulesetID"
+          resources:
+            {{- toYaml .Values.resources.rcache | nindent 12 }}
+      imagePullSecrets:
+        - name: container-repo-secret
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

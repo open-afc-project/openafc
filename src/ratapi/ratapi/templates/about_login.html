@@ -1,0 +1,21 @@
+
+<head>
+    <title>About</title>
+    <style>
+        hr { border-color: #cccccc; margin: 0; }
+        .no-margins { margin: 0px; }
+        .with-margins { margin: 10px; }
+        .margin-left {margin-left: 2em; }
+        .margin-bottom {margin-bottom: 0.7em; }
+        h1 {color: rgb(18, 134, 223)}
+        li {margin-left: 2em; margin-bottom: 0.7em;}
+        body { background-color: rgb(234, 241, 243); }
+    </style>
+</head>
+
+<body>
+    <div id="main-div" class="with-margins">
+    {% set about = '\#about' %}
+    <p class="margin-bottom"><a href= {{url_for('auth.LoginAPI')}}>Login</a> here.</p>
+    <p class="margin-bottom">If you don't have an account, visit <a href= {{about}}>About</a>.</p>
+</body> 

@@ -1,0 +1,4 @@
+{
+"sender_email":"sender email","password":"password","port":"465",
+"cert":"cert/test_cli_crt.pem", "key":"cert/test_cli_key.pem","cc_email":"cc address","afc_query":"query uri"
+}

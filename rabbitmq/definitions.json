@@ -1,0 +1,38 @@
+{
+  "users": [
+    {
+      "name": "celery",
+      "password": "celery",
+      "tags": "administrator"
+    },
+    {
+      "name": "rcache",
+      "password": "rcache",
+      "tags": "administrator"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "fbrat"
+    },
+    {
+      "name": "rcache"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "celery",
+      "vhost": "fbrat",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    },
+    {
+      "user": "rcache",
+      "vhost": "rcache",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ]
+}

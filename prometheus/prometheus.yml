@@ -1,0 +1,53 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+global:
+  scrape_interval: 5s
+  scrape_timeout: 2s
+  evaluation_interval: 15s  # Interval for recording rules
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets: [localhost:9090]
+  - job_name: rmq
+    static_configs:
+      - targets: [rmq:15692]
+    metrics_path: metrics/detailed
+    params:
+      vhost: [fbrat, rcache]
+      family: [queue_coarse_metrics]
+  - job_name: msghnd
+    static_configs:
+      - targets: [msghnd:8000]
+    metrics_path: fbrat/ap-afc/metrics
+  - job_name: als_siphon
+    static_configs:
+      - targets: [als_siphon:8080]
+  - job_name: nginxexporter
+    static_configs:
+      - targets: [nginxexporter:9113]
+  - job_name: uls_downloader
+    static_configs:
+      - targets: [uls_downloader:8000]
+  - job_name: cadvisor
+    static_configs:
+      - targets: [cadvisor:8080]
+    metric_relabel_configs:
+      - source_labels: [name]
+        regex: "(.*?)_(rat_server|als_siphon|uls_downloader|bulk_postgres|\
+          als_kafka|cert_db|rcache_tool|[^_]+)_[0-9]+"
+        replacement: "$1"
+        target_label: project
+      - source_labels: [name]
+        regex: "(.*?)_(rat_server|als_siphon|uls_downloader|bulk_postgres|\
+          als_kafka|cert_db|rcache_tool|[^_]+)_[0-9]+"
+        replacement: "$2"
+        target_label: service
+      - regex: image
+        action: labeldrop
+      - regex: container_label_.*
+        action: labeldrop

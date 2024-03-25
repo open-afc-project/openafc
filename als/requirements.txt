@@ -1,0 +1,12 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns 
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+GeoAlchemy==0.7.2
+GeoAlchemy2==0.12.5
+postgis==1.0.4
+prometheus-client==0.17.1
+pyparsing==3.0.9
+python-dateutil==2.8.2

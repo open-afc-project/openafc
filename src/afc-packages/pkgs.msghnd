@@ -1,0 +1,11 @@
+/wd/afc-packages/fstorage
+/wd/afc-packages/appconfig
+/wd/afc-packages/afctask
+/wd/afc-packages/defs
+/wd/afc-packages/afcworker
+/wd/afc-packages/netcli
+/wd/afc-packages/afcmodels
+/wd/afc-packages/rcache
+/wd/afc-packages/healthchecks
+/wd/afc-packages/als
+/wd/afc-packages/prometheus_utils

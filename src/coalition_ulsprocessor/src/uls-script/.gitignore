@@ -1,0 +1,9 @@
+*.o
+*.pro
+.qmake.stash
+uls-script
+warning_uls.txt
+Makefile
+anomalous_uls.csv
+cmd.txt
+mfk_*

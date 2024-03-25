@@ -1,0 +1,213 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+# default value of args
+ARG BLD_TAG=latest
+ARG PRINST_TAG=latest
+ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image
+ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall
+
+# Stage Build
+FROM ${BLD_NAME}:${BLD_TAG} as build_image
+ARG BUILDREV=localbuild
+COPY CMakeLists.txt LICENSE.txt version.txt Doxyfile.in /root/afc/
+COPY cmake /root/afc/cmake/
+COPY pkg /root/afc/pkg/
+COPY selinux /root/afc/selinux/
+COPY src /root/afc/src/
+
+RUN apk add py3-setuptools py3-pip
+
+RUN mkdir -p -m 777 /root/afc/build
+RUN cd /root/afc/build && \
+cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install \
+    -DCMAKE_BUILD_TYPE=Ulsprocessor -DSVN_LAST_REVISION=$BUILDREV \
+    -G Ninja /root/afc && \
+    ninja -j$(nproc --all --ignore=2) install
+
+FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
+RUN apk add py3-sqlalchemy py3-numpy py3-yaml py3-pydantic=~1.10 py3-psycopg2
+COPY uls/requirements.txt /wd
+RUN pip3 install -r /wd/requirements.txt
+
+RUN mkdir -p /mnt/nfs/rat_transfer/daily_uls_parse/data_files \
+            /mnt/nfs/rat_transfer/daily_uls_parse/temp \
+            /mnt/nfs/rat_transfer/ULS_Database \
+            /mnt/nfs/rat_transfer/Antenna_Patterns \
+            /output_folder
+
+COPY --from=build_image /root/afc/__install/bin \
+    /mnt/nfs/rat_transfer/daily_uls_parse/
+COPY --from=build_image /root/afc/build/src/ratapi/pkg/ratapi/db/ \
+    /mnt/nfs/rat_transfer/daily_uls_parse/
+COPY uls/uls_service*.py uls/fsid_tool.py uls/fs_db_diff.py uls/fs_afc.py \
+    uls/fs_afc.yaml /wd/
+RUN chmod -x /wd/*.py
+RUN chmod +x /wd/uls_service.py /wd/uls_service_healthcheck.py \
+    wd/fsid_tool.py wd/fs_db_diff.py wd/fs_afc.py
+
+FROM alpine:3.18
+
+# DOWNLOADER SERVICE PARAMETERS
+
+# Where to directory with ULS databases is mapped
+ENV ULS_EXT_DB_DIR=/
+
+# Symlink that points to recent ULS database. May include path, that is used to
+# override fsDatabaseFile in AFC Config
+ENV ULS_CURRENT_DB_SYMLINK=rat_transfer/ULS_Database/FS_LATEST.sqlite3
+
+# Name of RAS database (as mapped from external storage)
+ENV ULS_EXT_RAS_DATABASE=/rat_transfer/RAS_Database/RASdatabase.dat
+
+# File name from where daily_uls_parse.py reads RAS database
+# ENV ULS_RAS_DATABASE
+
+# YES to run downloader script on nice (lowered) priority, NO to use normal
+# priority (this is default)
+ENV ULS_NICE=YES
+
+# Download script
+# ENV ULS_DOWNLOAD_SCRIPT
+
+# Additional arguments (besides --region) to pass to daily_uls_parse.py
+# ENV ULS_DOWNLOAD_SCRIPT_ARGS
+
+# Colon separated list of regions to download. Default - all of them
+# ENV ULS_DOWNLOAD_REGION
+
+# Directory where script puts downloaded database
+# ENV ULS_RESULT_DIR
+
+# Directory where download script puts temporary files
+# ENV ULS_TEMP_DIR
+
+# FSID file location used by daily_uls_parse.py
+# ENV ULS_FSID_FILE
+
+# Connection string to service state database
+# ENV ULS_SERVICE_STATE_DB_DSN
+
+# Create service state database if absent (default is True)
+# ENV ULS_SERVICE_STATE_DB_CREATE_IF_ABSENT
+
+# Recreate (erase) service state database if exists (default is False)
+# ENV ULS_SERVICE_STATE_DB_RECREATE
+
+# Prometheus port to serve metrics on. Prometheus metrics (if used) are only
+# meaningful in continuous (not run-once) operation
+# ENV ULS_PROMETHEUS_PORT
+
+# HOST[PORT] of StatsD server to send metrics to. StatsD operation may be used
+# in run-once mode of operation
+# ENV ULS_STATSD_SERVER
+
+# External files to check: BASE_URL1:SUBDIR1:FILENAME[,FILENAME...];BASE_URL2...
+# ENV ULS_CHECK_EXT_FILES
+
+# Delay first download by given number of hours
+# ENV ULS_DELAY_HR
+
+# Download interval in hours
+# ENV ULS_INTERVAL_HR
+
+# Maximum allowed change since previous download in percents
+# ENV ULS_MAX_CHANGE_PERCENT
+
+# URL to use for testing new ULS database against AFC Service
+# ENV ULS_AFC_URL
+
+# Number of parallel AFC Requests to make during new ULS database verification
+# Default see config file of uls_afc.py
+# ENV ULS_AFC_PARALLEL
+
+# Download maximum duration in hours
+# ENV ULS_TIMEOUT_HR
+
+# YES to run download once, NO to run periodically (this is default)
+# ENV ULS_RUN_ONCE
+
+# True if Rcache enabled, False if not
+# ENV RCACHE_ENABLED
+
+# URL of Rcache service
+# ENV RCACHE_SERVICE_URL
+
+
+# HEALTHCHECKER PARAMETERS
+# Variables starting with ULS_HEALTH_ related to pronounce service healthy or
+# unhealthy
+# Variables starting with ULS_ALARM_ related to email sending.
+# For all variables it's OK to be empty/unspecified
+
+# Pronounce service unhealthy if no download attempt was made for this number
+# of hours. Default defined in uls_service.py (6 hours as of time of this
+# writing)
+# ENV ULS_HEALTH_ATTEMPT_MAX_AGE_HR
+
+# Pronounce service unhealthy if no download succeeded for this number
+# of hours. Default defined in uls_service.py (8 hours as of time of this
+# writing)
+# ENV ULS_HEALTH_SUCCESS_MAX_AGE_HR
+
+# Pronounce service unhealthy if ULS data had not changed for this number of
+# hours. Default defined in uls_service.py (40 hours as of time of this
+# writing)
+# ENV ULS_HEALTH_UPDATE_MAX_AGE_HR
+
+# Name of JSON secret with SMTP parameters (formatted as per
+# NOTIFIER_MAIL.json). If not specified no emails will be sent
+# ENV ULS_ALARM_SMTP_INFO
+
+# Email to send messages to. If not specified no emails will be sent
+# ENV ULS_ALARM_EMAIL_TO
+#
+# Email to send beacon information messages to. If not specified alarm email
+# will be used
+# ENV ULS_BEACON_EMAIL_TO
+
+# Minimum interval (in hours) of alarm message (message on something that went
+# wrong) sending. If not specified no alarm emails will be sent
+# ENV ULS_ALARM_ALARM_INTERVAL_HR
+
+# Minimum interval (in hours) of beacon message (message on current status, be
+# it good or bad) sending. If not specified no beacon emails will be sent
+# ENV ULS_ALARM_BEACON_INTERVAL_HR
+
+# Send alarm email if last download attempt is older than this number of
+# hours. If not specified last attempt time will not trigger alarm email
+# sending
+# ENV ULS_ALARM_ATTEMPT_MAX_AGE_HR
+
+# Send alarm email if last download success is older than this number of
+# hours. If not specified last download success time will not trigger alarm
+# email sending
+# ENV ULS_ALARM_SUCCESS_MAX_AGE_HR
+
+# Send alarm email if region's ULS (FS) data was not changed for more than
+# given number of hours.
+# Format is REG1:HOURS1,REG2:HOURS2... where REG... is region code (US, CA, BR
+# as of time of this writing).
+# If not specified, data age will not trigger alarm email sending
+# ENV ULS_ALARM_REG_UPD_MAX_AGE_HR
+
+# Optional note of where from is email. If specified - used as part of email
+# message body
+# ENV ULS_ALARM_SENDER_LOCATION
+
+COPY --from=install_image / /
+
+COPY src/afc-packages /wd/afc-packages
+RUN pip3 install --use-pep517 --root-user-action=ignore \
+        -r /wd/afc-packages/pkgs.uls \
+    && rm -rf /wd/afc-packages
+
+WORKDIR /wd
+
+ENTRYPOINT /wd/uls_service.py
+
+HEALTHCHECK --interval=2h --timeout=2m --retries=3 \
+    CMD /wd/uls_service_healthcheck.py || exit 1

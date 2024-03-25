@@ -1,0 +1,35 @@
+/// @copyright 
+#ifndef SRC_RATCOMMON_RATVERSION_H_
+#define SRC_RATCOMMON_RATVERSION_H_
+
+#include "ratcommon_export.h"
+#include <QString>
+
+/// The RAT version at build time
+#define RAT_BUILD_VERSION_NAME "@PROJECT_VERSION@"
+
+namespace RatVersion{
+
+/** Get a text name for this version of CPO.
+ * The version is of the form "X.Y.Z".
+ * @return The version text.
+ */
+RATCOMMON_EXPORT
+QString versionName();
+
+/** Get a text name for this SCM revision of CPO.
+ * The version is of the form "XXXM".
+ * @return The revision text.
+ */
+RATCOMMON_EXPORT
+QString revisionName();
+
+/** Get a text name for this version/revision of CPO.
+ * @return The combined version and revision text.
+ */
+RATCOMMON_EXPORT
+QString combinedName();
+
+} // End RatVersion
+
+#endif /* SRC_RATCOMMON_RATVERSION_H_ */

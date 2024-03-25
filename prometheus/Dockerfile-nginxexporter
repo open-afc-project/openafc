@@ -1,0 +1,17 @@
+#
+# Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Dockerfile for Nginx Exporter that brings Nginx metrics to Prometheus format
+
+FROM bitnami/nginx-exporter:0.11.0-debian-11-r370
+
+# URL on which Nginx' stub_status is exported
+ENV NGINXEXPORTER_STUB_URL=http://dispatcher:8080/stub_status
+
+EXPOSE 9113/tcp
+
+ENTRYPOINT nginx-prometheus-exporter -nginx.scrape-uri=$NGINXEXPORTER_STUB_URL

@@ -1,0 +1,34 @@
+# Versioning for this module, not for RPM packages
+policy_module(fbrat, 1.1)
+
+require {
+        type fs_t;
+        type httpd_t;
+        type init_t;
+        type unconfined_t;
+        class file { read getattr open };
+}
+
+
+# HTTP Daemon itself runs under httpd_t domain, this is for management processes
+type fbrat_t;
+type fbrat_exec_t;
+application_domain(fbrat_t, fbrat_exec_t)
+
+# System configuration types
+type fbrat_conf_t;
+files_config_file(fbrat_conf_t)
+
+# Daemon storage data types
+type fbrat_data_t;
+files_type(fbrat_data_t)
+
+type_transition unconfined_t fbrat_exec_t : process fbrat_t;
+type_transition httpd_t fbrat_exec_t : process fbrat_t;
+
+manage_dirs_pattern(httpd_t, fbrat_data_t, fbrat_data_t)
+manage_files_pattern(httpd_t, fbrat_data_t, fbrat_data_t)
+# Run the child process in different domain
+domain_auto_trans(httpd_t, fbrat_exec_t, fbrat_t)
+manage_dirs_pattern(fbrat_t, fbrat_data_t, fbrat_data_t)
+manage_files_pattern(fbrat_t, fbrat_data_t, fbrat_data_t)

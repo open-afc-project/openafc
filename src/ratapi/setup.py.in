@@ -1,0 +1,61 @@
+import os
+import setuptools
+
+if 'DESTDIR' not in os.environ:
+    os.environ['DESTDIR'] = ''
+
+setuptools.setup(
+    name='ratapi',
+    # Label compatible with PEP 440
+    version='@PROJECT_VERSION@+@SVN_LAST_REVISION@'.lower(),
+
+    author='RKF Engineering Solutions, LLC',
+    url='http://www.rkf-eng.com/',
+    license='Redistributable, no modification',
+
+    description='AFC',
+    package_dir={
+        '': '@DIST_LIB_PACKAGE_DIR_ESCAPED@'
+    },
+    packages=[
+        'ratapi',
+        'ratapi.migrations',
+        'ratapi.migrations.versions',
+        'ratapi.views',
+        'ratapi.db',
+        'ratapi.db.models',
+    ],
+    package_data = {
+        'ratapi': [
+            'migrations/alembic.ini',
+            'migrations/script.py.mako',
+            'templates/flask_user_layout.html',
+            'templates/login.html',
+            'templates/about.html',
+            'templates/about_csrf.html',
+            'templates/*.html',
+        ]
+    },
+    entry_points={
+        'console_scripts': [
+            'rat-manage-api = ratapi.manage:main',
+        ]
+    },
+    
+    install_requires=[
+        'werkzeug',
+        'flask',
+        'flask-script',
+        'flask_jsonrpc',
+        'flask-user',
+        'flask-sqlalchemy',
+        'flask-mail',
+        'pyxdg',
+        'cryptography',
+        'wsgidav',
+        'SQLAlchemy',
+        'numpy',
+        'prettytable',
+        #'jwt',
+    ],
+)

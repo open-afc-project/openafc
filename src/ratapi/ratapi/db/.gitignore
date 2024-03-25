@@ -1,0 +1,5 @@
+*.pyc
+log.txt
+run_python.py
+mfk_*
+
