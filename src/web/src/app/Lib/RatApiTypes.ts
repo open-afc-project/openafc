@@ -67,7 +67,6 @@ export interface AFCConfigFile {
     indoorFixedHeightAMSL?: boolean,
     reportUnavailableSpectrum?: boolean,
     reportUnavailPSDdBPerMHz?: number,
-    inquiredFrequencyResolutionMHz?: number,
     globeDir: string,
     srtmDir:string,
     depDir:string,

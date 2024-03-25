@@ -482,6 +482,8 @@ namespace UlsMeasurementAnalysis {
 			dumpHeightProfile(prefix, *heightProfilePtr);
 		}
 
+		terrain->numITM++;
+
 		return rv;
 	}
 

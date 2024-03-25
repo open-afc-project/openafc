@@ -316,10 +316,12 @@ class TestResultComparator:
                     for freq_info in self._get_item(src, path,
                                                     default_last=[]):
                         fr = freq_info["frequencyRange"]
-                        chan_dict[
-                            f"[{fr['lowFrequency']}-{fr['highFrequency']}"] = \
-                            float(freq_info.get("maxPSD") or
-                                  freq_info.get("maxPsd"))
+                        low = fr['lowFrequency']
+                        high = fr['highFrequency']
+                        for freq in range(low, high):
+                            chan_dict[ f"[{freq} - {freq+1}"] = \
+                                float(freq_info.get("maxPSD") or
+                                      freq_info.get("maxPsd"))
                 except (TypeError, ValueError, KeyError):
                     diffs.append((f"Unrecognized frequency list structure at "
                                   f"{path_repr} in {kind}"))

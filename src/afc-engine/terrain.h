@@ -70,6 +70,8 @@ class TerrainClass
 
 		bool getGdalDirectMode() const;
 		bool setGdalDirectMode(bool newGdalDirectMode);
+
+		static std::atomic_llong numITM;
 	private:
 		/**************************************************************************************/
 		/**** Data                                                                         ****/

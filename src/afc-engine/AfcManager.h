@@ -182,7 +182,7 @@ class AfcManager
 
 		void readDeniedRegionData(std::string filename);
 
-		void computePathLoss(CConst::PathLossModelEnum pathLossModel, CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx,
+		void computePathLoss(CConst::PathLossModelEnum pathLossModel, bool itmFSPLFlag, CConst::PropEnvEnum propEnv, CConst::PropEnvEnum propEnvRx,
 				CConst::NLCDLandCatEnum nlcdLandCatTx, CConst::NLCDLandCatEnum nlcdLandCatRx,
 				double distKm, double fsplDistKm, double win2DistKm, double frequency,
 				double txLongitudeDeg, double txLatitudeDeg, double txHeightM, double elevationAngleTxDeg,
@@ -229,6 +229,7 @@ class AfcManager
 		void runHeatmapAnalysis();
 		void writeKML();
 		void createChannelList();
+		void splitFrequencyRanges();
 		bool containsChannel(const std::vector<FreqBandClass>& freqBandList, int chanStartFreqMHz, int chanStopFreqMHz);
 		// Returns 1 is successful, 0 of cfi invalid
 		std::vector<std::pair<int,int>> calculateOverlapBandList(const std::vector<FreqBandClass>& freqBandList, int chanStartFreqMHz, int chanStopFreqMHz);
@@ -407,7 +408,6 @@ class AfcManager
 		std::vector<FreqBandClass> _allowableFreqBandList; // List of allowable freq bands.  For USA, correspond to UNII-5 and UNII-7
 		std::string _mapDataGeoJsonFile;               // File to write map data geojson
 		std::string _deniedRegionFile;                 // File containing data on denied geographic regions
-		int _inquiredFrequencyResolutionMHz;           // Resolution of inquired frequency response in MHz
 		double _inquiredFrequencyMaxPSD_dBmPerMHz;     // Max PSD for inquired frequency analysis
 
 		AntennaClass *_rlanAntenna;
