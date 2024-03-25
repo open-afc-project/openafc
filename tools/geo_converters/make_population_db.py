@@ -125,7 +125,7 @@ def main(argv: List[str]) -> None:
         unpack_format = "d" * line_len
 
         gdal_band = gdal_dataset.GetRasterBand(1)
-        nodata = gdal_band.GetNoDataValue();
+        nodata = gdal_band.GetNoDataValue()
 
         total_population: float = 0
         bulk: List[Dict[str, float]] = []

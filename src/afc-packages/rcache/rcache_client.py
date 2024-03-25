@@ -54,6 +54,7 @@ class RcacheClient:
                        invalidate)
     _update_on_send -- True to update cache on sender
     """
+
     def __init__(self, client_settings: RcacheClientSettings,
                  rmq_receiver: Optional[bool] = None) -> None:
         """ Constructor

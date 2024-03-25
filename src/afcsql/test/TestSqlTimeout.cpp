@@ -1,4 +1,4 @@
-// 
+//
 
 #include "../SqlConnectionDefinition.h"
 #include "../SqlScopedConnection.h"

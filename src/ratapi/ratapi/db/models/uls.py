@@ -44,7 +44,7 @@ class ULS(Base):
     rx_callsign = Column(String(16), nullable=False)
 
     #: Rx Location Number
-    #rx_location_num = Column(Integer, nullable=False)
+    # rx_location_num = Column(Integer, nullable=False)
 
     #: Rx Antenna Number
     rx_antenna_num = Column(Integer, nullable=False)
@@ -75,7 +75,7 @@ class ULS(Base):
     tx_height_to_center_raat_m = Column(Float)
 
     #: Tx Beamwidth
-    #tx_beamwidth = Column(Float, nullable=False)
+    # tx_beamwidth = Column(Float, nullable=False)
 
     #: Tx Gain (dBi)
     tx_gain = Column(Float)

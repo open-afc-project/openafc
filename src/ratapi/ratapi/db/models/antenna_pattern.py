@@ -5,6 +5,7 @@ import sqlalchemy as sa
 from sqlalchemy import types
 from base import Base
 
+
 class Population(Base):
     ''' Antenna Pattern table
     '''

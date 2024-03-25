@@ -23,9 +23,9 @@ def any_match(matchers, value):
 
 
 class Matcher(object):
-    ''' Keep track of a named item to match, and whether or not any 
+    ''' Keep track of a named item to match, and whether or not any
     candidate text has matched yet.
-    
+
     :param re_match: A regular expression pattern to match.
     :type re_match: str
     '''
@@ -59,17 +59,29 @@ def main(argv):
         argv[0],
         description='Move RPM packages into a repository tree.'
     )
-    parser.add_argument('--log-level', dest='log_level', default='info',
-                        metavar='LEVEL',
-                        help='Console logging lowest level displayed. Defaults to info.')
-    parser.add_argument('--include-pattern', type=str, action='append', default=[],
-                        help='A regexp pattern to determine if a package "name.arch" (not file name) is taken.')
-    parser.add_argument('--include-list', type=str,
-                        help='A text file containing an include pattern on each line.')
+    parser.add_argument(
+        '--log-level',
+        dest='log_level',
+        default='info',
+        metavar='LEVEL',
+        help='Console logging lowest level displayed. Defaults to info.')
+    parser.add_argument(
+        '--include-pattern',
+        type=str,
+        action='append',
+        default=[],
+        help='A regexp pattern to determine if a package "name.arch" (not file name) is taken.')
+    parser.add_argument(
+        '--include-list',
+        type=str,
+        help='A text file containing an include pattern on each line.')
     parser.add_argument('--ignore-dupes', action='store_true', default=False,
                         help='Ignore duplicate versions of a package name.')
-    parser.add_argument('--ignore-input-signatures', action='store_true', default=False,
-                        help='Ignore package signatures on inputs. Packages may be re-signed and those signatures lost anyway.')
+    parser.add_argument(
+        '--ignore-input-signatures',
+        action='store_true',
+        default=False,
+        help='Ignore package signatures on inputs. Packages may be re-signed and those signatures lost anyway.')
     parser.add_argument('inpath', type=str, nargs='+',
                         help='The input path to scan for files.')
     parser.add_argument('outpath', type=str,
@@ -115,7 +127,7 @@ def main(argv):
                 # Only care about RPM files
                 if not filename.endswith('.rpm'):
                     continue
-    
+
                 # get package info
                 src_path = os.path.join(dirpath, filename)
                 rel_path = os.path.relpath(src_path, inpath)
@@ -132,22 +144,24 @@ def main(argv):
                         archname = 'src'
                     else:
                         archname = head[rpm.RPMTAG_ARCH]
-    
+
                 fullname = '{0}.{1}'.format(pkgname, archname)
                 LOGGER.info('File %s name %s', rel_path, fullname)
-    
+
                 if not any_match(pkg_incl, fullname):
                     LOGGER.info('Ignoring name %s', fullname)
                     continue
                 if pkg_excl and any_match(pkg_excl, fullname):
                     LOGGER.info('Excluding name %s', fullname)
                     continue
-    
+
                 # check for dupes
                 if fullname in seen_fullnames and not args.ignore_dupes:
-                    raise ValueError('Duplicate package "{0}" in "{1}" and "{2}"'.format(fullname, rel_path, seen_fullnames[fullname]))
+                    raise ValueError(
+                        'Duplicate package "{0}" in "{1}" and "{2}"'.format(
+                            fullname, rel_path, seen_fullnames[fullname]))
                 seen_fullnames[fullname] = rel_path
-    
+
                 # move, preserving permission/time and relative tree structure
                 dst_path = os.path.join(tgtpath, rel_path)
                 dst_dir = os.path.dirname(dst_path)
@@ -161,7 +175,8 @@ def main(argv):
         if not matcher.matched():
             unmatched.add(str(matcher))
     if unmatched:
-        raise RuntimeError('Unmatched include names: {0}'.format(', '.join(unmatched)))
+        raise RuntimeError(
+            'Unmatched include names: {0}'.format(', '.join(unmatched)))
 
 
 if __name__ == '__main__':

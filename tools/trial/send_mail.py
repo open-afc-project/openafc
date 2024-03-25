@@ -5,7 +5,8 @@
 # This work is licensed under the OpenAFC Project License, a copy
 # of which is included with this software program.
 
-import smtplib, ssl
+import smtplib
+import ssl
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
@@ -14,10 +15,10 @@ from email.message import EmailMessage
 import json
 import argparse
 from send_requests import send_mail
-##### 
-### configurations
-### config file is in json of this format:
-#{"sender_email":"sender email here","password":"password here","port":"465"}
+#####
+# configurations
+# config file is in json of this format:
+# {"sender_email":"sender email here","password":"password here","port":"465"}
 ####
 
 parser = argparse.ArgumentParser(description='Read and parse request json')
@@ -57,5 +58,5 @@ context = ssl.create_default_context()
 
 with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
     server.login(sender_email, password)
-    send_mail(req_file, resp_file, receiver_email, cc_email, server, req_id, sender_email, sender_email)
-
+    send_mail(req_file, resp_file, receiver_email, cc_email,
+              server, req_id, sender_email, sender_email)

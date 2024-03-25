@@ -1,6 +1,16 @@
 #!/usr/bin/env python
-import os, datetime, zipfile, shutil, subprocess, sys, glob, argparse, csv
-import urllib.request, urllib.parse, urllib.error
+import os
+import datetime
+import zipfile
+import shutil
+import subprocess
+import sys
+import glob
+import argparse
+import csv
+import urllib.request
+import urllib.parse
+import urllib.error
 from collections import OrderedDict
 import ssl
 from urllib.error import URLError
@@ -10,20 +20,41 @@ from csvToSqliteULS import convertULS
 from sort_callsigns_addfsid import sortCallsignsAddFSID
 from fix_bps import fixBPS
 from fix_params import fixParams
-import sqlalchemy as sa, hashlib, fnmatch
+import sqlalchemy as sa
+import hashlib
+import fnmatch
 
 ssl._create_default_https_context = ssl._create_unverified_context
 
-# file types we need to consider along with their # of | symbols (i.e. # of cols - 1)
+# file types we need to consider along with their # of | symbols (i.e. #
+# of cols - 1)
 neededFilesUS = {}
-neededFilesUS[0] = {'AN.dat': 37, 'CP.dat': 13, 'EM.dat': 15, 'EN.dat': 29, 'FR.dat': 29, 'HD.dat': 58, 'LO.dat': 50, 'PA.dat': 21, 'SG.dat': 14}
-neededFilesUS[1] = {'AN.dat': 37, 'CP.dat': 13, 'EM.dat': 15, 'EN.dat': 29, 'FR.dat': 29, 'HD.dat': 58, 'LO.dat': 50, 'PA.dat': 23, 'SG.dat': 14}
+neededFilesUS[0] = {
+    'AN.dat': 37,
+    'CP.dat': 13,
+    'EM.dat': 15,
+    'EN.dat': 29,
+    'FR.dat': 29,
+    'HD.dat': 58,
+    'LO.dat': 50,
+    'PA.dat': 21,
+    'SG.dat': 14}
+neededFilesUS[1] = {
+    'AN.dat': 37,
+    'CP.dat': 13,
+    'EM.dat': 15,
+    'EN.dat': 29,
+    'FR.dat': 29,
+    'HD.dat': 58,
+    'LO.dat': 50,
+    'PA.dat': 23,
+    'SG.dat': 14}
 
 # Version changed AUG 18, 2022
 versionTime = datetime.datetime(2022, 8, 18, 0, 0, 0)
 
 # map to reuse weekday in loops
-dayMap = OrderedDict() # ordered dictionary so order is mainatined 
+dayMap = OrderedDict()  # ordered dictionary so order is mainatined
 dayMap[6] = 'sun'
 dayMap[0] = 'mon'
 dayMap[1] = 'tue'
@@ -51,38 +82,48 @@ monthMap = {
 # Download data files for each region (US, CA)                                #
 # Currently in fullPathTempDir                                                #
 ###############################################################################
+
+
 def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
     regionDataDir = fullPathTempDir + '/' + region
     if (not os.path.isdir(regionDataDir)):
         os.mkdir(regionDataDir)
-    logFile.write('Downloading data files for ' + region + ' into ' + regionDataDir + '\n')
+    logFile.write('Downloading data files for ' +
+                  region + ' into ' + regionDataDir + '\n')
     if region == 'US':
         # download the latest Weekly Update
-        weeklyURL =  'https://data.fcc.gov/download/pub/uls/complete/l_micro.zip'
+        weeklyURL = 'https://data.fcc.gov/download/pub/uls/complete/l_micro.zip'
         logFile.write('Downloading weekly' + '\n')
         urllib.request.urlretrieve(weeklyURL, regionDataDir + '/weekly.zip')
 
         # download all the daily updates starting from Sunday up to that day
-        # example: on Wednesday morning, we will download the weekly update PLUS Sun, Mon, Tue and Wed daily updates
+        # example: on Wednesday morning, we will download the weekly update
+        # PLUS Sun, Mon, Tue and Wed daily updates
         for key, day in dayMap.items():
             dayStr = day
-            dailyURL =  'https://data.fcc.gov/download/pub/uls/daily/l_mw_' + dayStr +'.zip'
+            dailyURL = 'https://data.fcc.gov/download/pub/uls/daily/l_mw_' + dayStr + '.zip'
             logFile.write('Downloading ' + dayStr + '\n')
-            urllib.request.urlretrieve(dailyURL, regionDataDir + '/' + dayStr + '.zip')
+            urllib.request.urlretrieve(
+                dailyURL, regionDataDir + '/' + dayStr + '.zip')
             # Exit after processing today's file
             if (key == currentWeekday) and (day != 'sun'):
                 break
     elif region == 'CA':
-        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Stations_Data_Extracts.csv',          regionDataDir + '/SD.csv')
-        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Passive_Repeater_data_extract.csv',   regionDataDir + '/PP.csv')
-        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Passive_Reflectors_Data_Extract.csv', regionDataDir + '/PR.csv')
-
+        urllib.request.urlretrieve(
+            'https://www.ic.gc.ca/engineering/Stations_Data_Extracts.csv',
+            regionDataDir + '/SD.csv')
+        urllib.request.urlretrieve(
+            'https://www.ic.gc.ca/engineering/Passive_Repeater_data_extract.csv',
+            regionDataDir + '/PP.csv')
+        urllib.request.urlretrieve(
+            'https://www.ic.gc.ca/engineering/Passive_Reflectors_Data_Extract.csv',
+            regionDataDir + '/PR.csv')
 
         # Not processing transmitters for CA
         # urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/SMS_TAFL_Files/TAFL_LTAF_Fixe.zip',   'TAFL_LTAF_Fixe.zip')
         # zip_file = zipfile.ZipFile("TAFL_LTAF_Fixe.zip") # zip object
-        # zip_file.extractall(regionDataDir) 
-        # zip_file.close() 
+        # zip_file.extractall(regionDataDir)
+        # zip_file.close()
         # if os.path.isfile(regionDataDir + '/TAFL_LTAF_Fixe.csv'):
         #     os.rename(regionDataDir + '/TAFL_LTAF_Fixe.csv', regionDataDir + '/TA.csv')
         # elif os.path.isfile(regionDataDir + '/IC_TAFL_File_fixed.csv'):
@@ -90,27 +131,32 @@ def downloadFiles(region, logFile, currentWeekday, fullPathTempDir):
         # else:
         #     raise Exception('ERROR: Unable to process CA file {}'.format("TAFL_LTAF_Fixe.zip"))
 
-        cmd = 'echo "Antenna Manufacturer,Antenna Model Number,Antenna Gain [dBi],Antenna Diameter,Beamwidth [deg],Last Updated,Pattern Type,Pattern Azimuth [deg],Pattern Attenuation [dB]" >| ' + regionDataDir + '/AP.csv'
+        cmd = 'echo "Antenna Manufacturer,Antenna Model Number,Antenna Gain [dBi],Antenna Diameter,Beamwidth [deg],Last Updated,Pattern Type,Pattern Azimuth [deg],Pattern Attenuation [dB]" >| ' + regionDataDir + '/AP.csv'  # noqa
         os.system(cmd)
-        urllib.request.urlretrieve('https://www.ic.gc.ca/engineering/Antenna_Patterns_6GHz.csv', regionDataDir + '/Antenna_Patterns_6GHz_orig.csv')
-        cmd = 'cat ' + regionDataDir + '/Antenna_Patterns_6GHz_orig.csv >> ' + regionDataDir + '/AP.csv'
+        urllib.request.urlretrieve(
+            'https://www.ic.gc.ca/engineering/Antenna_Patterns_6GHz.csv',
+            regionDataDir + '/Antenna_Patterns_6GHz_orig.csv')
+        cmd = 'cat ' + regionDataDir + \
+            '/Antenna_Patterns_6GHz_orig.csv >> ' + regionDataDir + '/AP.csv'
         os.system(cmd)
         os.remove(regionDataDir + '/Antenna_Patterns_6GHz_orig.csv')
 ###############################################################################
 
 # Downloads antenna files
+
+
 def prepareAFCGitHubFiles(rawDir, destDir, logFile):
     # Files in rawDir are downloaded from
     # https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data/
     # (can also be viewed at https://github.com/Wireless-Innovation-Forum/6-GHz-AFC/tree/main/data/common_data)
     # This function brings them to palatable state in destDir
-    dataFileList = [ 'antenna_model_diameter_gain.csv',
+    dataFileList = ['antenna_model_diameter_gain.csv',
                     'billboard_reflector.csv',
                     'category_b1_antennas.csv',
                     'high_performance_antennas.csv',
                     'fcc_fixed_service_channelization.csv',
                     'transmit_radio_unit_architecture.csv',
-                  ]
+                    ]
 
     for dataFile in dataFileList:
         srcFile = os.path.join(rawDir, dataFile)
@@ -126,62 +172,75 @@ def prepareAFCGitHubFiles(rawDir, destDir, logFile):
         os.system(cmd)
         if dataFile == "fcc_fixed_service_channelization.csv":
             cmd = 'echo -e "5967.4375,30,\n' \
-                        +  '6056.3875,30,\n' \
-                        +  '6189.8275,30,\n' \
-                        +  '6219.4775,30,\n' \
-                        +  '6308.4275,30," >> ' + dstFile
+                + '6056.3875,30,\n' \
+                + '6189.8275,30,\n' \
+                + '6219.4775,30,\n' \
+                + '6308.4275,30," >> ' + dstFile
             os.system(cmd)
 
 # Extracts all the zip files into sub-directories
+
+
 def extractZips(logFile, directory):
     logFile.write('Extracting zips for directory ' + directory + '\n')
     # unzip into sub-directories of directory
-    for tempZip in os.listdir(directory): # unzip every zip
+    for tempZip in os.listdir(directory):  # unzip every zip
         if (tempZip.endswith('.zip')):
             logFile.write('Extracting ' + tempZip + '\n')
-            fileName = os.path.abspath(directory + '/' + tempZip) # get full path
-            zip_file = zipfile.ZipFile(fileName) # zip object
+            fileName = os.path.abspath(
+                directory + '/' + tempZip)  # get full path
+            zip_file = zipfile.ZipFile(fileName)  # zip object
             subDirName = fileName.replace('.zip', '')
-            os.mkdir(subDirName) # sub-directory to extract to 
-            zip_file.extractall(subDirName) 
-            zip_file.close() 
+            os.mkdir(subDirName)  # sub-directory to extract to
+            zip_file.extractall(subDirName)
+            zip_file.close()
 
 # Returns the datetime object based on the counts file
+
+
 def verifyCountsFile(directory):
-    # check weekly date 
-    with open(directory + '/counts', 'r') as countsFile: 
+    # check weekly date
+    with open(directory + '/counts', 'r') as countsFile:
         line = countsFile.readline()
         # FCC Format for the line is:
         # File Creation Date: Sun Oct  3 17:59:04 EDT 2021
-        dateStr = line.replace('File Creation Date: ', '') # remove non-date part of string
-        dateData = dateStr.split() # split into word array
-        weekday = dateData[0] 
-        month = monthMap.get(dateData[1].lower(), 'err' ) # convert month string to an int between 1 and 12
-        day = int(dateData[2]) # day of the month as a Number
+        # remove non-date part of string
+        dateStr = line.replace('File Creation Date: ', '')
+        dateData = dateStr.split()  # split into word array
+        weekday = dateData[0]
+        # convert month string to an int between 1 and 12
+        month = monthMap.get(dateData[1].lower(), 'err')
+        day = int(dateData[2])  # day of the month as a Number
         time = dateData[3]
         timeZone = dateData[4]
         year = int(dateData[5])
-        timeData = [int(string) for string in time.split(':')] # convert string time to numbers array
+        # convert string time to numbers array
+        timeData = [int(string) for string in time.split(':')]
         hours = timeData[0]
         mins = timeData[1]
         sec = timeData[2]
-        if(month != 'err'):
-            fileCreationDate = datetime.datetime(year, month, day, hours, mins, sec)
+        if (month != 'err'):
+            fileCreationDate = datetime.datetime(
+                year, month, day, hours, mins, sec)
             return fileCreationDate
-        else: 
-            raise Exception('ERROR: Could not parse month of FCC string in counts file for ' + directory + ' update')
-            
+        else:
+            raise Exception(
+                'ERROR: Could not parse month of FCC string in counts file for ' +
+                directory +
+                ' update')
+
 
 # Removes any record with the given id from the given file
-def removeFromCombinedFile(fileName, directory, ids_to_remove, day, versionIdx):
+def removeFromCombinedFile(
+        fileName, directory, ids_to_remove, day, versionIdx):
     weeklyAndDailyPath = directory + '/weekly/' + fileName + '_withDaily'
 
     if (day == 'weekly'):
         # create file that contains weekly and daily
-        with open(weeklyAndDailyPath, 'w', encoding='utf8') as withDaily: 
+        with open(weeklyAndDailyPath, 'w', encoding='utf8') as withDaily:
             # open weekly file
-            with open(directory + '/weekly/' + fileName , 'r', encoding='utf8') as weekly:
-                record = '' 
+            with open(directory + '/weekly/' + fileName, 'r', encoding='utf8') as weekly:
+                record = ''
                 symbolCount = 0
                 numExpectedCols = neededFilesUS[versionIdx][fileName]
                 for line in weekly:
@@ -189,65 +248,76 @@ def removeFromCombinedFile(fileName, directory, ids_to_remove, day, versionIdx):
                     line = line.replace('\n', '')
                     line = line.replace('\r', '')
                     # the line was just newline character(s), skip it
-                    if(line == '' or line == ' '):
+                    if (line == '' or line == ' '):
                         continue
-                    # the line is a single piece of data that does not contain the | character
-                    elif(not '|' in line):
+                    # the line is a single piece of data that does not contain
+                    # the | character
+                    elif ('|' not in line):
                         record += line
-                        continue 
-                    else: 
-                        symbolCount += line.count('|') # this many | were in the line
-                        record += line  
-                    # the record is complete if the number of | symbols is equal to the number of expected cols
-                    if (symbolCount == numExpectedCols): 
+                        continue
+                    else:
+                        # this many | were in the line
+                        symbolCount += line.count('|')
+                        record += line
+                    # the record is complete if the number of | symbols is
+                    # equal to the number of expected cols
+                    if (symbolCount == numExpectedCols):
                         cols = record.split('|')
                         fileType = cols[0]
                         # Ensure we need this entry
-                        if(fileType + ".dat" in list(neededFilesUS[versionIdx].keys())):
-                            # only write when the id is not in the list of ids 
-                            if(not cols[1] in ids_to_remove):
-                                record += "\r\n" # add newline
+                        if (fileType +
+                                ".dat" in list(neededFilesUS[versionIdx].keys())):
+                            # only write when the id is not in the list of ids
+                            if (not cols[1] in ids_to_remove):
+                                record += "\r\n"  # add newline
                                 withDaily.write(record)
-                            #reset for the next record 
+                            # reset for the next record
                             record = ''
                             symbolCount = 0
                     elif (symbolCount > numExpectedCols):
-                        e = Exception('ERROR: Could not process record. More columns than expected in weekly file')
+                        e = Exception(
+                            'ERROR: Could not process record. More columns than expected in weekly file')
                         raise e
     else:
         # open new file that contains weekly and daily
-        with open(weeklyAndDailyPath + '_temp', 'w', encoding='utf8') as withDaily: 
-            # open older file 
-            with open(weeklyAndDailyPath , 'r', encoding='utf8') as weekly:
-                for line in weekly: 
+        with open(weeklyAndDailyPath + '_temp', 'w', encoding='utf8') as withDaily:
+            # open older file
+            with open(weeklyAndDailyPath, 'r', encoding='utf8') as weekly:
+                for line in weekly:
                     cols = line.split('|')
-                    # only write when the id is not in the list of ids 
-                    if(not cols[1] in ids_to_remove):
+                    # only write when the id is not in the list of ids
+                    if (not cols[1] in ids_to_remove):
                         withDaily.write(line)
         # remove old combined, move new one to right place
         os.remove(weeklyAndDailyPath)
         os.rename(weeklyAndDailyPath + '_temp', weeklyAndDailyPath)
 
 # Update specific datafile with daily data
+
+
 def updateIndividualFile(dayFile, directory, lineBuffer):
     weeklyAndDailyPath = directory + '/weekly/' + dayFile + '_withDaily'
-    if(os.path.isfile(weeklyAndDailyPath)):
+    if (os.path.isfile(weeklyAndDailyPath)):
         # open file that contains weekly and daily
-        with open(weeklyAndDailyPath, 'a', encoding='utf8') as withDaily:       
+        with open(weeklyAndDailyPath, 'a', encoding='utf8') as withDaily:
             withDaily.write(lineBuffer)
     else:
-        e =  Exception('Combined file ' + weeklyAndDailyPath + ' does not exist')
-        raise e 
+        e = Exception('Combined file ' +
+                      weeklyAndDailyPath + ' does not exist')
+        raise e
 
-# Reads the file and creates well formed entries from FCC data. 
-# The ONLY thing that consititutes a valid entry is the number of | characters (e.g. AN files have 38 columns and thus 37 | per record)
+# Reads the file and creates well formed entries from FCC data.
+# The ONLY thing that consititutes a valid entry is the number of |
+# characters (e.g. AN files have 38 columns and thus 37 | per record)
+
+
 def readEntries(dayFile, directory, day, versionIdx):
-    recordBuffer = '' # buffer to limit number of file open() calls
+    recordBuffer = ''  # buffer to limit number of file open() calls
     idsToRemove = []
     with open(directory + '/' + day + '/' + dayFile, encoding='utf8') as infile:
         numExpectedCols = neededFilesUS[versionIdx][dayFile]
         record = ''
-        symbolCount = 0   
+        symbolCount = 0
         # Iterate over the lines in the file
         linenum = 0
         for line in infile:
@@ -255,34 +325,48 @@ def readEntries(dayFile, directory, day, versionIdx):
             # remove newline characters from line
             line = line.replace('\n', '')
             line = line.replace('\r', '')
-            
-            # the line we were given was just newline character(s) or whitespace, skip it
-            if(line == '' or line == ' '):
+
+            # the line we were given was just newline character(s) or
+            # whitespace, skip it
+            if (line == '' or line == ' '):
                 continue
-            # the line is a single piece of data that does not contain the | character
-            elif(not '|' in line):
+            # the line is a single piece of data that does not contain the |
+            # character
+            elif ('|' not in line):
                 record += line
-                continue 
-            else: 
-                symbolCount += line.count('|') # this many | were in the line
-                record += line  
-            # the record is complete if the number of | symbols is equal to the number of expected cols
-            if(symbolCount == numExpectedCols):
+                continue
+            else:
+                symbolCount += line.count('|')  # this many | were in the line
+                record += line
+            # the record is complete if the number of | symbols is equal to the
+            # number of expected cols
+            if (symbolCount == numExpectedCols):
                 cols = record.split('|')
-                fccId = cols[1] # FCC unique system identifier should always be this index
+                # FCC unique system identifier should always be this index
+                fccId = cols[1]
                 # only need to remove an ID once per file per day
-                if(not fccId in idsToRemove): 
+                if (fccId not in idsToRemove):
                     idsToRemove.append(fccId)
-                recordBuffer += record + '\r\n' # store the record to the buffer with proper newline for csv format  
-                record = '' #reset the record 
+                # store the record to the buffer with proper newline for csv
+                # format
+                recordBuffer += record + '\r\n'
+                record = ''  # reset the record
                 symbolCount = 0
             elif (symbolCount > numExpectedCols):
-                raise Exception('ERROR: Could not process record more columns than expected: ' + day + '/' + dayFile + ':' + str(linenum))
+                raise Exception(
+                    'ERROR: Could not process record more columns than expected: ' +
+                    day +
+                    '/' +
+                    dayFile +
+                    ':' +
+                    str(linenum))
     removeFromCombinedFile(dayFile, directory, idsToRemove, day, versionIdx)
     updateIndividualFile(dayFile, directory, recordBuffer)
 
 # Processes the daily files, replacing weekly entries when needed
 # Returns datetime of ULS data upload (ULS data identity)
+
+
 def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
     logFile.write('Processing daily files' + '\n')
 
@@ -296,9 +380,8 @@ def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
         versionIdx = 0
     for file in list(neededFilesUS[versionIdx].keys()):
         # removeFromCombinedFile() will fix any formatting in FCC data
-        # passing an empty list for second arg means no records will be removed 
-        removeFromCombinedFile(file, directory, [], 'weekly', versionIdx) 
-
+        # passing an empty list for second arg means no records will be removed
+        removeFromCombinedFile(file, directory, [], 'weekly', versionIdx)
 
     for key, day in list(dayMap.items()):
         dayDirectory = directory + '/' + day
@@ -306,7 +389,7 @@ def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
         # ensure counts file is newer than weekly
         fileCreationDate = verifyCountsFile(dayDirectory)
         timeDiff = fileCreationDate - weeklyCreation
-        if(timeDiff.total_seconds() > 0):
+        if (timeDiff.total_seconds() > 0):
             upload_time = fileCreationDate
             if (fileCreationDate >= versionTime):
                 versionIdx = 1
@@ -314,45 +397,59 @@ def processDailyFiles(weeklyCreation, logFile, directory, currentWeekday):
                 versionIdx = 0
             for dailyFile in os.listdir(dayDirectory):
                 if (dailyFile in list(neededFilesUS[versionIdx].keys())):
-                    logFile.write('Processing ' + dailyFile + ' for: ' + day + '\n')
+                    logFile.write('Processing ' + dailyFile +
+                                  ' for: ' + day + '\n')
                     readEntries(dailyFile, directory, day, versionIdx)
         else:
-            logFile.write('INFO: Skipping ' + day + ' files because they are older than the weekly file' + '\n')
+            logFile.write(
+                'INFO: Skipping ' +
+                day +
+                ' files because they are older than the weekly file' +
+                '\n')
 
         # Exit after processing yesterdays file
         if (key == currentWeekday):
             break
     return upload_time
 
-# Generates the combined text file that the coalition processor uses. 
+# Generates the combined text file that the coalition processor uses.
+
+
 def generateUlsScriptInputUS(directory, logFile, genFilename):
-    logFile.write('Appending US data to ' + genFilename + ' as input for uls script' + '\n')
+    logFile.write('Appending US data to ' + genFilename +
+                  ' as input for uls script' + '\n')
     with open(genFilename, 'a', encoding='utf8') as combined:
         for weeklyFile in os.listdir(directory):
             if "withDaily" in weeklyFile:
-                logFile.write('Adding ' + directory + '/' + weeklyFile + ' to ' + genFilename + '\n')
-                with open(directory +'/' + weeklyFile, 'r', encoding='utf8') as infile:
+                logFile.write('Adding ' + directory + '/' +
+                              weeklyFile + ' to ' + genFilename + '\n')
+                with open(directory + '/' + weeklyFile, 'r', encoding='utf8') as infile:
                     for line in infile:
                         combined.write('US:' + line)
 
+
 def generateUlsScriptInputCA(directory, logFile, genFilename):
     """ Returns identity string of downloaded data """
-    logFile.write('Appending CA data to ' + genFilename + ' as input for uls script' + '\n')
+    logFile.write('Appending CA data to ' + genFilename +
+                  ' as input for uls script' + '\n')
     # Names of source files (to compute MD5 of)
     sourceFilenames = []
     with open(genFilename, 'a', encoding='utf8') as combined:
         for dataFile in os.listdir(directory):
-            if fnmatch.fnmatch(dataFile, "??.csv") and os.path.isfile(os.path.join(directory, dataFile)):
+            if fnmatch.fnmatch(dataFile, "??.csv") and os.path.isfile(
+                    os.path.join(directory, dataFile)):
                 sourceFilenames.append(dataFile)
-            if dataFile != "AP.csv": # skip antenna pattern file, processed separately
-                logFile.write('Adding ' + directory + '/' + dataFile + ' to ' + genFilename + '\n')
-                with open(directory +'/' + dataFile, 'r', encoding='utf8') as csvfile:
+            if dataFile != "AP.csv":  # skip antenna pattern file, processed separately
+                logFile.write('Adding ' + directory + '/' +
+                              dataFile + ' to ' + genFilename + '\n')
+                with open(directory + '/' + dataFile, 'r', encoding='utf8') as csvfile:
                     code = dataFile.replace('.csv', '')
                     csvreader = csv.reader(csvfile)
                     for row in csvreader:
-                        for (i,field) in enumerate(row):
+                        for (i, field) in enumerate(row):
                             row[i] = field.replace('|', ':')
-                        combined.write('CA:' + code + '|' + ('|'.join(row)) + '|\n')
+                        combined.write('CA:' + code + '|' +
+                                       ('|'.join(row)) + '|\n')
     if not sourceFilenames:
         raise Exception("CA source filenames not found")
     sources_md5 = hashlib.md5()
@@ -360,6 +457,7 @@ def generateUlsScriptInputCA(directory, logFile, genFilename):
         with open(os.path.join(directory, sourceFilename), mode="rb") as f:
             sources_md5.update(f.read())
     return sources_md5.hexdigest()
+
 
 def storeDataIdentities(sqlFile, identityDict):
     """ Stores region data identities in gewnerated SQLite database.
@@ -388,15 +486,16 @@ def storeDataIdentities(sqlFile, identityDict):
                                                 identity=identityDict[region]))
     conn.close()
 
+
 def daily_uls_parse(state_root, interactive):
     startTime = datetime.datetime.now()
-    nameTime =  startTime.isoformat().replace(":", '_')
+    nameTime = startTime.isoformat().replace(":", '_')
 
-    nameTime += "_UniiUS" + uniiStr.replace(":","")
+    nameTime += "_UniiUS" + uniiStr.replace(":", "")
 
     temp = "/temp"
 
-    root = state_root + "/daily_uls_parse"# root so path is consisent
+    root = state_root + "/daily_uls_parse"  # root so path is consisent
 
     ###########################################################################
     # If interactive, prompt to set root path                                 #
@@ -409,7 +508,8 @@ def daily_uls_parse(state_root, interactive):
         print("daily_uls_parse root directory set to " + root)
     ###########################################################################
 
-    currentWeekday = datetime.datetime.today().weekday() # weekday() is 0 indexed at monday
+    # weekday() is 0 indexed at monday
+    currentWeekday = datetime.datetime.today().weekday()
 
     ###########################################################################
     # If interactive, prompt for weekday                                      #
@@ -424,7 +524,8 @@ def daily_uls_parse(state_root, interactive):
         if (value != ""):
             currentWeekday = int(value)
         if (currentWeekday < 0 or currentWeekday > 6):
-            print("ERROR: currentWeekday = " + str(currentWeekday) + " invalid, must be in [0,6]")
+            print("ERROR: currentWeekday = " +
+                  str(currentWeekday) + " invalid, must be in [0,6]")
             return
     ###########################################################################
 
@@ -438,7 +539,8 @@ def daily_uls_parse(state_root, interactive):
     elif interactive:
         accepted = False
         while not accepted:
-            value = input("Remove temp directory: " + fullPathTempDir + " ? (y/n): ")
+            value = input("Remove temp directory: " +
+                          fullPathTempDir + " ? (y/n): ")
             if value == "y":
                 accepted = True
                 removeTempDirFlag = True
@@ -457,8 +559,8 @@ def daily_uls_parse(state_root, interactive):
     if removeTempDirFlag:
         if (os.path.isdir(fullPathTempDir)):
             try:
-                shutil.rmtree(fullPathTempDir) #delete temp folder
-            except Exception as e: 
+                shutil.rmtree(fullPathTempDir)  # delete temp folder
+            except Exception as e:
                 # LOGGER.error('ERROR: Could not delete old temp directory:')
                 raise e
         # create temp directory to download files to
@@ -472,26 +574,28 @@ def daily_uls_parse(state_root, interactive):
         print("ERROR: " + fullPathTempDir + " does not exist")
         return
 
-    os.chdir(fullPathTempDir) #change to temp 
+    os.chdir(fullPathTempDir)  # change to temp
     logname = fullPathTempDir + "/dailyParse_" + nameTime + ".log"
     logFile = open(logname, 'w', 1)
     if interactive:
-        logFile.write('Starting interactive mode update at: ' + startTime.isoformat() + '\n')
+        logFile.write('Starting interactive mode update at: ' +
+                      startTime.isoformat() + '\n')
     else:
         logFile.write('Starting update at: ' + startTime.isoformat() + '\n')
     ###########################################################################
 
     for region in regionList:
 
-        ###########################################################################
+        #######################################################################
         # If interactive, prompt for downloading of data files for region         #
-        ###########################################################################
+        #######################################################################
         if wfaFlag:
             downloadDataFilesFlag = False
         elif interactive:
             accepted = False
             while not accepted:
-                value = input("Download data files for " + region + "? (y/n): ")
+                value = input("Download data files for " +
+                              region + "? (y/n): ")
                 if value == "y":
                     accepted = True
                     downloadDataFilesFlag = True
@@ -499,44 +603,47 @@ def daily_uls_parse(state_root, interactive):
                     accepted = True
                     downloadDataFilesFlag = False
                 else:
-                    print("ERROR: Invalid input: " + value + ", must be y or n")
+                    print("ERROR: Invalid input: " +
+                          value + ", must be y or n")
         else:
             downloadDataFilesFlag = True
-        ###########################################################################
+        #######################################################################
 
-        ###########################################################################
+        #######################################################################
         # If downloadDataFilesFlag set, download data files for region            #
-        ###########################################################################
+        #######################################################################
         if downloadDataFilesFlag:
             downloadFiles(region, logFile, currentWeekday, fullPathTempDir)
-        ###########################################################################
+        #######################################################################
 
         regionDataDir = fullPathTempDir + '/' + region
 
         if region == 'US':
-            ###########################################################################
+            ###################################################################
             # If interactive, prompt for extraction of files from zip files           #
-            ###########################################################################
+            ###################################################################
             if wfaFlag:
                 extractZipFlag = True
             elif interactive:
-                value = input("Extract FCC files from downloaded zip files? (y/n): ")
+                value = input(
+                    "Extract FCC files from downloaded zip files? (y/n): ")
                 if value == "y":
                     extractZipFlag = True
                 elif value == "n":
                     extractZipFlag = False
                 else:
-                    print("ERROR: Invalid input: " + value + ", must be y or n")
+                    print("ERROR: Invalid input: " +
+                          value + ", must be y or n")
             else:
                 extractZipFlag = True
-            ###########################################################################
+            ###################################################################
 
-            ###########################################################################
+            ###################################################################
             # If extractZipFlag set, extract files from zip files                     #
-            ###########################################################################
+            ###################################################################
             if extractZipFlag:
                 extractZips(logFile, regionDataDir)
-            ###########################################################################
+            ###################################################################
 
     ###########################################################################
     # If interactive, prompt for converting AFC GitHub data files            #
@@ -563,7 +670,8 @@ def daily_uls_parse(state_root, interactive):
     # If prepareAFCGitHubFilesFlag set, prepare AFC GitHub data files         #
     ###########################################################################
     if prepareAFCGitHubFilesFlag:
-        prepareAFCGitHubFiles(root + '/raw_wireless_innovation_forum_files', ".", logFile)
+        prepareAFCGitHubFiles(
+            root + '/raw_wireless_innovation_forum_files', ".", logFile)
     ###########################################################################
 
     ###########################################################################
@@ -574,7 +682,8 @@ def daily_uls_parse(state_root, interactive):
     elif interactive:
         accepted = False
         while not accepted:
-            value = input("Process antenna model files to create antenna_model_list.csv, antenna_prefix_list.csv and antennaPatternFile? (y/n): ")
+            value = input(
+                "Process antenna model files to create antenna_model_list.csv, antenna_prefix_list.csv and antennaPatternFile? (y/n): ")
             if value == "y":
                 accepted = True
                 processAntFilesFlag = True
@@ -596,11 +705,14 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if interactive:
         if not processAntFilesFlag:
-            flist = glob.glob(fullPathTempDir + "/afc_antenna_patterns_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
+            flist = glob.glob(
+                fullPathTempDir +
+                "/afc_antenna_patterns_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")  # noqa
             if (len(flist)):
                 antennaPatternFileFile = os.path.basename(flist[-1])
 
-        value = input("Enter Antenna Pattern filename (" + antennaPatternFileFile + "): ")
+        value = input("Enter Antenna Pattern filename (" +
+                      antennaPatternFileFile + "): ")
         if (value != ""):
             antennaPatternFileFile = value
     ###########################################################################
@@ -614,9 +726,9 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if processAntFilesFlag:
         processAntFiles(fullPathTempDir, processCA, combineAntennaRegionFlag,
-            fullPathTempDir + '/antenna_model_list.csv',
-            fullPathTempDir + '/antenna_prefix_list.csv',
-            fullPathAntennaPatternFile, logFile)
+                        fullPathTempDir + '/antenna_model_list.csv',
+                        fullPathTempDir + '/antenna_prefix_list.csv',
+                        fullPathAntennaPatternFile, logFile)
     ###########################################################################
 
     ###########################################################################
@@ -626,7 +738,8 @@ def daily_uls_parse(state_root, interactive):
     if interactive:
         accepted = False
         while not accepted:
-            value = input("Process FCC files and generate file combined.txt to use as input to uls-script? (y/n): ")
+            value = input(
+                "Process FCC files and generate file combined.txt to use as input to uls-script? (y/n): ")
             if value == "y":
                 accepted = True
                 processDownloadFlag = True
@@ -650,7 +763,7 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if processDownloadFlag:
         with open(fullPathCoalitionScriptInput, 'w', encoding='utf8') as combined:
-            pass # Do nothing, create empty file that will be appended to
+            pass  # Do nothing, create empty file that will be appended to
 
         for region in regionList:
 
@@ -662,20 +775,27 @@ def daily_uls_parse(state_root, interactive):
                 # get the time creation of weekly file from the counts file
                 weeklyCreation = verifyCountsFile(regionDataDir + '/weekly')
                 # process the daily files day by day
-                uploadTime = processDailyFiles(weeklyCreation, logFile, regionDataDir, currentWeekday)
+                uploadTime = processDailyFiles(
+                    weeklyCreation, logFile, regionDataDir, currentWeekday)
                 # For US identity is FCC ULS upoload datetime
                 dataIdentity = uploadTime.isoformat()
 
-                rasDataFileUSSrc =  root + '/data_files/RASdatabase.dat'
+                rasDataFileUSSrc = root + '/data_files/RASdatabase.dat'
                 rasDataFileUSTgt = regionDataDir + '/weekly/RA.dat_withDaily'
-                logFile.write("Copying " + rasDataFileUSSrc + ' to ' + rasDataFileUSTgt + '\n')
-                subprocess.call(['cp', rasDataFileUSSrc, rasDataFileUSTgt]) 
+                logFile.write("Copying " + rasDataFileUSSrc +
+                              ' to ' + rasDataFileUSTgt + '\n')
+                subprocess.call(['cp', rasDataFileUSSrc, rasDataFileUSTgt])
 
-                # generate the combined csv/txt file for the coalition uls processor 
-                generateUlsScriptInputUS(regionDataDir + '/weekly', logFile, fullPathCoalitionScriptInput) 
+                # generate the combined csv/txt file for the coalition uls
+                # processor
+                generateUlsScriptInputUS(
+                    regionDataDir + '/weekly',
+                    logFile,
+                    fullPathCoalitionScriptInput)
             elif region == 'CA':
                 # For Canada identity is MD5 of downloaded files
-                dataIdentity = generateUlsScriptInputCA(regionDataDir, logFile, fullPathCoalitionScriptInput)
+                dataIdentity = generateUlsScriptInputCA(
+                    regionDataDir, logFile, fullPathCoalitionScriptInput)
             else:
                 logFile.write('ERROR: Invalid region = ' + region)
                 raise e
@@ -716,25 +836,33 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if interactive:
         if not runULSProcessorFlag:
-            flist = glob.glob(fullPathTempDir + "/FS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
+            flist = glob.glob(
+                fullPathTempDir +
+                "/FS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
             if (len(flist)):
                 coalitionScriptOutputFSFilename = os.path.basename(flist[-1])
-            flist = glob.glob(fullPathTempDir + "/RAS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
+            flist = glob.glob(
+                fullPathTempDir +
+                "/RAS_[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]T[0-9][0-9]_[0-9][0-9]_[0-9][0-9].[0-9][0-9][0-9][0-9][0-9][0-9].csv")
             if (len(flist)):
                 coalitionScriptOutputRASFilename = os.path.basename(flist[-1])
 
-        value = input("Enter ULS Processor output FS filename (" + coalitionScriptOutputFSFilename + "): ")
+        value = input("Enter ULS Processor output FS filename (" +
+                      coalitionScriptOutputFSFilename + "): ")
         if (value != ""):
             coalitionScriptOutputFSFilename = value
 
-        value = input("Enter ULS Processor output RAS filename (" + coalitionScriptOutputRASFilename + "): ")
+        value = input("Enter ULS Processor output RAS filename (" +
+                      coalitionScriptOutputRASFilename + "): ")
         if (value != ""):
             coalitionScriptOutputRASFilename = value
     ###########################################################################
 
     # output filename from uls-script
-    fullPathCoalitionScriptOutput = fullPathTempDir + "/" + coalitionScriptOutputFSFilename
-    fullPathRASDabataseFile = fullPathTempDir + "/" + coalitionScriptOutputRASFilename
+    fullPathCoalitionScriptOutput = fullPathTempDir + \
+        "/" + coalitionScriptOutputFSFilename
+    fullPathRASDabataseFile = fullPathTempDir + \
+        "/" + coalitionScriptOutputRASFilename
 
     ###########################################################################
     # If runULSProcessorFlag set, run ULS processor                           #
@@ -744,24 +872,25 @@ def daily_uls_parse(state_root, interactive):
         if combineAntennaRegionFlag:
             mode += "_ca"
 
-        # run through the uls processor 
+        # run through the uls processor
         logFile.write('Running through ULS processor' + '\n')
         try:
-            subprocess.call([root + '/uls-script', fullPathTempDir + '/combined.txt', \
-                                             fullPathCoalitionScriptOutput, \
-                                             fullPathRASDabataseFile, \
-                                             fullPathTempDir + '/antenna_model_list.csv', \
-                                             fullPathTempDir + '/antenna_prefix_list.csv', \
-                                             root + '/antenna_model_map.csv', \
-                                             fullPathTempDir + '/fcc_fixed_service_channelization.csv', \
-                                             fullPathTempDir + '/transmit_radio_unit_architecture.csv', \
-                                             uniiStr, \
-                                             mode]) 
-        except Exception as e: 
+            subprocess.call([root + '/uls-script',
+                             fullPathTempDir + '/combined.txt',
+                             fullPathCoalitionScriptOutput,
+                             fullPathRASDabataseFile,
+                             fullPathTempDir + '/antenna_model_list.csv',
+                             fullPathTempDir + '/antenna_prefix_list.csv',
+                             root + '/antenna_model_map.csv',
+                             fullPathTempDir + '/fcc_fixed_service_channelization.csv',
+                             fullPathTempDir + '/transmit_radio_unit_architecture.csv',
+                             uniiStr,
+                             mode])
+        except Exception as e:
             logFile.write('ERROR: ULS processor error:')
             raise e
     ###########################################################################
-    
+
     ###########################################################################
     # If interactive, prompt for running fixBPS                               #
     ###########################################################################
@@ -784,14 +913,16 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
 
     # output filename from runBPS
-    bpsScriptOutput = fullPathCoalitionScriptOutput.replace('.csv', '_fixedBPS.csv')
+    bpsScriptOutput = fullPathCoalitionScriptOutput.replace(
+        '.csv', '_fixedBPS.csv')
     modcodFile = root + "/data_files/modcod_bps.csv"
 
     ###########################################################################
     # If runFixBPSFlag set, run fixBPS                                        #
     ###########################################################################
     if runFixBPSFlag:
-        logFile.write("Running through BPS script, cwd = " + os.getcwd() + '\n')
+        logFile.write("Running through BPS script, cwd = " +
+                      os.getcwd() + '\n')
         fixBPS(fullPathCoalitionScriptOutput, modcodFile, bpsScriptOutput)
     ###########################################################################
 
@@ -824,12 +955,14 @@ def daily_uls_parse(state_root, interactive):
     # If runSortCallsignsAddFSIDFlag set, run sortCallsignsAddFSID            #
     ###########################################################################
     if runSortCallsignsAddFSIDFlag:
-        fsidTableFile =  root + '/data_files/fsid_table.csv'
-        fsidTableBakFile =  root + '/data_files/fsid_table_bak_' + nameTime + '.csv'
-        logFile.write("Backing up FSID table for to: " + fsidTableBakFile + '\n')
-        subprocess.call(['cp', fsidTableFile, fsidTableBakFile]) 
+        fsidTableFile = root + '/data_files/fsid_table.csv'
+        fsidTableBakFile = root + '/data_files/fsid_table_bak_' + nameTime + '.csv'
+        logFile.write("Backing up FSID table for to: " +
+                      fsidTableBakFile + '\n')
+        subprocess.call(['cp', fsidTableFile, fsidTableBakFile])
         logFile.write("Running through sort callsigns add FSID script" + '\n')
-        sortCallsignsAddFSID(bpsScriptOutput, fsidTableFile, sortedOutput, logFile)
+        sortCallsignsAddFSID(
+            bpsScriptOutput, fsidTableFile, sortedOutput, logFile)
     ###########################################################################
 
     ###########################################################################
@@ -892,10 +1025,11 @@ def daily_uls_parse(state_root, interactive):
     # If runConvertULSFlag set, run convertULS                                #
     ###########################################################################
     if runConvertULSFlag:
-        convertULS(paramOutput, fullPathRASDabataseFile, fullPathAntennaPatternFile, state_root, logFile, outputSQL)
+        convertULS(paramOutput, fullPathRASDabataseFile,
+                   fullPathAntennaPatternFile, state_root, logFile, outputSQL)
         storeDataIdentities(outputSQL, dataIdentities)
     ###########################################################################
-    
+
     finishTime = datetime.datetime.now()
 
     ###########################################################################
@@ -903,11 +1037,12 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     logFile.write('Update finished at: ' + finishTime.isoformat() + '\n')
     timeDiff = finishTime - startTime
-    logFile.write('Update took ' + str(timeDiff.total_seconds()) + ' seconds' + '\n')
+    logFile.write('Update took ' +
+                  str(timeDiff.total_seconds()) + ' seconds' + '\n')
     logFile.close()
     ###########################################################################
 
-    os.chdir(root) # change back to root of this script
+    os.chdir(root)  # change back to root of this script
 
     ###########################################################################
     # If not interactive:                                                     #
@@ -916,56 +1051,62 @@ def daily_uls_parse(state_root, interactive):
     ###########################################################################
     if not interactive:
         print("Creating and moving debug files\n")
-        # create debug zip containing final csv, anomalous_uls, and warning_uls and move it to where GUI can see
+        # create debug zip containing final csv, anomalous_uls, and warning_uls
+        # and move it to where GUI can see
         try:
             if wfaFlag:
                 dirName = "WFA_testvector_FS_" + nameTime
             else:
                 dirName = str(nameTime + "_debug")
-            subprocess.call(['mkdir', dirName]) 
+            subprocess.call(['mkdir', dirName])
 
             # Get all files in temp dir
             for file in os.listdir(fullPathTempDir):
                 fullPathFile = fullPathTempDir + "/" + file
                 if (not os.path.isdir(fullPathFile)):
-                    subprocess.call(['cp', fullPathFile, dirName]) 
+                    subprocess.call(['cp', fullPathFile, dirName])
 
             # anomalousPath = root + '/' + 'anomalous_uls.csv'
             # warningPath = root + '/' + 'warning_uls.txt'
-            # subprocess.call(['mv', anomalousPath, dirName]) 
-            # subprocess.call(['mv', warningPath, dirName]) 
-            # subprocess.call(['cp', paramOutput, dirName]) 
+            # subprocess.call(['mv', anomalousPath, dirName])
+            # subprocess.call(['mv', warningPath, dirName])
+            # subprocess.call(['cp', paramOutput, dirName])
 
-            shutil.make_archive( dirName , 'zip', root, dirName)
+            shutil.make_archive(dirName, 'zip', root, dirName)
             zipName = dirName + ".zip"
-            shutil.rmtree(dirName) #delete debug directory
-            subprocess.call(['mv', zipName,  state_root + '/ULS_Database/']) 
-        except Exception as e: 
+            shutil.rmtree(dirName)  # delete debug directory
+            subprocess.call(['mv', zipName, state_root + '/ULS_Database/'])
+        except Exception as e:
             print('Error moving debug files:' + '\n')
             raise e
 
         # copy sqlite to where GUI can see it
         print("Copying sqlite file" + '\n')
         try:
-            subprocess.call(['cp', outputSQL, state_root + '/ULS_Database/']) 
-        except Exception as e: 
+            subprocess.call(['cp', outputSQL, state_root + '/ULS_Database/'])
+        except Exception as e:
             print('Error copying ULS sqlite:' + '\n')
             raise e
-    
+
         with open(root + '/data_files/lastSuccessfulRun.txt', 'w') as timeFile:
             timeFile.write(finishTime.isoformat())
     ###########################################################################
 
     return finishTime.isoformat()
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Process FS link data for AFC.')
-    parser.add_argument('-i',   '--interactive', action='store_true')
-    parser.add_argument('-ca',  '--combine_antenna_region', action='store_true')
-    parser.add_argument('-wfa', '--wfa', action='store_true')
-    parser.add_argument('-unii_us',  '--unii_us', default='5:7', help='":" separated list of unii bands for US')
 
-    parser.add_argument('-r',  '--region', default='US:CA', help='":" separated list of regions')
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(
+        description='Process FS link data for AFC.')
+    parser.add_argument('-i', '--interactive', action='store_true')
+    parser.add_argument('-ca', '--combine_antenna_region',
+                        action='store_true')
+    parser.add_argument('-wfa', '--wfa', action='store_true')
+    parser.add_argument('-unii_us', '--unii_us', default='5:7',
+                        help='":" separated list of unii bands for US')
+
+    parser.add_argument('-r', '--region', default='US:CA',
+                        help='":" separated list of regions')
 
     args = parser.parse_args()
     interactive = args.interactive
@@ -987,7 +1128,7 @@ if __name__ == '__main__':
         elif u == '8':
             includeUnii8US = True
         else:
-            raise Exception('ERROR: Unrecognized unii band: ' + u )
+            raise Exception('ERROR: Unrecognized unii band: ' + u)
 
     combineAntennaRegionFlag = args.combine_antenna_region
     wfaFlag = args.wfa
@@ -1015,7 +1156,7 @@ if __name__ == '__main__':
         elif r == 'CA':
             processCA = True
         else:
-            raise Exception('ERROR: Unrecognized region: ' + r )
+            raise Exception('ERROR: Unrecognized region: ' + r)
 
     print("Process US = " + str(processUS))
     print("Process CA = " + str(processCA))

@@ -13,20 +13,24 @@
 #include <sstream>
 #include <stdexcept>
 
-namespace {
-	// Logger for all instances of class
-	LOGGER_DEFINE_GLOBAL(logger, "CachedGdal")
+namespace
+{
+// Logger for all instances of class
+LOGGER_DEFINE_GLOBAL(logger, "CachedGdal")
 
 } // end namespace
 
-  ///////////////////////////////////////////////////////////////////////////////
-  // CachedGdalBase::GdalInfo
-  ///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+// CachedGdalBase::GdalInfo
+///////////////////////////////////////////////////////////////////////////////
 
-CachedGdalBase::GdalInfo::GdalInfo(const GdalDatasetHolder *gdalDataset, int minBands,
-	const boost::optional<std::function<void(GdalTransform *)>> &transformationModifier)
-	: baseName(boost::filesystem::path(gdalDataset->fullFileName).filename().string()),
-	transformation(gdalDataset->gdalDataset, baseName), numBands(minBands)
+CachedGdalBase::GdalInfo::GdalInfo(
+	const GdalDatasetHolder *gdalDataset,
+	int minBands,
+	const boost::optional<std::function<void(GdalTransform *)>> &transformationModifier) :
+	baseName(boost::filesystem::path(gdalDataset->fullFileName).filename().string()),
+	transformation(gdalDataset->gdalDataset, baseName),
+	numBands(minBands)
 {
 	if (transformationModifier) {
 		transformationModifier.get()(&transformation);
@@ -36,8 +40,8 @@ CachedGdalBase::GdalInfo::GdalInfo(const GdalDatasetHolder *gdalDataset, int min
 	boost::system::error_code systemErr;
 	if (gdalDataset->gdalDataset->GetRasterCount() < minBands) {
 		errStr << "ERROR: CachedGdalBase::GdalData::GdalData(): GDAL data file '"
-			<< baseName << "' has only " << gdalDataset->gdalDataset->GetRasterCount() <<
-			" bands, whereas at least " << minBands << "is expected";
+		       << baseName << "' has only " << gdalDataset->gdalDataset->GetRasterCount()
+		       << " bands, whereas at least " << minBands << "is expected";
 		throw std::runtime_error(errStr.str());
 	}
 	for (int i = 0; i < minBands; ++i) {
@@ -50,20 +54,26 @@ CachedGdalBase::GdalInfo::GdalInfo(const GdalDatasetHolder *gdalDataset, int min
 // CachedGdalBase::TileKey
 ///////////////////////////////////////////////////////////////////////////////
 
-CachedGdalBase::TileKey::TileKey(int band_, int latOffset_, int lonOffset_,
-	const std::string &baseName_)
-	: band(band_), latOffset(latOffset_), lonOffset(lonOffset_), baseName(baseName_)
-{}
-
-CachedGdalBase::TileKey::TileKey()
-	: band(0), latOffset(0), lonOffset(0), baseName()
-{}
-
-bool CachedGdalBase::TileKey::operator <(const TileKey &other) const
+CachedGdalBase::TileKey::TileKey(int band_,
+				 int latOffset_,
+				 int lonOffset_,
+				 const std::string &baseName_) :
+	band(band_), latOffset(latOffset_), lonOffset(lonOffset_), baseName(baseName_)
 {
-	if (band != other.band) return band < other.band;
-	if (latOffset != other.latOffset) return latOffset < other.latOffset;
-	if (lonOffset != other.lonOffset) return lonOffset < other.lonOffset;
+}
+
+CachedGdalBase::TileKey::TileKey() : band(0), latOffset(0), lonOffset(0), baseName()
+{
+}
+
+bool CachedGdalBase::TileKey::operator<(const TileKey &other) const
+{
+	if (band != other.band)
+		return band < other.band;
+	if (latOffset != other.latOffset)
+		return latOffset < other.latOffset;
+	if (lonOffset != other.lonOffset)
+		return lonOffset < other.lonOffset;
 	return baseName < other.baseName;
 }
 
@@ -72,34 +82,43 @@ bool CachedGdalBase::TileKey::operator <(const TileKey &other) const
 ///////////////////////////////////////////////////////////////////////////////
 
 CachedGdalBase::TileInfo::TileInfo(CachedGdalBase *cachedGdal_,
-	const GdalTransform &transformation_, const GdalInfo *gdalInfo_)
-	: cachedGdal(cachedGdal_), transformation(transformation_),
-	boundRect(transformation_.makeBoundRect()), gdalInfo(gdalInfo_),
+				   const GdalTransform &transformation_,
+				   const GdalInfo *gdalInfo_) :
+	cachedGdal(cachedGdal_),
+	transformation(transformation_),
+	boundRect(transformation_.makeBoundRect()),
+	gdalInfo(gdalInfo_),
 	tileVector(cachedGdal_->createTileVector(transformation_.latSize, transformation_.lonSize),
-	[cachedGdal_](void *p) {cachedGdal_->deleteTileVector(p);})
-{}
+		   [cachedGdal_](void *p) {
+			   cachedGdal_->deleteTileVector(p);
+		   })
+{
+}
 
 CachedGdalBase::TileInfo::TileInfo() : cachedGdal(nullptr), gdalInfo(nullptr)
-{}
-		
+{
+}
+
 ///////////////////////////////////////////////////////////////////////////////
 // CachedGdalBase::GdalDatasetHolder
 ///////////////////////////////////////////////////////////////////////////////
 
-CachedGdalBase::GdalDatasetHolder::GdalDatasetHolder(const std::string &fullFileName_)
-	: fullFileName(fullFileName_)
+CachedGdalBase::GdalDatasetHolder::GdalDatasetHolder(const std::string &fullFileName_) :
+	fullFileName(fullFileName_)
 {
 	std::ostringstream errStr;
 	boost::system::error_code systemErr;
 	if (!boost::filesystem::is_regular_file(fullFileName, systemErr)) {
 		errStr << "ERROR: CachedGdalBase::GdalDatasetHolder::GdalDatasetHolder(): "
-			"GDAL data file '" << fullFileName << "' not found";
+			  "GDAL data file '"
+		       << fullFileName << "' not found";
 		throw std::runtime_error(errStr.str());
 	}
-	gdalDataset = static_cast<GDALDataset*>(GDALOpen(fullFileName.c_str(), GA_ReadOnly));
+	gdalDataset = static_cast<GDALDataset *>(GDALOpen(fullFileName.c_str(), GA_ReadOnly));
 	if (!gdalDataset) {
 		errStr << "ERROR: CachedGdalBase::GdalDatasetHolder::GdalDatasetHolder(): "
-			"Error opening GDAL data file '" << fullFileName << "': " << CPLGetLastErrorMsg();
+			  "Error opening GDAL data file '"
+		       << fullFileName << "': " << CPLGetLastErrorMsg();
 		throw std::runtime_error(errStr.str());
 	}
 	LOGGER_DEBUG(logger) << "Opened GDAL file '" << fullFileName << "'";
@@ -114,41 +133,55 @@ CachedGdalBase::GdalDatasetHolder::~GdalDatasetHolder()
 // CachedGdalBase::PixelInfo
 ///////////////////////////////////////////////////////////////////////////////
 
-CachedGdalBase::PixelInfo::PixelInfo(const std::string &baseName_, int row_, int column_)
-	: baseName(baseName_), row(row_), column(column_)
-{}
+CachedGdalBase::PixelInfo::PixelInfo(const std::string &baseName_, int row_, int column_) :
+	baseName(baseName_), row(row_), column(column_)
+{
+}
 
 CachedGdalBase::PixelInfo::PixelInfo() : baseName(""), row(-1), column(-1)
-{}
+{
+}
 
 ///////////////////////////////////////////////////////////////////////////////
 // CachedGdalBase
 ///////////////////////////////////////////////////////////////////////////////
 
-CachedGdalBase::CachedGdalBase(std::string fileOrDir,  const std::string &dsName,
-	std::unique_ptr<GdalNameMapperBase> nameMapper, int numBands, int maxTileSize,
-	int cacheSize, GDALDataType pixelType)
-	: _fileOrDir(fileOrDir), _dsName(dsName), _nameMapper(std::move(nameMapper)),
-	_numBands(numBands), _pixelType(pixelType), _maxTileSize(maxTileSize),
-	_tileCache(cacheSize), _gdalDsCache(GDAL_CACHE_SIZE), _recentGdalInfo(nullptr),
+CachedGdalBase::CachedGdalBase(std::string fileOrDir,
+			       const std::string &dsName,
+			       std::unique_ptr<GdalNameMapperBase> nameMapper,
+			       int numBands,
+			       int maxTileSize,
+			       int cacheSize,
+			       GDALDataType pixelType) :
+	_fileOrDir(fileOrDir),
+	_dsName(dsName),
+	_nameMapper(std::move(nameMapper)),
+	_numBands(numBands),
+	_pixelType(pixelType),
+	_maxTileSize(maxTileSize),
+	_tileCache(cacheSize),
+	_gdalDsCache(GDAL_CACHE_SIZE),
+	_recentGdalInfo(nullptr),
 	_allSeen(false)
 {
 	GDALAllRegister();
 }
-	
+
 void CachedGdalBase::initialize()
 {
-	LOGGER_INFO(logger) << "Initializing access to '" << _fileOrDir <<
-		(isMonolithic() ? "' GDAL file " : "' GDAL file directory ") <<
-		"containing " << (dsName().empty() ? "?some?" : dsName()) <<
-		" data. Assumed pixel data type is " << GDALGetDataTypeName(_pixelType) <<
-		", number of bands is " << _numBands;
+	LOGGER_INFO(logger) << "Initializing access to '" << _fileOrDir
+			    << (isMonolithic() ? "' GDAL file " : "' GDAL file directory ")
+			    << "containing " << (dsName().empty() ? "?some?" : dsName())
+			    << " data. Assumed pixel data type is "
+			    << GDALGetDataTypeName(_pixelType) << ", number of bands is "
+			    << _numBands;
 	boost::system::error_code systemErr;
 	std::ostringstream errStr;
 	if (isMonolithic()) {
 		if (!boost::filesystem::is_regular_file(_fileOrDir, systemErr)) {
 			errStr << "ERROR: CachedGdalBase::initialize(): "
-				"GDAL file '" << _fileOrDir << "' not found";
+				  "GDAL file '"
+			       << _fileOrDir << "' not found";
 			throw std::runtime_error(errStr.str());
 		}
 		std::string baseName = boost::filesystem::path(_fileOrDir).filename().string();
@@ -157,15 +190,18 @@ void CachedGdalBase::initialize()
 	} else {
 		if (!boost::filesystem::is_directory(_fileOrDir, systemErr)) {
 			errStr << "ERROR: CachedGdalBase::initialize(): "
-				"GDAL data directory '" << _fileOrDir <<
-				"' not found or is not a directory";
+				  "GDAL data directory '"
+			       << _fileOrDir << "' not found or is not a directory";
 			throw std::runtime_error(errStr.str());
 		}
-		if (!forEachGdalInfo([](const GdalInfo& gdalInfo) {return true; })) {
+		if (!forEachGdalInfo([](const GdalInfo &gdalInfo) {
+			    return true;
+		    })) {
 			errStr << "ERROR: CachedGdalBase::initialize(): "
-				"GDAL data directory '" << _fileOrDir <<
-				"' does not contain files matching fnmatch pattern '" <<
-				_nameMapper->fnmatchPattern() << "'";
+				  "GDAL data directory '"
+			       << _fileOrDir
+			       << "' does not contain files matching fnmatch pattern '"
+			       << _nameMapper->fnmatchPattern() << "'";
 			throw std::runtime_error(errStr.str());
 		}
 	}
@@ -181,8 +217,7 @@ const std::string &CachedGdalBase::dsName() const
 	return _dsName;
 }
 
-void CachedGdalBase::setTransformationModifier(
-	std::function<void(GdalTransform *)> modifier)
+void CachedGdalBase::setTransformationModifier(std::function<void(GdalTransform *)> modifier)
 {
 	_transformationModifier = modifier;
 	rereadGdal();
@@ -205,11 +240,11 @@ void CachedGdalBase::rereadGdal()
 }
 
 bool CachedGdalBase::forEachGdalInfo(
-	const std::function<bool(const CachedGdalBase::GdalInfo& gdalInfo)>& op)
+	const std::function<bool(const CachedGdalBase::GdalInfo &gdalInfo)> &op)
 {
 	// First iterating over previously seen (multifile and monolithic case)
-	for (const auto& it: _gdalInfos) {
-		const GdalInfo* gdalInfo = it.second.get();
+	for (const auto &it : _gdalInfos) {
+		const GdalInfo *gdalInfo = it.second.get();
 		if (gdalInfo && op(*gdalInfo)) {
 			return true;
 		}
@@ -221,17 +256,16 @@ bool CachedGdalBase::forEachGdalInfo(
 	// Iterating over not yet seen GDAL files
 	std::string fnmatch_pattern = _nameMapper->fnmatchPattern();
 	for (boost::filesystem::directory_iterator di(_fileOrDir);
-		di != boost::filesystem::directory_iterator(); ++di)
-	{
+	     di != boost::filesystem::directory_iterator();
+	     ++di) {
 		std::string baseName = di->path().filename().native();
 		// Skipping seen, nonmatching and nonfiles
 		if ((_gdalInfos.find(baseName) != _gdalInfos.end()) ||
-			(fnmatch(fnmatch_pattern.c_str(), baseName.c_str(), 0) == FNM_NOMATCH) ||
-			(!boost::filesystem::is_regular_file(di->path())))
-		{
+		    (fnmatch(fnmatch_pattern.c_str(), baseName.c_str(), 0) == FNM_NOMATCH) ||
+		    (!boost::filesystem::is_regular_file(di->path()))) {
 			continue;
 		}
-		const GdalInfo* gdalInfo = addGdalInfo(baseName, getGdalDatasetHolder(baseName));
+		const GdalInfo *gdalInfo = addGdalInfo(baseName, getGdalDatasetHolder(baseName));
 		if (op(*gdalInfo)) {
 			return true;
 		}
@@ -240,8 +274,7 @@ bool CachedGdalBase::forEachGdalInfo(
 	return false;
 }
 
-const void *CachedGdalBase::getTileVector(int band, double latDeg, double lonDeg,
-	int *pixelIndex)
+const void *CachedGdalBase::getTileVector(int band, double latDeg, double lonDeg, int *pixelIndex)
 {
 	checkBandIndex(band);
 	if (!findTile(band, latDeg, lonDeg)) {
@@ -261,18 +294,26 @@ bool CachedGdalBase::getPixelDirect(int band, double latDeg, double lonDeg, void
 	const GdalInfo *gdalInfo;
 	int fileLatIdx, fileLonIdx;
 	if (!getGdalPixel(latDeg, lonDeg, &gdalInfo, &fileLatIdx, &fileLonIdx)) {
-		return false;	// GDAL file not found
+		return false; // GDAL file not found
 	}
 	// Bringing GDAL data set and reading from it
 	const GdalDatasetHolder *datasetHolder = getGdalDatasetHolder(gdalInfo->baseName);
-	CPLErr readError = datasetHolder->gdalDataset->GetRasterBand(band)->RasterIO(
-		GF_Read, fileLonIdx, fileLatIdx, 1, 1, pixelBuf, 1, 1, _pixelType, 0, 0);
+	CPLErr readError = datasetHolder->gdalDataset->GetRasterBand(band)->RasterIO(GF_Read,
+										     fileLonIdx,
+										     fileLatIdx,
+										     1,
+										     1,
+										     pixelBuf,
+										     1,
+										     1,
+										     _pixelType,
+										     0,
+										     0);
 	if (readError != CPLErr::CE_None) {
 		std::ostringstream errStr;
-		errStr << "ERROR: CachedGdalBase::getPixelDirect(): Reading GDAL pixel from '" <<
-			gdalInfo->baseName << "' (band: " << band <<
-			", xOffset: " << fileLonIdx << ", yOffset: " << fileLatIdx << ") failed: " <<
-			CPLGetLastErrorMsg();
+		errStr << "ERROR: CachedGdalBase::getPixelDirect(): Reading GDAL pixel from '"
+		       << gdalInfo->baseName << "' (band: " << band << ", xOffset: " << fileLonIdx
+		       << ", yOffset: " << fileLatIdx << ") failed: " << CPLGetLastErrorMsg();
 		throw std::runtime_error(errStr.str());
 	}
 	return true;
@@ -284,10 +325,9 @@ bool CachedGdalBase::findTile(int band, double latDeg, double lonDeg)
 	// Double boundary check is necessary to cover the case of noninteger margin
 	// (not reflected in tile boundary, but reflected in GDAL boundary)
 	if (_tileCache.recentValue() &&
-		(_tileCache.recentValue()->boundRect.contains(latDeg, lonDeg)) &&
-		(_tileCache.recentValue()->gdalInfo->boundRect.contains(latDeg, lonDeg)) &&
-		(_tileCache.recentKey()->band == band))
-	{
+	    (_tileCache.recentValue()->boundRect.contains(latDeg, lonDeg)) &&
+	    (_tileCache.recentValue()->gdalInfo->boundRect.contains(latDeg, lonDeg)) &&
+	    (_tileCache.recentKey()->band == band)) {
 		return true;
 	}
 	// Will look up in cache. First need to find pixel whereabouts in file
@@ -299,50 +339,65 @@ bool CachedGdalBase::findTile(int band, double latDeg, double lonDeg)
 	// Key for tile cache
 	int intMargin = int(std::floor(gdalInfo->transformation.margin));
 	TileKey tileKey(band,
-		std::max(fileLatIdx - (fileLatIdx % _maxTileSize), intMargin),
-		std::max(fileLonIdx - (fileLonIdx % _maxTileSize), intMargin),
-		gdalInfo->baseName);
+			std::max(fileLatIdx - (fileLatIdx % _maxTileSize), intMargin),
+			std::max(fileLonIdx - (fileLonIdx % _maxTileSize), intMargin),
+			gdalInfo->baseName);
 	// Trying to bring tile from cache
 	if (_tileCache.get(tileKey)) {
 		return true;
 	}
 	// Tile not in cache - will add it. First building TileInfo object
-	int latTileSize =
-		std::min(_maxTileSize,
-		gdalInfo->transformation.latSize - tileKey.latOffset - intMargin);
-	int lonTileSize =
-		std::min(_maxTileSize,
-		gdalInfo->transformation.lonSize - tileKey.lonOffset - intMargin);
+	int latTileSize = std::min(_maxTileSize,
+				   gdalInfo->transformation.latSize - tileKey.latOffset -
+					   intMargin);
+	int lonTileSize = std::min(_maxTileSize,
+				   gdalInfo->transformation.lonSize - tileKey.lonOffset -
+					   intMargin);
 	TileInfo tileInfo(this,
-		GdalTransform(gdalInfo->transformation, tileKey.latOffset, tileKey.lonOffset,
-		latTileSize, lonTileSize),
-		gdalInfo);
+			  GdalTransform(gdalInfo->transformation,
+					tileKey.latOffset,
+					tileKey.lonOffset,
+					latTileSize,
+					lonTileSize),
+			  gdalInfo);
 
 	// Now reading pixel data into buffer of tile object
 	const GdalDatasetHolder *datasetHolder = getGdalDatasetHolder(gdalInfo->baseName);
-	CPLErr readError = datasetHolder->gdalDataset->GetRasterBand(tileKey.band)->RasterIO(
-		GF_Read, tileKey.lonOffset, tileKey.latOffset, lonTileSize, latTileSize,
-		getTileBuffer(tileInfo.tileVector.get()), lonTileSize, latTileSize, _pixelType, 0, 0);
+	CPLErr readError = datasetHolder->gdalDataset->GetRasterBand(tileKey.band)
+				   ->RasterIO(GF_Read,
+					      tileKey.lonOffset,
+					      tileKey.latOffset,
+					      lonTileSize,
+					      latTileSize,
+					      getTileBuffer(tileInfo.tileVector.get()),
+					      lonTileSize,
+					      latTileSize,
+					      _pixelType,
+					      0,
+					      0);
 	if (readError != CPLErr::CE_None) {
 		std::ostringstream errStr;
-		errStr << "ERROR: CachedGdalBase::findTile(): Reading GDAL data from '" <<
-			tileKey.baseName << "' (band: " << tileKey.band <<
-			", xOffset: " << tileKey.lonOffset << ", yOffset: " << tileKey.latOffset <<
-			", xSize: " << lonTileSize << ", ySize: " << latTileSize << ") failed: " <<
-			CPLGetLastErrorMsg();
+		errStr << "ERROR: CachedGdalBase::findTile(): Reading GDAL data from '"
+		       << tileKey.baseName << "' (band: " << tileKey.band
+		       << ", xOffset: " << tileKey.lonOffset << ", yOffset: " << tileKey.latOffset
+		       << ", xSize: " << lonTileSize << ", ySize: " << latTileSize
+		       << ") failed: " << CPLGetLastErrorMsg();
 		throw std::runtime_error(errStr.str());
 	}
-	LOGGER_DEBUG(logger) << "[" << latTileSize << " X " << lonTileSize <<
-		"] tile retrieved from (" << tileKey.latOffset << ", " <<
-		tileKey.lonOffset << ") of band " << tileKey.band << " of '" <<
-		gdalInfo->baseName << "'";
+	LOGGER_DEBUG(logger) << "[" << latTileSize << " X " << lonTileSize
+			     << "] tile retrieved from (" << tileKey.latOffset << ", "
+			     << tileKey.lonOffset << ") of band " << tileKey.band << " of '"
+			     << gdalInfo->baseName << "'";
 	// Finally adding tile to cache
 	_tileCache.add(tileKey, tileInfo);
 	return true;
 }
 
-bool CachedGdalBase::getGdalPixel(double latDeg, double lonDeg,
-	const GdalInfo **gdalInfo, int *fileLatIdx, int *fileLonIdx)
+bool CachedGdalBase::getGdalPixel(double latDeg,
+				  double lonDeg,
+				  const GdalInfo **gdalInfo,
+				  int *fileLatIdx,
+				  int *fileLonIdx)
 {
 	// First look for GdalInfo containing given point.
 	// For monolithic data - it is recent (and the only) GdalInfo object
@@ -388,41 +443,47 @@ const CachedGdalBase::GdalDatasetHolder *CachedGdalBase::getGdalDatasetHolder(
 	const std::string &baseName)
 {
 	if ((_gdalDsCache.recentKey() && (baseName == *_gdalDsCache.recentKey())) ||
-		_gdalDsCache.get(baseName))
-	{
+	    _gdalDsCache.get(baseName)) {
 		return _gdalDsCache.recentValue()->get();
 	}
 	boost::filesystem::path filePath(_fileOrDir);
 	if (!isMonolithic()) {
 		filePath /= baseName;
 	}
-	auto ret =
-		_gdalDsCache.add(baseName,
-		std::shared_ptr<GdalDatasetHolder>(new GdalDatasetHolder(filePath.native())))->get();
+	auto ret = _gdalDsCache
+			   .add(baseName,
+				std::shared_ptr<GdalDatasetHolder>(
+					new GdalDatasetHolder(filePath.native())))
+			   ->get();
 	return ret;
 }
 
-const CachedGdalBase::GdalInfo *CachedGdalBase::addGdalInfo(const std::string &baseName,
+const CachedGdalBase::GdalInfo *CachedGdalBase::addGdalInfo(
+	const std::string &baseName,
 	const GdalDatasetHolder *gdalDatasetHolder)
 {
 	if (gdalDatasetHolder) {
-		auto p =
-			_gdalInfos.emplace(
-			baseName,
-			std::move(std::unique_ptr<GdalInfo>(new GdalInfo(gdalDatasetHolder,
-			_numBands, _transformationModifier))));
+		auto p = _gdalInfos.emplace(baseName,
+					    std::move(std::unique_ptr<GdalInfo>(
+						    new GdalInfo(gdalDatasetHolder,
+								 _numBands,
+								 _transformationModifier))));
 		_recentGdalInfo = p.first->second.get();
-		LOGGER_DEBUG(logger) << "GDAL file '" << gdalDatasetHolder->fullFileName <<
-			"' covers area from [" <<
-			formatPosition(_recentGdalInfo->boundRect.latDegMin,
-			_recentGdalInfo->boundRect.lonDegMin) << "] (Lower Left) to [" <<
-			formatPosition(_recentGdalInfo->boundRect.latDegMax,
-			_recentGdalInfo->boundRect.lonDegMax) << "] (Upper Right). "
-			"Image resolution " << formatDms(_recentGdalInfo->transformation.latPixPerDeg) <<
-			" by " << formatDms(_recentGdalInfo->transformation.lonPixPerDeg) <<
-			" pixels per degree. Image size is " <<
-			_recentGdalInfo->transformation.latSize << " by " <<
-			_recentGdalInfo->transformation.lonSize << " pixels";
+		LOGGER_DEBUG(logger)
+			<< "GDAL file '" << gdalDatasetHolder->fullFileName
+			<< "' covers area from ["
+			<< formatPosition(_recentGdalInfo->boundRect.latDegMin,
+					  _recentGdalInfo->boundRect.lonDegMin)
+			<< "] (Lower Left) to ["
+			<< formatPosition(_recentGdalInfo->boundRect.latDegMax,
+					  _recentGdalInfo->boundRect.lonDegMax)
+			<< "] (Upper Right). "
+			   "Image resolution "
+			<< formatDms(_recentGdalInfo->transformation.latPixPerDeg) << " by "
+			<< formatDms(_recentGdalInfo->transformation.lonPixPerDeg)
+			<< " pixels per degree. Image size is "
+			<< _recentGdalInfo->transformation.latSize << " by "
+			<< _recentGdalInfo->transformation.lonSize << " pixels";
 		return _recentGdalInfo;
 	}
 	_gdalInfos.emplace(baseName, nullptr);
@@ -430,7 +491,7 @@ const CachedGdalBase::GdalInfo *CachedGdalBase::addGdalInfo(const std::string &b
 }
 
 bool CachedGdalBase::getGdalInfo(const std::string &filename,
-	const CachedGdalBase::GdalInfo **gdalInfo)
+				 const CachedGdalBase::GdalInfo **gdalInfo)
 {
 	auto iter = _gdalInfos.find(filename);
 	if (iter == _gdalInfos.end()) {
@@ -457,31 +518,32 @@ void CachedGdalBase::checkBandIndex(int band) const
 		return;
 	}
 	std::ostringstream errStr;
-	errStr << "ERROR: CachedGdalBase::checkBandIndex(): Invalid band index " <<
-		band << ". Should be in [1.." << _numBands << "] range";
+	errStr << "ERROR: CachedGdalBase::checkBandIndex(): Invalid band index " << band
+	       << ". Should be in [1.." << _numBands << "] range";
 	throw std::runtime_error(errStr.str());
 }
 
 bool CachedGdalBase::covers(double latDeg, double lonDeg)
 {
-	return forEachGdalInfo(
-		[latDeg, lonDeg](const GdalInfo &gdalInfo)
-		{return gdalInfo.boundRect.contains(latDeg, lonDeg);});
+	return forEachGdalInfo([latDeg, lonDeg](const GdalInfo &gdalInfo) {
+		return gdalInfo.boundRect.contains(latDeg, lonDeg);
+	});
 }
 
 GdalTransform::BoundRect CachedGdalBase::boundRect()
 {
 	GdalTransform::BoundRect ret(_recentGdalInfo->boundRect);
 	if (!isMonolithic()) {
-		forEachGdalInfo(
-			[&ret](const GdalInfo &gdalInfo)
-			{ret.combine(gdalInfo.boundRect); return false;});
+		forEachGdalInfo([&ret](const GdalInfo &gdalInfo) {
+			ret.combine(gdalInfo.boundRect);
+			return false;
+		});
 	}
 	return ret;
 }
 
-boost::optional<CachedGdalBase::PixelInfo> CachedGdalBase::getPixelInfo(
-	double latDeg, double lonDeg)
+boost::optional<CachedGdalBase::PixelInfo> CachedGdalBase::getPixelInfo(double latDeg,
+									double lonDeg)
 {
 	const GdalInfo *gdalInfo;
 	int fileLatIdx, fileLonIdx;
@@ -528,10 +590,31 @@ std::string CachedGdalBase::formatPosition(double latDeg, double lonDeg)
 	return ret;
 }
 
-GDALDataType CachedGdalBase::gdalDataType(uint8_t) {return GDT_Byte;}
-GDALDataType CachedGdalBase::gdalDataType(uint16_t) {return GDT_UInt16;}
-GDALDataType CachedGdalBase::gdalDataType(int16_t) {return GDT_Int16;}
-GDALDataType CachedGdalBase::gdalDataType(uint32_t) {return GDT_UInt32;}
-GDALDataType CachedGdalBase::gdalDataType(int32_t) {return GDT_Int32;}
-GDALDataType CachedGdalBase::gdalDataType(float) {return GDT_Float32;}
-GDALDataType CachedGdalBase::gdalDataType(double) {return GDT_Float64;}
+GDALDataType CachedGdalBase::gdalDataType(uint8_t)
+{
+	return GDT_Byte;
+}
+GDALDataType CachedGdalBase::gdalDataType(uint16_t)
+{
+	return GDT_UInt16;
+}
+GDALDataType CachedGdalBase::gdalDataType(int16_t)
+{
+	return GDT_Int16;
+}
+GDALDataType CachedGdalBase::gdalDataType(uint32_t)
+{
+	return GDT_UInt32;
+}
+GDALDataType CachedGdalBase::gdalDataType(int32_t)
+{
+	return GDT_Int32;
+}
+GDALDataType CachedGdalBase::gdalDataType(float)
+{
+	return GDT_Float32;
+}
+GDALDataType CachedGdalBase::gdalDataType(double)
+{
+	return GDT_Float64;
+}

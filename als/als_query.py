@@ -39,16 +39,16 @@ DbEnv = \
     NamedTuple(
         "DbEnv",
         [
-         # Host name
-         ("host", str),
-         # Port
-         ("port", str),
-         # Username
-         ("user", str),
-         # Password
-         ("password", str),
-         # Options
-         ("options", str)])
+            # Host name
+            ("host", str),
+            # Port
+            ("port", str),
+            # Username
+            ("user", str),
+            # Password
+            ("password", str),
+            # Options
+            ("options", str)])
 
 # Environment variable names for ALS and JSON log databases' connection strings
 DB_ENVS = {ALS_DB:
@@ -83,6 +83,7 @@ class DbConn:
     metadata -- Database metadata
     conn     -- Database connection
     """
+
     def __init__(self, conn_str: Optional[str], password: Optional[str],
                  db_name: str) -> None:
         """ Constructor
@@ -149,6 +150,7 @@ class DbConn:
 
 class JsonEncoder(json.JSONEncoder):
     """ JSON encoder that handles unusual types """
+
     def default(self, o: Any) -> Any:
         """ Handles unusual data types """
         if isinstance(o, datetime.datetime):

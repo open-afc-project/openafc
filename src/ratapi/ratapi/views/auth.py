@@ -22,7 +22,7 @@ from afcmodels.aaa import User, Organization, Role
 from flask_login import current_user
 import als
 
-OIDC_LOGIN=OIDCConfigurator().OIDC_LOGIN
+OIDC_LOGIN = OIDCConfigurator().OIDC_LOGIN
 
 if OIDC_LOGIN:
     from flask_login import (
@@ -63,7 +63,7 @@ def auth(ignore_active=False, roles=None, is_user=None, org=None):
          current_user.org if current_user.org else "")
 
     # Super always has admin roles
-    if "Super" in user_roles and not "Admin" in user_roles:
+    if "Super" in user_roles and "Admin" not in user_roles:
         user_roles.append("Admin")
 
     if not isinstance(user_id, str):
@@ -74,7 +74,7 @@ def auth(ignore_active=False, roles=None, is_user=None, org=None):
                 LOGGER.debug("User id matches: %i", user_id)
             elif "Super" in user_roles:
                 return is_user  # return impersonating user. Don't check org
-            elif not "Admin" in user_roles:
+            elif "Admin" not in user_roles:
                 raise werkzeug.exceptions.NotFound()
             target_user = User.get(is_user)
             target_org = target_user.org if target_user.org else ""
@@ -99,7 +99,7 @@ def auth(ignore_active=False, roles=None, is_user=None, org=None):
         raise werkzeug.exceptions.Unauthorized()
 
     # done checking roles/userid. now check org
-    if not "Super" in user_roles:
+    if "Super" not in user_roles:
         if (not cur_org == target_org) or (org and not cur_org == org):
             raise werkzeug.exceptions.Forbidden(
                 "You do not have access to this resource")
@@ -135,7 +135,8 @@ class LoginAPI(MethodView):
         flask.session['app_state'] = secrets.token_urlsafe(64)
         flask.session['code_verifier'] = secrets.token_urlsafe(64)
         # calculate code challenge
-        hashed = hashlib.sha256(flask.session['code_verifier'].encode('ascii')).digest()
+        hashed = hashlib.sha256(
+            flask.session['code_verifier'].encode('ascii')).digest()
         encoded = base64.urlsafe_b64encode(hashed)
         code_challenge = encoded.decode('ascii').strip('=')
         redirect_uri = flask.request.base_url
@@ -145,14 +146,15 @@ class LoginAPI(MethodView):
             redirect_uri = redirect_uri.replace("http:", "https:")
 
         # get request params
-        query_params = {'client_id': flask.current_app.config['OIDC_CLIENT_ID'],
-                        'redirect_uri': redirect_uri,
-                        'scope': "openid email profile",
-                        'state': flask.session['app_state'],
-                        'code_challenge': code_challenge,
-                        'code_challenge_method': 'S256',
-                        'response_type': 'code',
-                        'response_mode': 'query'}
+        query_params = {
+            'client_id': flask.current_app.config['OIDC_CLIENT_ID'],
+            'redirect_uri': redirect_uri,
+            'scope': "openid email profile",
+            'state': flask.session['app_state'],
+            'code_challenge': code_challenge,
+            'code_challenge_method': 'S256',
+            'response_type': 'code',
+            'response_mode': 'query'}
 
         # build request_uri
         request_uri = "{base_url}?{query_params}".format(
@@ -167,6 +169,7 @@ class CallbackAPI(MethodView):
     """
     Callback Resource
     """
+
     def get(self):
         if not flask.current_app.config['OIDC_LOGIN']:
             return "Invalid Access", 403
@@ -177,16 +180,24 @@ class CallbackAPI(MethodView):
 
         if app_state != flask.session['app_state']:
             LOGGER.debug('user:%s login bad state', 'unknown')
-            als.als_json_log('user_access', {'action':'login', 'user':'unknown', 'from':flask.request.remote_addr, 'status':'bad state'})
+            als.als_json_log('user_access',
+                             {'action': 'login',
+                              'user': 'unknown',
+                              'from': flask.request.remote_addr,
+                              'status': 'bad state'})
             return "Unexpected application state", 406
         if not code:
             LOGGER.debug('user:%s login no code', 'unknown')
-            als.als_json_log('user_access', {'action':'login', 'user':'unknown', 'from':flask.request.remote_addr, 'status':'no code'})
+            als.als_json_log('user_access',
+                             {'action': 'login',
+                              'user': 'unknown',
+                              'from': flask.request.remote_addr,
+                              'status': 'no code'})
             return "The code was not returned or is not accessible", 406
 
         fwd_proto = flask.request.headers.get('X-Forwarded-Proto')
         if (fwd_proto == 'https') and (flask.request.scheme == "http"):
-            redirect_uri = flask.request.base_url.replace("http:","https:")
+            redirect_uri = flask.request.base_url.replace("http:", "https:")
         else:
             redirect_uri = flask.request.base_url
 
@@ -194,7 +205,7 @@ class CallbackAPI(MethodView):
                         'code': code,
                         'redirect_uri': redirect_uri,
                         'code_verifier': flask.session['code_verifier'],
-                       }
+                        }
         query_params = requests.compat.urlencode(query_params)
         exchange = requests.post(
             flask.current_app.config['OIDC_ORG_TOKEN_URL'],
@@ -210,9 +221,9 @@ class CallbackAPI(MethodView):
         access_token = exchange["access_token"]
 
         # Authorization flow successful, get userinfo and login user
-        userinfo_response = requests.get( \
-            flask.current_app.config['OIDC_ORG_USER_INFO_URL'], \
-            headers={'Authorization': 'Bearer %s' %(access_token)}).json()
+        userinfo_response = requests.get(
+            flask.current_app.config['OIDC_ORG_USER_INFO_URL'],
+            headers={'Authorization': 'Bearer %s' % (access_token)}).json()
 
         user_sub = userinfo_response["sub"]
         user_email = userinfo_response["email"]
@@ -245,7 +256,7 @@ class CallbackAPI(MethodView):
                     user.email_confirmed_at = datetime.datetime.now()
                 else:
                     user = User(sub=user_sub, email=user_email,
-                                username=user_email, # fake user name
+                                username=user_email,  # fake user name
                                 first_name=first_name,
                                 last_name=last_name, active=True,
                                 password="",
@@ -257,14 +268,22 @@ class CallbackAPI(MethodView):
 
         except Exception as e:
             LOGGER.debug('user:%s login unauthorized', user_email)
-            als.als_json_log('user_access', {'action':'login', 'user':user_email, 'from':flask.request.remote_addr, 'status':'unauthorized'})
+            als.als_json_log('user_access',
+                             {'action': 'login',
+                              'user': user_email,
+                              'from': flask.request.remote_addr,
+                              'status': 'unauthorized'})
             raise werkzeug.exceptions.Unauthorized(
                 'An unexpected error occured. Please try again.')
 
         login_user(user)
 
         LOGGER.debug('user:%s login success', user.username)
-        als.als_json_log('user_access', {'action':'login', 'user':user.username, 'from':flask.request.remote_addr, 'status':'success'})
+        als.als_json_log('user_access',
+                         {'action': 'login',
+                          'user': user.username,
+                          'from': flask.request.remote_addr,
+                          'status': 'success'})
         return flask.redirect(flask.url_for("root"))
 
 
@@ -279,11 +298,16 @@ class LogoutAPI(MethodView):
             return flask.redirect(flask.url_for('user.logout'))
 
         try:
-           LOGGER.debug('user:%s logout', current_user.username)
-           als.als_json_log('user_access', {'action':'logout', 'user':current_user.username, 'from':flask.request.remote_addr})
-        except:
-           LOGGER.debug('user:%s logout', 'unknown')
-           als.als_json_log('user_access', {'action':'logout', 'user':'unknown', 'from':flask.request.remote_addr})
+            LOGGER.debug('user:%s logout', current_user.username)
+            als.als_json_log('user_access',
+                             {'action': 'logout',
+                              'user': current_user.username,
+                              'from': flask.request.remote_addr})
+        except BaseException:
+            LOGGER.debug('user:%s logout', 'unknown')
+            als.als_json_log(
+                'user_access', {
+                    'action': 'logout', 'user': 'unknown', 'from': flask.request.remote_addr})
 
         logout_user()
         return flask.redirect(flask.url_for("root"))
@@ -300,24 +324,27 @@ class UserAPI(MethodView):
 
         if not current_user.org:
             try:
-                current_user.org = current_user.email[current_user.email.index('@') + 1:]
+                current_user.org = current_user.email[current_user.email.index(
+                    '@') + 1:]
                 user = User.query.filter(User.id == current_user.id).first()
                 user.org = current_user.org
                 db.session.commit()
-            except:
+            except BaseException:
                 current_user.org = ""
 
         if not current_user.roles:
             try:
                 user = User.query.filter(User.id == current_user.id).first()
-                user.roles.append(db.session.query(Role).filter_by(name="Trial").first())
+                user.roles.append(db.session.query(
+                    Role).filter_by(name="Trial").first())
                 db.session.commit()
-            except:
+            except BaseException:
                 pass
 
         # add organization if not exist.
         org = current_user.org if current_user.org else ""
-        organization = Organization.query.filter(Organization.name == org).first()
+        organization = Organization.query.filter(
+            Organization.name == org).first()
         if not organization:
             organization = Organization(org)
             db.session.add(organization)

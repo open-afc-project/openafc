@@ -331,6 +331,7 @@ class Ras:
 
     class Point:
         """ Geodetic point (latitude and longitude) """
+
         def __init__(self, lat: float, lon: float) -> None:
             if not isinstance(lat, float):
                 raise ValueError(f"Latitude {lat} has incorrect type")
@@ -341,6 +342,7 @@ class Ras:
 
     class FigureBase:
         """ Abstract base class for restricted area figure """
+
         def tiles(self) -> List[Tile]:
             """ Returns list of 1 degree tiles covering figure """
             raise NotImplementedError(
@@ -377,6 +379,7 @@ class Ras:
         _min -- Left bottom point
         _max -- Right top point
         """
+
         def __init__(self, pt: "Ras.Point") -> None:
             """ Constructor, constructs from one of corners """
             self._min = pt
@@ -406,6 +409,7 @@ class Ras:
         _center    -- Center geodetic point
         _radius_km -- Radius in kilometers
         """
+
         def __init__(self, center: "Ras.Point") -> None:
             """ Construct by center """
             self._center = center
@@ -508,6 +512,7 @@ class Db:
     pr_hash_fields  -- Iterator over hash fields in Passive Repeater record
     ras_hash_fields -- Optional iterator over hash fields in RAS record
     """
+
     def __init__(self, filename: str) -> None:
         """ Constructor
 

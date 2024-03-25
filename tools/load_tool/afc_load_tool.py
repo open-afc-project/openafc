@@ -325,6 +325,7 @@ class ServiceDiscovery:
         name -- Container name
         ip   -- Container IP (if known) or None
         """
+
         def __init__(self, name: str) -> None:
             self.name = name
             self.ip: Optional[str] = None
@@ -532,6 +533,7 @@ class AfcReqRespGenerator:
     _db_cur           -- None or SQLite3 cursor
 
     """
+
     def __init__(self, cfg: Config, randomize: bool,
                  population_db: Optional[str],
                  req_msg_pattern: Optional[Dict[str, Any]]) -> None:
@@ -689,6 +691,7 @@ class AfcReqRespGenerator:
 class RestDataHandlerBase:
     """ Base class for generate/process REST API request/response data payloads
     """
+
     def __init__(self, cfg: Config, randomize: bool = False,
                  population_db: Optional[str] = None,
                  req_msg_pattern: Optional[Dict[str, Any]] = None) -> None:
@@ -746,6 +749,7 @@ class PreloadRestDataHandler(RestDataHandlerBase):
     Private attributes:
     _hash_base -- MD5 hash computed over AFC Config, awaiting AFC Request tail
     """
+
     def __init__(self, cfg: Config, afc_config: Dict[str, Any],
                  req_msg_pattern: Optional[Dict[str, Any]] = None) -> None:
         """ Constructor
@@ -788,6 +792,7 @@ class PreloadRestDataHandler(RestDataHandlerBase):
 class LoadRestDataHandler(RestDataHandlerBase):
     """ REST API data handler for 'load' operation - i.e. AFC Request/Response
     messages """
+
     def __init__(self, cfg: Config, randomize: bool,
                  population_db: Optional[str],
                  req_msg_pattern: Optional[Dict[str, Any]] = None) -> None:
@@ -849,18 +854,18 @@ class LoadRestDataHandler(RestDataHandlerBase):
 PostWorkerReqInfo = \
     NamedTuple("PostWorkerReqInfo",
                [
-                # Request indices, contained in REST API request data
-                ("req_indices", List[int]),
-                # REST API Request data
-                ("req_data", bytes)])
+                   # Request indices, contained in REST API request data
+                   ("req_indices", List[int]),
+                   # REST API Request data
+                   ("req_data", bytes)])
 
 
 # GET Worker request data and supplementary information
 GetWorkerReqInfo = \
     NamedTuple("GetWorkerReqInfo",
                [
-                # Number of GET requests to send
-                ("num_gets", int)])
+                   # Number of GET requests to send
+                   ("num_gets", int)])
 
 
 # REST API request results
@@ -896,6 +901,7 @@ class Ticker:
     Private attributes:
     _worker -- Tick worker process (generates TickInfo once per second)
     """
+
     def __init__(self,
                  result_queue: "multiprocessing.Queue[ResultQueueDataType]") \
             -> None:
@@ -939,6 +945,7 @@ class RateEma:
     _weight     -- Weight for EMA computation
     _prev_value -- Value on previous tick
     """
+
     def __init__(self, win_size_sec: float = 20) -> None:
         """ Constructor
 
@@ -967,6 +974,7 @@ class StatusPrinter:
     Private attributes:
     _prev_len -- Length of previously printed line
     """
+
     def __init__(self) -> None:
         """ Constructor
 
@@ -1006,6 +1014,7 @@ class ResultsProcessor:
     _err_dir             -- None or directory for failed requests
     _status_printer      -- StatusPrinter
     """
+
     def __init__(
             self, netload: bool, total_requests: int,
             result_queue: "multiprocessing.Queue[ResultQueueDataType]",
@@ -1820,8 +1829,8 @@ def do_preload(cfg: Config, args: Any) -> None:
     min_idx, max_idx = get_idx_range(args.idx_range)
 
     run(rest_data_handler=PreloadRestDataHandler(
-            cfg=cfg, afc_config=afc_config,
-            req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
+        cfg=cfg, afc_config=afc_config,
+        req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
         max_idx=max_idx, status_period=args.status_period,
@@ -1887,8 +1896,8 @@ def do_load(cfg: Config, args: Any) -> None:
 
     min_idx, max_idx = get_idx_range(args.idx_range)
     run(rest_data_handler=LoadRestDataHandler(
-            cfg=cfg, randomize=args.random, population_db=args.population,
-            req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
+        cfg=cfg, randomize=args.random, population_db=args.population,
+        req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
         max_idx=max_idx, status_period=args.status_period, count=args.count,
@@ -1953,7 +1962,7 @@ def do_cache(cfg: Config, args: Any) -> None:
     """
     error_if(args.protect and args.unprotect,
              "--protect and --unprotect are mutually exclusive")
-    error_if(not(args.protect or args.unprotect or args.invalidate),
+    error_if(not (args.protect or args.unprotect or args.invalidate),
              "Nothing to do")
     service_discovery = None if args.comp_proj is None \
         else ServiceDiscovery(compose_project=args.comp_proj)
@@ -1999,7 +2008,7 @@ def do_afc_config(cfg: Config, args: Any) -> None:
             command=cfg.ratdb.update_config_by_id.format(
                 afc_config=afc_config_str, region_str=afc_config["regionStr"]),
             service_discovery=service_discovery)
-    error_if(not(isinstance(result, int) and result > 0),
+    error_if(not (isinstance(result, int) and result > 0),
              "AFC Config update failed")
 
 

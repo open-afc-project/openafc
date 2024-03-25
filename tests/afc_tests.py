@@ -34,7 +34,8 @@ import subprocess
 import sys
 import time
 
-import smtplib, ssl
+import smtplib
+import ssl
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
@@ -72,20 +73,22 @@ MANDATORY_METADATA_KEYS = {TESTCASE_ID}
 
 app_log = logging.getLogger(__name__)
 
+
 class TestCfg(dict):
     """Keep test configuration"""
+
     def __init__(self):
         dict.__init__(self)
         self.update({
-            'cmd' : '',
-            'port' : 443,
-            'url_path' : AFC_PROT_NAME + '://',
-            'log_level' : logging.INFO,
-            'db_filename' : AFC_TEST_DB_FILENAME,
-            'tests' : None,
+            'cmd': '',
+            'port': 443,
+            'url_path': AFC_PROT_NAME + '://',
+            'log_level': logging.INFO,
+            'db_filename': AFC_TEST_DB_FILENAME,
+            'tests': None,
             'is_test_by_index': True,
-            'resp' : '',
-            'stress' : 0,
+            'resp': '',
+            'stress': 0,
             'precision': None})
 
     def _send_recv(self, params):
@@ -104,31 +107,32 @@ class TestCfg(dict):
         new_req = json.dumps(new_req_json, sort_keys=True)
         if (self['webui'] is False):
             params_data = {
-                'conn_type':self['conn_type'],
-                'debug':self['debug'],
-                'edebug':cfg['elaborated_debug'],
-                'gui':self['gui']
-                }
+                'conn_type': self['conn_type'],
+                'debug': self['debug'],
+                'edebug': cfg['elaborated_debug'],
+                'gui': self['gui']
+            }
         else:
             # emulating request calll from webui
             params_data = {
-                'debug':'True',
-                'edebug':cfg['elaborated_debug'],
-                'gui':'True'
-                }
+                'debug': 'True',
+                'edebug': cfg['elaborated_debug'],
+                'gui': 'True'
+            }
         if (self['cache'] == False):
             params_data['nocache'] = 'True'
 
-        ser_cert=not self['verif']
-        cli_certs=()
+        ser_cert = not self['verif']
+        cli_certs = ()
         if (self['prot'] == AFC_PROT_NAME and
-            self['verif'] == False):
+                self['verif'] == False):
             # add mtls certificates if explicitly provided
             if not isinstance(self['cli_cert'], type(None)):
-                cli_certs=("".join(self['cli_cert']), "".join(self['cli_key']))
+                cli_certs = ("".join(self['cli_cert']),
+                             "".join(self['cli_key']))
             # add tls certificates if explicitly provided
             if not isinstance(self['ca_cert'], type(None)):
-                ser_cert="".join(self['ca_cert'])
+                ser_cert = "".join(self['ca_cert'])
         app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
         before_ts = time.monotonic()
@@ -137,18 +141,18 @@ class TestCfg(dict):
             params=params_data,
             data=new_req,
             headers=headers,
-            timeout=600,    #10 min
+            timeout=600,  # 10 min
             verify=self['verif'])
         resp = rawresp.json()
 
         tId = resp.get('taskId')
         if ((self['conn_type'] == 'async') and
-            (not isinstance(tId, type(None)))):
+                (not isinstance(tId, type(None)))):
             tState = resp.get('taskState')
             params_data['task_id'] = tId
             while (tState == 'PENDING') or (tState == 'PROGRESS'):
                 app_log.debug('_run_test() state %s, tid %s, status %d',
-                          tState, tId, rawresp.status_code)
+                              tState, tId, rawresp.status_code)
                 time.sleep(2)
                 rawresp = requests.get(self['url_path'],
                                        params=params_data)
@@ -167,6 +171,7 @@ class TestResultComparator:
     Private instance attributes:
     _precision -- Precision for results' comparison in dB. 0 means exact match
     """
+
     def __init__(self, precision):
         """ Constructor
 
@@ -319,7 +324,7 @@ class TestResultComparator:
                         low = fr['lowFrequency']
                         high = fr['highFrequency']
                         for freq in range(low, high):
-                            chan_dict[ f"[{freq} - {freq+1}"] = \
+                            chan_dict[f"[{freq} - {freq+1}"] = \
                                 float(freq_info.get("maxPSD") or
                                       freq_info.get("maxPsd"))
                 except (TypeError, ValueError, KeyError):
@@ -414,7 +419,8 @@ def create_email_attachment(filename):
         part.set_payload(attachment.read())
         # Add header as key/value pair to attachment part
         encoders.encode_base64(part)
-        part.add_header( "Content-Disposition", f"attachment; filename= {filename}",)
+        part.add_header("Content-Disposition",
+                        f"attachment; filename= {filename}",)
         return part
 
 
@@ -452,51 +458,52 @@ def _send_recv(cfg, req_data, ssn=None):
     new_req = json.dumps(new_req_json, sort_keys=True)
     if (cfg['webui'] is False):
         params_data = {
-            'conn_type':cfg['conn_type'],
-            'debug':cfg['debug'],
-            'edebug':cfg['elaborated_debug'],
-            'gui':cfg['gui']
-            }
+            'conn_type': cfg['conn_type'],
+            'debug': cfg['debug'],
+            'edebug': cfg['elaborated_debug'],
+            'gui': cfg['gui']
+        }
         if (cfg['cache'] == False):
             params_data['nocache'] = 'True'
         post_func = requests.post
     else:
         # emulating request call from webui
         params_data = {
-            'debug':'True',
-            'gui':'True'
-            }
+            'debug': 'True',
+            'gui': 'True'
+        }
         headers['Accept-Encoding'] = 'gzip, defalte'
         headers['Referer'] = cfg['base_url'] + 'fbrat/www/index.html'
         headers['X-Csrf-Token'] = cfg['token']
-        app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
-                      f"Cookies: {requests.utils.dict_from_cookiejar(ssn.cookies)}")
+        app_log.debug(
+            f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
+            f"Cookies: {requests.utils.dict_from_cookiejar(ssn.cookies)}")
         post_func = ssn.post
 
-    ser_cert=()
-    cli_certs=None
+    ser_cert = ()
+    cli_certs = None
     if ((cfg['prot'] == AFC_PROT_NAME and
-        cfg['verif'] == True) or (cfg['ca_cert'])):
+            cfg['verif']) or (cfg['ca_cert'])):
 
         # add mtls certificates if explicitly provided
         if not isinstance(cfg['cli_cert'], type(None)):
-            cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
+            cli_certs = ("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
 
         # add tls certificates if explicitly provided
         if not isinstance(cfg['ca_cert'], type(None)):
-            ser_cert="".join(cfg['ca_cert'])
-            cfg['verif']=True
+            ser_cert = "".join(cfg['ca_cert'])
+            cfg['verif'] = True
         else:
             os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
             app_log.debug(f"REQUESTS_CA_BUNDLE "
-                f"{os.environ.get('REQUESTS_CA_BUNDLE')}")
+                          f"{os.environ.get('REQUESTS_CA_BUNDLE')}")
             if "REQUESTS_CA_BUNDLE" in os.environ:
-                ser_cert="".join(os.environ.get('REQUESTS_CA_BUNDLE'))
-                cfg['verif']=True
+                ser_cert = "".join(os.environ.get('REQUESTS_CA_BUNDLE'))
+                cfg['verif'] = True
             else:
                 app_log.error(f"Missing CA certificate while forced.")
                 return
-        
+
     app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
     try:
@@ -505,7 +512,7 @@ def _send_recv(cfg, req_data, ssn=None):
             params=params_data,
             data=new_req,
             headers=headers,
-            timeout=600,    #10 min
+            timeout=600,  # 10 min
             cert=cli_certs,
             verify=ser_cert if cfg['verif'] else False)
         rawresp.raise_for_status()
@@ -518,12 +525,12 @@ def _send_recv(cfg, req_data, ssn=None):
 
     tId = resp.get('taskId')
     if ((cfg['conn_type'] == 'async') and
-        (not isinstance(tId, type(None)))):
+            (not isinstance(tId, type(None)))):
         tState = resp.get('taskState')
         params_data['task_id'] = tId
         while (tState == 'PENDING') or (tState == 'PROGRESS'):
             app_log.debug('_run_test() state %s, tid %s, status %d',
-                      tState, tId, rawresp.status_code)
+                          tState, tId, rawresp.status_code)
             time.sleep(2)
             rawresp = requests.get(cfg['url_path'],
                                    params=params_data)
@@ -535,32 +542,33 @@ def _send_recv(cfg, req_data, ssn=None):
                   f" Resp status: {rawresp.status_code}")
     return resp
 
+
 def _send_recv_token(cfg, ssn):
     """Making login, open session and getting CSRF token"""
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
 
     token = ''
-    ser_cert=()
-    cli_certs=None
+    ser_cert = ()
+    cli_certs = None
     app_log.debug(f"=== ser {type(ser_cert)}")
     if ((cfg['prot'] == AFC_PROT_NAME and
-        cfg['verif'] == True) or (cfg['ca_cert'])):
+            cfg['verif']) or (cfg['ca_cert'])):
 
         # add mtls certificates if explicitly provided
         if not isinstance(cfg['cli_cert'], type(None)):
-            cli_certs=("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
+            cli_certs = ("".join(cfg['cli_cert']), "".join(cfg['cli_key']))
 
         # add tls certificates if explicitly provided
         if not isinstance(cfg['ca_cert'], type(None)):
-            ser_cert="".join(cfg['ca_cert'])
-            cfg['verif']=True
+            ser_cert = "".join(cfg['ca_cert'])
+            cfg['verif'] = True
         else:
             os.environ['REQUESTS_CA_BUNDLE'] = certifi.where()
             app_log.debug(f"REQUESTS_CA_BUNDLE "
-                f"{os.environ.get('REQUESTS_CA_BUNDLE')}")
+                          f"{os.environ.get('REQUESTS_CA_BUNDLE')}")
             if "REQUESTS_CA_BUNDLE" in os.environ:
-                ser_cert="".join(os.environ.get('REQUESTS_CA_BUNDLE'))
-                cfg['verif']=True
+                ser_cert = "".join(os.environ.get('REQUESTS_CA_BUNDLE'))
+                cfg['verif'] = True
             else:
                 app_log.error(f"Missing CA certificate while forced.")
                 return token
@@ -569,8 +577,8 @@ def _send_recv_token(cfg, ssn):
 
     # get login
     ssn.headers.update({
-           'Accept-Encoding': 'gzip, defalte'
-          })
+        'Accept-Encoding': 'gzip, defalte'
+    })
     url_login = cfg['base_url'] + 'fbrat/user/sign-in'
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
                   f"===> URL {url_login}\n"
@@ -587,7 +595,7 @@ def _send_recv_token(cfg, ssn):
         app_log.error(f"{err}")
         return token
     soup = BeautifulSoup(rawresp.text, 'html.parser')
-    inp_tkn = soup.find('input',id='csrf_token')
+    inp_tkn = soup.find('input', id='csrf_token')
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
                   f"<--- Status {rawresp.status_code}\n"
                   f"<--- Headers {rawresp.headers}\n"
@@ -605,16 +613,16 @@ def _send_recv_token(cfg, ssn):
     app_log.debug(f"Found Users: {found_json['username']}")
 
     form_data = {
-        'next':'/',
-        'reg_next':'/',
-        'csrf_token':token,
-        'username':found_json['username'],
-        'password':found_json['password']
-        }
+        'next': '/',
+        'reg_next': '/',
+        'csrf_token': token,
+        'username': found_json['username'],
+        'password': found_json['password']
+    }
     ssn.headers.update({
-           'Content-Type': 'application/x-www-form-urlencoded',
-           'Referer': url_login
-          })
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Referer': url_login
+    })
     try:
         rawresp = ssn.post(url_login,
                            data=form_data,
@@ -645,7 +653,7 @@ def make_db(filename):
                  TBL_REQS_NAME, TBL_RESPS_NAME)
     con = sqlite3.connect(filename)
     cur = con.cursor()
-    cur.execute('CREATE TABLE IF NOT EXISTS ' + TBL_REQS_NAME + 
+    cur.execute('CREATE TABLE IF NOT EXISTS ' + TBL_REQS_NAME +
                 ' (test_id varchar(50), data json)')
     cur.execute('CREATE TABLE IF NOT EXISTS ' + TBL_RESPS_NAME +
                 ' (test_id varchar(50), data json, hash varchar(255))')
@@ -685,7 +693,7 @@ def compare_afc_config(cfg):
             except (ValueError, TypeError) as e:
                 continue
             break
-    app_log.debug(json.dumps(get_rec, sort_keys=True, indent = 4))
+    app_log.debug(json.dumps(get_rec, sort_keys=True, indent=4))
 
     get_cfg = ''
     app_log.debug('Found %d config records', len(found_cfgs))
@@ -709,7 +717,7 @@ def compare_afc_config(cfg):
                       idx,
                       json.dumps(get_cfg['afcConfig'],
                                  sort_keys=True,
-                                 indent = 4))
+                                 indent=4))
 
         get_diff = DeepDiff(get_cfg['afcConfig'],
                             get_rec,
@@ -775,7 +783,7 @@ def start_acquisition(cfg):
             continue
         else:
             hash = hash_obj.hexdigest()
-            cur.execute('UPDATE ' + TBL_RESPS_NAME + ' SET ' + 
+            cur.execute('UPDATE ' + TBL_RESPS_NAME + ' SET ' +
                         'data = ?, hash = ? WHERE test_id =?',
                         (upd_data, hash, ids[test_id][0]))
             con.commit()
@@ -785,14 +793,14 @@ def start_acquisition(cfg):
 
 def process_jsonline(line):
     """
-    Function to process the input line from .txt file containing comma 
+    Function to process the input line from .txt file containing comma
     separated json strings
     """
 
     # convert the input line to list of dictioanry/dictionaries
     line_list = json.loads("[" + line + "]")
     request_dict = line_list[0]
-    metadata_dict = line_list[1] if len(line_list)>1 else {}
+    metadata_dict = line_list[1] if len(line_list) > 1 else {}
 
     return request_dict, metadata_dict
 
@@ -805,11 +813,11 @@ def get_db_req_resp(cfg):
     cur = con.cursor()
     cur.execute('SELECT * FROM %s' % TBL_REQS_NAME)
     found_reqs = cur.fetchall()
-    db_reqs_list = [ row[0] for row in found_reqs ]
+    db_reqs_list = [row[0] for row in found_reqs]
 
     cur.execute('SELECT * FROM %s' % TBL_RESPS_NAME)
     found_resps = cur.fetchall()
-    db_resp_list = [ row[0] for row in found_resps ]
+    db_resp_list = [row[0] for row in found_resps]
     con.close()
 
     return db_reqs_list, db_resp_list
@@ -818,7 +826,7 @@ def get_db_req_resp(cfg):
 def insert_reqs_int(filename, con, cur):
     """
     Insert requests from input file to a table in test db.
-    
+
     """
     with open(filename, 'r') as fp_test:
         while True:
@@ -830,22 +838,23 @@ def insert_reqs_int(filename, con, cur):
             app_log.debug(f"= {dataline}")
             request_json, metadata_json = process_jsonline(dataline)
 
-            # reject the request if mandatory metadata arguments are not present
+            # reject the request if mandatory metadata arguments are not
+            # present
             if not MANDATORY_METADATA_KEYS.issubset(
                     set(metadata_json.keys())):
                 # missing mandatory keys in test case input
                 app_log.error("Test case input does not contain required"
-                    " mandatory arguments: %s",
-                    ", ".join(list(
-                        MANDATORY_METADATA_KEYS - set(metadata_json.keys()))))
+                              " mandatory arguments: %s",
+                              ", ".join(list(
+                                  MANDATORY_METADATA_KEYS - set(metadata_json.keys()))))
                 return AFC_ERR
 
             app_log.info(f"Insert new request in DB "
                          f"({metadata_json[TESTCASE_ID]})")
             app_log.debug(f"+ {metadata_json[TESTCASE_ID]}")
             cur.execute('INSERT INTO ' + TBL_REQS_NAME + ' VALUES ( ?, ?)',
-                        (metadata_json[TESTCASE_ID], 
-                        json.dumps(request_json),))
+                        (metadata_json[TESTCASE_ID],
+                         json.dumps(request_json),))
             con.commit()
     con.close()
     return AFC_OK
@@ -855,7 +864,7 @@ def insert_reqs(cfg):
     """
     Insert requests from input file to a table in test db.
     Drop previous table of requests.
-    
+
     """
     app_log.debug(f"{inspect.stack()[0][3]}()")
 
@@ -882,8 +891,8 @@ def insert_reqs(cfg):
         cur.execute('DROP TABLE ' + TBL_REQS_NAME)
     except Exception as OperationalError:
         app_log.debug(f"Fail to drop, missing table {TBL_REQS_NAME}")
-    cur.execute('CREATE TABLE ' + TBL_REQS_NAME + 
-        ' (test_id varchar(50), data json)')
+    cur.execute('CREATE TABLE ' + TBL_REQS_NAME +
+                ' (test_id varchar(50), data json)')
     con.commit()
     return insert_reqs_int(filename, con, cur)
 
@@ -892,7 +901,7 @@ def extend_reqs(cfg):
     """
     Insert requests from input file to a table in test db.
     Drop previous table of requests.
-    
+
     """
     app_log.debug(f"{inspect.stack()[0][3]}()")
 
@@ -949,7 +958,7 @@ def insert_devs(cfg):
     except Exception as OperationalError:
         app_log.debug(f"Fail to drop, missing table {TBL_AP_CFG_NAME}")
     cur.execute('CREATE TABLE ' + TBL_AP_CFG_NAME +
-        ' (ap_config_id, data json, user_id)')
+                ' (ap_config_id, data json, user_id)')
     cnt = 1
     con.commit()
     with open(filename, 'r') as fp_test:
@@ -961,8 +970,8 @@ def insert_devs(cfg):
             # process dataline arguments
             app_log.debug(f"= {dataline}")
 
-            cur.execute('INSERT INTO ' + TBL_AP_CFG_NAME + ' VALUES ( ?, ?, ?)',
-                        (cnt, dataline[:-1], 1))
+            cur.execute('INSERT INTO ' + TBL_AP_CFG_NAME +
+                        ' VALUES ( ?, ?, ?)', (cnt, dataline[:-1], 1))
             con.commit()
             cnt += 1
     con.close()
@@ -1000,20 +1009,22 @@ def add_reqs(cfg):
             # process dataline arguments
             request_json, metadata_json = process_jsonline(dataline)
 
-            # reject the request if mandatory metadata arguments are not present
+            # reject the request if mandatory metadata arguments are not
+            # present
             if not MANDATORY_METADATA_KEYS.issubset(
                     set(metadata_json.keys())):
                 # missing mandatory keys in test case input
                 app_log.error("Test case input does not contain required"
-                    " mandatory arguments: %s",
-                    ", ".join(list(
-                        MANDATORY_METADATA_KEYS - set(metadata_json.keys()))))
+                              " mandatory arguments: %s",
+                              ", ".join(list(
+                                  MANDATORY_METADATA_KEYS - set(metadata_json.keys()))))
                 return AFC_ERR
 
-            # check if the test case already exists in the database test vectors
+            # check if the test case already exists in the database test
+            # vectors
             if metadata_json[TESTCASE_ID] in db_reqs_list:
-                app_log.error("Test case: %s already exists in database", 
-                    metadata_json[TESTCASE_ID])
+                app_log.error("Test case: %s already exists in database",
+                              metadata_json[TESTCASE_ID])
                 break
 
             app_log.info("Executing test case: %s", metadata_json[TESTCASE_ID])
@@ -1045,14 +1056,14 @@ def add_reqs(cfg):
             hash_obj = hashlib.sha256(upd_data.encode('utf-8'))
             cur = con.cursor()
             cur.execute('INSERT INTO ' + TBL_RESPS_NAME + ' values ( ?, ?, ?)',
-                        [metadata_json[TESTCASE_ID], 
-                        upd_data, hash_obj.hexdigest()])
+                        [metadata_json[TESTCASE_ID],
+                         upd_data, hash_obj.hexdigest()])
             con.commit()
     con.close()
     return AFC_OK
 
 
-def dump_table(conn, tbl_name, out_file, pref ):
+def dump_table(conn, tbl_name, out_file, pref):
     app_log.debug(f"{inspect.stack()[0][3]}() {tbl_name}")
     fp_new = ''
 
@@ -1076,7 +1087,7 @@ def dump_table(conn, tbl_name, out_file, pref ):
             if (name.lower().find('urs') != -1) or (pref and not pref == prefix):
                 continue
 
-            fp_test = open(f"{out_file['split']}/{prefix}_{name}_{nbr}" +\
+            fp_test = open(f"{out_file['split']}/{prefix}_{name}_{nbr}" +
                            f"{tbl_fname[tbl_name]}", 'a')
             fp_test.write(f"{val[1][1]}\n")
             fp_test.close()
@@ -1225,7 +1236,7 @@ def dry_run_test(cfg):
 
             resp_res = json_lookup('shortDescription', resp, None)
             if (resp_res[0] != 'Success') \
-                and (req_id[0].lower().find('urs') == -1):
+                    and (req_id[0].lower().find('urs') == -1):
                 app_log.error('Failed in test response - %s', resp_res)
                 app_log.debug(resp)
                 break
@@ -1244,7 +1255,7 @@ def dry_run_test(cfg):
 def get_nbr_testcases(cfg):
     """ Find APs count on DB table """
     if not os.path.isfile(cfg['db_filename']):
-        print ('INFO: Missing DB file %s', cfg['db_filename'])
+        print('INFO: Missing DB file %s', cfg['db_filename'])
         return False
     con = sqlite3.connect(cfg['db_filename'])
     cur = con.cursor()
@@ -1252,7 +1263,7 @@ def get_nbr_testcases(cfg):
     found_data = cur.fetchall()
     db_inquiry_count = found_data[0][0]
     con.close()
-    app_log.debug("found %s ap lists from db table",db_inquiry_count)
+    app_log.debug("found %s ap lists from db table", db_inquiry_count)
     return db_inquiry_count
 
 
@@ -1263,25 +1274,25 @@ def collect_tests2combine(sh, rows, t_ident, t2cmb, cmb_t):
     """
     app_log.debug('%s()\n', inspect.stack()[0][3])
     for i in range(1, rows + 1):
-        cell = sh.cell(row = i, column = PURPOSE_CLM)
+        cell = sh.cell(row=i, column=PURPOSE_CLM)
         if ((cell.value is None) or
             (AFC_TEST_IDENT.get(cell.value.lower()) is None) or
-            (cell.value == 'SRI')):
+                (cell.value == 'SRI')):
             continue
 
         if (t_ident != 'all') and (cell.value.lower() != t_ident):
             continue
 
-        cell = sh.cell(row = i, column = COMBINED_CLM)
+        cell = sh.cell(row=i, column=COMBINED_CLM)
         if cell.value is not None and \
-            cell.value.upper() != 'NO':
+                cell.value.upper() != 'NO':
             raw_list = str(cell.value)
 
-            test_case_id = sh.cell(row = i, column = UNIT_NAME_CLM).value
+            test_case_id = sh.cell(row=i, column=UNIT_NAME_CLM).value
             test_case_id += "."
-            test_case_id += sh.cell(row = i, column = PURPOSE_CLM).value
+            test_case_id += sh.cell(row=i, column=PURPOSE_CLM).value
             test_case_id += "."
-            test_case_id += str(sh.cell(row = i, column = TEST_VEC_CLM).value)
+            test_case_id += str(sh.cell(row=i, column=TEST_VEC_CLM).value)
 
             cmb_t[test_case_id] = []
             for t in raw_list.split(','):
@@ -1291,8 +1302,8 @@ def collect_tests2combine(sh, rows, t_ident, t2cmb, cmb_t):
                     t2cmb_ident = ''
                     for r in AFC_TEST_IDENT:
                         if r in left.lower():
-                            min = int(left.replace(r.upper(),''))
-                            max = int(right.replace(r.upper(),'')) + 1
+                            min = int(left.replace(r.upper(), ''))
+                            max = int(right.replace(r.upper(), '')) + 1
                             t2cmb_ident = r.upper()
                             for cnt in range(min, max):
                                 tcase = t2cmb_ident + str(cnt)
@@ -1308,26 +1319,26 @@ def _parse_tests_dev_desc(sheet, fp_new, rows):
     app_log.debug('%s()\n', inspect.stack()[0][3])
     for i in range(1, rows + 1):
         res_str = ""
-        cell = sheet.cell(row = i, column = PURPOSE_CLM)
+        cell = sheet.cell(row=i, column=PURPOSE_CLM)
         if ((cell.value is None) or
             (AFC_TEST_IDENT.get(cell.value.lower()) is None) or
-            (cell.value == 'SRI')):
+                (cell.value == 'SRI')):
             continue
 
         # skip combined test vectors because device descriptor is missing
-        cell = sheet.cell(row = i, column = COMBINED_CLM)
+        cell = sheet.cell(row=i, column=COMBINED_CLM)
         if cell.value is not None and \
-            cell.value.upper() != 'NO':
+                cell.value.upper() != 'NO':
             continue
 
         res_str += build_device_desc(
-                            sheet.cell(row = i, column = INDOOR_DEPL_CLM).value,
-                            sheet.cell(row = i, column = SER_NBR_CLM).value,
-                            sheet.cell(row = i, column = RULESET_CLM).value,
-                            sheet.cell(row = i, column = ID_CLM).value,
-                            True)
+            sheet.cell(row=i, column=INDOOR_DEPL_CLM).value,
+            sheet.cell(row=i, column=SER_NBR_CLM).value,
+            sheet.cell(row=i, column=RULESET_CLM).value,
+            sheet.cell(row=i, column=ID_CLM).value,
+            True)
 
-        fp_new.write(res_str+'\n')
+        fp_new.write(res_str + '\n')
     return res_str
 
 
@@ -1342,31 +1353,31 @@ def _parse_tests_all(sheet, fp_new, rows, test_ident):
                           combined_tests)
     if len(combined_tests):
         app_log.info('Found combined test vectors: %s',
-                      ' '.join(combined_tests))
+                     ' '.join(combined_tests))
         app_log.info('Found test vectors to combine: %s',
-                      ' '.join(tests2combine))
+                     ' '.join(tests2combine))
     for i in range(1, rows + 1):
-        cell = sheet.cell(row = i, column = PURPOSE_CLM)
+        cell = sheet.cell(row=i, column=PURPOSE_CLM)
         if ((cell.value is None) or
             (AFC_TEST_IDENT.get(cell.value.lower()) is None) or
-            (cell.value == 'SRI')):
+                (cell.value == 'SRI')):
             continue
 
         if (test_ident != 'all') and (cell.value.lower() != test_ident):
             continue
 
-        uut = sheet.cell(row = i, column = UNIT_NAME_CLM).value
-        purpose = sheet.cell(row = i, column = PURPOSE_CLM).value
-        test_vec = sheet.cell(row = i, column = TEST_VEC_CLM).value
+        uut = sheet.cell(row=i, column=UNIT_NAME_CLM).value
+        purpose = sheet.cell(row=i, column=PURPOSE_CLM).value
+        test_vec = sheet.cell(row=i, column=TEST_VEC_CLM).value
 
         test_case_id = uut + "." + purpose + "." + str(test_vec)
 
         # Prepare request header '{"availableSpectrumInquiryRequests": [{'
         res_str = REQ_INQUIRY_HEADER
-        # check if the test case is combined 
-        cell = sheet.cell(row = i, column = COMBINED_CLM)
+        # check if the test case is combined
+        cell = sheet.cell(row=i, column=COMBINED_CLM)
         if cell.value is not None and \
-            cell.value.upper() != 'NO':
+                cell.value.upper() != 'NO':
             for item in combined_tests[test_case_id]:
                 res_str += tests2combine[item] + ','
             res_str = res_str[:-1]
@@ -1375,41 +1386,41 @@ def _parse_tests_all(sheet, fp_new, rows, test_ident):
             # Inquired Channels
             #
             res_str += '{' + REQ_INQ_CHA_HEADER
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_131)
-            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value) 
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_131)
-            if cell.value is not None:
-                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
-            res_str += '}, '
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_132)
+            cell = sheet.cell(row=i, column=GLOBALOPERATINGCLASS_131)
             res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_132)
+            cell = sheet.cell(row=i, column=CHANNEL_CFI_131)
             if cell.value is not None:
-                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value)
             res_str += '}, '
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_133)
+            cell = sheet.cell(row=i, column=GLOBALOPERATINGCLASS_132)
             res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_133)
+            cell = sheet.cell(row=i, column=CHANNEL_CFI_132)
             if cell.value is not None:
-                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value)
             res_str += '}, '
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_134)
+            cell = sheet.cell(row=i, column=GLOBALOPERATINGCLASS_133)
             res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_134)
+            cell = sheet.cell(row=i, column=CHANNEL_CFI_133)
             if cell.value is not None:
-                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value)
             res_str += '}, '
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_136)
+            cell = sheet.cell(row=i, column=GLOBALOPERATINGCLASS_134)
             res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_136)
+            cell = sheet.cell(row=i, column=CHANNEL_CFI_134)
             if cell.value is not None:
-                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value)
             res_str += '}, '
-            cell = sheet.cell(row = i, column = GLOBALOPERATINGCLASS_137)
+            cell = sheet.cell(row=i, column=GLOBALOPERATINGCLASS_136)
             res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
-            cell = sheet.cell(row = i, column = CHANNEL_CFI_137)
+            cell = sheet.cell(row=i, column=CHANNEL_CFI_136)
             if cell.value is not None:
-                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value) 
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value)
+            res_str += '}, '
+            cell = sheet.cell(row=i, column=GLOBALOPERATINGCLASS_137)
+            res_str += '{' + REQ_INQ_CHA_GL_OPER_CLS + str(cell.value)
+            cell = sheet.cell(row=i, column=CHANNEL_CFI_137)
+            if cell.value is not None:
+                res_str += ', ' + REQ_INQ_CHA_CHANCFI + str(cell.value)
             res_str += '}' + REQ_INQ_CHA_FOOTER + ' '
             #
             # Device descriptor
@@ -1417,30 +1428,42 @@ def _parse_tests_all(sheet, fp_new, rows, test_ident):
             res_str += REQ_DEV_DESC_HEADER
 
             res_str += build_device_desc(
-                                sheet.cell(row = i, column = INDOOR_DEPL_CLM).value,
-                                sheet.cell(row = i, column = SER_NBR_CLM).value,
-                                sheet.cell(row = i, column = RULESET_CLM).value,
-                                sheet.cell(row = i, column = ID_CLM).value,
-                                False)
+                sheet.cell(row=i, column=INDOOR_DEPL_CLM).value,
+                sheet.cell(row=i, column=SER_NBR_CLM).value,
+                sheet.cell(row=i, column=RULESET_CLM).value,
+                sheet.cell(row=i, column=ID_CLM).value,
+                False)
             res_str += ','
             #
             # Inquired Frequency Range
             #
             res_str += REQ_INQ_FREQ_RANG_HEADER
             freq_range = AfcFreqRange()
-            freq_range.set_range_limit(sheet.cell(row = i,
-                column = INQ_FREQ_RNG_LOWFREQ_A), 'low')
-            freq_range.set_range_limit(sheet.cell(row = i,
-                column = INQ_FREQ_RNG_HIGHFREQ_A), 'high')
+            freq_range.set_range_limit(
+                sheet.cell(
+                    row=i,
+                    column=INQ_FREQ_RNG_LOWFREQ_A),
+                'low')
+            freq_range.set_range_limit(
+                sheet.cell(
+                    row=i,
+                    column=INQ_FREQ_RNG_HIGHFREQ_A),
+                'high')
             try:
                 res_str += freq_range.append_range()
             except IncompleteFreqRange as e:
                 app_log.debug(f"{e} -  row {i}")
             freq_range = AfcFreqRange()
-            freq_range.set_range_limit(sheet.cell(row = i,
-                column = INQ_FREQ_RNG_LOWFREQ_B), 'low')
-            freq_range.set_range_limit(sheet.cell(row = i,
-                column = INQ_FREQ_RNG_HIGHFREQ_B), 'high')
+            freq_range.set_range_limit(
+                sheet.cell(
+                    row=i,
+                    column=INQ_FREQ_RNG_LOWFREQ_B),
+                'low')
+            freq_range.set_range_limit(
+                sheet.cell(
+                    row=i,
+                    column=INQ_FREQ_RNG_HIGHFREQ_B),
+                'high')
             try:
                 tmp_str = freq_range.append_range()
                 res_str += ', ' + tmp_str
@@ -1448,24 +1471,24 @@ def _parse_tests_all(sheet, fp_new, rows, test_ident):
                 app_log.debug(f"{e} -  row {i}")
             res_str += REQ_INQ_FREQ_RANG_FOOTER
 
-            cell = sheet.cell(row = i, column = MINDESIREDPOWER)
+            cell = sheet.cell(row=i, column=MINDESIREDPOWER)
             if (cell.value):
                 res_str += REQ_MIN_DESIRD_PWR + str(cell.value) + ', '
             #
             # Location
             #
             res_str += REQ_LOC_HEADER
-            cell = sheet.cell(row = i, column = INDOORDEPLOYMENT)
+            cell = sheet.cell(row=i, column=INDOORDEPLOYMENT)
             res_str += REQ_LOC_INDOORDEPL + str(cell.value) + ', '
 
             # Location - elevation
             res_str += REQ_LOC_ELEV_HEADER
-            cell = sheet.cell(row = i, column = ELE_VERTICALUNCERTAINTY)
+            cell = sheet.cell(row=i, column=ELE_VERTICALUNCERTAINTY)
             if isinstance(cell.value, int):
                 res_str += REQ_LOC_VERT_UNCERT + str(cell.value) + ', '
-            cell = sheet.cell(row = i, column = ELE_HEIGHTTYPE)
+            cell = sheet.cell(row=i, column=ELE_HEIGHTTYPE)
             res_str += REQ_LOC_HEIGHT_TYPE + '"' + str(cell.value) + '"'
-            cell = sheet.cell(row = i, column = ELE_HEIGHT)
+            cell = sheet.cell(row=i, column=ELE_HEIGHT)
             if isinstance(cell.value, int) or isinstance(cell.value, float):
                 res_str += ', ' + REQ_LOC_HEIGHT + str(cell.value)
             res_str += '}, '
@@ -1479,7 +1502,7 @@ def _parse_tests_all(sheet, fp_new, rows, test_ident):
 
             res_str += REQ_LOC_FOOTER
 
-            cell = sheet.cell(row = i, column = REQ_ID_CLM)
+            cell = sheet.cell(row=i, column=REQ_ID_CLM)
             if isinstance(cell.value, str):
                 req_id = cell.value
             else:
@@ -1491,10 +1514,11 @@ def _parse_tests_all(sheet, fp_new, rows, test_ident):
             # build test case id in format <purpose><test vector>
             short_tcid = ''.join(test_case_id.split('.', 1)[1].split('.'))
             if short_tcid in tests2combine.keys():
-                tests2combine[short_tcid] = res_str.split(REQ_INQUIRY_HEADER)[1] 
+                tests2combine[short_tcid] = res_str.split(
+                    REQ_INQUIRY_HEADER)[1]
 
         res_str += REQ_INQUIRY_FOOTER
-        cell = sheet.cell(row = i, column = VERSION_CLM)
+        cell = sheet.cell(row=i, column=VERSION_CLM)
         res_str += REQ_VERSION + '"' + str(cell.value) + '"'
         res_str += REQ_FOOTER
 
@@ -1505,7 +1529,7 @@ def _parse_tests_all(sheet, fp_new, rows, test_ident):
         res_str += META_HEADER
         res_str += META_TESTCASE_ID + '"' + test_case_id + '"'
         res_str += META_FOOTER
-        fp_new.write(res_str+'\n')
+        fp_new.write(res_str + '\n')
     return AFC_OK
 
 
@@ -1539,8 +1563,8 @@ def parse_tests(cfg):
 
     # Look for request sheet
     for s in range(len(wb.sheetnames)):
-       if wb.sheetnames[s] == "Availability Requests":
-           break
+        if wb.sheetnames[s] == "Availability Requests":
+            break
 
     wb.active = s
     sheet = wb.active
@@ -1551,9 +1575,9 @@ def parse_tests(cfg):
 
     # partial parse if only certain parameters required.
     # only for device descriptor for now.
-    if cfg['dev_desc'] == True:
+    if cfg['dev_desc']:
         res_str = _parse_tests_dev_desc(sheet, fp_new, nbr_rows)
-        fp_new.write(res_str+'\n')
+        fp_new.write(res_str + '\n')
     else:
         _parse_tests_all(sheet, fp_new, nbr_rows, test_ident)
 
@@ -1583,7 +1607,8 @@ def test_report(fname, runtimedata, testnumdata, testvectordata,
             'Test Result': test_result, 'Response data': upd_data}
     with open(fname, "a") as f:
         file_writer = csv.DictWriter(f, fieldnames=data_names)
-        if os.stat(fname).st_size == 0: file_writer.writeheader()
+        if os.stat(fname).st_size == 0:
+            file_writer.writeheader()
         file_writer.writerow(data)
 
 
@@ -1630,7 +1655,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
         before_ts = time.monotonic()
         resp = _send_recv(cfg, json.dumps(request_data), ssn)
         tm_secs = time.monotonic() - before_ts
-        res=f"id {test_case} name {req_id} status $status time {tm_secs:.1f}"
+        res = f"id {test_case} name {req_id} status $status time {tm_secs:.1f}"
         res_template = Template(res)
 
         if isinstance(resp, type(None)):
@@ -1648,7 +1673,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
                                                result_str=upd_data)
             if (resps[test_case][1] == hash_obj.hexdigest()) \
                     if cfg['precision'] is None else (not diffs):
-                res=res_template.substitute(status="Ok")
+                res = res_template.substitute(status="Ok")
             else:
                 for line in diffs:
                     app_log.error(f"  Difference: {line}")
@@ -1656,7 +1681,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
                 test_res = AFC_ERR
 
         if test_res == AFC_ERR:
-            res=res_template.substitute(status="Fail")
+            res = res_template.substitute(status="Fail")
             app_log.error(res)
             all_test_res = AFC_ERR
 
@@ -1754,7 +1779,7 @@ def _convert_reqs_n_resps_to_dict(cfg):
             for row in found_resps
         }
         ids_dict = {
-            row[0]: [row[0], req_index+1]
+            row[0]: [row[0], req_index + 1]
             for req_index, row in enumerate(found_reqs)
         }
         test_indx = list(map(str.strip, cfg.pop("testcase_ids").split(',')))
@@ -1762,24 +1787,24 @@ def _convert_reqs_n_resps_to_dict(cfg):
     else:
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() by index")
         reqs_dict = {
-            str(req_index+1): [json.loads(row[1])]
+            str(req_index + 1): [json.loads(row[1])]
             for req_index, row in enumerate(found_reqs)
         }
         resp_dict = {
-            str(resp_index+1): [row[1], row[2]]
+            str(resp_index + 1): [row[1], row[2]]
             for resp_index, row in enumerate(found_resps)
         }
         ids_dict = {
-            str(req_index+1): [row[0], req_index+1]
+            str(req_index + 1): [row[0], req_index + 1]
             for req_index, row in enumerate(found_reqs)
         }
         if not isinstance(cfg['testcase_indexes'], type(None)):
             test_indx = list(map(str.strip,
-                                  cfg.pop("testcase_indexes").split(',')))
+                                 cfg.pop("testcase_indexes").split(',')))
             cfg.pop("testcase_ids")
         else:
             test_indx = [
-                str(item) for item in list(range(1, len(reqs_dict)+1))
+                str(item) for item in list(range(1, len(reqs_dict) + 1))
             ]
 
     # build list of indexes, omitting non-existing elements
@@ -1820,7 +1845,8 @@ def _run_cert_tests(cfg):
     """
     Run tests
     """
-    app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}() {cfg['url_path']}")
+    app_log.debug(
+        f"({os.getpid()}) {inspect.stack()[0][3]}() {cfg['url_path']}")
 
     test_res = AFC_OK
 
@@ -1841,7 +1867,7 @@ def _run_cert_tests(cfg):
         app_log.error(f"({os.getpid()}) {inspect.stack()[0][3]}() "
                       f"{os_err} - {proc.open_files()}")
         test_res = AFC_ERR
-    else :
+    else:
         if rawresp.status_code != 200:
             test_res = AFC_ERR
 
@@ -1879,12 +1905,13 @@ def run_cert_tests(cfg):
 
 
 log_level_map = {
-    'debug' : logging.DEBUG,    # 10
-    'info' : logging.INFO,      # 20
-    'warn' : logging.WARNING,   # 30
-    'err' : logging.ERROR,      # 40
-    'crit' : logging.CRITICAL,  # 50
+    'debug': logging.DEBUG,    # 10
+    'info': logging.INFO,      # 20
+    'warn': logging.WARNING,   # 30
+    'err': logging.ERROR,      # 40
+    'crit': logging.CRITICAL,  # 50
 }
+
 
 def set_log_level(opt):
     app_log.setLevel(log_level_map[opt])
@@ -1918,7 +1945,7 @@ def parse_run_test_args(cfg):
             cfg['url_path'] += AFC_URL_SUFFIX + AFC_REQ_NAME
         else:
             cfg['url_token'] = cfg['url_path'] + AFC_WEBUI_URL_SUFFIX +\
-                               AFC_WEBUI_TOKEN
+                AFC_WEBUI_TOKEN
             cfg['url_path'] += AFC_URL_SUFFIX + AFC_WEBUI_REQ_NAME
     return AFC_OK
 
@@ -1927,33 +1954,34 @@ def parse_run_cert_args(cfg):
     """Parse arguments for command 'run_cert'"""
     app_log.debug(f"{inspect.stack()[0][3]}()")
     if ((not isinstance(cfg['addr'], list)) or
-        isinstance(cfg['ca_cert'], type(None))):
+            isinstance(cfg['ca_cert'], type(None))):
         app_log.error(f"{inspect.stack()[0][3]}() Missing arguments")
         return AFC_ERR
 
     cfg['url_path'] = cfg['prot'] + '://' + str(cfg['addr'][0]) +\
-                      ':' + str(cfg['port']) + '/'
+        ':' + str(cfg['port']) + '/'
     return AFC_OK
 
 
 # available commands to execute in alphabetical order
 execution_map = {
-    'add_reqs' : [add_reqs, parse_run_test_args],
-    'ins_reqs' : [insert_reqs, parse_run_test_args],
-    'ext_reqs' : [extend_reqs, parse_run_test_args],
-    'ins_devs' : [insert_devs, parse_run_test_args],
-    'cmp_cfg' : [compare_afc_config, parse_run_test_args],
-    'dry_run' : [dry_run_test, parse_run_test_args],
+    'add_reqs': [add_reqs, parse_run_test_args],
+    'ins_reqs': [insert_reqs, parse_run_test_args],
+    'ext_reqs': [extend_reqs, parse_run_test_args],
+    'ins_devs': [insert_devs, parse_run_test_args],
+    'cmp_cfg': [compare_afc_config, parse_run_test_args],
+    'dry_run': [dry_run_test, parse_run_test_args],
     'dump_db': [dump_database, parse_run_test_args],
-    'get_nbr_testcases' : [get_nbr_testcases, parse_run_test_args],
+    'get_nbr_testcases': [get_nbr_testcases, parse_run_test_args],
     'exp_adm_cfg': [export_admin_config, parse_run_test_args],
     'parse_tests': [parse_tests, parse_run_test_args],
-    'reacq' : [start_acquisition, parse_run_test_args],
-    'run' : [run_test, parse_run_test_args],
-    'run_cert' : [run_cert_tests, parse_run_cert_args],
-    'stress' : [stress_run, parse_run_test_args],
-    'ver' : [get_version, parse_run_test_args],
+    'reacq': [start_acquisition, parse_run_test_args],
+    'run': [run_test, parse_run_test_args],
+    'run_cert': [run_cert_tests, parse_run_cert_args],
+    'stress': [stress_run, parse_run_test_args],
+    'ver': [get_version, parse_run_test_args],
 }
+
 
 def make_arg_parser():
     """Define command line options"""
@@ -1962,97 +1990,125 @@ def make_arg_parser():
         formatter_class=argparse.RawTextHelpFormatter)
 
     args_parser.add_argument('--addr', nargs=1, type=str,
-                         help="<address> - set AFC Server address.\n")
+                             help="<address> - set AFC Server address.\n")
     args_parser.add_argument('--prot', nargs='?', choices=['https', 'http'],
-                         default='https',
-                         help="<http|https> - set connection protocol "
-                              "(default=https).\n")
+                             default='https',
+                             help="<http|https> - set connection protocol "
+                             "(default=https).\n")
     args_parser.add_argument('--port', nargs='?', default='443',
-                         type=int,
-                         help="<port> - set connection port "
-                              "(default=443).\n")
+                             type=int,
+                             help="<port> - set connection port "
+                             "(default=443).\n")
     args_parser.add_argument('--conn_type', nargs='?',
-                         choices=['sync', 'async'], default='sync',
-                         help="<sync|async> - set connection to be "
-                              "synchronous or asynchronous (default=sync).\n")
+                             choices=['sync', 'async'], default='sync',
+                             help="<sync|async> - set connection to be "
+                             "synchronous or asynchronous (default=sync).\n")
     args_parser.add_argument('--conn_tm', nargs='?', default=None, type=int,
-                         help="<secs> - set timeout for asynchronous "
-                              "connection (default=None). \n")
+                             help="<secs> - set timeout for asynchronous "
+                             "connection (default=None). \n")
     args_parser.add_argument('--verif', action='store_true',
-                         help="<verif> - skip SSL verification "
-                              "on post request.\n")
+                             help="<verif> - skip SSL verification "
+                             "on post request.\n")
     args_parser.add_argument('--outfile', nargs=1, type=str,
-                         help="<filename> - set filename for output "
-                              "of tests results.\n")
-    args_parser.add_argument('--outpath', nargs=1, type=str,
-                         help="<filepath> - set path to output filename for "
-                              "results output.\n")
+                             help="<filename> - set filename for output "
+                             "of tests results.\n")
+    args_parser.add_argument(
+        '--outpath',
+        nargs=1,
+        type=str,
+        help="<filepath> - set path to output filename for "
+        "results output.\n")
     args_parser.add_argument('--infile', nargs=1, type=str,
-                         help="<filename> - set filename as a source "
-                              "for test requests.\n")
+                             help="<filename> - set filename as a source "
+                             "for test requests.\n")
     args_parser.add_argument('--debug', action='store_true',
-                         help="during a request make files "
-                              "with details for debugging.\n")
+                             help="during a request make files "
+                             "with details for debugging.\n")
     args_parser.add_argument('--elaborated_debug', action='store_true',
-                         help="during a request make files "
-                              "with even more details for debugging.\n")
+                             help="during a request make files "
+                             "with even more details for debugging.\n")
     args_parser.add_argument('--gui', action='store_true',
-                         help="during a request make files "
-                              "with details for debugging.\n")
+                             help="during a request make files "
+                             "with details for debugging.\n")
     args_parser.add_argument('--webui', action='store_true',
-                         help="during a request make files\n")
+                             help="during a request make files\n")
     args_parser.add_argument('--log', type=set_log_level,
-                         default='info', dest='log_level',
-                         help="<info|debug|warn|err|crit> - set "
-                         "logging level (default=info).\n")
+                             default='info', dest='log_level',
+                             help="<info|debug|warn|err|crit> - set "
+                             "logging level (default=info).\n")
     args_parser.add_argument('--testcase_indexes', nargs='?',
-                         help="<N1,...> - set single or group of tests "
-                         "to run.\n")
-    args_parser.add_argument('--testcase_ids', nargs='?',
-                         help="<N1,...> - set single or group of test case ids "
-                         "to run.\n")
+                             help="<N1,...> - set single or group of tests "
+                             "to run.\n")
+    args_parser.add_argument(
+        '--testcase_ids',
+        nargs='?',
+        help="<N1,...> - set single or group of test case ids "
+        "to run.\n")
     args_parser.add_argument('--table', nargs=1, type=str,
-                         help="<wfa|req|resp|ap|cfg|user> - set "
-                         "database table name.\n")
+                             help="<wfa|req|resp|ap|cfg|user> - set "
+                             "database table name.\n")
     args_parser.add_argument('--idx', nargs='?',
-                         type=int,
-                         help="<index> - set table record index.\n")
+                             type=int,
+                             help="<index> - set table record index.\n")
     args_parser.add_argument('--test_id',
-                         default='all',
-                         help="WFA test identifier, for example "
-                         "srs, urs, fsp, ibp, sip, etc (default=all).\n")
-    args_parser.add_argument("--precision", metavar="PRECISION_DB", type=float,
-                         help="Maximum allowed deviation of power limits from "
-                         "reference values in dB. 0 means exact match is "
-                         "required. Default is to use hash-based exact match "
-                         "comparison")
+                             default='all',
+                             help="WFA test identifier, for example "
+                             "srs, urs, fsp, ibp, sip, etc (default=all).\n")
+    args_parser.add_argument(
+        "--precision",
+        metavar="PRECISION_DB",
+        type=float,
+        help="Maximum allowed deviation of power limits from "
+        "reference values in dB. 0 means exact match is "
+        "required. Default is to use hash-based exact match "
+        "comparison")
     args_parser.add_argument('--cache', action='store_true',
-                         help="enable cache during a request, otherwise "
-                         "disabled.\n")
-    args_parser.add_argument('--tests2run', nargs=1, type=str,
-                         help="<nbr> - the total number of tests to run.\n")
-    args_parser.add_argument('--ca_cert', nargs=1, type=str,
-                         help="<filename> - set CA certificate filename to "
-                              "verify the remote server.\n")
-    args_parser.add_argument('--cli_cert', nargs=1, type=str,
-                         help="<filename> - set client certificate filename.\n")
-    args_parser.add_argument('--cli_key', nargs=1, type=str,
-                         help="<filename> - set client private key filename.\n")
+                             help="enable cache during a request, otherwise "
+                             "disabled.\n")
+    args_parser.add_argument(
+        '--tests2run',
+        nargs=1,
+        type=str,
+        help="<nbr> - the total number of tests to run.\n")
+    args_parser.add_argument(
+        '--ca_cert',
+        nargs=1,
+        type=str,
+        help="<filename> - set CA certificate filename to "
+        "verify the remote server.\n")
+    args_parser.add_argument(
+        '--cli_cert',
+        nargs=1,
+        type=str,
+        help="<filename> - set client certificate filename.\n")
+    args_parser.add_argument(
+        '--cli_key',
+        nargs=1,
+        type=str,
+        help="<filename> - set client private key filename.\n")
     args_parser.add_argument('--dev_desc', action='store_true',
-                         help="parse only device descriptors values.\n")
-    args_parser.add_argument('--prefix_cmd', nargs='*', type=str,
-                         help="hook to call currently provided command before "
-                         "main command specified by --cmd option.\n")
+                             help="parse only device descriptors values.\n")
+    args_parser.add_argument(
+        '--prefix_cmd',
+        nargs='*',
+        type=str,
+        help="hook to call currently provided command before "
+        "main command specified by --cmd option.\n")
     args_parser.add_argument('--email_from', type=str,
-                         help="<email address> - set sender email.\n")
+                             help="<email address> - set sender email.\n")
     args_parser.add_argument('--email_to', type=str,
-                         help="<email address> - set receiver email.\n")
-    args_parser.add_argument('--email_cc', type=str,
-                         help="<email address> - set receiver of cc email.\n")
+                             help="<email address> - set receiver email.\n")
+    args_parser.add_argument(
+        '--email_cc',
+        type=str,
+        help="<email address> - set receiver of cc email.\n")
     args_parser.add_argument('--email_pwd', type=str,
-                         help="<filename> - set sender email password.\n")
+                             help="<filename> - set sender email password.\n")
 
-    args_parser.add_argument('--cmd', choices=execution_map.keys(), nargs='?',
+    args_parser.add_argument(
+        '--cmd',
+        choices=execution_map.keys(),
+        nargs='?',
         help="run - run test from DB and compare.\n"
         "dry_run - run test from file and show response.\n"
         "exp_adm_cfg - export admin config into a file.\n"
@@ -2092,7 +2148,7 @@ def main_execution(cfg):
     """Call all requested commands"""
     app_log.debug(f"{inspect.stack()[0][3]}()")
     if (isinstance(cfg['prefix_cmd'], list) and
-        (pre_hook(cfg) == AFC_ERR)):
+            (pre_hook(cfg) == AFC_ERR)):
         return AFC_ERR
     if isinstance(cfg['cmd'], type(None)):
         parser.print_help()

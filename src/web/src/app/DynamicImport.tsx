@@ -1,4 +1,4 @@
-import * as React from "react";
+import * as React from 'react';
 
 /**
  * DynamicImport.tsx: component which loads app modules from the server on demand
@@ -13,9 +13,9 @@ import * as React from "react";
  */
 interface IDynamicImport<T = undefined> {
   load: () => Promise<any>;
-  children: (component: any, resolved: T) => JSX.Element,  
-  resolve?: Promise<T>
-};
+  children: (component: any, resolved: T) => JSX.Element;
+  resolve?: Promise<T>;
+}
 
 /**
  * Class to dynamically load bundles from server
@@ -27,21 +27,21 @@ interface IDynamicImport<T = undefined> {
 class DynamicImport<T> extends React.Component<IDynamicImport<T>> {
   public state = {
     component: null,
-    resolve: undefined
-  }
+    resolve: undefined,
+  };
   public componentDidMount() {
-    (this.props.resolve !== undefined ? this.props.resolve : Promise.resolve(undefined as unknown as T))
-      .then(resolve =>
+    (this.props.resolve !== undefined ? this.props.resolve : Promise.resolve(undefined as unknown as T)).then(
+      (resolve) =>
         this.props.load().then((component) => {
           this.setState({
             component: component.default ? component.default : component,
-            resolve: resolve
+            resolve: resolve,
           });
-        })
-      );
+        }),
+    );
   }
   public render() {
-    return this.props.children(this.state.component, this.state.resolve)
+    return this.props.children(this.state.component, this.state.resolve);
   }
 }
 

@@ -36,7 +36,7 @@ def brownNoise(start_mu, sigma, length):
     LOCK.acquire()
     arr = [start_mu]
     prev_val = start_mu
-    for _i in range(length-1):
+    for _i in range(length - 1):
         if False:  # random() < 0.25:
             arr.append(None)
         else:
@@ -89,7 +89,6 @@ def getSpectrum(**kwargs):
     result is AVAIL_SPECTRUM_RESP data.
     '''
 
-
     from flask_login import current_user
 
     REQUIRED_PARAMS = (
@@ -101,7 +100,8 @@ def getSpectrum(**kwargs):
         'version',
     )
 
-    missing_params = frozenset(REQUIRED_PARAMS) - frozenset(list(kwargs.keys()))
+    missing_params = frozenset(REQUIRED_PARAMS) - \
+        frozenset(list(kwargs.keys()))
     if missing_params:
         raise InvalidParamsError(
             'Required parameter names: {0}'.format(' '.join(REQUIRED_PARAMS)))
@@ -180,8 +180,10 @@ def getSpectrum(**kwargs):
 
     # authenitcate access point
     description = kwargs['deviceDesc']
-    auth_paws(description.get('serialNumber'), description.get(
--        'modelId'), description.get('manufacturerId'), description.get('rulesetIds'))
+    auth_paws(description.get('serialNumber'),
+              description.get(- 'modelId'),
+              description.get('manufacturerId'),
+              description.get('rulesetIds'))
     user_id = current_user.id
     user = User.query.filter_by(id=user_id).first()
 
@@ -199,7 +201,8 @@ def getSpectrum(**kwargs):
         f.write(flask.jsonify(kwargs).get_data(as_text=True))
     LOGGER.debug("Request file written")
 
-    task = build_task(request_file_path,response_file_path,request_type,user_id,user,temp_dir)
+    task = build_task(request_file_path, response_file_path,
+                      request_type, user_id, user, temp_dir)
 
     if task.state == 'FAILURE':
         raise ServerError('Task was unable to be started')
@@ -241,7 +244,9 @@ def create_handler(app, path):
     :return: The :py:cls:`JSONRPC` object created.
     '''
     rpc = JSONRPC(service_url=path, enable_web_browsable_api=True)
-    rpc.method('spectrum.paws.getSpectrum(deviceDesc=object, location=object, antenna=object, capabilities=object, type=str, version=str) -> object', validate=False)(getSpectrum)
+    rpc.method(
+        'spectrum.paws.getSpectrum(deviceDesc=object, location=object, antenna=object, capabilities=object, type=str, version=str) -> object',
+        validate=False)(getSpectrum)
     rpc.init_app(app)
 
     return rpc

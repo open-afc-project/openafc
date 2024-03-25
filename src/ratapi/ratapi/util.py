@@ -94,7 +94,7 @@ class TemporaryDirectory(object):
 
 
 def getQueueDirectory(task_queue_dir, analysis_type):
-    ''' creates a unique directory under the task_queue_dir 
+    ''' creates a unique directory under the task_queue_dir
     and returns the name to the caller. Caller responsible for cleanup.
     '''
 
@@ -127,14 +127,22 @@ def require_default_uls():
     '''
     # copy default uls database files to var
     for uls_file in os.listdir(flask.current_app.config['DEFAULT_ULS_DIR']):
-        if os.path.exists(os.path.join(flask.current_app.config['NFS_MOUNT_PATH'],
-                                       'rat_transfer', 'ULS_Database', uls_file)):
+        if os.path.exists(
+            os.path.join(
+                flask.current_app.config['NFS_MOUNT_PATH'],
+                'rat_transfer',
+                'ULS_Database',
+                uls_file)):
             continue
         os.symlink(
             os.path.join(
-                flask.current_app.config['DEFAULT_ULS_DIR'], uls_file),
-            os.path.join(flask.current_app.config['NFS_MOUNT_PATH'], 'rat_transfer',
-                         'ULS_Database', uls_file))
+                flask.current_app.config['DEFAULT_ULS_DIR'],
+                uls_file),
+            os.path.join(
+                flask.current_app.config['NFS_MOUNT_PATH'],
+                'rat_transfer',
+                'ULS_Database',
+                uls_file))
 
 
 class PrefixMiddleware(object):
@@ -155,14 +163,16 @@ class PrefixMiddleware(object):
             LOGGER.debug('Script: %s', environ['SCRIPT_NAME'])
             return self.app(environ, start_response)
         else:
-            # here the prefix has already been stripped by apache so just set script and pass on
+            # here the prefix has already been stripped by apache so just set
+            # script and pass on
             environ['SCRIPT_NAME'] = self.prefix
             return self.app(environ, start_response)
+
 
 class HeadersMiddleware(object):
     def __init__(self, app):
         self.app = app
-    
+
     def __call__(self, environ, start_response):
         def custom_start_response(status, headers, exc_info=None):
             headers.append(('Cache-Control', "max-age=0"))

@@ -194,6 +194,7 @@ class GdalInfo:
     min_value      -- Minimum value among all bands or None
     max_value      -- Maximum value among all bands or None
     """
+
     def __init__(self, filename: str,
                  options: Optional[Union[str, List[str]]] = None,
                  fail_on_error: bool = True, remove_aux: bool = False) -> None:
@@ -448,6 +449,7 @@ class Durator:
     _start_time -- Operation start time
 
     """
+
     def __init__(self, heading: str) -> None:
         """ Constructor
 
@@ -571,8 +573,8 @@ def warp(src: str, dst: str, resampling: str,
                   f"+proj=longlat +datum=WGS84"
                   f"{(' +geoidgrids=' + dst_geoid) if dst_geoid else ''}"]
 
-    error_if(not((top is None) == (bottom is None) == (left is None) ==
-                 (right is None)),
+    error_if(not ((top is None) == (bottom is None) == (left is None) ==
+                  (right is None)),
              "Target boundaries defined partially. They should either be "
              "defined fully or not at all")
     if left is not None:
@@ -584,7 +586,7 @@ def warp(src: str, dst: str, resampling: str,
         exec_args += ["-te", str(left), str(bottom),
                       str(right), str(top)]
 
-    error_if(not((pixel_size_lat is None) == (pixel_size_lon is None)),
+    error_if(not ((pixel_size_lat is None) == (pixel_size_lon is None)),
              "Pixel sizes defined partially. They should either be defined "
              "fully or not at all")
     if pixel_size_lat is not None:
@@ -649,6 +651,7 @@ class Boundaries:
                              parameters, map->geodetic conversion or adjustment
     cross_180             -- Crosses 180 longitude. None if not known
     """
+
     def __init__(self, filename: Optional[str] = None,
                  top: Optional[float] = None, bottom: Optional[float] = None,
                  left: Optional[float] = None, right: Optional[float] = None,
@@ -829,7 +832,7 @@ class Boundaries:
             right=self_right if self_circular else
             (other_right if other_circular else max(self_right, other_right)),
             round_all_boundaries_to_degree=round_boundaries_to_degree and
-            (not(self_circular or other_circular)))
+            (not (self_circular or other_circular)))
 
     def crop(self, other: "Boundaries",
              round_boundaries_to_degree: bool = False) \
@@ -901,7 +904,7 @@ class Boundaries:
         while (right2 - left2) > 360:
             right2 -= 360
 
-        if not(circular1 or circular2):
+        if not (circular1 or circular2):
             while (right1 - left2) >= 360:
                 left1 -= 360
                 right1 -= 360
@@ -918,6 +921,7 @@ class Geoids:
     _geoids    -- List of (boundary, file) tuples for geoid files
     _extension -- Amount of geoid coverage extension when coverage is tested
     """
+
     def __init__(self, geoids: Optional[Union[str, List[str]]],
                  extension: float = 0) -> None:
         """ Constructor
@@ -1037,7 +1041,7 @@ def get_resampling(
     """
     if arg_resampling:
         return arg_resampling
-    error_if(not(src_data_types or dst_data_type),
+    error_if(not (src_data_types or dst_data_type),
              "--resampling can't be derived and must be specified explicitly")
     return \
         "near" if "Byte" in list(src_data_types) + [dst_data_type] else "cubic"

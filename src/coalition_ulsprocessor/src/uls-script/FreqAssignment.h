@@ -7,15 +7,16 @@
 #include <tuple>
 #include "global_fn.h"
 
-class FreqAssignmentClass {
-public:
-	FreqAssignmentClass(const std::string freqAssignmentFile);
-	double getBandwidthUS(double freqMHz);
+class FreqAssignmentClass
+{
+	public:
+		FreqAssignmentClass(const std::string freqAssignmentFile);
+		double getBandwidthUS(double freqMHz);
 
-private:
-	void readFreqAssignment(const std::string filename);
+	private:
+		void readFreqAssignment(const std::string filename);
 
-	std::vector<std::tuple<double,double> > freqBWList;
+		std::vector<std::tuple<double, double>> freqBWList;
 };
 
 #endif

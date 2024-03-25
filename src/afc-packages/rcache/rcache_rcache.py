@@ -23,6 +23,7 @@ class RcacheRcache:
     Private attributes:
     _rcache_server_url -- Request cache service URL
     """
+
     def __init__(self, rcache_server_url: str) -> None:
         self._rcache_server_url = rcache_server_url.rstrip("/")
 

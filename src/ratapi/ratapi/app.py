@@ -104,13 +104,14 @@ def create_app(config_override=None):
         flaskapp, db, directory=os.path.join(owndir, 'migrations'))
 
     if flaskapp.config['OIDC_LOGIN']:
-        from flask_login import  LoginManager
+        from flask_login import LoginManager
         login_manager = LoginManager()
         login_manager.init_app(flaskapp)
 
         if (flaskapp.config['OIDC_DISCOVERY_URL']):
-            endpoints = requests.get(flaskapp.config['OIDC_DISCOVERY_URL'],
-                headers={'Accept' : 'application/json'}).json()
+            endpoints = requests.get(
+                flaskapp.config['OIDC_DISCOVERY_URL'], headers={
+                    'Accept': 'application/json'}).json()
             flaskapp.config['OIDC_ORG_AUTH_URL'] = endpoints['authorization_endpoint']
             flaskapp.config['OIDC_ORG_TOKEN_URL'] = endpoints['token_endpoint']
             flaskapp.config['OIDC_ORG_USER_INFO_URL'] = endpoints['userinfo_endpoint']
@@ -131,19 +132,35 @@ def create_app(config_override=None):
                 from flask_login import current_user
                 try:
                     LOGGER.debug('user:%s logout ', current_user.username)
-                    als.als_json_log('user_access', {'action':'logout', 'user':current_user.username, 'from':flask.request.remote_addr})
-                except:
+                    als.als_json_log('user_access',
+                                     {'action': 'logout',
+                                      'user': current_user.username,
+                                      'from': flask.request.remote_addr})
+                except BaseException:
                     LOGGER.debug('user:%s logout ', 'unknown')
-                    als.als_json_log('user_access', {'action':'logout', 'user':'unknown', 'from':flask.request.remote_addr})
+                    als.als_json_log(
+                        'user_access', {
+                            'action': 'logout', 'user': 'unknown', 'from': flask.request.remote_addr})
 
         @flaskapp.after_request
         def log_user_accessed(response):
             if flask.request.method == 'POST' and flask.request.endpoint == 'user.login':
-                LOGGER.debug('user:%s login status %d', flask.request.form['username'], response.status_code)
+                LOGGER.debug(
+                    'user:%s login status %d',
+                    flask.request.form['username'],
+                    response.status_code)
                 if response.status_code != 302:
-                    als.als_json_log('user_access', {'action':'login', 'user':flask.request.form['username'], 'from':flask.request.remote_addr, 'status':response.status_code})
+                    als.als_json_log('user_access',
+                                     {'action': 'login',
+                                      'user': flask.request.form['username'],
+                                         'from': flask.request.remote_addr,
+                                         'status': response.status_code})
                 else:
-                    als.als_json_log('user_access', {'action':'login', 'user':flask.request.form['username'], 'from':flask.request.remote_addr, 'status':'success'})
+                    als.als_json_log('user_access',
+                                     {'action': 'login',
+                                      'user': flask.request.form['username'],
+                                         'from': flask.request.remote_addr,
+                                         'status': 'success'})
 
             return response
 
@@ -161,12 +178,15 @@ def create_app(config_override=None):
     # Static file dispatchers
     if flaskapp.config['AFC_APP_TYPE'] == 'server':
         csrf = CSRFProtect(flaskapp)
+
         @flaskapp.before_request
         def check_csrf():
             csrf.protect()
 
-        if not os.path.exists(os.path.join(nfs_mount_path, 'rat_transfer', 'frequency_bands')):
-            os.makedirs(os.path.join(nfs_mount_path, 'rat_transfer', 'frequency_bands'))
+        if not os.path.exists(os.path.join(
+                nfs_mount_path, 'rat_transfer', 'frequency_bands')):
+            os.makedirs(os.path.join(nfs_mount_path,
+                        'rat_transfer', 'frequency_bands'))
 
         from werkzeug.middleware.dispatcher import DispatcherMiddleware
         from wsgidav import wsgidav_app
@@ -192,7 +212,9 @@ def create_app(config_override=None):
 
         # get static antenna patterns directory
         antenna_patterns = os.path.join(
-             flaskapp.config['NFS_MOUNT_PATH'], 'rat_transfer', 'Antenna_Patterns')
+            flaskapp.config['NFS_MOUNT_PATH'],
+            'rat_transfer',
+            'Antenna_Patterns')
         if not os.path.exists(antenna_patterns):
             os.makedirs(antenna_patterns)
 
@@ -208,11 +230,11 @@ def create_app(config_override=None):
         for (url_path, fs_path, read_only) in dav_trees:
             if fs_path is None:
                 flaskapp.logger.debug(
-        	    'skipping dav export: {0}'.format(url_path))
+                    'skipping dav export: {0}'.format(url_path))
                 continue
             if not os.path.isdir(fs_path):
                 flaskapp.logger.error(
-        	    'Missing DAV export path "{0}"'.format(fs_path))
+                    'Missing DAV export path "{0}"'.format(fs_path))
                 continue
 
             dav_config = wsgidav_app.DEFAULT_CONFIG.copy()
@@ -239,14 +261,15 @@ def create_app(config_override=None):
         # set prefix middleware
     flaskapp.wsgi_app = util.PrefixMiddleware(
         flaskapp.wsgi_app, prefix=flaskapp.config['APPLICATION_ROOT'])
-    #set header middleware
+    # set header middleware
     flaskapp.wsgi_app = util.HeadersMiddleware(
         flaskapp.wsgi_app)
 
     # User authentication wraps all others
     if False:
         # JWK wrapper
-        # This is the same procesing as done by jwcrypto v0.4+ but not present in 0.3
+        # This is the same procesing as done by jwcrypto v0.4+ but not present
+        # in 0.3
         with open(flaskapp.config['SIGNING_KEY_FILE'], 'rb') as pemfile:
             from cryptography.hazmat.backends import default_backend
             from cryptography.hazmat.primitives import serialization
@@ -256,7 +279,8 @@ def create_app(config_override=None):
 
             def encode_int(val):
                 intg = hex(val).rstrip('L').lstrip('0x')
-                return base64url_encode(unhexlify((len(intg) % 2) * '0' + intg))
+                return base64url_encode(
+                    unhexlify((len(intg) % 2) * '0' + intg))
 
             keydata = serialization.load_pem_private_key(
                 pemfile.read(), password=None, backend=default_backend())

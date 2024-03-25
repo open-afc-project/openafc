@@ -132,6 +132,7 @@ class ArgDsc:
     _required       -- True if this parameter required for KafkaProducer
                        initialization and its absence will lead to no logging
     """
+
     def __init__(self, env_var: str, arg: str,
                  type_conv: Callable[[str], Any] = str,
                  list_separator: Optional[str] = None,
@@ -249,6 +250,7 @@ class Als:
     _req_idx         -- Request message index
     _send_count      -- Number of sent records
     """
+
     def __init__(self, client_id: Optional[str] = None,
                  consolidate_configs: bool = True) -> None:
         """ Constructor

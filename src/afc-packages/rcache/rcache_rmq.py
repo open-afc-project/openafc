@@ -41,6 +41,7 @@ class RcacheRmqConnection:
     _for_rx     -- True for RX connection, False tot TX connection
     _queue_name -- Queue name
     """
+
     def __init__(self, url_params: pika.URLParameters,
                  tx_queue_name: Optional[str] = None) -> None:
         """ Constructor

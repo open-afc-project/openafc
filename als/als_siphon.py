@@ -149,6 +149,7 @@ class ErrorBase(Exception):
     code_line -- Source code line number
     data      -- Optional pertinent data - string or JSON dictionary
     """
+
     def __init__(self, msg: str, code_line: Optional[int],
                  data: Optional[Union[str, bytes, JSON_DATA_TYPE]] = None) \
             -> None:
@@ -177,6 +178,7 @@ class JsonFormatError(ErrorBase):
 
 class DbFormatError(ErrorBase):
     """ Exception class for DB format inconsistencies error """
+
     def __init__(self, msg: str, code_line: Optional[int]) -> None:
         """ Constructor
 
@@ -308,6 +310,7 @@ class Metrics:
         _metric -- Metric objects
         _labels -- List of additional (besides 'id') label names
         """
+
         def __init__(self, metric_def: "Metrics.MetricDef") -> None:
             """ Constructor
 
@@ -673,6 +676,7 @@ class KafkaPositions:
         kafka_offset -- Offset in partition
         processed    -- Processed status
         """
+
         def __init__(self, kafka_offset: int) -> None:
             self.kafka_offset = kafka_offset
             self.processed = False
@@ -697,6 +701,7 @@ class KafkaPositions:
         _queue   -- Heap queue of offset information objects
         _catalog -- Catalog of offset information objects by offset
         """
+
         def __init__(self) -> None:
             """ Constructor """
             self._queue: List["KafkaPositions.OffsetInfo"] = []
@@ -1231,6 +1236,7 @@ class RegRuleList:
 
     Privatew attributes:
     _reg_rules - By-index in list dictionary of regulatory rules names """
+
     def __init__(self, json_data: Optional[List[Any]] = None) -> None:
         """ Constructor
 
@@ -1336,6 +1342,7 @@ class Lookups:
     Private attributes:
     _lookups -- List of registered LookupBase objects
     """
+
     def __init__(self) -> None:
         """ Constructor """
         self._lookups: List["LookupBase"] = []
@@ -1370,6 +1377,7 @@ class LookupBase(AlsTableBase, Generic[LookupKey, LookupValue], ABC):
     _need_reread  -- True if dictionary should be reread from database on next
                      update_db()
     """
+
     def __init__(self, adb: AlsDatabase, table_name: str, lookups: Lookups,
                  value_column_name: Optional[str] = None) -> None:
         """ Constructor
@@ -1712,6 +1720,7 @@ class TableUpdaterBase(AlsTableBase,
                             _update_foreign_sources(), empty means not to call
                             _update_foreign_sources()
     """
+
     def __init__(self, adb: AlsDatabase, table_name: str, json_obj_name: str,
                  data_key_column_names: Optional[List[str]] = None) -> None:
         """ Constructor
@@ -2441,10 +2450,10 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
                 code_line=LineNumber.exc(), data=data_object)
 
     def _update_foreign_targets(
-                self,
-                row_infos: Dict[uuid.UUID,
-                                Tuple[JSON_DATA_TYPE, List[ROW_DATA_TYPE]]],
-                month_idx: int) -> None:
+            self,
+            row_infos: Dict[uuid.UUID,
+                            Tuple[JSON_DATA_TYPE, List[ROW_DATA_TYPE]]],
+            month_idx: int) -> None:
         """ Updates tables this one references
 
         Arguments:
@@ -2855,7 +2864,7 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
                 rr_dict[
                     RequestResponseAssociationTableDataKey(
                         message_id=ji(inserted_row[0]), request_id=req_id)] = \
-                        request_response
+                    request_response
         self._rr_assoc_updater.update_db(data_dict=rr_dict,
                                          month_idx=month_idx)
 
@@ -2879,6 +2888,7 @@ class IncompleteAlsBundles:
     _bundle_queue    -- Heap queue of ALS bundles, arranged by last update
     _bundle_map      -- Maps Kafka message keys to bundles
     """
+
     def __init__(self, kafka_positions: KafkaPositions) -> None:
         """ Constructor
 

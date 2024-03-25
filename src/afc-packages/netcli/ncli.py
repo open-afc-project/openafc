@@ -22,10 +22,12 @@ from kombu import Queue, Exchange, Connection, Producer
 
 app_log = logging.getLogger(__name__)
 
+
 class MsgAcceptor(ConsumerMixin):
     """ Accept messages from broadcast queue and handle them. """
     message_handler = None
     handler_params = None
+
     def __init__(self, broker_url, broker_exch,
                  msg_handler=None, handler_params=None) -> None:
         app_log.debug(f"({os.getpid()}) {self.__class__.__name__}()")
@@ -51,6 +53,7 @@ class MsgAcceptor(ConsumerMixin):
 
 class MsgPublisher():
     """ Connection maker """
+
     def __init__(self, broker_url, broker_exch) -> None:
         app_log.debug(f"({os.getpid()}) {self.__class__.__name__}()")
         self.connection = Connection(broker_url)

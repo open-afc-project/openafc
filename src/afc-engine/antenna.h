@@ -12,9 +12,10 @@ class LinInterpClass;
 class AntennaClass
 {
 	public:
-		AntennaClass(int type, const char *strid = (char *) NULL);
+		AntennaClass(int type, const char *strid = (char *)NULL);
 		~AntennaClass();
-		static std::vector<AntennaClass *> readMultipleBoresightAntennas(std::string filename);
+		static std::vector<AntennaClass *> readMultipleBoresightAntennas(
+			std::string filename);
 		void setBoresightGainTable(LinInterpClass *offBoresightGainTableVal);
 		double gainDB(double dx, double dy, double dz, double h_angle_rad);
 		double gainDB(double phi, double theta);
@@ -31,8 +32,8 @@ class AntennaClass
 		char *strid;
 		int type, is_omni;
 		double tilt_rad;
-		double gain_fwd_db;   /* gain_v( tilt_rad      ) */
-		double gain_back_db;  /* gain_v( PI - tilt_rad ) */
+		double gain_fwd_db; /* gain_v( tilt_rad      ) */
+		double gain_back_db; /* gain_v( PI - tilt_rad ) */
 		LinInterpClass *horizGainTable;
 		LinInterpClass *vertGainTable;
 		LinInterpClass *offBoresightGainTable;

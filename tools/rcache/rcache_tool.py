@@ -304,6 +304,7 @@ class Reporter:
     _periodicity    -- Report periodicity (e.g. 1000 - once in 1000 bumps)
     _last_print_len -- Length of last single-line print
     """
+
     def __init__(self, total_count: Optional[int] = None,
                  periodicity: int = DEFAULT_PERIODICITY) -> None:
         """ Constructor

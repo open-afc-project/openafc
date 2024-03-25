@@ -17,6 +17,7 @@ import os
 
 LOGGER = logging.getLogger(__name__)
 
+
 class Task():
     """ Replacement for AsyncResult class and self serialization"""
 
@@ -37,7 +38,7 @@ class Task():
             'runtime_opts': None,
             'exit_code': 0,
             'is_internal_request': is_internal_request
-            }
+        }
 
     def get(self):
         LOGGER.debug("Task.get()")
@@ -46,8 +47,9 @@ class Task():
         try:
             with self.__dataif.open(fstatus) as hfile:
                 data = hfile.read()
-        except:
-            LOGGER.debug("task.get() no {}".format(self.__dataif.rname(fstatus)))
+        except BaseException:
+            LOGGER.debug("task.get() no {}".format(
+                self.__dataif.rname(fstatus)))
             return self.__toDict(self.STAT_PENDING)
         stat = json.loads(data)
 
@@ -62,7 +64,9 @@ class Task():
         if (stat['status'] != self.STAT_PROGRESS and
                 stat['status'] != self.STAT_SUCCESS and
                 stat['status'] != self.STAT_FAILURE):
-            LOGGER.error("task.get() bad status {} in status.json".format(stat['status']))
+            LOGGER.error(
+                "task.get() bad status {} in status.json".format(
+                    stat['status']))
             raise Exception("Bad status in status.json")
         self.__stat = stat
         return self.__stat

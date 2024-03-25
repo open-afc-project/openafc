@@ -169,7 +169,7 @@ def conversion_worker(
     try:
         if os.path.isfile(src_dst.dst) and (not overwrite):
             return ConvResult(filename=src_dst.src, status=ConvStatus.Exists,
-                              duration=datetime.datetime.now()-start_time,
+                              duration=datetime.datetime.now() - start_time,
                               msg=None)
         src_geoid: Optional[str] = None
         if src_geoids:
@@ -201,7 +201,7 @@ def conversion_worker(
                  overwrite=True, quiet=quiet)
         if not success:
             return ConvResult(filename=src_dst.src, status=ConvStatus.Error,
-                              duration=datetime.datetime.now()-start_time,
+                              duration=datetime.datetime.now() - start_time,
                               msg=msg)
         if os.path.isfile(src_dst.dst):
             if not quiet:
@@ -231,11 +231,15 @@ def conversion_worker(
                 if not quiet:
                     print(f"Removing '{other_generated}'")
                 os.unlink(other_generated)
-        return ConvResult(filename=src_dst.src, status=ConvStatus.Success,
-                          duration=datetime.datetime.now()-start_time, msg=msg)
+        return ConvResult(
+            filename=src_dst.src,
+            status=ConvStatus.Success,
+            duration=datetime.datetime.now() -
+            start_time,
+            msg=msg)
     except (Exception, KeyboardInterrupt, SystemExit) as ex:
         return ConvResult(filename=src_dst.src, status=ConvStatus.Error,
-                          duration=datetime.datetime.now()-start_time,
+                          duration=datetime.datetime.now() - start_time,
                           msg=repr(ex))
     finally:
         try:

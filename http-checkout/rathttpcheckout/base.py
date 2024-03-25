@@ -36,7 +36,7 @@ PACKAGE_PATH = os.path.abspath(os.path.dirname(__file__))
 
 def get_xml_parser(schema):
     ''' Generate a function to extract an XML DOM tree from an encoded document.
-    
+
     :param schema: Iff not None, the document will be validated against
         this schema object.
     :type use_schema: bool
@@ -52,14 +52,16 @@ def get_xml_parser(schema):
             infile.seek(0)
             with tempfile.NamedTemporaryFile(delete=False) as outfile:
                 shutil.copyfileobj(infile, outfile)
-                raise ValueError('Failed to parse XML with error {0} in file {1}'.format(err, outfile.name))
+                raise ValueError(
+                    'Failed to parse XML with error {0} in file {1}'.format(
+                        err, outfile.name))
 
     return func
 
 
 def extract_metadict(doc):
     ''' Extract a server metadata dictionary from its parsed XML document.
-    
+
     :param doc: The document to read from.
     :return: The metadata URL map.
     '''
@@ -75,10 +77,10 @@ def extract_metadict(doc):
 
 def merged(base, delta):
     ''' Return a merged dictionary contents.
-    
+
     :param base: The initial contents to merge.
     :param delta: The modifications to apply.
-    :return: A dictionary containing the :py:obj:`base` updated 
+    :return: A dictionary containing the :py:obj:`base` updated
         by the :py:obj:`delta`.
     '''
     mod = dict(base)
@@ -89,7 +91,7 @@ def merged(base, delta):
 def limit_count(iterable, limit):
     ''' Wrap an iterable/generator with a count limit to only yield the first
     :py:obj:`count` number of items.
-    
+
     :param iterable: The source iterable object.
     :param limit: The maximum number of items available from the generator.
     :return A generator with a count limit.
@@ -103,9 +105,9 @@ def limit_count(iterable, limit):
 
 
 def modify_etag(orig):
-    ''' Given a base ETag value, generate a modified ETag which is 
+    ''' Given a base ETag value, generate a modified ETag which is
     guaranteed to not match the original.
-    
+
     :param str orig: The original ETag.
     :return: A different ETag
     '''
@@ -138,7 +140,7 @@ class ValidateHtmlResponse(object):
 
 class ValidateXmlResponse(object):
     ''' Validate an expected XML file response.
-    
+
     :param parser: A function to take a file-like input and output an
         XML element tree :py:cls:`lxml.etree.ElementTree`.
     :param require_root: If not None, the root element must be this value.
@@ -155,13 +157,15 @@ class ValidateXmlResponse(object):
         if self._require_root is not None:
             root_tag = xml_tree.getroot().tag
             if self._require_root != root_tag:
-                raise ValueError('Required root element "{0}" not present, got "{1}"'.format(self._require_root, root_tag))
+                raise ValueError(
+                    'Required root element "{0}" not present, got "{1}"'.format(
+                        self._require_root, root_tag))
 
 
 class BaseTestCase(unittest.TestCase):
-    ''' Common access and helper functions which use the :py:mod:`unittest` 
+    ''' Common access and helper functions which use the :py:mod:`unittest`
     framework but this class defines no test functions itself.
-    
+
     :ivar httpsession: An :py:class:`requests.Session` instance for test use.
     :ivar xmlparser: An :py:class:`etree.XMLParser` instance for test use.
     '''
@@ -177,7 +181,8 @@ class BaseTestCase(unittest.TestCase):
         unittest.TestCase.setUp(self)
         self.maxDiff = 10e3
 
-        self.assertIsNotNone(self.BASE_URL, 'Missing environment HTTPCHECKOUT_BASEURL')
+        self.assertIsNotNone(
+            self.BASE_URL, 'Missing environment HTTPCHECKOUT_BASEURL')
         self.httpsession = requests.Session()
 
         ca_roots = os.environ.get('HTTPCHECKOUT_CACERTS')
@@ -196,11 +201,12 @@ class BaseTestCase(unittest.TestCase):
         ''' Skip the current test if HTTPCHECKOUT_READONLY is set.
         '''
         if self.READONLY:
-            self.skipTest('Not running editing tests because of HTTPCHECKOUT_READONLY')
+            self.skipTest(
+                'Not running editing tests because of HTTPCHECKOUT_READONLY')
 
     def _resolve_url(self, url):
         ''' Resolve a URL relative to the original base URL.
-        
+
         :param url: The URL to resolve.
         :type url: str
         :return: The resolved absolute URL to request on.
@@ -223,7 +229,7 @@ class BaseTestCase(unittest.TestCase):
 
     def _get_xml_parser(self, use_schema=None):
         ''' Generate a function to extract an XML DOM tree from an encoded document.
-        
+
         :return: The parser function which takes a file-like parameter and
             returns a tree object of type :py:cls:`lxml.etree.ElementTree`.
         '''
@@ -231,7 +237,7 @@ class BaseTestCase(unittest.TestCase):
 
     def _get_xml_encoder(self):
         ''' Generate a function to encode a document from an XML DOM tree.
-        
+
         :return: The parser function which takes a parameter of a
             tree object of type :py:cls:`lxml.etree.ElementTree` and
             returns a file-like object.
@@ -254,7 +260,7 @@ class BaseTestCase(unittest.TestCase):
             if hasattr(outfile, 'seek'):
                 try:
                     outfile.seek(0)
-                except:
+                except BaseException:
                     pass
             return outfile
 
@@ -268,12 +274,12 @@ class BaseTestCase(unittest.TestCase):
 
         import bs4
         html = bs4.BeautifulSoup(text, 'html.parser')
-        for l in [ a['href'] for a in html.find_all('a')]:
-            self._test_working_link(l)
+        for link in [a['href'] for a in html.find_all('a')]:
+            self._test_working_link(link)
 
     def _test_working_link(self, url):
         ''' Verify that a url returns a 200 response
-        
+
         :param url: The URL to be checked
         '''
 
@@ -283,7 +289,7 @@ class BaseTestCase(unittest.TestCase):
 
     def _test_options_allow(self, url, methods):
         ''' Verify that the OPTIONS response for a URL matches a specific set.
-        
+
         :param url: The URL to pass to :py:mod:`requests`
         :type url: str
         :param methods: The method names which must be identical to the response.
@@ -302,17 +308,25 @@ class BaseTestCase(unittest.TestCase):
         got_allow = werkzeug.http.parse_set_header(resp.headers['allow'])
         self.assertEqual(methods, set(got_allow))
 
-    def _test_path_contents(self, url, params=None, base_headers=None,
-                            validate_response_pre=None, validate_response_post=None,
-                            must_authorize=True,
-                            valid_status=None, content_type=None,
-                            valid_encodings=None,
-                            require_length=True,
-                            require_vary=None, require_etag=True,
-                            require_lastmod=True, require_cacheable=True,
-                            cache_must_revalidate=False):
+    def _test_path_contents(
+            self,
+            url,
+            params=None,
+            base_headers=None,
+            validate_response_pre=None,
+            validate_response_post=None,
+            must_authorize=True,
+            valid_status=None,
+            content_type=None,
+            valid_encodings=None,
+            require_length=True,
+            require_vary=None,
+            require_etag=True,
+            require_lastmod=True,
+            require_cacheable=True,
+            cache_must_revalidate=False):
         ''' Common assertions for static resources.
-        
+
         :param url: The URL to pass to :py:mod:`requests`
         :type url: str
         :param params: URL parameter dictionary to pass to :py:mod:`requests`.
@@ -340,19 +354,19 @@ class BaseTestCase(unittest.TestCase):
         :param valid_encodings: If not None, a list of content encodings to check for.
             The resource must provide each of the non-identity encodings listed.
         :type valid_encodings: list or None
-        :param require_length: If either true or false, assert that the 
+        :param require_length: If either true or false, assert that the
             content-length header is present or not.
         :type require_length: bool or None
         :param require_vary: A set of Vary reults required to be present
             in the response.
-            If the :py:obj:`valid_encodings` list has more than the identity 
-            encoding present, then 'accept-encoding' will be automatically 
+            If the :py:obj:`valid_encodings` list has more than the identity
+            encoding present, then 'accept-encoding' will be automatically
             added to this vary list.
         :type require_vary: list or None
-        :param require_etag: If not None, whether the ETag is required present 
+        :param require_etag: If not None, whether the ETag is required present
             or not present (True or False) or a specific string value.
         :type require_etag: str or bool or None
-        :param require_lastmod: If not None, whether the Last-Modified is 
+        :param require_lastmod: If not None, whether the Last-Modified is
             required present or not present (True or False) or a specific value.
         :type require_lastmod: str or bool or None
         :param require_cacheable: If true, the resource is checked for its cacheability.
@@ -376,7 +390,8 @@ class BaseTestCase(unittest.TestCase):
             valid_encodings = []
         valid_encodings = set(valid_encodings)
         valid_encodings.add('identity')
-        # Force as ordered list with identity encoding first and gzip always attempted
+        # Force as ordered list with identity encoding first and gzip always
+        # attempted
         try_encodings = set(valid_encodings)
         try_encodings.discard('identity')
         try_encodings = sorted(list(try_encodings))
@@ -419,7 +434,7 @@ class BaseTestCase(unittest.TestCase):
             self.assertEqual(200, resp.status_code)
 
         for try_encoding in try_encodings:
-            #initial non-cache response
+            # initial non-cache response
             enc_headers = merged(
                 base_headers,
                 {
@@ -442,9 +457,11 @@ class BaseTestCase(unittest.TestCase):
             # Now parametric validation
             self.assertIn(resp.status_code, valid_status)
 
-            got_content_type = werkzeug.http.parse_options_header(resp.headers['content-type'])
+            got_content_type = werkzeug.http.parse_options_header(
+                resp.headers['content-type'])
             if content_type is not None:
-                self.assertEqual(content_type.lower(), got_content_type[0].lower())
+                self.assertEqual(content_type.lower(),
+                                 got_content_type[0].lower())
 
             # Encoding comparison compared to valid
             got_encoding = resp.headers.get('content-encoding', 'identity')
@@ -453,26 +470,34 @@ class BaseTestCase(unittest.TestCase):
             else:
                 self.assertEqual(
                     'identity', got_encoding,
-                    msg='"{0}" was supposed to be a disallowed content-encoding but it was accepted'.format(try_encoding)
+                    msg='"{0}" was supposed to be a disallowed content-encoding but it was accepted'.format(
+                        try_encoding)
                 )
 
             got_length = resp.headers.get('content-length')
             if require_length is True:
                 self.assertIsNotNone(got_length, msg='Content-Length missing')
             elif require_length is False:
-                self.assertIsNone(got_length, msg='Content-Length should not be present')
+                self.assertIsNone(
+                    got_length, msg='Content-Length should not be present')
 
             # Guarantee type is correct also
             if got_length is not None:
                 try:
                     got_length = int(got_length)
                 except ValueError:
-                    self.fail('Got a non-integer Content-Length: {0}'.format(got_length))
+                    self.fail(
+                        'Got a non-integer Content-Length: {0}'.format(got_length))
 
             got_vary = werkzeug.http.parse_set_header(resp.headers.get('vary'))
             for item in require_vary:
                 LOGGER.debug("headers: %s", resp.headers)
-                self.assertIn(item, got_vary, msg='Vary header missing item "{0}" got {1}'.format(item, got_vary))
+                self.assertIn(
+                    item,
+                    got_vary,
+                    msg='Vary header missing item "{0}" got {1}'.format(
+                        item,
+                        got_vary))
 
             got_etag = resp.headers.get('etag')
             got_lastmod = resp.headers.get('last-modified')
@@ -480,14 +505,17 @@ class BaseTestCase(unittest.TestCase):
                 if require_etag is True:
                     self.assertIsNotNone(got_etag, msg='ETag header missing')
                 elif require_etag is False:
-                    self.assertIsNone(got_etag, msg='ETag header should not be present')
+                    self.assertIsNone(
+                        got_etag, msg='ETag header should not be present')
                 elif require_etag is not None:
                     self.assertEqual(require_etag, got_etag)
 
                 if require_lastmod is True:
-                    self.assertIsNotNone(got_lastmod, msg='Last-Modified header missing')
+                    self.assertIsNotNone(
+                        got_lastmod, msg='Last-Modified header missing')
                 elif require_lastmod is False:
-                    self.assertIsNone(got_lastmod, msg='Last-Modified header should not be present')
+                    self.assertIsNone(
+                        got_lastmod, msg='Last-Modified header should not be present')
                 elif require_lastmod is not None:
                     self.assertEqual(require_lastmod, got_lastmod)
 
@@ -500,18 +528,20 @@ class BaseTestCase(unittest.TestCase):
             if False:
                 self.assertTrue(
                     cache_control.no_cache
-                    or cache_control.public # pylint: disable=no-member
-                    or cache_control.private, # pylint: disable=no-member
-                    msg='Missing cache public/private assertion for {0}'.format(resolved_url)
+                    or cache_control.public  # pylint: disable=no-member
+                    or cache_control.private,  # pylint: disable=no-member
+                    msg='Missing cache public/private assertion for {0}'.format(
+                        resolved_url)
                 )
             if require_cacheable is not False and cache_must_revalidate is True:
-                self.assertTrue(cache_control.must_revalidate) # pylint: disable=no-member
+                self.assertTrue(
+                    cache_control.must_revalidate)  # pylint: disable=no-member
             if require_cacheable is True:
                 self.assertFalse(cache_control.no_cache)
                 self.assertFalse(cache_control.no_store)
 #                self.assertLessEqual(0, cache_control.max_age)
             elif require_cacheable is False:
-                #FIXME not always true
+                # FIXME not always true
                 self.assertTrue(cache_control.no_cache)
 
             # Actual body content itself
@@ -529,8 +559,10 @@ class BaseTestCase(unittest.TestCase):
                     self.assertEqual(identity_body, got_body)
 
                 # XML specific decoding
-                if XML_CONTENT_RE.match(got_content_type[0]) is not None and validate_response_post is None:
-                    validate_response_post = ValidateXmlResponse(self._get_xml_parser(use_schema=True))
+                if XML_CONTENT_RE.match(
+                        got_content_type[0]) is not None and validate_response_post is None:
+                    validate_response_post = ValidateXmlResponse(
+                        self._get_xml_parser(use_schema=True))
 
                 # After all parametric tests on this response
                 if validate_response_post:
@@ -550,9 +582,21 @@ class BaseTestCase(unittest.TestCase):
                     }),
                 )
                 if must_authorize:
-                    self.assertEqual(401, resp.status_code, msg='For {0} on {1}: Expected 401 status got {2}'.format(method, resolved_url, resp.status_code))
+                    self.assertEqual(
+                        401,
+                        resp.status_code,
+                        msg='For {0} on {1}: Expected 401 status got {2}'.format(
+                            method,
+                            resolved_url,
+                            resp.status_code))
                 else:
-                    self.assertIn(resp.status_code, valid_status, msg='For {0} on {1}: Expected valid status got {2}'.format(method, resolved_url, resp.status_code))
+                    self.assertIn(
+                        resp.status_code,
+                        valid_status,
+                        msg='For {0} on {1}: Expected valid status got {2}'.format(
+                            method,
+                            resolved_url,
+                            resp.status_code))
 
             # Any resource with cache control header
             resp = self.httpsession.head(
@@ -583,7 +627,8 @@ class BaseTestCase(unittest.TestCase):
                         'if-none-match': got_etag,
                     }),
                 )
-                self.assertIn(resp.status_code, [304] if require_cacheable else valid_status)
+                self.assertIn(resp.status_code, [
+                              304] if require_cacheable else valid_status)
                 # With adjusted ETag
                 mod_etag = modify_etag(got_etag)
                 resp = self.httpsession.head(
@@ -608,25 +653,22 @@ class BaseTestCase(unittest.TestCase):
 #                self.assertIn(resp.status_code, valid_status)
 
                 # An earlier time will give a 412
-                new_time = werkzeug.http.parse_date(got_lastmod) - datetime.timedelta(seconds=5)
+                new_time = werkzeug.http.parse_date(
+                    got_lastmod) - datetime.timedelta(seconds=5)
                 resp = self.httpsession.head(
-                    resolved_url, params=params,
-                    allow_redirects=False,
-                    headers=merged(enc_headers, {
-                        'if-unmodified-since': werkzeug.http.http_date(new_time),
-                    }),
-                )
-                self.assertIn(resp.status_code, [412] if require_cacheable else valid_status)
+                    resolved_url, params=params, allow_redirects=False, headers=merged(
+                        enc_headers, {
+                            'if-unmodified-since': werkzeug.http.http_date(new_time), }), )
+                self.assertIn(resp.status_code, [
+                              412] if require_cacheable else valid_status)
 
                 # An later time is normal response
-                new_time = werkzeug.http.parse_date(got_lastmod) + datetime.timedelta(seconds=5)
+                new_time = werkzeug.http.parse_date(
+                    got_lastmod) + datetime.timedelta(seconds=5)
                 resp = self.httpsession.head(
-                    resolved_url, params=params,
-                    allow_redirects=False,
-                    headers=merged(enc_headers, {
-                        'if-unmodified-since': werkzeug.http.http_date(new_time),
-                    }),
-                )
+                    resolved_url, params=params, allow_redirects=False, headers=merged(
+                        enc_headers, {
+                            'if-unmodified-since': werkzeug.http.http_date(new_time), }), )
                 self.assertIn(resp.status_code, valid_status)
 
                 # Client cache response
@@ -640,7 +682,8 @@ class BaseTestCase(unittest.TestCase):
 #                self.assertIn(resp.status_code, [304] if require_cacheable else valid_status)
 
                 # A later time should also give a 304 response
-                new_time = werkzeug.http.parse_date(got_lastmod) + datetime.timedelta(seconds=5)
+                new_time = werkzeug.http.parse_date(
+                    got_lastmod) + datetime.timedelta(seconds=5)
                 resp = self.httpsession.head(
                     resolved_url, params=params,
                     allow_redirects=False,
@@ -648,10 +691,12 @@ class BaseTestCase(unittest.TestCase):
                         'if-modified-since': werkzeug.http.http_date(new_time),
                     }),
                 )
-                self.assertIn(resp.status_code, [304] if require_cacheable else valid_status)
+                self.assertIn(resp.status_code, [
+                              304] if require_cacheable else valid_status)
 
                 # An earlier time will give a 200 response
-                new_time = werkzeug.http.parse_date(got_lastmod) - datetime.timedelta(seconds=5)
+                new_time = werkzeug.http.parse_date(
+                    got_lastmod) - datetime.timedelta(seconds=5)
                 resp = self.httpsession.head(
                     resolved_url, params=params,
                     allow_redirects=False,
@@ -661,9 +706,10 @@ class BaseTestCase(unittest.TestCase):
                 )
                 self.assertIn(resp.status_code, valid_status)
 
-    def _test_modify_request(self, url, up_data, method='POST', params=None, **kwargs):
+    def _test_modify_request(
+            self, url, up_data, method='POST', params=None, **kwargs):
         ''' Common assertions for static resources.
-        
+
         :param url: The URL to pass to :py:mod:`requests`
         :type url: str
         :param up_data: The request body data.
@@ -682,7 +728,7 @@ class BaseTestCase(unittest.TestCase):
         :param empty_is_valid: Whether or not an empty document is a valid modification.
             The default is False.
         :type empty_is_valid: bool
-        :param is_idempotent: Whether or not sending the same request should 
+        :param is_idempotent: Whether or not sending the same request should
             not change the resource (except for the modify time).
             The default is true if the method is PUT.
         :type is_idempotent: bool
@@ -828,16 +874,16 @@ class BaseTestCase(unittest.TestCase):
                                 require_etag=True, require_lastmod=True,
                                 old_etag=None):
         ''' Verify the contents of a response to HTTP modification with no body.
-        
+
         :param resp: The response object to check.
         :type resp: :py:cls:`requests.Response`
         :param valid_status: A set of valid status codes to allow.
             If not provided, only codes (200, 201, 204) are valid.
         :type valid_status: set or None
-        :param require_etag: If not None, whether the ETag is required present 
+        :param require_etag: If not None, whether the ETag is required present
             or not present (True or False) or a specific string value.
         :type require_etag: str or bool or None
-        :param require_lastmod: If not None, whether the Last-Modified is 
+        :param require_lastmod: If not None, whether the Last-Modified is
             required present or not present (True or False) or a specific value.
         :type require_lastmod: str or bool or None
         :param old_etag: An optional old ETag value to compare against.
@@ -855,14 +901,17 @@ class BaseTestCase(unittest.TestCase):
         if require_etag is True:
             self.assertIsNotNone(got_etag, msg='ETag header missing')
         elif require_etag is False:
-            self.assertIsNone(got_etag, msg='ETag header should not be present')
+            self.assertIsNone(
+                got_etag, msg='ETag header should not be present')
         elif require_etag is not None:
             self.assertEqual(require_etag, got_etag)
 
         if require_lastmod is True:
-            self.assertIsNotNone(got_lastmod, msg='Last-Modified header missing')
+            self.assertIsNotNone(
+                got_lastmod, msg='Last-Modified header missing')
         elif require_lastmod is False:
-            self.assertIsNone(got_lastmod, msg='Last-Modified header should not be present')
+            self.assertIsNone(
+                got_lastmod, msg='Last-Modified header should not be present')
         elif require_lastmod is not None:
             self.assertEqual(require_lastmod, got_lastmod)
 
@@ -872,15 +921,18 @@ class BaseTestCase(unittest.TestCase):
         # Empty body
         self.assertFalse(bool(resp.content))
 
+
 class UserLoginBaseTestCase(BaseTestCase):
     """Wraps tests in login/logout flow
-    
-    Encapsulates login/logout wrapping of tests. 
+
+    Encapsulates login/logout wrapping of tests.
     Tests that require authentication will need to use the saved login_token and cookies as headers in their requests
     """
     #: User name to test as this assumes a user HTTPCHECKOUT_ACCTNAME already exists in the User DB
-    VALID_ACCTNAME = os.environ.get('HTTPCHECKOUT_ACCTNAME', 'admin').decode('utf8')
-    VALID_PASSPHRASE = os.environ.get('HTTPCHECKOUT_PASSPHRASE', 'admin').decode('utf8')
+    VALID_ACCTNAME = os.environ.get(
+        'HTTPCHECKOUT_ACCTNAME', 'admin').decode('utf8')
+    VALID_PASSPHRASE = os.environ.get(
+        'HTTPCHECKOUT_PASSPHRASE', 'admin').decode('utf8')
 
     def __init__(self, *args, **kwargs):
         BaseTestCase.__init__(self, *args, **kwargs)
@@ -889,19 +941,27 @@ class UserLoginBaseTestCase(BaseTestCase):
 
     def setUp(self):
         BaseTestCase.setUp(self)
-        resp = self.httpsession.post(self._resolve_url('auth/login'), json={'email': self.VALID_ACCTNAME, 'password': self.VALID_PASSPHRASE})
-        LOGGER.debug('code: %s, login headers: %s', resp.status_code, resp.content)
+        resp = self.httpsession.post(
+            self._resolve_url('auth/login'),
+            json={
+                'email': self.VALID_ACCTNAME,
+                'password': self.VALID_PASSPHRASE})
+        LOGGER.debug('code: %s, login headers: %s',
+                     resp.status_code, resp.content)
         self.cookies = resp.cookies
         if resp.status_code == 404:
-            self.fail(msg="{} not found on this server.".format(self._resolve_url('auth/login')))
+            self.fail(msg="{} not found on this server.".format(
+                self._resolve_url('auth/login')))
         try:
             self.login_token = resp.json()["token"]
         except ValueError:
             raise SkipTest("Could not login as {}".format(self.VALID_ACCTNAME))
 
     def tearDown(self):
-        resp = self.httpsession.post(self._resolve_url('auth/logout'), params={'Authorization': self.login_token})
-        LOGGER.debug('response code: %d\nbody: %s', resp.status_code, resp.content)
+        resp = self.httpsession.post(self._resolve_url(
+            'auth/logout'), params={'Authorization': self.login_token})
+        LOGGER.debug('response code: %d\nbody: %s',
+                     resp.status_code, resp.content)
         self.login_token = None
         self.cookies = None
         BaseTestCase.tearDown(self)

@@ -11,18 +11,20 @@
 #include "list.h"
 #include "global_fn.h"
 
-#define CORE_DUMP      printf("%d", *((int *) NULL))
+#define CORE_DUMP printf("%d", *((int *)NULL))
 
 /******************************************************************************************/
 /**** ListClass::ListClass                                                             ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 ListClass<T>::ListClass(int n, int incr)
 {
-	a = (T *) malloc(n * sizeof(T));
+	a = (T *)malloc(n * sizeof(T));
 	allocation_size = n;
 	if (incr <= 0) {
-		printf("ERROR in routine ListClass::ListClass(): allocation_increment = %d, must be > 0\n", incr);
+		printf("ERROR in routine ListClass::ListClass(): allocation_increment = %d, must "
+		       "be > 0\n",
+		       incr);
 		CORE_DUMP;
 	}
 	allocation_increment = incr;
@@ -34,7 +36,7 @@ ListClass<T>::ListClass(int n, int incr)
 /******************************************************************************************/
 /**** ListClass::~ListClass                                                            ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 ListClass<T>::~ListClass()
 {
 	free(a);
@@ -45,7 +47,7 @@ ListClass<T>::~ListClass()
 /**** ListClass::operator[]                                                            ****/
 /******************************************************************************************/
 template<class T>
-T& ListClass<T>::operator[] (int index) const
+T &ListClass<T>::operator[](int index) const
 {
 	return a[index];
 };
@@ -54,7 +56,7 @@ T& ListClass<T>::operator[] (int index) const
 /******************************************************************************************/
 /**** ListClass::operator==                                                            ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 int ListClass<T>::operator==(ListClass<T> &val)
 {
 	int i;
@@ -64,13 +66,13 @@ int ListClass<T>::operator==(ListClass<T> &val)
 		equal = 0;
 	}
 
-	for(i=0; i<=size-1; i++) {
+	for (i = 0; i <= size - 1; i++) {
 		if (!(a[i] == val[i])) {
 			equal = 0;
 		}
 	}
 
-	return(equal);
+	return (equal);
 };
 /******************************************************************************************/
 
@@ -80,7 +82,7 @@ int ListClass<T>::operator==(ListClass<T> &val)
 template<class T>
 int ListClass<T>::getSize() const
 {
-	return(size);
+	return (size);
 };
 /******************************************************************************************/
 
@@ -92,16 +94,18 @@ int ListClass<T>::getSize() const
 /**** If val is already in list and err=0 do nothing, else give ERROR and exit         ****/
 /**** The value returned is the position of val in the list.                           ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 int ListClass<T>::ins_elem(T val, const int err, int *insFlagPtr)
 {
 	int i, found;
 	int retval = -1;
 
-	if (insFlagPtr) { *insFlagPtr = 0; }
+	if (insFlagPtr) {
+		*insFlagPtr = 0;
+	}
 
 	found = 0;
-	for (i=size-1; (i>=0)&&(!found); i--) {
+	for (i = size - 1; (i >= 0) && (!found); i--) {
 		if (a[i] == val) {
 			found = 1;
 			retval = i;
@@ -117,12 +121,14 @@ int ListClass<T>::ins_elem(T val, const int err, int *insFlagPtr)
 		retval = size;
 		if ((size == allocation_size)) {
 			allocation_size += allocation_increment;
-			a = (T *) realloc((void *) a, allocation_size * sizeof(T));
+			a = (T *)realloc((void *)a, allocation_size * sizeof(T));
 		}
 		a[size++] = val;
-		if (insFlagPtr) { *insFlagPtr = 1; }
+		if (insFlagPtr) {
+			*insFlagPtr = 1;
+		}
 	}
-	return(retval);
+	return (retval);
 };
 /******************************************************************************************/
 
@@ -133,12 +139,12 @@ int ListClass<T>::ins_elem(T val, const int err, int *insFlagPtr)
 /**** Adds val to the end of {list[0], list[1], ..., list[n-1]}                        ****/
 /**** There is no check whether or not val is already in the list.                     ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 void ListClass<T>::append(T val)
 {
 	if ((size == allocation_size)) {
 		allocation_size += allocation_increment;
-		a = (T *) realloc((void *) a, allocation_size * sizeof(T));
+		a = (T *)realloc((void *)a, allocation_size * sizeof(T));
 	}
 
 	a[size++] = val;
@@ -152,14 +158,14 @@ void ListClass<T>::append(T val)
 /**** Removes val from {list[0], list[1], ..., list[n-1]}                              ****/
 /**** If val is not in list and err=0 do nothing, else give ERROR and exit             ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 void ListClass<T>::del_elem(T val, const int err)
 {
 	int i;
 
-	for (i=size-1; i>=0; i--) {
+	for (i = size - 1; i >= 0; i--) {
 		if (a[i] == val) {
-			a[i] = a[size-1];
+			a[i] = a[size - 1];
 			size--;
 			return;
 		}
@@ -172,19 +178,22 @@ void ListClass<T>::del_elem(T val, const int err)
 	return;
 };
 
-	template<class T>
+template<class T>
 void ListClass<T>::del_elem_idx(int index, const int err)
 {
-	if ( (index < 0) || (index > size-1) ) {
+	if ((index < 0) || (index > size - 1)) {
 		if (err) {
-			printf("ERROR in routine del_elem_idx(): index out of range, index = %d outside [0,%d]\n", index, size-1);
+			printf("ERROR in routine del_elem_idx(): index out of range, index = %d "
+			       "outside [0,%d]\n",
+			       index,
+			       size - 1);
 			CORE_DUMP;
 		} else {
 			return;
 		}
 	}
 
-	a[index] = a[size-1];
+	a[index] = a[size - 1];
 	size--;
 
 	return;
@@ -198,14 +207,14 @@ void ListClass<T>::del_elem_idx(int index, const int err)
 /**** If val is not in the list, then add it; and if val is in the list, then remove   ****/
 /**** it.                                                                              ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 void ListClass<T>::toggle_elem(T val)
 {
 	int i;
 
-	for (i=size-1; i>=0; i--) {
+	for (i = size - 1; i >= 0; i--) {
 		if (a[i] == val) {
-			a[i] = a[size-1];
+			a[i] = a[size - 1];
 			size--;
 			return;
 		}
@@ -213,7 +222,7 @@ void ListClass<T>::toggle_elem(T val)
 
 	if ((size == allocation_size)) {
 		allocation_size += allocation_increment;
-		a = (T *) realloc((void *) a, allocation_size * sizeof(T));
+		a = (T *)realloc((void *)a, allocation_size * sizeof(T));
 	}
 
 	a[size++] = val;
@@ -225,13 +234,13 @@ void ListClass<T>::toggle_elem(T val)
 /******************************************************************************************/
 /**** ListClass::pop                                                                   ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 T ListClass<T>::pop()
 {
 	T val;
 
 	if (size) {
-		val = a[size-1];
+		val = a[size - 1];
 		size--;
 	} else {
 		printf("ERROR in routine pop(), can't pop list of size zero.\n");
@@ -248,14 +257,14 @@ T ListClass<T>::pop()
 /**** OUTPUTS:                                                                         ****/
 /**** Removes all values from the list, sets allocation_size to zero.                  ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 void ListClass<T>::reset()
 {
 	size = 0;
 
 	if (allocation_size) {
 		allocation_size = 0;
-		a = (T *) realloc((void *) a, allocation_size * sizeof(T));
+		a = (T *)realloc((void *)a, allocation_size * sizeof(T));
 	}
 
 	return;
@@ -269,7 +278,7 @@ void ListClass<T>::reset()
 /**** Resize allocation_size to the specified value, but can't be less than the size   ****/
 /**** of the list                                                                      ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 void ListClass<T>::resize(int n)
 {
 	int new_alloc_size;
@@ -282,7 +291,7 @@ void ListClass<T>::resize(int n)
 
 	if (allocation_size != new_alloc_size) {
 		allocation_size = new_alloc_size;
-		a = (T *) realloc((void *) a, allocation_size * sizeof(T));
+		a = (T *)realloc((void *)a, allocation_size * sizeof(T));
 	}
 
 	return;
@@ -304,7 +313,7 @@ int ListClass<T>::get_index(T val, const int err) const
 	int retval = -1;
 
 	found = 0;
-	for (i=size-1; (i>=0)&&(!found); i--) {
+	for (i = size - 1; (i >= 0) && (!found); i--) {
 		if (a[i] == val) {
 			found = 1;
 			retval = i;
@@ -318,7 +327,7 @@ int ListClass<T>::get_index(T val, const int err) const
 		}
 	}
 
-	return(retval);
+	return (retval);
 };
 /******************************************************************************************/
 
@@ -335,13 +344,13 @@ int ListClass<T>::contains(T val) const
 	int i, found;
 
 	found = 0;
-	for (i=size-1; (i>=0)&&(!found); i--) {
+	for (i = size - 1; (i >= 0) && (!found); i--) {
 		if (a[i] == val) {
 			found = 1;
 		}
 	}
 
-	return(found);
+	return (found);
 };
 /******************************************************************************************/
 
@@ -353,47 +362,47 @@ int ListClass<T>::contains(T val) const
 /**** index i such that list[i] = val.  If val is not in list and err=0 return -1,     ****/
 /**** else give ERROR and exit.                                                        ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 int get_index_sorted(ListClass<T> *lc_t, T val, const int err)
 {
 	int i, i_min, i_max, done, found, retval;
 
-	found  = 0;
-	done   = 0;
+	found = 0;
+	done = 0;
 	retval = -1;
 
 	i_min = 0;
 	if (lc_t->getSize() == 0) {
-		done  = 1;
+		done = 1;
 	} else if ((*lc_t)[i_min] == val) {
-		done  = 1;
+		done = 1;
 		found = 1;
 		retval = i_min;
 	} else if ((*lc_t)[i_min] > val) {
-		done  = 1;
+		done = 1;
 	}
 
 	if (!done) {
-		i_max = lc_t->getSize()-1;
+		i_max = lc_t->getSize() - 1;
 		if ((*lc_t)[i_max] == val) {
-			done  = 1;
+			done = 1;
 			found = 1;
 			retval = i_max;
 		} else if (val > (*lc_t)[i_max]) {
-			done  = 1;
+			done = 1;
 		}
 	}
 
 	if (!done) {
 		if (lc_t->getSize() <= 2) {
-			done  = 1;
+			done = 1;
 		}
 	}
 
 	while (!done) {
-		i = (i_min + i_max)/2;
+		i = (i_min + i_max) / 2;
 		if ((*lc_t)[i] == val) {
-			done  = 1;
+			done = 1;
 			found = 1;
 			retval = i;
 		} else if (val > (*lc_t)[i]) {
@@ -414,7 +423,7 @@ int get_index_sorted(ListClass<T> *lc_t, T val, const int err)
 		}
 	}
 
-	return(retval);
+	return (retval);
 };
 /******************************************************************************************/
 
@@ -425,13 +434,13 @@ int get_index_sorted(ListClass<T> *lc_t, T val, const int err)
 /**** Given the SORTED list {list[0] < list[1] < ... < list[n-1]} and value val,       ****/
 /**** return 1 if val is contained in the list and 0 otherwise.                        ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 int contains_sorted(ListClass<T> *lc_t, T val)
 {
 	if (get_index_sorted(lc_t, val, 0) == -1) {
-		return(0);
+		return (0);
 	} else {
-		return(1);
+		return (1);
 	}
 };
 /******************************************************************************************/
@@ -444,53 +453,53 @@ int contains_sorted(ListClass<T> *lc_t, T val)
 /**** If val is already in list and err=0 do nothing, else give ERROR and exit         ****/
 /**** The value returned is the position of val in the list.                           ****/
 /******************************************************************************************/
-	template<class T>
+template<class T>
 int ins_elem_sorted(ListClass<T> *lc_t, T val, const int err, int *insFlagPtr)
 {
 	int i, i_min, i_max, done, found, retval;
 
-	found  = 0;
-	done   = 0;
+	found = 0;
+	done = 0;
 	retval = -1;
 
 	i_min = 0;
 	if (lc_t->getSize() == 0) {
 		i_min = -1;
-		i_max = i_min+1;
-		done  = 1;
+		i_max = i_min + 1;
+		done = 1;
 	} else if ((*lc_t)[i_min] == val) {
-		done  = 1;
+		done = 1;
 		found = 1;
 		retval = i_min;
 	} else if ((*lc_t)[i_min] > val) {
 		i_min = -1;
-		i_max = i_min+1;
-		done  = 1;
+		i_max = i_min + 1;
+		done = 1;
 	}
 
 	if (!done) {
-		i_max = lc_t->getSize()-1;
+		i_max = lc_t->getSize() - 1;
 		if ((*lc_t)[i_max] == val) {
-			done  = 1;
+			done = 1;
 			found = 1;
 			retval = i_max;
 		} else if (val > (*lc_t)[i_max]) {
-			i_min = lc_t->getSize()-1;
-			i_max = i_min+1;
-			done  = 1;
+			i_min = lc_t->getSize() - 1;
+			i_max = i_min + 1;
+			done = 1;
 		}
 	}
 
 	if (!done) {
 		if (lc_t->getSize() <= 2) {
-			done  = 1;
+			done = 1;
 		}
 	}
 
 	while (!done) {
-		i = (i_min + i_max)/2;
+		i = (i_min + i_max) / 2;
 		if ((*lc_t)[i] == val) {
-			done  = 1;
+			done = 1;
 			found = 1;
 			retval = i;
 		} else if (val > (*lc_t)[i]) {
@@ -507,8 +516,8 @@ int ins_elem_sorted(ListClass<T> *lc_t, T val, const int err, int *insFlagPtr)
 	if (!found) {
 		lc_t->append(val);
 
-		for(i=lc_t->getSize()-1; i>=i_max+1; i--) {
-			(*lc_t)[i] = (*lc_t)[i-1];
+		for (i = lc_t->getSize() - 1; i >= i_max + 1; i--) {
+			(*lc_t)[i] = (*lc_t)[i - 1];
 		}
 
 		(*lc_t)[i_max] = val;
@@ -517,9 +526,11 @@ int ins_elem_sorted(ListClass<T> *lc_t, T val, const int err, int *insFlagPtr)
 		CORE_DUMP;
 	}
 
-	if (insFlagPtr) { *insFlagPtr = (found ? 0 : 1); }
+	if (insFlagPtr) {
+		*insFlagPtr = (found ? 0 : 1);
+	}
 
-	return(retval);
+	return (retval);
 };
 /******************************************************************************************/
 
@@ -528,10 +539,10 @@ int ins_elem_sorted(ListClass<T> *lc_t, T val, const int err, int *insFlagPtr)
 /**** INPUTS: compare -- comparator function (kind of 'less'                           ****/
 /**** OUTPUTS:                                                                         ****/
 /**** Prints values of {list[0], list[1], ..., list[n-1]}                              ****/
-	template<class T>
+template<class T>
 void ListClass<T>::sort(const std::function<bool(const T &, const T &)> &compare)
 {
-	std::sort(a, a+size, compare);
+	std::sort(a, a + size, compare);
 }
 /******************************************************************************************/
 
@@ -540,15 +551,15 @@ void ListClass<T>::sort(const std::function<bool(const T &, const T &)> &compare
 /**** INPUTS:                                                                          ****/
 /**** OUTPUTS:                                                                         ****/
 /**** Prints values of {list[0], list[1], ..., list[n-1]}                              ****/
-	template<class T>
+template<class T>
 void ListClass<T>::printlist(int n, const char *elemSep, const char *grpSep, const char *endStr)
 {
 	int i;
 
-	for (i=0; i<=size-1; i++) {
+	for (i = 0; i <= size - 1; i++) {
 		std::cout << a[i];
-		if (i != size-1) {
-			if (i % n == n-1) {
+		if (i != size - 1) {
+			if (i % n == n - 1) {
 				if (grpSep) {
 					std::cout << grpSep;
 				} else {
@@ -577,16 +588,16 @@ void ListClass<T>::printlist(int n, const char *elemSep, const char *grpSep, con
 /**** INPUTS:                                                                          ****/
 /**** OUTPUTS:                                                                         ****/
 /**** Reverse the order of all values in the list.                                     ****/
-	template<class T>
+template<class T>
 void ListClass<T>::reverse()
 {
 	int i;
 	T tmp;
 
-	for (i=0; i<=(size/2)-1; i++) {
+	for (i = 0; i <= (size / 2) - 1; i++) {
 		tmp = a[i];
-		a[i] = a[size-1-i];
-		a[size-1-i] = tmp;
+		a[i] = a[size - 1 - i];
+		a[size - 1 - i] = tmp;
 	}
 
 	return;
@@ -600,73 +611,82 @@ void ListClass<T>::reverse()
 /**** Numerical Recipes in C: Modification of sort.c to sort integer array.            ****/
 /**** Modified to use zero-based vectors and translated to C++.                        ****/
 /******************************************************************************************/
-#define SWAP(a,b) temp=(a);(a)=(b);(b)=temp;
+#define SWAP(a, b) \
+	temp = (a); \
+	(a) = (b); \
+	(b) = temp;
 #define M 7
 #define NSTACK 50
 
-	template<class T>
+template<class T>
 void sort(ListClass<T> *lc_t)
 {
-	int i,j,k,l=1;
-	int jstack=0,*istack;
-	T vara,temp;
+	int i, j, k, l = 1;
+	int jstack = 0, *istack;
+	T vara, temp;
 
 	int ir = lc_t->getSize();
 
-	istack = (int *) malloc(NSTACK*sizeof(int));
+	istack = (int *)malloc(NSTACK * sizeof(int));
 	for (;;) {
-		if (ir-l < M) {
-			for (j=l+1;j<=ir;j++) {
-				vara=(*lc_t)[j-1];
-				for (i=j-1;i>=1;i--) {
-					if (!((*lc_t)[i-1] > vara)) break;
-					(*lc_t)[i]=(*lc_t)[i-1];
+		if (ir - l < M) {
+			for (j = l + 1; j <= ir; j++) {
+				vara = (*lc_t)[j - 1];
+				for (i = j - 1; i >= 1; i--) {
+					if (!((*lc_t)[i - 1] > vara))
+						break;
+					(*lc_t)[i] = (*lc_t)[i - 1];
 				}
-				(*lc_t)[i]=vara;
+				(*lc_t)[i] = vara;
 			}
 			if (jstack == 0) {
 				free(istack);
 				return;
 			}
-			ir=istack[jstack-1];
-			l=istack[jstack-2];
+			ir = istack[jstack - 1];
+			l = istack[jstack - 2];
 			jstack -= 2;
 		} else {
-			k=(l+ir) >> 1;
-			SWAP((*lc_t)[k-1],(*lc_t)[l])
-				if ((*lc_t)[l] > (*lc_t)[ir-1]) {
-					SWAP((*lc_t)[l],(*lc_t)[ir-1])
-				}
-			if ((*lc_t)[l-1] > (*lc_t)[ir-1]) {
-				SWAP((*lc_t)[l-1],(*lc_t)[ir-1])
+			k = (l + ir) >> 1;
+			SWAP((*lc_t)[k - 1], (*lc_t)[l])
+			if ((*lc_t)[l] > (*lc_t)[ir - 1]) {
+				SWAP((*lc_t)[l], (*lc_t)[ir - 1])
 			}
-			if ((*lc_t)[l] > (*lc_t)[l-1]) {
-				SWAP((*lc_t)[l],(*lc_t)[l-1])
+			if ((*lc_t)[l - 1] > (*lc_t)[ir - 1]) {
+				SWAP((*lc_t)[l - 1], (*lc_t)[ir - 1])
 			}
-			i=l+1;
-			j=ir;
-			vara=(*lc_t)[l-1];
+			if ((*lc_t)[l] > (*lc_t)[l - 1]) {
+				SWAP((*lc_t)[l], (*lc_t)[l - 1])
+			}
+			i = l + 1;
+			j = ir;
+			vara = (*lc_t)[l - 1];
 			for (;;) {
-				do i++; while (vara > (*lc_t)[i-1]);
-				do j--; while ((*lc_t)[j-1] > vara);
-				if (j < i) break;
-				SWAP((*lc_t)[i-1],(*lc_t)[j-1]);
+				do
+					i++;
+				while (vara > (*lc_t)[i - 1]);
+				do
+					j--;
+				while ((*lc_t)[j - 1] > vara);
+				if (j < i)
+					break;
+				SWAP((*lc_t)[i - 1], (*lc_t)[j - 1]);
 			}
-			(*lc_t)[l-1]=(*lc_t)[j-1];
-			(*lc_t)[j-1]=vara;
+			(*lc_t)[l - 1] = (*lc_t)[j - 1];
+			(*lc_t)[j - 1] = vara;
 			jstack += 2;
 			if (jstack > NSTACK) {
 				printf("NSTACK too small in isort.");
 				exit(1);
 			}
-			if (ir-i+1 >= j-l) {
-				istack[jstack-1]=ir;
-				istack[jstack-2]=i;
-				ir=j-1;
+			if (ir - i + 1 >= j - l) {
+				istack[jstack - 1] = ir;
+				istack[jstack - 2] = i;
+				ir = j - 1;
 			} else {
-				istack[jstack-1]=j-1;
-				istack[jstack-2]=l;
-				l=i;
+				istack[jstack - 1] = j - 1;
+				istack[jstack - 2] = l;
+				l = i;
 			}
 		}
 	}
@@ -686,18 +706,24 @@ void sort(ListClass<T> *lc_t)
 /**** Modified to use zero-based vectors and translated to C++.                        ****/
 /******************************************************************************************/
 
-#define TSWAP(a,b) tempa=(a);(a)=(b);(b)=tempa;
-#define USWAP(a,b) tempb=(a);(a)=(b);(b)=tempb;
+#define TSWAP(a, b) \
+	tempa = (a); \
+	(a) = (b); \
+	(b) = tempa;
+#define USWAP(a, b) \
+	tempb = (a); \
+	(a) = (b); \
+	(b) = tempb;
 #define M 7
 #define NSTACK 50
 
-	template<class T, class U>
+template<class T, class U>
 void sort2(ListClass<T> *lc_t, ListClass<U> *lc_u)
 {
-	int i,j,k,l=1;
-	int *istack,jstack=0;
-	T vara,tempa;
-	U varb,tempb;
+	int i, j, k, l = 1;
+	int *istack, jstack = 0;
+	T vara, tempa;
+	U varb, tempb;
 
 	int ir = lc_t->getSize();
 
@@ -706,71 +732,77 @@ void sort2(ListClass<T> *lc_t, ListClass<U> *lc_u)
 		CORE_DUMP;
 	}
 
-	istack = (int *) malloc((NSTACK+1)*sizeof(int));
+	istack = (int *)malloc((NSTACK + 1) * sizeof(int));
 	for (;;) {
-		if (ir-l < M) {
-			for (j=l+1;j<=ir;j++) {
-				vara=(*lc_t)[j-1];
-				varb=(*lc_u)[j-1];
-				for (i=j-1;i>=1;i--) {
-					if (!((*lc_t)[i-1] > vara)) break;
-					(*lc_t)[i]=(*lc_t)[i-1];
-					(*lc_u)[i]=(*lc_u)[i-1];
+		if (ir - l < M) {
+			for (j = l + 1; j <= ir; j++) {
+				vara = (*lc_t)[j - 1];
+				varb = (*lc_u)[j - 1];
+				for (i = j - 1; i >= 1; i--) {
+					if (!((*lc_t)[i - 1] > vara))
+						break;
+					(*lc_t)[i] = (*lc_t)[i - 1];
+					(*lc_u)[i] = (*lc_u)[i - 1];
 				}
-				(*lc_t)[i]=vara;
-				(*lc_u)[i]=varb;
+				(*lc_t)[i] = vara;
+				(*lc_u)[i] = varb;
 			}
 			if (!jstack) {
 				free(istack);
 				return;
 			}
-			ir=istack[jstack-1];
-			l=istack[jstack-2];
+			ir = istack[jstack - 1];
+			l = istack[jstack - 2];
 			jstack -= 2;
 		} else {
-			k=(l+ir) >> 1;
-			TSWAP((*lc_t)[k-1],(*lc_t)[l])
-				USWAP((*lc_u)[k-1],(*lc_u)[l])
-				if ((*lc_t)[l] > (*lc_t)[ir-1]) {
-					TSWAP((*lc_t)[l],(*lc_t)[ir-1])
-						USWAP((*lc_u)[l],(*lc_u)[ir-1])
-				}
-			if ((*lc_t)[l-1] > (*lc_t)[ir-1]) {
-				TSWAP((*lc_t)[l-1],(*lc_t)[ir-1])
-					USWAP((*lc_u)[l-1],(*lc_u)[ir-1])
+			k = (l + ir) >> 1;
+			TSWAP((*lc_t)[k - 1], (*lc_t)[l])
+			USWAP((*lc_u)[k - 1], (*lc_u)[l])
+			if ((*lc_t)[l] > (*lc_t)[ir - 1]) {
+				TSWAP((*lc_t)[l], (*lc_t)[ir - 1])
+				USWAP((*lc_u)[l], (*lc_u)[ir - 1])
 			}
-			if ((*lc_t)[l] > (*lc_t)[l-1]) {
-				TSWAP((*lc_t)[l],(*lc_t)[l-1])
-					USWAP((*lc_u)[l],(*lc_u)[l-1])
+			if ((*lc_t)[l - 1] > (*lc_t)[ir - 1]) {
+				TSWAP((*lc_t)[l - 1], (*lc_t)[ir - 1])
+				USWAP((*lc_u)[l - 1], (*lc_u)[ir - 1])
 			}
-			i=l+1;
-			j=ir;
-			vara=(*lc_t)[l-1];
-			varb=(*lc_u)[l-1];
+			if ((*lc_t)[l] > (*lc_t)[l - 1]) {
+				TSWAP((*lc_t)[l], (*lc_t)[l - 1])
+				USWAP((*lc_u)[l], (*lc_u)[l - 1])
+			}
+			i = l + 1;
+			j = ir;
+			vara = (*lc_t)[l - 1];
+			varb = (*lc_u)[l - 1];
 			for (;;) {
-				do i++; while (vara > (*lc_t)[i-1]);
-				do j--; while ((*lc_t)[j-1] > vara);
-				if (j < i) break;
-				TSWAP((*lc_t)[i-1],(*lc_t)[j-1])
-					USWAP((*lc_u)[i-1],(*lc_u)[j-1])
+				do
+					i++;
+				while (vara > (*lc_t)[i - 1]);
+				do
+					j--;
+				while ((*lc_t)[j - 1] > vara);
+				if (j < i)
+					break;
+				TSWAP((*lc_t)[i - 1], (*lc_t)[j - 1])
+				USWAP((*lc_u)[i - 1], (*lc_u)[j - 1])
 			}
-			(*lc_t)[l-1]=(*lc_t)[j-1];
-			(*lc_t)[j-1]=vara;
-			(*lc_u)[l-1]=(*lc_u)[j-1];
-			(*lc_u)[j-1]=varb;
+			(*lc_t)[l - 1] = (*lc_t)[j - 1];
+			(*lc_t)[j - 1] = vara;
+			(*lc_u)[l - 1] = (*lc_u)[j - 1];
+			(*lc_u)[j - 1] = varb;
 			jstack += 2;
 			if (jstack > NSTACK) {
 				printf("NSTACK too small in sort2.");
 				exit(1);
 			}
-			if (ir-i+1 >= j-l) {
-				istack[jstack-1]=ir;
-				istack[jstack-2]=i;
-				ir=j-1;
+			if (ir - i + 1 >= j - l) {
+				istack[jstack - 1] = ir;
+				istack[jstack - 2] = i;
+				ir = j - 1;
 			} else {
-				istack[jstack-1]=j-1;
-				istack[jstack-2]=l;
-				l=i;
+				istack[jstack - 1] = j - 1;
+				istack[jstack - 2] = l;
+				l = i;
 			}
 		}
 	}
@@ -791,104 +823,119 @@ void sort2(ListClass<T> *lc_t, ListClass<U> *lc_u)
 /**** Modified to use zero-based vectors and translated to C++.                        ****/
 /******************************************************************************************/
 
-#define TSWAP(a,b) tempa=(a);(a)=(b);(b)=tempa;
-#define USWAP(a,b) tempb=(a);(a)=(b);(b)=tempb;
-#define VSWAP(a,b) tempc=(a);(a)=(b);(b)=tempc;
+#define TSWAP(a, b) \
+	tempa = (a); \
+	(a) = (b); \
+	(b) = tempa;
+#define USWAP(a, b) \
+	tempb = (a); \
+	(a) = (b); \
+	(b) = tempb;
+#define VSWAP(a, b) \
+	tempc = (a); \
+	(a) = (b); \
+	(b) = tempc;
 #define M 7
 #define NSTACK 50
 
-	template<class T, class U, class V>
+template<class T, class U, class V>
 void sort3(ListClass<T> *lc_t, ListClass<U> *lc_u, ListClass<V> *lc_v)
 {
-	int i,j,k,l=1;
-	int *istack,jstack=0;
-	T vara,tempa;
-	U varb,tempb;
-	V varc,tempc;
+	int i, j, k, l = 1;
+	int *istack, jstack = 0;
+	T vara, tempa;
+	U varb, tempb;
+	V varc, tempc;
 
 	int ir = lc_t->getSize();
 
-	if ( (lc_u->getSize() != ir) || (lc_v->getSize() != ir) ) {
+	if ((lc_u->getSize() != ir) || (lc_v->getSize() != ir)) {
 		printf("ERROR in routine ListClass::sort3(), lists are of unequal length\n");
 		CORE_DUMP;
 	}
 
-	istack = (int *) malloc((NSTACK+1)*sizeof(int));
+	istack = (int *)malloc((NSTACK + 1) * sizeof(int));
 	for (;;) {
-		if (ir-l < M) {
-			for (j=l+1;j<=ir;j++) {
-				vara=(*lc_t)[j-1];
-				varb=(*lc_u)[j-1];
-				varc=(*lc_v)[j-1];
-				for (i=j-1;i>=1;i--) {
-					if (!((*lc_t)[i-1] > vara)) break;
-					(*lc_t)[i]=(*lc_t)[i-1];
-					(*lc_u)[i]=(*lc_u)[i-1];
-					(*lc_v)[i]=(*lc_v)[i-1];
+		if (ir - l < M) {
+			for (j = l + 1; j <= ir; j++) {
+				vara = (*lc_t)[j - 1];
+				varb = (*lc_u)[j - 1];
+				varc = (*lc_v)[j - 1];
+				for (i = j - 1; i >= 1; i--) {
+					if (!((*lc_t)[i - 1] > vara))
+						break;
+					(*lc_t)[i] = (*lc_t)[i - 1];
+					(*lc_u)[i] = (*lc_u)[i - 1];
+					(*lc_v)[i] = (*lc_v)[i - 1];
 				}
-				(*lc_t)[i]=vara;
-				(*lc_u)[i]=varb;
-				(*lc_v)[i]=varc;
+				(*lc_t)[i] = vara;
+				(*lc_u)[i] = varb;
+				(*lc_v)[i] = varc;
 			}
 			if (!jstack) {
 				free(istack);
 				return;
 			}
-			ir=istack[jstack-1];
-			l=istack[jstack-2];
+			ir = istack[jstack - 1];
+			l = istack[jstack - 2];
 			jstack -= 2;
 		} else {
-			k=(l+ir) >> 1;
-			TSWAP((*lc_t)[k-1],(*lc_t)[l])
-				USWAP((*lc_u)[k-1],(*lc_u)[l])
-				VSWAP((*lc_v)[k-1],(*lc_v)[l])
-				if ((*lc_t)[l] > (*lc_t)[ir-1]) {
-					TSWAP((*lc_t)[l],(*lc_t)[ir-1])
-						USWAP((*lc_u)[l],(*lc_u)[ir-1])
-						VSWAP((*lc_v)[l],(*lc_v)[ir-1])
-				}
-			if ((*lc_t)[l-1] > (*lc_t)[ir-1]) {
-				TSWAP((*lc_t)[l-1],(*lc_t)[ir-1])
-					USWAP((*lc_u)[l-1],(*lc_u)[ir-1])
-					VSWAP((*lc_v)[l-1],(*lc_v)[ir-1])
+			k = (l + ir) >> 1;
+			TSWAP((*lc_t)[k - 1], (*lc_t)[l])
+			USWAP((*lc_u)[k - 1], (*lc_u)[l])
+			VSWAP((*lc_v)[k - 1], (*lc_v)[l])
+			if ((*lc_t)[l] > (*lc_t)[ir - 1]) {
+				TSWAP((*lc_t)[l], (*lc_t)[ir - 1])
+				USWAP((*lc_u)[l], (*lc_u)[ir - 1])
+				VSWAP((*lc_v)[l], (*lc_v)[ir - 1])
 			}
-			if ((*lc_t)[l] > (*lc_t)[l-1]) {
-				TSWAP((*lc_t)[l],(*lc_t)[l-1])
-					USWAP((*lc_u)[l],(*lc_u)[l-1])
-					VSWAP((*lc_v)[l],(*lc_v)[l-1])
+			if ((*lc_t)[l - 1] > (*lc_t)[ir - 1]) {
+				TSWAP((*lc_t)[l - 1], (*lc_t)[ir - 1])
+				USWAP((*lc_u)[l - 1], (*lc_u)[ir - 1])
+				VSWAP((*lc_v)[l - 1], (*lc_v)[ir - 1])
 			}
-			i=l+1;
-			j=ir;
-			vara=(*lc_t)[l-1];
-			varb=(*lc_u)[l-1];
-			varc=(*lc_v)[l-1];
+			if ((*lc_t)[l] > (*lc_t)[l - 1]) {
+				TSWAP((*lc_t)[l], (*lc_t)[l - 1])
+				USWAP((*lc_u)[l], (*lc_u)[l - 1])
+				VSWAP((*lc_v)[l], (*lc_v)[l - 1])
+			}
+			i = l + 1;
+			j = ir;
+			vara = (*lc_t)[l - 1];
+			varb = (*lc_u)[l - 1];
+			varc = (*lc_v)[l - 1];
 			for (;;) {
-				do i++; while (vara > (*lc_t)[i-1]);
-				do j--; while ((*lc_t)[j-1] > vara);
-				if (j < i) break;
-				TSWAP((*lc_t)[i-1],(*lc_t)[j-1])
-					USWAP((*lc_u)[i-1],(*lc_u)[j-1])
-					VSWAP((*lc_v)[i-1],(*lc_v)[j-1])
+				do
+					i++;
+				while (vara > (*lc_t)[i - 1]);
+				do
+					j--;
+				while ((*lc_t)[j - 1] > vara);
+				if (j < i)
+					break;
+				TSWAP((*lc_t)[i - 1], (*lc_t)[j - 1])
+				USWAP((*lc_u)[i - 1], (*lc_u)[j - 1])
+				VSWAP((*lc_v)[i - 1], (*lc_v)[j - 1])
 			}
-			(*lc_t)[l-1]=(*lc_t)[j-1];
-			(*lc_t)[j-1]=vara;
-			(*lc_u)[l-1]=(*lc_u)[j-1];
-			(*lc_u)[j-1]=varb;
-			(*lc_v)[l-1]=(*lc_v)[j-1];
-			(*lc_v)[j-1]=varc;
+			(*lc_t)[l - 1] = (*lc_t)[j - 1];
+			(*lc_t)[j - 1] = vara;
+			(*lc_u)[l - 1] = (*lc_u)[j - 1];
+			(*lc_u)[j - 1] = varb;
+			(*lc_v)[l - 1] = (*lc_v)[j - 1];
+			(*lc_v)[j - 1] = varc;
 			jstack += 2;
 			if (jstack > NSTACK) {
 				printf("NSTACK too small in sort2.");
 				exit(1);
 			}
-			if (ir-i+1 >= j-l) {
-				istack[jstack-1]=ir;
-				istack[jstack-2]=i;
-				ir=j-1;
+			if (ir - i + 1 >= j - l) {
+				istack[jstack - 1] = ir;
+				istack[jstack - 2] = i;
+				ir = j - 1;
 			} else {
-				istack[jstack-1]=j-1;
-				istack[jstack-2]=l;
-				l=i;
+				istack[jstack - 1] = j - 1;
+				istack[jstack - 2] = l;
+				l = i;
 			}
 		}
 	}
@@ -906,17 +953,19 @@ void sort3(ListClass<T> *lc_t, ListClass<U> *lc_u, ListClass<V> *lc_v)
 /**** OUTPUTS:                                                                         ****/
 /**** Same as ins_elem except values are dereferenced.                                 ****/
 /******************************************************************************************/
-	template<class T>
-int ins_pointer(ListClass<T> *lc_t, T& val, const int err, int *insFlagPtr)
+template<class T>
+int ins_pointer(ListClass<T> *lc_t, T &val, const int err, int *insFlagPtr)
 {
 	int i, found;
 	int insIdx = -1;
 
-	if (insFlagPtr) { *insFlagPtr = 0; }
+	if (insFlagPtr) {
+		*insFlagPtr = 0;
+	}
 
 	found = 0;
-	for (i=lc_t->getSize()-1; (i>=0)&&(!found); i--) {
-		if ( *((*lc_t)[i]) == *val) {
+	for (i = lc_t->getSize() - 1; (i >= 0) && (!found); i--) {
+		if (*((*lc_t)[i]) == *val) {
 			found = 1;
 			insIdx = i;
 		}
@@ -932,11 +981,13 @@ int ins_pointer(ListClass<T> *lc_t, T& val, const int err, int *insFlagPtr)
 		}
 	} else {
 		lc_t->append(val);
-		insIdx = lc_t->getSize()-1;
-		if (insFlagPtr) { *insFlagPtr = 1; }
+		insIdx = lc_t->getSize() - 1;
+		if (insFlagPtr) {
+			*insFlagPtr = 1;
+		}
 	}
 
-	return(insIdx);
+	return (insIdx);
 };
 /******************************************************************************************/
 
@@ -946,71 +997,80 @@ int ins_pointer(ListClass<T> *lc_t, T& val, const int err, int *insFlagPtr)
 /**** OUTPUTS:                                                                         ****/
 /**** Same as sort except values are dereferenced when compared.                       ****/
 /******************************************************************************************/
-#define SWAP(a,b) temp=(a);(a)=(b);(b)=temp;
+#define SWAP(a, b) \
+	temp = (a); \
+	(a) = (b); \
+	(b) = temp;
 #define M 7
 #define NSTACK 50
 
-	template<class T>
+template<class T>
 void sort_pointer(ListClass<T> *lc_t)
 {
-	int i,ir=lc_t->getSize(),j,k,l=1;
-	int jstack=0,*istack;
-	T vara,temp;
+	int i, ir = lc_t->getSize(), j, k, l = 1;
+	int jstack = 0, *istack;
+	T vara, temp;
 
-	istack = (int *) malloc(NSTACK*sizeof(int));
+	istack = (int *)malloc(NSTACK * sizeof(int));
 	for (;;) {
-		if (ir-l < M) {
-			for (j=l+1;j<=ir;j++) {
-				vara=(*lc_t)[j-1];
-				for (i=j-1;i>=1;i--) {
-					if (!(*((*lc_t)[i-1]) > *vara)) break;
-					(*lc_t)[i]=(*lc_t)[i-1];
+		if (ir - l < M) {
+			for (j = l + 1; j <= ir; j++) {
+				vara = (*lc_t)[j - 1];
+				for (i = j - 1; i >= 1; i--) {
+					if (!(*((*lc_t)[i - 1]) > *vara))
+						break;
+					(*lc_t)[i] = (*lc_t)[i - 1];
 				}
-				(*lc_t)[i]=vara;
+				(*lc_t)[i] = vara;
 			}
 			if (jstack == 0) {
 				free(istack);
 				return;
 			}
-			ir=istack[jstack-1];
-			l=istack[jstack-2];
+			ir = istack[jstack - 1];
+			l = istack[jstack - 2];
 			jstack -= 2;
 		} else {
-			k=(l+ir) >> 1;
-			SWAP((*lc_t)[k-1],(*lc_t)[l])
-				if (*((*lc_t)[l]) > *((*lc_t)[ir-1])) {
-					SWAP((*lc_t)[l],(*lc_t)[ir-1])
-				}
-			if (*((*lc_t)[l-1]) > *((*lc_t)[ir-1])) {
-				SWAP((*lc_t)[l-1],(*lc_t)[ir-1])
+			k = (l + ir) >> 1;
+			SWAP((*lc_t)[k - 1], (*lc_t)[l])
+			if (*((*lc_t)[l]) > *((*lc_t)[ir - 1])) {
+				SWAP((*lc_t)[l], (*lc_t)[ir - 1])
 			}
-			if (*((*lc_t)[l]) > *((*lc_t)[l-1])) {
-				SWAP((*lc_t)[l],(*lc_t)[l-1])
+			if (*((*lc_t)[l - 1]) > *((*lc_t)[ir - 1])) {
+				SWAP((*lc_t)[l - 1], (*lc_t)[ir - 1])
 			}
-			i=l+1;
-			j=ir;
-			vara=(*lc_t)[l-1];
+			if (*((*lc_t)[l]) > *((*lc_t)[l - 1])) {
+				SWAP((*lc_t)[l], (*lc_t)[l - 1])
+			}
+			i = l + 1;
+			j = ir;
+			vara = (*lc_t)[l - 1];
 			for (;;) {
-				do i++; while (*vara > *((*lc_t)[i-1]));
-				do j--; while (*((*lc_t)[j-1]) > *vara);
-				if (j < i) break;
-				SWAP((*lc_t)[i-1],(*lc_t)[j-1]);
+				do
+					i++;
+				while (*vara > *((*lc_t)[i - 1]));
+				do
+					j--;
+				while (*((*lc_t)[j - 1]) > *vara);
+				if (j < i)
+					break;
+				SWAP((*lc_t)[i - 1], (*lc_t)[j - 1]);
 			}
-			(*lc_t)[l-1]=(*lc_t)[j-1];
-			(*lc_t)[j-1]=vara;
+			(*lc_t)[l - 1] = (*lc_t)[j - 1];
+			(*lc_t)[j - 1] = vara;
 			jstack += 2;
 			if (jstack > NSTACK) {
 				printf("NSTACK too small in isort.");
 				exit(1);
 			}
-			if (ir-i+1 >= j-l) {
-				istack[jstack-1]=ir;
-				istack[jstack-2]=i;
-				ir=j-1;
+			if (ir - i + 1 >= j - l) {
+				istack[jstack - 1] = ir;
+				istack[jstack - 2] = i;
+				ir = j - 1;
 			} else {
-				istack[jstack-1]=j-1;
-				istack[jstack-2]=l;
-				l=i;
+				istack[jstack - 1] = j - 1;
+				istack[jstack - 2] = l;
+				l = i;
 			}
 		}
 	}
@@ -1028,19 +1088,19 @@ void sort_pointer(ListClass<T> *lc_t)
 /**** Given list {list[0], list[1], ..., list[n-1]} and value val, return 1 if val is  ****/
 /**** contained in the list and 0 otherwise.                                           ****/
 /******************************************************************************************/
-	template<class T>
-int contains_pointer(ListClass<T> *lc_t, T& val)
+template<class T>
+int contains_pointer(ListClass<T> *lc_t, T &val)
 {
 	int i, found;
 
 	found = 0;
-	for (i=lc_t->getSize()-1; (i>=0)&&(!found); i--) {
-		if ( *((*lc_t)[i]) == *val) {
+	for (i = lc_t->getSize() - 1; (i >= 0) && (!found); i--) {
+		if (*((*lc_t)[i]) == *val) {
 			found = 1;
 		}
 	}
 
-	return(found);
+	return (found);
 };
 /******************************************************************************************/
 
@@ -1052,7 +1112,7 @@ int contains_pointer(ListClass<T> *lc_t, T& val)
 /**** Lines beginning with the character '#' are ignored to allow for comments.        ****/
 /**** Elements of class T must have overator << defined to read from the file.         ****/
 
-	template<class T>
+template<class T>
 void readOneCol(const char *flname, ListClass<T> *lc_t)
 {
 #if 1
@@ -1060,23 +1120,25 @@ void readOneCol(const char *flname, ListClass<T> *lc_t)
 	FILE *fp;
 	T val;
 
-	char *line = (char *) malloc(500*sizeof(char));
+	char *line = (char *)malloc(500 * sizeof(char));
 
-#define TMP_NEDELIM (lnptr[0] != ',')&&(lnptr[0] != ' ')&&(lnptr[0] != '\t')
-#define TMP_EQDELIM (lnptr[0] == ',')||(lnptr[0] == ' ')||(lnptr[0] == '\t')
+	#define TMP_NEDELIM (lnptr[0] != ',') && (lnptr[0] != ' ') && (lnptr[0] != '\t')
+	#define TMP_EQDELIM (lnptr[0] == ',') || (lnptr[0] == ' ') || (lnptr[0] == '\t')
 
-	if ( strcmp(flname,"stdin") == 0 ) {
+	if (strcmp(flname, "stdin") == 0) {
 		fp = stdin;
-	} else if ( !(fp = fopen(flname, "rb")) ) {
-		std::string errmsg = std::string("ERROR: Unable to read from file \"") + std::string(flname) + std::string("\"\n");
-		throw::std::invalid_argument(errmsg);
+	} else if (!(fp = fopen(flname, "rb"))) {
+		std::string errmsg = std::string("ERROR: Unable to read from file \"") +
+				     std::string(flname) + std::string("\"\n");
+		throw ::std::invalid_argument(errmsg);
 		return;
 	}
 
-	while ( fgetline(fp, line) ) {
+	while (fgetline(fp, line)) {
 		lnptr = line;
-		while ( (lnptr[0] == ' ') || (lnptr[0] == '\t') ) lnptr++;
-		if ( (lnptr[0] != '#') && (lnptr[0] != '\n') ) {
+		while ((lnptr[0] == ' ') || (lnptr[0] == '\t'))
+			lnptr++;
+		if ((lnptr[0] != '#') && (lnptr[0] != '\n')) {
 			lnptr += cvtStrToVal(lnptr, val);
 			lc_t->append(val);
 		}
@@ -1086,8 +1148,8 @@ void readOneCol(const char *flname, ListClass<T> *lc_t)
 	}
 
 	free(line);
-#undef TMP_NEDELIM
-#undef TMP_EQDELIM
+	#undef TMP_NEDELIM
+	#undef TMP_EQDELIM
 
 #else
 	int position;
@@ -1109,10 +1171,10 @@ void readOneCol(const char *flname, ListClass<T> *lc_t)
 	do {
 		position = fp.tellg();
 		cont = fp.get(ch);
-		while(cont && ((ch == ' ') || (ch == '\t'))) {
+		while (cont && ((ch == ' ') || (ch == '\t'))) {
 			cont = fp.get(ch);
 		}
-		if ( (ch != '#') && (ch != '\n') ) {
+		if ((ch != '#') && (ch != '\n')) {
 			fp.seekg(-1, std::ios::cur);
 			if (fp >> val) {
 				lc_t->append(val);
@@ -1120,11 +1182,12 @@ void readOneCol(const char *flname, ListClass<T> *lc_t)
 		}
 		fp.seekg(position, std::ios::beg);
 		cont = fp.get(ch);
-		while(cont && (ch != '\n')) {
+		while (cont && (ch != '\n')) {
 			cont = fp.get(ch);
-			// Using "cont = (fp >> ch)" ignores '\n' and doesn't work.  Don't understand.
+			// Using "cont = (fp >> ch)" ignores '\n' and doesn't work.  Don't
+			// understand.
 		}
-	} while(cont);
+	} while (cont);
 
 	fp.close();
 #endif
@@ -1142,15 +1205,15 @@ void readOneCol(const char *flname, ListClass<T> *lc_t)
 /****  AND   int value ival.                                                           ****/
 /**** Return the value x, such that x = list[i] and ilist[i] = ival.                   ****/
 /******************************************************************************************/
-	template<class T, class U>
+template<class T, class U>
 T crossList(const ListClass<T> *lc_t, const U *ilist, U val, int err)
 {
 	int i, found;
-	T retval = (T) NULL;
+	T retval = (T)NULL;
 	int size = lc_t->getSize();
 
 	found = 0;
-	for (i=size-1; (i>=0)&&(!found); i--) {
+	for (i = size - 1; (i >= 0) && (!found); i--) {
 		if (ilist[i] == val) {
 			found = 1;
 			retval = (*lc_t)[i];
@@ -1164,7 +1227,6 @@ T crossList(const ListClass<T> *lc_t, const U *ilist, U val, int err)
 		}
 	}
 
-	return(retval);
+	return (retval);
 };
 /******************************************************************************************/
-

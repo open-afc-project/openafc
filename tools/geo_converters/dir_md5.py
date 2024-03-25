@@ -75,6 +75,7 @@ class FileInfo:
     basename  -- Basename to use as sort key if computation is nonrecursive
     size      -- File size in bytes
     """
+
     def __init__(self, filename: str, root: str, size: int) -> None:
         """ Constructor
 
@@ -109,6 +110,7 @@ class ChunkInfo:
     length   -- Chunk length
     data     -- Chunk content (filled in worker, initially None)
     """
+
     def __init__(self, seq: int, fileinfo: FileInfo, offset: int,
                  length: int) -> None:
         """ Constructor
@@ -135,6 +137,7 @@ class Md5Computer:
     _max_in_flight -- Maximum number of retrieved but not processed chunks
     _progress      -- Print progress information
     """
+
     def __init__(self, num_threads: Optional[int], chunk_size: int,
                  max_in_flight: int, progress: bool, stats: bool) -> None:
         """ Constructor
@@ -368,11 +371,11 @@ class VersionJson:
         """ Returns information about filesets contained in the file """
         ret: List["VersionJson.FilesetInfo"] = []
         for fs_type, fs_dict in self._json_dict[FILESETS_KEY].items():
-            error_if(not(isinstance(fs_dict, dict) and
-                         (FILESET_MASKS_KEY in fs_dict) and
-                         isinstance(fs_dict[FILESET_MASKS_KEY], list) and
-                         all(isinstance(v, str)
-                             for v in fs_dict[FILESET_MASKS_KEY])),
+            error_if(not (isinstance(fs_dict, dict) and
+                          (FILESET_MASKS_KEY in fs_dict) and
+                          isinstance(fs_dict[FILESET_MASKS_KEY], list) and
+                          all(isinstance(v, str)
+                              for v in fs_dict[FILESET_MASKS_KEY])),
                      f"'{fs_type}' fileset descriptor in "
                      f"'{FILESET_KEY_PATTERN}' of '{self._filename}' has "
                      f"invalid structure")
@@ -652,7 +655,7 @@ def main(argv: List[str]) -> None:
         "--nice", action="store_true",
         help="Lower priority of this process and its subprocesses")
     switches_computation.add_argument(
-        "--chunk", type=int, default=16*1024*1024, help=argparse.SUPPRESS)
+        "--chunk", type=int, default=16 * 1024 * 1024, help=argparse.SUPPRESS)
     switches_computation.add_argument(
         "--max_in_flight", type=int, default=50, help=argparse.SUPPRESS)
 

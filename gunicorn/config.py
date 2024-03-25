@@ -7,5 +7,6 @@
 
 import prometheus_client.multiprocess
 
+
 def child_exit(server, worker):
     prometheus_client.multiprocess.mark_process_dead(worker.pid)

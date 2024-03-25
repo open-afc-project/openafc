@@ -9,7 +9,7 @@
 """
 Description
 
-The acceptor client (aka consumer) registeres own queue within broker 
+The acceptor client (aka consumer) registeres own queue within broker
 application (aka rabbitmq). Such queue used as a channel for control commands.
 """
 
@@ -37,19 +37,20 @@ dictConfig({
             'datefmt': '%Y-%m-%d %H:%M:%S',
         }
     },
-   'handlers' : {
+    'handlers': {
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'standard',
         }
-   },
-   'root': {
+    },
+    'root': {
         'level': 'INFO',
         'handlers': ['console']
-   },
+    },
 })
 app_log = logging.getLogger()
+
 
 class Configurator(dict):
     __instance = None
@@ -72,12 +73,13 @@ class Configurator(dict):
 
 
 log_level_map = {
-    'debug' : logging.DEBUG,    # 10
-    'info' : logging.INFO,      # 20
-    'warn' : logging.WARNING,   # 30
-    'err' : logging.ERROR,      # 40
-    'crit' : logging.CRITICAL,  # 50
+    'debug': logging.DEBUG,    # 10
+    'info': logging.INFO,      # 20
+    'warn': logging.WARNING,   # 30
+    'err': logging.ERROR,      # 40
+    'crit': logging.CRITICAL,  # 50
 }
+
 
 def set_log_level(opt) -> int:
     app_log.info(f"({os.getpid()}) {inspect.stack()[0][3]}() "
@@ -117,8 +119,8 @@ def run_restart(cfg):
             # use default certificate (placeholder)
             # in any case of missing file, no more certificates included
             app_log.info(f"Misssing certificate file "
-                          f"{cfg['OBJST_CERT_CLI_BUNDLE']}, back to default "
-                          f"{cfg['DISPAT_CERT_CLI_BUNDLE_DFLT']}")
+                         f"{cfg['OBJST_CERT_CLI_BUNDLE']}, back to default "
+                         f"{cfg['DISPAT_CERT_CLI_BUNDLE_DFLT']}")
             shutil.copy2(cfg['DISPAT_CERT_CLI_BUNDLE_DFLT'],
                          cfg['DISPAT_CERT_CLI_BUNDLE'])
         p = subprocess.Popen("nginx -s reload",
@@ -143,8 +145,8 @@ def run_remove(cfg):
 
 
 commands_map = {
-    'cmd_restart' : run_restart,
-    'cmd_remove'  : run_remove,
+    'cmd_restart': run_restart,
+    'cmd_remove': run_remove,
 }
 
 
@@ -172,8 +174,8 @@ def run_it(cfg):
 
 # available commands to execute in alphabetical order
 execution_map = {
-    'run' : run_it,
-    'check' : readiness_check,
+    'run': run_it,
+    'check': readiness_check,
 }
 
 
@@ -183,13 +185,13 @@ def make_arg_parser():
         epilog=__doc__.strip(),
         formatter_class=argparse.RawTextHelpFormatter)
     args_parser.add_argument('--log', type=set_log_level,
-                         default='info', dest='log_level',
-                         help="<info|debug|warn|err|crit> - set "
-                         "logging level (default=info).\n")
+                             default='info', dest='log_level',
+                             help="<info|debug|warn|err|crit> - set "
+                             "logging level (default=info).\n")
     args_parser.add_argument('--cmd', choices=execution_map.keys(),
-        nargs='?',
-        help="run - start accepting commands.\n"
-        "check - run readiness check.\n")
+                             nargs='?',
+                             help="run - start accepting commands.\n"
+                             "check - run readiness check.\n")
 
     return args_parser
 

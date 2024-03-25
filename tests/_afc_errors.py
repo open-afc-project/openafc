@@ -8,6 +8,7 @@
 class AfcError(Exception):
     pass
 
+
 class IncompleteRange(AfcError):
     def __init__(self, left, right, msg='Incomplete range'):
         self.msg = msg
@@ -15,9 +16,11 @@ class IncompleteRange(AfcError):
         self.right = right
         super().__init__(self.msg, self.left, self.right)
 
+
 class IncompleteFreqRange(IncompleteRange):
     def __init__(self, left, right, msg='Incomplete freq range'):
         IncompleteRange.__init__(self, left, right, msg)
+
 
 class IncompleteGeoCoordinates(IncompleteRange):
     def __init__(self, left, right, msg='Incomplete Geo coordinates'):

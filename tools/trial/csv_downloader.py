@@ -19,9 +19,10 @@ def main():
     """Shows basic usage of the Sheets API.
     Prints values from a sample spreadsheet.
     """
-    parser = argparse.ArgumentParser(description='Download google sheet into csv')
+    parser = argparse.ArgumentParser(
+        description='Download google sheet into csv')
     parser.add_argument('--out', type=str, required=True,
-                    help='output csv file name')
+                        help='output csv file name')
     args = parser.parse_args()
 
     creds = None
@@ -55,13 +56,13 @@ def main():
             print('No data found.')
             return
 
-        with open(args.out, 'w', encoding = 'utf-8') as csv_file:
+        with open(args.out, 'w', encoding='utf-8') as csv_file:
             for row in values:
-                l = len(row)
-                if l > 0:
-                    csv_file.write('\"%s\"' %(row[0]))
-                    for i in range(1, l):
-                        csv_file.write(',\"%s\"' %(row[i]))
+                length = len(row)
+                if length > 0:
+                    csv_file.write('\"%s\"' % (row[0]))
+                    for i in range(1, length):
+                        csv_file.write(',\"%s\"' % (row[i]))
                     csv_file.write('\n')
     except HttpError as err:
         print(err)

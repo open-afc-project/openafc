@@ -75,6 +75,7 @@ class GdalProgressor:
     _total_lines   -- Total number of raster lines
     _last_fraction -- Recently printed 1/40-th fraction
     """
+
     def __init__(self, filename: str, total_lines: int) -> None:
         """ Constructor
 
@@ -117,18 +118,18 @@ class YamlParams:
     TargetCodeInfo = \
         NamedTuple("TargetCodeInfo",
                    [
-                    # Land usage description
-                    ("description", str),
-                    # Color to use on generated map
-                    ("color", List[int])])
+                       # Land usage description
+                       ("description", str),
+                       # Color to use on generated map
+                       ("color", List[int])])
     # Information about source code
     SrcCodeInfo = \
         NamedTuple("SrcCodeInfo",
                    [
-                    # Land usage description
-                    ("description", str),
-                    # Correspondent target code
-                    ("target_code", int)])
+                       # Land usage description
+                       ("description", str),
+                       # Correspondent target code
+                       ("target_code", int)])
 
     def __init__(self):
         """ Constructor. Reads all from YAML file """
@@ -202,12 +203,12 @@ class TranslationContexts:
     TranslationContext = \
         NamedTuple("TranslationContext",
                    [
-                    # Format of input data for estruct.unpack()
-                    ("input_format", str),
-                    # Format of output data for struct.pack()
-                    ("output_format", str),
-                    # Buffer for output data
-                    ("buffer", List[int])])
+                       # Format of input data for estruct.unpack()
+                       ("input_format", str),
+                       # Format of output data for struct.pack()
+                       ("output_format", str),
+                       # Buffer for output data
+                       ("buffer", List[int])])
 
     # Translation of GDAL raster data types to struct data types
     _DATA_SIZES: Dict[int, str] = \
@@ -244,8 +245,8 @@ class TranslationContexts:
             length = input_size // struct.calcsize(struct_data_type)
             ret = \
                 self.TranslationContext(
-                    input_format=length*struct_data_type,
-                    output_format=length*"B", buffer=length*[0])
+                    input_format=length * struct_data_type,
+                    output_format=length * "B", buffer=length * [0])
             self._contexts[key] = ret
         return ret
 

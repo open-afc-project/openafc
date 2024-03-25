@@ -5,7 +5,7 @@
 # a copy of which is included with this software program
 #
 
-AFC_TEST_STATUS = { 'Ok':0, 'Error':1 }
+AFC_TEST_STATUS = {'Ok': 0, 'Error': 1}
 AFC_OK = AFC_TEST_STATUS['Ok']
 AFC_ERR = AFC_TEST_STATUS['Error']
 

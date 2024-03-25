@@ -34,7 +34,8 @@ class TestPawsApi(TestAfcEngine):
     def tearDown(self):
         UserLoginBaseTestCase.tearDown(self)
 
-    def _call_jsonrpc(self, url, method, params, expect_status=200, expect_error=None, expect_result=None):
+    def _call_jsonrpc(self, url, method, params, expect_status=200,
+                      expect_error=None, expect_result=None):
         if not params:
             params = {}
 
@@ -121,8 +122,7 @@ class TestPawsApi(TestAfcEngine):
                 u'code': -32602,
                 u'name': u'InvalidParamsError',
                 u'message': u'InvalidParamsError: Required parameter names: deviceDesc location antenna capabilities type version',
-            }
-        )
+            })
 
     def test_jsonrpc_no_rulesets(self):
         req_devicedesc = {
@@ -166,7 +166,11 @@ class TestPawsApi(TestAfcEngine):
     def test_paws_valid(self):
         afc_loc = self.guiconfig["afcconfig_defaults"]
         LOGGER.debug("cookies: %s, token: %s", self.cookies, self.login_token)
-        resp = self.httpsession.head(self._resolve_url(afc_loc), headers={'Authorization': self.login_token},cookies=self.cookies)
+        resp = self.httpsession.head(
+            self._resolve_url(afc_loc),
+            headers={
+                'Authorization': self.login_token},
+            cookies=self.cookies)
         code = resp.status_code
         LOGGER.debug("status: %d, url: %s", code, self._resolve_url(afc_loc))
         if code == 404:
@@ -212,7 +216,11 @@ class TestPawsApi(TestAfcEngine):
     def test_paws_resp_structure(self):
         afc_loc = self.guiconfig["afcconfig_defaults"]
         LOGGER.debug("cookies: %s, token: %s", self.cookies, self.login_token)
-        resp = self.httpsession.get(self._resolve_url(afc_loc), headers={'Authorization': self.login_token},cookies=self.cookies)
+        resp = self.httpsession.get(
+            self._resolve_url(afc_loc),
+            headers={
+                'Authorization': self.login_token},
+            cookies=self.cookies)
         code = resp.status_code
         LOGGER.debug("status: %d, url: %s", code, self._resolve_url(afc_loc))
         if code == 404:

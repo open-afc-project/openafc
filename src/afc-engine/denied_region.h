@@ -14,7 +14,8 @@ class WorldData;
 class AfcManager;
 class AntennaClass;
 
-template<class T> class ListClass;
+template<class T>
+class ListClass;
 
 /******************************************************************************************/
 /**** CLASS: DeniedRegionClass                                                         ****/
@@ -26,7 +27,7 @@ class DeniedRegionClass
 		virtual ~DeniedRegionClass();
 
 		/**************************************************************************************/
-		/**** Geometry                                                                     ****/
+		/**** Geometry ****/
 		/**************************************************************************************/
 		enum GeometryEnum {
 			nullGeometry,
@@ -38,33 +39,60 @@ class DeniedRegionClass
 		/**************************************************************************************/
 
 		/**************************************************************************************/
-		/**** Type                                                                         ****/
+		/**** Type ****/
 		/**************************************************************************************/
-		enum TypeEnum {
-			nullType,
-			RASType,
-			userSpecifiedType
-		};
+		enum TypeEnum { nullType, RASType, userSpecifiedType };
 		/**************************************************************************************/
 
 		virtual GeometryEnum getGeometry() const = 0;
 
-		virtual bool intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const = 0;
+		virtual bool intersect(double longitude,
+				       double latitude,
+				       double maxDist,
+				       double txHeightAGL) const = 0;
 
-		int getID() const {
+		int getID() const
+		{
 			return id;
 		}
 
-		TypeEnum getType() const { return(type); }
-        void setType(TypeEnum typeVal) { type = typeVal; }
+		TypeEnum getType() const
+		{
+			return (type);
+		}
+		void setType(TypeEnum typeVal)
+		{
+			type = typeVal;
+		}
 
-		void setStartFreq(double startFreqVal) { startFreq = startFreqVal; return; }
-		void setStopFreq (double  stopFreqVal) { stopFreq  =  stopFreqVal; return; }
-		void setHeightAGL(double heightAGLVal) { heightAGL = heightAGLVal; return; }
+		void setStartFreq(double startFreqVal)
+		{
+			startFreq = startFreqVal;
+			return;
+		}
+		void setStopFreq(double stopFreqVal)
+		{
+			stopFreq = stopFreqVal;
+			return;
+		}
+		void setHeightAGL(double heightAGLVal)
+		{
+			heightAGL = heightAGLVal;
+			return;
+		}
 
-		double getStartFreq() const { return startFreq; }
-		double getStopFreq()  const { return  stopFreq; }
-		double getHeightAGL() const { return heightAGL; }
+		double getStartFreq() const
+		{
+			return startFreq;
+		}
+		double getStopFreq() const
+		{
+			return stopFreq;
+		}
+		double getHeightAGL() const
+		{
+			return heightAGL;
+		}
 
 	protected:
 		int id;
@@ -86,7 +114,8 @@ class RectDeniedRegionClass : public DeniedRegionClass
 		RectDeniedRegionClass(int idVal);
 		~RectDeniedRegionClass();
 
-		GeometryEnum getGeometry() const {
+		GeometryEnum getGeometry() const
+		{
 			if (rectList.size() == 1) {
 				return rectGeometry;
 			} else if (rectList.size() == 2) {
@@ -96,15 +125,24 @@ class RectDeniedRegionClass : public DeniedRegionClass
 			}
 		}
 
-		bool intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const;
+		bool intersect(double longitude,
+			       double latitude,
+			       double maxDist,
+			       double txHeightAGL) const;
 
-		int getNumRect() const { return rectList.size(); }
-		std::tuple<double, double, double, double> getRect(int rectIdx) const { return rectList[rectIdx]; }
+		int getNumRect() const
+		{
+			return rectList.size();
+		}
+		std::tuple<double, double, double, double> getRect(int rectIdx) const
+		{
+			return rectList[rectIdx];
+		}
 
 		void addRect(double lon1, double lon2, double lat1, double lat2);
 
 	private:
-		std::vector<std::tuple<double, double, double, double> > rectList;
+		std::vector<std::tuple<double, double, double, double>> rectList;
 };
 /******************************************************************************************/
 
@@ -117,7 +155,8 @@ class CircleDeniedRegionClass : public DeniedRegionClass
 		CircleDeniedRegionClass(int idVal, bool horizonDistFlagVal);
 		~CircleDeniedRegionClass();
 
-		GeometryEnum getGeometry() const {
+		GeometryEnum getGeometry() const
+		{
 			if (!horizonDistFlag) {
 				return circleGeometry;
 			} else {
@@ -125,15 +164,39 @@ class CircleDeniedRegionClass : public DeniedRegionClass
 			}
 		}
 
-		bool intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const;
+		bool intersect(double longitude,
+			       double latitude,
+			       double maxDist,
+			       double txHeightAGL) const;
 
-		void setLongitudeCenter(double longitudeCenterVal) { longitudeCenter = longitudeCenterVal; return; }
-		void setLatitudeCenter (double  latitudeCenterVal) {  latitudeCenter =  latitudeCenterVal; return; }
-		void setRadius         (double          radiusVal) {          radius =          radiusVal; return; }
+		void setLongitudeCenter(double longitudeCenterVal)
+		{
+			longitudeCenter = longitudeCenterVal;
+			return;
+		}
+		void setLatitudeCenter(double latitudeCenterVal)
+		{
+			latitudeCenter = latitudeCenterVal;
+			return;
+		}
+		void setRadius(double radiusVal)
+		{
+			radius = radiusVal;
+			return;
+		}
 
-		double getLongitudeCenter() const { return longitudeCenter; }
-		double getLatitudeCenter()  const { return  latitudeCenter; }
-		bool   getHorizonDistFlag() const { return horizonDistFlag; }
+		double getLongitudeCenter() const
+		{
+			return longitudeCenter;
+		}
+		double getLatitudeCenter() const
+		{
+			return latitudeCenter;
+		}
+		bool getHorizonDistFlag() const
+		{
+			return horizonDistFlag;
+		}
 
 		double computeRadius(double txHeightAGL) const;
 

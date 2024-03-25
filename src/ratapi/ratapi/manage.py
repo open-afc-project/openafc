@@ -38,7 +38,7 @@ def json_lookup(key, json_obj, val):
         '''
         if isinstance(json_obj, dict):
             for k, v in json_obj.items():
-                #LOGGER.debug('%s ... %s', k, type(v))
+                # LOGGER.debug('%s ... %s', k, type(v))
                 if k == key:
                     keepit.append(v)
                     if val:
@@ -183,8 +183,10 @@ class DbCreate(Command):
                 get_or_create(db.session, Ruleset, name=rule)
             stamp(revision='head')
 
+
 class DbDrop(Command):
     ''' Create a full new database outside of alembic migrations. '''
+
     def __call__(self, flaskapp):
         LOGGER.debug('DbDrop.__call__()')
         with flaskapp.app_context():
@@ -212,49 +214,52 @@ class DbExport(Command):
             limit = None
             user_info = {}
             user_cfg = {}
-            for user, _, role in db.session.query(User, UserRole,
-Role).filter(User.id == UserRole.user_id).filter(UserRole.role_id ==
-Role.id).all():  # pylint: disable=no-member
+            for user, _, role in db.session.query(
+                    User, UserRole, Role).filter(
+                    User.id == UserRole.user_id).filter(
+                    UserRole.role_id == Role.id).all():  # pylint: disable=no-member
                 key = user.email + ":" + str(user.id)
                 if key in user_cfg:
                     user_cfg[key]['rolename'].append(role.name)
                 else:
                     user_cfg[key] = {
-                         'id':user.id,
-                         'email':user.email,
-                         'password':user.password,
-                         'rolename':[role.name],
-                         'ap':[]
+                        'id': user.id,
+                        'email': user.email,
+                        'password': user.password,
+                        'rolename': [role.name],
+                        'ap': []
                     }
 
                     try:
                         user_cfg[key]['username'] = user.username
-                    except:
+                    except BaseException:
                         # if old db has no username field, use email field.
                         user_cfg[key]['username'] = user.email
 
                     try:
                         user_cfg[key]['org'] = user.org
-                    except:
+                    except BaseException:
                         # if old db has no org field, derive from email field.
                         if '@' in user.email:
-                            user_cfg[key]['org'] = user.email[user.email.index('@') + 1:]
-                        else: # dummy user - dummy org
+                            user_cfg[key]['org'] = user.email[user.email.index(
+                                '@') + 1:]
+                        else:  # dummy user - dummy org
                             user_cfg[key]['org'] = ""
-
 
             try:
                 limits = db.session.query(Limit).filter(id=0).first()
-                limit = {'min_eirp':float(limits.min_eirp), 'enforce':bool(limits.enforce)}
+                limit = {'min_eirp': float(
+                    limits.min_eirp), 'enforce': bool(limits.enforce)}
 
-            except:
+            except BaseException:
                 LOGGER.debug("Error exporting EIRP Limit")
 
             with open(filename, 'w') as fpout:
                 for k, v in user_cfg.items():
-                    fpout.write("%s\n" %json.dumps({'userConfig':v}))
+                    fpout.write("%s\n" % json.dumps({'userConfig': v}))
                 if limit:
-                    fpout.write("%s\n" %json.dumps({'Limit':limit}))
+                    fpout.write("%s\n" % json.dumps({'Limit': limit}))
+
 
 def setUserIdNextVal():
     # Set nextval for the sequence so that next user record
@@ -263,9 +268,10 @@ def setUserIdNextVal():
     res = db.session.execute(cmd)
     val = res.fetchone()[0]
     if val:
-        cmd = 'ALTER SEQUENCE aaa_user_id_seq RESTART WITH ' + str(val+1)
+        cmd = 'ALTER SEQUENCE aaa_user_id_seq RESTART WITH ' + str(val + 1)
     db.session.execute(cmd)
     db.session.commit()
+
 
 class DbImport(Command):
     ''' Import User Database. '''
@@ -305,8 +311,9 @@ class DbImport(Command):
                     else:
                         limit = json_lookup('Limit', new_rcrd, None)
                         try:
-                            limits = db.session.query(Limit).filter_by(id=0).first()
-                            #insert case
+                            limits = db.session.query(
+                                Limit).filter_by(id=0).first()
+                            # insert case
                             if limits is None:
                                 limits = Limit(limit[0]['min_eirp'])
                                 db.session.add(limits)
@@ -316,8 +323,9 @@ class DbImport(Command):
                                 limits.min_eirp = limit[0]['min_eirp']
                                 limits.enforce = True
                             db.session.commit()
-                        except:
-                            raise RuntimeError("Can't commit DB for EIRP limits")
+                        except BaseException:
+                            raise RuntimeError(
+                                "Can't commit DB for EIRP limits")
 
                 setUserIdNextVal()
 
@@ -337,7 +345,8 @@ class DbUpgrade(Command):
             setUserIdNextVal()
             try:
                 from afcmodels.aaa import User
-                user = db.session.query(User).first()  # pylint: disable=no-member
+                user = db.session.query(
+                    User).first()  # pylint: disable=no-member
             except Exception as exception:
                 if 'aaa_user.username does not exist' in str(exception.args):
                     LOGGER.error("upgrade from preOIDC version")
@@ -350,7 +359,7 @@ class DbUpgrade(Command):
             ruleset_list = rulesets()
             for rule in ruleset_list:
                 get_or_create(db.session, Ruleset, name=rule)
- 
+
 
 class UserCreate(Command):
     ''' Create a new user functionality. '''
@@ -370,7 +379,7 @@ class UserCreate(Command):
     )
 
     def _create_user(self, flaskapp, id, username, email, password_in, role,
-hashed, org = None):
+                     hashed, org=None):
         ''' Create user in database. '''
         from contextlib import closing
         import datetime
@@ -402,7 +411,6 @@ hashed, org = None):
             else:
                 passhash = password_in
 
-
             with flaskapp.app_context():
                 # select count(*) from aaa_user where email = ?
                 if User.query.filter(User.email == email).count() > 0:
@@ -412,7 +420,7 @@ hashed, org = None):
                 if not org:
                     try:
                         org = email[email.index('@') + 1:]
-                    except:
+                    except BaseException:
                         org = ""
 
                 organization = Organization.query.filter_by(name=org).first()
@@ -478,12 +486,13 @@ hashed, org = None):
                               org)
 
     def __call__(self, flaskapp, username, password_in, role, hashed=False,
-org=None, email=None):
-        # If command does not provide email.  Populate email field with username
+                 org=None, email=None):
+        # If command does not provide email.  Populate email field with
+        # username
         if not email:
-           email = username
+            email = username
         self._create_user(flaskapp, None, username, email, password_in, role,
-hashed, org)
+                          hashed, org)
 
 
 class UserUpdate(Command):
@@ -498,7 +507,7 @@ class UserUpdate(Command):
         Option('--org', type=str, help='Organization'),
     )
 
-    def _update_user(self, flaskapp, email, role, org = None):
+    def _update_user(self, flaskapp, email, role, org=None):
         ''' Create user in database. '''
         from contextlib import closing
         from afcmodels.aaa import User, Role, Organization
@@ -519,10 +528,12 @@ class UserUpdate(Command):
                     if org:
                         user.org = org
                     org = user.org
-                    organization = Organization.query.filter_by(name=org).first()
+                    organization = Organization.query.filter_by(
+                        name=org).first()
                     if not organization:
                         organization = aaa.Organization(name=org)
-                        db.session.add(organization) # pylint: disable=no-member
+                        db.session.add(
+                            organization)  # pylint: disable=no-member
 
                     db.session.commit()  # pylint: disable=no-member
                 else:
@@ -579,19 +590,22 @@ class UserList(Command):
         table = PrettyTable()
         from afcmodels.aaa import User, UserRole, Role
         table.field_names = ["ID", "UserName", "Email", "Org", "Roles"]
- 
+
         if 'UPGRADE_REQ' in flaskapp.config and flaskapp.config['UPGRADE_REQ']:
             return
 
         with flaskapp.app_context():
             user_info = {}
             # select email, name from aaa_user as a join aaa_user_role as aur
-            # on au.id = aur.user_id join aaa_role as ar on ar.id = aur.role_id;
-            for user, _, role in db.session.query(User, UserRole,
-Role).filter(User.id == UserRole.user_id).filter(UserRole.role_id ==
-Role.id).all():  # pylint: disable=no-member
+            # on au.id = aur.user_id join aaa_role as ar on ar.id =
+            # aur.role_id;
+            for user, _, role in db.session.query(
+                    User, UserRole, Role).filter(
+                    User.id == UserRole.user_id).filter(
+                    UserRole.role_id == Role.id).all():  # pylint: disable=no-member
 
-                key = user.email + ":" + user.org + ":" + str(user.id) + ":" + user.username
+                key = user.email + ":" + user.org + ":" + \
+                    str(user.id) + ":" + user.username
 
                 if key in user_info:
                     user_info[key] = user_info[key] + ", " + role.name
@@ -599,8 +613,9 @@ Role.id).all():  # pylint: disable=no-member
                     user_info[key] = role.name
 
             # Find all users without roles and show them last
-            for user in  db.session.query(User).filter(~User.roles.any()).all():
-                key = user.email + ":" + user.org + ":" + str(user.id) + ":" + user.username
+            for user in db.session.query(User).filter(~User.roles.any()).all():
+                key = user.email + ":" + user.org + ":" + \
+                    str(user.id) + ":" + user.username
                 user_info[key] = ""
 
             for k, v in user_info.items():
@@ -608,6 +623,7 @@ Role.id).all():  # pylint: disable=no-member
                 table.add_row([_id, name, email, org, v])
 
             print(table)
+
 
 class User(Manager):
     ''' View and manage AAA state '''
@@ -640,7 +656,7 @@ class AccessPointDenyCreate(Command):
         import datetime
         from afcmodels.aaa import AccessPointDeny, Organization, Ruleset
         LOGGER.debug('AccessPointDenyCreate._create_ap() %s %s %s',
-                      serial, cert_id, ruleset)
+                     serial, cert_id, ruleset)
         with flaskapp.app_context():
             if not cert_id or not org or not ruleset:
                 raise RuntimeError('Certification, org and ruleset required')
@@ -649,11 +665,11 @@ class AccessPointDenyCreate(Command):
             if not ruleset:
                 raise RuntimeError('Bad ruleset')
 
-            ap = AccessPointDeny.query.filter(AccessPointDeny.\
-                 certification_id==cert_id).\
-                 filter(AccessPointDeny.serial_number == serial).first()
+            ap = AccessPointDeny.query.filter(AccessPointDeny.
+                                              certification_id == cert_id).\
+                filter(AccessPointDeny.serial_number == serial).first()
             if ap:
-                    raise RuntimeError('Duplicate device detected')
+                raise RuntimeError('Duplicate device detected')
 
             organization = Organization.query.filter_by(name=org).first()
             if not organization:
@@ -674,7 +690,8 @@ class AccessPointDenyCreate(Command):
         if flaskapp:
             self._create_ap(flaskapp, str(serial_id), cert_id, ruleset, org)
 
-    def __call__(self, flaskapp, serial=None, cert_id=None, ruleset=None, org=None):
+    def __call__(self, flaskapp, serial=None,
+                 cert_id=None, ruleset=None, org=None):
         self._create_ap(flaskapp, serial, cert_id, ruleset, org)
 
 
@@ -694,13 +711,13 @@ class AccessPointDenyRemove(Command):
         with flaskapp.app_context():
             try:
                 # select * from access_point as ap where ap.serial_number = ?
-                ap = AccessPointDeny.query.filter(\
-                     AccessPointDeny.serial_number == serial).\
-                     filter(AccessPointDeny.certification_id == cert_id).one()
+                ap = AccessPointDeny.query.filter(
+                    AccessPointDeny.serial_number == serial).\
+                    filter(AccessPointDeny.certification_id == cert_id).one()
 
                 if not ap:
                     raise RuntimeError('No access point found')
-            except:
+            except BaseException:
                 raise RuntimeError('No access point found')
 
             db.session.delete(ap)  # pylint: disable=no-member
@@ -723,9 +740,10 @@ class AccessPointDenyList(Command):
 
         table.field_names = ["Serial Number", "Cert ID", "Ruleset", "Org"]
         with flaskapp.app_context():
-            for ap in db.session.query(AccessPointDeny).all():  # pylint: disable=no-member
-                table.add_row([ap.serial_number, ap.certification_id,\
-                    ap.ruleset.name, ap.org.name])
+            for ap in db.session.query(
+                    AccessPointDeny).all():  # pylint: disable=no-member
+                table.add_row([ap.serial_number, ap.certification_id,
+                               ap.ruleset.name, ap.org.name])
             print(table)
 
 
@@ -749,6 +767,7 @@ class CertificationId(Manager):
         self.add_command("list", CertIdList())
         self.add_command("sweep", CertIdSweep())
 
+
 class CertIdList(Command):
     '''Lists all access points'''
 
@@ -758,8 +777,9 @@ class CertIdList(Command):
 
         table.field_names = ["Cert ID", "Ruleset", "Loc", "Refreshed"]
         with flaskapp.app_context():
-            for cert in db.session.query(CertId).all():  # pylint: disable=no-member
-                table.add_row([cert.certification_id, cert.ruleset.name, \
+            for cert in db.session.query(
+                    CertId).all():  # pylint: disable=no-member
+                table.add_row([cert.certification_id, cert.ruleset.name,
                                cert.location, cert.refreshed_at])
             print(table)
 
@@ -813,7 +833,7 @@ class CertIdCreate(Command):
         import datetime
         from afcmodels.aaa import CertId, Ruleset, Organization
         LOGGER.debug('CertIdCreate._create_cert_id() %s %s',
-                      cert_id, ruleset_id)
+                     cert_id, ruleset_id)
         with flaskapp.app_context():
             if not ruleset_id:
                 raise RuntimeError("Ruleset is required")
@@ -823,7 +843,8 @@ class CertIdCreate(Command):
             if not ruleset:
                 raise RuntimeError("Invalid Ruleset")
 
-            if CertId.query.filter(CertId.certification_id==cert_id).count() > 0:
+            if CertId.query.filter(
+                    CertId.certification_id == cert_id).count() > 0:
                 raise RuntimeError(
                     'Existing certificate found with id "{0}"'.format(cert_id))
 
@@ -833,10 +854,11 @@ class CertIdCreate(Command):
             db.session.add(cert)  # pylint: disable=no-member
             db.session.commit()  # pylint: disable=no-member
 
-    def __init__(self, flaskapp=None, cert_id=None, ruleset_id=None, location=0):
+    def __init__(self, flaskapp=None, cert_id=None,
+                 ruleset_id=None, location=0):
         if flaskapp and cert_id:
             self._create_cert_id(flaskapp, cert_id, ruleset_id=ruleset_id,
-location=location)
+                                 location=location)
 
     def __call__(self, flaskapp, cert_id, ruleset_id=None, location=0):
         self._create_cert_id(flaskapp, cert_id, ruleset_id, location)
@@ -859,68 +881,70 @@ class CertIdSweep(Command):
 
         with flaskapp.app_context():
             url = \
-                 "https://www.ic.gc.ca/engineering/Certified_Standard_Power_Access_Points_6GHz.csv"
+                "https://www.ic.gc.ca/engineering/Certified_Standard_Power_Access_Points_6GHz.csv"
             headers = {
-              'accept': 'text/html,application/xhtml+xml,application/xml',
-              'cache-control': 'max-age=0',
-              'content-type': 'application/x-www-form-urlencoded',
-              'user-agent': 'rat_server/1.0'
+                'accept': 'text/html,application/xhtml+xml,application/xml',
+                'cache-control': 'max-age=0',
+                'content-type': 'application/x-www-form-urlencoded',
+                'user-agent': 'rat_server/1.0'
             }
             try:
-              with requests.get(url, headers, stream=True) as r:
-                r.raise_for_status()
+                with requests.get(url, headers, stream=True) as r:
+                    r.raise_for_status()
 
-                local_filename = "/tmp/SD6_list.csv"
-                with open(local_filename, 'wb') as f:
-                    for chunk in r.iter_content(chunk_size=8192): 
-                        f.write(chunk)
+                    local_filename = "/tmp/SD6_list.csv"
+                    with open(local_filename, 'wb') as f:
+                        for chunk in r.iter_content(chunk_size=8192):
+                            f.write(chunk)
 
-              with open(local_filename, newline='') as csvfile:
-                rdr = csv.reader(csvfile, delimiter=',')
-                for row in rdr:
-                    try:
-                        cert_id = row[7]
-                        code = int(row[6])
-                        if code == 103:
-                            location = CertId.OUTDOOR
-                        elif code == 111:
-                            location = CertId.INDOOR | CertId.OUTDOOR
-                        else:
-                            location = CertId.UNKNOWN
-                        if not location == CertId.UNKNOWN:
-                            cert = CertId.query.filter_by(certification_id=cert_id).first()
-                            if cert :
-                                cert.refreshed_at = now
-                                cert.location = location
+                with open(local_filename, newline='') as csvfile:
+                    rdr = csv.reader(csvfile, delimiter=',')
+                    for row in rdr:
+                        try:
+                            cert_id = row[7]
+                            code = int(row[6])
+                            if code == 103:
+                                location = CertId.OUTDOOR
+                            elif code == 111:
+                                location = CertId.INDOOR | CertId.OUTDOOR
                             else:
-                                cert = CertId(certification_id=cert_id,
-                                              location=location)
-                                ruleset_id_str = regionStrToRulesetId("CA")
-                                ruleset = Ruleset.query.filter_by(name=ruleset_id_str).first()
-                                ruleset.cert_ids.append(cert)
-                                db.session.add(cert)
-                    except:
-                        # ignore badly formatted rows
-                        pass
-                als.als_json_log('cert_db', {'action':'sweep', \
-'country':'CA', 'status':'success'})
-                db.session.commit()  # pylint: disable=no-member
-            except:
-                als.als_json_log('cert_db', {'action':'sweep', \
-'country':'CA', 'status':'failed download'})
+                                location = CertId.UNKNOWN
+                            if not location == CertId.UNKNOWN:
+                                cert = CertId.query.filter_by(
+                                    certification_id=cert_id).first()
+                                if cert:
+                                    cert.refreshed_at = now
+                                    cert.location = location
+                                else:
+                                    cert = CertId(certification_id=cert_id,
+                                                  location=location)
+                                    ruleset_id_str = regionStrToRulesetId("CA")
+                                    ruleset = Ruleset.query.filter_by(
+                                        name=ruleset_id_str).first()
+                                    ruleset.cert_ids.append(cert)
+                                    db.session.add(cert)
+                        except BaseException:
+                            # ignore badly formatted rows
+                            pass
+                    als.als_json_log(
+                        'cert_db', {
+                            'action': 'sweep', 'country': 'CA', 'status': 'success'})
+                    db.session.commit()  # pylint: disable=no-member
+            except BaseException:
+                als.als_json_log(
+                    'cert_db', {
+                        'action': 'sweep', 'country': 'CA', 'status': 'failed download'})
                 self.mailAlert(flaskapp, 'CA', 'none')
-
 
     def sweep_fcc_id(self, flaskapp):
         from afcmodels.aaa import CertId
-        id_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=243&equipment_class_description=6ID-15E+6+GHz+Low+Power+Indoor+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"
+        id_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=243&equipment_class_description=6ID-15E+6+GHz+Low+Power+Indoor+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"  # noqa
         self.sweep_fcc_data(flaskapp, id_data, CertId.INDOOR)
-
 
     def sweep_fcc_sd(self, flaskapp):
         from afcmodels.aaa import CertId
 
-        sd_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=250&equipment_class_description=6SD-15E+6+GHz+Standard+Power+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"
+        sd_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=250&equipment_class_description=6SD-15E+6+GHz+Standard+Power+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"  # noqa
         self.sweep_fcc_data(flaskapp, sd_data, CertId.OUTDOOR)
 
     def sweep_fcc_data(self, flaskapp, data, location):
@@ -931,48 +955,51 @@ class CertIdSweep(Command):
 
         now = datetime.datetime.now()
         with flaskapp.app_context():
-            url  = 'https://apps.fcc.gov/oetcf/eas/reports/GenericSearchResult.cfm?RequestTimeout=500'
+            url = 'https://apps.fcc.gov/oetcf/eas/reports/GenericSearchResult.cfm?RequestTimeout=500'
             headers = {
-              'accept': 'text/html,application/xhtml+xml,application/xml',
-              'cache-control': 'max-age=0',
-              'content-type': 'application/x-www-form-urlencoded',
-              'user-agent': 'rat_server/1.0'
+                'accept': 'text/html,application/xhtml+xml,application/xml',
+                'cache-control': 'max-age=0',
+                'content-type': 'application/x-www-form-urlencoded',
+                'user-agent': 'rat_server/1.0'
             }
 
             try:
-              resp = requests.post(url, headers=headers, data=data)
-              if resp.status_code == 200:
-                try:
-                    from xml.etree import ElementTree
-                    tree = ElementTree.fromstring(resp.content)
-                    for node in tree:
-                        fcc_id = node.find('fcc_id').text
-                        cert = CertId.query.filter_by(certification_id=fcc_id).first()
-                         
-                        if cert:
-                            cert.refreshed_at = now
-                            cert.location = cert.location | location
-                        elif location == CertId.OUTDOOR:
-                            # add new entries that are in 6SD list.
-                            cert = CertId(certification_id=fcc_id,
-                                          location=CertId.OUTDOOR)
-                            ruleset_id_str = regionStrToRulesetId("US")
-                            ruleset = Ruleset.query.filter_by(name=ruleset_id_str).first()
-                            ruleset.cert_ids.append(cert)
-                            db.session.add(cert)
+                resp = requests.post(url, headers=headers, data=data)
+                if resp.status_code == 200:
+                    try:
+                        from xml.etree import ElementTree
+                        tree = ElementTree.fromstring(resp.content)
+                        for node in tree:
+                            fcc_id = node.find('fcc_id').text
+                            cert = CertId.query.filter_by(
+                                certification_id=fcc_id).first()
 
-                    als.als_json_log('cert_db', {'action':'sweep', \
-'country':'US', 'status':'success'})
-                except:
-                    raise RuntimeError("Bad XML in Cert Id download")
-              else:
-                raise RuntimeError("Bad Cert Id download")
-              db.session.commit()  # pylint: disable=no-member
-            except:
-                als.als_json_log('cert_db', {'action':'sweep', \
-'country':'US', 'status':'failed download'})
+                            if cert:
+                                cert.refreshed_at = now
+                                cert.location = cert.location | location
+                            elif location == CertId.OUTDOOR:
+                                # add new entries that are in 6SD list.
+                                cert = CertId(certification_id=fcc_id,
+                                              location=CertId.OUTDOOR)
+                                ruleset_id_str = regionStrToRulesetId("US")
+                                ruleset = Ruleset.query.filter_by(
+                                    name=ruleset_id_str).first()
+                                ruleset.cert_ids.append(cert)
+                                db.session.add(cert)
+
+                        als.als_json_log(
+                            'cert_db', {
+                                'action': 'sweep', 'country': 'US', 'status': 'success'})
+                    except BaseException:
+                        raise RuntimeError("Bad XML in Cert Id download")
+                else:
+                    raise RuntimeError("Bad Cert Id download")
+                db.session.commit()  # pylint: disable=no-member
+            except BaseException:
+                als.als_json_log(
+                    'cert_db', {
+                        'action': 'sweep', 'country': 'US', 'status': 'failed download'})
                 self.mailAlert(flaskapp, 'US', str(location))
-
 
     def mailAlert(self, flaskapp, country, other):
         import flask
@@ -989,11 +1016,9 @@ class CertIdSweep(Command):
             msg.body = f'''Fail to download CertId for country: {country} info {other}'''
             mail.send(msg)
 
-
-
     def __call__(self, flaskapp, country):
-        als.als_json_log('cert_db', {'action':'sweep', 'country':country,
-'status':'starting'})
+        als.als_json_log('cert_db', {'action': 'sweep', 'country': country,
+                                     'status': 'starting'})
         if country == "US":
             # first sweep SD (outdoor) entries, then sweep ID list.
             self.sweep_fcc_sd(flaskapp)
@@ -1010,6 +1035,7 @@ class Organization(Manager):
         self.add_command("create", OrganizationCreate())
         self.add_command("remove", OrganizationRemove())
         self.add_command("list", OrganizationList())
+
 
 class OrganizationCreate(Command):
     ''' Create a new Organization. '''
@@ -1029,8 +1055,8 @@ class OrganizationCreate(Command):
             if name is None:
                 raise RuntimeError('Name required')
 
-            org = Organization.query.filter(Organization.\
-                 name==name).first()
+            org = Organization.query.filter(Organization.
+                                            name == name).first()
             if org:
                 raise RuntimeError('Duplicate org detected')
 
@@ -1060,11 +1086,11 @@ class OrganizationRemove(Command):
         with flaskapp.app_context():
             try:
                 # select * from access_point as ap where ap.serial_number = ?
-                org = Organization.query.filter(\
-                     Organization.name == name).one()
+                org = Organization.query.filter(
+                    Organization.name == name).one()
                 if not org:
                     raise RuntimeError('No organization found')
-            except:
+            except BaseException:
                 raise RuntimeError('No organization found')
 
             for ap in org.aps:
@@ -1080,6 +1106,7 @@ class OrganizationRemove(Command):
     def __call__(self, flaskapp, name=None):
         self._remove_org(flaskapp, name)
 
+
 class OrganizationList(Command):
     '''Lists all access points'''
 
@@ -1088,9 +1115,11 @@ class OrganizationList(Command):
         from afcmodels.aaa import Organization
         table.field_names = ["Name"]
         with flaskapp.app_context():
-            for org in db.session.query(Organization).all():  # pylint: disable=no-member
+            for org in db.session.query(
+                    Organization).all():  # pylint: disable=no-member
                 table.add_row([org.name])
             print(table)
+
 
 class MTLSCreate(Command):
     ''' Create a new mtls certificate. '''
@@ -1109,7 +1138,7 @@ class MTLSCreate(Command):
         import datetime
         from afcmodels.aaa import MTLS, User
         LOGGER.debug('MTLS._create_mtls() %s %s %s',
-                      note, org, src)
+                     note, org, src)
         if not src:
             raise RuntimeError('certificate data file required')
 
@@ -1178,10 +1207,12 @@ class MTLSList(Command):
 
         table.field_names = ["ID", "Note", "Org", "Create"]
         with flaskapp.app_context():
-            for mtls in db.session.query(MTLS).all():  # pylint: disable=no-member
+            for mtls in db.session.query(
+                    MTLS).all():  # pylint: disable=no-member
                 org = mtls.org if mtls.org else ""
                 note = mtls.note if mtls.note else ""
-                table.add_row([mtls.id, mtls.note, mtls.org , str(mtls.created)])
+                table.add_row(
+                    [mtls.id, mtls.note, mtls.org, str(mtls.created)])
             print(table)
 
 
@@ -1214,7 +1245,7 @@ class MTLSDump(Command):
                     'No mtls certificate found with id"{0}"'.format(id))
 
             with open(filename, 'w') as fpout:
-                fpout.write("%s" %(mtls.cert));
+                fpout.write("%s" % (mtls.cert))
 
     def __init__(self, flaskapp=None, id=None, dst=None):
         if flaskapp and id and filename:
@@ -1222,6 +1253,7 @@ class MTLSDump(Command):
 
     def __call__(self, flaskapp, id, dst):
         self._dump_mtls(flaskapp, id, dst)
+
 
 class MTLS(Manager):
     '''View and manage Access Points'''
@@ -1264,8 +1296,18 @@ class TestCelery(Command):  # pylint: disable=abstract-method
         Option('--debug', action='store_true', dest='debug'),
     )
 
-    def __call__(self, flaskapp, request_type, request_file, afc_config, response_file,
-                 user_id, username, response_dir, temp_dir, history_dir):
+    def __call__(
+            self,
+            flaskapp,
+            request_type,
+            request_file,
+            afc_config,
+            response_file,
+            user_id,
+            username,
+            response_dir,
+            temp_dir,
+            history_dir):
         with flaskapp.app_context():
             from afc_worker import run
             import flask
@@ -1277,8 +1319,8 @@ class TestCelery(Command):  # pylint: disable=abstract-method
                 response_file = os.path.join(
                     temp_dir, request_type + '_response.json')
             if response_dir is None:
-                response_dir = os.path.join(flask.current_app.config['NFS_MOUNT_PATH'],
-                                            'responses')
+                response_dir = os.path.join(
+                    flask.current_app.config['NFS_MOUNT_PATH'], 'responses')
             if history_dir is None:
                 history_dir = flask.current_app.config['HISTORY_DIR']
 
@@ -1392,23 +1434,27 @@ class ConfigAdd(Command):
 
                         try:
                             OrganizationCreate(flaskapp, org)
-                            f_str = "OrganizationRemove(flaskapp, '" + org + "')"
+                            f_str = "OrganizationRemove(flaskapp, '" + \
+                                org + "')"
                             rollback.insert(0, f_str)
-                        except:
+                        except BaseException:
                             pass
 
                         try:
                             # Since this is test, we mark these as both indoor
-                            # and indoor certified 
-                            CertIdCreate(flaskapp, cert_id_str, ruleset_id_str, loc)
-                            f_str = "CertIdRemove(flaskapp, '" + cert_id_str + "')"
+                            # and indoor certified
+                            CertIdCreate(flaskapp, cert_id_str,
+                                         ruleset_id_str, loc)
+                            f_str = "CertIdRemove(flaskapp, '" + \
+                                cert_id_str + "')"
                             rollback.insert(0, f_str)
-                        except:
-                            LOGGER.debug('CertId %s already exists', cert_id_str)
-
+                        except BaseException:
+                            LOGGER.debug(
+                                'CertId %s already exists', cert_id_str)
 
                     with flaskapp.app_context():
-                        user = User.query.filter(User.email == username[0]).one()
+                        user = User.query.filter(
+                            User.email == username[0]).one()
                         LOGGER.debug('New user id %d', user.id)
 
                         cfg_rcrd = json_lookup('afcConfig', new_rcrd, None)
@@ -1416,11 +1462,12 @@ class ConfigAdd(Command):
                         # validate the region string
                         regionStrToRulesetId(region_rcrd[0])
 
-                        config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
-                            == region_rcrd[0]).first()
+                        config = AFCConfig.query.filter(
+                            AFCConfig.config['regionStr'].astext == region_rcrd[0]).first()
                         if not config:
                             config = AFCConfig(cfg_rcrd[0])
-                            config.config['regionStr'] = config.config['regionStr'].upper()
+                            config.config['regionStr'] = config.config['regionStr'].upper(
+                            )
                             db.session.add(config)
                         else:
                             config.config = cfg_rcrd[0]
@@ -1431,7 +1478,7 @@ class ConfigAdd(Command):
                     LOGGER.error(e)
                     LOGGER.error('Rolling back...')
                     for f in rollback:
-                       eval(f)
+                        eval(f)
 
 
 class ConfigRemove(Command):
@@ -1466,7 +1513,8 @@ class ConfigRemove(Command):
                 username = json_lookup('username', user_rcrd, None)
                 with flaskapp.app_context():
                     try:
-                        user = User.query.filter(User.email == username[0]).one()
+                        user = User.query.filter(
+                            User.email == username[0]).one()
                         LOGGER.debug('Found user id %d', user.id)
                         UserRemove(flaskapp, username[0])
 
@@ -1570,6 +1618,7 @@ def main():
         manager.run()
     finally:
         als.als_flush()
+
 
 if __name__ == '__main__':
     sys.exit(main())

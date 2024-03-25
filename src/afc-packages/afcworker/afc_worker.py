@@ -25,8 +25,10 @@ from rcache_client import RcacheClient
 
 LOGGER = get_task_logger(__name__)
 
+
 class WorkerConfig(BrokerConfigurator):
     """Worker internal config"""
+
     def __init__(self):
         BrokerConfigurator.__init__(self)
         self.AFC_ENGINE = os.getenv("AFC_ENGINE")
@@ -35,6 +37,7 @@ class WorkerConfig(BrokerConfigurator):
         # worker task engine timeout
         # the default value predefined by image environment (Dockefile)
         self.AFC_WORKER_ENG_TOUT = os.getenv("AFC_WORKER_ENG_TOUT")
+
 
 conf = WorkerConfig()
 
@@ -55,6 +58,7 @@ client = Celery(
     task_acks_late=True,
     worker_prefetch_multiplier=1,
 )
+
 
 @client.task(ignore_result=True)
 def run(prot, host, port, request_type, task_id, hash_val,
@@ -125,7 +129,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
             analysis_response_path = os.path.join(tmpdir,
                                                   "analysisResponse.json.gz")
             for fname, data in [(analysis_request_path, request_str),
-                                 (analysis_config_path, config_str)]:
+                                (analysis_config_path, config_str)]:
                 with open(fname, "w", encoding="utf-8") as outfile:
                     outfile.write(data)
 
@@ -175,10 +179,10 @@ def run(prot, host, port, request_type, task_id, hash_val,
                                                   "analysisRequest.json")) \
                             as hfile:
                         request_str = \
-                                hfile.read().decode("utf-8", errors="replace")
+                            hfile.read().decode("utf-8", errors="replace")
                     with dataif.open(config_path) as hfile:
                         config_str = \
-                                hfile.read().decode("utf-8", errors="replace")
+                            hfile.read().decode("utf-8", errors="replace")
                 als.als_initialize()
                 als.als_json_log("afc_engine_crash",
                                  {"task_id": task_id, "error_msg": error_msg,
@@ -237,7 +241,8 @@ def run(prot, host, port, request_type, task_id, hash_val,
     finally:
         LOGGER.info('Terminating worker')
 
-        # we may be being told to stop worker so we have to terminate C++ code if it is running
+        # we may be being told to stop worker so we have to terminate C++ code
+        # if it is running
         if proc:
             LOGGER.debug('terminating afc-engine')
             proc.terminate()

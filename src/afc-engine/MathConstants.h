@@ -3,7 +3,8 @@
 
 //  See MathConstants.cpp for implementation details, values and units.
 
-class MathConstants {
+class MathConstants
+{
 	public:
 		static const double GeostationaryOrbitHeight;
 		static const double GeostationaryOrbitRadius;

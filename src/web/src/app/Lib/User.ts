@@ -6,11 +6,11 @@
  * of which is included with this software program.
  */
 
-import { createContext } from "react";
-import { clearCache, guiConfig, importCache } from "./RatApi";
-import { logger } from "./Logger";
-import { RatResponse, error, success } from "./RatApiTypes";
-import { letin } from "./Utils";
+import { createContext } from 'react';
+import { clearCache, guiConfig, importCache } from './RatApi';
+import { logger } from './Logger';
+import { RatResponse, error, success } from './RatApiTypes';
+import { letin } from './Utils';
 
 /**
  * User.ts: Module for handling user state and login
@@ -21,24 +21,26 @@ import { letin } from "./Utils";
  * Storage object of current user of application
  */
 export interface UserState {
-    data: {
-        loggedIn: false
-    } | {
-        loggedIn: true,
-        email: string,
-        org: string,
-        userId: number,
-        roles: Role[],
-        firstName?: string,
-        lastName?: string,
-        active: boolean
-    }
+  data:
+    | {
+        loggedIn: false;
+      }
+    | {
+        loggedIn: true;
+        email: string;
+        org: string;
+        userId: number;
+        roles: Role[];
+        firstName?: string;
+        lastName?: string;
+        active: boolean;
+      };
 }
 
 /**
  * Sum type of possible roles a user can have
  */
-export type Role = "AP" | "Analysis" | "Admin" | "Super" | "Trial"; 
+export type Role = 'AP' | 'Analysis' | 'Admin' | 'Super' | 'Trial';
 
 /**
  * Create React context. This is used to provide a global service so that any component can access user state.
@@ -50,7 +52,7 @@ export const UserContext = createContext<UserState>({ data: { loggedIn: false } 
  * update the current user. To be overridden by configure.
  * @param user The user to set as the current user in the application
  */
-var setUser: (user: UserState) => void = () => { };
+var setUser: (user: UserState) => void = () => {};
 
 /**
  * get the current user. To be overridden by configure.
@@ -65,9 +67,9 @@ var getUser: () => UserState = () => ({ data: { loggedIn: false } });
  * @param set function to update the current user
  */
 export const configure = (get: () => UserState, set: (user: UserState) => void) => {
-    getUser = get;
-    setUser = set;
-}
+  getUser = get;
+  setUser = set;
+};
 
 /**
  * Gets user state from server and set user state.
@@ -75,34 +77,37 @@ export const configure = (get: () => UserState, set: (user: UserState) => void) 
  * @returns result of getting user data
  */
 export const retrieveUserData = async (): Promise<RatResponse<string>> => {
-    // get user information
-    const userInfoResult = await fetch(guiConfig.status_url, {
-        headers: {
-            "Content-Type": "application/json",
-        },
-        "method": "GET"
-    });
+  // get user information
+  const userInfoResult = await fetch(guiConfig.status_url, {
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    method: 'GET',
+  });
 
-    if (!userInfoResult.ok) return error(userInfoResult.statusText, userInfoResult.status);
+  if (!userInfoResult.ok) return error(userInfoResult.statusText, userInfoResult.status);
 
-    const userInfo = await userInfoResult.json();
-    if (userInfo.status !== "success") {
-        setUser({ data: { loggedIn: false } });
-        return error(status, userInfoResult.status, userInfoResult);
-    }
+  const userInfo = await userInfoResult.json();
+  if (userInfo.status !== 'success') {
+    setUser({ data: { loggedIn: false } });
+    return error(status, userInfoResult.status, userInfoResult);
+  }
 
-    logger.info("User is logged in");
-    // set the user session
-    setUser({
-        data: Object.assign({
-            loggedIn: true,
-        }, userInfo.data)
-    });
+  logger.info('User is logged in');
+  // set the user session
+  setUser({
+    data: Object.assign(
+      {
+        loggedIn: true,
+      },
+      userInfo.data,
+    ),
+  });
 
-    logger.info("User: ", getUser().data);
+  logger.info('User: ', getUser().data);
 
-    return success("User loaded");
-}
+  return success('User loaded');
+};
 
 /**
  * Is user credential is editable
@@ -120,17 +125,17 @@ export const isLoggedIn = () => getUser().data.loggedIn;
  * ie. have they verified their email.
  * @returns status of active status
  */
-export const isActive = () => letin(getUser(), u => u.data.loggedIn && u.data.active);
+export const isActive = () => letin(getUser(), (u) => u.data.loggedIn && u.data.active);
 
 /**
  * Does the user have this role?
  * @param role
  * @returns Tells if user has this role
  */
-export const hasRole = (role: Role) => letin(getUser(), u => u.data.loggedIn && u.data.roles.includes(role));
+export const hasRole = (role: Role) => letin(getUser(), (u) => u.data.loggedIn && u.data.roles.includes(role));
 
 /**
  * Is the current user an admin?
  * @returns Tells if user is an admin
  */
-export const isAdmin = () => (hasRole("Admin") || hasRole("Super"))
+export const isAdmin = () => hasRole('Admin') || hasRole('Super');

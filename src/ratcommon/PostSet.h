@@ -1,4 +1,4 @@
-// 
+//
 
 #ifndef SRC_RATCOMMON_POSTSET_H_
 #define SRC_RATCOMMON_POSTSET_H_
@@ -33,46 +33,47 @@ void logPostSetError(const char *msg);
  * @endcode
  * @tparam Type The type of value to set.
  */
-template <typename Type>
-class PostSet{
-public:
-    /** Bind to a variable to overwrite and value to write with.
-     * @param var The variable to overwrite.
-     * Its lifetime must be at least as long as this object
-     * @param val The value to set when this object is destroyed.
-     */
-    PostSet(Type &var, const Type &val)
-      : _var(var), _val(val){}
+template<typename Type>
+class PostSet
+{
+	public:
+		/** Bind to a variable to overwrite and value to write with.
+		 * @param var The variable to overwrite.
+		 * Its lifetime must be at least as long as this object
+		 * @param val The value to set when this object is destroyed.
+		 */
+		PostSet(Type &var, const Type &val) : _var(var), _val(val)
+		{
+		}
 
-    /** Bind to a variable and initialize with a new value.
-     * @param var The variable to overwrite.
-     * Its lifetime must be at least as long as this object
-     * @param pre The value to set immediately.
-     * @param post The value to set when this object is destroyed.
-     */
-    PostSet(Type &var, const Type &pre, const Type &post)
-      : _var(var), _val(post){
-        _var = pre;
-    }
+		/** Bind to a variable and initialize with a new value.
+		 * @param var The variable to overwrite.
+		 * Its lifetime must be at least as long as this object
+		 * @param pre The value to set immediately.
+		 * @param post The value to set when this object is destroyed.
+		 */
+		PostSet(Type &var, const Type &pre, const Type &post) : _var(var), _val(post)
+		{
+			_var = pre;
+		}
 
-    /// Perform the write
-    ~PostSet(){
-        try {
-            _var = _val;
-        }
-        catch (std::exception &err) {
-            logPostSetError(err.what());
-        }
-        catch (...) {
-            logPostSetError(nullptr);
-        }
-    }
+		/// Perform the write
+		~PostSet()
+		{
+			try {
+				_var = _val;
+			} catch (std::exception &err) {
+				logPostSetError(err.what());
+			} catch (...) {
+				logPostSetError(nullptr);
+			}
+		}
 
-private:
-    /// The variable to overwrite
-    Type &_var;
-    /// A copy of the value to set
-    Type _val;
+	private:
+		/// The variable to overwrite
+		Type &_var;
+		/// A copy of the value to set
+		Type _val;
 };
 
 /** Helper function to define a post-setter only final state.
@@ -83,8 +84,9 @@ private:
  * @param post The value to set when this object is destroyed.
  */
 template<typename Type>
-std::unique_ptr<const PostSet<Type>> make_PostSet(Type &var, const Type &post){
-    return std::unique_ptr<const PostSet<Type>>(new PostSet<Type>(var, post));
+std::unique_ptr<const PostSet<Type>> make_PostSet(Type &var, const Type &post)
+{
+	return std::unique_ptr<const PostSet<Type>>(new PostSet<Type>(var, post));
 }
 
 /** Helper function to define a post-setter with initial state.
@@ -96,8 +98,9 @@ std::unique_ptr<const PostSet<Type>> make_PostSet(Type &var, const Type &post){
  * @param post The value to set when this object is destroyed.
  */
 template<typename Type>
-std::unique_ptr<const PostSet<Type>> make_PostSet(Type &var, const Type &pre, const Type &post){
-    return std::unique_ptr<const PostSet<Type>>(new PostSet<Type>(var, pre, post));
+std::unique_ptr<const PostSet<Type>> make_PostSet(Type &var, const Type &pre, const Type &post)
+{
+	return std::unique_ptr<const PostSet<Type>>(new PostSet<Type>(var, pre, post));
 }
 
 #endif /* SRC_RATCOMMON_POSTSET_H_ */

@@ -13,9 +13,10 @@
 #include <afclogging/Logging.h>
 #include <stdexcept>
 
-namespace {
-	// Logger for all instances of class
-	LOGGER_DEFINE_GLOBAL(logger, "GzipCsv")
+namespace
+{
+// Logger for all instances of class
+LOGGER_DEFINE_GLOBAL(logger, "GzipCsv")
 
 } // end namespace
 
@@ -28,8 +29,7 @@ GzipCsv::GzipCsv(const std::string &filename)
 	QString qfilename = QString::fromStdString(filename);
 	_fileWriter = FileHelpers::open(qfilename, QIODevice::WriteOnly);
 	_gzipWriter.reset(new GzipStream(_fileWriter.get()));
-	if (!_gzipWriter->open(QIODevice::WriteOnly))
-	{
+	if (!_gzipWriter->open(QIODevice::WriteOnly)) {
 		throw std::runtime_error(
 			QString("Gzip \"%1\" failed to open").arg(qfilename).toStdString());
 	}
@@ -69,12 +69,11 @@ void GzipCsv::completeRow()
 
 void GzipCsv::writeRow(const std::vector<std::string> &columns)
 {
-	for (const auto &col: columns) {
+	for (const auto &col : columns) {
 		_csvWriter->writeRecord(QString::fromStdString(col));
 	}
 	_csvWriter->writeEndRow();
 }
-
 
 void GzipCsv::addColumn(ColBase *column)
 {
@@ -83,8 +82,8 @@ void GzipCsv::addColumn(ColBase *column)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GzipCsv::ColBase::ColBase(GzipCsv *container, const std::string &name)
-	: _name(QString::fromStdString(name))
+GzipCsv::ColBase::ColBase(GzipCsv *container, const std::string &name) :
+	_name(QString::fromStdString(name))
 {
 	container->addColumn(this);
 }
@@ -94,16 +93,17 @@ void GzipCsv::ColBase::checkSet() const
 	if (_valueSet) {
 		return;
 	}
-	throw std::runtime_error(
-		QString("Attempt to read value from column \"%1\" that was not set yet").
-		arg(_name).toStdString());
+	throw std::runtime_error(QString("Attempt to read value from column \"%1\" that was not "
+					 "set yet")
+					 .arg(_name)
+					 .toStdString());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GzipCsv::ColInt::ColInt(GzipCsv *container, const std::string &name)
-	: ColBase(container, name)
-{}
+GzipCsv::ColInt::ColInt(GzipCsv *container, const std::string &name) : ColBase(container, name)
+{
+}
 
 QString GzipCsv::ColInt::formatValue() const
 {
@@ -112,10 +112,12 @@ QString GzipCsv::ColInt::formatValue() const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GzipCsv::ColDouble::ColDouble(GzipCsv * container, const std::string & name,
-	const std::string &format)
-	: ColBase(container, name), _format(format)
-{}
+GzipCsv::ColDouble::ColDouble(GzipCsv *container,
+			      const std::string &name,
+			      const std::string &format) :
+	ColBase(container, name), _format(format)
+{
+}
 
 QString GzipCsv::ColDouble::formatValue() const
 {
@@ -130,9 +132,9 @@ QString GzipCsv::ColDouble::formatValue() const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GzipCsv::ColStr::ColStr(GzipCsv *container, const std::string &name)
-	: ColBase(container, name)
-{}
+GzipCsv::ColStr::ColStr(GzipCsv *container, const std::string &name) : ColBase(container, name)
+{
+}
 
 QString GzipCsv::ColStr::formatValue() const
 {
@@ -141,9 +143,10 @@ QString GzipCsv::ColStr::formatValue() const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GzipCsv::ColBool::ColBool(GzipCsv *container, const std::string &name,
-	const std::vector<std::string> &tf)
-	: ColBase(container, name)
+GzipCsv::ColBool::ColBool(GzipCsv *container,
+			  const std::string &name,
+			  const std::vector<std::string> &tf) :
+	ColBase(container, name)
 {
 	assert(tf.size() == 2);
 	for (const auto &s : tf) {
@@ -158,11 +161,13 @@ QString GzipCsv::ColBool::formatValue() const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GzipCsv::ColEnum::ColEnum(GzipCsv *container, const std::string &name,
-	const std::map<int, std::string> &items, const std::string &defName)
-	: ColBase(container, name), _defName(QString::fromStdString(defName))
+GzipCsv::ColEnum::ColEnum(GzipCsv *container,
+			  const std::string &name,
+			  const std::map<int, std::string> &items,
+			  const std::string &defName) :
+	ColBase(container, name), _defName(QString::fromStdString(defName))
 {
-	for (const auto &kvp: items) {
+	for (const auto &kvp : items) {
 		_items[kvp.first] = QString::fromStdString(kvp.second);
 	}
 }

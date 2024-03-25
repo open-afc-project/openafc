@@ -15,21 +15,23 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GdalTransform::BoundRect::BoundRect(double latDegMin_, double lonDegMin_,
-	double latDegMax_, double lonDegMax_)
-	: latDegMin(latDegMin_), lonDegMin(lonDegMin_), latDegMax(latDegMax_),
-	lonDegMax(lonDegMax_)
-{}
+GdalTransform::BoundRect::BoundRect(double latDegMin_,
+				    double lonDegMin_,
+				    double latDegMax_,
+				    double lonDegMax_) :
+	latDegMin(latDegMin_), lonDegMin(lonDegMin_), latDegMax(latDegMax_), lonDegMax(lonDegMax_)
+{
+}
 
-GdalTransform::BoundRect::BoundRect()
-	: latDegMin(0), lonDegMin(0), latDegMax(0), lonDegMax(0)
-{}
+GdalTransform::BoundRect::BoundRect() : latDegMin(0), lonDegMin(0), latDegMax(0), lonDegMax(0)
+{
+}
 
 bool GdalTransform::BoundRect::contains(double latDeg, double lonDeg) const
 {
 	lonDeg = rebaseLon(lonDeg, lonDegMin);
-	return (latDegMin < latDeg) && (lonDegMin <= lonDeg) &&
-		(latDeg <= latDegMax) && (lonDeg < lonDegMax);
+	return (latDegMin < latDeg) && (lonDegMin <= lonDeg) && (latDeg <= latDegMax) &&
+	       (lonDeg < lonDegMax);
 }
 
 void GdalTransform::BoundRect::combine(const GdalTransform::BoundRect &other)
@@ -51,11 +53,9 @@ double GdalTransform::BoundRect::rebaseLon(double lon, double base)
 	return lon;
 }
 
-
 ///////////////////////////////////////////////////////////////////////////////
 
-GdalTransform::GdalTransform(GDALDataset *gdalDataSet_, const std::string &filename_)
-	: margin(0)
+GdalTransform::GdalTransform(GDALDataset *gdalDataSet_, const std::string &filename_) : margin(0)
 {
 	std::ostringstream errStr;
 
@@ -67,42 +67,51 @@ GdalTransform::GdalTransform(GDALDataset *gdalDataSet_, const std::string &filen
 	CPLErr gdalErr = gdalDataSet_->GetGeoTransform(gdalTransform);
 	if (gdalErr != CPLErr::CE_None) {
 		errStr << "ERROR: GdalTransform::GdalTransform(): "
-			"Failed to read transformation from GDAL data file '"
-			<<  filename_ << "': " << CPLGetLastErrorMsg();
+			  "Failed to read transformation from GDAL data file '"
+		       << filename_ << "': " << CPLGetLastErrorMsg();
 		throw std::runtime_error(errStr.str());
 	}
-	if (!((gdalTransform[2] == 0) && (gdalTransform[4] == 0) &&
-		(gdalTransform[1] > 0) && (gdalTransform[5] < 0)))
-	{
-		errStr << "ERROR: GdalTransform::GdalTransform(): GDAL data file '"
-			<<  filename_ << "': does not contain 'north up' data";
+	if (!((gdalTransform[2] == 0) && (gdalTransform[4] == 0) && (gdalTransform[1] > 0) &&
+	      (gdalTransform[5] < 0))) {
+		errStr << "ERROR: GdalTransform::GdalTransform(): GDAL data file '" << filename_
+		       << "': does not contain 'north up' data";
 		throw std::runtime_error(errStr.str());
 	}
-	latPixPerDeg = -1./gdalTransform[5];
-	lonPixPerDeg = 1./gdalTransform[1];
-	latPixMax = -gdalTransform[3]/gdalTransform[5];
-	lonPixMin = gdalTransform[0]/gdalTransform[1];
+	latPixPerDeg = -1. / gdalTransform[5];
+	lonPixPerDeg = 1. / gdalTransform[1];
+	latPixMax = -gdalTransform[3] / gdalTransform[5];
+	lonPixMin = gdalTransform[0] / gdalTransform[1];
 	latSize = gdalDataSet_->GetRasterYSize();
 	lonSize = gdalDataSet_->GetRasterXSize();
 }
 
-GdalTransform::GdalTransform(
-	const GdalTransform &gdalXform_, int latPixOffset_, int lonPixOffset_,
-	int latSize_, int lonSize_)
-	: latPixPerDeg(gdalXform_.latPixPerDeg),
+GdalTransform::GdalTransform(const GdalTransform &gdalXform_,
+			     int latPixOffset_,
+			     int lonPixOffset_,
+			     int latSize_,
+			     int lonSize_) :
+	latPixPerDeg(gdalXform_.latPixPerDeg),
 	lonPixPerDeg(gdalXform_.lonPixPerDeg),
 	latPixMax(gdalXform_.latPixMax - latPixOffset_),
 	lonPixMin(gdalXform_.lonPixMin + lonPixOffset_),
-	latSize(latSize_), lonSize(lonSize_), margin(0)
-{}
+	latSize(latSize_),
+	lonSize(lonSize_),
+	margin(0)
+{
+}
 
-GdalTransform::GdalTransform()
-	: latPixPerDeg(0), lonPixPerDeg(0), latPixMax(0), lonPixMin(0),
-	latSize(0), lonSize(0), margin(0)
-{}
+GdalTransform::GdalTransform() :
+	latPixPerDeg(0),
+	lonPixPerDeg(0),
+	latPixMax(0),
+	lonPixMin(0),
+	latSize(0),
+	lonSize(0),
+	margin(0)
+{
+}
 
-void GdalTransform::computePixel(double latDeg, double lonDeg,
-	int *latIdx, int *lonIdx) const
+void GdalTransform::computePixel(double latDeg, double lonDeg, int *latIdx, int *lonIdx) const
 {
 	// Rebasing longitude relative to left side of bounding rectangle
 	lonDeg = BoundRect::rebaseLon(lonDeg, (lonPixMin + margin) / lonPixPerDeg);
@@ -111,15 +120,13 @@ void GdalTransform::computePixel(double latDeg, double lonDeg,
 	*lonIdx = (int)std::floor(lonDeg * lonPixPerDeg - lonPixMin);
 
 	// Off by more than a pixel - definitely a bug, not a rounding error
-	if ((*latIdx < -1) || (*latIdx > latSize) ||
-		(*lonIdx < -1) || (*lonIdx > lonSize))
-	{
+	if ((*latIdx < -1) || (*latIdx > latSize) || (*lonIdx < -1) || (*lonIdx > lonSize)) {
 		auto br(makeBoundRect());
 		std::ostringstream errStr;
-		errStr << "ERROR: GdalTransform::computePixel() internal error: point (" << 
-			latDeg << "N, " << lonDeg << "E is out of tile/GDAL bounds of [" <<
-			br.latDegMin << " - " << br.latDegMax << "]N X [" << br.lonDegMin <<
-			" - " << br.lonDegMax << "]E";
+		errStr << "ERROR: GdalTransform::computePixel() internal error: point (" << latDeg
+		       << "N, " << lonDeg << "E is out of tile/GDAL bounds of [" << br.latDegMin
+		       << " - " << br.latDegMax << "]N X [" << br.lonDegMin << " - " << br.lonDegMax
+		       << "]E";
 		throw std::runtime_error(errStr.str());
 	}
 	// Preventing rounding errors by less than a pixel
@@ -130,9 +137,9 @@ void GdalTransform::computePixel(double latDeg, double lonDeg,
 GdalTransform::BoundRect GdalTransform::makeBoundRect() const
 {
 	return BoundRect((latPixMax - latSize + margin) / latPixPerDeg,
-		(lonPixMin + margin) / lonPixPerDeg,
-		(latPixMax - margin) / latPixPerDeg,
-		(lonPixMin + lonSize - margin) /  lonPixPerDeg);
+			 (lonPixMin + margin) / lonPixPerDeg,
+			 (latPixMax - margin) / latPixPerDeg,
+			 (lonPixMin + lonSize - margin) / lonPixPerDeg);
 }
 
 void GdalTransform::roundPpdToMultipleOf(double pixelsPerDegree)

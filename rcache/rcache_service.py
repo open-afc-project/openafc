@@ -60,6 +60,7 @@ class Ema:
     _is_rate    -- True if rate is averaged, False if value
     _prev_value -- Previous value
     """
+
     def __init__(self, win_size: int, is_rate: bool) -> None:
         """ Constructor
 
@@ -115,6 +116,7 @@ class RcacheService:
     _all_tasks_running             -- True while no tasks crashed
     _schedule_lag_ema              -- Average scheduling delay
     """
+
     def __init__(self, rcache_db_dsn: str, precompute_quota: int,
                  afc_req_url: Optional[str], rulesets_url: Optional[str],
                  config_retrieval_url: Optional[str]) -> None:
@@ -324,7 +326,7 @@ class RcacheService:
                             max(math.cos(
                                 math.radians(
                                     (rect.min_lat + rect.max_lat) / 2)),
-                                1/180)
+                                1 / 180)
                         await self._db.spatial_invalidate(
                             LatLonRect(
                                 min_lat=rect.min_lat - max_link_distance_deg,

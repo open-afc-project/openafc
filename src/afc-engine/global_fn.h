@@ -10,8 +10,8 @@
 #include <vector>
 #include "global_defines.h"
 
-int  fgetline(FILE *file, std::string& s, bool keepcr = true);
-int  fgetline(FILE *, char *);
+int fgetline(FILE *file, std::string &s, bool keepcr = true);
+int fgetline(FILE *, char *);
 std::vector<std::string> split(const std::string &s, char delim);
 std::vector<std::string> splitCSV(const std::string &cmd);
 

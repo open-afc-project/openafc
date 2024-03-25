@@ -103,7 +103,7 @@ def tile_creator(tile_pattern: str, sources: List[str], top: int, left: int,
     temp_filename_xml: Optional[str] = None
     try:
         tile_filename = \
-            tile_pattern.format(lat_u=abs(top), lat_d=abs(top-1),
+            tile_pattern.format(lat_u=abs(top), lat_d=abs(top - 1),
                                 lon_l=abs(left), lon_r=abs(left + 1),
                                 lat_hem='n' if top > 0 else 's',
                                 LAT_HEM='N' if top > 0 else 'S',
@@ -117,7 +117,7 @@ def tile_creator(tile_pattern: str, sources: List[str], top: int, left: int,
         start_time = datetime.datetime.now()
         if os.path.isfile(tile_filename) and (not overwrite):
             return ConvResult(tilename=tile_filename, status=ConvStatus.Exists,
-                              duration=datetime.datetime.now()-start_time)
+                              duration=datetime.datetime.now() - start_time)
 
         # Preparing source - only source or vrt of all sources
         command_lines: List[str] = []
@@ -131,10 +131,13 @@ def tile_creator(tile_pattern: str, sources: List[str], top: int, left: int,
                                   fail_on_error=False)
             if exec_result is not None:
                 assert isinstance(exec_result, str)
-                return ConvResult(tilename=tile_filename,
-                                  status=ConvStatus.Error,
-                                  duration=datetime.datetime.now()-start_time,
-                                  msg=exec_result, command_lines=command_lines)
+                return ConvResult(
+                    tilename=tile_filename,
+                    status=ConvStatus.Error,
+                    duration=datetime.datetime.now() -
+                    start_time,
+                    msg=exec_result,
+                    command_lines=command_lines)
             src = temp_filename_vrt
         else:
             src = sources[0]
@@ -167,12 +170,12 @@ def tile_creator(tile_pattern: str, sources: List[str], top: int, left: int,
         elif exec_result is not None:
             assert isinstance(exec_result, str)
             return ConvResult(tilename=tile_filename, status=ConvStatus.Error,
-                              duration=datetime.datetime.now()-start_time,
+                              duration=datetime.datetime.now() - start_time,
                               msg=exec_result, command_lines=command_lines)
         gi = GdalInfo(temp_filename, options=["-stats"], fail_on_error=False)
         if not gi:
             return ConvResult(tilename=tile_filename, status=ConvStatus.Error,
-                              duration=datetime.datetime.now()-start_time,
+                              duration=datetime.datetime.now() - start_time,
                               msg="gdalinfo inspection failed",
                               command_lines=command_lines)
         if os.path.isfile(tile_filename):
@@ -182,7 +185,7 @@ def tile_creator(tile_pattern: str, sources: List[str], top: int, left: int,
         if gi.valid_percent == 0:
             return \
                 ConvResult(tilename=tile_filename, status=ConvStatus.Dropped,
-                           duration=datetime.datetime.now()-start_time,
+                           duration=datetime.datetime.now() - start_time,
                            msg="All pixels are NoData",
                            command_lines=command_lines)
         if (gi.min_value is not None) and (gi.min_value == gi.max_value) and \
@@ -190,7 +193,7 @@ def tile_creator(tile_pattern: str, sources: List[str], top: int, left: int,
             return \
                 ConvResult(
                     tilename=tile_filename, status=ConvStatus.Dropped,
-                    duration=datetime.datetime.now()-start_time,
+                    duration=datetime.datetime.now() - start_time,
                     msg=f"All valid pixels are equal to {gi.min_value}",
                     command_lines=command_lines)
         if verbose:
@@ -198,11 +201,11 @@ def tile_creator(tile_pattern: str, sources: List[str], top: int, left: int,
         os.rename(temp_filename, tile_filename)
 
         return ConvResult(tilename=tile_filename, status=ConvStatus.Success,
-                          duration=datetime.datetime.now()-start_time,
+                          duration=datetime.datetime.now() - start_time,
                           command_lines=command_lines)
     except (Exception, KeyboardInterrupt, SystemExit) as ex:
         return ConvResult(tilename=tile_filename, status=ConvStatus.Error,
-                          duration=datetime.datetime.now()-start_time,
+                          duration=datetime.datetime.now() - start_time,
                           msg=repr(ex))
     finally:
         for filename in (temp_filename, temp_filename_xml, temp_filename_vrt):

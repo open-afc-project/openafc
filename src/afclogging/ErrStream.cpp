@@ -1,9 +1,12 @@
-// 
+//
 
 #include "ErrStream.h"
 
-ErrStream::ErrStream(){}
+ErrStream::ErrStream()
+{
+}
 
-ErrStream::operator QString () const{
-    return QString::fromStdString(_str.str());
+ErrStream::operator QString() const
+{
+	return QString::fromStdString(_str.str());
 }

@@ -70,7 +70,7 @@ def _as_int(s):
 
 
 def create_pop_db(db_name, data_file):
-    ''' Creates an sqlite database from a csv file 
+    ''' Creates an sqlite database from a csv file
 
         :param db_name: name of sqlite database to be created
 
@@ -110,7 +110,7 @@ def create_pop_db(db_name, data_file):
                                longitude=row['Longitude (deg)'],
                                density=row['Density (people/sq-km)'],
                            )
-                           for row in data[chunk:chunk+10000]
+                           for row in data[chunk:chunk + 10000]
                        ]
                        )
 
@@ -127,7 +127,7 @@ def create_pop_db(db_name, data_file):
 
 
 def create_uls_db(db_name, data_file):
-    ''' create sqlite database from csv file 
+    ''' create sqlite database from csv file
 
         :param db_name: file name of sqlite database to be created
 
@@ -264,7 +264,7 @@ def create_uls_db(db_name, data_file):
 
 
 def shp_to_spatialite(dst, src):
-    ''' Convert shape file to sql spatialite database 
+    ''' Convert shape file to sql spatialite database
 
         NOTE: Does NOT sanitize inputs and runs in shell. Be careful of injection attacks
 
@@ -300,7 +300,7 @@ def shp_to_spatialite(dst, src):
 
 
 def spatialite_to_raster(dst, src, table, elev_field):
-    ''' Convert spatialite database into raster file 
+    ''' Convert spatialite database into raster file
 
         NOTE: Does NOT sanitize inputs and runs in shell. Be careful of injection attacks
 
@@ -318,7 +318,8 @@ def spatialite_to_raster(dst, src, table, elev_field):
     try:
         check_call(
             'gdal_rasterize ' +
-            # use sort to ensure that overlapping polygons give highest hight in raster lookup
+            # use sort to ensure that overlapping polygons give highest hight
+            # in raster lookup
             '-sql "SELECT * FROM {} ORDER BY {}" '.format(table, elev_field) +
             # pull from ELEVATION attribute (view in QGIS)
             '-a {} '.format(elev_field) +

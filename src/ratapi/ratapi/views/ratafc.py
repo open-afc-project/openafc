@@ -36,12 +36,12 @@ import six
 from appcfg import RatafcMsghndCfgIface, AFC_RATAPI_LOG_LEVEL
 from hchecks import RmqHealthcheck
 from defs import RNTM_OPT_NODBG_NOGUI, RNTM_OPT_DBG, RNTM_OPT_GUI, \
-RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG, \
-RNTM_OPT_CERT_ID
+    RNTM_OPT_AFCENGINE_HTTP_IO, RNTM_OPT_NOCACHE, RNTM_OPT_SLOW_DBG, \
+    RNTM_OPT_CERT_ID
 from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from afcmodels.aaa import User, AFCConfig, CertId, Ruleset, \
-                          Organization, AccessPointDeny
+    Organization, AccessPointDeny
 from .auth import auth
 from .ratapi import build_task, rulesetIdToRegionStr
 from fst import DataIf
@@ -78,6 +78,7 @@ module = flask.Blueprint('ap-afc', 'ap-afc')
 
 ALLOWED_VERSIONS = ['1.4']
 
+
 class AP_Exception(Exception):
     ''' Exception type used for RAT AFC respones
     '''
@@ -94,11 +95,13 @@ class AP_Exception(Exception):
 #     101	Name:	TEMPORARY_NOT_PROCESSED
 # 	Interpretation:	AFC cannot complete processing the request and respond to it.
 # 	Required Action:	AFC Device shall resend the same request later.
-# 	Other Information:	This responseCode value is returned when, for example, AFC receives a lot of requests or a large request and AFC cannot complete the process soon.
+# 	Other Information:	This responseCode value is returned when, for example, AFC receives a lot of requests or a large request and
+#        AFC cannot complete the process soon.
 #     '''
 
 #     def __init__(self, wait_time_sec=3600):
-#         super(TempNotProcessedException, self).__init__(101, 'The request could not be processed at this time. Try again later.', { 'waitTime': wait_time_sec })
+#         super(TempNotProcessedException, self).__init__(101, 'The request could not be processed at this time. Try again later.',
+#         { 'waitTime': wait_time_sec })
 
 class VersionNotSupportedException(AP_Exception):
     '''
@@ -109,8 +112,10 @@ class VersionNotSupportedException(AP_Exception):
     '''
 
     def __init__(self, invalid_version=[]):
-        super(VersionNotSupportedException, self).__init__(
-            100, 'The requested version number is invalid', {'invalidVersion': invalid_version})
+        super(
+            VersionNotSupportedException, self).__init__(
+            100, 'The requested version number is invalid', {
+                'invalidVersion': invalid_version})
 
 
 class DeviceUnallowedException(AP_Exception):
@@ -122,8 +127,12 @@ class DeviceUnallowedException(AP_Exception):
     '''
 
     def __init__(self, err_str):
-        super(DeviceUnallowedException, self).__init__(
-            101, 'This specific device is not allowed to operate under AFC control.' + err_str)
+        super(
+            DeviceUnallowedException,
+            self).__init__(
+            101,
+            'This specific device is not allowed to operate under AFC control.' +
+            err_str)
 
 
 class MissingParamException(AP_Exception):
@@ -135,8 +144,10 @@ class MissingParamException(AP_Exception):
     '''
 
     def __init__(self, missing_params=[]):
-        super(MissingParamException, self).__init__(
-            102, 'One or more fields required to be included in the request are missing.', {'missingParams': missing_params})
+        super(
+            MissingParamException, self).__init__(
+            102, 'One or more fields required to be included in the request are missing.', {
+                'missingParams': missing_params})
 
 
 class InvalidValueException(AP_Exception):
@@ -148,8 +159,10 @@ class InvalidValueException(AP_Exception):
     '''
 
     def __init__(self, invalid_params=[]):
-        super(InvalidValueException, self).__init__(
-            103, 'One or more fields have an invalid value.', {'invalidParams': invalid_params})
+        super(
+            InvalidValueException, self).__init__(
+            103, 'One or more fields have an invalid value.', {
+                'invalidParams': invalid_params})
 
 
 class UnexpectedParamException(AP_Exception):
@@ -161,21 +174,28 @@ class UnexpectedParamException(AP_Exception):
     '''
 
     def __init__(self, unexpected_params=[]):
-        super(UnexpectedParamException, self).__init__(
-            106, 'Unknown parameter found, or conditional parameter found, but condition is not met.', {'unexpectedParams': unexpected_params})
+        super(
+            UnexpectedParamException, self).__init__(
+            106, 'Unknown parameter found, or conditional parameter found, but condition is not met.', {
+                'unexpectedParams': unexpected_params})
 
 
 class UnsupportedSpectrumException(AP_Exception):
     '''
     300	Name:	UNSUPPORTED_SPECTRUM
-        Interpretation:	The frequency range indicated in the Available Spectrum Inquiry Request is at least partially outside of the frequency band under the management of the AFC (e.g. 5.925-6.425 GHz and 6.525-6.875 GHz bands in US).
+        Interpretation:	The frequency range indicated in the Available Spectrum Inquiry Request is at least partially outside of the frequency band
+                         under the management of the AFC (e.g. 5.925-6.425 GHz and 6.525-6.875 GHz bands in US).
         Required Action:	Not specified.
         Other Information:	None
     '''
 
     def __init__(self):
-        super(UnsupportedSpectrumException, self).__init__(
-            300, 'The frequency range indicated in the Available Spectrum Inquiry Request is at least partially outside of the frequency band under the management of the AFC.')
+        super(
+            UnsupportedSpectrumException,
+            self).__init__(
+            300,
+            'The frequency range indicated in the Available Spectrum Inquiry Request is at least partially '
+            'outside of the frequency band under the management of the AFC.')
 
 
 def _translate_afc_error(error_msg):
@@ -233,6 +253,7 @@ class VendorExtensionFilter:
         _partial_type -- Specifies type(s) of messages/resuests/response this
                           whitelist is for
         """
+
         def __init__(self, extensions, partial_type):
             """ Constructor
 
@@ -276,7 +297,7 @@ class VendorExtensionFilter:
         _Whitelist(
             ["openAfc.heatMap"],
             _WhitelistType(is_input=True, is_gui=True))]
- 
+
     def __init__(self):
         """ Constructor """
         # Maps whitelist types to sets of allowed extensions
@@ -385,7 +406,7 @@ def fail_done(t):
     with dataif.open(os.path.join("/responses", t.getId(), "engine-error.txt")) as hfile:
         try:
             error_data = hfile.read().decode("utf-8", errors="replace")
-        except:
+        except BaseException:
             LOGGER.debug("engine-error.txt not found")
         else:
             LOGGER.debug("Error data: %s", error_data)
@@ -403,7 +424,7 @@ def in_progress(t):
     LOGGER.debug('in_progress()')
     task_stat = t.getStat()
     if not isinstance(task_stat['runtime_opts'], type(None)) and \
-        task_stat['runtime_opts'] & RNTM_OPT_GUI:
+            task_stat['runtime_opts'] & RNTM_OPT_GUI:
         return flask.jsonify(
             percent=0,
             message='In progress...'
@@ -436,13 +457,13 @@ def success_done(t):
     try:
         with dataif.open(os.path.join("/responses", t.getId(), "results.kmz")) as hfile:
             kmz_data = hfile.read()
-    except:
+    except BaseException:
         pass
     map_data = None
     try:
         with dataif.open(os.path.join("/responses", t.getId(), "mapData.json.gz")) as hfile:
             map_data = hfile.read()
-    except:
+    except BaseException:
         pass
     if kmz_data or map_data:
         # TODO: temporary support python2 where kmz_data is of type str
@@ -450,13 +471,17 @@ def success_done(t):
             kmz_data = kmz_data.encode('base64')
         if isinstance(kmz_data, bytes):
             kmz_data = kmz_data.decode('iso-8859-1')
-        resp_json["availableSpectrumInquiryResponses"][0].setdefault("vendorExtensions", []).append({
-            "extensionId": "openAfc.mapinfo",
-            "parameters": {
-                "kmzFile": kmz_data if kmz_data else None,
-                "geoJsonFile": zlib.decompress(map_data, 16 + zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None
-            }
-            })
+        resp_json["availableSpectrumInquiryResponses"][0].setdefault(
+            "vendorExtensions",
+            []).append(
+            {
+                "extensionId": "openAfc.mapinfo",
+                "parameters": {
+                    "kmzFile": kmz_data if kmz_data else None,
+                    "geoJsonFile": zlib.decompress(
+                        map_data,
+                        16 +
+                        zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None}})
     get_vendor_extension_filter().filter(
         resp_json, is_input=False,
         is_gui=bool(task_stat['runtime_opts'] & RNTM_OPT_GUI),
@@ -523,6 +548,7 @@ class ReqInfo(NamedTuple):
 class RatAfc(MethodView):
     ''' RAT AFC resources
     '''
+
     def _auth_cert_id(self, cert_id, ruleset):
         ''' Authenticate certification id. Return new indoor value
             for bell application
@@ -565,13 +591,14 @@ class RatAfc(MethodView):
                      self.__class__, inspect.stack()[0][3],
                      serial_number, prefix, cert_id, rulesets, version)
 
-        deny_ap = AccessPointDeny.query.filter_by(serial_number=serial_number).\
-                  filter_by(certification_id=cert_id).first()
+        deny_ap = AccessPointDeny.query.filter_by(
+            serial_number=serial_number). filter_by(
+            certification_id=cert_id).first()
         if deny_ap:
             raise DeviceUnallowedException("")  # InvalidCredentialsException()
 
         deny_ap = AccessPointDeny.query.filter_by(certification_id=cert_id).\
-                  filter_by(serial_number=None).first()
+            filter_by(serial_number=None).first()
         if deny_ap:
             # denied all devices matching certification id
             raise DeviceUnallowedException("")  # InvalidCredentialsException()
@@ -586,13 +613,10 @@ class RatAfc(MethodView):
         if cert_id == "HeatMapCertificationId" \
            and serial_number == "HeatMapSerialNumber":
             return True
-        
-
 
         # Assume that once we got here, we already trim the cert_obj list down
         # to only one entry for the country we're operating in
         return self._auth_cert_id(cert_id, ruleset)
-
 
     def get(self):
         ''' GET method for Analysis Status '''
@@ -601,7 +625,8 @@ class RatAfc(MethodView):
                      self.__class__, inspect.stack()[0][3], task_id)
 
         dataif = DataIf()
-        t = afctask.Task(task_id, dataif, RatafcMsghndCfgIface().get_ratafc_tout())
+        t = afctask.Task(
+            task_id, dataif, RatafcMsghndCfgIface().get_ratafc_tout())
         task_stat = t.get()
 
         if t.ready(task_stat):  # The task is done
@@ -648,9 +673,12 @@ class RatAfc(MethodView):
                 raise VersionNotSupportedException([ver])
             results["version"] = ver
 
-
             # split multiple requests into an array of individual requests
-            requests = map(lambda r: {"availableSpectrumInquiryRequests": [r], "version": ver}, args["availableSpectrumInquiryRequests"])
+            requests = map(
+                lambda r: {
+                    "availableSpectrumInquiryRequests": [r],
+                    "version": ver},
+                args["availableSpectrumInquiryRequests"])
             request_ids = \
                 set([r["requestId"]
                      for r in args["availableSpectrumInquiryRequests"]])
@@ -663,7 +691,6 @@ class RatAfc(MethodView):
             use_tasks = (rcache is None) or \
                 (flask.request.args.get('conn_type') == 'async') or \
                 (flask.request.args.get('gui') == 'True')
-
 
             als.als_afc_request(req_id=als_req_id, req=args)
             uls_id = "Unknown"
@@ -686,7 +713,8 @@ class RatAfc(MethodView):
 
                     devices = device_desc.get('certificationId')
                     if not devices:
-                        raise MissingParamException(missing_params=['certificationId'])
+                        raise MissingParamException(
+                            missing_params=['certificationId'])
 
                     # Pick one ruleset that is being used for the
                     # deployment of this AFC (RULESETS)
@@ -704,23 +732,27 @@ class RatAfc(MethodView):
                         prefix = prefix.strip()
 
                     if prefix is None:
-                        raise MissingParamException(missing_params=['rulesetId'])
+                        raise MissingParamException(
+                            missing_params=['rulesetId'])
                     elif not prefix:
-                       raise InvalidValueException(["rulesetId", prefix])
+                        raise InvalidValueException(["rulesetId", prefix])
 
                     if region:
                         if certId is None:
                             # certificationId id field does not exist
-                            raise MissingParamException(missing_params=['certificationId', 'id'])
+                            raise MissingParamException(
+                                missing_params=['certificationId', 'id'])
                         elif not certId:
-                            raise InvalidValueException(["certificationId", certId])
+                            raise InvalidValueException(
+                                ["certificationId", certId])
                     else:
-                       # ruleset is not in list
-                       raise DeviceUnallowedException("")
+                        # ruleset is not in list
+                        raise DeviceUnallowedException("")
 
                     serial = device_desc.get('serialNumber')
                     if serial is None:
-                        raise MissingParamException(missing_params=['serialNumber'])
+                        raise MissingParamException(
+                            missing_params=['serialNumber'])
                     elif not serial:
                         raise InvalidValueException(["serialNumber", serial])
 
@@ -752,10 +784,11 @@ class RatAfc(MethodView):
                                  runtime_opts)
 
                     # Retrieving config
-                    config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
-                             == region).first()
+                    config = AFCConfig.query.filter(
+                        AFCConfig.config['regionStr'].astext == region).first()
                     if not config:
-                        raise DeviceUnallowedException("No AFC configuration for ruleset")
+                        raise DeviceUnallowedException(
+                            "No AFC configuration for ruleset")
                     afc_config = config.config
                     if region[:5] == "TEST_" or region[:5] == 'DEMO_':
                         afc_config = dict(afc_config)
@@ -773,7 +806,7 @@ class RatAfc(MethodView):
                     # calculate hash of config + request
                     hashlibobj.update(
                         json.dumps(
-                            {k:v for k, v in individual_request.items()
+                            {k: v for k, v in individual_request.items()
                              if k != "requestId"},
                             sort_keys=True).encode('utf-8'))
                     req_cfg_hash = hashlibobj.hexdigest()
@@ -861,7 +894,7 @@ class RatAfc(MethodView):
         except Exception as e:
             LOGGER.error(traceback.format_exc())
             lineno = "Unknown"
-            frame =  sys.exc_info()[2]
+            frame = sys.exc_info()[2]
             while frame is not None:
                 f_code = frame.tb_frame.f_code
                 if os.path.basename(f_code.co_filename) == \
@@ -889,11 +922,11 @@ class RatAfc(MethodView):
                  "rulesetId": "Unknown",
                  "response": response_info})
 
-        # Removing internal vendor extensions    
+        # Removing internal vendor extensions
         get_vendor_extension_filter().filter(
             json_dict=results, is_input=False, is_gui=is_gui,
             is_internal=is_internal_request)
-        
+
         # Logging response to ALS
         als.als_afc_response(req_id=als_req_id, resp=results)
 
@@ -934,7 +967,7 @@ class RatAfc(MethodView):
                             "/responses", req_cfg_hash,
                             "analysisResponse.json.gz")) as hfile:
                         resp_data = hfile.read()
-                except:
+                except BaseException:
                     continue
                 ret[req_cfg_hash] = \
                     zlib.decompress(resp_data, 16 + zlib.MAX_WBITS)
@@ -1007,7 +1040,8 @@ class RatAfc(MethodView):
                 ret = {}
                 for req_cfg_hash, task in tasks.items():
                     task_stat = \
-                        task.wait(timeout=RatafcMsghndCfgIface().get_ratafc_tout())
+                        task.wait(
+                            timeout=RatafcMsghndCfgIface().get_ratafc_tout())
                     ret[req_cfg_hash] = \
                         response_map[task_stat['status']](task).data
                 return ret
@@ -1026,6 +1060,7 @@ class RatAfc(MethodView):
                     hfile.write(zlib.compress(response.encode("utf-8")))
             return ret
 
+
 class RatAfcSec(RatAfc):
     def get(self):
         LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
@@ -1038,6 +1073,7 @@ class RatAfcSec(RatAfc):
                      self.__class__, inspect.stack()[0][3])
         user_id = auth(roles=['Analysis', 'Trial', 'Admin'])
         return super().post()
+
 
 class RatAfcInternal(MethodView):
     """ Add rule for availableSpectrumInquiryInternal """
@@ -1081,7 +1117,8 @@ module.add_url_rule('/availableSpectrumInquiryInternal',
 
 module.add_url_rule('/healthy', view_func=HealthCheck.as_view('HealthCheck'))
 
-module.add_url_rule('/ready', view_func=ReadinessCheck.as_view('ReadinessCheck'))
+module.add_url_rule(
+    '/ready', view_func=ReadinessCheck.as_view('ReadinessCheck'))
 
 # Local Variables:
 # mode: Python

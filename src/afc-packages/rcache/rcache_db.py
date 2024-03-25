@@ -259,7 +259,7 @@ class RcacheDb:
             self._engine = None
 
     def lookup(self, req_cfg_digests: List[str],
-               try_reconnect = False) -> Dict[str, str]:
+               try_reconnect=False) -> Dict[str, str]:
         """ Request cache lookup
 
         Arguments:

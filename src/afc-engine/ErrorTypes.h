@@ -5,44 +5,55 @@
 #include <QString>
 
 /** A convenience class to construct std::runtime_error from QStrings.
-*/
-class RuntimeError : public std::runtime_error{
+ */
+class RuntimeError : public std::runtime_error
+{
 	public:
 		/** Create a new error with title and message.
 		 * @param title Is used as the title of the error dialog.
 		 * @param msg I used as the body of the message dialog.
 		 * @param parent Optionally define the parent for the dialog.
 		 */
-		RuntimeError(const QString &msg)
-			: runtime_error(msg.toStdString()){}
+		RuntimeError(const QString &msg) : runtime_error(msg.toStdString())
+		{
+		}
 
 		/// Required for std::exception child
-		virtual ~RuntimeError() throw(){}
+		virtual ~RuntimeError() throw()
+		{
+		}
 };
 
 /** Represent an error which should be displayed as a dialog.
  * This is not derived from std::exception so that it is guaranteed not to
  * be trapped in a normal catch block.
  */
-class FatalError{
+class FatalError
+{
 	public:
 		/** Create a new error with title and message.
-		*/
-		FatalError(const QString &titleVal, const QString &msg)
-			: _title(titleVal), _msg(msg){}
+		 */
+		FatalError(const QString &titleVal, const QString &msg) :
+			_title(titleVal), _msg(msg)
+		{
+		}
 
 		/// Same behavior as std::exception
-		virtual ~FatalError() throw(){}
+		virtual ~FatalError() throw()
+		{
+		}
 
 		/** Get the title string for the error.
-		*/
-		const QString & title() const throw(){
+		 */
+		const QString &title() const throw()
+		{
 			return _title;
 		}
 
 		/** Duck-type replacement for std::exception::what().
-		*/
-		const QString & what() const throw(){
+		 */
+		const QString &what() const throw()
+		{
 			return _msg;
 		}
 

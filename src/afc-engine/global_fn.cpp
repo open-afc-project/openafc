@@ -10,12 +10,12 @@
 #include <sstream>
 
 #ifdef __linux__
-#include <unistd.h>
+	#include <unistd.h>
 #else
-#include <direct.h>
-#include <windows.h>
-#include <tchar.h>
-#include <shellapi.h>
+	#include <direct.h>
+	#include <windows.h>
+	#include <tchar.h>
+	#include <shellapi.h>
 #endif
 
 #include "global_fn.h"
@@ -28,16 +28,16 @@
 /**** the length of string s depending on whether '\r' or '\n' has been removed from   ****/
 /**** the string.                                                                      ****/
 /******************************************************************************************/
-int fgetline(FILE *file, std::string& s, bool keepcr)
+int fgetline(FILE *file, std::string &s, bool keepcr)
 {
 	int c, i;
 
 	s.clear();
-	for (i=0; (c=fgetc(file)) != EOF && c != '\n'; i++) {
+	for (i = 0; (c = fgetc(file)) != EOF && c != '\n'; i++) {
 		s += c;
 	}
-	if ( (i >= 1) && (s[i-1] == '\r') ) {
-		s.erase(i-1,1);
+	if ((i >= 1) && (s[i - 1] == '\r')) {
+		s.erase(i - 1, 1);
 		// i--;
 	}
 	if (c == '\n') {
@@ -46,7 +46,7 @@ int fgetline(FILE *file, std::string& s, bool keepcr)
 		}
 		i++;
 	}
-	return(i);
+	return (i);
 }
 /******************************************************************************************/
 
@@ -58,10 +58,10 @@ int fgetline(FILE *file, char *s)
 {
 	int c, i;
 
-	for (i=0; (c=fgetc(file)) != EOF && c != '\n'; i++) {
+	for (i = 0; (c = fgetc(file)) != EOF && c != '\n'; i++) {
 		s[i] = c;
 	}
-	if ( (i >= 1) && (s[i-1] == '\r') ) {
+	if ((i >= 1) && (s[i - 1] == '\r')) {
 		i--;
 	}
 	if (c == '\n') {
@@ -69,14 +69,14 @@ int fgetline(FILE *file, char *s)
 		i++;
 	}
 	s[i] = '\0';
-	return(i);
+	return (i);
 }
 /******************************************************************************************/
 
 /******************************************************************************************/
 /**** Split string into vector of strings using specified delim.                       ****/
 /******************************************************************************************/
-std::vector<std::string>& split(const std::string &s, char delim, std::vector<std::string> &elems)
+std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems)
 {
 	std::stringstream ss(s);
 	std::string item;
@@ -85,7 +85,6 @@ std::vector<std::string>& split(const std::string &s, char delim, std::vector<st
 	}
 	return elems;
 }
-
 
 std::vector<std::string> split(const std::string &s, char delim)
 {
@@ -116,14 +115,14 @@ std::vector<std::string> splitCSV(const std::string &line)
 	// state 3 = found end of field, is ", pass over 0 or more spaces until (comma)
 	int state = 0;
 
-	for(i=0; i<(int) line.length(); i++) {
+	for (i = 0; i < (int)line.length(); i++) {
 		if (skipChar) {
 			skipChar = false;
 		} else {
-			switch(state) {
+			switch (state) {
 				case 0:
 					if (line.at(i) == '\"') {
-						fieldStartIdx = i+1;
+						fieldStartIdx = i + 1;
 						state = 2;
 					} else if (line.at(i) == ',') {
 						field.clear();
@@ -137,15 +136,17 @@ std::vector<std::string> splitCSV(const std::string &line)
 					break;
 				case 1:
 					if (line.at(i) == ',') {
-						fieldLength = i-fieldStartIdx;
+						fieldLength = i - fieldStartIdx;
 						field = line.substr(fieldStartIdx, fieldLength);
 
-						std::size_t start = field.find_first_not_of(" \n\t");
+						std::size_t start = field.find_first_not_of(" \n"
+											    "\t");
 						std::size_t end = field.find_last_not_of(" \n\t");
 						if (start == std::string::npos) {
 							field.clear();
 						} else {
-							field = field.substr(start, end-start+1);
+							field = field.substr(start,
+									     end - start + 1);
 						}
 
 						elems.push_back(field);
@@ -154,14 +155,16 @@ std::vector<std::string> splitCSV(const std::string &line)
 					break;
 				case 2:
 					if (line.at(i) == '\"') {
-						if ( (i+1 < (int) line.length()) && (line.at(i+1) == '\"') ) {
+						if ((i + 1 < (int)line.length()) &&
+						    (line.at(i + 1) == '\"')) {
 							skipChar = true;
 						} else {
-							fieldLength = i-fieldStartIdx;
-							field = line.substr(fieldStartIdx, fieldLength);
+							fieldLength = i - fieldStartIdx;
+							field = line.substr(fieldStartIdx,
+									    fieldLength);
 							std::size_t k = field.find("\"\"");
-							while(k != std::string::npos) {
-								field.erase(k,1);
+							while (k != std::string::npos) {
+								field.erase(k, 1);
 								k = field.find("\"\"");
 							}
 							elems.push_back(field);
@@ -175,7 +178,8 @@ std::vector<std::string> splitCSV(const std::string &line)
 					} else if (line.at(i) == ',') {
 						state = 0;
 					} else {
-						s << "ERROR: Unable to splitCSV() for command \"" << line << "\" invalid quotes.\n";
+						s << "ERROR: Unable to splitCSV() for command \""
+						  << line << "\" invalid quotes.\n";
 						throw std::runtime_error(s.str());
 					}
 					break;
@@ -184,12 +188,12 @@ std::vector<std::string> splitCSV(const std::string &line)
 					break;
 			}
 		}
-		if (i == ((int) line.length())-1) {
+		if (i == ((int)line.length()) - 1) {
 			if (state == 0) {
 				field.clear();
 				elems.push_back(field);
 			} else if (state == 1) {
-				fieldLength = i-fieldStartIdx+1;
+				fieldLength = i - fieldStartIdx + 1;
 				field = line.substr(fieldStartIdx, fieldLength);
 
 				std::size_t start = field.find_first_not_of(" \n\t");
@@ -197,13 +201,14 @@ std::vector<std::string> splitCSV(const std::string &line)
 				if (start == std::string::npos) {
 					field.clear();
 				} else {
-					field = field.substr(start, end-start+1);
+					field = field.substr(start, end - start + 1);
 				}
 
 				elems.push_back(field);
 				state = 0;
 			} else if (state == 2) {
-				s << "ERROR: Unable to splitCSV() for command \"" << line << "\" unmatched quote.\n";
+				s << "ERROR: Unable to splitCSV() for command \"" << line
+				  << "\" unmatched quote.\n";
 				throw std::runtime_error(s.str());
 			} else if (state == 3) {
 				state = 0;
@@ -218,4 +223,3 @@ std::vector<std::string> splitCSV(const std::string &line)
 	return elems;
 }
 /******************************************************************************************/
-

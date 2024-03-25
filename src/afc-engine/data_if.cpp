@@ -9,22 +9,22 @@
 #include <QtCore/QEventLoop>
 #include <QtCore/QTimer>
 #ifdef DATA_IF_STANDALONE
-# include <QDebug>
-# define LOGGER_DEFINE_GLOBAL(a, b)
-# define LOGGER_DEBUG(a) qDebug()
-# define LOGGER_ERROR(a) qDebug()
+	#include <QDebug>
+	#define LOGGER_DEFINE_GLOBAL(a, b)
+	#define LOGGER_DEBUG(a) qDebug()
+	#define LOGGER_ERROR(a) qDebug()
 #else
-#include "afclogging/Logging.h"
+	#include "afclogging/Logging.h"
 #endif
 #include "data_if.h"
 
-#define ZLIB_COMPRESS_LEVEL	6
-#define ZLIB_WINDOW_BITS	(MAX_WBITS + 16)
-#define ZLIB_MEMORY_LEVEL	8
+#define ZLIB_COMPRESS_LEVEL 6
+#define ZLIB_WINDOW_BITS (MAX_WBITS + 16)
+#define ZLIB_MEMORY_LEVEL 8
 #if GUNZIP_INPUT_FILES
-#define ZLIB_MAX_FILE_SIZE	100000
+	#define ZLIB_MAX_FILE_SIZE 100000
 #endif
-#define MAX_NET_DELAY		5000 /* wait for download/upload, ms */
+#define MAX_NET_DELAY 5000 /* wait for download/upload, ms */
 
 LOGGER_DEFINE_GLOBAL(logger, "AfcDataIf")
 
@@ -50,17 +50,16 @@ AfcDataIf::~AfcDataIf()
 	}
 }
 
-bool AfcDataIf::readFile(QString fileName, QByteArray& data)
+bool AfcDataIf::readFile(QString fileName, QByteArray &data)
 {
-	LOGGER_DEBUG(logger)  << "AfcDataIf::readFile(" << fileName << ")";
+	LOGGER_DEBUG(logger) << "AfcDataIf::readFile(" << fileName << ")";
 	if (!AfcDataIf::_useUrl) {
 		QFile inFile;
 
 		inFile.setFileName(fileName);
-		if (inFile.open(QFile::ReadOnly))
-		{
+		if (inFile.open(QFile::ReadOnly)) {
 			QByteArray gzipped = inFile.readAll();
-			QByteArray* indata = &gzipped;
+			QByteArray *indata = &gzipped;
 #if GUNZIP_INPUT_FILES
 			QByteArray gunzipped;
 			if (AfcDataIf::gunzipBuffer(gzipped, gunzipped)) {
@@ -71,10 +70,10 @@ bool AfcDataIf::readFile(QString fileName, QByteArray& data)
 			inFile.close();
 			return true;
 		}
-		LOGGER_ERROR(logger)  << "AfcDataIf::readFile(" << fileName << ") QFile.open error";
+		LOGGER_ERROR(logger) << "AfcDataIf::readFile(" << fileName << ") QFile.open error";
 		return false;
 	} else {
-		QTimer timer;	/* use QNetworkRequest::setTransferTimeout after update to qt5.15 */
+		QTimer timer; /* use QNetworkRequest::setTransferTimeout after update to qt5.15 */
 		QEventLoop loop;
 		timer.setSingleShot(true);
 
@@ -93,15 +92,17 @@ bool AfcDataIf::readFile(QString fileName, QByteArray& data)
 			delete reply;
 			return true;
 		}
-		LOGGER_ERROR(logger) << "readFile(" << url.toString() << ") error " << reply->error();
+		LOGGER_ERROR(logger)
+			<< "readFile(" << url.toString() << ") error " << reply->error();
 		delete reply;
 		return false;
 	}
 }
 
-bool AfcDataIf::gzipAndWriteFile(QString fileName, QByteArray& data)
+bool AfcDataIf::gzipAndWriteFile(QString fileName, QByteArray &data)
 {
-	LOGGER_DEBUG(logger) << "gzipAndWriteFile(" << fileName << ")" << " len: " << data.length();
+	LOGGER_DEBUG(logger) << "gzipAndWriteFile(" << fileName << ")"
+			     << " len: " << data.length();
 	QByteArray gziped;
 	if (!AfcDataIf::gzipBuffer(data, gziped)) {
 		return false;
@@ -109,15 +110,15 @@ bool AfcDataIf::gzipAndWriteFile(QString fileName, QByteArray& data)
 	return AfcDataIf::writeFile(fileName, gziped);
 }
 
-bool AfcDataIf::writeFile(QString fileName, QByteArray& data)
+bool AfcDataIf::writeFile(QString fileName, QByteArray &data)
 {
-	LOGGER_DEBUG(logger) << "writeFile(" << fileName << ")" << " len: " << data.length();
+	LOGGER_DEBUG(logger) << "writeFile(" << fileName << ")"
+			     << " len: " << data.length();
 	if (!AfcDataIf::_useUrl) {
 		QFile outFile;
 
 		outFile.setFileName(fileName);
-		if (outFile.open(QFile::WriteOnly))
-		{
+		if (outFile.open(QFile::WriteOnly)) {
 			if (outFile.write(data) == data.size()) {
 				outFile.close();
 				return true;
@@ -143,7 +144,8 @@ bool AfcDataIf::writeFile(QString fileName, QByteArray& data)
 			delete reply;
 			return true;
 		}
-		LOGGER_ERROR(logger) << "writeFile(" << url.toString() << ") error " << reply->error();
+		LOGGER_ERROR(logger)
+			<< "writeFile(" << url.toString() << ") error " << reply->error();
 		delete reply;
 		return false;
 	}
@@ -164,7 +166,12 @@ bool AfcDataIf::gzipBuffer(QByteArray &input, QByteArray &output)
 	strm.total_out = 0;
 	strm.next_in = Z_NULL;
 
-	int ret = deflateInit2(&strm, ZLIB_COMPRESS_LEVEL, Z_DEFLATED, ZLIB_WINDOW_BITS, ZLIB_MEMORY_LEVEL, Z_DEFAULT_STRATEGY);
+	int ret = deflateInit2(&strm,
+			       ZLIB_COMPRESS_LEVEL,
+			       Z_DEFLATED,
+			       ZLIB_WINDOW_BITS,
+			       ZLIB_MEMORY_LEVEL,
+			       Z_DEFAULT_STRATEGY);
 	if (ret != Z_OK) {
 		LOGGER_ERROR(logger) << "deflateInit2 error";
 		return false;
@@ -174,9 +181,9 @@ bool AfcDataIf::gzipBuffer(QByteArray &input, QByteArray &output)
 	output.resize(input.size());
 
 	strm.avail_in = input.size();
-	strm.next_in = (unsigned char*)input.data();
+	strm.next_in = (unsigned char *)input.data();
 	strm.avail_out = output.size();
-	strm.next_out = (unsigned char*)output.data();
+	strm.next_out = (unsigned char *)output.data();
 	ret = deflate(&strm, Z_FINISH);
 	if (ret != Z_OK && ret != Z_STREAM_END) {
 		LOGGER_ERROR(logger) << "deflate error";
@@ -193,9 +200,9 @@ bool AfcDataIf::gzipBuffer(QByteArray &input, QByteArray &output)
 #if GUNZIP_INPUT_FILES
 bool AfcDataIf::gunzipBuffer(QByteArray &input, QByteArray &output)
 {
-	LOGGER_DEBUG(logger)  << "AfcDataIf::gunzipBuffer()";
+	LOGGER_DEBUG(logger) << "AfcDataIf::gunzipBuffer()";
 	if (!input.length()) {
-		LOGGER_ERROR(logger)  << "AfcDataIf::gunzipBuffer() empty input buffer";
+		LOGGER_ERROR(logger) << "AfcDataIf::gunzipBuffer() empty input buffer";
 		return true;
 	}
 
@@ -225,9 +232,9 @@ bool AfcDataIf::gunzipBuffer(QByteArray &input, QByteArray &output)
 	if (ret != Z_OK)
 		return false;
 	strm.avail_in = input.size();
-	strm.next_in = (unsigned char*)input.data();
+	strm.next_in = (unsigned char *)input.data();
 	strm.avail_out = output.size();
-	strm.next_out = (unsigned char*)output.data();
+	strm.next_out = (unsigned char *)output.data();
 	ret = inflate(&strm, Z_FINISH);
 	if (ret != Z_OK && ret != Z_STREAM_END) {
 		LOGGER_ERROR(logger) << "inflate error " << ret;

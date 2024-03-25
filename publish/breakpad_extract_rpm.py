@@ -9,6 +9,7 @@ import tempfile
 
 LOGGER = logging.getLogger()
 
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--verbose', type=int, default=0,
@@ -29,11 +30,11 @@ Default is %(default)s.''')
     else:
         log_level = logging.WARNING
     logging.basicConfig(level=log_level)
-    
+
     symbol_path = os.path.abspath(args.symboldir)
     if not os.path.isdir(symbol_path):
         os.path.makedirs(symbol_path)
-    
+
     tmp_path = tempfile.mkdtemp()
     LOGGER.debug('Temporary package contents under %s', tmp_path)
 
@@ -70,9 +71,10 @@ Default is %(default)s.''')
             '{0}/usr/sbin'.format(tmp_path),
         ],
     )
-    
+
     LOGGER.debug('Cleaning up %s', tmp_path)
     shutil.rmtree(tmp_path)
+
 
 if __name__ == '__main__':
     sys.exit(main())

@@ -43,7 +43,7 @@
  * Creation of GDAL data source object (template parameter is pixel data type,
  * second constructor parameter is data set name, not used internally but useful
  * for logging, etc.) for various GDAL sources:
- * 
+ *
  * - NLCD data (land usage information). May come in several forms:
  *   - Single file:
  *	nlcd = CachedGdal<uint8_t> nlcd("nlcd/federated_nlcd.tif", "nlcd");
@@ -173,605 +173,618 @@
  * Unified GDAL geospatial data access module */
 
 /** Abstract base class that handles everything but pixel data */
-class CachedGdalBase : private boost::noncopyable {
-public:
-	//////////////////////////////////////////////////
-	// CachedGdalBase. Public class constants
-	//////////////////////////////////////////////////
+class CachedGdalBase : private boost::noncopyable
+{
+	public:
+		//////////////////////////////////////////////////
+		// CachedGdalBase. Public class constants
+		//////////////////////////////////////////////////
 
-	/** Default maximum tile side (number of pixels in one dimension) size */
-	static const int DEFAULT_MAX_TILE_SIZE = 1000;
+		/** Default maximum tile side (number of pixels in one dimension) size */
+		static const int DEFAULT_MAX_TILE_SIZE = 1000;
 
-	/** Default maximum size of LRU cache of tiles */
-	static const int DEFAULT_CACHE_SIZE = 50;
+		/** Default maximum size of LRU cache of tiles */
+		static const int DEFAULT_CACHE_SIZE = 50;
 
-	/** Maximum number of simultaneously opened GDAL files */
-	static const int GDAL_CACHE_SIZE = 9;
+		/** Maximum number of simultaneously opened GDAL files */
+		static const int GDAL_CACHE_SIZE = 9;
 
-	//////////////////////////////////////////////////
-	// CachedGdalBase. Public class types
-	//////////////////////////////////////////////////
+		//////////////////////////////////////////////////
+		// CachedGdalBase. Public class types
+		//////////////////////////////////////////////////
 
-	/** Holds GDALDataset pointer and full filename.
-	 * RAII wrapper around GDALDataset*
-	 */
-	struct GdalDatasetHolder {
-		/** Constructor - opens dataset.
-		 * @param fullFileName Full file name of GDAL file
+		/** Holds GDALDataset pointer and full filename.
+		 * RAII wrapper around GDALDataset*
 		 */
-		GdalDatasetHolder(const std::string& fullFileName);
+		struct GdalDatasetHolder {
+				/** Constructor - opens dataset.
+				 * @param fullFileName Full file name of GDAL file
+				 */
+				GdalDatasetHolder(const std::string &fullFileName);
 
-		/** Destructor - closes dataset */
-		~GdalDatasetHolder();
+				/** Destructor - closes dataset */
+				~GdalDatasetHolder();
 
-		/** Dataset pointer */
-		GDALDataset* gdalDataset;
+				/** Dataset pointer */
+				GDALDataset *gdalDataset;
 
-		/** Full file name of GDAL file */
-		std::string fullFileName;
-	};
+				/** Full file name of GDAL file */
+				std::string fullFileName;
+		};
 
-	/** Information of whereabouts of data for certain pixel */
-	struct PixelInfo {
-		/** Constructor
-		 * @param baseName Base name of GDAL file containing pixel
-		 * @param row 0-based row number in GDAL file
-		 * @param column 0-based column number in GDAL file
+		/** Information of whereabouts of data for certain pixel */
+		struct PixelInfo {
+				/** Constructor
+				 * @param baseName Base name of GDAL file containing pixel
+				 * @param row 0-based row number in GDAL file
+				 * @param column 0-based column number in GDAL file
+				 */
+				PixelInfo(const std::string &baseName, int row, int column);
+
+				/** Default constructor */
+				PixelInfo();
+
+				/** Base name of GDAL file containing pixel */
+				std::string baseName;
+				/** 0-based row number in GDAL file */
+				int row;
+				/** 0-based column number in GDAL file */
+				int column;
+		};
+
+		//////////////////////////////////////////////////
+		// CachedGdalBase. Public member functions
+		//////////////////////////////////////////////////
+
+		/** Virtual destructor */
+		virtual ~CachedGdalBase() = default;
+
+		/** Data set name */
+		const std::string &dsName() const;
+
+		/** Sets callback that modifies (rectifies) transformation data retrieved
+		 * from GDAL file. */
+		void setTransformationModifier(std::function<void(GdalTransform *)> modifier);
+
+		/** True for monolithic data source, false for tiled directory */
+		bool isMonolithic() const;
+
+		/** Check if given point is covered by GDAL data.
+		 * Current version only works for monolithic data
 		 */
-		PixelInfo(const std::string &baseName, int row, int column);
+		bool covers(double latDeg, double lonDeg);
 
-		/** Default constructor */
-		PixelInfo();
-
-		/** Base name of GDAL file containing pixel */
-		std::string baseName;
-		/** 0-based row number in GDAL file */
-		int row;
-		/** 0-based column number in GDAL file */
-		int column;
-	};
-
-	//////////////////////////////////////////////////
-	// CachedGdalBase. Public member functions
-	//////////////////////////////////////////////////
-
-	/** Virtual destructor */
-	virtual ~CachedGdalBase() = default;
-
-	/** Data set name */
-	const std::string &dsName() const;
-
-	/** Sets callback that modifies (rectifies) transformation data retrieved
-	 * from GDAL file. */
-	void setTransformationModifier(std::function<void(GdalTransform *)> modifier);
-
-	/** True for monolithic data source, false for tiled directory */
-	bool isMonolithic() const;
-
-	/** Check if given point is covered by GDAL data.
-	 * Current version only works for monolithic data
-	 */
-	bool covers(double latDeg, double lonDeg);
-
-	/** Retrieves geospatial data boundaries.
-	 * Current version only works for monolithic data
-	 * @param[out] lonDegMax Optional maximum longitude in east-positive degrees
-	 */
-	GdalTransform::BoundRect boundRect();
-
-	/** Returns whereabouts of data for given latitude/longitude in GDAL file.
-	 * This function is for comparison with other implementations
-	 * @param latDeg Latitude in north-positive degrees
-	 * @param lonDeg Longitude in east-positive degrees
-	 * @return Optional information about pixel whereabouts
-	 */
-	boost::optional<PixelInfo> getPixelInfo(double latDeg, double lonDeg);
-
-	//////////////////////////////////////////////////
-	// CachedGdalBase. Public static methods
-	//////////////////////////////////////////////////
-
-	/** Format degree value into degree/minute/second.
-	 * @param deg Degree value
-	 * @param forceDegrees True to present leading degrees/minutes even if they
-	 *	are zero
-	 * @return String representation
-	 */
-	static std::string formatDms(double deg, bool forceDegrees = false);
-
-	/** String representation of given position.
-	 * @param latDeg North-positive latitude in degrees
-	 * @param lonDeg East-positive longitude in degrees
-	 * @return String representation of given position
-	 */
-	static std::string formatPosition(double latDeg, double lonDeg);
-
-protected:
-
-	/** Constructor.
-	 * @param fileOrDir Name of file (for monolithic file data GDAL source) or
-	 *	name of directory (for multifile directory data source)
-	 * @param dsName Data set name (not used internally - for logging purposes)
-	 * @param nameMapper Null for monolithic (single-file) data, address of
-	 *	GdalNameMapper object for multifile (tiled) data
-	 * @param numBands Number of bands that will be used (i.e. maximum 1-based
-	 *	band index)
-	 * @param maxTileSize Maximum size for tile in one dimension
-	 * @param cacheSize Maximum number of tiles in tile cache
-	 * @param pixelType Value describing pixel data type in RasterIO operation
-	 */
-	CachedGdalBase(std::string fileOrDir, const std::string &dsName,
-		std::unique_ptr<GdalNameMapperBase> nameMapper, int numBands,
-		int maxTileSize, int cacheSize, GDALDataType pixelType);
-
-	/** Value for unavailable data for given band, as obtained from GDAL */
-	double gdalNoData(int band) const;
-
-	/** Post-construction initialization.
-	 * Initialization functionality that requires virtual functions of derived
-	 * classes, unavailable at this class' construction time
-	 */
-	void initialize();
-
-	/** Pre-destruction cleanup (stuff that requires virtual functions,
-	 * unavailable in destructor)
-	 */
-	void cleanup();
-
-	/** Looks up tile, containing pixel for given coordinates.
-	 * @param[in] band 1-based index of band in GDAL file
-	 * @param[in] latDeg North-positive latitude in degrees
-	 * @param[in] lonDeg East-positive longitude in degrees
-	 * @param[out] pixelIndex Index of pixel data inside tile vector
-	 * @return std::vector, containing tile pixel data, nullptr if lookup failed
-	 */
-	const void *getTileVector(int band, double latDeg, double lonDeg, int *pixelIndex);
-
-	/** Read pixel data directly, bypassing caching mechanism
-	 * @param[in] band 1-based index of band in GDAL file
-	 * @param[in] latDeg North-positive latitude in degrees
-	 * @param[in] lonDeg East-positive longitude in degrees
-	 * @param[out] pixelBuf Buffer to read pixel into
-	 * @return True on success, false on fail
-	 */ 
-	bool getPixelDirect(int band, double latDeg, double lonDeg, void *pixelBuf);
-
-	/** Throws if given band index is invalid */
-	void checkBandIndex(int band) const;
-
-
-	//////////////////////////////////////////////////
-	// CachedGdalBase. Pixel-type specific tile manipulation pure virtual functions
-	//////////////////////////////////////////////////
-
-	/** Creates on heap a std::vector buffer for tile pixel data.
-	 * @param latSize Pixel count in latitude direction
-	 * @param lonSize Pixel count in longitude direction
-	 * @return Address of created std::vector
-	 */
-	virtual void *createTileVector(int latSize, int lonSize) const = 0;
-
-	/** Deletes tile vector.
-	 * @param tileVector std::vector to delete
-	 */
-	virtual void deleteTileVector(void *tileVector) const = 0;
-
-	/** Returns address of tile's data buffer
-	 * @param tileVector std::vector, containing tile pixel data
-	 * @return Vector's buffer, containing pixel data
-	 */
-	virtual void *getTileBuffer(void *tileVector) const = 0;
-
-
-	//////////////////////////////////////////////////
-	// CachedGdalBase. Protected static methods
-	//////////////////////////////////////////////////
-
-	// Functions that map pixel types to respective GDAL data type codes
-	static GDALDataType gdalDataType(uint8_t);
-	static GDALDataType gdalDataType(uint16_t);
-	static GDALDataType gdalDataType(int16_t);
-	static GDALDataType gdalDataType(uint32_t);
-	static GDALDataType gdalDataType(int32_t);
-	static GDALDataType gdalDataType(float);
-	static GDALDataType gdalDataType(double);
-
-private:
-
-	//////////////////////////////////////////////////
-	// CachedGdalBase. Private class types
-	//////////////////////////////////////////////////
-
-	//////////////////////////////////////////////////
-	// CachedGdalBase::GdalInfo
-	//////////////////////////////////////////////////
-
-	/** Information pertinent to a single GDAL file */
-	struct GdalInfo {
-
-		//////////////////////////////////////////////////
-		// CachedGdalBase::GdalInfo. Public instance methods
-		//////////////////////////////////////////////////
-
-		/** Constructor.
-		 * @param gdalDataset GdalDatasetHolder for file being added
-		 * @param minBands Minimum required number of bands
-		 * @param transformationModifier Optional transformation modifier
+		/** Retrieves geospatial data boundaries.
+		 * Current version only works for monolithic data
+		 * @param[out] lonDegMax Optional maximum longitude in east-positive degrees
 		 */
-		GdalInfo(const GdalDatasetHolder *gdalDataset, int minBands,
-			const boost::optional<std::function<void(GdalTransform *)>>
-			&transformationModifier);
+		GdalTransform::BoundRect boundRect();
+
+		/** Returns whereabouts of data for given latitude/longitude in GDAL file.
+		 * This function is for comparison with other implementations
+		 * @param latDeg Latitude in north-positive degrees
+		 * @param lonDeg Longitude in east-positive degrees
+		 * @return Optional information about pixel whereabouts
+		 */
+		boost::optional<PixelInfo> getPixelInfo(double latDeg, double lonDeg);
 
 		//////////////////////////////////////////////////
-		// CachedGdalBase::GdalInfo. Public instance data
+		// CachedGdalBase. Public static methods
 		//////////////////////////////////////////////////
 
-		/** File name without directory */
-		std::string baseName;
+		/** Format degree value into degree/minute/second.
+		 * @param deg Degree value
+		 * @param forceDegrees True to present leading degrees/minutes even if they
+		 *	are zero
+		 * @return String representation
+		 */
+		static std::string formatDms(double deg, bool forceDegrees = false);
 
-		/** Transformation of coordinates to pixel indices */
-		GdalTransform transformation;
+		/** String representation of given position.
+		 * @param latDeg North-positive latitude in degrees
+		 * @param lonDeg East-positive longitude in degrees
+		 * @return String representation of given position
+		 */
+		static std::string formatPosition(double latDeg, double lonDeg);
 
-		/** Boundary rectangle with margins (if any) applied */
-		GdalTransform::BoundRect boundRect;
-
-		/** Number of bands */
-		int numBands;
-
-		/** Per-band no-data values [0] contains value for band 1, etc. */
-		std::vector<double> noDataValues;
-	};
-
-	//////////////////////////////////////////////////
-	// CachedGdalBase::TileKey
-	//////////////////////////////////////////////////
-
-	/** Tile identifier in cache */
-	struct TileKey {
-
-		//////////////////////////////////////////////////
-		// CachedGdalBase::TileKey. Public instance methods
-		//////////////////////////////////////////////////
-
+	protected:
 		/** Constructor.
-		* @param band 1-based band index
-		* @param latOffset Tile offset in latitude direction
-		* @param lonOffset Tile offset in longitude direction
-		* @param baseName Tile file base name
-		*/
-		TileKey(int band, int latOffset, int lonOffset, const std::string &baseName);
+		 * @param fileOrDir Name of file (for monolithic file data GDAL source) or
+		 *	name of directory (for multifile directory data source)
+		 * @param dsName Data set name (not used internally - for logging purposes)
+		 * @param nameMapper Null for monolithic (single-file) data, address of
+		 *	GdalNameMapper object for multifile (tiled) data
+		 * @param numBands Number of bands that will be used (i.e. maximum 1-based
+		 *	band index)
+		 * @param maxTileSize Maximum size for tile in one dimension
+		 * @param cacheSize Maximum number of tiles in tile cache
+		 * @param pixelType Value describing pixel data type in RasterIO operation
+		 */
+		CachedGdalBase(std::string fileOrDir,
+			       const std::string &dsName,
+			       std::unique_ptr<GdalNameMapperBase> nameMapper,
+			       int numBands,
+			       int maxTileSize,
+			       int cacheSize,
+			       GDALDataType pixelType);
 
-		/** Default constructor */
-		TileKey();
+		/** Value for unavailable data for given band, as obtained from GDAL */
+		double gdalNoData(int band) const;
 
-		/** Ordering comparison */
-		bool operator <(const TileKey &other) const;
+		/** Post-construction initialization.
+		 * Initialization functionality that requires virtual functions of derived
+		 * classes, unavailable at this class' construction time
+		 */
+		void initialize();
+
+		/** Pre-destruction cleanup (stuff that requires virtual functions,
+		 * unavailable in destructor)
+		 */
+		void cleanup();
+
+		/** Looks up tile, containing pixel for given coordinates.
+		 * @param[in] band 1-based index of band in GDAL file
+		 * @param[in] latDeg North-positive latitude in degrees
+		 * @param[in] lonDeg East-positive longitude in degrees
+		 * @param[out] pixelIndex Index of pixel data inside tile vector
+		 * @return std::vector, containing tile pixel data, nullptr if lookup failed
+		 */
+		const void *getTileVector(int band, double latDeg, double lonDeg, int *pixelIndex);
+
+		/** Read pixel data directly, bypassing caching mechanism
+		 * @param[in] band 1-based index of band in GDAL file
+		 * @param[in] latDeg North-positive latitude in degrees
+		 * @param[in] lonDeg East-positive longitude in degrees
+		 * @param[out] pixelBuf Buffer to read pixel into
+		 * @return True on success, false on fail
+		 */
+		bool getPixelDirect(int band, double latDeg, double lonDeg, void *pixelBuf);
+
+		/** Throws if given band index is invalid */
+		void checkBandIndex(int band) const;
 
 		//////////////////////////////////////////////////
-		// CachedGdalBase::TileKey. Public instance data
+		// CachedGdalBase. Pixel-type specific tile manipulation pure virtual functions
 		//////////////////////////////////////////////////
 
-		/** 1-based band index */
-		int band;
+		/** Creates on heap a std::vector buffer for tile pixel data.
+		 * @param latSize Pixel count in latitude direction
+		 * @param lonSize Pixel count in longitude direction
+		 * @return Address of created std::vector
+		 */
+		virtual void *createTileVector(int latSize, int lonSize) const = 0;
 
-		/** Tile offset in latitude direction */
-		int latOffset;
+		/** Deletes tile vector.
+		 * @param tileVector std::vector to delete
+		 */
+		virtual void deleteTileVector(void *tileVector) const = 0;
 
-		/** Tile offset in longitude direction */
-		int lonOffset;
-
-		/** Tile file base name */
-		std::string baseName;
-	};
-
-	//////////////////////////////////////////////////
-	// CachedGdalBase::TileInfo
-	//////////////////////////////////////////////////
-
-	/** Tile data in cache */
-	struct TileInfo {
+		/** Returns address of tile's data buffer
+		 * @param tileVector std::vector, containing tile pixel data
+		 * @return Vector's buffer, containing pixel data
+		 */
+		virtual void *getTileBuffer(void *tileVector) const = 0;
 
 		//////////////////////////////////////////////////
-		// CachedGdalBase::TileInfo. Public instance methods
+		// CachedGdalBase. Protected static methods
 		//////////////////////////////////////////////////
 
-		/** Constructor.
-		* @param cachedGdal Parent container
-		* @param transformation Pixel indices computation transformation
-		* @param gdalInfo GdalInfo containing this tile
-		*/
-		TileInfo(CachedGdalBase *cachedGdal, const GdalTransform &transformation,
-			const GdalInfo *gdalInfo);
+		// Functions that map pixel types to respective GDAL data type codes
+		static GDALDataType gdalDataType(uint8_t);
+		static GDALDataType gdalDataType(uint16_t);
+		static GDALDataType gdalDataType(int16_t);
+		static GDALDataType gdalDataType(uint32_t);
+		static GDALDataType gdalDataType(int32_t);
+		static GDALDataType gdalDataType(float);
+		static GDALDataType gdalDataType(double);
 
-		/** Default constructor to appease boost::lru_cache */
-		TileInfo();
-
-
+	private:
 		//////////////////////////////////////////////////
-		// CachedGdalBase::TileInfo. Public instance data
+		// CachedGdalBase. Private class types
 		//////////////////////////////////////////////////
 
-		/** Parent container */
-		const CachedGdalBase *cachedGdal;
+		//////////////////////////////////////////////////
+		// CachedGdalBase::GdalInfo
+		//////////////////////////////////////////////////
 
-		/** Transformation of coordinates to pixel indices */
-		GdalTransform transformation;
+		/** Information pertinent to a single GDAL file */
+		struct GdalInfo {
+				//////////////////////////////////////////////////
+				// CachedGdalBase::GdalInfo. Public instance methods
+				//////////////////////////////////////////////////
 
-		/** Tile boundary rectangle.
-		* Always contain whole number of pixels, noninteger boundaries checked
-		* through gdalInfo->boundRect
-		*/
-		GdalTransform::BoundRect boundRect;
+				/** Constructor.
+				 * @param gdalDataset GdalDatasetHolder for file being added
+				 * @param minBands Minimum required number of bands
+				 * @param transformationModifier Optional transformation modifier
+				 */
+				GdalInfo(const GdalDatasetHolder *gdalDataset,
+					 int minBands,
+					 const boost::optional<std::function<void(GdalTransform *)>>
+						 &transformationModifier);
 
-		/* GdalInfo containing this tile */
-		const GdalInfo *gdalInfo;
+				//////////////////////////////////////////////////
+				// CachedGdalBase::GdalInfo. Public instance data
+				//////////////////////////////////////////////////
 
-		/** std::vector that contains tile pixel data */
-		std::shared_ptr<void> tileVector;
-	};
+				/** File name without directory */
+				std::string baseName;
 
+				/** Transformation of coordinates to pixel indices */
+				GdalTransform transformation;
 
-	//////////////////////////////////////////////////
-	// CachedGdalBase. Private instance methods
-	//////////////////////////////////////////////////
+				/** Boundary rectangle with margins (if any) applied */
+				GdalTransform::BoundRect boundRect;
 
-	/** Tries to find tile for given coordinates and bands
-	 * @param[in] band 1-based band index
-	 * @param[in] latDeg Latitude of point to look tile of in north-positive
-	 *	degrees
-	 * @param[in] lonDeg Longitude of point to look tile of in east-positive
-	 *	degrees
-	 * @return On success makes desired tile the recent in tile cache and returns
-	 *	true, otherwise returns false
-	 */
-	bool findTile(int band, double latDeg, double lonDeg);
+				/** Number of bands */
+				int numBands;
 
-	/** Provides GDAL whereabouts of data for point with given coordinates.
-	 * @param latDeg[in] North-positive latitude in degrees
-	 * @param lonDeg[in] East-positive longitude in degrees
-	 * @param gdalInfo[out] GdalInfo of file, containing point (if found)
-	 * @param fileLatIdx[out] Latitude index (row) in GDAL file (if found)
-	 * @param fileLonIdx[out] Longitude index (column) in file (if found)
-	 * @return True if pixel for given point found, false otherwise
-	 */
-	bool getGdalPixel(double latDeg, double lonDeg, const GdalInfo **gdalInfo,
-		int *fileLatIdx, int *fileLonIdx);
+				/** Per-band no-data values [0] contains value for band 1, etc. */
+				std::vector<double> noDataValues;
+		};
 
-	/** Brings in GDAL dataset holder that corresponds to given file name (file
-	 * must exist).
-	 * @param baseName Base name of file to bring in
-	 * @return Pointer to holder of GDALDataset of given file
-	 */
-	const GdalDatasetHolder *getGdalDatasetHolder(const std::string& filename);
+		//////////////////////////////////////////////////
+		// CachedGdalBase::TileKey
+		//////////////////////////////////////////////////
 
-	/** Adds GdalInfo information for given file to collection of known GDAL files
-	 * @param baseName GDAL file base name
-	 * @param gdalDataset Holder of GDALDataset for existing file, nullptr for
-	 *	nonexistent file
-	 * @return Address of created GdalInfo object
-	 */
-	const GdalInfo* addGdalInfo(const std::string& baseName,
-		const GdalDatasetHolder* gdalDataset);
+		/** Tile identifier in cache */
+		struct TileKey {
+				//////////////////////////////////////////////////
+				// CachedGdalBase::TileKey. Public instance methods
+				//////////////////////////////////////////////////
 
-	/* Lookup of GdalInfo for given file name.
-	 * @param[in] baseName File base name
-	 * @param[out] gdalInfo Address of found (or not found) GdalInfo object
-	 * @return True on lookup success (in case of lookup for nonexistent files,
-	 * true is still returned, but *gdalInfo filled with nullptr)
-	 */
-	bool getGdalInfo(const std::string& baseName, const GdalInfo** gdalInfo);
+				/** Constructor.
+				 * @param band 1-based band index
+				 * @param latOffset Tile offset in latitude direction
+				 * @param lonOffset Tile offset in longitude direction
+				 * @param baseName Tile file base name
+				 */
+				TileKey(int band,
+					int latOffset,
+					int lonOffset,
+					const std::string &baseName);
 
-	/** Calls given function for GdalInfo objects, corresponding to some or all
-	 * GDAL files
-	 * @param op Function to call for each GdalInfo object. Function return true
-	 *	to stop iteration (e.g. if something desirable was found), false to
-	 *	continue
-	 * @return True if last call of op() returned true
-	 */
-	bool forEachGdalInfo(const std::function<bool(const GdalInfo& gdalInfo)>& op);
+				/** Default constructor */
+				TileKey();
 
-	/** Does proper cleanup and reinitialization after GDAL parameters modification
-	 * For use after mapping parameter change
-	 */
-	void rereadGdal();
+				/** Ordering comparison */
+				bool operator<(const TileKey &other) const;
 
+				//////////////////////////////////////////////////
+				// CachedGdalBase::TileKey. Public instance data
+				//////////////////////////////////////////////////
 
-	//////////////////////////////////////////////////
-	// CachedGdalBase. Private instance data
-	//////////////////////////////////////////////////
+				/** 1-based band index */
+				int band;
 
-	/** Name of file or directory of tiled files */
-	const std::string _fileOrDir;
+				/** Tile offset in latitude direction */
+				int latOffset;
 
-	/** Data set name */
-	std::string _dsName;
+				/** Tile offset in longitude direction */
+				int lonOffset;
 
-	/** For tiled  (multifile) data source - provides base name of tile file
-	 * for given latitude/longitude. Null for monolithic data source
-	 */
-	std::unique_ptr<GdalNameMapperBase> _nameMapper;
+				/** Tile file base name */
+				std::string baseName;
+		};
 
-	/** Optional transformation modifier (rectifier) callback */
-	boost::optional<std::function<void(GdalTransform *)>> _transformationModifier;
+		//////////////////////////////////////////////////
+		// CachedGdalBase::TileInfo
+		//////////////////////////////////////////////////
 
-	/** Number of bands to be used (maximum 1-based band index) */
-	const int _numBands;
+		/** Tile data in cache */
+		struct TileInfo {
+				//////////////////////////////////////////////////
+				// CachedGdalBase::TileInfo. Public instance methods
+				//////////////////////////////////////////////////
 
-	/** Pixel data type for RasterIO() call */
-	const GDALDataType _pixelType;
+				/** Constructor.
+				 * @param cachedGdal Parent container
+				 * @param transformation Pixel indices computation transformation
+				 * @param gdalInfo GdalInfo containing this tile
+				 */
+				TileInfo(CachedGdalBase *cachedGdal,
+					 const GdalTransform &transformation,
+					 const GdalInfo *gdalInfo);
 
-	/** Maximum size for tile in one dimension */
-	const int _maxTileSize;
+				/** Default constructor to appease boost::lru_cache */
+				TileInfo();
 
-	/** LRU tile cache */
-	LruValueCache<TileKey, TileInfo> _tileCache;
+				//////////////////////////////////////////////////
+				// CachedGdalBase::TileInfo. Public instance data
+				//////////////////////////////////////////////////
 
-	/** GDAL dataset holders indexed by base file names */
-	LruValueCache<std::string, std::shared_ptr<GdalDatasetHolder>> _gdalDsCache;
+				/** Parent container */
+				const CachedGdalBase *cachedGdal;
 
-	/** Maps base filenames to GdalInfo objects (null pointers for nonexistent
-	 * files)
-	 */
-	std::map<std::string, std::unique_ptr<GdalInfo>> _gdalInfos;
+				/** Transformation of coordinates to pixel indices */
+				GdalTransform transformation;
 
-	/** Recently used GdalInfo object.
-	 * After initial initialization is always nonnull. May only be changed by
-	 * addGdalInfo() and getGdalInfo()
-	 */
-	const GdalInfo* _recentGdalInfo;
+				/** Tile boundary rectangle.
+				 * Always contain whole number of pixels, noninteger boundaries
+				 * checked through gdalInfo->boundRect
+				 */
+				GdalTransform::BoundRect boundRect;
 
-	/** True if information about all GDAL files retrieved to _gdalInfos */
-	bool _allSeen;
+				/* GdalInfo containing this tile */
+				const GdalInfo *gdalInfo;
+
+				/** std::vector that contains tile pixel data */
+				std::shared_ptr<void> tileVector;
+		};
+
+		//////////////////////////////////////////////////
+		// CachedGdalBase. Private instance methods
+		//////////////////////////////////////////////////
+
+		/** Tries to find tile for given coordinates and bands
+		 * @param[in] band 1-based band index
+		 * @param[in] latDeg Latitude of point to look tile of in north-positive
+		 *	degrees
+		 * @param[in] lonDeg Longitude of point to look tile of in east-positive
+		 *	degrees
+		 * @return On success makes desired tile the recent in tile cache and returns
+		 *	true, otherwise returns false
+		 */
+		bool findTile(int band, double latDeg, double lonDeg);
+
+		/** Provides GDAL whereabouts of data for point with given coordinates.
+		 * @param latDeg[in] North-positive latitude in degrees
+		 * @param lonDeg[in] East-positive longitude in degrees
+		 * @param gdalInfo[out] GdalInfo of file, containing point (if found)
+		 * @param fileLatIdx[out] Latitude index (row) in GDAL file (if found)
+		 * @param fileLonIdx[out] Longitude index (column) in file (if found)
+		 * @return True if pixel for given point found, false otherwise
+		 */
+		bool getGdalPixel(double latDeg,
+				  double lonDeg,
+				  const GdalInfo **gdalInfo,
+				  int *fileLatIdx,
+				  int *fileLonIdx);
+
+		/** Brings in GDAL dataset holder that corresponds to given file name (file
+		 * must exist).
+		 * @param baseName Base name of file to bring in
+		 * @return Pointer to holder of GDALDataset of given file
+		 */
+		const GdalDatasetHolder *getGdalDatasetHolder(const std::string &filename);
+
+		/** Adds GdalInfo information for given file to collection of known GDAL files
+		 * @param baseName GDAL file base name
+		 * @param gdalDataset Holder of GDALDataset for existing file, nullptr for
+		 *	nonexistent file
+		 * @return Address of created GdalInfo object
+		 */
+		const GdalInfo *addGdalInfo(const std::string &baseName,
+					    const GdalDatasetHolder *gdalDataset);
+
+		/* Lookup of GdalInfo for given file name.
+		 * @param[in] baseName File base name
+		 * @param[out] gdalInfo Address of found (or not found) GdalInfo object
+		 * @return True on lookup success (in case of lookup for nonexistent files,
+		 * true is still returned, but *gdalInfo filled with nullptr)
+		 */
+		bool getGdalInfo(const std::string &baseName, const GdalInfo **gdalInfo);
+
+		/** Calls given function for GdalInfo objects, corresponding to some or all
+		 * GDAL files
+		 * @param op Function to call for each GdalInfo object. Function return true
+		 *	to stop iteration (e.g. if something desirable was found), false to
+		 *	continue
+		 * @return True if last call of op() returned true
+		 */
+		bool forEachGdalInfo(const std::function<bool(const GdalInfo &gdalInfo)> &op);
+
+		/** Does proper cleanup and reinitialization after GDAL parameters modification
+		 * For use after mapping parameter change
+		 */
+		void rereadGdal();
+
+		//////////////////////////////////////////////////
+		// CachedGdalBase. Private instance data
+		//////////////////////////////////////////////////
+
+		/** Name of file or directory of tiled files */
+		const std::string _fileOrDir;
+
+		/** Data set name */
+		std::string _dsName;
+
+		/** For tiled  (multifile) data source - provides base name of tile file
+		 * for given latitude/longitude. Null for monolithic data source
+		 */
+		std::unique_ptr<GdalNameMapperBase> _nameMapper;
+
+		/** Optional transformation modifier (rectifier) callback */
+		boost::optional<std::function<void(GdalTransform *)>> _transformationModifier;
+
+		/** Number of bands to be used (maximum 1-based band index) */
+		const int _numBands;
+
+		/** Pixel data type for RasterIO() call */
+		const GDALDataType _pixelType;
+
+		/** Maximum size for tile in one dimension */
+		const int _maxTileSize;
+
+		/** LRU tile cache */
+		LruValueCache<TileKey, TileInfo> _tileCache;
+
+		/** GDAL dataset holders indexed by base file names */
+		LruValueCache<std::string, std::shared_ptr<GdalDatasetHolder>> _gdalDsCache;
+
+		/** Maps base filenames to GdalInfo objects (null pointers for nonexistent
+		 * files)
+		 */
+		std::map<std::string, std::unique_ptr<GdalInfo>> _gdalInfos;
+
+		/** Recently used GdalInfo object.
+		 * After initial initialization is always nonnull. May only be changed by
+		 * addGdalInfo() and getGdalInfo()
+		 */
+		const GdalInfo *_recentGdalInfo;
+
+		/** True if information about all GDAL files retrieved to _gdalInfos */
+		bool _allSeen;
 };
 
 /** Concrete GDAL cache class, parameterized by pixel data type */
-template <class PixelData>
-class CachedGdal : public CachedGdalBase {
-public:
-	/** Constructor.
-	 * @param fileOrDir Name of file (for monolithic file data GDAL source) or
-	 *	of directory (for multifile data source)
-	 * @param dsName Data set name (not used internally - for logging purposes)
-	 * @param nameMapper Null for monolithic (single-file) data, address of
-	 *	GdalNameMapperBase-derived  object for multifile (tiled) data
-	 * @param numBands Number of bands that will be used (maximum value for
-	 *	1-based band index)
-	 * @param maxTileSize Maximum size for tile in one dimension
-	 * @param cacheSize Maximum number of tiles in LRU cache
-	 */
-	CachedGdal(const std::string &file_or_dir, const std::string &dsName,
-		std::unique_ptr<GdalNameMapperBase> nameMapper = nullptr, int numBands = 1,
-		int maxTileSize = CachedGdalBase::DEFAULT_MAX_TILE_SIZE,
-		int cacheSize = CachedGdalBase::DEFAULT_CACHE_SIZE)
-		: CachedGdalBase(file_or_dir, dsName, std::move(nameMapper), numBands,
-		maxTileSize, cacheSize, CachedGdalBase::gdalDataType((PixelData)0))
-	{
-		initialize();
-	}
+template<class PixelData>
+class CachedGdal : public CachedGdalBase
+{
+	public:
+		/** Constructor.
+		 * @param fileOrDir Name of file (for monolithic file data GDAL source) or
+		 *	of directory (for multifile data source)
+		 * @param dsName Data set name (not used internally - for logging purposes)
+		 * @param nameMapper Null for monolithic (single-file) data, address of
+		 *	GdalNameMapperBase-derived  object for multifile (tiled) data
+		 * @param numBands Number of bands that will be used (maximum value for
+		 *	1-based band index)
+		 * @param maxTileSize Maximum size for tile in one dimension
+		 * @param cacheSize Maximum number of tiles in LRU cache
+		 */
+		CachedGdal(const std::string &file_or_dir,
+			   const std::string &dsName,
+			   std::unique_ptr<GdalNameMapperBase> nameMapper = nullptr,
+			   int numBands = 1,
+			   int maxTileSize = CachedGdalBase::DEFAULT_MAX_TILE_SIZE,
+			   int cacheSize = CachedGdalBase::DEFAULT_CACHE_SIZE) :
+			CachedGdalBase(file_or_dir,
+				       dsName,
+				       std::move(nameMapper),
+				       numBands,
+				       maxTileSize,
+				       cacheSize,
+				       CachedGdalBase::gdalDataType((PixelData)0))
+		{
+			initialize();
+		}
 
-	/** Virtual destructor */
-	virtual ~CachedGdal()
-	{
-		cleanup();
-	}
+		/** Virtual destructor */
+		virtual ~CachedGdal()
+		{
+			cleanup();
+		}
 
-	/** Retrieves geospatial data value by output parameter
-	 * @param[in] latDeg North-positive latitude in degrees
-	 * @param[in] lonDeg East-positive longitude in degrees
-	 * @param[out] value Geospatial value
-	 * @param[in] band 1-based band index
-	 * @param[in] direct True to read pixel directly, bypassing caching
-	 *	mechanism (may speed up accessing scattered data)
-	 * @return True on success, false if coordinates are outside of file(s)
-	 */
-	bool getValueAt(double latDeg, double lonDeg, PixelData *value, int band = 1,
-		bool direct = false)
-	{
-		PixelData v;
-		bool ret; // True if retrieval successful
-		if (direct) {
-			// Directly reading pixel
-			ret = getPixelDirect(band, latDeg, lonDeg, &v);
-		} else {
-			// First - finding tile
-			int pixelIndex;
-			auto tileVector = reinterpret_cast<const std::vector<PixelData> *>(
-				getTileVector(band, latDeg, lonDeg, &pixelIndex));
-			ret = tileVector != nullptr;
-			if (ret) {
-				// if tile found - retrieving pixel from it
-				v = tileVector->at(pixelIndex);
+		/** Retrieves geospatial data value by output parameter
+		 * @param[in] latDeg North-positive latitude in degrees
+		 * @param[in] lonDeg East-positive longitude in degrees
+		 * @param[out] value Geospatial value
+		 * @param[in] band 1-based band index
+		 * @param[in] direct True to read pixel directly, bypassing caching
+		 *	mechanism (may speed up accessing scattered data)
+		 * @return True on success, false if coordinates are outside of file(s)
+		 */
+		bool getValueAt(double latDeg,
+				double lonDeg,
+				PixelData *value,
+				int band = 1,
+				bool direct = false)
+		{
+			PixelData v;
+			bool ret; // True if retrieval successful
+			if (direct) {
+				// Directly reading pixel
+				ret = getPixelDirect(band, latDeg, lonDeg, &v);
+			} else {
+				// First - finding tile
+				int pixelIndex;
+				auto tileVector = reinterpret_cast<const std::vector<PixelData> *>(
+					getTileVector(band, latDeg, lonDeg, &pixelIndex));
+				ret = tileVector != nullptr;
+				if (ret) {
+					// if tile found - retrieving pixel from it
+					v = tileVector->at(pixelIndex);
+				}
 			}
-		}
-		if (ret && (v == static_cast<PixelData>(gdalNoData(band)))) {
-			// If 'no-data' pixel was retrieved - count as faiilure
-			ret = false;
-		}
-		if (value) {
-			// Caller needs pixel value
-			if (!ret) {
-				// Value for 'no-data' pixel - overridden or from GHDAL file
-				auto ndi = _noData.find(band);
-				v = (ndi != _noData.end()) ? ndi->second : static_cast<PixelData>(gdalNoData(band));
+			if (ret && (v == static_cast<PixelData>(gdalNoData(band)))) {
+				// If 'no-data' pixel was retrieved - count as faiilure
+				ret = false;
 			}
-			*value = v;
+			if (value) {
+				// Caller needs pixel value
+				if (!ret) {
+					// Value for 'no-data' pixel - overridden or from GHDAL file
+					auto ndi = _noData.find(band);
+					v = (ndi != _noData.end()) ?
+						    ndi->second :
+						    static_cast<PixelData>(gdalNoData(band));
+				}
+				*value = v;
+			}
+			return ret;
 		}
-		return ret;
-	}
 
-	/** Retrieves geospatial data value by return result
-	 * @param[in] latDeg North-positive latitude in degrees
-	 * @param[in] lonDeg East-positive longitude in degrees
-	 * @param[in] band 1-based band index
-	 * @param[in] direct True to read pixel directly, bypassing caching
-	 *	mechanism (may speed up accessing scattered data)
-	 * @return Resulted geospatial value
-	 */
-	PixelData valueAt(double latDeg, double lonDeg, int band = 1,
-		bool direct = false)
-	{
-		PixelData ret;
-		getValueAt(latDeg, lonDeg, &ret, band, direct);
-		return ret;
-	}
+		/** Retrieves geospatial data value by return result
+		 * @param[in] latDeg North-positive latitude in degrees
+		 * @param[in] lonDeg East-positive longitude in degrees
+		 * @param[in] band 1-based band index
+		 * @param[in] direct True to read pixel directly, bypassing caching
+		 *	mechanism (may speed up accessing scattered data)
+		 * @return Resulted geospatial value
+		 */
+		PixelData valueAt(double latDeg, double lonDeg, int band = 1, bool direct = false)
+		{
+			PixelData ret;
+			getValueAt(latDeg, lonDeg, &ret, band, direct);
+			return ret;
+		}
 
-	/** Sets value used when no data is available for given band */
-	void setNoData(PixelData value, int band = 1)
-	{
-		checkBandIndex(band);
-		_noData[band] = value;
-	}
+		/** Sets value used when no data is available for given band */
+		void setNoData(PixelData value, int band = 1)
+		{
+			checkBandIndex(band);
+			_noData[band] = value;
+		}
 
-	/** Returns value used when no data is available for given band */
-	PixelData noData(int band = 1) const
-	{
-		checkBandIndex(band);
-		auto ndi = _noData.find(band);
-		return (ndi == _noData.end())
-			? static_cast<PixelData>(gdalNoData(band)) : ndi->second;
-	}
+		/** Returns value used when no data is available for given band */
+		PixelData noData(int band = 1) const
+		{
+			checkBandIndex(band);
+			auto ndi = _noData.find(band);
+			return (ndi == _noData.end()) ? static_cast<PixelData>(gdalNoData(band)) :
+							ndi->second;
+		}
 
-protected:
+	protected:
+		//////////////////////////////////////////////////
+		// CachedGdal<PixelDataType>. Protected instance methods
+		//////////////////////////////////////////////////
 
-	//////////////////////////////////////////////////
-	// CachedGdal<PixelDataType>. Protected instance methods
-	//////////////////////////////////////////////////
+		/** Creates on heap a std::vector buffer for tile pixel data.
+		 * @param latSize Pixel count in latitude direction
+		 * @param lonSize Pixel count in longitude direction
+		 * @return Address of created std::vector
+		 */
+		virtual void *createTileVector(int latSize, int lonSize) const
+		{
+			return new std::vector<PixelData>(latSize * lonSize);
+		}
 
-	/** Creates on heap a std::vector buffer for tile pixel data.
-	 * @param latSize Pixel count in latitude direction
-	 * @param lonSize Pixel count in longitude direction
-	 * @return Address of created std::vector
-	 */
-	virtual void *createTileVector(int latSize, int lonSize) const
-	{
-		return new std::vector<PixelData>(latSize * lonSize);
-	}
+		/** Deletes tile vector.
+		 * @param tileVector std::vector to delete
+		 */
+		virtual void deleteTileVector(void *tile) const
+		{
+			delete reinterpret_cast<std::vector<PixelData> *>(tile);
+		}
 
-	/** Deletes tile vector.
-	 * @param tileVector std::vector to delete
-	 */
-	virtual void deleteTileVector(void *tile) const
-	{
-		delete reinterpret_cast<std::vector<PixelData> *>(tile);
-	}
+		/** Returns address of tile's data buffer
+		 * @param tileVector std::vector, containing tile pixel data
+		 * @return Vector's buffer, containing pixel data
+		 */
+		virtual void *getTileBuffer(void *tile) const
+		{
+			return reinterpret_cast<std::vector<PixelData> *>(tile)->data();
+		}
 
-	/** Returns address of tile's data buffer
-	 * @param tileVector std::vector, containing tile pixel data
-	 * @return Vector's buffer, containing pixel data
-	 */
-	virtual void *getTileBuffer(void *tile) const
-	{
-		return reinterpret_cast<std::vector<PixelData> *>(tile)->data();
-	}
+	private:
+		//////////////////////////////////////////////////
+		// CachedGdal<PixelDataType>. Private instance data
+		//////////////////////////////////////////////////
 
-private:
-
-	//////////////////////////////////////////////////
-	// CachedGdal<PixelDataType>. Private instance data
-	//////////////////////////////////////////////////
-
-	/** Overridden no-data values */
-	std::map<int, PixelData> _noData;
+		/** Overridden no-data values */
+		std::map<int, PixelData> _noData;
 };
 
 #endif /* CACHED_GDAL_H */
