@@ -1,0 +1,26 @@
+#
+# Portions copyright © 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate
+# affiliate that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy
+# of which is included with this software program.
+#
+
+*.bak
+*.*~
+*.swp
+build/*
+.vscode
+.vscode/*.git
+.github
+.github/*
+.DS_Store
+.dockerignore
+mfk_*
+src/web/node_modules/*
+CMakeCache.txt
+CMakeFiles/*
+src/ratapi/ratapi/priv_config.py
+mfk_*
+*.secret.yaml
+tests/regression/pipe

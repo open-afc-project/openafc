@@ -4,7 +4,8 @@ on:
   release:
     types: [released]
 
-permissions: read-all
+permissions: 
+  contents: write
 
 jobs:
   generate-SBOM:
