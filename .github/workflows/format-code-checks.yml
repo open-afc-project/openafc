@@ -1,0 +1,46 @@
+name: Verify code formatting
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches: [ main]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check-python-code:
+    name: Check Python code format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5 
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      - run: |
+          pip install pycodestyle
+          pycodestyle  --config=tools/editing/pycodestyle.cfg .
+  
+  check-javascript-code:
+    name: Check JavaScript code format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: creyD/prettier_action@v4.3
+        with:
+          dry: true
+          prettier_options: "src/web/src --check"
+
+  check-cpp-code:
+    name: Check C++ code format
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run clang-format style check for C/C++/Protobuf programs.
+      uses: jidicula/clang-format-action@v4.11.0
+      with:
+        clang-format-version: '14'
+        check-path: 'src'
+            
+            

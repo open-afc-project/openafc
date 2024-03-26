@@ -10,22 +10,22 @@
 # pylint: disable=no-member
 ''' Authentication, authorization, and accounting classes.
 '''
+import time
+import datetime
+from .base import db, UserDbInfo
+import jwt
 from appcfg import OIDCConfigurator
 import os
 from sqlalchemy.schema import Sequence
 from sqlalchemy.dialects.postgresql import JSON
 
-OIDC_LOGIN=OIDCConfigurator().OIDC_LOGIN
+OIDC_LOGIN = OIDCConfigurator().OIDC_LOGIN
 
 if OIDC_LOGIN:
     from flask_login import UserMixin
 else:
     from flask_user import UserMixin
 
-import jwt
-from .base import db, UserDbInfo
-import datetime
-import time
 
 class User(db.Model, UserMixin):
     ''' Each user account in the system. '''
@@ -51,7 +51,8 @@ class User(db.Model, UserMixin):
     last_name = db.Column(db.String(50))
 
     # Relationships
-    roles = db.relationship('Role', secondary='aaa_user_role', back_populates='users')
+    roles = db.relationship(
+        'Role', secondary='aaa_user_role', back_populates='users')
 
     @staticmethod
     def get(user_id):
@@ -65,6 +66,7 @@ class User(db.Model, UserMixin):
     def getemail(user_email):
         return User.query.filter_by(email=user_email).first()
 
+
 class Role(db.Model):
     ''' A role is used for authorization. '''
     __tablename__ = 'aaa_role'
@@ -77,7 +79,8 @@ class Role(db.Model):
     name = db.Column(db.String(50))
 
     # Relationships
-    users = db.relationship('User', secondary='aaa_user_role', back_populates='roles')
+    users = db.relationship(
+        'User', secondary='aaa_user_role', back_populates='roles')
 
 
 class UserRole(db.Model):
@@ -114,14 +117,14 @@ class CertId(db.Model):
         self.refreshed_at = datetime.datetime.now()
 
 
-class AccessPointDeny(db.Model):                                                     
-    ''' entry to designate allowed AP's for the PAWS interface '''               
-                                                                                 
-    __tablename__ = 'access_point_deny'                                               
+class AccessPointDeny(db.Model):
+    ''' entry to designate allowed AP's for the PAWS interface '''
 
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)             
-    serial_number = db.Column(db.String(64), nullable=True, index=True)         
-    certification_id = db.Column(db.String(64))                                  
+    __tablename__ = 'access_point_deny'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    serial_number = db.Column(db.String(64), nullable=True, index=True)
+    certification_id = db.Column(db.String(64))
     org_id = db.Column(db.Integer, db.ForeignKey(
         'aaa_org.id', ondelete='CASCADE'))
     ruleset_id = db.Column(db.Integer, db.ForeignKey(
@@ -130,7 +133,6 @@ class AccessPointDeny(db.Model):
     def __init__(self, serial_number=None, certification_id=None):
         self.serial_number = serial_number
         self.certification_id = certification_id
-
 
 
 class MTLS(db.Model):
@@ -154,14 +156,14 @@ class MTLS(db.Model):
 
 class Limit(db.Model):
     ''' entry for limits '''
-    # this table is ready to expand to hold different limits if needed, but the init method would need to be 
+    # this table is ready to expand to hold different limits if needed, but the init method would need to be
     # upgraded to have more than a boolean for indoor/outdoor eirp mins.
-    
+
     __tablename__ = 'limits'
     __table_args__ = (
-         db.UniqueConstraint('name', name="limits_name_unique"),
-     )
-    #only one set of limits currently
+        db.UniqueConstraint('name', name="limits_name_unique"),
+    )
+    # only one set of limits currently
     id = db.Column(db.Integer(), primary_key=True)
     # Application data fields
     limit = db.Column(db.Numeric(50))
@@ -180,6 +182,7 @@ class Limit(db.Model):
             self.enforce = enforce
             self.name = "Outdoor Min EIRP"
 
+
 class AFCConfig(db.Model):
     ''' entry for AFC Config '''
 
@@ -194,6 +197,7 @@ class AFCConfig(db.Model):
         self.config = config
         self.created = datetime.datetime.fromtimestamp(time.time())
 
+
 class Organization(db.Model):
     ''' entry for Organization '''
 
@@ -204,6 +208,7 @@ class Organization(db.Model):
 
     def __init__(self, name):
         self.name = name
+
 
 class Ruleset(db.Model):
     ''' entry for Organization '''

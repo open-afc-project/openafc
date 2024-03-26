@@ -30,7 +30,7 @@ L_POLYGON_LONGITUDE_CLM = 19
 L_POLYGON_LATITUDE_CLM = 20
 
 R_POLYGON_CENTER_LONG_CLM = 49
-R_POLYGON_CENTER_LAT_CLM  = 50
+R_POLYGON_CENTER_LAT_CLM = 50
 R_POLYGON_LENGTH_CLM = 51
 R_POLYGON_ANGLE_CLM = 52
 
@@ -73,8 +73,8 @@ REQ_INQ_CHA_CHANCFI = '"channelCfi": '
 
 REQ_DEV_DESC_HEADER = '"deviceDescriptor": '
 REQ_DEV_DESC_FOOTER = '}'
-REQ_CERT_LOC = '"location": ' 
-REQ_SER_NBR = '"serialNumber": ' 
+REQ_CERT_LOC = '"location": '
+REQ_SER_NBR = '"serialNumber": '
 REQ_CERT_ID_HEADER = '"certificationId": [{'
 REQ_CERT_ID_FOOTER = '}]'
 REQ_RULESET = '"rulesetId": '
@@ -128,18 +128,23 @@ LOC_TYPE_RADIAL_POL = 'radial polygon'
 LOC_RADIAL_POL_NBR_POS = 20
 
 NEW_AFC_TEST_SUFX = '_afc_test_reqs.txt'
-AFC_TEST_IDENT = { 'all':0, 'srs':1, 'urs':2, 'sri':3, 'fsp':4, 'ibp':5, 'sip':6 }
+AFC_TEST_IDENT = {'all': 0, 'srs': 1, 'urs': 2,
+                  'sri': 3, 'fsp': 4, 'ibp': 5, 'sip': 6}
 
 WFA_TEST_DIR = 'wfa_test'
 
+
 class AfcFreqRange:
     """Afc Frequency range"""
+
     def __init__(self):
         self.low = 0
         self.high = 0
+
     def set_range_limit(self, cell, type):
         if isinstance(cell.value, int):
             setattr(self, type, cell.value)
+
     def append_range(self):
         if (not self.low or not self.high):
             raise IncompleteFreqRange(self.low, self.high)
@@ -147,8 +152,10 @@ class AfcFreqRange:
             return '{' + REQ_LOWFREQUENCY + str(self.low) + ', ' +\
                    REQ_HIGHFREQUENCY + str(self.high) + '}'
 
+
 class AfcCell:
     """Keep current cell from excel document."""
+
     def __init__(self, sheet, row):
         self.sh = sheet
         self.row = row
@@ -156,38 +163,43 @@ class AfcCell:
 
 class AfcCoordinates:
     """Create Afc position - pair of latitude and longitude."""
+
     def __init__(self):
-        self.coordinates = {'latitude':'', 'longitude':''}
+        self.coordinates = {'latitude': '', 'longitude': ''}
+
     def _set_coordinates(self, excell_obj, lat_col, long_col):
-        cell = excell_obj.sh.cell(row = excell_obj.row, column = lat_col)
+        cell = excell_obj.sh.cell(row=excell_obj.row, column=lat_col)
         if isinstance(cell.value, float):
             self.coordinates['latitude'] = '{' + REQ_LOC_LATITUDE +\
                                            str(cell.value) + ', '
-        cell = excell_obj.sh.cell(row = excell_obj.row, column = long_col)
+        cell = excell_obj.sh.cell(row=excell_obj.row, column=long_col)
         if isinstance(cell.value, float):
             self.coordinates['longitude'] = REQ_LOC_LONGITUDE +\
-                                            str(cell.value) + '}'
+                str(cell.value) + '}'
         return self.coordinates['latitude'] + self.coordinates['longitude']
 
 
 class AfcCoordRadPol:
     """Create Afc position - pair of angle and length."""
+
     def __init__(self):
-        self.coordinates = {'angle':'', 'length':''}
+        self.coordinates = {'angle': '', 'length': ''}
+
     def _set_coordinates(self, excell_obj, ang_col, len_col):
-        cell = excell_obj.sh.cell(row = excell_obj.row, column = ang_col)
+        cell = excell_obj.sh.cell(row=excell_obj.row, column=ang_col)
         if isinstance(cell.value, int):
             self.coordinates['angle'] = REQ_LOC_ANGLE +\
-                                           str(cell.value) + '}'
-        cell = excell_obj.sh.cell(row = excell_obj.row, column = len_col)
+                str(cell.value) + '}'
+        cell = excell_obj.sh.cell(row=excell_obj.row, column=len_col)
         if isinstance(cell.value, int):
             self.coordinates['length'] = '{' + REQ_LOC_LENGTH +\
-                                            str(cell.value) + ', '
+                str(cell.value) + ', '
         return self.coordinates['length'] + self.coordinates['angle']
 
 
 class AfcGeoCoordinates:
     """Afc Geo coordinates"""
+
     def __init__(self, sheet, row):
         self.positions = []
         self.region_type = 'unknown'
@@ -195,7 +207,7 @@ class AfcGeoCoordinates:
         self.find_region_type()
 
     def _valid_cell(self, clm):
-        cell = self.exc.sh.cell(row = self.exc.row, column = clm)
+        cell = self.exc.sh.cell(row=self.exc.row, column=clm)
         if (str(cell.value) == 'NULL'):
             return AFC_ERR
         return AFC_OK
@@ -221,36 +233,33 @@ class AfcGeoCoordinates:
         """
         for i in range(0, self.nbr_loc_pos, 2):
             if self.region_type == LOC_TYPE_RADIAL_POL:
-                coor = AfcCoordinates()._set_coordinates(self.exc,
-                                                         self.start_col - 1 + i,
-                                                         self.start_col - 2 + i)
+                coor = AfcCoordinates()._set_coordinates(
+                    self.exc, self.start_col - 1 + i, self.start_col - 2 + i)
                 if len(coor):
                     self.positions.append(coor)
-                coor = AfcCoordRadPol()._set_coordinates(self.exc,
-                                                         self.start_col + 1 + i,
-                                                         self.start_col + i)
+                coor = AfcCoordRadPol()._set_coordinates(
+                    self.exc, self.start_col + 1 + i, self.start_col + i)
             else:
-                coor = AfcCoordinates()._set_coordinates(self.exc,
-                                                         self.start_col + 1 + i,
-                                                         self.start_col + i)
+                coor = AfcCoordinates()._set_coordinates(
+                    self.exc, self.start_col + 1 + i, self.start_col + i)
             if len(coor):
                 self.positions.append(coor)
 
     def _set_orientation(self):
-        cell = self.exc.sh.cell(row = self.exc.row,
-                                   column = ELLIPSE_ORIENTATION_CLM)
+        cell = self.exc.sh.cell(row=self.exc.row,
+                                column=ELLIPSE_ORIENTATION_CLM)
         if isinstance(cell.value, int):
             setattr(self, 'orientation', REQ_LOC_ORIENT + str(cell.value))
 
     def _set_minoraxis(self):
-        cell = self.exc.sh.cell(row = self.exc.row,
-                                column = ELLIPSE_MINORAXIS_CLM)
+        cell = self.exc.sh.cell(row=self.exc.row,
+                                column=ELLIPSE_MINORAXIS_CLM)
         if isinstance(cell.value, int):
             setattr(self, 'minoraxis', REQ_LOC_MINOR_AXIS + str(cell.value))
 
     def _set_majoraxis(self):
-        cell = self.exc.sh.cell(row = self.exc.row,
-                                column = ELLIPSE_MAJORAXIS_CLM)
+        cell = self.exc.sh.cell(row=self.exc.row,
+                                column=ELLIPSE_MAJORAXIS_CLM)
         if isinstance(cell.value, int):
             setattr(self, 'majoraxis', REQ_LOC_MAJOR_AXIS + str(cell.value))
 
@@ -269,7 +278,7 @@ class AfcGeoCoordinates:
     def _append_ellipse_coordinates(self):
         res = ''
         if self.positions:
-            res += REQ_LOC_CENTER + ''.join(map(str,self.positions)) + ','
+            res += REQ_LOC_CENTER + ''.join(map(str, self.positions)) + ','
         if hasattr(self, 'orientation'):
             res += ' ' + self.orientation + ','
         if hasattr(self, 'minoraxis'):
@@ -284,7 +293,7 @@ class AfcGeoCoordinates:
         res = ''
         if (len(self.positions)):
             res += REQ_LOC_L_POLYGON_OUTER_HEADER +\
-                   ', '.join(map(str,self.positions))
+                ', '.join(map(str, self.positions))
         return res + REQ_LOC_L_POLYGON_OUTER_FOOTER
 
     def _append_r_polygon_coordinates(self):
@@ -293,8 +302,8 @@ class AfcGeoCoordinates:
             center_lat_long = self.positions.pop(0)
         if (len(self.positions)):
             res += REQ_LOC_R_POLYGON_OUTER_HEADER +\
-                   ', '.join(map(str,self.positions)) +\
-                   REQ_LOC_R_POLYGON_OUTER_FOOTER
+                ', '.join(map(str, self.positions)) +\
+                REQ_LOC_R_POLYGON_OUTER_FOOTER
         if (len(center_lat_long)):
             res += ', ' + REQ_LOC_CENTER +\
                    center_lat_long
@@ -308,17 +317,18 @@ class AfcGeoCoordinates:
         elif self.region_type == LOC_TYPE_LINEAR_POL:
             self._collect_linear_polygon()
             res = REQ_LOC_L_POLYGON_HEADER +\
-                  self._append_l_polygon_coordinates() +\
-                  REQ_LOC_L_POLYGON_FOOTER
+                self._append_l_polygon_coordinates() +\
+                REQ_LOC_L_POLYGON_FOOTER
         elif self.region_type == LOC_TYPE_RADIAL_POL:
             self._collect_radial_polygon()
             res = REQ_LOC_R_POLYGON_HEADER +\
-                  self._append_r_polygon_coordinates() +\
-                  REQ_LOC_R_POLYGON_FOOTER
+                self._append_r_polygon_coordinates() +\
+                REQ_LOC_R_POLYGON_FOOTER
         return res
 
 
-def build_device_desc(indoor_deploy, ser_nbr, ruleset_id, cert_id, ins_location):
+def build_device_desc(indoor_deploy, ser_nbr,
+                      ruleset_id, cert_id, ins_location):
     _ser_nbr = ""
     _cert_id = ""
     if isinstance(ser_nbr, str):
@@ -335,12 +345,12 @@ def build_device_desc(indoor_deploy, ser_nbr, ruleset_id, cert_id, ins_location)
         else:
             location = "2"
 
-        ostr +=  REQ_CERT_LOC + '"' + location + '",'
+        ostr += REQ_CERT_LOC + '"' + location + '",'
 
     ostr += REQ_SER_NBR + '"' + _ser_nbr + '",' +\
-           REQ_CERT_ID_HEADER + REQ_RULESET + '"' + str(ruleset_id) + '",' +\
-           REQ_CERT_ID + '"' + _cert_id + '"' + REQ_CERT_ID_FOOTER +\
-           REQ_DEV_DESC_FOOTER
+        REQ_CERT_ID_HEADER + REQ_RULESET + '"' + str(ruleset_id) + '",' +\
+        REQ_CERT_ID + '"' + _cert_id + '"' + REQ_CERT_ID_FOOTER +\
+        REQ_DEV_DESC_FOOTER
 
     return ostr
 

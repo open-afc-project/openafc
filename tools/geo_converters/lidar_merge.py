@@ -46,6 +46,7 @@ Some usage examples:
   On 8 CPUs this takes ~5 hours.
 """
 
+
 class ConvResult(NamedTuple):
     """ Conversion result """
 
@@ -99,14 +100,14 @@ def merge_worker(
                     return \
                         ConvResult(
                             locality=locality, status=ConvStatus.Error,
-                            duration=datetime.datetime.now()-start_time,
+                            duration=datetime.datetime.now() - start_time,
                             msg=f"Invalid '{csv_file_nmame}' file structure")
                 src_filename = os.path.join(src_dir, locality, row["FILE"])
                 if not os.path.isfile(src_filename):
                     return \
                         ConvResult(
                             locality=locality, status=ConvStatus.Error,
-                            duration=datetime.datetime.now()-start_time,
+                            duration=datetime.datetime.now() - start_time,
                             msg=f"Source file '{src_filename}' of locality "
                             f"'{locality}' not found")
                 gi = GdalInfo(src_filename, fail_on_error=False)
@@ -114,7 +115,7 @@ def merge_worker(
                     return \
                         ConvResult(
                             locality=locality, status=ConvStatus.Error,
-                            duration=datetime.datetime.now()-start_time,
+                            duration=datetime.datetime.now() - start_time,
                             msg=f"Unable to inspect '{src_filename}' of "
                             f"locality '{locality}' with gdalinfo")
                 src_extensions.add(os.path.splitext(src_filename)[1])
@@ -124,7 +125,7 @@ def merge_worker(
             return \
                 ConvResult(
                     locality=locality, status=ConvStatus.Error,
-                    duration=datetime.datetime.now()-start_time,
+                    duration=datetime.datetime.now() - start_time,
                     msg=f"Locality '{locality}' have no source files")
         srcs.reverse()
         if len(src_pixel_sizes) != 1:
@@ -138,7 +139,7 @@ def merge_worker(
                 return \
                     ConvResult(
                         locality=locality, status=ConvStatus.Error,
-                        duration=datetime.datetime.now()-start_time,
+                        duration=datetime.datetime.now() - start_time,
                         msg=f"Source files for locality '{locality}' have "
                         f"have different extensions. Extension for output "
                         f"file must be explicitly specified")
@@ -149,8 +150,11 @@ def merge_worker(
         temp_filename_xml = temp_filename + ".aux.xml"
         if os.path.isfile(dst_filename):
             if not overwrite:
-                return ConvResult(locality=locality, status=ConvStatus.Exists,
-                                  duration=datetime.datetime.now()-start_time)
+                return ConvResult(
+                    locality=locality,
+                    status=ConvStatus.Exists,
+                    duration=datetime.datetime.now() -
+                    start_time)
 
         # Building VRT for filelist
         vrt_args = ["gdalbuildvrt", "-ignore_srcmaskband"]
@@ -167,7 +171,7 @@ def merge_worker(
         elif exec_result is not None:
             assert isinstance(exec_result, str)
             return ConvResult(locality=locality, status=ConvStatus.Error,
-                              duration=datetime.datetime.now()-start_time,
+                              duration=datetime.datetime.now() - start_time,
                               msg=exec_result, command_line=command_line)
 
         # Translating VRT to single file
@@ -186,7 +190,7 @@ def merge_worker(
         elif exec_result is not None:
             assert isinstance(exec_result, str)
             return ConvResult(locality=locality, status=ConvStatus.Error,
-                              duration=datetime.datetime.now()-start_time,
+                              duration=datetime.datetime.now() - start_time,
                               msg=exec_result, command_line=command_line)
         if os.path.isfile(dst_filename):
             if verbose:
@@ -196,11 +200,11 @@ def merge_worker(
             print(f"Renaming '{temp_filename}' to '{dst_filename}'")
         os.rename(temp_filename, dst_filename)
         return ConvResult(locality=locality, status=ConvStatus.Success,
-                          duration=datetime.datetime.now()-start_time,
+                          duration=datetime.datetime.now() - start_time,
                           msg=warn_msg, command_line=command_line)
     except (Exception, KeyboardInterrupt, SystemExit) as ex:
         return ConvResult(locality=locality, status=ConvStatus.Error,
-                          duration=datetime.datetime.now()-start_time,
+                          duration=datetime.datetime.now() - start_time,
                           msg=repr(ex))
     finally:
         for filename in (temp_filename, temp_filename_xml, temp_filename_vrt):

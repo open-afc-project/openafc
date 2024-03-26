@@ -3,10 +3,12 @@ from setuptools.command.install import install
 import os
 import inspect
 
+
 class InstallCmdWrapper(install):
     def run(self):
         print(f"{inspect.stack()[0][3]}()")
         install.run(self)
+
 
 setup(
     name='netcli',

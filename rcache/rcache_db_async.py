@@ -84,10 +84,10 @@ class RcacheDbAsync(RcacheDb):
         try:
             ins = sa_pg.insert(self.ap_table).values(rows)
             ins = ins.on_conflict_do_update(
-                    index_elements=self.ap_pk_columns,
-                    set_={col_name: ins.excluded[col_name]
-                          for col_name in self.ap_table.columns.keys()
-                          if col_name not in self.ap_pk_columns})
+                index_elements=self.ap_pk_columns,
+                set_={col_name: ins.excluded[col_name]
+                      for col_name in self.ap_table.columns.keys()
+                      if col_name not in self.ap_pk_columns})
             async with self._engine.begin() as conn:
                 await conn.execute(ins)
         except sa.exc.SQLAlchemyError as ex:

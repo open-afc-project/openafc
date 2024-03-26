@@ -37,7 +37,7 @@ class BasicHealthcheck():
             rawresp = requests.get(self.url)
         except Exception as e:
             app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()"
-                      f" exception: {type(e).__name__}")
+                          f" exception: {type(e).__name__}")
             result = 1
         else:
             if rawresp.status_code != 200:
@@ -49,6 +49,7 @@ class BasicHealthcheck():
 
 class ObjstHealthcheck(BasicHealthcheck):
     """ Provide basic healthcheck for Objst """
+
     def __init__(self, cfg) -> None:
         app_log.debug(f"({os.getpid()}) {self.__class__.__name__}()")
         self.url = 'http://' + cfg['AFC_OBJST_HOST'] + ':' + \
@@ -71,6 +72,7 @@ class MsghndHealthcheck(BasicHealthcheck):
 
 class RmqHealthcheck():
     """ Make basic connection for healthcheck """
+
     def __init__(self, broker_url) -> None:
         app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
         self.connection = Connection(broker_url)

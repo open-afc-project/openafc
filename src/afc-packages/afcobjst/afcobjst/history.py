@@ -19,7 +19,7 @@ from flask import Flask, request, helpers, abort
 import google.cloud.storage
 from .objstconf import ObjstConfigInternal
 
-NET_TIMEOUT = 60 # The amount of time, in seconds, to wait for the server response
+NET_TIMEOUT = 60  # The amount of time, in seconds, to wait for the server response
 
 hist_app = Flask(__name__)
 hist_app.config.from_object(ObjstConfigInternal())
@@ -34,6 +34,7 @@ if hist_app.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = hist_app.config["AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON"]
     client = google.cloud.storage.client.Client()
     bucket = client.bucket(hist_app.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
+
 
 def generateHtml(rurl, path, dirs, files):
     hist_app.logger.debug(f"generateHtml({rurl}, {path}, {dirs}, {files})")
@@ -53,8 +54,8 @@ def generateHtml(rurl, path, dirs, files):
 
     path_split = vpath.split("/")
     url = rurl
-    if url[len(url)-1] == "/":
-        url = url[:len(url)-1]
+    if url[len(url) - 1] == "/":
+        url = url[:len(url) - 1]
     i = 0
     for dir in path_split:
         if i != 0:
@@ -67,10 +68,12 @@ def generateHtml(rurl, path, dirs, files):
 """
 
     for e in dirs:
-        html += "<li><a href=" + rurl + "/" + path + "/" + e + "><b>" + e + """/</b></a></li>
+        html += "<li><a href=" + rurl + "/" + path + \
+            "/" + e + "><b>" + e + """/</b></a></li>
 """
     for e in files:
-        html += "<li><a href=" + rurl + "/" + path + "/" + e + ">" + e + """</a></li>
+        html += "<li><a href=" + rurl + "/" + \
+            path + "/" + e + ">" + e + """</a></li>
 """
 
     html += """</ul>
@@ -117,12 +120,15 @@ class ObjIntLocalFS(ObjInt):
     def list(self):
         hist_app.logger.debug("ObjIntLocalFS.list")
         ls = os.listdir(self.__file_name)
-        files = [f for f in ls if os.path.isfile(os.path.join(self.__file_name, f))]
-        dirs = [f for f in ls if os.path.isdir(os.path.join(self.__file_name, f))]
+        files = [f for f in ls if os.path.isfile(
+            os.path.join(self.__file_name, f))]
+        dirs = [f for f in ls if os.path.isdir(
+            os.path.join(self.__file_name, f))]
         return dirs, files
 
     def read(self):
-        hist_app.logger.debug("ObjIntLocalFS.read({})".format(self.__file_name))
+        hist_app.logger.debug(
+            "ObjIntLocalFS.read({})".format(self.__file_name))
         if os.path.isfile(self.__file_name):
             with open(self.__file_name, "rb") as hfile:
                 return hfile.read()
@@ -169,17 +175,19 @@ class Objstorage:
 
 
 @hist_app.route('/', defaults={'path': ""}, methods=['GET'])
-@hist_app.route('/'+'<path:path>', methods=['GET'])
+@hist_app.route('/' + '<path:path>', methods=['GET'])
 def get(path):
     ''' File download handler. '''
     # ratapi URL preffix
     rurl = request.args["url"]
     fwd_proto = request.headers.get('X-Forwarded-Proto')
     if (fwd_proto == 'https') and (request.scheme == "http"):
-        rurl = rurl.replace("http:","https:")
-    hist_app.logger.debug(f'get method={request.method}, path={path} url={rurl}')
+        rurl = rurl.replace("http:", "https:")
+    hist_app.logger.debug(
+        f'get method={request.method}, path={path} url={rurl}')
     # local path in the storage
-    lpath = os.path.join(hist_app.config["AFC_OBJST_FILE_LOCATION"], "history", path)
+    lpath = os.path.join(
+        hist_app.config["AFC_OBJST_FILE_LOCATION"], "history", path)
 
     try:
         objst = Objstorage()
@@ -197,8 +205,9 @@ def get(path):
 
 
 if __name__ == '__main__':
-    os.makedirs(os.path.join(hist_app.config["AFC_OBJST_FILE_LOCATION"], "history"), exist_ok=True)
-    waitress.serve(hist_app, port=hist_app.config["AFC_OBJST_HIST_PORT"], host="0.0.0.0")
+    os.makedirs(os.path.join(
+        hist_app.config["AFC_OBJST_FILE_LOCATION"], "history"), exist_ok=True)
+    waitress.serve(
+        hist_app, port=hist_app.config["AFC_OBJST_HIST_PORT"], host="0.0.0.0")
 
-    #hist_app.run(port=hist_app.config['AFC_OBJST_HIST_PORT'], host="0.0.0.0", debug=True)
-
+    # hist_app.run(port=hist_app.config['AFC_OBJST_HIST_PORT'], host="0.0.0.0", debug=True)

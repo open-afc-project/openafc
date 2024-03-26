@@ -22,37 +22,37 @@ from uls_service_common import *
 DownloaderMilestone = \
     enum.Enum("DownloaderMilestone",
               [
-               # Service birth (first write to milestone database)
-               "ServiceBirth",
-               # Service start
-               "ServiceStart",
-               # Download start
-               "DownloadStart",
-               # Download success
-               "DownloadSuccess",
-               # FS region changed
-               "RegionChanged",
-               # FS database file updated
-               "DbUpdated",
-               # External parameters checked
-               "ExtParamsChecked",
-               # Healthcheck performed
-               "Healthcheck",
-               # Beacon sent
-               "BeaconSent",
-               # Alarm sent
-               "AlarmSent"])
+                  # Service birth (first write to milestone database)
+                  "ServiceBirth",
+                  # Service start
+                  "ServiceStart",
+                  # Download start
+                  "DownloadStart",
+                  # Download success
+                  "DownloadSuccess",
+                  # FS region changed
+                  "RegionChanged",
+                  # FS database file updated
+                  "DbUpdated",
+                  # External parameters checked
+                  "ExtParamsChecked",
+                  # Healthcheck performed
+                  "Healthcheck",
+                  # Beacon sent
+                  "BeaconSent",
+                  # Alarm sent
+                  "AlarmSent"])
 
 # Type of log
 LogType = \
     enum.Enum("LogType",
               [
-               # Log of last download attempt
-               "Last",
-               # Log of last failed attempt
-               "LastFailed",
-               # Log of last completed update
-               "LastCompleted"])
+                  # Log of last download attempt
+                  "Last",
+                  # Log of last failed attempt
+                  "LastFailed",
+                  # Log of last completed update
+                  "LastCompleted"])
 
 # Information about retrieved log record
 LogInfo = \
@@ -69,14 +69,14 @@ CheckInfo = \
     NamedTuple(
         "CheckInfo",
         [
-         # Check type
-         ("check_type", CheckType),
-         # Item checked
-         ("check_item", str),
-         # Error message (None if check passed)
-         ("errmsg", Optional[str]),
-         # Check timestamp
-         ("timestamp", datetime.datetime)])
+            # Check type
+            ("check_type", CheckType),
+            # Item checked
+            ("check_item", str),
+            # Error message (None if check passed)
+            ("errmsg", Optional[str]),
+            # Check timestamp
+            ("timestamp", datetime.datetime)])
 
 
 # Alarm types
@@ -87,13 +87,13 @@ AlarmInfo = \
     NamedTuple(
         "AlarmInfo",
         [
-         # Type of alarm
-         ("alarm_type", AlarmType),
-         # Specific reason for alarm (name of missing milestone,
-         # name of offending external file, etc.)
-         ("alarm_reason", str),
-         # Alarm timestramp
-         ("timestamp", datetime.datetime)])
+            # Type of alarm
+            ("alarm_type", AlarmType),
+            # Specific reason for alarm (name of missing milestone,
+            # name of offending external file, etc.)
+            ("alarm_reason", str),
+            # Alarm timestramp
+            ("timestamp", datetime.datetime)])
 
 
 def safe_dsn(dsn: Optional[str]) -> Optional[str]:

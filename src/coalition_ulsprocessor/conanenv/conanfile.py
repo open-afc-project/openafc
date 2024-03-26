@@ -1,5 +1,6 @@
 # File based on boilerplate at https://github.com/bincrafters/conan-templates/blob/master/conanfile.py
-# When 'install'ed this conanfile produces a 'cpodeps-runtime.zip' file in the current directory
+# When 'install'ed this conanfile produces a 'cpodeps-runtime.zip' file in
+# the current directory
 
 import contextlib
 import os.path
@@ -11,11 +12,13 @@ from conans import ConanFile, CMake
 from conans.errors import ConanException
 from conans.client import tools
 
+
 def path_append(paths, suffix):
     return tuple(
         os.path.join(path, suffix)
         for path in paths
     )
+
 
 class UlsDepsConan(ConanFile):
     settings = "os", "compiler", "build_type", "arch"
@@ -28,7 +31,7 @@ class UlsDepsConan(ConanFile):
         'import_symstore': False,
     }
     generators = "cmake"
-    
+
     requires = (
         'qt/5.9.0@cpo/stable',
     )
@@ -42,24 +45,26 @@ class UlsDepsConan(ConanFile):
                     filepath = os.path.join(rootpath, filename)
                     relpath = os.path.relpath(filepath, relroot)
                     zip.write(filepath, relpath)
-    
+
     def _import_runtime(self, tmpdir):
         ''' Copy runtime dependencies. '''
         outzip_name = 'uls-deps-runtime.zip'
-        
+
         # Do nothing if output zip exists and is newer than this spec
         if os.path.exists(outzip_name):
             own_mtime = os.path.getmtime(os.path.realpath(__file__))
             outzip_mtime = os.path.getmtime(outzip_name)
             if own_mtime < outzip_mtime:
-                self.output.info('Skipping imports because file newer file exists: {0}'.format(outzip_name))
+                self.output.info(
+                    'Skipping imports because file newer file exists: {0}'.format(outzip_name))
                 return
-        
+
         bindir = os.path.join(tmpdir, 'bin')
         if not os.path.exists(bindir):
             os.makedirs(bindir)
         # MSVC runtime redistributable DLLs
-        msvcrt_libs = ('msvcrt', 'vcruntime140', 'vcruntime140d', 'msvcp140', 'msvcp140d')
+        msvcrt_libs = ('msvcrt', 'vcruntime140',
+                       'vcruntime140d', 'msvcp140', 'msvcp140d')
         for libname in msvcrt_libs:
             filename = '{0}.dll'.format(libname)
             shutil.copyfile(
@@ -70,42 +75,43 @@ class UlsDepsConan(ConanFile):
         self.copy("Qt5Core.dll", dst=bindir, src="bin")
         self.copy("zlib*.dll", dst=bindir, src="bin")
         self.copy("icu*.dll", dst=bindir, src="bin")
-        
+
         # Write this zip file last
         self._copy_to_zipfile(tmpdir, outzip_name)
-    
+
     def _import_symstore(self, tmpdir):
         ''' Extract runtime debugging info into a symbol store. '''
         outzip_name = 'uls-script-symstore.zip'
-        
+
         # Do nothing if output zip exists and is newer than this spec
         if os.path.exists(outzip_name):
             own_mtime = os.path.getmtime(os.path.realpath(__file__))
             outzip_mtime = os.path.getmtime(outzip_name)
             if own_mtime < outzip_mtime:
-                self.output.info('Skipping imports because file newer file exists: {0}'.format(outzip_name))
+                self.output.info(
+                    'Skipping imports because file newer file exists: {0}'.format(outzip_name))
                 return
-        
+
         # Normalize all files into a single symbol store
         for (name, cppinfo) in self.deps_cpp_info.dependencies:
             self.output.info('Building symbol store for "{0}"'.format(name))
             subprocess.check_call([
-                'symstore', 'add', '/r', 
+                'symstore', 'add', '/r',
                 '/compress',
                 '/f', cppinfo.rootpath,
                 '/s', tmpdir,
                 '/t', name,
                 '/v', cppinfo.version,
             ])
-        
+
         # Write this zip file last
         self._copy_to_zipfile(tmpdir, outzip_name)
-    
+
     def imports(self):
         ''' Copy only runtime-required DLLs and resources into local zip file.
         A bit of an abuse of the conan imports system but ensures isolation from testroot.
-        
-        Conan uses imported files to build a manifest (with checksum) after 
+
+        Conan uses imported files to build a manifest (with checksum) after
         this function exits, so the "importroot" cannot disappear after zipping.
         '''
         importdir = os.path.abspath('importroot')

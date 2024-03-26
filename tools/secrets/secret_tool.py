@@ -259,7 +259,7 @@ def manifests(files: List[str], is_template: Optional[bool] = None) \
 
 
 def check_manifests(files: List[str], is_template: Optional[bool],
-                    is_local: bool)  -> bool:
+                    is_local: bool) -> bool:
     """ Check list of manifest/template files for validity and mutual
     consistency
 

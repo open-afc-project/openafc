@@ -8,7 +8,8 @@
 #
 
 import json
-import logging, os
+import logging
+import os
 import inspect
 import contextlib
 import shutil
@@ -119,9 +120,7 @@ class User(MethodView):
                 else:
                     pass_hash = (
                         flask.current_app.user_manager.password_manager.hash_password(
-                            user_props["password"]
-                        )
-                    )
+                            user_props["password"]))
                 user.password = pass_hash
             db.session.commit()  # pylint: disable=no-member
 
@@ -134,13 +133,15 @@ class User(MethodView):
                 auth(roles=["Admin"], org=org)
             LOGGER.debug("Adding role: %s", role)
             # check if user already has role
-            if not role in [r.name for r in user.roles]:
+            if role not in [r.name for r in user.roles]:
                 # add role
                 to_add_role = aaa.Role.query.filter_by(name=role).first()
                 user.roles.append(to_add_role)
                 # When adding Super role, add Admin role too
-                if role == "Super" and not "Admin" in [r.name for r in user.roles]:
-                    to_add_role = aaa.Role.query.filter_by(name="Admin").first()
+                if role == "Super" and "Admin" not in [
+                        r.name for r in user.roles]:
+                    to_add_role = aaa.Role.query.filter_by(
+                        name="Admin").first()
                     user.roles.append(to_add_role)
                 db.session.commit()  # pylint: disable=no-member
 
@@ -211,7 +212,8 @@ class AccessPointDeny(MethodView):
         rules = rulesets()
         rule_map = {}
         for idx, rule in enumerate(rules):
-            r = db.session.query(aaa.Ruleset).filter(aaa.Ruleset.name == rule).first()
+            r = db.session.query(aaa.Ruleset).filter(
+                aaa.Ruleset.name == rule).first()
             if r:
                 rule_map[r.id] = idx
 
@@ -302,8 +304,10 @@ class AccessPointDeny(MethodView):
             aaa.AccessPointDeny.query.delete()
         else:
             # delete, replace list belonging to the admin's org
-            organization = aaa.Organization.query.filter_by(name=user_org).first()
-            aaa.AccessPointDeny.query.filter_by(org_id=organization.id).delete()
+            organization = aaa.Organization.query.filter_by(
+                name=user_org).first()
+            aaa.AccessPointDeny.query.filter_by(
+                org_id=organization.id).delete()
 
         payload = content.get("accessPoints")
         rcrd = json.loads(payload)
@@ -331,7 +335,7 @@ class AccessPointDeny(MethodView):
                     raise exceptions.BadRequest(
                         "ruleset {} does not exist".format(ruleset_id)
                     )
-            except:
+            except BaseException:
                 raise exceptions.BadRequest("ruleset does not exist")
 
             if len(row) > 3:  # this column is to override the AP org if user is Super
@@ -352,7 +356,8 @@ class AccessPointDeny(MethodView):
                 .first()
             )
             if not ap:
-                organization = aaa.Organization.query.filter_by(name=org).first()
+                organization = aaa.Organization.query.filter_by(
+                    name=org).first()
                 if not organization:
                     raise exceptions.BadRequest(
                         "organization {} does not exist".format(org)
@@ -398,8 +403,9 @@ class DeniedRegion(MethodView):
         """
 
         config_path = os.path.join(
-            flask.current_app.config["NFS_MOUNT_PATH"], "rat_transfer", "denied_regions"
-        )
+            flask.current_app.config["NFS_MOUNT_PATH"],
+            "rat_transfer",
+            "denied_regions")
         if not os.path.exists(config_path):
             os.makedirs(config_path)
 
@@ -476,28 +482,28 @@ class Limits(MethodView):
         auth(roles=["Super"])
         try:
             LOGGER.error("content: %s ", content)
-            newIndoorEnforce = content.get('indoorEnforce');
-            newIndoorLimit = content.get('indoorLimit');
-            newOutdoorEnforce = content.get('outdoorEnforce');
-            newOutdoorLimit = content.get('outdoorLimit');
+            newIndoorEnforce = content.get('indoorEnforce')
+            newIndoorLimit = content.get('indoorLimit')
+            newOutdoorEnforce = content.get('outdoorEnforce')
+            newOutdoorLimit = content.get('outdoorLimit')
 
             indoorlimitRecord = aaa.Limit.query.filter_by(id=0).first()
             outdoorlimitRecord = aaa.Limit.query.filter_by(id=1).first()
 
-            if(indoorlimitRecord is None and outdoorlimitRecord is None):
+            if (indoorlimitRecord is None and outdoorlimitRecord is None):
                 # create new records
-                if(not newIndoorEnforce and not newOutdoorEnforce):
+                if (not newIndoorEnforce and not newOutdoorEnforce):
                     raise exceptions.BadRequest("No change")
-                limit0 = aaa.Limit(newIndoorLimit,newIndoorEnforce, False)
+                limit0 = aaa.Limit(newIndoorLimit, newIndoorEnforce, False)
                 limit1 = aaa.Limit(newOutdoorLimit, newOutdoorEnforce, True)
                 db.session.add(limit0)
                 db.session.add(limit1)
-            elif(indoorlimitRecord is None and  outdoorlimitRecord is not None):
-                limit0 = aaa.Limit(newIndoorLimit,newIndoorEnforce, False)
+            elif (indoorlimitRecord is None and outdoorlimitRecord is not None):
+                limit0 = aaa.Limit(newIndoorLimit, newIndoorEnforce, False)
                 db.session.add(limit0)
                 outdoorlimitRecord.enforce = newOutdoorEnforce
                 outdoorlimitRecord.limit = newOutdoorLimit
-            elif(indoorlimitRecord is not None and  outdoorlimitRecord is None):
+            elif (indoorlimitRecord is not None and outdoorlimitRecord is None):
                 limit1 = aaa.Limit(newOutdoorLimit, newOutdoorEnforce, True)
                 db.session.add(limit1)
                 indoorlimitRecord.enforce = newIndoorEnforce
@@ -509,10 +515,10 @@ class Limits(MethodView):
                 indoorlimitRecord.limit = newIndoorLimit
             db.session.commit()
             return flask.jsonify(
-                    indoorLimit=float(newIndoorLimit),
-                    outdoorLimit=float(newOutdoorLimit),
-                    indoorEnforce=newIndoorEnforce,
-                    outdoorEnforce=newOutdoorEnforce,
+                indoorLimit=float(newIndoorLimit),
+                outdoorLimit=float(newOutdoorLimit),
+                indoorEnforce=newIndoorEnforce,
+                outdoorEnforce=newOutdoorEnforce,
             )
         except IntegrityError:
             raise exceptions.BadRequest("DB Error")
@@ -520,9 +526,9 @@ class Limits(MethodView):
     def get(self):
         """get eirp limit"""
         try:
-            #First get the indoor limit (id 0)
+            # First get the indoor limit (id 0)
             indoorlimits = aaa.Limit.query.filter_by(id=0).first()
-            #Then get the outdoor limit (id 1)
+            # Then get the outdoor limit (id 1)
             outdoorlimits = aaa.Limit.query.filter_by(id=1).first()
             if indoorlimits or outdoorlimits:
                 return flask.jsonify(
@@ -622,7 +628,8 @@ class MTLS(MethodView):
             LOGGER.info(f"{certs.id}")
             bundle_data += certs.cert
         db.session.commit()  # pylint: disable=no-member
-        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() {bundle_data} {len(bundle_data)}")
+        LOGGER.debug(
+            f"{type(self)}.{eval(dbg_msg)}() {bundle_data} {len(bundle_data)}")
         with DataIf().open("certificate/client.bundle.pem") as hfile:
             if len(bundle_data) == 0:
                 hfile.delete()
@@ -653,7 +660,8 @@ class MTLS(MethodView):
             else:
                 # Admin user gets certificates for his/her own org
                 org = user.org if user.org else ""
-                mtls_list = db.session.query(aaa.MTLS).filter(aaa.MTLS.org == org).all()
+                mtls_list = db.session.query(aaa.MTLS).filter(
+                    aaa.MTLS.org == org).all()
         else:
             raise werkzeug.exceptions.NotFound()
 
@@ -679,7 +687,8 @@ class MTLS(MethodView):
         content = flask.request.json
         org = content.get("org")
         auth(roles=["Admin"], org=org)
-        LOGGER.debug(f"{type(self)}.{eval(dbg_msg)}() " f"mtls: {str(id)} org: {org}")
+        LOGGER.debug(
+            f"{type(self)}.{eval(dbg_msg)}() " f"mtls: {str(id)} org: {org}")
 
         # check if certificate is already there.
         cert = content.get("cert")
@@ -688,9 +697,9 @@ class MTLS(MethodView):
 
             strip_chars = "base64,"
             index = cert.index(strip_chars)
-            cert = base64.b64decode(cert[index + len(strip_chars) :])
+            cert = base64.b64decode(cert[index + len(strip_chars):])
             cert = str(cert, "UTF-8").replace("\\n", "\n")
-        except:
+        except BaseException:
             LOGGER.error(f"PUT mtls: {str(id)} org: {org} exception")
             raise exceptions.BadRequest("Unexpected certificate format")
 
@@ -699,7 +708,8 @@ class MTLS(MethodView):
             db.session.add(mtls)
             db.session.flush()  # pylint: disable=no-member
         except Exception as e:
-            LOGGER.error(f"Failed to insert new cert into table " f"({type(e)} {e})")
+            LOGGER.error(
+                f"Failed to insert new cert into table " f"({type(e)} {e})")
             raise exceptions.BadRequest("Failed to insert new cert into table")
 
         LOGGER.debug(
@@ -746,9 +756,8 @@ class MTLS(MethodView):
 
 
 module.add_url_rule("/user/<int:user_id>", view_func=User.as_view("User"))
-module.add_url_rule(
-    "/user/ap_deny/<int:id>", view_func=AccessPointDeny.as_view("AccessPointDeny")
-)
+module.add_url_rule("/user/ap_deny/<int:id>",
+                    view_func=AccessPointDeny.as_view("AccessPointDeny"))
 module.add_url_rule("/user/cert/<int:id>", view_func=CertId.as_view("CertId"))
 module.add_url_rule("/user/eirp_min", view_func=Limits.as_view("Eirp"))
 module.add_url_rule(

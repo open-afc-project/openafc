@@ -21,5 +21,4 @@ template class ListClass<BBClass *>;
 template void sort(ListClass<double> *);
 template void sort(ListClass<DblDblClass> *);
 
-template void sort2<double, int>(ListClass<double>*, ListClass<int>*);
-
+template void sort2<double, int>(ListClass<double> *, ListClass<int> *);

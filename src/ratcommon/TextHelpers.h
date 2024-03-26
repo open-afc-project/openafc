@@ -1,4 +1,4 @@
-// 
+//
 
 #ifndef SRC_RATCOMMON_TEXTHELPERS_H_
 #define SRC_RATCOMMON_TEXTHELPERS_H_
@@ -16,7 +16,8 @@ class DateTimeInterval;
  * Most convert to/from Qt string representations and throw RuntimeError to
  * signal failures.
  */
-namespace TextHelpers{
+namespace TextHelpers
+{
 
 /** Convert text to an integer value.
  *
@@ -24,7 +25,7 @@ namespace TextHelpers{
  * @return The number represented.
  * @throw RuntimeError if the text cannot be converted.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 int toInt(const QString &text);
 
 /** Convert text to a floating point value.
@@ -33,7 +34,7 @@ int toInt(const QString &text);
  * @return The number represented.
  * @throw RuntimeError if the text cannot be converted.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 double toNumber(const QString &text);
 
 /** Convert an integer to hexadecimal digits.
@@ -43,7 +44,7 @@ double toNumber(const QString &text);
  * Unused digits will be padded with zeros.
  * @return
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QString toHex(int value, int digits = -1);
 
 /** Convert from hexadecimal string representation.
@@ -51,7 +52,7 @@ QString toHex(int value, int digits = -1);
  * @param text The string with no leading "0x" or any other characters.
  * @return The number represented.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 int fromHex(const QString &text);
 
 /** Convert a byte array into a printable hexadecimal string.
@@ -62,7 +63,7 @@ int fromHex(const QString &text);
  * @param hash The raw bytes of a data set (i.e. a fingerprint).
  * @return The formatted hexadecimal string.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QString toHex(const QByteArray &hash);
 
 /** Construct a string with random hexadecimal digits.
@@ -70,7 +71,7 @@ QString toHex(const QByteArray &hash);
  * @param digits The number of base-16 digits to choose.
  * @return The resulting string of length @c digits.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QString randomHexDigits(int digits);
 
 /** This string is used for QDateTime::toString() to consistently format
@@ -79,21 +80,21 @@ QString randomHexDigits(int digits);
  * The ISO-standard value here is 'T'.
  * @return The display format string.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QString dateTimeFormat(const QChar &sep = QChar(' '));
 
 /** Surround a string with quotation characters.
  * @param text The text to quote.
  * @return The quoted text.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QString quoted(const QString &text);
 
 /** Surround each element of a string list with quotation characters.
  * @param text The text items to quote.
  * @return The quoted text items.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QStringList quoted(const QStringList &text);
 
 /** Get a name for a socket connection.
@@ -101,7 +102,7 @@ QStringList quoted(const QStringList &text);
  * @param socket The socket to name.
  * @return A combination of the socket's peer name and port.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QString peerName(const QAbstractSocket &socket);
 
 /** Get the human readable name for an HTTP operation.
@@ -109,14 +110,14 @@ QString peerName(const QAbstractSocket &socket);
  * @param reply The reply to take the operation from.
  * @return The name for the operation, in original character encoding.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QByteArray operationName(const QNetworkReply &reply);
 
 /** Retrieve the standard errno information in a thread safe way.
  * @return The string associated with the local errno value.
  * The format is "(N) STR" where N is the original error number.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QString qstrerror();
 
 /** Generate a nicely formatted debug string corresponding with a child
@@ -127,7 +128,7 @@ QString qstrerror();
  * @param env The full environment of the child process.
  * @return A string suitable for copy-paste into a bash terminal for diagnosis.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QString executableString(const QStringList &args, const QProcessEnvironment &env);
 
 /** Combine a display label and an optional value unit together.
@@ -137,7 +138,7 @@ QString executableString(const QStringList &args, const QProcessEnvironment &env
  * @param unit A possibly-empty unit for the value.
  * @return The combined representation.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QString combineLabelUnit(const QString &label, const QString &unit);
 
 /** Get text name for non-finite floating point values.
@@ -145,7 +146,7 @@ QString combineLabelUnit(const QString &label, const QString &unit);
  * @param value The non-finite value to get a name for.
  * @return The human-readable name for the value.
  */
-//RATCOMMON_EXPORT
+// RATCOMMON_EXPORT
 QString nonfiniteText(double value);
 
 }

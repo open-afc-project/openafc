@@ -21,6 +21,7 @@ CREATEREPO_BIN = find_bin('createrepo')
 
 LOGGER = logging.getLogger(__name__)
 
+
 def pat_match(pattern, full, positive=True):
     ''' Construct a function to match a pattern or not match.
     @param pattern The pattern to check.
@@ -39,14 +40,17 @@ def pat_match(pattern, full, positive=True):
     else:
         return lambda fn: re_func(fn) is None
 
+
 def any_match(matchers, value):
     ''' Determine if a matcher function list is non-empty and has any matches
     for a value. '''
     return matchers and any(item(value) for item in matchers)
 
+
 class ListItem(object):
     ''' Keep track of anamed item to match, and whether or not any candiate text has matched yet.
     '''
+
     def __init__(self, exact_match):
         self._text = exact_match
         self._matched = False
@@ -63,28 +67,62 @@ class ListItem(object):
             return True
         return False
 
+
 def main(argv):
     parser = argparse.ArgumentParser()
-    parser.add_argument('--log-level', dest='log_level', default='info',
-                        metavar='LEVEL',
-                        help='Console logging lowest level displayed. Defaults to info.')
-    parser.add_argument('--include', type=str, action='append', default=[], help='A regexp pattern to include if a file name matches')
-    parser.add_argument('--exclude', type=str, action='append', default=[], help='A regexp pattern to exclude if a file name matches')
-    parser.add_argument('--private', type=str, action='append', default=[], help='A regexp pattern to determine if a package name is private.')
-    parser.add_argument('--public', type=str, action='append', default=[], help='A regexp pattern to determine if a package name is public. This overrides --private arguments.')
-    parser.add_argument('--public-list', type=str, help='A file containing a whitelist of public package names (not file name patterns).')
-    parser.add_argument('--ignore-dupes', action='store_true', default=False, help='Ignore duplicate versions of a package name.')
-    parser.add_argument('--ignore-input-signatures', action='store_true', default=False, help='Ignore package signatures on inputs. Packages may be re-signed and those signatures lost anyway.')
-    parser.add_argument('inpath', type=str, help='The input path to scan for files')
-    parser.add_argument('outpath', type=str, help='The output path to create repositories')
+    parser.add_argument(
+        '--log-level',
+        dest='log_level',
+        default='info',
+        metavar='LEVEL',
+        help='Console logging lowest level displayed. Defaults to info.')
+    parser.add_argument(
+        '--include',
+        type=str,
+        action='append',
+        default=[],
+        help='A regexp pattern to include if a file name matches')
+    parser.add_argument(
+        '--exclude',
+        type=str,
+        action='append',
+        default=[],
+        help='A regexp pattern to exclude if a file name matches')
+    parser.add_argument(
+        '--private',
+        type=str,
+        action='append',
+        default=[],
+        help='A regexp pattern to determine if a package name is private.')
+    parser.add_argument(
+        '--public',
+        type=str,
+        action='append',
+        default=[],
+        help='A regexp pattern to determine if a package name is public. This overrides --private arguments.')
+    parser.add_argument(
+        '--public-list',
+        type=str,
+        help='A file containing a whitelist of public package names (not file name patterns).')
+    parser.add_argument('--ignore-dupes', action='store_true', default=False,
+                        help='Ignore duplicate versions of a package name.')
+    parser.add_argument(
+        '--ignore-input-signatures',
+        action='store_true',
+        default=False,
+        help='Ignore package signatures on inputs. Packages may be re-signed and those signatures lost anyway.')
+    parser.add_argument('inpath', type=str,
+                        help='The input path to scan for files')
+    parser.add_argument('outpath', type=str,
+                        help='The output path to create repositories')
     args = parser.parse_args(argv[1:])
 
     log_level_name = args.log_level.upper()
     logging.basicConfig(level=log_level_name, format='%(message)s')
-    
+
     if not os.path.exists(CREATEREPO_BIN):
         raise RuntimeError('Missing "createrepo" executable')
-    
+
     # include if matching
     fn_incl = []
     for pat in args.include:
@@ -139,13 +177,13 @@ def main(argv):
             # Only care about RPM files
             if not filename.endswith('.rpm'):
                 continue
-            if fn_incl and not any_match(fn_incl ,filename):
+            if fn_incl and not any_match(fn_incl, filename):
                 LOGGER.info('Ignoring {0}'.format(filename))
                 continue
-            if any_match(fn_excl ,filename):
+            if any_match(fn_excl, filename):
                 LOGGER.info('Excluding {0}'.format(filename))
                 continue
-            
+
             # get package info
             src_path = os.path.join(dirpath, filename)
             with open(src_path, 'rb') as rpmfile:
@@ -169,7 +207,7 @@ def main(argv):
                     labels.append('priv')
                 LOGGER.info('File {fn} pkg {pkg} {labels}'.format(
                     fn=filename,
-                    pkg=pkgname, 
+                    pkg=pkgname,
                     labels=','.join(labels)
                 ))
 
@@ -182,7 +220,9 @@ def main(argv):
 
                 # check for dupes
                 if pkgname in pkggrp and not args.ignore_dupes:
-                    raise ValueError('Duplicate package "{0}" in "{1}" and "{2}"'.format(pkgname, filename, pkggrp[pkgname]))
+                    raise ValueError(
+                        'Duplicate package "{0}" in "{1}" and "{2}"'.format(
+                            pkgname, filename, pkggrp[pkgname]))
                 pkggrp[pkgname] = filename
 
                 # SRPMs are always in private repos
@@ -191,7 +231,7 @@ def main(argv):
                     tgtpath = priv_path
                 else:
                     tgtpath = pub_path
-            
+
             arch_path = os.path.join(tgtpath, archname)
             if not os.path.exists(arch_path):
                 os.mkdir(arch_path)
@@ -205,17 +245,19 @@ def main(argv):
         if not matcher.matched():
             unmatched.add(matcher.name())
     if unmatched:
-        raise RuntimeError('Unmatched whitelist names: {0}'.format(', '.join(unmatched)))
-    
+        raise RuntimeError(
+            'Unmatched whitelist names: {0}'.format(', '.join(unmatched)))
+
     # Build repo information
     for repopath in (pub_path, priv_path):
         LOGGER.info('Publishing {0}'.format(repopath))
         subprocess.check_call([
-                CREATEREPO_BIN,
-                '--no-database', 
-                '--simple-md-filenames',
-                repopath
+            CREATEREPO_BIN,
+            '--no-database',
+            '--simple-md-filenames',
+            repopath
         ])
+
 
 if __name__ == '__main__':
     import sys

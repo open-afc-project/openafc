@@ -71,4 +71,6 @@ class TestWebApp(BaseTestCase):
             if resp.status_code != 200:
                 non_200_eps[value] = resp.status_code
             self.assertEqual(
-                {}, non_200_eps, msg="{}, were defined in GUI config as required endpoint(s) but returned non-200 status on OPTIONS".format(non_200_eps))
+                {},
+                non_200_eps,
+                msg="{}, were defined in GUI config as required endpoint(s) but returned non-200 status on OPTIONS".format(non_200_eps))

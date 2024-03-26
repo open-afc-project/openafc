@@ -117,6 +117,7 @@ class RpmSigner(object):
 
     :param gpghome: The GPG home directory to sign with.
     '''
+
     def __init__(self, gpghome, rpmsign_bin=None):
         if isinstance(gpghome, GpgHome):
             self._gpghome = gpghome.gpghome
@@ -141,7 +142,8 @@ class RpmSigner(object):
             '-v',
             file_path,
         ]
-        LOGGER.debug('Calling ' + ' '.join(['"{0}"'.format(arg.replace('"', '\\"')) for arg in cmd]))
+        LOGGER.debug(
+            'Calling ' + ' '.join(['"{0}"'.format(arg.replace('"', '\\"')) for arg in cmd]))
 
         try:
             os.environ['GNUPGHOME'] = self._gpghome
@@ -153,7 +155,8 @@ class RpmSigner(object):
             outstr = ''
             while True:
                 try:
-                    # Signing may take considerable time on large (100+ MiB) packages
+                    # Signing may take considerable time on large (100+ MiB)
+                    # packages
                     outstr += proc.read_nonblocking(size=100, timeout=300)
                 except pexpect.EOF:
                     pass

@@ -17,8 +17,18 @@ class TestAfcEngine(UserLoginBaseTestCase):
         self._test_modify_request(self._resolve_url(
             'ratapi/v1/afcconfig/afc_config.json'), afc_config)
 
-    def _generate_params(self, lat, lng, height, semi_maj=0, semi_min=0, orientation=0,
-                         height_type="AGL", height_cert=0, in_out_door="INDOOR", ruleset_ids=None):
+    def _generate_params(
+            self,
+            lat,
+            lng,
+            height,
+            semi_maj=0,
+            semi_min=0,
+            orientation=0,
+            height_type="AGL",
+            height_cert=0,
+            in_out_door="INDOOR",
+            ruleset_ids=None):
         ''' Uses parameters to generate a well formed JSON object to be used for analysis.
 
         :param lat: latitude

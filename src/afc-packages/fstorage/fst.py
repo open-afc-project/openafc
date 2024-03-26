@@ -20,6 +20,7 @@ from appcfg import ObjstConfig
 app_log = logging.getLogger(__name__)
 conf = ObjstConfig()
 
+
 class DataInt:
     """ Abstract class for data prot operations """
     __metaclass__ = abc.ABCMeta
@@ -93,7 +94,8 @@ class DataIfBaseV1():
         assert self._host is not None, "Missing host"
         assert self._port is not None, "Missing port"
         assert self._prot in (self.HTTP, self.HTTPS), "Wrong or missing scheme"
-        self._pref = self._prot + "://" + self._host + ":" + str(self._port) + "/"
+        self._pref = self._prot + "://" + \
+            self._host + ":" + str(self._port) + "/"
 
     def open(self, r_name):
         """ Create FileInt instance """
@@ -121,8 +123,10 @@ class DataIfBaseV1():
         app_log.debug("httpsProbe() HTTPS ok")
         return True
 
+
 class DataIf(DataIfBaseV1):
     """ Wrappers for RATAPI data operations """
+
     def __init__(self, prot=None, host=None, port=None):
         # Assign default args from env vars
         self._host = host

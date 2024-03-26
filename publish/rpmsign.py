@@ -14,15 +14,23 @@ from .util import GpgHome, RpmSigner
 
 LOGGER = logging.getLogger(__name__)
 
+
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--log-level', dest='log_level', default='info',
-                        metavar='LEVEL',
-                        help='Console logging lowest level displayed. Defaults to info.')
-    parser.add_argument('--keyid',
-                        help='The key ID to sign with. Mandatory if the keyring has more than one keypair.')
-    parser.add_argument('--passphrase-fd', type=int, default=0,
-                        help='The FD to read passphrase from. Defaults to stdin.')
+    parser.add_argument(
+        '--log-level',
+        dest='log_level',
+        default='info',
+        metavar='LEVEL',
+        help='Console logging lowest level displayed. Defaults to info.')
+    parser.add_argument(
+        '--keyid',
+        help='The key ID to sign with. Mandatory if the keyring has more than one keypair.')
+    parser.add_argument(
+        '--passphrase-fd',
+        type=int,
+        default=0,
+        help='The FD to read passphrase from. Defaults to stdin.')
     parser.add_argument('gpgkey', type=str,
                         help='GPG-encoded private keypair file.')
     parser.add_argument('rpmfile',
@@ -32,7 +40,7 @@ def main():
 
     log_level_name = args.log_level.upper()
     logging.basicConfig(level=log_level_name)
-    
+
     with contextlib.closing(GpgHome()) as gpghome:
         with contextlib.closing(open(args.gpgkey, 'rb')) as gpgfile:
             gpghome.gpg.import_keys(gpgfile.read())
@@ -59,6 +67,7 @@ def main():
             return 0
         else:
             return 2
+
 
 if __name__ == '__main__':
     sys.exit(main())

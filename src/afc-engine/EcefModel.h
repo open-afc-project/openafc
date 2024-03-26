@@ -8,7 +8,8 @@
 /** Convert between geodetic coordinates and WGS84 Earth-centered Earth-fixed
  * (ECEF) coordinates.
  */
-class EcefModel {
+class EcefModel
+{
 	public:
 		static Vector3 geodeticToEcef(double lat, double lon, double alt);
 		static GeodeticCoord ecefToGeodetic(const Vector3 &ecef);

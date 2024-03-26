@@ -106,8 +106,7 @@ Highly desirable to use branch name from Issue ticket title, or use meaningful b
 eg. git checkout -b 146-update-readme-md-to-reflect-issueticket-and-branch-creation-procedure
 ```
 ### Step 4: Make your changes
-For changes to the C++ codes, once you're done with making your changes, run the clang-format using the instructions under tools/editing/.
-For changes to codes in other languages, follow the existing formatting in the file. 
+Review the [Readme in the tools/editing directory](tools/editing/README.md) to review the code style tools that are required.  Pull requests not meeting the code style requirements will fail to build in the pull request.
 
 ### Step 5: Commit your changes
 As you develop code, commit your changes into your local feature branch.

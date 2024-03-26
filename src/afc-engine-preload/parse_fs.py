@@ -16,9 +16,10 @@ max_size = 0
 max_name_len = 0
 max_tab = 0
 
+
 def write_obj(name, size, tab, outfile):
-    #print(("\t"*tab) + "{} {}".format(name, size))
-    outfile.write(("\t"*tab).encode('utf-8'))
+    # print(("\t"*tab) + "{} {}".format(name, size))
+    outfile.write(("\t" * tab).encode('utf-8'))
     if tab > 0:
         global max_tab
         if tab > max_tab:
@@ -39,8 +40,10 @@ def write_obj(name, size, tab, outfile):
     if len(name) > max_name_len:
         max_name_len = len(name)
 
+
 def sort_key(direntry):
     return direntry.name
+
 
 def parse_dir(path, tab, outfile):
     if not os.listdir(path):
@@ -63,6 +66,7 @@ def parse_dir(path, tab, outfile):
     for dire in files:
         write_obj(dire.name, dire.stat().st_size, tab + 1, outfile)
 
+
 if __name__ == '__main__':
     if len(sys.argv) <= 2 or not os.path.isdir(sys.argv[1]):
         print("usage: {} static_data_path list_path".format(sys.argv[0]))
@@ -78,4 +82,5 @@ if __name__ == '__main__':
         outfile.write(nooffiles.to_bytes(4, byteorder="little", signed=False))
         outfile.write(max_tab.to_bytes(1, byteorder="little", signed=False))
 
-    print("dirs {} files {} max tab {} max size {} max name length {}".format(noofdirs, nooffiles, max_tab, hex(max_size), max_name_len))
+    print("dirs {} files {} max tab {} max size {} max name length {}".format(
+        noofdirs, nooffiles, max_tab, hex(max_size), max_name_len))

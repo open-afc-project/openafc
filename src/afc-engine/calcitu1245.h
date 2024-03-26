@@ -11,7 +11,8 @@
 
 using namespace std;
 
-namespace calcItu1245 {
+namespace calcItu1245
+{
 
 double mymin(const double &a, const double &b);
 

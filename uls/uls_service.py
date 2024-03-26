@@ -255,6 +255,7 @@ class LoggingExecutor:
     Private attributes:
     _lines -- Output lines
     """
+
     def __init__(self) -> None:
         self._lines: List[str] = []
 
@@ -370,11 +371,11 @@ class StatusUpdater:
         NamedTuple(
             "_StatsdLabeledMetricInfo",
             [
-             # String.format()-compatible pattern, containing placeholder for
-             # label value
-             ("pattern", str),
-             # Dictionary of StatsD metrics, indexed by label value name
-             ("metrics", Dict[str, statsd.Gauge])])
+                # String.format()-compatible pattern, containing placeholder for
+                # label value
+                ("pattern", str),
+                # Dictionary of StatsD metrics, indexed by label value name
+                ("metrics", Dict[str, statsd.Gauge])])
 
     def __init__(self, state_db: StateDb, prometheus_port: Optional[int],
                  statsd_server: Optional[str]) -> None:
@@ -591,6 +592,7 @@ class DbDiff:
     ras_diff_len -- Number of different RAS entries
     diff_tiles   -- Tiles containing receivers of different paths
     """
+
     def __init__(self, prev_filename: str, new_filename: str,
                  executor: LoggingExecutor) -> None:
         """ Constructor
@@ -663,6 +665,7 @@ class UlsFileChecker:
     _executor           -- LoggingExecutor object
     _status_updater      -- StatusUpdater object
     """
+
     def __init__(self, executor: LoggingExecutor,
                  status_updater: StatusUpdater,
                  max_change_percent: Optional[float] = None,
@@ -702,7 +705,7 @@ class UlsFileChecker:
         """
         check_results: Dict[str, Optional[str]] = {}
         for item, (tested, errmsg) in \
-                [("difference from previous",  self._check_diff(db_diff)),
+                [("difference from previous", self._check_diff(db_diff)),
                  ("usable by AFC Service", self._check_afc(new_filename))]:
             if not tested:
                 continue
@@ -778,10 +781,10 @@ class ExtParamFilesChecker:
     _ExtParamFiles = \
         NamedTuple("_ExtParamFiles",
                    [
-                    # Location in the internet
-                    ("base_url", str),
-                    # Downloader script subdirectory
-                    ("subdir", str), ("files", List[str])])
+                       # Location in the internet
+                       ("base_url", str),
+                       # Downloader script subdirectory
+                       ("subdir", str), ("files", List[str])])
 
     def __init__(self, status_updater: StatusUpdater,
                  ext_files_arg: Optional[List[str]] = None,

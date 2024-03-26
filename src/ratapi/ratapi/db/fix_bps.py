@@ -7,19 +7,22 @@ import math
 modmapBPS = {}
 cslistBPS = {}
 
+
 def RepresentInt(s):
     try:
         int(s)
         return True
-    except:
+    except BaseException:
         return False
+
 
 def RepresentFloat(s):
     try:
         float(s)
         return True
-    except:
+    except BaseException:
         return False
+
 
 def getBPSFromMod(mod_type, cs):
     try:
@@ -28,34 +31,36 @@ def getBPSFromMod(mod_type, cs):
             if cs not in cslistBPS[mc]:
                 bits_per_sym = -1
         return bits_per_sym
-    except:
+    except BaseException:
         return -1
+
 
 def getEmdegBW(emdeg):
     chList = ["H", "K", "M", "G", "T"]
-    ba = bytearray(bytes(emdeg,encoding='utf8'))
+    ba = bytearray(bytes(emdeg, encoding='utf8'))
     found = False
     sVal = 1.0
     for (chIdx, ch) in enumerate(chList):
         if not found:
-            strpos = ba.find(bytes(ch,encoding='utf8'))
+            strpos = ba.find(bytes(ch, encoding='utf8'))
             if strpos != -1:
                 ba[strpos] = ord('.')
                 scale = sVal
-                found = True 
+                found = True
 
-            sVal *= 1000.0 
-    bandwidth = float(ba)*scale
+            sVal *= 1000.0
+    bandwidth = float(ba) * scale
     return bandwidth
 
-def fixBPS(inputPath, modcodFile, outputPath): 
+
+def fixBPS(inputPath, modcodFile, outputPath):
     with open(modcodFile, 'r') as f:
         for ln in f:
             lns = ln.strip().split(',')
-            mc = lns.pop(0) 
-            bps = lns.pop(0) 
+            mc = lns.pop(0)
+            bps = lns.pop(0)
             modmapBPS[mc] = bps
-            cslistBPS[mc] = [ ]
+            cslistBPS[mc] = []
             for cs in lns:
                 cslistBPS[mc].append(cs)
 
@@ -63,8 +68,6 @@ def fixBPS(inputPath, modcodFile, outputPath):
 
     modmapEmdegScale = {}
     modmapEmdegScale["M"] = 1.0e6
-
-
 
     with open(inputPath, 'r') as f:
         with open(outputPath, 'w') as fout:
@@ -75,17 +78,17 @@ def fixBPS(inputPath, modcodFile, outputPath):
             for row in csvreader:
                 linenum = linenum + 1
                 if firstRow:
-                    row.append("mod_rate (BPS)") 
-                    row.append("spectral_efficiency (bit/Hz)") 
-                    row.append("comment") 
+                    row.append("mod_rate (BPS)")
+                    row.append("spectral_efficiency (bit/Hz)")
+                    row.append("comment")
                     csvwriter.writerow(row)
                     firstRow = False
-                    callsignIdx =  -1
-                    pathIdx =  -1
-                    freqIdx =  -1
-                    emdegIdx =  -1
-                    digitalModRateIdx =  -1
-                    modTypeIdx =  -1
+                    callsignIdx = -1
+                    pathIdx = -1
+                    freqIdx = -1
+                    emdegIdx = -1
+                    digitalModRateIdx = -1
+                    modTypeIdx = -1
                     for fieldIdx, field in enumerate(row):
                         if field == "Callsign":
                             callsignIdx = fieldIdx
@@ -119,16 +122,17 @@ def fixBPS(inputPath, modcodFile, outputPath):
                     mod_type = row[modTypeIdx]
                     mod_rate_bps = ""
                     spectral_efficiency = ""
-                    comment = "" 
+                    comment = ""
                     processFlag = True
                     removeFlag = False
-                    mod_type = mod_type.replace(',','')
+                    mod_type = mod_type.replace(',', '')
 
                     if RepresentFloat(row[digitalModRateIdx]):
                         mod_rate = float(row[digitalModRateIdx])
                         if mod_rate == 0.0:
-                            comment = "INVALID Digital Mod Rate = " + str(mod_rate)
-                            #print ("WARN: "+ comment + " for callsign " + cs + " at line "+ str(linenum))
+                            comment = "INVALID Digital Mod Rate = " + \
+                                str(mod_rate)
+                            # print ("WARN: "+ comment + " for callsign " + cs + " at line "+ str(linenum))
                             processFlag = False
                     else:
                         processFlag = False
@@ -140,7 +144,7 @@ def fixBPS(inputPath, modcodFile, outputPath):
                     bits_per_sym = getBPSFromMod(mod_type, cs)
                     if bits_per_sym == -1:
                         comment = "INVALID mod_type = " + mod_type
-                        #print ("WARN: "+ comment + " for callsign " + cs + " at line "+ str(linenum))
+                        # print ("WARN: "+ comment + " for callsign " + cs + " at line "+ str(linenum))
                         processFlag = False
 
                     if emdeg == "":
@@ -151,8 +155,10 @@ def fixBPS(inputPath, modcodFile, outputPath):
 
                         se = mod_rate / bw
                         if se == 0.0:
-                            comment = "ERROR: se = 0.0, bw = " + str(bw) + ", mod_rate = " + str(mod_rate)
-                            print (comment + " for callsign " + cs + " at line " + str(linenum))
+                            comment = "ERROR: se = 0.0, bw = " + \
+                                str(bw) + ", mod_rate = " + str(mod_rate)
+                            print(comment + " for callsign " +
+                                  cs + " at line " + str(linenum))
                         scale = bits_per_sym / se
                         scaleFactor = 1.0
                         if scale > 1.0:
@@ -168,7 +174,7 @@ def fixBPS(inputPath, modcodFile, outputPath):
                         spectral_efficiency = mod_rate_bps / bw
 
                     if not removeFlag:
-                        row.append(mod_rate_bps) 
-                        row.append(spectral_efficiency) 
-                        row.append(comment) 
+                        row.append(mod_rate_bps)
+                        row.append(spectral_efficiency)
+                        row.append(comment)
                         csvwriter.writerow(row)

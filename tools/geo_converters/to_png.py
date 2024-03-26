@@ -121,7 +121,7 @@ def conversion_worker(
     try:
         if os.path.isfile(dst) and (not overwrite):
             return ConvResult(filename=src, status=ConvStatus.Exists,
-                              duration=datetime.datetime.now()-start_time)
+                              duration=datetime.datetime.now() - start_time)
         boundaries = \
             Boundaries(
                 src, pixel_size=pixel_size,
@@ -132,7 +132,7 @@ def conversion_worker(
         gi = GdalInfo(src, fail_on_error=False)
         if not (gi and boundaries):
             return ConvResult(filename=src, status=ConvStatus.Error,
-                              duration=datetime.datetime.now()-start_time,
+                              duration=datetime.datetime.now() - start_time,
                               msg="gdalinfo inspection failed")
         warn: Optional[str] = None
         if (not scale) and \
@@ -164,9 +164,13 @@ def conversion_worker(
         if quiet:
             if exec_result is not None:
                 assert isinstance(exec_result, str)
-                return ConvResult(filename=src, status=ConvStatus.Error,
-                                  duration=datetime.datetime.now()-start_time,
-                                  msg=exec_result, command_line=command_line)
+                return ConvResult(
+                    filename=src,
+                    status=ConvStatus.Error,
+                    duration=datetime.datetime.now() -
+                    start_time,
+                    msg=exec_result,
+                    command_line=command_line)
         else:
             assert isinstance(exec_result, bool) and exec_result
         if os.path.isfile(dst):
@@ -177,11 +181,11 @@ def conversion_worker(
         if wld:
             os.rename(temp_file_wld, dst_wld)
         return ConvResult(filename=src, status=ConvStatus.Success,
-                          duration=datetime.datetime.now()-start_time,
+                          duration=datetime.datetime.now() - start_time,
                           msg=warn)
     except (Exception, KeyboardInterrupt, SystemExit) as ex:
         return ConvResult(filename=src, status=ConvStatus.Error,
-                          duration=datetime.datetime.now()-start_time,
+                          duration=datetime.datetime.now() - start_time,
                           msg=repr(ex))
     finally:
         for filename in (temp_file_xml, temp_file_wld, temp_file):
@@ -437,7 +441,7 @@ def main(argv: List[str]) -> None:
     if scale != args.scale:
         implicit_conversion_params.append(f"scale of {scale}")
     if no_data != args.no_data:
-         implicit_conversion_params.append(f"NoData of {no_data}")
+        implicit_conversion_params.append(f"NoData of {no_data}")
     if resampling != args.resampling:
         implicit_conversion_params.append(f"resampling of {resampling}")
     if data_type != args.data_type:

@@ -12,6 +12,7 @@ import sqlalchemy.ext.declarative as declarative
 #: Base class for declarative models
 Base = declarative.declarative_base()
 
+
 class CoerceUTF8(TypeDecorator):
     impl = Unicode
 
@@ -19,6 +20,7 @@ class CoerceUTF8(TypeDecorator):
         if isinstance(value, bytes):
             value = value.decode('utf-8')
         return value
+
 
 class PR(Base):
     ''' Passive Repeater table
@@ -49,6 +51,7 @@ class PR(Base):
     pr_back_to_back_gain_rx = Column(Float)
     pr_ant_diameter_tx = Column(Float)
     pr_ant_diameter_rx = Column(Float)
+
 
 class ULS(Base):
     ''' ULS Database table
@@ -87,7 +90,7 @@ class ULS(Base):
     rx_callsign = Column(String(16), nullable=False)
 
     #: Rx Location Number
-    #rx_location_num = Column(Integer, nullable=False)
+    # rx_location_num = Column(Integer, nullable=False)
 
     #: Rx Antenna Number
     rx_antenna_num = Column(Integer, nullable=False)
@@ -117,14 +120,14 @@ class ULS(Base):
     #: Tx Architecture (IDU, ODU, UNKNOWN)
     tx_architecture = Column(String(8), nullable=False)
 
-    #Azimuth Angle Towards Tx (deg)
+    # Azimuth Angle Towards Tx (deg)
     azimuth_angle_to_tx = Column(Float)
 
-    #Elevation Angle Towards Tx (deg)
+    # Elevation Angle Towards Tx (deg)
     elevation_angle_to_tx = Column(Float)
 
     #: Tx Beamwidth
-    #tx_beamwidth = Column(Float, nullable=False)
+    # tx_beamwidth = Column(Float, nullable=False)
 
     #: Tx Gain (dBi)
     tx_gain = Column(Float)
@@ -181,6 +184,7 @@ class ULS(Base):
 
     path_number = Column(Integer, nullable=False)
 
+
 class RAS(Base):
     ''' ULS Database table
     '''
@@ -209,12 +213,14 @@ class RAS(Base):
     centerLon = Column(Float)
     heightAGL = Column(Float)
 
+
 class ANTAOB(Base):
     ''' Antenna Angle Off Boresight
     '''
     __tablename__ = 'antaob'
     aob_idx = Column(Integer, primary_key=True)
     aob_deg = Column(Float)
+
 
 class ANTNAME(Base):
     ''' Antenna Name
@@ -223,12 +229,14 @@ class ANTNAME(Base):
     ant_idx = Column(Integer, primary_key=True)
     ant_name = Column(CoerceUTF8(64))
 
+
 class ANTGAIN(Base):
     ''' Antenna Gain
     '''
     __tablename__ = 'antgain'
     id = Column(Integer, nullable=False, index=True, primary_key=True)
     gain_db = Column(Float)
+
 
 def _as_bool(s):
     if s == 'Y':
@@ -249,9 +257,11 @@ def _as_int(s):
         return None
     return int(s)
 
+
 def truncate(num, n):
-    integer = int(num * (10**n))/(10**n)
+    integer = int(num * (10**n)) / (10**n)
     return float(integer)
+
 
 def load_csv_data(file_name, headers=None):
     ''' Loads csv file into python objects
@@ -275,7 +285,9 @@ def load_csv_data(file_name, headers=None):
                     },
                     delimiter=','), None)
 
-def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile, outputSQL):
+
+def convertULS(fsDataFile, rasDataFile, antennaPatternFile,
+               state_root, logFile, outputSQL):
     logFile.write('Converting ULS csv to sqlite' + '\n')
 
     logFile.write('Converting CSV file to SQLITE\n')
@@ -285,7 +297,8 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
     logFile.write('SQLITE: ' + outputSQL + '\n')
 
     if os.path.exists(outputSQL):
-        logFile.write('WARNING: sqlite file ' + outputSQL + ' already exists, deleting\n')
+        logFile.write('WARNING: sqlite file ' + outputSQL +
+                      ' already exists, deleting\n')
         os.remove(outputSQL)
         if os.path.exists(outputSQL):
             logFile.write('ERROR: unable to delete file ' + outputSQL + '\n')
@@ -299,31 +312,45 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
     s = today_session()
 
     # create tables: ULS, RAS, PR, ANTAOB, ANTNAME, ANTGAIN
-    Base.metadata.create_all(today_engine, tables=[ULS.__table__,PR.__table__,RAS.__table__,ANTAOB.__table__,ANTNAME.__table__,ANTGAIN.__table__])
+    Base.metadata.create_all(
+        today_engine,
+        tables=[
+            ULS.__table__,
+            PR.__table__,
+            RAS.__table__,
+            ANTAOB.__table__,
+            ANTNAME.__table__,
+            ANTGAIN.__table__])
     try:
 
         antIdxMap = {}
 
-        ####################################################################################
+        #######################################################################
         # Process antennaPatternFile                                                       #
-        ####################################################################################
+        #######################################################################
         (antennaPatternData, file_handle) = load_csv_data(antennaPatternFile)
 
         antPatternCount = 0
         for fieldIdx, field in enumerate(antennaPatternData.fieldnames):
             if fieldIdx == 0:
                 if field != 'Off-axis angle (deg)':
-                    sys.exit('ERROR: Invalid antennaPatternFile: ' + antennaPatternFile + ' Especting "Off-axis angle (deg)", found ' + field + '\n')
+                    sys.exit(
+                        'ERROR: Invalid antennaPatternFile: ' +
+                        antennaPatternFile +
+                        ' Especting "Off-axis angle (deg)", found ' +
+                        field +
+                        '\n')
             else:
-                antIdx = fieldIdx-1
+                antIdx = fieldIdx - 1
                 antname = ANTNAME(
-                    ant_idx = antIdx,
-                    ant_name = field
+                    ant_idx=antIdx,
+                    ant_name=field
                 )
                 s.add(antname)
                 antPatternCount += 1
                 if field in antIdxMap:
-                    sys.exit('ERROR: Invalid antennaPatternFile: ' + antennaPatternFile + ': ' + field + ' defined multiple times\n')
+                    sys.exit('ERROR: Invalid antennaPatternFile: ' +
+                             antennaPatternFile + ': ' + field + ' defined multiple times\n')
                 antIdxMap[field] = antIdx
 
         antennaPatternFileRows = list(antennaPatternData)
@@ -332,36 +359,39 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
         count = 0
         for aobIdx, row in enumerate(antennaPatternFileRows):
             try:
-                for fieldIdx, field in enumerate(antennaPatternData.fieldnames):
+                for fieldIdx, field in enumerate(
+                        antennaPatternData.fieldnames):
                     if fieldIdx == 0:
                         antaob = ANTAOB(
-                            aob_idx = aobIdx,
-                            aob_deg = float(row[field])
+                            aob_idx=aobIdx,
+                            aob_deg=float(row[field])
                         )
                         s.add(antaob)
                     else:
-                        antIdx = fieldIdx-1
+                        antIdx = fieldIdx - 1
                         antgain = ANTGAIN(
-                            id = numAOB*antIdx + aobIdx,
-                            gain_db = float(row[field])
+                            id=numAOB * antIdx + aobIdx,
+                            gain_db=float(row[field])
                         )
                         s.add(antgain)
                         count += 1
                         if (count) % 10000 == 0:
-                            logFile.write('CSV to sqlite Up to ANT PATTERN entry ' + str(count) + '\n')
+                            logFile.write(
+                                'CSV to sqlite Up to ANT PATTERN entry ' + str(count) + '\n')
 
             except Exception as e:
-                errMsg = 'ERROR processing antennaPatternFile: ' + str(e) + '\n'
+                errMsg = 'ERROR processing antennaPatternFile: ' + \
+                    str(e) + '\n'
                 logFile.write(errMsg)
                 sys.exit(errMsg)
 
         if not (file_handle is None):
             file_handle.close()
-        ####################################################################################
+        #######################################################################
 
-        ####################################################################################
+        #######################################################################
         # Process RAS Data                                                                 #
-        ####################################################################################
+        #######################################################################
         (rasData, file_handle) = load_csv_data(rasDataFile)
 
         ras = None
@@ -369,30 +399,31 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
         for count, row in enumerate(rasData):
             try:
                 ras = RAS(
-                    rasid = int(row['RASID']),
+                    rasid=int(row['RASID']),
 
-                    region = str(row['Region']),
-                    name = str(row['Name']),
-                    location = str(row['Location']),
-                    startFreqMHz = _as_float(row['Start Freq (MHz)']),
-                    stopFreqMHz = _as_float(row['End Freq (MHz)']),
-                    exclusionZone = str(row['Exclusion Zone']),
-                    rect1lat1 = _as_float(row['Rectangle1 Lat 1']),
-                    rect1lat2 = _as_float(row['Rectangle1 Lat 2']),
-                    rect1lon1 = _as_float(row['Rectangle1 Lon 1']),
-                    rect1lon2 = _as_float(row['Rectangle1 Lon 2']),
-                    rect2lat1 = _as_float(row['Rectangle2 Lat 1']),
-                    rect2lat2 = _as_float(row['Rectangle2 Lat 2']),
-                    rect2lon1 = _as_float(row['Rectangle2 Lon 1']),
-                    rect2lon2 = _as_float(row['Rectangle2 Lon 2']),
-                    radiusKm = _as_float(row['Circle Radius (km)']),
-                    centerLat = _as_float(row['Circle center Lat']),
-                    centerLon = _as_float(row['Circle center Lon']),
-                    heightAGL = _as_float(row['Antenna AGL height (m)'])
+                    region=str(row['Region']),
+                    name=str(row['Name']),
+                    location=str(row['Location']),
+                    startFreqMHz=_as_float(row['Start Freq (MHz)']),
+                    stopFreqMHz=_as_float(row['End Freq (MHz)']),
+                    exclusionZone=str(row['Exclusion Zone']),
+                    rect1lat1=_as_float(row['Rectangle1 Lat 1']),
+                    rect1lat2=_as_float(row['Rectangle1 Lat 2']),
+                    rect1lon1=_as_float(row['Rectangle1 Lon 1']),
+                    rect1lon2=_as_float(row['Rectangle1 Lon 2']),
+                    rect2lat1=_as_float(row['Rectangle2 Lat 1']),
+                    rect2lat2=_as_float(row['Rectangle2 Lat 2']),
+                    rect2lon1=_as_float(row['Rectangle2 Lon 1']),
+                    rect2lon2=_as_float(row['Rectangle2 Lon 2']),
+                    radiusKm=_as_float(row['Circle Radius (km)']),
+                    centerLat=_as_float(row['Circle center Lat']),
+                    centerLon=_as_float(row['Circle center Lon']),
+                    heightAGL=_as_float(row['Antenna AGL height (m)'])
                 )
                 s.add(ras)
                 if (count) % 10000 == 0:
-                    logFile.write('CSV to sqlite Up to RAS entry ' + str(count) + '\n')
+                    logFile.write(
+                        'CSV to sqlite Up to RAS entry ' + str(count) + '\n')
 
             except Exception as e:
                 errMsg = 'ERROR processing rasDataFile: ' + str(e) + '\n'
@@ -401,17 +432,17 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
 
         if not (file_handle is None):
             file_handle.close()
-        ####################################################################################
+        #######################################################################
 
-        ####################################################################################
+        #######################################################################
         # Process FS Data                                                                  #
-        ####################################################################################
+        #######################################################################
         (data, file_handle) = load_csv_data(fsDataFile)
 
         # generate queries in chunks to reduce memory footprint
         to_save = []
         invalid_rows = 0
-        prCount = 0;
+        prCount = 0
         errors = []
         uls = None
         pr = None
@@ -429,7 +460,7 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
                     rxAntIdx = -1
                 uls = ULS(
                     #: FSID
-                    fsid = fsidVal,
+                    fsid=fsidVal,
                     #: Callsign
                     region=str(row['Region']),
                     #: Callsign
@@ -460,13 +491,16 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
                     #: Tx Polarization
                     tx_polarization=str(row['Tx Polarization']),
                     #: Tx Height to Center RAAT (m)
-                    tx_height_to_center_raat_m=_as_float(row['Tx Height to Center RAAT (m)']),
+                    tx_height_to_center_raat_m=_as_float(
+                        row['Tx Height to Center RAAT (m)']),
                     #: Tx Architecture
                     tx_architecture=str(row['Tx Architecture']),
                     # Azimuth Angle Towards Tx (deg)
-                    azimuth_angle_to_tx =  _as_float(row['Azimuth Angle Towards Tx (deg)']),
+                    azimuth_angle_to_tx=_as_float(
+                        row['Azimuth Angle Towards Tx (deg)']),
                     # Elevation Angle Towards Tx (deg)
-                    elevation_angle_to_tx =  _as_float(row['Elevation Angle Towards Tx (deg)']),
+                    elevation_angle_to_tx=_as_float(
+                        row['Elevation Angle Towards Tx (deg)']),
                     #: Tx Gain (dBi)
                     tx_gain=_as_float(row['Tx Gain (dBi)']),
                     #: Rx Lat Coords
@@ -487,25 +521,32 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
                     #: Rx Line Loss (dB)
                     rx_line_loss=_as_float(row['Rx Line Loss (dB)']),
                     #: Rx Height to Center RAAT (m)
-                    rx_height_to_center_raat_m=_as_float(row['Rx Height to Center RAAT (m)']),
+                    rx_height_to_center_raat_m=_as_float(
+                        row['Rx Height to Center RAAT (m)']),
                     #: Rx Gain (dBi)
                     rx_gain=_as_float(row['Rx Gain (dBi)']),
                     #: Rx Ant Diameter (m)
                     rx_ant_diameter=_as_float(row['Rx Ant Diameter (m)']),
 
                     #: Rx Near Field Ant Diameter (m)
-                    rx_near_field_ant_diameter = _as_float(row['Rx Near Field Ant Diameter (m)']),
+                    rx_near_field_ant_diameter=_as_float(
+                        row['Rx Near Field Ant Diameter (m)']),
                     #: Rx Near Field Dist Limit (m)
-                    rx_near_field_dist_limit = _as_float(row['Rx Near Field Dist Limit (m)']),
+                    rx_near_field_dist_limit=_as_float(
+                        row['Rx Near Field Dist Limit (m)']),
                     #: Rx Near Field Ant Efficiency
-                    rx_near_field_ant_efficiency = _as_float(row['Rx Near Field Ant Efficiency']),
+                    rx_near_field_ant_efficiency=_as_float(
+                        row['Rx Near Field Ant Efficiency']),
 
                     #: Rx Diversity Height to Center RAAT (m)
-                    rx_diversity_height_to_center_raat_m=_as_float(row['Rx Diversity Height to Center RAAT (m)']),
+                    rx_diversity_height_to_center_raat_m=_as_float(
+                        row['Rx Diversity Height to Center RAAT (m)']),
                     #: Rx Gain (dBi)
-                    rx_diversity_gain=_as_float(row['Rx Diversity Gain (dBi)']),
+                    rx_diversity_gain=_as_float(
+                        row['Rx Diversity Gain (dBi)']),
                     #: Rx Ant Diameter (m)
-                    rx_diversity_ant_diameter=_as_float(row['Rx Diversity Ant Diameter (m)']),
+                    rx_diversity_ant_diameter=_as_float(
+                        row['Rx Diversity Ant Diameter (m)']),
 
                     #: Number of passive repeaters
                     p_rp_num=numPR,
@@ -516,32 +557,48 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
 
                 s.add(uls)
                 # print "FSID = " + str(uls.fsid)
-                for idx in range(1, numPR+1):
-                    if row['Passive Repeater ' + str(idx) + ' Ant Model Name Matched'] in antIdxMap:
-                        prAntIdx = antIdxMap[row['Passive Repeater ' + str(idx) + ' Ant Model Name Matched']]
+                for idx in range(1, numPR + 1):
+                    if row['Passive Repeater ' +
+                           str(idx) + ' Ant Model Name Matched'] in antIdxMap:
+                        prAntIdx = antIdxMap[row['Passive Repeater ' +
+                                                 str(idx) + ' Ant Model Name Matched']]
                     else:
                         prAntIdx = -1
                     pr = PR(
-                        id = prCount,
-                        fsid = fsidVal,
-                        prSeq = idx,
-                        pr_lat_deg = _as_float(                    row['Passive Repeater ' + str(idx) + ' Lat Coords']),
-                        pr_lon_deg = _as_float(                    row['Passive Repeater ' + str(idx) + ' Long Coords']),
-                        pr_height_to_center_raat_tx_m = _as_float( row['Passive Repeater ' + str(idx) + ' Height to Center RAAT Tx (m)']),
-                        pr_height_to_center_raat_rx_m = _as_float( row['Passive Repeater ' + str(idx) + ' Height to Center RAAT Rx (m)']),
-                        pr_ant_type = str(                         row['Passive Repeater ' + str(idx) + ' Ant Type']),
-                        pr_ant_category = str(                     row['Passive Repeater ' + str(idx) + ' Ant Category']),
-                        pr_ant_model_idx = prAntIdx,
-                        pr_ant_model = str(                        row['Passive Repeater ' + str(idx) + ' Ant Model Name Matched']),
-                        pr_line_loss = _as_float(                  row['Passive Repeater ' + str(idx) + ' Line Loss (dB)']),
-                        pr_reflector_height_m = _as_float(         row['Passive Repeater ' + str(idx) + ' Reflector Height (m)']),
-                        pr_reflector_width_m = _as_float(          row['Passive Repeater ' + str(idx) + ' Reflector Width (m)']),
-                        pr_back_to_back_gain_tx = _as_float(       row['Passive Repeater ' + str(idx) + ' Back-to-Back Gain Tx (dBi)']),
-                        pr_back_to_back_gain_rx = _as_float(       row['Passive Repeater ' + str(idx) + ' Back-to-Back Gain Rx (dBi)']),
-                        pr_ant_diameter_tx = _as_float(            row['Passive Repeater ' + str(idx) + ' Tx Ant Diameter (m)']),
-                        pr_ant_diameter_rx = _as_float(            row['Passive Repeater ' + str(idx) + ' Rx Ant Diameter (m)'])
+                        id=prCount,
+                        fsid=fsidVal,
+                        prSeq=idx,
+                        pr_lat_deg=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Lat Coords']),
+                        pr_lon_deg=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Long Coords']),
+                        pr_height_to_center_raat_tx_m=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Height to Center RAAT Tx (m)']),
+                        pr_height_to_center_raat_rx_m=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Height to Center RAAT Rx (m)']),
+                        pr_ant_type=str(
+                            row['Passive Repeater ' + str(idx) + ' Ant Type']),
+                        pr_ant_category=str(
+                            row['Passive Repeater ' + str(idx) + ' Ant Category']),
+                        pr_ant_model_idx=prAntIdx,
+                        pr_ant_model=str(
+                            row['Passive Repeater ' + str(idx) + ' Ant Model Name Matched']),
+                        pr_line_loss=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Line Loss (dB)']),
+                        pr_reflector_height_m=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Reflector Height (m)']),
+                        pr_reflector_width_m=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Reflector Width (m)']),
+                        pr_back_to_back_gain_tx=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Back-to-Back Gain Tx (dBi)']),
+                        pr_back_to_back_gain_rx=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Back-to-Back Gain Rx (dBi)']),
+                        pr_ant_diameter_tx=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Tx Ant Diameter (m)']),
+                        pr_ant_diameter_rx=_as_float(
+                            row['Passive Repeater ' + str(idx) + ' Rx Ant Diameter (m)'])
                     )
-                    prCount = prCount+1
+                    prCount = prCount + 1
                     s.add(pr)
 
                 # to_save.append(uls)
@@ -549,20 +606,28 @@ def convertULS(fsDataFile, rasDataFile, antennaPatternFile, state_root, logFile,
                 logFile.write('ERROR: ' + str(e) + '\n')
                 invalid_rows = invalid_rows + 1
                 if invalid_rows > 50:
-                    #errors.append('{}\nData: {}'.format(str(e), str(row)))
+                    # errors.append('{}\nData: {}'.format(str(e), str(row)))
                     logFile.write('WARN: > 50 invalid rows' + '\n')
 
             if count % 10000 == 0:
-                logFile.write('CSV to sqlite Up to FS entry ' + str(count) + '\n')
+                logFile.write('CSV to sqlite Up to FS entry ' +
+                              str(count) + '\n')
 
         if not (file_handle is None):
             file_handle.close()
-        ####################################################################################
+        #######################################################################
 
-        s.commit() # only commit after DB opertation are completed
-        logFile.write('File ' + str(outputSQL) + ' created with ' + str(count) + ' FS entries, '
-             + str(prCount) + ' passive repeaters, '
-             + str(antPatternCount) + ' antennaPatterns.\n')
+        s.commit()  # only commit after DB opertation are completed
+        logFile.write(
+            'File ' +
+            str(outputSQL) +
+            ' created with ' +
+            str(count) +
+            ' FS entries, ' +
+            str(prCount) +
+            ' passive repeaters, ' +
+            str(antPatternCount) +
+            ' antennaPatterns.\n')
 
         return
 

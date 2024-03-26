@@ -5,7 +5,8 @@
 # This work is licensed under the OpenAFC Project License, a copy
 # of which is included with this software program.
 
-import smtplib, ssl
+import smtplib
+import ssl
 from email import encoders
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
@@ -19,7 +20,10 @@ import os
 from email.message import EmailMessage
 
 time_val = 40
-def send_mail(file, outfile, email, cc_email, server, req_id, requester, sender_email):
+
+
+def send_mail(file, outfile, email, cc_email, server,
+              req_id, requester, sender_email):
     receiver_email = email
 
     body = f"Hello there,\nPlease find attached response for AFC trial requested with\n"
@@ -40,12 +44,13 @@ def send_mail(file, outfile, email, cc_email, server, req_id, requester, sender_
     message.add_alternative(body)
     with open(file, "rb") as attachment:
         message.add_attachment(attachment.read(), maintype='application',
-               subtype='octet-stream', filename=file)
+                               subtype='octet-stream', filename=file)
     with open(outfile, "rb") as attachment:
         message.add_attachment(attachment.read(), maintype='application',
-               subtype='octet-stream', filename=outfile)
+                               subtype='octet-stream', filename=outfile)
 
-    server.sendmail(sender_email, [receiver_email, cc_email], message.as_string())
+    server.sendmail(sender_email, [receiver_email,
+                    cc_email], message.as_string())
 
 
 def run_test(uid, requester, res, email, config_data):
@@ -58,10 +63,9 @@ def run_test(uid, requester, res, email, config_data):
     conf_cert = config_data['cert']
     conf_key = config_data['key']
     cert = (conf_cert, conf_key)
-    filename =  f'{indir}/UID_{uid}.json'
+    filename = f'{indir}/UID_{uid}.json'
     outfilename = f'{res}/UID_{uid}.json'
-    print ("Sending request UID = %s" %uid)
-
+    print("Sending request UID = %s" % uid)
 
     with open(filename) as f:
         data = f.read().replace('\n', '').replace('\r', '').encode()
@@ -84,24 +88,26 @@ def run_test(uid, requester, res, email, config_data):
         except KeyError:
             pass
         except IndexError:
-            print ("Unknown response format!")
+            print("Unknown response format!")
 
         fout = open(outfilename, "w")
         fout.write(json.dumps(filtered_response, indent=1))
 
         fout.close()
-        print("Email UID %s to %s" %(uid, email))
+        print("Email UID %s to %s" % (uid, email))
         # Send to requester if no override provided
         if not email:
-           email = requester
+            email = requester
 
         # Create a secure SSL context
         context = ssl.create_default_context()
         port = int(config_data['port'])
-        server =  smtplib.SMTP_SSL("smtp.gmail.com", port, context=context)
+        server = smtplib.SMTP_SSL("smtp.gmail.com", port, context=context)
         password = config_data['password']
         server.login(sender_email, password)
-        send_mail(filename, outfilename, email, cc_email, server, uid, requester, sender_email)
+        send_mail(filename, outfilename, email, cc_email,
+                  server, uid, requester, sender_email)
+
 
 def init_db(conn):
     # create cursor object
@@ -109,9 +115,9 @@ def init_db(conn):
 
     # check if table exists
     listOfTables = cur.execute(
-      """SELECT name FROM sqlite_master WHERE type='table'
+        """SELECT name FROM sqlite_master WHERE type='table'
       AND name='REQUESTS'; """).fetchall()
-    
+
     if listOfTables == []:
         print('Table not found!')
         conn.execute('''CREATE TABLE REQUESTS
@@ -119,6 +125,7 @@ def init_db(conn):
              UID           TEXT    NOT NULL,
              TIMESTAMP     TEXT     NOT NULL);''')
         print("Table created successfully")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Read and parse request json')
@@ -135,17 +142,17 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if not os.path.exists(args.res):
-        print ("Make result directory %s " %args.res)
+        print("Make result directory %s " % args.res)
         os.mkdir(args.res)
 
     req_file = args.csv
     indir = os.path.dirname(req_file)
 
     if not dir:
-       indir = os.getcwd()
+        indir = os.getcwd()
 
     conn = sqlite3.connect(args.db)
-    print ("Opened database %s successfully" %args.db)
+    print("Opened database %s successfully" % args.db)
 
     conf_file = args.config
     f = open(conf_file)
@@ -160,12 +167,12 @@ if __name__ == "__main__":
     # optional cc_email in config.json
     try:
         cc_email = config_data['cc_email']
-    except:
+    except BaseException:
         cc_email = ""
 
     try:
         dry_run = (config_data['dry_run'].lower() == "true")
-    except:
+    except BaseException:
         dry_run = False
 
     f.close()
@@ -179,26 +186,27 @@ if __name__ == "__main__":
         i = 2
         try:
             start_row = int(config_data['start_row'])
-        except:
+        except BaseException:
             start_row = 2
 
         for row in reader:
             ts = row['Timestamp']
             uid = row['Unique request ID'] + f'_R{i}'
             requester = row['Email address']
-            i = i+1
-            list = conn.execute("SELECT * from REQUESTS WHERE UID=?", (uid,)).fetchall()
+            i = i + 1
+            list = conn.execute(
+                "SELECT * from REQUESTS WHERE UID=?", (uid,)).fetchall()
             if list == [] and i > start_row:
-                print("Querying for uid %s" %uid)
+                print("Querying for uid %s" % uid)
                 run_test(uid, requester, args.res, email, config_data)
 
                 # if not dry run, update db to avoid running same req again
                 if not dry_run:
                     conn.execute("INSERT INTO REQUESTS (TIMESTAMP,UID) \
-                        VALUES (?, ?)", (ts, uid));
+                        VALUES (?, ?)", (ts, uid))
                     conn.commit()
 
             else:
-                print("Ignore existing uid %s" %uid)
+                print("Ignore existing uid %s" % uid)
 
     conn.close()

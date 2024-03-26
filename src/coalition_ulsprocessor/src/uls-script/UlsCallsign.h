@@ -1,5 +1,6 @@
 /*
- *      This database permits fast lookup of links, locations, etc via callsign. Each callsign has its own table of locations, antennas, etc.
+ *      This database permits fast lookup of links, locations, etc via callsign. Each callsign has
+ * its own table of locations, antennas, etc.
  *
  */
 
@@ -17,25 +18,27 @@
 #include <QList>
 #include <QString>
 
-class UlsCallsign {
-public:
-    QString callsign;
-    char callsignascii[11];
-    QList<UlsHeader *> *headers;
-	QList<UlsAntenna *> *antennas;
-	QList<UlsLocation *> *locations;
-	QList<UlsFrequency *> *frequencies;
-    QList<UlsEmission *> *emissions;
-    QList<UlsEntity *> *entities;
-	QList<UlsMarketFrequency *> *marketFreqs;
+class UlsCallsign
+{
+	public:
+		QString callsign;
+		char callsignascii[11];
+		QList<UlsHeader *> *headers;
+		QList<UlsAntenna *> *antennas;
+		QList<UlsLocation *> *locations;
+		QList<UlsFrequency *> *frequencies;
+		QList<UlsEmission *> *emissions;
+		QList<UlsEntity *> *entities;
+		QList<UlsMarketFrequency *> *marketFreqs;
 
-	UlsCallsign() {
-        antennas = NULL;
-		locations = NULL;
-		frequencies = NULL;
-        headers = NULL;
-		strlcpy(callsignascii, "", sizeof(callsignascii));
-    }
+		UlsCallsign()
+		{
+			antennas = NULL;
+			locations = NULL;
+			frequencies = NULL;
+			headers = NULL;
+			strlcpy(callsignascii, "", sizeof(callsignascii));
+		}
 };
 
 #endif

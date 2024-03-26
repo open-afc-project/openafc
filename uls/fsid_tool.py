@@ -228,6 +228,7 @@ class Db:
                                      False for use more recent one
     _current_transaction_length   -- Currently used maximum transaction length
     """
+
     def __init__(self, database_file: str,
                  recreate_fsid_table: bool = False) -> None:
         """ Constructor

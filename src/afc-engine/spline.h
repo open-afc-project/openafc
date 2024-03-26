@@ -8,7 +8,8 @@
 #include <vector>
 #include "dbldbl.h"
 
-template<class T> class ListClass;
+template<class T>
+class ListClass;
 
 /******************************************************************************************/
 /**** CLASS: SplineClass                                                               ****/

@@ -1,4 +1,4 @@
-// 
+//
 
 #ifndef SRC_RATCOMMON_FILEHELPERS_H_
 #define SRC_RATCOMMON_FILEHELPERS_H_
@@ -12,11 +12,14 @@ class QString;
 class QFileInfo;
 class QDir;
 
-namespace FileHelpers{
+namespace FileHelpers
+{
 
 /// Error indicating file system issue
-struct Error : public std::runtime_error{
-    Error(const QString &msg) : runtime_error(msg.toStdString()){}
+struct Error : public std::runtime_error {
+		Error(const QString &msg) : runtime_error(msg.toStdString())
+		{
+		}
 };
 
 /** Open a file for reading or writing.

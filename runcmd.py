@@ -20,10 +20,11 @@ else:
     # Python 2 specific definitions
     echo_outfile = sys.stdout
 
+
 class StatusTimer(threading.Thread):
     def __init__(self, timeoutSecs):
         threading.Thread.__init__(self)
-        self.daemon = True # Exit with the parent process
+        self.daemon = True  # Exit with the parent process
 
         self._began = datetime.datetime.now()
         self._timeout = timeoutSecs
@@ -32,15 +33,17 @@ class StatusTimer(threading.Thread):
         while True:
             time.sleep(self._timeout)
             diff = datetime.datetime.now() - self._began
-            sys.stdout.write('Running for %.1f minutes...\n' % (diff.seconds / 60.0))
+            sys.stdout.write('Running for %.1f minutes...\n' %
+                             (diff.seconds / 60.0))
             sys.stdout.flush()
+
 
 class Monitor(threading.Thread):
     def __init__(self, stream, outFile):
         ''' Process lines from a stream and write to the file.
         '''
         threading.Thread.__init__(self)
-        self.daemon = True # Exit with the parent process
+        self.daemon = True  # Exit with the parent process
 
         self._stream = stream
         self._file = outFile
@@ -54,6 +57,7 @@ class Monitor(threading.Thread):
             for out in (self._file, echo_outfile):
                 out.write(line + b'\n')
                 out.flush()
+
 
 def main(argv):
     parser = optparse.OptionParser(
@@ -86,7 +90,7 @@ def main(argv):
     # Spawn the child
     proc = subprocess.Popen(
         cmdParts, shell=useShell,
-        stdout=subprocess.PIPE, 
+        stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         close_fds=('posix' in sys.builtin_module_names)
     )
@@ -94,10 +98,11 @@ def main(argv):
     # Wait for completion with background threads
     mon = Monitor(proc.stdout, outFile)
     mon.start()
-    
+
     exitCode = proc.wait()
     mon.join()
     return exitCode
+
 
 if __name__ == '__main__':
     sys.exit(main(sys.argv))

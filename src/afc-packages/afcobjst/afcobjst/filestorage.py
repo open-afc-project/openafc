@@ -21,8 +21,8 @@ from flask import Flask, request, abort, make_response
 import google.cloud.storage
 from .objstconf import ObjstConfigInternal
 
-NET_TIMEOUT = 600 # The amount of time, in seconds, to wait for the server response
-SEM_TIMEOUT = 60 # Per file semaphore timeout
+NET_TIMEOUT = 600  # The amount of time, in seconds, to wait for the server response
+SEM_TIMEOUT = 60  # Per file semaphore timeout
 
 objst_app = Flask(__name__)
 objst_app.config.from_object(ObjstConfigInternal())
@@ -37,6 +37,7 @@ if objst_app.config["AFC_OBJST_MEDIA"] == "GoogleCloudBucket":
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = objst_app.config["AFC_OBJST_GOOGLE_CLOUD_CREDENTIALS_JSON"]
     client = google.cloud.storage.client.Client()
     bucket = client.bucket(objst_app.config["AFC_OBJST_GOOGLE_CLOUD_BUCKET"])
+
 
 class ObjInt:
     """ Abstract class for data prot operations """
@@ -71,7 +72,7 @@ class ObjInt:
 class ObjIntLocalFS(ObjInt):
     def __lock(self, name):
         sem_name = "/" + name[1:].replace("/", "_")
-        sem = Semaphore(sem_name, O_CREAT, initial_value = 1)
+        sem = Semaphore(sem_name, O_CREAT, initial_value=1)
         sem.acquire(timeout=SEM_TIMEOUT)
         return sem
 
@@ -80,7 +81,7 @@ class ObjIntLocalFS(ObjInt):
         sem.close()
         try:
             sem.unlink()
-        except:
+        except BaseException:
             pass
 
     def write(self, data):
@@ -135,20 +136,20 @@ class ObjIntGoogleCloudBucket(ObjInt):
     def head(self):
         blobs = client.list_blobs(bucket,
                                   prefix=self._file_name,
-                                  delimeter = "/",
+                                  delimeter="/",
                                   timeout=NET_TIMEOUT)
         return blobs is not None
 
     def delete(self):
         blobs = client.list_blobs(bucket,
                                   prefix=self._file_name,
-                                  delimeter = "/",
+                                  delimeter="/",
                                   timeout=NET_TIMEOUT)
         for blob in blobs:
             try:
                 blob.delete(timeout=NET_TIMEOUT)
-            except:
-                pass # ignore google.cloud.exceptions.NotFound
+            except BaseException:
+                pass  # ignore google.cloud.exceptions.NotFound
 
 
 class Objstorage:
@@ -165,7 +166,7 @@ def get_local_path(path):
     return path
 
 
-@objst_app.route('/'+'<path:path>', methods=['POST'])
+@objst_app.route('/' + '<path:path>', methods=['POST'])
 def post(path):
     ''' File upload handler. '''
     objst_app.logger.debug(f'post {path}')
@@ -196,7 +197,7 @@ def post(path):
     return make_response('OK', 200)
 
 
-@objst_app.route('/'+'<path:path>', methods=["DELETE"])
+@objst_app.route('/' + '<path:path>', methods=["DELETE"])
 def delete(path):
     ''' File/dir delete handler. '''
     objst_app.logger.debug(f'delete {path}')
@@ -214,7 +215,8 @@ def delete(path):
 
 
 @objst_app.route('/', defaults={'path': ''}, methods=['HEAD'])
-@objst_app.route('/'+'<path:path>', methods=['HEAD'])  # handle URL with filename
+# handle URL with filename
+@objst_app.route('/' + '<path:path>', methods=['HEAD'])
 def head(path):
     ''' Is file exist handler. '''
     objst_app.logger.debug(f'head {path}')
@@ -236,13 +238,15 @@ def head(path):
 def healthcheck():
     ''' Get method for healthcheck. '''
     msg = 'The objst is healthy'
-    objst_app.logger.debug(f"{msg}."
-                           f" own ip: {socket.gethostbyname(socket.gethostname())}"
-                           f" from: {request.remote_addr}")
+    objst_app.logger.debug(
+        f"{msg}."
+        f" own ip: {socket.gethostbyname(socket.gethostname())}"
+        f" from: {request.remote_addr}")
     return make_response(msg, 200)
 
 
-@objst_app.route('/'+'<path:path>', methods=['GET'])  # handle URL with filename
+# handle URL with filename
+@objst_app.route('/' + '<path:path>', methods=['GET'])
 def get(path):
     ''' File download handler. '''
     objst_app.logger.debug(f'get {path}')
@@ -262,15 +266,17 @@ def get(path):
 
 
 if __name__ == '__main__':
-    objst_app.logger.debug("port={} AFC_OBJST_FILE_LOCATION={} AFC_OBJST_MEDIA={}".
-                       format(objst_app.config['AFC_OBJST_PORT'],
-                              objst_app.config['AFC_OBJST_FILE_LOCATION'],
-                              objst_app.config["AFC_OBJST_MEDIA"]))
+    objst_app.logger.debug(
+        "port={} AFC_OBJST_FILE_LOCATION={} AFC_OBJST_MEDIA={}". format(
+            objst_app.config['AFC_OBJST_PORT'],
+            objst_app.config['AFC_OBJST_FILE_LOCATION'],
+            objst_app.config["AFC_OBJST_MEDIA"]))
     os.makedirs(objst_app.config['AFC_OBJST_FILE_LOCATION'], exist_ok=True)
     # production env:
-    waitress.serve(objst_app, port=objst_app.config['AFC_OBJST_PORT'], host="0.0.0.0")
+    waitress.serve(
+        objst_app, port=objst_app.config['AFC_OBJST_PORT'], host="0.0.0.0")
     # Development env:
-    #objst_app.run(port=objst_app.config['AFC_OBJST_PORT'], host="0.0.0.0", debug=True)
+    # objst_app.run(port=objst_app.config['AFC_OBJST_PORT'], host="0.0.0.0", debug=True)
 
 # Local Variables:
 # mode: Python

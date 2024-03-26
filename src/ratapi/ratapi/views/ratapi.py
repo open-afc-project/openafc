@@ -45,13 +45,21 @@ LOGGER.setLevel(appcfg.AFC_RATAPI_LOG_LEVEL)
 
 #: All views under this API blueprint
 module = flask.Blueprint('ratapi-v1', 'ratapi')
-baseRegions =  ['US', 'CA', 'BR', 'GB']
+baseRegions = ['US', 'CA', 'BR', 'GB']
+
 
 def regions():
-    return baseRegions + list(map(lambda s: 'DEMO_'+ s, baseRegions)) + list(map(lambda s: 'TEST_'+ s, baseRegions))
+    return baseRegions + list(map(lambda s: 'DEMO_' + s, baseRegions)) + \
+        list(map(lambda s: 'TEST_' + s, baseRegions))
+
 
 def rulesets():
-    return ['US_47_CFR_PART_15_SUBPART_E', 'CA_RES_DBS-06', 'BRAZIL_RULESETID','UNITEDKINGDOM_RULESETID'] + list(map(lambda s: 'DEMO_'+ s, baseRegions)) + list(map(lambda s: 'TEST_'+ s, baseRegions))
+    return ['US_47_CFR_PART_15_SUBPART_E',
+            'CA_RES_DBS-06',
+            'BRAZIL_RULESETID',
+            'UNITEDKINGDOM_RULESETID'] + list(map(lambda s: 'DEMO_' + s,
+                                                  baseRegions)) + list(map(lambda s: 'TEST_' + s,
+                                                                           baseRegions))
 
 
 # after 1.4 use Ruleset ID
@@ -62,53 +70,60 @@ def regionStrToRulesetId(region_str):
         Eg. 'USA' => 'FCC'
     """
     map = {
-       'DEFAULT':'US_47_CFR_PART_15_SUBPART_E',
-       'US':'US_47_CFR_PART_15_SUBPART_E',
-       'CA':'CA_RES_DBS-06',
-       'BR':'BRAZIL_RULESETID',
-       'GB':'UNITEDKINGDOM_RULESETID'
+        'DEFAULT': 'US_47_CFR_PART_15_SUBPART_E',
+        'US': 'US_47_CFR_PART_15_SUBPART_E',
+        'CA': 'CA_RES_DBS-06',
+        'BR': 'BRAZIL_RULESETID',
+        'GB': 'UNITEDKINGDOM_RULESETID'
 
     }
     region_str = region_str.upper()
     try:
         # for test and demo
-        if region_str.startswith("DEMO_") or  region_str.startswith("TEST_"):
+        if region_str.startswith("DEMO_") or region_str.startswith("TEST_"):
             return region_str
- 
+
         return map[region_str]
-    except:
+    except BaseException:
         raise werkzeug.exceptions.NotFound('Invalid Region %s' % region_str)
+
 
 def rulesetIdToRegionStr(rulesetId):
     map = {
-        'US_47_CFR_PART_15_SUBPART_E':'US',
-        'CA_RES_DBS-06':'CA',
-        'BRAZIL_RULESETID':'BR',
-        'UNITEDKINGDOM_RULESETID':'GB'
+        'US_47_CFR_PART_15_SUBPART_E': 'US',
+        'CA_RES_DBS-06': 'CA',
+        'BRAZIL_RULESETID': 'BR',
+        'UNITEDKINGDOM_RULESETID': 'GB'
 
     }
     rulesetId = rulesetId.upper()
     try:
-        if rulesetId.startswith("DEMO_") or  rulesetId.startswith("TEST_"):
+        if rulesetId.startswith("DEMO_") or rulesetId.startswith("TEST_"):
             if rulesetId in rulesets():
                 return rulesetId
 
         return map[rulesetId]
-    except:
+    except BaseException:
         raise werkzeug.exceptions.NotFound('Invalid ruleset %s' % rulesetId)
 
 
-def build_task(dataif,
+def build_task(
+        dataif,
         request_type,
-        task_id, hash_val, config_path, history_dir,
-        runtime_opts=RNTM_OPT_DBG_GUI, rcache_queue=None, request_str=None,
+        task_id,
+        hash_val,
+        config_path,
+        history_dir,
+        runtime_opts=RNTM_OPT_DBG_GUI,
+        rcache_queue=None,
+        request_str=None,
         config_str=None):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
     """
 
     prot, host, port = dataif.getProtocol()
-    args=[
+    args = [
         prot,
         host,
         port,
@@ -125,6 +140,7 @@ def build_task(dataif,
     ]
     LOGGER.debug("build_task() {}".format(args))
     run.apply_async(args)
+
 
 class GuiConfig(MethodView):
     ''' Allow the web UI to obtain configuration, including resolved URLs.
@@ -156,21 +172,21 @@ class GuiConfig(MethodView):
         u = urlparse(flask.request.url)
 
         if 'USE_CAPTCHA' in flask.current_app.config and \
-            flask.current_app.config['USE_CAPTCHA']:
-            about_sitekey=flask.current_app.config['CAPTCHA_SITEKEY']
+                flask.current_app.config['USE_CAPTCHA']:
+            about_sitekey = flask.current_app.config['CAPTCHA_SITEKEY']
         else:
-            about_sitekey=None
+            about_sitekey = None
 
         if flask.current_app.config['OIDC_LOGIN']:
-            login_url=flask.url_for('auth.LoginAPI')
-            logout_url=flask.url_for('auth.LogoutAPI')
-            about_url=flask.url_for('ratapi-v1.About')
-            about_login_url=flask.url_for('auth.AboutLoginAPI')
+            login_url = flask.url_for('auth.LoginAPI')
+            logout_url = flask.url_for('auth.LogoutAPI')
+            about_url = flask.url_for('ratapi-v1.About')
+            about_login_url = flask.url_for('auth.AboutLoginAPI')
         else:
-            login_url=flask.url_for('user.login'),
-            logout_url=flask.url_for('user.logout'),
-            about_url=None
-            about_login_url=None
+            login_url = flask.url_for('user.login'),
+            logout_url = flask.url_for('user.logout'),
+            about_url = None
+            about_login_url = None
 
         # TODO: temporary support python2
         resp = flask.jsonify(
@@ -209,7 +225,7 @@ class HealthCheck(MethodView):
 
     def get(self):
         '''GET method for HealthCheck'''
-        cert_bdl_name='certificate/client.bundle.pem'
+        cert_bdl_name = 'certificate/client.bundle.pem'
         bundle_data = ''
         try:
             with DataIf().open(cert_bdl_name) as hfile:
@@ -220,7 +236,7 @@ class HealthCheck(MethodView):
                 for certs in db.session.query(MTLS).all():
                     LOGGER.info(f"{certs.id}")
                     bundle_data += certs.cert
-                db.session.commit() # pylint: disable=no-member
+                db.session.commit()  # pylint: disable=no-member
                 if len(bundle_data) == 0:
                     LOGGER.debug(f"No certificates stored.")
                     raise
@@ -230,11 +246,11 @@ class HealthCheck(MethodView):
                 # note relevant listen peers
                 cmd = 'cmd_restart'
                 publisher = MsgPublisher(
-                        flask.current_app.config['BROKER_URL'],
-                        flask.current_app.config['BROKER_EXCH_DISPAT'])
+                    flask.current_app.config['BROKER_URL'],
+                    flask.current_app.config['BROKER_EXCH_DISPAT'])
                 publisher.publish(cmd)
                 publisher.close()
-        except:
+        except BaseException:
             pass
 
         msg = 'The ' + flask.current_app.config['AFC_APP_TYPE'] + ' is healthy'
@@ -249,6 +265,7 @@ def check_rmq(cfg):
     if hconn.healthcheck():
         return 1
     return 0
+
 
 class ReadinessCheck(MethodView):
 
@@ -292,7 +309,7 @@ class ReloadAnalysis(MethodView):
         for x in files:
 
             dateMatch = re.search(
-                '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{6}', x)
+                '\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}.\\d{6}', x)
             if dateMatch:
                 date = datetime.datetime.strptime(
                     dateMatch.group(), '%Y-%m-%dT%H:%M:%S.%f')
@@ -304,16 +321,18 @@ class ReloadAnalysis(MethodView):
 
         LOGGER.debug(os.path.join(
             flask.current_app.config['HISTORY_DIR'], fileName))
-        if mode == 'wb' and user is not None and not \
-                os.path.exists(os.path.join(flask.current_app.config['HISTORY_DIR'], fileName)):
-            # create scoped user directory so people don't clash over each others config
+        if mode == 'wb' and user is not None and not os.path.exists(
+                os.path.join(flask.current_app.config['HISTORY_DIR'], fileName)):
+            # create scoped user directory so people don't clash over each
+            # others config
             os.mkdir(os.path.join(
                 flask.current_app.config['HISTORY_DIR'], fileName))
 
         config_path = ''
-        if user is not None and os.path.exists(os.path.join(flask.current_app.config['HISTORY_DIR'], fileName)):
+        if user is not None and os.path.exists(os.path.join(
+                flask.current_app.config['HISTORY_DIR'], fileName)):
             config_path = os.path.join(
-               flask.current_app.config['HISTORY_DIR'], fileName)
+                flask.current_app.config['HISTORY_DIR'], fileName)
         else:
             config_path = os.path.join(
                 flask.current_app.config['HISTORY_DIR'], fileName)
@@ -369,16 +388,17 @@ class ReloadAnalysis(MethodView):
         # has key deviceDesc and deviceDesc.serialNumber != "analysis-ap" => Virtual AP
         # has key spacing => HeatMap
         # has key FSID => ExclusionZone
-        if('deviceDesc' in json_resp and json_resp['deviceDesc']['serialNumber'] == "analysis-ap"):
+        if ('deviceDesc' in json_resp and json_resp['deviceDesc']
+                ['serialNumber'] == "analysis-ap"):
             resp.headers['AnalysisType'] = 'PointAnalysis'
 
-        elif('deviceDesc' in json_resp and json_resp['deviceDesc']['serialNumber'] != "analysis-ap"):
+        elif ('deviceDesc' in json_resp and json_resp['deviceDesc']['serialNumber'] != "analysis-ap"):
             resp.headers['AnalysisType'] = 'VirtualAP'
 
-        elif('key spacing' in json_resp):
+        elif ('key spacing' in json_resp):
             resp.headers['AnalysisType'] = 'HeatMap'
 
-        elif('FSID' in json_resp):
+        elif ('FSID' in json_resp):
             resp.headers['AnalysisType'] = 'ExclusionZone'
         else:
             resp.headers['AnalysisType'] = 'None'
@@ -404,14 +424,14 @@ class AfcConfigFile(MethodView):
         require_default_uls()
 
         resp = flask.make_response()
-        config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext == filename).first()
+        config = AFCConfig.query.filter(
+            AFCConfig.config['regionStr'].astext == filename).first()
         if config:
             resp.data = json.dumps(config.config)
             resp.content_type = 'application/json'
             return resp
         else:
             raise werkzeug.exceptions.NotFound()
-
 
     def put(self, filename):
         ''' PUT method for afc config
@@ -425,7 +445,6 @@ class AfcConfigFile(MethodView):
         if flask.request.content_type != 'application/json':
             raise werkzeug.exceptions.UnsupportedMediaType()
 
-
         bytes = flask.request.stream.read()
         rcrd = json.loads(bytes)
         filename = rcrd['regionStr'].upper()
@@ -436,18 +455,29 @@ class AfcConfigFile(MethodView):
         rcrd['regionStr'] = filename
         ordered_bytes = json.dumps(rcrd, sort_keys=True)
         try:
-            config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext == filename).first()
+            config = AFCConfig.query.filter(
+                AFCConfig.config['regionStr'].astext == filename).first()
             if not config:
                 config = AFCConfig(rcrd)
                 db.session.add(config)
-                als.als_json_log('afc_config', {'action':'create', 'user':current_user.username, 'region':filename, 'from':flask.request.remote_addr, 'content':ordered_bytes})
+                als.als_json_log('afc_config',
+                                 {'action': 'create',
+                                  'user': current_user.username,
+                                  'region': filename,
+                                  'from': flask.request.remote_addr,
+                                  'content': ordered_bytes})
             else:
                 config.config = rcrd
                 config.created = datetime.datetime.now()
-                als.als_json_log('afc_config', {'action':'update', 'user':current_user.username, 'region':filename, 'from':flask.request.remote_addr, 'content':ordered_bytes})
+                als.als_json_log('afc_config',
+                                 {'action': 'update',
+                                  'user': current_user.username,
+                                  'region': filename,
+                                  'from': flask.request.remote_addr,
+                                  'content': ordered_bytes})
             db.session.commit()
 
-        except:
+        except BaseException:
             raise werkzeug.exceptions.NotFound()
 
         return flask.make_response('AFC configuration file updated', 204)
@@ -494,7 +524,7 @@ class About(MethodView):
             approve_link = flask.current_app.config['REGISTRATION_APPROVE_LINK']
 
             if 'USE_CAPTCHA' in flask.current_app.config and \
-                flask.current_app.config['USE_CAPTCHA']:
+                    flask.current_app.config['USE_CAPTCHA']:
                 captcha_secret = flask.current_app.config['CAPTCHA_SECRET']
                 captcha_verify = flask.current_app.config['CAPTCHA_VERIFY']
             else:
@@ -513,15 +543,16 @@ class About(MethodView):
                               'response': token}
                 res = requests.post(captcha_verify, data=dictToSend)
 
-                LOGGER.debug("Got verify response " + str(res.json()["success"]))
+                LOGGER.debug("Got verify response " +
+                             str(res.json()["success"]))
 
                 if not res.json()["success"]:
-                     return flask.make_response("No valid captcha", 400)
+                    return flask.make_response("No valid captcha", 400)
 
-            recipients=[dest_email]
+            recipients = [dest_email]
             if dest_pdl_email:
                 recipients.append(dest_pdl_email)
- 
+
             mail = Mail(flask.current_app)
             msg = Message(f"AFC Access Request by {email}",
                           sender=src_email,
@@ -530,8 +561,9 @@ class About(MethodView):
             msg.body = f'''Name: {name}\nEmail: {email}\nOrg: {org}
 Approve request at: {approve_link}'''
             mail.send(msg)
-            return flask.make_response(f"Thank you {name}. An access request for {email} has been submitted", 204)
-        except:
+            return flask.make_response(
+                f"Thank you {name}. An access request for {email} has been submitted", 204)
+        except BaseException:
             raise werkzeug.exceptions.NotFound()
 
 
@@ -584,10 +616,12 @@ class LiDAR_Bounds(MethodView):
 
         try:
             resp = flask.make_response()
-            datapath = next(xdg.BaseDirectory.load_data_paths('fbrat', 'rat_transfer', 'proc_lidar_2019'))
+            datapath = next(xdg.BaseDirectory.load_data_paths(
+                'fbrat', 'rat_transfer', 'proc_lidar_2019'))
             full_path = os.path.join(datapath, 'LiDAR_Bounds.json.gz')
             if not os.path.exists(full_path):
-                raise werkzeug.exceptions.NotFound('LiDAR bounds file not found')
+                raise werkzeug.exceptions.NotFound(
+                    'LiDAR bounds file not found')
             with self._open(full_path, 'rb', user_id) as data_file:
                 resp.data = data_file.read()
             resp.content_type = 'application/json'
@@ -595,6 +629,7 @@ class LiDAR_Bounds(MethodView):
             return resp
         except StopIteration:
             raise werkzeug.exceptions.NotFound('Path not found to file')
+
 
 class RAS_Bounds(MethodView):
     ''' Allow the web UI to manipulate configuration directly.
@@ -628,10 +663,12 @@ class RAS_Bounds(MethodView):
 
         try:
             resp = flask.make_response()
-            datapath = next(xdg.BaseDirectory.load_data_paths('fbrat', 'rat_transfer', 'proc_lidar_2019'))
+            datapath = next(xdg.BaseDirectory.load_data_paths(
+                'fbrat', 'rat_transfer', 'proc_lidar_2019'))
             full_path = os.path.join(datapath, 'RAS_ExclusionZone.json')
             if not os.path.exists(full_path):
-                raise werkzeug.exceptions.NotFound('RAS exclusion zone file not found')
+                raise werkzeug.exceptions.NotFound(
+                    'RAS exclusion zone file not found')
             with self._open(full_path, 'rb', user_id) as data_file:
                 resp.data = data_file.read()
             resp.content_type = 'application/json'
@@ -663,7 +700,7 @@ class Phase1Analysis(MethodView):
         return open(abs_path, mode)
 
     def post(self, request_type):
-        ''' Run analysis 
+        ''' Run analysis
 
             :param request_type: 'PointAnalysis', 'ExclusionZoneAnalysis', or 'HeatmapAnalysis'
         '''
@@ -697,7 +734,9 @@ class Phase1Analysis(MethodView):
 
         if task.state == 'FAILURE':
             raise werkzeug.exceptions.InternalServerError(
-                'Task was unable to be started', dict(id=task.id, info=str(task.info)))
+                'Task was unable to be started', dict(
+                    id=task.id, info=str(
+                        task.info)))
 
         include_kml = request_type in [
             'ExclusionZoneAnalysis', 'PointAnalysis']
@@ -741,9 +780,12 @@ class AnalysisKmlResult(MethodView):
 
         if task.successful() and task.result['status'] == 'DONE':
             if not os.path.exists(task.result['result_path']):
-                return flask.make_response(flask.json.dumps(dict(message='Resource already deleted')), 410)
-            if 'kml_path' not in task.result or not os.path.exists(task.result['kml_path']):
-                return werkzeug.exceptions.NotFound('This task did not produce a KML')
+                return flask.make_response(flask.json.dumps(
+                    dict(message='Resource already deleted')), 410)
+            if 'kml_path' not in task.result or not os.path.exists(
+                    task.result['kml_path']):
+                return werkzeug.exceptions.NotFound(
+                    'This task did not produce a KML')
             resp = flask.make_response()
             LOGGER.debug("Reading kml file: %s", task.result['kml_path'])
             with self._open(task.result['kml_path'], 'rb') as resp_file:
@@ -752,6 +794,7 @@ class AnalysisKmlResult(MethodView):
             return resp
 
         raise werkzeug.exceptions.NotFound('KML not found')
+
 
 class AnalysisStatus(MethodView):
     ''' Check status of task '''
@@ -783,7 +826,8 @@ class AnalysisStatus(MethodView):
 
         if task.info and task.info.get('progress_file') is not None and \
                 not os.path.exists(os.path.dirname(task.info['progress_file'])):
-            return flask.make_response(flask.json.dumps(dict(percent=0, message="Try Again")), 503)
+            return flask.make_response(flask.json.dumps(
+                dict(percent=0, message="Try Again")), 503)
 
         if task.state == 'PROGRESS':
             auth(is_user=task.info['user_id'])
@@ -797,7 +841,8 @@ class AnalysisStatus(MethodView):
             with open(progress_file, 'r') as prog:
                 lines = prog.readlines()
                 if len(lines) <= 0:
-                    return flask.make_response(flask.json.dumps(dict(percent=0, message="Try Again")), 503)
+                    return flask.make_response(flask.json.dumps(
+                        dict(percent=0, message="Try Again")), 503)
                 LOGGER.debug(lines)
                 return flask.jsonify(
                     percent=float(lines[0]),
@@ -805,7 +850,8 @@ class AnalysisStatus(MethodView):
                 ), 202
 
         if not task.ready():
-            return flask.make_response(flask.json.dumps(dict(percent=0, message='Pending...')), 202)
+            return flask.make_response(flask.json.dumps(
+                dict(percent=0, message='Pending...')), 202)
 
         if task.failed():
             raise werkzeug.exceptions.InternalServerError(
@@ -814,7 +860,8 @@ class AnalysisStatus(MethodView):
         if task.successful() and task.result['status'] == 'DONE':
             auth(is_user=task.result['user_id'])
             if not os.path.exists(task.result['result_path']):
-                return flask.make_response(flask.json.dumps(dict(message='Resource already deleted')), 410)
+                return flask.make_response(flask.json.dumps(
+                    dict(message='Resource already deleted')), 410)
             # read temporary file generated by afc-engine
             resp = flask.make_response()
             LOGGER.debug("Reading result file: %s", task.result['result_path'])
@@ -827,12 +874,14 @@ class AnalysisStatus(MethodView):
         elif task.successful() and task.result['status'] == 'ERROR':
             auth(is_user=task.result['user_id'])
             if not os.path.exists(task.result['error_path']):
-                return flask.make_response(flask.json.dumps(dict(message='Resource already deleted')), 410)
+                return flask.make_response(flask.json.dumps(
+                    dict(message='Resource already deleted')), 410)
             # read temporary file generated by afc-engine
             LOGGER.debug("Reading error file: %s", task.result['error_path'])
             with self._open(task.result['error_path'], 'rb') as error_file:
                 raise AFCEngineException(
-                    description=error_file.read(), exit_code=task.result['exit_code'])
+                    description=error_file.read(),
+                    exit_code=task.result['exit_code'])
 
         else:
             raise werkzeug.exceptions.NotFound('Task not found')
@@ -846,31 +895,38 @@ class AnalysisStatus(MethodView):
             # task is still running, terminate it
             LOGGER.debug('Terminating %s', task_id)
             task.revoke(terminate=True)
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+            return flask.make_response(flask.json.dumps(
+                dict(message='Task deleted')), 200)
 
         if task.failed():
             task.forget()
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+            return flask.make_response(flask.json.dumps(
+                dict(message='Task deleted')), 200)
 
         if task.successful() and task.result['status'] == 'DONE':
             auth(is_user=task.result['user_id'])
             if not os.path.exists(task.info['result_path']):
-                return flask.make_response(flask.json.dumps(dict(message='Resource already deleted')), 410)
+                return flask.make_response(flask.json.dumps(
+                    dict(message='Resource already deleted')), 410)
             LOGGER.debug('Deleting %s', task.info.get('result_path'))
             os.remove(task.info['result_path'])
-            if 'kml_path' in task.info and os.path.exists(task.info['kml_path']):
+            if 'kml_path' in task.info and os.path.exists(
+                    task.info['kml_path']):
                 os.remove(task.info['kml_path'])
             task.forget()
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+            return flask.make_response(flask.json.dumps(
+                dict(message='Task deleted')), 200)
 
         elif task.successful() and task.result['status'] == 'ERROR':
             auth(is_user=task.result['user_id'])
             if not os.path.exists(task.info['error_path']):
-                return flask.make_response(flask.json.dumps(dict(message='Resource already deleted')), 410)
+                return flask.make_response(flask.json.dumps(
+                    dict(message='Resource already deleted')), 410)
             LOGGER.debug('Deleting %s', task.info.get('result_path'))
             os.remove(task.info['error_path'])
             task.forget()
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+            return flask.make_response(flask.json.dumps(
+                dict(message='Task deleted')), 200)
 
         else:
             raise werkzeug.exceptions.NotFound('Task not found')
@@ -889,7 +945,10 @@ class UlsDb(MethodView):
         from ..db.generators import create_uls_db
 
         uls_path = os.path.join(
-            flask.current_app.config['NFS_MOUNT_PATH'], 'rat_transfer', 'ULS_Database', uls_file)
+            flask.current_app.config['NFS_MOUNT_PATH'],
+            'rat_transfer',
+            'ULS_Database',
+            uls_file)
         if not os.path.exists(uls_path):
             raise werkzeug.exceptions.BadRequest(
                 "File does not exist: " + uls_file)
@@ -923,9 +982,11 @@ class UlsParse(MethodView):
         user_id = auth(roles=['Admin'])
 
         try:
-            datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/lastSuccessfulRun.txt'
+            datapath = flask.current_app.config["STATE_ROOT_PATH"] + \
+                '/daily_uls_parse/data_files/lastSuccessfulRun.txt'
             if not os.path.exists(datapath):
-                raise werkzeug.exceptions.NotFound('last succesful run file not found')
+                raise werkzeug.exceptions.NotFound(
+                    'last succesful run file not found')
             lastSuccess = ''
             with open(datapath, 'r') as data_file:
                 lastSuccess = data_file.read()
@@ -943,8 +1004,9 @@ class UlsParse(MethodView):
 
         LOGGER.debug('Kicking off daily uls parse')
         try:
-            task = parseULS.apply_async(args=[flask.current_app.config["STATE_ROOT_PATH"], True])
-            
+            task = parseULS.apply_async(
+                args=[flask.current_app.config["STATE_ROOT_PATH"], True])
+
             LOGGER.debug('uls parse started')
 
             if task.state == 'FAILURE':
@@ -953,7 +1015,7 @@ class UlsParse(MethodView):
 
             return flask.jsonify(
                 taskId=task.id,
-                
+
                 statusUrl=flask.url_for(
                     'ratapi-v1.DailyULSStatus', task_id=task.id),
             )
@@ -969,14 +1031,15 @@ class UlsParse(MethodView):
         args = json.loads(flask.request.data)
         LOGGER.debug('Recieved arg %s', args)
         hours = args["hours"]
-        mins =  args["mins"]
+        mins = args["mins"]
         if hours == 0:
             hours = "00"
         if mins == 0:
             mins = "00"
         timeStr = str(hours) + ":" + str(mins)
         LOGGER.debug('Updating automated ULS time to ' + timeStr + " UTC")
-        datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/nextRun.txt'
+        datapath = flask.current_app.config["STATE_ROOT_PATH"] + \
+            '/daily_uls_parse/data_files/nextRun.txt'
         if not os.path.exists(datapath):
             raise werkzeug.exceptions.NotFound('next run file not found')
         with open(datapath, 'w') as data_file:
@@ -997,7 +1060,8 @@ class DailyULSStatus(MethodView):
 
     def resetManualParseFile(self):
         ''' Overwrites the file for manual task id with a blank string '''
-        datapath = flask.current_app.config["STATE_ROOT_PATH"] + '/daily_uls_parse/data_files/currentManualId.txt'
+        datapath = flask.current_app.config["STATE_ROOT_PATH"] + \
+            '/daily_uls_parse/data_files/currentManualId.txt'
         with open(datapath, 'w') as data_file:
             data_file.write("")
 
@@ -1011,11 +1075,12 @@ class DailyULSStatus(MethodView):
             LOGGER.debug("Found Task in progress")
             # todo: add percent progress
             return flask.jsonify(
-                    percent="WIP",
+                percent="WIP",
             ), 202
         if not task.ready():
             LOGGER.debug("Found Task pending")
-            return flask.make_response(flask.json.dumps(dict(percent=0, message='Pending...')), 202)
+            return flask.make_response(flask.json.dumps(
+                dict(percent=0, message='Pending...')), 202)
         if task.state == 'REVOKED':
             LOGGER.debug("Found task already in progress")
             # LOGGER.debug("task info %s", task.info)
@@ -1031,9 +1096,9 @@ class DailyULSStatus(MethodView):
             self.resetManualParseFile()
             results = task.result
             return flask.jsonify(
-                    entriesUpdated=results[0],
-                    entriesAdded=results[1],
-                    finishTime=results[2]
+                entriesUpdated=results[0],
+                entriesAdded=results[1],
+                finishTime=results[2]
             ), 200
 
         else:
@@ -1048,20 +1113,24 @@ class DailyULSStatus(MethodView):
             # task is still running, terminate it
             LOGGER.debug('Terminating %s', task_id)
             task.revoke(terminate=True)
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+            return flask.make_response(flask.json.dumps(
+                dict(message='Task deleted')), 200)
         if task.failed():
             task.forget()
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+            return flask.make_response(flask.json.dumps(
+                dict(message='Task deleted')), 200)
 
         if task.successful() and task.result['status'] == 'DONE':
             auth(is_user=task.result['user_id'])
             task.forget()
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+            return flask.make_response(flask.json.dumps(
+                dict(message='Task deleted')), 200)
 
         elif task.successful() and task.result['status'] == 'ERROR':
             auth(is_user=task.result['user_id'])
             task.forget()
-            return flask.make_response(flask.json.dumps(dict(message='Task deleted')), 200)
+            return flask.make_response(flask.json.dumps(
+                dict(message='Task deleted')), 200)
 
         else:
             raise werkzeug.exceptions.NotFound('Task not found')
@@ -1076,16 +1145,16 @@ class BackendFiles():
         '''
         import requests
         headers = {
-              'accept': 'text/html,application/xhtml+xml,application/xml',
-              'Accept-Encoding': 'gzip, deflate',
-              'cache-control': 'max-age=0',
-              'content-type': 'application/x-www-form-urlencoded',
-              'user-agent': 'rat_server/1.0'
-            }
+            'accept': 'text/html,application/xhtml+xml,application/xml',
+            'Accept-Encoding': 'gzip, deflate',
+            'cache-control': 'max-age=0',
+            'content-type': 'application/x-www-form-urlencoded',
+            'user-agent': 'rat_server/1.0'
+        }
         resp = requests.get(url, headers)
         response = flask.make_response()
         response.content_type = 'text/html'
-        response.data= resp.content
+        response.data = resp.content
         return response
 
 
@@ -1141,14 +1210,23 @@ class History(MethodView):
             if path is not None:
                 path_len = len(path)
                 rurl = flask.request.base_url[:-path_len]
-            response = requests.get(conf.AFC_OBJST_SCHEME + "://" + conf.AFC_OBJST_HOST + ":" +
-                                    conf.AFC_OBJST_HIST_PORT +
-                                    (("/" + path) if path is not None else ""),
-                                    headers={'X-Forwarded-Proto': fwd_proto},
-                                    params = {"url": rurl}, stream=True)
+            response = requests.get(
+                conf.AFC_OBJST_SCHEME +
+                "://" +
+                conf.AFC_OBJST_HOST +
+                ":" +
+                conf.AFC_OBJST_HIST_PORT +
+                (
+                    ("/" +
+                     path) if path is not None else ""),
+                headers={
+                    'X-Forwarded-Proto': fwd_proto},
+                params={
+                    "url": rurl},
+                stream=True)
             if response.headers['Content-Type'].startswith("application/octet-stream") \
-                and "Content-Encoding" not in response.headers:
-                # results.kmz case. Apache can't decompress it. 
+                    and "Content-Encoding" not in response.headers:
+                # results.kmz case. Apache can't decompress it.
                 resp = flask.make_response()
                 resp.data = response.raw.read()
                 return resp
@@ -1165,34 +1243,37 @@ class History0(History):
 
 class GetRuleset(MethodView):
     """ Get all active rulesets """
+
     def get(self):
         try:
             configs = AFCConfig.query.all()
             regionStrs = set()
             for config in configs:
-                regionStrs.add(regionStrToRulesetId(config.config['regionStr']))
-        except:
+                regionStrs.add(regionStrToRulesetId(
+                    config.config['regionStr']))
+        except BaseException:
             return flask.make_response('DB error', 404)
         resp = flask.make_response()
-        resp.data = "{ \n\t\"rulesetId\": [" + ", ".join('"{0}"'.format(x) for x in regionStrs) + \
-        "]\n}\n"
+        resp.data = "{ \n\t\"rulesetId\": [" + ", ".join(
+            '"{0}"'.format(x) for x in regionStrs) + "]\n}\n"
         resp.content_type = 'application/json'
         return resp
 
 
 class GetAfcConfigByRuleset(MethodView):
     """ Get afc_config by rulesets """
+
     def get(self, ruleset):
-        regionStr = rulesetIdToRegionStr(ruleset) # returns 404 if not found
+        regionStr = rulesetIdToRegionStr(ruleset)  # returns 404 if not found
         try:
-            config = AFCConfig.query.filter(AFCConfig.config['regionStr'].astext \
-             == regionStr).first()
-        except:
+            config = AFCConfig.query.filter(
+                AFCConfig.config['regionStr'].astext == regionStr).first()
+        except BaseException:
             return flask.make_response('DB error', 404)
         if config is None:
             return flask.make_response("Ruleset unactive", 404)
         resp = flask.make_response()
-        resp.data = json.dumps(config.config, sort_keys=True, indent = 4) + "\n"
+        resp.data = json.dumps(config.config, sort_keys=True, indent=4) + "\n"
         resp.content_type = 'application/json'
         return resp
 
@@ -1202,7 +1283,7 @@ module.add_url_rule('/afcconfig/<path:filename>',
                     view_func=AfcConfigFile.as_view('AfcConfigFile'))
 module.add_url_rule('/files/lidar_bounds',
                     view_func=LiDAR_Bounds.as_view('LiDAR_Bounds'))
-module.add_url_rule('/files/ras_bounds', 
+module.add_url_rule('/files/ras_bounds',
                     view_func=RAS_Bounds.as_view('RAS_Bounds'))
 module.add_url_rule('/analysis/p1/<request_type>',
                     view_func=Phase1Analysis.as_view('Phase1Analysis'))
@@ -1234,7 +1315,8 @@ module.add_url_rule('/antennaFiles/',
                     view_func=AntennaFiles.as_view('AntennaFiles'))
 module.add_url_rule('/GetRulesetIDs',
                     view_func=GetRuleset.as_view('GetRuleset'))
-module.add_url_rule('/GetAfcConfigByRulesetID/<ruleset>',
-                    view_func=GetAfcConfigByRuleset.as_view('GetAfcConfigByRuleset'))
+module.add_url_rule(
+    '/GetAfcConfigByRulesetID/<ruleset>',
+    view_func=GetAfcConfigByRuleset.as_view('GetAfcConfigByRuleset'))
 module.add_url_rule('/about_csrf',
                     view_func=AboutCSRF.as_view('AboutCSRF'))
