@@ -50,7 +50,7 @@ merge_upstream_changes:
       when: always
   script:
     - git config --global user.email "gitlab-runner@broadcom.com"
-    - git remote add upstream git@github.com:Telecominfraproject/open-afc.git  || true   # Prevents errors if the remote already exists
+    - git remote add upstream $CI_GITHUB_UPSTREAM  || true   # Prevents errors if the remote already exists
     - git fetch upstream
     - UPSTREAM_CHANGES=$(git log HEAD..upstream/main --oneline)
     - |
