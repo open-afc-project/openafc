@@ -1,3 +1,4 @@
+Welcome to the OpenAFC project. This open-source project is sponsored by Broadcom, CableLabs, Cisco, Wi-Fi Alliance (WFA) and Wireless Broadband Alliance (WBA). You can get involved by following the link below on how to contribute.
 This work is licensed under the OpenAFC Project License, a copy of which is included in the LICENSE.txt file with this software program.
 
 <br />
