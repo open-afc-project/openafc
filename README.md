@@ -61,7 +61,7 @@ OpenAFC software can also be deployed for production using the Kubernetes framew
 
 The sample docker-compose.yaml assumes that the required databases (e.g. terrain, landcover, winnforum databases, etc.) have been obtained and placed in an accessible folder according to the information in [database_readme.md](https://github.com/Telecominfraproject/open-afc/blob/main/database_readme.md
 ) on Github.
-	
+
 Many of the components have additional README files inside folders that describe the additional configuration for each component.  Default values are provided either inside the component or in the sample files that will work to stand up the system.
 
 Note that this sample does not provide working SSL certificates for authentication to the server.
@@ -186,7 +186,7 @@ In order to run the system, you will need to construct a data volume and make it
 There is a script that builds all container used by the AFC service.
 This script is used by automatic test infrastructure. Please check [tests/regression](/tests/regression/) dir.
 
-This script uses two environment variables PRIV_REPO and PUB_REPO to determine what repository to push images to. These values default to those used by the regression test infrastructure, but you should define them to refer to your repository. Note that the script 
+This script uses two environment variables PRIV_REPO and PUB_REPO to determine what repository to push images to. These values default to those used by the regression test infrastructure, but you should define them to refer to your repository. Note that the script
 
 ### Using scripts from the code base
 
@@ -276,7 +276,7 @@ inside the container's shell, execute:
 ```
 mkdir -p -m 777 /wd/afc/build && BUILDREV=offlinebuild && cd /wd/afc/build && cmake -DCMAKE_INSTALL_PREFIX=/wd/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /wd/afc && ninja -j$(nproc) install
 ```
-Now the afc-engine is ready: 
+Now the afc-engine is ready:
 ```
 [@wcc-afc-01 work/dimar/open-afc] > ls -l build/src/afc-engine/afc-engine
 -rwxr-xr-x. 1 dr942120 dr942120 4073528 Mar  8 04:03 build/src/afc-engine/afc-engine
@@ -291,7 +291,7 @@ inside the worker container execute the afc-engine app
 ```
 
 ## Prereqs
-OpenAFC containers needs several mappings to work properly.  Assuming that you are using /var/databases on your host to store the databases, you can select either option 1 here (which is assumed in the docker compose shown below) or set mappings individually as shown in 2-6.   
+OpenAFC containers needs several mappings to work properly.  Assuming that you are using /var/databases on your host to store the databases, you can select either option 1 here (which is assumed in the docker compose shown below) or set mappings individually as shown in 2-6.
 
 1) All databases in one folder - map to /mnt/nfs/rat_transfer
       ```
@@ -613,7 +613,7 @@ secrets:
 
 
 ```
-`.env` file used with the docker-compose.yaml. please read comments in the file and update it accordingly 
+`.env` file used with the docker-compose.yaml. please read comments in the file and update it accordingly
 ```
 # --------------------------------------------------- #
 # docker-compose.yaml variables                       #
