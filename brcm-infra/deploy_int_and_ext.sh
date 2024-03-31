@@ -44,7 +44,7 @@ helm repo add external-secrets https://charts.external-secrets.io
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 
 helm repo update
-helm install external-secrets \
+helm upgrade --install external-secrets \
    external-secrets/external-secrets \
     -n external-secrets \
     --create-namespace \
@@ -52,9 +52,9 @@ helm install external-secrets \
 
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=external-secrets-webhook -n external-secrets
 
-helm install keda kedacore/keda --namespace keda --create-namespace
+helm upgrade --install keda kedacore/keda --namespace keda --create-namespace
 
-helm install ingress-nginx ingress-nginx \
+helm upgrade --install ingress-nginx ingress-nginx \
     --repo https://kubernetes.github.io/ingress-nginx \
     --namespace ingress-nginx \
     --create-namespace \
@@ -62,7 +62,10 @@ helm install ingress-nginx ingress-nginx \
     --set contorller.service.internal.enabled="true" \
     --set controller.service.internal.annotations."cloud\.google\.com/load-balancer-type"="Internal" \
     --set controller.service.annotations."networking\.gke\.io/load-balancer-type"="Internal" \
-    --set controller.service.loadBalancerIP=$INT_INGRESS_IP
+    --set controller.service.loadBalancerIP=$INT_INGRESS_IP \
+    --set controller.metrics.enabled=true \
+    --set-string controller.podAnnotations."prometheus\.io/scrape"="true" \
+    --set-string controller.podAnnotations."prometheus\.io/port"="10254"
 
 kubectl wait --namespace ingress-nginx \
   --for=condition=ready pod \
@@ -75,11 +78,12 @@ kubectl rollout status deployment/keda-operator-metrics-apiserver --namespace ke
 
 kubectl create namespace prometheus
 kubectl create namespace monitoring
-helm install prometheus prometheus-community/prometheus --namespace prometheus
+helm upgrade --install prometheus prometheus-community/prometheus --namespace prometheus
 
 kubectl delete -A ValidatingWebhookConfiguration ingress-nginx-admission
+kubectl delete -n prometheus configmap prometheus-server
 
-if ! helm install test-internal afc-int/ -f afc-int/values-$arg.yaml; then
+if ! helm upgrade --install test-internal afc-int/ -f afc-int/values-$arg.yaml; then
     echo "Helm install failed, exiting script."
     exit 1
 fi
@@ -108,7 +112,7 @@ kubectl get all
 
 helm repo add external-secrets https://charts.external-secrets.io
 helm repo update
-helm install external-secrets \
+helm upgrade --install external-secrets \
    external-secrets/external-secrets \
     -n external-secrets \
     --create-namespace \
@@ -116,4 +120,4 @@ helm install external-secrets \
 
 kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=external-secrets-webhook -n external-secrets --timeout=90s
 
-helm install test-external afc-ext/ -f afc-ext/values.yaml
+helm upgrade --install test-external afc-ext/ -f afc-ext/values.yaml

@@ -20,8 +20,8 @@ data:
   prometheus.yml: |-
     global:
       evaluation_interval: 1m
-      scrape_interval: 1m
-      scrape_timeout: 10s
+      scrape_interval: 15s
+      scrape_timeout: 5s
     rule_files:
     - /etc/config/recording_rules.yml
     - /etc/config/alerting_rules.yml
@@ -122,3 +122,29 @@ data:
             action: labeldrop
           - regex: container_label_.*
             action: labeldrop
+
+      - job_name: 'ingress-nginx'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: ['ingress-nginx']
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_annotation_prometheus_io_scrape]
+            action: keep
+            regex: true
+          - source_labels: [__meta_kubernetes_pod_container_port_number]
+            action: keep
+            regex: "10254"  # Verify and use the actual metrics port of your ingress-nginx
+          - action: replace
+            source_labels: [__address__]
+            target_label: __address__
+            regex: (.+):(?:\d+)
+            replacement: $1:10254  # Ensure this is the correct port for ingress-nginx metrics
+          - action: replace
+            source_labels: [__meta_kubernetes_namespace]
+            target_label: namespace
+          - action: replace
+            source_labels: [__meta_kubernetes_pod_name]
+            target_label: pod
+        metrics_path: /metrics
+          
