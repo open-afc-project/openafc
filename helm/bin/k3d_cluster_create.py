@@ -1,0 +1,288 @@
+#!/usr/bin/env python3
+""" Wrapper around 'k3d cluster create' that calls it with proper parameters
+"""
+#
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# pylint: disable=invalid-name, too-many-locals, too-many-branches
+# pylint: disable=too-many-statements
+
+import argparse
+import os
+import re
+import sys
+import tempfile
+from typing import cast, Dict, List, NamedTuple, Optional, Set
+
+from k3d_lib import auto_name, AUTO_NAME, error, error_if, execute, \
+    get_known_nodeports, INT_HELM_REL_DIR, K3D_PREFIX, parse_json_output, \
+    parse_k3d_reg, warning_if
+
+RAT_TRANSFER_LOCATIONS = ["/opt/afc/databases/rat_transfer"]
+RAT_TRANSFER_FILES = ["ULS_Database", "RAS_Database"]
+
+EPILOG = """\
+This script concocts 'k3d cluster create' command line according to given
+parameters, creates namespace if necessary, creates kubeconfig context (of
+given k3d cluster and namespace) and switches to this config.
+In examples below cluster name may be any. Special name 'AUTO' generates
+cluster name from login name and checkout directory
+- Simplest form - create cluster with HTTP and HTTPS ports exposed:
+    $ helm/bin/k3d_cluster_create.py AUTO
+  name also may be specified explicitly:
+    $ helm/bin/k3d_cluster_create.py mycluster
+- Expose http, https, ratdb ports:
+    $ helm/bin/k3d_cluster_create.py --expose http,https,ratdb AUTO
+- Explicitly specify HTTP port:
+    $ helm/bin/k3d_cluster_create.py --expose http:8800 AUTO
+- Use namespace different from cluster name:
+    $ helm/bin/k3d_cluster_create.py --namespace mynamespace AUTO
+- Explicitly specify kubeconfig (e.g. when running from under 'kubie ctx'):
+    $ helm/bin/k3d_cluster_create.py --kubeconfig ~/.kube/config AUTO
+- Explicitly specify location static files (terrain databases, etc.):
+    $ helm/bin/k3d_cluster_create.py --static /somewhere/rat_transfer AUTO
+- Explicitly specify k3d registry (if more than one running):
+    $ helm/bin/k3d_cluster_create.py --k3d_reg k3d-myreg.localhost:43649 AUTO
+  or:
+    $ helm/bin/k3d_cluster_create.py --k3d_reg :43649 AUTO
+  or:
+    $ helm/bin/k3d_cluster_create.py --k3d_reg myreg.localhost AUTO
+
+Other k3d cluster operations do not need additional support, hence may be
+performed directly:
+- List k3d clusters:
+    $ k3d cluster list
+- Detailed information about k3d clusters:
+    $ k3d cluster list -o yaml
+- Delete cluster:
+    $ helm/bin/k3d_cluster_create.py --delete AUTO
+- Stop cluster:
+    $ k3d cluster stop clustername
+- (Re)start cluster:
+    $ k3d cluster start clustername
+"""
+
+
+def main(argv: List[str]) -> None:
+    """Do the job.
+
+    Arguments:
+    argv -- Program arguments
+    """
+    known_nodeports = get_known_nodeports(INT_HELM_REL_DIR)
+    argument_parser = \
+        argparse.ArgumentParser(
+            description="Wrapper around 'k3d cluster create'",
+            formatter_class=argparse.RawDescriptionHelpFormatter,
+            epilog=EPILOG)
+    argument_parser.add_argument(
+        "--kubeconfig", metavar="KUBECONFIG_FILE",
+        help="Kubeconfig file to use. By default current one is used, but if "
+        "some context switching shell is in use (e.g. started by "
+        "'kubie ctx'), current kubeconfig file is temporary, so the 'real' "
+        "one should be specified explicitly")
+    argument_parser.add_argument(
+        "--namespace", metavar="NAMESPACE",
+        help="Namespace to create. By default create namespace with same name "
+        "as cluster (without 'k3d-' prefix)")
+    argument_parser.add_argument(
+        "--static", metavar="STATIC_FILE_DIR",
+        help="Static file directory (usually /.../rat_transfer). By default "
+        "script trying to locate it by itself")
+    argument_parser.add_argument(
+        "--k3d_reg", metavar="K3D_REGISTRY",
+        help="K3d image registry to use. By default first (and only!) "
+        "currently running k3d registry is used")
+    argument_parser.add_argument(
+        "--expose",
+        metavar="NODEPORT1[:HOST_PORT1][,NODEPORT2[:HOST_PORT2]]...",
+        action="append",
+        help=f"Cluster nodeports to expose to host. NODEPORTn is either "
+        f"nodeport value (integer), or key of values.yaml's "
+        f"components.*.ports (descriptor should hav eunique name and nodePort "
+        f"subkey). Known nodeport names: "
+        f"{', '.join(sorted(known_nodeports.keys()))}). For this to work "
+        f"ports should also be exposed during helm installation (--expose "
+        f"switch of helm_install.py). HOST_PPORTn are unused host ports (if "
+        f"unspecified - some unused ports are chosen). If this parameter is "
+        f"unspecified, dispatcher's 'http' and 'https' ports are  exposed and "
+        f"mapped to some unused host ports. This parameter may be specified "
+        f"more than once")
+    argument_parser.add_argument(
+        "--delete", action="store_true",
+        help="Delete cluster if it is running. Not very logical, but makes "
+        "things simple")
+    argument_parser.add_argument(
+        "CLUSTER",
+        help="Cluster name (RFC1123: [a-z0-9-]+). Note that k3d will actually "
+        "create cluster with 'k3d-' prefix, but in k3d commands cluster name "
+        "should be specified without prefix. Use 'AUTO' to generate name from "
+        "source checkout directory and username")
+
+    if not argv:
+        argument_parser.print_help()
+        sys.exit(1)
+
+    args = argument_parser.parse_args(argv)
+
+    # Computing cluster name
+    cluster = args.CLUSTER
+    if cluster.startswith(K3D_PREFIX):
+        cluster = cluster[len(K3D_PREFIX):]
+    if cluster == AUTO_NAME:
+        cluster = auto_name(kabob=True)
+
+    # If cluster already running - let's delete it first
+    for attempt in range(10):
+        for cluster_info in \
+                parse_json_output(["k3d", "cluster", "list", "-o", "json"]):
+            if cluster_info["name"] == cluster:
+                break
+        else:
+            break
+        print(f"Cluster '{cluster}' currently running. Attempt to delete "
+              f"#{attempt + 1}")
+        execute(["k3d", "cluster", "delete", cluster])
+    else:
+        error(f"Cluster `{cluster}' still runs despite numerous attempts to "
+              f"delete it")
+    if args.delete:
+        return
+
+    # Inspecting kubeconfig
+    env_kubeconfig = os.environ.get("KUBECONFIG")
+    error_if((not args.kubeconfig) and env_kubeconfig and
+             (not os.path.relpath(env_kubeconfig,
+                                  tempfile.gettempdir()).startswith("..")),
+             "Kubeconfig file should be specified explicitly, because current "
+             "one seems to be temporary")
+
+    namespace = args.namespace or cluster
+
+    # Looking for static directory
+    static_dir = args.static
+    warning_if(static_dir and
+               (not all(os.path.exists(os.path.join(static_dir, f))
+                        for f in RAT_TRANSFER_FILES)),
+               f"Looks like static file directory '{static_dir}' does not "
+               f"contain expected files/directories. Please double check. "
+               "Continuing though...")
+    if not static_dir:
+        for rtl in RAT_TRANSFER_LOCATIONS:
+            if all(os.path.exists(os.path.join(rtl, f))
+                   for f in RAT_TRANSFER_FILES):
+                static_dir = rtl
+                break
+        else:
+            error("Static file directory (usually something like "
+                  "/.../rat_transfer) not found in expected places. It should "
+                  "be specified explicitly with --static parameter")
+
+    # Looking for registry
+    registry = parse_k3d_reg(args.k3d_reg)
+
+    # Computing port mappings
+    conns = cast(str, execute(["netstat", "-latn"], return_output=True))
+    used_ports: Set[int] = set()
+    for line in conns.splitlines():
+        m = re.match(r"^\s*\S+\s+\S+\s+\S+\s+\S+:(\d+)\s+", line)
+        if m:
+            used_ports.add(int(m.group(1)))
+
+    def get_unused_port() -> int:
+        for ret in range(30000, 65536):
+            if ret not in used_ports:
+                used_ports.add(ret)
+                return ret
+        error("All ports allocated?!?!")
+        return 0  # Unreachable code
+
+    MappingInfo = \
+        NamedTuple(
+            "MappingInfo",
+            [("component", Optional[str]), ("port_name", Optional[str]),
+             ("nodeport", int)])
+    port_mappings: Dict[int, MappingInfo] = {}
+    for mapping_strings in (args.expose or ["http,https"]):
+        for mapping_str in mapping_strings.split(","):
+            component: Optional[str] = None
+            port_name: Optional[str] = None
+            m = re.match(r"^([^:]+)(:(\d+))?$", mapping_str)
+            error_if(m is None,
+                     f"Nodeport descriptor '{mapping_str}' has invalid format")
+            assert m is not None
+            if re.match(r"^\d+$", m.group(1)):
+                nodeport = int(m.group(1))
+            else:
+                port_name = m.group(1)
+                error_if(port_name not in known_nodeports,
+                         f"Nodeport name '{port_name}' is not known. Please "
+                         f"specify it numerically")
+                nodeport = known_nodeports[port_name].port
+                component = known_nodeports[port_name].component
+            if m.group(3):
+                hostport = int(m.group(3))
+                error_if(hostport in port_mappings,
+                         f"Port '{hostport}' mapped more than once")
+                warning_if(hostport in used_ports,
+                           f"Looks like host port '{hostport}' is in use")
+                used_ports.add(hostport)
+            else:
+                hostport = get_unused_port()
+            port_mappings[hostport] = \
+                MappingInfo(component=component, port_name=port_name,
+                            nodeport=nodeport)
+
+    # If cluster already running - let's delete it first
+    for attempt in range(10):
+        for cluster_info in \
+                parse_json_output(["k3d", "cluster", "list", "-o", "json"]):
+            if cluster_info["name"] == cluster:
+                break
+        else:
+            break
+        print(f"Cluster '{cluster}' currently running. Attempt to delete "
+              f"#{attempt + 1}")
+        execute(["k3d", "cluster", "delete", cluster])
+    else:
+        error(f"Cluster `{cluster}' still runs despite numerous attempts to "
+              f"delete it")
+
+    # Now do the deed
+    execute(
+        ["k3d", "cluster", "create", cluster, "--agents", "2",
+         "-v", f"{static_dir}:/opt/afc/databases/rat_transfer",
+         "-v", "/home:/hosthome", "--registry-use", registry,
+         "--kubeconfig-switch-context", "--kubeconfig-update-default"] +
+        (["--config", os.path.expanduser(os.path.expandvars(args.kubeconfig))]
+         if args.kubeconfig else []) +
+        sum((["--port", f"{host_port}:{mapping_info.nodeport}@agent:0"]
+             for host_port, mapping_info in port_mappings.items()), []))
+    if namespace not in \
+            (cast(str,
+                  execute(["kubectl", "get", "namespaces", "--no-headers",
+                           "-o", 'custom-columns=":metadata.name"'],
+                          return_output=True)).splitlines()):
+        execute(["kubectl", "create", "namespace", namespace])
+    execute(
+        ["kubectl", "config", "set", f"contexts.k3d-{cluster}.namespace",
+         namespace])
+    print(f"Cluster '{cluster}' (aka '{K3D_PREFIX}{cluster}') created\n"
+          f"in context '{K3D_PREFIX}{cluster}' that made current in "
+          f"kubeconfig\n"
+          f"`{args.kubeconfig or env_kubeconfig or '~/.kube/config'} with "
+          f"namespace of '{namespace}'.\n"
+          f"Host port mappings:")
+    for host_port, mapping_info in port_mappings.items():
+        info_str = \
+            f" ({mapping_info.port_name} of {mapping_info.component})" \
+            if mapping_info.port_name and mapping_info.component else ""
+        print(f"  {host_port} -> {mapping_info.nodeport}{info_str}")
+
+
+if __name__ == "__main__":
+    main(sys.argv[1:])
