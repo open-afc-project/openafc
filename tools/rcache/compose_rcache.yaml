@@ -13,5 +13,5 @@ services:
     image: rcache_tool:${TAG:-latest}
     environment:
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
-      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_PORT}
+      - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
     dns_search: [.]
