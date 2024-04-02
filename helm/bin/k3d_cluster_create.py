@@ -39,7 +39,7 @@ cluster name from login name and checkout directory
     $ helm/bin/k3d_cluster_create.py --expose http,https,ratdb AUTO
 - Explicitly specify HTTP port:
     $ helm/bin/k3d_cluster_create.py --expose http:8800 AUTO
-- Use namespace different from cluster name:
+- Use namespace different from default:
     $ helm/bin/k3d_cluster_create.py --namespace mynamespace AUTO
 - Explicitly specify kubeconfig (e.g. when running from under 'kubie ctx'):
     $ helm/bin/k3d_cluster_create.py --kubeconfig ~/.kube/config AUTO
@@ -87,8 +87,7 @@ def main(argv: List[str]) -> None:
         "one should be specified explicitly")
     argument_parser.add_argument(
         "--namespace", metavar="NAMESPACE",
-        help="Namespace to create. By default create namespace with same name "
-        "as cluster (without 'k3d-' prefix)")
+        help="Namespace to create. Default namespace is used by default")
     argument_parser.add_argument(
         "--static", metavar="STATIC_FILE_DIR",
         help="Static file directory (usually /.../rat_transfer). By default "
@@ -137,6 +136,7 @@ def main(argv: List[str]) -> None:
         cluster = auto_name(kabob=True)
 
     # If cluster already running - let's delete it first
+    cluster_existed = False
     for attempt in range(10):
         for cluster_info in \
                 parse_json_output(["k3d", "cluster", "list", "-o", "json"]):
@@ -144,13 +144,16 @@ def main(argv: List[str]) -> None:
                 break
         else:
             break
-        print(f"Cluster '{cluster}' currently running. Attempt to delete "
-              f"#{attempt + 1}")
+        cluster_existed = True
+        running_clause = "" if args.delete \
+            else f"Cluster '{cluster}' currently running. "
+        print(f"{running_clause}Attempt to delete #{attempt + 1}")
         execute(["k3d", "cluster", "delete", cluster])
     else:
         error(f"Cluster `{cluster}' still runs despite numerous attempts to "
               f"delete it")
     if args.delete:
+        error_if(not cluster_existed, f"Cluster '{cluster}' not found")
         return
 
     # Inspecting kubeconfig
@@ -160,8 +163,6 @@ def main(argv: List[str]) -> None:
                                   tempfile.gettempdir()).startswith("..")),
              "Kubeconfig file should be specified explicitly, because current "
              "one seems to be temporary")
-
-    namespace = args.namespace or cluster
 
     # Looking for static directory
     static_dir = args.static
@@ -262,20 +263,22 @@ def main(argv: List[str]) -> None:
          if args.kubeconfig else []) +
         sum((["--port", f"{host_port}:{mapping_info.nodeport}@agent:0"]
              for host_port, mapping_info in port_mappings.items()), []))
-    if namespace not in \
-            (cast(str,
-                  execute(["kubectl", "get", "namespaces", "--no-headers",
-                           "-o", 'custom-columns=":metadata.name"'],
-                          return_output=True)).splitlines()):
-        execute(["kubectl", "create", "namespace", namespace])
-    execute(
-        ["kubectl", "config", "set", f"contexts.k3d-{cluster}.namespace",
-         namespace])
-    print(f"Cluster '{cluster}' (aka '{K3D_PREFIX}{cluster}') created\n"
+    if args.namespace:
+        if all(ns.get("metadata", {}).get("name") != args.namespace
+               for ns in
+               parse_json_output(["kubectl", "get", "namespaces",
+                                  "-o", "json"]).get("items", [])):
+            execute(["kubectl", "create", "namespace", args.namespace])
+        execute(
+            ["kubectl", "config", "set", f"contexts.k3d-{cluster}.namespace",
+             args.namespace])
+    namespace_clause = f"namespace of '{args.namespace}'" if args.namespace \
+        else "default namespace"
+    print(f"Cluster '{cluster}' (aka '{K3D_PREFIX}{cluster}') created "
           f"in context '{K3D_PREFIX}{cluster}' that made current in "
-          f"kubeconfig\n"
-          f"`{args.kubeconfig or env_kubeconfig or '~/.kube/config'} with "
-          f"namespace of '{namespace}'.\n"
+          f"kubeconfig "
+          f"`{args.kubeconfig or env_kubeconfig or '~/.kube/config'}' with "
+          f"{namespace_clause}.\n"
           f"Host port mappings:")
     for host_port, mapping_info in port_mappings.items():
         info_str = \

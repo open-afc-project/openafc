@@ -112,15 +112,19 @@ Some generated Kubernetes objects in AFC cluster (most importantly - pods, but a
 
 ## Kubeconfigs, namespaces, clusters <a name="configs-namespaces-clusters"/>
 
-Name of almost any Kubernetes Object (**Kubernetes Object** is something that has manifest - pod, service, deployment, etc.) exists in some **namespace**. Exceptions are global objects (nodes, etc.) that are mostly beyond the scope of this document.
+Something that 'runs on Kubernetes' - runs in some **Kubernetes cluster**. Kubernetes cluster is an **API server** (entity accepting **Kubernetes manifests**, storing them and  and notifying subscribers on new/changed Kubernetes manifests), surrounded by surrounded by retinue of **Kubernetes Controllers** (entities subscribed to changes in manifests and doing the real job - well, mostly making changes in those manifests to elicit attention of other controllers).
 
-Something that 'runs on Kubernetes' - runs in some **Kubernetes cluster**, managed by **Kubernetes API Server** (surrounded by retinue of **Kubernetes Controllers**).
+Every **Kubernetes Object** (entity that has Kubernetes manifest - pod, service, deployment, etc.) has name. This name either cluster-global or defined in certain namespace. Cluster-global names (including, but not limited to, namespace names) are defined within a cluster, i.e. ther eis no clash if different clusters use the same name.
 
-This bundle (Namespace, API server, Cluster and some other minor stuff) is named **Kubernetes Context**. Kubernetes Contexts are stored in **Kubeconfig files** - each Kubeconfig may contain several contexts, one of contexts is current.
+Default namespace is named `default`.
+
+Cluster (defined by name and API Server address), current namespace and some other attributes comprise a **Kubernetes context**. The purpose of contetx is, as always, switching - switching between Kubernetes contexts allows one to switch between several clusters or between different namespaces in one cluster.
+
+Kubernetes Contexts are stored in **Kubeconfig files** - each Kubeconfig may contain several contexts, one of contexts is current.
 
 **Current Kubeconfig** (containing set of contexts, one of which is current :D ) is pointed to by **`KUBECONFIG`** environment variable. If this variable not defined - **default Kubeconfig** `~/.kube/config` is used.
 
-Of course, for unsophisticated operation it is enough to always use default (and only) context in default kubeconfig. Still cluster name (if multicluster operation is supported) and namespace better be once set to something user-specific, to avoid clashes with other users.
+Of course, for unsophisticated operation it is enough to always use default (and only) context in default kubeconfig.
 
 Some useful commands:
 
@@ -160,7 +164,7 @@ In <https://home.robusta.dev/blog/switching-kubernets-context> one can find a re
 
 **k3d** is a stripped-down **k3s** which is, in turn, stripped-down Kubernetes. They share underlying code (albeit each step involved removal of some code) and are all community-supported. Heritage is important, as some information on `k3d` may be found only in `k3s` form.
 
-k3d is a single executable. It supports multicluster/multinode/docker-only operation. It is significantly more complicated than Minikube and significantly less documented than Kubernetes. Still it runs even on `CentOS 7` - and this is good.
+`K3d` is a single executable. It supports multicluster/multinode/docker-only operation. It is significantly more complicated than `Minikube` and significantly less documented than `Kubernetes`. Still it runs even on `CentOS 7` - and this is good.
 
 ### K3d installation <a name="k3d_installation">
 
@@ -277,11 +281,6 @@ $ k3d cluster create my-cluster -v /opt/afc/databases:/opt/afc/databases -v /hom
     --registry-use LOCAL_REGISTRY -p "$AFC80:30080@agent:0" -p "$AFC443:30443@agent:0" --agents 2
 ```  
 
-* **Create namespace** (if not yet):  
-  `$ kubectl create namespace my-namespace`  
-  ... and set it as default in the current context:
-  `$ kubectl set-context --current --namespace=NAMESPACE`
-
 * Build images with some tag MYTAG and **push images to local repository**:  
   `$ helm/bin/k3d_push_images.py MYTAG`  
 
@@ -341,7 +340,7 @@ Options:
 |**--delete**|Delete cluster. Default is (re)create it|
 |**--expose** *NODEPORT1[:HOST_PORT1][,NODEPORT2[:HOST_PORT2]]...*|Cluster services' ports to map to host ports. Host ports may optionally be specified (by default unused ports in 30000+ range are used). Nodeports may be specified by name (see script's help message for list of known port names) or numerically|
 |**--kubeconfig** *FILENAME*|Explicitly specifies kubeconfig file in which create cluster's context. Default is current kubeconfig. This parameter may be needed when executing from under `kubie` or other context switcher that uses temporary kubeconfig file|
-|**--namespace** *NAMESPACE*|Namespace to use in cluster's context. Default is to use namespace of same name as cluster|
+|**--namespace** *NAMESPACE*|Namespace to use in cluster's context. Default is to use default namespace|
 |**--static** *DIRECTORY*|Static files' directory. Useful if static files are in some unconventional place (usually they are in `/opt/afc/databases/rat_transfer`)|
 |**--k3d_reg** *REGISTRY*|K3d image registry to use. Needed if more than one k3d registry running (which is not recommended). Default to use the first (and only) k3d registry or, if none running, not use it (load images from the remote registries)|
 

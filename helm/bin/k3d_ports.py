@@ -39,7 +39,8 @@ def main(argv: List[str]) -> None:
     args = argument_parser.parse_args(argv)
 
     # Computing cluster name
-    cluster = auto_name(kabob=True) if args.CLUSTER == AUTO_NAME else args.CLUSTER
+    cluster = auto_name(kabob=True) if args.CLUSTER == AUTO_NAME \
+        else args.CLUSTER
 
     # Obtaining mappings from cluster
     host_to_node: Dict[int, int] = {}

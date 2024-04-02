@@ -89,7 +89,7 @@ def main(argv: List[str]) -> None:
         help="Preload ratdb from test database using 'ratdb_from_test.py'. "
         "Requires --wait")
     argument_parser.add_argument(
-        "--upgrade", action="store true",
+        "--upgrade", action="store_true",
         help="If helmchart is already running - do 'helm upgrade' (rolling "
         "update that preserves AFC operation continuity) and ignore "
         "'--preload_ratdb'. Default is to uninstall and (completely stop AFC) "
@@ -124,7 +124,8 @@ def main(argv: List[str]) -> None:
 
     tag: Optional[str] = \
         auto_name(kabob=False) if args.tag == AUTO_NAME else args.tag
-    release = auto_name(kabob=True) if args.RELEASE == AUTO_NAME else args.RELEASE
+    release = auto_name(kabob=True) if args.RELEASE == AUTO_NAME \
+        else args.RELEASE
 
     # What components to convert to nodeport?
     nodeport_components: Set[str] = set()
@@ -159,7 +160,7 @@ def main(argv: List[str]) -> None:
             context_args += [switch, arg]
 
     # If release currently running - uninstall it first
-    upgrade = False        
+    upgrade = False
     for helm_info in \
             parse_json_output(["helm", "list", "-o", "json"] + context_args):
         if helm_info["name"] == release:

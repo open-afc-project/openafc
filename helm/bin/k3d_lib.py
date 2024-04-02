@@ -117,6 +117,11 @@ def execute(args: Union[List[str], str], cwd: Optional[str] = None,
     return ret
 
 
+def parse_json_output(args: List[str], echo: bool = True) -> Any:
+    """ Execute given command and return its output as parsed json """
+    return json.loads(cast(str, execute(args, return_output=True, echo=echo)))
+
+
 def parse_kubecontext(context_arg: Optional[str]) -> \
         Tuple[Optional[str], Optional[str]]:
     """ Parse optional contetx parameter [kubeconfig][:context]
@@ -134,14 +139,9 @@ def parse_kubecontext(context_arg: Optional[str]) -> \
                  f"Kubeconfig file `{kubeconfig}' not found")
     if m.group(3):
         config = \
-            json.loads(
-                cast(
-                    str,
-                    execute(
-                        ["kubectl", "config", "view", "-o", "json"] +
-                        (["--kubeconfig", kubeconfig] if kubeconfig
-                         else []),
-                        return_output=True)))
+            parse_json_output(
+                ["kubectl", "config", "view", "-o", "json"] +
+                (["--kubeconfig", kubeconfig] if kubeconfig else []))
         for context in config.contexts:
             if context.name in (m.group(3), f"{K3D_PREFIX}{m.group(3)}"):
                 kubecontext = context.name
@@ -161,9 +161,7 @@ def parse_k3d_reg(k3d_reg_arg: Optional[str]) -> str:
     reg_port = m.group(1) if m else ""
     ret: Optional[str] = None
     for reg_info in \
-            json.loads(cast(str,
-                            execute(["k3d", "registry", "list", "-o", "json"],
-                                    return_output=True))):
+            parse_json_output(["k3d", "registry", "list", "-o", "json"]):
         reg_info_name = reg_info["name"]
         reg_info_port = \
             str(reg_info["portMappings"]["5000/tcp"][0]["HostPort"])
@@ -226,17 +224,20 @@ def get_known_nodeports(helm_dir: str) -> Dict[str, NodePortInfo]:
     return ret
 
 
-def rfc_1123(s: Optional[str]) -> Optional[str]:
+def rfc_1123(s: Optional[str], no_strip: bool = False) -> Optional[str]:
     """ Convert given string to RFC1123 ([a-z0-9-]+), kabob-casing case
     transitions
 
     Arguments:
-    s -- String to convert or None
+    s        -- String to convert or None
+    no_strip -- don't strip trailing dash
     Returns None for None, converted string otherwise
     """
     if s is None:
         return s
-    s = re.sub(r"[_+]", "-", s).strip("-")
+    s = re.sub(r"[_+]", "-", s)
+    if not no_strip:
+        s = s.strip("-")
     while True:
         m = re.search("[A-Z]+", s)
         if m is None:
@@ -253,14 +254,9 @@ def rfc_1123(s: Optional[str]) -> Optional[str]:
 def auto_name(kabob: bool) -> str:
     """ Returns auto-name, consisting of username and checkout directory name
     (kabobcased optionally) """
-    def kabober(s: str) -> str:
+    def kabober(s: str, no_strip: bool = False) -> str:
         """ Optional kabobcasing """
-        return cast(str, rfc_1123(s)) if kabob else s
+        return cast(str, rfc_1123(s, no_strip=no_strip)) if kabob else s
 
-    return f"{kabober(os.getlogin())}{kabober('_')}" \
+    return f"{kabober(os.getlogin())}{kabober('_', no_strip=True)}" \
         f"{kabober(os.path.basename(ROOT_DIR) or 'root')}"
-
-
-def parse_json_output(args: List[str], echo: bool = True) -> Any:
-    """ Execute given command and return its output as parsed json """
-    return json.loads(cast(str, execute(args, return_output=True, echo=echo)))
