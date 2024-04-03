@@ -7,8 +7,8 @@
 # default value of args
 ARG BLD_TAG=latest
 ARG PRINST_TAG=latest
-ARG BLD_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-build-image
-ARG PRINST_NAME=public.ecr.aws/w9v6y1o0/openafc/worker-al-preinstall
+ARG BLD_NAME=ghcr.io/open-afc-project/worker-al-build-image
+ARG PRINST_NAME=ghcr.io/open-afc-project/worker-al-preinstall
 
 # Stage Build
 FROM ${BLD_NAME}:${BLD_TAG} as build_image

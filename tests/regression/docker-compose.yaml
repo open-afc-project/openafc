@@ -3,17 +3,17 @@
 version: '3.2'
 services:
   ratdb:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/ratdb-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/ratdb-image:${TAG:-latest}
     restart: always
     dns_search: [.]
 
   rmq:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/rmq-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/rmq-image:${TAG:-latest}
     restart: always
     dns_search: [.]
 
   dispatcher:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/dispatcher-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/dispatcher-image:${TAG:-latest}
     restart: always
     ports:
       - "${EXT_PORT}:80"
@@ -39,7 +39,7 @@ services:
     dns_search: [.]
 
   rat_server:
-    image: ${PRIV_REPO:-110738915961.dkr.ecr.us-east-1.amazonaws.com}/afc-server:${TAG:-latest}
+    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-server:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       - ./pipe:/pipe
@@ -76,7 +76,7 @@ services:
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
 
   msghnd:
-    image: ${PRIV_REPO:-110738915961.dkr.ecr.us-east-1.amazonaws.com}/afc-msghnd:${TAG:-latest}
+    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-msghnd:${TAG:-latest}
     environment:
       # RabbitMQ server name:
       - BROKER_TYPE=external
@@ -105,14 +105,14 @@ services:
       - rcache
 
   objst:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/objstorage-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/objstorage-image:${TAG:-latest}
     environment:
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_HIST_PORT=4999
       - AFC_OBJST_LOCAL_DIR=/storage
     dns_search: [.]
   worker:
-    image: ${PRIV_REPO:-110738915961.dkr.ecr.us-east-1.amazonaws.com}/afc-worker:${TAG:-latest}
+    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-worker:${TAG:-latest}
     volumes:
       - ${VOL_H_DB}:${VOL_C_DB}
       - ./pipe:/pipe
@@ -147,7 +147,7 @@ services:
     dns_search: [.]
 
   als_kafka:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/als-kafka-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/als-kafka-image:${TAG:-latest}
     restart: always
     environment:
       - KAFKA_ADVERTISED_HOST=${ALS_KAFKA_SERVER_}
@@ -156,7 +156,7 @@ services:
     dns_search: [.]
 
   als_siphon:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/als-siphon-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/als-siphon-image:${TAG:-latest}
     restart: always
     environment:
       - KAFKA_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
@@ -169,11 +169,11 @@ services:
     dns_search: [.]
 
   bulk_postgres:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/bulk-postgres-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/bulk-postgres-image:${TAG:-latest}
     dns_search: [.]
 
   uls_downloader:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/uls-downloader:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/uls-downloader:${TAG:-latest}
     restart: always
     environment:
       - ULS_AFC_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
@@ -192,7 +192,7 @@ services:
     dns_search: [.]
 
   cert_db:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/cert_db:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/cert_db:${TAG:-latest}
     depends_on:
       - ratdb
     links:
@@ -204,7 +204,7 @@ services:
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
 
   rcache:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/rcache-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/rcache-image:${TAG:-latest}
     restart: always
     environment:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
@@ -218,7 +218,7 @@ services:
     dns_search: [.]
 
   grafana:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/grafana-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/grafana-image:${TAG:-latest}
     restart: always
     depends_on:
       - prometheus
@@ -226,7 +226,7 @@ services:
     dns_search: [.]
 
   prometheus:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/prometheus-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/prometheus-image:${TAG:-latest}
     restart: always
     depends_on:
       - cadvisor
@@ -234,7 +234,7 @@ services:
     dns_search: [.]
 
   cadvisor:
-    image:  ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/cadvisor-image:${TAG:-latest}
+    image:  ${PUB_REPO:-ghcr.io/open-afc-project}/cadvisor-image:${TAG:-latest}
     restart: always
     volumes:
     - /:/rootfs:ro
@@ -245,7 +245,7 @@ services:
     dns_search: [.]
 
   nginxexporter:
-    image: ${PUB_REPO:-public.ecr.aws/w9v6y1o0/openafc}/nginxexporter-image:${TAG:-latest}
+    image: ${PUB_REPO:-ghcr.io/open-afc-project}/nginxexporter-image:${TAG:-latest}
     restart: always
     depends_on:
       - dispatcher

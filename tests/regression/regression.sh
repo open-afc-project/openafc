@@ -6,8 +6,8 @@
 # a copy of which is included with this software program
 #
 
-PRIV_REPO="${PRIV_REPO:=110738915961.dkr.ecr.us-east-1.amazonaws.com}"
-PUB_REPO="${PUB_REPO:=public.ecr.aws/w9v6y1o0/openafc}"
+PRIV_REPO="${PRIV_REPO:=ghcr.io/open-afc-project}"
+PUB_REPO="${PUB_REPO:=ghcr.io/open-afc-project}"
 
 SRV="${PRIV_REPO}/afc-server"                                         # server image
 MSGHND="${PRIV_REPO}/afc-msghnd"                             # msghnd image

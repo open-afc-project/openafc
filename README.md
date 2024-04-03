@@ -520,11 +520,11 @@ services:
     dns_search: [.]
 
   bulk_postgres:
-    image: public.ecr.aws/w9v6y1o0/openafc/bulk-postgres-image:${TAG:-latest}
+    image: ghcr.io/open-afc-project/bulk-postgres-image:${TAG:-latest}
     dns_search: [.]
 
   uls_downloader:
-    image: public.ecr.aws/w9v6y1o0/openafc/uls-downloader:${TAG:-latest}
+    image: ghcr.io/open-afc-project/uls-downloader:${TAG:-latest}
     restart: always
     environment:
       - ULS_SERVICE_STATE_DB_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
@@ -873,7 +873,7 @@ BROKER_MNG_PORT = 15672
 Following the example to use RabbitMQ service in docker-compose.
 ```
   rmq:
-    image: public.ecr.aws/w9v6y1o0/openafc/rmq-image:latest
+    image: ghcr.io/open-afc-project/rmq-image:latest
     restart: always
 ```
 
