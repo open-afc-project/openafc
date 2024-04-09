@@ -51,19 +51,16 @@ merge_upstream_changes:
   script:
     - git config --global user.email "gitlab-runner@broadcom.com"
     - git remote add upstream $CI_GITHUB_UPSTREAM  || true   # Prevents errors if the remote already exists
-    - git fetch origin main
-    - git fetch upstream main
-    - git checkout -B main origin/main
-    - COMMON_ANCESTOR=$(git merge-base main upstream/main)
-    - UPSTREAM_CHANGES=$(git log --oneline $COMMON_ANCESTOR..upstream/main)
+    - git fetch upstream
+    - UPSTREAM_CHANGES=$(git log HEAD..upstream/main --oneline)
     - |
       if [ -n "$UPSTREAM_CHANGES" ]; then
-        echo "Changes detected in upstream that are not in main."
         git merge upstream/main
         git push origin main
       else
-        echo "No new changes detected in upstream since the last common ancestor."
+        echo "No changes found in the upstream repository."
       fi
+
 
 # This job runs to create dir with unique name
 # that includes sources that will be validated
