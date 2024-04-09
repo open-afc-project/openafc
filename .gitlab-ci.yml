@@ -55,7 +55,7 @@ merge_upstream_changes:
     - git fetch origin main
     - git fetch upstream main
     # Find the last common ancestor of your main branch and upstream/main
-    - COMMON_ANCESTOR=$(git merge-base main upstream/main)
+    - COMMON_ANCESTOR=$(git merge-base refs/remotes/origin/main refs/remotes/upstream/main)
     # Check for any commits in upstream/main since the common ancestor
     - UPSTREAM_CHANGES=$(git log --oneline $COMMON_ANCESTOR..upstream/main)
     - |
