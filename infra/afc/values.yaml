@@ -15,45 +15,45 @@ replicaCount:
 
 image:
   msghnd:
-    repository: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-msghnd
+    repository: ghcr.io/open-afc-project/afc-msghnd
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.15.0"
+    #tag: "1.0.0.0"
   webui:
-    repository: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-server
+    repository: ghcr.io/open-afc-project/afc-server
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.15.0"
+    #tag: "1.0.0.0"
   objst:
-    repository: public.ecr.aws/w9v6y1o0/openafc/objstorage-image
+    repository: ghcr.io/open-afc-project/objstorage-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.15.0"
+    #tag: "1.0.0.0"
   worker:
-    repository: 110738915961.dkr.ecr.us-east-1.amazonaws.com/afc-worker
+    repository: ghcr.io/open-afc-project/afc-worker
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.15.0"
+    #tag: "1.0.0.0"
   rmq:
-    repository: public.ecr.aws/w9v6y1o0/openafc/rmq-image
+    repository: ghcr.io/open-afc-project/rmq-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.15.0"
+    #tag: "1.0.0.0"
   rcache:
-    repository: public.ecr.aws/w9v6y1o0/openafc/rcache-image
+    repository: ghcr.io/open-afc-project/rcache-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.15.0"
+    #tag: "1.0.0.0"
   als_kafka:
-    repository: public.ecr.aws/w9v6y1o0/openafc/als-kafka-image
+    repository: ghcr.io/open-afc-project/als-kafka-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.15.0"
+    #tag: "1.0.0.0"
   als_siphon:
-    repository: public.ecr.aws/w9v6y1o0/openafc/als-siphon-image
+    repository: ghcr.io/open-afc-project/als-siphon-image
     pullPolicy: Always
     # Overrides the image tag whose default is the chart appVersion.
-    #tag: "3.8.15.0"
+    #tag: "1.0.0.0"
 
 
 imagePullSecrets: []

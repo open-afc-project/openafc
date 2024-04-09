@@ -8,8 +8,7 @@
 
 set -x
 docker_login() {
-  aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws/w9v6y1o0
-  aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 110738915961.dkr.ecr.us-east-1.amazonaws.com
+  docker login ghcr.io
 }
 
 docker_login
