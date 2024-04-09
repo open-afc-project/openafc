@@ -54,6 +54,7 @@ merge_upstream_changes:
     # Ensure local branch information is up to date
     - git fetch origin main
     - git fetch upstream main
+    - git checkout main
     # Find the last common ancestor of your main branch and upstream/main
     - COMMON_ANCESTOR=$(git merge-base refs/remotes/origin/main refs/remotes/upstream/main)
     # Check for any commits in upstream/main since the common ancestor
@@ -61,8 +62,8 @@ merge_upstream_changes:
     - |
       if [ -n "$UPSTREAM_CHANGES" ]; then
         echo "Changes detected in upstream that are not in main."
-        git merge upstream/main
-        git push origin main
+        git merge refs/remotes/upstream/main
+        git push origin main:main
       else
         echo "No new changes detected in upstream since the last common ancestor."
       fi
