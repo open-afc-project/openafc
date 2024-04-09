@@ -50,16 +50,22 @@ merge_upstream_changes:
       when: always
   script:
     - git config --global user.email "gitlab-runner@broadcom.com"
-    - git remote add upstream $CI_GITHUB_UPSTREAM  || true   # Prevents errors if the remote already exists
+    - git remote add upstream $CI_GITHUB_UPSTREAM  || true
     - git fetch upstream
+    # Ensure the local main branch exists and tracks origin/main
+    - git fetch origin main:main
+    - git checkout main
+    # Merge changes from upstream/main into the local main branch
     - UPSTREAM_CHANGES=$(git log HEAD..upstream/main --oneline)
     - |
       if [ -n "$UPSTREAM_CHANGES" ]; then
         git merge upstream/main
+        # Push the changes back to origin/main
         git push origin main
       else
         echo "No changes found in the upstream repository."
       fi
+
 
 
 # This job runs to create dir with unique name
