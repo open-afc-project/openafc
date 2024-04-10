@@ -1,0 +1,448 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+---
+
+# Default values for afc-int chart
+# Please use configuration-specific value files (e.g. values-k3d.yaml for
+# k3d configuration) to augment/override values defined here
+
+# Global name overrides
+
+# App name to use instead of default Chart.Name
+# appNameOverride:
+
+# Dictionary of image repositories. Keys may be any - they are used in
+# component definition. Fields are:
+# path Repository path
+# pullSecrets List of names of pull secrets
+imageRepositories:
+  public:
+    path: public.ecr.aws/w9v6y1o0/openafc
+    pullSecrets: []
+  private:
+    path: 110738915961.dkr.ecr.us-east-1.amazonaws.com
+    pullSecrets: []
+  k3d:
+    path: Intentionally left incorrect because it requires override
+
+# Dictionary of security contexts. Keys are used in component definitions (and
+# may be any). Values are the same as in securityContext dictionaries
+# (runAsUser, runAsGroup, fsGroup, readOnlyRootFilesystem, capabilities.add,
+# capabilities.drop)
+securityContexts:
+  none: {}
+  readOnly:
+    readOnlyRootFilesystem: true
+
+# Dictionary of configmaps. Indexed by configmap keys (suffixes of configmap
+# names). Values are dictionaries, with uppercase-named entries going to
+# configmap as is, nonuppercase entries may be used in construction of
+# configmap entries.
+# DSNs present here may contain usernames/passwords for development (Docker
+# Compose) configurations. Really secret usernames/passwords (but not entire
+# DSNs please!) should be passed via secrets.
+# Some syntax conventions introduced to properly render variables without
+# additional helm trickery:
+#  - If variable name ends with @S, its value rendered as string verbatim (@S
+#     is trimmed from variable name)
+#  - If variable name ends with @I, it is rendered as integer, thus avoiding
+#    - rendering big integers as floating points (@I is trimmed from variable
+#    - name)
+#  - {{host:<COMPONENTNAME>}} rendered as hostname for given component (e.g.
+#    as of time of this writing '{{host:rat_server}}' rendered as 'webui')
+#  - {{port:<COMPONENTNAME>:<PORTNAME>}} rendered as service port number of
+#    - port of - given name of given component (e.g. as of time of this writing
+#    '{{port:objst:fileStorage}}' rendered as '5000')
+#  - {{containerPort:<COMPONENTNAME>:<PORTNAME>}} ditto, but container (aka
+#    - target) port number is rendered
+#  - {{staticVolumeMount:<COMPONENTNAME>:<STATICMOUNTNAME>[:<IFABSENT>]}}
+#    rendered as mount directory for given static volume.
+#    <IFABSENT> describes what to do if volume data is empty/absent:
+#    - 'optional' - don't add this environment variable
+#    - 'nullable' - set entire value to empty string
+#    - 'required' - abort rendering (default)
+configmaps:
+  # Own environment variables of dispatcher container(s)
+  dispatcher:
+    AFC_SERVER_NAME: _
+    AFC_ENFORCE_HTTPS: "True"
+    AFC_ENFORCE_MTLS: "False"
+    AFC_MSGHND_NAME: "{{host:msghnd}}"
+    AFC_MSGHND_PORT: "{{port:msghnd:msghnd}}"
+    AFC_WEBUI_NAME: "{{host:rat_server}}"
+    AFC_WEBUI_PORT: "{{port:rat_server:rat_server}}"
+  # Own environment variables for rat_server container(s)
+  rat_server:
+    ALS_KAFKA_SERVER_ID: rat_server
+  # Own environment variables for msghnd container(s)
+  msghnd:
+    ALS_KAFKA_SERVER_ID: msghnd
+  # Own environment variables of objst container(s)
+  objst:
+    AFC_OBJST_HIST_PORT: "{{port:objst:historyView}}"
+    AFC_OBJST_LOCAL_DIR: /storage
+  # Common environment variables for objst container(s)
+  objst-common:
+    AFC_OBJST_PORT: "{{port:objst:fileStorage}}"
+  # Environment variables for clients of objst service
+  objst-client:
+    AFC_OBJST_SCHEME: HTTP
+    AFC_OBJST_HOST: "{{host:objst}}"
+  # Environment variables for Celery clients of rmq service
+  celery-client:
+    BROKER_TYPE: external
+    BROKER_FQDN: "{{host:rmq}}"
+  # Environment variables for ALS clients service
+  als-client:
+    ALS_KAFKA_MAX_REQUEST_SIZE@I: 10485760
+    ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS: >-
+      {{host:als_kafka}}:{{port:als_kafka:kafka}}
+  # Own environment variables for als_kafka
+  als_kafka:
+    KAFKA_ADVERTISED_HOST: "{{host:als_kafka}}"
+    KAFKA_CLIENT_PORT: "{{port:als_kafka:kafka}}"
+  # Environment variables common to als_kafka and als_siphon
+  als_kafka-common:
+    KAFKA_MAX_REQUEST_SIZE@I: 10485760
+  # Own environment variables for als_siphon
+  als_siphon:
+    KAFKA_SERVERS: "{{host:als_kafka}}:{{port:als_kafka:kafka}}"
+    POSTGRES_HOST: "{{host:bulk_postgres}}"
+    INIT_IF_EXISTS: skip
+  # Own environment variables of worker container(s)
+  worker:
+    AFC_WORKER_CELERY_WORKERS: rat_1
+    # Number of engines per worker by default is equal to number of CPUs
+    # (`nproc`). It can't be limited with containerResources.limits.cpu, hence
+    # must be explicitly set with AFC_WORKER_CELERY_CONCURRENCY
+    AFC_WORKER_CELERY_CONCURRENCY: 2
+    AFC_AEP_ENABLE: 1
+    AFC_AEP_DEBUG: 1
+    AFC_AEP_REAL_MOUNTPOINT: >-
+      {{staticVolumeMount:worker:rat_transfer}}/3dep/1_arcsec
+  # Own environment variables of uls_downloader container(s)
+  uls_downloader:
+    ULS_AFC_URL: >-
+      http://{{host:msghnd}}:{{port:msghnd:msghnd}}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
+    ULS_DELAY_HR: 1
+    ULS_SERVICE_STATE_DB_DSN: >-
+      postgresql://postgres:postgres@{{host:bulk_postgres}}/fs_state
+    ULS_PROMETHEUS_PORT: 8000
+    ULS_ALARM_SMTP_INFO: >-
+      {{staticVolumeMount:uls_downloader:notifier_mail_secret:optional}}/NOTIFIER_MAIL.json
+  # Common Environment variables for Rcache container(s) and clients of Rcache
+  # service
+  rcache-common:
+    RCACHE_ENABLED: "True"
+    RCACHE_POSTGRES_DSN: >-
+      postgresql://postgres:postgres@{{host:bulk_postgres}}/rcache
+  # Environment variables for Rcache service clients
+  rcache-client:
+    RCACHE_SERVICE_URL: "http://{{host:rcache}}:{{port:rcache:rcache}}"
+    RCACHE_RMQ_DSN: >-
+      amqp://rcache:rcache@{{host:rmq}}:{{port:rmq:amqp}}/rcache
+  # Own environment variables of rcache container(s)
+  rcache:
+    RCACHE_CLIENT_PORT: "{{port:rcache:rcache}}"
+    RCACHE_AFC_REQ_URL: >-
+      http://{{host:msghnd}}:{{port:msghnd:msghnd}}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
+    RCACHE_RULESETS_URL: >-
+      http://{{host:rat_server}}/fbrat/ratapi/v1/GetRulesetIDs
+    RCACHE_CONFIG_RETRIEVAL_URL: >-
+      http://{{host:rat_server}}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
+
+# Dictionary of static (nontemplated) volume descriptors. Indexed by volume
+# names, content is the same as pod's volumes entries (except for name field -
+# entries' keys are used as names)
+staticVolumes:
+  rat_transfer:
+    hostPath:
+      path: /opt/afc/databases/rat_transfer
+      type: Directory
+  pipe:
+    hostPath:
+      # Path better be overridden, type set to bypass creation if overridden
+      path: /tmp
+      type: DirectoryOrCreate
+  notifier_mail_secret:
+    secret:
+      secretName: notifier-mail
+
+# Dictionary of components. Component roughly corresponds to Docker Compose
+# service. Keys in dictionary are Docker Compose service names, plus there is
+# 'default' component containing default values for certain parameters.
+# Structure of component:
+# imageName Image name (without repository and tag). Empty means component
+#         should not be used (like Postgres components in GCP)
+# imageRepositoryKey Key in .Values.imageRepositories
+# imageRepositoryKeyOverride Key in .Values.imageRepositories that, if
+#         specified, overrides imageRepositoryKey
+# imageTag Image tag. Default is .Chart.appVersion
+# imagePullPolicy Image pull policy
+# hostname Hostname to use in Kubernetes service. Default is component name
+# serviceType Kubernetes service type
+# initialReplicas Initial replica count
+# loadBalancerIP Explicitly specifiedLoad Balancer port. Best be specified
+#         in configuration-specific values file
+# serviceAccount Name of service account. Empty/absent to use default
+# securityContextKey Key in securityContexts
+# ports Dictionary of TCP port descriptors. Keys are port names, values have
+#         the following structure:
+#   servicePort Port exposed by service. Absent if not for exposing by service
+#   containerPort Port exposed by container. Default is same as servicePort
+#   nodePort Node port to allocate for service that may be designated as
+#         NodePort. Names of such ports better be unique (as it simplifies
+#         wrapper scripts' interface)
+# containerResources Kubernetes container resources (Dictionary with 'requests'
+#         and 'limits' keys)
+# pvc Persistent Volume Claim data. Subkeys:
+#   name PVC name
+#   accessMode Access mode (ReadWriteOnce, ReadOnlyMany, ReadWriteMany, or
+#           ReadWriteOncePod)
+#   mountPath Mount path inside container
+#   resources PVC resources (has 'requests', etc. subkeys)
+# envConfigmapKeys: List of configmap keys (keys into configmaps dictionary) to
+#         include into environment
+# staticVolumeMounts Dictionary of mount points of used static (nontemplated)
+#         volumes, indexed by staticVolumes dictionary keys
+# metrics Where to look for prometheus metrics. Contains single entry in
+#         podmonitor's podMetricsEndpoints key (port, path, params, etc.)
+#   port Port name
+#   path Path to metric. Default is /metrics
+# hpa Data for horizontal Pod Autoscaler
+#   minReplicas Minimum number of replicas. Optional, default is 1
+#   maxReplicas Maximum number of replicas
+#   metric Type-specific part of HPA manifest's' spec.metrics element (i.e.
+#           'type' field derived from top-level key)
+#   behavior Behavior clause of HPA manifest. Optional. Default is to scale
+#           immediately, without looking back
+components:
+  default:
+    serviceType: ClusterIP
+    initialReplicas: 1
+    imagePullPolicy: IfNotPresent
+    serviceAccount:
+    securityContextKey: none
+    pvc:
+      accessMode: ReadWriteOnce
+  ratdb:
+    imageName: ratdb-image
+    imageRepositoryKey: public
+    ports:
+      ratdb:
+        servicePort: 5432
+        nodePort: 31432
+    pvc:
+      name: postgresData
+      mountPath: /var/lib/postgresql/data
+      resources:
+        requests:
+          storage: 1Gi
+  rmq:
+    imageName: rmq-image
+    imageRepositoryKey: public
+    ports:
+      amqp:
+        servicePort: 5672
+      metrics:
+        containerPort: 15692
+    metrics:
+      port: metrics
+      path: /metrics/detailed
+      params:
+        vhost: [fbrat, rcache]
+        family: [queue_coarse_metrics]
+    containerResources:
+      requests:
+        memory: 200Mi
+  dispatcher:
+    imageName: dispatcher-image
+    imageRepositoryKey: public
+    serviceType: LoadBalancer
+    envConfigmapKeys: [dispatcher, objst-client, objst-common]
+    ports:
+      http:
+        servicePort: 80
+        nodePort: 30080
+      https:
+        servicePort: 443
+        nodePort: 30443
+      status:
+        servicePort: 8080
+  rat_server:
+    imageName: afc-server
+    imageRepositoryKey: private
+    hostname: webui
+    ports:
+      rat_server:
+        servicePort: 80
+        nodePort: 30081
+      https:
+        servicePort: 443
+    containerResources:
+      requests:
+        memory: 200Mi
+    envConfigmapKeys: [rat_server, celery-client, objst-client, objst-common,
+                       als-client, rcache-client, rcache-common]
+    staticVolumeMounts:
+      rat_transfer: /mnt/nfs/rat_transfer
+      pipe: /pipe
+  msghnd:
+    imageName: afc-msghnd
+    imageRepositoryKey: private
+    ports:
+      msghnd:
+        servicePort: 80
+        containerPort: 8000
+        nodePort: 30082
+    metrics:
+      port: msghnd
+      path: /fbrat/metrics
+    containerResources:
+      requests:
+        memory: 1200Mi
+    envConfigmapKeys: [msghnd, celery-client, objst-client, objst-common,
+                       als-client, rcache-client, rcache-common]
+  objst:
+    imageName: objstorage-image
+    imageRepositoryKey: public
+    ports:
+      fileStorage:
+        servicePort: 5000
+      historyView:
+        servicePort: 4999
+    containerResources:
+      requests:
+        memory: 500Mi
+    envConfigmapKeys: [objst, objst-common]
+  worker:
+    imageName: afc-worker
+    imageRepositoryKey: private
+    containerResources:
+      requests:
+        memory: 4500Mi
+    envConfigmapKeys: [worker, celery-client, objst-client, objst-common,
+                       als-client, rcache-client, rcache-common]
+    staticVolumeMounts:
+      rat_transfer: /mnt/nfs/rat_transfer
+      pipe: /pipe
+    hpa:
+      maxReplicas: 10
+      metric:
+        external:
+          metric:
+            # Number of outstanding AFC Engine (per pod, because of
+            # 'AverageValue' type). This metric exists in two flavors:
+            #   - active_engine_requests_msghnd - Number of incomplete AFC
+            #             requests msghnd put to worker
+            #   - active_engine_requests_rabbitmq - Number of incomplete
+            #             requests in Celery queue
+            #  Both are (or should be) equivalent
+            name: active_engine_requests_msghnd
+          target:
+            type: AverageValue
+            # 1700m is 1.7 in HPA parlance
+            averageValue: 1700m
+      behavior:
+        # This is just a sample behavior for illustration purposes
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Pods
+              value: 4
+              periodSeconds: 30
+        scaleDown:
+          stabilizationWindowSeconds: 300
+  als_kafka:
+    imageName: als-kafka-image
+    imageRepositoryKey: public
+    hostname: als-kafka
+    ports:
+      kafka:
+        servicePort: 9092
+    containerResources:
+      requests:
+        memory: 500Mi
+    envConfigmapKeys: [als_kafka, als_kafka-common]
+  als_siphon:
+    imageName: als-siphon-image
+    imageRepositoryKey: public
+    hostname: als-siphon
+    ports:
+      metrics:
+        containerPort: 8080
+    metrics:
+      port: metrics
+    containerResources:
+      requests:
+        memory: 100Mi
+    envConfigmapKeys: [als_siphon, als_kafka-common]
+  bulk_postgres:
+    imageName: bulk-postgres-image
+    imageRepositoryKey: public
+    hostname: bulk-postgres
+    ports:
+      bulk_postgres:
+        servicePort: 5432
+        nodePort: 31433
+    pvc:
+      name: postgresData
+      mountPath: /var/lib/postgresql/data
+      resources:
+        requests:
+          storage: 100Mi
+  uls_downloader:
+    imageName: uls-downloader
+    imageRepositoryKey: public
+    hostname: uls-downloader
+    envConfigmapKeys: [uls_downloader, rcache-client, rcache-common]
+    staticVolumeMounts:
+      rat_transfer: /rat_transfer
+      notifier_mail_secret: /secrets/notifier_mail_secret
+    ports:
+      metrics:
+        containerPort: 8000
+    metrics:
+      port: metrics
+  cert_db:
+    imageName: cert_db
+    imageRepositoryKey: public
+    hostname: cert-db
+    envConfigmapKeys: [als-client]
+  rcache:
+    imageName: rcache-image
+    imageRepositoryKey: public
+    ports:
+      rcache:
+        servicePort: 8000
+        nodePort: 30083
+    containerResources:
+      requests:
+        memory: 100Mi
+    envConfigmapKeys: [rcache, rcache-common]
+  grafana:
+    imageName: grafana-image
+    imageRepositoryKey: public
+    ports:
+      grafana:
+        servicePort: 3000
+        nodePort: 31000
+  nginxexporter:
+    imageName: nginxexporter-image
+    imageRepositoryKey: public
+    ports:
+      http:
+        servicePort: 9113
+    metrics:
+      port: http
+  prometheus:
+    # Only to create optional nodeport service on k3d. Other aspects managed by
+    # prometheus-operator
+    ports:
+      prometheus:
+        servicePort: 9090
+        nodePort: 31090

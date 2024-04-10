@@ -1,0 +1,64 @@
+#
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Parameters for k3d_cluster_create_operation.py
+
+# Static file directory lookup information
+---
+static_files:
+    # List of locations
+    known_locations: [/opt/afc/databases/rat_transfer]
+
+    # List of files/directories to be in directory to qualify as static file
+    # directory
+    expected_items: [ULS_Database, RAS_Database]
+
+# List of ports names expose by default
+default_expose: ["http", "https"]
+
+# Manifests/helmcharts to install. Dictionary (indexed by stage name, allowing
+# replace by merge if will be needed) of objects with the following keys:
+#   - order. Optional installation order indicator. Floating point value.
+#             Orderless items installed last
+#   - namespace. Namespace to install manifests/helmcharts in
+#   - cmd. List of commands to perform before kubernetes/helm installation.
+#             Commands that starts with `-` - not checked for failure. Executed
+#             from checkout root directory
+#   - manifest_path. Path to manifest file or directory. Absolute or relative
+#             from checkout root. May use ~ and environment variables
+#   - manifest_url. URL to manifest file or directory
+#   - helm_chart. Helmchart to install
+#   - helm_release. Helm release name
+#   - helm_repo. Helm repository URL
+#   - helm_values. List of helm value files. Absolute or relative from checkout
+#             root. May use ~ and environment variables
+#   - helm_settings: List of value settings
+#   - helm_version. Helmchart version specifier
+#   - args. List of other command line parameters. As of time of this writing
+#             only used for helm
+install:
+    monitoring_namespace:
+        namespace: monitoring
+        order: 0
+    prometheus_operator:
+        order: 1
+        manifest_url: https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.72.0/bundle.yaml
+    prometheus:
+        order: 2
+        namespace: monitoring
+        manifest_path: helm/monitoring/manifests
+    prometheus_adapter:
+        namespace: monitoring
+        cmd:
+          - -kubectl delete apiservice v1beta1.metrics.k8s.io
+        helm_chart: prometheus-community/prometheus-adapter
+        helm_repo: https://prometheus-community.github.io/helm-charts
+        helm_release: custom-metrics
+        helm_values:
+            - helm/monitoring/values/values-prometheus_adapter.yaml
+        helm_version: 2.14.2
+        args: [--wait, --timeout, "5m"]

@@ -1,0 +1,49 @@
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+
+# Rules for promnetheus adapter. Define metrics to be used by HPA
+prometheus:
+  url: http://prometheus-operated.monitoring.svc
+rules:
+  default: true
+  external:
+    - seriesQuery: 'msghnd_flask_afc_waiting_reqs'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "active_engine_requests_msghnd"
+      metricsQuery: 'sum by (pod) (<<.Series>>)'
+    - seriesQuery: 'rabbitmq_detailed_queue_messages{queue="celery", vhost="fbrat"}'
+      resources:
+        template: <<.Resource>>
+      name:
+        as: "active_engine_requests_rabbitmq"
+      metricsQuery: '<<.Series>>{queue="celery", vhost="fbrat"}'
+  resource:
+    cpu:
+      containerQuery: sum(rate(container_cpu_usage_seconds_total{<<.LabelMatchers>>, container_label_io_kubernetes_container_name!=""}[3m])) by (<<.GroupBy>>)
+      nodeQuery: sum(rate(container_cpu_usage_seconds_total{<<.LabelMatchers>>, id='/'}[3m])) by (<<.GroupBy>>) by (<<.GroupBy>>)
+      resources:
+        overrides:
+          container_label_io_kubernetes_pod_namespace:
+            resource: namespace
+          node:
+            resource: node
+          container_label_io_kubernetes_pod_name:
+            resource: pod
+      containerLabel: container_label_io_kubernetes_container_name
+    memory:
+      containerQuery: sum(container_memory_working_set_bytes{<<.LabelMatchers>>, container_label_io_kubernetes_container_name!=""}) by (<<.GroupBy>>)
+      nodeQuery: sum(container_memory_working_set_bytes{<<.LabelMatchers>>,id='/'}) by (<<.GroupBy>>)
+      resources:
+        overrides:
+          container_label_io_kubernetes_pod_namespace:
+            resource: namespace
+          node:
+            resource: node
+          container_label_io_kubernetes_pod_name:
+            resource: pod
+      containerLabel: container_label_io_kubernetes_container_name
+    window: 3m

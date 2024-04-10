@@ -1,0 +1,25 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# Exposes Prometheus as nodePort (if component present and serviceType is indeed NodePort).
+# Note that Prometheus pods run in 'monitoring' namespace - and so does this obiect
+{{- $ := mergeOverwrite $ (dict "component" "prometheus") }}
+{{- $compDef := merge (get .Values.components .component | default dict) .Values.components.default -}}
+{{- if eq (get $compDef "serviceType") "NodePort" }}
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "afc.hostName" . }}
+  labels: {{- include "afc.commonLabels" . | nindent 4 }}
+  namespace: monitoring
+spec:
+  {{- include "afc.serviceIp" . | nindent 2 }}
+  selector:
+    prometheus: main
+  ports: {{- include "afc.servicePorts" . | nindent 4 }}
+
+{{- end }}
