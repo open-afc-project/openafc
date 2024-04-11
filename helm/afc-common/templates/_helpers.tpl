@@ -102,9 +102,6 @@ helm.sh/chart: {{ include "afc.versionedChartName" . | quote }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- if .component }}
-{{-   $compDef := merge (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
-{{- end }}
 {{- end }}
 
 {{/*
@@ -129,7 +126,7 @@ app.kubernetes.io/name: {{ include "afc.appName" . }}
 {{- if $releaseName }}
 app.kubernetes.io/instance: {{ $releaseName }}
 {{- end }}
-{{- if get . "component" }}
+{{- if hasKey . "component" }}
 app.kubernetes.io/component: {{ include "afc.compManifestName" . }}
 {{- end }}
 {{- end }}

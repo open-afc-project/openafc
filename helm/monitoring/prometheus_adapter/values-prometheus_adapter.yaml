@@ -46,4 +46,4 @@ rules:
           container_label_io_kubernetes_pod_name:
             resource: pod
       containerLabel: container_label_io_kubernetes_container_name
-    window: 3m
+    window: 30s

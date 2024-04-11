@@ -347,16 +347,16 @@ components:
             type: AverageValue
             # 1700m is 1.7 in HPA parlance
             averageValue: 1700m
-      behavior:
-        # This is just a sample behavior for illustration purposes
-        scaleUp:
-          stabilizationWindowSeconds: 0
-          policies:
-            - type: Pods
-              value: 4
-              periodSeconds: 30
-        scaleDown:
-          stabilizationWindowSeconds: 300
+      # Example behavior definition
+      # behavior:
+      #   scaleUp:
+      #     stabilizationWindowSeconds: 0
+      #     policies:
+      #       - type: Pods
+      #         value: 4
+      #         periodSeconds: 30
+      #   scaleDown:
+      #     stabilizationWindowSeconds: 300
   als_kafka:
     imageName: als-kafka-image
     imageRepositoryKey: public
@@ -446,3 +446,5 @@ components:
       prometheus:
         servicePort: 9090
         nodePort: 31090
+  # Only to have proper label in its servicemonitor
+  cadvisor: {}
