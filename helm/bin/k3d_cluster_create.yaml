@@ -50,7 +50,7 @@ install:
     prometheus:
         order: 2
         namespace: monitoring
-        manifest_path: helm/monitoring/manifests
+        manifest_path: helm/monitoring/prometheus
     prometheus_adapter:
         namespace: monitoring
         cmd:
@@ -59,6 +59,6 @@ install:
         helm_repo: https://prometheus-community.github.io/helm-charts
         helm_release: custom-metrics
         helm_values:
-            - helm/monitoring/values/values-prometheus_adapter.yaml
+            - helm/monitoring/prometheus_adapter/values-prometheus_adapter.yaml
         helm_version: 2.14.2
         args: [--wait, --timeout, "5m"]
