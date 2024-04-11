@@ -102,13 +102,6 @@ helm.sh/chart: {{ include "afc.versionedChartName" . | quote }}
 app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 {{- end }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
-{{- if .component }}
-{{-   $compDef := merge (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
-{{-   $subsystem := get $compDef "subsystem" -}}
-{{-   if $subsystem }}
-subsystem: {{ $subsystem }}
-{{-   end }}
-{{- end }}
 {{- end }}
 
 {{/*
@@ -133,7 +126,7 @@ app.kubernetes.io/name: {{ include "afc.appName" . }}
 {{- if $releaseName }}
 app.kubernetes.io/instance: {{ $releaseName }}
 {{- end }}
-{{- if get . "component" }}
+{{- if hasKey . "component" }}
 app.kubernetes.io/component: {{ include "afc.compManifestName" . }}
 {{- end }}
 {{- end }}
@@ -239,15 +232,17 @@ Service ports definition
 {{- $portDefs := get $compDef "ports" -}}
 {{- if $portDefs }}
 {{-   range $portName, $portInfo := $portDefs }}
+{{-     if hasKey $portInfo "servicePort" }}
 - name: {{ $portName | include "afc.rfc1123" }}
   port: {{ get $portInfo "servicePort" | int }}
-{{-     if hasKey $portInfo "containerPort" }}
+{{-       if hasKey $portInfo "containerPort" }}
   targetPort: {{ get $portInfo "containerPort" }}
-{{-     end }}
-{{-     if and (hasKey $portInfo "nodePort") (eq "NodePort" (get $compDef "serviceType")) }}
+{{-       end }}
+{{-       if and (hasKey $portInfo "nodePort") (eq "NodePort" (get $compDef "serviceType")) }}
   nodePort: {{ get $portInfo "nodePort" | int }}
-{{-     end }}
+{{-       end }}
   protocol: TCP
+{{-     end }}
 {{-   end }}
 {{- end }}
 {{- end }}
@@ -482,3 +477,50 @@ Common StatefulSet annotations
 {{- define "afc.commonStatefulsetAnnotations" -}}
 {{ include "afc.commonDeploymentAnnotations" . }}
 {{- end }}
+
+{{/*
+Declaration of Prometheus metric endpoint for ServiceMonitor resource
+.component (key in .Values.components) must be defined
+*/}}
+{{- define "afc.metricEndpoints" -}}
+{{- $compDef := merge (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $metricsDef := get $compDef "metrics" | required (cat "Component" .component "does not have metrics' definition") -}}
+- {{ toYaml $metricsDef | nindent 2 }}
+{{- end }}
+
+{{/*
+Renders HPA min/maxReplicas
+.component (key in .Values.components) must be defined
+*/}}
+{{- define "afc.hpaReplicas" -}}
+{{- $compDef := merge (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $hpaDef := get $compDef "hpa" | required (cat "Component" .component "does not have 'hpa' section") -}}
+minReplicas: {{ get $hpaDef "minReplicas" | default 1 | int }}
+maxReplicas: {{ get $hpaDef "maxReplicas" | required (cat "Component" .component "does not have 'hpa.maxReplicas' value") | int }}
+{{- end }}
+
+{{/*
+Renders HPA behavior section (if it is defined)
+.component (key in .Values.components) must be defined
+*/}}
+{{- define "afc.hpaBehavior" -}}
+{{- $compDef := merge (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $hpaDef := get $compDef "hpa" | required (cat "Component" .component "does not have 'hpa' section") -}}
+{{- $behaviorDef := get $hpaDef "behavior" -}}
+{{- if $behaviorDef }}
+behavior: {{ toYaml $behaviorDef | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/*
+Renders HPA metric
+.component (key in .Values.components) must be defined
+*/}}
+{{- define "afc.hpaMetric" -}}
+{{- $compDef := merge (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $hpaDef := get $compDef "hpa" | required (cat "Component" .component "does not have 'hpa' section") -}}
+{{- $metricDef := get $hpaDef "metric" | required (cat "Component" .component "does not have 'hpa.metric' section") -}}
+- type: {{ camelcase (mustFirst (keys $metricDef)) }}
+  {{- toYaml $metricDef | nindent 2 }}
+{{- end }}
+

@@ -12,9 +12,9 @@ import argparse
 import re
 import socket
 import sys
-from typing import cast, List, Set
+from typing import cast, Dict, List
 
-from k3d_lib import error_if, execute, parse_k3d_reg
+from k3d_lib import error_if, execute, K3D_PREFIX, parse_k3d_reg
 
 
 def main(argv: List[str]) -> None:
@@ -51,28 +51,45 @@ def main(argv: List[str]) -> None:
         push_to_localhost = True
 
     # Do the deed
-    pushed: Set[str] = set()
+    pushed_image_to_id: Dict[str, str] = {}
     for imgdef in cast(str, execute(["docker", "image", "list"],
                                     return_output=True)).splitlines():
         m = re.match(r"^(\S+)\s+(\S+)\s+([0-9a-f]+)", imgdef)
         if not m:
             continue
         assert m is not None
-        image_name = cast(re.Match, re.search(r"[^/]+$", m.group(1))).group(0)
+        image_full_name = m.group(1)
         image_tag = m.group(2)
         image_id = m.group(3)
-        if (image_tag != args.TAG) or (image_id in pushed):
+        m = re.match(r"^(.*?)([^/]+)$", image_full_name)
+        error_if(not m,
+                 f"Unsupported structure of image name: '{image_full_name}'")
+        assert m is not None
+        image_repo = m.group(1)
+        image_base_name = m.group(2)
+        if (image_tag != args.TAG) or \
+                any(image_repo.startswith(prefix)
+                    for prefix in (K3D_PREFIX, "localhost")):
             continue
-        execute(["docker", "image", "tag", image_id,
-                 f"{registry_host}:{registry_port}/{image_name}:{args.TAG}"])
+        pushed_id = pushed_image_to_id.get(image_base_name)
+        if pushed_id:
+            error_if(
+                pushed_id != image_id,
+                f"More than one different nonlocal versions of "
+                f"'{image_base_name}:{image_tag}' found in docker repository")
+            continue
+        execute(
+            ["docker", "image", "tag", image_id,
+             f"{registry_host}:{registry_port}/{image_base_name}:{args.TAG}"])
         if push_to_localhost:
-            execute(["docker", "image", "tag", image_id,
-                     f"localhost:{registry_port}/{image_name}:{args.TAG}"])
+            execute(
+                ["docker", "image", "tag", image_id,
+                 f"localhost:{registry_port}/{image_base_name}:{args.TAG}"])
         execute(["docker", "image", "push",
                  f"{'localhost' if push_to_localhost else registry_host}:"
-                 f"{registry_port}/{image_name}:{args.TAG}"])
-        pushed.add(image_id)
-    error_if(not pushed, f"No images with tag `{args.TAG}' found")
+                 f"{registry_port}/{image_base_name}:{args.TAG}"])
+        pushed_image_to_id[image_base_name] = image_id
+    error_if(not pushed_image_to_id, f"No images with tag `{args.TAG}' found")
 
 
 if __name__ == "__main__":

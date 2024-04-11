@@ -7,19 +7,26 @@
 # a copy of which is included with this software program
 
 # pylint: disable=too-many-locals, too-many-branches, too-many-statements
+# pylint: disable=too-many-nested-blocks, invalid-name
 
 import argparse
 import enum
+import multiprocessing
 import os
+import re
 import shlex
 import sys
-from typing import List, Optional, Set
+from typing import Any, List, Optional, Set
 
 from k3d_lib import auto_name, AUTO_NAME, error, error_if, execute, \
     get_known_nodeports, INT_HELM_REL_DIR, K3D_PREFIX, parse_json_output, \
-    parse_k3d_reg, parse_kubecontext, ROOT_DIR, SCRIPTS_DIR
+    parse_k3d_reg, parse_kubecontext, ROOT_DIR, SCRIPTS_DIR, yaml_loads
 
 EPILOG = """\
+- Recommended invocation:
+    $ helm/helm_install.py --build --tag AUTO --no_secrets --http --wait 5m \
+        --preload_ratdb AUTO
+
 - Simplest case - load images from remote repository to current cluster (that
   has secrets loaded), expose AFC http/https:
     $ helm/helm_install.py AUTO
@@ -29,8 +36,26 @@ EPILOG = """\
         --expose ratdb --wait 5m --preload_ratdb
 """
 
+# Path to engines per worker environment variable
+ENGINES_PER_WORKER_PATH = "configmaps.worker.AFC_WORKER_CELERY_CONCURRENCY"
+# Path to maximum number of workers
+MAX_WORKERS_PATH = "components.worker.hpa.maxReplicas"
+
 # Supported cluster types
 ClusterType = enum.Enum("ClusterType", ["K3d"])
+
+
+def get_helm_values(helm_cmd: List[str]) -> Any:
+    """ Retrieves resulting helm values for given helm command """
+    dry_run = execute(helm_cmd + ["--dry-run", "--debug"],
+                      return_output=True, fail_on_error=False)
+    if dry_run is None:
+        return None
+    m = re.search(r"\nCOMPUTED VALUES:\n((.|\n)+?)\n---", dry_run)
+    error_if(not m,
+             "Can't obtain helm values: unrecognized helm output structure")
+    assert m is not None
+    return yaml_loads(m.group(1))
 
 
 def main(argv: List[str]) -> None:
@@ -74,12 +99,12 @@ def main(argv: List[str]) -> None:
     argument_parser.add_argument(
         "--expose", metavar="NODEPORT_NAME1,NODEPORT_NAME2,...",
         action="append", default=[],
-        help=f"Expose to localhost(convert to nodeports) service of "
-        f"components that held given port names. On k3d dispatcher is "
-        f"nodeport (exposed) anyway. List of known nodeports: "
-        f"{', '.join(sorted(known_nodeports.keys()))}. For this to work on "
-        f"k3d nodeports should also be exposed during cluster creation. This "
-        f"parameter may be specified several times")
+        help=f"Expose to localhost (convert to nodeports) services of "
+        f"components that held given port names. List of known nodeports: "
+        f"{', '.join(sorted(known_nodeports.keys()))}. On k3d default is to "
+        f"expose same ports as were specified on cluster creation, plus "
+        f"dispatcher's http and https ports always exposed. This parameter "
+        f"may be specified several times")
     argument_parser.add_argument(
         "--wait", metavar="TIMEunit",
         help="Wait for completion for up to given timeout, specified in "
@@ -94,6 +119,11 @@ def main(argv: List[str]) -> None:
         "update that preserves AFC operation continuity) and ignore "
         "'--preload_ratdb'. Default is to uninstall and (completely stop AFC) "
         "reinstall")
+    argument_parser.add_argument(
+        "--max_workers", metavar="MAX_WORKER_PODS", type=int,
+        help=f"Maximum number of worker pods to set for autoscaler. For k3d "
+        f"default is number of CPUs divided by {ENGINES_PER_WORKER_PATH} (if "
+        f"set). If not set or parameter value is nonpositive - does nothing")
     argument_parser.add_argument(
         "--k3d_reg", metavar="[HOST][:PORT]",
         help="K3d registry to use for k3d operation from local repository. "
@@ -127,16 +157,9 @@ def main(argv: List[str]) -> None:
     release = auto_name(kabob=True) if args.RELEASE == AUTO_NAME \
         else args.RELEASE
 
-    # What components to convert to nodeport?
-    nodeport_components: Set[str] = set()
-    for nodeports in args.expose:
-        for nodeport in nodeports.split(","):
-            error_if(nodeport not in known_nodeports,
-                     f"'{nodeport}' is not a known nodeport name")
-            nodeport_components.add(known_nodeports[nodeport].component)
-
     kubeconfig, kubecontext = parse_kubecontext(args.context)
 
+    k3d_cluster: Optional[str] = None
     current_config = \
         parse_json_output(
             ["kubectl", "config", "view", "-o", "json", "--minify"] +
@@ -145,11 +168,49 @@ def main(argv: List[str]) -> None:
     if current_config["contexts"][0]["context"]["cluster"].\
             startswith(K3D_PREFIX):
         cluster_type = ClusterType.K3d
+        k3d_cluster = current_config["clusters"][0]["name"][len(K3D_PREFIX):]
     else:
         error("Only k3d clusters supported for now. Stay tuned!")
 
+    # What components to convert to nodeport?
+    nodeport_components: Set[str] = set()
+    if args.expose:
+        for nodeports in args.expose:
+            for nodeport_name in nodeports.split(","):
+                if nodeport_name == "":
+                    continue
+                error_if(nodeport_name not in known_nodeports,
+                         f"'{nodeport_name}' is not a known nodeport name")
+                nodeport_components.add(
+                    known_nodeports[nodeport_name].component)
+    elif cluster_type == ClusterType.K3d:
+        known_nodeports = get_known_nodeports(INT_HELM_REL_DIR)
+        assert k3d_cluster is not None
+        for cluster_info in \
+                parse_json_output(["k3d", "cluster", "list", "-o", "json"]):
+            if cluster_info["name"] != k3d_cluster:
+                continue
+            for node_info in cluster_info["nodes"]:
+                for nodeport_str in node_info.get("portMappings", {}):
+                    m = re.match(r"^(\d+)/tcp", str(nodeport_str))
+                    if m is None:
+                        continue
+                    nodeport = int(m.group(1))
+                    for nodeport_info in known_nodeports.values():
+                        if nodeport_info.port == nodeport:
+                            nodeport_components.add(nodeport_info.component)
+                            break
+            break
+        else:
+            error(f"Can't find information about exposed compoinents of k3d "
+                  f"cluster '{k3d_cluster}': cluster not found. Please "
+                  f"specify ports to expose (or lack thereof) explicitly with "
+                  f"--expose parameter")
+
     k3d_registry: Optional[str] = parse_k3d_reg(args.k3d_reg) \
         if (cluster_type == ClusterType.K3d) else None
+
+    execute(["helm", "dependency", "update", INT_HELM_REL_DIR], cwd=ROOT_DIR)
 
     # Create installation context arguments
     context_args: List[str] = []
@@ -219,12 +280,25 @@ def main(argv: List[str]) -> None:
         install_args += ["--values", os.path.abspath(filename)]
     # ... specified settings ...
     install_args += sum((["--set", setting] for setting in args.set), [])
+
+    # Setting maximum number of workers to avoid computer hang
+    max_workers = -1
+    if args.max_workers is not None:
+        max_workers = args.max_workers
+    elif cluster_type == ClusterType.K3d:
+        v = get_helm_values(install_args) or {}
+        for key in ENGINES_PER_WORKER_PATH.split("."):
+            v = v.get(key, {})
+        if isinstance(v, int):
+            max_workers = multiprocessing.cpu_count() // v
+    if max_workers > 0:
+        install_args += ["--set", f"{MAX_WORKERS_PATH}={max_workers}"]
+
     # ... timeout
     if args.wait:
         install_args += ["--wait", "--timeout", args.wait]
 
     # Executing helm install
-    execute(["helm", "dependency", "update", INT_HELM_REL_DIR], cwd=ROOT_DIR)
     execute(install_args, cwd=ROOT_DIR)
 
     # Preloading ratdb

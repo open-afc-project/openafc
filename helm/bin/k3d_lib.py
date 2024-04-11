@@ -73,7 +73,9 @@ def warning_if(cond: Any, message: str) -> None:
 
 
 def execute(args: Union[List[str], str], cwd: Optional[str] = None,
-            return_output: bool = False, echo=True) -> Optional[str]:
+            return_output: bool = False, echo=True,
+            print_prefix: str = "> ", fail_on_error: bool = True) \
+            -> Optional[str]:
     """ Execute given command or commands
 
     Arguments:
@@ -83,9 +85,11 @@ def execute(args: Union[List[str], str], cwd: Optional[str] = None,
     return_output -- True to return output, False to print output and return
                      nothing
     echo          -- True to print command being executed
+    print_prefix  -- Prefix to print before each command
+    fail_on_error -- True to fail on error
     Returns stdout if requested, otherwise None
     """
-    ret: Optional[str] = None
+    ret: Optional[str] = "" if return_output else None
     command: Union[str, List[str]]
     # No matter what, MyPy doesn't get it...
     for command in (args.splitlines() if isinstance(args, str) else [args]):
@@ -102,18 +106,22 @@ def execute(args: Union[List[str], str], cwd: Optional[str] = None,
             print_parts.append("cd -")
 
         if echo:
-            print(" ; ".join(print_parts))
+            print(f"{print_prefix or ''}{' ; '.join(print_parts)}")
         try:
             p = subprocess.run(command, shell=isinstance(command, str),
                                text=True, check=False, cwd=cwd,
                                stdout=subprocess.PIPE if return_output
                                else None)
         except OSError as ex:
+            if not fail_on_error:
+                continue
             ofwhat = "" if echo else f" of '{' ; '.join(print_parts)}'"
             error(f"Execution{ofwhat} failed: {ex}")
-        error_if(p.returncode, "Execution failed")
+        error_if(p.returncode and fail_on_error, "Execution failed")
         if return_output:
-            ret = (ret or "") + ("\n" if ret else "") + p.stdout
+            assert isinstance(ret, str)
+            ret = ret + ("\n" if ret else "") + \
+                ("" if p.returncode else p.stdout)
     return ret
 
 
@@ -183,6 +191,25 @@ def parse_k3d_reg(k3d_reg_arg: Optional[str]) -> str:
     return ret
 
 
+def yaml_load(filename: str) -> Any:
+    """ Returns loaded content of given yaml file """
+    try:
+        with open(filename, encoding="utf-8") as f:
+            return yaml_loads(f.read(), filename=filename)
+    except OSError as ex:
+        error(f"Error reading '{filename}': {ex}")
+
+
+def yaml_loads(s: str, filename: Optional[str] = None) -> Any:
+    """ Returns yaml=parsed value of given string """
+    try:
+        return yaml.load(s,
+                         yaml.CFullLoader if hasattr(yaml, "CFullLoader")
+                         else yaml.FullLoader)
+    except yaml.YAMLError as ex:
+        error(f"Invalid YAML syntax of '{filename if filename else s}': {ex}")
+
+
 NodePortInfo = NamedTuple("NodePortInfo", [("component", str), ("port", int)])
 
 
@@ -190,14 +217,7 @@ def get_known_nodeports(helm_dir: str) -> Dict[str, NodePortInfo]:
     """ Returns dictionary of (component, nodeport) pairs indexed by nodeport
     names """
     values_file = os.path.join(ROOT_DIR, helm_dir, "values.yaml")
-    try:
-        with open(values_file, encoding="utf-8") as f:
-            values = \
-                yaml.load(f.read(),
-                          yaml.CFullLoader if hasattr(yaml, "CFullLoader")
-                          else yaml.FullLoader)
-    except (OSError, yaml.YAMLError) as ex:
-        error(f"Error reading '{values_file}': {ex}")
+    values = yaml_load(values_file)
     if "components" not in values:
         warning(f"'{values_file}' has unknown structure (no 'components' "
                 f"section)")

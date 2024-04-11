@@ -14,8 +14,8 @@ import re
 import sys
 from typing import Dict, List
 
-from k3d_lib import auto_name, AUTO_NAME, error, get_known_nodeports, \
-    INT_HELM_REL_DIR, parse_json_output
+from k3d_lib import auto_name, AUTO_NAME, error, error_if, \
+    get_known_nodeports, INT_HELM_REL_DIR, K3D_PREFIX, parse_json_output
 
 
 def main(argv: List[str]) -> None:
@@ -29,8 +29,8 @@ def main(argv: List[str]) -> None:
             description="List port mappings of (AFC) k3d cluster")
     argument_parser.add_argument(
         "CLUSTER",
-        help="K3d cluster name. AUTO for cluster name made of login name and "
-        "checkout directory")
+        help="K3d cluster name. 'AUTO' for cluster name made of login name "
+        "and checkout directory. 'CURRENT' for current cluster")
 
     if not argv:
         argument_parser.print_help()
@@ -39,8 +39,22 @@ def main(argv: List[str]) -> None:
     args = argument_parser.parse_args(argv)
 
     # Computing cluster name
-    cluster = auto_name(kabob=True) if args.CLUSTER == AUTO_NAME \
-        else args.CLUSTER
+    if args.CLUSTER == "CURRENT":
+        current_cfg = \
+            parse_json_output(
+                ["kubectl", "config", "view", "--minify", "-o", "json"])
+        clusters = current_cfg.get("clusters", [])
+        error_if(len(clusters) != 1,
+                 "Can't determine a current cluster from kubeconfig")
+        kubeconfig_cluster_name = clusters[0].get("name", "")
+        error_if(not kubeconfig_cluster_name.startswith(K3D_PREFIX),
+                 f"Current cluster '{kubeconfig_cluster_name}' is not a k3d "
+                 f"cluster")
+        cluster = kubeconfig_cluster_name[len(K3D_PREFIX):]
+    elif args.CLUSTER == AUTO_NAME:
+        cluster = auto_name(kabob=True)
+    else:
+        cluster = args.CLUSTER
 
     # Obtaining mappings from cluster
     host_to_node: Dict[int, int] = {}

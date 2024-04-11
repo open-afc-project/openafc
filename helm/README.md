@@ -31,11 +31,11 @@ License, a copy of which is included with this software program.
   `$ helm/bin/k3d_cluster_create.py --expose http,https,prometheus AUTO`
 - Build images (`AUTO` as tag name makes tag named after login name and checkout directory), load images to k3d image registry; (re)load AFC into the current cluster. `AUTO` as helm release name makes release name from login name and checkout directory. In loaded AFC cluster HTTP is enabled, no secrets, HTTP/HTTPS/Prometheus ports exposed. Then ratdb prefilled from test database (similarly to what `run_srvr.sh` does):  
 ```
-$ helm/bin/helm_install.py --tag AUTO --build --http --no_secrets --expose http,https,prometheus \
-   --preload_ratdb AUTO
+$ helm/bin/helm_install.py --tag AUTO --build --http --no_secrets \
+    --wait 5m --preload_ratdb AUTO
 ```
-- View port mapping in cluster created above:  
-  `$ helm/bin/k3d_ports.py AUTO`
+- View external port mapping in current cluster:  
+  `$ helm/bin/k3d_ports.py CURRENT`
 - Delete cluster created above:  
   `$ helm/bin/k3d_cluster_create.py --delete AUTO`
 
@@ -343,6 +343,7 @@ Options:
 |**--namespace** *NAMESPACE*|Namespace to use in cluster's context. Default is to use default namespace|
 |**--static** *DIRECTORY*|Static files' directory. Useful if static files are in some unconventional place (usually they are in `/opt/afc/databases/rat_transfer`)|
 |**--k3d_reg** *REGISTRY*|K3d image registry to use. Needed if more than one k3d registry running (which is not recommended). Default to use the first (and only) k3d registry or, if none running, not use it (load images from the remote registries)|
+|**--cfg** *CFG_FILE*|Script's config fil ename. Default is `helm/bin/k3d_cluster_create.yaml`. May also be specified by means of `K3D_CLUSTER_CREATE_CONFIG` environment variable|
 
 ### `k3d_helm_install.py` <a name="k3d_helm_install">
 
@@ -361,7 +362,6 @@ Options:
 |**--tag** TAG|Tag of images to use. May be some tag name or `AUTO` that creates tag name from login name and checkout directory. If unspecified - `appVersion` from `Chart.yaml` is used (usually it corresponds to version, released to remote repositories)|
 |**--build**|Build images and push them to local k3d registry before (re)starting the cluster. `--tag` must be specified|
 |**--push**|Push images to local k3d registry before (re)starting the cluster|
-|**--expose** *NODEPORT1,NODEPORT2,...*|Ports to expose to host. These ports should also be exposed by k3d cluster. Nodeports are specified by name, list of name see in script's help message. If unspecified - HTTP and HTTPS ports of `dispatcher` are exposed|
 |**--http**|Enable HTTP use on `dispatcher`. Default is HTTPS-only even if HTTP port is exposed|
 |**--no_secrets**|Enables operation without secrets. By default secrets should be somehow loaded before cluster starts|
 |**--wait** *TIMEOUT*|Wait for helm installation completion for given time (e.g. `5m`, `30s`, `5m30s` etc.)|
@@ -369,17 +369,19 @@ Options:
 |**--upgrade**|If helmchart is already running - do `helm upgrade` (rolling update that preserves AFC operation continuity) and ignore `--preload_ratdb`. Default is to uninstall and (completely stop AFC) reinstall|
 |**--values** *VALUES_FILE*|Additional `values.yaml` file (e.g. with user/usecase-specific settings). If specified without path - same directory as `values.yaml` is assumed. May be specified several times|
 |**--set** *SE.TT.ING=VALUE*|Sets/overrides individual value for `values.yaml`. Hierarchy levels specified by dots|
+|**--max_workers** *WORKERS*|Maximum number of worker pods. Nonpositive if as per helmchart. For k3d default is number of CPUs divided by number of AFC Engines per worker|
+|**--expose** *NODEPORT1,NODEPORT2,...*|Nodeport names to expose. For k3d clusters, by default - same as exposed by cluster (`--erxpose` switch of `k3d_cluster_create.py`)|
 |**--context** *[KUBECONFIG_FILE][:CONTEXT]*|Kubeconfig file and/or context to use. Default is current context of current kubeconfig|
 |**--namespace** *NAMESPACE*|Namespace to use. Default is namespace from current (or chosen with `--context`) context|
 |**--k3d_reg** *REGISTRY*|K3d registry to use. May be useful if more than one running (not recommended). If none running - none used (thus images are loaded from remote repositories)|
 
 ### `k3d_ports.py` <a name="k3d_ports">
 
-Prints port mapping for given cluster:
+Prints port mapping for given k3d cluster:
 
 `$ helm/bin/k3d_ports.py CLUSTERNAME`
 
-Here `CLUSTERNAME` may be name of cluster or `AUTO` for cluster name made of login name and checkout directory.
+Here `CLUSTERNAME` may be name of cluster or `AUTO` for cluster name made of login name and checkout directory or `CURRENT` for current cluster.
 
 ### Other scripts <a name="other_scripts">
 

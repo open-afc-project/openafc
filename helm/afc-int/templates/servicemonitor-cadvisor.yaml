@@ -1,0 +1,47 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  labels:
+    app: kubelet
+    labels: {{- include "afc.commonLabels" . | nindent 4 }}
+    # serviceMonitorSelector: prometheus
+  name: kubelet
+spec:
+  endpoints:
+  - port: https-metrics
+    scheme: https
+    interval: 5s
+    tlsConfig:
+      insecureSkipVerify: true
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  - port: https-metrics
+    scheme: https
+    path: /metrics/cadvisor
+    interval: 30s
+    honorLabels: true
+    tlsConfig:
+      insecureSkipVerify: true
+    bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  # Maybe below http version will work on GCP. Or maybe not
+  # - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  #   honorLabels: true
+  #   interval: 30s
+  #   port: http-metrics
+  #   scheme: http
+  #   tlsConfig:
+  #     insecureSkipVerify: true
+  # - bearerTokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+  #   honorLabels: true
+  #   interval: 30s
+  #   path: /metrics/cadvisor
+  #   port: http-metrics
+  #   scheme: http
+  #   tlsConfig:
+  #     insecureSkipVerify: true
+  jobLabel: kubelet
+  namespaceSelector:
+    matchNames:
+    - kube-system
+  selector:
+    matchLabels:
+      k8s-app: kubelet

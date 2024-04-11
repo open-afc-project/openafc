@@ -1,0 +1,25 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# Prometheus descriptor for prometheus-operator
+apiVersion: monitoring.coreos.com/v1
+kind: Prometheus
+metadata:
+  name: main
+  namespace: monitoring
+spec:
+  version: v2.45.3
+  portName: prometheus
+  serviceAccountName: prometheus
+  serviceMonitorNamespaceSelector: {}
+  serviceMonitorSelector: {}
+  podMonitorNamespaceSelector: {}
+  podMonitorSelector: {}
+  replicas: 2
+  retention: 7d
+  scrapeInterval: 5s
+  scrapeTimeout: 2s
+  evaluationInterval: 30s  # Interval for recording rules
