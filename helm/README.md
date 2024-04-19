@@ -24,6 +24,11 @@ License, a copy of which is included with this software program.
   - [`k3d_helm_install.py`](#k3d_helm_install)
   - [`k3d_ports.py`](#k3d_ports)
   - [Other scripts](#other_scripts)
+- [Other scripts](#other_scripts)
+- [Prometheus-based autoscaling](#autoscaling)
+  - [Prometheus ins and outs](#prometheus_ins_outs)
+  - [Prometheus operator](#prometheus_operator)
+  - [Prometheus adapter](#prometheus_adaptor)
 
 ## TL;DR <a name="tldr">
 
@@ -74,7 +79,12 @@ helm
 +-- secrets
 |   +-- *.yaml
 +-- bin
-|   +-- *.bin
+|   +-- *.py
++-- monitoring
+|   +-- prometheus
+|   |   +-- *.yaml
+|   +-- prometheus_adapter
+|       +-- *.yaml
 +-- README.md
 ```
 Here is what is important to be known about these folders and files:
@@ -95,6 +105,7 @@ Here is what is important to be known about these folders and files:
   * **templates/_helpers.tpl**. Contains macros, that render various fragments of helmcharts.
 * **Secrets** Directory full of secret manifests that illustrate the structure of used secrets, but not secrets themselves.
 * **bin** Various scripts, initially written to simplify `k3d` operation
+* **monitoring** Manifests and values for Prometheus monitoring and Prometheus-based autoscaling.
 * **README.md** This file
 
 ## Names <a name="names">
@@ -388,3 +399,70 @@ Here `CLUSTERNAME` may be name of cluster or `AUTO` for cluster name made of log
 * **`k3d_push_images.py`** Pushes images to local k3d repository. Used by `helm_install.py`, but also may be used directly.
 * **`ratdb_from_test.p`** Fills `ratdb` from test database. Used by `helm_install.py`, but also may be used directly.
 * **`k3d_lib.py`** Not directly runnable - contains common stuff for other scripts.
+
+## Prometheus-based autoscaling <a name="autoscaling">
+
+Bringing Prometheus to Kubernetes is rather complicated endeavor - and using it for HPA-based autoscaling is even more complicated. Here is a brief overview of what was done and what remains to be done with this respect.
+
+While `kubectl`-ing how it all runs, please note that (by seemingly established convention) all Prometheus/autoscaling infrastructure Kubernetes objects use separate namespaces - some `monitoring`, some `kube-system`. However objects defined in helmcharts of `helm/afc-int/templates` (pod monitors, service monitors, HPA) use `default` namespace.
+
+### Prometheus ins and outs <a name="prometheus_ins-outs">
+
+**Prometheus** is an application that **scrapes** (gathers) **metrics** (labeled numerical time series).
+
+To know where from to scrape metrics Prometheus needs a **Prometheus config file** that specifies REST API URLs (hosts, ports, paths) of metrics' whereabouts and if/how to relabel retrieved metrics. Prometheus counts on external entities to prepare this config file. Moreover, on each config file change Prometheus should be reloaded - again by some external entity.
+
+With scraped metrics Prometheus may do the following:
+ - **Expose** metrics to outer clients via **PromQL** language queries (received via REST API or WebUI).  
+   Thus exposed metrics may be used by:
+   - **Developers** - access via WebUI.
+   - **Grafana** - status presentation tool widely used for Kubernetes monitoring.
+   - **Metrics server** used by autoscaler (more on this in the next chapter).
+   - **Thanos Ruler** - **Thanos** is a system allowing to store metrics in external object storages and optimize their querying. For now this is outside of scope, Prometheus Operator has some Thanos CRDs - maybe they'll eventually be used. Or maybe not.
+ - **Store** metrics persistently in (proprietary) Prometheus database. Metrics to store may be chosen according to store rules.
+ - **Alert** - when certain metrics-based alert rules are met send notification to certain destinations of various kinds.
+
+### Prometheus operator <a name="prometheus_operator">
+
+\<trivia\> In Kubernetes, **operator** is a **stateful controller**. As a controller it defines its own manifest formats (**CRD**s - **Custom Resource Definitions**), subscribes to Cluster API Server for notifications on these and other manifest files. What is stateful about it is not quite clear. \</trivia\>
+
+**Prometheus Operator** is a Kubernetes operator, responsible for:
+ - Concocting Prometheus Config file.
+ - Running Prometheus. This includes Prometheus reloading when config file changes
+ - Handling alerts.
+ - Interfacing with Thanos.
+
+Prometheus Operator may be installed with manifests or helmcharts. AFC uses manifest-based installation as it is simple enough. Prometheus operator itself and its CRDs may be installed like this:  
+`$ kubectl create -f https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.72.0/bundle.yaml`  
+This installs operator's deployment/service/RBAC and a bunch of related CRDs.
+
+To make Prometheus operator work some CRDs shoulds be instantiated as manifests or helmcharts. As of time of this writting following CRDs are instantiatred:  
+ - **Prometheus**. Its CRD is defined by Prometheus Operator. This manifest contains information on how to run Prometheus (how many replicas, how to select metrics, persistent storage of metrics database, etc.) and config reloader.  
+   `helm/monitoring/prometheus` directory contains this manifest (`prometheus-main.yaml`) and RBAC stuff (ServiceAccount, ClusterRole, ClusterRoleBinding manifests) that config reloader needs to gather information about scrapem targets to put to Prometheus config.  
+   As of time of this writing Prometheus manifest does not configure persistent storage for Prometheus database - this may change in future (or maybe Thanos will be used for this).
+ - **PodMonitor/ServiceMonitor** CRDs, defined by Prometheus Operator, containing information on how to scrape metrics from certain pods or from pods behind certain service. Mainly they contain scrape ports and directories.  
+   This CRDs instantiated in `helm/afc-int/templates/podmonitor-*.yaml` and `helm/afc-int/templates/servicemonitor-cadvisor.yaml` helmcharts (`cadvisor` implemented as service monitor, because what it targets is not a pod, but `kubelet`).  
+   Pod monitor helmcharts are pretty identical, their actual contents is defined in `components.*.metrics` of `helm/afc-int/values.yaml`.
+
+In future **Alertmanager** and, maybe, **ThanosRuler** CRDs will also be instantiated.
+
+### Prometheus adapter <a name="prometheus_adaptor">
+
+So, to this moment we have Prometheus up and running - it scrapes metrics, responds to PromQL queries, maybe even generates alerts. The only remaining task is to feed metrics to Kubernetes autoscaler. This seemingly simple task is performed by **Prometheus Adapter** that is as much overcomplicated as it is underdocumented and opaque for debugging. Dealing with it requires extensive googling for examples and a some luck (because if it doesn't work there is almost no way to tell why).
+
+Manifest-based installation of Prometheus adapter is not feasible (too many manifests are needed), so it is installed via helmcharts.
+
+Prometheus adapter replaces Kubernetes metrics server (data source for autoscaler). Metrics server is a separate server (not a controller around Kubernetes API Server), so if it is running - it should be stopped first. The whole installation procedure on k3d looks like this:
+
+```
+$ kubectl delete apiservice v1beta1.metrics.k8s.io
+$ helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+$ helm repo update
+$ helm install custom-metrics prometheus-community/prometheus-adapter --version 2.14.2 \
+    --values helm/monitoring/prometheus_adapter/values-prometheus_adapter.yaml \
+    --wait --timeout 5m
+```
+
+The tricky part here is `values-prometheus_adapter.yaml` that defines how to get autoscaling metrics from Prometheus. PromQL queries for the metrics are defined by means Go templates of not quite documented semantics, so the only possible way is to try to replicate various googled examples until success. This part may take a days of misery and frustration.
+
+Once metrics become available through Prometheus adapter's metrics' server - they can be used for autoscaling. AFC worker autoscaling defined in `helm/afc-int/templates/hpa-worker.yaml`, data for this helmchart defined in `components.worker.hpa` of `helm/afc-int/values.yaml`.
