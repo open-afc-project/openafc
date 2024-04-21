@@ -11,10 +11,15 @@ ENV PYTHONUNBUFFERED=1
 RUN apk add --update --no-cache python3 && ln -sf python3 /usr/bin/python && \
 apk add --update --no-cache py3-six py3-numpy py3-cryptography py3-sqlalchemy \
 py3-requests py3-flask py3-psycopg2 py3-pydantic=~1.10 && \
-apk add --repository=http://dl-cdn.alpinelinux.org/alpine/edge/testing/ \
-py3-confluent-kafka && \
 python3 -m ensurepip && \
 pip3 install --no-cache --upgrade pip setuptools
+
+# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
+# installed as Alpine package (thus not requiring gcc and musl-dev install)
+RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
+    librdkafka-dev=~2.1.1
+RUN pip3 install confluent-kafka==2.1.1
+
 COPY msghnd/requirements.txt /wd/
 RUN pip3 install -r /wd/requirements.txt && mkdir -p /run/gunicorn /etc/xdg/fbrat
 COPY gunicorn/wsgi.py /wd/
