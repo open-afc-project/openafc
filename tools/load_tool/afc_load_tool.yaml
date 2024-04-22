@@ -448,9 +448,13 @@ rest_api:
     rcache_status:
         url: http://rcache:8000/status
 
-    # Make AFC Request
+    # Make AFC Request via msghnd
     afc_req:
         url: http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry
+
+    # Make AFC Request via dispatcher
+    afc_req_dispatcher:
+        url: http://dispatcher/fbrat/ap-afc/availableSpectrumInquiry
 
     # Msghnd endpoint to use for network load test
     msghnd_get:
@@ -480,3 +484,18 @@ ratdb:
     update_config_by_id: >-
         UPDATE "AFCConfig" SET config = '{afc_config}'
         WHERE config->>'regionStr' = '{region_str}'
+
+
+# Kubernetes service information (taken from helm/afc-int/values.yaml)
+k3d_nodeports:
+    rat_server:
+        http: 30081
+    rcache:
+        http: 30083
+    msghnd:
+        http: 30082
+    dispatcher:
+        http: 30080
+        https: 30443
+    ratdb:
+        http: 31432
