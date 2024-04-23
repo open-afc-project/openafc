@@ -1204,7 +1204,8 @@ void AfcManager::initializeDatabases()
 			// Name part contains template - tiled NLCD
 			nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
 			nameMapper = GdalNameMapperPattern::make_unique(
-				nlcdFileInfo.fileName().toStdString(), nlcdDirectory);
+				nlcdFileInfo.fileName().toStdString(),
+				nlcdDirectory);
 		} else if (nlcdFileInfo.isDir()) {
 			// Path is directory - set of files
 			nlcdDirectory = _nlcdFile;
@@ -1213,9 +1214,12 @@ void AfcManager::initializeDatabases()
 			// Otherwise path supposed to be a file
 			nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
 			nameMapper = GdalNameMapperDirect::make_unique(
-				nlcdFileInfo.fileName().toStdString(), nlcdDirectory);
+				nlcdFileInfo.fileName().toStdString(),
+				nlcdDirectory);
 		}
-		cgNlcd.reset(new CachedGdal<uint8_t>(nlcdDirectory, "nlcd",
+		cgNlcd.reset(new CachedGdal<uint8_t>(
+			nlcdDirectory,
+			"nlcd",
 			std::move(nameMapper)));
 		cgNlcd->setNoData(0);
 		/**********************************************************************************/
