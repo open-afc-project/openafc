@@ -1201,21 +1201,24 @@ void AfcManager::initializeDatabases()
 		std::unique_ptr<GdalNameMapperBase> nameMapper(nullptr);
 		// NLCD specification in config may be of various flavors
 		if (nlcdFileInfo.fileName().contains('{')) {
-			// Name part contains template - tiled NLCD
-			/* Sample config: "nlcdFile": "rat_transfer/tiled_nlcd/nlcd_production/nlcd_production_{latHem:ns}{latDegCeil:02}{lonHem:ew}{lonDegFloor:03}.tif", */
+			// Name part contains template - tiled NLCD. Sample config:
+			// "nlcdFile":
+			// "rat_transfer/tiled_nlcd/nlcd_production/nlcd_production_{latHem:ns}{latDegCeil:02}{lonHem:ew}{lonDegFloor:03}.tif"
 			// See comments in GdalNameMapper.h for formatting details
 			nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
 			nameMapper = GdalNameMapperPattern::make_unique(
 				nlcdFileInfo.fileName().toStdString(),
 				nlcdDirectory);
 		} else if (nlcdFileInfo.isDir()) {
-			// Path is directory - set of files
-			/* Sample config: "nlcdFile": "rat_transfer/nlcd/nlcd_production", */
+			// Path is directory - set of files. Sample config:
+			// "nlcdFile":
+			// "rat_transfer/nlcd/nlcd_production"
 			nlcdDirectory = _nlcdFile;
 			nameMapper = GdalNameMapperDirect::make_unique("*", _nlcdFile);
 		} else {
-			// Otherwise path supposed to be a file
-			/* Sample config: "nlcdFile": "rat_transfer/nlcd/nlcd_production/nlcd_2019_land_cover_l48_20210604_resample.tif", */
+			// Otherwise path supposed to be a file. Sample config:
+			// "nlcdFile":
+			// "rat_transfer/nlcd/nlcd_production/nlcd_2019_land_cover_l48_20210604_resample.tif"
 			nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
 			nameMapper = GdalNameMapperDirect::make_unique(
 				nlcdFileInfo.fileName().toStdString(),
