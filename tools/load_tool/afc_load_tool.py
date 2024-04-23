@@ -19,6 +19,7 @@ from collections.abc import Iterable, Iterator
 import copy
 import csv
 import datetime
+import enum
 import hashlib
 import http
 import inspect
@@ -32,14 +33,15 @@ try:
 except ImportError:
     pass
 import re
+import shlex
 import signal
 import sqlite3
 import subprocess
 import sys
 import time
 import traceback
-from typing import Any, Callable, cast, List, Dict, NamedTuple, Optional, \
-    Tuple, Union
+from typing import Any, Callable, cast, List, Dict, NamedTuple, NoReturn, \
+    Optional, Tuple, Union
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -49,6 +51,12 @@ try:
     import yaml
 except ImportError:
     has_yaml = False
+
+
+CURRENT_CLUSTER_NAME = "CURRENT"
+K3D_PREFIX = "k3d-"
+
+Protocol = enum.Enum("Protocol", ["http", "https"])
 
 
 def dp(*args, **kwargs) -> None:  # pylint: disable=invalid-name
@@ -70,7 +78,7 @@ def dp(*args, **kwargs) -> None:  # pylint: disable=invalid-name
     print(f"DP {frameinfo.function}()@{frameinfo.lineno}: {msg}")
 
 
-def error(msg: str) -> None:
+def error(msg: str) -> NoReturn:
     """ Prints given msg as error message and exit abnormally """
     logging.error(msg)
     sys.exit(1)
@@ -159,7 +167,7 @@ class Config(Iterable):
         assert argv is not None
         assert arg_name is not None
         self._path = ""
-        argument_parser = argparse.ArgumentParser()
+        argument_parser = argparse.ArgumentParser(add_help=False)
         argument_parser.add_argument(
             "--" + arg_name, action="append", default=[])
         configs = getattr(argument_parser.parse_known_args(argv)[0], arg_name)
@@ -298,97 +306,229 @@ class Config(Iterable):
                 if isinstance(attr, str) else f"{self._path}[{attr}]")
 
 
-def run_docker(args: List[str]) -> str:
-    """ Runs docker with given parameters, returns stdout content """
+def get_output(args: List[str]) -> str:
+    """ Returns stdout content of givcen command's output """
     try:
-        return \
-            subprocess.check_output(["docker"] + args, universal_newlines=True,
-                                    encoding="utf-8")
-    except subprocess.CalledProcessError as ex:
-        error(f"Failed to run 'docker {' '.join(args)}': {repr(ex)}. Please "
-              "specify all hosts explicitly")
+        return subprocess.check_output(args, universal_newlines=True,
+                                       encoding="utf-8")
+    except (subprocess.CalledProcessError, OSError) as ex:
+        error(f"Failed to run '{' '.join(shlex.quote(arg) for arg in args)}': "
+              f"{repr(ex)}")
     return ""  # Unreachable code to make pylint happy
 
 
 class ServiceDiscovery:
-    """ Container and IP discovery for services
+    """ Base class for service discovery
+
+    Protected members:
+    cfg -- Config object
+    """
+
+    def __init__(self, cfg: Config) -> None:
+        """ Constructor
+
+        Arguments:
+        cfg -- Config object
+        """
+        self.cfg = cfg
+
+    def get_exec(self, service: str) -> List[str]:
+        """ Initial part of command to execute something in container of given
+        service. Should be overloaded """
+        error("Cluster type/name not specified")
+        unused_argument(service)
+        return []  # Unreacheable code
+
+    def get_url(self, base_url: str, param_host: Optional[str],
+                protocol: Optional[Protocol] = None) -> str:
+        """ Construct URL from base URL (taken from config) and optional
+        command line host
+
+        Arguments:
+        base_url   -- Base URL from config
+        param_host -- Optional [protocol://][host:port][/path] from command
+                      line
+        protocol   -- Protocol (scheme) to use. None to use protocol from base
+                      URL
+        Returns actionable URL
+        """
+        base_parts = urllib.parse.urlparse(base_url)
+        if param_host:
+            replacement_url = param_host
+            if "://" not in replacement_url:
+                replacement_url = f"{base_parts.scheme}://{replacement_url}"
+        else:
+            base_netloc_parts = base_parts.netloc.split(":")
+            host = base_netloc_parts[0]
+            port = \
+                int(base_netloc_parts[1]) if len(base_netloc_parts) > 1 else 80
+            replacement_url = \
+                self.get_cluster_url(
+                    protocol=protocol if protocol is not None
+                    else getattr(Protocol, base_parts.scheme),
+                    service=host, port=port)
+        replacement_parts = urllib.parse.urlparse(replacement_url)
+        replacements = {field: getattr(replacement_parts, field)
+                        for field in base_parts._fields
+                        if getattr(replacement_parts, field)}
+        return urllib.parse.urlunparse(base_parts._replace(**replacements))
+
+    def get_cluster_url(self, protocol: Protocol, service: str, port: int) \
+            -> str:
+        """ Returns URL inside cluster that corresponds to given parametess
+        (should be overloaded)
+
+        Arguments:
+        protocol -- Protocol (http or https)
+        service  -- Service name from
+        port     -- Port number
+        Returns SCHEME://HOST:PORT
+        """
+        error("Cluster type/name not specified")
+        unused_argument(protocol)  # Unreacheable code
+        unused_argument(service)
+        unused_argument(port)
+        return ""
+
+    @classmethod
+    def create(cls, cfg: Config, compose_project: Optional[str] = None,
+               k3d_cluster: Optional[str] = None) -> "ServiceDiscovery":
+        """ Factory method
+
+        Arguments:
+        cfg             -- Config object
+        compose_project -- Compose project name or None
+        k3d_cluster     -- K3d cluster name (may be CURRENT) or None
+        Returns instance of class derived from ServiceDiscovery
+        """
+        error_if(compose_project and k3d_cluster,
+                 "--comp_proj and --k3d parameters are mutually exclusive")
+        if compose_project:
+            return ServiceDiscoveryCompose(cfg=cfg,
+                                           compose_project=compose_project)
+        if k3d_cluster:
+            return ServiceDiscoveryK3d(cfg=cfg, k3d_cluster=k3d_cluster)
+        return ServiceDiscovery(cfg=cfg)
+
+    def _get_json_output(self, args: List[str]) -> Any:
+        """ Execute command and return parsed JSON output """
+        try:
+            return json.loads(get_output(args))
+        except json.JSONDecodeError as ex:
+            error(f"Error parsing as JSON output of "
+                  f"'{' '.join(shlex.quote(arg) for arg in args)}': {ex}")
+        return None  # Unreacheable code
+
+
+class ServiceDiscoveryCompose(ServiceDiscovery):
+    """ Implements service discovery for Compose cluster
 
     Private attributes:
-    _compose_project -- Compose project name
-    _containers      -- Dictionary of _ContainerInfo object, indexed by service
-                        name. None before first access
+    _compose_project  -- Cmpose project name
+    _containers       -- Dictionary of _ContainerInfo object, indexed by
+                         service name. None before first access
     """
     class _ContainerInfo:
         """ Information about single service
 
         Public attributes:
-        name -- Container name
-        ip   -- Container IP (if known) or None
+        name      -- Container/pod name
+        ip        -- IP address. None if not yet found
+        ext_ports -- Dictionary of external IPv4 ports, indexed by internal
+                     ports
         """
 
         def __init__(self, name: str) -> None:
-            self.name = name
-            self.ip: Optional[str] = None
+            """ Constructor
 
-    def __init__(self, compose_project: str) -> None:
+            Arguments:
+            name -- Container name
+            """
+            self.name = name
+            self.ip = None
+            self.ext_ports: Dict[int, int] = {}
+
+    def __init__(self, cfg: Config, compose_project: str) -> None:
         """ Constructor
 
         Arguments:
+        cfg             -- Config object
         compose_project -- Docker compose project name
         """
+        super().__init__(cfg=cfg)
         self._compose_project = compose_project
         self._containers: \
-            Optional[Dict[str, "ServiceDiscovery._ContainerInfo"]] = None
+            Optional[Dict[str, "ServiceDiscoveryCompose._ContainerInfo"]] = \
+            None
 
-    def get_container(self, service: str) -> str:
-        """ Returns container name for given service name """
-        ci = self._get_cont_info(service)
-        return ci.name
+    def get_exec(self, service: str) -> List[str]:
+        """ Initial part of command to execute something in container of given
+        service """
+        return ["docker", "exec", self._get_cont_info(service=service).name]
 
-    def get_ip(self, service: str) -> str:
-        """ Returns container IP for given service name """
+    def get_cluster_url(self, protocol: Protocol, service: str, port: int) \
+            -> str:
+        """ Returns URL inside cluster that corresponds to given parametess
+
+        Arguments:
+        protocol -- Protocol (http or https)
+        service  -- Service name from
+        port     -- Port number
+        Returns SCHEME://HOST:PORT
+        """
         ci = self._get_cont_info(service)
-        if ci.ip:
-            return ci.ip
-        try:
-            inspect_dict = json.loads(run_docker(["inspect", ci.name]))
-        except json.JSONDecodeError as ex:
-            error(f"Error parsing 'docker inspect {ci.name}' output: "
-                  f"{repr(ex)}")
-        try:
-            for net_name, net_info in \
-                    inspect_dict[0]["NetworkSettings"]["Networks"].items():
-                if net_name.endswith("_default"):
-                    ci.ip = net_info["IPAddress"]
-                    break
-            else:
-                error(f"Default network not found in container '{ci.name}'")
-        except (AttributeError, LookupError) as ex:
-            error(f"Unsupported structure of  'docker inspect {ci.name}' "
-                  f"output: {repr(ex)}")
-        assert ci.ip is not None
-        return ci.ip
+        if service == "dispatcher":
+            ext_port = \
+                ci.ext_ports.get(80 if protocol == Protocol.http else 443)
+            error_if(not ext_port,
+                     f"Dispatcher {protocol.name} port not exposed")
+            return f"{protocol}://localhost:{ext_port}"
+        if not ci.ip:
+            inspect_dict = \
+                self._get_json_output(["docker", "inspect", ci.name])
+            try:
+                for net_name, net_info in \
+                        inspect_dict[0]["NetworkSettings"]["Networks"].items():
+                    if net_name.endswith("_default"):
+                        ci.ip = net_info["IPAddress"]
+                        break
+                else:
+                    error(
+                        f"Default network not found in container '{ci.name}'")
+            except (AttributeError, LookupError) as ex:
+                error(f"Unsupported structure of  'docker inspect {ci.name}' "
+                      f"output: {repr(ex)}")
+            assert ci.ip is not None
+        return f"{protocol.name}://{ci.ip}:{port}"
 
     def _get_cont_info(self, service: str) \
-            -> "ServiceDiscovery._ContainerInfo":
+            -> "ServiceDiscoveryCompose._ContainerInfo":
         """ Returns _ContainerInfo object for given service name """
         if self._containers is None:
             self._containers = {}
             name_offset: Optional[int] = None
-            for line in run_docker(["ps"]).splitlines():
+            for line in get_output(["docker", "ps"]).splitlines():
                 if name_offset is None:
                     name_offset = line.find("NAMES")
                     error_if(name_offset < 0,
                              "Unsupported structure of 'docker ps' output")
                     continue
                 assert name_offset is not None
+                container: Optional[str] = None
                 for names in re.split(r",\s*", line[name_offset:]):
                     m = re.search(r"(%s_(.+)_\d+)" %
                                   re.escape(self._compose_project),
                                   names)
                     if m:
-                        self._containers[m.group(2)] = \
+                        container = m.group(2)
+                        self._containers[container] = \
                             self._ContainerInfo(name=m.group(1))
+                if container:
+                    for m in \
+                            re.finditer(r"\d+\.\d+\.\d+\.\d+:(\d+)->(\d+)/tcp",
+                                        line):
+                        self._containers[container].\
+                            ext_ports[int(m.group(2))] = int(m.group(1))
         error_if(not self._containers,
                  f"No running containers found for compose project "
                  f"'{self._compose_project}'")
@@ -400,38 +540,130 @@ class ServiceDiscovery:
         return ret
 
 
-def get_url(base_url: str, param_host: Optional[str],
-            service_discovery: Optional[ServiceDiscovery]) -> str:
-    """ Construct URL from base URL in config and command line host or compose
-    project name
+class ServiceDiscoveryK3d(ServiceDiscovery):
+    """ Implements service discovery for k3d cluster
 
-    Arguments:
-    base_url           -- Base URL from config
-    param_host         -- Optional host name from command line parameter
-    service_discovery  -- Optional ServiceDiscovery object. None means that
-                          service discovery is not possible (--comp_proj was
-                          not specified) and hostname must be provided
-                          explicitly
-    Returns actionable URL with host either specified or retrieved from compose
-    container inspection and tail from base URL
+    Private attributes:
+    _k3d_cluster_arg  -- Cluster name from command line
+    _k3d_cluster_name -- Actual cluster name (without k3d- prefix). Initially
+                         None
+    _context_name     -- Kubeconfig contetx name. Initially None
+    _pod_list         -- List of pod names. Initially None
+    _port_mapping     -- External ports indexed by internal nodeports.
+                         Initially None
     """
-    base_parts = urllib.parse.urlparse(base_url)
-    if param_host:
-        if "://" not in param_host:
-            param_host = f"{base_parts.scheme}://{param_host}"
-        param_parts = urllib.parse.urlparse(param_host)
-        replacements = {field: getattr(param_parts, field)
-                        for field in base_parts._fields
-                        if getattr(param_parts, field)}
-        return urllib.parse.urlunparse(base_parts._replace(**replacements))
-    if service_discovery is None:
-        return base_url
-    service = base_parts.netloc.split(":")[0]
-    return \
-        urllib.parse.urlunparse(
-            base_parts._replace(
-                netloc=service_discovery.get_ip(service) +
-                base_parts.netloc[len(service):]))
+
+    def __init__(self, cfg: Config, k3d_cluster: str) -> None:
+        """ Constructor
+
+        Arguments:
+        cfg         -- Config object
+        k3d_cluster -- K3d cluster name of CURRENT
+        """
+        super().__init__(cfg=cfg)
+        self._k3d_cluster_arg = k3d_cluster
+        self._k3d_cluster_name: Optional[str] = None
+        self._context_name: Optional[str] = None
+        self._pod_list: Optional[List[str]] = None
+        self._port_mapping: Optional[Dict[int, int]] = None
+
+    def get_exec(self, service: str) -> List[str]:
+        """ Initial part of command to execute something in container of given
+        service """
+        self._compute_cluster_name()
+        if self._pod_list is None:
+            self._pod_list = []
+            kubeconfig = self._get_json_output(["kubectl", "config", "view",
+                                                "-o", "json"])
+            for context in (kubeconfig or {}).get("contexts", []):
+                if context.get("context" or {}).get("cluster", "") == \
+                        f"{K3D_PREFIX}{self._k3d_cluster_name}":
+                    self._context_name = context["name"]
+                    break
+            else:
+                error(f"Cluster '{self._k3d_cluster_name}' (aka "
+                      f"'{K3D_PREFIX}{self._k3d_cluster_name}') not found in "
+                      f"current kubeconfig (without being in kubeconfig its "
+                      f"pods can't be obtained)")
+            assert self._context_name is not None
+            self._pod_list = \
+                [cast(re.Match, re.match(r"^(pod/)?(.*)$", line)).group(2)
+                 for line in get_output(["kubectl", "get", "pods",
+                                         "-o", "name",
+                                         "--context", self._context_name,
+                                         "-n", "default"]).splitlines()]
+        assert self._context_name is not None
+        service = service.replace("_", "-")
+        for pod_name in self._pod_list:
+            if pod_name.startswith(service):
+                return ["kubectl", "exec", "--context", self._context_name,
+                        pod_name, "--"]
+        error(
+            f"Pod '{service}' not found in cluster '{self._k3d_cluster_name}'")
+        return []  # Unreacheable code
+
+    def get_cluster_url(self, protocol: Protocol, service: str, port: int) \
+            -> str:
+        """ Returns URL inside cluster that corresponds to given parametess
+
+        Arguments:
+        protocol -- Protocol (http or https)
+        service  -- Service name from
+        port     -- Port number
+        Returns SCHEME://HOST:PORT
+        """
+        self._compute_cluster_name()
+        if self._port_mapping is None:
+            self._port_mapping = {}
+            for cluster_info in \
+                    self._get_json_output(["k3d", "cluster", "list",
+                                           "-o", "json"]):
+                if cluster_info.get("name") == self._k3d_cluster_name:
+                    for node_info in cluster_info.get("nodes", []):
+                        for int_port, mappings in \
+                                node_info.get("portMappings", {}).items():
+                            m = re.match(r"^(\d+)/tcp$", int_port)
+                            if not m:
+                                continue
+                            int_port_num = int(m.group(1))
+                            for mapping_info in (mappings or []):
+                                if mapping_info.get("HostIp"):
+                                    continue
+                                ext_port = mapping_info.get("HostPort")
+                                if ext_port:
+                                    self._port_mapping[int_port_num] = \
+                                        int(ext_port)
+                    break
+            else:
+                error(f"Information about k3d cluster "
+                      f"{self._k3d_cluster_name} not found")
+        assert self._port_mapping is not None
+        nodeport = self.cfg.k3d_nodeports.get(service, {}).get(protocol.name)
+        error_if(nodeport is None,
+                 f"Can't find {protocol.name} nodeport name for {service} in "
+                 f"the config file")
+        error_if(nodeport not in self._port_mapping,
+                 f"{protocol.name} port of {service} not exposed by k3d "
+                 f"cluster {self._k3d_cluster_name}")
+        return f"{protocol.name}://localhost:{self._port_mapping[nodeport]}"
+
+    def _compute_cluster_name(self) -> None:
+        """ Make sure _k3d_cluster_name is computed """
+        if self._k3d_cluster_name is not None:
+            return
+        k3d_cluster_arg = self._k3d_cluster_arg
+        if k3d_cluster_arg == CURRENT_CLUSTER_NAME:
+            current_kubeconfig = \
+                self._get_json_output(["kubectl", "config", "view", "--minify",
+                                       "-o", "json"])
+            clusters = current_kubeconfig.get("clusters", [])
+            error_if(not clusters, "Current kubeconfig has no current cluster")
+            k3d_cluster_arg = clusters[0].get("name", "")
+            error_if(not k3d_cluster_arg.startswith(K3D_PREFIX),
+                     "Current cluster is not k3d")
+        self._k3d_cluster_name = \
+            k3d_cluster_arg[len(K3D_PREFIX):] \
+            if k3d_cluster_arg.startswith(K3D_PREFIX) else k3d_cluster_arg
 
 
 def ratdb(cfg: Config, command: str, service_discovery: ServiceDiscovery) \
@@ -445,9 +677,11 @@ def ratdb(cfg: Config, command: str, service_discovery: ServiceDiscovery) \
     Returns number of affected records for INSERT/UPDATE/DELETE, list of row
     dictionaries on SELECT
     """
-    cont = service_discovery.get_container(cfg.ratdb.service)
-    result = run_docker(["exec", cont, "psql", "-U", cfg.ratdb.username,
-                         "-d", cfg.ratdb.dbname, "--csv", "-c", command])
+    result = \
+        get_output(
+            service_discovery.get_exec(cfg.ratdb.service) +
+            ["psql", "-U", cfg.ratdb.username, "-d", cfg.ratdb.dbname, "--csv",
+             "-c", command])
     if command.upper().startswith("SELECT "):
         try:
             return list(csv.DictReader(result.splitlines()))
@@ -854,18 +1088,18 @@ class LoadRestDataHandler(RestDataHandlerBase):
 PostWorkerReqInfo = \
     NamedTuple("PostWorkerReqInfo",
                [
-                   # Request indices, contained in REST API request data
-                   ("req_indices", List[int]),
-                   # REST API Request data
-                   ("req_data", bytes)])
+                # Request indices, contained in REST API request data
+                ("req_indices", List[int]),
+                # REST API Request data
+                ("req_data", bytes)])
 
 
 # GET Worker request data and supplementary information
 GetWorkerReqInfo = \
     NamedTuple("GetWorkerReqInfo",
                [
-                   # Number of GET requests to send
-                   ("num_gets", int)])
+                # Number of GET requests to send
+                ("num_gets", int)])
 
 
 # REST API request results
@@ -1604,13 +1838,13 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
 
 
 def wait_rcache_flush(cfg: Config, args: Any,
-                      service_discovery: Optional[ServiceDiscovery]) -> None:
+                      service_discovery: ServiceDiscovery) -> None:
     """ Waiting for rcache preload stuff flushing to DB
 
     Arguments:
     cfg               -- Config object
     args              -- Parsed command line arguments
-    service_discovery -- Optional ServiceDiscovery object
+    service_discovery -- ServiceDiscovery object
     """
     logging.info("Waiting for updates to flush to DB")
     start_time = datetime.datetime.now()
@@ -1618,8 +1852,8 @@ def wait_rcache_flush(cfg: Config, args: Any,
     prev_queue_len: Optional[int] = None
     status_printer = StatusPrinter()
     rcache_status_url = \
-        get_url(base_url=cfg.rest_api.rcache_status.url,
-                param_host=args.rcache, service_discovery=service_discovery)
+        service_discovery.get_url(base_url=cfg.rest_api.rcache_status.url,
+                                  param_host=args.rcache)
     while True:
         try:
             with urllib.request.urlopen(rcache_status_url, timeout=30) as f:
@@ -1660,20 +1894,18 @@ def wait_rcache_flush(cfg: Config, args: Any,
 
 
 def get_afc_config(cfg: Config, args: Any,
-                   service_discovery: Optional[ServiceDiscovery]) \
-        -> Dict[str, Any]:
+                   service_discovery: ServiceDiscovery) -> Dict[str, Any]:
     """ Retrieve AFC Config for configured Ruleset ID
 
     Arguments:
     cfg                -- Config object
     args               -- Parsed command line arguments
-    service_discovery  -- Optional ServiceDiscovery object
+    service_discovery  -- ServiceDiscovery object
     Returns AFC Config as dictionary
     """
     get_config_url = \
-        get_url(base_url=cfg.rest_api.get_config.url,
-                param_host=getattr(args, "rat_server", None),
-                service_discovery=service_discovery)
+        service_discovery.get_url(base_url=cfg.rest_api.get_config.url,
+                                  param_host=getattr(args, "rat_server", None))
     try:
         get_config_url += cfg.region.rulesest_id
         with urllib.request.urlopen(get_config_url, timeout=30) as f:
@@ -1802,15 +2034,16 @@ def do_preload(cfg: Config, args: Any) -> None:
         afc_config = {}
         worker_url = ""
     else:
-        service_discovery = None if args.comp_proj is None \
-            else ServiceDiscovery(compose_project=args.comp_proj)
+        service_discovery = \
+            ServiceDiscovery.create(cfg=cfg, compose_project=args.comp_proj,
+                                    k3d_cluster=args.k3d)
         if args.protect_cache:
             try:
                 with urllib.request.urlopen(
                         urllib.request.Request(
-                            get_url(base_url=cfg.rest_api.protect_rcache.url,
-                                    param_host=args.rcache,
-                                    service_discovery=service_discovery),
+                            service_discovery.get_url(
+                                base_url=cfg.rest_api.protect_rcache.url,
+                                param_host=args.rcache),
                             method="POST"),
                         timeout=30):
                     pass
@@ -1819,9 +2052,9 @@ def do_preload(cfg: Config, args: Any) -> None:
                       f"using protect_rcache.url: {repr(ex)}")
 
         worker_url = \
-            get_url(base_url=cfg.rest_api.update_rcache.url,
-                    param_host=args.rcache,
-                    service_discovery=service_discovery)
+            service_discovery.get_url(
+                base_url=cfg.rest_api.update_rcache.url,
+                param_host=args.rcache)
 
         afc_config = get_afc_config(cfg=cfg, args=args,
                                     service_discovery=service_discovery)
@@ -1829,8 +2062,8 @@ def do_preload(cfg: Config, args: Any) -> None:
     min_idx, max_idx = get_idx_range(args.idx_range)
 
     run(rest_data_handler=PreloadRestDataHandler(
-        cfg=cfg, afc_config=afc_config,
-        req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
+            cfg=cfg, afc_config=afc_config,
+            req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
         max_idx=max_idx, status_period=args.status_period,
@@ -1839,36 +2072,6 @@ def do_preload(cfg: Config, args: Any) -> None:
     if not args.dry:
         wait_rcache_flush(cfg=cfg, args=args,
                           service_discovery=service_discovery)
-
-
-def get_afc_worker_url(args: Any, base_url: str,
-                       service_discovery: Optional[ServiceDiscovery]) -> str:
-    """ REST API URL to AFC server
-
-    Arguments:
-    cfg               -- Config object
-    base_url          -- Base URL from config
-    service_discovery -- Optional ServiceDiscovery object
-    Returns REST API URL
-    """
-    if args.localhost:
-        error_if(not args.comp_proj,
-                 "--comp_proj parameter must be specified")
-        m = re.search(r"0\.0\.0\.0:(\d+)->%d/tcp.*%s_dispatcher_\d+" %
-                      (80 if args.localhost == "http" else 443,
-                       re.escape(args.comp_proj)),
-                      run_docker(["ps"]))
-        error_if(not m,
-                 "AFC port not found. Please specify AFC server address "
-                 "explicitly and remove --localhost switch")
-        assert m is not None
-        ret = get_url(base_url=base_url,
-                      param_host=f"localhost:{m.group(1)}",
-                      service_discovery=service_discovery)
-    else:
-        ret = get_url(base_url=base_url, param_host=args.afc,
-                      service_discovery=service_discovery)
-    return ret
 
 
 def do_load(cfg: Config, args: Any) -> None:
@@ -1881,11 +2084,15 @@ def do_load(cfg: Config, args: Any) -> None:
     if args.dry:
         worker_url = ""
     else:
-        service_discovery = None if args.comp_proj is None \
-            else ServiceDiscovery(compose_project=args.comp_proj)
+        service_discovery = \
+            ServiceDiscovery.create(cfg=cfg, compose_project=args.comp_proj,
+                                    k3d_cluster=args.k3d)
         worker_url = \
-            get_afc_worker_url(args=args, base_url=cfg.rest_api.afc_req.url,
-                               service_discovery=service_discovery)
+            service_discovery.get_url(
+                base_url=cfg.rest_api.afc_req_dispatcher.url if args.dispatcher
+                else cfg.rest_api.afc_req.url, param_host=args.afc,
+                protocol=getattr(Protocol, args.dispatcher) if args.dispatcher
+                else None)
         if args.no_cache:
             parsed_worker_url = urllib.parse.urlparse(worker_url)
             worker_url = \
@@ -1896,8 +2103,8 @@ def do_load(cfg: Config, args: Any) -> None:
 
     min_idx, max_idx = get_idx_range(args.idx_range)
     run(rest_data_handler=LoadRestDataHandler(
-        cfg=cfg, randomize=args.random, population_db=args.population,
-        req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
+            cfg=cfg, randomize=args.random, population_db=args.population,
+            req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
         retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
         max_idx=max_idx, status_period=args.status_period, count=args.count,
@@ -1916,35 +2123,37 @@ def do_netload(cfg: Config, args: Any) -> None:
     expected_code: Optional[int] = None
     worker_url = ""
     if not args.dry:
-        service_discovery = None if args.comp_proj is None \
-            else ServiceDiscovery(compose_project=args.comp_proj)
+        service_discovery = \
+            ServiceDiscovery.create(cfg=cfg, compose_project=args.comp_proj,
+                                    k3d_cluster=args.k3d)
         if args.target is None:
-            if args.localhost and (not args.rcache):
+            if args.dispatcher and (not args.rcache):
                 args.target = "dispatcher"
-            elif args.afc and (not (args.localhost or args.rcache)):
+            elif args.afc and (not (args.dispatcher or args.rcache)):
                 args.target = "msghnd"
-            elif args.target and (not (args.localhost or args.afc)):
+            elif args.rcache and (not (args.dispatcher or args.afc)):
                 args.target = "rcache"
             else:
                 error("'--target' argument must be explicitly specified")
         if args.target == "rcache":
             worker_url = \
-                get_url(base_url=cfg.rest_api.rcache_get.url,
-                        param_host=args.rcache,
-                        service_discovery=service_discovery)
+                service_discovery.get_url(base_url=cfg.rest_api.rcache_get.url,
+                                          param_host=args.rcache)
             expected_code = cfg.rest_api.rcache_get.get("code")
         elif args.target == "msghnd":
             worker_url = \
-                get_url(base_url=cfg.rest_api.msghnd_get.url,
-                        param_host=args.afc,
-                        service_discovery=service_discovery)
+                service_discovery.get_url(base_url=cfg.rest_api.msghnd_get.url,
+                                          param_host=args.afc)
             expected_code = cfg.rest_api.msghnd_get.get("code")
         else:
             assert args.target == "dispatcher"
             worker_url = \
-                get_afc_worker_url(
-                    args=args, base_url=cfg.rest_api.dispatcher_get.url,
-                    service_discovery=service_discovery)
+                service_discovery.get_url(
+                    base_url=cfg.rest_api.afc_req_dispatcher.url
+                    if args.dispatcher else cfg.rest_api.afc_req.url,
+                    param_host=args.afc,
+                    protocol=getattr(Protocol, args.dispatcher)
+                    if args.dispatcher else None)
             expected_code = cfg.rest_api.dispatcher_get.get("code")
     run(netload_target=args.target, url=worker_url,
         parallel=args.parallel, backoff=args.backoff, retries=args.retries,
@@ -1964,8 +2173,9 @@ def do_cache(cfg: Config, args: Any) -> None:
              "--protect and --unprotect are mutually exclusive")
     error_if(not (args.protect or args.unprotect or args.invalidate),
              "Nothing to do")
-    service_discovery = None if args.comp_proj is None \
-        else ServiceDiscovery(compose_project=args.comp_proj)
+    service_discovery = \
+        ServiceDiscovery.create(cfg=cfg, compose_project=args.comp_proj,
+                                k3d_cluster=args.k3d)
     json_data: Any
     for arg, attr, json_data in \
             [("protect", "protect_rcache", None),
@@ -1975,9 +2185,10 @@ def do_cache(cfg: Config, args: Any) -> None:
             if not getattr(args, arg):
                 continue
             data: Optional[bytes] = None
-            url = get_url(base_url=getattr(cfg.rest_api, attr).url,
-                          param_host=args.rcache,
-                          service_discovery=service_discovery)
+            url = \
+                service_discovery.get_url(
+                    base_url=getattr(cfg.rest_api, attr).url,
+                    param_host=args.rcache)
             req = urllib.request.Request(url, method="POST")
             if json_data is not None:
                 data = json.dumps(json_data).encode(encoding="ascii")
@@ -1995,7 +2206,9 @@ def do_afc_config(cfg: Config, args: Any) -> None:
     cfg  -- Config object
     args -- Parsed command line arguments
     """
-    service_discovery = ServiceDiscovery(compose_project=args.comp_proj)
+    service_discovery = \
+        ServiceDiscovery.create(cfg=cfg, compose_project=args.comp_proj,
+                                k3d_cluster=args.k3d)
     afc_config = get_afc_config(cfg=cfg, args=args,
                                 service_discovery=service_discovery)
     afc_config_str = \
@@ -2107,13 +2320,20 @@ def main(argv: List[str]) -> None:
         "--afc", metavar="[PROTOCOL://]HOST[:port][path][params]",
         help="AFC Server to send requests to. Unspecified parts are taken "
         "from 'rest_api.afc_req' of config file. By default determined by "
-        "means of '--comp_proj'")
+        "means of '--comp_proj' or '--k3d'")
     switches_afc.add_argument(
-        "--localhost", nargs="?", choices=["http", "https"], const="http",
-        help="If --afc not specified, default is to send requests to msghnd "
-        "container (bypassing Nginx container). This flag causes requests to "
-        "be sent to external http/https AFC port on localhost. If protocol "
-        "not specified http is assumed")
+        "--dispatcher", nargs="?", choices=["http", "https"], const="http",
+        help="If --afc is not specified - send AFC Requests to http (default) "
+        "or https port of the dispatcher. If neither --afc nor --dispatcher "
+        "specified, AFC Requests are sent directly to msghnd (to avoid https "
+        "issues on dispatcher")
+
+    switches_k3d = argparse.ArgumentParser(add_help=False)
+    switches_k3d.add_argument(
+        "--k3d", metavar="CLUSTER",
+        help=f"K3d cluster to send requests to. '{CURRENT_CLUSTER_NAME}' for "
+        f"current cluster.  Should have necessary ports exposed (at a "
+        f"minimum - dispatcher's http or https)")
 
     switches_rat = argparse.ArgumentParser(add_help=False)
     switches_rat.add_argument(
@@ -2155,7 +2375,7 @@ def main(argv: List[str]) -> None:
     parser_preload = subparsers.add_parser(
         "preload",
         parents=[switches_common, switches_rat, switches_req, switches_compose,
-                 switches_rcache],
+                 switches_rcache, switches_k3d],
         help="Fill rcache with (fake) responses")
     parser_preload.add_argument(
         "--protect_cache", action="store_true",
@@ -2167,7 +2387,7 @@ def main(argv: List[str]) -> None:
     parser_load = subparsers.add_parser(
         "load",
         parents=[switches_common, switches_req, switches_count,
-                 switches_compose, switches_afc],
+                 switches_compose, switches_afc, switches_k3d],
         help="Do load test")
     parser_load.add_argument(
         "--no_cache", action="store_true",
@@ -2194,17 +2414,17 @@ def main(argv: List[str]) -> None:
     parser_network = subparsers.add_parser(
         "netload",
         parents=[switches_common, switches_count, switches_compose,
-                 switches_afc, switches_rcache],
+                 switches_afc, switches_rcache, switches_k3d],
         help="Network load test by repeatedly querying health endpoints")
     parser_network.add_argument(
         "--target", choices=["dispatcher", "msghnd", "rcache"],
         help="What to test. If omitted then guess is attempted: 'dispatcher' "
-        "if --localhost specified, 'msghnd' if --afc without --localhost is "
+        "if --dispatcher specified, 'msghnd' if --afc without --dispatcher is "
         "specified, 'rcache' if --rcache is specified")
     parser_network.set_defaults(func=do_netload)
 
     parser_cache = subparsers.add_parser(
-        "cache", parents=[switches_compose, switches_rcache],
+        "cache", parents=[switches_compose, switches_rcache, switches_k3d],
         help="Do something with response cache")
     parser_cache.add_argument(
         "--protect", action="store_true",
@@ -2220,10 +2440,8 @@ def main(argv: List[str]) -> None:
     parser_cache.set_defaults(func=do_cache)
 
     parser_afc_config = subparsers.add_parser(
-        "afc_config", parents=[switches_rat], help="Modify AFC Config")
-    parser_afc_config.add_argument(
-        "--comp_proj", metavar="PROJ_NAME", required=True,
-        help="Docker compose project name. This parameter is mandatory")
+        "afc_config", parents=[switches_rat, switches_compose, switches_k3d],
+        help="Modify AFC Config")
     parser_afc_config.add_argument(
         "--new", metavar="VALUE_TYPE",
         choices=["str", "int", "float", "bool", "list"],
