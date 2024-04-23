@@ -17,12 +17,6 @@ py3-click py3-click-plugins py3-wcwidth py3-six py3-tz tzdata \
 # heatmap adds
 imagemagick zip
 
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1
-RUN pip3 install confluent-kafka==2.1.1
-
 COPY worker/requirements.txt /wd/
 RUN pip3 install --root-user-action=ignore -r /wd/requirements.txt
 
