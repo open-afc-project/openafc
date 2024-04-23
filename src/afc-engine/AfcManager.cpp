@@ -1217,10 +1217,7 @@ void AfcManager::initializeDatabases()
 				nlcdFileInfo.fileName().toStdString(),
 				nlcdDirectory);
 		}
-		cgNlcd.reset(new CachedGdal<uint8_t>(
-			nlcdDirectory,
-			"nlcd",
-			std::move(nameMapper)));
+		cgNlcd.reset(new CachedGdal<uint8_t>(nlcdDirectory, "nlcd", std::move(nameMapper)));
 		cgNlcd->setNoData(0);
 		/**********************************************************************************/
 	} else if (_propEnvMethod == CConst::popDensityMapPropEnvMethod) {
