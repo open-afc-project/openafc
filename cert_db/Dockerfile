@@ -16,8 +16,9 @@ pip3 install --no-cache --upgrade pip setuptools
 # Installing Confluent Kafka Python client. Eventually, hopefully, it will be
 # installed as Alpine package (thus not requiring gcc and musl-dev install)
 RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1
-RUN pip3 install confluent-kafka==2.1.1
+    librdkafka-dev=~2.1.1 && \
+    pip3 install confluent-kafka==2.1.1 && \
+    apk del python3-dev gcc musl-dev
 
 COPY cert_db/requirements.txt /wd/
 RUN pip3 install -r /wd/requirements.txt && mkdir -p /etc/xdg/fbrat
