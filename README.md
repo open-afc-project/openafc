@@ -825,6 +825,8 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 |AFC_MSGHND_ACCESS_LOG||msghnd| the Access log file to write to. Default to don't. Use `/proc/self/fd/2` for console|
 |AFC_MSGHND_ERROR_LOG|`/proc/self/fd/2`|msghnd| the Error log file to write to|
 |AFC_MSGHND_LOG_LEVEL|`info`|msghnd| The granularity of Error log outputs (values are 'debug', 'info', 'warning', 'error', 'critical'|
+|FLASK_SQLALCHEMY_DATABASE_URI||msghnd,rat-server,objst,cert_db|Ratdb DSN. Overrides SQLALCHEMY_DATABASE_URI of ratapi.conf|
+|FLASK_RATDB_PASSWORD_FILE||msghnd,rat-server,objst,cert_db|File with password for ratdb DSN. Overrides RATDB_PASSWORD_FILE of ratapi.conf|
 | **worker settings**|||please read [afc-engine-preload README.md](/src/afc-engine-preload/README.md)|
 |AFC_AEP_ENABLE|Not defined|worker|Enable the preload library if defined|
 |AFC_AEP_FILELIST|`/aep/list/aep.list`|worker|Path to file tree info file|
@@ -847,7 +849,8 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 |AFC_SERVER_NAME|"_"|dispatcher|Hostname of the AFC Server, for example - "openafc.tip.build". "_" - will accept any hostname (but this is not secure)|
 | **RCACHE settings** ||||
 |RCACHE_ENABLED|TRUE|rcache, rat_server, msghnd, worker, uls_downloader|TRUE if Rcache enabled, FALSE to use legacy objstroage response cache|
-|RCACHE_POSTGRES_DSN|Must be set|rcache, rat_server, msghnd|Connection string to Rcache Postgres database|
+|RCACHE_POSTGRES_DSN|Must be set|rcache, rat_server, msghnd|Connection string to Rcache Postgres database (with default credentials)|
+|RCACHE_POSTGRES_PASWORD_FILE||rcache, rat_server, msghnd|Name of file with password for Rcache database DSN|
 |RCACHE_SERVICE_URL|Must be set|rat_server, msghnd, worker, uls_downloader|Rcache service REST API base URL|
 |RCACHE_RMQ_DSN|Must be set|rat_server, msghnd, worker|AMQP URL to RabbitMQ vhost that workers use to communicate computation result|
 |RCACHE_UPDATE_ON_SEND|TRUE|TRUE if worker sends result to Rcache server, FALSE if msghnd/rat_server|
