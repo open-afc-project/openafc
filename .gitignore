@@ -24,3 +24,7 @@ src/ratapi/ratapi/priv_config.py
 mfk_*
 *.secret.yaml
 tests/regression/pipe
+__pycache__/
+*.pyc
+Chart.lock
+**/charts/*.tgz

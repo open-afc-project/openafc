@@ -1,6 +1,6 @@
 #
 # Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
-# refers solely to the Broadcom Inc. corporate affiliate that owns 
+# refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
@@ -15,6 +15,9 @@ ENV RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
 
 # Default Rcache database connection string
 ENV RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
+
+# Rcache database password file name
+# ENV RCACHE_POSTGRES_PASSWORD_FILE
 
 WORKDIR /wd
 

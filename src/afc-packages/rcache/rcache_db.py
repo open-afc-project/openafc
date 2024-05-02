@@ -10,6 +10,7 @@
 # pylint: disable=too-many-branches
 
 import sqlalchemy as sa
+import secret_utils
 from typing import Any, cast, Dict, List, Optional, Tuple
 import urllib.parse
 
@@ -100,12 +101,14 @@ class RcacheDb:
     # All table names
     ALL_TABLE_NAMES = [AP_TABLE_NAME, SWITCHES_TABLE_NAME]
 
-    def __init__(self, rcache_db_dsn: Optional[str] = None) -> None:
+    def __init__(self, rcache_db_dsn: Optional[str] = None,
+                 rcache_db_password_file: Optional[str] = None) -> None:
         """ Constructor
 
         Arguments:
-        rcache_db_dsn -- Database connection string. May be None for Alembic
-                         use
+        rcache_db_dsn           -- Database connection string. May be None for
+                                   Alembic use
+        rcache_db_password_file -- Optional file with password for DSN
         """
         self.metadata = sa.MetaData()
         # This declaration must be kept in sync with rcache_models.ApDbRecord
@@ -136,7 +139,10 @@ class RcacheDb:
             self.metadata,
             sa.Column("name", sa.String(), nullable=False, primary_key=True),
             sa.Column("state", sa.Boolean(), nullable=False))
-        self.rcache_db_dsn = rcache_db_dsn
+        self.rcache_db_dsn = \
+            secret_utils.substitute_password(
+                dsc="rcache database", dsn=rcache_db_dsn,
+                password_file=rcache_db_password_file, optional=True)
         self.db_name: Optional[str] = \
             urllib.parse.urlsplit(self.rcache_db_dsn).path.strip("/") \
             if self.rcache_db_dsn else None

@@ -11,6 +11,7 @@
 
 import datetime
 import enum
+import secret_utils
 import sqlalchemy as sa
 import sqlalchemy.dialects.postgresql as sa_pg
 from typing import Any, Dict, Iterable, List, NamedTuple, Optional, Set
@@ -87,13 +88,13 @@ AlarmInfo = \
     NamedTuple(
         "AlarmInfo",
         [
-            # Type of alarm
-            ("alarm_type", AlarmType),
-            # Specific reason for alarm (name of missing milestone,
-            # name of offending external file, etc.)
-            ("alarm_reason", str),
-            # Alarm timestramp
-            ("timestamp", datetime.datetime)])
+         # Type of alarm
+         ("alarm_type", AlarmType),
+         # Specific reason for alarm (name of missing milestone,
+         # name of offending external file, etc.)
+         ("alarm_reason", str),
+         # Alarm timestramp
+         ("timestamp", datetime.datetime)])
 
 
 def safe_dsn(dsn: Optional[str]) -> Optional[str]:
@@ -190,14 +191,20 @@ class StateDb:
             if self._engine is not None:
                 self._engine.dispose()
 
-    def __init__(self, db_dsn: Optional[str]) -> None:
+    def __init__(self, db_dsn: Optional[str],
+                 db_password_file: Optional[str]) -> None:
         """ Constructor
 
         Arguments:
-        db_dsn -- Connection string to state database. None in Alembic
-                  environment
+        db_dsn           -- Connection string to state database. None in
+                            Alembic environment
+        db_password_file -- File with password to use in DSN
         """
-        self.db_dsn = db_dsn
+        self.db_dsn = \
+            secret_utils.substitute_password(
+                dsc="ULS Service State Database", dsn=db_dsn,
+                password_file=db_password_file, optional=True)
+        db_dsn
         self.db_name: Optional[str] = \
             urllib.parse.urlsplit(self.db_dsn).path.strip("/") \
             if self.db_dsn else None

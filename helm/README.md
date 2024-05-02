@@ -76,8 +76,6 @@ helm
 |   +-- Chart.yaml
 |   +-- templates
 |       +-- _helpers.tpl
-+-- secrets
-|   +-- *.yaml
 +-- bin
 |   +-- *.py
 +-- monitoring
@@ -103,7 +101,6 @@ Here is what is important to be known about these folders and files:
 * **afc-ext** Folder for forthcoming 'outer' AFC cluster.
 * **afc-common** Folder for files common for all cluster-definition helmcharts
   * **templates/_helpers.tpl**. Contains macros, that render various fragments of helmcharts.
-* **Secrets** Directory full of secret manifests that illustrate the structure of used secrets, but not secrets themselves.
 * **bin** Various scripts, initially written to simplify `k3d` operation
 * **monitoring** Manifests and values for Prometheus monitoring and Prometheus-based autoscaling.
 * **README.md** This file

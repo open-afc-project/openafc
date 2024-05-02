@@ -32,12 +32,14 @@ import os
 import prometheus_client                            # type: ignore
 import random
 import re
+import secret_utils
 import sqlalchemy as sa                             # type: ignore
 import sqlalchemy.dialects.postgresql as sa_pg      # type: ignore
 import string
 import sys
 from typing import Any, Callable, Dict, Generic, List, NamedTuple, Optional, \
     Set, Tuple, Type, TypeVar, Union
+import urllib.parse
 import uuid
 
 # This script version
@@ -415,40 +417,22 @@ class DatabaseBase(ABC):
     """
 
     # Driver part to use in Postgres database connection strings
-    DB_DRIVER = "postgresql+psycopg2://"
-
-    # Parts of connection string
-    ConnStrParts = \
-        NamedTuple(
-            "ConnStrParts",
-            # Driver part with trailing '://'
-            [("driver", str),
-             # Username
-             ("user", str),
-             # Host name
-             ("host", str),
-             # Port number
-             ("port", str),
-             # Database name
-             ("database", str),
-             # Parameters with leading '?' or empty string
-             ("params", str)])
+    DB_DRIVER = "postgresql+psycopg2"
 
     def __init__(self, arg_conn_str: Optional[str],
-                 arg_password: Optional[str]) -> None:
+                 arg_password_file: Optional[str]) -> None:
         """ Constructor
 
         Arguments:
-        arg_conn_str -- Connection string from command line or None
-        arg_password -- Password from command line or None
+        arg_conn_str      -- Connection string from command line or None
+        arg_password_file -- Name of file with password
         """
         self._disposed = True
         try:
             self.engine = \
                 self.create_engine(arg_conn_str=arg_conn_str,
-                                   arg_password=arg_password)
-            self.db_name = \
-                self.parse_conn_str(arg_conn_str=arg_conn_str).database
+                                   arg_password_file=arg_password_file)
+            self.db_name = self.get_db_name(arg_conn_str)
             self.metadata = sa.MetaData()
             self.metadata.reflect(bind=self.engine)
             self._disposed = False
@@ -464,60 +448,66 @@ class DatabaseBase(ABC):
             self.engine.dispose()
 
     @classmethod
-    def parse_conn_str(cls, arg_conn_str: Optional[str]) \
-            -> "DatabaseBase.ConnStrParts":
-        """ Parse argument/default connection string
+    def get_db_name(cls, arg_conn_str: Optional[str]) -> str:
+        """ Get database name from combination of argument connection string
+        and default connection string """
+        return \
+            urllib.parse.urlparse(cls.create_dsn(arg_conn_str=arg_conn_str)).\
+            path.lstrip("/")
+
+    @classmethod
+    def create_dsn(cls, arg_conn_str: Optional[str],
+                   arg_password_file: Optional[str] = None) -> str:
+        """ Creates DSN by combining given parameters and default connection
+        string
 
         Arguments:
-        arg_conn_str -- Connection string from command line or None
-        Returns ConnStrParts
+        arg_conn_str      -- Connection string passed from command line
+        arg_password_file -- File with password
+        Returns DSN, made by combining all that stuff
         """
-        cs_re = \
-            re.compile(
-                r"^((?P<driver>[^/ ]+)://)?"
-                r"(?P<user>[^@/ ]+?)?"
-                r"(@(?P<host>[^:/ ]+)(:(?P<port>\d+))?)?"
-                r"(/(?P<database>[^?]+))?"
-                r"(?P<params>\?\S.+)?$")
-        m_arg = cs_re.match((arg_conn_str or "").strip())
-        error_if(not m_arg,
-                 f"{cls.name_for_logs()} database connection string "
-                 f"'{arg_conn_str or ''}' has invalid format")
-        assert m_arg is not None
-        m_def = cs_re.match(cls.default_conn_str())
-        assert m_def is not None
-        error_if(m_arg.group("driver") and
-                 (m_arg.group("driver") != m_def.group("driver")),
+        default_parts = urllib.parse.urlparse(cls.default_conn_str())
+        if arg_conn_str and ("://" not in arg_conn_str):
+            arg_conn_str = f"{default_parts.scheme}://{arg_conn_str}"
+        arg_parts = urllib.parse.urlparse(arg_conn_str)
+        error_if(arg_parts.scheme != default_parts.scheme,
                  f"{cls.name_for_logs()} database connection string has "
-                 f"invalid database driver name '{m_arg.group('driver')}'. "
-                 f"If specified it must be '{m_def.group('driver')}'")
+                 f"invalid database driver name '{arg_parts.scheme}'. "
+                 f"If specified it must be '{default_parts.scheme}'")
+
+        netloc = ""
+        for part_name, separator in [("username", ""), ("password", ":"),
+                                     ("hostname", "@"), ("port", ":")]:
+            part = getattr(arg_parts, part_name) or \
+                getattr(default_parts, part_name)
+            netloc += f"{separator}{part}"
+        replacements = {"scheme": cls.DB_DRIVER, "netloc": netloc}
+        replacements.update(
+            {field: getattr(default_parts, field)
+             for field in default_parts._fields
+             if (not getattr(arg_parts, field)) and
+             getattr(default_parts, field) and (field not in replacements)})
         return \
-            cls.ConnStrParts(
-                driver=m_def.group("driver"),
-                user=m_arg.group("user") or m_def.group("user"),
-                host=m_arg.group("host") or m_def.group("host"),
-                port=m_arg.group("port") or m_def.group("port"),
-                database=m_arg.group("database") or m_def.group("database"),
-                params=(m_arg.group("params") or m_def.group("params")) or "")
+            secret_utils.substitute_password(
+                dsc=cls.name_for_logs(),
+                dsn=arg_parts._replace(**replacements).geturl(),
+                password_file=arg_password_file)
 
     @classmethod
     def create_engine(cls, arg_conn_str: Optional[str],
-                      arg_password: Optional[str]) -> sa.engine.base.Engine:
+                      arg_password_file: Optional[str]) \
+            -> sa.engine.base.Engine:
         """ Creates SqlAlchemy engine
 
         Arguments:
-        arg_conn_str -- Connection string from command line or None
-        arg_password -- Password from command line or None
+        arg_conn_str      -- Connection string from command line or None
+        arg_password_file -- Name of file with password or None
         Returns SqlAlchemy engine
         """
-        conn_str_parts = cls.parse_conn_str(arg_conn_str=arg_conn_str)
         return \
             sa.create_engine(
-                f"{cls.DB_DRIVER}"
-                f"{conn_str_parts.user}"
-                f"{(':' + arg_password) if arg_password else ''}"
-                f"@{conn_str_parts.host}:{conn_str_parts.port}/"
-                f"{conn_str_parts.database}{conn_str_parts.params}")
+                cls.create_dsn(arg_conn_str=arg_conn_str,
+                               arg_password_file=arg_password_file))
 
     @classmethod
     @abstractmethod
@@ -538,7 +528,7 @@ class AlsDatabase(DatabaseBase):
     @classmethod
     def default_conn_str(cls) -> str:
         """ Default connection string """
-        return "postgresql://postgres@localhost:5432/ALS"
+        return "postgresql://postgres:postgres@localhost:5432/ALS"
 
     @classmethod
     def name_for_logs(cls) -> str:
@@ -557,7 +547,7 @@ class LogsDatabase(DatabaseBase):
     @classmethod
     def default_conn_str(cls) -> str:
         """ Default connection string """
-        return "postgresql://postgres@localhost:5432/AFC_LOGS"
+        return "postgresql://postgres:postgres@localhost:5432/AFC_LOGS"
 
     @classmethod
     def name_for_logs(cls) -> str:
@@ -606,7 +596,7 @@ class InitialDatabase(DatabaseBase):
     @classmethod
     def default_conn_str(cls) -> str:
         """ Default connection string """
-        return "postgresql://postgres@localhost:5432/postgres"
+        return "postgresql://postgres:postgres@localhost:5432/postgres"
 
     @classmethod
     def name_for_logs(cls) -> str:
@@ -615,16 +605,16 @@ class InitialDatabase(DatabaseBase):
 
     def create_db(self, db_name: str,
                   if_exists: "InitialDatabase.IfExists",
-                  conn_str: str, password: Optional[str] = None,
+                  conn_str: str, password_file: Optional[str] = None,
                   template: Optional[str] = None) -> bool:
         """ Create database
 
         Arguments:
-        db_name   -- Name of database to create
-        if_exists -- What to do if database already exists
-        conn_str  -- Connection string to database being created
-        password  -- Password for connection string to database being created
-        template  -- Name of template database to use
+        db_name       -- Name of database to create
+        if_exists     -- What to do if database already exists
+        conn_str      -- Connection string to database being created
+        password_file -- Optional name of file with password
+        template      -- Name of template database to use
         Returns True if database was created, False if it already exists
         """
         with self.engine.connect() as conn:
@@ -643,7 +633,7 @@ class InitialDatabase(DatabaseBase):
                 if if_exists != self.IfExists.Skip:
                     raise
                 engine = self.create_engine(arg_conn_str=conn_str,
-                                            arg_password=password)
+                                            arg_password_file=password_file)
                 engine.dispose()
                 logging.info(
                     f"Already existing database '{db_name}' will be used")
@@ -2450,10 +2440,10 @@ class RequestResponseTableUpdater(TableUpdaterBase[uuid.UUID, JSON_DATA_TYPE]):
                 code_line=LineNumber.exc(), data=data_object)
 
     def _update_foreign_targets(
-            self,
-            row_infos: Dict[uuid.UUID,
-                            Tuple[JSON_DATA_TYPE, List[ROW_DATA_TYPE]]],
-            month_idx: int) -> None:
+                self,
+                row_infos: Dict[uuid.UUID,
+                                Tuple[JSON_DATA_TYPE, List[ROW_DATA_TYPE]]],
+                month_idx: int) -> None:
         """ Updates tables this one references
 
         Arguments:
@@ -2864,7 +2854,7 @@ class AfcMessageTableUpdater(TableUpdaterBase[int, AlsMessageBundle]):
                 rr_dict[
                     RequestResponseAssociationTableDataKey(
                         message_id=ji(inserted_row[0]), request_id=req_id)] = \
-                    request_response
+                        request_response
         self._rr_assoc_updater.update_db(data_dict=rr_dict,
                                          month_idx=month_idx)
 
@@ -3481,20 +3471,23 @@ def do_init_db(args: Any) -> None:
     databases: Set[DatabaseBase] = set()
     try:
         try:
-            init_db = InitialDatabase(arg_conn_str=args.init_postgres,
-                                      arg_password=args.init_postgres_password)
+            init_db = \
+                InitialDatabase(
+                    arg_conn_str=args.init_postgres,
+                    arg_password_file=args.init_postgres_password_file)
             databases.add(init_db)
         except sa.exc.SQLAlchemyError as ex:
             error(f"Connection to {InitialDatabase.name_for_logs()} database "
                   f"failed: {ex}")
         nothing_done = True
         patch: List[str]
-        for conn_str, password, sql_file, template, db_class, sql_required, \
-                patch in \
-                [(args.als_postgres, args.als_postgres_password, args.als_sql,
-                  args.als_template, AlsDatabase, True, ALS_PATCH),
-                 (args.log_postgres, args.log_postgres_password, args.log_sql,
-                  args.log_template, LogsDatabase, False, [])]:
+        for conn_str, password_file, sql_file, template, db_class, \
+                sql_required, patch in \
+                [(args.als_postgres, args.als_postgres_password_file,
+                  args.als_sql, args.als_template, AlsDatabase, True,
+                  ALS_PATCH),
+                 (args.log_postgres, args.log_postgres_password_file,
+                  args.log_sql, args.log_template, LogsDatabase, False, [])]:
             if not (conn_str or sql_file or template):
                 continue
             nothing_done = False
@@ -3506,14 +3499,15 @@ def do_init_db(args: Any) -> None:
                 f"database")
             created = False
             try:
-                database = db_class.parse_conn_str(conn_str).database
+                database = db_class.get_db_name(conn_str)
                 created = \
                     init_db.create_db(
                         db_name=database,
                         if_exists=InitialDatabase.IfExists(args.if_exists),
                         template=template, conn_str=conn_str,
-                        password=password)
-                db = db_class(arg_conn_str=conn_str, arg_password=password)
+                        password_file=password_file)
+                db = db_class(arg_conn_str=conn_str,
+                              arg_password_file=password_file)
                 databases.add(db)
                 with db.engine.connect() as conn:
                     if created and sql_file:
@@ -3544,10 +3538,10 @@ def do_siphon(args: Any) -> None:
     if args.prometheus_port is not None:
         prometheus_client.start_http_server(args.prometheus_port)
     adb = AlsDatabase(arg_conn_str=args.als_postgres,
-                      arg_password=args.als_postgres_password) \
+                      arg_password_file=args.als_postgres_password_file) \
         if args.als_postgres else None
     ldb = LogsDatabase(arg_conn_str=args.log_postgres,
-                       arg_password=args.log_postgres_password) \
+                       arg_password_file=args.log_postgres_password_file) \
         if args.log_postgres else None
     try:
         kafka_client = \
@@ -3677,9 +3671,10 @@ def main(argv: List[str]) -> None:
         f"https://www.postgresql.org/docs/current/libpq-connect.html"
         f"#LIBPQ-CONNSTRING for details")
     switches_als_db.add_argument(
-        "--als_postgres_password", metavar="PASSWORD",
+        "--als_postgres_password_file", metavar="PASSWORD_FILE",
         type=docker_arg_type(str),
-        help="Password to use for ALS Database connection")
+        help="File with password to substitute to ALS database connection "
+        "string")
 
     switches_log_db = argparse.ArgumentParser(add_help=False)
     switches_log_db.add_argument(
@@ -3693,9 +3688,10 @@ def main(argv: List[str]) -> None:
         f"https://www.postgresql.org/docs/current/libpq-connect.html"
         f"#LIBPQ-CONNSTRING for details. Default is not use log database")
     switches_log_db.add_argument(
-        "--log_postgres_password", metavar="PASSWORD",
+        "--log_postgres_password_file", metavar="PASSWORD_FILE",
         type=docker_arg_type(str),
-        help="Password to use for Log Database connection")
+        help="File with password to substitute to Log database connection "
+        "string")
 
     switches_init = argparse.ArgumentParser(add_help=False)
     switches_init.add_argument(
@@ -3710,9 +3706,10 @@ def main(argv: List[str]) -> None:
         f"https://www.postgresql.org/docs/current/libpq-connect.html"
         f"#LIBPQ-CONNSTRING for details")
     switches_init.add_argument(
-        "--init_postgres_password", metavar="PASSWORD",
+        "--init_postgres_password_file", metavar="PASSWORD_FILE",
         type=docker_arg_type(str),
-        help="Password to use for initial database connection")
+        help="File with password to substitute to initial database connection "
+        "string")
     switches_init.add_argument(
         "--if_exists", choices=["skip", "drop"],
         type=docker_arg_type(str, default="exc"),
