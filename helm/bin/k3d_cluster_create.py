@@ -369,7 +369,7 @@ def main(argv: List[str]) -> None:
                 helmchart = expand_filename(helmchart, root=ROOT_DIR)
             helm_args = ["helm", "install"]
             for param, value, no_value in \
-                    [("", install_item.get("helm_release"), "--generate_name"),
+                    [("", install_item.get("helm_release"), "--generate-name"),
                      ("",  helmchart, ""),
                      ("--kubeconfig", kubeconfig, ""),
                      ("--kube-context", context, ""),
