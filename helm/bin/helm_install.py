@@ -10,17 +10,23 @@
 # pylint: disable=too-many-nested-blocks, invalid-name
 
 import argparse
+import base64
 import enum
+import glob
 import multiprocessing
 import os
 import re
 import shlex
+import shutil
 import sys
-from typing import Any, List, Optional, Set
+import tempfile
+from typing import Any, Dict, List, Optional, Set
+import yaml
 
 from k3d_lib import auto_name, AUTO_NAME, error, error_if, execute, \
     get_known_nodeports, INT_HELM_REL_DIR, K3D_PREFIX, parse_json_output, \
-    parse_k3d_reg, parse_kubecontext, ROOT_DIR, SCRIPTS_DIR, yaml_loads
+    parse_k3d_reg, parse_kubecontext, ROOT_DIR, SCRIPTS_DIR, yaml_load, \
+    yaml_loads
 
 EPILOG = """\
 - Recommended invocation:
@@ -36,6 +42,8 @@ EPILOG = """\
         --expose ratdb --wait 5m --preload_ratdb
 """
 
+DEFAULT_SECRET_DIR = "tools/secrets/templates"
+
 # Path to engines per worker environment variable
 ENGINES_PER_WORKER_PATH = "configmaps.worker.AFC_WORKER_CELERY_CONCURRENCY"
 # Path to maximum number of workers
@@ -43,6 +51,69 @@ MAX_WORKERS_PATH = "components.worker.hpa.maxReplicas"
 
 # Supported cluster types
 ClusterType = enum.Enum("ClusterType", ["K3d"])
+
+
+def make_fake_secrets(fake_secrets_arg: Optional[str], tempdir: str) \
+        -> Optional[str]:
+    """ Creates fake secrets backend definition in values.yaml format
+
+    Arguments:
+    fake_secrets_arg -- --fake_secrets argument in
+                          SECRETSTORE_NAME[:SECRET_DIR] form. May be None
+    tempdir            -- Directory for values.yaml override file
+    Returns name of created values.yaml override file, None if fake_secrets_arg
+    is None
+    """
+    if not fake_secrets_arg:
+        return None
+    parts = fake_secrets_arg.split(":")
+    error_if(len(parts) > 2,
+             "--fake_secrets has invalid format")
+    secret_store = parts[0]
+    file_or_dir = parts[1] if len(parts) > 1 \
+        else os.path.join(ROOT_DIR, DEFAULT_SECRET_DIR)
+    files: List[str] = []
+    if os.path.isfile(file_or_dir):
+        files = [file_or_dir]
+    elif os.path.isdir(file_or_dir):
+        files = glob.glob(os.path.join(file_or_dir, "*.yaml"))
+        error_if(not files, f"No YAML files found in '{file_or_dir}'")
+    else:
+        error("Secrets for --fake_secrets not found")
+    secrets: Dict[str, str] = {}
+    for file in files:
+        for yaml_idx, yaml_dict in enumerate(yaml_load(filename=file,
+                                                       multidoc=True)):
+            if yaml_dict.get("kind") != "Secret":
+                continue
+            name = yaml_dict.get("metadata", {}).get("name")
+            error_if(not name, f"Secret #{yaml_idx + 1} of '{file}' doesn't "
+                     f"have name")
+            try:
+                properties: List[str] = \
+                    list(yaml_dict.get("stringData", {}).values()) + \
+                    [base64.b64decode(v)
+                     for v in yaml_dict.get("data", {}).values()]
+            except LookupError as ex:
+                error(f"Secret '{name}' from file '{file}' has invalid "
+                      f"structure: {ex}")
+            error_if(len(properties) != 1,
+                     f"Secret '{name}' from file '{file}' has invalid "
+                     f"structure: exactly one property per secret is allowed")
+            error_if(name in secrets,
+                     f"Duplicate definition of secret '{name}'")
+            secrets[name] = properties[0]
+    ret = os.path.join(tempdir, "fake_secrets.yaml")
+    fake_provider = \
+        {"secretStores":
+         {secret_store:
+          {"provider":
+           {"fake":
+            {"data":
+             [{"key": k, "value": v} for k, v in secrets.items()]}}}}}
+    with open(ret, mode="w", encoding="utf-8") as f:
+        yaml.dump(fake_provider, stream=f, indent=2)
+    return ret
 
 
 def get_helm_values(helm_cmd: List[str]) -> Any:
@@ -94,6 +165,15 @@ def main(argv: List[str]) -> None:
         "--no_secrets", action="store_true",
         help="Expect no secrets to be loaded")
     argument_parser.add_argument(
+        "--fake_secrets", metavar="STORE[:FILE_OR_DIR]",
+        help=f"Creates 'fake' secret backend for given secret store (STORE is "
+        f"an index in 'secretStores' of values.yaml) from given file with "
+        f"secret manifest or directory full of such files (only *.yaml files "
+        f"in it are considered). Each manifest file may contain several "
+        f"secrets. Each secret should contain just one key (which is "
+        f"ignoreds, as fake store is propertyless). Default secret directory "
+        f"is {DEFAULT_SECRET_DIR}")
+    argument_parser.add_argument(
         "--http", action="store_true",
         help="Enable HTTP use (default is HTTPS only)")
     argument_parser.add_argument(
@@ -137,6 +217,10 @@ def main(argv: List[str]) -> None:
         "--set", metavar="VA.RI.AB.LE=VALUE", action="append", default=[],
         help="Additional value setting (overrides some vaslues.yaml variable)")
     argument_parser.add_argument(
+        "--temp_dir", metavar="SIRECTORY",
+        help="Use this directory as temporary file directory and do not "
+        "remove it upon completion (for debugging)")
+    argument_parser.add_argument(
         "RELEASE",
         help="Helm release name. 'AUTO' means construct from username and "
         "checkout directory")
@@ -172,143 +256,164 @@ def main(argv: List[str]) -> None:
     else:
         error("Only k3d clusters supported for now. Stay tuned!")
 
-    # What components to convert to nodeport?
-    nodeport_components: Set[str] = set()
-    if args.expose:
-        for nodeports in args.expose:
-            for nodeport_name in nodeports.split(","):
-                if nodeport_name == "":
-                    continue
-                error_if(nodeport_name not in known_nodeports,
-                         f"'{nodeport_name}' is not a known nodeport name")
-                nodeport_components.add(
-                    known_nodeports[nodeport_name].component)
-    elif cluster_type == ClusterType.K3d:
-        known_nodeports = get_known_nodeports(INT_HELM_REL_DIR)
-        assert k3d_cluster is not None
-        for cluster_info in \
-                parse_json_output(["k3d", "cluster", "list", "-o", "json"]):
-            if cluster_info["name"] != k3d_cluster:
-                continue
-            for node_info in cluster_info["nodes"]:
-                for nodeport_str in node_info.get("portMappings", {}):
-                    m = re.match(r"^(\d+)/tcp", str(nodeport_str))
-                    if m is None:
-                        continue
-                    nodeport = int(m.group(1))
-                    for nodeport_info in known_nodeports.values():
-                        if nodeport_info.port == nodeport:
-                            nodeport_components.add(nodeport_info.component)
-                            break
-            break
+    tempdir: Optional[str] = None
+    try:
+        if args.temp_dir:
+            os.makedirs(args.temp_dir, exist_ok=True)
+            tempdir = os.path.abspath(args.temp_dir)
         else:
-            error(f"Can't find information about exposed compoinents of k3d "
-                  f"cluster '{k3d_cluster}': cluster not found. Please "
-                  f"specify ports to expose (or lack thereof) explicitly with "
-                  f"--expose parameter")
+            tempdir = tempfile.gettempdir()
 
-    k3d_registry: Optional[str] = parse_k3d_reg(args.k3d_reg) \
-        if (cluster_type == ClusterType.K3d) else None
-
-    execute(["helm", "dependency", "update", INT_HELM_REL_DIR], cwd=ROOT_DIR)
-
-    # Create installation context arguments
-    context_args: List[str] = []
-    for switch, arg, in [("--kubeconfig", kubeconfig),
-                         ("--kube-context", kubecontext),
-                         ("--namespace", args.namespace)]:
-        if arg:
-            context_args += [switch, arg]
-
-    # If release currently running - uninstall it first
-    upgrade = False
-    for helm_info in \
-            parse_json_output(["helm", "list", "-o", "json"] + context_args):
-        if helm_info["name"] == release:
-            if args.upgrade:
-                upgrade = True
+        # What components to convert to nodeport?
+        nodeport_components: Set[str] = set()
+        if args.expose:
+            for nodeports in args.expose:
+                for nodeport_name in nodeports.split(","):
+                    if nodeport_name == "":
+                        continue
+                    error_if(nodeport_name not in known_nodeports,
+                             f"'{nodeport_name}' is not a known nodeport name")
+                    nodeport_components.add(
+                        known_nodeports[nodeport_name].component)
+        elif cluster_type == ClusterType.K3d:
+            known_nodeports = get_known_nodeports(INT_HELM_REL_DIR)
+            assert k3d_cluster is not None
+            for cluster_info in \
+                    parse_json_output(["k3d", "cluster", "list",
+                                       "-o", "json"]):
+                if cluster_info["name"] != k3d_cluster:
+                    continue
+                for node_info in cluster_info["nodes"]:
+                    for nodeport_str in node_info.get("portMappings", {}):
+                        m = re.match(r"^(\d+)/tcp", str(nodeport_str))
+                        if m is None:
+                            continue
+                        nodeport = int(m.group(1))
+                        for nodeport_info in known_nodeports.values():
+                            if nodeport_info.port == nodeport:
+                                nodeport_components.add(
+                                    nodeport_info.component)
+                                break
+                break
             else:
-                execute(["helm", "uninstall", release] + context_args)
-            break
+                error(f"Can't find information about exposed compoinents of "
+                      f"k3d cluster '{k3d_cluster}': cluster not found. "
+                      f"Please specify ports to expose (or lack thereof) "
+                      f"explicitly with --expose parameter")
 
-    # Build and push as needed
-    if args.build:
-        assert tag is not None
-        if cluster_type == ClusterType.K3d:
-            execute([os.path.join(ROOT_DIR, "tests/regression/build_imgs.sh"),
-                     ROOT_DIR, tag, "0"])
-    if args.build or args.push:
-        assert tag is not None
-        if cluster_type == ClusterType.K3d:
-            execute([os.path.join(SCRIPTS_DIR, "k3d_push_images.py"), tag] +
+        k3d_registry: Optional[str] = parse_k3d_reg(args.k3d_reg) \
+            if (cluster_type == ClusterType.K3d) else None
+
+        execute(["helm", "dependency", "update", INT_HELM_REL_DIR],
+                cwd=ROOT_DIR)
+
+        # Create installation context arguments
+        context_args: List[str] = []
+        for switch, arg, in [("--kubeconfig", kubeconfig),
+                             ("--kube-context", kubecontext),
+                             ("--namespace", args.namespace)]:
+            if arg:
+                context_args += [switch, arg]
+
+        # If release currently running?
+        was_running = \
+            any(helm_info["name"] == release
+                for helm_info in parse_json_output(["helm", "list",
+                                                    "-o", "json"] +
+                                                   context_args))
+
+        # If release currently running and no upgrade uninstall it first
+        if not args.upgrade:
+            execute(["helm", "uninstall", "--ignore-not-found", release] +
+                    context_args)
+
+        # Build and push as needed
+        if args.build:
+            assert tag is not None
+            if cluster_type == ClusterType.K3d:
+                execute([os.path.join(ROOT_DIR,
+                                      "tests/regression/build_imgs.sh"),
+                         ROOT_DIR, tag, "0"])
+        if args.build or args.push:
+            assert tag is not None
+            if cluster_type == ClusterType.K3d:
+                execute(
+                    [os.path.join(SCRIPTS_DIR, "k3d_push_images.py"), tag] +
                     (["--k3d_reg", args.k3d_reg] if args.k3d_reg else []))
 
-    # Preparing arguments...
-    install_args = ["helm", "upgrade" if upgrade else "install", release,
-                    INT_HELM_REL_DIR] + context_args
-    # ... assumed values files ...
-    for cond, filename in \
-            [(cluster_type == ClusterType.K3d, "values-k3d.yaml"),
-             (args.no_secrets, "values-no_secrets.yaml"),
-             (args.http, "values-http.yaml")]:
-        if not cond:
-            continue
-        install_args += ["--values",
-                         os.path.abspath(os.path.join(ROOT_DIR,
-                                                      INT_HELM_REL_DIR,
-                                                      filename))]
-    # ... assumed settings ...
-    for cond, setting, value in \
-            [(tag, "components.default.imageTag", tag),
-             (tag and (cluster_type == ClusterType.K3d),
-              "imageRepositories.k3d.path", k3d_registry),
-             (tag and (cluster_type == ClusterType.K3d),
-             "components.default.imageRepositoryKeyOverride", "k3d")]:
-        if not cond:
-            continue
-        assert value is not None
-        install_args += ["--set", f"{setting}={shlex.quote(value)}"]
-    # ... nodeport holding components ...
-    for component in sorted(nodeport_components):
-        install_args += \
-            ["--set", f"components.{component}.serviceType=NodePort"]
+        # Preparing arguments...
+        install_args = ["helm"] + \
+            (["upgrade", "--install"] if args.upgrade else ["install"]) + \
+            [release, INT_HELM_REL_DIR] + context_args
+        # ... assumed values files ...
+        for cond, filename in \
+                [(cluster_type == ClusterType.K3d, "values-k3d.yaml"),
+                 (args.no_secrets, "values-no_secrets.yaml"),
+                 (args.http, "values-http.yaml"),
+                 (args.fake_secrets,
+                  make_fake_secrets(fake_secrets_arg=args.fake_secrets,
+                                    tempdir=tempdir))]:
+            if not cond:
+                continue
+            install_args += ["--values",
+                             os.path.abspath(os.path.join(ROOT_DIR,
+                                                          INT_HELM_REL_DIR,
+                                                          filename))]
+        # ... assumed settings ...
+        for cond, setting, value in \
+                [(tag, "components.default.imageTag", tag),
+                 (tag and (cluster_type == ClusterType.K3d),
+                  "imageRepositories.k3d.path", k3d_registry),
+                 (tag and (cluster_type == ClusterType.K3d),
+                 "components.default.imageRepositoryKeyOverride", "k3d")]:
+            if not cond:
+                continue
+            assert value is not None
+            install_args += ["--set", f"{setting}={shlex.quote(value)}"]
+        # ... nodeport holding components ...
+        for component in sorted(nodeport_components):
+            install_args += \
+                ["--set", f"components.{component}.serviceType=NodePort"]
 
-    # ... specified values ...
-    for filename in args.values:
-        if not os.path.dirname(filename):
-            filename = os.path.join(ROOT_DIR, INT_HELM_REL_DIR, filename)
-        install_args += ["--values", os.path.abspath(filename)]
-    # ... specified settings ...
-    install_args += sum((["--set", setting] for setting in args.set), [])
+        # ... specified values ...
+        for filename in args.values:
+            if not os.path.dirname(filename):
+                filename = os.path.join(ROOT_DIR, INT_HELM_REL_DIR, filename)
+            install_args += ["--values", os.path.abspath(filename)]
+        # ... specified settings ...
+        install_args += sum((["--set", setting] for setting in args.set), [])
 
-    # Setting maximum number of workers to avoid computer hang
-    max_workers = -1
-    if args.max_workers is not None:
-        max_workers = args.max_workers
-    elif cluster_type == ClusterType.K3d:
-        v = get_helm_values(install_args) or {}
-        for key in ENGINES_PER_WORKER_PATH.split("."):
-            v = v.get(key, {})
-        if isinstance(v, int):
-            max_workers = multiprocessing.cpu_count() // v
-    if max_workers > 0:
-        install_args += ["--set", f"{MAX_WORKERS_PATH}={max_workers}"]
+        # Setting maximum number of workers to avoid computer hang
+        max_workers = -1
+        if args.max_workers is not None:
+            max_workers = args.max_workers
+        elif cluster_type == ClusterType.K3d:
+            v = get_helm_values(install_args) or {}
+            for key in ENGINES_PER_WORKER_PATH.split("."):
+                v = v.get(key, {})
+            if isinstance(v, int):
+                max_workers = multiprocessing.cpu_count() // v
+        if max_workers > 0:
+            install_args += ["--set", f"{MAX_WORKERS_PATH}={max_workers}"]
 
-    # ... timeout
-    if args.wait:
-        install_args += ["--wait", "--timeout", args.wait]
+        # ... timeout
+        if args.wait:
+            install_args += ["--wait", "--timeout", args.wait]
 
-    # Executing helm install
-    execute(install_args, cwd=ROOT_DIR)
+        # Executing helm install
+        execute(install_args, cwd=ROOT_DIR)
 
-    # Preloading ratdb
-    if (not upgrade) and args.preload_ratdb:
-        rft_args = [os.path.join(SCRIPTS_DIR, "ratdb_from_test.py")]
-        for switch, arg in [("--namespace", args.namespace),
-                            ("--context", args.context)]:
-            if arg:
-                rft_args += [switch, arg]
-        execute(rft_args)
+        # Preloading ratdb
+        if (not (args.upgrade and was_running)) and args.preload_ratdb:
+            rft_args = [os.path.join(SCRIPTS_DIR, "ratdb_from_test.py")]
+            for switch, arg in [("--namespace", args.namespace),
+                                ("--context", args.context)]:
+                if arg:
+                    rft_args += [switch, arg]
+            execute(rft_args)
+    finally:
+        if tempdir and (not args.temp_dir):
+            shutil.rmtree(tempdir, ignore_errors=True)
 
 
 if __name__ == "__main__":
