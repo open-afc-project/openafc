@@ -23,6 +23,7 @@ This work is licensed under the OpenAFC Project License, a copy of which is incl
   - [Compare AFC config records](#compare-afc-config-records)
   - [Reacquisition response records for exist requests](#reacquisition-response-records-for-exist-requests)
   - [How to run HTTPs access test](#how-to-run-https-access-test)
+  - [How to send an email with test results](#how-to-send-an-email-with-test-results)
 - [**Testing setup**](#testing-setup)
 - [**Change testing database manually**](#change-testing-database-manually)
 
@@ -108,7 +109,7 @@ the test app runs exist testcases 3 times.
 afc_tests.py --addr 1.2.3.4 --cmd run --tests2run 1234
 ```
 
-## Add new test vectors
+## Add new test vectors 
 
 Add new test vectors to the database provide a file to the following command line.
 ```
