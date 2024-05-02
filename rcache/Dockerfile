@@ -14,7 +14,10 @@ FROM alpine:3.18
 # ENV RCACHE_CLIENT_PORT
 
 # Connection string to Postgres DB
-# ENV RCACHE_POSTGRES_DSN=postgresql://[user[:password]]@host[:port]/database[?options]
+# ENV RCACHE_POSTGRES_DSN=postgresql://[user[:password]@]host[:port]/database[?options]
+
+# File with password for Rcache database DSN
+# ENV RCACHE_POSTGRES_PASSWORD_FILE
 
 # What to do if database already exists:
 #  - 'leave' (leave as is - default)
