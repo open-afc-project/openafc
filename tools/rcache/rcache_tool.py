@@ -670,7 +670,7 @@ def main(argv: List[str]) -> None:
     argv -- Program arguments
     """
     default_postgres = os.environ.get(POSTGRES_DSN_ENV)
-    default_postgres_password_file=os.environ.get(POSTGRES_PASSWORD_FILE_ENV)
+    default_postgres_password_file = os.environ.get(POSTGRES_PASSWORD_FILE_ENV)
 
     default_rcache = os.environ.get(RCACHE_URL_ENV)
     if (default_rcache is None) and (RCACHE_PORT_ENV in os.environ):
