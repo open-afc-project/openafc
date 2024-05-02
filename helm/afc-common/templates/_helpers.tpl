@@ -506,7 +506,7 @@ Declaration of static volumes (inhabitatnts of .Values.staticVolumes) and mounte
 {{- end }}
 {{- if $mountedSecrets }}
 {{-   range $name := $mountedSecrets }}
-{{-     if hasKey (default (dict) $functionContext.Values.externalSecrets) $name }}
+{{-     if get (default (dict) $functionContext.Values.externalSecrets) $name }}
 - name: {{ $name | include "afc.secretMountName" }}
   secret:
     secretName: {{ $name | include "afc.rfc1123" }}
