@@ -16,6 +16,9 @@ ENV RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
 # Default Rcache database connection string
 ENV RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
 
+# Rcache database password file name
+# ENV RCACHE_POSTGRES_PASSWORD_FILE
+
 WORKDIR /wd
 
 RUN apk add --update --no-cache python3=~3.11 py3-sqlalchemy=~1.4 py3-pip \
