@@ -390,7 +390,7 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-       end }}
 {{-       $compDef := merge (dict) (get $functionContext.Values.components $component | required (cat "No component for this component key:" $component)) $functionContext.Values.components.default -}}
 {{-       $mounts := default (dict) (get $compDef "staticVolumeMounts") -}}
-{{-       $mount := get $mounts $mountName -}}
+{{-       $mount := default (get (get $functionContext.Values.staticVolumes $mountName) "defaultMountPath") (get $mounts $mountName) | required (cat "No mount path defined for mount" $mountName "when used in component" $component) -}}
 {{-       if not $mount -}}
 {{-         if eq $ifAbsent "optional" -}}
 {{-           $skip = true -}}
@@ -430,7 +430,7 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-       if ge (len $parts) 3 }}
 {{-         $ifAbsent = index $parts 2 -}}
 {{-       end }}
-{{-       $extSecretDef := merge (dict) (default (dict) (get $functionContext.Values.externalSecrets $extSecret)) (default (dict) (get $functionContext.Values.externalSecrets "default")) -}}
+{{-       $extSecretDef := merge (dict) (default (dict) (get (default (dict) $functionContext.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $functionContext.Values.externalSecrets) "default")) -}}
 {{-       $property := get $extSecretDef "property" -}}
 {{-       if not $property -}}
 {{-         if eq $ifAbsent "optional" -}}
@@ -489,8 +489,17 @@ Declaration of static volumes (inhabitatnts of .Values.staticVolumes) in a Deplo
 {{- $functionContext := . -}}
 {{- if $volumes }}
 {{-   range $name := keys $volumes }}
-{{-     $volumeDef := "volume" | get (get $functionContext.Values.staticVolumes $name | required (cat "Undefined static volume key:" $name "used in definition of component" $functionContext.component)) -}}
+{{-     $volumeDef := "volume" | get (get $functionContext.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $functionContext.component)) -}}
+{{-     $skip := false -}}
+{{-     if hasKey $volumeDef "secret" }}
+{{-       $secretName := get (get $volumeDef "secret") "secretName" -}}
+{{-       if not (hasKey (default (dict) $functionContext.Values.externalSecrets) $secretName) }}
+{{-         $skip = true -}}
+{{-       end }}
+{{-     end }}
+{{-     if not $skip }}
 - name: {{ $name | include "afc.rfc1123" }} {{ toYaml $volumeDef | nindent 2 }}
+{{-     end }}
 {{    end }}
 {{- end }}
 {{- end }}
@@ -505,8 +514,18 @@ Mount of static volumes (inhabitatnts of .Values.staticVolumes) in a Deployment/
 {{- $functionContext := . -}}
 {{- if $volumes }}
 {{-   range $name, $mount := $volumes }}
+{{-     $volumeDef := get (get $functionContext.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $functionContext.component)) "volume" -}}
+{{-     $skip := false -}}
+{{-     if hasKey $volumeDef "secret" }}
+{{-       $secretName := get (get $volumeDef "secret") "secretName" -}}
+{{-       if not (hasKey (default (dict) $functionContext.Values.externalSecrets) $secretName) }}
+{{-         $skip = true -}}
+{{-       end }}
+{{-     end }}
+{{-     if not $skip }}
 - name: {{ $name | include "afc.rfc1123" }}
   mountPath: {{ $mount | default (get (get $functionContext.Values.staticVolumes $name) "defaultMountPath") | required (cat "Component " $functionContext.component "does not define mount path for volume" $name "that does not have default mount path") }}
+{{-     end }}
 {{-   end }}
 {{- end }}
 {{- end }}
