@@ -1,6 +1,0 @@
-dependencies:
-- name: afc-common
-  repository: file://../afc-common/
-  version: 0.0.1
-digest: sha256:9208a7c48f36b13826226fb2b2b6be84cbd910debcd96559b83856a3e4c093e2
-generated: "2024-04-25T12:54:12.421939488-07:00"
