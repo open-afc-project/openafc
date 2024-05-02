@@ -91,6 +91,9 @@ ENV ULS_NICE=YES
 # Connection string to service state database
 # ENV ULS_SERVICE_STATE_DB_DSN
 
+# Optional name of file with password for state database DSN
+# ENV ULS_SERVICE_STATE_DB_PASSWORD_FILE
+
 # Create service state database if absent (default is True)
 # ENV ULS_SERVICE_STATE_DB_CREATE_IF_ABSENT
 
