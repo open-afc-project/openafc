@@ -20,11 +20,17 @@ RUN apk add --update --no-cache python3=~3.11 py3-sqlalchemy=~1.4 py3-pip \
 # Installing Confluent Kafka Python client. Eventually, hopefully, it will be
 # installed as Alpine package (thus not requiring gcc and musl-dev install)
 RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1
-RUN pip3 install confluent-kafka==2.1.1
+    librdkafka-dev=~2.1.1 && \
+    pip3 install confluent-kafka==2.1.1 && \
+    apk del python3-dev gcc musl-dev
 
-COPY requirements.txt /usr/app/
+COPY als/requirements.txt /usr/app/
 RUN pip3 install --no-cache-dir --root-user-action=ignore -r requirements.txt
+
+COPY src/afc-packages /wd/afc-packages
+RUN pip3 install --use-pep517 --root-user-action=ignore \
+        -r /wd/afc-packages/pkgs.als_siphon \
+    && rm -rf /wd/afc-packages
 
 ENV PYTHONPATH=/usr/app
 ENV PATH=$PATH:/usr/app
@@ -43,36 +49,31 @@ ENV KAFKA_SSL_KEYFILE=
 ENV KAFKA_SSL_CAFILE=
 # Maximum message size (default is 1MB)
 ENV KAFKA_MAX_REQUEST_SIZE=
-# PostgreSQL server hostname
-ENV POSTGRES_HOST=localhost
-# PostgreSQL server port
-ENV POSTGRES_PORT=5432
-# Parameters (name, user, password, options) of initial database - database to
-# connect to to create other databases
-ENV POSTGRES_INIT_DB=postgres
-ENV POSTGRES_INIT_USER=postgres
-ENV POSTGRES_INIT_PASSWORD=postgres
-ENV POSTGRES_INIT_OPTIONS=
-# Parameters (name, user, password, options) of database for
-# Request/Response/Config logs
-ENV POSTGRES_ALS_DB=ALS
-ENV POSTGRES_ALS_USER=postgres
-ENV POSTGRES_ALS_PASSWORD=postgres
-ENV POSTGRES_ALS_OPTIONS=
-# Parameters (name, user, password, options) of database for JSON logs
-ENV POSTGRES_LOG_DB=AFC_LOGS
-ENV POSTGRES_LOG_USER=postgres
-ENV POSTGRES_LOG_PASSWORD=postgres
-ENV POSTGRES_LOG_OPTIONS=
+# Connection string to init database (may be partial, leaving default parts).
+# Hostname better be specified, as default is 'localhost'
+# ENV POSTGRES_INIT_CONN_STR
+# Optional name of file with password for init database connection string
+# ENV POSTGRES_INIT_PASSWORD_FILE
+# Connection string to ALS database (may be partial, leaving default parts).
+# Hostname better be specified, as default is 'localhost'
+# ENV POSTGRES_ALS_CONN_STR
+# Optional name of file with password for ALS database connection string
+# ENV POSTGRES_ALS_PASSWORD_FILE
+# Connection string to JSON logs database (may be partial, leaving default
+# parts). Hostname better be specified, as default is 'localhost'
+# ENV POSTGRES_LOG_CONN_STR
+# Optional name of of file with password for JSON logs database connection
+# string
+# ENV POSTGRES_LOG_PASSWORD_FILE
 # What to do if database being created already exists: 'skip', 'drop'. Default
 # is to fail
 ENV INIT_IF_EXISTS=skip
 # Port to serve Prometheus metrics on (none/empty is to not serve)
 ENV SIPHON_PROMETHEUS_PORT=8080
 
-COPY als_siphon.py als_query.py /usr/app/
+COPY als/als_siphon.py als/als_query.py /usr/app/
 RUN chmod a+x /usr/app/*.py
-COPY ALS.sql /usr/app
+COPY als/ALS.sql /usr/app
 
 ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_servers=$KAFKA_SERVERS \
@@ -81,13 +82,13 @@ ENTRYPOINT /usr/app/als_siphon.py init_siphon \
     --kafka_ssl_keyfile=$KAFKA_SSL_KEYFILE \
     --kafka_ssl_cafile=$KAFKA_SSL_CAFILE \
     --kafka_max_partition_fetch_bytes=$KAFKA_MAX_REQUEST_SIZE \
-    --init_postgres=postgresql://${POSTGRES_INIT_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_INIT_DB}${POSTGRES_INIT_OPTIONS} \
-    --init_postgres_password=$POSTGRES_INIT_PASSWORD \
+    --init_postgres=$POSTGRES_INIT_CONN_STR \
+    --init_postgres_password_file=$POSTGRES_INIT_PASSWORD_FILE \
     --if_exists=$INIT_IF_EXISTS \
-    --als_postgres=postgresql://${POSTGRES_ALS_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_ALS_DB}${POSTGRES_ALS_OPTIONS} \
-    --als_postgres_password=$POSTGRES_ALS_PASSWORD \
-    --log_postgres=postgresql://${POSTGRES_LOG_USER}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_LOG_DB}${POSTGRES_LOG_OPTIONS} \
-    --log_postgres_password=$POSTGRES_LOG_PASSWORD \
+    --als_postgres=$POSTGRES_ALS_CONN_STR \
+    --als_postgres_password_file=$POSTGRES_ALS_PASSWORD_FILE \
+    --log_postgres=$POSTGRES_LOG_CONN_STR \
+    --log_postgres_password_file=$POSTGRES_LOG_PASSWORD_FILE \
     --prometheus_port=$SIPHON_PROMETHEUS_PORT \
     --if_exists=$INIT_IF_EXISTS \
     --als_sql /usr/app/ALS.sql
