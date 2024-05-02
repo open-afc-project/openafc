@@ -63,8 +63,8 @@ securityContexts:
 #    - 'optional' - don't add this environment variable
 #    - 'nullable' - set entire value to empty string
 #    - 'required' - abort rendering (default)
-#  - {{defaultVolumeMount:<VOLUMENAME>[:<IFABSENT>]}}
-#    rendered as default mount path for given volume name.
+#  - {{secretFile:<EXTERNALSECRETNAME>[:<IFABSENT>]}}
+#    rendered as  full name of file given external secret mounted to
 #    <IFABSENT> - see above
 #  - {{secretProperty:<EXTERNALSECRET>[:<IFABSENT>]}} 'property' of external
 #    secret with given <EXTERNALSECRET> name (i.e. name of secret file or
@@ -84,8 +84,7 @@ configmaps:
   ratdb-conn:
     FLASK_SQLALCHEMY_DATABASE_URI: >-
       postgresql://postgres:postgres@{{host:ratdb}}:{{port:ratdb:ratdb}}/fbrat
-    FLASK_RATDB_PASSWORD_FILE: >-
-      {{defaultVolumeMount:ratdb_password_secret:optional}}/{{secretProperty:ratdb-password:optional}}
+    FLASK_RATDB_PASSWORD_FILE: "{{secretFile:ratdb-password:optional}}"
   # Own environment variables for rat_server container(s)
   rat_server:
     ALS_KAFKA_SERVER_ID: rat_server
@@ -129,12 +128,10 @@ configmaps:
       postgresql://postgres:postgres@{{host:bulk_postgres}}:{{port:bulk_postgres:bulk_postgres}}/ALS
     POSTGRES_LOG_CONN_STR: >-
       postgresql://postgres:postgres@{{host:bulk_postgres}}:{{port:bulk_postgres:bulk_postgres}}/AFC_LOGS
-    POSTGRES_INIT_PASSWORD_FILE: >-
-      {{defaultVolumeMount:postgres_password_secret:optional}}/{{secretProperty:postgres-password:optional}}
-    POSTGRES_ALS_PASSWORD_FILE: >-
-      {{defaultVolumeMount:als_db_password_secret:optional}}/{{secretProperty:als-db-password:optional}}
+    POSTGRES_INIT_PASSWORD_FILE: "{{secretFile:postgres-password:optional}}"
+    POSTGRES_ALS_PASSWORD_FILE: "{{secretFile:als-db-password:optional}}"
     POSTGRES_LOG_PASSWORD_FILE: >-
-      {{defaultVolumeMount:als_json_log_db_password_secret:optional}}/{{secretProperty:als-json-log-db-password:optional}}
+      {{secretFile:als-json-log-db-password:optional}}
   # Own environment variables of worker container(s)
   worker:
     AFC_WORKER_CELERY_WORKERS: rat_1
@@ -154,18 +151,16 @@ configmaps:
     ULS_SERVICE_STATE_DB_DSN: >-
       postgresql://postgres:postgres@{{host:bulk_postgres}}/fs_state
     ULS_SERVICE_STATE_DB_PASSWORD_FILE: >-
-      {{defaultVolumeMount:uls_state_db_password_secret:optional}}/{{secretProperty:uls-state-db-password:optional}}
+      {{secretFile:uls-state-db-password:optional}}
     ULS_PROMETHEUS_PORT: 8000
-    ULS_ALARM_SMTP_INFO: >-
-      {{staticVolumeMount:uls_downloader:notifier_mail_secret:optional}}/{{secretProperty:notifier-mail:optional}}
+    ULS_ALARM_SMTP_INFO: "{{secretFile:notifier-mail:optional}}"
   # Common Environment variables for Rcache container(s) and clients of Rcache
   # service
   rcache-common:
     RCACHE_ENABLED: "True"
     RCACHE_POSTGRES_DSN: >-
       postgresql://postgres:postgres@{{host:bulk_postgres}}/rcache
-    RCACHE_POSTGRES_PASSWORD_FILE: >-
-      {{defaultVolumeMount:rcache_db_password_secret:optional}}/{{secretProperty:rcache-db-password:optional}}
+    RCACHE_POSTGRES_PASSWORD_FILE: "{{secretFile:rcache-db-password:optional}}"
   # Environment variables for Rcache service clients
   rcache-client:
     RCACHE_SERVICE_URL: "http://{{host:rcache}}:{{port:rcache:rcache}}"
@@ -180,58 +175,18 @@ configmaps:
       http://{{host:rat_server}}/fbrat/ratapi/v1/GetRulesetIDs
     RCACHE_CONFIG_RETRIEVAL_URL: >-
       http://{{host:rat_server}}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
-# Dictionary of static (nontemplated) volume descriptors. Indexed by volume
-# names. Properties:
-# defaultMountPath Default mount path inside pods
-# volume Volume definition (stuff that goes to 'volumes' entry of pod
-#         definition)
+# Dictionary of static (nontemplated and nonsecret) volume definitions. Indexed
+# by volume names
 staticVolumes:
   rat_transfer:
-    volume:
-      hostPath:
-        path: /opt/afc/databases/rat_transfer
-        type: Directory
+    hostPath:
+      path: /opt/afc/databases/rat_transfer
+      type: Directory
   pipe:
-    volume:
-      hostPath:
-        # Path better be overridden, type set to bypass creation if overridden
-        path: /tmp
-        type: DirectoryOrCreate
-  notifier_mail_secret:
-    defaultMountPath: /secrets/notifier_mail_secret
-    volume:
-      secret:
-        secretName: notifier-mail
-  postgres_password_secret:
-    defaultMountPath: /secrets/postgres_password_secret
-    volume:
-      secret:
-        secretName: postgres-password
-  ratdb_password_secret:
-    defaultMountPath: /secrets/ratdb_password_secret
-    volume:
-      secret:
-        secretName: ratdb-password
-  uls_state_db_password_secret:
-    defaultMountPath: /secrets/uls_state_db_password_secret
-    volume:
-      secret:
-        secretName: uls-state-db-password
-  rcache_db_password_secret:
-    defaultMountPath: /secrets/rcache_db_password_secret
-    volume:
-      secret:
-        secretName: rcache-db-password
-  als_db_password_secret:
-    defaultMountPath: /secrets/als_db_password_secret
-    volume:
-      secret:
-        secretName: als-db-password
-  als_json_log_db_password_secret:
-    defaultMountPath: /secrets/als_json_log_db_password_secret
-    volume:
-      secret:
-        secretName: als-json-log-db-password
+    hostPath:
+      # Path better be overridden, type set to bypass creation if overridden
+      path: /tmp
+      type: DirectoryOrCreate
 
 # Dictionary of components. Component roughly corresponds to Docker Compose
 # service. Keys in dictionary are Docker Compose service names, plus there is
@@ -268,9 +223,10 @@ staticVolumes:
 #   resources PVC resources (has 'requests', etc. subkeys)
 # envConfigmapKeys: List of configmap keys (keys into configmaps dictionary) to
 #         include into environment
-# staticVolumeMounts Dictionary of mount points of used static (nontemplated)
-#         volumes, indexed by staticVolumes dictionary keys. Empty value means
-#         that defaultMountPath from volume definition should be used
+# staticVolumeMounts Dictionary of mount points of used static (nontemplated,
+#         nonsecret) volumes, indexed by staticVolumes dictionary keys
+# mountedSecrets List of external secret names (keys in externalSecrets
+#         dictionary) to mount
 # metrics Where to look for prometheus metrics. Contains single entry in
 #         podmonitor's podMetricsEndpoints key (port, path, params, etc.)
 #   port Port name
@@ -353,8 +309,7 @@ components:
     staticVolumeMounts:
       rat_transfer: /mnt/nfs/rat_transfer
       pipe: /pipe
-      ratdb_password_secret:
-      rcache_db_password_secret:
+    mountedSecrets: [ratdb-password, rcache-db-password]
   msghnd:
     imageName: afc-msghnd
     imageRepositoryKey: private
@@ -371,9 +326,7 @@ components:
         memory: 1200Mi
     envConfigmapKeys: [msghnd, ratdb-conn, celery-client, objst-client,
                        objst-common, als-client, rcache-client, rcache-common]
-    staticVolumeMounts:
-      ratdb_password_secret:
-      rcache_db_password_secret:
+    mountedSecrets: [ratdb-password, rcache-db-password]
   objst:
     imageName: objstorage-image
     imageRepositoryKey: public
@@ -386,8 +339,7 @@ components:
       requests:
         memory: 500Mi
     envConfigmapKeys: [objst, ratdb-conn, objst-common]
-    staticVolumeMounts:
-      ratdb_password_secret:
+    mountedSecrets: [ratdb-password]
   worker:
     imageName: afc-worker
     imageRepositoryKey: private
@@ -450,10 +402,8 @@ components:
       requests:
         memory: 100Mi
     envConfigmapKeys: [als_siphon, als_kafka-common]
-    staticVolumeMounts:
-      postgres_password_secret:
-      als_db_password_secret:
-      als_json_log_db_password_secret:
+    mountedSecrets: [postgres-password, als-db-password,
+                     als-json-log-db-password]
   bulk_postgres:
     imageName: bulk-postgres-image
     imageRepositoryKey: public
@@ -475,8 +425,7 @@ components:
     envConfigmapKeys: [uls_downloader, rcache-client, rcache-common]
     staticVolumeMounts:
       rat_transfer: /rat_transfer
-      notifier_mail_secret:
-      uls_state_db_password_secret:
+    mountedSecrets: [notifier-mail, uls-state-db-password]
     ports:
       metrics:
         containerPort: 8000
@@ -487,8 +436,7 @@ components:
     imageRepositoryKey: public
     hostname: cert-db
     envConfigmapKeys: [ratdb-conn, als-client]
-    staticVolumeMounts:
-      ratdb_password_secret:
+    mountedSecrets: [ratdb-password]
   rcache:
     imageName: rcache-image
     imageRepositoryKey: public
@@ -500,8 +448,7 @@ components:
       requests:
         memory: 100Mi
     envConfigmapKeys: [rcache, rcache-common]
-    staticVolumeMounts:
-      rcache_db_password_secret:
+    mountedSecrets: [rcache-db-password]
   grafana:
     imageName: grafana-image
     imageRepositoryKey: public
@@ -550,24 +497,25 @@ secretStores:
 # holding common properties (to avoid their duplication in each secret
 # definition - still they can be redefined ther if needed)
 # Properties are:
-#  secretStore - name of secret store - key in 'secretStores' dictionary
-#  refreshInterval - secret refresh interval (e.g. 1h), 0 to fetch once. Note
+#  secretStore Name of secret store - key in 'secretStores' dictionary
+#  refreshInterval Secret refresh interval (e.g. 1h), 0 to fetch once. Note
 #          that in secretStores interval is an integer, expressed in seconds!
-#  property - can be:
+#  property Can be:
 #    nonempty - top-level secret property (i.e. name of secret file or
 #            environment variable)
 #    empty - remote secret used verbatim
 #    absent - corresponded ExternalSecret not created
+#  mountPath Directory to which secret is mounted
 #  structuredRemote - can be:
-#    True - if secrets in remote secret store have key-value form (e.g.
+#    True If secrets in remote secret store have key-value form (e.g.
 #            Kubernetes as External Secrets backend). For such stores
 #            'property' (if nonempty) used to retrieve secret value from
 #            external secret
-#    False - if values of secrets stored as is, without any keys (e.g. GCP)
-#  remoteSecretName - name of remote secret (if different from this item's
+#    False If values of secrets stored as is, without any keys (e.g. GCP)
+#  remoteSecretName Name of remote secret (if different from this item's
 #          key). Useful for several ExternalSecret manifests to share the same
 #          external secret
-#  remoteProperty - name of key in remote structured property, if different
+#  remoteProperty Name of key in remote structured property, if different
 #          from 'property'. Useful for several ExternalSecret manifests to
 #          share the same external secret
 externalSecrets:
@@ -577,15 +525,22 @@ externalSecrets:
     refreshInterval: 5m
   notifier-mail:
     property: NOTIFIER_MAIL.json
+    mountPath: /secrets/notifier-mail
   postgres-password:
     property: POSTGRES_PASSWORD
+    mountPath: /secrets/postgres-password
   ratdb-password:
     property: RATDB_PASSWORD
+    mountPath: /secrets/ratdb-password
   uls-state-db-password:
     property: ULS_STATE_DB_PASSWORD
+    mountPath: /secrets/uls-state-db-password
   rcache-db-password:
     property: RCACHE_DB_PASSWORD
+    mountPath: /secrets/rcache-db-password
   als-db-password:
     property: ALS_DB_PASSWORD
+    mountPath: /secrets/als-db-password
   als-json-log-db-password:
     property: ALS_JSON_LOG_DB_PASSWORD
+    mountPath: /secrets/als-json-log-db-password

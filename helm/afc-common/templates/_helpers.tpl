@@ -77,6 +77,14 @@ Versioned chart name
 {{- end }}
 
 {{/*
+Secret mount name
+Argument is a secret name
+*/}}
+{{- define "afc.secretMountName" -}}
+{{- printf "%s-secret" (include "afc.rfc1123" .) }}
+{{- end }}
+
+{{/*
 Full image name. Empty if image omitted.
 .component (key in .Values.components) must be defined
 */}}
@@ -390,7 +398,7 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-       end }}
 {{-       $compDef := merge (dict) (get $functionContext.Values.components $component | required (cat "No component for this component key:" $component)) $functionContext.Values.components.default -}}
 {{-       $mounts := default (dict) (get $compDef "staticVolumeMounts") -}}
-{{-       $mount := default (get (get $functionContext.Values.staticVolumes $mountName) "defaultMountPath") (get $mounts $mountName) | required (cat "No mount path defined for mount" $mountName "when used in component" $component) -}}
+{{-       $mount := get $mounts $mountName | required (cat "No mount path defined for mount" $mountName "when used in component" $component) -}}
 {{-       if not $mount -}}
 {{-         if eq $ifAbsent "optional" -}}
 {{-           $skip = true -}}
@@ -402,27 +410,29 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-       end }}
 {{-       $value = replace $staticMountDef $mount $value -}}
 {{-     end }}
-{{-     $defaultVolumeMountDefs := regexFindAll "\\{\\{defaultVolumeMount:.+?:.+?\\}\\}" $value -1 -}}
-{{-     range $defaultVolumeMountDef := $defaultVolumeMountDefs }}
-{{-       $parts := regexFindAll "[^:\\{\\}]+" $defaultVolumeMountDef -1 -}}
-{{-       $volume := index $parts 1 -}}
+{{-     $secretFileDefs := regexFindAll "\\{\\{secretFile:.+?\\}\\}" $value -1 -}}
+{{-     range $secretFileDef := $secretFileDefs }}
+{{-       $parts := regexFindAll "[^:\\{\\}]+" $secretFileDef -1 -}}
+{{-       $extSecret := index $parts 1 -}}
 {{        $ifAbsent := "required" }}
 {{-       if ge (len $parts) 3 }}
 {{-         $ifAbsent = index $parts 2 -}}
 {{-       end }}
-{{-       $defMountpath := get (default (dict) (get $functionContext.Values.staticVolumes $volume)) "defaultMountPath" -}}
-{{-       if not $defMountpath -}}
+{{-       $extSecretDef := merge (dict) (default (dict) (get (default (dict) $functionContext.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $functionContext.Values.externalSecrets) "default")) -}}
+{{-       $property := get $extSecretDef "property" -}}
+{{-       $mountPath := get $extSecretDef "mountPath" -}}
+{{-       if not (and $property $mountPath) }}
 {{-         if eq $ifAbsent "optional" -}}
 {{-           $skip = true -}}
 {{-         else if eq $ifAbsent "nullable" }}
 {{-           $empty = true -}}
 {{-         else }}
-{{-           fail (cat "No default mount path defined for volume" $volume) }}
+{{-           fail (cat "External secret" $extSecret "must be defined and have 'property' and 'mountPath' subkeys") }}
 {{-         end }}
 {{-       end }}
-{{-       $value = replace $defaultVolumeMountDef $defMountpath $value -}}
+{{-       $value = replace $secretFileDef (printf "%s/%s" $mountPath $property) $value -}}
 {{-     end }}
-{{-     $secretPropertyDefs := regexFindAll "\\{\\{secretProperty:.+?:.+?\\}\\}" $value -1 -}}
+{{-     $secretPropertyDefs := regexFindAll "\\{\\{secretProperty:.+?\\}\\}" $value -1 -}}
 {{-     range $secretPropertyDef := $secretPropertyDefs }}
 {{-       $parts := regexFindAll "[^:\\{\\}]+" $secretPropertyDef -1 -}}
 {{-       $extSecret := index $parts 1 -}}
@@ -480,52 +490,55 @@ Container (target) port number by name
 {{- end -}}
 
 {{/*
-Declaration of static volumes (inhabitatnts of .Values.staticVolumes) in a Deployment/StatefulSet
+Declaration of static volumes (inhabitatnts of .Values.staticVolumes) and mounted secrets in a Deployment/StatefulSet
 .component (key in .Values.components) must be defined
 */}}
 {{- define "afc.staticVolumes" -}}
 {{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
 {{- $volumes := get $compDef "staticVolumeMounts" -}}
+{{- $mountedSecrets := get $compDef "mountedSecrets" -}}
 {{- $functionContext := . -}}
 {{- if $volumes }}
 {{-   range $name := keys $volumes }}
-{{-     $volumeDef := "volume" | get (get $functionContext.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $functionContext.component)) -}}
-{{-     $skip := false -}}
-{{-     if hasKey $volumeDef "secret" }}
-{{-       $secretName := get (get $volumeDef "secret") "secretName" -}}
-{{-       if not (hasKey (default (dict) $functionContext.Values.externalSecrets) $secretName) }}
-{{-         $skip = true -}}
-{{-       end }}
-{{-     end }}
-{{-     if not $skip }}
+{{-     $volumeDef := get $functionContext.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $functionContext.component) -}}
 - name: {{ $name | include "afc.rfc1123" }} {{ toYaml $volumeDef | nindent 2 }}
-{{-     end }}
 {{    end }}
+{{- end }}
+{{- if $mountedSecrets }}
+{{-   range $name := $mountedSecrets }}
+{{-     if hasKey (default (dict) $functionContext.Values.externalSecrets) $name }}
+- name: {{ $name | include "afc.secretMountName" }}
+  secret:
+    secretName: {{ $name | include "afc.rfc1123" }}
+{{-     end }}
+{{-   end }}
 {{- end }}
 {{- end }}
 
 {{/*
-Mount of static volumes (inhabitatnts of .Values.staticVolumes) in a Deployment/StatefulSet
+Mount of static volumes (inhabitatnts of .Values.staticVolumes) and mounted secrets in a Deployment/StatefulSet
 .component (key in .Values.components) must be defined
 */}}
 {{- define "afc.staticVolumeMounts" -}}
 {{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
 {{- $volumes := get $compDef "staticVolumeMounts" -}}
+{{- $mountedSecrets := get $compDef "mountedSecrets" -}}
 {{- $functionContext := . -}}
 {{- if $volumes }}
 {{-   range $name, $mount := $volumes }}
-{{-     $volumeDef := get (get $functionContext.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $functionContext.component)) "volume" -}}
-{{-     $skip := false -}}
-{{-     if hasKey $volumeDef "secret" }}
-{{-       $secretName := get (get $volumeDef "secret") "secretName" -}}
-{{-       if not (hasKey (default (dict) $functionContext.Values.externalSecrets) $secretName) }}
-{{-         $skip = true -}}
-{{-       end }}
-{{-     end }}
-{{-     if not $skip }}
+{{-     $volumeDef := get $functionContext.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $functionContext.component) -}}
 - name: {{ $name | include "afc.rfc1123" }}
-  mountPath: {{ $mount | default (get (get $functionContext.Values.staticVolumes $name) "defaultMountPath") | required (cat "Component " $functionContext.component "does not define mount path for volume" $name "that does not have default mount path") }}
-{{-     end }}
+  mountPath: {{ $mount }}
+{{    end }}
+{{- end }}
+{{- if $mountedSecrets }}
+{{-   range $name := $mountedSecrets }}
+{{-     $secretDef := get (default (dict) $functionContext.Values.externalSecrets) $name -}}
+{{-     if $secretDef }}
+{{-       $mountPath := get $secretDef "mountPath" | required (cat "External secret" $name "doesn't have 'mountPath' property") -}}
+- name: {{ $name | include "afc.secretMountName" }}
+  mountPath: {{ $mountPath }}
+{{      end }}
 {{-   end }}
 {{- end }}
 {{- end }}
