@@ -41,52 +41,49 @@ def fatal_if(cond: Any, msg: str) -> None:
         fatal(msg)
 
 
-def get_yaml(filename: str, secret_name: str, secret_value: Optional[str]) \
+def get_yaml(filename: str, secret_key: str, secret_value: Optional[str]) \
         -> Tuple[bool, Optional[Union[List[Any], Dict[str, Any]]]]:
     """ Tries to decode secret as YAML-formatted
 
     Arguments:
     filename     -- Name of secret manifest/template file
-    secret_name  -- Name of secret
+    secret_key   -- Key inside the secret
     secret_value -- Value of secret
 
     Returns (success, optional_yaml_dictionary) tuple. 'success' is true if no
     decode was attempted (secret name does not have YAML extension) or if
     decode was successful """
     if (not secret_value) or \
-            (os.path.splitext(secret_name)[1] not in YAML_EXTENSIONS):
+            (os.path.splitext(secret_key)[1] not in YAML_EXTENSIONS):
         return (True, None)
     try:
-        return (True,
-                yaml.load(secret_value,
-                          Loader=yaml.CLoader if hasattr(yaml, "CLoader")
-                          else yaml.Loader))
+        return (True, yaml.load(secret_value, Loader=yaml.CLoader))
     except yaml.YAMLError as ex:
         logging.error(f"File '{filename}' has incorrectly formatted YAML "
-                      f"secret '{secret_name}': {ex}")
+                      f"secret '{secret_key}': {ex}")
         return (False, None)
 
 
-def get_json(filename: str, secret_name: str, secret_value: Optional[str]) \
+def get_json(filename: str, secret_key: str, secret_value: Optional[str]) \
         -> Tuple[bool, Optional[Union[List[Any], Dict[str, Any]]]]:
     """ Tries to decode secret as JSON-formatted
 
     Arguments:
     filename     -- Name of secret manifest/template file
-    secret_name  -- Name of secret
+    secret_key   -- Key inside the secret
     secret_value -- Value of secret
 
     Returns (success, optional_json_dictionary) tuple. 'success' is true if no
     decode was attempted (secret name does not have JSON extension) or if
     decode was successful """
     if (not secret_value) or \
-            (os.path.splitext(secret_name)[1] not in JSON_EXTENSIONS):
+            (os.path.splitext(secret_key)[1] not in JSON_EXTENSIONS):
         return (True, None)
     try:
         return (True, json.loads(secret_value))
     except json.JSONDecodeError as ex:
         logging.error(f"File '{filename}' has incorrectly formatted JSON "
-                      f"secret '{secret_name}': {ex}")
+                      f"secret '{secret_key}': {ex}")
         return (False, None)
 
 
@@ -131,16 +128,15 @@ def manifests(files: List[str], is_template: Optional[bool] = None) \
     Returns sequence of ManifestInfo objects
     """
     assert files
+    secret_names: Set[str] = set()
+    secret_keys: Set[str] = set()
     for filename in files:
         if not os.path.isfile(filename):
             logging.error(f"Manifest file '{filename}' not found")
             yield ManifestInfo(filename=filename, valid=False)
         try:
             with open(filename, encoding="utf-8") as f:
-                yaml_dict = \
-                    yaml.load(f,
-                              Loader=yaml.CLoader if hasattr(yaml, "CLoader")
-                              else yaml.Loader)
+                yaml_dicts = yaml.load_all(f.read(), Loader=yaml.CLoader)
         except OSError as ex:
             logging.error(f"Error reading manifest file '{filename}': {ex}")
             yield ManifestInfo(filename=filename, valid=False)
@@ -151,111 +147,130 @@ def manifests(files: List[str], is_template: Optional[bool] = None) \
                 f"{ex}")
             yield ManifestInfo(filename=filename, valid=False)
             continue
-        valid = True
-        if not yaml_dict.get("apiVersion"):
-            logging.error(
-                f"'apiVersion' field not found in manifest file '{filename}'")
-            valid = False
-        if yaml_dict.get("kind") != "Secret":
-            logging.error(
-                f"'Manifest file '{filename}' is not of a 'kind: Secret'")
-            valid = False
-        name = yaml_dict.get("metadata", {}).get("name")
-        if not name:
-            logging.error(
-                f"'metadata: name:' not found in manifest file '{filename}'")
-            valid = False
-        elif not isinstance(name, str):
-            logging.error(f"'metadata: name:' is no a string in manifest file "
-                          f"'{filename}'")
-            name = None
-            valid = False
-        data: Dict[str, Any] = yaml_dict.get("data", {})
-        if not isinstance(data, dict):
-            logging.error(
-                f"'data' field of manifest file '{filename}' is not a "
-                f"dictionary")
-            data = {}
-            valid = False
-        string_data: Dict[str, Any] = yaml_dict.get("stringData", {})
-        if not isinstance(string_data, dict):
-            logging.error(
-                f"'stringData' field of manifest file '{filename}' is not a "
-                f"dictionary")
-            string_data = {}
-            valid = False
-        valid = True
-        decoded_data: Dict[str, Optional[bytes]] = {}
-        for secret_name, secret_value in data.items():
-            decoded_data[secret_name] = None
-            if is_template is not None:
+        for yaml_idx, yaml_dict in enumerate(yaml_dicts):
+            valid = True
+            name = yaml_dict.get("metadata", {}).get("name")
+            if not name:
+                logging.error(f"'metadata: name:' not found in secret "
+                              f"#{yaml_idx + 1} of manifest file '{filename}'")
+                valid = False
+            if name in secret_names:
+                logging.error(f"Secret name '{name}' encountered more than "
+                              f"once")
+                valid = False
+
+            secret_names.add(name)
+            if not yaml_dict.get("apiVersion"):
+                logging.error(f"'apiVersion' field not found in manifest file "
+                              f"'{filename}'")
+                valid = False
+            if yaml_dict.get("kind") != "Secret":
+                logging.error(
+                    f"'Manifest file '{filename}' is not of a 'kind: Secret'")
+                valid = False
+            elif not isinstance(name, str):
+                logging.error(f"'metadata: name:' is no a string in manifest "
+                              f"file '{filename}'")
+                name = None
+                valid = False
+            data: Dict[str, Any] = yaml_dict.get("data", {})
+            if not isinstance(data, dict):
+                logging.error(f"'data' field of manifest file '{filename}' is "
+                              f"not a dictionary")
+                data = {}
+                valid = False
+            string_data: Dict[str, Any] = yaml_dict.get("stringData", {})
+            if not isinstance(string_data, dict):
+                logging.error(f"'stringData' field of manifest file "
+                              f"'{filename}' is not a dictionary")
+                string_data = {}
+                valid = False
+            valid = True
+            decoded_data: Dict[str, Optional[bytes]] = {}
+            for secret_key, secret_value in data.items():
+                if secret_key in secret_keys:
+                    logging.error(f"Secret key '{secret_key}' encountered "
+                                  f"more than once")
+                    valid = False
+                secret_keys.add(secret_key)
+                decoded_data[secret_key] = None
+                if is_template is not None:
+                    if is_template:
+                        if secret_value is not None:
+                            logging.error(f"Manifest template file "
+                                          f"'{filename}' has nonempty value "
+                                          f"for secret '{secret_key}'")
+                            valid = False
+                            continue
+                    else:
+                        if not isinstance(secret_value, str):
+                            logging.error(f"Manifest file '{filename}' has "
+                                          f"nonstring value for secret "
+                                          f"'{secret_key}'")
+                            valid = False
+                        else:
+                            try:
+                                decoded_data[secret_key] = \
+                                    base64.b64decode(secret_value)
+                            except binascii.Error as ex:
+                                logging.error(f"Manifest file '{filename}' "
+                                              f"has incorrectly encoded "
+                                              f"Base64 value for secret "
+                                              f"'{secret_key}'")
+                                valid = False
+            for secret_key, secret_value in string_data.items():
+                if secret_key in secret_keys:
+                    logging.error(f"Secret key '{secret_key}' encountered "
+                                  f"more than once")
+                    valid = False
+                secret_keys.add(secret_key)
+                if secret_key in data:
+                    logging.error(f"Manifest "
+                                  f"{'template ' if is_template else ''} "
+                                  f"file '{filename}' has duplicate secret "
+                                  f"'{secret_key}'")
+                    valid = False
                 if is_template:
-                    if secret_value is not None:
-                        logging.error(
-                            f"Manifest template file '{filename}' has "
-                            f"nonempty value for secret '{secret_name}'")
+                    if secret_value is None:
+                        continue
+                    if not isinstance(secret_value, str):
+                        logging.error(f"Manifest template file '{filename}' "
+                                      f"has nonempty nonstring value for "
+                                      f"secret '{secret_key}'")
                         valid = False
                         continue
+                    for retrieve in (get_yaml, get_json):
+                        v, content = retrieve(filename=filename,
+                                              secret_key=secret_key,
+                                              secret_value=secret_value)
+                        valid &= v
+                        if content is not None:
+                            if content != clean_secret(content):
+                                logging.error(
+                                    f"Manifest template file '{filename}' has "
+                                    f"nonempty field values in secret "
+                                    f"'{secret_key}'")
+                                valid = False
+                            break
+                    else:
+                        logging.error(f"Manifest template file '{filename}' "
+                                      f"has nonempty value for secret "
+                                      f"'{secret_key}'")
+                        valid = False
                 else:
                     if not isinstance(secret_value, str):
-                        logging.error(
-                            f"Manifest file '{filename}' has nonstring value "
-                            f"for secret '{secret_name}'")
+                        logging.error(f"Manifest file '{filename}' has "
+                                      f"nonstring value for secret "
+                                      f"'{secret_key}'")
                         valid = False
-                    else:
-                        try:
-                            decoded_data[secret_name] = \
-                                base64.b64decode(secret_value)
-                        except binascii.Error as ex:
-                            logging.error(
-                                f"Manifest file '{filename}' has incorrectly "
-                                f"encoded Base64 value for secret "
-                                f"'{secret_name}'")
-                            valid = False
-        for secret_name, secret_value in string_data.items():
-            if secret_name in data:
-                logging.error(f"Manifest {'template ' if is_template else ''} "
-                              f"file '{filename}' has duplicate secret "
-                              f"'{secret_name}'")
-                valid = False
-            if is_template:
-                if secret_value is None:
-                    continue
-                if not isinstance(secret_value, str):
-                    logging.error(f"Manifest template file '{filename}' has "
-                                  f"nonempty nonstring value for secret "
-                                  f"'{secret_name}'")
-                    valid = False
-                    continue
-                for retrieve in (get_yaml, get_json):
-                    v, content = retrieve(filename=filename,
-                                          secret_name=secret_name,
-                                          secret_value=secret_value)
-                    valid &= v
-                    if content is not None:
-                        if content != clean_secret(content):
-                            logging.error(
-                                f"Manifest template file '{filename}' has "
-                                f"nonempty field values in secret "
-                                f"'{secret_name}'")
-                            valid = False
-                        break
-                else:
-                    logging.error(f"Manifest template file '{filename}' has "
-                                  "nonempty value for secret '{secret_name}'")
-                    valid = False
-            else:
-                if not isinstance(secret_value, str):
-                    logging.error(f"Manifest file '{filename}' has nonstring "
-                                  f"value for secret '{secret_name}'")
-                    valid = False
-                for retrieve in (get_yaml, get_json):
-                    v, _ = retrieve(filename=filename, secret_name=secret_name,
-                                    secret_value=secret_value)
-                    valid &= v
-        yield ManifestInfo(
-            filename=filename, valid=valid, name=name, data=decoded_data,
-            string_data=string_data)
+                    for retrieve in (get_yaml, get_json):
+                        v, _ = retrieve(filename=filename,
+                                        secret_key=secret_key,
+                                        secret_value=secret_value)
+                        valid &= v
+            yield ManifestInfo(
+                filename=filename, valid=valid, name=name, data=decoded_data,
+                string_data=string_data)
 
 
 def check_manifests(files: List[str], is_template: Optional[bool],
@@ -405,7 +420,7 @@ def do_compare_template(args: Any) -> None:
             if s not in ti.string_data:
                 continue
             for retrieve in (get_yaml, get_json):
-                v, ms = retrieve(filename=mi.filename, secret_name=s,
+                v, ms = retrieve(filename=mi.filename, secret_key=s,
                                  secret_value=mi.string_data[s])
                 success &= v
                 if not ms:
@@ -416,7 +431,7 @@ def do_compare_template(args: Any) -> None:
                                   f"string secret '{s}'")
                     success = False
                     break
-                v, ts = retrieve(filename=ti.filename, secret_name=s,
+                v, ts = retrieve(filename=ti.filename, secret_key=s,
                                  secret_value=ti.string_data[s])
                 success &= v
                 if not ts:
