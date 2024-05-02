@@ -24,6 +24,7 @@ from afcmodels.aaa import User
 import als
 import prometheus_utils
 import prometheus_client
+import secret_utils
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -77,6 +78,8 @@ def create_app(config_override=None):
     config_path = BaseDirectory.load_first_config('fbrat', 'ratapi.conf')
     if config_path:
         flaskapp.config.from_pyfile(config_path)
+    # override from FLASK_... environment variables
+    flaskapp.config.from_prefixed_env()
     # final overrides for this instance
     if config_override:
         flaskapp.config.update(config_override)
@@ -98,6 +101,13 @@ def create_app(config_override=None):
     als.als_initialize()
 
     LOGGER.debug('BROKER_URL %s', flaskapp.config['BROKER_URL'])
+
+    # Substitute DB password
+    flaskapp.config['SQLALCHEMY_DATABASE_URI'] = \
+        secret_utils.substitute_password(
+            dsc='fbrat', dsn=flaskapp.config.get('SQLALCHEMY_DATABASE_URI'),
+            password_file=flaskapp.config.get('RATDB_PASSWORD_FILE'),
+            optional=True)
 
     db.init_app(flaskapp)
     Migrate(
