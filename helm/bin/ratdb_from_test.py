@@ -18,7 +18,7 @@ import sys
 import tempfile
 from typing import cast, List, Optional
 
-from k3d_lib import error, execute, parse_kubecontext, ROOT_DIR
+from utils import error, execute, parse_kubecontext, ROOT_DIR
 
 POD_NAME_STEMS = ["rat-server", "webui"]
 TESTS_DOCKERFILE = "tests/Dockerfile"

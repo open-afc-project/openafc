@@ -14,8 +14,8 @@ import re
 import sys
 from typing import Dict, List
 
-from k3d_lib import auto_name, AUTO_NAME, error, error_if, \
-    get_known_nodeports, INT_HELM_REL_DIR, K3D_PREFIX, parse_json_output
+from utils import auto_name, AUTO_NAME, error, error_if, get_known_nodeports, \
+    INT_HELM_REL_DIR, K3D_PREFIX, parse_json_output
 
 
 def main(argv: List[str]) -> None:
