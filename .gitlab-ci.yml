@@ -52,9 +52,10 @@ merge_upstream_changes:
     - git config --global user.email "gitlab-runner@broadcom.com"
     - git remote add upstream $CI_GITHUB_UPSTREAM  || true
     - git fetch upstream
-    # Ensure the local main branch exists and tracks origin/main
-    - git fetch origin main:main
+    # # Ensure the local main branch exists and tracks origin/main
+    # - git fetch origin main:main
     - git checkout main
+    - git reset --hard origin/main
     # Merge changes from upstream/main into the local main branch
     - UPSTREAM_CHANGES=$(git log HEAD..upstream/main --oneline)
     - |
