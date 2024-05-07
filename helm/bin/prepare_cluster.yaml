@@ -1,0 +1,57 @@
+#
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+---
+# Parameters for cluster_prepare.py
+
+# Manifests/helmcharts to install. Has the following properties:
+#   - name. Stage name
+#   - namespace. Namespace to install manifests/helmcharts in
+#   - cmd. List of commands to perform before kubernetes/helm installation.
+#             Commands that starts with `-` - not checked for failure. Executed
+#             from checkout root directory
+#   - manifest. Path or URL to manifest file or directory. Path may use ~ and
+#             $. Relative paths are from script's directory'
+#   - manifest_url. URL to manifest file or directory
+#   - helm_chart. Helmchart to install if filename - relative to script's
+#             directory
+#   - helm_release. Helm release name
+#   - helm_repo. Helm repository URL
+#   - helm_values. List of helm value files. Absolute or relative from script
+#             directory. May use ~ and environment variables
+#   - helm_settings: List of value settings
+#   - helm_version. Helmchart version specifier
+#   - helm_wait. How long to wait for helm install install
+#   - uninstall_wait. How long to wait for helm/kubectl uninstall
+install:
+  - name: Prometheus operator
+    manifest: >-
+      https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.72.0/bundle.yaml
+  - name: Prometheus
+    namespace: monitoring
+    manifest: ../monitoring/prometheus
+    uninstall_wait: 5m
+  - name: Prometheus adapter
+    namespace: monitoring
+    cmd:
+      - -kubectl delete apiservice v1beta1.metrics.k8s.io
+    helm_chart: prometheus-community/prometheus-adapter
+    helm_repo: https://prometheus-community.github.io/helm-charts
+    helm_release: custom-metrics
+    helm_values:
+      - ../monitoring/prometheus_adapter/values-prometheus_adapter.yaml
+    helm_version: 2.14.2
+    helm_wait: 5m
+    uninstall_wait: 5m
+  - name: External secrets operator
+    namespace: external-secrets
+    helm_chart: external-secrets/external-secrets
+    helm_repo:  https://charts.external-secrets.io
+    helm_release: external-secrets
+    helm_settings:
+      - installCRDs=true
+    helm_wait: 5m
+    uninstall_wait: 5m
