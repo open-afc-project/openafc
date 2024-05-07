@@ -33,4 +33,3 @@ spec:
           volumeMounts: {{- include "afc.staticVolumeMounts" . | nindent 12 }}
       volumes:
         {{- include "afc.staticVolumes" . | nindent 8 }}
-

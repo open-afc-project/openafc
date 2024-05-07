@@ -71,7 +71,11 @@ class RcacheClient:
         if client_settings.enabled and \
                 (client_settings.postgres_dsn is not None):
             assert "rcache_db" in sys.modules
-            self._rcache_db = RcacheDb(client_settings.postgres_dsn)
+            self._rcache_db = \
+                RcacheDb(
+                    rcache_db_dsn=client_settings.postgres_dsn,
+                    rcache_db_password_file=client_settings.
+                    postgres_password_file)
 
         self._rcache_rmq: Optional[RcacheRmq] = None
         if client_settings.enabled and \

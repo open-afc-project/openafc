@@ -52,12 +52,11 @@ services:
       - bulk_postgres
       - rcache
     secrets:
-      - NOTIFIER_MAIL.json
-      - OIDC.json
-      - REGISTRATION.json
-      - REGISTRATION_CAPTCHA.json
+      - RATDB_PASSWORD
+      - RCACHE_DB_PASSWORD
     dns_search: [.]
     environment:
+      - FLASK_RATDB_PASSWORD_FILE=${VOL_C_SECRETS}/RATDB_PASSWORD
       # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
@@ -72,12 +71,14 @@ services:
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
+      - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
 
   msghnd:
     image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-msghnd:${TAG:-latest}
     environment:
+      - FLASK_RATDB_PASSWORD_FILE=${VOL_C_SECRETS}/RATDB_PASSWORD
       # RabbitMQ server name:
       - BROKER_TYPE=external
       - BROKER_FQDN=rmq
@@ -92,9 +93,13 @@ services:
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
+      - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
       - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
     dns_search: [.]
+    secrets:
+      - RATDB_PASSWORD
+      - RCACHE_DB_PASSWORD
     depends_on:
       - ratdb
       - rmq
@@ -110,7 +115,11 @@ services:
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_HIST_PORT=4999
       - AFC_OBJST_LOCAL_DIR=/storage
+      - FLASK_RATDB_PASSWORD_FILE=${VOL_C_SECRETS}/RATDB_PASSWORD
+    secrets:
+      - RATDB_PASSWORD
     dns_search: [.]
+
   worker:
     image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afc-worker:${TAG:-latest}
     volumes:
@@ -160,9 +169,18 @@ services:
     restart: always
     environment:
       - KAFKA_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
-      - POSTGRES_HOST=bulk_postgres
+      - POSTGRES_INIT_CONN_STR=bulk_postgres
+      - POSTGRES_ALS_CONN_STR=bulk_postgres
+      - POSTGRES_LOG_CONN_STR=bulk_postgres
+      - POSTGRES_INIT_PASSWORD_FILE=${VOL_C_SECRETS}/POSTGRES_PASSWORD
+      - POSTGRES_ALS_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_DB_PASSWORD
+      - POSTGRES_LOG_PASSWORD_FILE=${VOL_C_SECRETS}/ALS_JSON_LOG_DB_PASSWORD
       - INIT_IF_EXISTS=skip
       - KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
+    secrets:
+      - ALS_DB_PASSWORD
+      - ALS_JSON_LOG_DB_PASSWORD
+      - POSTGRES_PASSWORD
     depends_on:
       - als_kafka
       - bulk_postgres
@@ -179,7 +197,9 @@ services:
       - ULS_AFC_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
       - ULS_DELAY_HR=1
       - ULS_SERVICE_STATE_DB_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
+      - ULS_SERVICE_STATE_DB_PASSWORD_FILE=${VOL_C_SECRETS}/ULS_STATE_DB_PASSWORD
       - ULS_PROMETHEUS_PORT=8000
+      - ULS_ALARM_SMTP_INFO=${VOL_C_SECRETS}/NOTIFIER_MAIL.json
       # Rcache parameters
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_SERVICE_URL=http://rcache:${RCACHE_CLIENT_PORT}
@@ -187,6 +207,7 @@ services:
       - ${VOL_H_DB}:/rat_transfer
     secrets:
       - NOTIFIER_MAIL.json
+      - ULS_STATE_DB_PASSWORD
     depends_on:
       - bulk_postgres
     dns_search: [.]
@@ -202,6 +223,9 @@ services:
       - ALS_KAFKA_SERVER_ID=cert_db
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
+      - FLASK_RATDB_PASSWORD_FILE=${VOL_C_SECRETS}/RATDB_PASSWORD
+    secrets:
+      - RATDB_PASSWORD
 
   rcache:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/rcache-image:${TAG:-latest}
@@ -210,9 +234,12 @@ services:
       - RCACHE_ENABLED=${RCACHE_ENABLED}
       - RCACHE_CLIENT_PORT=${RCACHE_CLIENT_PORT}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
+      - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
       - RCACHE_AFC_REQ_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
       - RCACHE_RULESETS_URL=http://rat_server/fbrat/ratapi/v1/GetRulesetIDs
       - RCACHE_CONFIG_RETRIEVAL_URL=http://rat_server/fbrat/ratapi/v1/GetAfcConfigByRulesetID
+    secrets:
+      - RCACHE_DB_PASSWORD
     depends_on:
       - bulk_postgres
     dns_search: [.]
@@ -254,9 +281,16 @@ services:
 secrets:
     NOTIFIER_MAIL.json:
         file: ${VOL_H_SECRETS}/NOTIFIER_MAIL.json
-    OIDC.json:
-        file: ${VOL_H_SECRETS}/OIDC.json
-    REGISTRATION.json:
-        file: ${VOL_H_SECRETS}/REGISTRATION.json
-    REGISTRATION_CAPTCHA.json:
-        file: ${VOL_H_SECRETS}/REGISTRATION_CAPTCHA.json
+    POSTGRES_PASSWORD:
+        file: ${VOL_H_SECRETS}/POSTGRES_PASSWORD
+    RATDB_PASSWORD:
+        file: ${VOL_H_SECRETS}/RATDB_PASSWORD
+    ULS_STATE_DB_PASSWORD:
+        file: ${VOL_H_SECRETS}/ULS_STATE_DB_PASSWORD
+    RCACHE_DB_PASSWORD:
+        file: ${VOL_H_SECRETS}/RCACHE_DB_PASSWORD
+    ALS_DB_PASSWORD:
+        file: ${VOL_H_SECRETS}/ALS_DB_PASSWORD
+    ALS_JSON_LOG_DB_PASSWORD:
+        file: ${VOL_H_SECRETS}/ALS_JSON_LOG_DB_PASSWORD
+

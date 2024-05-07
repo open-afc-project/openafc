@@ -29,4 +29,7 @@ spec:
         - {{- include "afc.containerImage" . | nindent 10 }}
           envFrom: {{- include "afc.envFromConfigMaps" . | nindent 12 }}
           resources: {{- include "afc.containerResources" . | nindent 12 }}
+          volumeMounts: {{- include "afc.staticVolumeMounts" . | nindent 12 }}
+      volumes:
+        {{- include "afc.staticVolumes" . | nindent 8 }}
 

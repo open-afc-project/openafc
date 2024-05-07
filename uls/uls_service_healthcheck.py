@@ -34,6 +34,8 @@ class Settings(pydantic.BaseSettings):
 
     service_state_db_dsn: str = \
         pydantic.Field(..., env="ULS_SERVICE_STATE_DB_DSN")
+    service_state_db_password_file: Optional[str] = \
+        pydantic.Field(None, env="ULS_SERVICE_STATE_DB_PASSWORD_FILE")
     smtp_info: Optional[str] = pydantic.Field(None, env="ULS_ALARM_SMTP_INFO")
     email_to: Optional[str] = pydantic.Field(None, env="ULS_ALARM_EMAIL_TO")
     beacon_email_to: Optional[str] = \
@@ -325,6 +327,10 @@ def main(argv: List[str]) -> None:
         f"(that is used by healthcheck script)"
         f"{env_help(Settings, 'service_state_db_dsn')}")
     argument_parser.add_argument(
+        "--service_state_db_password_file", metavar="PASWORD_FILE",
+        help=f"Optional name of file with password to use in database DSN"
+        f"{env_help(Settings, 'service_state_db_password_file')}")
+    argument_parser.add_argument(
         "--smtp_info", metavar="SMTP_CREDENTIALS_FILE",
         help=f"SMTP credentials file. For its structure - see "
         f"NOTIFIER_MAIL.json secret in one of files in "
@@ -406,7 +412,9 @@ def main(argv: List[str]) -> None:
     if settings.force_success:
         set_error_exit_params(exit_code=00)
 
-    state_db = StateDb(db_dsn=settings.service_state_db_dsn)
+    state_db = \
+        StateDb(db_dsn=settings.service_state_db_dsn,
+                db_password_file=settings.service_state_db_password_file)
     try:
         state_db.connect()
     except sa.exc.SQLAlchemyError as ex:

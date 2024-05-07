@@ -62,3 +62,11 @@ install:
             - helm/monitoring/prometheus_adapter/values-prometheus_adapter.yaml
         helm_version: 2.14.2
         args: [--wait, --timeout, "5m"]
+    external_secrets_operator:
+        namespace: external-secrets
+        helm_chart: external-secrets/external-secrets
+        helm_repo:  https://charts.external-secrets.io
+        helm_release: external-secrets
+        helm_settings:
+          - installCRDs=true
+        args: [--wait, --timeout, "5m"]

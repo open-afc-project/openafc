@@ -191,21 +191,24 @@ def parse_k3d_reg(k3d_reg_arg: Optional[str]) -> str:
     return ret
 
 
-def yaml_load(filename: str) -> Any:
+def yaml_load(filename: str, multidoc: bool = False) -> Any:
     """ Returns loaded content of given yaml file """
     try:
         with open(filename, encoding="utf-8") as f:
-            return yaml_loads(f.read(), filename=filename)
+            return yaml_loads(f.read(), filename=filename, multidoc=multidoc)
     except OSError as ex:
         error(f"Error reading '{filename}': {ex}")
 
 
-def yaml_loads(s: str, filename: Optional[str] = None) -> Any:
-    """ Returns yaml=parsed value of given string """
+def yaml_loads(s: str, filename: Optional[str] = None,
+               multidoc: bool = False) -> Any:
+    """ Returns yaml-parsed value of given string """
     try:
-        return yaml.load(s,
-                         yaml.CFullLoader if hasattr(yaml, "CFullLoader")
-                         else yaml.FullLoader)
+        return \
+            (yaml.load_all if multidoc else yaml.load)(
+                s,
+                yaml.CFullLoader if hasattr(yaml, "CFullLoader")
+                else yaml.FullLoader)
     except yaml.YAMLError as ex:
         error(f"Invalid YAML syntax of '{filename if filename else s}': {ex}")
 
