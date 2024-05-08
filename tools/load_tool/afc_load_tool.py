@@ -471,7 +471,7 @@ class ServiceDiscoveryCompose(ServiceDiscovery):
         """ Returns URL inside cluster that corresponds to given parametess
 
         Arguments:
-        protocol -- Protocol (http or https)
+        protocol -- Protocol
         service  -- Service name from
         port     -- Port number
         Returns SCHEME://HOST:PORT
@@ -482,7 +482,7 @@ class ServiceDiscoveryCompose(ServiceDiscovery):
                 ci.ext_ports.get(80 if protocol == Protocol.http else 443)
             error_if(not ext_port,
                      f"Dispatcher {protocol.name} port not exposed")
-            return f"{protocol}://localhost:{ext_port}"
+            return f"{protocol.name}://localhost:{ext_port}"
         if not ci.ip:
             inspect_dict = \
                 self._get_json_output(["docker", "inspect", ci.name])
@@ -607,7 +607,7 @@ class ServiceDiscoveryK3d(ServiceDiscovery):
         """ Returns URL inside cluster that corresponds to given parametess
 
         Arguments:
-        protocol -- Protocol (http or https)
+        protocol -- Protocol
         service  -- Service name from
         port     -- Port number
         Returns SCHEME://HOST:PORT
