@@ -832,7 +832,8 @@ int PolygonClass::in_bdy_area(const int a,
 				} else if ((x1 < a) && (x2 < a)) {
 					num_left++;
 				} else {
-					long long eps = (((long long) (x2-x1))*(b-y1)-((long long) (a-x1))*(y2-y1));
+					long long eps = (((long long)(x2 - x1)) * (b - y1) -
+							 ((long long)(a - x1)) * (y2 - y1));
 					if (eps == 0) {
 						if (edge) {
 							*edge = 1;
