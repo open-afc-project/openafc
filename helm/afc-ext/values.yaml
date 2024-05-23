@@ -1,0 +1,250 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+---
+
+# Default values for afc-ext chart
+
+# Global name overrides
+
+# App name to use instead of default Chart.Name
+# appNameOverride:
+
+# Dictionary of external IPs (keys are names, values are IPs) - if used should
+# be defined in some override
+externalIps:
+  # Ingress of internal cluster
+  int-ingress: null
+  # RabbitMQ of internal cluster
+  int-rmq: null
+  # Dispatcher of external cluster
+  ext-dispatcher: null
+
+# Dictionary of image repositories. Keys may be any - they are used in
+# component definition. Fields are:
+# path Repository path
+# pullSecrets List of names of pull secrets
+imageRepositories:
+  public:
+    path: ghcr.io/open-afc-project
+    pullSecrets: []
+  private:
+    path: ghcr.io/open-afc-project
+    pullSecrets: []
+
+# Dictionary of security contexts. Keys are used in component definitions (and
+# may be any). Values are the same as in securityContext dictionaries
+# (runAsUser, runAsGroup, fsGroup, readOnlyRootFilesystem, capabilities.add,
+# capabilities.drop)
+securityContexts:
+  none: {}
+  readOnly:
+    readOnlyRootFilesystem: true
+
+# Dictionary of configmaps. Indexed by configmap keys (suffixes of configmap
+# names). Values are dictionaries, with uppercase-named entries going to
+# configmap as is, non-uppercase entries may be used in construction of
+# configmap entries.
+# DSNs present here may contain usernames/passwords for development (Docker
+# Compose) configurations. Really secret usernames/passwords (but not entire
+# DSNs please!) should be passed via secrets.
+# Some syntax conventions introduced to properly render variables without
+# additional helm trickery:
+#  - If variable name ends with @S, its value rendered as string verbatim (@S
+#    is trimmed from variable name)
+#  - If variable name ends with @I, it is rendered as integer, thus avoiding
+#    rendering big integers as floating points (@I is trimmed from variable
+#    name)
+#  - {{host:<COMPONENTNAME>}} rendered as hostname for given component (e.g.
+#    as of time of this writing '{{host:rat_server}}' rendered as 'webui')
+#  - {{port:<COMPONENTNAME>:<PORTNAME>}} rendered as service port number of
+#    port of - given name of given component (e.g. as of time of this writing
+#    '{{port:objst:fileStorage}}' rendered as '5000')
+#  - {{containerPort:<COMPONENTNAME>:<PORTNAME>}} ditto, but container (aka
+#    target) port number is rendered
+#  - {{staticVolumeMount:<COMPONENTNAME>:<STATICMOUNTNAME>[:<IFABSENT>]}}
+#    rendered as mount directory for given static volume.
+#    <IFABSENT> describes what to do if volume data is empty/absent:
+#    - 'optional' - don't add this environment variable
+#    - 'nullable' - set entire value to empty string
+#    - 'required' - abort rendering (default)
+#  - {{secretFile:<EXTERNALSECRETNAME>[:<IFABSENT>]}}
+#    rendered as  full name of file given external secret mounted to
+#    <IFABSENT> - see above
+#  - {{secretProperty:<EXTERNALSECRET>[:<IFABSENT>]}} 'property' of external
+#    secret with given <EXTERNALSECRET> name (i.e. name of secret file or
+#    secret environment variable). <IFABSENT> describes what to do if secret or
+#    'property' field of secret definition is absent (see above for values)
+#  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. IFABSENT>
+#    describes what to do if name is valid, but IP name is not defined (see
+#    above for values)
+configmaps:
+  dispatcher:
+    AFC_SERVER_NAME: _
+    AFC_ENFORCE_HTTPS: "True"
+    AFC_ENFORCE_MTLS: "False"
+    AFC_MSGHND_NAME: "{{ip:int-ingress}}"
+    AFC_MSGHND_PORT: "80"
+    AFC_WEBUI_NAME: "{{ip:int-ingress}}"
+    AFC_WEBUI_PORT: "80"
+    AFC_OBJST_SCHEME: HTTP
+    AFC_OBJST_HOST: "{{ip:int-ingress}}"
+    AFC_OBJST_PORT: "80"
+    BROKER_FQDN: "{{ip:int-rmq}}"
+    BROKER_PORT: 5672
+
+
+# Dictionary of components. Component roughly corresponds to Docker Compose
+# service. Keys in dictionary are Docker Compose service names, plus there is
+# 'default' component containing default values for certain parameters.
+# Properties are:
+#   imageName Image name (without repository and tag). Empty means component
+#           should not be used (like Postgres components in GCP)
+#   imageRepositoryKey Key in .Values.imageRepositories
+#   imageRepositoryKeyOverride Key in .Values.imageRepositories that, if
+#           specified, overrides imageRepositoryKey
+#   imageTag Image tag. Default is .Chart.appVersion
+#   imagePullPolicy Image pull policy
+#   namespace optional namespace
+#   service Stuff related to service. Properties are:
+#     type Service type
+#     hostname Hostname to use in Kubernetes service. Default is component name
+#     loadBalancerIpKey Key in externalIps of loadBalancerIP value. Ignored if
+#             value is empty/null
+#     annotations Dictionary of service annotations
+#     selector Pod selector dictionary
+#   initialReplicas Initial replica count
+#   serviceAccount Name of service account. Empty/absent to use default
+#   securityContextKey Key in securityContexts
+#   ports Dictionary of TCP port descriptors. Keys are port names, values have
+#           the following structure:
+#     servicePort Port exposed by service. Absent if not for exposing by
+#             service
+#     containerPort Port exposed by container. Default is same as servicePort
+#     nodePort Node port to allocate for service that may be designated as
+#             NodePort. Names of such ports better be unique (as it simplifies
+#             wrapper scripts' interface)
+#     appProtocol Protocol hint
+#   containerResources Kubernetes container resources (Dictionary with
+#           'requests' and 'limits' keys)
+#   pvc Persistent Volume Claim data. Properties:
+#     name PVC name
+#     accessMode Access mode (ReadWriteOnce, ReadOnlyMany, ReadWriteMany, or
+#             ReadWriteOncePod)
+#     mountPath Mount path inside container
+#     resources PVC resources (has 'requests', etc. properties)
+#   envConfigmapKeys: List of configmap keys (keys into configmaps dictionary)
+#           to include into environment
+#   staticVolumeMounts Dictionary of mount points of used static
+#           (non-templated, non-secret) volumes, indexed by staticVolumes
+#           dictionary keys
+#   mountedSecrets List of external secret names (keys in externalSecrets
+#           dictionary) to mount
+#   metrics Where to look for Prometheus metrics. Contains single entry in
+#           podmonitor's podMetricsEndpoints key (port, path, params, etc.)
+#     port Port name
+#     path Path to metric. Default is /metrics
+#   hpa Data for horizontal Pod Autoscaler
+#     minReplicas Minimum number of replicas. Optional, default is 1
+#     maxReplicas Maximum number of replicas
+#     metric Type-specific part of HPA manifest's' spec.metrics element (i.e.
+#             'type' field derived from top-level key)
+#     behavior Behavior clause of HPA manifest. Optional. Default is to scale
+#             immediately, without looking back
+components:
+  default:
+    service:
+      type: ClusterIP
+    initialReplicas: 1
+    imagePullPolicy: IfNotPresent
+    serviceAccount:
+    securityContextKey: none
+    pvc:
+      accessMode: ReadWriteOnce
+  dispatcher:
+    imageName: dispatcher-image
+    imageRepositoryKey: public
+    service:
+      type: LoadBalancer
+      loadBalancerIpKey: ext-dispatcher
+    envConfigmapKeys: [dispatcher]
+    ports:
+      http:
+        servicePort: 80
+      https:
+        servicePort: 443
+      status:
+        servicePort: 8080
+
+# Dictionary of secret store descriptors
+# Keys used as secret store name (after conversion to RFC1123)
+# Properties are:
+#   provider - provider clause as per SecretStore/ClusterSecretStore
+#   structured - can be:
+#    True If secrets in remote secret store have key-value form (e.g.
+#            Kubernetes as External Secrets backend). For such stores
+#            'property' (if nonempty) used to retrieve secret value from
+#            external secret
+#    False If values of secrets stored as is, without any keys (e.g. GCP)
+#   namespace - if specified then SecretStore is created, otherwise
+#           ClusterSecretStore
+#   refreshInterval - refresh interval in seconds (sic! - unlike in
+#           externalSecrets refreshInterval, that comprised of number an unit)
+secretStores:
+  # Main (and, hopefully, only) external secret store
+  secret-store:
+    # Provider must be overridden
+    structured: False
+    provider: {}
+    refreshInterval: 300
+
+# Dictionary of external secrets.
+# Intended use is single-property (single file/environment) secrets, albeit
+# multifile/environment secrets may be established with empty 'property'
+# Dictionary key (converted to RFC1123) used as name (key) of external secret
+# and name of created secret. Special 'default' dictionary key denotes entry,
+# holding common properties (to avoid their duplication in each secret
+# definition - still they can be redefined there if needed)
+# Properties are:
+#  secretStore Name of secret store - key in 'secretStores' dictionary
+#  refreshInterval Secret refresh interval (e.g. 1h), 0 to fetch once. Note
+#          that in secretStores interval is an integer, expressed in seconds!
+#  property Can be:
+#    nonempty - top-level secret property (i.e. name of secret file or
+#            environment variable)
+#    empty - remote secret used verbatim
+#    absent - corresponded ExternalSecret not created
+#  type - Optional 'type' value for secret manifest
+#  mountPath Directory to which secret is mounted
+#  subPath SubPath clause (e.g. for mounting several secrets into same
+#          directory)
+#  structuredRemote - can be:
+#    True If secrets in remote secret store have key-value form (e.g.
+#            Kubernetes as External Secrets backend). For such stores
+#            'property' (if nonempty) used to retrieve secret value from
+#            external secret
+#    False If values of secrets stored as is, without any keys (e.g. GCP)
+#  remoteSecretName Name of remote secret (if different from this item's
+#          key). Useful for several ExternalSecret manifests to share the same
+#          external secret
+#  remoteProperty Name of key in remote structured property, if different
+#          from 'property'. Useful for several ExternalSecret manifests to
+#          share the same external secret
+externalSecrets:
+  default:
+    secretStore: secret-store
+    refreshInterval: 5m
+  image-pull:
+    property: .dockerconfigjson
+    type: kubernetes.io/dockerconfigjson
+  server-cert-pem:
+    property: server.cert.pem
+    subpath: server.cert.pem
+    mountPath: /certificates/servers/server.cert.pem
+  server-key-pem:
+    property: server.key.pem
+    subpath: server.key.pem
+    mountPath: /certificates/servers/server.key.pem
