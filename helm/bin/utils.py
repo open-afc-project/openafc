@@ -5,7 +5,7 @@
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 
-# pylint: disable=invalid-name, too-many-arguments
+# pylint: disable=invalid-name, too-many-arguments, global-statement
 
 import argparse
 import fnmatch
@@ -84,14 +84,14 @@ def warning_if(cond: Any, message: str) -> None:
         warning(message)
 
 
-def set_silent_execute(state: bool=True) -> None:
+def set_silent_execute(state: bool = True) -> None:
     """ Disables/enables silent execute() """
     global _silent_execute
     _silent_execute = state
 
 
 def execute(args: Union[List[str], str], cwd: Optional[str] = None,
-            return_output: bool = False, echo=True, hide_stderr: bool=False,
+            return_output: bool = False, echo=True, hide_stderr: bool = False,
             print_prefix: str = "> ", fail_on_error: bool = True) \
             -> Union[str, bool]:
     """ Execute given command or commands
