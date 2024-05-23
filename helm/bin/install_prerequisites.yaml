@@ -5,10 +5,10 @@
 # a copy of which is included with this software program
 #
 ---
-# Parameters for prepare_cluster.py
+# Parameters for install_prerequisites.py
 
 # Dictionary of components (helmcharts and manifests) that might be installed.
-# Keys used in prepare_cluster.py command lines to chose what to install.
+# Keys used in install_prerequisites.py command lines to chose what to install.
 # Entries better be in recommended install order (e.g. because parametyerless
 # uninstall uninstall components in reverse order)
 # Dictionary values may have the following properties:
