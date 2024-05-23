@@ -15,16 +15,24 @@
 # App name to use instead of default Chart.Name
 # appNameOverride:
 
+# Dictionary of external IPs (keys are names, values are IPs) - if used should
+# be defined in some override
+externalIps:
+  # Ingress of internal cluster
+  int-ingress: null
+  # RabbitMQ AMQP of internal cluster
+  int-rmq: null
+
 # Dictionary of image repositories. Keys may be any - they are used in
 # component definition. Fields are:
 # path Repository path
 # pullSecrets List of names of pull secrets
 imageRepositories:
   public:
-    path: ghcr.io/open-afc-project/afc-worker
+    path: ghcr.io/open-afc-project
     pullSecrets: []
   private:
-    path: ghcr.io/open-afc-project/afc-worker
+    path: ghcr.io/open-afc-project
     pullSecrets: []
 
 # Dictionary of security contexts. Keys are used in component definitions (and
@@ -38,7 +46,7 @@ securityContexts:
 
 # Dictionary of configmaps. Indexed by configmap keys (suffixes of configmap
 # names). Values are dictionaries, with uppercase-named entries going to
-# configmap as is, nonuppercase entries may be used in construction of
+# configmap as is, non-uppercase entries may be used in construction of
 # configmap entries.
 # DSNs present here may contain usernames/passwords for development (Docker
 # Compose) configurations. Really secret usernames/passwords (but not entire
@@ -69,7 +77,10 @@ securityContexts:
 #  - {{secretProperty:<EXTERNALSECRET>[:<IFABSENT>]}} 'property' of external
 #    secret with given <EXTERNALSECRET> name (i.e. name of secret file or
 #    secret environment variable). <IFABSENT> describes what to do if secret or
-#    'property' fild of secret definition is absent (see above for values)
+#    'property' field of secret definition is absent (see above for values)
+#  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. IFABSENT>
+#    describes what to do if name is valid, but IP name is not defined (see
+#    above for values)
 configmaps:
   # Own environment variables of dispatcher container(s)
   dispatcher:
@@ -175,72 +186,81 @@ configmaps:
       http://{{host:rat_server}}/fbrat/ratapi/v1/GetRulesetIDs
     RCACHE_CONFIG_RETRIEVAL_URL: >-
       http://{{host:rat_server}}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
-# Dictionary of static (nontemplated and nonsecret) volume definitions. Indexed
-# by volume names
+
+# Dictionary of static (non-templated and non-secret) volume definitions.
+# Indexed by volume names
 staticVolumes:
+  # All must be overridden
   rat_transfer:
-    hostPath:
-      path: /opt/afc/databases/rat_transfer
-      type: Directory
+    # hostPath:
+    #   path: /opt/afc/databases/rat_transfer
+    #   type: Directory
   pipe:
-    hostPath:
-      # Path better be overridden, type set to bypass creation if overridden
-      path: /tmp
-      type: DirectoryOrCreate
+    # hostPath:
+    #   # Path better be overridden, type set to bypass creation if overridden
+    #   path: /tmp
+    #   type: DirectoryOrCreate
 
 # Dictionary of components. Component roughly corresponds to Docker Compose
 # service. Keys in dictionary are Docker Compose service names, plus there is
 # 'default' component containing default values for certain parameters.
-# Structure of component:
-# imageName Image name (without repository and tag). Empty means component
-#         should not be used (like Postgres components in GCP)
-# imageRepositoryKey Key in .Values.imageRepositories
-# imageRepositoryKeyOverride Key in .Values.imageRepositories that, if
-#         specified, overrides imageRepositoryKey
-# imageTag Image tag. Default is .Chart.appVersion
-# imagePullPolicy Image pull policy
-# hostname Hostname to use in Kubernetes service. Default is component name
-# serviceType Kubernetes service type
-# initialReplicas Initial replica count
-# loadBalancerIP Explicitly specifiedLoad Balancer port. Best be specified
-#         in configuration-specific values file
-# serviceAccount Name of service account. Empty/absent to use default
-# securityContextKey Key in securityContexts
-# ports Dictionary of TCP port descriptors. Keys are port names, values have
-#         the following structure:
-#   servicePort Port exposed by service. Absent if not for exposing by service
-#   containerPort Port exposed by container. Default is same as servicePort
-#   nodePort Node port to allocate for service that may be designated as
-#         NodePort. Names of such ports better be unique (as it simplifies
-#         wrapper scripts' interface)
-# containerResources Kubernetes container resources (Dictionary with 'requests'
-#         and 'limits' keys)
-# pvc Persistent Volume Claim data. Subkeys:
-#   name PVC name
-#   accessMode Access mode (ReadWriteOnce, ReadOnlyMany, ReadWriteMany, or
-#           ReadWriteOncePod)
-#   mountPath Mount path inside container
-#   resources PVC resources (has 'requests', etc. subkeys)
-# envConfigmapKeys: List of configmap keys (keys into configmaps dictionary) to
-#         include into environment
-# staticVolumeMounts Dictionary of mount points of used static (nontemplated,
-#         nonsecret) volumes, indexed by staticVolumes dictionary keys
-# mountedSecrets List of external secret names (keys in externalSecrets
-#         dictionary) to mount
-# metrics Where to look for prometheus metrics. Contains single entry in
-#         podmonitor's podMetricsEndpoints key (port, path, params, etc.)
-#   port Port name
-#   path Path to metric. Default is /metrics
-# hpa Data for horizontal Pod Autoscaler
-#   minReplicas Minimum number of replicas. Optional, default is 1
-#   maxReplicas Maximum number of replicas
-#   metric Type-specific part of HPA manifest's' spec.metrics element (i.e.
-#           'type' field derived from top-level key)
-#   behavior Behavior clause of HPA manifest. Optional. Default is to scale
-#           immediately, without looking back
+# Properties are:
+#   imageName Image name (without repository and tag). Empty means component
+#           should not be used (like Postgres components in GCP)
+#   imageRepositoryKey Key in .Values.imageRepositories
+#   imageRepositoryKeyOverride Key in .Values.imageRepositories that, if
+#           specified, overrides imageRepositoryKey
+#   imageTag Image tag. Default is .Chart.appVersion
+#   imagePullPolicy Image pull policy
+#   service Stuff related to service. Properties are:
+#     type Service type
+#     hostname Hostname to use in Kubernetes service. Default is component name
+#     loadBalancerIpKey Key in externalIps of loadBalancerIP value. Ignored if
+#             value is empty/null
+#     annotations Dictionary of service annotations
+#     selector Pod selector dictionary
+#   initialReplicas Initial replica count
+#   serviceAccount Name of service account. Empty/absent to use default
+#   securityContextKey Key in securityContexts
+#   ports Dictionary of TCP port descriptors. Keys are port names, values have
+#           the following structure:
+#     servicePort Port exposed by service. Absent if not for exposing by
+#             service
+#     containerPort Port exposed by container. Default is same as servicePort
+#     nodePort Node port to allocate for service that may be designated as
+#             NodePort. Names of such ports better be unique (as it simplifies
+#             wrapper scripts' interface)
+#     appProtocol Protocol hint
+#   containerResources Kubernetes container resources (Dictionary with
+#           'requests' and 'limits' keys)
+#   pvc Persistent Volume Claim data. Properties:
+#     name PVC name
+#     accessMode Access mode (ReadWriteOnce, ReadOnlyMany, ReadWriteMany, or
+#             ReadWriteOncePod)
+#     mountPath Mount path inside container
+#     resources PVC resources (has 'requests', etc. properties)
+#   envConfigmapKeys: List of configmap keys (keys into configmaps dictionary)
+#           to include into environment
+#   staticVolumeMounts Dictionary of mount points of used static
+#           (non-templated, non-secret) volumes, indexed by staticVolumes
+#           dictionary keys
+#   mountedSecrets List of external secret names (keys in externalSecrets
+#           dictionary) to mount
+#   metrics Where to look for Prometheus metrics. Contains single entry in
+#           podmonitor's podMetricsEndpoints key (port, path, params, etc.)
+#     port Port name
+#     path Path to metric. Default is /metrics
+#   hpa Data for horizontal Pod Autoscaler
+#     minReplicas Minimum number of replicas. Optional, default is 1
+#     maxReplicas Maximum number of replicas
+#     metric Type-specific part of HPA manifest's' spec.metrics element (i.e.
+#             'type' field derived from top-level key)
+#     behavior Behavior clause of HPA manifest. Optional. Default is to scale
+#             immediately, without looking back
 components:
   default:
-    serviceType: ClusterIP
+    service:
+      type: ClusterIP
     initialReplicas: 1
     imagePullPolicy: IfNotPresent
     serviceAccount:
@@ -263,6 +283,8 @@ components:
   rmq:
     imageName: rmq-image
     imageRepositoryKey: public
+    service:
+      loadBalancerIpKey: int-rmq
     ports:
       amqp:
         servicePort: 5672
@@ -280,7 +302,8 @@ components:
   dispatcher:
     imageName: dispatcher-image
     imageRepositoryKey: public
-    serviceType: LoadBalancer
+    service:
+      type: LoadBalancer
     envConfigmapKeys: [dispatcher, objst-client, objst-common]
     ports:
       http:
@@ -294,7 +317,8 @@ components:
   rat_server:
     imageName: afc-server
     imageRepositoryKey: private
-    hostname: webui
+    service:
+      hostname: webui
     ports:
       rat_server:
         servicePort: 80
@@ -363,7 +387,7 @@ components:
             #   - active_engine_requests_rabbitmq - Number of incomplete
             #             requests in Celery queue
             #  Both are (or should be) equivalent
-            name: active_engine_requests_msghnd
+            name: active_engine_requests_rabbitmq
           target:
             type: AverageValue
             # 1700m is 1.7 in HPA parlance
@@ -381,7 +405,8 @@ components:
   als_kafka:
     imageName: als-kafka-image
     imageRepositoryKey: public
-    hostname: als-kafka
+    service:
+      hostname: als-kafka
     ports:
       kafka:
         servicePort: 9092
@@ -392,7 +417,8 @@ components:
   als_siphon:
     imageName: als-siphon-image
     imageRepositoryKey: public
-    hostname: als-siphon
+    service:
+      hostname: als-siphon
     ports:
       metrics:
         containerPort: 8080
@@ -407,7 +433,8 @@ components:
   bulk_postgres:
     imageName: bulk-postgres-image
     imageRepositoryKey: public
-    hostname: bulk-postgres
+    service:
+      hostname: bulk-postgres
     ports:
       bulk_postgres:
         servicePort: 5432
@@ -421,7 +448,8 @@ components:
   uls_downloader:
     imageName: uls-downloader
     imageRepositoryKey: public
-    hostname: uls-downloader
+    service:
+      hostname: uls-downloader
     envConfigmapKeys: [uls_downloader, rcache-client, rcache-common]
     staticVolumeMounts:
       rat_transfer: /rat_transfer
@@ -434,7 +462,8 @@ components:
   cert_db:
     imageName: cert_db
     imageRepositoryKey: public
-    hostname: cert-db
+    service:
+      hostname: cert-db
     envConfigmapKeys: [ratdb-conn, als-client]
     mountedSecrets: [ratdb-password]
   rcache:
@@ -467,6 +496,9 @@ components:
   prometheus:
     # Only to create optional nodeport service on k3d. Other aspects managed by
     # prometheus-operator
+    service:
+      selector:
+        prometheus: main
     ports:
       prometheus:
         servicePort: 9090
@@ -474,18 +506,53 @@ components:
   # Only to have proper label in its servicemonitor
   cadvisor: {}
 
+# Dictionary that defines ingress parameters (override to Null if no ingress)
+# name Ingress name.
+# Properties are
+#   annotations
+#   ingressClassName Value for spec.ingressClassName
+#   rules List of path descriptors. Each descriptor has properties:
+#     name Ingress name
+#     componentKey Index in components
+#     portKey Index in components[componentKey].ports
+#     path Path to match
+#     pathType (Prefix, ImplementationSpecific or Exact). Default is Prefix
+ingress:
+  name: ingress-int
+  ingressClassName: nginx
+  rules:
+    - componentKey: msghnd
+      portKey: msghnd
+      path: /fbrat/ap-afc/availableSpectrumInquiry
+      pathType: Prefix
+    - componentKey: rat_server
+      portKey: rat_server
+      path: /fbrat
+      pathType: Prefix
+    - componentKey: objst
+      portKey: fileStorage
+      path: /certificate
+      pathType: Prefix
+
 # Dictionary of secret store descriptors
 # Keys used as secret store name (after conversion to RFC1123)
 # Properties are:
 #   provider - provider clause as per SecretStore/ClusterSecretStore
+#   structured - can be:
+#    True If secrets in remote secret store have key-value form (e.g.
+#            Kubernetes as External Secrets backend). For such stores
+#            'property' (if nonempty) used to retrieve secret value from
+#            external secret
+#    False If values of secrets stored as is, without any keys (e.g. GCP)
 #   namespace - if specified then SecretStore is created, otherwise
 #           ClusterSecretStore
 #   refreshInterval - refresh interval in seconds (sic! - unlike in
 #           externalSecrets refreshInterval, that comprised of number an unit)
 secretStores:
-  # Main (and, hopefully, only secret store)
+  # Main (and, hopefully, only) external secret store
   secret-store:
     # Provider must be overridden
+    structured: False
     provider: {}
     refreshInterval: 300
 
@@ -495,7 +562,7 @@ secretStores:
 # Dictionary key (converted to RFC1123) used as name (key) of external secret
 # and name of created secret. Special 'default' dictionary key denotes entry,
 # holding common properties (to avoid their duplication in each secret
-# definition - still they can be redefined ther if needed)
+# definition - still they can be redefined there if needed)
 # Properties are:
 #  secretStore Name of secret store - key in 'secretStores' dictionary
 #  refreshInterval Secret refresh interval (e.g. 1h), 0 to fetch once. Note
@@ -505,7 +572,10 @@ secretStores:
 #            environment variable)
 #    empty - remote secret used verbatim
 #    absent - corresponded ExternalSecret not created
+#  type - Optional 'type' value for secret manifest
 #  mountPath Directory to which secret is mounted
+#  subPath SubPath clause (e.g. for mounting several secrets into same
+#          directory)
 #  structuredRemote - can be:
 #    True If secrets in remote secret store have key-value form (e.g.
 #            Kubernetes as External Secrets backend). For such stores
@@ -521,7 +591,6 @@ secretStores:
 externalSecrets:
   default:
     secretStore: secret-store
-    structuredRemote: False
     refreshInterval: 5m
   notifier-mail:
     property: NOTIFIER_MAIL.json
@@ -544,3 +613,6 @@ externalSecrets:
   als-json-log-db-password:
     property: ALS_JSON_LOG_DB_PASSWORD
     mountPath: /secrets/als-json-log-db-password
+  image-pull:
+    property: .dockerconfigjson
+    type: kubernetes.io/dockerconfigjson
