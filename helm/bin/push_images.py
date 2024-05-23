@@ -1,20 +1,23 @@
 #!/usr/bin/env python3
-""" Pushes docker images to k3d local registry """
+""" Pushes docker images to registry """
 #
 # Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 
-# pylint: disable=invalid-name, too-many-locals
+# pylint: disable=invalid-name, too-many-locals, too-many-statements
+# pylint: disable=too-many-branches
 
 import argparse
+import datetime
+import os
 import re
-import socket
 import sys
-from typing import cast, Dict, List
+from typing import cast, Dict, List, NamedTuple, Set
 
-from k3d_lib import error_if, execute, K3D_PREFIX, parse_k3d_reg
+from utils import auto_name, AUTO_NAME, error, error_if, execute, \
+    ImageRegistryInfo, parse_json_output, parse_k3d_reg, ROOT_DIR
 
 
 def main(argv: List[str]) -> None:
@@ -27,12 +30,23 @@ def main(argv: List[str]) -> None:
         argparse.ArgumentParser(
             description="Pushes docker images to k3d local registry")
     argument_parser.add_argument(
-        "--k3d_reg", metavar="[name][:port]",
-        help="Name and/or port of k3d local registry to push images to. "
-        "Default is the first (and only) currently running registry")
+        "--k3d_reg", metavar="[NAME][:PORT] or DEFAULT",
+        help="Push images to k3d image registry - either explicitly specified "
+        "or the default (default is the only k3d registryt, running locally)")
+    argument_parser.add_argument(
+        "--registry", metavar="PULL_REGISTRY",
+        help="Image registry Kubernetes will pull images from")
+    argument_parser.add_argument(
+        "--push_registry", metavar="PUSH_REGISTRY",
+        help="Image registry to push images to (may be - and strangely "
+        "usually is - different from pull registry)")
+    argument_parser.add_argument(
+        "--build", action="store_true",
+        help="Build images before push")
     argument_parser.add_argument(
         "TAG",
-        help="Tag of images to put to k3d registry")
+        help="Tag of images to put to registry. AUTO to make tag from login "
+        "name and source root directory")
 
     if not argv:
         argument_parser.print_help()
@@ -40,22 +54,35 @@ def main(argv: List[str]) -> None:
 
     args = argument_parser.parse_args(argv)
 
-    registry = parse_k3d_reg(args.k3d_reg)
-    registry_host, registry_port = registry.split(":")
+    if args.k3d_reg:
+        error_if(args.registry,
+                 "--k3d_reg and --registry are mutually exclusive")
+        reg_info = parse_k3d_reg(args.k3d_reg)
+        assert reg_info is not None
+    elif args.registry:
+        reg_info = \
+            ImageRegistryInfo(pull=args.registry,
+                              push=args.push_registry or args.pull_registry)
+    else:
+        error("target registry not specified")
 
-    # Find out if 'push to localhost' should be used
-    push_to_localhost = False
-    try:
-        socket.gethostbyname(registry_host)
-    except OSError:
-        push_to_localhost = True
+    args_tag = auto_name(kabob=False) if args.TAG == AUTO_NAME else args.TAG
 
-    # Do the deed
-    pushed_image_to_id: Dict[str, str] = {}
+    # Build images if requested
+    if args.build:
+        execute([os.path.join(ROOT_DIR, "tests/regression/build_imgs.sh"),
+                 ROOT_DIR, args_tag, "0"])
+    # Chose latest images of given tag
+    ImageInfo = NamedTuple("ImageInfo", [("image_id", str),
+                                         ("created", datetime.datetime),
+                                         ("known_ids", Set[str])])
+    images: Dict[str, ImageInfo] = {}
+
     for imgdef in cast(str, execute(["docker", "image", "list"],
                                     return_output=True)).splitlines():
         m = re.match(r"^(\S+)\s+(\S+)\s+([0-9a-f]+)", imgdef)
         if not m:
+            # Probably image table heading
             continue
         assert m is not None
         image_full_name = m.group(1)
@@ -65,31 +92,48 @@ def main(argv: List[str]) -> None:
         error_if(not m,
                  f"Unsupported structure of image name: '{image_full_name}'")
         assert m is not None
-        image_repo = m.group(1)
         image_base_name = m.group(2)
-        if (image_tag != args.TAG) or \
-                any(image_repo.startswith(prefix)
-                    for prefix in (K3D_PREFIX, "localhost")):
+        if image_tag != args_tag:
+            # Other tag
             continue
-        pushed_id = pushed_image_to_id.get(image_base_name)
-        if pushed_id:
-            error_if(
-                pushed_id != image_id,
-                f"More than one different nonlocal versions of "
-                f"'{image_base_name}:{image_tag}' found in docker repository")
+        current_image_info = images.get(image_base_name)
+        if current_image_info and (image_id in current_image_info.known_ids):
+            # Image already found
             continue
+        image_inspection = \
+            parse_json_output(["docker", "image", "inspect", image_id],
+                              echo=False)
+        try:
+            created = \
+                datetime.datetime.fromisoformat(
+                    image_inspection[0]["Created"])
+            if current_image_info and (created <= current_image_info.created):
+                # Same or fresher image already found
+                continue
+        except LookupError as ex:
+            error(f"Unsupported format of image '{imgdef}' inspection: {ex}")
+        except ValueError as ex:
+            error(f"Unsuported creation tiem format of image '{imgdef}': {ex}")
+        images[image_base_name] = \
+            ImageInfo(
+                image_id=image_id, created=created,
+                known_ids={image_id} |
+                (current_image_info.known_ids if current_image_info
+                 else set()))
+    error_if(not images,
+             "No eligible images found. Maybe they are not yet built?")
+
+    # Pushing selected images
+    for image_base_name, image_info in images.items():
         execute(
-            ["docker", "image", "tag", image_id,
-             f"{registry_host}:{registry_port}/{image_base_name}:{args.TAG}"])
-        if push_to_localhost:
+            ["docker", "image", "tag", image_info.image_id,
+             f"{reg_info.pull}/{image_base_name}:{args_tag}"])
+        if reg_info.push != reg_info.pull:
             execute(
-                ["docker", "image", "tag", image_id,
-                 f"localhost:{registry_port}/{image_base_name}:{args.TAG}"])
+                ["docker", "image", "tag", image_info.image_id,
+                 f"{reg_info.push}/{image_base_name}:{args_tag}"])
         execute(["docker", "image", "push",
-                 f"{'localhost' if push_to_localhost else registry_host}:"
-                 f"{registry_port}/{image_base_name}:{args.TAG}"])
-        pushed_image_to_id[image_base_name] = image_id
-    error_if(not pushed_image_to_id, f"No images with tag `{args.TAG}' found")
+                 f"{reg_info.push}/{image_base_name}:{args_tag}"])
 
 
 if __name__ == "__main__":
