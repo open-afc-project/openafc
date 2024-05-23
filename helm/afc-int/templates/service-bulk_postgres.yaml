@@ -4,7 +4,7 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Service helmchart for bulk_postgres pod (for use in Minikube configuration)
+# Service helmchart for bulk_postgres pod (for use in k3d configuration)
 {{- $ := mergeOverwrite $ (dict "component" "bulk_postgres") }}
 {{- if (include "afc.fullImageName" .) }}
 
@@ -14,9 +14,10 @@ kind: Service
 metadata:
   name: {{ include "afc.hostName" . -}}-headless
   labels: {{- include "afc.commonLabels" . | nindent 4 }}
+  {{- include "afc.serviceAnnotations" . | nindent 2 }}
 spec:
   clusterIP: None
-  selector: {{- include "afc.selectorLabels" . | nindent 4 }}
+  selector: {{- include "afc.serviceSelector" . | nindent 4 }}
   ports: {{- include "afc.servicePortsHeadless" . | nindent 4 }}
 
 ---
@@ -27,9 +28,10 @@ kind: Service
 metadata:
   name: {{ include "afc.hostName" . }}
   labels: {{- include "afc.commonLabels" . | nindent 4 }}
+  {{- include "afc.serviceAnnotations" . | nindent 2 }}
 spec:
   {{- include "afc.serviceIp" . | nindent 2 }}
-  selector: {{- include "afc.selectorLabels" . | nindent 4 }}
+  selector: {{- include "afc.serviceSelector" . | nindent 4 }}
   ports: {{- include "afc.servicePorts" . | nindent 4 }}
 
 {{- end -}}

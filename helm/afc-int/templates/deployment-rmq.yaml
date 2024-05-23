@@ -20,11 +20,11 @@ spec:
   replicas: {{ include "afc.replicas" . }}
   {{- include "afc.serviceAccountRef" . | indent 2 }}
   {{- include "afc.securityContext" . | indent 2 }}
-  {{- include "afc.imagePullSecrets" . | indent 2 }}
   template:
     metadata:
       labels: {{- include "afc.commonLabels" . | nindent 8 }}
     spec:
+      {{- include "afc.imagePullSecrets" . | indent 6 }}
       containers:
         - {{- include "afc.containerImage" . | nindent 10 }}
           ports: {{- include "afc.containerPorts" . | nindent 12 }}

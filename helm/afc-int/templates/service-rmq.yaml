@@ -12,7 +12,8 @@ kind: Service
 metadata:
   name: {{ include "afc.hostName" . }}
   labels: {{- include "afc.commonLabels" . | nindent 4 }}
+  {{- include "afc.serviceAnnotations" . | nindent 2 }}
 spec:
   {{- include "afc.serviceIp" . | nindent 2 }}
-  selector: {{- include "afc.selectorLabels" . | nindent 4 }}
+  selector: {{- include "afc.serviceSelector" . | nindent 4 }}
   ports: {{- include "afc.servicePorts" . | nindent 4 }}

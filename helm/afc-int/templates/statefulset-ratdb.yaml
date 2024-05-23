@@ -4,7 +4,7 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# StatefuSet helmchart for ratdb pod (for use in Minikube configuration)
+# StatefuSet helmchart for ratdb pod (for use in k3d configuration)
 
 {{- $ := mergeOverwrite $ (dict "component" "ratdb") }}
 {{- if (include "afc.fullImageName" .) }}
@@ -21,12 +21,12 @@ spec:
   replicas: {{ include "afc.replicas" . }}
   {{- include "afc.serviceAccountRef" . | indent 2 }}
   {{- include "afc.securityContext" . | indent 2 }}
-  {{- include "afc.imagePullSecrets" . | indent 2 }}
   serviceName: {{ include "afc.compManifestName" . }}
   template:
     metadata:
       labels: {{- include "afc.commonLabels" . | nindent 8 }}
     spec:
+      {{- include "afc.imagePullSecrets" . | indent 6 }}
       containers:
         - {{- include "afc.containerImage" . | nindent 10 }}
           ports: {{- include "afc.containerPorts" . | nindent 12 }}
