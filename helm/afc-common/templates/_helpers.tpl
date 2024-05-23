@@ -66,7 +66,7 @@ Hostname for a component
 */}}
 {{- define "afc.hostName" -}}
 {{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
-{{- default .component (get $compDef "hostname") -}}
+{{- default .component (get (default (dict) (get $compDef "service")) "hostname") -}}
 {{- end }}
 
 {{/*
@@ -162,10 +162,25 @@ IP fields (type, loadBalancerIP) in service manifest
 */}}
 {{- define "afc.serviceIp" -}}
 {{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
-type: {{ get $compDef "serviceType" }}
-{{- if hasKey $compDef "loadBalancerIP" }}
-loadBalancerIP: {{ get $compDef "loadBalancerIP" }}
+{{- $serviceDef := default (dict) (get $compDef "service") -}}
+{{- $serviceType := get $serviceDef "type" -}}
+{{- $ip := "" -}}
+{{- $ipKey := get $serviceDef "loadBalancerIpKey" -}}
+{{- if $ipKey -}}
+{{-   if not (hasKey .Values.externalIps $ipKey) -}}
+{{-     fail (cat "Service of component" .component "uses undefined loadBalancerIpKey" $ipKey) -}}
+{{-   end -}}
+{{-   $ip = get .Values.externalIps $ipKey -}}
+{{- end -}}
+{{- if $serviceType }}
+type: {{ $serviceType }}
 {{- end }}
+{{- if $ip }}
+{{-   if ne $serviceType "LoadBalancer" -}}
+{{-     fail (cat "Component" .component "defines loadBalancerIp for non-LoadBalancer service") }}
+{{-   end }}
+loadBalancerIP: {{ $ip }}
+{{- end -}}
 {{- end }}
 
 {{/*
@@ -196,11 +211,10 @@ Image pull secrets (if any)
 {{- $repoKey := default (get $compDef "imageRepositoryKey") (get $compDef "imageRepositoryKeyOverride") | required (cat "No 'imageRepositoryKey[Override]' found in definition of component" .component) -}}
 {{- $repoDef := get .Values.imageRepositories $repoKey | required (cat "Component" .component "refers unknown image repository" $repoKey) -}}
 {{- $pullSecrets := get $repoDef "pullSecrets" -}}
-{{- $functionContext := . -}}
 {{- if $pullSecrets }}
 imagePullSecrets:
 {{-   range $secret := $pullSecrets }}
-  - name: {{ include "afc.secretManifestName" (mergeOverwrite $functionContext (dict "secret" $secret))  }}
+  - name: {{ include "afc.secretManifestName" (mergeOverwrite $ (dict "secret" $secret))  }}
 {{-   end }}
 {{- end }}
 {{- end }}
@@ -235,6 +249,9 @@ Headless service ports definition (no nodePort even if defined)
 {{-     if hasKey $portInfo "containerPort" }}
   targetPort: {{ get $portInfo "containerPort" }}
 {{-     end }}
+{{-     if hasKey $portInfo "appProtocol" }}
+  appProtocol: {{ get $portInfo "appProtocol" }}
+{{-     end }}
 {{-   end }}
 {{- end }}
 {{- end }}
@@ -245,6 +262,7 @@ Service ports definition
 */}}
 {{- define "afc.servicePorts" -}}
 {{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $serviceDef := default (dict) (get $compDef "service") -}}
 {{- $portDefs := get $compDef "ports" -}}
 {{- if $portDefs }}
 {{-   range $portName, $portInfo := $portDefs }}
@@ -254,12 +272,42 @@ Service ports definition
 {{-       if hasKey $portInfo "containerPort" }}
   targetPort: {{ get $portInfo "containerPort" }}
 {{-       end }}
-{{-       if and (hasKey $portInfo "nodePort") (eq "NodePort" (get $compDef "serviceType")) }}
+{{-       if and (hasKey $portInfo "nodePort") (eq "NodePort" (get $serviceDef "type")) }}
   nodePort: {{ get $portInfo "nodePort" | int }}
+{{-       end }}
+{{-       if hasKey $portInfo "appProtocol" }}
+  appProtocol: {{ get $portInfo "appProtocol" }}
 {{-       end }}
   protocol: TCP
 {{-     end }}
 {{-   end }}
+{{- end }}
+{{- end }}
+
+{{/*
+Service annotations
+.component (key in .Values.components) must be defined
+*/}}
+{{- define "afc.serviceAnnotations" -}}
+{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $serviceDef := default (dict) (get $compDef "service") -}}
+{{- $annotations := get $serviceDef "annotations" -}}
+{{- if $annotations }}
+annotations: {{- toYaml $annotations | nindent 2 }}
+{{- end }}
+{{- end }}
+
+{{/*
+Service selector
+.component (key in .Values.components) must be defined
+*/}}
+{{- define "afc.serviceSelector" -}}
+{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $serviceDef := default (dict) (get $compDef "service") -}}
+{{- if get $serviceDef "selector" }}
+{{-   toYaml (get $serviceDef "selector") }}
+{{- else }}
+{{-   include "afc.selectorLabels" . }}
 {{- end }}
 {{- end }}
 
@@ -339,11 +387,10 @@ Render environment from ConfigMaps, contained in envConfigmapKeys list of compon
 {{- define "afc.envFromConfigMaps" -}}
 {{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
 {{- $configmaps := get $compDef "envConfigmapKeys" -}}
-{{- $functionContext := . -}}
 {{- if $configmaps }}
 {{-   range $configmap := $configmaps }}
 - configMapRef:
-    name: {{ include "afc.configmapManifestName" (mergeOverwrite $functionContext (dict "configmap" $configmap)) }}
+    name: {{ include "afc.configmapManifestName" (mergeOverwrite $ (dict "configmap" $configmap)) }}
 {{-   end }}
 {{- end }}
 {{- end }}
@@ -355,7 +402,6 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{- define "afc.configmapEnvEntries" -}}
 {{- $values := get .Values.configmaps .configmap | required (cat "No configmap for this configmap key:" .configmap) -}}
 {{- $savedComponent := get . "component" -}}
-{{- $functionContext := . -}}
 {{- range $name, $value := $values }}
 {{-   if hasSuffix "@S" $name }}
 {{      trimSuffix "@S" $name -}}: {{ toYaml $value }}
@@ -368,7 +414,7 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-     range $hostDef := $hostDefs }}
 {{-       $parts := regexFindAll "[^:\\{\\}]+" $hostDef 2 -}}
 {{-       $component := index $parts 1 -}}
-{{-       $hostName := include "afc.hostName" (mergeOverwrite $functionContext (dict "component" $component)) -}}
+{{-       $hostName := include "afc.hostName" (mergeOverwrite $ (dict "component" $component)) -}}
 {{-       $value = replace $hostDef $hostName $value -}}
 {{-     end }}
 {{-     $servicePortDefs := regexFindAll "\\{\\{port:.+?:.+?\\}\\}" $value -1 -}}
@@ -376,7 +422,7 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-       $parts := regexFindAll "[^:\\{\\}]+" $servicePortDef 3 -}}
 {{-       $component := index $parts 1 -}}
 {{-       $portName := index $parts 2 -}}
-{{-       $port := include "afc.servicePort" (mergeOverwrite $functionContext (dict "component" $component "portName" $portName)) -}}
+{{-       $port := include "afc.servicePort" (mergeOverwrite $ (dict "component" $component "portName" $portName)) -}}
 {{-       $value = replace $servicePortDef $port $value -}}
 {{-     end }}
 {{-     $contPortDefs := regexFindAll "\\{\\{containerPort:.+?:.+?\\}\\}" $value -1 -}}
@@ -384,7 +430,7 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-       $parts := regexFindAll "[^:\\{\\}]+" $contPortDef 3 -}}
 {{-       $component := index $parts 1 -}}
 {{-       $portName := index $parts 2 -}}
-{{-       $port := include "afc.containerPort" (mergeOverwrite $functionContext (dict "component" $component "portName" $portName)) -}}
+{{-       $port := include "afc.containerPort" (mergeOverwrite $ (dict "component" $component "portName" $portName)) -}}
 {{-       $value = replace $contPortDef $port $value -}}
 {{-     end }}
 {{-     $staticMountDefs := regexFindAll "\\{\\{staticVolumeMount:.+?:.+?\\}\\}" $value -1 -}}
@@ -396,7 +442,7 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-       if ge (len $parts) 4 }}
 {{-         $ifAbsent = index $parts 3 -}}
 {{-       end }}
-{{-       $compDef := merge (dict) (get $functionContext.Values.components $component | required (cat "No component for this component key:" $component)) $functionContext.Values.components.default -}}
+{{-       $compDef := merge (dict) (get $.Values.components $component | required (cat "No component for this component key:" $component)) $.Values.components.default -}}
 {{-       $mounts := default (dict) (get $compDef "staticVolumeMounts") -}}
 {{-       $mount := get $mounts $mountName | required (cat "No mount path defined for mount" $mountName "when used in component" $component) -}}
 {{-       if not $mount -}}
@@ -418,7 +464,7 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-       if ge (len $parts) 3 }}
 {{-         $ifAbsent = index $parts 2 -}}
 {{-       end }}
-{{-       $extSecretDef := merge (dict) (default (dict) (get (default (dict) $functionContext.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $functionContext.Values.externalSecrets) "default")) -}}
+{{-       $extSecretDef := merge (dict) (default (dict) (get (default (dict) $.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $.Values.externalSecrets) "default")) -}}
 {{-       $property := get $extSecretDef "property" -}}
 {{-       $mountPath := get $extSecretDef "mountPath" -}}
 {{-       if not (and $property $mountPath) }}
@@ -440,7 +486,7 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-       if ge (len $parts) 3 }}
 {{-         $ifAbsent = index $parts 2 -}}
 {{-       end }}
-{{-       $extSecretDef := merge (dict) (default (dict) (get (default (dict) $functionContext.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $functionContext.Values.externalSecrets) "default")) -}}
+{{-       $extSecretDef := merge (dict) (default (dict) (get (default (dict) $.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $.Values.externalSecrets) "default")) -}}
 {{-       $property := get $extSecretDef "property" -}}
 {{-       if not $property -}}
 {{-         if eq $ifAbsent "optional" -}}
@@ -452,6 +498,29 @@ Renders entries in .Values.configmap subdictionary as configmap environment entr
 {{-         end }}
 {{-       end }}
 {{-       $value = replace $secretPropertyDef $property $value -}}
+{{-     end }}
+{{-     $ipDefs := regexFindAll "\\{\\{ip:.+?\\}\\}" $value -1 -}}
+{{-     range $ipDef := $ipDefs }}
+{{-       $parts := regexFindAll "[^:\\{\\}]+" $ipDef -1 -}}
+{{-       $ipKey := index $parts 1 -}}
+{{        $ifAbsent := "required" }}
+{{-       if ge (len $parts) 3 }}
+{{-         $ifAbsent = index $parts 2 -}}
+{{-       end }}
+{{-       if not (hasKey $.Values.externalIps $ipKey) }}
+{{-         fail (cat "External IP key" $ipKey "not found in 'externalIps'") }}
+{{-       end }}
+{{-       $ip := get $.Values.externalIps $ipKey }}
+{{-       if not $ip }}
+{{-         if eq $ifAbsent "optional" -}}
+{{-           $skip = true -}}
+{{-         else if eq $ifAbsent "nullable" }}
+{{-           $empty = true -}}
+{{-         else }}
+{{-           fail (cat "External IP" $ipKey "is not defined") }}
+{{-         end }}
+{{-       end }}
+{{-       $value = replace $ipDef $ip $value -}}
 {{-     end }}
 {{-     if not $skip }}
 {{        $name -}}: {{ $empty | ternary "" (toYaml $value) }}
@@ -497,16 +566,15 @@ Declaration of static volumes (inhabitatnts of .Values.staticVolumes) and mounte
 {{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
 {{- $volumes := get $compDef "staticVolumeMounts" -}}
 {{- $mountedSecrets := get $compDef "mountedSecrets" -}}
-{{- $functionContext := . -}}
 {{- if $volumes }}
 {{-   range $name := keys $volumes }}
-{{-     $volumeDef := get $functionContext.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $functionContext.component) -}}
+{{-     $volumeDef := get $.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $.component) -}}
 - name: {{ $name | include "afc.rfc1123" }} {{ toYaml $volumeDef | nindent 2 }}
 {{    end }}
 {{- end }}
 {{- if $mountedSecrets }}
 {{-   range $name := $mountedSecrets }}
-{{-     if get (default (dict) $functionContext.Values.externalSecrets) $name }}
+{{-     if get (default (dict) $.Values.externalSecrets) $name }}
 - name: {{ $name | include "afc.secretMountName" }}
   secret:
     secretName: {{ $name | include "afc.rfc1123" }}
@@ -523,17 +591,16 @@ Mount of static volumes (inhabitatnts of .Values.staticVolumes) and mounted secr
 {{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
 {{- $volumes := get $compDef "staticVolumeMounts" -}}
 {{- $mountedSecrets := get $compDef "mountedSecrets" -}}
-{{- $functionContext := . -}}
 {{- if $volumes }}
 {{-   range $name, $mount := $volumes }}
-{{-     $volumeDef := get $functionContext.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $functionContext.component) -}}
+{{-     $volumeDef := get $.Values.staticVolumes $name | required (cat "Undefined static volume key" $name "used in definition of component" $.component) -}}
 - name: {{ $name | include "afc.rfc1123" }}
   mountPath: {{ $mount }}
 {{    end }}
 {{- end }}
 {{- if $mountedSecrets }}
 {{-   range $name := $mountedSecrets }}
-{{-     $secretDef := get (default (dict) $functionContext.Values.externalSecrets) $name -}}
+{{-     $secretDef := get (default (dict) $.Values.externalSecrets) $name -}}
 {{-     if $secretDef }}
 {{-       $mountPath := get $secretDef "mountPath" | required (cat "External secret" $name "doesn't have 'mountPath' property") -}}
 - name: {{ $name | include "afc.secretMountName" }}
@@ -632,10 +699,10 @@ Renders secretStoreRef in ExternalSecret
 */}}
 {{- define "afc.extSecretStoreRef" -}}
 {{- $extSecretDef := merge (dict) (get .Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) .Values.externalSecrets.default -}}
-{{- $secretStore := get $extSecretDef "secretStore" | required (cat "secretStore not defined for external secret" .extSecret) -}}
+{{- $secretStoreName := get $extSecretDef "secretStore" | required (cat "secretStore not defined for external secret" .extSecret) -}}
 secretStoreRef:
-  name: {{ $secretStore }}
-  kind: {{ include "afc.extSecretStoreKind" (mergeOverwrite . (dict "secretStore" $secretStore)) }}
+  name: {{ $secretStoreName }}
+  kind: {{ include "afc.extSecretStoreKind" (mergeOverwrite . (dict "secretStore" $secretStoreName)) }}
 {{- end }}
 
 {{/*
@@ -654,29 +721,78 @@ Renders target in ExternalSecret
 */}}
 {{- define "afc.extSecretTarget" -}}
 {{- $extSecretDef := merge (dict) (get .Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) .Values.externalSecrets.default -}}
+{{- $type := get $extSecretDef "type" -}}
 target:
   name: {{ include "afc.secretManifestName" . }}
   creationPolicy: Owner
   deletionPolicy: Delete
+{{- if $type }}
+  template:
+    type: {{ $type }}
+{{- end }}
 {{- end }}
 
 {{/*
-Renders data or dataFromin ExternalSecret
+Renders data or dataFrom in ExternalSecret
 .secret (key in .Values.externalSecrets) must be defined
 */}}
 {{- define "afc.extSecretData" -}}
 {{- $extSecretDef := merge (dict) (get .Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) .Values.externalSecrets.default -}}
 {{- $property := get $extSecretDef "property" -}}
+{{- $secretStoreName := get $extSecretDef "secretStore" | required  (cat "secretStore not defined for external secret" .secret) }}
+{{- $secretStoreDef := get .Values.secretStores $secretStoreName | required (cat "Secret" .secret "uses undefined secret store"  $secretStoreName) }}
 {{- if $property }}
 data:
   - secretKey: {{ $property }}
     remoteRef:
       key: {{ get $extSecretDef "remoteSecretName" | default .secret | include "afc.rfc1123" }}
-{{-   if get $extSecretDef "structuredRemote" }}
+{{-   if get $secretStoreDef "structured" }}
       property: {{ get $extSecretDef "remoteProperty" | default $property }}
 {{-   end }}
 {{- else }}
 dataFrom:
   - key:  {{ get $extSecretDef "remoteSecretName" | default .secret | include "afc.rfc1123" }}
+{{- end }}
+{{- end }}
+
+{{/*
+Renders Ingress name
+*/}}
+{{- define "afc.ingressName" -}}
+{{- $ingressDef := get .Values "ingress" | required "'ingress' missing in values.yaml" -}}
+{{ default "ingress" (get $ingressDef "name") | include "afc.rfc1123" }}
+{{- end }}
+
+{{/*
+Renders ingressClassName (if specified)
+*/}}
+{{- define "afc.ingressClass" -}}
+{{- $ingressDef := get .Values "ingress" | required "'ingress' missing in values.yaml" -}}
+{{- $ingressClassName := get $ingressDef "ingressClassName" -}}
+{{- if $ingressClassName }}
+ingressClassName: {{ $ingressClassName }}
+{{- end }}
+{{- end }}
+
+{{/*
+Renders ingress rules
+*/}}
+{{- define "afc.ingressRules" -}}
+{{- $ingressDef := get .Values "ingress" | required "'ingress' missing in values.yaml" -}}
+- http:
+    paths:
+{{- range $ruleDef := (default (list) (get $ingressDef "rules")) }}
+{{-   $compKey := get $ruleDef "componentKey" | required (cat "'componentKey' missing in ingress rule definition") }}
+{{-   $portKey := get $ruleDef "portKey" | required (cat "'portKey' missing in ingress rule definition") }}
+{{-   $path := get $ruleDef "path" | required (cat "'path' missing in ingress rule definition") }}
+{{-   $compDef := get $.Values.components $compKey | required (cat "Component" $compKey "used in one of ingress rules not found") }}
+{{-   $servicePort := get (default (dict) (get (default (dict) (get $compDef "ports")) $portKey)) "servicePort" | required (cat "Component" $compKey "used in one of ingress rules does not define service port" $portKey) }}
+      - path: {{ $path }}
+        pathType: {{ default "Prefix" (get $ruleDef "pathType") }}
+        backend:
+          service:
+            name: {{ default $compKey (get (default (dict) (get $compDef "service")) "hostname" ) }}
+            port:
+              number: {{ $servicePort }}
 {{- end }}
 {{- end }}
