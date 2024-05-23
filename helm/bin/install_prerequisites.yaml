@@ -1,0 +1,84 @@
+#
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+---
+# Parameters for prepare_cluster.py
+
+# Dictionary of components (helmcharts and manifests) that might be installed.
+# Keys used in prepare_cluster.py command lines to chose what to install.
+# Entries better be in recommended install order (e.g. because parametyerless
+# uninstall uninstall components in reverse order)
+# Dictionary values may have the following properties:
+#   - namespace. Namespace to install manifests/helmcharts in
+#   - preinstall. List of commands to perform before kubernetes/helm
+#             installation. Commands that starts with `-` - not checked for
+#             failure. Executed from checkout root directory
+#   - postinstall. List of commands to perform after kubernetes/helm
+#             installation. Commands that starts with `-` - not checked for
+#             failure. Executed from checkout root directory
+#   - manifest. Path or URL to manifest file or directory. Path may use ~ and
+#             $. Relative paths are from script's directory'
+#   - manifest_url. URL to manifest file or directory
+#   - has_service. Name of service installed by manifest of this step. If
+#             present - installation is skipped
+#   - helm_chart. Helmchart to install if filename - relative to script's
+#             directory
+#   - helm_release. Helm release name
+#   - helm_repo. Helm repository URL
+#   - helm_values. List of helm value files. Absolute or relative from script
+#             directory. May use ~ and environment variables
+#   - helm_settings: List of value settings
+#   - helm_version. Helmchart version specifier
+#   - helm_wait. How long to wait for helm install install
+#   - uninstall_wait. How long to wait for helm/kubectl uninstall
+#
+# Property values may contain references to content of other places in config
+# file in form {{attr1.attr2....}}. Here attrN is a sequence of
+# attributes to reach target value.
+# E.g. if there is ip.yaml file containing ip address dictionary externalIps
+# (see values.yaml for details) and command line has --extra_cfg ip.yaml then
+# {{externalIps.int-ingress}} in some value will be substituted with
+# corresponding IP address. This feature was introduced to access IPs in AFC
+# helmchart in values.yaml override of ingress-nginx
+install_components:
+  prometheus_operator:
+    manifest: >-
+      https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.72.0/bundle.yaml
+    has_service: prometheus-operator
+    uninstall_wait: 5m
+  prometheus:
+    namespace: monitoring
+    manifest: ../monitoring/prometheus
+    has_service: prometheus-operated
+    uninstall_wait: 5m
+  prometheus_adapter:
+    namespace: monitoring
+    preinstall:
+      - -kubectl delete apiservice v1beta1.metrics.k8s.io
+    helm_chart: prometheus-community/prometheus-adapter
+    helm_repo: https://prometheus-community.github.io/helm-charts
+    helm_release: custom-metrics
+    helm_values:
+      - ../monitoring/prometheus_adapter/values-prometheus_adapter.yaml
+    helm_version: 2.14.2
+    helm_wait: 5m
+    uninstall_wait: 5m
+  external_secrets:
+    namespace: external-secrets
+    helm_chart: external-secrets/external-secrets
+    helm_repo:  https://charts.external-secrets.io
+    helm_release: external-secrets
+    helm_settings:
+      - installCRDs=true
+    helm_wait: 5m
+    uninstall_wait: 5m
+  ingress_nginx:
+    namespace: ingress-nginx
+    helm_chart: ingress-nginx/ingress-nginx
+    helm_repo: https://kubernetes.github.io/ingress-nginx
+    helm_release: ingress-nginx
+    helm_wait: 5m
+    uninstall_wait: 5m
