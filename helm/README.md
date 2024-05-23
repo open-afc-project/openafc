@@ -241,7 +241,7 @@ $ docker tag foo/bar k3d-afcregistry.localhost:12345/bar:baz  # For pull to work
 $ docker push localhost:12345/bar:baz
 ```
 
-This procedure may be performed with `helm/bin/k3d_push_images.py` script. It is also may be performed as part of `helm/bin/helm_install.py` script (if `--build` or `--push` parameter specified).
+This procedure may be performed with `helm/bin/push_images.py` script. It is also may be performed as part of `helm/bin/helm_install.py` script (if `--build` or `--push` parameter specified).
 
 Images in local k3d registry have registry names like `k3d-afcregistry.localhost:12345` that differ from original registry names of these images (as used in Docker Compose) - this should be reflected in deployment/statefulset manifests. `values.yaml` has `components.default.imageRepositoryKeyOverride` field to override what registry name to use in images and `imageRepositories.k3d.path` to set the name of k3d registry. Hence helm install command should be like this:  
 `$ helm install ... helm/afc-int ... -f helm/afc-int/values-k3d.yaml --set imageRepositories.k3d.path=k3d-afcregistry:12345`  
@@ -290,7 +290,7 @@ $ k3d cluster create my-cluster -v /opt/afc/databases:/opt/afc/databases -v /hom
 ```  
 
 * Build images with some tag MYTAG and **push images to local repository**:  
-  `$ helm/bin/k3d_push_images.py MYTAG`  
+  `$ helm/bin/push_images.py --k3d_reg DEFAULT MYTAG`  
 
 * **Load AFC** into cluster:  
   `$ helm dependencies update helm/afc-int`  
@@ -395,7 +395,7 @@ Here `CLUSTERNAME` may be name of cluster or `AUTO` for cluster name made of log
 
 * **`k3d_push_images.py`** Pushes images to local k3d repository. Used by `helm_install.py`, but also may be used directly.
 * **`ratdb_from_test.p`** Fills `ratdb` from test database. Used by `helm_install.py`, but also may be used directly.
-* **`k3d_lib.py`** Not directly runnable - contains common stuff for other scripts.
+* **`utils.py`** Not directly runnable - contains common stuff for other scripts.
 
 ## Prometheus-based autoscaling <a name="autoscaling">
 
