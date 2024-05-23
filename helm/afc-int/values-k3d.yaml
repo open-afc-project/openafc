@@ -4,10 +4,27 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Parameter values for Minikube cluster
+# Parameter values for k3d cluster
 
 components:
   default:
     imagePullPolicy: Always
   dispatcher:
-    serviceType: NodePort
+    service:
+      type: NodePort
+
+ingress: null
+
+staticVolumes:
+  rat_transfer:
+    hostPath:
+      path: /opt/afc/databases/rat_transfer
+      type: Directory
+  pipe:
+    hostPath:
+      # Path better be overridden, type set to bypass creation if overridden
+      path: /tmp
+      type: DirectoryOrCreate
+
+externalSecrets:
+  image-pull: null
