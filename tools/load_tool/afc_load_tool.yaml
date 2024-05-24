@@ -58,7 +58,7 @@ region:
     # Ruleset ID (identifies region)
     rulesest_id: US_47_CFR_PART_15_SUBPART_E
 
-    # Certification ID (must be registered with given Rulsest ID)
+    # Certification ID (must be registered with given Ruleset ID)
     cert_id: FCCID-FSP43
 
 # Paths inside requests, responses and other dictionaries
@@ -96,10 +96,10 @@ paths:
     # Ruleset (region definition) inside AFC Request
     ruleset_in_resp: ["rulesetId"]
 
-    # Response code insire AFC Response
+    # Response code inside AFC Response
     response_in_resp: ["response"]
 
-    # Response code insire AFC Response
+    # Response code inside AFC Response
     code_in_resp: ["response", "responseCode"]
 
     # Variable channels inside AFC Response
@@ -424,7 +424,7 @@ channels_20mhz: [1, 5, 9, 13, 17, 21, 25, 29, 33, 37, 41, 45, 49, 53, 57, 61,
 
 # Various necessary REST APIs
 rest_api:
-    # Get config by RulestID (thgat passed as part of URL)
+    # Get config by RulestID (that passed as part of URL)
     get_config:
         url: http://rat_server/fbrat/ratapi/v1/GetAfcConfigByRulesetID/
 
