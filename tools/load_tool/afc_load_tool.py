@@ -307,7 +307,7 @@ class Config(Iterable):
 
 
 def get_output(args: List[str]) -> str:
-    """ Returns stdout content of givcen command's output """
+    """ Returns stdout content of given command's output """
     try:
         return subprocess.check_output(args, universal_newlines=True,
                                        encoding="utf-8")
@@ -337,7 +337,7 @@ class ServiceDiscovery:
         service. Should be overloaded """
         error("Cluster type/name not specified")
         unused_argument(service)
-        return []  # Unreacheable code
+        return []  # Unreachable code
 
     def get_url(self, base_url: str, param_host: Optional[str],
                 protocol: Optional[Protocol] = None) -> str:
@@ -375,7 +375,7 @@ class ServiceDiscovery:
 
     def get_cluster_url(self, protocol: Protocol, service: str, port: int) \
             -> str:
-        """ Returns URL inside cluster that corresponds to given parametess
+        """ Returns URL inside cluster that corresponds to given parameters
         (should be overloaded)
 
         Arguments:
@@ -385,7 +385,7 @@ class ServiceDiscovery:
         Returns SCHEME://HOST:PORT
         """
         error("Cluster type/name not specified")
-        unused_argument(protocol)  # Unreacheable code
+        unused_argument(protocol)  # Unreachable code
         unused_argument(service)
         unused_argument(port)
         return ""
@@ -417,14 +417,14 @@ class ServiceDiscovery:
         except json.JSONDecodeError as ex:
             error(f"Error parsing as JSON output of "
                   f"'{' '.join(shlex.quote(arg) for arg in args)}': {ex}")
-        return None  # Unreacheable code
+        return None  # Unreachable code
 
 
 class ServiceDiscoveryCompose(ServiceDiscovery):
     """ Implements service discovery for Compose cluster
 
     Private attributes:
-    _compose_project  -- Cmpose project name
+    _compose_project  -- Compose project name
     _containers       -- Dictionary of _ContainerInfo object, indexed by
                          service name. None before first access
     """
@@ -468,10 +468,10 @@ class ServiceDiscoveryCompose(ServiceDiscovery):
 
     def get_cluster_url(self, protocol: Protocol, service: str, port: int) \
             -> str:
-        """ Returns URL inside cluster that corresponds to given parametess
+        """ Returns URL inside cluster that corresponds to given parameters
 
         Arguments:
-        protocol -- Protocol (http or https)
+        protocol -- Protocol
         service  -- Service name from
         port     -- Port number
         Returns SCHEME://HOST:PORT
@@ -482,7 +482,7 @@ class ServiceDiscoveryCompose(ServiceDiscovery):
                 ci.ext_ports.get(80 if protocol == Protocol.http else 443)
             error_if(not ext_port,
                      f"Dispatcher {protocol.name} port not exposed")
-            return f"{protocol}://localhost:{ext_port}"
+            return f"{protocol.name}://localhost:{ext_port}"
         if not ci.ip:
             inspect_dict = \
                 self._get_json_output(["docker", "inspect", ci.name])
@@ -547,7 +547,7 @@ class ServiceDiscoveryK3d(ServiceDiscovery):
     _k3d_cluster_arg  -- Cluster name from command line
     _k3d_cluster_name -- Actual cluster name (without k3d- prefix). Initially
                          None
-    _context_name     -- Kubeconfig contetx name. Initially None
+    _context_name     -- Kubeconfig context name. Initially None
     _pod_list         -- List of pod names. Initially None
     _port_mapping     -- External ports indexed by internal nodeports.
                          Initially None
@@ -600,14 +600,14 @@ class ServiceDiscoveryK3d(ServiceDiscovery):
                         pod_name, "--"]
         error(
             f"Pod '{service}' not found in cluster '{self._k3d_cluster_name}'")
-        return []  # Unreacheable code
+        return []  # Unreachable code
 
     def get_cluster_url(self, protocol: Protocol, service: str, port: int) \
             -> str:
-        """ Returns URL inside cluster that corresponds to given parametess
+        """ Returns URL inside cluster that corresponds to given parameters
 
         Arguments:
-        protocol -- Protocol (http or https)
+        protocol -- Protocol
         service  -- Service name from
         port     -- Port number
         Returns SCHEME://HOST:PORT
@@ -897,6 +897,7 @@ class AfcReqRespGenerator:
             return (self._min_lat +
                     (req_idx // self._grid_size) *
                     (self._max_lat - self._min_lat) / self._grid_size,
+                    self._min_lon +
                     (req_idx % self._grid_size) *
                     (self._max_lon - self._min_lon) / self._grid_size,
                     height)
@@ -1930,7 +1931,7 @@ def patch_json(patch_arg: Optional[List[str]], json_dict: Dict[str, Any],
     patch_arg -- Optional list of FIELD1=VALUE1[,FIELD2=VALUE2...] patches
     json_dict -- JSON dictionary to modify
     data_type -- Patch of what - to be used in error messages
-    new_type  -- None or type of new values for previously nonexisted keys
+    new_type  -- None or type of new values for previously nonexistent keys
     returns modified dictionary
     """
     if not patch_arg:
@@ -2093,14 +2094,14 @@ def do_load(cfg: Config, args: Any) -> None:
                 else cfg.rest_api.afc_req.url, param_host=args.afc,
                 protocol=getattr(Protocol, args.dispatcher) if args.dispatcher
                 else None)
-        if args.no_cache:
-            parsed_worker_url = urllib.parse.urlparse(worker_url)
-            worker_url = \
-                parsed_worker_url._replace(
-                    query="&".join(
-                        p for p in [parsed_worker_url.query, "nocache=True"]
-                        if p)).geturl()
-
+        parsed_url = urllib.parse.urlparse(worker_url)
+        query = \
+            "&".join(
+                q for q, pred in [(parsed_url.query, parsed_url.query),
+                                  ("nocache=True", args.no_cache),
+                                  ("debug=True", args.debug)]
+                if pred)
+        worker_url = parsed_url._replace(query=query).geturl()
     min_idx, max_idx = get_idx_range(args.idx_range)
     run(rest_data_handler=LoadRestDataHandler(
             cfg=cfg, randomize=args.random, population_db=args.population,
@@ -2392,6 +2393,9 @@ def main(argv: List[str]) -> None:
     parser_load.add_argument(
         "--no_cache", action="store_true",
         help="Don't use rcache, force each request to be computed")
+    parser_load.add_argument(
+        "--debug", action="store_true",
+        help="Run AFC engine in debug mode")
     parser_load.add_argument(
         "--population", metavar="POPULATION_DB_FILE",
         help="Select AP positions proportionally to population density from "
