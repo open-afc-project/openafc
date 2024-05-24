@@ -1,0 +1,57 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# helm/afc-int/values.yaml overrides for internal GCP cluster
+
+components:
+  bulk_postgres:
+    imageName: null
+  ratdb:
+    imageName: null
+  nginxexporter:
+    imageName: null
+  dispatcher:
+    imageName: null
+  rmq:
+    service:
+      type: LoadBalancer
+      annotations:
+        networking.gke.io/internal-load-balancer-allow-global-access: "true"
+        networking.gke.io/load-balancer-type: Internal
+
+staticVolumes:
+  rat_transfer:
+    nfs:
+      server: 10.255.160.2
+      path: /vol1/rat_transfer
+  pipe:
+    nfs:
+      server: 10.255.160.2
+      path: /vol1/rat_transfer
+
+configmaps:
+  ratdb-conn:
+    FLASK_SQLALCHEMY_DATABASE_URI: postgresql://postgres@10.255.161.7/fbrat
+  als_siphon:
+    POSTGRES_INIT_CONN_STR: postgresql://postgres@10.255.161.7/postgres
+    POSTGRES_ALS_CONN_STR: postgresql://postgres@10.255.161.7/ALS
+    POSTGRES_LOG_CONN_STR: postgresql://postgres@10.255.161.7/AFC_LOGS
+  uls_downloader:
+    ULS_SERVICE_STATE_DB_DSN: postgresql://postgres@10.255.161.7/fs_state
+  rcache-common:
+    RCACHE_POSTGRES_DSN: postgresql://postgres@10.255.161.7/rcache
+
+externalSecrets:
+  ratdb-password:
+    remoteSecretName: postgres-password
+  uls-state-db-password:
+    remoteSecretName: postgres-password
+  rcache-db-password:
+    remoteSecretName: postgres-password
+  als-db-password:
+    remoteSecretName: postgres-password
+  als-json-log-db-password:
+    remoteSecretName: postgres-password

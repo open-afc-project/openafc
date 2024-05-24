@@ -1,0 +1,33 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# Static IPs of internal and external clusters
+externalIps:
+  # Ingress of internal cluster
+  int-ingress: 10.255.128.213
+  # RabbitMQ AMQP of internal cluster
+  int-rmq: 10.255.128.214
+  # Dispatcher on external cluster
+  ext-dispatcher: 10.255.0.24
+
+imageRepositories:
+  public:
+    path: wcc-afc-docker-virtual.usw2.packages.broadcom.com
+    pullSecrets: [image-pull]
+  private:
+    path: wcc-afc-docker-virtual.usw2.packages.broadcom.com
+    pullSecrets: [image-pull]
+
+secretStores:
+  secret-store:
+    provider:
+      gcpsm:
+        auth:
+          secretRef:
+            secretAccessKeySecretRef:
+              name: gcpsm-secret
+              key: secret-access-credentials
+        projectID: wcc-enterprise-afc-dev

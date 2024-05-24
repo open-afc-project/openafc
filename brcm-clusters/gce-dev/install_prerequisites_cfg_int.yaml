@@ -1,0 +1,18 @@
+#
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Internal cluster-specifc config for install_prerequisites.py.
+# Requires YAML with externalIps (values-afc-common.yaml as of time of this
+# writing) to also be included as config file
+install_components:
+  ingress_nginx:
+    helm_settings:
+      - controller.service.annotations."networking\.gke\.io/internal-load-balancer-allow-global-access"=true
+      - contorller.service.internal.enabled="true"
+      - controller.service.internal.annotations."cloud\.google\.com/load-balancer-type"=Internal
+      - controller.service.annotations."networking\.gke\.io/load-balancer-type"=Internal
+      - controller.service.loadBalancerIP={{externalIps.int-ingress}}
