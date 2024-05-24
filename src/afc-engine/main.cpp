@@ -38,19 +38,14 @@ int main(int argc, char **argv)
 		AfcManager afcManager = AfcManager();
 		// Parse command line parameters
 		try {
-			afcManager.setCmdLineParams(inputFilePath,
-						    configFilePath,
-						    outputFilePath,
-						    tempDir,
-						    logLevel,
-						    argc,
-						    argv);
+			afcManager.setCmdLineParams(
+				inputFilePath, configFilePath, outputFilePath, tempDir, logLevel, argc, argv);
 			conf.filter.setLevel(logLevel);
 			Logging::initialize(conf); // reinitialize log level
 		} catch (std::exception &err) {
 			throw std::runtime_error(ErrStream() << "Failed to parse command line "
-								"arguments provided by GUI: "
-							     << err.what());
+													"arguments provided by GUI: "
+												 << err.what());
 		}
 
 		/**************************************************************************************/
@@ -65,20 +60,17 @@ int main(int argc, char **argv)
 		try {
 			afcManager.importConfigAFCjson(configFilePath, tempDir);
 		} catch (std::exception &err) {
-			throw std::runtime_error(ErrStream()
-						 << "Failed to import configuration from GUI: "
-						 << err.what());
+			throw std::runtime_error(
+				ErrStream() << "Failed to import configuration from GUI: " << err.what());
 		}
 
 		// Import user inputs from the GUI
 		LOGGER_DEBUG(logger) << "AFC Engine is importing user inputs...";
 		try {
-			afcManager.importGUIjson(
-				inputFilePath); // Reads the JSON file provided by the GUI
+			afcManager.importGUIjson(inputFilePath); // Reads the JSON file provided by the GUI
 		} catch (std::exception &err) {
-			throw std::runtime_error(ErrStream()
-						 << "Failed to import user inputs from GUI: "
-						 << err.what());
+			throw std::runtime_error(
+				ErrStream() << "Failed to import user inputs from GUI: " << err.what());
 		}
 
 		/**************************************************************************************/
@@ -92,13 +84,12 @@ int main(int argc, char **argv)
 			auto t1 = std::chrono::high_resolution_clock::now();
 			afcManager.initializeDatabases();
 			auto t2 = std::chrono::high_resolution_clock::now();
-			LOGGER_INFO(logger)
-				<< "Databases initialized in: "
-				<< std::chrono::duration_cast<std::chrono::seconds>(t2 - t1).count()
-				<< " seconds";
+			LOGGER_INFO(logger) << "Databases initialized in: "
+								<< std::chrono::duration_cast<std::chrono::seconds>(t2 - t1).count()
+								<< " seconds";
 		} catch (std::exception &err) {
-			throw std::runtime_error(ErrStream() << "Failed to initialize databases: "
-							     << err.what());
+			throw std::runtime_error(
+				ErrStream() << "Failed to initialize databases: " << err.what());
 		}
 		/**************************************************************************************/
 		/* Perform AFC Engine Computations */
@@ -106,10 +97,9 @@ int main(int argc, char **argv)
 		auto t1 = std::chrono::high_resolution_clock::now();
 		afcManager.compute();
 		auto t2 = std::chrono::high_resolution_clock::now();
-		LOGGER_INFO(logger)
-			<< "Computations completed in: "
-			<< std::chrono::duration_cast<std::chrono::seconds>(t2 - t1).count()
-			<< " seconds";
+		LOGGER_INFO(logger) << "Computations completed in: "
+							<< std::chrono::duration_cast<std::chrono::seconds>(t2 - t1).count()
+							<< " seconds";
 		/**************************************************************************************/
 
 #if 0

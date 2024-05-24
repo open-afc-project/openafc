@@ -28,10 +28,8 @@ bool ExceptionSafeCoreApp::notify(QObject *obj, QEvent *eventVal)
 	return false;
 }
 
-void ExceptionSafeCoreApp::logError(const QObject *obj,
-				    const QMetaObject *mObj,
-				    const QEvent *eventVal,
-				    const QString &msg) const
+void ExceptionSafeCoreApp::logError(
+	const QObject *obj, const QMetaObject *mObj, const QEvent *eventVal, const QString &msg) const
 {
 	QString targetObj;
 	if (obj) {
@@ -54,9 +52,9 @@ void ExceptionSafeCoreApp::logError(const QObject *obj,
 	}
 
 	LOGGER_ERROR(logger) << QString("Failed sending event type %1 to %2(%3): %4")
-					.arg(eType)
-					.arg(targetClass, targetObj)
-					.arg(msg);
+								.arg(eType)
+								.arg(targetClass, targetObj)
+								.arg(msg);
 }
 
 int ExceptionSafeCoreApp::exec()

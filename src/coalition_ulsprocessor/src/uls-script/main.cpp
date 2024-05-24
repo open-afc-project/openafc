@@ -21,32 +21,18 @@ bool includeUnii8US = false;
 bool debugFlag = false;
 bool combineAntennaRegionFlag = false;
 
-void testAntennaModelMap(AntennaModelMapClass &antennaModelMap,
-			 std::string inputFile,
-			 std::string outputFile);
-void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap,
-			     std::string inputFile,
-			     std::string outputFile);
+void testAntennaModelMap(
+	AntennaModelMapClass &antennaModelMap, std::string inputFile, std::string outputFile);
+void testTransmitterModelMap(
+	TransmitterModelMapClass &transmitterModelMap, std::string inputFile, std::string outputFile);
 void writeRAS(UlsFileReader &r, std::string filename);
-void processUS(UlsFileReader &r,
-	       int maxNumPassiveRepeater,
-	       CsvWriter &wt,
-	       CsvWriter &anomalous,
-	       FILE *fwarn,
-	       AntennaModelMapClass &antennaModelMap,
-	       FreqAssignmentClass &freqAssignment,
-	       TransmitterModelMapClass &transmitterModelMap);
-void processCA(UlsFileReader &r,
-	       int maxNumPassiveRepeater,
-	       CsvWriter &wt,
-	       CsvWriter &anomalous,
-	       FILE *fwarn,
-	       AntennaModelMapClass &antennaModelMap);
-void makeLink(const StationDataCAClass &station,
-	      const QList<PassiveRepeaterCAClass> &prList,
-	      std::vector<int> &idxList,
-	      double &azimuthPtg,
-	      double &elevationPtg);
+void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous,
+	FILE *fwarn, AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment,
+	TransmitterModelMapClass &transmitterModelMap);
+void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous,
+	FILE *fwarn, AntennaModelMapClass &antennaModelMap);
+void makeLink(const StationDataCAClass &station, const QList<PassiveRepeaterCAClass> &prList,
+	std::vector<int> &idxList, double &azimuthPtg, double &elevationPtg);
 
 /******************************************************************************************/
 /* This flag will adjust longitude/latitude values to be consistent with what             */
@@ -66,8 +52,8 @@ int main(int argc, char **argv)
 		printf("Copyright 2019 (C) RKF Engineering Solutions\n");
 		printf("Compatible with ULS Database Version 4\n");
 		printf("Spec: "
-		       "https://www.fcc.gov/sites/default/files/"
-		       "public_access_database_definitions_v4.pdf\n");
+			   "https://www.fcc.gov/sites/default/files/"
+			   "public_access_database_definitions_v4.pdf\n");
 		return 0;
 	}
 
@@ -105,7 +91,7 @@ int main(int argc, char **argv)
 	std::string warningFile = "warning_uls.txt";
 	if (!(fwarn = fopen(warningFile.c_str(), "wb"))) {
 		std::cout << std::string("WARNING: Unable to open warningFile \"") + warningFile +
-				     std::string("\"\n");
+				std::string("\"\n");
 	}
 
 	AntennaModelMapClass antennaModelMap(antModelListFile, antPrefixFile, antModelMapFile);
@@ -174,11 +160,8 @@ int main(int argc, char **argv)
 
 	UlsFileReader r(inputFile.c_str(), fwarn, alignFederatedFlag, alignFederatedScale);
 
-	int maxNumPRUS = r.computeStatisticsUS(fccFreqAssignment,
-					       includeUnii5US,
-					       includeUnii6US,
-					       includeUnii7US,
-					       includeUnii8US);
+	int maxNumPRUS = r.computeStatisticsUS(
+		fccFreqAssignment, includeUnii5US, includeUnii6US, includeUnii7US, includeUnii8US);
 	int maxNumPRCA = r.computeStatisticsCA(fwarn);
 	int maxNumPassiveRepeater = (maxNumPRUS > maxNumPRCA ? maxNumPRUS : maxNumPRCA);
 
@@ -202,14 +185,8 @@ int main(int argc, char **argv)
 
 	writeRAS(r, outputRASFile);
 
-	processUS(r,
-		  maxNumPassiveRepeater,
-		  wt,
-		  anomalous,
-		  fwarn,
-		  antennaModelMap,
-		  fccFreqAssignment,
-		  transmitterModelMap);
+	processUS(r, maxNumPassiveRepeater, wt, anomalous, fwarn, antennaModelMap, fccFreqAssignment,
+		transmitterModelMap);
 
 	processCA(r, maxNumPassiveRepeater, wt, anomalous, fwarn, antennaModelMap);
 
@@ -292,22 +269,16 @@ void writeRAS(UlsFileReader &r, std::string filename)
 /******************************************************************************************/
 /**** processUS                                                                        ****/
 /******************************************************************************************/
-void processUS(UlsFileReader &r,
-	       int maxNumPassiveRepeater,
-	       CsvWriter &wt,
-	       CsvWriter &anomalous,
-	       FILE *fwarn,
-	       AntennaModelMapClass &antennaModelMap,
-	       FreqAssignmentClass &freqAssignment,
-	       TransmitterModelMapClass &transmitterModelMap)
+void processUS(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous,
+	FILE *fwarn, AntennaModelMapClass &antennaModelMap, FreqAssignmentClass &freqAssignment,
+	TransmitterModelMapClass &transmitterModelMap)
 {
 	int prIdx;
 	std::string antPfx = (combineAntennaRegionFlag ? "" : "US:");
 
 	qDebug() << "--- Beginning path processing";
 
-	const std::vector<double> bwMHzListUnii5 =
-		{0.4, 0.8, 1.25, 2.5, 3.75, 5.0, 10.0, 30.0, 60.0};
+	const std::vector<double> bwMHzListUnii5 = {0.4, 0.8, 1.25, 2.5, 3.75, 5.0, 10.0, 30.0, 60.0};
 
 	const std::vector<double> bwMHzListUnii7 = {0.4, 0.8, 1.25, 2.5, 3.75, 5.0, 10.0, 30.0};
 
@@ -325,11 +296,11 @@ void processUS(UlsFileReader &r,
 	int numFreqUpperBandPresent = 0;
 	int numFreqInconsistent = 0;
 	int numAssignedStart = 0; // Number of times frequencyAssigned, frequencyUpperBand
-				  // consistent with frequencyAssigned being startFreq
+							  // consistent with frequencyAssigned being startFreq
 	int numAssignedCenter = 0; // Number of times frequencyAssigned, frequencyUpperBand
-				   // consistent with frequencyAssigned being centerFreq
+							   // consistent with frequencyAssigned being centerFreq
 	int numAssignedOther = 0; // Number of times frequencyAssigned, frequencyUpperBand not
-				  // consistent with frequencyAssigned being startFreq or centerFreq
+							  // consistent with frequencyAssigned being startFreq or centerFreq
 
 	if (debugFlag) {
 		std::cout << "Item,Callsign,frequencyAssigned,frequencyUpperBand" << std::endl;
@@ -348,7 +319,7 @@ void processUS(UlsFileReader &r,
 		{
 			if (strcmp(p.callsign, freq.callsign) == 0) {
 				if ((freq.locationNumber == p.txLocationNumber) &&
-				    (freq.antennaNumber == p.txAntennaNumber)) {
+					(freq.antennaNumber == p.txAntennaNumber)) {
 					pathList << p;
 				}
 			}
@@ -358,9 +329,7 @@ void processUS(UlsFileReader &r,
 			fprintf(fwarn,
 				"CALLSIGN: %s, Unable to find path matching TX_LOCATION_NUM = %d "
 				"TX_ANTENNA_NUM = %d\n",
-				freq.callsign,
-				freq.locationNumber,
-				freq.antennaNumber);
+				freq.callsign, freq.locationNumber, freq.antennaNumber);
 		}
 
 		foreach(const UlsPath &path, pathList)
@@ -386,8 +355,7 @@ void processUS(UlsFileReader &r,
 					fprintf(fwarn,
 						"CALLSIGN: %s, Unable to find txLoc matching "
 						"LOCATION_NUM = %d\n",
-						freq.callsign,
-						path.txLocationNumber);
+						freq.callsign, path.txLocationNumber);
 				}
 				continue;
 			}
@@ -401,8 +369,8 @@ void processUS(UlsFileReader &r,
 					// Implicitly matches with an Antenna record with
 					// locationClass 'T'
 					if ((ant.locationNumber == txLoc.locationNumber) &&
-					    (ant.antennaNumber == path.txAntennaNumber) &&
-					    (ant.pathNumber == path.pathNumber)) {
+						(ant.antennaNumber == path.txAntennaNumber) &&
+						(ant.pathNumber == path.pathNumber)) {
 						txAnt = ant;
 						txAntFound = true;
 						break;
@@ -416,10 +384,7 @@ void processUS(UlsFileReader &r,
 						"CALLSIGN: %s, Unable to find txAnt matching "
 						"LOCATION_NUM = %d ANTENNA_NUM = %d PATH_NUM = "
 						"%d\n",
-						freq.callsign,
-						txLoc.locationNumber,
-						path.txAntennaNumber,
-						path.pathNumber);
+						freq.callsign, txLoc.locationNumber, path.txAntennaNumber, path.pathNumber);
 				}
 				continue;
 			}
@@ -446,8 +411,7 @@ void processUS(UlsFileReader &r,
 					fprintf(fwarn,
 						"CALLSIGN: %s, Unable to find rxLoc matching "
 						"LOCATION_NUM = %d\n",
-						freq.callsign,
-						path.rxLocationNumber);
+						freq.callsign, path.rxLocationNumber);
 				}
 				continue;
 			}
@@ -461,8 +425,8 @@ void processUS(UlsFileReader &r,
 					// Implicitly matches with an Antenna record with
 					// locationClass 'R'
 					if ((ant.locationNumber == rxLoc.locationNumber) &&
-					    (ant.antennaNumber == path.rxAntennaNumber) &&
-					    (ant.pathNumber == path.pathNumber)) {
+						(ant.antennaNumber == path.rxAntennaNumber) &&
+						(ant.pathNumber == path.pathNumber)) {
 						rxAnt = ant;
 						rxAntFound = true;
 						break;
@@ -476,10 +440,7 @@ void processUS(UlsFileReader &r,
 						"CALLSIGN: %s, Unable to find rxAnt matching "
 						"LOCATION_NUM = %d ANTENNA_NUM = %d PATH_NUM = "
 						"%d\n",
-						freq.callsign,
-						rxLoc.locationNumber,
-						path.rxAntennaNumber,
-						path.pathNumber);
+						freq.callsign, rxLoc.locationNumber, path.rxAntennaNumber, path.pathNumber);
 				}
 				continue;
 			}
@@ -502,41 +463,37 @@ void processUS(UlsFileReader &r,
 				const UlsSegment &s = segList[segIdx];
 				if (s.segmentNumber != segIdx + 1) {
 					anomalousReason.append("Segments missing, ");
-					qDebug() << "callsign " << path.callsign << " path "
-						 << path.pathNumber << " has missing segments.";
+					qDebug() << "callsign " << path.callsign << " path " << path.pathNumber
+							 << " has missing segments.";
 					break;
 				}
 				if (segIdx == 0) {
 					if (s.txLocationId != txLoc.locationNumber) {
 						anomalousReason.append("First segment not at TX, ");
-						qDebug() << "callsign " << path.callsign << " path "
-							 << path.pathNumber
-							 << " first segment not at TX.";
+						qDebug() << "callsign " << path.callsign << " path " << path.pathNumber
+								 << " first segment not at TX.";
 						break;
 					}
 				}
 				if (segIdx == segList.size() - 1) {
 					if (s.rxLocationId != rxLoc.locationNumber) {
 						anomalousReason.append("Last segment not at RX, ");
-						qDebug() << "callsign " << path.callsign << " path "
-							 << path.pathNumber
-							 << " last segment not at RX.";
+						qDebug() << "callsign " << path.callsign << " path " << path.pathNumber
+								 << " last segment not at RX.";
 						break;
 					}
 				}
 				if (segIdx) {
 					if (s.txLocationId != prevSegRxLocationId) {
 						anomalousReason.append("Segments do not form a "
-								       "path, ");
-						qDebug() << "callsign " << path.callsign << " path "
-							 << path.pathNumber
-							 << " segments do not form a path.";
+											   "path, ");
+						qDebug() << "callsign " << path.callsign << " path " << path.pathNumber
+								 << " segments do not form a path.";
 						break;
 					}
 					bool found;
 					found = false;
-					foreach(const UlsLocation &loc,
-						r.locationsMap(path.callsign))
+					foreach(const UlsLocation &loc, r.locationsMap(path.callsign))
 					{
 						if (loc.locationNumber == s.txLocationId) {
 							prLocList << loc;
@@ -546,19 +503,17 @@ void processUS(UlsFileReader &r,
 					}
 					if (!found) {
 						anomalousReason.append("Segment location not "
-								       "found, ");
-						qDebug() << "callsign " << path.callsign << " path "
-							 << path.pathNumber
-							 << " segment location not found.";
+											   "found, ");
+						qDebug() << "callsign " << path.callsign << " path " << path.pathNumber
+								 << " segment location not found.";
 						break;
 					}
 					found = false;
 					foreach(const UlsAntenna &ant, r.antennasMap(path.callsign))
 					{
 						if ((ant.antennaType == 'P') &&
-						    (ant.locationNumber ==
-						     prLocList.last().locationNumber) &&
-						    (ant.pathNumber == path.pathNumber)) {
+							(ant.locationNumber == prLocList.last().locationNumber) &&
+							(ant.pathNumber == path.pathNumber)) {
 							prAntList << ant;
 							found = true;
 							break;
@@ -566,10 +521,9 @@ void processUS(UlsFileReader &r,
 					}
 					if (!found) {
 						anomalousReason.append("Segment antenna not "
-								       "found, ");
-						qDebug() << "callsign " << path.callsign << " path "
-							 << path.pathNumber
-							 << " segment antenna not found.";
+											   "found, ");
+						qDebug() << "callsign " << path.callsign << " path " << path.pathNumber
+								 << " segment antenna not found.";
 						break;
 					}
 				}
@@ -598,8 +552,8 @@ void processUS(UlsFileReader &r,
 			{
 				if (strcmp(e.callsign, path.callsign) == 0) {
 					if (e.locationId == txLoc.locationNumber &&
-					    e.antennaId == txAnt.antennaNumber &&
-					    e.frequencyId == txFreq.frequencyNumber) {
+						e.antennaId == txAnt.antennaNumber &&
+						e.frequencyId == txFreq.frequencyNumber) {
 						allTxEm << e;
 						txEmFound = true;
 					}
@@ -680,25 +634,18 @@ void processUS(UlsFileReader &r,
 					anomalousReason.append("FrequencyAssigned value missing");
 				} else {
 					if (txEmFound) {
-						bwMHz = UlsFunctionsClass::
-							emissionDesignatorToBandwidth(e.desig);
+						bwMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(e.desig);
 					}
 					if (isnan(bwMHz) || (bwMHz > 60.0) || (bwMHz == 0)) {
-						bwMHz = freqAssignment.getBandwidthUS(
-							txFreq.frequencyAssigned);
+						bwMHz = freqAssignment.getBandwidthUS(txFreq.frequencyAssigned);
 					} else {
-						bool unii5Flag =
-							(txFreq.frequencyAssigned >=
-							 UlsFunctionsClass::unii5StartFreqMHz) &&
-							(txFreq.frequencyAssigned <=
-							 UlsFunctionsClass::unii5StopFreqMHz);
-						bool unii7Flag =
-							(txFreq.frequencyAssigned >=
-							 UlsFunctionsClass::unii7StartFreqMHz) &&
-							(txFreq.frequencyAssigned <=
-							 UlsFunctionsClass::unii7StopFreqMHz);
-						const std::vector<double> *fccBWList =
-							(std::vector<double> *)NULL;
+						bool unii5Flag = (txFreq.frequencyAssigned >=
+											 UlsFunctionsClass::unii5StartFreqMHz) &&
+							(txFreq.frequencyAssigned <= UlsFunctionsClass::unii5StopFreqMHz);
+						bool unii7Flag = (txFreq.frequencyAssigned >=
+											 UlsFunctionsClass::unii7StartFreqMHz) &&
+							(txFreq.frequencyAssigned <= UlsFunctionsClass::unii7StopFreqMHz);
+						const std::vector<double> *fccBWList = (std::vector<double> *)NULL;
 						if (unii5Flag) {
 							fccBWList = &bwMHzListUnii5;
 						} else if (unii7Flag) {
@@ -707,18 +654,14 @@ void processUS(UlsFileReader &r,
 						if (fccBWList) {
 							bool found = false;
 							double fccBW;
-							for (int i = 0;
-							     (i < (int)fccBWList->size()) &&
-							     (!found);
-							     ++i) {
+							for (int i = 0; (i < (int)fccBWList->size()) && (!found); ++i) {
 								if (fccBWList->at(i) >= bwMHz) {
 									found = true;
 									fccBW = fccBWList->at(i);
 								}
 							}
 							if (found) {
-								bwMHz = std::min(fccBW,
-										 bwMHz * 1.1);
+								bwMHz = std::min(fccBW, bwMHz * 1.1);
 							}
 						}
 					}
@@ -728,51 +671,40 @@ void processUS(UlsFileReader &r,
 						anomalousReason.append("Unable to get bandwidth");
 					} else if (isnan(txFreq.frequencyUpperBand)) {
 						freqUpperBandMissingFlag = true;
-						startFreq = txFreq.frequencyAssigned -
-							    bwMHz / 2.0; // Lower Band (MHz)
-						stopFreq = txFreq.frequencyAssigned +
-							   bwMHz / 2.0; // Upper Band (MHz)
+						startFreq = txFreq.frequencyAssigned - bwMHz / 2.0; // Lower Band (MHz)
+						stopFreq = txFreq.frequencyAssigned + bwMHz / 2.0; // Upper Band (MHz)
 						startFreqBand = startFreq;
 						stopFreqBand = stopFreq;
 					} else {
 						// frequencyAssigned is taken to be center frequency
 						// and frequencyUpperBand is ignored as per TS 1014
-						startFreq = txFreq.frequencyAssigned -
-							    bwMHz / 2.0; // Lower Band (MHz)
-						stopFreq = txFreq.frequencyAssigned +
-							   bwMHz / 2.0; // Upper Band (MHz)
+						startFreq = txFreq.frequencyAssigned - bwMHz / 2.0; // Lower Band (MHz)
+						stopFreq = txFreq.frequencyAssigned + bwMHz / 2.0; // Upper Band (MHz)
 
 						// For the purpuse of determining which UNII band
 						// the link is in, frequencyAssigned is the start
 						// freq
-						startFreqBand =
-							txFreq.frequencyAssigned; // Lower Band
-										  // (MHz)
-						stopFreqBand = startFreqBand +
-							       bwMHz; // Upper Band (MHz)
+						startFreqBand = txFreq.frequencyAssigned; // Lower Band
+																  // (MHz)
+						stopFreqBand = startFreqBand + bwMHz; // Upper Band (MHz)
 
-						if (fabs(txFreq.frequencyUpperBand -
-							 txFreq.frequencyAssigned - bwMHz) >
-						    1.0e-6) {
+						if (fabs(txFreq.frequencyUpperBand - txFreq.frequencyAssigned - bwMHz) >
+							1.0e-6) {
 							freqInconsistentFlag = true;
 							std::stringstream stream;
-							stream << "frequencyUpperBand = "
-							       << txFreq.frequencyUpperBand
-							       << " inconsistent with "
-								  "frequencyAssigned and "
-								  "bandwidth ";
-							fixedReason.append(QString::fromStdString(
-								stream.str()));
+							stream << "frequencyUpperBand = " << txFreq.frequencyUpperBand
+								   << " inconsistent with "
+									  "frequencyAssigned and "
+									  "bandwidth ";
+							fixedReason.append(QString::fromStdString(stream.str()));
 							stream.str(std::string());
 						}
 
-						if (fabs(txFreq.frequencyUpperBand -
-							 txFreq.frequencyAssigned - bwMHz) <
-						    1.0e-6) {
+						if (fabs(txFreq.frequencyUpperBand - txFreq.frequencyAssigned - bwMHz) <
+							1.0e-6) {
 							numAssignedStart++;
-						} else if (fabs(txFreq.frequencyUpperBand -
-								txFreq.frequencyAssigned -
-								bwMHz / 2) < 1.0e-6) {
+						} else if (fabs(txFreq.frequencyUpperBand - txFreq.frequencyAssigned -
+									   bwMHz / 2) < 1.0e-6) {
 							numAssignedCenter++;
 						} else {
 							numAssignedOther++;
@@ -781,11 +713,8 @@ void processUS(UlsFileReader &r,
 				}
 
 				AntennaModel::CategoryEnum category;
-				AntennaModelClass *rxAntModel =
-					antennaModelMap.find(antPfx,
-							     rxAnt.antennaModel,
-							     category,
-							     AntennaModel::B1Category);
+				AntennaModelClass *rxAntModel = antennaModelMap.find(
+					antPfx, rxAnt.antennaModel, category, AntennaModel::B1Category);
 
 				AntennaModel::CategoryEnum rxAntennaCategory;
 				double rxAntennaDiameter;
@@ -805,16 +734,12 @@ void processUS(UlsFileReader &r,
 					rxAntennaCategory = category;
 					rxAntennaDiameter = -1.0;
 					rxDiversityDiameter = -1.0;
-					rxAntennaMidbandGain =
-						std::numeric_limits<double>::quiet_NaN();
+					rxAntennaMidbandGain = std::numeric_limits<double>::quiet_NaN();
 					fixedReason.append("Rx Antenna Model Unmatched");
 				}
 
-				AntennaModelClass *txAntModel =
-					antennaModelMap.find(antPfx,
-							     txAnt.antennaModel,
-							     category,
-							     AntennaModel::B1Category);
+				AntennaModelClass *txAntModel = antennaModelMap.find(
+					antPfx, txAnt.antennaModel, category, AntennaModel::B1Category);
 
 				AntennaModel::CategoryEnum txAntennaCategory;
 				double txAntennaDiameter;
@@ -831,46 +756,31 @@ void processUS(UlsFileReader &r,
 					txAntennaModelName = "";
 					txAntennaCategory = category;
 					txAntennaDiameter = -1.0;
-					txAntennaMidbandGain =
-						std::numeric_limits<double>::quiet_NaN();
+					txAntennaMidbandGain = std::numeric_limits<double>::quiet_NaN();
 					fixedReason.append("Tx Antenna Model Unmatched");
 				}
 
 				if (isnan(startFreq) || isnan(stopFreq)) {
 					anomalousReason.append("NaN frequency value, ");
 				} else {
-					bool overlapUnii5 =
-						(stopFreqBand >
-						 UlsFunctionsClass::unii5StartFreqMHz) &&
-						(startFreqBand <
-						 UlsFunctionsClass::unii5StopFreqMHz);
-					bool overlapUnii6 =
-						(stopFreqBand >
-						 UlsFunctionsClass::unii6StartFreqMHz) &&
-						(startFreqBand <
-						 UlsFunctionsClass::unii6StopFreqMHz);
-					bool overlapUnii7 =
-						(stopFreqBand >
-						 UlsFunctionsClass::unii7StartFreqMHz) &&
-						(startFreqBand <
-						 UlsFunctionsClass::unii7StopFreqMHz);
-					bool overlapUnii8 =
-						(stopFreqBand >
-						 UlsFunctionsClass::unii8StartFreqMHz) &&
-						(startFreqBand <
-						 UlsFunctionsClass::unii8StopFreqMHz);
+					bool overlapUnii5 = (stopFreqBand > UlsFunctionsClass::unii5StartFreqMHz) &&
+						(startFreqBand < UlsFunctionsClass::unii5StopFreqMHz);
+					bool overlapUnii6 = (stopFreqBand > UlsFunctionsClass::unii6StartFreqMHz) &&
+						(startFreqBand < UlsFunctionsClass::unii6StopFreqMHz);
+					bool overlapUnii7 = (stopFreqBand > UlsFunctionsClass::unii7StartFreqMHz) &&
+						(startFreqBand < UlsFunctionsClass::unii7StopFreqMHz);
+					bool overlapUnii8 = (stopFreqBand > UlsFunctionsClass::unii8StartFreqMHz) &&
+						(startFreqBand < UlsFunctionsClass::unii8StopFreqMHz);
 
-					if (!((includeUnii5US && overlapUnii5) ||
-					      (includeUnii6US && overlapUnii6) ||
-					      (includeUnii7US && overlapUnii7) ||
-					      (includeUnii8US && overlapUnii8))) {
+					if (!((includeUnii5US && overlapUnii5) || (includeUnii6US && overlapUnii6) ||
+							(includeUnii7US && overlapUnii7) || (includeUnii8US && overlapUnii8))) {
 						continue;
 					} else if (overlapUnii5 && overlapUnii7) {
 						anomalousReason.append("Band overlaps both Unii5 "
-								       "and Unii7, ");
+											   "and Unii7, ");
 					} else if (overlapUnii6 && overlapUnii8) {
 						anomalousReason.append("Band overlaps both Unii6 "
-								       "and Unii8, ");
+											   "and Unii8, ");
 					}
 				}
 
@@ -901,17 +811,8 @@ void processUS(UlsFileReader &r,
 				}
 
 				// now that we have everything, ensure that inputs have what we need
-				anomalousReason.append(
-					UlsFunctionsClass::hasNecessaryFields(e,
-									      path,
-									      rxLoc,
-									      txLoc,
-									      rxAnt,
-									      txAnt,
-									      txHeader,
-									      prLocList,
-									      prAntList,
-									      removeMobile));
+				anomalousReason.append(UlsFunctionsClass::hasNecessaryFields(e, path, rxLoc, txLoc,
+					rxAnt, txAnt, txHeader, prLocList, prAntList, removeMobile));
 
 				if (anomalousReason.length() == 0) {
 					if (freqInconsistentFlag) {
@@ -923,26 +824,22 @@ void processUS(UlsFileReader &r,
 						numFreqUpperBandPresent++;
 						if (debugFlag) {
 							std::cout << "Inband link with Frequency "
-								     "Upper Band specified,"
-								  << path.callsign << ","
-								  << txFreq.frequencyAssigned << ","
-								  << txFreq.frequencyUpperBand
-								  << std::endl;
+										 "Upper Band specified,"
+									  << path.callsign << "," << txFreq.frequencyAssigned << ","
+									  << txFreq.frequencyUpperBand << std::endl;
 						}
 					}
 				}
 
-				TransmitterModelClass *matchedTransmitterModel =
-					transmitterModelMap.find(
-						std::string(txFreq.transmitterModel));
+				TransmitterModelClass *matchedTransmitterModel = transmitterModelMap.find(
+					std::string(txFreq.transmitterModel));
 
 				std::string matchedTransmitterStr;
 				std::string transmitterArchitectureStr;
 				if (matchedTransmitterModel) {
 					matchedTransmitterStr = matchedTransmitterModel->name;
-					transmitterArchitectureStr =
-						TransmitterModelClass::architectureStr(
-							matchedTransmitterModel->architecture);
+					transmitterArchitectureStr = TransmitterModelClass::architectureStr(
+						matchedTransmitterModel->architecture);
 				} else {
 					matchedTransmitterStr = std::string("");
 					transmitterArchitectureStr = "UNKNOWN";
@@ -965,39 +862,28 @@ void processUS(UlsFileReader &r,
 					row << txControlPoint.controlPointState; // State
 				} else {
 					row << ""
-					    << ""
-					    << ""
-					    << "";
+						<< ""
+						<< ""
+						<< "";
 				}
-				row << UlsFunctionsClass::charString(
-					txHeader.commonCarrier); // Common Carrier
+				row << UlsFunctionsClass::charString(txHeader.commonCarrier); // Common Carrier
 				row << UlsFunctionsClass::charString(
 					txHeader.nonCommonCarrier); // Non Common Carrier
-				row << UlsFunctionsClass::charString(
-					txHeader.privateCarrier); // Private Comm
+				row << UlsFunctionsClass::charString(txHeader.privateCarrier); // Private Comm
 				row << UlsFunctionsClass::charString(txHeader.fixed); // Fixed
 				row << UlsFunctionsClass::charString(txHeader.mobile); // Mobile
-				row << UlsFunctionsClass::charString(
-					txHeader.radiolocation); // Radiolocation
-				row << UlsFunctionsClass::charString(
-					txHeader.satellite); // Satellite
+				row << UlsFunctionsClass::charString(txHeader.radiolocation); // Radiolocation
+				row << UlsFunctionsClass::charString(txHeader.satellite); // Satellite
 				row << UlsFunctionsClass::charString(
 					txHeader.developmental); // Developmental or STA or Demo
-				row << UlsFunctionsClass::charString(
-					txHeader.interconnected); // Interconnected
-				row << UlsFunctionsClass::makeNumber(
-					path.pathNumber); // Path Number
-				row << UlsFunctionsClass::makeNumber(
-					path.txLocationNumber); // Tx Location Number
-				row << UlsFunctionsClass::makeNumber(
-					path.txAntennaNumber); // Tx Antenna Number
+				row << UlsFunctionsClass::charString(txHeader.interconnected); // Interconnected
+				row << UlsFunctionsClass::makeNumber(path.pathNumber); // Path Number
+				row << UlsFunctionsClass::makeNumber(path.txLocationNumber); // Tx Location Number
+				row << UlsFunctionsClass::makeNumber(path.txAntennaNumber); // Tx Antenna Number
 				row << path.rxCallsign; // Rx Callsign
-				row << UlsFunctionsClass::makeNumber(
-					path.rxLocationNumber); // Rx Location Number
-				row << UlsFunctionsClass::makeNumber(
-					path.rxAntennaNumber); // Rx Antenna Number
-				row << UlsFunctionsClass::makeNumber(
-					txFreq.frequencyNumber); // Frequency Number
+				row << UlsFunctionsClass::makeNumber(path.rxLocationNumber); // Rx Location Number
+				row << UlsFunctionsClass::makeNumber(path.rxAntennaNumber); // Rx Antenna Number
+				row << UlsFunctionsClass::makeNumber(txFreq.frequencyNumber); // Frequency Number
 				if (txSegFound) {
 					row << UlsFunctionsClass::makeNumber(
 						txSeg.segmentLength); // 1st Segment Length (km)
@@ -1005,35 +891,30 @@ void processUS(UlsFileReader &r,
 					row << "";
 				}
 
-				row << UlsFunctionsClass::makeNumber((startFreq + stopFreq) /
-								     2); // Center Frequency (MHz)
+				row << UlsFunctionsClass::makeNumber(
+					(startFreq + stopFreq) / 2); // Center Frequency (MHz)
 				row << UlsFunctionsClass::makeNumber(bwMHz); // Bandiwdth (MHz)
 				row << UlsFunctionsClass::makeNumber(startFreq); // Lower Band (MHz)
 				row << UlsFunctionsClass::makeNumber(stopFreq); // Upper Band (MHz)
 
-				row << UlsFunctionsClass::makeNumber(
-					txFreq.tolerance); // Tolerance (%)
+				row << UlsFunctionsClass::makeNumber(txFreq.tolerance); // Tolerance (%)
 				row << UlsFunctionsClass::makeNumber(txFreq.EIRP); // Tx EIRP (dBm)
 				row << UlsFunctionsClass::charString(
 					txFreq.transmitterPowerControl); // Auto Tx Pwr Control
 				if (txEmFound) {
 					row << QString(e.desig); // Emissions Designator
-					row << UlsFunctionsClass::makeNumber(
-						e.modRate); // Digital Mod Rate
-					row << QString::fromStdString(
-						e.modCode); // Digital Mod Type
+					row << UlsFunctionsClass::makeNumber(e.modRate); // Digital Mod Rate
+					row << QString::fromStdString(e.modCode); // Digital Mod Type
 				} else {
 					row << ""
-					    << ""
-					    << "";
+						<< ""
+						<< "";
 				}
 
 				row << txFreq.transmitterMake; // Tx Manufacturer
 				row << txFreq.transmitterModel; // Tx Model ULS
-				row << QString::fromStdString(
-					matchedTransmitterStr); // Tx Model Matched
-				row << QString::fromStdString(
-					transmitterArchitectureStr); // Tx Architecture
+				row << QString::fromStdString(matchedTransmitterStr); // Tx Model Matched
+				row << QString::fromStdString(transmitterArchitectureStr); // Tx Architecture
 				row << txLoc.locationName; // Tx Location Name
 				row << UlsFunctionsClass::makeNumber(txLoc.latitude);
 				// QString("%1-%2-%3
@@ -1046,25 +927,19 @@ void processUS(UlsFileReader &r,
 				row << UlsFunctionsClass::makeNumber(
 					txLoc.groundElevation); // Tx Ground Elevation (m)
 				row << txAnt.polarizationCode; // Tx Polarization
-				row << UlsFunctionsClass::makeNumber(
-					txAnt.azimuth); // Tx Azimuth Angle (deg)
-				row << UlsFunctionsClass::makeNumber(
-					txAnt.tilt); // Tx Elevation Angle (deg)
-				row << QString::fromStdString(
-					txAnt.antennaMake); // Tx Ant Manufacturer
+				row << UlsFunctionsClass::makeNumber(txAnt.azimuth); // Tx Azimuth Angle (deg)
+				row << UlsFunctionsClass::makeNumber(txAnt.tilt); // Tx Elevation Angle (deg)
+				row << QString::fromStdString(txAnt.antennaMake); // Tx Ant Manufacturer
 				row << QString::fromStdString(txAnt.antennaModel); // Tx Ant Model
 				row << txAntennaModelName.c_str(); // Tx Matched antenna model
-								   // (blank if unmatched)
-				row << AntennaModel::categoryStr(txAntennaCategory)
-						.c_str(); // Tx Antenna category
-				row << UlsFunctionsClass::makeNumber(
-					txAntennaDiameter); // Tx Ant Diameter (m)
+												   // (blank if unmatched)
+				row << AntennaModel::categoryStr(txAntennaCategory).c_str(); // Tx Antenna category
+				row << UlsFunctionsClass::makeNumber(txAntennaDiameter); // Tx Ant Diameter (m)
 				row << UlsFunctionsClass::makeNumber(
 					txAntennaMidbandGain); // Tx Ant Midband Gain (dB)
 				row << UlsFunctionsClass::makeNumber(
 					txAnt.heightToCenterRAAT); // Tx Height to Center RAAT (m)
-				row << UlsFunctionsClass::makeNumber(
-					txAnt.beamwidth); // Tx Beamwidth
+				row << UlsFunctionsClass::makeNumber(txAnt.beamwidth); // Tx Beamwidth
 				row << UlsFunctionsClass::makeNumber(txAnt.gain); // Tx Gain (dBi)
 				row << rxLoc.locationName; // Rx Location Name
 				row << UlsFunctionsClass::makeNumber(rxLoc.latitude);
@@ -1079,19 +954,15 @@ void processUS(UlsFileReader &r,
 					rxLoc.groundElevation); // Rx Ground Elevation (m)
 				row << ""; // Rx Manufacturer
 				row << ""; // Rx Model
-				row << QString::fromStdString(
-					rxAnt.antennaMake); // Rx Ant Manufacturer
+				row << QString::fromStdString(rxAnt.antennaMake); // Rx Ant Manufacturer
 				row << QString::fromStdString(rxAnt.antennaModel); // Rx Ant Model
 				row << rxAntennaModelName.c_str(); // Rx Matched antenna model
-								   // (blank if unmatched)
-				row << AntennaModel::categoryStr(rxAntennaCategory)
-						.c_str(); // Rx Antenna category
-				row << UlsFunctionsClass::makeNumber(
-					rxAntennaDiameter); // Rx Ant Diameter (m)
+												   // (blank if unmatched)
+				row << AntennaModel::categoryStr(rxAntennaCategory).c_str(); // Rx Antenna category
+				row << UlsFunctionsClass::makeNumber(rxAntennaDiameter); // Rx Ant Diameter (m)
 				row << UlsFunctionsClass::makeNumber(
 					rxAntennaMidbandGain); // Rx Ant Midband Gain (dB)
-				row << UlsFunctionsClass::makeNumber(
-					rxAnt.lineLoss); // Rx Line Loss (dB)
+				row << UlsFunctionsClass::makeNumber(rxAnt.lineLoss); // Rx Line Loss (dB)
 				row << UlsFunctionsClass::makeNumber(
 					rxAnt.heightToCenterRAAT); // Rx Height to Center RAAT (m)
 				row << UlsFunctionsClass::makeNumber(rxAnt.gain); // Rx Gain (dBi)
@@ -1104,18 +975,13 @@ void processUS(UlsFileReader &r,
 
 				row << QString::number(prLocList.size());
 				for (prIdx = 1; prIdx <= maxNumPassiveRepeater; ++prIdx) {
-					if ((prIdx <= prLocList.size()) &&
-					    (prIdx <= prAntList.size())) {
+					if ((prIdx <= prLocList.size()) && (prIdx <= prAntList.size())) {
 						UlsLocation &prLoc = prLocList[prIdx - 1];
 						UlsAntenna &prAnt = prAntList[prIdx - 1];
 						UlsSegment &segment = segList[prIdx];
 
-						AntennaModelClass *prAntModel =
-							antennaModelMap.find(
-								antPfx,
-								prAnt.antennaModel,
-								category,
-								AntennaModel::B1Category);
+						AntennaModelClass *prAntModel = antennaModelMap.find(
+							antPfx, prAnt.antennaModel, category, AntennaModel::B1Category);
 
 						AntennaModel::TypeEnum prAntennaType;
 						AntennaModel::CategoryEnum prAntennaCategory;
@@ -1131,114 +997,98 @@ void processUS(UlsFileReader &r,
 							prAntennaType = prAntModel->type;
 							prAntennaCategory = prAntModel->category;
 							prAntennaDiameter = prAntModel->diameterM;
-							prAntennaMidbandGain =
-								prAntModel->midbandGain;
-							prAntennaReflectorWidth =
-								prAntModel->reflectorWidthM;
-							prAntennaReflectorHeight =
-								prAntModel->reflectorHeightM;
+							prAntennaMidbandGain = prAntModel->midbandGain;
+							prAntennaReflectorWidth = prAntModel->reflectorWidthM;
+							prAntennaReflectorHeight = prAntModel->reflectorHeightM;
 						} else {
 							numAntUnmatch++;
 							prAntennaModelName = "";
 							prAntennaType = AntennaModel::UnknownType;
 							prAntennaCategory = category;
 							prAntennaDiameter = -1.0;
-							prAntennaMidbandGain = std::numeric_limits<
-								double>::quiet_NaN();
+							prAntennaMidbandGain = std::numeric_limits<double>::quiet_NaN();
 							prAntennaReflectorWidth = -1.0;
 							prAntennaReflectorHeight = -1.0;
 							fixedReason.append("PR Antenna Model "
-									   "Unmatched");
+											   "Unmatched");
 						}
 
 						row << prLoc.locationName; // Passive Repeater
-									   // Location Name
-						row << UlsFunctionsClass::makeNumber(
-							prLoc.latitude); // Passive Repeater Lat
-									 // Coords
-						row << UlsFunctionsClass::makeNumber(
-							prLoc.longitude); // Passive Repeater Lon
-									  // Coords
+												   // Location Name
+						row << UlsFunctionsClass::makeNumber(prLoc.latitude); // Passive Repeater
+																			  // Lat Coords
+						row << UlsFunctionsClass::makeNumber(prLoc.longitude); // Passive Repeater
+																			   // Lon Coords
 						row << UlsFunctionsClass::makeNumber(
 							prLoc.groundElevation); // Passive Repeater
-										// Ground Elevation
+													// Ground Elevation
 						row << prAnt.polarizationCode; // Passive Repeater
-									       // Polarization
-						row << UlsFunctionsClass::makeNumber(
-							prAnt.azimuth); // Passive Repeater Azimuth
-									// Angle
-						row << UlsFunctionsClass::makeNumber(
-							prAnt.tilt); // Passive Repeater Elevation
-								     // Angle
-						row << QString::fromStdString(
-							prAnt.antennaMake); // Passive Repeater Ant
-									    // Make
-						row << QString::fromStdString(
-							prAnt.antennaModel); // Passive Repeater Ant
-									     // Model
-						row << prAntennaModelName
-								.c_str(); // Passive Repeater
-									  // antenna model (blank if
-									  // unmatched)
-						row << AntennaModel::typeStr(prAntennaType)
-								.c_str(); // Passive Repeater Ant
-									  // Type
+													   // Polarization
+						row << UlsFunctionsClass::makeNumber(prAnt.azimuth); // Passive Repeater
+																			 // Azimuth Angle
+						row << UlsFunctionsClass::makeNumber(prAnt.tilt); // Passive Repeater
+																		  // Elevation Angle
+						row << QString::fromStdString(prAnt.antennaMake); // Passive Repeater Ant
+																		  // Make
+						row << QString::fromStdString(prAnt.antennaModel); // Passive Repeater Ant
+																		   // Model
+						row << prAntennaModelName.c_str(); // Passive Repeater
+														   // antenna model (blank if
+														   // unmatched)
+						row << AntennaModel::typeStr(prAntennaType).c_str(); // Passive Repeater Ant
+																			 // Type
 						row << AntennaModel::categoryStr(prAntennaCategory)
-								.c_str(); // Passive Repeater Ant
-									  // Category
+								   .c_str(); // Passive Repeater Ant
+											 // Category
 						row << UlsFunctionsClass::makeNumber(
 							prAnt.backtobackTxGain); // Passive Repeater
-										 // Back-To-Back Tx
-										 // Gain
+													 // Back-To-Back Tx
+													 // Gain
 						row << UlsFunctionsClass::makeNumber(
 							prAnt.backtobackRxGain); // Passive Repeater
-										 // Back-To-Back Rx
-										 // Gain
+													 // Back-To-Back Rx
+													 // Gain
 						row << UlsFunctionsClass::makeNumber(
 							prAnt.reflectorHeight); // Passive Repeater
-										// ULS Reflector
-										// Height
+													// ULS Reflector
+													// Height
 						row << UlsFunctionsClass::makeNumber(
 							prAnt.reflectorWidth); // Passive Repeater
-									       // ULS Reflector
-									       // Width
+												   // ULS Reflector
+												   // Width
 						row << UlsFunctionsClass::makeNumber(
 							prAntennaDiameter); // Passive Repeater Ant
-									    // Model Diameter (m)
+												// Model Diameter (m)
 						row << UlsFunctionsClass::makeNumber(
 							prAntennaMidbandGain); // Passive Repeater
-									       // Ant Model Midband
-									       // Gain (dB)
-						row << UlsFunctionsClass::makeNumber(
-							prAntennaReflectorHeight); // Passive
-										   // Repeater Ant
-										   // Model
-										   // Reflector
-										   // Height
+												   // Ant Model Midband
+												   // Gain (dB)
+						row << UlsFunctionsClass::makeNumber(prAntennaReflectorHeight); // Passive
+																						// Repeater
+																						// Ant Model
+																						// Reflector
+																						// Height
 						row << UlsFunctionsClass::makeNumber(
 							prAntennaReflectorWidth); // Passive
-										  // Repeater Ant
-										  // Model Reflector
-										  // Width
-						row << UlsFunctionsClass::makeNumber(
-							prAnt.lineLoss); // Passive Repeater Line
-									 // Loss
-						row << UlsFunctionsClass::makeNumber(
-							prAnt.heightToCenterRAAT); // Passive
-										   // Repeater
-										   // Height to
-										   // Center RAAT Tx
+													  // Repeater Ant
+													  // Model Reflector
+													  // Width
+						row << UlsFunctionsClass::makeNumber(prAnt.lineLoss); // Passive Repeater
+																			  // Line Loss
 						row << UlsFunctionsClass::makeNumber(
 							prAnt.heightToCenterRAAT); // Passive
-										   // Repeater
-										   // Height to
-										   // Center RAAT Rx
+													   // Repeater
+													   // Height to
+													   // Center RAAT Tx
 						row << UlsFunctionsClass::makeNumber(
-							prAnt.beamwidth); // Passive Repeater
-									  // Beamwidth
-						row << UlsFunctionsClass::makeNumber(
-							segment.segmentLength); // Segment Length
-										// (km)
+							prAnt.heightToCenterRAAT); // Passive
+													   // Repeater
+													   // Height to
+													   // Center RAAT Rx
+						row << UlsFunctionsClass::makeNumber(prAnt.beamwidth); // Passive Repeater
+																			   // Beamwidth
+						row << UlsFunctionsClass::makeNumber(segment.segmentLength); // Segment
+																					 // Length (km)
 					} else {
 						row << "";
 						row << "";
@@ -1292,30 +1142,24 @@ void processUS(UlsFileReader &r,
 
 	std::cout << "US Num Frequency Assigned Missing: " << numFreqAssignedMissing << std::endl;
 	std::cout << "US Num Unable To Get Bandwidth: " << numUnableGetBandwidth << std::endl;
-	std::cout << "US Num Frequency Upper Band Missing: " << numFreqUpperBandMissing
-		  << std::endl;
-	std::cout << "US Num Frequency Upper Band Present: " << numFreqUpperBandPresent
-		  << std::endl;
+	std::cout << "US Num Frequency Upper Band Missing: " << numFreqUpperBandMissing << std::endl;
+	std::cout << "US Num Frequency Upper Band Present: " << numFreqUpperBandPresent << std::endl;
 	std::cout << "US Num Frequency Inconsistent: " << numFreqInconsistent << std::endl;
 	std::cout << "US Num Frequency Assigned = Start: " << numAssignedStart << std::endl;
 	std::cout << "US Num Frequency Assigned = Center: " << numAssignedCenter << std::endl;
 	std::cout << "US Num Frequency Assigned = Other: " << numAssignedOther << std::endl;
 
 	std::cout << "US Processed " << r.frequencies().count()
-		  << " frequency records and output to file; a total of " << numRecs << " output"
-		  << '\n';
+			  << " frequency records and output to file; a total of " << numRecs << " output"
+			  << '\n';
 }
 /******************************************************************************************/
 
 /******************************************************************************************/
 /**** processCA                                                                        ****/
 /******************************************************************************************/
-void processCA(UlsFileReader &r,
-	       int maxNumPassiveRepeater,
-	       CsvWriter &wt,
-	       CsvWriter &anomalous,
-	       FILE * /* fwarn */,
-	       AntennaModelMapClass &antennaModelMap)
+void processCA(UlsFileReader &r, int maxNumPassiveRepeater, CsvWriter &wt, CsvWriter &anomalous,
+	FILE * /* fwarn */, AntennaModelMapClass &antennaModelMap)
 {
 	int prIdx;
 	std::string antPfx = (combineAntennaRegionFlag ? "" : "CA:");
@@ -1334,8 +1178,7 @@ void processCA(UlsFileReader &r,
 		int numPR = prList.size();
 		std::vector<int> idxList(numPR);
 
-		foreach(const StationDataCAClass &station,
-			r.stationsMap(authorizationNumber.c_str()))
+		foreach(const StationDataCAClass &station, r.stationsMap(authorizationNumber.c_str()))
 		{
 			QString anomalousReason = "";
 			QString fixedReason = "";
@@ -1354,40 +1197,29 @@ void processCA(UlsFileReader &r,
 					break;
 			}
 
-			double startFreq = station.centerFreqMHz -
-					   station.bandwidthMHz / 2; // Lower Band (MHz)
-			double stopFreq = station.centerFreqMHz +
-					  station.bandwidthMHz / 2; // Upper Band (MHz)
+			double startFreq = station.centerFreqMHz - station.bandwidthMHz / 2; // Lower Band (MHz)
+			double stopFreq = station.centerFreqMHz + station.bandwidthMHz / 2; // Upper Band (MHz)
 
 			if (isnan(startFreq) || isnan(stopFreq)) {
 				anomalousReason.append("NaN frequency value, ");
 			} else {
-				bool overlapUnii5 = (stopFreq >
-						     UlsFunctionsClass::unii5StartFreqMHz) &&
-						    (startFreq <
-						     UlsFunctionsClass::unii5StopFreqMHz);
-				bool overlapUnii6 = (stopFreq >
-						     UlsFunctionsClass::unii6StartFreqMHz) &&
-						    (startFreq <
-						     UlsFunctionsClass::unii6StopFreqMHz);
-				bool overlapUnii7 = (stopFreq >
-						     UlsFunctionsClass::unii7StartFreqMHz) &&
-						    (startFreq <
-						     UlsFunctionsClass::unii7StopFreqMHz);
-				bool overlapUnii8 = (stopFreq >
-						     UlsFunctionsClass::unii8StartFreqMHz) &&
-						    (startFreq <
-						     UlsFunctionsClass::unii8StopFreqMHz);
+				bool overlapUnii5 = (stopFreq > UlsFunctionsClass::unii5StartFreqMHz) &&
+					(startFreq < UlsFunctionsClass::unii5StopFreqMHz);
+				bool overlapUnii6 = (stopFreq > UlsFunctionsClass::unii6StartFreqMHz) &&
+					(startFreq < UlsFunctionsClass::unii6StopFreqMHz);
+				bool overlapUnii7 = (stopFreq > UlsFunctionsClass::unii7StartFreqMHz) &&
+					(startFreq < UlsFunctionsClass::unii7StopFreqMHz);
+				bool overlapUnii8 = (stopFreq > UlsFunctionsClass::unii8StartFreqMHz) &&
+					(startFreq < UlsFunctionsClass::unii8StopFreqMHz);
 
-				if (!(overlapUnii5 || overlapUnii6 || overlapUnii7 ||
-				      overlapUnii8)) {
+				if (!(overlapUnii5 || overlapUnii6 || overlapUnii7 || overlapUnii8)) {
 					anomalousReason.append("Out of band, ");
 				} else if (overlapUnii5 && overlapUnii7) {
 					anomalousReason.append("Band overlaps both Unii5 and "
-							       "Unii7, ");
+										   "Unii7, ");
 				} else if (overlapUnii6 && overlapUnii8) {
 					anomalousReason.append("Band overlaps both Unii6 and "
-							       "Unii8, ");
+										   "Unii8, ");
 				}
 			}
 
@@ -1396,11 +1228,8 @@ void processCA(UlsFileReader &r,
 			makeLink(station, prList, idxList, azimuthPtg, elevationPtg);
 
 			AntennaModel::CategoryEnum category;
-			AntennaModelClass *rxAntModel =
-				antennaModelMap.find(antPfx,
-						     station.antennaModel,
-						     category,
-						     AntennaModel::UnknownCategory);
+			AntennaModelClass *rxAntModel = antennaModelMap.find(
+				antPfx, station.antennaModel, category, AntennaModel::UnknownCategory);
 
 			AntennaModel::CategoryEnum rxAntennaCategory;
 			double rxAntennaDiameter;
@@ -1430,16 +1259,15 @@ void processCA(UlsFileReader &r,
 			row << QString("A"); // Status
 			row << ""; // Radio Service
 			row << ""; // Entity Name
-			row << QString::fromStdString(
-				authorizationNumber); // FRN: Fcc Registration Number / CA:
-						      // authorizationNumber
+			row << QString::fromStdString(authorizationNumber); // FRN: Fcc Registration Number /
+																// CA: authorizationNumber
 			row << ""; // Grant
 			row << ""; // Expiration
 			row << station.inServiceDate.c_str(); // Effective
 			row << "" // Address
-			    << "" // City
-			    << "" // County
-			    << ""; // State
+				<< "" // City
+				<< "" // County
+				<< ""; // State
 			row << ""; // Common Carrier
 			row << ""; // Non Common Carrier
 			row << ""; // Private Comm
@@ -1458,17 +1286,13 @@ void processCA(UlsFileReader &r,
 			row << "1"; // Frequency Number
 			row << ""; // 1st Segment Length (km)
 
-			row << UlsFunctionsClass::makeNumber(
-				station.centerFreqMHz); // Center Frequency (MHz)
-			row << UlsFunctionsClass::makeNumber(
-				station.bandwidthMHz); // Bandiwdth (MHz)
+			row << UlsFunctionsClass::makeNumber(station.centerFreqMHz); // Center Frequency (MHz)
+			row << UlsFunctionsClass::makeNumber(station.bandwidthMHz); // Bandiwdth (MHz)
 
-			row << UlsFunctionsClass::makeNumber(station.centerFreqMHz -
-							     station.bandwidthMHz /
-								     2); // Lower Band (MHz)
-			row << UlsFunctionsClass::makeNumber(station.centerFreqMHz +
-							     station.bandwidthMHz /
-								     2); // Upper Band (MHz)
+			row << UlsFunctionsClass::makeNumber(
+				station.centerFreqMHz - station.bandwidthMHz / 2); // Lower Band (MHz)
+			row << UlsFunctionsClass::makeNumber(
+				station.centerFreqMHz + station.bandwidthMHz / 2); // Upper Band (MHz)
 
 			row << ""; // Tolerance (%)
 			row << ""; // Tx EIRP (dBm)
@@ -1487,8 +1311,7 @@ void processCA(UlsFileReader &r,
 			row << ""; // Tx Ground Elevation (m)
 			row << ""; // Tx Polarization
 			row << UlsFunctionsClass::makeNumber(azimuthPtg); // Tx Azimuth Angle (deg)
-			row << UlsFunctionsClass::makeNumber(
-				elevationPtg); // Tx Elevation Angle (deg)
+			row << UlsFunctionsClass::makeNumber(elevationPtg); // Tx Elevation Angle (deg)
 			row << ""; // Tx Ant Manufacturer
 			row << ""; // Tx Ant Model
 			row << ""; // Tx Matched antenna model (blank if unmatched)
@@ -1499,31 +1322,24 @@ void processCA(UlsFileReader &r,
 			row << ""; // Tx Beamwidth
 			row << ""; // Tx Gain (dBi)
 			row << station.stationLocation.c_str(); // Rx Location Name
-			row << UlsFunctionsClass::makeNumber(
-				station.latitudeDeg); // Rx Latitude (deg)
-			row << UlsFunctionsClass::makeNumber(
-				station.longitudeDeg); // Rx Longitude (deg)
+			row << UlsFunctionsClass::makeNumber(station.latitudeDeg); // Rx Latitude (deg)
+			row << UlsFunctionsClass::makeNumber(station.longitudeDeg); // Rx Longitude (deg)
 			row << UlsFunctionsClass::makeNumber(
 				station.groundElevation); // Rx Ground Elevation (m)
 			row << ""; // Rx Manufacturer
 			row << ""; // Rx Model
 			row << station.antennaManufacturer.c_str(); // Rx Ant Manufacturer
 			row << station.antennaModel.c_str(); // Rx Ant Model
-			row << rxAntennaModelName
-					.c_str(); // Rx Matched antenna model (blank if unmatched)
-			row << AntennaModel::categoryStr(rxAntennaCategory)
-					.c_str(); // Rx Antenna category
-			row << UlsFunctionsClass::makeNumber(
-				rxAntennaDiameter); // Rx Ant Diameter (m)
-			row << UlsFunctionsClass::makeNumber(
-				rxAntennaMidbandGain); // Rx Ant Midband Gain (dB)
+			row << rxAntennaModelName.c_str(); // Rx Matched antenna model (blank if unmatched)
+			row << AntennaModel::categoryStr(rxAntennaCategory).c_str(); // Rx Antenna category
+			row << UlsFunctionsClass::makeNumber(rxAntennaDiameter); // Rx Ant Diameter (m)
+			row << UlsFunctionsClass::makeNumber(rxAntennaMidbandGain); // Rx Ant Midband Gain (dB)
 			row << UlsFunctionsClass::makeNumber(station.lineLoss); // Rx Line Loss (dB)
 			row << UlsFunctionsClass::makeNumber(
 				station.antennaHeightAGL); // Rx Height to Center RAAT (m)
 			row << UlsFunctionsClass::makeNumber(station.antennaGain); // Rx Gain (dBi)
 			row << ""; // Rx Diveristy Height (m)
-			row << UlsFunctionsClass::makeNumber(
-				rxDiversityDiameter); // Rx Diversity Diameter (m)
+			row << UlsFunctionsClass::makeNumber(rxDiversityDiameter); // Rx Diversity Diameter (m)
 			row << ""; // Rx Diversity Gain (dBi)
 
 			row << QString::number(numPR); // Num Passive Repeater
@@ -1537,11 +1353,8 @@ void processCA(UlsFileReader &r,
 
 					const PassiveRepeaterCAClass &pr = prList[prIdx];
 
-					AntennaModelClass *prAntModel =
-						antennaModelMap.find(antPfx,
-								     pr.antennaModelA,
-								     category,
-								     AntennaModel::UnknownCategory);
+					AntennaModelClass *prAntModel = antennaModelMap.find(
+						antPfx, pr.antennaModelA, category, AntennaModel::UnknownCategory);
 
 					PassiveRepeaterCAClass::PRTypeEnum prAntennaType;
 					AntennaModel::CategoryEnum prAntennaCategory;
@@ -1557,17 +1370,14 @@ void processCA(UlsFileReader &r,
 						prAntennaCategory = prAntModel->category;
 						prAntennaDiameter = prAntModel->diameterM;
 						prAntennaMidbandGain = prAntModel->midbandGain;
-						prAntennaReflectorWidth =
-							prAntModel->reflectorWidthM;
-						prAntennaReflectorHeight =
-							prAntModel->reflectorHeightM;
+						prAntennaReflectorWidth = prAntModel->reflectorWidthM;
+						prAntennaReflectorHeight = prAntModel->reflectorHeightM;
 					} else {
 						numAntUnmatch++;
 						prAntennaModelName = "";
 						prAntennaCategory = category;
 						prAntennaDiameter = -1.0;
-						prAntennaMidbandGain =
-							std::numeric_limits<double>::quiet_NaN();
+						prAntennaMidbandGain = std::numeric_limits<double>::quiet_NaN();
 						prAntennaReflectorWidth = -1.0;
 						prAntennaReflectorHeight = -1.0;
 						fixedReason.append("PR Antenna Model Unmatched");
@@ -1577,12 +1387,10 @@ void processCA(UlsFileReader &r,
 
 					std::string prAntennaTypeStr;
 					switch (prAntennaType) {
-						case PassiveRepeaterCAClass::
-							backToBackAntennaPRType:
+						case PassiveRepeaterCAClass::backToBackAntennaPRType:
 							prAntennaTypeStr = "Ant";
 							break;
-						case PassiveRepeaterCAClass::
-							billboardReflectorPRType:
+						case PassiveRepeaterCAClass::billboardReflectorPRType:
 							prAntennaTypeStr = "Ref";
 							break;
 						case PassiveRepeaterCAClass::unknownPRType:
@@ -1597,57 +1405,47 @@ void processCA(UlsFileReader &r,
 						pr.latitudeDeg); // Passive Repeater Lat Coords
 					row << UlsFunctionsClass::makeNumber(
 						pr.longitudeDeg); // Passive Repeater Lon Coords
-					row << UlsFunctionsClass::makeNumber(
-						pr.groundElevation); // Passive Repeater Ground
-								     // Elevation
+					row << UlsFunctionsClass::makeNumber(pr.groundElevation); // Passive Repeater
+																			  // Ground Elevation
 					row << ""; // Passive Repeater Polarization
 					row << ""; // Passive Repeater Azimuth Angle
 					row << ""; // Passive Repeater Elevation Angle
 					row << ""; // Passive Repeater Ant Make
-					row << pr.antennaModelA
-							.c_str(); // Passive Repeater Ant Model
-					row << prAntennaModelName
-							.c_str(); // Passive Repeater antenna model
-								  // (blank if unmatched)
-					row << prAntennaTypeStr
-							.c_str(); // Passive Repeater Ant Type
+					row << pr.antennaModelA.c_str(); // Passive Repeater Ant Model
+					row << prAntennaModelName.c_str(); // Passive Repeater antenna model
+													   // (blank if unmatched)
+					row << prAntennaTypeStr.c_str(); // Passive Repeater Ant Type
 					row << AntennaModel::categoryStr(prAntennaCategory)
-							.c_str(); // Passive Repeater Ant Category
+							   .c_str(); // Passive Repeater Ant Category
 					row << UlsFunctionsClass::makeNumber(
-						repFlag ? pr.antennaGainA :
-							  pr.antennaGainB); // Passive Repeater
-									    // Back-To-Back Tx Gain
+						repFlag ? pr.antennaGainA : pr.antennaGainB); // Passive Repeater
+																	  // Back-To-Back Tx Gain
 					row << UlsFunctionsClass::makeNumber(
-						repFlag ? pr.antennaGainB :
-							  pr.antennaGainA); // Passive Repeater
-									    // Back-To-Back Rx Gain
+						repFlag ? pr.antennaGainB : pr.antennaGainA); // Passive Repeater
+																	  // Back-To-Back Rx Gain
 					row << UlsFunctionsClass::makeNumber(
 						pr.reflectorHeight); // Passive Repeater ULS
-								     // Reflector Height
-					row << UlsFunctionsClass::makeNumber(
-						pr.reflectorWidth); // Passive Repeater ULS
-								    // Reflector Width
-					row << UlsFunctionsClass::makeNumber(
-						prAntennaDiameter); // Passive Repeater Ant Model
-								    // Diameter (m)
+											 // Reflector Height
+					row << UlsFunctionsClass::makeNumber(pr.reflectorWidth); // Passive Repeater ULS
+																			 // Reflector Width
+					row << UlsFunctionsClass::makeNumber(prAntennaDiameter); // Passive Repeater Ant
+																			 // Model Diameter (m)
 					row << UlsFunctionsClass::makeNumber(
 						prAntennaMidbandGain); // Passive Repeater Ant Model
-								       // Midband Gain (dB)
+											   // Midband Gain (dB)
 					row << UlsFunctionsClass::makeNumber(
 						prAntennaReflectorHeight); // Passive Repeater Ant
-									   // Model Reflector Height
+												   // Model Reflector Height
 					row << UlsFunctionsClass::makeNumber(
 						prAntennaReflectorWidth); // Passive Repeater Ant
-									  // Model Reflector Width
+												  // Model Reflector Width
 					row << ""; // Passive Repeater Line Loss
 					row << UlsFunctionsClass::makeNumber(
-						repFlag ? pr.heightAGLA :
-							  pr.heightAGLB); // Passive Repeater Height
-									  // to Center RAAT Tx
+						repFlag ? pr.heightAGLA : pr.heightAGLB); // Passive Repeater Height
+																  // to Center RAAT Tx
 					row << UlsFunctionsClass::makeNumber(
-						repFlag ? pr.heightAGLB :
-							  pr.heightAGLA); // Passive Repeater Height
-									  // to Center RAAT Rx
+						repFlag ? pr.heightAGLB : pr.heightAGLA); // Passive Repeater Height
+																  // to Center RAAT Rx
 					row << ""; // Passive Repeater Beamwidth
 					row << ""; // Segment Length (km)
 				} else {
@@ -1699,11 +1497,8 @@ void processCA(UlsFileReader &r,
 /******************************************************************************************/
 /**** makeLink                                                                         ****/
 /******************************************************************************************/
-void makeLink(const StationDataCAClass &station,
-	      const QList<PassiveRepeaterCAClass> &prList,
-	      std::vector<int> &idxList,
-	      double &azimuthPtg,
-	      double &elevationPtg)
+void makeLink(const StationDataCAClass &station, const QList<PassiveRepeaterCAClass> &prList,
+	std::vector<int> &idxList, double &azimuthPtg, double &elevationPtg)
 {
 	idxList.clear();
 
@@ -1740,8 +1535,7 @@ void makeLink(const StationDataCAClass &station,
 		prIdx = unassignedIdxList[selUIdx];
 		const PassiveRepeaterCAClass &pr = prList[prIdx];
 		if (selUIdx < (int)unassignedIdxList.size() - 1) {
-			unassignedIdxList[selUIdx] =
-				unassignedIdxList[unassignedIdxList.size() - 1];
+			unassignedIdxList[selUIdx] = unassignedIdxList[unassignedIdxList.size() - 1];
 		}
 		unassignedIdxList.pop_back();
 		Vector3 prPosition;
@@ -1765,9 +1559,7 @@ void makeLink(const StationDataCAClass &station,
 			idxList.push_back(2 * prIdx);
 			prPosition = pr.reflectorPosition;
 			Vector3 pVec = (position - prPosition).normalized();
-			pointingVec = 2 * pVec.dot(pr.reflectorPointingVec) *
-					      pr.reflectorPointingVec -
-				      pVec;
+			pointingVec = 2 * pVec.dot(pr.reflectorPointingVec) * pr.reflectorPointingVec - pVec;
 
 			Vector3 upVec = prPosition.normalized();
 			Vector3 zVec = Vector3(0.0, 0.0, 1.0);
@@ -1775,8 +1567,7 @@ void makeLink(const StationDataCAClass &station,
 			Vector3 northVec = upVec.cross(eastVec);
 
 			elevationPtg = asin(pointingVec.dot(upVec)) * 180.0 / M_PI;
-			azimuthPtg = atan2(pointingVec.dot(eastVec), pointingVec.dot(northVec)) *
-				     180.0 / M_PI;
+			azimuthPtg = atan2(pointingVec.dot(eastVec), pointingVec.dot(northVec)) * 180.0 / M_PI;
 		} else {
 			CORE_DUMP;
 		}
@@ -1789,9 +1580,8 @@ void makeLink(const StationDataCAClass &station,
 /******************************************************************************************/
 /**** testAntennaModelMap                                                              ****/
 /******************************************************************************************/
-void testAntennaModelMap(AntennaModelMapClass &antennaModelMap,
-			 std::string inputFile,
-			 std::string outputFile)
+void testAntennaModelMap(
+	AntennaModelMapClass &antennaModelMap, std::string inputFile, std::string outputFile)
 {
 	std::ostringstream errStr;
 	FILE *fin, *fout;
@@ -1800,13 +1590,13 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap,
 
 	if (!(fin = fopen(inputFile.c_str(), "rb"))) {
 		errStr << std::string("ERROR: Unable to open inputFile: \"") << inputFile << "\""
-		       << std::endl;
+			   << std::endl;
 		throw std::runtime_error(errStr.str());
 	}
 
 	if (!(fout = fopen(outputFile.c_str(), "wb"))) {
 		errStr << std::string("ERROR: Unable to open outputFile: \"") << outputFile << "\""
-		       << std::endl;
+			   << std::endl;
 		throw std::runtime_error(errStr.str());
 	}
 
@@ -1874,9 +1664,7 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap,
 					// std::cout << "FIELD: \"" << field << "\"" << std::endl;
 
 					found = false;
-					for (fIdx = 0;
-					     (fIdx < (int)fieldLabelList.size()) && (!found);
-					     fIdx++) {
+					for (fIdx = 0; (fIdx < (int)fieldLabelList.size()) && (!found); fIdx++) {
 						if (field == fieldLabelList.at(fIdx)) {
 							*fieldIdxList.at(fIdx) = fieldIdx;
 							found = true;
@@ -1886,10 +1674,9 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap,
 
 				for (fIdx = 0; fIdx < (int)fieldIdxList.size(); fIdx++) {
 					if (*fieldIdxList.at(fIdx) == -1) {
-						errStr << "ERROR: Invalid input file \""
-						       << inputFile << "\" label line missing \""
-						       << fieldLabelList.at(fIdx) << "\""
-						       << std::endl;
+						errStr << "ERROR: Invalid input file \"" << inputFile
+							   << "\" label line missing \"" << fieldLabelList.at(fIdx) << "\""
+							   << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -1901,11 +1688,8 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap,
 				strval = fieldList.at(antennaModelFieldIdx);
 
 				AntennaModel::CategoryEnum category;
-				AntennaModelClass *antModel =
-					antennaModelMap.find(antPfx,
-							     strval,
-							     category,
-							     AntennaModel::UnknownCategory);
+				AntennaModelClass *antModel = antennaModelMap.find(
+					antPfx, strval, category, AntennaModel::UnknownCategory);
 
 				std::string matchedModelName;
 				if (antModel) {
@@ -1939,9 +1723,8 @@ void testAntennaModelMap(AntennaModelMapClass &antennaModelMap,
 /******************************************************************************************/
 /**** testTransmitterModelMap                                                          ****/
 /******************************************************************************************/
-void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap,
-			     std::string inputFile,
-			     std::string outputFile)
+void testTransmitterModelMap(
+	TransmitterModelMapClass &transmitterModelMap, std::string inputFile, std::string outputFile)
 {
 	std::ostringstream errStr;
 	FILE *fin, *fout;
@@ -1953,13 +1736,13 @@ void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap,
 
 	if (!(fin = fopen(inputFile.c_str(), "rb"))) {
 		errStr << std::string("ERROR: Unable to open inputFile: \"") << inputFile << "\""
-		       << std::endl;
+			   << std::endl;
 		throw std::runtime_error(errStr.str());
 	}
 
 	if (!(fout = fopen(outputFile.c_str(), "wb"))) {
 		errStr << std::string("ERROR: Unable to open outputFile: \"") << outputFile << "\""
-		       << std::endl;
+			   << std::endl;
 		throw std::runtime_error(errStr.str());
 	}
 
@@ -2027,9 +1810,7 @@ void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap,
 					// std::cout << "FIELD: \"" << field << "\"" << std::endl;
 
 					found = false;
-					for (fIdx = 0;
-					     (fIdx < (int)fieldLabelList.size()) && (!found);
-					     fIdx++) {
+					for (fIdx = 0; (fIdx < (int)fieldLabelList.size()) && (!found); fIdx++) {
 						if (field == fieldLabelList.at(fIdx)) {
 							*fieldIdxList.at(fIdx) = fieldIdx;
 							found = true;
@@ -2039,10 +1820,9 @@ void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap,
 
 				for (fIdx = 0; fIdx < (int)fieldIdxList.size(); fIdx++) {
 					if (*fieldIdxList.at(fIdx) == -1) {
-						errStr << "ERROR: Invalid input file \""
-						       << inputFile << "\" label line missing \""
-						       << fieldLabelList.at(fIdx) << "\""
-						       << std::endl;
+						errStr << "ERROR: Invalid input file \"" << inputFile
+							   << "\" label line missing \"" << fieldLabelList.at(fIdx) << "\""
+							   << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -2054,8 +1834,7 @@ void testTransmitterModelMap(TransmitterModelMapClass &transmitterModelMap,
 				numTX++;
 				strval = fieldList.at(transmitterModelFieldIdx);
 
-				TransmitterModelClass *transmitterModel = transmitterModelMap.find(
-					strval);
+				TransmitterModelClass *transmitterModel = transmitterModelMap.find(strval);
 
 				std::string matchedModelName;
 				if (transmitterModel) {

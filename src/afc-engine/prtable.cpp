@@ -60,8 +60,8 @@ void PRTABLEClass::readTable()
 
 	ifstream file(tableFile);
 	if (!file.is_open()) {
-		errStr << std::string("ERROR: Unable to open Passive Repeater Table File \"") +
-				  tableFile + std::string("\"\n");
+		errStr << std::string("ERROR: Unable to open Passive Repeater Table File \"") + tableFile +
+				std::string("\"\n");
 		throw std::runtime_error(errStr.str());
 	}
 	int linenum = 0;
@@ -114,10 +114,8 @@ void PRTABLEClass::readTable()
 			case labelLineType: {
 				std::vector<std::string> sizeStrList = split(fieldList[0], ':');
 				if (sizeStrList.size() != 2) {
-					errStr << std::string("ERROR: Passive Repeater Table File ")
-					       << tableFile << ":" << linenum
-					       << " Ivalid table size " << fieldList[0]
-					       << std::endl;
+					errStr << std::string("ERROR: Passive Repeater Table File ") << tableFile << ":"
+						   << linenum << " Ivalid table size " << fieldList[0] << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 				numQ = std::stoi(sizeStrList[0]);
@@ -127,12 +125,11 @@ void PRTABLEClass::readTable()
 				oneOverKsValList = (double *)malloc(numOneOverKs * sizeof(double));
 				prTable = (double **)malloc(numQ * sizeof(double *));
 				for (qIdx = 0; qIdx < numQ; ++qIdx) {
-					prTable[qIdx] = (double *)malloc(numOneOverKs *
-									 sizeof(double));
+					prTable[qIdx] = (double *)malloc(numOneOverKs * sizeof(double));
 				}
 				if ((int)fieldList.size() != numQ + 1) {
-					errStr << std::string("ERROR: Passive Repeater Table File ")
-					       << tableFile << ":" << linenum << " INVALID DATA\n";
+					errStr << std::string("ERROR: Passive Repeater Table File ") << tableFile << ":"
+						   << linenum << " INVALID DATA\n";
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -148,16 +145,16 @@ void PRTABLEClass::readTable()
 				break;
 			case dataLineType:
 				if (kIdx > numOneOverKs - 1) {
-					errStr << std::string("ERROR: Passive Repeater Table File ")
-					       << tableFile << ":" << linenum << " INVALID DATA\n";
+					errStr << std::string("ERROR: Passive Repeater Table File ") << tableFile << ":"
+						   << linenum << " INVALID DATA\n";
 					throw std::runtime_error(errStr.str());
 				}
 
 				oneOverKsValList[kIdx] = std::stod(fieldList[0]);
 
 				if (((int)fieldList.size()) != numQ + 1) {
-					errStr << std::string("ERROR: Passive Repeater Table File ")
-					       << tableFile << ":" << linenum << " INVALID DATA\n";
+					errStr << std::string("ERROR: Passive Repeater Table File ") << tableFile << ":"
+						   << linenum << " INVALID DATA\n";
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -181,8 +178,7 @@ void PRTABLEClass::readTable()
 	}
 	if (kIdx != numOneOverKs) {
 		errStr << std::string("ERROR: Passive Repeater Table File ") << tableFile << ":"
-		       << " Read " << kIdx << " lines of data, expecting " << numOneOverKs
-		       << std::endl;
+			   << " Read " << kIdx << " lines of data, expecting " << numOneOverKs << std::endl;
 		throw std::runtime_error(errStr.str());
 	}
 
@@ -226,9 +222,9 @@ double PRTABLEClass::computePRTABLE(double Q, double oneOverKs)
 	double F11 = prTable[qIdx0 + 1][kIdx0 + 1];
 
 	double tableVal = F00 * (qIdx0 + 1 - qIdxDbl) * (kIdx0 + 1 - kIdxDbl) +
-			  F01 * (qIdx0 + 1 - qIdxDbl) * (kIdxDbl - kIdx0) +
-			  F10 * (qIdxDbl - qIdx0) * (kIdx0 + 1 - kIdxDbl) +
-			  F11 * (qIdxDbl - qIdx0) * (kIdxDbl - kIdx0);
+		F01 * (qIdx0 + 1 - qIdxDbl) * (kIdxDbl - kIdx0) +
+		F10 * (qIdxDbl - qIdx0) * (kIdx0 + 1 - kIdxDbl) +
+		F11 * (qIdxDbl - qIdx0) * (kIdxDbl - kIdx0);
 
 	return (tableVal);
 }

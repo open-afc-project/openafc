@@ -49,7 +49,7 @@ void FreqAssignmentClass::readFreqAssignment(const std::string filename)
 
 	if (!(fp = fopen(filename.c_str(), "rb"))) {
 		str = std::string("ERROR: Unable to open Frequency Assignment File \"") + filename +
-		      std::string("\"\n");
+			std::string("\"\n");
 		throw std::runtime_error(str);
 	}
 
@@ -104,9 +104,7 @@ void FreqAssignmentClass::readFreqAssignment(const std::string filename)
 					// std::cout << "FIELD: \"" << field << "\"" << std::endl;
 
 					found = false;
-					for (fIdx = 0;
-					     (fIdx < (int)fieldLabelList.size()) && (!found);
-					     fIdx++) {
+					for (fIdx = 0; (fIdx < (int)fieldLabelList.size()) && (!found); fIdx++) {
 						if (field == fieldLabelList.at(fIdx)) {
 							*fieldIdxList.at(fIdx) = fieldIdx;
 							found = true;
@@ -117,10 +115,9 @@ void FreqAssignmentClass::readFreqAssignment(const std::string filename)
 				for (fIdx = 0; fIdx < (int)fieldIdxList.size(); fIdx++) {
 					if (*fieldIdxList.at(fIdx) == -1) {
 						errStr << "ERROR: Invalid Frequency Assignment "
-							  "file \""
-						       << filename << "\" label line missing \""
-						       << fieldLabelList.at(fIdx) << "\""
-						       << std::endl;
+								  "file \""
+							   << filename << "\" label line missing \"" << fieldLabelList.at(fIdx)
+							   << "\"" << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -132,17 +129,15 @@ void FreqAssignmentClass::readFreqAssignment(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(frequencyFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Frequency Assignment file \"" << filename
-					       << "\" line " << linenum << " missing frequency"
-					       << std::endl;
+					errStr << "ERROR: Frequency Assignment file \"" << filename << "\" line "
+						   << linenum << " missing frequency" << std::endl;
 					throw std::runtime_error(errStr.str());
 				} else {
 					frequency = std::strtod(strval.c_str(), &chptr);
 					if (frequency <= 0.0) {
-						errStr << "ERROR: Frequency Assignment file \""
-						       << filename << "\" line " << linenum
-						       << " invalid frequency: \"" << strval << "\""
-						       << std::endl;
+						errStr << "ERROR: Frequency Assignment file \"" << filename << "\" line "
+							   << linenum << " invalid frequency: \"" << strval << "\""
+							   << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -153,17 +148,15 @@ void FreqAssignmentClass::readFreqAssignment(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(bandwidthFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Frequency Assignment file \"" << filename
-					       << "\" line " << linenum << " missing bandwidth"
-					       << std::endl;
+					errStr << "ERROR: Frequency Assignment file \"" << filename << "\" line "
+						   << linenum << " missing bandwidth" << std::endl;
 					throw std::runtime_error(errStr.str());
 				} else {
 					bandwidth = std::strtod(strval.c_str(), &chptr);
 					if (bandwidth <= 0.0) {
-						errStr << "ERROR: Frequency Assignment file \""
-						       << filename << "\" line " << linenum
-						       << " invalid bandwidth: \"" << strval << "\""
-						       << std::endl;
+						errStr << "ERROR: Frequency Assignment file \"" << filename << "\" line "
+							   << linenum << " invalid bandwidth: \"" << strval << "\""
+							   << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}

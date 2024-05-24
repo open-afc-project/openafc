@@ -105,16 +105,16 @@ class AfcManager
 			std::tie(lat, lon, alt) = _rlanLLA;
 			std::tie(minorUncert, majorUncert, heightUncert) = _rlanUncerts_m;
 			return (((_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE ||
-				  _rlanUncertaintyRegionType == RLANBoundary::RADIAL_POLY) &&
-				 (std::isnan(lat) || std::isnan(lon))) ||
+						 _rlanUncertaintyRegionType == RLANBoundary::RADIAL_POLY) &&
+						(std::isnan(lat) || std::isnan(lon))) ||
 				(_analysisType != "HeatmapAnalysis" && std::isnan(alt)) ||
 				(_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE &&
-				 (std::isnan(minorUncert) || std::isnan(majorUncert))) ||
-				std::isnan(heightUncert) || std::isnan(_minEIRP_dBm) ||
-				std::isnan(_maxEIRP_dBm) || std::isnan(_IoverN_threshold_dB) ||
-				std::isnan(_bodyLossDB) || std::isnan(_polarizationLossDB) ||
+					(std::isnan(minorUncert) || std::isnan(majorUncert))) ||
+				std::isnan(heightUncert) || std::isnan(_minEIRP_dBm) || std::isnan(_maxEIRP_dBm) ||
+				std::isnan(_IoverN_threshold_dB) || std::isnan(_bodyLossDB) ||
+				std::isnan(_polarizationLossDB) ||
 				(_rlanUncertaintyRegionType == RLANBoundary::ELLIPSE &&
-				 std::isnan(_rlanOrientation_deg)) ||
+					std::isnan(_rlanOrientation_deg)) ||
 				(_ulsDatabaseList.size() == 0) || std::isnan((int)_buildingType) ||
 				std::isnan(_confidenceBldg2109) ||
 				_pathLossModel == CConst::unknownPathLossModel); // ||
@@ -140,8 +140,7 @@ class AfcManager
 		void importGUIjson(const std::string &inputJSONpath);
 
 		// Read configuration parameters for AFC
-		void importConfigAFCjson(const std::string &inputJSONpath,
-					 const std::string &tempDir);
+		void importConfigAFCjson(const std::string &inputJSONpath, const std::string &tempDir);
 
 		/* create OGR layer for generateExclusionZoneJson, generateMapDataGeoJson, */
 		OGRLayer *createGeoJSONLayer(const char *tmpPath, GDALDataset **dataSet);
@@ -174,26 +173,18 @@ class AfcManager
 
 		// ***** Perform AFC Engine computations *****
 		void compute(); // Computes all the necessary losses and stores them into the output
-				// member variables below
+						// member variables below
 
-		double computeClutter452HtEl(
-			double txHeightM,
-			double distKm,
+		double computeClutter452HtEl(double txHeightM, double distKm,
 			double elevationAngleRad) const; // Clutter loss from ITU-R p.452
 
-		std::tuple<LatLon, LatLon, LatLon> computeBeamConeLatLon(
-			ULSClass *uls,
-			LatLon rxLatLonVal,
+		std::tuple<LatLon, LatLon, LatLon> computeBeamConeLatLon(ULSClass *uls, LatLon rxLatLonVal,
 			LatLon txLatLonVal); // Calculates and stores the beam cone coordinates
 
 		// Support command line interface with AFC Engine
-		void setCmdLineParams(std::string &inputFilePath,
-				      std::string &configFilePath,
-				      std::string &outputFilePath,
-				      std::string &tempDir,
-				      std::string &logLevel,
-				      int argc,
-				      char **argv);
+		void setCmdLineParams(std::string &inputFilePath, std::string &configFilePath,
+			std::string &outputFilePath, std::string &tempDir, std::string &logLevel, int argc,
+			char **argv);
 
 		void setConstInputs(const std::string &tempDir); // set inputs not specified by user
 
@@ -209,156 +200,71 @@ class AfcManager
 		void clearData();
 		void clearULSList();
 
-		void readULSData(
-			const std::vector<std::tuple<std::string, std::string>> &ulsDatabaseList,
-			PopGridClass *popGrid,
-			int linkDirection,
-			double minFreq,
-			double maxFreq,
-			bool removeMobileFlag,
-			CConst::SimulationEnum simulationFlag,
-			const double &minLat = -90,
-			const double &maxLat = 90,
-			const double &minLon = -180,
+		void readULSData(const std::vector<std::tuple<std::string, std::string>> &ulsDatabaseList,
+			PopGridClass *popGrid, int linkDirection, double minFreq, double maxFreq,
+			bool removeMobileFlag, CConst::SimulationEnum simulationFlag,
+			const double &minLat = -90, const double &maxLat = 90, const double &minLon = -180,
 			const double &maxLon = 180); // Reads a database for FS stations information
 		double getAngleFromDMS(std::string dmsStr);
 		int findULSAntenna(std::string strval);
-		bool computeSpectralOverlapLoss(
-			double *spectralOverlapLossDBptr,
-			double sigStartFreq,
-			double sigStopFreq,
-			double rxStartFreq,
-			double rxStopFreq,
-			bool aciFlag,
+		bool computeSpectralOverlapLoss(double *spectralOverlapLossDBptr, double sigStartFreq,
+			double sigStopFreq, double rxStartFreq, double rxStopFreq, bool aciFlag,
 			CConst::SpectralAlgorithmEnum spectralAlgorithm) const;
 
 		void readDeniedRegionData(std::string filename);
 
-		void computePathLoss(CConst::PathLossModelEnum pathLossModel,
-				     bool itmFSPLFlag,
-				     CConst::PropEnvEnum propEnv,
-				     CConst::PropEnvEnum propEnvRx,
-				     CConst::NLCDLandCatEnum nlcdLandCatTx,
-				     CConst::NLCDLandCatEnum nlcdLandCatRx,
-				     double distKm,
-				     double fsplDistKm,
-				     double win2DistKm,
-				     double frequency,
-				     double txLongitudeDeg,
-				     double txLatitudeDeg,
-				     double txHeightM,
-				     double elevationAngleTxDeg,
-				     double rxLongitudeDeg,
-				     double rxLatitudeDeg,
-				     double rxHeightM,
-				     double elevationAngleRxDeg,
-				     double &pathLoss,
-				     double &pathClutterTxDB,
-				     double &pathClutterRxDB,
-				     std::string &pathLossModelStr,
-				     double &pathLossCDF,
-				     std::string &pathClutterTxModelStr,
-				     double &pathClutterTxCDF,
-				     std::string &pathClutterRxModelStr,
-				     double &pathClutterRxCDF,
-				     std::string *txClutterStrPtr,
-				     std::string *rxClutterStrPtr,
-				     double **ITMProfilePtr,
-				     double **isLOSProfilePtr,
-				     double *isLOSSurfaceFracPtr
+		void computePathLoss(
+			CConst::PathLossModelEnum pathLossModel, bool itmFSPLFlag, CConst::PropEnvEnum propEnv,
+			CConst::PropEnvEnum propEnvRx, CConst::NLCDLandCatEnum nlcdLandCatTx,
+			CConst::NLCDLandCatEnum nlcdLandCatRx, double distKm, double fsplDistKm,
+			double win2DistKm, double frequency, double txLongitudeDeg, double txLatitudeDeg,
+			double txHeightM, double elevationAngleTxDeg, double rxLongitudeDeg,
+			double rxLatitudeDeg, double rxHeightM, double elevationAngleRxDeg, double &pathLoss,
+			double &pathClutterTxDB, double &pathClutterRxDB, std::string &pathLossModelStr,
+			double &pathLossCDF, std::string &pathClutterTxModelStr, double &pathClutterTxCDF,
+			std::string &pathClutterRxModelStr, double &pathClutterRxCDF,
+			std::string *txClutterStrPtr, std::string *rxClutterStrPtr, double **ITMProfilePtr,
+			double **isLOSProfilePtr, double *isLOSSurfaceFracPtr
 #if DEBUG_AFC
-				     ,
-				     std::vector<std::string> &ITMHeightType
+			,
+			std::vector<std::string> &ITMHeightType
 #endif
 		) const;
 
 		double q(double Z) const;
 		double computeBuildingPenetration(CConst::BuildingTypeEnum buildingType,
-						  double elevationAngleDeg,
-						  double frequency,
-						  std::string &buildingPenetrationModelStr,
-						  double &buildingPenetrationCDF) const;
+			double elevationAngleDeg, double frequency, std::string &buildingPenetrationModelStr,
+			double &buildingPenetrationCDF) const;
 
-		double computeNearFieldLoss(double frequency,
-					    double maxGain,
-					    double distance) const;
+		double computeNearFieldLoss(double frequency, double maxGain, double distance) const;
 
 		// Winner II models
-		double Winner2_C1suburban_LOS(double distance,
-					      double hBS,
-					      double hMS,
-					      double frequency,
-					      double zval,
-					      double &sigma,
-					      double &pathLossCDF) const;
-		double Winner2_C1suburban_NLOS(double distance,
-					       double hBS,
-					       double hMS,
-					       double frequency,
-					       double zval,
-					       double &sigma,
-					       double &pathLossCDF) const;
-		double Winner2_C2urban_LOS(double distance,
-					   double hBS,
-					   double hMS,
-					   double frequency,
-					   double zval,
-					   double &sigma,
-					   double &pathLossCDF) const;
-		double Winner2_C2urban_NLOS(double distance,
-					    double hBS,
-					    double hMS,
-					    double frequency,
-					    double zval,
-					    double &sigma,
-					    double &pathLossCDF) const;
-		double Winner2_D1rural_LOS(double distance,
-					   double hBS,
-					   double hMS,
-					   double frequency,
-					   double zval,
-					   double &sigma,
-					   double &pathLossCDF) const;
-		double Winner2_D1rural_NLOS(double distance,
-					    double hBS,
-					    double hMS,
-					    double frequency,
-					    double zval,
-					    double &sigma,
-					    double &pathLossCDF) const;
+		double Winner2_C1suburban_LOS(double distance, double hBS, double hMS, double frequency,
+			double zval, double &sigma, double &pathLossCDF) const;
+		double Winner2_C1suburban_NLOS(double distance, double hBS, double hMS, double frequency,
+			double zval, double &sigma, double &pathLossCDF) const;
+		double Winner2_C2urban_LOS(double distance, double hBS, double hMS, double frequency,
+			double zval, double &sigma, double &pathLossCDF) const;
+		double Winner2_C2urban_NLOS(double distance, double hBS, double hMS, double frequency,
+			double zval, double &sigma, double &pathLossCDF) const;
+		double Winner2_D1rural_LOS(double distance, double hBS, double hMS, double frequency,
+			double zval, double &sigma, double &pathLossCDF) const;
+		double Winner2_D1rural_NLOS(double distance, double hBS, double hMS, double frequency,
+			double zval, double &sigma, double &pathLossCDF) const;
 
-		double Winner2_C1suburban(double distance,
-					  double hBS,
-					  double hMS,
-					  double frequency,
-					  double &sigma,
-					  std::string &pathLossModelStr,
-					  double &pathLossCDF,
-					  double &probLOS,
-					  int losValue) const;
-		double Winner2_C2urban(double distance,
-				       double hBS,
-				       double hMS,
-				       double frequency,
-				       double &sigma,
-				       std::string &pathLossModelStr,
-				       double &pathLossCDF,
-				       double &probLOS,
-				       int losValue) const;
-		double Winner2_D1rural(double distance,
-				       double hBS,
-				       double hMS,
-				       double frequency,
-				       double &sigma,
-				       std::string &pathLossModelStr,
-				       double &pathLossCDF,
-				       double &probLOS,
-				       int losValue) const;
+		double Winner2_C1suburban(double distance, double hBS, double hMS, double frequency,
+			double &sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS,
+			int losValue) const;
+		double Winner2_C2urban(double distance, double hBS, double hMS, double frequency,
+			double &sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS,
+			int losValue) const;
+		double Winner2_D1rural(double distance, double hBS, double hMS, double frequency,
+			double &sigma, std::string &pathLossModelStr, double &pathLossCDF, double &probLOS,
+			int losValue) const;
 
 		void computeInquiredFreqRangesPSD(
-			std::vector<psdFreqRangeClass>
-				&psdFreqRangeList); // Compute list of psdSegments for each inquired
-						    // frequency range
+			std::vector<psdFreqRangeClass> &psdFreqRangeList); // Compute list of psdSegments for
+															   // each inquired frequency range
 
 		void defineHeatmapColors();
 		std::string getHeatmapColor(double itonVal, bool indoorFlag, bool hexFlag);
@@ -374,53 +280,38 @@ class AfcManager
 		void writeKML();
 		void createChannelList();
 		void splitFrequencyRanges();
-		bool containsChannel(const std::vector<FreqBandClass> &freqBandList,
-				     int chanStartFreqMHz,
-				     int chanStopFreqMHz);
+		bool containsChannel(const std::vector<FreqBandClass> &freqBandList, int chanStartFreqMHz,
+			int chanStopFreqMHz);
 		// Returns 1 is successful, 0 of cfi invalid
 		std::vector<std::pair<int, int>> calculateOverlapBandList(
-			const std::vector<FreqBandClass> &freqBandList,
-			int chanStartFreqMHz,
+			const std::vector<FreqBandClass> &freqBandList, int chanStartFreqMHz,
 			int chanStopFreqMHz);
 
 		void fixFSTerrain();
-		CConst::PropEnvEnum computePropEnv(double lonDeg,
-						   double latDeg,
-						   CConst::NLCDLandCatEnum &nlcdLandCat,
-						   bool errorFlag = true) const;
-		double computeIToNMargin(double d,
-					 double cc,
-					 double ss,
-					 ULSClass *uls,
-					 double chanCenterFreq,
-					 double bandwidth,
-					 double chanStartFreq,
-					 double chanStopFreq,
-					 double spectralOverlapLossDB,
-					 char ulsRxPropEnv,
-					 double &distKmM,
-					 std::string comment,
-					 ExThrGzipCsv *excthrGc);
+		CConst::PropEnvEnum computePropEnv(double lonDeg, double latDeg,
+			CConst::NLCDLandCatEnum &nlcdLandCat, bool errorFlag = true) const;
+		double computeIToNMargin(double d, double cc, double ss, ULSClass *uls,
+			double chanCenterFreq, double bandwidth, double chanStartFreq, double chanStopFreq,
+			double spectralOverlapLossDB, char ulsRxPropEnv, double &distKmM, std::string comment,
+			ExThrGzipCsv *excthrGc);
 
 		/**************************************************************************************/
 		/* Input Parameters */
 		/**************************************************************************************/
 		std::string _srtmDir; // Directory that contains SRTM terrain height files
 		std::string _cdsmDir; // Directory that contains CDSM (Canadian Digital Surface
-				      // Model) height files
+							  // Model) height files
 		std::string _depDir; // Directory that contains 3DEP terrain height files
 		std::string _globeDir; // Directory that contains NOAA GLOBE terrain data files
 		std::string _lidarDir; // Directory that contains LiDAR multiband raster files.
 
-		std::string
-			_regionDir; // Directory that contains polygons for each simulation region
+		std::string _regionDir; // Directory that contains polygons for each simulation region
 
-		std::string
-			_worldPopulationFile; // GDAL file (tiff) containing population density data
+		std::string _worldPopulationFile; // GDAL file (tiff) containing population density data
 		std::string _nlcdFile; // GDAL file contining NLCD data
 		std::string _rainForestFile; // KML file contining rain forest polygon
 		std::string _nfaTableFile; // File containing near field adjustment tabular data
-					   // described in R2-AIP-17
+								   // described in R2-AIP-17
 		std::string _radioClimateFile; // ITU radio climate data
 		std::string _surfRefracFile; // ITU surface refractivity data
 
@@ -429,7 +320,7 @@ class AfcManager
 		// name.
 
 		std::string _analysisType; // Parsed Analysis Type: "AP-AFC",
-					   // "ExclusionZoneAnalysis", "HeatmapAnalysis";
+								   // "ExclusionZoneAnalysis", "HeatmapAnalysis";
 		std::string _stateRoot; // Parsed path of fbrat state root
 		std::string _mntPath; // Parsed path to share with GeoData and config data"
 		bool _createKmz;
@@ -441,18 +332,14 @@ class AfcManager
 
 		RLANBoundary _rlanUncertaintyRegionType =
 			RLANBoundary::NO_BOUNDARY; // specifies the type of horizontal uncertainty
-						   // region being used (ellipse, linear polygon, or
-						   // radial polygon)
-		DoubleTriplet _rlanLLA =
-			std::make_tuple(quietNaN,
-					quietNaN,
-					quietNaN); // lat (deg) (NaN if not ellipse), lon (deg) (NaN
-						   // if not ellipse), height (m)
-		DoubleTriplet _rlanUncerts_m = std::make_tuple(
-			quietNaN,
-			quietNaN,
+									   // region being used (ellipse, linear polygon, or
+									   // radial polygon)
+		DoubleTriplet _rlanLLA = std::make_tuple(quietNaN, quietNaN,
+			quietNaN); // lat (deg) (NaN if not ellipse), lon (deg) (NaN
+					   // if not ellipse), height (m)
+		DoubleTriplet _rlanUncerts_m = std::make_tuple(quietNaN, quietNaN,
 			quietNaN); // minor uncertainity (NaN if not ellipse), major uncertainity
-				   // (NaN if not ellipse), height uncertainty
+					   // (NaN if not ellipse), height uncertainty
 		std::vector<LatLon> _rlanLinearPolygon = std::vector<LatLon>();
 		std::vector<AngleRadius> _rlanRadialPolygon = std::vector<AngleRadius>();
 		bool _allowScanPtsInUncRegFlag;
@@ -479,15 +366,15 @@ class AfcManager
 		double _minPSD_dBmPerMHz = quietNaN; // minimum RLAN PSD (in dBm/Hz)
 
 		double _reportUnavailPSDdBmPerMHz; // Unavailable channels inside uncertinty volume
-						   // or in uncertainty footprint are reported at
-						   // this level;
+										   // or in uncertainty footprint are reported at
+										   // this level;
 
 		double _IoverN_threshold_dB; // IoverN not to exceed this value for a viable channel
 		double _bodyLossIndoorDB; // Indoor body Loss (dB)
 		double _bodyLossOutdoorDB; // Outdoor body Loss (dB)
 		double _polarizationLossDB; // Polarization Loss (dB)
 		double _rlanOrientation_deg; // Orientation (deg) of ellipse clockwise from North in
-					     // [-90, 90]
+									 // [-90, 90]
 		RLANType _rlanType;
 		CConst::HeightTypeEnum
 			_rlanHeightType; // Above Mean Sea Level (AMSL), Above Ground Level (AGL)
@@ -508,19 +395,19 @@ class AfcManager
 		CConst::BuildingTypeEnum _buildingType; // Defaults to traditionalBuildingType
 
 		bool _fixedBuildingLossFlag; // If set, use fixed building loss value, otherwise run
-					     // P.2109
+									 // P.2109
 		double _fixedBuildingLossValue; // Building loss value to use if
-						// _fixedBuildingLossFlag is set
+										// _fixedBuildingLossFlag is set
 
 		double _confidenceBldg2109; // Statistical confidence for P.2109 building
-					    // penetration loss
+									// penetration loss
 		double _confidenceClutter2108; // Statistical confidence for P.2108 clutter loss
 		double _confidenceWinner2LOS; // Statistical confidence for Winner2 LOS path loss
-					      // model
+									  // model
 		double _confidenceWinner2NLOS; // Statistical confidence for Winner2 NLOS path loss
-					       // model
+									   // model
 		double _confidenceWinner2Combined; // Statistical confidence for Winner2 combined
-						   // path loss model
+										   // path loss model
 		double _confidenceITM; // Statistical confidence for ITM path loss model
 		double _reliabilityITM; // Statistical reliability   for ITM path loss model
 
@@ -536,13 +423,13 @@ class AfcManager
 
 		CConst::Winner2UnknownLOSMethodEnum
 			_winner2UnknownLOSMethod; // Method used to compute Winner2 PL when LOS not
-						  // known
+									  // known
 		// PLOSCombineWinner2UnknownLOSMethod : Compute probLOS, then combine
 		// PLOSThresholdWinner2UnknownLOSMethod : Compute probLOS, use LOS if exceeds
 		// _winner2ProbLOSThr
 
 		double _winner2ProbLOSThr; // Winner2 prob LOS threshold, if probLOS exceeds
-					   // threshold, use LOS model, otherwise use NLOS
+								   // threshold, use LOS model, otherwise use NLOS
 		// bool _winner2CombineFlag;               // Whether or not to combine LOS and NLOS
 		// path loss values in Winner2. bool _winner2BldgLOSFlag;               // If set,
 		// use building data to determine if winner2 LOS or NLOS model is used
@@ -552,21 +439,19 @@ class AfcManager
 
 		QString _inputULSDatabaseStr; // ULS Database being used
 
-		CConst::PropEnvMethodEnum
-			_propEnvMethod; // Method for determining propagation environment (e.g.
-					// Population Density Map)
+		CConst::PropEnvMethodEnum _propEnvMethod; // Method for determining propagation environment
+												  // (e.g. Population Density Map)
 
 		double _rxFeederLossDBIDU; // User-inputted ULS receiver feeder loss for IDU
-					   // Architecture
+								   // Architecture
 		double _rxFeederLossDBODU; // User-inputted ULS receiver feeder loss for ODU
-					   // Architecture
+								   // Architecture
 		double _rxFeederLossDBUnknown; // User-inputted ULS receiver feeder loss for Unknown
-					       // Architecture
+									   // Architecture
 
-		std::vector<double>
-			_noisePSDFreqList; // Freq list for specification of noise PSD (Hz)
+		std::vector<double> _noisePSDFreqList; // Freq list for specification of noise PSD (Hz)
 		std::vector<double> _noisePSDList; // Noise PSD for each band determined by
-						   // _noisePSDFreqList (dBW/Hz)
+										   // _noisePSDFreqList (dBW/Hz)
 
 		double _itmEpsDielect;
 		double _itmSgmConductivity;
@@ -578,46 +463,45 @@ class AfcManager
 
 		int _exclusionZoneFSID; // FSID to use for Exclusion Zone Analysis
 		int _exclusionZoneRLANChanIdx; // RLAN channel Index to use for Exclusion Zone
-					       // Analysis
+									   // Analysis
 		double _exclusionZoneRLANBWHz; // RLAN bandwidth (Hz) to use for Exclusion Zone
-					       // Analysis
+									   // Analysis
 		double _exclusionZoneRLANEIRPDBm; // RLAN EIRP (dBm) to use for Exclusion Zone
-						  // Analysis
+										  // Analysis
 
 		double _heatmapMinLon; // Min Lon for region in which Heatmap Analysis is performed
 		double _heatmapMaxLon; // Max Lon for region in which Heatmap Analysis is performed
 		double _heatmapMinLat; // Min Lat for region in which Heatmap Analysis is performed
 		double _heatmapMaxLat; // Max Lat for region in which Heatmap Analysis is performed
 		double _heatmapRLANSpacing; // Maximum spacing (m) between points in Heatmap
-					    // Analysis
+									// Analysis
 		std::string _heatmapIndoorOutdoorStr; // Can be: "Indoor", "Outdoor", "Database"
 		std::string _heatmapAnalysisStr; // Can be: "iton", "availability"
 		int _heatmapFSID; // Set to FSID for single FS analysis, -1 otherwise
 
 		std::vector<int> _heatmapColorList; // Color list for Heatmap Analysis
 		std::vector<double> _heatmapIndoorThrList; // I/N threshold list for indoor RLAN in
-							   // Heatmap Analysis
+												   // Heatmap Analysis
 		std::vector<double> _heatmapOutdoorThrList; // I/N threshold list for indoor RLAN in
-							    // Heatmap Analysis
+													// Heatmap Analysis
 
 		double _heatmapRLANIndoorEIRPDBm; // RLAN Indoor EIRP (dBm) to use for Heatmap
-						  // Analysis
+										  // Analysis
 		std::string _heatmapRLANIndoorHeightType; // Above Mean Sea Level (AMSL), Above
-							  // Ground Level (AGL) for Indoor RLAN's
+												  // Ground Level (AGL) for Indoor RLAN's
 		double _heatmapRLANIndoorHeight; // RLAN Indoor Height (m) to use for Heatmap
-						 // Analysis
+										 // Analysis
 		double _heatmapRLANIndoorHeightUncertainty; // RLAN Indoor Height Uncertainty (m) to
-							    // use for Heatmap Analysis
+													// use for Heatmap Analysis
 
 		double _heatmapRLANOutdoorEIRPDBm; // RLAN Outdoor EIRP (dBm) to use for Heatmap
-						   // Analysis
-		std::string
-			_heatmapRLANOutdoorHeightType; // Above Mean Sea Level (AMSL), Above Ground
-						       // Level (AGL) for OutIndoor RLAN's
+										   // Analysis
+		std::string _heatmapRLANOutdoorHeightType; // Above Mean Sea Level (AMSL), Above Ground
+												   // Level (AGL) for OutIndoor RLAN's
 		double _heatmapRLANOutdoorHeight; // RLAN Outdoor Height (m) to use for Heatmap
-						  // Analysis
+										  // Analysis
 		double _heatmapRLANOutdoorHeightUncertainty; // RLAN Outdoor Height Uncertainty (m)
-							     // to use for Heatmap Analysis
+													 // to use for Heatmap Analysis
 
 		bool _applyClutterFSRxFlag;
 		bool _allowRuralFSClutterFlag;
@@ -626,13 +510,12 @@ class AfcManager
 
 		CConst::ITMClutterMethodEnum _rlanITMTxClutterMethod;
 
-		std::vector<FreqBandClass>
-			_allowableFreqBandList; // List of allowable freq bands.  For USA,
-						// correspond to UNII-5 and UNII-7
+		std::vector<FreqBandClass> _allowableFreqBandList; // List of allowable freq bands.  For
+														   // USA, correspond to UNII-5 and UNII-7
 		std::string _mapDataGeoJsonFile; // File to write map data geojson
 		std::string _deniedRegionFile; // File containing data on denied geographic regions
 		double _inquiredFrequencyMaxPSD_dBmPerMHz; // Max PSD for inquired frequency
-							   // analysis
+												   // analysis
 
 		AntennaClass *_rlanAntenna;
 		Vector3 _rlanPointing;
@@ -647,7 +530,7 @@ class AfcManager
 		bool _use3DEP = false; // flag to enable use of 3DEP 10m terrain data
 
 		double _cdsmLOSThr; // Fraction of points in path profile below which path is
-				    // considered to not have CDSM data
+							// considered to not have CDSM data
 
 		double _minRlanHeightAboveTerrain; // Min height above terrain for RLAN
 
@@ -655,27 +538,27 @@ class AfcManager
 		double _exclusionDist; // Min link distance to consider, links shorter are ignored
 
 		bool _nearFieldAdjFlag; // If set compute near field loss, otherwise near field loss
-					// is 0
+								// is 0
 		bool _passiveRepeaterFlag; // If set compute passive repeaters, otherwise ignore
-					   // passive repeaters
+								   // passive repeaters
 		bool _reportErrorRlanHeightLowFlag; // If set, report an error when all scan points
-						    // are below _minRlanHeightAboveTerrain
+											// are below _minRlanHeightAboveTerrain
 		double _illuminationEfficiency; // Illumination Efficiency value to use for near
-						// field loss calculation",
+										// field loss calculation",
 		bool _closeInHgtFlag; // Whether or not to force LOS when mobile height above
-				      // closeInHgtLOS for close in model",
+							  // closeInHgtLOS for close in model",
 		double _closeInHgtLOS; // RLAN height above which prob of LOS = 100% for close in
-				       // model",
+							   // model",
 		double _closeInDist; // Radius in which close in path loss model is used
 		std::string _closeInPathLossModel; // Close in path loss model is used
 		bool _pathLossClampFSPL; // If set, when path loss < fspl, clamp to fspl value
 		bool _printSkippedLinksFlag; // If set, links that are skipped in the analysis
-					     // because using FSPL does not limit I/N performance
-					     // are still printed in exc_thr file.  This
+									 // because using FSPL does not limit I/N performance
+									 // are still printed in exc_thr file.  This
 		bool _roundPSDEIRPFlag; // If set, round down PSD and EIRP values in output json to
-					// nearest multiple of 0.1 dB. is useful for debugging, but
-					// depending on visibility threshold setting may impact
-					// execution speed.
+								// nearest multiple of 0.1 dB. is useful for debugging, but
+								// depending on visibility threshold setting may impact
+								// execution speed.
 
 		int _wlanMinFreqMHz; // Min Frequency for WiFi system (integer in MHz)
 		int _wlanMaxFreqMHz; // Max Frequency for WiFi system (integer in MHz)
@@ -685,43 +568,43 @@ class AfcManager
 		std::vector<OpClass::OpClass> _psdOpClassList;
 
 		std::string _regionStr; // Comma separated list of names of regions in sim, corresp
-					// to pop density file
+								// to pop density file
 		std::string _regionPolygonFileList; // Comma separated list of KML files, one for
-						    // each region in simulation
+											// each region in simulation
 		std::vector<PolygonClass *>
 			_regionPolygonList; // Polygon list, multiple polygons for each region
 		double _regionPolygonResolution; // Resolution to use for polygon vertices, 1.0e-5
-						 // corresp to 1.11m, should not have to change
+										 // corresp to 1.11m, should not have to change
 		PolygonClass *_rainForestPolygon; // Polygon that defines rain forest region
 
 		double _densityThrUrban; // Population density threshold above which region is
-					 // considered URBAN
+								 // considered URBAN
 		double _densityThrSuburban; // Population density above this thr and below urban thr
-					    // is SUBURBAN
+									// is SUBURBAN
 		double _densityThrRural; // Population density above this thr and below suburban thr
-					 // is RURAL
+								 // is RURAL
 
 		bool _removeMobile; // If set to true, mobile entries are removed when reading ULS
-				    // file
+							// file
 
 		bool _filterSimRegionOnly; // Filter ULS file only for in/out of simulation region
 
 		CConst::ULSAntennaTypeEnum
 			_ulsDefaultAntennaType; // Default ULS antenna type to use when antenna
-						// pattern is not otherwise specified.
+									// pattern is not otherwise specified.
 
 		// std::string _rlanBWStr;                 // Comma separated list of RLAN
 		// bandwidths (Hz), "b0,b1,b2"
 
 		double _visibilityThreshold; // I/N threshold to determine whether or not an RLAN is
-					     // visible to an FS
+									 // visible to an FS
 		std::string _excThrFile; // Generate file containing data for wifi devices where
-					 // single entry I/N > visibility Threshold
+								 // single entry I/N > visibility Threshold
 		std::string _eirpGcFile; // Generate file containing data for EIRP computation
 		std::string _fsAnomFile; // Generate file containing anomalous FS entries
 		std::string _userInputsFile; // Generate file containing user inputs
 		std::string _kmlFile; // Generate kml file showing simulation results, primarily for
-				      // debugging
+							  // debugging
 		std::string _fsAnalysisListFile; // File containing list of FS used in the analysis
 		int _maxLidarRegionLoadVal;
 		/**************************************************************************************/
@@ -730,7 +613,7 @@ class AfcManager
 		/* Data */
 		/**************************************************************************************/
 		TerrainClass *_terrainDataModel; // Contains building/terrain data, auto falls back
-						 // to SRTM -> Population
+										 // to SRTM -> Population
 
 		double _bodyLossDB; // Body Loss (dB)
 
@@ -739,7 +622,7 @@ class AfcManager
 		int _numRegion;
 
 		PopGridClass *_popGrid; // Population data stored in here after being read in for a
-					// particular city/region
+								// particular city/region
 
 		std::vector<double> _rlanBWList; // In this case four elements (20MHz, 40MHz, etc.)
 
@@ -748,8 +631,8 @@ class AfcManager
 
 		std::vector<DeniedRegionClass *>
 			_deniedRegionList; // List of the denied regions.  This includes RAS (Radio
-					   // Astronomy Stations) and other regions for which
-					   // channels are denied.
+							   // Astronomy Stations) and other regions for which
+							   // channels are denied.
 
 		std::shared_ptr<CachedGdal<uint8_t>> cgNlcd; // NLCD data accessor
 
@@ -764,10 +647,9 @@ class AfcManager
 		double _zwinner2NLOS;
 		double _zwinner2Combined;
 
-		std::vector<int>
-			_ulsIdxList; // Stores the indices of the ULS stations we are analyzing
+		std::vector<int> _ulsIdxList; // Stores the indices of the ULS stations we are analyzing
 		DoubleTriplet _beamConeLatLons; // Stores beam cone coordinates together to be
-						// loaded into geometries
+										// loaded into geometries
 
 		RlanRegionClass *_rlanRegion; // RLAN Uncertainty Region
 
@@ -775,44 +657,40 @@ class AfcManager
 		NFAClass *_nfa;
 		PRTABLEClass *_prTable;
 		std::string _prTableFile; // File containing passive repeater tabular data described
-					  // in WINNF-TS-1014-V1.2.0-App02
+								  // in WINNF-TS-1014-V1.2.0-App02
 		/**************************************************************************************/
 
 		/**************************************************************************************/
 		/* Output Parameters */
 		/**************************************************************************************/
-		std::vector<LatLon>
-			FSLatLon; // Three vertices for complete coverage triangle in lat/lon
+		std::vector<LatLon> FSLatLon; // Three vertices for complete coverage triangle in lat/lon
 		std::vector<double> calculatedIoverN;
 		std::vector<double> EIRPMask; // Maximum EIRP for a given channel frequency
 
-		std::vector<ChannelStruct>
-			_channelList; // List of channels, each channel identified by startFreq,
-				      // stopFreq.  Computed results are availability and
-				      // eirp_limit_dbm
+		std::vector<ChannelStruct> _channelList; // List of channels, each channel identified by
+												 // startFreq, stopFreq.  Computed results are
+												 // availability and eirp_limit_dbm
 		bool _aciFlag; // If set, consider ACI in the overal interference calculation
 
-		std::vector<LatLon>
-			_exclusionZone; // List of vertices of exclusion zone contour (Lon, Lat)
+		std::vector<LatLon> _exclusionZone; // List of vertices of exclusion zone contour (Lon, Lat)
 		double _exclusionZoneFSTerrainHeight; // Terrain height at location of FS used in
-						      // exclusion zone analysis
+											  // exclusion zone analysis
 		double _exclusionZoneHeightAboveTerrain; // Height above terrain for FS used in
-							 // exclusion zone analysis
+												 // exclusion zone analysis
 
-		double **
-			_heatmapIToNDB; // Matrix of I/N values for heatmap
-					// _heatmapIToNDB[lonIdx][latIdx], lonIdx in
-					// [0,_heatmapNumPtsLon-1] latIdx in [0,_heatmapNumPtsLat-1]
+		double **_heatmapIToNDB; // Matrix of I/N values for heatmap
+								 // _heatmapIToNDB[lonIdx][latIdx], lonIdx in
+								 // [0,_heatmapNumPtsLon-1] latIdx in [0,_heatmapNumPtsLat-1]
 		bool **_heatmapIsIndoor; // Matrix of bool values: true for indoor, false for
-					 // outdoor for grid point (lonIdx, latIdx)
+								 // outdoor for grid point (lonIdx, latIdx)
 		int _heatmapNumPtsLon; // Num LON values in heatmap matrix
 		int _heatmapNumPtsLat; // Num LAT values in heatmap matrix
 		double _heatmapMinIToNDB; // Min I/N in _heatmapIToNDB
 		double _heatmapMaxIToNDB; // Max I/N in _heatmapIToNDB
 		double _heatmapIToNThresholdDB; // I/N threshold value used to determine colors in
-						// heatmap graphical desplay
+										// heatmap graphical desplay
 		double _heatmapMaxRLANHeightAGL; // Max AGL RLAN height over gridpoints in heatmap
-						 // analysis
+										 // analysis
 		Vector3 _heatmapRLANCenterPosn; // Center gridpoint in heatmap analysis
 		double _heatmapRLANCenterLon; // Longitude of center gridpoint in heatmap analysis
 		double _heatmapRLANCenterLat; // Latitude of center gridpoint in heatmap analysis

@@ -31,8 +31,7 @@ QString SqlTable::expression() const
 	++it;
 
 	for (; it != _joins.end(); ++it) {
-		expr += QString(" %1 JOIN %2 ON (%3)")
-				.arg(it->typeClause, it->whatClause, it->onClause);
+		expr += QString(" %1 JOIN %2 ON (%3)").arg(it->typeClause, it->whatClause, it->onClause);
 	}
 
 	return expr;

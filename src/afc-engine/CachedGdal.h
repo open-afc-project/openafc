@@ -300,13 +300,9 @@ class CachedGdalBase : private boost::noncopyable
 		 * @param cacheSize Maximum number of tiles in tile cache
 		 * @param pixelType Value describing pixel data type in RasterIO operation
 		 */
-		CachedGdalBase(std::string fileOrDir,
-			       const std::string &dsName,
-			       std::unique_ptr<GdalNameMapperBase> nameMapper,
-			       int numBands,
-			       int maxTileSize,
-			       int cacheSize,
-			       GDALDataType pixelType);
+		CachedGdalBase(std::string fileOrDir, const std::string &dsName,
+			std::unique_ptr<GdalNameMapperBase> nameMapper, int numBands, int maxTileSize,
+			int cacheSize, GDALDataType pixelType);
 
 		/** Value for unavailable data for given band, as obtained from GDAL */
 		double gdalNoData(int band) const;
@@ -398,10 +394,9 @@ class CachedGdalBase : private boost::noncopyable
 				 * @param minBands Minimum required number of bands
 				 * @param transformationModifier Optional transformation modifier
 				 */
-				GdalInfo(const GdalDatasetHolder *gdalDataset,
-					 int minBands,
-					 const boost::optional<std::function<void(GdalTransform *)>>
-						 &transformationModifier);
+				GdalInfo(const GdalDatasetHolder *gdalDataset, int minBands,
+					const boost::optional<std::function<void(GdalTransform *)>>
+						&transformationModifier);
 
 				//////////////////////////////////////////////////
 				// CachedGdalBase::GdalInfo. Public instance data
@@ -439,10 +434,7 @@ class CachedGdalBase : private boost::noncopyable
 				 * @param lonOffset Tile offset in longitude direction
 				 * @param baseName Tile file base name
 				 */
-				TileKey(int band,
-					int latOffset,
-					int lonOffset,
-					const std::string &baseName);
+				TileKey(int band, int latOffset, int lonOffset, const std::string &baseName);
 
 				/** Default constructor */
 				TileKey();
@@ -482,9 +474,8 @@ class CachedGdalBase : private boost::noncopyable
 				 * @param transformation Pixel indices computation transformation
 				 * @param gdalInfo GdalInfo containing this tile
 				 */
-				TileInfo(CachedGdalBase *cachedGdal,
-					 const GdalTransform &transformation,
-					 const GdalInfo *gdalInfo);
+				TileInfo(CachedGdalBase *cachedGdal, const GdalTransform &transformation,
+					const GdalInfo *gdalInfo);
 
 				/** Default constructor to appease boost::lru_cache */
 				TileInfo();
@@ -535,11 +526,8 @@ class CachedGdalBase : private boost::noncopyable
 		 * @param fileLonIdx[out] Longitude index (column) in file (if found)
 		 * @return True if pixel for given point found, false otherwise
 		 */
-		bool getGdalPixel(double latDeg,
-				  double lonDeg,
-				  const GdalInfo **gdalInfo,
-				  int *fileLatIdx,
-				  int *fileLonIdx);
+		bool getGdalPixel(double latDeg, double lonDeg, const GdalInfo **gdalInfo, int *fileLatIdx,
+			int *fileLonIdx);
 
 		/** Brings in GDAL dataset holder that corresponds to given file name (file
 		 * must exist).
@@ -554,8 +542,8 @@ class CachedGdalBase : private boost::noncopyable
 		 *	nonexistent file
 		 * @return Address of created GdalInfo object
 		 */
-		const GdalInfo *addGdalInfo(const std::string &baseName,
-					    const GdalDatasetHolder *gdalDataset);
+		const GdalInfo *addGdalInfo(
+			const std::string &baseName, const GdalDatasetHolder *gdalDataset);
 
 		/* Lookup of GdalInfo for given file name.
 		 * @param[in] baseName File base name
@@ -643,19 +631,12 @@ class CachedGdal : public CachedGdalBase
 		 * @param maxTileSize Maximum size for tile in one dimension
 		 * @param cacheSize Maximum number of tiles in LRU cache
 		 */
-		CachedGdal(const std::string &file_or_dir,
-			   const std::string &dsName,
-			   std::unique_ptr<GdalNameMapperBase> nameMapper = nullptr,
-			   int numBands = 1,
-			   int maxTileSize = CachedGdalBase::DEFAULT_MAX_TILE_SIZE,
-			   int cacheSize = CachedGdalBase::DEFAULT_CACHE_SIZE) :
-			CachedGdalBase(file_or_dir,
-				       dsName,
-				       std::move(nameMapper),
-				       numBands,
-				       maxTileSize,
-				       cacheSize,
-				       CachedGdalBase::gdalDataType((PixelData)0))
+		CachedGdal(const std::string &file_or_dir, const std::string &dsName,
+			std::unique_ptr<GdalNameMapperBase> nameMapper = nullptr, int numBands = 1,
+			int maxTileSize = CachedGdalBase::DEFAULT_MAX_TILE_SIZE,
+			int cacheSize = CachedGdalBase::DEFAULT_CACHE_SIZE) :
+			CachedGdalBase(file_or_dir, dsName, std::move(nameMapper), numBands, maxTileSize,
+				cacheSize, CachedGdalBase::gdalDataType((PixelData)0))
 		{
 			initialize();
 		}
@@ -675,11 +656,8 @@ class CachedGdal : public CachedGdalBase
 		 *	mechanism (may speed up accessing scattered data)
 		 * @return True on success, false if coordinates are outside of file(s)
 		 */
-		bool getValueAt(double latDeg,
-				double lonDeg,
-				PixelData *value,
-				int band = 1,
-				bool direct = false)
+		bool getValueAt(
+			double latDeg, double lonDeg, PixelData *value, int band = 1, bool direct = false)
 		{
 			PixelData v;
 			bool ret; // True if retrieval successful
@@ -706,9 +684,8 @@ class CachedGdal : public CachedGdalBase
 				if (!ret) {
 					// Value for 'no-data' pixel - overridden or from GHDAL file
 					auto ndi = _noData.find(band);
-					v = (ndi != _noData.end()) ?
-						    ndi->second :
-						    static_cast<PixelData>(gdalNoData(band));
+					v = (ndi != _noData.end()) ? ndi->second :
+												 static_cast<PixelData>(gdalNoData(band));
 				}
 				*value = v;
 			}
@@ -742,8 +719,7 @@ class CachedGdal : public CachedGdalBase
 		{
 			checkBandIndex(band);
 			auto ndi = _noData.find(band);
-			return (ndi == _noData.end()) ? static_cast<PixelData>(gdalNoData(band)) :
-							ndi->second;
+			return (ndi == _noData.end()) ? static_cast<PixelData>(gdalNoData(band)) : ndi->second;
 		}
 
 	protected:

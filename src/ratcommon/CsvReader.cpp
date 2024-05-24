@@ -235,8 +235,7 @@ class FieldMachine
 		bool checkEol(const QChar &chr, bool require)
 		{
 			bool anyAccept = false;
-			for (QList<TextMatcher *>::iterator it = eol.begin(); it != eol.end();
-			     ++it) {
+			for (QList<TextMatcher *>::iterator it = eol.begin(); it != eol.end(); ++it) {
 				if ((**it).addChar(chr)) {
 					anyAccept = true;
 				}
@@ -246,8 +245,7 @@ class FieldMachine
 				throw CsvReader::FileError("Bad or missing end-of-row");
 			}
 
-			for (QList<TextMatcher *>::const_iterator it = eol.begin(); it != eol.end();
-			     ++it) {
+			for (QList<TextMatcher *>::const_iterator it = eol.begin(); it != eol.end(); ++it) {
 				if ((**it).matched()) {
 					state = EndOfRow;
 					field.chop((**it).size());
@@ -267,8 +265,8 @@ CsvReader::CsvReader(const QString &fileName) : _ownFile(true), _nominalColumnCo
 	QScopedPointer<QIODevice> file(new QFile(fileName));
 
 	if (!file->open(QIODevice::ReadOnly)) {
-		throw FileError(QString("Failed to open \"%1\" for reading: %2")
-					.arg(fileName, file->errorString()));
+		throw FileError(
+			QString("Failed to open \"%1\" for reading: %2").arg(fileName, file->errorString()));
 	}
 	_dev = file.take();
 #if defined(CSV_USE_TEXT_STREAM)
@@ -285,11 +283,11 @@ CsvReader::CsvReader(QIODevice &device) : _ownFile(false), _nominalColumnCount(-
 			QFile *qFile = qobject_cast<QFile *>(&device);
 			if (qFile != NULL) {
 				throw FileError(QString("Failed to open \"%1\" for reading: %2")
-							.arg(qFile->fileName())
-							.arg(device.errorString()));
+									.arg(qFile->fileName())
+									.arg(device.errorString()));
 			} else {
-				throw FileError(QString("Failed to open for reading: %1")
-							.arg(device.errorString()));
+				throw FileError(
+					QString("Failed to open for reading: %1").arg(device.errorString()));
 			}
 		}
 	}
@@ -384,8 +382,8 @@ QStringList CsvReader::readRow()
 				break;
 
 			default:
-				throw FileError(QString("Failed to read line from file: %1")
-							.arg(_str.device()->errorString()));
+				throw FileError(
+					QString("Failed to read line from file: %1").arg(_str.device()->errorString()));
 		}
 #else
 		if (_dev->atEnd()) {
@@ -403,8 +401,8 @@ QStringList CsvReader::readRow()
 				chr = char(c);
 				process.addChar(chr);
 			} else {
-				throw FileError(QString("Failed to read line from file: %1")
-							.arg(_dev->errorString()));
+				throw FileError(
+					QString("Failed to read line from file: %1").arg(_dev->errorString()));
 			}
 		}
 #endif

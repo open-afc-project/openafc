@@ -12,7 +12,7 @@ Vector3 EcefModel::geodeticToEcef(double lat, double lon, double alt)
 		MathConstants::WGS84EarthSemiMajorAxis; // 6378.137; // Radius of the earth in km.
 	const double esq =
 		MathConstants::WGS84EarthFirstEccentricitySquared; // 6.694379901e-3; // First
-								   // eccentricity squared.
+														   // eccentricity squared.
 
 	//  Convert lat/lon to radians.
 	const double latr = lat * M_PI / 180.0;
@@ -26,9 +26,8 @@ Vector3 EcefModel::geodeticToEcef(double lat, double lon, double alt)
 	//  Compute 'chi', which adjusts for vertical eccentricity.
 	const double chi = sqrt(1.0 - esq * sinLat * sinLat);
 
-	return Vector3((a / chi + alt) * cosLat * cosLon,
-		       (a / chi + alt) * cosLat * sinLon,
-		       (a * (1 - esq) / chi + alt) * sinLat);
+	return Vector3((a / chi + alt) * cosLat * cosLon, (a / chi + alt) * cosLat * sinLon,
+		(a * (1 - esq) / chi + alt) * sinLat);
 }
 
 //  Converts from ecef to geodetic coordinates. This algorithm is from Wikipedia, and
@@ -55,8 +54,7 @@ GeodeticCoord EcefModel::ecefToGeodetic(const Vector3 &ecef)
 	double P = F / (3 * (S + 1 / S + 1) * (S + 1 / S + 1) * G * G);
 	double Q = sqrt(1 + 2 * esq * esq * P);
 	double r0 = -(P * esq * r) / (1 + Q) +
-		    sqrt(a * a / 2 * (1 + 1 / Q) - (P * (1 - esq) * Z * Z) / (Q * (1 + Q)) -
-			 P * r * r / 2.0);
+		sqrt(a * a / 2 * (1 + 1 / Q) - (P * (1 - esq) * Z * Z) / (Q * (1 + Q)) - P * r * r / 2.0);
 	double U = sqrt((r - esq * r0) * (r - esq * r0) + Z * Z);
 	double V = sqrt((r - esq * r0) * (r - esq * r0) + (1 - esq) * Z * Z);
 	double Z0 = (b * b * Z) / (a * V);

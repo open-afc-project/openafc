@@ -31,30 +31,20 @@ class UlsFunctionsClass
 
 		static QString charString(char c);
 		static double emissionDesignatorToBandwidth(const QString &emDesig);
-		static QString hasNecessaryFields(const UlsEmission &e,
-						  UlsPath path,
-						  UlsLocation rxLoc,
-						  UlsLocation txLoc,
-						  UlsAntenna rxAnt,
-						  UlsAntenna txAnt,
-						  UlsHeader txHeader,
-						  QList<UlsLocation> prLocList,
-						  QList<UlsAntenna> prAntList,
-						  bool removeMobile);
+		static QString hasNecessaryFields(const UlsEmission &e, UlsPath path, UlsLocation rxLoc,
+			UlsLocation txLoc, UlsAntenna rxAnt, UlsAntenna txAnt, UlsHeader txHeader,
+			QList<UlsLocation> prLocList, QList<UlsAntenna> prAntList, bool removeMobile);
 		static bool SegmentCompare(const UlsSegment &segA, const UlsSegment &segB);
 
 		static QStringList getCSVHeader(int numPR);
 
 		static QStringList getRASHeader();
 
-		static double computeSpectralOverlap(double sigStartFreq,
-						     double sigStopFreq,
-						     double rxStartFreq,
-						     double rxStopFreq);
+		static double computeSpectralOverlap(
+			double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq);
 
-		static Vector3 computeHPointingVec(Vector3 position,
-						   double azimuthPtg,
-						   double elevationPtg);
+		static Vector3 computeHPointingVec(
+			Vector3 position, double azimuthPtg, double elevationPtg);
 
 		static double getAngleFromDMS(std::string dmsStr);
 };

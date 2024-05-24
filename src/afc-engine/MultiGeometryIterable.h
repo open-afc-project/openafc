@@ -43,7 +43,7 @@ class MultiGeometryIterable
 					auto *sub = _geom->getGeometryRef(_ix);
 					if (!sub) {
 						throw std::logic_error("MultiGeometryIterable null "
-								       "dereference");
+											   "dereference");
 					}
 					return static_cast<Contained *>(sub);
 				}

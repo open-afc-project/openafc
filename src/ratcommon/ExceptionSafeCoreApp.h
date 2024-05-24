@@ -30,10 +30,8 @@ class RATCOMMON_EXPORT ExceptionSafeCoreApp : public QCoreApplication
 		 * @param event The event associated with the error.
 		 * @param msg The error message.
 		 */
-		void logError(const QObject *obj,
-			      const QMetaObject *mObj,
-			      const QEvent *event,
-			      const QString &msg) const;
+		void logError(const QObject *obj, const QMetaObject *mObj, const QEvent *event,
+			const QString &msg) const;
 
 		/** Overload to provide status messages.
 		 * @return The exit code of the QCoreApplication.

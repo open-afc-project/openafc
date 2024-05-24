@@ -87,25 +87,18 @@ class UlsDatabase
 		void nullInitialize();
 
 		// Loads all FS within lat/lon bounds
-		void loadUlsData(const QString &dbName,
-				 std::vector<DeniedRegionClass *> &deniedRegionList,
-				 std::vector<AntennaClass *> &antennaList,
-				 std::vector<UlsRecord> &target,
-				 const double &minLat = -90,
-				 const double &maxLat = 90,
-				 const double &minLon = -180,
-				 const double &maxLon = 180);
+		void loadUlsData(const QString &dbName, std::vector<DeniedRegionClass *> &deniedRegionList,
+			std::vector<AntennaClass *> &antennaList, std::vector<UlsRecord> &target,
+			const double &minLat = -90, const double &maxLat = 90, const double &minLon = -180,
+			const double &maxLon = 180);
 
 		// Loads a single FS by looking up its Id
-		void loadFSById(const QString &dbName,
-				std::vector<DeniedRegionClass *> &deniedRegionList,
-				std::vector<AntennaClass *> &antennaList,
-				std::vector<UlsRecord> &target,
-				const int &fsid);
+		void loadFSById(const QString &dbName, std::vector<DeniedRegionClass *> &deniedRegionList,
+			std::vector<AntennaClass *> &antennaList, std::vector<UlsRecord> &target,
+			const int &fsid);
 		UlsRecord getFSById(const QString &dbName,
-				    std::vector<DeniedRegionClass *> &deniedRegionList,
-				    std::vector<AntennaClass *> &antennaList,
-				    const int &fsid)
+			std::vector<DeniedRegionClass *> &deniedRegionList,
+			std::vector<AntennaClass *> &antennaList, const int &fsid)
 		{
 			// list of size 1
 			auto list = std::vector<UlsRecord>();
@@ -116,15 +109,12 @@ class UlsDatabase
 		};
 
 		void fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
-				std::vector<DeniedRegionClass *> &deniedRegionList,
-				std::vector<AntennaClass *> &antennaList,
-				std::vector<UlsRecord> &target,
-				QSqlQuery &ulsQueryRes);
+			std::vector<DeniedRegionClass *> &deniedRegionList,
+			std::vector<AntennaClass *> &antennaList, std::vector<UlsRecord> &target,
+			QSqlQuery &ulsQueryRes);
 
 		AntennaClass *createAntennaPattern(SqlScopedConnection<SqlExceptionDb> &db,
-						   int rxAntennaIdxDB,
-						   std::vector<double> antennaAOBList,
-						   std::string antennaName);
+			int rxAntennaIdxDB, std::vector<double> antennaAOBList, std::string antennaName);
 
 		QStringList columns;
 		QStringList prColumns;

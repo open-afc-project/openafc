@@ -14,11 +14,7 @@ class PassiveRepeaterCAClass
 		/**************************************************************************************/
 		/**** PRType ****/
 		/**************************************************************************************/
-		enum PRTypeEnum {
-			backToBackAntennaPRType,
-			billboardReflectorPRType,
-			unknownPRType
-		};
+		enum PRTypeEnum { backToBackAntennaPRType, billboardReflectorPRType, unknownPRType };
 		/**************************************************************************************/
 
 		std::string authorizationNumber;

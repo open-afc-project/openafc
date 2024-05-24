@@ -279,8 +279,8 @@ PolygonClass::~PolygonClass()
 /******************************************************************************************/
 /**** FUNCTION: PolygonClass::readMultiGeometry()                                      ****/
 /******************************************************************************************/
-std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilename,
-							    double resolution)
+std::vector<PolygonClass *> PolygonClass::readMultiGeometry(
+	std::string kmlFilename, double resolution)
 {
 	std::ostringstream errStr;
 	std::string tag;
@@ -312,8 +312,7 @@ std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilen
 	found = sval.find(tag);
 	if (found != std::string::npos) {
 		std::cout << "SVAL: " << sval << std::endl;
-		errStr << "ERROR: multiple " << tag << "'s found while reading file "
-		       << kmlFilename;
+		errStr << "ERROR: multiple " << tag << "'s found while reading file " << kmlFilename;
 		throw std::runtime_error(errStr.str());
 	}
 
@@ -410,8 +409,7 @@ std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilen
 			found = sval.find(tag);
 			if (found == std::string::npos) {
 				std::cout << "SVAL: " << sval << std::endl;
-				errStr << "ERROR: unable to find " << tag << " while reading file "
-				       << kmlFilename;
+				errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
 				throw std::runtime_error(errStr.str());
 			}
 			polystr = sval.substr(0, found);
@@ -427,8 +425,7 @@ std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilen
 			found = polystr.find(tag);
 			if (found == std::string::npos) {
 				std::cout << "POLYSTR: " << polystr << std::endl;
-				errStr << "ERROR: unable to find " << tag << " while reading file "
-				       << kmlFilename;
+				errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
 				throw std::runtime_error(errStr.str());
 			}
 			polystr.replace(0, found + tag.size(), "");
@@ -437,8 +434,7 @@ std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilen
 			found = polystr.find(tag);
 			if (found == std::string::npos) {
 				std::cout << "POLYSTR: " << polystr << std::endl;
-				errStr << "ERROR: unable to find " << tag << " while reading file "
-				       << kmlFilename;
+				errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
 				throw std::runtime_error(errStr.str());
 			}
 			polystr.replace(found, sval.size() - found, "");
@@ -453,8 +449,7 @@ std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilen
 			found = polystr.find(tag);
 			if (found == std::string::npos) {
 				std::cout << "POLYSTR: " << polystr << std::endl;
-				errStr << "ERROR: unable to find " << tag << " while reading file "
-				       << kmlFilename;
+				errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
 				throw std::runtime_error(errStr.str());
 			}
 			polystr.replace(0, found + tag.size(), "");
@@ -463,8 +458,7 @@ std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilen
 			found = polystr.find(tag);
 			if (found == std::string::npos) {
 				std::cout << "POLYSTR: " << polystr << std::endl;
-				errStr << "ERROR: unable to find " << tag << " while reading file "
-				       << kmlFilename;
+				errStr << "ERROR: unable to find " << tag << " while reading file " << kmlFilename;
 				throw std::runtime_error(errStr.str());
 			}
 			polystr.replace(found, polystr.size() - found, "");
@@ -496,8 +490,7 @@ std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilen
 				if (posnA == std::string::npos) {
 					foundWhitespace = false;
 				} else {
-					std::size_t posnB = polystr.find_first_not_of(" \n\t",
-										      posnA);
+					std::size_t posnB = polystr.find_first_not_of(" \n\t", posnA);
 					if (posnB - posnA == 1) {
 						if (polystr[posnA] != ' ') {
 							polystr[posnA] = ' ';
@@ -563,11 +556,8 @@ std::vector<PolygonClass *> PolygonClass::readMultiGeometry(std::string kmlFilen
 /**** FUNCTION: PolygonClass::comp_bdy_min_max                                         ****/
 /**** Find minx, maxx, miny, maxy for a list of bdy points.                            ****/
 /******************************************************************************************/
-void PolygonClass::comp_bdy_min_max(int &minx,
-				    int &maxx,
-				    int &miny,
-				    int &maxy,
-				    const int segment_idx)
+void PolygonClass::comp_bdy_min_max(
+	int &minx, int &maxx, int &miny, int &maxy, const int segment_idx)
 {
 	int i;
 	int n = num_bdy_pt[segment_idx];
@@ -658,9 +648,8 @@ double PolygonClass::comp_bdy_area()
 	area = 0.0;
 
 	for (segment_idx = 0; segment_idx <= num_segment - 1; segment_idx++) {
-		area += comp_bdy_area(num_bdy_pt[segment_idx],
-				      bdy_pt_x[segment_idx],
-				      bdy_pt_y[segment_idx]);
+		area += comp_bdy_area(
+			num_bdy_pt[segment_idx], bdy_pt_x[segment_idx], bdy_pt_y[segment_idx]);
 	}
 
 	return (area);
@@ -679,12 +668,8 @@ bool PolygonClass::in_bdy_area(const int a, const int b, bool *edge)
 	}
 	n = 0;
 	for (segment_idx = 0; segment_idx <= num_segment - 1; segment_idx++) {
-		n += in_bdy_area(a,
-				 b,
-				 num_bdy_pt[segment_idx],
-				 bdy_pt_x[segment_idx],
-				 bdy_pt_y[segment_idx],
-				 &is_edge);
+		n += in_bdy_area(
+			a, b, num_bdy_pt[segment_idx], bdy_pt_x[segment_idx], bdy_pt_y[segment_idx], &is_edge);
 		if (is_edge) {
 			if (edge) {
 				*edge = true;
@@ -713,10 +698,8 @@ PolygonClass *PolygonClass::duplicate()
 		new_polygon->bdy_pt_x[segment_idx] = IVECTOR(num_bdy_pt[segment_idx]);
 		new_polygon->bdy_pt_y[segment_idx] = IVECTOR(num_bdy_pt[segment_idx]);
 		for (int bdy_pt_idx = 0; bdy_pt_idx <= num_bdy_pt[segment_idx] - 1; bdy_pt_idx++) {
-			new_polygon->bdy_pt_x[segment_idx][bdy_pt_idx] =
-				bdy_pt_x[segment_idx][bdy_pt_idx];
-			new_polygon->bdy_pt_y[segment_idx][bdy_pt_idx] =
-				bdy_pt_y[segment_idx][bdy_pt_idx];
+			new_polygon->bdy_pt_x[segment_idx][bdy_pt_idx] = bdy_pt_x[segment_idx][bdy_pt_idx];
+			new_polygon->bdy_pt_y[segment_idx][bdy_pt_idx] = bdy_pt_y[segment_idx][bdy_pt_idx];
 		}
 	}
 
@@ -781,12 +764,8 @@ double PolygonClass::comp_bdy_area(std::vector<std::tuple<int, int>> *ii_list)
 /**** FUNCTION: in_bdy_area                                                            ****/
 /**** Determine whether or not a given point lies within the bounded area              ****/
 /******************************************************************************************/
-int PolygonClass::in_bdy_area(const int a,
-			      const int b,
-			      const int n,
-			      const int *x,
-			      const int *y,
-			      int *edge)
+int PolygonClass::in_bdy_area(
+	const int a, const int b, const int n, const int *x, const int *y, int *edge)
 {
 	int i, num_left, num_right, same_y, index;
 	int x1, y1, x2, y2;
@@ -833,7 +812,7 @@ int PolygonClass::in_bdy_area(const int a,
 					num_left++;
 				} else {
 					long long eps = (((long long)(x2 - x1)) * (b - y1) -
-							 ((long long)(a - x1)) * (y2 - y1));
+						((long long)(a - x1)) * (y2 - y1));
 					if (eps == 0) {
 						if (edge) {
 							*edge = 1;
@@ -945,7 +924,7 @@ void PolygonClass::calcHorizExtents(double yVal, double &xA, double &xB, bool &f
 				found = true;
 				xVal = (double)x0;
 			} else if ((((double)y0 < yVal) && ((double)y1 >= yVal)) ||
-				   (((double)y0 > yVal) && ((double)y1 <= yVal))) {
+				(((double)y0 > yVal) && ((double)y1 <= yVal))) {
 				found = true;
 				xVal = (x0 * (y1 - yVal) + x1 * (yVal - y0)) / (y1 - y0);
 			}
@@ -987,7 +966,7 @@ void PolygonClass::calcVertExtents(double xVal, double &yA, double &yB, bool &fl
 				found = true;
 				yVal = (double)y0;
 			} else if ((((double)x0 < xVal) && ((double)x1 >= xVal)) ||
-				   (((double)x0 > xVal) && ((double)x1 <= xVal))) {
+				(((double)x0 > xVal) && ((double)x1 <= xVal))) {
 				found = true;
 				yVal = (y0 * (x1 - xVal) + y1 * (xVal - x0)) / (x1 - x0);
 			}

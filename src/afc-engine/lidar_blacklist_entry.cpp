@@ -17,9 +17,8 @@
 /******************************************************************************************/
 /**** FUNCTION: LidarBlacklistEntryClass::LidarBlacklistEntryClass()                   ****/
 /******************************************************************************************/
-LidarBlacklistEntryClass::LidarBlacklistEntryClass(double lonDegVal,
-						   double latDegVal,
-						   double radiusMeterVal) :
+LidarBlacklistEntryClass::LidarBlacklistEntryClass(
+	double lonDegVal, double latDegVal, double radiusMeterVal) :
 	lonDeg(lonDegVal), latDeg(latDegVal), radiusMeter(radiusMeterVal)
 {
 	centerPosition = EcefModel::geodeticToEcef(latDeg, lonDeg, 0.0);

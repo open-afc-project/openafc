@@ -64,10 +64,9 @@ class LruValueCache
 					++_evictions;
 				}
 				_list.push_front(key);
-				i = _map.emplace(std::piecewise_construct,
-						 std::forward_as_tuple(key),
-						 std::forward_as_tuple(value, _list.begin()))
-					    .first;
+				i = _map.emplace(std::piecewise_construct, std::forward_as_tuple(key),
+							std::forward_as_tuple(value, _list.begin()))
+						.first;
 			} else {
 				// Key in cache
 				_list.splice(_list.begin(), _list, i->second.second);

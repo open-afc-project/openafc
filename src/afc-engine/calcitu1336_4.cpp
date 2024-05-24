@@ -7,9 +7,8 @@ using namespace std;
 namespace calcItu1336_4
 {
 
-double CalcITU1336_omni_avg(const double &elAngleDeg,
-			    const double &maxGain,
-			    const double & /* frequencyHz */)
+double CalcITU1336_omni_avg(
+	const double &elAngleDeg, const double &maxGain, const double & /* frequencyHz */)
 {
 	// ITU-R F.1336-4 (02/2014)
 	// Section 2.2 Omnidirectional Antenna, average side-lobe pattern

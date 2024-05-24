@@ -34,10 +34,7 @@ void GzipStream::setSourceDevice(QIODevice *dev)
 	_dev = dev;
 	if (_dev) {
 		connect(_dev, &QIODevice::readyRead, this, &QIODevice::readyRead);
-		connect(_dev,
-			&QIODevice::readChannelFinished,
-			this,
-			&QIODevice::readChannelFinished);
+		connect(_dev, &QIODevice::readChannelFinished, this, &QIODevice::readChannelFinished);
 	}
 }
 
@@ -245,12 +242,8 @@ bool GzipStream::openStream(OpenMode rwmode)
 				setErrorString(QString("Underlying device not writable"));
 				return false;
 			}
-			status = ::deflateInit2(&_stream,
-						_params.compressLevel,
-						Z_DEFLATED,
-						_params.windowBits,
-						_params.memLevel,
-						Z_DEFAULT_STRATEGY);
+			status = ::deflateInit2(&_stream, _params.compressLevel, Z_DEFLATED, _params.windowBits,
+				_params.memLevel, Z_DEFAULT_STRATEGY);
 			if (status != Z_OK) {
 				setError();
 				return false;

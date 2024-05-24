@@ -88,9 +88,8 @@ std::string AntennaModel::typeStr(AntennaModel::TypeEnum typeVal)
 /******************************************************************************************/
 /**** CONSTRUCTOR: AntennaModelMapClass::AntennaModelMapClass                          ****/
 /******************************************************************************************/
-AntennaModelMapClass::AntennaModelMapClass(std::string antModelListFile,
-					   std::string antPrefixListFile,
-					   std::string antModelMapFile)
+AntennaModelMapClass::AntennaModelMapClass(
+	std::string antModelListFile, std::string antPrefixListFile, std::string antModelMapFile)
 {
 	readModelList(antModelListFile);
 	readPrefixList(antPrefixListFile);
@@ -152,7 +151,7 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 
 	if (!(fp = fopen(filename.c_str(), "rb"))) {
 		str = std::string("ERROR: Unable to open Antenna Model List File \"") + filename +
-		      std::string("\"\n");
+			std::string("\"\n");
 		throw std::runtime_error(str);
 	}
 
@@ -209,9 +208,7 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 					// std::cout << "FIELD: \"" << field << "\"" << std::endl;
 
 					found = false;
-					for (fIdx = 0;
-					     (fIdx < (int)fieldLabelList.size()) && (!found);
-					     fIdx++) {
+					for (fIdx = 0; (fIdx < (int)fieldLabelList.size()) && (!found); fIdx++) {
 						if (field == fieldLabelList.at(fIdx)) {
 							*fieldIdxList.at(fIdx) = fieldIdx;
 							found = true;
@@ -222,10 +219,9 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				for (fIdx = 0; fIdx < (int)fieldIdxList.size(); fIdx++) {
 					if (*fieldIdxList.at(fIdx) == -1) {
 						errStr << "ERROR: Invalid Antenna Model List file "
-							  "\""
-						       << filename << "\" label line missing \""
-						       << fieldLabelList.at(fIdx) << "\""
-						       << std::endl;
+								  "\""
+							   << filename << "\" label line missing \"" << fieldLabelList.at(fIdx)
+							   << "\"" << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -237,9 +233,8 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(modelNameFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Antenna Model List file \"" << filename
-					       << "\" line " << linenum << " missing model name"
-					       << std::endl;
+					errStr << "ERROR: Antenna Model List file \"" << filename << "\" line "
+						   << linenum << " missing model name" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -251,9 +246,8 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(typeFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Antenna Model List file \"" << filename
-					       << "\" line " << linenum << " missing type"
-					       << std::endl;
+					errStr << "ERROR: Antenna Model List file \"" << filename << "\" line "
+						   << linenum << " missing type" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -262,9 +256,8 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				} else if ((strval == "Ref") || (strval == "Reflector")) {
 					type = AntennaModel::ReflectorType;
 				} else {
-					errStr << "ERROR: Antenna Model List file \"" << filename
-					       << "\" line " << linenum
-					       << " invalid type: " << strval << std::endl;
+					errStr << "ERROR: Antenna Model List file \"" << filename << "\" line "
+						   << linenum << " invalid type: " << strval << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 				/**************************************************************************/
@@ -274,9 +267,8 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(categoryFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Antenna Model List file \"" << filename
-					       << "\" line " << linenum << " missing category"
-					       << std::endl;
+					errStr << "ERROR: Antenna Model List file \"" << filename << "\" line "
+						   << linenum << " missing category" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -287,9 +279,8 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				} else if ((strval == "OTHER") || (strval == "Other")) {
 					category = AntennaModel::OtherCategory;
 				} else {
-					errStr << "ERROR: Antenna Model List file \"" << filename
-					       << "\" line " << linenum
-					       << " invalid category: " << strval << std::endl;
+					errStr << "ERROR: Antenna Model List file \"" << filename << "\" line "
+						   << linenum << " invalid category: " << strval << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 				/**************************************************************************/
@@ -303,10 +294,8 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				} else {
 					diameterM = std::strtod(strval.c_str(), &chptr);
 					if (diameterM <= 0.0) {
-						errStr << "ERROR: Antenna Model List file \""
-						       << filename << "\" line " << linenum
-						       << " invalid diameter: \"" << strval << "\""
-						       << std::endl;
+						errStr << "ERROR: Antenna Model List file \"" << filename << "\" line "
+							   << linenum << " invalid diameter: \"" << strval << "\"" << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 					// Use meters in input file, no conversion here
@@ -334,10 +323,9 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				} else {
 					reflectorWidthM = std::strtod(strval.c_str(), &chptr);
 					if (reflectorWidthM <= 0.0) {
-						errStr << "ERROR: Antenna Model List file \""
-						       << filename << "\" line " << linenum
-						       << " invalid reflector width: \"" << strval
-						       << "\"" << std::endl;
+						errStr << "ERROR: Antenna Model List file \"" << filename << "\" line "
+							   << linenum << " invalid reflector width: \"" << strval << "\""
+							   << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -352,10 +340,9 @@ void AntennaModelMapClass::readModelList(const std::string filename)
 				} else {
 					reflectorHeightM = std::strtod(strval.c_str(), &chptr);
 					if (reflectorHeightM <= 0.0) {
-						errStr << "ERROR: Antenna Model List file \""
-						       << filename << "\" line " << linenum
-						       << " invalid reflector height: \"" << strval
-						       << "\"" << std::endl;
+						errStr << "ERROR: Antenna Model List file \"" << filename << "\" line "
+							   << linenum << " invalid reflector height: \"" << strval << "\""
+							   << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -427,7 +414,7 @@ void AntennaModelMapClass::readPrefixList(const std::string filename)
 
 	if (!(fp = fopen(filename.c_str(), "rb"))) {
 		str = std::string("ERROR: Unable to open Antenna Prefix File \"") + filename +
-		      std::string("\"\n");
+			std::string("\"\n");
 		throw std::runtime_error(str);
 	}
 
@@ -484,9 +471,7 @@ void AntennaModelMapClass::readPrefixList(const std::string filename)
 					// std::cout << "FIELD: \"" << field << "\"" << std::endl;
 
 					found = false;
-					for (fIdx = 0;
-					     (fIdx < (int)fieldLabelList.size()) && (!found);
-					     fIdx++) {
+					for (fIdx = 0; (fIdx < (int)fieldLabelList.size()) && (!found); fIdx++) {
 						if (field == fieldLabelList.at(fIdx)) {
 							*fieldIdxList.at(fIdx) = fieldIdx;
 							found = true;
@@ -497,10 +482,9 @@ void AntennaModelMapClass::readPrefixList(const std::string filename)
 				for (fIdx = 0; fIdx < (int)fieldIdxList.size(); fIdx++) {
 					if (*fieldIdxList.at(fIdx) == -1) {
 						errStr << "ERROR: Invalid Antenna Model List file "
-							  "\""
-						       << filename << "\" label line missing \""
-						       << fieldLabelList.at(fIdx) << "\""
-						       << std::endl;
+								  "\""
+							   << filename << "\" label line missing \"" << fieldLabelList.at(fIdx)
+							   << "\"" << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -512,9 +496,8 @@ void AntennaModelMapClass::readPrefixList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(prefixFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Antenna Prefix file \"" << filename
-					       << "\" line " << linenum << " missing prefix"
-					       << std::endl;
+					errStr << "ERROR: Antenna Prefix file \"" << filename << "\" line " << linenum
+						   << " missing prefix" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -526,9 +509,8 @@ void AntennaModelMapClass::readPrefixList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(typeFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Antenna Prefix file \"" << filename
-					       << "\" line " << linenum << " missing type"
-					       << std::endl;
+					errStr << "ERROR: Antenna Prefix file \"" << filename << "\" line " << linenum
+						   << " missing type" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -537,9 +519,8 @@ void AntennaModelMapClass::readPrefixList(const std::string filename)
 				} else if ((strval == "Ref") || (strval == "Reflector")) {
 					type = AntennaModel::ReflectorType;
 				} else {
-					errStr << "ERROR: Antenna Prefix file \"" << filename
-					       << "\" line " << linenum
-					       << " invalid type: " << strval << std::endl;
+					errStr << "ERROR: Antenna Prefix file \"" << filename << "\" line " << linenum
+						   << " invalid type: " << strval << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 				/**************************************************************************/
@@ -549,9 +530,8 @@ void AntennaModelMapClass::readPrefixList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(categoryFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Antenna Prefix file \"" << filename
-					       << "\" line " << linenum << " missing category"
-					       << std::endl;
+					errStr << "ERROR: Antenna Prefix file \"" << filename << "\" line " << linenum
+						   << " missing category" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -562,9 +542,8 @@ void AntennaModelMapClass::readPrefixList(const std::string filename)
 				} else if ((strval == "OTHER") || (strval == "Other")) {
 					category = AntennaModel::OtherCategory;
 				} else {
-					errStr << "ERROR: Antenna Prefix file \"" << filename
-					       << "\" line " << linenum
-					       << " invalid category: " << strval << std::endl;
+					errStr << "ERROR: Antenna Prefix file \"" << filename << "\" line " << linenum
+						   << " invalid category: " << strval << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 				/**************************************************************************/
@@ -630,7 +609,7 @@ void AntennaModelMapClass::readModelMap(const std::string filename)
 
 	if (!(fp = fopen(filename.c_str(), "rb"))) {
 		str = std::string("ERROR: Unable to open Antenna Model List File \"") + filename +
-		      std::string("\"\n");
+			std::string("\"\n");
 		throw std::runtime_error(str);
 	}
 
@@ -685,9 +664,7 @@ void AntennaModelMapClass::readModelMap(const std::string filename)
 					// std::cout << "FIELD: \"" << field << "\"" << std::endl;
 
 					found = false;
-					for (fIdx = 0;
-					     (fIdx < (int)fieldLabelList.size()) && (!found);
-					     fIdx++) {
+					for (fIdx = 0; (fIdx < (int)fieldLabelList.size()) && (!found); fIdx++) {
 						if (field == fieldLabelList.at(fIdx)) {
 							*fieldIdxList.at(fIdx) = fieldIdx;
 							found = true;
@@ -697,10 +674,9 @@ void AntennaModelMapClass::readModelMap(const std::string filename)
 
 				for (fIdx = 0; fIdx < (int)fieldIdxList.size(); fIdx++) {
 					if (*fieldIdxList.at(fIdx) == -1) {
-						errStr << "ERROR: Invalid Antenna Model Map file \""
-						       << filename << "\" label line missing \""
-						       << fieldLabelList.at(fIdx) << "\""
-						       << std::endl;
+						errStr << "ERROR: Invalid Antenna Model Map file \"" << filename
+							   << "\" label line missing \"" << fieldLabelList.at(fIdx) << "\""
+							   << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -712,9 +688,8 @@ void AntennaModelMapClass::readModelMap(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(regexFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Antenna Model Map file \"" << filename
-					       << "\" line " << linenum << " missing regex"
-					       << std::endl;
+					errStr << "ERROR: Antenna Model Map file \"" << filename << "\" line "
+						   << linenum << " missing regex" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -726,9 +701,8 @@ void AntennaModelMapClass::readModelMap(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(modelNameFieldIdx);
 				if (strval.empty()) {
-					errStr << "ERROR: Antenna Model Map file \"" << filename
-					       << "\" line " << linenum << " missing model name"
-					       << std::endl;
+					errStr << "ERROR: Antenna Model Map file \"" << filename << "\" line "
+						   << linenum << " missing model name" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -746,9 +720,8 @@ void AntennaModelMapClass::readModelMap(const std::string filename)
 					}
 				}
 				if (!found) {
-					errStr << "ERROR: Antenna Model Map file \"" << filename
-					       << "\" line " << linenum
-					       << " invalid model name: " << name << std::endl;
+					errStr << "ERROR: Antenna Model Map file \"" << filename << "\" line "
+						   << linenum << " invalid model name: " << name << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -786,10 +759,8 @@ inline bool isInvalidModelNameChar(char c)
 /******************************************************************************************/
 /**** FUNCTION: AntennaModelMapClass::find()                                           ****/
 /******************************************************************************************/
-AntennaModelClass *AntennaModelMapClass::find(std::string antPfx,
-					      std::string modelName,
-					      AntennaModel::CategoryEnum &category,
-					      AntennaModel::CategoryEnum modelNameBlankCategory)
+AntennaModelClass *AntennaModelMapClass::find(std::string antPfx, std::string modelName,
+	AntennaModel::CategoryEnum &category, AntennaModel::CategoryEnum modelNameBlankCategory)
 {
 	bool found = false;
 	int antIdx;
@@ -817,10 +788,8 @@ AntennaModelClass *AntennaModelMapClass::find(std::string antPfx,
 		/**********************************************************************************/
 		/* Remove non-alhpanumeric characters                                             */
 		/**********************************************************************************/
-		modelName.erase(std::remove_if(modelName.begin(),
-					       modelName.end(),
-					       isInvalidModelNameChar),
-				modelName.end());
+		modelName.erase(std::remove_if(modelName.begin(), modelName.end(), isInvalidModelNameChar),
+			modelName.end());
 		/**********************************************************************************/
 
 		/**********************************************************************************/
@@ -842,16 +811,15 @@ AntennaModelClass *AntennaModelMapClass::find(std::string antPfx,
 			AntennaModelClass *m = antennaModelList[i];
 			bool prefixFlag;
 			if ((!forceModelNameEqualFlag) && (m->type == AntennaModel::AntennaType) &&
-			    ((m->category == AntennaModel::HPCategory) ||
-			     (m->category == AntennaModel::B1Category))) {
+				((m->category == AntennaModel::HPCategory) ||
+					(m->category == AntennaModel::B1Category))) {
 				prefixFlag = true;
 			} else {
 				prefixFlag = false;
 			}
 
-			if (((prefixFlag) &&
-			     (modelName.compare(0, m->name.size(), m->name) == 0)) ||
-			    (m->name == modelName)) {
+			if (((prefixFlag) && (modelName.compare(0, m->name.size(), m->name) == 0)) ||
+				(m->name == modelName)) {
 				found = true;
 				antennaModel = m;
 			}

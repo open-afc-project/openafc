@@ -40,10 +40,8 @@ double emptyAtof(const char *str)
 /**************************************************************************/
 /* UlsFileReader::UlsFileReader()                                         */
 /**************************************************************************/
-UlsFileReader::UlsFileReader(const char *fpath,
-			     FILE *fwarn,
-			     bool alignFederatedFlag,
-			     double alignFederatedScale)
+UlsFileReader::UlsFileReader(
+	const char *fpath, FILE *fwarn, bool alignFederatedFlag, double alignFederatedScale)
 {
 	FILE *fi = fopen(fpath, "r");
 	std::ostringstream errStr;
@@ -108,9 +106,7 @@ UlsFileReader::UlsFileReader(const char *fpath,
 				} else if (front == "US:FR") {
 					readIndividualFrequencyUS(fieldList, fwarn);
 				} else if (front == "US:LO") {
-					readIndividualLocationUS(fieldList,
-								 alignFederatedFlag,
-								 alignFederatedScale);
+					readIndividualLocationUS(fieldList, alignFederatedFlag, alignFederatedScale);
 				} else if (front == "US:EM") {
 					readIndividualEmissionUS(fieldList, fwarn);
 				} else if (front == "US:EN") {
@@ -129,10 +125,7 @@ UlsFileReader::UlsFileReader(const char *fpath,
 					/* Canada Data (CA) */
 					/******************************************************************/
 				} else if (front == "CA:SD") {
-					readStationDataCA(fieldList,
-							  fwarn,
-							  alignFederatedFlag,
-							  alignFederatedScale);
+					readStationDataCA(fieldList, fwarn, alignFederatedFlag, alignFederatedScale);
 				} else if (front == "CA:PP") {
 					readBackToBackPassiveRepeaterCA(fieldList, fwarn);
 				} else if (front == "CA:PR") {
@@ -145,9 +138,8 @@ UlsFileReader::UlsFileReader(const char *fpath,
 
 				} else {
 					errStr << std::string("ERROR: Unable to process inputFile "
-							      "line ")
-					       << linenum << ", unrecognized: \"" << front << "\""
-					       << std::endl;
+										  "line ")
+						   << linenum << ", unrecognized: \"" << front << "\"" << std::endl;
 					throw std::runtime_error(errStr.str());
 				}
 
@@ -172,7 +164,7 @@ UlsFileReader::UlsFileReader(const char *fpath,
 	}
 
 	std::cout << "CA: Total " << authorizationNumberList.size() << " authorization numbers"
-		  << std::endl;
+			  << std::endl;
 	/**************************************************************************/
 
 	fclose(fi);
@@ -339,9 +331,8 @@ void UlsFileReader::readIndividualEmissionUS(const std::vector<std::string> &fie
 					fprintf(fwarn, "%c", ch);
 				}
 			}
-			fprintf(fwarn,
-				"\" contains invalid characters, replaced with \"%s\"\n",
-				modCode.c_str());
+			fprintf(
+				fwarn, "\" contains invalid characters, replaced with \"%s\"\n", modCode.c_str());
 		}
 		current.modCode = modCode;
 	}
@@ -430,9 +421,8 @@ void UlsFileReader::readIndividualEntityUS(const std::vector<std::string> &field
 /**************************************************************************/
 /* UlsFileReader::readIndividualLocationUS()                              */
 /**************************************************************************/
-void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fieldList,
-					     bool alignFederatedFlag,
-					     double alignFederatedScale)
+void UlsFileReader::readIndividualLocationUS(
+	const std::vector<std::string> &fieldList, bool alignFederatedFlag, double alignFederatedScale)
 {
 	UlsLocation current;
 
@@ -498,8 +488,7 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
 				current.latitudeMinutes = atoi(field.c_str());
 				break;
 			case 21:
-				current.latitude = current.latitude +
-						   emptyAtof(field.c_str()) / 3600.0;
+				current.latitude = current.latitude + emptyAtof(field.c_str()) / 3600.0;
 				current.latitudeSeconds = emptyAtof(field.c_str());
 				break;
 			case 22:
@@ -513,13 +502,11 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
 				current.longitudeDeg = atoi(field.c_str());
 				break;
 			case 24:
-				current.longitude = current.longitude +
-						    emptyAtof(field.c_str()) / 60.0;
+				current.longitude = current.longitude + emptyAtof(field.c_str()) / 60.0;
 				current.longitudeMinutes = atoi(field.c_str());
 				break;
 			case 25:
-				current.longitude = current.longitude +
-						    emptyAtof(field.c_str()) / 3600.0;
+				current.longitude = current.longitude + emptyAtof(field.c_str()) / 3600.0;
 				current.longitudeSeconds = atoi(field.c_str());
 				break;
 			case 26:
@@ -560,9 +547,9 @@ void UlsFileReader::readIndividualLocationUS(const std::vector<std::string> &fie
 
 	if (alignFederatedFlag) {
 		current.longitude = std::floor(current.longitude * alignFederatedScale + 0.5) /
-				    alignFederatedScale;
+			alignFederatedScale;
 		current.latitude = std::floor(current.latitude * alignFederatedScale + 0.5) /
-				   alignFederatedScale;
+			alignFederatedScale;
 	}
 
 	allLocations << current;
@@ -688,7 +675,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
 	std::string antennaModel = origAntennaModel;
 
 	antennaModel.erase(std::remove_if(antennaModel.begin(), antennaModel.end(), isInvalidChar),
-			   antennaModel.end());
+		antennaModel.end());
 
 	if (antennaModel != origAntennaModel) {
 		if (fwarn) {
@@ -701,8 +688,7 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
 					fprintf(fwarn, "%c", ch);
 				}
 			}
-			fprintf(fwarn,
-				"\" contains invalid characters, replaced with \"%s\"\n",
+			fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n",
 				antennaModel.c_str());
 		}
 		current.antennaModel = antennaModel;
@@ -718,8 +704,8 @@ void UlsFileReader::readIndividualAntennaUS(const std::vector<std::string> &fiel
 /**************************************************************************/
 /* UlsFileReader::readIndividualFrequencyUS()                             */
 /**************************************************************************/
-void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fieldList,
-					      FILE *fwarn)
+void UlsFileReader::readIndividualFrequencyUS(
+	const std::vector<std::string> &fieldList, FILE *fwarn)
 {
 	UlsFrequency current;
 
@@ -811,10 +797,9 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
 	std::string origTransmitterModel = std::string(current.transmitterModel);
 	std::string transmitterModel = origTransmitterModel;
 
-	transmitterModel.erase(std::remove_if(transmitterModel.begin(),
-					      transmitterModel.end(),
-					      isInvalidChar),
-			       transmitterModel.end());
+	transmitterModel.erase(
+		std::remove_if(transmitterModel.begin(), transmitterModel.end(), isInvalidChar),
+		transmitterModel.end());
 
 	if (transmitterModel != origTransmitterModel) {
 		if (fwarn) {
@@ -827,8 +812,7 @@ void UlsFileReader::readIndividualFrequencyUS(const std::vector<std::string> &fi
 					fprintf(fwarn, "%c", ch);
 				}
 			}
-			fprintf(fwarn,
-				"\" contains invalid characters, replaced with \"%s\"\n",
+			fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n",
 				transmitterModel.c_str());
 		}
 		strlcpy(current.transmitterModel, transmitterModel.c_str(), 26);
@@ -1040,48 +1024,38 @@ void UlsFileReader::readIndividualRASUS(const std::vector<std::string> &fieldLis
 				current.exclusionZone = field;
 				break;
 			case 6:
-				current.rect1lat1 = UlsFunctionsClass::getAngleFromDMS(
-					field.c_str());
+				current.rect1lat1 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
 				break;
 			case 7:
-				current.rect1lat2 = UlsFunctionsClass::getAngleFromDMS(
-					field.c_str());
+				current.rect1lat2 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
 				break;
 			case 8:
-				current.rect1lon1 = UlsFunctionsClass::getAngleFromDMS(
-					field.c_str());
+				current.rect1lon1 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
 				break;
 			case 9:
-				current.rect1lon2 = UlsFunctionsClass::getAngleFromDMS(
-					field.c_str());
+				current.rect1lon2 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
 				break;
 			case 10:
-				current.rect2lat1 = UlsFunctionsClass::getAngleFromDMS(
-					field.c_str());
+				current.rect2lat1 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
 				break;
 			case 11:
-				current.rect2lat2 = UlsFunctionsClass::getAngleFromDMS(
-					field.c_str());
+				current.rect2lat2 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
 				break;
 			case 12:
-				current.rect2lon1 = UlsFunctionsClass::getAngleFromDMS(
-					field.c_str());
+				current.rect2lon1 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
 				break;
 			case 13:
-				current.rect2lon2 = UlsFunctionsClass::getAngleFromDMS(
-					field.c_str());
+				current.rect2lon2 = UlsFunctionsClass::getAngleFromDMS(field.c_str());
 				break;
 
 			case 14:
 				current.radiusKm = emptyAtof(field.c_str());
 				break;
 			case 15:
-				current.centerLat = UlsFunctionsClass::getAngleFromDMS(
-					field.c_str());
+				current.centerLat = UlsFunctionsClass::getAngleFromDMS(field.c_str());
 				break;
 			case 16:
-				current.centerLon = UlsFunctionsClass::getAngleFromDMS(
-					field.c_str());
+				current.centerLon = UlsFunctionsClass::getAngleFromDMS(field.c_str());
 				break;
 			case 17:
 				current.heightAGL = emptyAtof(field.c_str());
@@ -1100,10 +1074,8 @@ void UlsFileReader::readIndividualRASUS(const std::vector<std::string> &fieldLis
 /**************************************************************************/
 /* UlsFileReader::readStationDataCA()                                     */
 /**************************************************************************/
-void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
-				      FILE *fwarn,
-				      bool alignFederatedFlag,
-				      double alignFederatedScale)
+void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList, FILE *fwarn,
+	bool alignFederatedFlag, double alignFederatedScale)
 {
 	StationDataCAClass current;
 
@@ -1180,11 +1152,10 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 	}
 
 	if (alignFederatedFlag) {
-		current.longitudeDeg = std::floor(current.longitudeDeg * alignFederatedScale +
-						  0.5) /
-				       alignFederatedScale;
+		current.longitudeDeg = std::floor(current.longitudeDeg * alignFederatedScale + 0.5) /
+			alignFederatedScale;
 		current.latitudeDeg = std::floor(current.latitudeDeg * alignFederatedScale + 0.5) /
-				      alignFederatedScale;
+			alignFederatedScale;
 	}
 
 	if (isnan(current.antennaHeightAGL)) {
@@ -1194,19 +1165,17 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 	}
 
 	double heightAMSL_km = (current.groundElevation + current.antennaHeightAGL) / 1000.0;
-	current.position = EcefModel::geodeticToEcef(current.latitudeDeg,
-						     current.longitudeDeg,
-						     heightAMSL_km);
+	current.position = EcefModel::geodeticToEcef(
+		current.latitudeDeg, current.longitudeDeg, heightAMSL_km);
 
-	current.pointingVec = UlsFunctionsClass::computeHPointingVec(current.position,
-								     current.azimuthPtg,
-								     current.elevationPtg);
+	current.pointingVec = UlsFunctionsClass::computeHPointingVec(
+		current.position, current.azimuthPtg, current.elevationPtg);
 
 	std::string origAntennaModel = std::string(current.antennaModel);
 	std::string antennaModel = origAntennaModel;
 
 	antennaModel.erase(std::remove_if(antennaModel.begin(), antennaModel.end(), isInvalidChar),
-			   antennaModel.end());
+		antennaModel.end());
 
 	if (antennaModel != origAntennaModel) {
 		if (fwarn) {
@@ -1219,8 +1188,7 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 					fprintf(fwarn, "%c", ch);
 				}
 			}
-			fprintf(fwarn,
-				"\" contains invalid characters, replaced with \"%s\"\n",
+			fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n",
 				antennaModel.c_str());
 		}
 		current.antennaModel = antennaModel;
@@ -1283,8 +1251,8 @@ void UlsFileReader::readStationDataCA(const std::vector<std::string> &fieldList,
 /**************************************************************************/
 /* UlsFileReader::readBackToBackPassiveRepeaterCA()                       */
 /**************************************************************************/
-void UlsFileReader::readBackToBackPassiveRepeaterCA(const std::vector<std::string> &fieldList,
-						    FILE *fwarn)
+void UlsFileReader::readBackToBackPassiveRepeaterCA(
+	const std::vector<std::string> &fieldList, FILE *fwarn)
 {
 	BackToBackPassiveRepeaterCAClass current;
 
@@ -1326,7 +1294,7 @@ void UlsFileReader::readBackToBackPassiveRepeaterCA(const std::vector<std::strin
 	std::string antennaModel = origAntennaModel;
 
 	antennaModel.erase(std::remove_if(antennaModel.begin(), antennaModel.end(), isInvalidChar),
-			   antennaModel.end());
+		antennaModel.end());
 
 	if (antennaModel != origAntennaModel) {
 		if (fwarn) {
@@ -1339,8 +1307,7 @@ void UlsFileReader::readBackToBackPassiveRepeaterCA(const std::vector<std::strin
 					fprintf(fwarn, "%c", ch);
 				}
 			}
-			fprintf(fwarn,
-				"\" contains invalid characters, replaced with \"%s\"\n",
+			fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n",
 				antennaModel.c_str());
 		}
 		current.antennaModel = antennaModel;
@@ -1355,8 +1322,8 @@ void UlsFileReader::readBackToBackPassiveRepeaterCA(const std::vector<std::strin
 /**************************************************************************/
 /* UlsFileReader::readReflectorPassiveRepeaterCA()                        */
 /**************************************************************************/
-void UlsFileReader::readReflectorPassiveRepeaterCA(const std::vector<std::string> &fieldList,
-						   FILE * /* fwarn */)
+void UlsFileReader::readReflectorPassiveRepeaterCA(
+	const std::vector<std::string> &fieldList, FILE * /* fwarn */)
 {
 	ReflectorPassiveRepeaterCAClass current;
 
@@ -1472,7 +1439,7 @@ void UlsFileReader::readTransmitterCA(const std::vector<std::string> &fieldList,
 	std::string antennaModel = origAntennaModel;
 
 	antennaModel.erase(std::remove_if(antennaModel.begin(), antennaModel.end(), isInvalidChar),
-			   antennaModel.end());
+		antennaModel.end());
 
 	if (antennaModel != origAntennaModel) {
 		if (fwarn) {
@@ -1485,8 +1452,7 @@ void UlsFileReader::readTransmitterCA(const std::vector<std::string> &fieldList,
 					fprintf(fwarn, "%c", ch);
 				}
 			}
-			fprintf(fwarn,
-				"\" contains invalid characters, replaced with \"%s\"\n",
+			fprintf(fwarn, "\" contains invalid characters, replaced with \"%s\"\n",
 				antennaModel.c_str());
 		}
 		current.antennaModel = antennaModel;
@@ -1501,18 +1467,14 @@ void UlsFileReader::readTransmitterCA(const std::vector<std::string> &fieldList,
 /******************************************************************************************/
 /**** computeStatisticsUS                                                              ****/
 /******************************************************************************************/
-int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
-				       bool includeUnii5,
-				       bool includeUnii6,
-				       bool includeUnii7,
-				       bool includeUnii8)
+int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool includeUnii5,
+	bool includeUnii6, bool includeUnii7, bool includeUnii8)
 {
 	int n = 0;
 	int maxNumSegment;
 	std::string maxNumSegmentCallsign = "";
 
-	const std::vector<double> bwMHzListUnii5 =
-		{0.4, 0.8, 1.25, 2.5, 3.75, 5.0, 10.0, 30.0, 60.0};
+	const std::vector<double> bwMHzListUnii5 = {0.4, 0.8, 1.25, 2.5, 3.75, 5.0, 10.0, 30.0, 60.0};
 
 	const std::vector<double> bwMHzListUnii7 = {0.4, 0.8, 1.25, 2.5, 3.75, 5.0, 10.0, 30.0};
 
@@ -1525,7 +1487,7 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
 		{
 			if (strcmp(p.callsign, freq.callsign) == 0) {
 				if (freq.locationNumber == p.txLocationNumber &&
-				    freq.antennaNumber == p.txAntennaNumber) {
+					freq.antennaNumber == p.txAntennaNumber) {
 					path = p;
 					pathFound = true;
 					break;
@@ -1542,10 +1504,8 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
 		QList<UlsEmission> allTxEm;
 		foreach(const UlsEmission &e, emissionsMap(freq.callsign))
 		{
-			if (strcmp(e.callsign, freq.callsign) == 0 &&
-			    e.locationId == freq.locationNumber &&
-			    e.antennaId == freq.antennaNumber &&
-			    e.frequencyId == freq.frequencyNumber) {
+			if (strcmp(e.callsign, freq.callsign) == 0 && e.locationId == freq.locationNumber &&
+				e.antennaId == freq.antennaNumber && e.frequencyId == freq.frequencyNumber) {
 				allTxEm << e;
 				txEmFound = true;
 			}
@@ -1588,23 +1548,18 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
 				invalidFlag = true;
 			} else {
 				if (txEmFound) {
-					bwMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(
-						e.desig);
+					bwMHz = UlsFunctionsClass::emissionDesignatorToBandwidth(e.desig);
 				}
 				if (isnan(bwMHz) || (bwMHz > 60.0) || (bwMHz == 0)) {
-					bwMHz = freqAssignment.getBandwidthUS(
-						freq.frequencyAssigned);
+					bwMHz = freqAssignment.getBandwidthUS(freq.frequencyAssigned);
 				} else {
 					bool unii5Flag = (freq.frequencyAssigned >=
-							  UlsFunctionsClass::unii5StartFreqMHz) &&
-							 (freq.frequencyAssigned <=
-							  UlsFunctionsClass::unii5StopFreqMHz);
+										 UlsFunctionsClass::unii5StartFreqMHz) &&
+						(freq.frequencyAssigned <= UlsFunctionsClass::unii5StopFreqMHz);
 					bool unii7Flag = (freq.frequencyAssigned >=
-							  UlsFunctionsClass::unii7StartFreqMHz) &&
-							 (freq.frequencyAssigned <=
-							  UlsFunctionsClass::unii7StopFreqMHz);
-					const std::vector<double> *fccBWList =
-						(std::vector<double> *)NULL;
+										 UlsFunctionsClass::unii7StartFreqMHz) &&
+						(freq.frequencyAssigned <= UlsFunctionsClass::unii7StopFreqMHz);
+					const std::vector<double> *fccBWList = (std::vector<double> *)NULL;
 					if (unii5Flag) {
 						fccBWList = &bwMHzListUnii5;
 					} else if (unii7Flag) {
@@ -1613,9 +1568,7 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
 					if (fccBWList) {
 						bool found = false;
 						double fccBW;
-						for (int i = 0;
-						     (i < (int)fccBWList->size()) && (!found);
-						     ++i) {
+						for (int i = 0; (i < (int)fccBWList->size()) && (!found); ++i) {
 							if (fccBWList->at(i) >= bwMHz) {
 								found = true;
 								fccBW = fccBWList->at(i);
@@ -1630,17 +1583,13 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
 				if ((bwMHz == -1)) {
 					invalidFlag = true;
 				} else if (isnan(freq.frequencyUpperBand)) {
-					startFreq = freq.frequencyAssigned -
-						    bwMHz / 2.0; // Lower Band (MHz)
-					stopFreq = freq.frequencyAssigned +
-						   bwMHz / 2.0; // Upper Band (MHz)
+					startFreq = freq.frequencyAssigned - bwMHz / 2.0; // Lower Band (MHz)
+					stopFreq = freq.frequencyAssigned + bwMHz / 2.0; // Upper Band (MHz)
 					startFreqBand = startFreq;
 					stopFreqBand = stopFreq;
 				} else {
-					startFreq = freq.frequencyAssigned -
-						    bwMHz / 2.0; // Lower Band (MHz)
-					stopFreq = freq.frequencyAssigned +
-						   bwMHz / 2.0; // Upper Band (MHz)
+					startFreq = freq.frequencyAssigned - bwMHz / 2.0; // Lower Band (MHz)
+					stopFreq = freq.frequencyAssigned + bwMHz / 2.0; // Upper Band (MHz)
 					startFreqBand = freq.frequencyAssigned; // Lower Band (MHz)
 					stopFreqBand = startFreqBand + bwMHz; // Upper Band (MHz)
 				}
@@ -1648,27 +1597,17 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
 
 			if (!invalidFlag) {
 				// skip if no overlap UNII5 and 7
-				bool overlapUnii5 = (stopFreqBand >
-						     UlsFunctionsClass::unii5StartFreqMHz) &&
-						    (startFreqBand <
-						     UlsFunctionsClass::unii5StopFreqMHz);
-				bool overlapUnii6 = (stopFreqBand >
-						     UlsFunctionsClass::unii6StartFreqMHz) &&
-						    (startFreqBand <
-						     UlsFunctionsClass::unii6StopFreqMHz);
-				bool overlapUnii7 = (stopFreqBand >
-						     UlsFunctionsClass::unii7StartFreqMHz) &&
-						    (startFreqBand <
-						     UlsFunctionsClass::unii7StopFreqMHz);
-				bool overlapUnii8 = (stopFreqBand >
-						     UlsFunctionsClass::unii8StartFreqMHz) &&
-						    (startFreqBand <
-						     UlsFunctionsClass::unii8StopFreqMHz);
+				bool overlapUnii5 = (stopFreqBand > UlsFunctionsClass::unii5StartFreqMHz) &&
+					(startFreqBand < UlsFunctionsClass::unii5StopFreqMHz);
+				bool overlapUnii6 = (stopFreqBand > UlsFunctionsClass::unii6StartFreqMHz) &&
+					(startFreqBand < UlsFunctionsClass::unii6StopFreqMHz);
+				bool overlapUnii7 = (stopFreqBand > UlsFunctionsClass::unii7StartFreqMHz) &&
+					(startFreqBand < UlsFunctionsClass::unii7StopFreqMHz);
+				bool overlapUnii8 = (stopFreqBand > UlsFunctionsClass::unii8StartFreqMHz) &&
+					(startFreqBand < UlsFunctionsClass::unii8StopFreqMHz);
 
-				if (!((includeUnii5 && overlapUnii5) ||
-				      (includeUnii6 && overlapUnii6) ||
-				      (includeUnii7 && overlapUnii7) ||
-				      (includeUnii8 && overlapUnii8))) {
+				if (!((includeUnii5 && overlapUnii5) || (includeUnii6 && overlapUnii6) ||
+						(includeUnii7 && overlapUnii7) || (includeUnii8 && overlapUnii8))) {
 					invalidFlag = true;
 				}
 			}
@@ -1678,8 +1617,7 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
 					int segmentNumber = segment.segmentNumber;
 					if ((n == 0) || (segmentNumber > maxNumSegment)) {
 						maxNumSegment = segmentNumber;
-						maxNumSegmentCallsign = std::string(
-							segment.callsign);
+						maxNumSegmentCallsign = std::string(segment.callsign);
 						n++;
 					}
 				}
@@ -1701,7 +1639,7 @@ int UlsFileReader::computeStatisticsUS(FreqAssignmentClass &freqAssignment,
 	qDebug() << "control points" << controlPoints().count();
 	qDebug() << "segments" << segments().count();
 	qDebug() << "maxNumPassiveRepeater" << maxNumPassiveRepeater
-		 << " callsign: " << QString::fromStdString(maxNumSegmentCallsign);
+			 << " callsign: " << QString::fromStdString(maxNumSegmentCallsign);
 
 	return (maxNumPassiveRepeater);
 }
@@ -1728,8 +1666,8 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
 	/* If entries don't match, there is an error in the database, report in warning file. */
 	/**************************************************************************************/
 	for (std::string authorizationNumber : authorizationNumberList) {
-		const QList<BackToBackPassiveRepeaterCAClass> &bbList =
-			backToBackPassiveRepeatersMap(authorizationNumber.c_str());
+		const QList<BackToBackPassiveRepeaterCAClass> &bbList = backToBackPassiveRepeatersMap(
+			authorizationNumber.c_str());
 		std::vector<int> idxList;
 		idxList.clear();
 		for (i = 0; i < bbList.size(); ++i) {
@@ -1744,16 +1682,14 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
 			for (int iiB = 0; (iiB < iiA) && (!found); ++iiB) {
 				const BackToBackPassiveRepeaterCAClass &bbB = bbList[idxList[iiB]];
 				if ((fabs(bbA.longitudeDeg - bbB.longitudeDeg) < epsLonLat) &&
-				    (fabs(bbA.latitudeDeg - bbB.latitudeDeg) < epsLonLat) &&
-				    (fabs(bbA.groundElevation - bbB.groundElevation) <
-				     epsGroundElevation)) {
+					(fabs(bbA.latitudeDeg - bbB.latitudeDeg) < epsLonLat) &&
+					(fabs(bbA.groundElevation - bbB.groundElevation) < epsGroundElevation)) {
 					found = true;
 					iiMatch = iiB;
 				}
 			}
 			if (found) {
-				const BackToBackPassiveRepeaterCAClass &bbB =
-					bbList[idxList[iiMatch]];
+				const BackToBackPassiveRepeaterCAClass &bbB = bbList[idxList[iiMatch]];
 				PassiveRepeaterCAClass pr;
 				pr.type = PassiveRepeaterCAClass::backToBackAntennaPRType;
 				pr.authorizationNumber = authorizationNumber;
@@ -1773,13 +1709,9 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
 				pr.elevationPtgB = bbA.elevationPtg;
 
 				pr.positionA = EcefModel::geodeticToEcef(
-					pr.latitudeDeg,
-					pr.longitudeDeg,
-					(pr.groundElevation + pr.heightAGLA) / 1000.0);
+					pr.latitudeDeg, pr.longitudeDeg, (pr.groundElevation + pr.heightAGLA) / 1000.0);
 				pr.positionB = EcefModel::geodeticToEcef(
-					pr.latitudeDeg,
-					pr.longitudeDeg,
-					(pr.groundElevation + pr.heightAGLB) / 1000.0);
+					pr.latitudeDeg, pr.longitudeDeg, (pr.groundElevation + pr.heightAGLB) / 1000.0);
 
 				pr.reflectorHeight = std::numeric_limits<double>::quiet_NaN();
 				pr.reflectorWidth = std::numeric_limits<double>::quiet_NaN();
@@ -1795,9 +1727,7 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
 				fprintf(fwarn,
 					"UNMATCHED BACK-TO-BACK REPEATER: authorizationNumber: %s, "
 					"LON = %.6f, LAT = %.6f\n",
-					authorizationNumber.c_str(),
-					bbA.longitudeDeg,
-					bbA.latitudeDeg);
+					authorizationNumber.c_str(), bbA.longitudeDeg, bbA.latitudeDeg);
 				idxList.pop_back();
 			}
 		}
@@ -1827,9 +1757,7 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
 			pr.elevationPtgB = std::numeric_limits<double>::quiet_NaN();
 
 			pr.reflectorPosition = EcefModel::geodeticToEcef(
-				pr.latitudeDeg,
-				pr.longitudeDeg,
-				(pr.groundElevation + pr.heightAGLA) / 1000.0);
+				pr.latitudeDeg, pr.longitudeDeg, (pr.groundElevation + pr.heightAGLA) / 1000.0);
 
 			passiveRepeaterMap[authorizationNumber.c_str()] << pr;
 		}
@@ -1842,8 +1770,8 @@ int UlsFileReader::computeStatisticsCA(FILE *fwarn)
 	}
 	/**************************************************************************************/
 
-	std::cout << "CA: Number of matched back-to-back passive repeaters: "
-		  << numMatchedBackToBack << std::endl;
+	std::cout << "CA: Number of matched back-to-back passive repeaters: " << numMatchedBackToBack
+			  << std::endl;
 
 	return (maxNumPassiveRepeater);
 }

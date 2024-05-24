@@ -101,15 +101,15 @@ int SplineClass::makesplinecoeffs(int p_n1, int p_n2, double *xs, double *ys)
 
 	if (n1 <= 0) {
 		errStr << std::string("ERROR in routine makesplinecoeffs()") << std::endl
-		       << "first data point index must be > 0" << std::endl
-		       << "n1 = " << n1 << std::endl;
+			   << "first data point index must be > 0" << std::endl
+			   << "n1 = " << n1 << std::endl;
 		throw std::runtime_error(errStr.str());
 	}
 
 	if ((n1 >= n2)) {
 		errStr << std::string("ERROR in routine makesplinecoeffs()") << std::endl
-		       << "n1  >=  n2" << std::endl
-		       << "n1 = " << n1 << ", n2 = " << n2 << std::endl;
+			   << "n1  >=  n2" << std::endl
+			   << "n1 = " << n1 << ", n2 = " << n2 << std::endl;
 		throw std::runtime_error(errStr.str());
 	}
 
@@ -117,8 +117,8 @@ int SplineClass::makesplinecoeffs(int p_n1, int p_n2, double *xs, double *ys)
 		x[i] = xs[i];
 		if ((i > n1) && (x[i] <= x[i - 1])) {
 			errStr << std::string("ERROR in routine makesplinecoeffs()") << std::endl
-			       << "x var not strictly increasing between indicies = " << i - 1
-			       << "," << i << " (" << x[i - 1] << ", " << x[i] << std::endl;
+				   << "x var not strictly increasing between indicies = " << i - 1 << "," << i
+				   << " (" << x[i - 1] << ", " << x[i] << std::endl;
 			throw std::runtime_error(errStr.str());
 		}
 	}

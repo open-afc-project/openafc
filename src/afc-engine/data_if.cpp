@@ -92,8 +92,7 @@ bool AfcDataIf::readFile(QString fileName, QByteArray &data)
 			delete reply;
 			return true;
 		}
-		LOGGER_ERROR(logger)
-			<< "readFile(" << url.toString() << ") error " << reply->error();
+		LOGGER_ERROR(logger) << "readFile(" << url.toString() << ") error " << reply->error();
 		delete reply;
 		return false;
 	}
@@ -102,7 +101,7 @@ bool AfcDataIf::readFile(QString fileName, QByteArray &data)
 bool AfcDataIf::gzipAndWriteFile(QString fileName, QByteArray &data)
 {
 	LOGGER_DEBUG(logger) << "gzipAndWriteFile(" << fileName << ")"
-			     << " len: " << data.length();
+						 << " len: " << data.length();
 	QByteArray gziped;
 	if (!AfcDataIf::gzipBuffer(data, gziped)) {
 		return false;
@@ -113,7 +112,7 @@ bool AfcDataIf::gzipAndWriteFile(QString fileName, QByteArray &data)
 bool AfcDataIf::writeFile(QString fileName, QByteArray &data)
 {
 	LOGGER_DEBUG(logger) << "writeFile(" << fileName << ")"
-			     << " len: " << data.length();
+						 << " len: " << data.length();
 	if (!AfcDataIf::_useUrl) {
 		QFile outFile;
 
@@ -144,8 +143,7 @@ bool AfcDataIf::writeFile(QString fileName, QByteArray &data)
 			delete reply;
 			return true;
 		}
-		LOGGER_ERROR(logger)
-			<< "writeFile(" << url.toString() << ") error " << reply->error();
+		LOGGER_ERROR(logger) << "writeFile(" << url.toString() << ") error " << reply->error();
 		delete reply;
 		return false;
 	}
@@ -166,12 +164,8 @@ bool AfcDataIf::gzipBuffer(QByteArray &input, QByteArray &output)
 	strm.total_out = 0;
 	strm.next_in = Z_NULL;
 
-	int ret = deflateInit2(&strm,
-			       ZLIB_COMPRESS_LEVEL,
-			       Z_DEFLATED,
-			       ZLIB_WINDOW_BITS,
-			       ZLIB_MEMORY_LEVEL,
-			       Z_DEFAULT_STRATEGY);
+	int ret = deflateInit2(&strm, ZLIB_COMPRESS_LEVEL, Z_DEFLATED, ZLIB_WINDOW_BITS,
+		ZLIB_MEMORY_LEVEL, Z_DEFAULT_STRATEGY);
 	if (ret != Z_OK) {
 		LOGGER_ERROR(logger) << "deflateInit2 error";
 		return false;

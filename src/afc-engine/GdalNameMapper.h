@@ -91,8 +91,7 @@ class GdalNameMapperPattern : public GdalNameMapperBase
 		 * @param directory Directory containing files. Must be specified if pattern
 		 *	contains wildcard symbols (*?[]), otherwise ignored
 		 */
-		GdalNameMapperPattern(const std::string &pattern,
-				      const std::string &directory = "");
+		GdalNameMapperPattern(const std::string &pattern, const std::string &directory = "");
 
 		/** Virtual destructor */
 		virtual ~GdalNameMapperPattern() = default;
@@ -122,8 +121,7 @@ class GdalNameMapperPattern : public GdalNameMapperBase
 		 *	contains wildcard symbols (*?[]), otherwise ignored
 		 */
 		static std::unique_ptr<GdalNameMapperBase> make_unique(
-			const std::string &pattern,
-			const std::string &directory = "");
+			const std::string &pattern, const std::string &directory = "");
 
 	private:
 		//////////////////////////////////////////////////
@@ -190,10 +188,8 @@ class GdalNameMapperPattern : public GdalNameMapperBase
 		 * @param elemFormat Numeric part of printf-style number format
 		 * @aram errPrefix Prefix for error messages
 		 */
-		void appendLatLon(Src src,
-				  Op op,
-				  const std::string &elemFormat,
-				  const std::string errPrefix);
+		void appendLatLon(
+			Src src, Op op, const std::string &elemFormat, const std::string errPrefix);
 
 		/** Filename pattern (see comments to class) */
 		std::vector<NamePart> _nameParts;
@@ -224,8 +220,7 @@ class GdalNameMapperDirect : public GdalNameMapperBase
 		 * @param fnmatchPattern Fnmatch-compatible pattern for relevant files
 		 * @param directory Directory containing GDAL files
 		 */
-		GdalNameMapperDirect(const std::string &fnmatchPattern,
-				     const std::string &directory);
+		GdalNameMapperDirect(const std::string &fnmatchPattern, const std::string &directory);
 
 		/** Virtual destructor */
 		virtual ~GdalNameMapperDirect() = default;
@@ -254,8 +249,7 @@ class GdalNameMapperDirect : public GdalNameMapperBase
 		 * @param directory Directory containing GDAL files
 		 */
 		static std::unique_ptr<GdalNameMapperBase> make_unique(
-			const std::string &fnmatchPattern,
-			const std::string &directory);
+			const std::string &fnmatchPattern, const std::string &directory);
 
 	private:
 		//////////////////////////////////////////////////

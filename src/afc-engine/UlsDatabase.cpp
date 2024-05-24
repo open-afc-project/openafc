@@ -337,28 +337,21 @@ void verifyResult(const QSqlQuery &ulsQueryRes)
 	if (!ulsQueryRes.isActive()) {
 		// Query encountered error
 		QSqlError err = ulsQueryRes.lastError();
-		throw std::runtime_error(ErrStream()
-					 << "UlsDatabase.cpp: Database query failed with code "
-					 << err.type() << " " << err.text());
+		throw std::runtime_error(ErrStream() << "UlsDatabase.cpp: Database query failed with code "
+											 << err.type() << " " << err.text());
 	}
 }
 
 // construct and run sql query and return result
 QSqlQuery runQueryWithBounds(const SqlScopedConnection<SqlExceptionDb> &db,
-			     const QStringList &columns,
-			     const double &minLat,
-			     const double &maxLat,
-			     const double &minLon,
-			     const double &maxLon);
-QSqlQuery runQueryById(const SqlScopedConnection<SqlExceptionDb> &db,
-		       const QStringList &columns,
-		       const int &fsid);
+	const QStringList &columns, const double &minLat, const double &maxLat, const double &minLon,
+	const double &maxLon);
+QSqlQuery runQueryById(
+	const SqlScopedConnection<SqlExceptionDb> &db, const QStringList &columns, const int &fsid);
 
 void UlsDatabase::loadFSById(const QString &dbName,
-			     std::vector<DeniedRegionClass *> &deniedRegionList,
-			     std::vector<AntennaClass *> &antennaList,
-			     std::vector<UlsRecord> &target,
-			     const int &fsid)
+	std::vector<DeniedRegionClass *> &deniedRegionList, std::vector<AntennaClass *> &antennaList,
+	std::vector<UlsRecord> &target, const int &fsid)
 {
 	LOGGER_DEBUG(logger) << "FSID: " << fsid;
 
@@ -380,16 +373,12 @@ void UlsDatabase::loadFSById(const QString &dbName,
 }
 
 void UlsDatabase::loadUlsData(const QString &dbName,
-			      std::vector<DeniedRegionClass *> &deniedRegionList,
-			      std::vector<AntennaClass *> &antennaList,
-			      std::vector<UlsRecord> &target,
-			      const double &minLat,
-			      const double &maxLat,
-			      const double &minLon,
-			      const double &maxLon)
+	std::vector<DeniedRegionClass *> &deniedRegionList, std::vector<AntennaClass *> &antennaList,
+	std::vector<UlsRecord> &target, const double &minLat, const double &maxLat,
+	const double &minLon, const double &maxLon)
 {
 	LOGGER_DEBUG(logger) << "Bounds: " << minLat << ", " << maxLat << "; " << minLon << ", "
-			     << maxLon;
+						 << maxLon;
 
 	// create and open db connection
 	SqlConnectionDefinition config;
@@ -409,41 +398,31 @@ void UlsDatabase::loadUlsData(const QString &dbName,
 }
 
 QSqlQuery runQueryWithBounds(const SqlScopedConnection<SqlExceptionDb> &db,
-			     const QStringList &columns,
-			     const double &minLat,
-			     const double &maxLat,
-			     const double &minLon,
-			     const double &maxLon)
+	const QStringList &columns, const double &minLat, const double &maxLat, const double &minLon,
+	const double &maxLon)
 {
 	return SqlSelect(*db, "uls")
 		.cols(columns)
 		.where(QString("(rx_lat_deg BETWEEN %1 AND %2)"
-			       "AND"
-			       "(rx_long_deg BETWEEN %3 AND %4)")
-			       .arg(std::min(minLat, maxLat))
-			       .arg(std::max(minLat, maxLat))
-			       .arg(std::min(minLon, maxLon))
-			       .arg(std::max(minLon, maxLon)))
+					   "AND"
+					   "(rx_long_deg BETWEEN %3 AND %4)")
+				   .arg(std::min(minLat, maxLat))
+				   .arg(std::max(minLat, maxLat))
+				   .arg(std::min(minLon, maxLon))
+				   .arg(std::max(minLon, maxLon)))
 		.order("fsid")
 		.run();
 }
 
-QSqlQuery runQueryById(const SqlScopedConnection<SqlExceptionDb> &db,
-		       const QStringList &columns,
-		       const int &fsid)
+QSqlQuery runQueryById(
+	const SqlScopedConnection<SqlExceptionDb> &db, const QStringList &columns, const int &fsid)
 {
-	return SqlSelect(*db, "uls")
-		.cols(columns)
-		.where(QString("fsid=%1").arg(fsid))
-		.topmost(1)
-		.run();
+	return SqlSelect(*db, "uls").cols(columns).where(QString("fsid=%1").arg(fsid)).topmost(1).run();
 }
 
 void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
-			     std::vector<DeniedRegionClass *> &deniedRegionList,
-			     std::vector<AntennaClass *> &antennaList,
-			     std::vector<UlsRecord> &target,
-			     QSqlQuery &q)
+	std::vector<DeniedRegionClass *> &deniedRegionList, std::vector<AntennaClass *> &antennaList,
+	std::vector<UlsRecord> &target, QSqlQuery &q)
 {
 	// resize vector to fit result
 	if (q.driver()->hasFeature(QSqlDriver::QuerySize)) {
@@ -513,24 +492,16 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 				double rect1lon1 = rasQueryRes.value(ras_rect1lon1Idx).toDouble();
 				double rect1lon2 = rasQueryRes.value(ras_rect1lon2Idx).toDouble();
 
-				((RectDeniedRegionClass *)ras)
-					->addRect(rect1lon1, rect1lon2, rect1lat1, rect1lat2);
+				((RectDeniedRegionClass *)ras)->addRect(rect1lon1, rect1lon2, rect1lat1, rect1lat2);
 
 				if (exclusionZoneType == DeniedRegionClass::rect2Geometry) {
-					double rect2lat1 =
-						rasQueryRes.value(ras_rect2lat1Idx).toDouble();
-					double rect2lat2 =
-						rasQueryRes.value(ras_rect2lat2Idx).toDouble();
-					double rect2lon1 =
-						rasQueryRes.value(ras_rect2lon1Idx).toDouble();
-					double rect2lon2 =
-						rasQueryRes.value(ras_rect2lon2Idx).toDouble();
+					double rect2lat1 = rasQueryRes.value(ras_rect2lat1Idx).toDouble();
+					double rect2lat2 = rasQueryRes.value(ras_rect2lat2Idx).toDouble();
+					double rect2lon1 = rasQueryRes.value(ras_rect2lon1Idx).toDouble();
+					double rect2lon2 = rasQueryRes.value(ras_rect2lon2Idx).toDouble();
 
 					((RectDeniedRegionClass *)ras)
-						->addRect(rect2lon1,
-							  rect2lon2,
-							  rect2lat1,
-							  rect2lat2);
+						->addRect(rect2lon1, rect2lon2, rect2lat1, rect2lat2);
 				}
 			} break;
 			case DeniedRegionClass::circleGeometry:
@@ -539,33 +510,26 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 				double latCircle = rasQueryRes.value(ras_centerLatIdx).toDouble();
 
 				bool horizonDistFlag = (exclusionZoneType ==
-							DeniedRegionClass::horizonDistGeometry);
+					DeniedRegionClass::horizonDistGeometry);
 
-				ras = (DeniedRegionClass *)new CircleDeniedRegionClass(
-					rasid,
-					horizonDistFlag);
+				ras = (DeniedRegionClass *)new CircleDeniedRegionClass(rasid, horizonDistFlag);
 
 				((CircleDeniedRegionClass *)ras)->setLongitudeCenter(lonCircle);
 				((CircleDeniedRegionClass *)ras)->setLatitudeCenter(latCircle);
 
 				if (!horizonDistFlag) {
-					double radius =
-						rasQueryRes.value(ras_radiusKmIdx).isNull() ?
-							quietNaN :
-							rasQueryRes.value(ras_radiusKmIdx)
-									.toDouble() *
-								1.0e3; // Convert km to m
+					double radius = rasQueryRes.value(ras_radiusKmIdx).isNull() ?
+						quietNaN :
+						rasQueryRes.value(ras_radiusKmIdx).toDouble() * 1.0e3; // Convert km to m
 
 					((CircleDeniedRegionClass *)ras)->setRadius(radius);
 				} else {
 					/**************************************************************************/
 					/* heightAGL */
 					/**************************************************************************/
-					double heightAGL =
-						rasQueryRes.value(ras_heightAGLIdx).isNull() ?
-							quietNaN :
-							rasQueryRes.value(ras_heightAGLIdx)
-								.toDouble(); // Height value in m
+					double heightAGL = rasQueryRes.value(ras_heightAGLIdx).isNull() ?
+						quietNaN :
+						rasQueryRes.value(ras_heightAGLIdx).toDouble(); // Height value in m
 					ras->setHeightAGL(heightAGL);
 					/**************************************************************************/
 				}
@@ -575,15 +539,12 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 		}
 
 		if (ras) {
-			double startFreq =
-				rasQueryRes.value(ras_startFreqMHzIdx).isNull() ?
-					quietNaN :
-					rasQueryRes.value(ras_startFreqMHzIdx).toDouble() *
-						1.0e6; // Convert MHz to Hz
+			double startFreq = rasQueryRes.value(ras_startFreqMHzIdx).isNull() ?
+				quietNaN :
+				rasQueryRes.value(ras_startFreqMHzIdx).toDouble() * 1.0e6; // Convert MHz to Hz
 			double stopFreq = rasQueryRes.value(ras_stopFreqMHzIdx).isNull() ?
-						  quietNaN :
-						  rasQueryRes.value(ras_stopFreqMHzIdx).toDouble() *
-							  1.0e6; // Convert MHz to Hz
+				quietNaN :
+				rasQueryRes.value(ras_stopFreqMHzIdx).toDouble() * 1.0e6; // Convert MHz to Hz
 
 			ras->setStartFreq(startFreq);
 			ras->setStopFreq(stopFreq);
@@ -661,8 +622,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 
 		while (antaobQueryRes.next()) {
 			int aobIdx = antaobQueryRes.value(antaob_aob_idxIdx).toInt();
-			double aobRad = antaobQueryRes.value(antaob_aob_degIdx).toDouble() * M_PI /
-					180.0;
+			double aobRad = antaobQueryRes.value(antaob_aob_degIdx).toDouble() * M_PI / 180.0;
 			antennaAOBList[aobIdx] = aobRad;
 		}
 	}
@@ -684,80 +644,70 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 		target.at(r).startFreq = q.value(freq_assigned_start_mhzIdx).toDouble();
 		target.at(r).stopFreq = q.value(freq_assigned_end_mhzIdx).toDouble();
 		target.at(r).txLatitudeDeg = q.value(tx_lat_degIdx).isNull() ?
-						     quietNaN :
-						     q.value(tx_lat_degIdx).toDouble();
+			quietNaN :
+			q.value(tx_lat_degIdx).toDouble();
 		target.at(r).txLongitudeDeg = q.value(tx_long_degIdx).isNull() ?
-						      quietNaN :
-						      q.value(tx_long_degIdx).toDouble();
+			quietNaN :
+			q.value(tx_long_degIdx).toDouble();
 		target.at(r).txGroundElevation = q.value(tx_ground_elev_mIdx).isNull() ?
-							 quietNaN :
-							 q.value(tx_ground_elev_mIdx).toDouble();
+			quietNaN :
+			q.value(tx_ground_elev_mIdx).toDouble();
 		target.at(r).txPolarization = q.value(tx_polarizationIdx).toString().toStdString();
 		target.at(r).txGain = q.value(tx_gainIdx).isNull() ? quietNaN :
-								     q.value(tx_gainIdx).toDouble();
+															 q.value(tx_gainIdx).toDouble();
 		target.at(r).txEIRP = q.value(tx_eirpIdx).toDouble();
-		target.at(r).txHeightAboveTerrain =
-			q.value(tx_height_to_center_raat_mIdx).isNull() ?
-				quietNaN :
-				q.value(tx_height_to_center_raat_mIdx).toDouble();
-		target.at(r).txArchitecture =
-			q.value(tx_architecture_mIdx).toString().toStdString();
-		target.at(r).azimuthAngleToTx =
-			q.value(azimuth_angle_to_tx_mIdx).isNull() ?
-				quietNaN :
-				q.value(azimuth_angle_to_tx_mIdx).toDouble();
-		target.at(r).elevationAngleToTx =
-			q.value(elevation_angle_to_tx_mIdx).isNull() ?
-				quietNaN :
-				q.value(elevation_angle_to_tx_mIdx).toDouble();
+		target.at(r).txHeightAboveTerrain = q.value(tx_height_to_center_raat_mIdx).isNull() ?
+			quietNaN :
+			q.value(tx_height_to_center_raat_mIdx).toDouble();
+		target.at(r).txArchitecture = q.value(tx_architecture_mIdx).toString().toStdString();
+		target.at(r).azimuthAngleToTx = q.value(azimuth_angle_to_tx_mIdx).isNull() ?
+			quietNaN :
+			q.value(azimuth_angle_to_tx_mIdx).toDouble();
+		target.at(r).elevationAngleToTx = q.value(elevation_angle_to_tx_mIdx).isNull() ?
+			quietNaN :
+			q.value(elevation_angle_to_tx_mIdx).toDouble();
 		target.at(r).rxLatitudeDeg = q.value(rx_lat_degIdx).toDouble();
 		target.at(r).rxLongitudeDeg = q.value(rx_long_degIdx).toDouble();
 		target.at(r).rxGroundElevation = q.value(rx_ground_elev_mIdx).isNull() ?
-							 quietNaN :
-							 q.value(rx_ground_elev_mIdx).toDouble();
-		target.at(r).rxHeightAboveTerrain =
-			q.value(rx_height_to_center_raat_mIdx).isNull() ?
-				quietNaN :
-				q.value(rx_height_to_center_raat_mIdx).toDouble();
+			quietNaN :
+			q.value(rx_ground_elev_mIdx).toDouble();
+		target.at(r).rxHeightAboveTerrain = q.value(rx_height_to_center_raat_mIdx).isNull() ?
+			quietNaN :
+			q.value(rx_height_to_center_raat_mIdx).toDouble();
 		target.at(r).rxLineLoss = q.value(rx_line_loss_mIdx).isNull() ?
-						  quietNaN :
-						  q.value(rx_line_loss_mIdx).toDouble();
+			quietNaN :
+			q.value(rx_line_loss_mIdx).toDouble();
 		target.at(r).rxGain = q.value(rx_gainIdx).isNull() ? quietNaN :
-								     q.value(rx_gainIdx).toDouble();
+															 q.value(rx_gainIdx).toDouble();
 		target.at(r).rxAntennaDiameter = q.value(rx_antennaDiameterIdx).isNull() ?
-							 quietNaN :
-							 q.value(rx_antennaDiameterIdx).toDouble();
+			quietNaN :
+			q.value(rx_antennaDiameterIdx).toDouble();
 
-		target.at(r).rxNearFieldAntDiameter =
-			q.value(rx_near_field_ant_diameterIdx).isNull() ?
-				quietNaN :
-				q.value(rx_near_field_ant_diameterIdx).toDouble();
-		target.at(r).rxNearFieldDistLimit =
-			q.value(rx_near_field_dist_limitIdx).isNull() ?
-				quietNaN :
-				q.value(rx_near_field_dist_limitIdx).toDouble();
-		target.at(r).rxNearFieldAntEfficiency =
-			q.value(rx_near_field_ant_efficiencyIdx).isNull() ?
-				quietNaN :
-				q.value(rx_near_field_ant_efficiencyIdx).toDouble();
+		target.at(r).rxNearFieldAntDiameter = q.value(rx_near_field_ant_diameterIdx).isNull() ?
+			quietNaN :
+			q.value(rx_near_field_ant_diameterIdx).toDouble();
+		target.at(r).rxNearFieldDistLimit = q.value(rx_near_field_dist_limitIdx).isNull() ?
+			quietNaN :
+			q.value(rx_near_field_dist_limitIdx).toDouble();
+		target.at(r).rxNearFieldAntEfficiency = q.value(rx_near_field_ant_efficiencyIdx).isNull() ?
+			quietNaN :
+			q.value(rx_near_field_ant_efficiencyIdx).toDouble();
 
 		target.at(r).hasDiversity = q.value(rx_diversity_gainIdx).isNull() ? false : true;
 		target.at(r).diversityGain = q.value(rx_diversity_gainIdx).isNull() ?
-						     quietNaN :
-						     q.value(rx_diversity_gainIdx).toDouble();
+			quietNaN :
+			q.value(rx_diversity_gainIdx).toDouble();
 		target.at(r).diversityHeightAboveTerrain =
 			q.value(rx_diversity_height_to_center_raat_mIdx).isNull() ?
-				quietNaN :
-				q.value(rx_diversity_height_to_center_raat_mIdx).toDouble();
-		target.at(r).diversityAntennaDiameter =
-			q.value(rx_diversity_antennaDiameterIdx).isNull() ?
-				quietNaN :
-				q.value(rx_diversity_antennaDiameterIdx).toDouble();
+			quietNaN :
+			q.value(rx_diversity_height_to_center_raat_mIdx).toDouble();
+		target.at(r).diversityAntennaDiameter = q.value(rx_diversity_antennaDiameterIdx).isNull() ?
+			quietNaN :
+			q.value(rx_diversity_antennaDiameterIdx).toDouble();
 
 		target.at(r).status = q.value(statusIdx).toString().toStdString();
 		target.at(r).mobile = q.value(mobileIdx).toBool();
-		target.at(r).rxAntennaModelName =
-			q.value(rx_ant_modelNameIdx).toString().toStdString();
+		target.at(r).rxAntennaModelName = q.value(rx_ant_modelNameIdx).toString().toStdString();
 
 		int rxAntennaIdxDB = q.value(rx_ant_model_idxIdx).toInt();
 
@@ -765,11 +715,8 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 
 		if (rxAntennaIdxDB != -1) {
 			if (antennaIdxMap[rxAntennaIdxDB] == -1) {
-				antennaPattern =
-					createAntennaPattern(db,
-							     rxAntennaIdxDB,
-							     antennaAOBList,
-							     antennaNameList[rxAntennaIdxDB]);
+				antennaPattern = createAntennaPattern(
+					db, rxAntennaIdxDB, antennaAOBList, antennaNameList[rxAntennaIdxDB]);
 				antennaIdxMap[rxAntennaIdxDB] = antennaList.size();
 				antennaList.push_back(antennaPattern);
 			} else {
@@ -780,8 +727,7 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 
 		target.at(r).numPR = numPR;
 
-		std::string rxAntennaCategoryStr =
-			q.value(rx_antennaCategoryIdx).toString().toStdString();
+		std::string rxAntennaCategoryStr = q.value(rx_antennaCategoryIdx).toString().toStdString();
 		CConst::AntennaCategoryEnum rxAntennaCategory;
 		if (rxAntennaCategoryStr == "B1") {
 			rxAntennaCategory = CConst::B1AntennaCategory;
@@ -805,18 +751,15 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 			target.at(r).prTxAntennaDiameter = std::vector<double>(numPR);
 			target.at(r).prRxGain = std::vector<double>(numPR);
 			target.at(r).prRxAntennaDiameter = std::vector<double>(numPR);
-			target.at(r).prAntCategory = std::vector<CConst::AntennaCategoryEnum>(
-				numPR);
+			target.at(r).prAntCategory = std::vector<CConst::AntennaCategoryEnum>(numPR);
 			target.at(r).prAntModelName = std::vector<std::string>(numPR);
 
 			target.at(r).prReflectorHeight = std::vector<double>(numPR);
 			target.at(r).prReflectorWidth = std::vector<double>(numPR);
 			target.at(r).prAntenna = std::vector<AntennaClass *>(numPR);
 
-			QSqlQuery prQueryRes = SqlSelect(*db, "pr")
-						       .cols(prColumns)
-						       .where(QString("fsid=%1").arg(fsid))
-						       .run();
+			QSqlQuery prQueryRes =
+				SqlSelect(*db, "pr").cols(prColumns).where(QString("fsid=%1").arg(fsid)).run();
 
 			int querySize;
 			// resize vector to fit result
@@ -836,10 +779,9 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 			}
 
 			if (querySize != numPR) {
-				throw std::runtime_error(ErrStream()
-							 << "UlsDatabase.cpp: Inconsistent numPR "
-							    "for FSID = "
-							 << fsid);
+				throw std::runtime_error(ErrStream() << "UlsDatabase.cpp: Inconsistent numPR "
+														"for FSID = "
+													 << fsid);
 			}
 
 			while (prQueryRes.next()) {
@@ -847,47 +789,37 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 				int prIdx = prSeq - 1;
 
 				target.at(r).prType[prIdx] = prQueryRes.value(prTypeIdx).isNull() ?
-								     "" :
-								     prQueryRes.value(prTypeIdx)
-									     .toString()
-									     .toStdString();
-				target.at(r).prLatitudeDeg[prIdx] =
-					prQueryRes.value(pr_lat_degIdx).isNull() ?
-						quietNaN :
-						prQueryRes.value(pr_lat_degIdx).toDouble();
-				target.at(r).prLongitudeDeg[prIdx] =
-					prQueryRes.value(pr_lon_degIdx).isNull() ?
-						quietNaN :
-						prQueryRes.value(pr_lon_degIdx).toDouble();
+					"" :
+					prQueryRes.value(prTypeIdx).toString().toStdString();
+				target.at(r).prLatitudeDeg[prIdx] = prQueryRes.value(pr_lat_degIdx).isNull() ?
+					quietNaN :
+					prQueryRes.value(pr_lat_degIdx).toDouble();
+				target.at(r).prLongitudeDeg[prIdx] = prQueryRes.value(pr_lon_degIdx).isNull() ?
+					quietNaN :
+					prQueryRes.value(pr_lon_degIdx).toDouble();
 				target.at(r).prHeightAboveTerrainTx[prIdx] =
-					prQueryRes.value(pr_height_to_center_raat_tx_mIdx)
-							.isNull() ?
-						quietNaN :
-						prQueryRes.value(pr_height_to_center_raat_tx_mIdx)
-							.toDouble();
+					prQueryRes.value(pr_height_to_center_raat_tx_mIdx).isNull() ?
+					quietNaN :
+					prQueryRes.value(pr_height_to_center_raat_tx_mIdx).toDouble();
 				target.at(r).prHeightAboveTerrainRx[prIdx] =
-					prQueryRes.value(pr_height_to_center_raat_rx_mIdx)
-							.isNull() ?
-						quietNaN :
-						prQueryRes.value(pr_height_to_center_raat_rx_mIdx)
-							.toDouble();
+					prQueryRes.value(pr_height_to_center_raat_rx_mIdx).isNull() ?
+					quietNaN :
+					prQueryRes.value(pr_height_to_center_raat_rx_mIdx).toDouble();
 
-				target.at(r).prTxGain[prIdx] =
-					prQueryRes.value(prTxGainIdx).isNull() ?
-						quietNaN :
-						prQueryRes.value(prTxGainIdx).toDouble();
+				target.at(r).prTxGain[prIdx] = prQueryRes.value(prTxGainIdx).isNull() ?
+					quietNaN :
+					prQueryRes.value(prTxGainIdx).toDouble();
 				target.at(r).prTxAntennaDiameter[prIdx] =
 					prQueryRes.value(prTxDiameterIdx).isNull() ?
-						quietNaN :
-						prQueryRes.value(prTxDiameterIdx).toDouble();
-				target.at(r).prRxGain[prIdx] =
-					prQueryRes.value(prRxGainIdx).isNull() ?
-						quietNaN :
-						prQueryRes.value(prRxGainIdx).toDouble();
+					quietNaN :
+					prQueryRes.value(prTxDiameterIdx).toDouble();
+				target.at(r).prRxGain[prIdx] = prQueryRes.value(prRxGainIdx).isNull() ?
+					quietNaN :
+					prQueryRes.value(prRxGainIdx).toDouble();
 				target.at(r).prRxAntennaDiameter[prIdx] =
 					prQueryRes.value(prRxDiameterIdx).isNull() ?
-						quietNaN :
-						prQueryRes.value(prRxDiameterIdx).toDouble();
+					quietNaN :
+					prQueryRes.value(prRxDiameterIdx).toDouble();
 
 				std::string prAntCategoryStr =
 					prQueryRes.value(prAntCategoryIdx).toString().toStdString();
@@ -904,18 +836,16 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 				target.at(r).prAntCategory[prIdx] = prAntCategory;
 
 				target.at(r).prAntModelName[prIdx] =
-					prQueryRes.value(prAntModelNameIdx)
-						.toString()
-						.toStdString();
+					prQueryRes.value(prAntModelNameIdx).toString().toStdString();
 
 				target.at(r).prReflectorHeight[prIdx] =
 					prQueryRes.value(prReflectorHeightIdx).isNull() ?
-						quietNaN :
-						prQueryRes.value(prReflectorHeightIdx).toDouble();
+					quietNaN :
+					prQueryRes.value(prReflectorHeightIdx).toDouble();
 				target.at(r).prReflectorWidth[prIdx] =
 					prQueryRes.value(prReflectorWidthIdx).isNull() ?
-						quietNaN :
-						prQueryRes.value(prReflectorWidthIdx).toDouble();
+					quietNaN :
+					prQueryRes.value(prReflectorWidthIdx).toDouble();
 
 				int prAntennaIdxDB = prQueryRes.value(pr_ant_model_idxIdx).toInt();
 
@@ -924,15 +854,11 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 				if (prAntennaIdxDB != -1) {
 					if (antennaIdxMap[prAntennaIdxDB] == -1) {
 						antennaPattern = createAntennaPattern(
-							db,
-							prAntennaIdxDB,
-							antennaAOBList,
-							antennaNameList[prAntennaIdxDB]);
+							db, prAntennaIdxDB, antennaAOBList, antennaNameList[prAntennaIdxDB]);
 						antennaIdxMap[prAntennaIdxDB] = antennaList.size();
 						antennaList.push_back(antennaPattern);
 					} else {
-						antennaPattern =
-							antennaList[antennaIdxMap[prAntennaIdxDB]];
+						antennaPattern = antennaList[antennaIdxMap[prAntennaIdxDB]];
 					}
 				}
 				target.at(r).prAntenna[prIdx] = antennaPattern;
@@ -943,19 +869,16 @@ void UlsDatabase::fillTarget(SqlScopedConnection<SqlExceptionDb> &db,
 }
 
 AntennaClass *UlsDatabase::createAntennaPattern(SqlScopedConnection<SqlExceptionDb> &db,
-						int rxAntennaIdxDB,
-						std::vector<double> antennaAOBList,
-						std::string antennaName)
+	int rxAntennaIdxDB, std::vector<double> antennaAOBList, std::string antennaName)
 {
 	int numAntennaAOB = antennaAOBList.size();
 	int idmin = numAntennaAOB * rxAntennaIdxDB;
 	int idmax = idmin + numAntennaAOB - 1;
-	QSqlQuery antgainQueryRes =
-		SqlSelect(*db, "antgain")
-			.cols(antgainColumns)
-			.where(QString("(id BETWEEN %1 AND %2)").arg(idmin).arg(idmax))
-			.order("id")
-			.run();
+	QSqlQuery antgainQueryRes = SqlSelect(*db, "antgain")
+									.cols(antgainColumns)
+									.where(QString("(id BETWEEN %1 AND %2)").arg(idmin).arg(idmax))
+									.order("id")
+									.run();
 
 	int querySize;
 	// resize vector to fit result
@@ -974,9 +897,9 @@ AntennaClass *UlsDatabase::createAntennaPattern(SqlScopedConnection<SqlException
 	}
 
 	if (querySize != numAntennaAOB) {
-		LOGGER_DEBUG(logger)
-			<< "ERROR Creating antenna " << antennaName
-			<< ": numAntennaAOB = " << numAntennaAOB << ", querySize = " << querySize;
+		LOGGER_DEBUG(logger) << "ERROR Creating antenna " << antennaName
+							 << ": numAntennaAOB = " << numAntennaAOB
+							 << ", querySize = " << querySize;
 	}
 
 	std::vector<std::tuple<double, double>> sampledData;

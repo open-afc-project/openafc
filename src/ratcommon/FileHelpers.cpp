@@ -11,9 +11,9 @@ std::unique_ptr<QFile> FileHelpers::open(const QString &name, QIODevice::OpenMod
 	std::unique_ptr<QFile> file(new QFile(name));
 	if (!file->open(mode)) {
 		throw Error(QString("Error opening file \"%1\" in mode %2: %3")
-				    .arg(name)
-				    .arg(mode)
-				    .arg(file->errorString()));
+						.arg(name)
+						.arg(mode)
+						.arg(file->errorString()));
 	}
 	return file;
 }
@@ -50,7 +50,7 @@ void FileHelpers::remove(const QFileInfo &filePath)
 	QFile file(filePath.absoluteFilePath());
 	if (!file.remove()) {
 		throw Error(ErrStream() << "Failed to remove \"" << file.fileName()
-					<< "\": " << file.errorString());
+								<< "\": " << file.errorString());
 	}
 }
 
@@ -65,7 +65,6 @@ void FileHelpers::removeTree(const QDir &root)
 	}
 
 	if (!dir.rmdir(dir.absolutePath())) {
-		throw Error(ErrStream()
-			    << "Failed to remove directory \"" << dir.absolutePath() << "\"");
+		throw Error(ErrStream() << "Failed to remove directory \"" << dir.absolutePath() << "\"");
 	}
 }

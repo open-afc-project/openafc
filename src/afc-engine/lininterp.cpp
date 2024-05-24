@@ -27,9 +27,8 @@ LinInterpClass::LinInterpClass(ListClass<DblDblClass> *dataList, double xshift, 
 /******************************************************************************************/
 /**** CONSTRUCTOR: LinInterpClass::LinInterpClass                                      ****/
 /******************************************************************************************/
-LinInterpClass::LinInterpClass(std::vector<std::tuple<double, double>> dataList,
-			       double xshift,
-			       double yshift)
+LinInterpClass::LinInterpClass(
+	std::vector<std::tuple<double, double>> dataList, double xshift, double yshift)
 {
 	n = dataList.size();
 
@@ -56,9 +55,8 @@ LinInterpClass::~LinInterpClass()
 /**** FUNCTION: LinInterpClass::makelininterpcoeffs                                    ****/
 /**** Return value: 1 if successfull, 0 if not successful                              ****/
 /******************************************************************************************/
-int LinInterpClass::makelininterpcoeffs(ListClass<DblDblClass> *dataList,
-					double xshift,
-					double yshift)
+int LinInterpClass::makelininterpcoeffs(
+	ListClass<DblDblClass> *dataList, double xshift, double yshift)
 {
 	int i;
 	double x0, x1, y0, y1;
@@ -86,9 +84,8 @@ int LinInterpClass::makelininterpcoeffs(ListClass<DblDblClass> *dataList,
 /**** FUNCTION: LinInterpClass::makelininterpcoeffs                                    ****/
 /**** Return value: 1 if successfull, 0 if not successful                              ****/
 /******************************************************************************************/
-int LinInterpClass::makelininterpcoeffs(std::vector<std::tuple<double, double>> dataList,
-					double xshift,
-					double yshift)
+int LinInterpClass::makelininterpcoeffs(
+	std::vector<std::tuple<double, double>> dataList, double xshift, double yshift)
 {
 	int i;
 	double x0, x1, y0, y1;

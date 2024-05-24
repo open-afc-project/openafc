@@ -168,8 +168,7 @@ OGRSpatialReference *GdalHelpers::importWellKnownGcs(const std::string &name)
 	std::unique_ptr<OGRSpatialReference, SrsDeleter> srs(new OGRSpatialReference());
 	const auto status = srs->SetWellKnownGeogCS(name.data());
 	if (status != OGRERR_NONE) {
-		throw std::runtime_error(ErrStream()
-					 << "Failed to import well-known GCS: code " << status);
+		throw std::runtime_error(ErrStream() << "Failed to import well-known GCS: code " << status);
 	}
 	return srs.release();
 }

@@ -50,10 +50,8 @@ SqlDelete &SqlDelete::whereInExpr(const QString &col, const QString &expr)
 
 SqlDelete &SqlDelete::whereCompare(const QString &col, const QString &op, const QVariant &value)
 {
-	_whereExprs << QString("(%1 %2 %3)")
-			       .arg(col)
-			       .arg(op)
-			       .arg(SqlHelpers::quoted(_db.driver(), value));
+	_whereExprs
+		<< QString("(%1 %2 %3)").arg(col).arg(op).arg(SqlHelpers::quoted(_db.driver(), value));
 	return *this;
 }
 

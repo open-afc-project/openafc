@@ -46,10 +46,8 @@ class DeniedRegionClass
 
 		virtual GeometryEnum getGeometry() const = 0;
 
-		virtual bool intersect(double longitude,
-				       double latitude,
-				       double maxDist,
-				       double txHeightAGL) const = 0;
+		virtual bool intersect(
+			double longitude, double latitude, double maxDist, double txHeightAGL) const = 0;
 
 		int getID() const
 		{
@@ -125,10 +123,7 @@ class RectDeniedRegionClass : public DeniedRegionClass
 			}
 		}
 
-		bool intersect(double longitude,
-			       double latitude,
-			       double maxDist,
-			       double txHeightAGL) const;
+		bool intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const;
 
 		int getNumRect() const
 		{
@@ -164,10 +159,7 @@ class CircleDeniedRegionClass : public DeniedRegionClass
 			}
 		}
 
-		bool intersect(double longitude,
-			       double latitude,
-			       double maxDist,
-			       double txHeightAGL) const;
+		bool intersect(double longitude, double latitude, double maxDist, double txHeightAGL) const;
 
 		void setLongitudeCenter(double longitudeCenterVal)
 		{

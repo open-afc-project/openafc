@@ -36,6 +36,6 @@ bool GeodeticCoord::isIdenticalTo(const GeodeticCoord &other, qreal accuracy) co
 QDebug operator<<(QDebug stream, const GeodeticCoord &pt)
 {
 	stream.nospace() << "(lon: " << pt.longitudeDeg << ", lat: " << pt.latitudeDeg
-			 << ", height: " << pt.heightKm << ")";
+					 << ", height: " << pt.heightKm << ")";
 	return stream.space();
 }

@@ -87,8 +87,8 @@ int cvtStrToVal(char const *strptr, DblDblClass &val)
 		}
 		if (nptr == chptr) {
 			std::stringstream errorStr;
-			errorStr << "ERROR in cvtStrToVal() : Unable to cvt to DblDblClass \""
-				 << strptr << "\"";
+			errorStr << "ERROR in cvtStrToVal() : Unable to cvt to DblDblClass \"" << strptr
+					 << "\"";
 			throw std::runtime_error(errorStr.str());
 			return (0);
 		}

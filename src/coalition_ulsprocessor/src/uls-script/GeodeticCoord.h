@@ -40,9 +40,7 @@ struct GeodeticCoord {
 		/** Construct a new geodetic coordinate, the height is optional.
 		 */
 		GeodeticCoord(qreal inLongitudeDeg, qreal inLatitudeDeg, qreal inHeightKm = 0) :
-			longitudeDeg(inLongitudeDeg),
-			latitudeDeg(inLatitudeDeg),
-			heightKm(inHeightKm)
+			longitudeDeg(inLongitudeDeg), latitudeDeg(inLatitudeDeg), heightKm(inHeightKm)
 		{
 		}
 

@@ -19,8 +19,8 @@ class PolygonClass
 		PolygonClass(std::string kmlFilename, double resolution);
 		~PolygonClass();
 
-		static std::vector<PolygonClass *> readMultiGeometry(std::string kmlFilename,
-								     double resolution);
+		static std::vector<PolygonClass *> readMultiGeometry(
+			std::string kmlFilename, double resolution);
 		bool in_bdy_area(const int a, const int b, bool *edge = (bool *)NULL);
 		double comp_bdy_area();
 		void comp_bdy_min_max(int &minx, int &maxx, int &miny, int &maxy);
@@ -35,12 +35,8 @@ class PolygonClass
 		static PolygonClass *combinePolygons(std::vector<PolygonClass *> polyList);
 		static double comp_bdy_area(const int n, const int *x, const int *y);
 		static double comp_bdy_area(std::vector<std::tuple<int, int>> *ii_list);
-		static int in_bdy_area(const int a,
-				       const int b,
-				       const int n,
-				       const int *x,
-				       const int *y,
-				       int *edge = (int *)NULL);
+		static int in_bdy_area(const int a, const int b, const int n, const int *x, const int *y,
+			int *edge = (int *)NULL);
 
 		std::string name;
 		int num_segment;
@@ -48,11 +44,7 @@ class PolygonClass
 		int **bdy_pt_x, **bdy_pt_y;
 
 	private:
-		void comp_bdy_min_max(int &minx,
-				      int &maxx,
-				      int &miny,
-				      int &maxy,
-				      const int segment_idx);
+		void comp_bdy_min_max(int &minx, int &maxx, int &miny, int &maxy, const int segment_idx);
 };
 /******************************************************************************************/
 

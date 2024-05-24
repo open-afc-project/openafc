@@ -18,9 +18,8 @@
 // GdalNameMapperPattern::NamePart
 ///////////////////////////////////////////////////////////////////////////////
 
-GdalNameMapperPattern::NamePart::NamePart(GdalNameMapperPattern::Src src_,
-					  GdalNameMapperPattern::Op op_,
-					  std::string str_) :
+GdalNameMapperPattern::NamePart::NamePart(
+	GdalNameMapperPattern::Src src_, GdalNameMapperPattern::Op op_, std::string str_) :
 	src(src_), op(op_), str(str_)
 {
 }
@@ -29,21 +28,21 @@ GdalNameMapperPattern::NamePart::NamePart(GdalNameMapperPattern::Src src_,
 // GdalNameMapperPattern
 ///////////////////////////////////////////////////////////////////////////////
 
-GdalNameMapperPattern::GdalNameMapperPattern(const std::string &pattern,
-					     const std::string &directory)
+GdalNameMapperPattern::GdalNameMapperPattern(
+	const std::string &pattern, const std::string &directory)
 {
 	if (pattern.find_first_of("*?[]") != std::string::npos) {
 		std::ostringstream errStr;
 		if (directory.empty()) {
 			errStr << "ERROR: GdalNameMapperPattern::GdalNameMapperPattern(): "
-				  "GDAL filename pattern contains wildcard, but directory "
-				  "is not specified";
+					  "GDAL filename pattern contains wildcard, but directory "
+					  "is not specified";
 			throw std::runtime_error(errStr.str());
 		}
 		if (!boost::filesystem::is_directory(directory)) {
 			errStr << "ERROR: GdalNameMapperPattern::GdalNameMapperPattern(): "
-				  "Specified directory '"
-			       << directory << "' does not exist";
+					  "Specified directory '"
+				   << directory << "' does not exist";
 			throw std::runtime_error(errStr.str());
 		}
 		_directory = boost::filesystem::absolute(directory).string();
@@ -60,18 +59,16 @@ GdalNameMapperPattern::GdalNameMapperPattern(const std::string &pattern,
 		std::string elemType = m[1].str(), elemFormat = m[2].str();
 		std::ostringstream errPrefix;
 		errPrefix << "ERROR: GdalNameMapperPattern::GdalNameMapperPattern(): "
-			     "Invalid format for element '"
-			  << m.str() << "' in filename pattern '" << pattern << "'";
+					 "Invalid format for element '"
+				  << m.str() << "' in filename pattern '" << pattern << "'";
 		if ((elemType == "latHem") || (elemType == "lonHem")) {
 			if (elemFormat.length() != 2) {
 				throw std::runtime_error(errPrefix.str() +
-							 ": hemisphere specifier must be two "
-							 "character long");
+					": hemisphere specifier must be two "
+					"character long");
 			}
-			_nameParts.emplace_back((elemType.substr(0, 3) == "lat") ? Src::Lat :
-										   Src::Lon,
-						Op::Hemi,
-						elemFormat);
+			_nameParts.emplace_back(
+				(elemType.substr(0, 3) == "lat") ? Src::Lat : Src::Lon, Op::Hemi, elemFormat);
 			_fnmatchPattern += "[" + elemFormat + "]";
 		} else if (elemType == "latDegFloor") {
 			appendLatLon(Src::Lat, Op::DegFloor1, elemFormat, errPrefix.str());
@@ -97,18 +94,16 @@ void GdalNameMapperPattern::appendLiteral(std::string pattern, size_t pos, size_
 	if ((lit.find('{') != std::string::npos) || (lit.find('{') != std::string::npos)) {
 		std::ostringstream errStr;
 		errStr << "ERROR: GdalNameMapperPattern::appendLiteral(): "
-			  "Filename pattern '"
-		       << pattern << "' contains unrecognized element at offset " << pos;
+				  "Filename pattern '"
+			   << pattern << "' contains unrecognized element at offset " << pos;
 		throw std::runtime_error(errStr.str());
 	}
 	_nameParts.emplace_back(Src::Str, Op::Literal, lit);
 	_fnmatchPattern += lit;
 }
 
-void GdalNameMapperPattern::appendLatLon(Src src,
-					 Op op,
-					 const std::string &elemFormat,
-					 const std::string errPrefix)
+void GdalNameMapperPattern::appendLatLon(
+	Src src, Op op, const std::string &elemFormat, const std::string errPrefix)
 {
 	if (elemFormat.find('%') != std::string::npos) {
 		throw std::runtime_error(errPrefix + ": format should not contain '%' character");
@@ -170,18 +165,14 @@ std::string GdalNameMapperPattern::nameFor(double latDeg, double lonDeg)
 				break;
 			case Op::DegCeil1:
 			case Op::DegCeil:
-				snprintf(buf,
-					 sizeof(buf),
-					 np.str.c_str(),
-					 (int)fabs(ceil((np.src == Src::Lat) ? latDeg : lonDeg)));
+				snprintf(buf, sizeof(buf), np.str.c_str(),
+					(int)fabs(ceil((np.src == Src::Lat) ? latDeg : lonDeg)));
 				ret += buf;
 				break;
 			case Op::DegFloor:
 			case Op::DegFloor1:
-				snprintf(buf,
-					 sizeof(buf),
-					 np.str.c_str(),
-					 (int)fabs(floor((np.src == Src::Lat) ? latDeg : lonDeg)));
+				snprintf(buf, sizeof(buf), np.str.c_str(),
+					(int)fabs(floor((np.src == Src::Lat) ? latDeg : lonDeg)));
 				ret += buf;
 				break;
 		}
@@ -199,12 +190,11 @@ std::string GdalNameMapperPattern::nameFor(double latDeg, double lonDeg)
 		// largest candidate (to exclude ambiguity and to cater for 3DEP)
 		std::string candidate = "";
 		for (boost::filesystem::directory_iterator di(_directory);
-		     di != boost::filesystem::directory_iterator();
-		     ++di) {
+			 di != boost::filesystem::directory_iterator(); ++di) {
 			std::string filename = di->path().filename().string();
 			if (boost::filesystem::is_regular_file(di->path()) &&
-			    (fnmatch(ret.c_str(), filename.c_str(), 0) != FNM_NOMATCH) &&
-			    (candidate.empty() || (candidate < filename))) {
+				(fnmatch(ret.c_str(), filename.c_str(), 0) != FNM_NOMATCH) &&
+				(candidate.empty() || (candidate < filename))) {
 				candidate = filename;
 			}
 		}
@@ -214,8 +204,8 @@ std::string GdalNameMapperPattern::nameFor(double latDeg, double lonDeg)
 	return ret;
 }
 
-std::unique_ptr<GdalNameMapperBase> GdalNameMapperPattern::make_unique(const std::string &pattern,
-								       const std::string &directory)
+std::unique_ptr<GdalNameMapperBase> GdalNameMapperPattern::make_unique(
+	const std::string &pattern, const std::string &directory)
 {
 	return std::unique_ptr<GdalNameMapperBase>(new GdalNameMapperPattern(pattern, directory));
 }
@@ -224,27 +214,25 @@ std::unique_ptr<GdalNameMapperBase> GdalNameMapperPattern::make_unique(const std
 // GdalNameMapperDirect
 ///////////////////////////////////////////////////////////////////////////////
 
-GdalNameMapperDirect::GdalNameMapperDirect(const std::string &fnmatchPattern,
-					   const std::string &directory) :
+GdalNameMapperDirect::GdalNameMapperDirect(
+	const std::string &fnmatchPattern, const std::string &directory) :
 	_fnmatchPattern(fnmatchPattern)
 {
 	GDALAllRegister();
 	std::ostringstream errStr;
 	for (boost::filesystem::directory_iterator di(directory);
-	     di != boost::filesystem::directory_iterator();
-	     ++di) {
+		 di != boost::filesystem::directory_iterator(); ++di) {
 		std::string filename = di->path().filename().native();
 		if ((!boost::filesystem::is_regular_file(di->path())) ||
-		    (fnmatch(fnmatchPattern.c_str(), filename.c_str(), 0) == FNM_NOMATCH)) {
+			(fnmatch(fnmatchPattern.c_str(), filename.c_str(), 0) == FNM_NOMATCH)) {
 			continue;
 		}
 		GDALDataset *gdalDataSet = nullptr;
 		try {
 			gdalDataSet = static_cast<GDALDataset *>(
 				GDALOpen(di->path().native().c_str(), GA_ReadOnly));
-			_files.push_back(std::make_tuple(
-				GdalTransform(gdalDataSet, filename).makeBoundRect(),
-				filename));
+			_files.push_back(
+				std::make_tuple(GdalTransform(gdalDataSet, filename).makeBoundRect(), filename));
 			GDALClose(gdalDataSet);
 		} catch (...) {
 			if (gdalDataSet) {
@@ -270,9 +258,7 @@ std::string GdalNameMapperDirect::nameFor(double latDeg, double lonDeg)
 	return "";
 }
 std::unique_ptr<GdalNameMapperBase> GdalNameMapperDirect::make_unique(
-	const std::string &fnmatchPattern,
-	const std::string &directory)
+	const std::string &fnmatchPattern, const std::string &directory)
 {
-	return std::unique_ptr<GdalNameMapperBase>(
-		new GdalNameMapperDirect(fnmatchPattern, directory));
+	return std::unique_ptr<GdalNameMapperBase>(new GdalNameMapperDirect(fnmatchPattern, directory));
 }

@@ -89,15 +89,14 @@ SqlSelect &SqlSelect::whereInList(const QString &colVal, const QVariantList &val
 	return whereInExpr(colVal, parts.join(","));
 }
 
-SqlSelect &SqlSelect::whereBetween(const QString &colVal,
-				   const QVariant &minInclusive,
-				   const QVariant &maxInclusive)
+SqlSelect &SqlSelect::whereBetween(
+	const QString &colVal, const QVariant &minInclusive, const QVariant &maxInclusive)
 {
 	const QSqlDriver *drv = _db.driver();
 	_whereExprs << QString("((%1 >= %2) AND (%1 <= %3))")
-			       .arg(colVal)
-			       .arg(SqlHelpers::quoted(drv, minInclusive))
-			       .arg(SqlHelpers::quoted(drv, maxInclusive));
+					   .arg(colVal)
+					   .arg(SqlHelpers::quoted(drv, minInclusive))
+					   .arg(SqlHelpers::quoted(drv, maxInclusive));
 	return *this;
 }
 
@@ -136,7 +135,7 @@ QString SqlSelect::query() const
 	foreach(const Join &joinVal, _joins)
 	{
 		queryStr += QString(" %1 JOIN %2 ON (%3)")
-				    .arg(joinVal.typeClause, joinVal.whatClause, joinVal.onClause);
+						.arg(joinVal.typeClause, joinVal.whatClause, joinVal.onClause);
 	}
 
 	// Add list of WHERE clauses

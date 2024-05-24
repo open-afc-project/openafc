@@ -25,14 +25,11 @@ LOGGER_DEFINE_GLOBAL(logger, "PopulationDatabase")
 
 // Loads population data from an sql database that is stored in a vector
 void PopulationDatabase::loadPopulationData(const QString &dbName,
-					    std::vector<PopulationRecord> &target,
-					    const double &minLat,
-					    const double &maxLat,
-					    const double &minLon,
-					    const double &maxLon)
+	std::vector<PopulationRecord> &target, const double &minLat, const double &maxLat,
+	const double &minLon, const double &maxLon)
 {
 	LOGGER_DEBUG(logger) << "Bounds: " << minLat << ", " << maxLat << "; " << minLon << ", "
-			     << maxLon;
+						 << maxLon;
 
 	// create and open db connection
 	SqlConnectionDefinition config;
@@ -45,16 +42,14 @@ void PopulationDatabase::loadPopulationData(const QString &dbName,
 
 	LOGGER_DEBUG(logger) << "Querying population database";
 	auto populationQueryRes = SqlSelect(*db, "population")
-					  .cols(QStringList() << "latitude"
-							      << "longitude"
-							      << "density")
-					  .whereBetween("latitude",
-							std::min(minLat, maxLat),
-							std::max(minLat, maxLat))
-					  .whereBetween("longitude",
-							std::min(minLon, maxLon),
-							std::max(minLon, maxLon))
-					  .run();
+								  .cols(QStringList() << "latitude"
+													  << "longitude"
+													  << "density")
+								  .whereBetween("latitude", std::min(minLat, maxLat),
+									  std::max(minLat, maxLat))
+								  .whereBetween("longitude", std::min(minLon, maxLon),
+									  std::max(minLon, maxLon))
+								  .run();
 
 	LOGGER_DEBUG(logger) << "Is Active: " << populationQueryRes.isActive();
 	LOGGER_DEBUG(logger) << "Is Select: " << populationQueryRes.isSelect();
@@ -62,8 +57,8 @@ void PopulationDatabase::loadPopulationData(const QString &dbName,
 		// Query encountered error
 		QSqlError err = populationQueryRes.lastError();
 		throw std::runtime_error(ErrStream() << "PopulationDatabase.cpp: Database query "
-							"failed with code "
-						     << err.type() << " " << err.text());
+												"failed with code "
+											 << err.type() << " " << err.text());
 	}
 
 	// resize vector to fit result
@@ -74,10 +69,9 @@ void PopulationDatabase::loadPopulationData(const QString &dbName,
 		populationQueryRes.setForwardOnly(true);
 	} else {
 		if (!populationQueryRes.last()) {
-			throw std::runtime_error(ErrStream()
-						 << "PopulationDatabase.cpp: Failed to get last "
-						    "item. Check that lat/lon are within CONUS : "
-						 << populationQueryRes.at());
+			throw std::runtime_error(ErrStream() << "PopulationDatabase.cpp: Failed to get last "
+													"item. Check that lat/lon are within CONUS : "
+												 << populationQueryRes.at());
 		}
 		LOGGER_DEBUG(logger) << target.size() << " to " << populationQueryRes.at();
 		target.resize(populationQueryRes.at() + 1);

@@ -76,10 +76,8 @@ void RectDeniedRegionClass::addRect(double lon1, double lon2, double lat1, doubl
 /******************************************************************************************/
 /**** FUNCTION: RectDeniedRegionClass::intersect()                                   ****/
 /******************************************************************************************/
-bool RectDeniedRegionClass::intersect(double longitude,
-				      double latitude,
-				      double maxDist,
-				      double txHeightAGL) const
+bool RectDeniedRegionClass::intersect(
+	double longitude, double latitude, double maxDist, double txHeightAGL) const
 {
 	int rectIdx;
 	double deltaLon, deltaLat, dist;
@@ -109,7 +107,7 @@ bool RectDeniedRegionClass::intersect(double longitude,
 			deltaLat = (sy == -1 ? rectLatStart - latitude : latitude - rectLatStop);
 			deltaLon = (sx == -1 ? rectLonStart - longitude : longitude - rectLonStop);
 			dist = CConst::earthRadius * M_PI / 180.0 *
-			       sqrt(deltaLat * deltaLat + deltaLon * deltaLon * cosSq);
+				sqrt(deltaLat * deltaLat + deltaLon * deltaLon * cosSq);
 			intersectFlag = (dist <= maxDist);
 		}
 	}
@@ -148,8 +146,7 @@ double CircleDeniedRegionClass::computeRadius(double txHeightAGL) const
 	if (!horizonDistFlag) {
 		returnVal = radius;
 	} else {
-		returnVal = sqrt(2 * CConst::earthRadius * 4.0 / 3) *
-			    (sqrt(heightAGL) + sqrt(txHeightAGL));
+		returnVal = sqrt(2 * CConst::earthRadius * 4.0 / 3) * (sqrt(heightAGL) + sqrt(txHeightAGL));
 	}
 
 	return returnVal;
@@ -159,10 +156,8 @@ double CircleDeniedRegionClass::computeRadius(double txHeightAGL) const
 /******************************************************************************************/
 /**** FUNCTION: CircleDeniedRegionClass::intersect()                                   ****/
 /******************************************************************************************/
-bool CircleDeniedRegionClass::intersect(double longitude,
-					double latitude,
-					double maxDist,
-					double txHeightAGL) const
+bool CircleDeniedRegionClass::intersect(
+	double longitude, double latitude, double maxDist, double txHeightAGL) const
 {
 	double drRadius = computeRadius(txHeightAGL);
 
@@ -172,7 +167,7 @@ bool CircleDeniedRegionClass::intersect(double longitude,
 	double cosSq = cosVal * cosVal;
 
 	double dist = CConst::earthRadius * M_PI / 180.0 *
-		      (sqrt(deltaLat * deltaLat + deltaLon * deltaLon * cosSq));
+		(sqrt(deltaLat * deltaLat + deltaLon * deltaLon * cosSq));
 
 	bool retval = (dist <= drRadius + maxDist);
 

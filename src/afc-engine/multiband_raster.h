@@ -20,24 +20,19 @@ class MultibandRasterClass : private boost::noncopyable
 		enum HeightResult {
 			OUTSIDE_REGION, // point outside region defined by rectangle "bounds"
 			NO_DATA, // point inside bounds that has no data.  terrainHeight set to
-				 // nodataBE, bldgHeight undefined
+					 // nodataBE, bldgHeight undefined
 			NO_BUILDING, // point where there is no building, terrainHeight set to valid
-				     // value, bldgHeight set to nodataBldg
+						 // value, bldgHeight set to nodataBldg
 			BUILDING // point where there is a building, terrainHeight and bldgHeight
-				 // valid values
+					 // valid values
 		};
 
-		MultibandRasterClass(const std::string &rasterFile,
-				     CConst::LidarFormatEnum formatVal);
+		MultibandRasterClass(const std::string &rasterFile, CConst::LidarFormatEnum formatVal);
 
 		// Returns building height at a specified (lat/lon) point. If there are no buildings
 		// present at the given position then a quiet NaN value is returned
-		void getHeight(const double &latDeg,
-			       const double &lonDeg,
-			       double &terrainHeight,
-			       double &bldgHeight,
-			       HeightResult &heightResult,
-			       bool directGdalMode = false) const;
+		void getHeight(const double &latDeg, const double &lonDeg, double &terrainHeight,
+			double &bldgHeight, HeightResult &heightResult, bool directGdalMode = false) const;
 		bool contains(const double &latDeg, const double &lonDeg);
 
 		static const StrTypeClass strHeightResultList[];

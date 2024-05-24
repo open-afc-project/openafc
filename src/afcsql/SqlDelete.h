@@ -95,9 +95,7 @@ class SqlDelete
 		 * @param value The value which must be in the column.
 		 * @return The updated query object.
 		 */
-		SqlDelete &whereCompare(const QString &col,
-					const QString &op,
-					const QVariant &value);
+		SqlDelete &whereCompare(const QString &col, const QString &op, const QVariant &value);
 
 		/** Get the SQL query string which would be executed by run().
 		 * @return The query string to be executed.

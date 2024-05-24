@@ -14,8 +14,8 @@ void setTestEnv(const QString &locPath, const QString &sysPath)
 	::qputenv("XDG_DATA_DIRS", sysPath.toLocal8Bit());
 	::qputenv("XDG_DATA_HOME", locPath.toLocal8Bit());
 #elif defined(Q_OS_WIN)
-	::qputenv("LOCALAPPDATA",
-		  QStringList({locPath, sysPath}).join(QDir::listSeparator()).toLocal8Bit());
+	::qputenv(
+		"LOCALAPPDATA", QStringList({locPath, sysPath}).join(QDir::listSeparator()).toLocal8Bit());
 #else
 	#error Unknown OS define
 #endif
@@ -109,8 +109,8 @@ TEST_F(TestSearchPaths, forReadingSearchOrder)
 	ASSERT_TRUE(SearchPaths::init(QString()));
 
 	// Priority order
-	ASSERT_EQ(filterPathList(QDir::searchPaths("data")),
-		  QStringList({locPath, sys2Path, sys1Path}));
+	ASSERT_EQ(
+		filterPathList(QDir::searchPaths("data")), QStringList({locPath, sys2Path, sys1Path}));
 
 	ASSERT_EQ(content("data:only1.txt"), QByteArray("system1"));
 	ASSERT_EQ(content("data:only2.txt"), QByteArray("system2"));
@@ -173,8 +173,8 @@ TEST_F(TestSearchPaths, pathSuffix)
 
 	// Local gets priority
 	ASSERT_EQ(filterPathList(QDir::searchPaths("data")),
-		  QStringList({
-			  (locPath + QDir::separator() + "suffix"),
-			  (sysPath + QDir::separator() + "suffix"),
-		  }));
+		QStringList({
+			(locPath + QDir::separator() + "suffix"),
+			(sysPath + QDir::separator() + "suffix"),
+		}));
 }

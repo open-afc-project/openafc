@@ -33,8 +33,7 @@ class FatalError
 	public:
 		/** Create a new error with title and message.
 		 */
-		FatalError(const QString &titleVal, const QString &msg) :
-			_title(titleVal), _msg(msg)
+		FatalError(const QString &titleVal, const QString &msg) : _title(titleVal), _msg(msg)
 		{
 		}
 

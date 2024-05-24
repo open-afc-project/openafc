@@ -17,7 +17,7 @@ class UlsPath
 		int txLocationNumber; // This matches a UlsLocation of the same callsign as above.
 		int txAntennaNumber; // Likewise for a UlsAntenna.
 		int rxLocationNumber; // This matches a UlsLocation with either the same callsign of
-				      // the one below.
+							  // the one below.
 		int rxAntennaNumber; // Likewise.
 		char pathType[21];
 		char passiveReceiver;

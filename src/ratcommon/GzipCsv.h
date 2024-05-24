@@ -174,9 +174,8 @@ class GzipCsv : private boost::noncopyable
 				 * @pasram format Printf-style format. Empty to show at maximum
 				 * precision
 				 */
-				ColDouble(GzipCsv *container,
-					  const std::string &name,
-					  const std::string &format = "");
+				ColDouble(
+					GzipCsv *container, const std::string &name, const std::string &format = "");
 
 				/** Setting field value */
 				ColDouble &operator=(double value)
@@ -261,8 +260,7 @@ class GzipCsv : private boost::noncopyable
 				 * @param name Column name
 				 * @param tf Column values for true and false
 				 */
-				ColBool(GzipCsv *container,
-					const std::string &name,
+				ColBool(GzipCsv *container, const std::string &name,
 					const std::vector<std::string> &tf = {"True", "False"});
 
 				/** Setting field value */
@@ -303,8 +301,7 @@ class GzipCsv : private boost::noncopyable
 				 * @param items Enum item descriptors
 				 * @param defName Name for unknown item
 				 */
-				ColEnum(GzipCsv *container,
-					const std::string &name,
+				ColEnum(GzipCsv *container, const std::string &name,
 					const std::map<int, std::string> &items,
 					const std::string &defName = "Unknown");
 

@@ -82,8 +82,8 @@ void NFAClass::readTable()
 
 	ifstream file(tableFile);
 	if (!file.is_open()) {
-		errStr << std::string("ERROR: Unable to open Near Field Adjustment File \"") +
-				  tableFile + std::string("\"\n");
+		errStr << std::string("ERROR: Unable to open Near Field Adjustment File \"") + tableFile +
+				std::string("\"\n");
 		throw std::runtime_error(errStr.str());
 	}
 	int linenum = 0;
@@ -105,19 +105,17 @@ void NFAClass::readTable()
 			last = next + 1;
 		}
 		if (current_row.size() != 4) {
-			errStr << std::string("ERROR: Near Field Adjustment File ") << tableFile
-			       << ":" << linenum << " INVALID DATA\n";
+			errStr << std::string("ERROR: Near Field Adjustment File ") << tableFile << ":"
+				   << linenum << " INVALID DATA\n";
 			throw std::runtime_error(errStr.str());
 		}
 		if (linenum == 1) {
 		} else {
 			vector<double> doubleVector(current_row.size());
-			transform(current_row.begin(),
-				  current_row.end(),
-				  doubleVector.begin(),
-				  [](const std::string &val) {
-					  return std::stod(val);
-				  });
+			transform(current_row.begin(), current_row.end(), doubleVector.begin(),
+				[](const std::string &val) {
+					return std::stod(val);
+				});
 			datastore.push_back(doubleVector);
 
 			double xdb = doubleVector[0];
@@ -200,11 +198,9 @@ void NFAClass::readTable()
 						u = uStart + uIdx * uStep;
 						eff = effStart + effIdx * effStep;
 						errStr << std::string("ERROR: Near Field "
-								      "Adjustment File ")
-						       << tableFile
-						       << " does not contain data for xdb = " << xdb
-						       << ", u = " << u << ", eff = " << eff
-						       << std::endl;
+											  "Adjustment File ")
+							   << tableFile << " does not contain data for xdb = " << xdb
+							   << ", u = " << u << ", eff = " << eff << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				} else {
@@ -269,8 +265,7 @@ double NFAClass::computeNFA(double xdb, double u, double eff)
 	double F110 = nfaTable[xdbIdx0 + 1][uIdx0 + 1][effIdx0];
 	double F111 = nfaTable[xdbIdx0 + 1][uIdx0 + 1][effIdx0 + 1];
 
-	double nfa =
-		F000 * (xdbIdx0 + 1 - xdbIdxDbl) * (uIdx0 + 1 - uIdxDbl) *
+	double nfa = F000 * (xdbIdx0 + 1 - xdbIdxDbl) * (uIdx0 + 1 - uIdxDbl) *
 			(effIdx0 + 1 - effIdxDbl) +
 		F001 * (xdbIdx0 + 1 - xdbIdxDbl) * (uIdx0 + 1 - uIdxDbl) * (effIdxDbl - effIdx0) +
 		F010 * (xdbIdx0 + 1 - xdbIdxDbl) * (uIdxDbl - uIdx0) * (effIdx0 + 1 - effIdxDbl) +

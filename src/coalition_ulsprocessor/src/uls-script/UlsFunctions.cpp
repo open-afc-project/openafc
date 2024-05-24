@@ -90,16 +90,9 @@ double UlsFunctionsClass::emissionDesignatorToBandwidth(const QString &emDesig)
 /**************************************************************************/
 /* UlsFunctionsClass::hasNecessaryFields()                                */
 /**************************************************************************/
-QString UlsFunctionsClass::hasNecessaryFields(const UlsEmission &e,
-					      UlsPath path,
-					      UlsLocation rxLoc,
-					      UlsLocation txLoc,
-					      UlsAntenna rxAnt,
-					      UlsAntenna txAnt,
-					      UlsHeader txHeader,
-					      QList<UlsLocation> prLocList,
-					      QList<UlsAntenna> prAntList,
-					      bool removeMobile)
+QString UlsFunctionsClass::hasNecessaryFields(const UlsEmission &e, UlsPath path, UlsLocation rxLoc,
+	UlsLocation txLoc, UlsAntenna rxAnt, UlsAntenna txAnt, UlsHeader txHeader,
+	QList<UlsLocation> prLocList, QList<UlsAntenna> prAntList, bool removeMobile)
 {
 	QString failReason = "";
 	// check lat/lon degree for rx
@@ -112,7 +105,7 @@ QString UlsFunctionsClass::hasNecessaryFields(const UlsEmission &e,
 	}
 	// check tx and rx not at same position
 	if ((failReason == "") && (fabs(txLoc.longitude - rxLoc.longitude) <= 1.0e-5) &&
-	    (fabs(txLoc.latitude - rxLoc.latitude) <= 1.0e-5)) {
+		(fabs(txLoc.latitude - rxLoc.latitude) <= 1.0e-5)) {
 		failReason.append("RX and TX at same location, ");
 	}
 	// check rx latitude/longitude direction
@@ -268,25 +261,17 @@ QStringList UlsFunctionsClass::getCSVHeader(int numPR)
 		header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Name Matched";
 		header << "Passive Repeater " + QString::number(prIdx) + " Ant Type";
 		header << "Passive Repeater " + QString::number(prIdx) + " Ant Category";
-		header << "Passive Repeater " + QString::number(prIdx) +
-				  " ULS Back-to-Back Gain Tx (dBi)";
-		header << "Passive Repeater " + QString::number(prIdx) +
-				  " ULS Back-to-Back Gain Rx (dBi)";
-		header << "Passive Repeater " + QString::number(prIdx) +
-				  " ULS Reflector Height (m)";
+		header << "Passive Repeater " + QString::number(prIdx) + " ULS Back-to-Back Gain Tx (dBi)";
+		header << "Passive Repeater " + QString::number(prIdx) + " ULS Back-to-Back Gain Rx (dBi)";
+		header << "Passive Repeater " + QString::number(prIdx) + " ULS Reflector Height (m)";
 		header << "Passive Repeater " + QString::number(prIdx) + " ULS Reflector Width (m)";
 		header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Diameter (m)";
-		header << "Passive Repeater " + QString::number(prIdx) +
-				  " Ant Model Midband Gain (dB)";
-		header << "Passive Repeater " + QString::number(prIdx) +
-				  " Ant Model Reflector Height (m)";
-		header << "Passive Repeater " + QString::number(prIdx) +
-				  " Ant Model Reflector Width (m)";
+		header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Midband Gain (dB)";
+		header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Reflector Height (m)";
+		header << "Passive Repeater " + QString::number(prIdx) + " Ant Model Reflector Width (m)";
 		header << "Passive Repeater " + QString::number(prIdx) + " Line Loss (dB)";
-		header << "Passive Repeater " + QString::number(prIdx) +
-				  " Height to Center RAAT Tx (m)";
-		header << "Passive Repeater " + QString::number(prIdx) +
-				  " Height to Center RAAT Rx (m)";
+		header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT Tx (m)";
+		header << "Passive Repeater " + QString::number(prIdx) + " Height to Center RAAT Rx (m)";
 		header << "Passive Repeater " + QString::number(prIdx) + " Beamwidth";
 		header << "Segment " + QString::number(prIdx + 1) + " Length (Km)";
 	}
@@ -329,10 +314,8 @@ QStringList UlsFunctionsClass::getRASHeader()
 /******************************************************************************************/
 /**** UlsFunctionsClass::computeSpectralOverlap()                                      ****/
 /******************************************************************************************/
-double UlsFunctionsClass::computeSpectralOverlap(double sigStartFreq,
-						 double sigStopFreq,
-						 double rxStartFreq,
-						 double rxStopFreq)
+double UlsFunctionsClass::computeSpectralOverlap(
+	double sigStartFreq, double sigStopFreq, double rxStartFreq, double rxStopFreq)
 {
 	double overlap;
 
@@ -351,9 +334,8 @@ double UlsFunctionsClass::computeSpectralOverlap(double sigStartFreq,
 /******************************************************************************************/
 /**** UlsFunctionsClass::computeHPointingVec()                                         ****/
 /******************************************************************************************/
-Vector3 UlsFunctionsClass::computeHPointingVec(Vector3 position,
-					       double azimuthPtg,
-					       double elevationPtg)
+Vector3 UlsFunctionsClass::computeHPointingVec(
+	Vector3 position, double azimuthPtg, double elevationPtg)
 {
 	Vector3 ptgVec;
 
@@ -412,9 +394,8 @@ double UlsFunctionsClass::getAngleFromDMS(std::string dmsStr)
 			std::string dStr = dmsStr.substr(0, dashPosn1);
 			std::string mStr = dmsStr.substr(dashPosn1 + 1, dashPosn2 - dashPosn1 - 1);
 			std::string sStr = ((letterPosn == std::string::npos) ?
-						    dmsStr.substr(dashPosn2 + 1) :
-						    dmsStr.substr(dashPosn2 + 1,
-								  letterPosn - dashPosn2 - 1));
+					dmsStr.substr(dashPosn2 + 1) :
+					dmsStr.substr(dashPosn2 + 1, letterPosn - dashPosn2 - 1));
 
 			dVal = strtod(dStr.c_str(), &chptr);
 			mVal = strtod(mStr.c_str(), &chptr);
@@ -422,8 +403,8 @@ double UlsFunctionsClass::getAngleFromDMS(std::string dmsStr)
 		}
 
 		if (error) {
-			errStr << "ERROR: Unable to convert DMS string to angle, DMS string = \""
-			       << dmsStr << "\"" << std::endl;
+			errStr << "ERROR: Unable to convert DMS string to angle, DMS string = \"" << dmsStr
+				   << "\"" << std::endl;
 			throw std::runtime_error(errStr.str());
 		}
 

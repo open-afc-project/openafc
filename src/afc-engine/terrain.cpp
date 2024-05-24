@@ -33,29 +33,16 @@ LOGGER_DEFINE_GLOBAL(logger, "terrain")
 /******************************************************************************************/
 /**** FUNCTION: TerrainClass::TerrainClass()                                           ****/
 /******************************************************************************************/
-TerrainClass::TerrainClass(std::string lidarDir,
-			   std::string cdsmDir,
-			   std::string srtmDir,
-			   std::string depDir,
-			   std::string globeDir,
-			   double terrainMinLat,
-			   double terrainMinLon,
-			   double terrainMaxLat,
-			   double terrainMaxLon,
-			   double terrainMinLatBldg,
-			   double terrainMinLonBldg,
-			   double terrainMaxLatBldg,
-			   double terrainMaxLonBldg,
-			   int maxLidarRegionLoadVal) :
+TerrainClass::TerrainClass(std::string lidarDir, std::string cdsmDir, std::string srtmDir,
+	std::string depDir, std::string globeDir, double terrainMinLat, double terrainMinLon,
+	double terrainMaxLat, double terrainMaxLon, double terrainMinLatBldg, double terrainMinLonBldg,
+	double terrainMaxLatBldg, double terrainMaxLonBldg, int maxLidarRegionLoadVal) :
 	maxLidarRegionLoad(maxLidarRegionLoadVal), gdalDirectMode(false)
 {
 	if (!lidarDir.empty()) {
 		LOGGER_INFO(logger) << "Loading building+terrain data from " << lidarDir;
 		readLidarInfo(lidarDir);
-		readLidarData(terrainMinLatBldg,
-			      terrainMinLonBldg,
-			      terrainMaxLatBldg,
-			      terrainMaxLonBldg);
+		readLidarData(terrainMinLatBldg, terrainMinLonBldg, terrainMaxLatBldg, terrainMaxLonBldg);
 		minLidarLongitude = terrainMinLonBldg;
 		maxLidarLongitude = terrainMaxLonBldg;
 		minLidarLatitude = terrainMinLatBldg;
@@ -68,12 +55,10 @@ TerrainClass::TerrainClass(std::string lidarDir,
 	}
 
 	if (!cdsmDir.empty()) {
-		cgCdsm.reset(new CachedGdal<float>(
-			cdsmDir,
-			"cdsm",
+		cgCdsm.reset(new CachedGdal<float>(cdsmDir, "cdsm",
 			GdalNameMapperPattern::make_unique("{latHem:ns}{latDegCeil:02}{lonHem:ew}{"
-							   "lonDegFloor:03}.tif",
-							   cdsmDir)));
+											   "lonDegFloor:03}.tif",
+				cdsmDir)));
 		cgCdsm->setTransformationModifier([](GdalTransform *t) {
 			t->roundPpdToMultipleOf(1.);
 			t->setMarginsOutsideDeg(1.);
@@ -81,12 +66,10 @@ TerrainClass::TerrainClass(std::string lidarDir,
 	}
 
 	if (!depDir.empty()) {
-		cgDep.reset(new CachedGdal<float>(
-			depDir,
-			"dep",
+		cgDep.reset(new CachedGdal<float>(depDir, "dep",
 			GdalNameMapperPattern::make_unique("USGS_1_{latHem:ns}{latDegCeil:02}{"
-							   "lonHem:ew}{lonDegFloor:03}.tif",
-							   depDir)));
+											   "lonHem:ew}{lonDegFloor:03}.tif",
+				depDir)));
 		cgDep->setTransformationModifier([](GdalTransform *t) {
 			t->roundPpdToMultipleOf(1.);
 			t->setMarginsOutsideDeg(1.);
@@ -94,21 +77,17 @@ TerrainClass::TerrainClass(std::string lidarDir,
 	}
 
 	// STRM data is always loaded as fallback
-	cgSrtm.reset(new CachedGdal<int16_t>(srtmDir,
-					     "srtm",
-					     GdalNameMapperPattern::make_unique(
-						     "{latHem:NS}{latDegFloor:02}{lonHem:EW}{"
-						     "lonDegFloor:03}.hgt")));
+	cgSrtm.reset(new CachedGdal<int16_t>(srtmDir, "srtm",
+		GdalNameMapperPattern::make_unique("{latHem:NS}{latDegFloor:02}{lonHem:EW}{"
+										   "lonDegFloor:03}.hgt")));
 	cgSrtm->setTransformationModifier([](GdalTransform *t) {
 		t->roundPpdToMultipleOf(0.5);
 		t->setMarginsOutsideDeg(1.);
 	});
 
 	// GLOBE data is always loaded as final fallback
-	cgGlobe.reset(
-		new CachedGdal<int16_t>(globeDir,
-					"globe",
-					GdalNameMapperDirect::make_unique("*.bil", globeDir)));
+	cgGlobe.reset(new CachedGdal<int16_t>(
+		globeDir, "globe", GdalNameMapperDirect::make_unique("*.bil", globeDir)));
 	cgGlobe->setNoData(0);
 
 	numLidar = (long long)0;
@@ -128,8 +107,7 @@ TerrainClass::~TerrainClass()
 		int deleteLidarRegionIdx = activeLidarRegionList.back();
 		activeLidarRegionList.pop_back();
 		delete lidarRegionList[deleteLidarRegionIdx].multibandRaster;
-		lidarRegionList[deleteLidarRegionIdx].multibandRaster = (MultibandRasterClass *)
-			NULL;
+		lidarRegionList[deleteLidarRegionIdx].multibandRaster = (MultibandRasterClass *)NULL;
 	}
 }
 /******************************************************************************************/
@@ -150,9 +128,9 @@ LidarRegionStruct &TerrainClass::getLidarRegion(int lidarRegionIdx)
 {
 	if (!lidarRegionList[lidarRegionIdx].multibandRaster) {
 		std::string file = lidarRegionList[lidarRegionIdx].topPath + "/" +
-				   lidarRegionList[lidarRegionIdx].multibandFile;
-		lidarRegionList[lidarRegionIdx].multibandRaster =
-			new MultibandRasterClass(file, lidarRegionList[lidarRegionIdx].format);
+			lidarRegionList[lidarRegionIdx].multibandFile;
+		lidarRegionList[lidarRegionIdx].multibandRaster = new MultibandRasterClass(
+			file, lidarRegionList[lidarRegionIdx].format);
 	}
 	return (lidarRegionList[lidarRegionIdx]);
 }
@@ -161,13 +139,9 @@ LidarRegionStruct &TerrainClass::getLidarRegion(int lidarRegionIdx)
 /******************************************************************************************/
 /**** FUNCTION: TerrainClass::getTerrainHeight()                                       ****/
 /******************************************************************************************/
-void TerrainClass::getTerrainHeight(double longitudeDeg,
-				    double latitudeDeg,
-				    double &terrainHeight,
-				    double &bldgHeight,
-				    MultibandRasterClass::HeightResult &lidarHeightResult,
-				    CConst::HeightSourceEnum &heightSource,
-				    bool cdsmFlag) const
+void TerrainClass::getTerrainHeight(double longitudeDeg, double latitudeDeg, double &terrainHeight,
+	double &bldgHeight, MultibandRasterClass::HeightResult &lidarHeightResult,
+	CConst::HeightSourceEnum &heightSource, bool cdsmFlag) const
 {
 	int lidarRegionIdx = -1;
 	heightSource = CConst::unknownHeightSource;
@@ -180,29 +154,23 @@ void TerrainClass::getTerrainHeight(double longitudeDeg,
 			numCDSM++;
 		}
 	} else if ((longitudeDeg >= minLidarLongitude) && (longitudeDeg <= maxLidarLongitude) &&
-		   (latitudeDeg >= minLidarLatitude) && (latitudeDeg <= maxLidarLatitude)) {
+		(latitudeDeg >= minLidarLatitude) && (latitudeDeg <= maxLidarLatitude)) {
 		lidarRegionIdx = getLidarRegion(longitudeDeg, latitudeDeg);
 	}
 
 	if (lidarRegionIdx != -1) {
 		// loadLidarRegion(lidarRegionIdx);
-		lidarRegionList[lidarRegionIdx].multibandRaster->getHeight(latitudeDeg,
-									   longitudeDeg,
-									   terrainHeight,
-									   bldgHeight,
-									   lidarHeightResult,
-									   gdalDirectMode);
+		lidarRegionList[lidarRegionIdx].multibandRaster->getHeight(latitudeDeg, longitudeDeg,
+			terrainHeight, bldgHeight, lidarHeightResult, gdalDirectMode);
 
 		switch (lidarHeightResult) {
 			case MultibandRasterClass::OUTSIDE_REGION:
 				// point outside region defined by rectangle "bounds"
 				// This should be impossible because lidarRegion has already been
 				// checked.
-				throw std::logic_error(
-					"point outside region defined by rectangle 'bounds' for "
-					"lat: " +
-					std::to_string(latitudeDeg) +
-					", lon: " + std::to_string(longitudeDeg) +
+				throw std::logic_error("point outside region defined by rectangle 'bounds' for "
+									   "lat: " +
+					std::to_string(latitudeDeg) + ", lon: " + std::to_string(longitudeDeg) +
 					" in lidarRegionIdx: " + std::to_string(lidarRegionIdx));
 				break;
 			case MultibandRasterClass::NO_DATA:
@@ -243,10 +211,7 @@ void TerrainClass::getTerrainHeight(double longitudeDeg,
 	}
 
 	if (heightSource == CConst::unknownHeightSource) {
-		terrainHeight = (double)cgGlobe->valueAt(latitudeDeg,
-							 longitudeDeg,
-							 1,
-							 gdalDirectMode);
+		terrainHeight = (double)cgGlobe->valueAt(latitudeDeg, longitudeDeg, 1, gdalDirectMode);
 		heightSource = CConst::globalHeightSource;
 		numGlobal++;
 	}
@@ -290,22 +255,21 @@ void TerrainClass::loadLidarRegion(int lidarRegionIdx)
 		int deleteLidarRegionIdx = activeLidarRegionList.back();
 		activeLidarRegionList.pop_back();
 		delete lidarRegionList[deleteLidarRegionIdx].multibandRaster;
-		lidarRegionList[deleteLidarRegionIdx].multibandRaster = (MultibandRasterClass *)
-			NULL;
+		lidarRegionList[deleteLidarRegionIdx].multibandRaster = (MultibandRasterClass *)NULL;
 
 		LOGGER_WARN(logger) << "REMOVING LIDAR REGION: " << deleteLidarRegionIdx;
 	}
 
 	LOGGER_DEBUG(logger) << "LOADING LIDAR REGION: " << lidarRegionIdx;
 	std::string file = lidarRegionList[lidarRegionIdx].topPath + "/" +
-			   lidarRegionList[lidarRegionIdx].multibandFile;
-	lidarRegionList[lidarRegionIdx].multibandRaster =
-		new MultibandRasterClass(file, lidarRegionList[lidarRegionIdx].format);
+		lidarRegionList[lidarRegionIdx].multibandFile;
+	lidarRegionList[lidarRegionIdx].multibandRaster = new MultibandRasterClass(
+		file, lidarRegionList[lidarRegionIdx].format);
 
 	activeLidarRegionList.insert(activeLidarRegionList.begin(), lidarRegionIdx);
 
 	LOGGER_DEBUG(logger) << "NUM LIDAR REGIONS LOADED = " << activeLidarRegionList.size()
-			     << "    MAX = " << maxLidarRegionLoad;
+						 << "    MAX = " << maxLidarRegionLoad;
 }
 /******************************************************************************************/
 
@@ -318,7 +282,7 @@ int TerrainClass::getLidarRegion(double lonDeg, double latDeg) const
 	bool found = false;
 
 	for (lidarRegionIdx = 0; (lidarRegionIdx < ((int)lidarRegionList.size())) && (!found);
-	     ++lidarRegionIdx) {
+		 ++lidarRegionIdx) {
 		const LidarRegionStruct &lidarRegion = lidarRegionList[lidarRegionIdx];
 
 		if (lidarRegion.multibandRaster) {
@@ -349,42 +313,36 @@ int TerrainClass::getLidarRegion(double lonDeg, double latDeg) const
 /******************************************************************************************/
 /**** TerrainClass::readLidarData()                                                    ****/
 /******************************************************************************************/
-void TerrainClass::readLidarData(double terrainMinLat,
-				 double terrainMinLon,
-				 double terrainMaxLat,
-				 double terrainMaxLon)
+void TerrainClass::readLidarData(
+	double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon)
 {
 	int lidarRegionIdx;
 	std::ostringstream errStr;
 
 	int numRegionWithOverlap = 0;
-	for (lidarRegionIdx = 0; (lidarRegionIdx < ((int)lidarRegionList.size()));
-	     ++lidarRegionIdx) {
+	for (lidarRegionIdx = 0; (lidarRegionIdx < ((int)lidarRegionList.size())); ++lidarRegionIdx) {
 		const LidarRegionStruct &lidarRegion = lidarRegionList[lidarRegionIdx];
 
-		if (!((terrainMaxLon < lidarRegion.minLonDeg) ||
-		      (terrainMinLon > lidarRegion.maxLonDeg) ||
-		      (terrainMaxLat < lidarRegion.minLatDeg) ||
-		      (terrainMinLat > lidarRegion.maxLatDeg))) {
+		if (!((terrainMaxLon < lidarRegion.minLonDeg) || (terrainMinLon > lidarRegion.maxLonDeg) ||
+				(terrainMaxLat < lidarRegion.minLatDeg) ||
+				(terrainMinLat > lidarRegion.maxLatDeg))) {
 			numRegionWithOverlap++;
 		}
 	}
 
 	if (numRegionWithOverlap > maxLidarRegionLoad) {
 		errStr << "ERROR: Terrain region specified requires " << numRegionWithOverlap
-		       << " LIDAR tiles which exceeds maxLidarRegionLoad = " << maxLidarRegionLoad
-		       << std::endl;
+			   << " LIDAR tiles which exceeds maxLidarRegionLoad = " << maxLidarRegionLoad
+			   << std::endl;
 		throw std::runtime_error(errStr.str());
 	}
 
-	for (lidarRegionIdx = 0; (lidarRegionIdx < ((int)lidarRegionList.size()));
-	     ++lidarRegionIdx) {
+	for (lidarRegionIdx = 0; (lidarRegionIdx < ((int)lidarRegionList.size())); ++lidarRegionIdx) {
 		const LidarRegionStruct &lidarRegion = lidarRegionList[lidarRegionIdx];
 
-		if (!((terrainMaxLon < lidarRegion.minLonDeg) ||
-		      (terrainMinLon > lidarRegion.maxLonDeg) ||
-		      (terrainMaxLat < lidarRegion.minLatDeg) ||
-		      (terrainMinLat > lidarRegion.maxLatDeg))) {
+		if (!((terrainMaxLon < lidarRegion.minLonDeg) || (terrainMinLon > lidarRegion.maxLonDeg) ||
+				(terrainMaxLat < lidarRegion.minLatDeg) ||
+				(terrainMinLat > lidarRegion.maxLatDeg))) {
 			loadLidarRegion(lidarRegionIdx);
 		}
 	}
@@ -464,7 +422,7 @@ void TerrainClass::readLidarInfo(std::string lidarDir)
 
 		if (!(fp = fopen(infoFile.c_str(), "rb"))) {
 			str = std::string("ERROR: Unable to open Lidar Info file \"") + infoFile +
-			      std::string("\"\n");
+				std::string("\"\n");
 			throw std::runtime_error(str);
 		}
 
@@ -517,18 +475,14 @@ void TerrainClass::readLidarInfo(std::string lidarDir)
 			lidarRegion.multibandRaster = (MultibandRasterClass *)NULL;
 			switch (lineType) {
 				case labelLineType:
-					for (fieldIdx = 0; fieldIdx < (int)fieldList.size();
-					     fieldIdx++) {
+					for (fieldIdx = 0; fieldIdx < (int)fieldList.size(); fieldIdx++) {
 						field = fieldList.at(fieldIdx);
 
 						// std::cout << "FIELD: \"" << field << "\"" <<
 						// std::endl;
 
 						found = false;
-						for (fIdx = 0;
-						     (fIdx < (int)fieldLabelList.size()) &&
-						     (!found);
-						     fIdx++) {
+						for (fIdx = 0; (fIdx < (int)fieldLabelList.size()) && (!found); fIdx++) {
 							if (field == fieldLabelList.at(fIdx)) {
 								*fieldIdxList.at(fIdx) = fieldIdx;
 								found = true;
@@ -541,13 +495,10 @@ void TerrainClass::readLidarInfo(std::string lidarDir)
 							if (fieldLabelList.at(fIdx) == "FORMAT") {
 							} else {
 								errStr << "ERROR: Invalid Lidar "
-									  "Info file \""
-								       << infoFile
-								       << "\" label line missing \""
-								       << fieldLabelList.at(fIdx)
-								       << "\"" << std::endl;
-								throw std::runtime_error(
-									errStr.str());
+										  "Info file \""
+									   << infoFile << "\" label line missing \""
+									   << fieldLabelList.at(fIdx) << "\"" << std::endl;
+								throw std::runtime_error(errStr.str());
 							}
 						}
 					}
@@ -580,8 +531,8 @@ void TerrainClass::readLidarInfo(std::string lidarDir)
 						lidarRegion.format = CConst::fromRasterLidarFormat;
 					} else {
 						errStr << "lidarRegion.format not a valid value. "
-							  "Got "
-						       << strval << std::endl;
+								  "Got "
+							   << strval << std::endl;
 						throw std::logic_error(errStr.str());
 					}
 
@@ -602,7 +553,7 @@ void TerrainClass::readLidarInfo(std::string lidarDir)
 					break;
 				default:
 					throw std::runtime_error("Impossible case statement "
-								 "reached in terrain.cpp");
+											 "reached in terrain.cpp");
 					break;
 			}
 		}
@@ -633,8 +584,8 @@ std::vector<QRectF> TerrainClass::getBounds() const
 /**
  * Register a label with a height source value
  */
-void TerrainClass::setSourceName(const CConst::HeightSourceEnum &sourceVal,
-				 const std::string &sourceName)
+void TerrainClass::setSourceName(
+	const CConst::HeightSourceEnum &sourceVal, const std::string &sourceName)
 {
 	sourceNames[sourceVal] = sourceName;
 }
@@ -656,20 +607,20 @@ void TerrainClass::printStats()
 
 	LOGGER_INFO(logger) << "TOTAL_NUM_TERRAIN = " << totalNumTerrain;
 	LOGGER_INFO(logger) << "NUM_LIDAR = " << numLidar << "  ("
-			    << (double)(totalNumTerrain ? numLidar * 100.0 / totalNumTerrain : 0.0)
-			    << " %)";
+						<< (double)(totalNumTerrain ? numLidar * 100.0 / totalNumTerrain : 0.0)
+						<< " %)";
 	LOGGER_INFO(logger) << "NUM_CDSM = " << numCDSM << "  ("
-			    << (double)(totalNumTerrain ? numCDSM * 100.0 / totalNumTerrain : 0.0)
-			    << " %)";
+						<< (double)(totalNumTerrain ? numCDSM * 100.0 / totalNumTerrain : 0.0)
+						<< " %)";
 	LOGGER_INFO(logger) << "NUM_DEP = " << numDEP << "  ("
-			    << (double)(totalNumTerrain ? numDEP * 100.0 / totalNumTerrain : 0.0)
-			    << " %)";
+						<< (double)(totalNumTerrain ? numDEP * 100.0 / totalNumTerrain : 0.0)
+						<< " %)";
 	LOGGER_INFO(logger) << "NUM_SRTM = " << numSRTM << "  ("
-			    << (double)(totalNumTerrain ? numSRTM * 100.0 / totalNumTerrain : 0.0)
-			    << " %)";
+						<< (double)(totalNumTerrain ? numSRTM * 100.0 / totalNumTerrain : 0.0)
+						<< " %)";
 	LOGGER_INFO(logger) << "NUM_GLOBAL = " << numGlobal << "  ("
-			    << (double)(totalNumTerrain ? numGlobal * 100.0 / totalNumTerrain : 0.0)
-			    << " %)";
+						<< (double)(totalNumTerrain ? numGlobal * 100.0 / totalNumTerrain : 0.0)
+						<< " %)";
 	LOGGER_INFO(logger) << "NUM_ITM = " << numITM;
 }
 /******************************************************************************************/

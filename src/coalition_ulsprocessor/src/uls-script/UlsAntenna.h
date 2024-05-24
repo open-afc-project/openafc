@@ -15,7 +15,7 @@ class UlsAntenna
 		char callsign[11]; // this is the 'key' for the owner of this antenna.
 		int antennaNumber; // identifier for this antenna
 		int locationNumber; // location of the antenna. This matches up with a UlsLocation
-				    // of the same callsign.
+							// of the same callsign.
 		char recvZoneCode[6]; // marker for the received zone?
 		char antennaType; // R or T or P
 		double heightToTip; // Presumably in feet.
@@ -41,7 +41,7 @@ class UlsAntenna
 		int passiveRepeaterSequenceId;
 		char alternativeCGSA;
 		int pathNumber; // Which microwave path this record is used in. This maps to a
-				// UlsPath of the same callsign.
+						// UlsPath of the same callsign.
 		double lineLoss;
 		char statusCode;
 		char statusDate[11];

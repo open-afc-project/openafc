@@ -159,9 +159,7 @@ class SqlSelect
 		 * @param value The value which must be in the column.
 		 * @return The updated query object.
 		 */
-		SqlSelect &whereCompare(const QString &col,
-					const QString &op,
-					const QVariant &value);
+		SqlSelect &whereCompare(const QString &col, const QString &op, const QVariant &value);
 
 		/** Add a WHERE clause to the SELECT for a single column.
 		 * @param col The name of the column to filter.
@@ -207,9 +205,8 @@ class SqlSelect
 		 * @param maxInclusive The maximum possible value allowed by the filter.
 		 * @return The updated query object.
 		 */
-		SqlSelect &whereBetween(const QString &col,
-					const QVariant &minInclusive,
-					const QVariant &maxInclusive);
+		SqlSelect &whereBetween(
+			const QString &col, const QVariant &minInclusive, const QVariant &maxInclusive);
 
 		/** Join the current table with another.
 		 * Multiple joins may be added in-sequence.

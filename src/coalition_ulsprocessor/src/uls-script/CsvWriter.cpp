@@ -12,8 +12,8 @@ CsvWriter::CsvWriter(const QString &fileName) : _ownFile(true), _colI(0)
 	// Destructor is not called if constructor throws
 	QScopedPointer<QIODevice> file(new QFile(fileName));
 	if (!file->open(QIODevice::WriteOnly)) {
-		throw FileError(QString("Failed to open \"%1\" for writing: %2")
-					.arg(fileName, file->errorString()));
+		throw FileError(
+			QString("Failed to open \"%1\" for writing: %2").arg(fileName, file->errorString()));
 	}
 	_str.setDevice(file.take());
 }
@@ -24,8 +24,7 @@ CsvWriter::CsvWriter(QIODevice &device) : _ownFile(false), _colI(0)
 
 	if (!device.isOpen()) {
 		if (!device.open(QIODevice::WriteOnly)) {
-			throw FileError(QString("Failed to open for writing: %1")
-						.arg(device.errorString()));
+			throw FileError(QString("Failed to open for writing: %1").arg(device.errorString()));
 		}
 	}
 	_str.setDevice(&device);
@@ -117,7 +116,6 @@ void CsvWriter::_write(const QString &text)
 {
 	_str << text;
 	if (_str.status() != QTextStream::Ok) {
-		throw FileError(
-			QString("Failed to write output: %1").arg(_str.device()->errorString()));
+		throw FileError(QString("Failed to write output: %1").arg(_str.device()->errorString()));
 	}
 }

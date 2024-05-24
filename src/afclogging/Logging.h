@@ -24,7 +24,7 @@ LOGGER_DEFINE_GLOBAL(logger, "logname")
 }
 ...
 void func(){
-    LOGGER_INFO(logger) << "some message " << with_data;
+	LOGGER_INFO(logger) << "some message " << with_data;
 }
  * @endcode
  */
@@ -37,15 +37,15 @@ using channel_name_type = std::string;
 std::ostream &operator<<(std::ostream &stream, const severity_level &val);
 
 /// Convenience name for single-thread logger class
-typedef boost::log::sources::severity_channel_logger<
-	severity_level, // the type of the severity level
+typedef boost::log::sources::severity_channel_logger<severity_level, // the type of the severity
+																	 // level
 	channel_name_type // the type of the channel name
 	>
 	logger_st;
 
 /// Convenience name for multi-thread-safe logger class
-typedef boost::log::sources::severity_channel_logger_mt<
-	severity_level, // the type of the severity level
+typedef boost::log::sources::severity_channel_logger_mt<severity_level, // the type of the severity
+																		// level
 	channel_name_type // the type of the channel name
 	>
 	logger_mt;

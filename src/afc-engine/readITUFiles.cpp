@@ -146,9 +146,9 @@ double ITUDataClass::getSurfaceRefractivityValue(double latDeg, double lonDeg)
 	double val11 = SRData[latIdx1][lonIdx1];
 
 	double surf_refract = (val00 * (latIdx1 - latIdxDbl) * (lonIdx1 - lonIdxDbl) +
-			       val01 * (latIdx1 - latIdxDbl) * (lonIdxDbl - lonIdx0) +
-			       val10 * (latIdxDbl - latIdx0) * (lonIdx1 - lonIdxDbl) +
-			       val11 * (latIdxDbl - latIdx0) * (lonIdxDbl - lonIdx0));
+		val01 * (latIdx1 - latIdxDbl) * (lonIdxDbl - lonIdx0) +
+		val10 * (latIdxDbl - latIdx0) * (lonIdx1 - lonIdxDbl) +
+		val11 * (latIdxDbl - latIdx0) * (lonIdxDbl - lonIdx0));
 
 	return surf_refract;
 }

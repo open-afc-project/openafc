@@ -154,22 +154,21 @@ typedef struct {
 } aep_statistic_t;
 
 static struct stat def_stat = {.st_dev = 0x72,
-			       .st_ino = 0x6ea7ca04,
-			       .st_nlink = 0x1,
-			       .st_mode = 0, /*  S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO - directory,
-						 S_IFREG | S_IRUSR | S_IRGRP | S_IROTH - file */
-			       .st_uid = 0x4466,
-			       .st_gid = 0x592,
-			       .st_rdev = 0,
-			       .st_size = 0,
-			       .st_blksize = 0x80000,
-			       .st_blocks = 0, /* st_size / 512 rounded up */
-			       .st_atim = {0x63b45b04, 0},
-			       .st_mtim = {0x63b45b04, 0},
-			       .st_ctim = {0x63b45b04, 0}};
+	.st_ino = 0x6ea7ca04,
+	.st_nlink = 0x1,
+	.st_mode = 0, /*  S_IFDIR | S_IRWXU | S_IRWXG | S_IRWXO - directory,
+		  S_IFREG | S_IRUSR | S_IRGRP | S_IROTH - file */
+	.st_uid = 0x4466,
+	.st_gid = 0x592,
+	.st_rdev = 0,
+	.st_size = 0,
+	.st_blksize = 0x80000,
+	.st_blocks = 0, /* st_size / 512 rounded up */
+	.st_atim = {0x63b45b04, 0},
+	.st_mtim = {0x63b45b04, 0},
+	.st_ctim = {0x63b45b04, 0}};
 
-static struct statx def_statx = {
-	.stx_mask = 0x17ff,
+static struct statx def_statx = {.stx_mask = 0x17ff,
 	.stx_blksize = 0x80000,
 	.stx_attributes = 0,
 	.stx_nlink = 1,
@@ -260,18 +259,10 @@ static inline void prn_statistic()
 	if (!(aep_debug & (DBG_LOG | DBG_DBG))) {
 		return;
 	}
-	dprintf(logfile,
-		"statistics: remoteIO %u/%u/%u cachedIO %u/%u/%u dl %u/%u/%u cs %lu\n",
-		aepst.read_remote,
-		aepst.read_remote_size,
-		aepst.read_remote_time,
-		aepst.read_cached,
-		aepst.read_cached_size,
-		aepst.read_cached_time,
-		aepst.read_write,
-		aepst.read_write_size,
-		aepst.read_write_time,
-		*cache_size);
+	dprintf(logfile, "statistics: remoteIO %u/%u/%u cachedIO %u/%u/%u dl %u/%u/%u cs %lu\n",
+		aepst.read_remote, aepst.read_remote_size, aepst.read_remote_time, aepst.read_cached,
+		aepst.read_cached_size, aepst.read_cached_time, aepst.read_write, aepst.read_write_size,
+		aepst.read_write_time, *cache_size);
 }
 
 static void starttime(struct timeval *tv)
@@ -536,12 +527,8 @@ static off_t f_seek(FILE *f, off_t off, int whence)
 			data_fd->off = data_fd->fe->size + off;
 			break;
 	}
-	dbgd("FILE->seek(%d(%s), %jd, %d) %jd",
-	     fileno(f),
-	     fd_get_dbg_name(fileno(f)),
-	     off,
-	     whence,
-	     data_fd->off);
+	dbgd("FILE->seek(%d(%s), %jd, %d) %jd", fileno(f), fd_get_dbg_name(fileno(f)), off, whence,
+		data_fd->off);
 	return data_fd->off;
 }
 
@@ -619,8 +606,8 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 	dbg("read_data(%s)", data_fd->tpath);
 	char fakepath[AEP_PATH_MAX];
 	ssize_t ret;
-	ssize_t (*read_remote_data)(void *destv, size_t size, char *tpath, off_t off) =
-		aep_use_gs ? read_remote_data_gs : read_remote_data_nfs;
+	ssize_t (*read_remote_data)(void *destv, size_t size, char *tpath,
+		off_t off) = aep_use_gs ? read_remote_data_gs : read_remote_data_nfs;
 	/* define pointer to download file func */
 	int (*download_file)(data_fd_t * data_fd, char *dest);
 	download_file = aep_use_gs ? download_file_gs : download_file_nfs;
@@ -648,24 +635,14 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 				// dbg("download %s", data_fd->tpath);
 				if (!download_file(data_fd, fakepath)) {
 					cache_size_set(data_fd->fe->size);
-					dbg("download %s done, cs %ld",
-					    data_fd->tpath,
-					    *cache_size);
+					dbg("download %s done, cs %ld", data_fd->tpath, *cache_size);
 					is_cached = true;
 				} else {
-					dbg("download %s failed, cs %ld",
-					    data_fd->tpath,
-					    *cache_size);
+					dbg("download %s failed, cs %ld", data_fd->tpath, *cache_size);
 				}
 			} else {
-				dbgl("Can't cache %s %lu cs %ld",
-				     data_fd->tpath,
-				     data_fd->fe->size,
-				     *cache_size);
-				dbg("Can't cache %s %lu cs %ld",
-				    data_fd->tpath,
-				    data_fd->fe->size,
-				    *cache_size);
+				dbgl("Can't cache %s %lu cs %ld", data_fd->tpath, data_fd->fe->size, *cache_size);
+				dbg("Can't cache %s %lu cs %ld", data_fd->tpath, data_fd->fe->size, *cache_size);
 			}
 		}
 	}
@@ -685,11 +662,8 @@ static size_t read_data(void *destv, size_t size, data_fd_t *data_fd)
 		us = stoptime(&tv);
 		sem_post(sem);
 		sem_close(sem);
-		dbgl("read cached file %s size %zu time %u us cache size %zu",
-		     data_fd->tpath,
-		     ret,
-		     us,
-		     *cache_size);
+		dbgl("read cached file %s size %zu time %u us cache size %zu", data_fd->tpath, ret, us,
+			*cache_size);
 		aepst.read_cached++;
 		aepst.read_cached_size += ret;
 		aepst.read_cached_time += us;
@@ -1053,23 +1027,15 @@ void __attribute__((constructor)) aep_init(void)
 		/* O_CREAT | O_EXCL failed, so shared memory object already was initialized */
 		shm_fd = shm_open("aep_shmem", O_RDWR, 0666);
 		aep_assert(shm_fd >= 0, "shm_open");
-		cache_size = (int64_t *)mmap(NULL,
-					     sizeof(int64_t) + HASH_SIZE,
-					     PROT_READ | PROT_WRITE,
-					     MAP_SHARED,
-					     shm_fd,
-					     0);
+		cache_size = (int64_t *)mmap(
+			NULL, sizeof(int64_t) + HASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
 		open_files = (int8_t *)(cache_size + 1);
 	} else {
 		// dbg("aep_init recount cache");
 		aep_assert(!ftruncate(shm_fd, sizeof(uint64_t) + HASH_SIZE), "aep_init:ftruncate");
-		cache_size = (int64_t *)mmap(NULL,
-					     sizeof(int64_t) + HASH_SIZE,
-					     PROT_READ | PROT_WRITE,
-					     MAP_SHARED,
-					     shm_fd,
-					     0);
+		cache_size = (int64_t *)mmap(
+			NULL, sizeof(int64_t) + HASH_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, shm_fd, 0);
 		aep_assert(cache_size, "mmap");
 		open_files = (int8_t *)(cache_size + 1);
 		memset((void *)cache_size, 0, sizeof(int64_t) + HASH_SIZE);
@@ -1243,11 +1209,8 @@ int fstat(int fd, struct stat *statbuf)
 		statbuf->st_size = data_fd->fe->size;
 		statbuf->st_blocks = (statbuf->st_size >> 9) + (statbuf->st_size & 0x1ff) ? 1 : 0;
 		ret = 0;
-		dbgd("fstat(%s, 0x%lx, %s) %d",
-		     fd_get_dbg_name(fd),
-		     data_fd->fe->size,
-		     data_fd->fe->size ? "file" : "dir",
-		     ret);
+		dbgd("fstat(%s, 0x%lx, %s) %d", fd_get_dbg_name(fd), data_fd->fe->size,
+			data_fd->fe->size ? "file" : "dir", ret);
 	} else {
 		ret = orig_fstat(fd, statbuf);
 		dbgo("fstat(%d) %d", fd, ret);
@@ -1279,11 +1242,8 @@ int lstat(const char *pathname, struct stat *statbuf)
 		statbuf->st_size = data_fd->fe->size;
 		statbuf->st_blocks = (statbuf->st_size >> 9) + (statbuf->st_size & 0x1ff) ? 1 : 0;
 		ret = 0;
-		dbgd("lstat(%s, 0x%lx, %s) %d",
-		     tpath,
-		     data_fd->fe->size,
-		     data_fd->fe->size ? "file" : "dir",
-		     ret);
+		dbgd("lstat(%s, 0x%lx, %s) %d", tpath, data_fd->fe->size,
+			data_fd->fe->size ? "file" : "dir", ret);
 		fd_rm(fd, true);
 	} else {
 		ret = orig_lstat(pathname, statbuf);
@@ -1346,12 +1306,8 @@ long int syscall(long int __sysno, ...)
 				return -1;
 			}
 
-			dbgd("syscall(SYS_statx, dirfd:%d, path:%s, flags:0x%x, mask:0x%x) 0x%lx",
-			     dirfd,
-			     path,
-			     flags,
-			     mask,
-			     fe->size);
+			dbgd("syscall(SYS_statx, dirfd:%d, path:%s, flags:0x%x, mask:0x%x) 0x%lx", dirfd, path,
+				flags, mask, fe->size);
 			memcpy(st, &def_statx, sizeof(struct statx));
 			if (fe->size) {
 				st->stx_mode = S_IFREG | S_IRUSR | S_IRGRP | S_IROTH;
@@ -1432,11 +1388,8 @@ off_t lseek(int fd, off_t offset, int whence)
 	if (fd_is_remote(fd)) {
 		data_fd_t *data_fd = fd_get_data_fd(fd);
 
-		aep_assert(whence == SEEK_SET,
-			   "lseek(%s, %ld, %d) unsupported whence",
-			   fd_get_dbg_name(fd),
-			   offset,
-			   whence);
+		aep_assert(whence == SEEK_SET, "lseek(%s, %ld, %d) unsupported whence", fd_get_dbg_name(fd),
+			offset, whence);
 		data_fd->off = offset;
 		ret = 0;
 		dbgd("lseek(%d(%s), %ld, %d) %ld", fd, fd_get_dbg_name(fd), offset, whence, ret);
@@ -1601,9 +1554,8 @@ static ssize_t read_remote_data_gs(void *destv, size_t size, char *tpath, off_t 
 {
 #ifndef NO_GOOGLE_LINK
 	// ObjectReadStream is std::basic_istream<char>
-	gcs::ObjectReadStream stream = client.ReadObject(bucket_name,
-							 tpath,
-							 gcs::ReadRange(off, off + size));
+	gcs::ObjectReadStream stream = client.ReadObject(
+		bucket_name, tpath, gcs::ReadRange(off, off + size));
 	stream.read((char *)destv, size);
 	return stream.tellg();
 #else

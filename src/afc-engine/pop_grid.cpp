@@ -40,9 +40,8 @@ LOGGER_DEFINE_GLOBAL(logger, "pop_grid")
 /******************************************************************************************/
 /**** FUNCTION: PopGridClass::PopGridClass()                                           ****/
 /******************************************************************************************/
-PopGridClass::PopGridClass(double densityThrUrbanVal,
-			   double densityThrSuburbanVal,
-			   double densityThrRuralVal) :
+PopGridClass::PopGridClass(
+	double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal) :
 	densityThrUrban(densityThrUrbanVal),
 	densityThrSuburban(densityThrSuburbanVal),
 	densityThrRural(densityThrRuralVal)
@@ -68,15 +67,9 @@ PopGridClass::PopGridClass(double densityThrUrbanVal,
 /**** CONSTRUCTOR: PopGridClass::PopGridClass()                                        ****/
 /******************************************************************************************/
 PopGridClass::PopGridClass(std::string worldPopulationFile,
-			   const std::vector<PolygonClass *> &regionPolygonList,
-			   double regionPolygonResolution,
-			   double densityThrUrbanVal,
-			   double densityThrSuburbanVal,
-			   double densityThrRuralVal,
-			   double minLat,
-			   double minLon,
-			   double maxLat,
-			   double maxLon) :
+	const std::vector<PolygonClass *> &regionPolygonList, double regionPolygonResolution,
+	double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal,
+	double minLat, double minLon, double maxLat, double maxLon) :
 	densityThrUrban(densityThrUrbanVal),
 	densityThrSuburban(densityThrSuburbanVal),
 	densityThrRural(densityThrRuralVal)
@@ -122,7 +115,7 @@ PopGridClass::PopGridClass(std::string worldPopulationFile,
 	CPLErr readError = gdalDataset->GetGeoTransform(adfGeoTransform);
 	if (readError != CPLErr::CE_None) {
 		errStr << "ERROR: getting GEO Transform" << worldPopulationFile
-		       << ", throwing CPLErr = " << readError;
+			   << ", throwing CPLErr = " << readError;
 		throw std::runtime_error(errStr.str());
 	}
 
@@ -150,7 +143,7 @@ PopGridClass::PopGridClass(std::string worldPopulationFile,
 
 	if ((ULX != LLX) || (URX != LRX) || (LLY != LRY) || (ULY != URY)) {
 		errStr << "ERROR: Inconsistent bounding box in world population file: "
-		       << worldPopulationFile;
+			   << worldPopulationFile;
 		throw std::runtime_error(errStr.str());
 	}
 
@@ -160,9 +153,9 @@ PopGridClass::PopGridClass(std::string worldPopulationFile,
 	double worldMaxLat = URY;
 
 	if ((fabs(worldMinLon + 180.0) > 1.0e-8) || (fabs(worldMaxLon - 180.0) > 1.0e-8) ||
-	    (fabs(worldMinLat + 90.0) > 1.0e-8) || (fabs(worldMaxLat - 90.0) > 1.0e-8)) {
+		(fabs(worldMinLat + 90.0) > 1.0e-8) || (fabs(worldMaxLat - 90.0) > 1.0e-8)) {
 		errStr << "ERROR: world population file: " << worldPopulationFile
-		       << " does not cover region LON: -180,180 LAT: -90,90";
+			   << " does not cover region LON: -180,180 LAT: -90,90";
 		throw std::runtime_error(errStr.str());
 	}
 
@@ -201,11 +194,9 @@ PopGridClass::PopGridClass(std::string worldPopulationFile,
 	}
 
 	rasterBand->GetBlockSize(&nBlockXSize, &nBlockYSize);
-	printf("Block=%dx%d Type=%s, ColorInterp=%s\n",
-	       nBlockXSize,
-	       nBlockYSize,
-	       GDALGetDataTypeName(rasterBand->GetRasterDataType()),
-	       GDALGetColorInterpretationName(rasterBand->GetColorInterpretation()));
+	printf("Block=%dx%d Type=%s, ColorInterp=%s\n", nBlockXSize, nBlockYSize,
+		GDALGetDataTypeName(rasterBand->GetRasterDataType()),
+		GDALGetColorInterpretationName(rasterBand->GetColorInterpretation()));
 
 	int bGotMin, bGotMax;
 	double adfMinMax[2];
@@ -222,7 +213,7 @@ PopGridClass::PopGridClass(std::string worldPopulationFile,
 	}
 	if (rasterBand->GetColorTable() != NULL) {
 		printf("Band has a color table with %d entries.\n",
-		       rasterBand->GetColorTable()->GetColorEntryCount());
+			rasterBand->GetColorTable()->GetColorEntryCount());
 	}
 
 	int hasNoData;
@@ -275,7 +266,7 @@ PopGridClass::PopGridClass(std::string worldPopulationFile,
 	}
 
 	std::cout << "Analysis region wraps around LON discontinuity at +/- 180 deg: "
-		  << (wrapLonFlag ? "YES" : "NO") << std::endl;
+			  << (wrapLonFlag ? "YES" : "NO") << std::endl;
 
 	/**************************************************************************************/
 	/**** Set parameters                                                               ****/
@@ -343,48 +334,22 @@ PopGridClass::PopGridClass(std::string worldPopulationFile,
 	float *pafScanline = (float *)CPLMalloc(numLon * GDALGetDataTypeSize(GDT_Float32));
 
 	double areaGridEquator = CConst::earthRadius * CConst::earthRadius *
-				 (deltaLonDeg * M_PI / 180.0) * (deltaLatDeg * M_PI / 180.0);
+		(deltaLonDeg * M_PI / 180.0) * (deltaLatDeg * M_PI / 180.0);
 
 	for (latIdx = 0; latIdx < numLat; latIdx++) {
 		if (wrapLonFlag) {
-			rasterBand->RasterIO(GF_Read,
-					     minLonIdx,
-					     nYSize - 1 - minLatIdx - latIdx,
-					     nXSize - minLonIdx,
-					     1,
-					     pafScanline,
-					     nXSize - minLonIdx,
-					     1,
-					     GDT_Float32,
-					     0,
-					     0);
-			rasterBand->RasterIO(GF_Read,
-					     0,
-					     nYSize - 1 - minLatIdx - latIdx,
-					     numLon - (nXSize - minLonIdx),
-					     1,
-					     pafScanline + nXSize - minLonIdx,
-					     numLon - (nXSize - minLonIdx),
-					     1,
-					     GDT_Float32,
-					     0,
-					     0);
+			rasterBand->RasterIO(GF_Read, minLonIdx, nYSize - 1 - minLatIdx - latIdx,
+				nXSize - minLonIdx, 1, pafScanline, nXSize - minLonIdx, 1, GDT_Float32, 0, 0);
+			rasterBand->RasterIO(GF_Read, 0, nYSize - 1 - minLatIdx - latIdx,
+				numLon - (nXSize - minLonIdx), 1, pafScanline + nXSize - minLonIdx,
+				numLon - (nXSize - minLonIdx), 1, GDT_Float32, 0, 0);
 		} else {
-			rasterBand->RasterIO(GF_Read,
-					     minLonIdx,
-					     nYSize - 1 - minLatIdx - latIdx,
-					     numLon,
-					     1,
-					     pafScanline,
-					     numLon,
-					     1,
-					     GDT_Float32,
-					     0,
-					     0);
+			rasterBand->RasterIO(GF_Read, minLonIdx, nYSize - 1 - minLatIdx - latIdx, numLon, 1,
+				pafScanline, numLon, 1, GDT_Float32, 0, 0);
 		}
 		double latitudeDeg = (maxLatDeg * (2 * latIdx + 1) +
-				      minLatDeg * (2 * numLat - 2 * latIdx - 1)) /
-				     (2 * numLat);
+								 minLatDeg * (2 * numLat - 2 * latIdx - 1)) /
+			(2 * numLat);
 		int polygonY = (int)floor(latitudeDeg / regionPolygonResolution + 0.5);
 		for (lonIdx = 0; lonIdx < numLon; lonIdx++) {
 			// if ((lonIdx == 1382) && (latIdx == 1425) ) {
@@ -393,25 +358,20 @@ PopGridClass::PopGridClass(std::string worldPopulationFile,
 
 			if (pafScanline[lonIdx] != origNodataValueFloat) {
 				double longitudeDeg = (maxLonDeg * (2 * lonIdx + 1) +
-						       minLonDeg * (2 * numLon - 2 * lonIdx - 1)) /
-						      (2 * numLon);
+										  minLonDeg * (2 * numLon - 2 * lonIdx - 1)) /
+					(2 * numLon);
 				// std::cout << longitudeDeg << " " << latitudeDeg << std::endl;
-				int polygonX = (int)floor(longitudeDeg / regionPolygonResolution +
-							  0.5);
+				int polygonX = (int)floor(longitudeDeg / regionPolygonResolution + 0.5);
 				bool foundRegion = false;
-				for (regionIdx = 0;
-				     (regionIdx < (int)regionPolygonList.size()) && (!foundRegion);
-				     ++regionIdx) {
+				for (regionIdx = 0; (regionIdx < (int)regionPolygonList.size()) && (!foundRegion);
+					 ++regionIdx) {
 					PolygonClass *regionPolygon = regionPolygonList[regionIdx];
 					if (regionPolygon->in_bdy_area(polygonX, polygonY)) {
 						foundRegion = true;
 
-						double density =
-							pafScanline[lonIdx] *
-							1.0e-6; // convert from people/sq-km to
-								// people/sqm;
-						double area = areaGridEquator *
-							      cos(latitudeDeg * M_PI / 180.0);
+						double density = pafScanline[lonIdx] * 1.0e-6; // convert from people/sq-km
+																	   // to people/sqm;
+						double area = areaGridEquator * cos(latitudeDeg * M_PI / 180.0);
 
 						pop[lonIdx][latIdx] = density * area;
 						region[lonIdx][latIdx] = regionIdx;
@@ -451,10 +411,7 @@ PopGridClass::PopGridClass(std::string worldPopulationFile,
 
 #if DEBUG_AFC
 						if (fchk) {
-							fprintf(fchk,
-								"%.4f,%.4f,%.6f\n",
-								latitudeDeg,
-								longitudeDeg,
+							fprintf(fchk, "%.4f,%.4f,%.6f\n", latitudeDeg, longitudeDeg,
 								density * 1.0e6);
 						}
 #endif
@@ -475,58 +432,55 @@ PopGridClass::PopGridClass(std::string worldPopulationFile,
 	if ((totalPop > 0.0) && (totalArea > 0.0)) {
 		for (regionIdx = 0; regionIdx < numRegion; regionIdx++) {
 			PolygonClass *regionPolygon = regionPolygonList[regionIdx];
-			double regionPop = urbanPop[regionIdx] + suburbanPop[regionIdx] +
-					   ruralPop[regionIdx] + barrenPop[regionIdx];
+			double regionPop = urbanPop[regionIdx] + suburbanPop[regionIdx] + ruralPop[regionIdx] +
+				barrenPop[regionIdx];
 			std::cout << "REGION " << regionPolygon->name
-				  << " URBAN    POPULATION: " << urbanPop[regionIdx] << " "
-				  << 100 * urbanPop[regionIdx] / totalPop << " % (total)"
-				  << " " << 100 * urbanPop[regionIdx] / regionPop << " % (region)"
-				  << std::endl;
+					  << " URBAN    POPULATION: " << urbanPop[regionIdx] << " "
+					  << 100 * urbanPop[regionIdx] / totalPop << " % (total)"
+					  << " " << 100 * urbanPop[regionIdx] / regionPop << " % (region)" << std::endl;
 			std::cout << "REGION " << regionPolygon->name
-				  << " SUBURBAN POPULATION: " << suburbanPop[regionIdx] << " "
-				  << 100 * suburbanPop[regionIdx] / totalPop << " % (total)"
-				  << " " << 100 * suburbanPop[regionIdx] / regionPop
-				  << " % (region)" << std::endl;
+					  << " SUBURBAN POPULATION: " << suburbanPop[regionIdx] << " "
+					  << 100 * suburbanPop[regionIdx] / totalPop << " % (total)"
+					  << " " << 100 * suburbanPop[regionIdx] / regionPop << " % (region)"
+					  << std::endl;
 			std::cout << "REGION " << regionPolygon->name
-				  << " RURAL    POPULATION: " << ruralPop[regionIdx] << " "
-				  << 100 * ruralPop[regionIdx] / totalPop << " % (total)"
-				  << " " << 100 * ruralPop[regionIdx] / regionPop << " % (region)"
-				  << std::endl;
+					  << " RURAL    POPULATION: " << ruralPop[regionIdx] << " "
+					  << 100 * ruralPop[regionIdx] / totalPop << " % (total)"
+					  << " " << 100 * ruralPop[regionIdx] / regionPop << " % (region)" << std::endl;
 			std::cout << "REGION " << regionPolygon->name
-				  << " BARREN   POPULATION: " << barrenPop[regionIdx] << " "
-				  << 100 * barrenPop[regionIdx] / totalPop << " % (total)"
-				  << " " << 100 * barrenPop[regionIdx] / regionPop << " % (region)"
-				  << std::endl;
+					  << " BARREN   POPULATION: " << barrenPop[regionIdx] << " "
+					  << 100 * barrenPop[regionIdx] / totalPop << " % (total)"
+					  << " " << 100 * barrenPop[regionIdx] / regionPop << " % (region)"
+					  << std::endl;
 			std::cout << std::endl;
 
 			double regionArea = urbanArea[regionIdx] + suburbanArea[regionIdx] +
-					    ruralArea[regionIdx] + barrenArea[regionIdx] +
-					    zeroArea[regionIdx];
+				ruralArea[regionIdx] + barrenArea[regionIdx] + zeroArea[regionIdx];
 			std::cout << "REGION " << regionPolygon->name
-				  << " URBAN_NZ    AREA: " << urbanArea[regionIdx] << " "
-				  << 100 * urbanArea[regionIdx] / totalArea << " % (total)"
-				  << " " << 100 * urbanArea[regionIdx] / regionArea << " % (region)"
-				  << std::endl;
+					  << " URBAN_NZ    AREA: " << urbanArea[regionIdx] << " "
+					  << 100 * urbanArea[regionIdx] / totalArea << " % (total)"
+					  << " " << 100 * urbanArea[regionIdx] / regionArea << " % (region)"
+					  << std::endl;
 			std::cout << "REGION " << regionPolygon->name
-				  << " SUBURBAN_NZ AREA: " << suburbanArea[regionIdx] << " "
-				  << 100 * suburbanArea[regionIdx] / totalArea << " % (total)"
-				  << " " << 100 * suburbanArea[regionIdx] / regionArea
-				  << " % (region)" << std::endl;
+					  << " SUBURBAN_NZ AREA: " << suburbanArea[regionIdx] << " "
+					  << 100 * suburbanArea[regionIdx] / totalArea << " % (total)"
+					  << " " << 100 * suburbanArea[regionIdx] / regionArea << " % (region)"
+					  << std::endl;
 			std::cout << "REGION " << regionPolygon->name
-				  << " RURAL_NZ    AREA: " << ruralArea[regionIdx] << " "
-				  << 100 * ruralArea[regionIdx] / totalArea << " % (total)"
-				  << " " << 100 * ruralArea[regionIdx] / regionArea << " % (region)"
-				  << std::endl;
+					  << " RURAL_NZ    AREA: " << ruralArea[regionIdx] << " "
+					  << 100 * ruralArea[regionIdx] / totalArea << " % (total)"
+					  << " " << 100 * ruralArea[regionIdx] / regionArea << " % (region)"
+					  << std::endl;
 			std::cout << "REGION " << regionPolygon->name
-				  << " BARREN_NZ   AREA: " << barrenArea[regionIdx] << " "
-				  << 100 * barrenArea[regionIdx] / totalArea << " % (total)"
-				  << " " << 100 * barrenArea[regionIdx] / regionArea
-				  << " % (region)" << std::endl;
+					  << " BARREN_NZ   AREA: " << barrenArea[regionIdx] << " "
+					  << 100 * barrenArea[regionIdx] / totalArea << " % (total)"
+					  << " " << 100 * barrenArea[regionIdx] / regionArea << " % (region)"
+					  << std::endl;
 			std::cout << "REGION " << regionPolygon->name
-				  << " ZERO-POP    AREA: " << zeroArea[regionIdx] << " "
-				  << 100 * zeroArea[regionIdx] / totalArea << " % (total)"
-				  << " " << 100 * zeroArea[regionIdx] / regionArea << " % (region)"
-				  << std::endl;
+					  << " ZERO-POP    AREA: " << zeroArea[regionIdx] << " "
+					  << 100 * zeroArea[regionIdx] / totalArea << " % (total)"
+					  << " " << 100 * zeroArea[regionIdx] / regionArea << " % (region)"
+					  << std::endl;
 			std::cout << std::endl;
 		}
 	}
@@ -662,9 +616,9 @@ double PopGridClass::getPropEnvPop(CConst::PropEnvEnum propEnvVal, int regionIdx
 			popVal = barrenPop[regionIdx];
 			break;
 		default:
-			throw std::runtime_error(
-				ErrStream() << "ERROR in PopGridClass::getPropEnvPop: propEnvVal = "
-					    << propEnvVal << " INVALID value");
+			throw std::runtime_error(ErrStream()
+				<< "ERROR in PopGridClass::getPropEnvPop: propEnvVal = " << propEnvVal
+				<< " INVALID value");
 			break;
 	}
 
@@ -747,15 +701,9 @@ double PopGridClass::getProbFromCDF(int lonIdx, int latIdx) const
 /******************************************************************************************/
 /**** FUNCTION: PopGridClass::readData()                                               ****/
 /******************************************************************************************/
-void PopGridClass::readData(std::string filename,
-			    const std::vector<std::string> &regionNameListVal,
-			    const std::vector<int> &regionIDListVal,
-			    int numLonVal,
-			    double deltaLonDegVal,
-			    double minLonDegVal,
-			    int numLatVal,
-			    double deltaLatDegVal,
-			    double minLatDegVal)
+void PopGridClass::readData(std::string filename, const std::vector<std::string> &regionNameListVal,
+	const std::vector<int> &regionIDListVal, int numLonVal, double deltaLonDegVal,
+	double minLonDegVal, int numLatVal, double deltaLatDegVal, double minLatDegVal)
 {
 	LOGGER_INFO(logger) << "Reading population density file: " << filename << " ...";
 
@@ -838,12 +786,9 @@ void PopGridClass::readData(std::string filename,
 	// bool hasRegion = false;
 
 	std::vector<PopulationRecord> rows;
-	PopulationDatabase::loadPopulationData(QString::fromStdString(filename),
-					       rows,
-					       minLatDeg,
-					       maxLatDeg,
-					       minLonDeg,
-					       maxLonDeg); // add buffer *1.5
+	PopulationDatabase::loadPopulationData(QString::fromStdString(filename), rows, minLatDeg,
+		maxLatDeg, minLonDeg,
+		maxLonDeg); // add buffer *1.5
 
 	// iterate through returned rows in population db and add them to members
 	for (int r = 0; r < (int)rows.size(); r++) {
@@ -868,23 +813,19 @@ void PopGridClass::readData(std::string filename,
 		// not that they are on grid
 		if (fabs(lonIdxDbl - lonIdx - 0.5) > 0.05) {
 			throw std::runtime_error(ErrStream()
-						 << "ERROR: Invalid population density data file \""
-						 << filename << "(" << r
-						 << ")\" longitude value not on grid, lonIdxDbl = "
-						 << lonIdxDbl);
+				<< "ERROR: Invalid population density data file \"" << filename << "(" << r
+				<< ")\" longitude value not on grid, lonIdxDbl = " << lonIdxDbl);
 		}
 
 		if (fabs(latIdxDbl - latIdx - 0.5) > 0.05) {
 			throw std::runtime_error(ErrStream()
-						 << "ERROR: Invalid population density data file \""
-						 << filename << "(" << r
-						 << ")\" latitude value not on grid, latIdxDbl = "
-						 << latIdxDbl);
+				<< "ERROR: Invalid population density data file \"" << filename << "(" << r
+				<< ")\" latitude value not on grid, latIdxDbl = " << latIdxDbl);
 		}
 
 		// area of population tile
 		area = CConst::earthRadius * CConst::earthRadius * cos(latitudeDeg * M_PI / 180.0) *
-		       deltaLonDeg * deltaLatDeg * (M_PI / 180.0) * (M_PI / 180.0);
+			deltaLonDeg * deltaLatDeg * (M_PI / 180.0) * (M_PI / 180.0);
 
 		// assign data value to class members
 		double populationVal = density * area;
@@ -892,9 +833,8 @@ void PopGridClass::readData(std::string filename,
 
 		region[lonIdx][latIdx] = regionVal;
 
-		if (density >=
-		    densityThrUrban) { // Check density against different thresholds to determine
-				       // what the population environment is (urban, suburban, etc.)
+		if (density >= densityThrUrban) { // Check density against different thresholds to determine
+			// what the population environment is (urban, suburban, etc.)
 			urbanPop[regionVal] += populationVal;
 			urbanArea[regionVal] += area;
 			propEnv[lonIdx][latIdx] = 'U'; // Urban
@@ -923,29 +863,29 @@ void PopGridClass::readData(std::string filename,
 	LOGGER_INFO(logger) << "TOTAL INTEGRATED AREA: " << totalArea;
 	for (regionIdx = 0; regionIdx < numRegion; regionIdx++) {
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " URBAN    POPULATION: " << urbanPop[regionIdx] << " "
-				    << 100 * urbanPop[regionIdx] / totalPop << " %";
+							<< " URBAN    POPULATION: " << urbanPop[regionIdx] << " "
+							<< 100 * urbanPop[regionIdx] / totalPop << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " SUBURBAN POPULATION: " << suburbanPop[regionIdx] << " "
-				    << 100 * suburbanPop[regionIdx] / totalPop << " %";
+							<< " SUBURBAN POPULATION: " << suburbanPop[regionIdx] << " "
+							<< 100 * suburbanPop[regionIdx] / totalPop << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " RURAL    POPULATION: " << ruralPop[regionIdx] << " "
-				    << 100 * ruralPop[regionIdx] / totalPop << " %";
+							<< " RURAL    POPULATION: " << ruralPop[regionIdx] << " "
+							<< 100 * ruralPop[regionIdx] / totalPop << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " BARREN   POPULATION: " << barrenPop[regionIdx] << " "
-				    << 100 * barrenPop[regionIdx] / totalPop << " %";
+							<< " BARREN   POPULATION: " << barrenPop[regionIdx] << " "
+							<< 100 * barrenPop[regionIdx] / totalPop << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " URBAN    AREA: " << urbanArea[regionIdx] << " "
-				    << 100 * urbanArea[regionIdx] / totalArea << " %";
+							<< " URBAN    AREA: " << urbanArea[regionIdx] << " "
+							<< 100 * urbanArea[regionIdx] / totalArea << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " SUBURBAN AREA: " << suburbanArea[regionIdx] << " "
-				    << 100 * suburbanArea[regionIdx] / totalArea << " %";
+							<< " SUBURBAN AREA: " << suburbanArea[regionIdx] << " "
+							<< 100 * suburbanArea[regionIdx] / totalArea << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " RURAL    AREA: " << ruralArea[regionIdx] << " "
-				    << 100 * ruralArea[regionIdx] / totalArea << " %";
+							<< " RURAL    AREA: " << ruralArea[regionIdx] << " "
+							<< 100 * ruralArea[regionIdx] / totalArea << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " BARREN   AREA: " << barrenArea[regionIdx] << " "
-				    << 100 * barrenArea[regionIdx] / totalArea << " %";
+							<< " BARREN   AREA: " << barrenArea[regionIdx] << " "
+							<< 100 * barrenArea[regionIdx] / totalArea << " %";
 	}
 	/**************************************************************************************/
 
@@ -956,12 +896,8 @@ void PopGridClass::readData(std::string filename,
 /******************************************************************************************/
 /**** FUNCTION: PopGridClass::setDimensions()                                          ****/
 /******************************************************************************************/
-void PopGridClass::setDimensions(int numLonVal,
-				 double deltaLonDegVal,
-				 double minLonDegVal,
-				 int numLatVal,
-				 double deltaLatDegVal,
-				 double minLatDegVal)
+void PopGridClass::setDimensions(int numLonVal, double deltaLonDegVal, double minLonDegVal,
+	int numLatVal, double deltaLatDegVal, double minLatDegVal)
 {
 	int lonIdx, latIdx;
 
@@ -1004,10 +940,8 @@ void PopGridClass::setDimensions(int numLonVal,
 /******************************************************************************************/
 /**** FUNCTION: PopGridClass::scale()                                               ****/
 /******************************************************************************************/
-void PopGridClass::scale(std::vector<double> urbanPopVal,
-			 std::vector<double> suburbanPopVal,
-			 std::vector<double> ruralPopVal,
-			 std::vector<double> barrenPopVal)
+void PopGridClass::scale(std::vector<double> urbanPopVal, std::vector<double> suburbanPopVal,
+	std::vector<double> ruralPopVal, std::vector<double> barrenPopVal)
 {
 	int regionIdx;
 
@@ -1025,8 +959,8 @@ void PopGridClass::scale(std::vector<double> urbanPopVal,
 		scaleSuburban[regionIdx] = suburbanPopVal[regionIdx] / suburbanPop[regionIdx];
 		scaleRural[regionIdx] = ruralPopVal[regionIdx] / ruralPop[regionIdx];
 		scaleBarren[regionIdx] = ((barrenPopVal[regionIdx] == 0.0) ?
-						  0.0 :
-						  barrenPopVal[regionIdx] / barrenPop[regionIdx]);
+				0.0 :
+				barrenPopVal[regionIdx] / barrenPop[regionIdx]);
 
 		urbanPop[regionIdx] = 0.0;
 		suburbanPop[regionIdx] = 0.0;
@@ -1065,20 +999,19 @@ void PopGridClass::scale(std::vector<double> urbanPopVal,
 	int totalScaledPopulation = 0;
 	for (regionIdx = 0; regionIdx < numRegion; regionIdx++) {
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " RLAN DEVICE URBAN    POPULATION: " << urbanPop[regionIdx]
-				    << " " << 100 * urbanPop[regionIdx] / totalPop << " %";
-		LOGGER_INFO(logger)
-			<< "REGION " << regionNameList[regionIdx]
-			<< " RLAN DEVICE SUBURBAN POPULATION: " << suburbanPop[regionIdx] << " "
-			<< 100 * suburbanPop[regionIdx] / totalPop << " %";
+							<< " RLAN DEVICE URBAN    POPULATION: " << urbanPop[regionIdx] << " "
+							<< 100 * urbanPop[regionIdx] / totalPop << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " RLAN DEVICE RURAL    POPULATION: " << ruralPop[regionIdx]
-				    << " " << 100 * ruralPop[regionIdx] / totalPop << " %";
+							<< " RLAN DEVICE SUBURBAN POPULATION: " << suburbanPop[regionIdx] << " "
+							<< 100 * suburbanPop[regionIdx] / totalPop << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " RLAN DEVICE BARREN   POPULATION: " << barrenPop[regionIdx]
-				    << " " << 100 * barrenPop[regionIdx] / totalPop << " %";
+							<< " RLAN DEVICE RURAL    POPULATION: " << ruralPop[regionIdx] << " "
+							<< 100 * ruralPop[regionIdx] / totalPop << " %";
+		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
+							<< " RLAN DEVICE BARREN   POPULATION: " << barrenPop[regionIdx] << " "
+							<< 100 * barrenPop[regionIdx] / totalPop << " %";
 		totalScaledPopulation += urbanPop[regionIdx] + suburbanPop[regionIdx] +
-					 ruralPop[regionIdx] + barrenPop[regionIdx];
+			ruralPop[regionIdx] + barrenPop[regionIdx];
 	}
 	LOGGER_INFO(logger) << "TOTAL_RLAN_DEVICE_POPULATION: " << totalScaledPopulation;
 
@@ -1099,8 +1032,8 @@ void PopGridClass::writeDensity(std::string filename, bool dumpPopGrid)
 	}
 
 	if (!(fp = fopen(filename.c_str(), "wb"))) {
-		throw std::runtime_error(ErrStream() << "ERROR: Unable to write to file \""
-						     << filename << "\"");
+		throw std::runtime_error(
+			ErrStream() << "ERROR: Unable to write to file \"" << filename << "\"");
 	}
 
 	int lonIdx, latIdx;
@@ -1111,12 +1044,7 @@ void PopGridClass::writeDensity(std::string filename, bool dumpPopGrid)
 		for (lonIdx = 0; lonIdx < numLon; lonIdx++) {
 			for (latIdx = 0; latIdx < numLat; latIdx++) {
 				popSum += pop[lonIdx][latIdx];
-				fprintf(fp,
-					"%d,%d,%.5f,%.5f\n",
-					lonIdx,
-					latIdx,
-					pop[lonIdx][latIdx],
-					popSum);
+				fprintf(fp, "%d,%d,%.5f,%.5f\n", lonIdx, latIdx, pop[lonIdx][latIdx], popSum);
 			}
 		}
 	} else {
@@ -1126,18 +1054,12 @@ void PopGridClass::writeDensity(std::string filename, bool dumpPopGrid)
 		for (lonIdx = 0; lonIdx < numLon; lonIdx++) {
 			double longitudeDeg = minLonDeg + (lonIdx + 0.5) * deltaLonDeg;
 			for (latIdx = 0; latIdx < numLat; latIdx++) {
-				if ((propEnv[lonIdx][latIdx] != 'X') &&
-				    (propEnv[lonIdx][latIdx] != 'B')) {
-					double latitudeDeg = minLatDeg +
-							     (latIdx + 0.5) * deltaLatDeg;
+				if ((propEnv[lonIdx][latIdx] != 'X') && (propEnv[lonIdx][latIdx] != 'B')) {
+					double latitudeDeg = minLatDeg + (latIdx + 0.5) * deltaLatDeg;
 					double area = computeArea(lonIdx, latIdx);
 
-					fprintf(fp,
-						"%.5f,%.5f,%.3f,%c\n",
-						longitudeDeg,
-						latitudeDeg,
-						(pop[lonIdx][latIdx] / area) * 1.0e6,
-						propEnv[lonIdx][latIdx]);
+					fprintf(fp, "%.5f,%.5f,%.3f,%c\n", longitudeDeg, latitudeDeg,
+						(pop[lonIdx][latIdx] / area) * 1.0e6, propEnv[lonIdx][latIdx]);
 				}
 			}
 		}
@@ -1160,13 +1082,11 @@ int PopGridClass::adjustRegion(double centerLongitudeDeg, double centerLatitudeD
 		throw("ERROR in PopGridClass::adjustRegion(), pop grid cumulative\n");
 	}
 
-	Vector3 centerPosition = EcefModel::geodeticToEcef(centerLatitudeDeg,
-							   centerLongitudeDeg,
-							   0.0);
+	Vector3 centerPosition = EcefModel::geodeticToEcef(centerLatitudeDeg, centerLongitudeDeg, 0.0);
 
 	// Solve: radius = 2*EarthRadius*cos(centerLatitude)*sin(maxLonOffset/2);
-	double maxLonOffset = 2 * asin(radius / (2 * CConst::earthRadius *
-						 cos(centerLatitudeDeg * M_PI / 180.0)));
+	double maxLonOffset = 2 *
+		asin(radius / (2 * CConst::earthRadius * cos(centerLatitudeDeg * M_PI / 180.0)));
 
 	// Solve: radius = 2*EarthRadius*sin(maxLatOffset/2);
 	double maxLatOffset = 2 * asin(radius / (2 * CConst::earthRadius)) * 180.0 / M_PI;
@@ -1224,12 +1144,9 @@ int PopGridClass::adjustRegion(double centerLongitudeDeg, double centerLatitudeD
 			double latDeg = (newMinLat + latIdx * deltaLatDeg);
 			Vector3 posn = EcefModel::geodeticToEcef(latDeg, lonDeg, 0.0);
 			if ((posn - centerPosition).len() * 1000.0 <= radius) {
-				newPop[lonIdx][latIdx] =
-					pop[minLonIdx + lonIdx][minLatIdx + latIdx];
-				newPropEnv[lonIdx][latIdx] =
-					propEnv[minLonIdx + lonIdx][minLatIdx + latIdx];
-				newRegion[lonIdx][latIdx] =
-					region[minLonIdx + lonIdx][minLatIdx + latIdx];
+				newPop[lonIdx][latIdx] = pop[minLonIdx + lonIdx][minLatIdx + latIdx];
+				newPropEnv[lonIdx][latIdx] = propEnv[minLonIdx + lonIdx][minLatIdx + latIdx];
+				newRegion[lonIdx][latIdx] = region[minLonIdx + lonIdx][minLatIdx + latIdx];
 			} else {
 				newPop[lonIdx][latIdx] = 0.0;
 				newPropEnv[lonIdx][latIdx] = 'X';
@@ -1304,12 +1221,11 @@ double PopGridClass::adjustRegion(ListClass<ULSClass *> *ulsList, double maxRadi
 	std::cout << std::flush;
 
 	double maxDistGridCenterToEdge = CConst::earthRadius *
-					 sqrt((deltaLonDeg * deltaLonDeg +
-					       deltaLatDeg * deltaLatDeg) *
-					      (M_PI / 180.0) * (M_PI / 180.0)) /
-					 2;
+		sqrt((deltaLonDeg * deltaLonDeg + deltaLatDeg * deltaLatDeg) * (M_PI / 180.0) *
+			(M_PI / 180.0)) /
+		2;
 	double maxDistKMSQ = (maxRadius + maxDistGridCenterToEdge) *
-			     (maxRadius + maxDistGridCenterToEdge) * 1.0e-6;
+		(maxRadius + maxDistGridCenterToEdge) * 1.0e-6;
 
 	int lonIdx, latIdx;
 	int **possible = (int **)malloc(numLon * sizeof(int *));
@@ -1370,12 +1286,9 @@ double PopGridClass::adjustRegion(ListClass<ULSClass *> *ulsList, double maxRadi
 			bool useFlag = false;
 
 			if (possible[lonIdx][latIdx]) {
-				Vector3 gridPosition = EcefModel::geodeticToEcef(latitudeDeg,
-										 longitudeDeg,
-										 0.0);
+				Vector3 gridPosition = EcefModel::geodeticToEcef(latitudeDeg, longitudeDeg, 0.0);
 
-				for (int ulsIdx = 0; (ulsIdx < ulsList->getSize()) && (!useFlag);
-				     ulsIdx++) {
+				for (int ulsIdx = 0; (ulsIdx < ulsList->getSize()) && (!useFlag); ulsIdx++) {
 					ULSClass *uls = (*ulsList)[ulsIdx];
 					Vector3 losPath = uls->getRxPosition() - gridPosition;
 					double pathDistKMSQ = losPath.dot(losPath);
@@ -1407,8 +1320,7 @@ double PopGridClass::adjustRegion(ListClass<ULSClass *> *ulsList, double maxRadi
 		}
 
 		if ((lonIdx % 100) == 99) {
-			std::cout << "ADJUSTED " << (double)(lonIdx + 1.0) * 100 / numLon << " %"
-				  << std::endl;
+			std::cout << "ADJUSTED " << (double)(lonIdx + 1.0) * 100 / numLon << " %" << std::endl;
 			std::cout << std::flush;
 		}
 	}
@@ -1451,12 +1363,11 @@ double PopGridClass::adjustRegion(ListClass<ULSClass *> *ulsList, double maxRadi
 		for (latIdx = 0; latIdx < newNumLat; latIdx++) {
 			double latitudeDeg = minLatDeg + latIdx * deltaLatDeg;
 			double area = CConst::earthRadius * CConst::earthRadius *
-				      cos(latitudeDeg * M_PI / 180.0) * deltaLonDeg * deltaLatDeg *
-				      (M_PI / 180.0) * (M_PI / 180.0);
+				cos(latitudeDeg * M_PI / 180.0) * deltaLonDeg * deltaLatDeg * (M_PI / 180.0) *
+				(M_PI / 180.0);
 
 			newPop[lonIdx][latIdx] = pop[minLonIdx + lonIdx][minLatIdx + latIdx];
-			newPropEnv[lonIdx][latIdx] =
-				propEnv[minLonIdx + lonIdx][minLatIdx + latIdx];
+			newPropEnv[lonIdx][latIdx] = propEnv[minLonIdx + lonIdx][minLatIdx + latIdx];
 			newRegion[lonIdx][latIdx] = region[minLonIdx + lonIdx][minLatIdx + latIdx];
 
 			regionIdx = newRegion[lonIdx][latIdx];
@@ -1524,30 +1435,30 @@ double PopGridClass::adjustRegion(ListClass<ULSClass *> *ulsList, double maxRadi
 
 	for (regionIdx = 0; regionIdx < numRegion; regionIdx++) {
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " ADJUSTED URBAN    POPULATION: " << urbanPop[regionIdx]
-				    << " " << 100 * urbanPop[regionIdx] / totalPop << " %";
+							<< " ADJUSTED URBAN    POPULATION: " << urbanPop[regionIdx] << " "
+							<< 100 * urbanPop[regionIdx] / totalPop << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " ADJUSTED SUBURBAN POPULATION: " << suburbanPop[regionIdx]
-				    << " " << 100 * suburbanPop[regionIdx] / totalPop << " %";
+							<< " ADJUSTED SUBURBAN POPULATION: " << suburbanPop[regionIdx] << " "
+							<< 100 * suburbanPop[regionIdx] / totalPop << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " ADJUSTED RURAL    POPULATION: " << ruralPop[regionIdx]
-				    << " " << 100 * ruralPop[regionIdx] / totalPop << " %";
+							<< " ADJUSTED RURAL    POPULATION: " << ruralPop[regionIdx] << " "
+							<< 100 * ruralPop[regionIdx] / totalPop << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " ADJUSTED BARREN   POPULATION: " << barrenPop[regionIdx]
-				    << " " << 100 * barrenPop[regionIdx] / totalPop << " %";
+							<< " ADJUSTED BARREN   POPULATION: " << barrenPop[regionIdx] << " "
+							<< 100 * barrenPop[regionIdx] / totalPop << " %";
 
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " ADJUSTED URBAN    AREA: " << urbanArea[regionIdx] << " "
-				    << 100 * urbanArea[regionIdx] / totalArea << " %";
+							<< " ADJUSTED URBAN    AREA: " << urbanArea[regionIdx] << " "
+							<< 100 * urbanArea[regionIdx] / totalArea << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " ADJUSTED SUBURBAN AREA: " << suburbanArea[regionIdx] << " "
-				    << 100 * suburbanArea[regionIdx] / totalArea << " %";
+							<< " ADJUSTED SUBURBAN AREA: " << suburbanArea[regionIdx] << " "
+							<< 100 * suburbanArea[regionIdx] / totalArea << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " ADJUSTED RURAL    AREA: " << ruralArea[regionIdx] << " "
-				    << 100 * ruralArea[regionIdx] / totalArea << " %";
+							<< " ADJUSTED RURAL    AREA: " << ruralArea[regionIdx] << " "
+							<< 100 * ruralArea[regionIdx] / totalArea << " %";
 		LOGGER_INFO(logger) << "REGION " << regionNameList[regionIdx]
-				    << " ADJUSTED BARREN   AREA: " << barrenArea[regionIdx] << " "
-				    << 100 * barrenArea[regionIdx] / totalArea << " %";
+							<< " ADJUSTED BARREN   AREA: " << barrenArea[regionIdx] << " "
+							<< 100 * barrenArea[regionIdx] / totalArea << " %";
 	}
 	LOGGER_INFO(logger) << "TOTAL_ADJUSTED_POPULATION: " << totalPop;
 	LOGGER_INFO(logger) << "TOTAL_ADJUSTED_AREA: " << totalArea;
@@ -1597,7 +1508,7 @@ void PopGridClass::check(std::string s)
 		for (latIdx = 0; latIdx < numLat; latIdx++) {
 			if ((propEnv[lonIdx][latIdx] == 'X') && (pop[lonIdx][latIdx] != 0.0)) {
 				std::cout << "CHECK GRID: " << s << " " << lonIdx << " " << latIdx
-					  << " POP = " << pop[lonIdx][latIdx] << std::endl;
+						  << " POP = " << pop[lonIdx][latIdx] << std::endl;
 			}
 		}
 	}
@@ -1611,12 +1522,8 @@ void PopGridClass::check(std::string s)
 /**** Find given longitude/latitude coordinates in PopGridClass, if coordinates are    ****/
 /**** outside the grid, set lonIdx = -1, latIdx = -1, provEnv = (char) NULL            ****/
 /******************************************************************************************/
-void PopGridClass::findDeg(double longitudeDeg,
-			   double latitudeDeg,
-			   int &lonIdx,
-			   int &latIdx,
-			   char &propEnvVal,
-			   int &regionIdx) const
+void PopGridClass::findDeg(double longitudeDeg, double latitudeDeg, int &lonIdx, int &latIdx,
+	char &propEnvVal, int &regionIdx) const
 {
 	if (longitudeDeg < minLonDeg) {
 		longitudeDeg += 360.0;
@@ -1646,7 +1553,7 @@ double PopGridClass::computeArea(int /* lonIdx */, int latIdx) const
 {
 	double latitudeDeg = minLatDeg + (latIdx + 0.5) * deltaLatDeg;
 	double area = CConst::earthRadius * CConst::earthRadius * cos(latitudeDeg * M_PI / 180.0) *
-		      deltaLonDeg * deltaLatDeg * (M_PI / 180.0) * (M_PI / 180.0);
+		deltaLonDeg * deltaLatDeg * (M_PI / 180.0) * (M_PI / 180.0);
 
 	return (area);
 }

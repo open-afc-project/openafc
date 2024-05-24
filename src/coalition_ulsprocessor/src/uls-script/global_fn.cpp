@@ -140,13 +140,12 @@ std::vector<std::string> splitCSV(const std::string &line)
 						field = line.substr(fieldStartIdx, fieldLength);
 
 						std::size_t start = field.find_first_not_of(" \n"
-											    "\t");
+																	"\t");
 						std::size_t end = field.find_last_not_of(" \n\t");
 						if (start == std::string::npos) {
 							field.clear();
 						} else {
-							field = field.substr(start,
-									     end - start + 1);
+							field = field.substr(start, end - start + 1);
 						}
 
 						elems.push_back(field);
@@ -155,13 +154,11 @@ std::vector<std::string> splitCSV(const std::string &line)
 					break;
 				case 2:
 					if (line.at(i) == '\"') {
-						if ((i + 1 < (int)line.length()) &&
-						    (line.at(i + 1) == '\"')) {
+						if ((i + 1 < (int)line.length()) && (line.at(i + 1) == '\"')) {
 							skipChar = true;
 						} else {
 							fieldLength = i - fieldStartIdx;
-							field = line.substr(fieldStartIdx,
-									    fieldLength);
+							field = line.substr(fieldStartIdx, fieldLength);
 							std::size_t k = field.find("\"\"");
 							while (k != std::string::npos) {
 								field.erase(k, 1);
@@ -178,8 +175,8 @@ std::vector<std::string> splitCSV(const std::string &line)
 					} else if (line.at(i) == ',') {
 						state = 0;
 					} else {
-						s << "ERROR: Unable to splitCSV() for command \""
-						  << line << "\" invalid quotes.\n";
+						s << "ERROR: Unable to splitCSV() for command \"" << line
+						  << "\" invalid quotes.\n";
 						throw std::runtime_error(s.str());
 					}
 					break;

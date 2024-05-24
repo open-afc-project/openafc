@@ -23,8 +23,8 @@ ListClass<T>::ListClass(int n, int incr)
 	allocation_size = n;
 	if (incr <= 0) {
 		printf("ERROR in routine ListClass::ListClass(): allocation_increment = %d, must "
-		       "be > 0\n",
-		       incr);
+			   "be > 0\n",
+			incr);
 		CORE_DUMP;
 	}
 	allocation_increment = incr;
@@ -184,9 +184,8 @@ void ListClass<T>::del_elem_idx(int index, const int err)
 	if ((index < 0) || (index > size - 1)) {
 		if (err) {
 			printf("ERROR in routine del_elem_idx(): index out of range, index = %d "
-			       "outside [0,%d]\n",
-			       index,
-			       size - 1);
+				   "outside [0,%d]\n",
+				index, size - 1);
 			CORE_DUMP;
 		} else {
 			return;
@@ -1129,7 +1128,7 @@ void readOneCol(const char *flname, ListClass<T> *lc_t)
 		fp = stdin;
 	} else if (!(fp = fopen(flname, "rb"))) {
 		std::string errmsg = std::string("ERROR: Unable to read from file \"") +
-				     std::string(flname) + std::string("\"\n");
+			std::string(flname) + std::string("\"\n");
 		throw ::std::invalid_argument(errmsg);
 		return;
 	}

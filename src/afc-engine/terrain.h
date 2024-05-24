@@ -43,52 +43,33 @@ struct LidarRegionStruct {
 class TerrainClass
 {
 	public:
-		TerrainClass(std::string lidarDir,
-			     std::string cdsmDir,
-			     std::string srtmDir,
-			     std::string depDir,
-			     std::string globeDir,
-			     double terrainMinLat,
-			     double terrainMinLon,
-			     double terrainMaxLat,
-			     double terrainMaxLon,
-			     double terrainMinLatBldg,
-			     double terrainMinLonBldg,
-			     double terrainMaxLatBldg,
-			     double terrainMaxLonBldg,
-			     int maxLidarRegionLoadVal);
+		TerrainClass(std::string lidarDir, std::string cdsmDir, std::string srtmDir,
+			std::string depDir, std::string globeDir, double terrainMinLat, double terrainMinLon,
+			double terrainMaxLat, double terrainMaxLon, double terrainMinLatBldg,
+			double terrainMinLonBldg, double terrainMaxLatBldg, double terrainMaxLonBldg,
+			int maxLidarRegionLoadVal);
 		~TerrainClass();
 
 		void readLidarInfo(std::string lidarDir);
-		void readLidarData(double terrainMinLat,
-				   double terrainMinLon,
-				   double terrainMaxLat,
-				   double terrainMaxLon);
+		void readLidarData(
+			double terrainMinLat, double terrainMinLon, double terrainMaxLat, double terrainMaxLon);
 		int getLidarRegion(double lonDeg, double latDeg) const;
 		void loadLidarRegion(int lidarRegionIdx);
 
 		void printStats();
 
-		void getTerrainHeight(double longitudeDeg,
-				      double latitudeDeg,
-				      double &terrainHeight,
-				      double &bldgHeight,
-				      MultibandRasterClass::HeightResult &lidarHeightResult,
-				      CConst::HeightSourceEnum &heightSource,
-				      bool cdsmFlag = false) const;
+		void getTerrainHeight(double longitudeDeg, double latitudeDeg, double &terrainHeight,
+			double &bldgHeight, MultibandRasterClass::HeightResult &lidarHeightResult,
+			CConst::HeightSourceEnum &heightSource, bool cdsmFlag = false) const;
 
-		void writeTerrainProfile(std::string filename,
-					 double startLongitudeDeg,
-					 double startLatitudeDeg,
-					 double startHeightAboveTerrain,
-					 double stopLongitudeDeg,
-					 double stopLatitudeDeg,
-					 double stopHeightAboveTerrain);
+		void writeTerrainProfile(std::string filename, double startLongitudeDeg,
+			double startLatitudeDeg, double startHeightAboveTerrain, double stopLongitudeDeg,
+			double stopLatitudeDeg, double stopHeightAboveTerrain);
 		int getNumLidarRegion();
 		LidarRegionStruct &getLidarRegion(int lidarRegionIdx);
 
-		void setSourceName(const CConst::HeightSourceEnum &sourceVal,
-				   const std::string &sourceName);
+		void setSourceName(
+			const CConst::HeightSourceEnum &sourceVal, const std::string &sourceName);
 		const std::string &getSourceName(const CConst::HeightSourceEnum &sourceVal) const;
 
 		std::vector<QRectF> getBounds() const;

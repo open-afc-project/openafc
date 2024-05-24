@@ -67,8 +67,8 @@ class AttrFilterSet
 {
 	public:
 		/// Boost intrinsic functional type
-		using Filter = boost::log::aux::light_function<bool(
-			boost::log::attribute_value_set const &)>;
+		using Filter =
+			boost::log::aux::light_function<bool(boost::log::attribute_value_set const &)>;
 
 		AttrFilterSet()
 		{
@@ -107,14 +107,12 @@ class AttrFilterSet
 
 /// Unchanging text formatter
 const boost::log::formatter textFormatter = (expr::stream
-					     // Include a timestamp for console output
-					     << expr::format_date_time<boost::posix_time::ptime>(
-							Logging::utctimestamp_type::get_name(),
-							"%Y-%m-%d %H:%M:%S.%fZ")
-					     << " "
-					     << "TH:" << Logging::thread_id << " "
-					     << "<" << Logging::severity << "> " << Logging::channel
-					     << ": " << Logging::message);
+	// Include a timestamp for console output
+	<< expr::format_date_time<boost::posix_time::ptime>(
+		   Logging::utctimestamp_type::get_name(), "%Y-%m-%d %H:%M:%S.%fZ")
+	<< " "
+	<< "TH:" << Logging::thread_id << " "
+	<< "<" << Logging::severity << "> " << Logging::channel << ": " << Logging::message);
 /// Initial #curConfig has been set
 bool hasConfig = false;
 /// Copy of running configuration
@@ -272,7 +270,7 @@ void Logging::initialize(const Logging::Config &config)
 			keywords::log_source = config.winlogConfig->identity);
 		{
 			sinks::event_log::custom_event_type_mapping<severity_level> mapping("Severi"
-											    "ty");
+																				"ty");
 			mapping[Logging::LOG_DEBUG] = sinks::event_log::success;
 			mapping[Logging::LOG_INFO] = sinks::event_log::info;
 			mapping[Logging::LOG_WARN] = sinks::event_log::warning;
@@ -311,8 +309,7 @@ void Logging::initialize(const Logging::Config &config)
 	core->set_logging_enabled(sinkCount > 0);
 
 	if (!hasConfig || (config.filter.leastLevel != curConfig.filter.leastLevel)) {
-		LOGINST_INFO(getLoggerInstance())
-			<< "Logging at level " << config.filter.leastLevel;
+		LOGINST_INFO(getLoggerInstance()) << "Logging at level " << config.filter.leastLevel;
 	}
 	curConfig = config;
 	hasConfig = true;

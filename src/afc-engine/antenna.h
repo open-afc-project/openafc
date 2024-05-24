@@ -14,8 +14,7 @@ class AntennaClass
 	public:
 		AntennaClass(int type, const char *strid = (char *)NULL);
 		~AntennaClass();
-		static std::vector<AntennaClass *> readMultipleBoresightAntennas(
-			std::string filename);
+		static std::vector<AntennaClass *> readMultipleBoresightAntennas(std::string filename);
 		void setBoresightGainTable(LinInterpClass *offBoresightGainTableVal);
 		double gainDB(double dx, double dy, double dz, double h_angle_rad);
 		double gainDB(double phi, double theta);

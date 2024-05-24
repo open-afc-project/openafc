@@ -84,8 +84,8 @@ void TransmitterModelMapClass::readModelList(const std::string filename)
 	}
 
 	if (!(fp = fopen(filename.c_str(), "rb"))) {
-		str = std::string("ERROR: Unable to open Transmitter Model List File \"") +
-		      filename + std::string("\"\n");
+		str = std::string("ERROR: Unable to open Transmitter Model List File \"") + filename +
+			std::string("\"\n");
 		throw std::runtime_error(str);
 	}
 
@@ -144,9 +144,7 @@ void TransmitterModelMapClass::readModelList(const std::string filename)
 					// std::cout << "FIELD: \"" << field << "\"" << std::endl;
 
 					found = false;
-					for (fIdx = 0;
-					     (fIdx < (int)fieldLabelList.size()) && (!found);
-					     fIdx++) {
+					for (fIdx = 0; (fIdx < (int)fieldLabelList.size()) && (!found); fIdx++) {
 						if (field == fieldLabelList.at(fIdx)) {
 							*fieldIdxList.at(fIdx) = fieldIdx;
 							found = true;
@@ -157,10 +155,9 @@ void TransmitterModelMapClass::readModelList(const std::string filename)
 				for (fIdx = 0; fIdx < (int)fieldIdxList.size(); fIdx++) {
 					if (*fieldIdxList.at(fIdx) == -1) {
 						errStr << "ERROR: Invalid Transmitter Model List "
-							  "file \""
-						       << filename << "\" label line missing \""
-						       << fieldLabelList.at(fIdx) << "\""
-						       << std::endl;
+								  "file \""
+							   << filename << "\" label line missing \"" << fieldLabelList.at(fIdx)
+							   << "\"" << std::endl;
 						throw std::runtime_error(errStr.str());
 					}
 				}
@@ -175,9 +172,8 @@ void TransmitterModelMapClass::readModelList(const std::string filename)
 				/**************************************************************************/
 				strval = fieldList.at(modelNameFieldIdx);
 				if (strval.empty()) {
-					errStr << "WARNING: Transmitter Model List file \""
-					       << filename << "\" line " << linenum
-					       << " missing model name" << std::endl;
+					errStr << "WARNING: Transmitter Model List file \"" << filename << "\" line "
+						   << linenum << " missing model name" << std::endl;
 
 					// throw std::runtime_error(errStr.str());
 
@@ -196,9 +192,8 @@ void TransmitterModelMapClass::readModelList(const std::string filename)
 					strval = fieldList.at(architectureFieldIdx);
 
 					if (strval.empty()) {
-						errStr << "ERROR: Transmitter Model List file \""
-						       << filename << "\" line " << linenum
-						       << " missing architecture" << std::endl;
+						errStr << "ERROR: Transmitter Model List file \"" << filename << "\" line "
+							   << linenum << " missing architecture" << std::endl;
 
 						// throw std::runtime_error(errStr.str());
 
@@ -206,19 +201,14 @@ void TransmitterModelMapClass::readModelList(const std::string filename)
 						errStr.str(std::string());
 						errorFlag = true;
 					} else if (strval == "IDU") {
-						architecture =
-							TransmitterModelClass::IDUArchitecture;
+						architecture = TransmitterModelClass::IDUArchitecture;
 					} else if (strval == "ODU") {
-						architecture =
-							TransmitterModelClass::ODUArchitecture;
+						architecture = TransmitterModelClass::ODUArchitecture;
 					} else if ((strval == "Unknown") || (strval == "UNKNOWN")) {
-						architecture =
-							TransmitterModelClass::UnknownArchitecture;
+						architecture = TransmitterModelClass::UnknownArchitecture;
 					} else {
-						errStr << "ERROR: Transmitter Model List file \""
-						       << filename << "\" line " << linenum
-						       << " invalid architecture: " << strval
-						       << std::endl;
+						errStr << "ERROR: Transmitter Model List file \"" << filename << "\" line "
+							   << linenum << " invalid architecture: " << strval << std::endl;
 
 						// throw std::runtime_error(errStr.str());
 
@@ -256,7 +246,7 @@ void TransmitterModelMapClass::readModelList(const std::string filename)
 
 	std::cout << "NUM LINES IGNORED ERROR in " << filename << ": " << numError << std::endl;
 	std::cout << "NUM LINES IGNORED ARCHITECTURE UNKNOWN in " << filename << ": " << numIgnore
-		  << std::endl;
+			  << std::endl;
 
 	return;
 }
@@ -291,7 +281,7 @@ TransmitterModelClass *TransmitterModelMapClass::find(std::string modelName)
 	/* Remove non-alhpanumeric characters                                             */
 	/**********************************************************************************/
 	modelName.erase(std::remove_if(modelName.begin(), modelName.end(), isInvalidModelNameChar),
-			modelName.end());
+		modelName.end());
 	/**********************************************************************************/
 
 	/**********************************************************************************/
@@ -330,21 +320,16 @@ int TransmitterModelMapClass::checkPrefixValues()
 		for (ib = 0; ib < (int)transmitterModelList.size(); ++ib) {
 			if (ib != ia) {
 				TransmitterModelClass *mb = transmitterModelList[ib];
-				if ((ma->architecture !=
-				     TransmitterModelClass::UnknownArchitecture) &&
-				    (mb->name.compare(0, ma->name.size(), ma->name) == 0)) {
+				if ((ma->architecture != TransmitterModelClass::UnknownArchitecture) &&
+					(mb->name.compare(0, ma->name.size(), ma->name) == 0)) {
 					numError++;
 					std::cout << "(" << numError << ") " << ma->name << "["
-						  << TransmitterModelClass::architectureStr(
-							     ma->architecture)
-						  << "] is a prefix of " << mb->name << "["
-						  << TransmitterModelClass::architectureStr(
-							     mb->architecture)
-						  << "]"
-						  << (ma->architecture != mb->architecture ?
-							      " DIFFERENT ARCHITECTURE" :
-							      "")
-						  << std::endl;
+							  << TransmitterModelClass::architectureStr(ma->architecture)
+							  << "] is a prefix of " << mb->name << "["
+							  << TransmitterModelClass::architectureStr(mb->architecture) << "]"
+							  << (ma->architecture != mb->architecture ? " DIFFERENT ARCHITECTURE" :
+																		 "")
+							  << std::endl;
 				}
 			}
 		}

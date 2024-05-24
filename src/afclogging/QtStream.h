@@ -52,9 +52,8 @@ template<typename Typ>
  * @return The updated stream.
  */
 template<class Container>
-::std::ostream &out_stl_container(::std::ostream &stream,
-				  const Container &val,
-				  const ::std::string &className)
+::std::ostream &out_stl_container(
+	::std::ostream &stream, const Container &val, const ::std::string &className)
 {
 	stream << className << "[size=" << val.size() << "](";
 	for (auto it = val.begin(); it != val.end(); ++it) {

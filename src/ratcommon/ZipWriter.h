@@ -59,9 +59,8 @@ class ZipWriter
 		 * archive. This is an integer in range [0, 9], and can use the enumerated
 		 * values in CompressionLevel.
 		 */
-		ZipWriter(const QString &fileName,
-			  WriterMode mode = Overwrite,
-			  int compress = CompressDefault);
+		ZipWriter(
+			const QString &fileName, WriterMode mode = Overwrite, int compress = CompressDefault);
 
 		/** Close the archive.
 		 * This will also close any open content files.
@@ -90,8 +89,8 @@ class ZipWriter
 		 *     ...
 		 * }
 		 */
-		std::unique_ptr<QIODevice> openFile(const QString &intFileName,
-						    const QDateTime &modTime = QDateTime());
+		std::unique_ptr<QIODevice> openFile(
+			const QString &intFileName, const QDateTime &modTime = QDateTime());
 
 	private:
 		/// PIMPL instance

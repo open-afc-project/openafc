@@ -35,10 +35,8 @@ class ListClass
 
 		void sort(const std::function<bool(const T &, const T &)> &compare);
 
-		void printlist(int n = 100,
-			       const char *elemSep = (const char *)0,
-			       const char *grpSep = (const char *)0,
-			       const char *endStr = (const char *)0);
+		void printlist(int n = 100, const char *elemSep = (const char *)0,
+			const char *grpSep = (const char *)0, const char *endStr = (const char *)0);
 
 	private:
 		T *a;

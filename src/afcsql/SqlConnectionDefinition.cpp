@@ -50,6 +50,6 @@ QSqlDatabase SqlConnectionDefinition::newConnection() const
 		throw SqlError("Bad SQL configuration", db.lastError());
 	}
 	LOGGER_DEBUG(logger) << "newConnection " << connName << " to " << driverName << "://"
-			     << userName << "@" << hostName << ":" << port << "/" << dbName;
+						 << userName << "@" << hostName << ":" << port << "/" << dbName;
 	return db;
 }

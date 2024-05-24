@@ -194,8 +194,7 @@ class RunningStatistic
 
 			T u = mean();
 			if (unbiased)
-				return _sumOfSquares / T(_count - 1) -
-				       T(_count) / T(_count - 1) * sqr(u);
+				return _sumOfSquares / T(_count - 1) - T(_count) / T(_count - 1) * sqr(u);
 			else
 				return _sumOfSquares / T(_count) - sqr(u);
 		}

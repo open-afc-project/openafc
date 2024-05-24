@@ -21,21 +21,17 @@ namespace Logging
 {
 
 /// Register timestamp attribute
-BOOST_LOG_ATTRIBUTE_KEYWORD(utctimestamp,
-			    "UtcTimeStamp",
-			    boost::log::attributes::utc_time_traits::time_type)
+BOOST_LOG_ATTRIBUTE_KEYWORD(
+	utctimestamp, "UtcTimeStamp", boost::log::attributes::utc_time_traits::time_type)
 /// Register severity attribute
-BOOST_LOG_ATTRIBUTE_KEYWORD(severity,
-			    boost::log::aux::default_attribute_names::severity(),
-			    severity_level)
+BOOST_LOG_ATTRIBUTE_KEYWORD(
+	severity, boost::log::aux::default_attribute_names::severity(), severity_level)
 /// Register channel type attribute
-BOOST_LOG_ATTRIBUTE_KEYWORD(channel,
-			    boost::log::aux::default_attribute_names::channel(),
-			    channel_name_type)
+BOOST_LOG_ATTRIBUTE_KEYWORD(
+	channel, boost::log::aux::default_attribute_names::channel(), channel_name_type)
 /// Register thread ID type attribute
-BOOST_LOG_ATTRIBUTE_KEYWORD(thread_id,
-			    boost::log::aux::default_attribute_names::thread_id(),
-			    boost::log::attributes::current_thread_id::value_type)
+BOOST_LOG_ATTRIBUTE_KEYWORD(thread_id, boost::log::aux::default_attribute_names::thread_id(),
+	boost::log::attributes::current_thread_id::value_type)
 /// Register message-text attribute type
 using message_type = boost::log::expressions::smessage_type;
 /// Register message-text attribute

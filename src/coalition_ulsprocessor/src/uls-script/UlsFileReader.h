@@ -33,10 +33,8 @@
 class UlsFileReader
 {
 	public:
-		UlsFileReader(const char *filePath,
-			      FILE *fwarn,
-			      bool alignFederatedFlag,
-			      double alignFederatedScale);
+		UlsFileReader(
+			const char *filePath, FILE *fwarn, bool alignFederatedFlag, double alignFederatedScale);
 
 		const QList<UlsPath> &paths()
 		{
@@ -165,11 +163,8 @@ class UlsFileReader
 
 		std::unordered_set<std::string> authorizationNumberList;
 
-		int computeStatisticsUS(FreqAssignmentClass &freqAssignment,
-					bool includeUnii5,
-					bool includeUnii6,
-					bool includeUnii7,
-					bool includeUnii8);
+		int computeStatisticsUS(FreqAssignmentClass &freqAssignment, bool includeUnii5,
+			bool includeUnii6, bool includeUnii7, bool includeUnii8);
 		int computeStatisticsCA(FILE *fwarn);
 
 		QList<RASClass> RASList;
@@ -177,29 +172,22 @@ class UlsFileReader
 	private:
 		void readIndividualHeaderUS(const std::vector<std::string> &fieldList);
 		void readIndividualPathUS(const std::vector<std::string> &fieldList);
-		void readIndividualAntennaUS(const std::vector<std::string> &fieldList,
-					     FILE *fwarn);
-		void readIndividualFrequencyUS(const std::vector<std::string> &fieldList,
-					       FILE *fwarn);
+		void readIndividualAntennaUS(const std::vector<std::string> &fieldList, FILE *fwarn);
+		void readIndividualFrequencyUS(const std::vector<std::string> &fieldList, FILE *fwarn);
 		void readIndividualLocationUS(const std::vector<std::string> &fieldList,
-					      bool alignFederatedFlag,
-					      double alignFederatedScale);
-		void readIndividualEmissionUS(const std::vector<std::string> &fieldList,
-					      FILE *fwarn);
+			bool alignFederatedFlag, double alignFederatedScale);
+		void readIndividualEmissionUS(const std::vector<std::string> &fieldList, FILE *fwarn);
 		void readIndividualEntityUS(const std::vector<std::string> &fieldList);
 		void readIndividualMarketFrequencyUS(const std::vector<std::string> &fieldList);
 		void readIndividualControlPointUS(const std::vector<std::string> &fieldList);
 		void readIndividualSegmentUS(const std::vector<std::string> &fieldList);
 		void readIndividualRASUS(const std::vector<std::string> &fieldList);
 
-		void readStationDataCA(const std::vector<std::string> &fieldList,
-				       FILE *fwarn,
-				       bool alignFederatedFlag,
-				       double alignFederatedScale);
-		void readBackToBackPassiveRepeaterCA(const std::vector<std::string> &fieldList,
-						     FILE *fwarn);
-		void readReflectorPassiveRepeaterCA(const std::vector<std::string> &fieldList,
-						    FILE *fwarn);
+		void readStationDataCA(const std::vector<std::string> &fieldList, FILE *fwarn,
+			bool alignFederatedFlag, double alignFederatedScale);
+		void readBackToBackPassiveRepeaterCA(
+			const std::vector<std::string> &fieldList, FILE *fwarn);
+		void readReflectorPassiveRepeaterCA(const std::vector<std::string> &fieldList, FILE *fwarn);
 		void readTransmitterCA(const std::vector<std::string> &fieldList, FILE *fwarn);
 
 		QList<UlsPath> allPaths;
@@ -228,8 +216,7 @@ class UlsFileReader
 		QHash<QString, QList<UlsHeader>> headerMap;
 
 		QHash<QString, QList<StationDataCAClass>> stationMap;
-		QHash<QString, QList<BackToBackPassiveRepeaterCAClass>>
-			backToBackPassiveRepeaterMap;
+		QHash<QString, QList<BackToBackPassiveRepeaterCAClass>> backToBackPassiveRepeaterMap;
 		QHash<QString, QList<ReflectorPassiveRepeaterCAClass>> reflectorPassiveRepeaterMap;
 		QHash<QString, QList<PassiveRepeaterCAClass>> passiveRepeaterMap;
 		QHash<QString, QList<TransmitterCAClass>> transmitterMap;

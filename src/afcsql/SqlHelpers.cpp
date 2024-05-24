@@ -134,7 +134,7 @@ void SqlHelpers::execPrepared(const QSqlDatabase &db, QSqlQuery &qObj)
 	std::unique_ptr<QElapsedTimer> timer;
 	if (doDebug()) {
 		LOGGER_DEBUG(logger) << "execPrepared RUN " << qObj.lastQuery() << " WITH ("
-				     << boundList(qObj).join(", ") << ")";
+							 << boundList(qObj).join(", ") << ")";
 		timer.reset(new QElapsedTimer);
 		timer->start();
 	}
@@ -143,15 +143,15 @@ void SqlHelpers::execPrepared(const QSqlDatabase &db, QSqlQuery &qObj)
 	if (doDebug()) {
 		const qint64 elapsed = timer->elapsed();
 		LOGGER_DEBUG(logger) << "execPrepared TIME " << elapsed << " SIZE " << qObj.size()
-				     << " ERR " << qObj.lastError();
+							 << " ERR " << qObj.lastError();
 	}
 	if (!success) {
 		const QSqlError sqlErr = qObj.lastError();
 		checkMysql(db, sqlErr);
 		throw SqlError(QString("Failed exec for \"%1\" with values (%2)")
-				       .arg(qObj.lastQuery())
-				       .arg(boundList(qObj).join(",")),
-			       sqlErr);
+						   .arg(qObj.lastQuery())
+						   .arg(boundList(qObj).join(",")),
+			sqlErr);
 	}
 }
 
@@ -199,8 +199,8 @@ QSqlQuery SqlHelpers::exec(const QSqlDatabase &db, const QString &query)
 	const bool success = qObj.exec(query);
 	if (doDebug()) {
 		const qint64 elapsed = timer->elapsed();
-		LOGGER_DEBUG(logger) << "exec TIME " << elapsed << " SIZE " << qObj.size()
-				     << " ERR " << qObj.lastError();
+		LOGGER_DEBUG(logger) << "exec TIME " << elapsed << " SIZE " << qObj.size() << " ERR "
+							 << qObj.lastError();
 	}
 	if (!success) {
 		const QSqlError sqlErr = qObj.lastError();

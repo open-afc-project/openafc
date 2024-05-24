@@ -108,7 +108,7 @@ std::unique_ptr<QIODevice> ZipWriter::openFile(const QString &intFileName, const
 {
 	if (_impl->openChild) {
 		throw std::logic_error("ZipWriter can only have one ContentFile instance at a "
-				       "time");
+							   "time");
 	}
 
 	// Default to current time
@@ -138,20 +138,11 @@ std::unique_ptr<QIODevice> ZipWriter::openFile(const QString &intFileName, const
 	fileInfo.external_fa = 0;
 
 	// No comment or extra info, always use 64-bit mode
-	int status = zipOpenNewFileInZip64(_impl->file,
-					   intFileName.toUtf8().data(),
-					   &fileInfo,
-					   nullptr,
-					   0,
-					   nullptr,
-					   0,
-					   nullptr,
-					   Z_DEFLATED,
-					   _impl->compression,
-					   1);
+	int status = zipOpenNewFileInZip64(_impl->file, intFileName.toUtf8().data(), &fileInfo, nullptr,
+		0, nullptr, 0, nullptr, Z_DEFLATED, _impl->compression, 1);
 	if (status != ZIP_OK) {
-		throw FileError(ErrStream() << "Failed to create internal file \"" << intFileName
-					    << "\": " << status);
+		throw FileError(
+			ErrStream() << "Failed to create internal file \"" << intFileName << "\": " << status);
 	}
 
 	std::unique_ptr<ContentFile> child(new ContentFile(*this));

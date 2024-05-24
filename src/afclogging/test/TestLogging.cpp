@@ -94,8 +94,8 @@ TEST_F(TestLogging, testIntercept)
 		std::string line;
 		*outbuf >> line;
 		ASSERT_TRUE(boost::regex_match(line,
-					       boost::regex(".* <info> Logging: Logging at level "
-							    "error")))
+			boost::regex(".* <info> Logging: Logging at level "
+						 "error")))
 			<< "Line:" << line;
 
 		ASSERT_THROW(*outbuf >> line, std::exception);
@@ -130,8 +130,7 @@ TEST_F(TestLogging, testFilterLevel)
 		boost::log::core::get()->flush();
 		std::string line;
 		*outbuf >> line;
-		ASSERT_TRUE(boost::regex_match(line,
-					       boost::regex(".* <warning> TestLoggingA: hi there")))
+		ASSERT_TRUE(boost::regex_match(line, boost::regex(".* <warning> TestLoggingA: hi there")))
 			<< "Line:" << line;
 
 		ASSERT_THROW(*outbuf >> line, std::exception);
@@ -161,8 +160,7 @@ TEST_F(TestLogging, testFilterChannelInclude)
 		boost::log::core::get()->flush();
 		std::string line;
 		*outbuf >> line;
-		ASSERT_TRUE(boost::regex_match(line,
-					       boost::regex(".* <warning> TestLoggingA: hi there")))
+		ASSERT_TRUE(boost::regex_match(line, boost::regex(".* <warning> TestLoggingA: hi there")))
 			<< "Line:" << line;
 
 		ASSERT_THROW(*outbuf >> line, std::exception);
@@ -192,8 +190,7 @@ TEST_F(TestLogging, testFilterChannelExclude)
 		boost::log::core::get()->flush();
 		std::string line;
 		*outbuf >> line;
-		ASSERT_TRUE(
-			boost::regex_match(line, boost::regex(".* <warning> TestLoggingB: oh hi")))
+		ASSERT_TRUE(boost::regex_match(line, boost::regex(".* <warning> TestLoggingB: oh hi")))
 			<< "Line:" << line;
 
 		ASSERT_THROW(*outbuf >> line, std::exception);

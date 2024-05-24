@@ -59,14 +59,14 @@ bool SearchPaths::init(const QString &pathSuffix)
 	}
 #endif
 	for (const auto &path :
-	     QStandardPaths::standardLocations(QStandardPaths::GenericConfigLocation)) {
+		QStandardPaths::standardLocations(QStandardPaths::GenericConfigLocation)) {
 		const auto extendedPath = extend(path);
 		if (configPaths.isEmpty() || (configPaths.last() != extendedPath)) {
 			configPaths.append(extendedPath);
 		}
 	}
 	for (const auto &path :
-	     QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation)) {
+		QStandardPaths::standardLocations(QStandardPaths::GenericDataLocation)) {
 		const auto extendedPath = extend(path);
 		if (dataPaths.isEmpty() || (dataPaths.last() != extendedPath)) {
 			dataPaths.append(extendedPath);
@@ -105,8 +105,7 @@ QStringList SearchPaths::allPaths(const QString &prefix, const QString &fileName
 	foreach(const QString &path, QDir::searchPaths(prefix))
 	{
 		const QDir testDir(path);
-		const QString fullPath(
-			QDir::toNativeSeparators(testDir.absoluteFilePath(fileName)));
+		const QString fullPath(QDir::toNativeSeparators(testDir.absoluteFilePath(fileName)));
 		fullPaths.append(fullPath);
 	}
 	return fullPaths;
@@ -117,18 +116,17 @@ QString SearchPaths::forWriting(const QString &prefix, const QString &fileName)
 	foreach(const QString &path, QDir::searchPaths(prefix))
 	{
 		const QDir testDir(path);
-		const QString fullPath(
-			QDir::toNativeSeparators(testDir.absoluteFilePath(fileName)));
+		const QString fullPath(QDir::toNativeSeparators(testDir.absoluteFilePath(fileName)));
 		const bool finished = canWrite(fullPath);
-		LOGGER_DEBUG(logger) << "forWriting " << prefix << " \"" << fileName << "\" is "
-				     << finished << " at " << fullPath;
+		LOGGER_DEBUG(logger) << "forWriting " << prefix << " \"" << fileName << "\" is " << finished
+							 << " at " << fullPath;
 		if (finished) {
 			return fullPath;
 		}
 	}
 
 	LOGGER_WARN(logger) << "No forWriting path found under \"" << prefix << "\" with name \""
-			    << fileName << "\"";
+						<< fileName << "\"";
 	return QString();
 }
 
@@ -138,11 +136,10 @@ QString SearchPaths::forReading(const QString &prefix, const QString &fileName, 
 	foreach(const QString &path, searchList)
 	{
 		const QDir testDir(path);
-		const QFileInfo fullPath(
-			QDir::toNativeSeparators(testDir.absoluteFilePath(fileName)));
+		const QFileInfo fullPath(QDir::toNativeSeparators(testDir.absoluteFilePath(fileName)));
 		const bool finished = fullPath.exists();
-		LOGGER_DEBUG(logger) << "forReading " << prefix << " \"" << fileName << "\" is "
-				     << finished << " at " << fullPath.absoluteFilePath();
+		LOGGER_DEBUG(logger) << "forReading " << prefix << " \"" << fileName << "\" is " << finished
+							 << " at " << fullPath.absoluteFilePath();
 		if (finished) {
 			return fullPath.absoluteFilePath();
 		}
@@ -150,11 +147,11 @@ QString SearchPaths::forReading(const QString &prefix, const QString &fileName, 
 
 	if (required) {
 		throw std::runtime_error(QString("No path found for \"%1\" with name \"%2\"")
-						 .arg(prefix, fileName)
-						 .toStdString());
+									 .arg(prefix, fileName)
+									 .toStdString());
 	}
 
 	LOGGER_WARN(logger) << "No forReading path found for \"" << prefix << "\" with name \""
-			    << fileName << "\"";
+						<< fileName << "\"";
 	return QString();
 }

@@ -98,14 +98,14 @@ std::vector<AntennaClass *> AntennaClass::readMultipleBoresightAntennas(std::str
 	std::ostringstream errStr;
 
 	if (filename.empty()) {
-		throw std::runtime_error(ErrStream()
-					 << "ERROR: No multiple boresight antenna file specified");
+		throw std::runtime_error(
+			ErrStream() << "ERROR: No multiple boresight antenna file specified");
 	}
 
 	if (!(fp = fopen(filename.c_str(), "rb"))) {
 		throw std::runtime_error(ErrStream() << "ERROR: Unable to open multiple boresight "
-							"antenna file \""
-						     << filename << "\"");
+												"antenna file \""
+											 << filename << "\"");
 	}
 
 	enum LineTypeEnum { labelLineType, dataLineType, ignoreLineType, unknownLineType };
@@ -165,22 +165,18 @@ std::vector<AntennaClass *> AntennaClass::readMultipleBoresightAntennas(std::str
 					field = fieldList.at(fieldIdx);
 					if (fieldIdx == 0) {
 						if (field != "Off-axis angle (deg)") {
-							throw std::runtime_error(
-								ErrStream()
-								<< "ERROR: Invalid antenna data "
-								   "file \""
-								<< filename << "(" << linenum
-								<< ")\" invalid \"Off-axis angle "
-								   "(deg)\" label = "
-								<< field);
+							throw std::runtime_error(ErrStream() << "ERROR: Invalid antenna data "
+																	"file \""
+																 << filename << "(" << linenum
+																 << ")\" invalid \"Off-axis angle "
+																	"(deg)\" label = "
+																 << field);
 						}
 					} else {
-						ListClass<DblDblClass> *lutGain =
-							new ListClass<DblDblClass>(0);
+						ListClass<DblDblClass> *lutGain = new ListClass<DblDblClass>(0);
 						lutGainList.push_back(lutGain);
 						AntennaClass *antenna = new AntennaClass(
-							CConst::antennaLUT_Boresight,
-							field.c_str());
+							CConst::antennaLUT_Boresight, field.c_str());
 						antennaList.push_back(antenna);
 					}
 				}
@@ -189,10 +185,8 @@ std::vector<AntennaClass *> AntennaClass::readMultipleBoresightAntennas(std::str
 				phaseRad = strtod(fieldList.at(0).c_str(), &chptr) * M_PI / 180;
 				for (fieldIdx = 1; fieldIdx < (int)fieldList.size(); fieldIdx++) {
 					field = fieldList.at(fieldIdx);
-					double gainVal = strtod(fieldList.at(fieldIdx).c_str(),
-								&chptr);
-					lutGainList[fieldIdx - 1]->append(
-						DblDblClass(phaseRad, gainVal));
+					double gainVal = strtod(fieldList.at(fieldIdx).c_str(), &chptr);
+					lutGainList[fieldIdx - 1]->append(DblDblClass(phaseRad, gainVal));
 				}
 				break;
 
@@ -201,9 +195,8 @@ std::vector<AntennaClass *> AntennaClass::readMultipleBoresightAntennas(std::str
 				// do nothing
 				break;
 			default:
-				throw std::runtime_error(
-					ErrStream() << "ERROR reading Antenna File: lineType = "
-						    << lineType << " INVALID value");
+				throw std::runtime_error(ErrStream()
+					<< "ERROR reading Antenna File: lineType = " << lineType << " INVALID value");
 				break;
 		}
 	}
@@ -295,10 +288,10 @@ double AntennaClass::gainDB(double dx, double dy, double dz, double h_angle_rad)
 		double gh = horizGainTable->lininterpval(phi);
 
 		gain_db = (1.0 - fabs(phi) / M_PI) * (gv1 - gain_fwd_db) +
-			  (fabs(phi) / M_PI) * (gv2 - gain_back_db) + gh;
+			(fabs(phi) / M_PI) * (gv2 - gain_back_db) + gh;
 	} else {
-		throw std::runtime_error(ErrStream() << "ERROR in AntennaClass::gainDB: type = "
-						     << type << " INVALID value");
+		throw std::runtime_error(
+			ErrStream() << "ERROR in AntennaClass::gainDB: type = " << type << " INVALID value");
 	}
 
 	return (gain_db);
@@ -342,10 +335,10 @@ double AntennaClass::gainDB(double phi, double theta)
 		double gh = horizGainTable->lininterpval(phi);
 
 		gain_db = (1.0 - fabs(phi) / M_PI) * (gv1 - gain_fwd_db) +
-			  (fabs(phi) / M_PI) * (gv2 - gain_back_db) + gh;
+			(fabs(phi) / M_PI) * (gv2 - gain_back_db) + gh;
 	} else {
-		throw std::runtime_error(ErrStream() << "ERROR in AntennaClass::gainDB: type = "
-						     << type << " INVALID value");
+		throw std::runtime_error(
+			ErrStream() << "ERROR in AntennaClass::gainDB: type = " << type << " INVALID value");
 	}
 
 	return (gain_db);
@@ -362,8 +355,8 @@ double AntennaClass::gainDB(double theta)
 	if (type == CConst::antennaLUT_Boresight) {
 		gain_db = offBoresightGainTable->lininterpval(theta);
 	} else {
-		throw std::runtime_error(ErrStream() << "ERROR in AntennaClass::gainDB: type = "
-						     << type << " INVALID value");
+		throw std::runtime_error(
+			ErrStream() << "ERROR in AntennaClass::gainDB: type = " << type << " INVALID value");
 	}
 
 	return (gain_db);
@@ -385,24 +378,23 @@ int AntennaClass::checkGain(const char *flname, int orient, int numpts)
 
 	if (numpts <= 0) {
 		throw std::runtime_error(ErrStream()
-					 << "ERROR in routine check_antenna_gain(), numpts = "
-					 << numpts << " must be > 0");
+			<< "ERROR in routine check_antenna_gain(), numpts = " << numpts << " must be > 0");
 	}
 
 	if (!flname) {
 		throw std::runtime_error(ErrStream() << "ERROR in routine check_antenna_gain(), No "
-							"filename specified");
+												"filename specified");
 	}
 
 	if (!(fp = fopen(flname, "w"))) {
 		throw std::runtime_error(ErrStream() << "ERROR in routine check_antenna_gain(), "
-							"unable to write to file \""
-						     << flname << "\"");
+												"unable to write to file \""
+											 << flname << "\"");
 	}
 
 	LOGGER_INFO(logger) << "Checking " << (orient == 0 ? "HORIZONTAL" : "VERTICAL")
-			    << " antenna gain.  Writing " << numpts << " points to file \""
-			    << flname << "\"";
+						<< " antenna gain.  Writing " << numpts << " points to file \"" << flname
+						<< "\"";
 
 	for (i = 0; i <= numpts - 1; i++) {
 		phase_deg = -180.0 + 360.0 * i / numpts;

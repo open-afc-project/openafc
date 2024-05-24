@@ -77,13 +77,11 @@ class AntennaPrefixClass
 class AntennaModelMapClass
 {
 	public:
-		AntennaModelMapClass(const std::string antListFile,
-				     const std::string antPrefixFile,
-				     const std::string antMapFile);
-		AntennaModelClass *find(std::string antPfx,
-					std::string modelName,
-					AntennaModel::CategoryEnum &category,
-					AntennaModel::CategoryEnum modelNameBlankCategory);
+		AntennaModelMapClass(const std::string antListFile, const std::string antPrefixFile,
+			const std::string antMapFile);
+		AntennaModelClass *find(std::string antPfx, std::string modelName,
+			AntennaModel::CategoryEnum &category,
+			AntennaModel::CategoryEnum modelNameBlankCategory);
 
 	private:
 		void readModelList(const std::string filename);

@@ -37,10 +37,7 @@ struct GdalTransform {
 				 * @param latDegMax Maximum latitude in north-positive degrees
 				 * @param lonDegMax Maximum longitude in east-positive degrees
 				 */
-				BoundRect(double latDegMin,
-					  double lonDegMin,
-					  double latDegMax,
-					  double lonDegMax);
+				BoundRect(double latDegMin, double lonDegMin, double latDegMax, double lonDegMax);
 
 				/** Default constructor */
 				BoundRect();
@@ -77,11 +74,8 @@ struct GdalTransform {
 		 * @param latSize Number of pixels in latitudinal direction
 		 * @param lonSize Number of pixels in longitudinal direction
 		 */
-		GdalTransform(const GdalTransform &gdalXform,
-			      int latPixOffset,
-			      int lonPixOffset,
-			      int latSize,
-			      int lonSize);
+		GdalTransform(const GdalTransform &gdalXform, int latPixOffset, int lonPixOffset,
+			int latSize, int lonSize);
 
 		/** Default constructor */
 		GdalTransform();

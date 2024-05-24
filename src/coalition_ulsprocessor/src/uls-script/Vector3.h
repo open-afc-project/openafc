@@ -96,8 +96,8 @@ class Vector3
 		inline Vector3 cross(const Vector3 &other) const
 		{
 			return Vector3(data[1] * other.data[2] - data[2] * other.data[1],
-				       data[2] * other.data[0] - data[0] * other.data[2],
-				       data[0] * other.data[1] - data[1] * other.data[0]);
+				data[2] * other.data[0] - data[0] * other.data[2],
+				data[0] * other.data[1] - data[1] * other.data[0]);
 		}
 
 		/**
@@ -201,20 +201,19 @@ class Vector3
 		inline bool operator==(const Vector3 &other)
 		{
 			bool retval = (data[0] == other.data[0]) && (data[1] == other.data[1]) &&
-				      (data[2] == other.data[2]);
+				(data[2] == other.data[2]);
 
 			return retval;
 		}
 		friend std::ostream &operator<<(std::ostream &os, const Vector3 &vector)
 		{
-			return os << "(" << vector.x() << ", " << vector.y() << ", " << vector.z()
-				  << ")";
+			return os << "(" << vector.x() << ", " << vector.y() << ", " << vector.z() << ")";
 		}
 
 		friend QDebug operator<<(QDebug stream, const Vector3 &vector)
 		{
-			stream.nospace() << "(" << vector.x() << ", " << vector.y() << ", "
-					 << vector.z() << ")";
+			stream.nospace() << "(" << vector.x() << ", " << vector.y() << ", " << vector.z()
+							 << ")";
 			return stream.space();
 		}
 

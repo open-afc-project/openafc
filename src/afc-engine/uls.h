@@ -26,11 +26,8 @@ class PRClass
 		PRClass();
 		~PRClass();
 
-		double computeDiscriminationGain(double angleOffBoresightDeg,
-						 double elevationAngleDeg,
-						 double frequency,
-						 double &reflectorD0,
-						 double &reflectorD1);
+		double computeDiscriminationGain(double angleOffBoresightDeg, double elevationAngleDeg,
+			double frequency, double &reflectorD0, double &reflectorD1);
 
 		// Path segment gain as defined in R2-AIP-31
 		double pathSegGain;
@@ -74,7 +71,7 @@ class PRClass
 		Vector3 reflectorX, reflectorY, reflectorZ;
 
 		double reflectorThetaIN; // Inclusion angle between incident and reflected waves at
-					 // reflector is 2*thetaIN
+								 // reflector is 2*thetaIN
 		double reflectorKS;
 		double reflectorQ;
 		// double reflectorAlphaEL;  // Inclusion angle in elevation plane is 2*alphaEL
@@ -92,11 +89,7 @@ class PRClass
 class ULSClass
 {
 	public:
-		ULSClass(AfcManager *dataSetVal,
-			 int idVal,
-			 int dbIdx,
-			 int numPRVal,
-			 std::string regionVal);
+		ULSClass(AfcManager *dataSetVal, int idVal, int dbIdx, int numPRVal, std::string regionVal);
 		~ULSClass();
 
 		int getID() const;
@@ -154,28 +147,15 @@ class ULSClass
 		double getFadeMarginDB();
 		std::string getStatus();
 		double computeBeamWidth(double attnDB);
-		double computeRxGain(double angleOffBoresightDeg,
-				     double elevationAngleDeg,
-				     double frequency,
-				     std::string &subModelStr,
-				     int divIdx);
+		double computeRxGain(double angleOffBoresightDeg, double elevationAngleDeg,
+			double frequency, std::string &subModelStr, int divIdx);
 
-		static double calcR2AIP07Antenna(double angleOffBoresightDeg,
-						 double frequency,
-						 std::string antennaModel,
-						 CConst::AntennaCategoryEnum category,
-						 std::string &subModelStr,
-						 int divIdx,
-						 double maxGain,
-						 double Dlambda);
-		static double calcR2AIP07CANAntenna(double angleOffBoresightDeg,
-						    double frequency,
-						    std::string antennaModel,
-						    CConst::AntennaCategoryEnum category,
-						    std::string &subModelStr,
-						    int divIdx,
-						    double maxGain,
-						    double Dlambda);
+		static double calcR2AIP07Antenna(double angleOffBoresightDeg, double frequency,
+			std::string antennaModel, CConst::AntennaCategoryEnum category,
+			std::string &subModelStr, int divIdx, double maxGain, double Dlambda);
+		static double calcR2AIP07CANAntenna(double angleOffBoresightDeg, double frequency,
+			std::string antennaModel, CConst::AntennaCategoryEnum category,
+			std::string &subModelStr, int divIdx, double maxGain, double Dlambda);
 
 		std::string getRxAntennaModel()
 		{

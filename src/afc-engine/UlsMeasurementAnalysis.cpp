@@ -16,20 +16,9 @@
 #include "gdal_priv.h"
 #include "cpl_conv.h" // for CPLMalloc()
 
-extern void point_to_point(double elev[],
-			   double tht_m,
-			   double rht_m,
-			   double eps_dielect,
-			   double sgm_conductivity,
-			   double eno_ns_surfref,
-			   double frq_mhz,
-			   int radio_climate,
-			   int pol,
-			   double conf,
-			   double rel,
-			   double &dbloss,
-			   std::string &strmode,
-			   int &errnum);
+extern void point_to_point(double elev[], double tht_m, double rht_m, double eps_dielect,
+	double sgm_conductivity, double eno_ns_surfref, double frq_mhz, int radio_climate, int pol,
+	double conf, double rel, double &dbloss, std::string &strmode, int &errnum);
 
 namespace
 {
@@ -43,10 +32,8 @@ namespace UlsMeasurementAnalysis
 {
 void dumpHeightProfile(const char *prefix, const double *heights);
 
-QVector<QPointF> computeApproximateGreatCircleLine(const QPointF &from,
-						   const QPointF &to,
-						   int numpts,
-						   double *tdist)
+QVector<QPointF> computeApproximateGreatCircleLine(
+	const QPointF &from, const QPointF &to, int numpts, double *tdist)
 {
 	QVector<QPointF> latlons;
 	latlons.fill(from, numpts);
@@ -73,17 +60,14 @@ QVector<QPointF> computeApproximateGreatCircleLine(const QPointF &from,
 		double slat = sin((lat2Rad - lat1Rad) / 2);
 		double slon = sin((lon2Rad - lon1Rad) / 2);
 		*tdist = 2 * CConst::averageEarthRadius *
-			 asin(sqrt(slat * slat + cos(lat1Rad) * cos(lat2Rad) * slon * slon)) *
-			 1.0e-3;
+			asin(sqrt(slat * slat + cos(lat1Rad) * cos(lat2Rad) * slon * slon)) * 1.0e-3;
 	}
 
 	return latlons;
 }
 
-QVector<QPointF> computeGreatCircleLine(const QPointF &from,
-					const QPointF &to,
-					int numpts,
-					double *tdist)
+QVector<QPointF> computeGreatCircleLine(
+	const QPointF &from, const QPointF &to, int numpts, double *tdist)
 {
 	//  We're going to do what the fortran program does. It's kinda stupid, though.
 
@@ -246,10 +230,8 @@ QVector<QPointF> computeGreatCircleLine(const QPointF &from,
 	return latlons;
 }
 
-QVector<QPointF> computeGreatCircleLineMM(const QPointF &from,
-					  const QPointF &to,
-					  int numpts,
-					  double *tdist)
+QVector<QPointF> computeGreatCircleLineMM(
+	const QPointF &from, const QPointF &to, int numpts, double *tdist)
 {
 	double lon1Rad = from.y() * M_PI / 180.0;
 	double lat1Rad = from.x() * M_PI / 180.0;
@@ -258,14 +240,10 @@ QVector<QPointF> computeGreatCircleLineMM(const QPointF &from,
 	double slat = sin((lat2Rad - lat1Rad) / 2);
 	double slon = sin((lon2Rad - lon1Rad) / 2);
 	*tdist = 2 * CConst::averageEarthRadius *
-		 asin(sqrt(slat * slat + cos(lat1Rad) * cos(lat2Rad) * slon * slon)) * 1.0e-3;
+		asin(sqrt(slat * slat + cos(lat1Rad) * cos(lat2Rad) * slon * slon)) * 1.0e-3;
 
-	Vector3 posn1 = Vector3(cos(lat1Rad) * cos(lon1Rad),
-				cos(lat1Rad) * sin(lon1Rad),
-				sin(lat1Rad));
-	Vector3 posn2 = Vector3(cos(lat2Rad) * cos(lon2Rad),
-				cos(lat2Rad) * sin(lon2Rad),
-				sin(lat2Rad));
+	Vector3 posn1 = Vector3(cos(lat1Rad) * cos(lon1Rad), cos(lat1Rad) * sin(lon1Rad), sin(lat1Rad));
+	Vector3 posn2 = Vector3(cos(lat2Rad) * cos(lon2Rad), cos(lat2Rad) * sin(lon2Rad), sin(lat2Rad));
 
 	double dotprod = posn1.dot(posn2);
 	if (dotprod > 1.0) {
@@ -283,8 +261,7 @@ QVector<QPointF> computeGreatCircleLineMM(const QPointF &from,
 	QVector<QPointF> latlons(numpts);
 
 	for (int ptIdx = 0; ptIdx < numpts; ++ptIdx) {
-		double theta_i = (greatCircleAngle * (2 * ptIdx - (numpts - 1))) /
-				 (2 * (numpts - 1));
+		double theta_i = (greatCircleAngle * (2 * ptIdx - (numpts - 1))) / (2 * (numpts - 1));
 		Vector3 posn_i = uVec * cos(theta_i) + vVec * sin(theta_i);
 		double lon_i = atan2(posn_i.y(), posn_i.x());
 		double lat_i = atan2(posn_i.z(), posn_i.x() * cos(lon_i) + posn_i.y() * sin(lon_i));
@@ -295,11 +272,8 @@ QVector<QPointF> computeGreatCircleLineMM(const QPointF &from,
 	return latlons;
 }
 
-QVector<QPointF> computePartialGreatCircleLine(const QPointF &from,
-					       const QPointF &to,
-					       int numptsTotal,
-					       int numptsPartial,
-					       double *tdist)
+QVector<QPointF> computePartialGreatCircleLine(
+	const QPointF &from, const QPointF &to, int numptsTotal, int numptsPartial, double *tdist)
 {
 	QVector<QPointF> latlonGc = computeGreatCircleLine(from, to, numptsPartial + 1, tdist);
 
@@ -320,14 +294,11 @@ QVector<QPointF> computePartialGreatCircleLine(const QPointF &from,
 			thisStepCount = remainingPoints;
 		else
 			remainingPoints -= thisStepCount;
-		QVector<QPointF> r = computeApproximateGreatCircleLine(f,
-								       t,
-								       thisStepCount + 1,
-								       NULL);
+		QVector<QPointF> r = computeApproximateGreatCircleLine(f, t, thisStepCount + 1, NULL);
 
 		for (int pr = 0; pr < r.count(); ++pr) {
-			qDebug() << " partial from " << f.x() << f.y() << " to " << t.x() << t.y()
-				 << " [" << pr << "] = " << r[pr].x() << r[pr].y();
+			qDebug() << " partial from " << f.x() << f.y() << " to " << t.x() << t.y() << " [" << pr
+					 << "] = " << r[pr].x() << r[pr].y();
 		}
 
 		const int thisCnt = r.count();
@@ -339,13 +310,8 @@ QVector<QPointF> computePartialGreatCircleLine(const QPointF &from,
 	return ret;
 }
 
-double *computeElevationVector(const TerrainClass *terrain,
-			       bool includeBldg,
-			       bool cdsmFlag,
-			       const QPointF &from,
-			       const QPointF &to,
-			       int numpts,
-			       double *cdsmFracPtr)
+double *computeElevationVector(const TerrainClass *terrain, bool includeBldg, bool cdsmFlag,
+	const QPointF &from, const QPointF &to, int numpts, double *cdsmFracPtr)
 {
 	double tdist;
 	double terrainHeight, bldgHeight;
@@ -372,12 +338,8 @@ double *computeElevationVector(const TerrainClass *terrain,
 		// Compute numBldgPtTX so building at TX can be removed
 		/*********************************************************************************************************/
 		const QPointF &ptTX = latlons.at(0);
-		terrain->getTerrainHeight(ptTX.y(),
-					  ptTX.x(),
-					  terrainHeight,
-					  bldgHeight,
-					  lidarHeightResult,
-					  heightSource);
+		terrain->getTerrainHeight(
+			ptTX.y(), ptTX.x(), terrainHeight, bldgHeight, lidarHeightResult, heightSource);
 		if (lidarHeightResult == MultibandRasterClass::BUILDING) {
 			bool found = false;
 			for (stepIdx = 1; (stepIdx < maxBldgStep) && (!found); stepIdx++) {
@@ -385,15 +347,11 @@ double *computeElevationVector(const TerrainClass *terrain,
 				int n0 = (int)floor(ptIdxDbl);
 				int n1 = n0 + 1;
 				double ptx = latlons.at(n0).x() * (n1 - ptIdxDbl) +
-					     latlons.at(n1).x() * (ptIdxDbl - n0);
+					latlons.at(n1).x() * (ptIdxDbl - n0);
 				double pty = latlons.at(n0).y() * (n1 - ptIdxDbl) +
-					     latlons.at(n1).y() * (ptIdxDbl - n0);
-				terrain->getTerrainHeight(pty,
-							  ptx,
-							  terrainHeight,
-							  bldgHeight,
-							  lidarHeightResult,
-							  heightSource);
+					latlons.at(n1).y() * (ptIdxDbl - n0);
+				terrain->getTerrainHeight(
+					pty, ptx, terrainHeight, bldgHeight, lidarHeightResult, heightSource);
 				if (lidarHeightResult != MultibandRasterClass::BUILDING) {
 					found = true;
 					numBldgPtTX = n1;
@@ -411,12 +369,8 @@ double *computeElevationVector(const TerrainClass *terrain,
 		// Compute numBldgPtRX so building at RX can be removed
 		/*********************************************************************************************************/
 		const QPointF &ptRX = latlons.at(numpts - 1);
-		terrain->getTerrainHeight(ptRX.y(),
-					  ptRX.x(),
-					  terrainHeight,
-					  bldgHeight,
-					  lidarHeightResult,
-					  heightSource);
+		terrain->getTerrainHeight(
+			ptRX.y(), ptRX.x(), terrainHeight, bldgHeight, lidarHeightResult, heightSource);
 		if (lidarHeightResult == MultibandRasterClass::BUILDING) {
 			bool found = false;
 			for (stepIdx = 1; (stepIdx < maxBldgStep) && (!found); stepIdx++) {
@@ -424,15 +378,11 @@ double *computeElevationVector(const TerrainClass *terrain,
 				int n0 = (int)floor(ptIdxDbl);
 				int n1 = n0 + 1;
 				double ptx = latlons.at(n0).x() * (n1 - ptIdxDbl) +
-					     latlons.at(n1).x() * (ptIdxDbl - n0);
+					latlons.at(n1).x() * (ptIdxDbl - n0);
 				double pty = latlons.at(n0).y() * (n1 - ptIdxDbl) +
-					     latlons.at(n1).y() * (ptIdxDbl - n0);
-				terrain->getTerrainHeight(pty,
-							  ptx,
-							  terrainHeight,
-							  bldgHeight,
-							  lidarHeightResult,
-							  heightSource);
+					latlons.at(n1).y() * (ptIdxDbl - n0);
+				terrain->getTerrainHeight(
+					pty, ptx, terrainHeight, bldgHeight, lidarHeightResult, heightSource);
 				if (lidarHeightResult != MultibandRasterClass::BUILDING) {
 					found = true;
 					numBldgPtRX = numpts - n1;
@@ -453,15 +403,10 @@ double *computeElevationVector(const TerrainClass *terrain,
 		const QPointF &pt = latlons.at(i);
 		bool cdsmFlagVal = (((i == 0) || (i == numpts - 1)) ? false : cdsmFlag);
 
-		terrain->getTerrainHeight(pt.y(),
-					  pt.x(),
-					  terrainHeight,
-					  bldgHeight,
-					  lidarHeightResult,
-					  heightSource,
-					  cdsmFlagVal);
+		terrain->getTerrainHeight(pt.y(), pt.x(), terrainHeight, bldgHeight, lidarHeightResult,
+			heightSource, cdsmFlagVal);
 		if (includeBldg && (lidarHeightResult == MultibandRasterClass::BUILDING) &&
-		    (i >= numBldgPtTX) && (i <= numpts - 1 - numBldgPtRX)) {
+			(i >= numBldgPtTX) && (i <= numpts - 1 - numBldgPtRX)) {
 			*pos = terrainHeight + bldgHeight;
 		} else {
 			*pos = terrainHeight;
@@ -496,7 +441,7 @@ double greatCircleDistance(double lat1, double lon1, double lat2, double lon2)
 	// law of cosines
 	// inaccurate for small distances?
 	double centerAngle = std::acos(std::sin(lat1rad) * std::sin(lat2rad) +
-				       std::cos(lat1rad) * std::cos(lat2rad) * std::cos(deltalon));
+		std::cos(lat1rad) * std::cos(lat2rad) * std::cos(deltalon));
 	/*double hav = 2*std::asin(
 	  std::sqrt(sqr(std::sin(deltalat/2)) +
 	  std::cos(lat1rad) *
@@ -506,14 +451,8 @@ double greatCircleDistance(double lat1, double lon1, double lat2, double lon2)
 	return rad2deg(centerAngle);
 }
 
-void computeElevationVector(const TerrainClass *terrain,
-			    bool includeBldg,
-			    const QPointF &from,
-			    const QPointF &to,
-			    int numpts,
-			    std::vector<double> &hi,
-			    std::vector<double> &di,
-			    double ae)
+void computeElevationVector(const TerrainClass *terrain, bool includeBldg, const QPointF &from,
+	const QPointF &to, int numpts, std::vector<double> &hi, std::vector<double> &di, double ae)
 {
 	// For compatability with P.452
 	double tdist;
@@ -529,12 +468,8 @@ void computeElevationVector(const TerrainClass *terrain,
 		double terrainHeight, bldgHeight;
 		MultibandRasterClass::HeightResult lidarHeightResult;
 		CConst::HeightSourceEnum heightSource;
-		terrain->getTerrainHeight(pt.y(),
-					  pt.x(),
-					  terrainHeight,
-					  bldgHeight,
-					  lidarHeightResult,
-					  heightSource);
+		terrain->getTerrainHeight(
+			pt.y(), pt.x(), terrainHeight, bldgHeight, lidarHeightResult, heightSource);
 
 		if (includeBldg && (lidarHeightResult == MultibandRasterClass::BUILDING)) {
 			// CORE DUMP, not yet implemented, need to remove building at TX and RX
@@ -556,33 +491,15 @@ void computeElevationVector(const TerrainClass *terrain,
 	return;
 }
 
-double runPointToPoint(const TerrainClass *terrain,
-		       bool includeBldg,
-		       QPointF transLocLatLon,
-		       double transHt,
-		       QPointF receiveLocLatLon,
-		       double receiveHt,
-		       double lineOfSightDistanceKm,
-		       double eps_dielect,
-		       double sgm_conductivity,
-		       double eno_ns_surfref,
-		       double frq_mhz,
-		       int radio_climate,
-		       int pol,
-		       double conf,
-		       double rel,
-		       int numpts,
-		       char *prefix,
-		       double **heightProfilePtr)
+double runPointToPoint(const TerrainClass *terrain, bool includeBldg, QPointF transLocLatLon,
+	double transHt, QPointF receiveLocLatLon, double receiveHt, double lineOfSightDistanceKm,
+	double eps_dielect, double sgm_conductivity, double eno_ns_surfref, double frq_mhz,
+	int radio_climate, int pol, double conf, double rel, int numpts, char *prefix,
+	double **heightProfilePtr)
 {
 	if (!(*heightProfilePtr)) {
-		*heightProfilePtr = computeElevationVector(terrain,
-							   includeBldg,
-							   false,
-							   transLocLatLon,
-							   receiveLocLatLon,
-							   numpts,
-							   (double *)NULL);
+		*heightProfilePtr = computeElevationVector(
+			terrain, includeBldg, false, transLocLatLon, receiveLocLatLon, numpts, (double *)NULL);
 	}
 
 	double rv;
@@ -596,20 +513,8 @@ double runPointToPoint(const TerrainClass *terrain,
 		LOGGER_INFO(logger) << "ITM Parameter: pol = " << pol;
 		itmInitFlag = false;
 	}
-	point_to_point(*heightProfilePtr,
-		       transHt,
-		       receiveHt,
-		       eps_dielect,
-		       sgm_conductivity,
-		       eno_ns_surfref,
-		       frq_mhz,
-		       radio_climate,
-		       pol,
-		       conf,
-		       rel,
-		       rv,
-		       strmode,
-		       errnum);
+	point_to_point(*heightProfilePtr, transHt, receiveHt, eps_dielect, sgm_conductivity,
+		eno_ns_surfref, frq_mhz, radio_climate, pol, conf, rel, rv, strmode, errnum);
 	// qDebug() << " point_to_point" << rv << strmode << errnum;
 
 	if (prefix != NULL) {
@@ -621,24 +526,13 @@ double runPointToPoint(const TerrainClass *terrain,
 	return rv;
 }
 
-bool isLOS(const TerrainClass *terrain,
-	   QPointF transLocLatLon,
-	   double transHt,
-	   QPointF receiveLocLatLon,
-	   double receiveHt,
-	   double lineOfSightDistanceKm,
-	   int numpts,
-	   double **heightProfilePtr,
-	   double *cdsmFracPtr)
+bool isLOS(const TerrainClass *terrain, QPointF transLocLatLon, double transHt,
+	QPointF receiveLocLatLon, double receiveHt, double lineOfSightDistanceKm, int numpts,
+	double **heightProfilePtr, double *cdsmFracPtr)
 {
 	if (!(*heightProfilePtr)) {
-		*heightProfilePtr = computeElevationVector(terrain,
-							   true,
-							   true,
-							   transLocLatLon,
-							   receiveLocLatLon,
-							   numpts,
-							   cdsmFracPtr);
+		*heightProfilePtr = computeElevationVector(
+			terrain, true, true, transLocLatLon, receiveLocLatLon, numpts, cdsmFracPtr);
 	}
 
 	double txHeightAMSL = (*heightProfilePtr)[2] + transHt;
@@ -649,7 +543,7 @@ bool isLOS(const TerrainClass *terrain,
 	for (ptIdx = 0; (ptIdx < numpts) && (losFlag); ++ptIdx) {
 		double ptHeight = (*heightProfilePtr)[2 + ptIdx];
 		double signalHeight = (txHeightAMSL * (numpts - 1 - ptIdx) + rxHeightAMSL * ptIdx) /
-				      (numpts - 1);
+			(numpts - 1);
 
 		double clearance = signalHeight - ptHeight;
 

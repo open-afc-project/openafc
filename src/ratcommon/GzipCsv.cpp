@@ -94,9 +94,9 @@ void GzipCsv::ColBase::checkSet() const
 		return;
 	}
 	throw std::runtime_error(QString("Attempt to read value from column \"%1\" that was not "
-					 "set yet")
-					 .arg(_name)
-					 .toStdString());
+									 "set yet")
+								 .arg(_name)
+								 .toStdString());
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -112,9 +112,8 @@ QString GzipCsv::ColInt::formatValue() const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GzipCsv::ColDouble::ColDouble(GzipCsv *container,
-			      const std::string &name,
-			      const std::string &format) :
+GzipCsv::ColDouble::ColDouble(
+	GzipCsv *container, const std::string &name, const std::string &format) :
 	ColBase(container, name), _format(format)
 {
 }
@@ -143,9 +142,8 @@ QString GzipCsv::ColStr::formatValue() const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GzipCsv::ColBool::ColBool(GzipCsv *container,
-			  const std::string &name,
-			  const std::vector<std::string> &tf) :
+GzipCsv::ColBool::ColBool(
+	GzipCsv *container, const std::string &name, const std::vector<std::string> &tf) :
 	ColBase(container, name)
 {
 	assert(tf.size() == 2);
@@ -161,10 +159,8 @@ QString GzipCsv::ColBool::formatValue() const
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GzipCsv::ColEnum::ColEnum(GzipCsv *container,
-			  const std::string &name,
-			  const std::map<int, std::string> &items,
-			  const std::string &defName) :
+GzipCsv::ColEnum::ColEnum(GzipCsv *container, const std::string &name,
+	const std::map<int, std::string> &items, const std::string &defName) :
 	ColBase(container, name), _defName(QString::fromStdString(defName))
 {
 	for (const auto &kvp : items) {

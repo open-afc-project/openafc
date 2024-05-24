@@ -15,8 +15,7 @@ int TextHelpers::toInt(const QString &text)
 	bool valid;
 	const double val = text.toInt(&valid);
 	if (!valid) {
-		throw std::runtime_error(ErrStream()
-					 << "Failed to convert '" << text << "' to integer");
+		throw std::runtime_error(ErrStream() << "Failed to convert '" << text << "' to integer");
 	}
 	return val;
 }
@@ -26,8 +25,7 @@ double TextHelpers::toNumber(const QString &text)
 	bool valid;
 	const double val = text.toDouble(&valid);
 	if (!valid) {
-		throw std::runtime_error(ErrStream()
-					 << "Failed to convert '" << text << "' to double");
+		throw std::runtime_error(ErrStream() << "Failed to convert '" << text << "' to double");
 	}
 	return val;
 }
@@ -119,9 +117,7 @@ QByteArray TextHelpers::operationName(const QNetworkReply &reply)
 		case QNetworkAccessManager::DeleteOperation:
 			return "DELETE";
 		default:
-			return reply.request()
-				.attribute(QNetworkRequest::CustomVerbAttribute)
-				.toByteArray();
+			return reply.request().attribute(QNetworkRequest::CustomVerbAttribute).toByteArray();
 	}
 }
 

@@ -46,13 +46,9 @@ void SqlExceptionDb::tryOpen()
 	if (isOpen()) {
 		QSqlQuery test = exec("SELECT 1");
 		if (!test.isActive()) {
-			const QString name = QString("%1://%3@%2/%4")
-						     .arg(driverName(),
-							  hostName(),
-							  userName(),
-							  databaseName());
-			qWarning().nospace()
-				<< "SqlExceptionDb closing supposedly open connection to " << name;
+			const QString name =
+				QString("%1://%3@%2/%4").arg(driverName(), hostName(), userName(), databaseName());
+			qWarning().nospace() << "SqlExceptionDb closing supposedly open connection to " << name;
 			close();
 		}
 	}

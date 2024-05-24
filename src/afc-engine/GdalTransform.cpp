@@ -15,10 +15,8 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 
-GdalTransform::BoundRect::BoundRect(double latDegMin_,
-				    double lonDegMin_,
-				    double latDegMax_,
-				    double lonDegMax_) :
+GdalTransform::BoundRect::BoundRect(
+	double latDegMin_, double lonDegMin_, double latDegMax_, double lonDegMax_) :
 	latDegMin(latDegMin_), lonDegMin(lonDegMin_), latDegMax(latDegMax_), lonDegMax(lonDegMax_)
 {
 }
@@ -31,7 +29,7 @@ bool GdalTransform::BoundRect::contains(double latDeg, double lonDeg) const
 {
 	lonDeg = rebaseLon(lonDeg, lonDegMin);
 	return (latDegMin < latDeg) && (lonDegMin <= lonDeg) && (latDeg <= latDegMax) &&
-	       (lonDeg < lonDegMax);
+		(lonDeg < lonDegMax);
 }
 
 void GdalTransform::BoundRect::combine(const GdalTransform::BoundRect &other)
@@ -67,14 +65,14 @@ GdalTransform::GdalTransform(GDALDataset *gdalDataSet_, const std::string &filen
 	CPLErr gdalErr = gdalDataSet_->GetGeoTransform(gdalTransform);
 	if (gdalErr != CPLErr::CE_None) {
 		errStr << "ERROR: GdalTransform::GdalTransform(): "
-			  "Failed to read transformation from GDAL data file '"
-		       << filename_ << "': " << CPLGetLastErrorMsg();
+				  "Failed to read transformation from GDAL data file '"
+			   << filename_ << "': " << CPLGetLastErrorMsg();
 		throw std::runtime_error(errStr.str());
 	}
 	if (!((gdalTransform[2] == 0) && (gdalTransform[4] == 0) && (gdalTransform[1] > 0) &&
-	      (gdalTransform[5] < 0))) {
+			(gdalTransform[5] < 0))) {
 		errStr << "ERROR: GdalTransform::GdalTransform(): GDAL data file '" << filename_
-		       << "': does not contain 'north up' data";
+			   << "': does not contain 'north up' data";
 		throw std::runtime_error(errStr.str());
 	}
 	latPixPerDeg = -1. / gdalTransform[5];
@@ -85,11 +83,8 @@ GdalTransform::GdalTransform(GDALDataset *gdalDataSet_, const std::string &filen
 	lonSize = gdalDataSet_->GetRasterXSize();
 }
 
-GdalTransform::GdalTransform(const GdalTransform &gdalXform_,
-			     int latPixOffset_,
-			     int lonPixOffset_,
-			     int latSize_,
-			     int lonSize_) :
+GdalTransform::GdalTransform(const GdalTransform &gdalXform_, int latPixOffset_, int lonPixOffset_,
+	int latSize_, int lonSize_) :
 	latPixPerDeg(gdalXform_.latPixPerDeg),
 	lonPixPerDeg(gdalXform_.lonPixPerDeg),
 	latPixMax(gdalXform_.latPixMax - latPixOffset_),
@@ -101,13 +96,7 @@ GdalTransform::GdalTransform(const GdalTransform &gdalXform_,
 }
 
 GdalTransform::GdalTransform() :
-	latPixPerDeg(0),
-	lonPixPerDeg(0),
-	latPixMax(0),
-	lonPixMin(0),
-	latSize(0),
-	lonSize(0),
-	margin(0)
+	latPixPerDeg(0), lonPixPerDeg(0), latPixMax(0), lonPixMin(0), latSize(0), lonSize(0), margin(0)
 {
 }
 
@@ -123,10 +112,9 @@ void GdalTransform::computePixel(double latDeg, double lonDeg, int *latIdx, int 
 	if ((*latIdx < -1) || (*latIdx > latSize) || (*lonIdx < -1) || (*lonIdx > lonSize)) {
 		auto br(makeBoundRect());
 		std::ostringstream errStr;
-		errStr << "ERROR: GdalTransform::computePixel() internal error: point (" << latDeg
-		       << "N, " << lonDeg << "E is out of tile/GDAL bounds of [" << br.latDegMin
-		       << " - " << br.latDegMax << "]N X [" << br.lonDegMin << " - " << br.lonDegMax
-		       << "]E";
+		errStr << "ERROR: GdalTransform::computePixel() internal error: point (" << latDeg << "N, "
+			   << lonDeg << "E is out of tile/GDAL bounds of [" << br.latDegMin << " - "
+			   << br.latDegMax << "]N X [" << br.lonDegMin << " - " << br.lonDegMax << "]E";
 		throw std::runtime_error(errStr.str());
 	}
 	// Preventing rounding errors by less than a pixel
@@ -137,9 +125,8 @@ void GdalTransform::computePixel(double latDeg, double lonDeg, int *latIdx, int 
 GdalTransform::BoundRect GdalTransform::makeBoundRect() const
 {
 	return BoundRect((latPixMax - latSize + margin) / latPixPerDeg,
-			 (lonPixMin + margin) / lonPixPerDeg,
-			 (latPixMax - margin) / latPixPerDeg,
-			 (lonPixMin + lonSize - margin) / lonPixPerDeg);
+		(lonPixMin + margin) / lonPixPerDeg, (latPixMax - margin) / latPixPerDeg,
+		(lonPixMin + lonSize - margin) / lonPixPerDeg);
 }
 
 void GdalTransform::roundPpdToMultipleOf(double pixelsPerDegree)
