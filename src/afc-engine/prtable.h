@@ -14,22 +14,22 @@ using namespace std;
 /******************************************************************************************/
 class PRTABLEClass
 {
-	public:
-		PRTABLEClass();
-		PRTABLEClass(std::string tableFile);
-		~PRTABLEClass();
+    public:
+        PRTABLEClass();
+        PRTABLEClass(std::string tableFile);
+        ~PRTABLEClass();
 
-		double computePRTABLE(double Q, double oneOverKs);
-		double getIdx(double val, double *valList, int numVal);
+        double computePRTABLE(double Q, double oneOverKs);
+        double getIdx(double val, double *valList, int numVal);
 
-	private:
-		void readTable();
+    private:
+        void readTable();
 
-		std::string tableFile;
-		double **prTable;
-		int numOneOverKs, numQ;
-		double *oneOverKsValList;
-		double *QValList;
+        std::string tableFile;
+        double **prTable;
+        int numOneOverKs, numQ;
+        double *oneOverKsValList;
+        double *QValList;
 };
 /******************************************************************************************/
 

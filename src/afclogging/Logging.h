@@ -24,7 +24,7 @@ LOGGER_DEFINE_GLOBAL(logger, "logname")
 }
 ...
 void func(){
-	LOGGER_INFO(logger) << "some message " << with_data;
+    LOGGER_INFO(logger) << "some message " << with_data;
 }
  * @endcode
  */
@@ -38,17 +38,17 @@ std::ostream &operator<<(std::ostream &stream, const severity_level &val);
 
 /// Convenience name for single-thread logger class
 typedef boost::log::sources::severity_channel_logger<severity_level, // the type of the severity
-																	 // level
-	channel_name_type // the type of the channel name
-	>
-	logger_st;
+                                                                     // level
+    channel_name_type // the type of the channel name
+    >
+    logger_st;
 
 /// Convenience name for multi-thread-safe logger class
 typedef boost::log::sources::severity_channel_logger_mt<severity_level, // the type of the severity
-																		// level
-	channel_name_type // the type of the channel name
-	>
-	logger_mt;
+                                                                        // level
+    channel_name_type // the type of the channel name
+    >
+    logger_mt;
 
 /** Access the root logger, which always passes the record filter.
  *
@@ -65,16 +65,16 @@ void flush();
  */
 class Flusher
 {
-	public:
-		/// Do nothing
-		Flusher()
-		{
-		}
-		/// Flush the logs
-		~Flusher()
-		{
-			Logging::flush();
-		}
+    public:
+        /// Do nothing
+        Flusher()
+        {
+        }
+        /// Flush the logs
+        ~Flusher()
+        {
+            Logging::flush();
+        }
 };
 
 } // End namespace
@@ -86,11 +86,11 @@ class Flusher
  * @sa LOG_SEV, LOGGER_DEBUG, LOGGER_INFO, LOGGER_WARN, LOGGER_ERROR
  */
 #define LOGGER_DEFINE_GLOBAL(tag_name, chan_name) \
-	BOOST_LOG_INLINE_GLOBAL_LOGGER_INIT(tag_name, Logging::logger_mt) \
-	{ \
-		namespace keywords = boost::log::keywords; \
-		return Logging::logger_mt(keywords::channel = chan_name); \
-	}
+    BOOST_LOG_INLINE_GLOBAL_LOGGER_INIT(tag_name, Logging::logger_mt) \
+    { \
+        namespace keywords = boost::log::keywords; \
+        return Logging::logger_mt(keywords::channel = chan_name); \
+    }
 
 /** Log at Logging::LOG_DEBUG level.
  * @param inst The logger instance to write to.

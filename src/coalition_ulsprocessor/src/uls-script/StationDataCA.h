@@ -12,30 +12,30 @@
 
 class StationDataCAClass
 {
-	public:
-		int service;
-		int subService;
-		std::string authorizationNumber;
-		std::string callsign;
-		double latitudeDeg;
-		double longitudeDeg;
-		double groundElevation;
-		double antennaHeightAGL;
-		std::string emissionsDesignator;
-		double bandwidthMHz;
-		double centerFreqMHz;
-		double antennaGain;
-		std::string antennaModel;
-		std::string modulation;
-		double azimuthPtg;
-		double elevationPtg;
-		double lineLoss;
-		std::string inServiceDate;
-		std::string stationLocation;
-		std::string antennaManufacturer;
+    public:
+        int service;
+        int subService;
+        std::string authorizationNumber;
+        std::string callsign;
+        double latitudeDeg;
+        double longitudeDeg;
+        double groundElevation;
+        double antennaHeightAGL;
+        std::string emissionsDesignator;
+        double bandwidthMHz;
+        double centerFreqMHz;
+        double antennaGain;
+        std::string antennaModel;
+        std::string modulation;
+        double azimuthPtg;
+        double elevationPtg;
+        double lineLoss;
+        std::string inServiceDate;
+        std::string stationLocation;
+        std::string antennaManufacturer;
 
-		Vector3 position;
-		Vector3 pointingVec;
+        Vector3 position;
+        Vector3 pointingVec;
 };
 
 #endif

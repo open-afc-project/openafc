@@ -9,7 +9,7 @@ const double MathConstants::GeostationaryOrbitHeight = 35786.094; // altitude ab
 const double MathConstants::EarthMaxRadius = 6378.137; // km, from WGS '84
 const double MathConstants::EarthMinRadius = 6356.760; // km
 const double MathConstants::GeostationaryOrbitRadius = MathConstants::EarthMaxRadius +
-	MathConstants::GeostationaryOrbitHeight; // from earth center (km)
+    MathConstants::GeostationaryOrbitHeight; // from earth center (km)
 
 const double MathConstants::WGS84EarthSemiMajorAxis = 6378.137; // km
 const double MathConstants::WGS84EarthSemiMinorAxis = 6356.7523142; // km

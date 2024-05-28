@@ -17,22 +17,22 @@ enum HopType { HopArea, HopFixedLink, HopOther };
 
 class UlsHop
 {
-	public:
-		enum HopType type;
-		char callsign[11];
-		char unconfirmedReceiver;
+    public:
+        enum HopType type;
+        char callsign[11];
+        char unconfirmedReceiver;
 
-		struct UlsAntenna *txAntenna;
-		struct UlsAntenna *rxAntenna;
-		struct QList<UlsFrequency *> freq;
-		struct UlsPath *path;
-		struct UlsLocation *rxLocation;
-		struct UlsLocation *txLocation;
-		struct UlsEmission *emission;
-		struct UlsHeader *header;
+        struct UlsAntenna *txAntenna;
+        struct UlsAntenna *rxAntenna;
+        struct QList<UlsFrequency *> freq;
+        struct UlsPath *path;
+        struct UlsLocation *rxLocation;
+        struct UlsLocation *txLocation;
+        struct UlsEmission *emission;
+        struct UlsHeader *header;
 
-		QList<UlsEntity *> txEntities;
-		QList<UlsEntity *> rxEntities;
+        QList<UlsEntity *> txEntities;
+        QList<UlsEntity *> rxEntities;
 };
 
 #endif

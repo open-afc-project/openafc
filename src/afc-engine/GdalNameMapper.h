@@ -26,25 +26,25 @@
  */
 class GdalNameMapperBase
 {
-	public:
-		//////////////////////////////////////////////////
-		// GdalNameMapperBase. Public instance methods
-		//////////////////////////////////////////////////
+    public:
+        //////////////////////////////////////////////////
+        // GdalNameMapperBase. Public instance methods
+        //////////////////////////////////////////////////
 
-		/** Virtual destructor */
-		virtual ~GdalNameMapperBase() = default;
+        /** Virtual destructor */
+        virtual ~GdalNameMapperBase() = default;
 
-		/** Returns fnmatch-compatible filename pattern that matches all relevant
-		 * GDAL files in the directory
-		 */
-		virtual std::string fnmatchPattern() const = 0;
+        /** Returns fnmatch-compatible filename pattern that matches all relevant
+         * GDAL files in the directory
+         */
+        virtual std::string fnmatchPattern() const = 0;
 
-		/** Provides file name for given latitude/longitude
-		 * @param latDeg North-positive latitude in degrees
-		 * @param lonDeg East-positive latitude in degrees
-		 * @return File name for given coordinates, empty string if there is none
-		 */
-		virtual std::string nameFor(double latDeg, double lonDeg) = 0;
+        /** Provides file name for given latitude/longitude
+         * @param latDeg North-positive latitude in degrees
+         * @param lonDeg East-positive latitude in degrees
+         * @return File name for given coordinates, empty string if there is none
+         */
+        virtual std::string nameFor(double latDeg, double lonDeg) = 0;
 };
 
 /** GDAL mapper, based on filename pattern.
@@ -81,127 +81,125 @@ class GdalNameMapperBase
  */
 class GdalNameMapperPattern : public GdalNameMapperBase
 {
-	public:
-		//////////////////////////////////////////////////
-		// GdalNameMapperPattern. Public instance methods
-		//////////////////////////////////////////////////
+    public:
+        //////////////////////////////////////////////////
+        // GdalNameMapperPattern. Public instance methods
+        //////////////////////////////////////////////////
 
-		/** Construct with filename pattern.
-		 * @param pattern Filename pattern (see comments to class)
-		 * @param directory Directory containing files. Must be specified if pattern
-		 *	contains wildcard symbols (*?[]), otherwise ignored
-		 */
-		GdalNameMapperPattern(const std::string &pattern, const std::string &directory = "");
+        /** Construct with filename pattern.
+         * @param pattern Filename pattern (see comments to class)
+         * @param directory Directory containing files. Must be specified if pattern
+         *	contains wildcard symbols (*?[]), otherwise ignored
+         */
+        GdalNameMapperPattern(const std::string &pattern, const std::string &directory = "");
 
-		/** Virtual destructor */
-		virtual ~GdalNameMapperPattern() = default;
+        /** Virtual destructor */
+        virtual ~GdalNameMapperPattern() = default;
 
-		/** Returns fnmatch-compatible filename pattern that matches all relevant
-		 * GDAL files in the directory
-		 */
-		virtual std::string fnmatchPattern() const;
+        /** Returns fnmatch-compatible filename pattern that matches all relevant
+         * GDAL files in the directory
+         */
+        virtual std::string fnmatchPattern() const;
 
-		/** Provides file name for given latitude/longitude
-		 * @param latDeg North-positive latitude in degrees
-		 * @param lonDeg East-positive latitude in degrees
-		 * @return File name for given coordinates, empty string if there is none
-		 */
-		virtual std::string nameFor(double latDeg, double lonDeg);
+        /** Provides file name for given latitude/longitude
+         * @param latDeg North-positive latitude in degrees
+         * @param lonDeg East-positive latitude in degrees
+         * @return File name for given coordinates, empty string if there is none
+         */
+        virtual std::string nameFor(double latDeg, double lonDeg);
 
-		//////////////////////////////////////////////////
-		// GdalNameMapperPattern. Public instance methods
-		//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // GdalNameMapperPattern. Public instance methods
+        //////////////////////////////////////////////////
 
-		/** Creates pointer, passable to CachedGdal constructor.
-		 * This function encapsulates C++11 hassle around unique
-		 * pointer creation. Parameters are the same as constructor
-		 * has.
-		 * @param pattern Filename pattern (see comments to class)
-		 * @param directory Directory containing files. Must be specified if pattern
-		 *	contains wildcard symbols (*?[]), otherwise ignored
-		 */
-		static std::unique_ptr<GdalNameMapperBase> make_unique(
-			const std::string &pattern, const std::string &directory = "");
+        /** Creates pointer, passable to CachedGdal constructor.
+         * This function encapsulates C++11 hassle around unique
+         * pointer creation. Parameters are the same as constructor
+         * has.
+         * @param pattern Filename pattern (see comments to class)
+         * @param directory Directory containing files. Must be specified if pattern
+         *	contains wildcard symbols (*?[]), otherwise ignored
+         */
+        static std::unique_ptr<GdalNameMapperBase> make_unique(const std::string &pattern, const std::string &directory = "");
 
-	private:
-		//////////////////////////////////////////////////
-		// GdalNameMapperPattern. Private constants
-		//////////////////////////////////////////////////
+    private:
+        //////////////////////////////////////////////////
+        // GdalNameMapperPattern. Private constants
+        //////////////////////////////////////////////////
 
-		/** Source data for operation */
-		enum class Src {
-			Str, /*!< String part */
-			Lat, /*!< Latitude */
-			Lon, /*<! Longitude */
-		};
+        /** Source data for operation */
+        enum class Src {
+            Str, /*!< String part */
+            Lat, /*!< Latitude */
+            Lon, /*<! Longitude */
+        };
 
-		/** Operation to perform */
-		enum class Op {
-			Literal, /*!< Append string literal. String part is a literal */
-			Hemi, /*!< Append hemisphere. String part is [POS][NEG] */
-			DegFloor, /*!< Append fabs(floor(degree)). String part is '%...d' */
-			DegCeil, /*!< Append fabs(ceil(deg)). String part is '%...d' */
-			DegFloor1, /*!< Same as DegFloor, but integers rounded to N-1 */
-			DegCeil1, /*!< Same as DegCeil, but integers rounded to N+1 */
-		};
+        /** Operation to perform */
+        enum class Op {
+            Literal, /*!< Append string literal. String part is a literal */
+            Hemi, /*!< Append hemisphere. String part is [POS][NEG] */
+            DegFloor, /*!< Append fabs(floor(degree)). String part is '%...d' */
+            DegCeil, /*!< Append fabs(ceil(deg)). String part is '%...d' */
+            DegFloor1, /*!< Same as DegFloor, but integers rounded to N-1 */
+            DegCeil1, /*!< Same as DegCeil, but integers rounded to N+1 */
+        };
 
-		//////////////////////////////////////////////////
-		// GdalNameMapperPattern. Private types
-		//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // GdalNameMapperPattern. Private types
+        //////////////////////////////////////////////////
 
-		/** Part of name */
-		struct NamePart {
-				//////////////////////////////////////////////////
-				// SimpleGdalNameMapper::NamePart. Public instance methods
-				//////////////////////////////////////////////////
+        /** Part of name */
+        struct NamePart {
+                //////////////////////////////////////////////////
+                // SimpleGdalNameMapper::NamePart. Public instance methods
+                //////////////////////////////////////////////////
 
-				/** Constructor.
-				 * @param src Source data for operation
-				 * @param op Operation to perform
-				 * String str Literal for operation
-				 */
-				NamePart(Src src, Op op, std::string str);
+                /** Constructor.
+                 * @param src Source data for operation
+                 * @param op Operation to perform
+                 * String str Literal for operation
+                 */
+                NamePart(Src src, Op op, std::string str);
 
-				//////////////////////////////////////////////////
-				// SimpleGdalNameMapper::NamePart. Public instance data
-				//////////////////////////////////////////////////
+                //////////////////////////////////////////////////
+                // SimpleGdalNameMapper::NamePart. Public instance data
+                //////////////////////////////////////////////////
 
-				Src src; /*!< Source data for operation */
-				Op op; /*!< Operation to perform */
-				std::string str; /*!< Literal for operation */
-		};
+                Src src; /*!< Source data for operation */
+                Op op; /*!< Operation to perform */
+                std::string str; /*!< Literal for operation */
+        };
 
-		//////////////////////////////////////////////////
-		// GdalNameMapperPattern. Private instance methods
-		//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // GdalNameMapperPattern. Private instance methods
+        //////////////////////////////////////////////////
 
-		/** Appends literal part of filename pattern to _nameParts and _fnmatchPattern.
-		 * @param pattern Filename pattern passed to constructor
-		 * @param offset Offset of literal part
-		 * @param len Length of literal part
-		 */
-		void appendLiteral(std::string pattern, size_t offset, size_t len);
+        /** Appends literal part of filename pattern to _nameParts and _fnmatchPattern.
+         * @param pattern Filename pattern passed to constructor
+         * @param offset Offset of literal part
+         * @param len Length of literal part
+         */
+        void appendLiteral(std::string pattern, size_t offset, size_t len);
 
-		/** Appends numeric part of filename pattern to _nameParts and _fnmatchPattern.
-		 * @param src Data source
-		 * @param op Data operation
-		 * @param elemFormat Numeric part of printf-style number format
-		 * @aram errPrefix Prefix for error messages
-		 */
-		void appendLatLon(
-			Src src, Op op, const std::string &elemFormat, const std::string errPrefix);
+        /** Appends numeric part of filename pattern to _nameParts and _fnmatchPattern.
+         * @param src Data source
+         * @param op Data operation
+         * @param elemFormat Numeric part of printf-style number format
+         * @aram errPrefix Prefix for error messages
+         */
+        void appendLatLon(Src src, Op op, const std::string &elemFormat, const std::string errPrefix);
 
-		/** Filename pattern (see comments to class) */
-		std::vector<NamePart> _nameParts;
+        /** Filename pattern (see comments to class) */
+        std::vector<NamePart> _nameParts;
 
-		/** fnmatch() pattern */
-		std::string _fnmatchPattern;
+        /** fnmatch() pattern */
+        std::string _fnmatchPattern;
 
-		/** Directory for the case of pattern with wildcards, empty otherwise */
-		std::string _directory;
+        /** Directory for the case of pattern with wildcards, empty otherwise */
+        std::string _directory;
 
-		/** Maps generated wildcarded filenames to real filenames */
-		std::map<std::string, std::string> _wildcardMap;
+        /** Maps generated wildcarded filenames to real filenames */
+        std::map<std::string, std::string> _wildcardMap;
 };
 
 /** GDAL mapper that obtains information from GDAL files in directory.
@@ -211,56 +209,55 @@ class GdalNameMapperPattern : public GdalNameMapperBase
  */
 class GdalNameMapperDirect : public GdalNameMapperBase
 {
-	public:
-		//////////////////////////////////////////////////
-		// DirectGdalNameMapper. Public instance methods
-		//////////////////////////////////////////////////
+    public:
+        //////////////////////////////////////////////////
+        // DirectGdalNameMapper. Public instance methods
+        //////////////////////////////////////////////////
 
-		/** Constructor
-		 * @param fnmatchPattern Fnmatch-compatible pattern for relevant files
-		 * @param directory Directory containing GDAL files
-		 */
-		GdalNameMapperDirect(const std::string &fnmatchPattern, const std::string &directory);
+        /** Constructor
+         * @param fnmatchPattern Fnmatch-compatible pattern for relevant files
+         * @param directory Directory containing GDAL files
+         */
+        GdalNameMapperDirect(const std::string &fnmatchPattern, const std::string &directory);
 
-		/** Virtual destructor */
-		virtual ~GdalNameMapperDirect() = default;
+        /** Virtual destructor */
+        virtual ~GdalNameMapperDirect() = default;
 
-		/** Returns fnmatch-compatible filename pattern that matches all relevant
-		 * GDAL files in the directory
-		 */
-		virtual std::string fnmatchPattern() const;
+        /** Returns fnmatch-compatible filename pattern that matches all relevant
+         * GDAL files in the directory
+         */
+        virtual std::string fnmatchPattern() const;
 
-		/** Provides file name for given latitude/longitude
-		 * @param latDeg North-positive latitude in degrees
-		 * @param lonDeg East-positive latitude in degrees
-		 * @return File name for given coordinates, empty string if there is none
-		 */
-		virtual std::string nameFor(double latDeg, double lonDeg);
+        /** Provides file name for given latitude/longitude
+         * @param latDeg North-positive latitude in degrees
+         * @param lonDeg East-positive latitude in degrees
+         * @return File name for given coordinates, empty string if there is none
+         */
+        virtual std::string nameFor(double latDeg, double lonDeg);
 
-		//////////////////////////////////////////////////
-		// DirectGdalNameMapper. Public instance methods
-		//////////////////////////////////////////////////
+        //////////////////////////////////////////////////
+        // DirectGdalNameMapper. Public instance methods
+        //////////////////////////////////////////////////
 
-		/** Creates pointer, passable to CachedGdal constructor.
-		 * This function encapsulates C++11 hassle around unique
-		 * pointer creation. Parameters are the same as constructor
-		 * has.
-		 * @param fnmatchPattern Fnmatch-compatible pattern for relevant files
-		 * @param directory Directory containing GDAL files
-		 */
-		static std::unique_ptr<GdalNameMapperBase> make_unique(
-			const std::string &fnmatchPattern, const std::string &directory);
+        /** Creates pointer, passable to CachedGdal constructor.
+         * This function encapsulates C++11 hassle around unique
+         * pointer creation. Parameters are the same as constructor
+         * has.
+         * @param fnmatchPattern Fnmatch-compatible pattern for relevant files
+         * @param directory Directory containing GDAL files
+         */
+        static std::unique_ptr<GdalNameMapperBase> make_unique(const std::string &fnmatchPattern, const std::string &directory);
 
-	private:
-		//////////////////////////////////////////////////
-		// GdalNameMapperDirect. Private instance data
-		//////////////////////////////////////////////////
+    private:
+        //////////////////////////////////////////////////
+        // GdalNameMapperDirect. Private instance data
+        //////////////////////////////////////////////////
 
-		/** Pattern for relevant files */
-		std::string _fnmatchPattern;
+        /** Pattern for relevant files */
+        std::string _fnmatchPattern;
 
-		/** Coordinate rectangles mapped to file names */
-		std::vector<std::tuple<GdalTransform::BoundRect, std::string>> _files;
+        /** Coordinate rectangles mapped to file names */
+        std::vector<std::tuple<GdalTransform::BoundRect, std::string>> _files;
 };
 
 #endif /* GDAL_NAME_MAPPER_H */

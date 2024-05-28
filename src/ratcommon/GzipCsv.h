@@ -62,322 +62,318 @@
  */
 class GzipCsv : private boost::noncopyable
 {
-	public:
-		///////////////////////////////////////////////////////////////////////////
-		// CLASSES FOR COLUMNS
-		///////////////////////////////////////////////////////////////////////////
+    public:
+        ///////////////////////////////////////////////////////////////////////////
+        // CLASSES FOR COLUMNS
+        ///////////////////////////////////////////////////////////////////////////
 
-		/** Abstract base class for columns.
-		 * Defines general management, but leavse value storing and formatting to
-		 * derived classes
-		 */
-		class ColBase : private boost::noncopyable
-		{
-			public:
-				/** Default virtual destructor */
-				virtual ~ColBase() = default;
+        /** Abstract base class for columns.
+         * Defines general management, but leavse value storing and formatting to
+         * derived classes
+         */
+        class ColBase : private boost::noncopyable
+        {
+            public:
+                /** Default virtual destructor */
+                virtual ~ColBase() = default;
 
-				/** True if column value was set */
-				bool isValueSet() const
-				{
-					return _valueSet;
-				}
+                /** True if column value was set */
+                bool isValueSet() const
+                {
+                    return _valueSet;
+                }
 
-				/** Mark column value as not set */
-				void resetValue()
-				{
-					_valueSet = false;
-				}
+                /** Mark column value as not set */
+                void resetValue()
+                {
+                    _valueSet = false;
+                }
 
-			protected:
-				/** Constructor
-				 * @param container GzipCsv-derived object that stores column values
-				 * @param name Column name
-				 */
-				ColBase(GzipCsv *container, const std::string &name);
+            protected:
+                /** Constructor
+                 * @param container GzipCsv-derived object that stores column values
+                 * @param name Column name
+                 */
+                ColBase(GzipCsv *container, const std::string &name);
 
-				/** Mark column as set (assigned value) */
-				void markSet()
-				{
-					_valueSet = true;
-				}
+                /** Mark column as set (assigned value) */
+                void markSet()
+                {
+                    _valueSet = true;
+                }
 
-				/** Column name */
-				const QString &name() const
-				{
-					return _name;
-				}
+                /** Column name */
+                const QString &name() const
+                {
+                    return _name;
+                }
 
-				/** Returns column value formatted for putting to CSV. "" if not set
-				 */
-				virtual QString formatValue() const = 0;
+                /** Returns column value formatted for putting to CSV. "" if not set
+                 */
+                virtual QString formatValue() const = 0;
 
-				/** Raise exception if value not set */
-				void checkSet() const;
+                /** Raise exception if value not set */
+                void checkSet() const;
 
-			private:
-				friend class GzipCsv;
+            private:
+                friend class GzipCsv;
 
-				// INSTANCE DATA
+                // INSTANCE DATA
 
-				const QString _name; /*!< Column name */
-				bool _valueSet = false; /*!< Column value set */
-		};
+                const QString _name; /*!< Column name */
+                bool _valueSet = false; /*!< Column value set */
+        };
 
-		///////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////
 
-		/** Class for integer columns */
-		class ColInt : public ColBase
-		{
-			public:
-				/** Constructor
-				 * @param container GzipCsv-derived object that stores column values
-				 * @param name Column name
-				 */
-				ColInt(GzipCsv *container, const std::string &name);
+        /** Class for integer columns */
+        class ColInt : public ColBase
+        {
+            public:
+                /** Constructor
+                 * @param container GzipCsv-derived object that stores column values
+                 * @param name Column name
+                 */
+                ColInt(GzipCsv *container, const std::string &name);
 
-				/** Setting field value */
-				ColInt &operator=(int value)
-				{
-					markSet();
-					_value = value;
-					return *this;
-				}
+                /** Setting field value */
+                ColInt &operator=(int value)
+                {
+                    markSet();
+                    _value = value;
+                    return *this;
+                }
 
-				/** Returning field value (assert if not set) */
-				int value() const
-				{
-					checkSet();
-					return _value;
-				}
+                /** Returning field value (assert if not set) */
+                int value() const
+                {
+                    checkSet();
+                    return _value;
+                }
 
-			protected:
-				/** Returns column value formatted for putting to CSV. "" if not set
-				 */
-				virtual QString formatValue() const;
+            protected:
+                /** Returns column value formatted for putting to CSV. "" if not set
+                 */
+                virtual QString formatValue() const;
 
-			private:
-				// INSTANCE DATA
+            private:
+                // INSTANCE DATA
 
-				int _value; /*!< Column value (for current row) */
-		};
+                int _value; /*!< Column value (for current row) */
+        };
 
-		///////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////
 
-		/** Class for floating point columns */
-		class ColDouble : public ColBase
-		{
-			public:
-				/** Constructor
-				 * @param container GzipCsv-derived object that stores column values
-				 * @param name Column name
-				 * @pasram format Printf-style format. Empty to show at maximum
-				 * precision
-				 */
-				ColDouble(
-					GzipCsv *container, const std::string &name, const std::string &format = "");
+        /** Class for floating point columns */
+        class ColDouble : public ColBase
+        {
+            public:
+                /** Constructor
+                 * @param container GzipCsv-derived object that stores column values
+                 * @param name Column name
+                 * @pasram format Printf-style format. Empty to show at maximum
+                 * precision
+                 */
+                ColDouble(GzipCsv *container, const std::string &name, const std::string &format = "");
 
-				/** Setting field value */
-				ColDouble &operator=(double value)
-				{
-					markSet();
-					_value = value;
-					return *this;
-				}
+                /** Setting field value */
+                ColDouble &operator=(double value)
+                {
+                    markSet();
+                    _value = value;
+                    return *this;
+                }
 
-				/** Returning field value (assert if not set) */
-				double value() const
-				{
-					checkSet();
-					return _value;
-				}
+                /** Returning field value (assert if not set) */
+                double value() const
+                {
+                    checkSet();
+                    return _value;
+                }
 
-			protected:
-				/** Returns column value formatted for putting to CSV. "" if not set
-				 */
-				virtual QString formatValue() const;
+            protected:
+                /** Returns column value formatted for putting to CSV. "" if not set
+                 */
+                virtual QString formatValue() const;
 
-			private:
-				// INSTANCE DATA
+            private:
+                // INSTANCE DATA
 
-				double _value; /*!< Column value (for current row) */
-				std::string _format; /*!< Printf-style format. Empty for maximum
-							precision */
-		};
+                double _value; /*!< Column value (for current row) */
+                std::string _format; /*!< Printf-style format. Empty for maximum
+                            precision */
+        };
 
-		///////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////
 
-		/** Class for string columns */
-		class ColStr : public ColBase
-		{
-			public:
-				/** Constructor
-				 * @param container GzipCsv-derived object that stores column values
-				 * @param name Column name
-				 */
-				ColStr(GzipCsv *container, const std::string &name);
+        /** Class for string columns */
+        class ColStr : public ColBase
+        {
+            public:
+                /** Constructor
+                 * @param container GzipCsv-derived object that stores column values
+                 * @param name Column name
+                 */
+                ColStr(GzipCsv *container, const std::string &name);
 
-				/** Setting field value */
-				ColStr &operator=(const std::string &value)
-				{
-					markSet();
-					_value = value;
-					return *this;
-				}
-				ColStr &operator=(char value)
-				{
-					markSet();
-					_value = value;
-					return *this;
-				}
+                /** Setting field value */
+                ColStr &operator=(const std::string &value)
+                {
+                    markSet();
+                    _value = value;
+                    return *this;
+                }
+                ColStr &operator=(char value)
+                {
+                    markSet();
+                    _value = value;
+                    return *this;
+                }
 
-				/** Returning field value (assert if not set) */
-				const std::string &value() const
-				{
-					checkSet();
-					return _value;
-				}
+                /** Returning field value (assert if not set) */
+                const std::string &value() const
+                {
+                    checkSet();
+                    return _value;
+                }
 
-			protected:
-				/** Returns column value formatted for putting to CSV. "" if not set
-				 */
-				virtual QString formatValue() const;
+            protected:
+                /** Returns column value formatted for putting to CSV. "" if not set
+                 */
+                virtual QString formatValue() const;
 
-			private:
-				// INSTANCE DATA
+            private:
+                // INSTANCE DATA
 
-				std::string _value; /*!< Column value (for current row) */
-		};
+                std::string _value; /*!< Column value (for current row) */
+        };
 
-		///////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////
 
-		/** Class for bool columns */
-		class ColBool : public ColBase
-		{
-			public:
-				/** Constructor
-				 * @param container GzipCsv-derived object that stores column values
-				 * @param name Column name
-				 * @param tf Column values for true and false
-				 */
-				ColBool(GzipCsv *container, const std::string &name,
-					const std::vector<std::string> &tf = {"True", "False"});
+        /** Class for bool columns */
+        class ColBool : public ColBase
+        {
+            public:
+                /** Constructor
+                 * @param container GzipCsv-derived object that stores column values
+                 * @param name Column name
+                 * @param tf Column values for true and false
+                 */
+                ColBool(GzipCsv *container, const std::string &name, const std::vector<std::string> &tf = {"True", "False"});
 
-				/** Setting field value */
-				ColBool &operator=(bool value)
-				{
-					markSet();
-					_value = value;
-					return *this;
-				}
+                /** Setting field value */
+                ColBool &operator=(bool value)
+                {
+                    markSet();
+                    _value = value;
+                    return *this;
+                }
 
-				/** Returning field value (assert if not set) */
-				bool value() const
-				{
-					checkSet();
-					return _value;
-				}
+                /** Returning field value (assert if not set) */
+                bool value() const
+                {
+                    checkSet();
+                    return _value;
+                }
 
-			protected:
-				/** Returns column value formatted for putting to CSV */
-				virtual QString formatValue() const;
+            protected:
+                /** Returns column value formatted for putting to CSV */
+                virtual QString formatValue() const;
 
-			private:
-				// INSTANCE DATA
+            private:
+                // INSTANCE DATA
 
-				bool _value; /*!< Column value (for current row) */
-				std::vector<QString> _tf; /*!< Column values for true and false */
-		};
+                bool _value; /*!< Column value (for current row) */
+                std::vector<QString> _tf; /*!< Column values for true and false */
+        };
 
-		///////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////
 
-		/** Class for enum columns */
-		class ColEnum : public ColBase
-		{
-			public:
-				/** Constructor
-				 * @param container GzipCsv-derived object that stores column values
-				 * @param name Column name
-				 * @param items Enum item descriptors
-				 * @param defName Name for unknown item
-				 */
-				ColEnum(GzipCsv *container, const std::string &name,
-					const std::map<int, std::string> &items,
-					const std::string &defName = "Unknown");
+        /** Class for enum columns */
+        class ColEnum : public ColBase
+        {
+            public:
+                /** Constructor
+                 * @param container GzipCsv-derived object that stores column values
+                 * @param name Column name
+                 * @param items Enum item descriptors
+                 * @param defName Name for unknown item
+                 */
+                ColEnum(GzipCsv *container, const std::string &name, const std::map<int, std::string> &items, const std::string &defName = "Unknown");
 
-				/** Setting field value */
-				ColEnum &operator=(int value)
-				{
-					markSet();
-					_value = value;
-					return *this;
-				}
+                /** Setting field value */
+                ColEnum &operator=(int value)
+                {
+                    markSet();
+                    _value = value;
+                    return *this;
+                }
 
-				/** Returning field value (assert if not set) */
-				int value() const
-				{
-					checkSet();
-					return _value;
-				}
+                /** Returning field value (assert if not set) */
+                int value() const
+                {
+                    checkSet();
+                    return _value;
+                }
 
-			protected:
-				/** Returns column value formatted for putting to CSV */
-				virtual QString formatValue() const;
+            protected:
+                /** Returns column value formatted for putting to CSV */
+                virtual QString formatValue() const;
 
-			private:
-				// INSTANCE DATA
+            private:
+                // INSTANCE DATA
 
-				int _value; /*!< Column value (for current row) */
-				std::map<int, QString> _items; /*!< Item descriptors */
-				QString _defName; /*<! Name for unknown items */
-		};
+                int _value; /*!< Column value (for current row) */
+                std::map<int, QString> _items; /*!< Item descriptors */
+                QString _defName; /*<! Name for unknown items */
+        };
 
-		///////////////////////////////////////////////////////////////////////////
+        ///////////////////////////////////////////////////////////////////////////
 
-		/** Constructor
-		 * @param filename Name of CSV GZIP file (expected to have .csv.gz extension).
-		 *	Empty if writer should not be activated
-		 */
-		GzipCsv(const std::string &filename);
+        /** Constructor
+         * @param filename Name of CSV GZIP file (expected to have .csv.gz extension).
+         *	Empty if writer should not be activated
+         */
+        GzipCsv(const std::string &filename);
 
-		/** Default virtual destructor */
-		virtual ~GzipCsv() = default;
+        /** Default virtual destructor */
+        virtual ~GzipCsv() = default;
 
-		/** True if writer was active (initialized with nonempty file name */
-		operator bool() const;
+        /** True if writer was active (initialized with nonempty file name */
+        operator bool() const;
 
-		/** Marks all columns as not set */
-		void clearRow();
+        /** Marks all columns as not set */
+        void clearRow();
 
-		/** Writes currently set column values as CSV row, marks all columns as not
-		 * set
-		 */
-		void completeRow();
+        /** Writes currently set column values as CSV row, marks all columns as not
+         * set
+         */
+        void completeRow();
 
-		/** Writes sequence of strings as CSV row */
-		void writeRow(const std::vector<std::string> &columns);
+        /** Writes sequence of strings as CSV row */
+        void writeRow(const std::vector<std::string> &columns);
 
-	private:
-		friend class ColBase;
+    private:
+        friend class ColBase;
 
-		/** Append reference to column to vector of columns */
-		void addColumn(ColBase *column);
+        /** Append reference to column to vector of columns */
+        void addColumn(ColBase *column);
 
-		// INSTANCE DATA
+        // INSTANCE DATA
 
-		/** True if heading row have been written */
-		bool _headingWritten = false;
+        /** True if heading row have been written */
+        bool _headingWritten = false;
 
-		/** File writer, used by gzip writer */
-		std::unique_ptr<QFile> _fileWriter;
+        /** File writer, used by gzip writer */
+        std::unique_ptr<QFile> _fileWriter;
 
-		/** GZIP writer used by CSV writer */
-		std::unique_ptr<GzipStream> _gzipWriter;
+        /** GZIP writer used by CSV writer */
+        std::unique_ptr<GzipStream> _gzipWriter;
 
-		/** CSV writer */
-		std::unique_ptr<CsvWriter> _csvWriter;
+        /** CSV writer */
+        std::unique_ptr<CsvWriter> _csvWriter;
 
-		/** Vector of columns */
-		std::vector<ColBase *> _columns;
+        /** Vector of columns */
+        std::vector<ColBase *> _columns;
 };
 #endif /* GZIP_CSV_H */

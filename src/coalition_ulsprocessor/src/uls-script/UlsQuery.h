@@ -9,11 +9,11 @@
 #define ULS_QUERY_H
 
 struct UlsQuery {
-		enum { GreaterThan, LessThan, EqualTo } QuerySign;
+        enum { GreaterThan, LessThan, EqualTo } QuerySign;
 
-		struct UlsQuery *next;
-		QuerySign sgn;
-		int field;
+        struct UlsQuery *next;
+        QuerySign sgn;
+        int field;
 };
 
 #endif

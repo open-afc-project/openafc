@@ -19,60 +19,60 @@ class QString;
  */
 class AFCLOGGING_EXPORT ErrStream
 {
-	public:
-		/** Initialize to an empty string.
-		 */
-		ErrStream();
+    public:
+        /** Initialize to an empty string.
+         */
+        ErrStream();
 
-		/** Implicitly convert to std::string for exceptions.
-		 * @return The string representation.
-		 */
-		operator std::string() const
-		{
-			return _str.str();
-		}
+        /** Implicitly convert to std::string for exceptions.
+         * @return The string representation.
+         */
+        operator std::string() const
+        {
+            return _str.str();
+        }
 
-		/** Implicitly convert to QString for processing.
-		 * @return The text representation.
-		 */
-		operator QString() const;
+        /** Implicitly convert to QString for processing.
+         * @return The text representation.
+         */
+        operator QString() const;
 
-		/** Append to stream and keep this class type for final conversion.
-		 *
-		 * @tparam The type to append.
-		 * @param val The value to append.
-		 * @return This updated stream.
-		 */
-		template<typename T>
-		ErrStream &operator<<(const T &val)
-		{
-			_str << val;
-			return *this;
-		}
+        /** Append to stream and keep this class type for final conversion.
+         *
+         * @tparam The type to append.
+         * @param val The value to append.
+         * @return This updated stream.
+         */
+        template<typename T>
+        ErrStream &operator<<(const T &val)
+        {
+            _str << val;
+            return *this;
+        }
 
-		///@{
-		/** Handle stream manipulation functions.
-		 *
-		 * @tparam The stream type to manipulate.
-		 * @param func The manipulator to apply.
-		 * @return This updated stream.
-		 */
-		template<typename T>
-		ErrStream &operator<<(T &(*func)(T &))
-		{
-			_str << func;
-			return *this;
-		}
-		ErrStream &operator<<(std::ostream &(*func)(std::ostream &))
-		{
-			_str << func;
-			return *this;
-		}
-		///@}
+        ///@{
+        /** Handle stream manipulation functions.
+         *
+         * @tparam The stream type to manipulate.
+         * @param func The manipulator to apply.
+         * @return This updated stream.
+         */
+        template<typename T>
+        ErrStream &operator<<(T &(*func)(T &))
+        {
+            _str << func;
+            return *this;
+        }
+        ErrStream &operator<<(std::ostream &(*func)(std::ostream &))
+        {
+            _str << func;
+            return *this;
+        }
+        ///@}
 
-	private:
-		/// string storage
-		std::ostringstream _str;
+    private:
+        /// string storage
+        std::ostringstream _str;
 };
 
 #endif /* SRC_AFCLOGGING_ERRSTREAM_H_ */

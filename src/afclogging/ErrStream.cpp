@@ -8,5 +8,5 @@ ErrStream::ErrStream()
 
 ErrStream::operator QString() const
 {
-	return QString::fromStdString(_str.str());
+    return QString::fromStdString(_str.str());
 }

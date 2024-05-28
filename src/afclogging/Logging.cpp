@@ -13,11 +13,11 @@ LOGGER_DEFINE_GLOBAL(logger, "Logging");
 
 Logging::logger_mt &Logging::getLoggerInstance()
 {
-	return logger::get();
+    return logger::get();
 }
 
 void Logging::flush()
 {
-	boost::shared_ptr<logging::core> core = logging::core::get();
-	core->flush();
+    boost::shared_ptr<logging::core> core = logging::core::get();
+    core->flush();
 }

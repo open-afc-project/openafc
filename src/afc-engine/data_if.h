@@ -7,20 +7,20 @@
 
 class AfcDataIf : public QObject
 {
-		Q_OBJECT
-	public:
-		AfcDataIf(bool useUrl);
-		~AfcDataIf();
-		bool readFile(QString fileName, QByteArray &data);
-		bool writeFile(QString fileName, QByteArray &data);
-		bool gzipAndWriteFile(QString fileName, QByteArray &data);
+        Q_OBJECT
+    public:
+        AfcDataIf(bool useUrl);
+        ~AfcDataIf();
+        bool readFile(QString fileName, QByteArray &data);
+        bool writeFile(QString fileName, QByteArray &data);
+        bool gzipAndWriteFile(QString fileName, QByteArray &data);
 
-	private:
-		bool _useUrl;
-		QNetworkAccessManager _mngr;
-		bool gzipBuffer(QByteArray &indata, QByteArray &outdata);
-		QCoreApplication *_app;
+    private:
+        bool _useUrl;
+        QNetworkAccessManager _mngr;
+        bool gzipBuffer(QByteArray &indata, QByteArray &outdata);
+        QCoreApplication *_app;
 #if GUNZIP_INPUT_FILES
-		bool gunzipBuffer(QByteArray &input, QByteArray &output);
+        bool gunzipBuffer(QByteArray &input, QByteArray &output);
 #endif
 };

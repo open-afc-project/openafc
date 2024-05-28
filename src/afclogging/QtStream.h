@@ -38,10 +38,10 @@ void installLogHandler();
 template<typename Typ>
 ::std::ostream &out_qt(::std::ostream &stream, const Typ &value)
 {
-	QString str;
-	QDebug(&str).nospace() << value;
-	stream << str.toStdString();
-	return stream;
+    QString str;
+    QDebug(&str).nospace() << value;
+    stream << str.toStdString();
+    return stream;
 }
 
 /** Convenience for logging stl-style containers.
@@ -52,18 +52,17 @@ template<typename Typ>
  * @return The updated stream.
  */
 template<class Container>
-::std::ostream &out_stl_container(
-	::std::ostream &stream, const Container &val, const ::std::string &className)
+::std::ostream &out_stl_container(::std::ostream &stream, const Container &val, const ::std::string &className)
 {
-	stream << className << "[size=" << val.size() << "](";
-	for (auto it = val.begin(); it != val.end(); ++it) {
-		if (it != val.begin()) {
-			stream << ",";
-		}
-		stream << *it;
-	}
-	stream << ")";
-	return stream;
+    stream << className << "[size=" << val.size() << "](";
+    for (auto it = val.begin(); it != val.end(); ++it) {
+        if (it != val.begin()) {
+            stream << ",";
+        }
+        stream << *it;
+    }
+    stream << ")";
+    return stream;
 }
 
 }
@@ -90,25 +89,25 @@ QT_BEGIN_NAMESPACE
 template<typename T>
 ::std::ostream &operator<<(::std::ostream &stream, const QList<T> &val)
 {
-	return QtStream::out_stl_container(stream, val, "QList");
+    return QtStream::out_stl_container(stream, val, "QList");
 }
 template<typename T>
 ::std::ostream &operator<<(::std::ostream &stream, const QVector<T> &val)
 {
-	return QtStream::out_stl_container(stream, val, "QVector");
+    return QtStream::out_stl_container(stream, val, "QVector");
 }
 template<typename T>
 ::std::ostream &operator<<(::std::ostream &stream, const QSet<T> &val)
 {
-	return QtStream::out_stl_container(stream, val, "QSet");
+    return QtStream::out_stl_container(stream, val, "QSet");
 }
 ///@}
 
 #define LOG_STREAM_WRAP_QT(QtType) \
-	inline ::std::ostream &operator<<(::std::ostream &stream, const QtType &val) \
-	{ \
-		return QtStream::out_qt(stream, val); \
-	}
+    inline ::std::ostream &operator<<(::std::ostream &stream, const QtType &val) \
+    { \
+        return QtStream::out_qt(stream, val); \
+    }
 LOG_STREAM_WRAP_QT(QDateTime)
 LOG_STREAM_WRAP_QT(QVariant)
 LOG_STREAM_WRAP_QT(QVariantMap)

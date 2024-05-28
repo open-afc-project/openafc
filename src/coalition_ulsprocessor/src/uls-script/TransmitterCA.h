@@ -10,22 +10,22 @@
 
 class TransmitterCAClass
 {
-	public:
-		int service;
-		int subService;
-		std::string authorizationNumber;
-		std::string callsign;
-		double latitudeDeg;
-		double longitudeDeg;
-		double groundElevation;
-		double antennaHeightAGL;
-		std::string emissionsDesignator;
-		double bandwidthMHz;
-		double centerFreqMHz;
-		double antennaGain;
-		std::string antennaModel;
-		std::string modulation;
-		double modRate;
+    public:
+        int service;
+        int subService;
+        std::string authorizationNumber;
+        std::string callsign;
+        double latitudeDeg;
+        double longitudeDeg;
+        double groundElevation;
+        double antennaHeightAGL;
+        std::string emissionsDesignator;
+        double bandwidthMHz;
+        double centerFreqMHz;
+        double antennaGain;
+        std::string antennaModel;
+        std::string modulation;
+        double modRate;
 };
 
 #endif

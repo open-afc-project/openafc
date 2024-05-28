@@ -20,25 +20,25 @@
 
 class UlsCallsign
 {
-	public:
-		QString callsign;
-		char callsignascii[11];
-		QList<UlsHeader *> *headers;
-		QList<UlsAntenna *> *antennas;
-		QList<UlsLocation *> *locations;
-		QList<UlsFrequency *> *frequencies;
-		QList<UlsEmission *> *emissions;
-		QList<UlsEntity *> *entities;
-		QList<UlsMarketFrequency *> *marketFreqs;
+    public:
+        QString callsign;
+        char callsignascii[11];
+        QList<UlsHeader *> *headers;
+        QList<UlsAntenna *> *antennas;
+        QList<UlsLocation *> *locations;
+        QList<UlsFrequency *> *frequencies;
+        QList<UlsEmission *> *emissions;
+        QList<UlsEntity *> *entities;
+        QList<UlsMarketFrequency *> *marketFreqs;
 
-		UlsCallsign()
-		{
-			antennas = NULL;
-			locations = NULL;
-			frequencies = NULL;
-			headers = NULL;
-			strlcpy(callsignascii, "", sizeof(callsignascii));
-		}
+        UlsCallsign()
+        {
+            antennas = NULL;
+            locations = NULL;
+            frequencies = NULL;
+            headers = NULL;
+            strlcpy(callsignascii, "", sizeof(callsignascii));
+        }
 };
 
 #endif

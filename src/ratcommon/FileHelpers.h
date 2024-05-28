@@ -17,9 +17,9 @@ namespace FileHelpers
 
 /// Error indicating file system issue
 struct Error : public std::runtime_error {
-		Error(const QString &msg) : runtime_error(msg.toStdString())
-		{
-		}
+        Error(const QString &msg) : runtime_error(msg.toStdString())
+        {
+        }
 };
 
 /** Open a file for reading or writing.

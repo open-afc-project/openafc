@@ -5,21 +5,21 @@
 
 class MathConstants
 {
-	public:
-		static const double GeostationaryOrbitHeight;
-		static const double GeostationaryOrbitRadius;
-		static const double EarthMaxRadius, EarthMinRadius;
-		static const double EarthEccentricitySquared;
+    public:
+        static const double GeostationaryOrbitHeight;
+        static const double GeostationaryOrbitRadius;
+        static const double EarthMaxRadius, EarthMinRadius;
+        static const double EarthEccentricitySquared;
 
-		//  WGS'84 constants.
-		static const double WGS84EarthSemiMajorAxis;
-		static const double WGS84EarthSemiMinorAxis;
-		static const double WGS84EarthFirstEccentricitySquared;
-		static const double WGS84EarthSecondEccentricitySquared;
+        //  WGS'84 constants.
+        static const double WGS84EarthSemiMajorAxis;
+        static const double WGS84EarthSemiMinorAxis;
+        static const double WGS84EarthFirstEccentricitySquared;
+        static const double WGS84EarthSecondEccentricitySquared;
 
-		// Physics constants
-		static const double speedOfLight;
-		static const double boltzmannConstant;
+        // Physics constants
+        static const double speedOfLight;
+        static const double boltzmannConstant;
 };
 
 #endif

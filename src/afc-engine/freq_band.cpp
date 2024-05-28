@@ -8,7 +8,7 @@
 /**** CONSTRUCTOR: FreqBandClass::FreqBandClass()                                      ****/
 /******************************************************************************************/
 FreqBandClass::FreqBandClass(std::string nameVal, int startFreqMHzVal, int stopFreqMHzVal) :
-	name(nameVal), startFreqMHz(startFreqMHzVal), stopFreqMHz(stopFreqMHzVal)
+    name(nameVal), startFreqMHz(startFreqMHzVal), stopFreqMHz(stopFreqMHzVal)
 {
 }
 /******************************************************************************************/

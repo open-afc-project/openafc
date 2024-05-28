@@ -3,17 +3,17 @@
 
 class UlsSegment
 {
-	public:
-		long long systemId;
-		char callsign[11];
-		int pathNumber;
-		int txLocationId;
-		int txAntennaId;
-		;
-		int rxLocationId;
-		int rxAntennaId;
-		int segmentNumber;
-		double segmentLength;
+    public:
+        long long systemId;
+        char callsign[11];
+        int pathNumber;
+        int txLocationId;
+        int txAntennaId;
+        ;
+        int rxLocationId;
+        int rxAntennaId;
+        int segmentNumber;
+        double segmentLength;
 };
 
 #endif

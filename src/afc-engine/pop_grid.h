@@ -29,85 +29,79 @@ class PolygonClass;
 /******************************************************************************************/
 class PopGridClass
 {
-	public:
-		PopGridClass(
-			double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal);
-		PopGridClass(std::string worldPopulationFile,
-			const std::vector<PolygonClass *> &regionPolygonList, double regionPolygonResolution,
-			double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal,
-			double minLat, double minLon, double maxLat, double maxLon);
-		PopGridClass(const PopGridClass &obj);
-		~PopGridClass();
-		void readData(std::string populationDensityFile,
-			const std::vector<std::string> &regionNameList, const std::vector<int> &regionIDList,
-			int numLonVal, double deltaLonDeg, double minLonDeg, int numLatVal, double deltaLatDeg,
-			double minLatDeg);
-		void setDimensions(int numLonVal, double deltaLonRad, double minLonRad, int numLatVal,
-			double deltaLatRad, double minLatRad);
-		void scale(std::vector<double> urbanPopVal, std::vector<double> suburbanPopVal,
-			std::vector<double> ruralPopVal, std::vector<double> barrenPopVal);
-		int adjustRegion(double centerLongitudeDeg, double centerLatitudeDeg, double radius);
-		double adjustRegion(ListClass<ULSClass *> *ulsList, double maxRadius);
-		void makeCDF();
-		void check(std::string s);
-		void writeDensity(std::string filename, bool dumpPopGrid = false);
-		void findDeg(double longitudeDeg, double latitudeDeg, int &lonIdx, int &latIdx,
-			char &propEnvVal, int &regionIdx) const;
-		double computeArea(int lonIdx, int latIdx) const;
-		void setPop(int lonIdx, int latIdx, double popVal);
-		void setPropEnv(int lonIdx, int latIdx, char propEnvVal);
-		char getPropEnv(int lonIdx, int latIdx) const;
-		double getPropEnvPop(CConst::PropEnvEnum propEnv, int regionIdx) const;
-		double getPop(int lonIdx, int latIdx) const;
-		double getPopFromCDF(int lonIdx, int latIdx) const;
-		double getProbFromCDF(int lonIdx, int latIdx) const;
-		void getLonLatDeg(int lonIdx, int latIdx, double &longitudeDeg, double &latitudeDeg);
-		int getNumLon();
-		int getNumLat();
-		double getDensityThrUrban();
-		double getDensityThrSuburban();
-		double getDensityThrRural();
-		std::string getRegionName(int regionIdx)
-		{
-			return (regionNameList[regionIdx]);
-		}
-		double getMinLonDeg()
-		{
-			return (minLonDeg);
-		}
-		double getMinLatDeg()
-		{
-			return (minLatDeg);
-		}
-		double getMaxLonDeg()
-		{
-			return (minLonDeg + numLon * deltaLonDeg);
-		}
-		double getMaxLatDeg()
-		{
-			return (minLatDeg + numLat * deltaLatDeg);
-		}
+    public:
+        PopGridClass(double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal);
+        PopGridClass(std::string worldPopulationFile, const std::vector<PolygonClass *> &regionPolygonList, double regionPolygonResolution,
+            double densityThrUrbanVal, double densityThrSuburbanVal, double densityThrRuralVal, double minLat, double minLon, double maxLat,
+            double maxLon);
+        PopGridClass(const PopGridClass &obj);
+        ~PopGridClass();
+        void readData(std::string populationDensityFile, const std::vector<std::string> &regionNameList, const std::vector<int> &regionIDList,
+            int numLonVal, double deltaLonDeg, double minLonDeg, int numLatVal, double deltaLatDeg, double minLatDeg);
+        void setDimensions(int numLonVal, double deltaLonRad, double minLonRad, int numLatVal, double deltaLatRad, double minLatRad);
+        void scale(
+            std::vector<double> urbanPopVal, std::vector<double> suburbanPopVal, std::vector<double> ruralPopVal, std::vector<double> barrenPopVal);
+        int adjustRegion(double centerLongitudeDeg, double centerLatitudeDeg, double radius);
+        double adjustRegion(ListClass<ULSClass *> *ulsList, double maxRadius);
+        void makeCDF();
+        void check(std::string s);
+        void writeDensity(std::string filename, bool dumpPopGrid = false);
+        void findDeg(double longitudeDeg, double latitudeDeg, int &lonIdx, int &latIdx, char &propEnvVal, int &regionIdx) const;
+        double computeArea(int lonIdx, int latIdx) const;
+        void setPop(int lonIdx, int latIdx, double popVal);
+        void setPropEnv(int lonIdx, int latIdx, char propEnvVal);
+        char getPropEnv(int lonIdx, int latIdx) const;
+        double getPropEnvPop(CConst::PropEnvEnum propEnv, int regionIdx) const;
+        double getPop(int lonIdx, int latIdx) const;
+        double getPopFromCDF(int lonIdx, int latIdx) const;
+        double getProbFromCDF(int lonIdx, int latIdx) const;
+        void getLonLatDeg(int lonIdx, int latIdx, double &longitudeDeg, double &latitudeDeg);
+        int getNumLon();
+        int getNumLat();
+        double getDensityThrUrban();
+        double getDensityThrSuburban();
+        double getDensityThrRural();
+        std::string getRegionName(int regionIdx)
+        {
+            return (regionNameList[regionIdx]);
+        }
+        double getMinLonDeg()
+        {
+            return (minLonDeg);
+        }
+        double getMinLatDeg()
+        {
+            return (minLatDeg);
+        }
+        double getMaxLonDeg()
+        {
+            return (minLonDeg + numLon * deltaLonDeg);
+        }
+        double getMaxLatDeg()
+        {
+            return (minLatDeg + numLat * deltaLatDeg);
+        }
 
-	private:
-		int numRegion;
-		std::vector<std::string> regionNameList;
-		// std::vector<int> regionIDList;
-		double densityThrUrban, densityThrSuburban, densityThrRural;
+    private:
+        int numRegion;
+        std::vector<std::string> regionNameList;
+        // std::vector<int> regionIDList;
+        double densityThrUrban, densityThrSuburban, densityThrRural;
 
-		double minLonDeg;
-		double minLatDeg;
-		double deltaLonDeg;
-		double deltaLatDeg;
+        double minLonDeg;
+        double minLatDeg;
+        double deltaLonDeg;
+        double deltaLatDeg;
 
-		int numLon, numLat;
-		double **pop;
-		char **propEnv;
-		int **region;
-		std::vector<double> urbanPop;
-		std::vector<double> suburbanPop;
-		std::vector<double> ruralPop;
-		std::vector<double> barrenPop;
-		bool isCumulative;
+        int numLon, numLat;
+        double **pop;
+        char **propEnv;
+        int **region;
+        std::vector<double> urbanPop;
+        std::vector<double> suburbanPop;
+        std::vector<double> ruralPop;
+        std::vector<double> barrenPop;
+        bool isCumulative;
 };
 /******************************************************************************************/
 

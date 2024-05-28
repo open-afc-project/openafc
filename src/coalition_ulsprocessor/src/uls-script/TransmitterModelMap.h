@@ -8,33 +8,33 @@
 
 class TransmitterModelClass
 {
-	public:
-		enum ArchitectureEnum { IDUArchitecture, ODUArchitecture, UnknownArchitecture };
+    public:
+        enum ArchitectureEnum { IDUArchitecture, ODUArchitecture, UnknownArchitecture };
 
-		TransmitterModelClass(std::string nameVal);
+        TransmitterModelClass(std::string nameVal);
 
-		void setArchitecture(ArchitectureEnum architectureVal)
-		{
-			architecture = architectureVal;
-		}
+        void setArchitecture(ArchitectureEnum architectureVal)
+        {
+            architecture = architectureVal;
+        }
 
-		static std::string architectureStr(ArchitectureEnum architectureVal);
+        static std::string architectureStr(ArchitectureEnum architectureVal);
 
-		std::string name;
-		ArchitectureEnum architecture;
+        std::string name;
+        ArchitectureEnum architecture;
 };
 
 class TransmitterModelMapClass
 {
-	public:
-		TransmitterModelMapClass(const std::string transmitterModelListFile);
-		TransmitterModelClass *find(std::string modelName);
-		int checkPrefixValues();
+    public:
+        TransmitterModelMapClass(const std::string transmitterModelListFile);
+        TransmitterModelClass *find(std::string modelName);
+        int checkPrefixValues();
 
-	private:
-		void readModelList(const std::string filename);
+    private:
+        void readModelList(const std::string filename);
 
-		std::vector<TransmitterModelClass *> transmitterModelList;
+        std::vector<TransmitterModelClass *> transmitterModelList;
 };
 
 #endif

@@ -16,7 +16,7 @@ namespace MathHelpers
 template<typename T>
 inline T deg2rad(T deg)
 {
-	return M_PI / 180.0 * deg;
+    return M_PI / 180.0 * deg;
 }
 /** Convert an angle from radians to degrees.
  * @param rad The angle in radians
@@ -25,7 +25,7 @@ inline T deg2rad(T deg)
 template<typename T>
 inline T rad2deg(T rad)
 {
-	return 180.0 / M_PI * rad;
+    return 180.0 / M_PI * rad;
 }
 
 /** Shortcut for computing squares.
@@ -35,7 +35,7 @@ inline T rad2deg(T rad)
 template<typename T>
 inline T sqr(T val)
 {
-	return val * val;
+    return val * val;
 }
 
 /** Shortcut for computing cubes.
@@ -45,7 +45,7 @@ inline T sqr(T val)
 template<typename T>
 inline T cube(T val)
 {
-	return val * val * val;
+    return val * val * val;
 }
 
 /** Shortcut for computing sinc.
@@ -55,11 +55,11 @@ inline T cube(T val)
 template<typename T>
 inline T sinc(T x)
 {
-	static const double eps = 1e-6;
-	if (x < eps && x > -eps)
-		return 1.0 - sqr(M_PI * x) / 6.0;
-	else
-		return sin(M_PI * x) / (M_PI * x);
+    static const double eps = 1e-6;
+    if (x < eps && x > -eps)
+        return 1.0 - sqr(M_PI * x) / 6.0;
+    else
+        return sin(M_PI * x) / (M_PI * x);
 }
 
 /** One-dimensional linear interpolation.
@@ -70,7 +70,7 @@ inline T sinc(T x)
  */
 inline double interp1d(double val1, double val2, double t)
 {
-	return val1 + t * (val2 - val1);
+    return val1 + t * (val2 - val1);
 }
 
 /** Wrap a value to a particular size by tiling the object space onto
@@ -102,25 +102,25 @@ double mirror(double size, double value);
  * a single sample point, and a scale factor between them.
  */
 struct Align {
-		/** Compute the grid-aligned points and scale.
-		 *
-		 * @param value The value to compute for.
-		 */
-		Align(const double value)
-		{
-			p1 = std::floor(value);
-			p2 = std::ceil(value);
-			factor = value - p1;
-		}
+        /** Compute the grid-aligned points and scale.
+         *
+         * @param value The value to compute for.
+         */
+        Align(const double value)
+        {
+            p1 = std::floor(value);
+            p2 = std::ceil(value);
+            factor = value - p1;
+        }
 
-		/// First integer-point lower than the value
-		double p1;
-		/// First integer-point higher than the value
-		double p2;
-		/** Inverse weight factor to use for #p1 point.
-		 * Value has range [0, 1] where 0 means p1 == value, 1 means p2 == value.
-		 */
-		double factor;
+        /// First integer-point lower than the value
+        double p1;
+        /// First integer-point higher than the value
+        double p2;
+        /** Inverse weight factor to use for #p1 point.
+         * Value has range [0, 1] where 0 means p1 == value, 1 means p2 == value.
+         */
+        double factor;
 };
 
 // helper class to calculate statistics of a continuously sampled one dimensional process
@@ -128,83 +128,83 @@ struct Align {
 template<typename T>
 class RunningStatistic
 {
-	public:
-		RunningStatistic()
-		{
-			_count = 0;
-			_sum = 0.0;
-			_sumOfSquares = 0.0;
-			_max = 0.0;
-			_min = std::numeric_limits<T>::max();
-		}
+    public:
+        RunningStatistic()
+        {
+            _count = 0;
+            _sum = 0.0;
+            _sumOfSquares = 0.0;
+            _max = 0.0;
+            _min = std::numeric_limits<T>::max();
+        }
 
-		inline RunningStatistic &operator<<(T sample)
-		{
-			if (_count == 0)
-				_max = _min = sample;
+        inline RunningStatistic &operator<<(T sample)
+        {
+            if (_count == 0)
+                _max = _min = sample;
 
-			_count++;
-			_sum += sample;
-			_sumOfSquares += sqr(sample);
-			_max = std::max(_max, sample);
-			_min = std::min(_min, sample);
-			return *this;
-		}
+            _count++;
+            _sum += sample;
+            _sumOfSquares += sqr(sample);
+            _max = std::max(_max, sample);
+            _min = std::min(_min, sample);
+            return *this;
+        }
 
-		inline RunningStatistic &operator<<(const RunningStatistic &statistic)
-		{
-			_count += statistic._count;
-			_sum += statistic._sum;
-			_sumOfSquares += statistic._sumOfSquares;
-			_max = std::max(_max, statistic._max);
-			_min = std::min(_min, statistic._min);
-			return *this;
-		}
+        inline RunningStatistic &operator<<(const RunningStatistic &statistic)
+        {
+            _count += statistic._count;
+            _sum += statistic._sum;
+            _sumOfSquares += statistic._sumOfSquares;
+            _max = std::max(_max, statistic._max);
+            _min = std::min(_min, statistic._min);
+            return *this;
+        }
 
-		inline int count() const
-		{
-			return _count;
-		}
+        inline int count() const
+        {
+            return _count;
+        }
 
-		inline T mean() const
-		{
-			if (_count == 0)
-				return 0.0;
+        inline T mean() const
+        {
+            if (_count == 0)
+                return 0.0;
 
-			return _sum / T(_count);
-		}
+            return _sum / T(_count);
+        }
 
-		inline T min() const
-		{
-			if (_count == 0)
-				return 0.0;
+        inline T min() const
+        {
+            if (_count == 0)
+                return 0.0;
 
-			return _min;
-		}
+            return _min;
+        }
 
-		inline T max() const
-		{
-			return _max;
-		}
+        inline T max() const
+        {
+            return _max;
+        }
 
-		inline T variance(bool unbiased = true) const
-		{
-			if (_count < 1)
-				return 0.0;
+        inline T variance(bool unbiased = true) const
+        {
+            if (_count < 1)
+                return 0.0;
 
-			T u = mean();
-			if (unbiased)
-				return _sumOfSquares / T(_count - 1) - T(_count) / T(_count - 1) * sqr(u);
-			else
-				return _sumOfSquares / T(_count) - sqr(u);
-		}
+            T u = mean();
+            if (unbiased)
+                return _sumOfSquares / T(_count - 1) - T(_count) / T(_count - 1) * sqr(u);
+            else
+                return _sumOfSquares / T(_count) - sqr(u);
+        }
 
-	private:
-		int _count;
-		T _sum;
-		T _sumOfSquares;
-		T _min;
-		T _max;
+    private:
+        int _count;
+        T _sum;
+        T _sumOfSquares;
+        T _min;
+        T _max;
 };
 
 } // end namespace MathHelpers

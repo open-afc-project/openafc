@@ -6,22 +6,22 @@
 
 class TestSqlHelpers : public testing::Test
 {
-	public:
-		void SetUp() override
-		{
-			QSqlDatabase::addDatabase("QMYSQL", "mysql");
-			_conns.push_back("mysql");
-		}
+    public:
+        void SetUp() override
+        {
+            QSqlDatabase::addDatabase("QMYSQL", "mysql");
+            _conns.push_back("mysql");
+        }
 
-		void TearDown() override
-		{
-			for (const QString &name : _conns) {
-				QSqlDatabase::removeDatabase(name);
-			}
-			_conns.clear();
-		}
+        void TearDown() override
+        {
+            for (const QString &name : _conns) {
+                QSqlDatabase::removeDatabase(name);
+            }
+            _conns.clear();
+        }
 
-		std::vector<QString> _conns;
+        std::vector<QString> _conns;
 };
 
 TEST_F(TestSqlHelpers, testWrite)
@@ -42,18 +42,18 @@ void TestSqlHelpers::testQuotedVariant_data(){
     //QTest::newRow("localtime") << QVariant(QDateTime(QDate(2013, 1, 2), QTime(3, 4), Qt::LocalTime)) << "'2013-01-02 03:04:00'";
 }
 
-	#include <QSqlField>
+    #include <QSqlField>
 void TestSqlHelpers::testQuotedVariant(){
     const QFETCH(QVariant, var);
     const QFETCH(QString, encoded);
 
     foreach(const QString &name, _conns){
         QSqlDriver *drv = QSqlDatabase::database(name, false).driver();
-	#if 0
+    #if 0
         QSqlField field;
         field.setValue(var);
         qDebug() << drv << var << drv->formatValue(field) << SqlHelpers::quoted(drv, var);
-	#endif
+    #endif
         QCOMPARE(SqlHelpers::quoted(drv, var), encoded);
     }
 }

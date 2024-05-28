@@ -56,18 +56,18 @@ OGRGeometryCollection *createGeometry();
  */
 class OgrFreer
 {
-	public:
-		/// Interface for std::unique_ptr deleter
-		void operator()(void *ptr) const;
+    public:
+        /// Interface for std::unique_ptr deleter
+        void operator()(void *ptr) const;
 };
 
 /** Delete OGRGeometry objects in a DLL-safe way.
  */
 class GeometryDeleter
 {
-	public:
-		/// Interface for std::unique_ptr deleter
-		void operator()(OGRGeometry *ptr) const;
+    public:
+        /// Interface for std::unique_ptr deleter
+        void operator()(OGRGeometry *ptr) const;
 };
 
 /// Convenience name for unique-pointer class
@@ -78,18 +78,18 @@ using GeomUniquePtr = std::unique_ptr<T, GeometryDeleter>;
  */
 class FeatureDeleter
 {
-	public:
-		/// Interface for std::unique_ptr deleter
-		void operator()(OGRFeature *obj);
+    public:
+        /// Interface for std::unique_ptr deleter
+        void operator()(OGRFeature *obj);
 };
 
 /** Delete OGRSpatialReference objects in a DLL-safe way.
  */
 class SrsDeleter
 {
-	public:
-		/// Interface for std::unique_ptr deleter
-		void operator()(OGRSpatialReference *obj);
+    public:
+        /// Interface for std::unique_ptr deleter
+        void operator()(OGRSpatialReference *obj);
 };
 
 /** Move contained geometries from one collection to another.

@@ -14,21 +14,21 @@ using namespace std;
 /******************************************************************************************/
 class NFAClass
 {
-	public:
-		NFAClass();
-		NFAClass(std::string tableFile);
-		~NFAClass();
+    public:
+        NFAClass();
+        NFAClass(std::string tableFile);
+        ~NFAClass();
 
-		double computeNFA(double xdb, double u, double eff);
+        double computeNFA(double xdb, double u, double eff);
 
-	private:
-		void readTable();
+    private:
+        void readTable();
 
-		std::string tableFile;
-		double ***nfaTable;
-		int numxdb, numu, numeff;
-		double xdbStart, uStart, effStart;
-		double xdbStep, uStep, effStep;
+        std::string tableFile;
+        double ***nfaTable;
+        int numxdb, numu, numeff;
+        double xdbStart, uStart, effStart;
+        double xdbStep, uStep, effStep;
 };
 /******************************************************************************************/
 

@@ -12,19 +12,19 @@ namespace Logging
  */
 class ScopedSink
 {
-	public:
-		/** Attach the sink.
-		 *
-		 * @param sink The sink to manage:
-		 */
-		ScopedSink(const boost::shared_ptr<boost::log::sinks::sink> &sink);
+    public:
+        /** Attach the sink.
+         *
+         * @param sink The sink to manage:
+         */
+        ScopedSink(const boost::shared_ptr<boost::log::sinks::sink> &sink);
 
-		/** Detach the sink.
-		 */
-		~ScopedSink();
+        /** Detach the sink.
+         */
+        ~ScopedSink();
 
-		/// The managed sink
-		boost::shared_ptr<boost::log::sinks::sink> sink;
+        /// The managed sink
+        boost::shared_ptr<boost::log::sinks::sink> sink;
 };
 
 } // End namespace
