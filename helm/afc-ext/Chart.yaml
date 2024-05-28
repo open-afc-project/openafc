@@ -5,8 +5,8 @@
 # included with this software program.
 
 apiVersion: v2
-name: afc-int
-description: Helm charts for 'internal' AFC cluster
+name: afc-ext
+description: Helm charts for 'external' AFC cluster
 
 # A chart can be either an 'application' or a 'library' chart.
 #

@@ -18,15 +18,29 @@ import sys
 import tempfile
 from typing import cast, Dict, List, NamedTuple, Optional, Set
 
-from k3d_lib import auto_name, AUTO_NAME, error, error_if, execute, \
-    get_known_nodeports, INT_HELM_REL_DIR, K3D_PREFIX, parse_json_output, \
-    parse_k3d_reg, ROOT_DIR, warning_if, yaml_load
+from utils import auto_name, AUTO_NAME, error, error_if, execute, \
+    expand_filename, get_known_nodeports, ImageRegistryInfo, \
+    INT_HELM_REL_DIR, K3D_PREFIX, parse_json_output, parse_k3d_reg, \
+    SCRIPTS_DIR, warning_if
 
-# Default config file name
-DEFAULT_CONFIG = os.path.splitext(__file__)[0] + ".yaml"
+# List of known static file locations
+KNOWN_STATIC_FILE_LOCATIONS = ["/opt/afc/databases/rat_transfer"]
 
-# Environment variable for config file
-CONFIG_ENV = "K3D_CLUSTER_CREATE_CONFIG"
+# List of files/directories to be in directory to qualify as static file
+# directory
+STATIC_FILE_EXPETED_CONTENT = ["ULS_Database", "RAS_Database"]
+
+# List of ports names expose by default
+DEFAULT_EXPOSE = ["http", "https"]
+
+# Cluster preparation script
+INSTALL_PREREQUISITES_SCRIPT = \
+    os.path.join(SCRIPTS_DIR, "install_prerequisites.py")
+
+# Components to install in cluster
+INSTALL_PREREQUISITES_COMPONENTS = ["prometheus_operator", "prometheus",
+                                    "prometheus_adapter", "external_secrets"]
+
 
 EPILOG = """\
 This script concocts 'k3d cluster create' command line according to given
@@ -70,59 +84,6 @@ performed directly:
 """
 
 
-class NamespaceCreator:
-    """ Namespace creator
-
-    Private attributes:
-    _kubeconfig_args -- kubectl arguments identifying kubeconfig file
-    _context         -- Context within kubeconfig file
-    _namespaces      -- Set of already existing namespaces
-    """
-
-    def __init__(self, kubeconfig: Optional[str], context: str) -> None:
-        """ Constructor
-
-        Arguments:
-        kubeconfig -- Kubeconfig file. None for default
-        context    -- Context referring created cluster
-        """
-        self._kubeconfig_args = \
-            ["--kubeconfig", kubeconfig] if kubeconfig else []
-        self._context = context
-        self._namespaces: Set[str] = \
-            set(ns["metadata"]["name"] for ns in
-                parse_json_output(["kubectl", "get", "namespaces",
-                                   "--context", self._context, "-o", "json"] +
-                                  self._kubeconfig_args).get("items", []))
-
-    def create_namespace(self, namespace: str, make_current: bool = False) \
-            -> None:
-        """ Create namespace
-
-        Arguments:
-        namespace    -- Namespace to create
-        make_current -- Make namespace current
-        """
-        if namespace not in self._namespaces:
-            self._namespaces.add(namespace)
-            execute(
-                ["kubectl", "create", "namespace", namespace,
-                 "--context", self._context] + self._kubeconfig_args)
-        if make_current:
-            execute(["kubectl", "config", "set",
-                     f"contexts.{self._context}.namespace", namespace] +
-                    self._kubeconfig_args)
-
-
-def expand_filename(fn: str, root: Optional[str] = None) -> str:
-    """ Do expamnduser/expandvars on given filename, optionally rebasing it
-    from given root  """
-    ret = os.path.expanduser(os.path.expandvars(fn))
-    if root:
-        ret = os.path.join(root, ret)
-    return ret
-
-
 def main(argv: List[str]) -> None:
     """Do the job.
 
@@ -135,10 +96,6 @@ def main(argv: List[str]) -> None:
             description="Wrapper around 'k3d cluster create'",
             formatter_class=argparse.RawDescriptionHelpFormatter,
             epilog=EPILOG)
-    argument_parser.add_argument(
-        "--cfg", metavar="SCRIPT_CONFIG_FILE",
-        help=f"Config file for this script. May also be specified with "
-        f"`{CONFIG_ENV}' environment variable. Default is `{DEFAULT_CONFIG}'")
     argument_parser.add_argument(
         "--expose",
         metavar="NODEPORT1[:HOST_PORT1][,NODEPORT2[:HOST_PORT2]]...",
@@ -187,12 +144,6 @@ def main(argv: List[str]) -> None:
 
     args = argument_parser.parse_args(argv)
 
-    # Reading script's config file
-    cfg = \
-        yaml_load(
-            expand_filename(
-                args.cfg or os.environ.get(CONFIG_ENV) or DEFAULT_CONFIG))
-
     # Computing cluster name
     cluster = args.CLUSTER
     if cluster.startswith(K3D_PREFIX):
@@ -234,7 +185,7 @@ def main(argv: List[str]) -> None:
         """ True if given directory is static file directory """
         return bool(dirname) and os.path.isdir(dirname) and \
             all(os.path.exists(os.path.join(dirname, f))
-                for f in cfg["static_files"]["expected_items"])
+                for f in STATIC_FILE_EXPETED_CONTENT)
 
     static_dir = args.static
     if static_dir:
@@ -242,7 +193,7 @@ def main(argv: List[str]) -> None:
                  f"Static file directory '{static_dir}' does not contain "
                  "expected files/directories")
     else:
-        for kl in cfg["static_files"]["known_locations"]:
+        for kl in KNOWN_STATIC_FILE_LOCATIONS:
             if is_static_dir(kl):
                 static_dir = kl
                 break
@@ -252,7 +203,7 @@ def main(argv: List[str]) -> None:
                   "be specified explicitly with --static parameter")
 
     # Looking for registry
-    registry = parse_k3d_reg(args.k3d_reg)
+    registry = cast(ImageRegistryInfo, parse_k3d_reg(args.k3d_reg)).pull
 
     # Computing port mappings
     conns = cast(str, execute(["netstat", "-latn"], return_output=True))
@@ -276,7 +227,7 @@ def main(argv: List[str]) -> None:
             [("component", Optional[str]), ("port_name", Optional[str]),
              ("nodeport", int)])
     port_mappings: Dict[int, MappingInfo] = {}
-    for mapping_strings in (args.expose or [",".join(cfg["default_expose"])]):
+    for mapping_strings in (args.expose or [",".join(DEFAULT_EXPOSE)]):
         for mapping_str in mapping_strings.split(","):
             component: Optional[str] = None
             port_name: Optional[str] = None
@@ -334,60 +285,9 @@ def main(argv: List[str]) -> None:
              for host_port, mapping_info in port_mappings.items()), []))
 
     # Install stuff into cluster
-    context = f"k3d-{cluster}"
-    namespace_creator = NamespaceCreator(kubeconfig=args.kubeconfig,
-                                         context=context)
-    for install_item in \
-            sorted(cfg.get("install", {}).values(),
-                   key=lambda item: item.get("order", 1e10)):
-        namespace: Optional[str] = install_item.get("namespace")
-        if namespace:
-            namespace_creator.create_namespace(namespace)
-        for cmd in install_item.get("cmd", []):
-            execute(cmd.lstrip("-"), fail_on_error=not cmd.startswith("-"))
-        manifest = \
-            install_item.get("manifest_path", install_item.get("manifest_url"))
-        if manifest:
-            if "manifest_path" in install_item:
-                manifest = expand_filename(manifest, root=ROOT_DIR)
-            execute(
-                ["kubectl", "create", "-f", manifest, "--context", context] +
-                (["--kubeconfig", kubeconfig] if kubeconfig else []) +
-                (["--namespace", namespace] if namespace else []))
-        elif "helm_chart" in install_item:
-            helmchart = install_item["helm_chart"]
-            if "helm_repo" in install_item:
-                m = re.match("^(.+?)/", helmchart)
-                error_if(not m,
-                         f"fNo repository part found in helmchart name "
-                         f"'{helmchart}'")
-                assert m is not None
-                execute(["helm", "repo", "add", m.group(1),
-                         install_item["helm_repo"]])
-                execute(["helm", "repo", "update"])
-            else:
-                helmchart = expand_filename(helmchart, root=ROOT_DIR)
-            helm_args = ["helm", "install"]
-            for param, value, no_value in \
-                    [("", install_item.get("helm_release"), "--generate-name"),
-                     ("",  helmchart, ""),
-                     ("--kubeconfig", kubeconfig, ""),
-                     ("--kube-context", context, ""),
-                     ("--namespace", namespace, ""),
-                     ("--version", install_item.get("helm_version"), "")]:
-                if value:
-                    if param:
-                        helm_args.append(param)
-                    helm_args.append(value)
-                elif no_value:
-                    helm_args.append(no_value)
-            for helm_values in install_item.get("helm_values", []):
-                helm_args += \
-                    ["--values", expand_filename(helm_values, root=ROOT_DIR)]
-            for helm_setting in install_item.get("helm_settings", []):
-                helm_args += ["--set", helm_setting]
-            helm_args += install_item.get("args", [])
-            execute(helm_args)
+    execute([INSTALL_PREREQUISITES_SCRIPT,
+             "--context", f"{kubeconfig or ''}:k3d-{cluster}"] +
+            INSTALL_PREREQUISITES_COMPONENTS)
 
     # Reporting results
     namespace_clause = f"namespace of '{args.namespace}'" if args.namespace \

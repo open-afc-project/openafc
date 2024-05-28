@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Deployment helmchart for RabbitMQ pods
+# Deployment helmchart for dispatcher (nginx) pods
 
-{{- $ := mergeOverwrite $ (dict "component" "rmq") }}
+{{- $ := mergeOverwrite $ (dict "component" "dispatcher") }}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -27,5 +27,6 @@ spec:
       {{- include "afc.imagePullSecrets" . | indent 6 }}
       containers:
         - {{- include "afc.containerImage" . | nindent 10 }}
+          envFrom: {{- include "afc.envFromConfigMaps" . | nindent 12 }}
           ports: {{- include "afc.containerPorts" . | nindent 12 }}
           resources: {{- include "afc.containerResources" . | nindent 12 }}

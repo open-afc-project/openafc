@@ -4,8 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Service helmchart for objst pod
-{{- $ := mergeOverwrite $ (dict "component" "objst") }}
+# Service helmchart for dispatcher pod
+{{- $ := mergeOverwrite $ (dict "component" "dispatcher") }}
 
 apiVersion: v1
 kind: Service

@@ -7,6 +7,7 @@
 # Deployment helmchart for dispatcher (nginx) pods
 
 {{- $ := mergeOverwrite $ (dict "component" "dispatcher") }}
+{{- if (include "afc.fullImageName" .) }}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -20,13 +21,15 @@ spec:
   replicas: {{ include "afc.replicas" . }}
   {{- include "afc.serviceAccountRef" . | indent 2 }}
   {{- include "afc.securityContext" . | indent 2 }}
-  {{- include "afc.imagePullSecrets" . | indent 2 }}
   template:
     metadata:
       labels: {{- include "afc.commonLabels" . | nindent 8 }}
     spec:
+      {{- include "afc.imagePullSecrets" . | indent 6 }}
       containers:
         - {{- include "afc.containerImage" . | nindent 10 }}
           envFrom: {{- include "afc.envFromConfigMaps" . | nindent 12 }}
           ports: {{- include "afc.containerPorts" . | nindent 12 }}
           resources: {{- include "afc.containerResources" . | nindent 12 }}
+
+{{- end -}}

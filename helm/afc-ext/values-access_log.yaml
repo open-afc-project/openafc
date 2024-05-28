@@ -4,8 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Parameter values for Minikube cluster
+# Allows dispatcher access log
 
-components:
+configmaps:
   dispatcher:
-    serviceType: NodePort
+    AFC_MSGHND_ACCESS_LOG: /proc/self/fd/2

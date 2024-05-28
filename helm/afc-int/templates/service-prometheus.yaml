@@ -5,10 +5,10 @@
 # included with this software program.
 
 # Exposes Prometheus as nodePort (if component present and serviceType is indeed NodePort).
-# Note that Prometheus pods run in 'monitoring' namespace - and so does this obiect
+# Note that Prometheus pods run in 'monitoring' namespace - and so does this object
 {{- $ := mergeOverwrite $ (dict "component" "prometheus") }}
 {{- $compDef := merge (dict) (get .Values.components .component | default dict) .Values.components.default -}}
-{{- if eq (get $compDef "serviceType") "NodePort" }}
+{{- if eq (get (default (dict) (get $compDef "service")) "type") "NodePort" }}
 
 apiVersion: v1
 kind: Service
@@ -16,10 +16,10 @@ metadata:
   name: {{ include "afc.hostName" . }}
   labels: {{- include "afc.commonLabels" . | nindent 4 }}
   namespace: monitoring
+  {{- include "afc.serviceAnnotations" . | nindent 2 }}
 spec:
   {{- include "afc.serviceIp" . | nindent 2 }}
-  selector:
-    prometheus: main
+  selector: {{- include "afc.serviceSelector" . | nindent 4 }}
   ports: {{- include "afc.servicePorts" . | nindent 4 }}
 
 {{- end }}
