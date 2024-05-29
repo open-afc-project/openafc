@@ -6,7 +6,7 @@
 
 # Prometheus operator Pod Monitor for nginxexporter
 {{- $ := mergeOverwrite $ (dict "component" "nginxexporter") }}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- if hasKey $compDef "metrics"}}
 
 apiVersion: monitoring.coreos.com/v1

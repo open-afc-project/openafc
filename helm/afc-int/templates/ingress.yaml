@@ -6,7 +6,7 @@
 
 # Manifest for ingress of configuration with internal cluster
 {{- $ := unset $ "component" -}}
-{{- if get .Values "ingress" }}
+{{- if get $.Values "ingress" }}
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress

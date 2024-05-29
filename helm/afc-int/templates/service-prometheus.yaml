@@ -7,7 +7,7 @@
 # Exposes Prometheus as nodePort (if component present and serviceType is indeed NodePort).
 # Note that Prometheus pods run in 'monitoring' namespace - and so does this object
 {{- $ := mergeOverwrite $ (dict "component" "prometheus") }}
-{{- $compDef := merge (dict) (get .Values.components .component | default dict) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | default dict) $.Values.components.default -}}
 {{- if eq (get (default (dict) (get $compDef "service")) "type") "NodePort" }}
 
 apiVersion: v1
