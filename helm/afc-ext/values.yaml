@@ -4,8 +4,6 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
----
-
 # Default values for afc-ext chart
 
 # Global name overrides
@@ -81,6 +79,8 @@ securityContexts:
 #  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. IFABSENT>
 #    describes what to do if name is valid, but IP name is not defined (see
 #    above for values)
+#  - {{sameAs:<CONFIGMAP>:<ENTRY>}} Same value as another entry in another
+#    configmap
 configmaps:
   dispatcher:
     AFC_SERVER_NAME: _
@@ -95,7 +95,6 @@ configmaps:
     AFC_OBJST_PORT: "80"
     BROKER_FQDN: "{{ip:int-rmq}}"
     BROKER_PORT: 5672
-
 
 # Dictionary of components. Component roughly corresponds to Docker Compose
 # service. Keys in dictionary are Docker Compose service names, plus there is

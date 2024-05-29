@@ -81,6 +81,8 @@ securityContexts:
 #  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. IFABSENT>
 #    describes what to do if name is valid, but IP name is not defined (see
 #    above for values)
+#  - {{sameAs:<CONFIGMAP>:<ENTRY>}} Same value as another entry in another
+#    configmap
 configmaps:
   # Own environment variables of dispatcher container(s)
   dispatcher:
@@ -154,6 +156,7 @@ configmaps:
     AFC_AEP_DEBUG: 1
     AFC_AEP_REAL_MOUNTPOINT: >-
       {{staticVolumeMount:worker:rat_transfer}}/3dep/1_arcsec
+    TEST: "{{sameAs:als_kafka:KAFKA_CLIENT_PORT}}"
   # Own environment variables of uls_downloader container(s)
   uls_downloader:
     ULS_AFC_URL: >-
@@ -239,8 +242,9 @@ staticVolumes:
 #             ReadWriteOncePod)
 #     mountPath Mount path inside container
 #     resources PVC resources (has 'requests', etc. properties)
-#   envConfigmapKeys: List of configmap keys (keys into configmaps dictionary)
+#   envConfigmapKeys List of configmap keys (keys into configmaps dictionary)
 #           to include into environment
+#   env Dictionary of individual environment variables
 #   staticVolumeMounts Dictionary of mount points of used static
 #           (non-templated, non-secret) volumes, indexed by staticVolumes
 #           dictionary keys
