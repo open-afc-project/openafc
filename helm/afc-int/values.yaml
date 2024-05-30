@@ -78,11 +78,12 @@ securityContexts:
 #    secret with given <EXTERNALSECRET> name (i.e. name of secret file or
 #    secret environment variable). <IFABSENT> describes what to do if secret or
 #    'property' field of secret definition is absent (see above for values)
-#  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. IFABSENT>
+#  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. <IFABSENT>
 #    describes what to do if name is valid, but IP name is not defined (see
 #    above for values)
-#  - {{sameAs:<CONFIGMAP>:<ENTRY>}} Same value as another entry in another
-#    configmap
+#  - {{sameAs:<CONFIGMAP>:<ENTRY>[:<IFABSENT>]}} Same value as another entry in
+#    another configmap. <IFABSENT> describes what to do if referred value is
+#    absent (see above for values)
 configmaps:
   # Own environment variables of dispatcher container(s)
   dispatcher:
@@ -156,7 +157,6 @@ configmaps:
     AFC_AEP_DEBUG: 1
     AFC_AEP_REAL_MOUNTPOINT: >-
       {{staticVolumeMount:worker:rat_transfer}}/3dep/1_arcsec
-    TEST: "{{sameAs:als_kafka:KAFKA_CLIENT_PORT}}"
   # Own environment variables of uls_downloader container(s)
   uls_downloader:
     ULS_AFC_URL: >-

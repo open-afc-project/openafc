@@ -521,12 +521,22 @@ Returns value or 'SKIP_SKIP_SKIP_SKIP' to skip
 {{- end }}
 {{- $sameAsDefs := regexFindAll "\\{\\{sameAs:.+?\\}\\}" $value -1 -}}
 {{- range $sameAsDef := $sameAsDefs }}
-{{-   $parts := regexFindAll "[^:\\{\\}]+" $sameAsDef 3 -}}
+{{-   $parts := regexFindAll "[^:\\{\\}]+" $sameAsDef -1 -}}
 {{-   $configmapKey := index $parts 1 -}}
 {{-   $valueKey := index $parts 2 -}}
+{{    $ifAbsent := "required" }}
+{{-   if ge (len $parts) 4 }}
+{{-     $ifAbsent = index $parts 3 -}}
+{{-   end }}
 {{-   $configmapDef := get $.Values.configmaps $configmapKey | required (cat "Configmap" $configmapKey "used in rendering of " $sameAsDef "not found" ) -}}
-{{-   if not (hasKey $configmapDef $valueKey) -}}
-{{-     fail (cat "Value" $valueKey "not found in configmap" $configmapKey "while rendering" $sameAsDef) }}
+{{-   if not (hasKey $configmapDef $valueKey) }}
+{{-     if eq $ifAbsent "optional" }}
+{{-       $skip = true -}}
+{{-     else if eq $ifAbsent "nullable" }}
+{{-       $empty = true -}}
+{{-     else }}
+{{-       fail (cat "Value" $valueKey "not found in configmap" $configmapKey "while rendering" $sameAsDef) }}
+{{-     end }}
 {{-   end }}
 {{-   $v := include "afc.envValue" (dict "value" (get $configmapDef $valueKey) "Values" $.Values) -}}
 {{-   if eq $v "SKIP_SKIP_SKIP_SKIP" }}

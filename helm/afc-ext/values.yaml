@@ -76,11 +76,12 @@ securityContexts:
 #    secret with given <EXTERNALSECRET> name (i.e. name of secret file or
 #    secret environment variable). <IFABSENT> describes what to do if secret or
 #    'property' field of secret definition is absent (see above for values)
-#  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. IFABSENT>
+#  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. <IFABSENT>
 #    describes what to do if name is valid, but IP name is not defined (see
 #    above for values)
-#  - {{sameAs:<CONFIGMAP>:<ENTRY>}} Same value as another entry in another
-#    configmap
+#  - {{sameAs:<CONFIGMAP>:<ENTRY>[:<IFABSENT>]}} Same value as another entry in
+#    another configmap. <IFABSENT> describes what to do if referred value is
+#    absent (see above for values)
 configmaps:
   dispatcher:
     AFC_SERVER_NAME: _
