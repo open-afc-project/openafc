@@ -106,16 +106,23 @@ def main(argv: List[str]) -> None:
         "--access_log", action="store_true",
         help="Enables dispatcher access log")
     argument_parser.add_argument(
+        "--internal", action="store_true",
+        help="Only reloads (upgrades) internal AFC helmchart")
+    argument_parser.add_argument(
         "--source_root", metavar="SOURCE_ROOT_DIR",
         default=DEFAULT_SOURCE_ROOT,
         help=f"Source root directory (directory having 'helm' subdirectory. "
         f"Default is '{DEFAULT_SOURCE_ROOT}'")
+    argument_parser.add_argument(
+        "--set", metavar="VA.RI.AB.LE=VALUE", action="append", default=[],
+        help="Additional setting for values.yaml of AFC helmchart")
 
     args = argument_parser.parse_args(argv)
     bin_dir = os.path.join(args.source_root, "helm/bin")
-    execute([os.path.join(bin_dir, "k3d_registry.py")])
-    execute([os.path.join(bin_dir, "k3d_cluster_create.py"),
-             "--expose", args.expose, args.cluster])
+    if not args.internal:
+        execute([os.path.join(bin_dir, "k3d_registry.py")])
+        execute([os.path.join(bin_dir, "k3d_cluster_create.py"),
+                 "--expose", args.expose, args.cluster])
     execute(
         [os.path.join(bin_dir, "helm_install_int.py"), "--tag", args.tag,
          "--fake_secrets",
@@ -128,6 +135,7 @@ def main(argv: List[str]) -> None:
                        ("--http", None, args.http),
                        ("--mtls", None, args.mtls),
                        ("--access_log", None, args.access_log)]) +
+        sum([["--set", s] for s in args.set], []) +
         [args.release])
     execute([os.path.join(bin_dir, "k3d_ports.py"), "CURRENT"])
 
