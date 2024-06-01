@@ -78,9 +78,12 @@ securityContexts:
 #    secret with given <EXTERNALSECRET> name (i.e. name of secret file or
 #    secret environment variable). <IFABSENT> describes what to do if secret or
 #    'property' field of secret definition is absent (see above for values)
-#  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. IFABSENT>
+#  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. <IFABSENT>
 #    describes what to do if name is valid, but IP name is not defined (see
 #    above for values)
+#  - {{sameAs:<CONFIGMAP>:<ENTRY>[:<IFABSENT>]}} Same value as another entry in
+#    another configmap. <IFABSENT> describes what to do if referred value is
+#    absent (see above for values)
 configmaps:
   # Own environment variables of dispatcher container(s)
   dispatcher:
@@ -239,8 +242,9 @@ staticVolumes:
 #             ReadWriteOncePod)
 #     mountPath Mount path inside container
 #     resources PVC resources (has 'requests', etc. properties)
-#   envConfigmapKeys: List of configmap keys (keys into configmaps dictionary)
+#   envConfigmapKeys List of configmap keys (keys into configmaps dictionary)
 #           to include into environment
+#   env Dictionary of individual environment variables
 #   staticVolumeMounts Dictionary of mount points of used static
 #           (non-templated, non-secret) volumes, indexed by staticVolumes
 #           dictionary keys

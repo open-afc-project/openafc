@@ -15,17 +15,17 @@ Argument is a name to convert
 {{- end }}
 
 {{/*
-App name that may be used as manifest name/label (chartname if not overridden by .Values.appNameOverride)
+App name that may be used as manifest name/label (chartname if not overridden by $.Values.appNameOverride)
 */}}
 {{- define "afc.appName" -}}
-{{- default .Chart.Name .Values.appNameOverride | include "afc.rfc1123" }}
+{{- default $.Chart.Name $.Values.appNameOverride | include "afc.rfc1123" }}
 {{- end }}
 
 {{/*
 Helm release name (empty if unspecified)
 */}}
 {{- define "afc.releaseName" -}}
-{{- eq .Release.Name "release-name" | ternary "" (.Release.Name | include "afc.rfc1123") -}}
+{{- eq $.Release.Name "release-name" | ternary "" ($.Release.Name | include "afc.rfc1123") -}}
 {{- end }}
 
 {{/*
@@ -62,10 +62,11 @@ Manifest name made from secret store name
 
 {{/*
 Hostname for a component
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
+.Values must be defined
 */}}
 {{- define "afc.hostName" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- default .component (get (default (dict) (get $compDef "service")) "hostname") -}}
 {{- end }}
 
@@ -73,7 +74,7 @@ Hostname for a component
 Versioned chart name
 */}}
 {{- define "afc.versionedChartName" -}}
-{{- printf "%s-%s" .Chart.Name .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- printf "%s-%s" $.Chart.Name $.Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" }}
 {{- end }}
 
 {{/*
@@ -86,15 +87,15 @@ Argument is a secret name
 
 {{/*
 Full image name. Empty if image omitted.
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.fullImageName" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $shortName := get $compDef "imageName" -}}
 {{- if $shortName -}}
 {{-   $repoKey := default (get $compDef "imageRepositoryKey") (get $compDef "imageRepositoryKeyOverride") | required (cat "No 'imageRepositoryKey[Override]' found in definition of component" .component) -}}
-{{-   $repoDef := get .Values.imageRepositories $repoKey | required (cat "Component" .component "refers unknown image repository" $repoKey) -}}
-{{-   $tag := default .Chart.AppVersion (get $compDef "imageTag") -}}
+{{-   $repoDef := get $.Values.imageRepositories $repoKey | required (cat "Component" .component "refers unknown image repository" $repoKey) -}}
+{{-   $tag := default $.Chart.AppVersion (get $compDef "imageTag") -}}
 {{-   $path := get $repoDef "path" -}}
 {{-   if $path }}
 {{-     $path = printf "%s/" $path }}
@@ -109,15 +110,15 @@ Full image name. Empty if image omitted.
 
 {{/*
 Common labels
-.component (key in .Values.components) used if defined
+.component (key in $.Values.components) used if defined
 */}}
 {{- define "afc.commonLabels" -}}
 helm.sh/chart: {{ include "afc.versionedChartName" . | quote }}
 {{ include "afc.selectorLabels" . }}
-{{- if .Chart.AppVersion }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- if $.Chart.AppVersion }}
+app.kubernetes.io/version: {{ $.Chart.AppVersion | quote }}
 {{- end }}
-app.kubernetes.io/managed-by: {{ .Release.Service }}
+app.kubernetes.io/managed-by: {{ $.Release.Service }}
 {{- end }}
 
 {{/*
@@ -134,7 +135,7 @@ Common app labels (does not include component)
 
 {{/*
 Selector labels
-.component (key in .Values.components) used if defined
+.component (key in $.Values.components) used if defined
 */}}
 {{- define "afc.selectorLabels" -}}
 app.kubernetes.io/name: {{ include "afc.appName" . }}
@@ -149,28 +150,28 @@ app.kubernetes.io/component: {{ include "afc.compManifestName" . }}
 
 {{/*
 Initial replica count
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.replicas" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{ get $compDef "initialReplicas" | int }}
 {{- end }}
 
 {{/*
 IP fields (type, loadBalancerIP) in service manifest
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.serviceIp" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $serviceDef := default (dict) (get $compDef "service") -}}
 {{- $serviceType := get $serviceDef "type" -}}
 {{- $ip := "" -}}
 {{- $ipKey := get $serviceDef "loadBalancerIpKey" -}}
 {{- if $ipKey -}}
-{{-   if not (hasKey .Values.externalIps $ipKey) -}}
+{{-   if not (hasKey $.Values.externalIps $ipKey) -}}
 {{-     fail (cat "Service of component" .component "uses undefined loadBalancerIpKey" $ipKey) -}}
 {{-   end -}}
-{{-   $ip = get .Values.externalIps $ipKey -}}
+{{-   $ip = get $.Values.externalIps $ipKey -}}
 {{- end -}}
 {{- if $serviceType }}
 type: {{ $serviceType }}
@@ -185,7 +186,7 @@ loadBalancerIP: {{ $ip }}
 
 {{/*
 Container name
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.containerName" -}}
 {{- include "afc.compManifestName" . -}}
@@ -193,10 +194,10 @@ Container name
 
 {{/*
 Image definition (container name, image, imagePullPolicy)
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.containerImage" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 name: {{ include "afc.containerName" . }}
 image: {{ include "afc.fullImageName" . | required (cat "Image name undefined for component" .component) | quote }}
 imagePullPolicy: {{ get $compDef "imagePullPolicy" }}
@@ -204,27 +205,27 @@ imagePullPolicy: {{ get $compDef "imagePullPolicy" }}
 
 {{/*
 Image pull secrets (if any)
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.imagePullSecrets" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $repoKey := default (get $compDef "imageRepositoryKey") (get $compDef "imageRepositoryKeyOverride") | required (cat "No 'imageRepositoryKey[Override]' found in definition of component" .component) -}}
-{{- $repoDef := get .Values.imageRepositories $repoKey | required (cat "Component" .component "refers unknown image repository" $repoKey) -}}
+{{- $repoDef := get $.Values.imageRepositories $repoKey | required (cat "Component" .component "refers unknown image repository" $repoKey) -}}
 {{- $pullSecrets := get $repoDef "pullSecrets" -}}
 {{- if $pullSecrets }}
 imagePullSecrets:
 {{-   range $secret := $pullSecrets }}
-  - name: {{ include "afc.secretManifestName" (mergeOverwrite $ (dict "secret" $secret))  }}
+  - name: {{ include "afc.secretManifestName" (dict "secret" $secret)  }}
 {{-   end }}
 {{- end }}
 {{- end }}
 
 {{/*
 Container ports definition
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.containerPorts" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $portDefs := get $compDef "ports" -}}
 {{- if $portDefs }}
 {{-   range $portName, $portInfo := $portDefs }}
@@ -237,10 +238,10 @@ Container ports definition
 
 {{/*
 Headless service ports definition (no nodePort even if defined)
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.servicePortsHeadless" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $portDefs := get $compDef "ports" -}}
 {{- if $portDefs }}
 {{-   range $portName, $portInfo := $portDefs }}
@@ -258,10 +259,10 @@ Headless service ports definition (no nodePort even if defined)
 
 {{/*
 Service ports definition
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.servicePorts" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $serviceDef := default (dict) (get $compDef "service") -}}
 {{- $portDefs := get $compDef "ports" -}}
 {{- if $portDefs }}
@@ -286,10 +287,10 @@ Service ports definition
 
 {{/*
 Service annotations
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.serviceAnnotations" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $serviceDef := default (dict) (get $compDef "service") -}}
 {{- $annotations := get $serviceDef "annotations" -}}
 {{- if $annotations }}
@@ -299,10 +300,10 @@ annotations: {{- toYaml $annotations | nindent 2 }}
 
 {{/*
 Service selector
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.serviceSelector" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $serviceDef := default (dict) (get $compDef "service") -}}
 {{- if get $serviceDef "selector" }}
 {{-   toYaml (get $serviceDef "selector") }}
@@ -313,10 +314,10 @@ Service selector
 
 {{/*
 Container resources definition
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.containerResources" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $resources := get $compDef "containerResources" -}}
 {{- if $resources }}
 {{-   toYaml $resources }}
@@ -325,10 +326,10 @@ Container resources definition
 
 {{/*
 Persistent Volume Claim template
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.pvcTemplate" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $pvc := get $compDef "pvc" -}}
 {{- if and $pvc (hasKey $pvc "name") -}}
 metadata:
@@ -342,10 +343,10 @@ spec:
 
 {{/*
 Persistent Volume mount
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.pvcMount" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $pvc := get $compDef "pvc" -}}
 {{- if and $pvc (hasKey $pvc "name") -}}
 name: {{ get $pvc "name" | include "afc.rfc1123" }}
@@ -355,10 +356,10 @@ mountPath: {{ get $pvc "mountPath" }}
 
 {{/*
 Service account reference
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.serviceAccountRef" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $serviceAcc := get $compDef "serviceAccount" -}}
 {{- if $serviceAcc }}
 serviceAccountName: {{ $serviceAcc }}
@@ -367,13 +368,13 @@ serviceAccountName: {{ $serviceAcc }}
 
 {{/*
 SecurityContext
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.securityContext" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $scKey := get $compDef "securityContextKey" -}}
 {{- if $scKey }}
-{{-   $sc := get .Values.securityContexts $scKey | required (cat "No security context found for this securityContextKey:" $scKey) -}}
+{{-   $sc := get $.Values.securityContexts $scKey | required (cat "No security context found for this securityContextKey:" $scKey) -}}
 {{-   if $sc }}
 securityContext: {{ toYaml $sc | nindent 2 }}
 {{-   end }}
@@ -382,165 +383,225 @@ securityContext: {{ toYaml $sc | nindent 2 }}
 
 {{/*
 Render environment from ConfigMaps, contained in envConfigmapKeys list of component descriptor
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.envFromConfigMaps" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $configmaps := get $compDef "envConfigmapKeys" -}}
 {{- if $configmaps }}
 {{-   range $configmap := $configmaps }}
 - configMapRef:
-    name: {{ include "afc.configmapManifestName" (mergeOverwrite $ (dict "configmap" $configmap)) }}
+    name: {{ include "afc.configmapManifestName" (dict "configmap" $configmap) }}
 {{-   end }}
 {{- end }}
 {{- end }}
 
 {{/*
-Renders entries in .Values.configmap subdictionary as configmap environment entries
-.configmap (key in .Values.configmaps) must be defined
+Renders configmap entry or environment variable value
+.value (Value to render) must be defined
+.Values (top level values dictionary) must be defined
+Parameter is configmap entry or environment variable as specified in values.yanl (i.e. may contain {{...}} expressions - see values.yaml, comment to configmap section for supported expressons)
+Returns value or 'SKIP_SKIP_SKIP_SKIP' to skip
+*/}}
+{{- define "afc.envValue" -}}
+{{- $value := .value }}
+{{- $skip := false }}
+{{- $empty := false }}
+{{- $hostDefs := regexFindAll "\\{\\{host:.+?\\}\\}" $value -1 -}}
+{{- range $hostDef := $hostDefs }}
+{{-   $parts := regexFindAll "[^:\\{\\}]+" $hostDef 2 -}}
+{{-   $component := index $parts 1 -}}
+{{-   $hostName := include "afc.hostName" (dict "component" $component "Values" $.Values) -}}
+{{-   $value = replace $hostDef $hostName $value -}}
+{{- end }}
+{{- $servicePortDefs := regexFindAll "\\{\\{port:.+?:.+?\\}\\}" $value -1 -}}
+{{- range $servicePortDef := $servicePortDefs }}
+{{-   $parts := regexFindAll "[^:\\{\\}]+" $servicePortDef 3 -}}
+{{-   $component := index $parts 1 -}}
+{{-   $portName := index $parts 2 -}}
+{{-   $port := include "afc.servicePort" (dict "component" $component "portName" $portName "Values" $.Values) -}}
+{{-   $value = replace $servicePortDef $port $value -}}
+{{- end }}
+{{- $contPortDefs := regexFindAll "\\{\\{containerPort:.+?:.+?\\}\\}" $value -1 -}}
+{{- range $contPortDef := $contPortDefs }}
+{{-   $parts := regexFindAll "[^:\\{\\}]+" $contPortDef 3 -}}
+{{-   $component := index $parts 1 -}}
+{{-   $portName := index $parts 2 -}}
+{{-   $port := include "afc.containerPort" (dict "component" $component "portName" $portName "Values" $.Values) -}}
+{{-   $value = replace $contPortDef $port $value -}}
+{{- end }}
+{{- $staticMountDefs := regexFindAll "\\{\\{staticVolumeMount:.+?:.+?\\}\\}" $value -1 -}}
+{{- range $staticMountDef := $staticMountDefs }}
+{{-   $parts := regexFindAll "[^:\\{\\}]+" $staticMountDef -1 -}}
+{{-   $component := index $parts 1 -}}
+{{-   $mountName := index $parts 2 -}}
+{{    $ifAbsent := "required" }}
+{{-   if ge (len $parts) 4 }}
+{{-     $ifAbsent = index $parts 3 -}}
+{{-   end }}
+{{-   $compDef := merge (dict) (get $.Values.components $component | required (cat "No component for this component key:" $component)) $.Values.components.default -}}
+{{-   $mounts := default (dict) (get $compDef "staticVolumeMounts") -}}
+{{-   $mount := get $mounts $mountName | required (cat "No mount path defined for mount" $mountName "when used in component" $component) -}}
+{{-   if not $mount -}}
+{{-     if eq $ifAbsent "optional" -}}
+{{-       $skip = true -}}
+{{-     else if eq $ifAbsent "nullable" }}
+{{-       $empty = true -}}
+{{-     else }}
+{{-       fail (cat "No volume mount named" $mountName "found in static volumes of component" $component) }}
+{{-     end }}
+{{-   end }}
+{{-   $value = replace $staticMountDef $mount $value -}}
+{{- end }}
+{{- $secretFileDefs := regexFindAll "\\{\\{secretFile:.+?\\}\\}" $value -1 -}}
+{{- range $secretFileDef := $secretFileDefs }}
+{{-   $parts := regexFindAll "[^:\\{\\}]+" $secretFileDef -1 -}}
+{{-   $extSecret := index $parts 1 -}}
+{{    $ifAbsent := "required" }}
+{{-   if ge (len $parts) 3 }}
+{{-     $ifAbsent = index $parts 2 -}}
+{{-   end }}
+{{-   $extSecretDef := merge (dict) (default (dict) (get (default (dict) $.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $.Values.externalSecrets) "default")) -}}
+{{-   $property := get $extSecretDef "property" -}}
+{{-   $mountPath := get $extSecretDef "mountPath" -}}
+{{-   if not (and $property $mountPath) }}
+{{-     if eq $ifAbsent "optional" -}}
+{{-       $skip = true -}}
+{{-     else if eq $ifAbsent "nullable" }}
+{{-       $empty = true -}}
+{{-     else }}
+{{-       fail (cat "External secret" $extSecret "must be defined and have 'property' and 'mountPath' subkeys") }}
+{{-     end }}
+{{-   end }}
+{{-   $value = replace $secretFileDef (printf "%s/%s" $mountPath $property) $value -}}
+{{- end }}
+{{- $secretPropertyDefs := regexFindAll "\\{\\{secretProperty:.+?\\}\\}" $value -1 -}}
+{{- range $secretPropertyDef := $secretPropertyDefs }}
+{{-   $parts := regexFindAll "[^:\\{\\}]+" $secretPropertyDef -1 -}}
+{{-   $extSecret := index $parts 1 -}}
+{{    $ifAbsent := "required" }}
+{{-   if ge (len $parts) 3 }}
+{{-     $ifAbsent = index $parts 2 -}}
+{{-   end }}
+{{-   $extSecretDef := merge (dict) (default (dict) (get (default (dict) $.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $.Values.externalSecrets) "default")) -}}
+{{-   $property := get $extSecretDef "property" -}}
+{{-   if not $property -}}
+{{-     if eq $ifAbsent "optional" -}}
+{{-       $skip = true -}}
+{{-     else if eq $ifAbsent "nullable" }}
+{{-       $empty = true -}}
+{{-     else }}
+{{-       fail (cat "External secret named" $extSecret "not found or has empty 'key' property") }}
+{{-     end }}
+{{-   end }}
+{{-   $value = replace $secretPropertyDef $property $value -}}
+{{- end }}
+{{- $ipDefs := regexFindAll "\\{\\{ip:.+?\\}\\}" $value -1 -}}
+{{- range $ipDef := $ipDefs }}
+{{-   $parts := regexFindAll "[^:\\{\\}]+" $ipDef -1 -}}
+{{-   $ipKey := index $parts 1 -}}
+{{    $ifAbsent := "required" }}
+{{-   if ge (len $parts) 3 }}
+{{-     $ifAbsent = index $parts 2 -}}
+{{-   end }}
+{{-   if not (hasKey $.Values.externalIps $ipKey) }}
+{{-     fail (cat "External IP key" $ipKey "not found in 'externalIps'") }}
+{{-   end }}
+{{-   $ip := get $.Values.externalIps $ipKey }}
+{{-   if not $ip }}
+{{-     if eq $ifAbsent "optional" -}}
+{{-       $skip = true -}}
+{{-     else if eq $ifAbsent "nullable" }}
+{{-       $empty = true -}}
+{{-     else }}
+{{-       fail (cat "External IP" $ipKey "is not defined") }}
+{{-     end }}
+{{-   end }}
+{{-   $value = replace $ipDef $ip $value -}}
+{{- end }}
+{{- $sameAsDefs := regexFindAll "\\{\\{sameAs:.+?\\}\\}" $value -1 -}}
+{{- range $sameAsDef := $sameAsDefs }}
+{{-   $parts := regexFindAll "[^:\\{\\}]+" $sameAsDef -1 -}}
+{{-   $configmapKey := index $parts 1 -}}
+{{-   $valueKey := index $parts 2 -}}
+{{    $ifAbsent := "required" }}
+{{-   if ge (len $parts) 4 }}
+{{-     $ifAbsent = index $parts 3 -}}
+{{-   end }}
+{{-   $configmapDef := get $.Values.configmaps $configmapKey | required (cat "Configmap" $configmapKey "used in rendering of " $sameAsDef "not found" ) -}}
+{{-   if not (hasKey $configmapDef $valueKey) }}
+{{-     if eq $ifAbsent "optional" }}
+{{-       $skip = true -}}
+{{-     else if eq $ifAbsent "nullable" }}
+{{-       $empty = true -}}
+{{-     else }}
+{{-       fail (cat "Value" $valueKey "not found in configmap" $configmapKey "while rendering" $sameAsDef) }}
+{{-     end }}
+{{-   end }}
+{{-   $v := include "afc.envValue" (dict "value" (get $configmapDef $valueKey) "Values" $.Values) -}}
+{{-   if eq $v "SKIP_SKIP_SKIP_SKIP" }}
+{{-     $skip = true -}}
+{{-   end }}
+{{-   $value = replace $sameAsDef $v $value -}}
+{{- end }}
+{{- $skip | ternary "SKIP_SKIP_SKIP_SKIP" ($empty | ternary "" $value) }}
+{{- end }}
+
+{{/*
+Renders entries in $.Values.configmap subdictionary as configmap environment entries
+.configmap (key in $.Values.configmaps) must be defined
 */}}
 {{- define "afc.configmapEnvEntries" -}}
-{{- $values := get .Values.configmaps .configmap | required (cat "No configmap for this configmap key:" .configmap) -}}
-{{- $savedComponent := get . "component" -}}
+{{- $values := get $.Values.configmaps .configmap | required (cat "No configmap for this configmap key:" .configmap) -}}
 {{- range $name, $value := $values }}
 {{-   if hasSuffix "@S" $name }}
 {{      trimSuffix "@S" $name -}}: {{ toYaml $value }}
 {{-   else if hasSuffix "@I" $name }}
 {{      trimSuffix "@I" $name -}}: {{ int $value | toString | toYaml }}
 {{-   else if kindIs "string" $value }}
-{{-     $skip := false }}
-{{-     $empty := false }}
-{{-     $hostDefs := regexFindAll "\\{\\{host:.+?\\}\\}" $value -1 -}}
-{{-     range $hostDef := $hostDefs }}
-{{-       $parts := regexFindAll "[^:\\{\\}]+" $hostDef 2 -}}
-{{-       $component := index $parts 1 -}}
-{{-       $hostName := include "afc.hostName" (mergeOverwrite $ (dict "component" $component)) -}}
-{{-       $value = replace $hostDef $hostName $value -}}
-{{-     end }}
-{{-     $servicePortDefs := regexFindAll "\\{\\{port:.+?:.+?\\}\\}" $value -1 -}}
-{{-     range $servicePortDef := $servicePortDefs }}
-{{-       $parts := regexFindAll "[^:\\{\\}]+" $servicePortDef 3 -}}
-{{-       $component := index $parts 1 -}}
-{{-       $portName := index $parts 2 -}}
-{{-       $port := include "afc.servicePort" (mergeOverwrite $ (dict "component" $component "portName" $portName)) -}}
-{{-       $value = replace $servicePortDef $port $value -}}
-{{-     end }}
-{{-     $contPortDefs := regexFindAll "\\{\\{containerPort:.+?:.+?\\}\\}" $value -1 -}}
-{{-     range $contPortDef := $contPortDefs }}
-{{-       $parts := regexFindAll "[^:\\{\\}]+" $contPortDef 3 -}}
-{{-       $component := index $parts 1 -}}
-{{-       $portName := index $parts 2 -}}
-{{-       $port := include "afc.containerPort" (mergeOverwrite $ (dict "component" $component "portName" $portName)) -}}
-{{-       $value = replace $contPortDef $port $value -}}
-{{-     end }}
-{{-     $staticMountDefs := regexFindAll "\\{\\{staticVolumeMount:.+?:.+?\\}\\}" $value -1 -}}
-{{-     range $staticMountDef := $staticMountDefs }}
-{{-       $parts := regexFindAll "[^:\\{\\}]+" $staticMountDef -1 -}}
-{{-       $component := index $parts 1 -}}
-{{-       $mountName := index $parts 2 -}}
-{{        $ifAbsent := "required" }}
-{{-       if ge (len $parts) 4 }}
-{{-         $ifAbsent = index $parts 3 -}}
-{{-       end }}
-{{-       $compDef := merge (dict) (get $.Values.components $component | required (cat "No component for this component key:" $component)) $.Values.components.default -}}
-{{-       $mounts := default (dict) (get $compDef "staticVolumeMounts") -}}
-{{-       $mount := get $mounts $mountName | required (cat "No mount path defined for mount" $mountName "when used in component" $component) -}}
-{{-       if not $mount -}}
-{{-         if eq $ifAbsent "optional" -}}
-{{-           $skip = true -}}
-{{-         else if eq $ifAbsent "nullable" }}
-{{-           $empty = true -}}
-{{-         else }}
-{{-           fail (cat "No volume mount named" $mountName "found in static volumes of component" $component) }}
-{{-         end }}
-{{-       end }}
-{{-       $value = replace $staticMountDef $mount $value -}}
-{{-     end }}
-{{-     $secretFileDefs := regexFindAll "\\{\\{secretFile:.+?\\}\\}" $value -1 -}}
-{{-     range $secretFileDef := $secretFileDefs }}
-{{-       $parts := regexFindAll "[^:\\{\\}]+" $secretFileDef -1 -}}
-{{-       $extSecret := index $parts 1 -}}
-{{        $ifAbsent := "required" }}
-{{-       if ge (len $parts) 3 }}
-{{-         $ifAbsent = index $parts 2 -}}
-{{-       end }}
-{{-       $extSecretDef := merge (dict) (default (dict) (get (default (dict) $.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $.Values.externalSecrets) "default")) -}}
-{{-       $property := get $extSecretDef "property" -}}
-{{-       $mountPath := get $extSecretDef "mountPath" -}}
-{{-       if not (and $property $mountPath) }}
-{{-         if eq $ifAbsent "optional" -}}
-{{-           $skip = true -}}
-{{-         else if eq $ifAbsent "nullable" }}
-{{-           $empty = true -}}
-{{-         else }}
-{{-           fail (cat "External secret" $extSecret "must be defined and have 'property' and 'mountPath' subkeys") }}
-{{-         end }}
-{{-       end }}
-{{-       $value = replace $secretFileDef (printf "%s/%s" $mountPath $property) $value -}}
-{{-     end }}
-{{-     $secretPropertyDefs := regexFindAll "\\{\\{secretProperty:.+?\\}\\}" $value -1 -}}
-{{-     range $secretPropertyDef := $secretPropertyDefs }}
-{{-       $parts := regexFindAll "[^:\\{\\}]+" $secretPropertyDef -1 -}}
-{{-       $extSecret := index $parts 1 -}}
-{{        $ifAbsent := "required" }}
-{{-       if ge (len $parts) 3 }}
-{{-         $ifAbsent = index $parts 2 -}}
-{{-       end }}
-{{-       $extSecretDef := merge (dict) (default (dict) (get (default (dict) $.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $.Values.externalSecrets) "default")) -}}
-{{-       $property := get $extSecretDef "property" -}}
-{{-       if not $property -}}
-{{-         if eq $ifAbsent "optional" -}}
-{{-           $skip = true -}}
-{{-         else if eq $ifAbsent "nullable" }}
-{{-           $empty = true -}}
-{{-         else }}
-{{-           fail (cat "External secret named" $extSecret "not found or has empty 'key' property") }}
-{{-         end }}
-{{-       end }}
-{{-       $value = replace $secretPropertyDef $property $value -}}
-{{-     end }}
-{{-     $ipDefs := regexFindAll "\\{\\{ip:.+?\\}\\}" $value -1 -}}
-{{-     range $ipDef := $ipDefs }}
-{{-       $parts := regexFindAll "[^:\\{\\}]+" $ipDef -1 -}}
-{{-       $ipKey := index $parts 1 -}}
-{{        $ifAbsent := "required" }}
-{{-       if ge (len $parts) 3 }}
-{{-         $ifAbsent = index $parts 2 -}}
-{{-       end }}
-{{-       if not (hasKey $.Values.externalIps $ipKey) }}
-{{-         fail (cat "External IP key" $ipKey "not found in 'externalIps'") }}
-{{-       end }}
-{{-       $ip := get $.Values.externalIps $ipKey }}
-{{-       if not $ip }}
-{{-         if eq $ifAbsent "optional" -}}
-{{-           $skip = true -}}
-{{-         else if eq $ifAbsent "nullable" }}
-{{-           $empty = true -}}
-{{-         else }}
-{{-           fail (cat "External IP" $ipKey "is not defined") }}
-{{-         end }}
-{{-       end }}
-{{-       $value = replace $ipDef $ip $value -}}
-{{-     end }}
-{{-     if not $skip }}
-{{        $name -}}: {{ $empty | ternary "" (toYaml $value) }}
+{{-     $value = include "afc.envValue" (dict "value" $value "Values" $.Values) }}
+{{-     if ne $value "SKIP_SKIP_SKIP_SKIP" }}
+{{        $name -}}: {{ $value | toString | toYaml }}
 {{-     end }}
 {{-   else }}
 {{      $name -}}: {{ $value | toString | toYaml }}
 {{-   end }}
 {{- end }}
-{{- if $savedComponent -}}
-{{-   $_ := set . "component" $savedComponent -}}
+{{- end }}
+
+{{/*
+Renders environment entries from $.Values.component.*.env
+.component (key in $.Values.components) must be defined
+*/}}
+{{- define "afc.componentEnvEntries" -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
+{{- range $name, $value := default (dict) (get $compDef "env") }}
+{{-   $skip := false }}
+{{-   if hasSuffix "@S" $name }}
+{{-     $name = trimSuffix "@S" $name }}
+{{-   else if hasSuffix "@I" $name }}
+{{-     $name = trimSuffix "@I" $name }}
+{{      $value = int $value | toString }}
+{{-   else if kindIs "string" $value }}
+{{-     $value = include "afc.envValue" (dict "value" $value "Values" $.Values) }}
+{{-     if eq $value "SKIP_SKIP_SKIP_SKIP" }}
+{{        $skip = true }}
+{{-     end }}
+{{-   end }}
+{{-   if not $skip }}
+- name: {{ $name }}
+  value: {{ $value | toString | toYaml }}
+{{-   end }}
 {{- end }}
 {{- end }}
 
 {{/*
 Service port number by name
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 .portName (key in components' port dictionary) must be defined
 */}}
 {{- define "afc.servicePort" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $portDict := get $compDef "ports" | required (cat "Port dictionary not defined for this component:" .component) -}}
 {{- $portDef := get $portDict .portName | required (cat "Component" .component "doesn' have port named" .portName) -}}
 {{- $servicePort := get $portDef "servicePort" | required (cat "Component" .component "doesn't define service port number for port" .portName) -}}
@@ -549,21 +610,21 @@ Service port number by name
 
 {{/*
 Container (target) port number by name
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 .portName (key in components' port dictionary) must be defined
 */}}
 {{- define "afc.containerPort" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $servicePort := include "afc.servicePort" . -}}
 {{- default $servicePort (get (get (get $compDef "ports") .portName) "containerPort") -}}
 {{- end -}}
 
 {{/*
-Declaration of static volumes (inhabitatnts of .Values.staticVolumes) and mounted secrets in a Deployment/StatefulSet
-.component (key in .Values.components) must be defined
+Declaration of static volumes (inhabitatnts of $.Values.staticVolumes) and mounted secrets in a Deployment/StatefulSet
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.staticVolumes" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $volumes := get $compDef "staticVolumeMounts" -}}
 {{- $mountedSecrets := get $compDef "mountedSecrets" -}}
 {{- if $volumes }}
@@ -584,11 +645,11 @@ Declaration of static volumes (inhabitatnts of .Values.staticVolumes) and mounte
 {{- end }}
 
 {{/*
-Mount of static volumes (inhabitatnts of .Values.staticVolumes) and mounted secrets in a Deployment/StatefulSet
-.component (key in .Values.components) must be defined
+Mount of static volumes (inhabitatnts of $.Values.staticVolumes) and mounted secrets in a Deployment/StatefulSet
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.staticVolumeMounts" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $volumes := get $compDef "staticVolumeMounts" -}}
 {{- $mountedSecrets := get $compDef "mountedSecrets" -}}
 {{- if $volumes }}
@@ -612,7 +673,7 @@ Mount of static volumes (inhabitatnts of .Values.staticVolumes) and mounted secr
 
 {{/*
 Common Deployment annotations
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.commonDeploymentAnnotations" -}}
 kubectl.kubernetes.io/default-container: {{ include "afc.containerName" . }}
@@ -620,7 +681,7 @@ kubectl.kubernetes.io/default-container: {{ include "afc.containerName" . }}
 
 {{/*
 Common StatefulSet annotations
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.commonStatefulsetAnnotations" -}}
 {{ include "afc.commonDeploymentAnnotations" . }}
@@ -628,20 +689,20 @@ Common StatefulSet annotations
 
 {{/*
 Declaration of Prometheus metric endpoint for ServiceMonitor resource
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.metricEndpoints" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $metricsDef := get $compDef "metrics" | required (cat "Component" .component "does not have metrics' definition") -}}
 - {{ toYaml $metricsDef | nindent 2 }}
 {{- end }}
 
 {{/*
 Renders HPA min/maxReplicas
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.hpaReplicas" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $hpaDef := get $compDef "hpa" | required (cat "Component" .component "does not have 'hpa' section") -}}
 minReplicas: {{ get $hpaDef "minReplicas" | default 1 | int }}
 maxReplicas: {{ get $hpaDef "maxReplicas" | required (cat "Component" .component "does not have 'hpa.maxReplicas' value") | int }}
@@ -649,10 +710,10 @@ maxReplicas: {{ get $hpaDef "maxReplicas" | required (cat "Component" .component
 
 {{/*
 Renders HPA behavior section (if it is defined)
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.hpaBehavior" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $hpaDef := get $compDef "hpa" | required (cat "Component" .component "does not have 'hpa' section") -}}
 {{- $behaviorDef := get $hpaDef "behavior" -}}
 {{- if $behaviorDef }}
@@ -662,10 +723,10 @@ behavior: {{ toYaml $behaviorDef | nindent 2 }}
 
 {{/*
 Renders HPA metric
-.component (key in .Values.components) must be defined
+.component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.hpaMetric" -}}
-{{- $compDef := merge (dict) (get .Values.components .component | required (cat "No component for this component key:" .component)) .Values.components.default -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $hpaDef := get $compDef "hpa" | required (cat "Component" .component "does not have 'hpa' section") -}}
 {{- $metricDef := get $hpaDef "metric" | required (cat "Component" .component "does not have 'hpa.metric' section") -}}
 - type: {{ camelcase (mustFirst (keys $metricDef)) }}
@@ -674,19 +735,19 @@ Renders HPA metric
 
 {{/*
 Renders secret store kind
-.secretStore (key in .Values.secretStores) must be defined
+.secretStore (key in $.Values.secretStores) must be defined
 */}}
 {{- define "afc.extSecretStoreKind" -}}
-{{- $extStoreDef := get .Values.secretStores .secretStore | required (cat "Secret store" .secretStore "not defined in .Values.secretStores") -}}
+{{- $extStoreDef := get $.Values.secretStores .secretStore | required (cat "Secret store" .secretStore "not defined in $.Values.secretStores") -}}
 {{- hasKey $extStoreDef "namespace" | ternary "SecretStore" "ClusterSecretStore" -}}
 {{- end }}
 
 {{/*
 Renders optional secret store namespace
-.secretStore (key in .Values.secretStores) must be defined
+.secretStore (key in $.Values.secretStores) must be defined
 */}}
 {{- define "afc.extSecretStoreNamespace" -}}
-{{- $extStoreDef := get .Values.secretStores .secretStore | required (cat "Secret store" .secretStore "not defined in .Values.secretStores") -}}
+{{- $extStoreDef := get $.Values.secretStores .secretStore | required (cat "Secret store" .secretStore "not defined in $.Values.secretStores") -}}
 {{- $namespace := get $extStoreDef "namespace" -}}
 {{- if $namespace }}
 namespace: {{ $namespace }}
@@ -695,14 +756,14 @@ namespace: {{ $namespace }}
 
 {{/*
 Renders secretStoreRef in ExternalSecret
-.secret (key in .Values.externalSecrets) must be defined
+.secret (key in $.Values.externalSecrets) must be defined
 */}}
 {{- define "afc.extSecretStoreRef" -}}
-{{- $extSecretDef := merge (dict) (get .Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) .Values.externalSecrets.default -}}
+{{- $extSecretDef := merge (dict) (get $.Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) $.Values.externalSecrets.default -}}
 {{- $secretStoreName := get $extSecretDef "secretStore" | required (cat "secretStore not defined for external secret" .extSecret) -}}
 secretStoreRef:
   name: {{ $secretStoreName }}
-  kind: {{ include "afc.extSecretStoreKind" (mergeOverwrite . (dict "secretStore" $secretStoreName)) }}
+  kind: {{ include "afc.extSecretStoreKind" (dict "secretStore" $secretStoreName "Values" $.Values) }}
 {{- end }}
 
 {{/*
@@ -717,10 +778,10 @@ refreshInterval: {{ get . "refreshInterval" }}
 
 {{/*
 Renders target in ExternalSecret
-.secret (key in .Values.externalSecrets) must be defined
+.secret (key in $.Values.externalSecrets) must be defined
 */}}
 {{- define "afc.extSecretTarget" -}}
-{{- $extSecretDef := merge (dict) (get .Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) .Values.externalSecrets.default -}}
+{{- $extSecretDef := merge (dict) (get $.Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) $.Values.externalSecrets.default -}}
 {{- $type := get $extSecretDef "type" -}}
 target:
   name: {{ include "afc.secretManifestName" . }}
@@ -734,13 +795,13 @@ target:
 
 {{/*
 Renders data or dataFrom in ExternalSecret
-.secret (key in .Values.externalSecrets) must be defined
+.secret (key in $.Values.externalSecrets) must be defined
 */}}
 {{- define "afc.extSecretData" -}}
-{{- $extSecretDef := merge (dict) (get .Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) .Values.externalSecrets.default -}}
+{{- $extSecretDef := merge (dict) (get $.Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) $.Values.externalSecrets.default -}}
 {{- $property := get $extSecretDef "property" -}}
 {{- $secretStoreName := get $extSecretDef "secretStore" | required  (cat "secretStore not defined for external secret" .secret) }}
-{{- $secretStoreDef := get .Values.secretStores $secretStoreName | required (cat "Secret" .secret "uses undefined secret store"  $secretStoreName) }}
+{{- $secretStoreDef := get $.Values.secretStores $secretStoreName | required (cat "Secret" .secret "uses undefined secret store"  $secretStoreName) }}
 {{- if $property }}
 data:
   - secretKey: {{ $property }}
@@ -759,7 +820,7 @@ dataFrom:
 Renders Ingress name
 */}}
 {{- define "afc.ingressName" -}}
-{{- $ingressDef := get .Values "ingress" | required "'ingress' missing in values.yaml" -}}
+{{- $ingressDef := get $.Values "ingress" | required "'ingress' missing in values.yaml" -}}
 {{ default "ingress" (get $ingressDef "name") | include "afc.rfc1123" }}
 {{- end }}
 
@@ -767,7 +828,7 @@ Renders Ingress name
 Renders ingressClassName (if specified)
 */}}
 {{- define "afc.ingressClass" -}}
-{{- $ingressDef := get .Values "ingress" | required "'ingress' missing in values.yaml" -}}
+{{- $ingressDef := get $.Values "ingress" | required "'ingress' missing in values.yaml" -}}
 {{- $ingressClassName := get $ingressDef "ingressClassName" -}}
 {{- if $ingressClassName }}
 ingressClassName: {{ $ingressClassName }}
@@ -778,7 +839,7 @@ ingressClassName: {{ $ingressClassName }}
 Renders ingress rules
 */}}
 {{- define "afc.ingressRules" -}}
-{{- $ingressDef := get .Values "ingress" | required "'ingress' missing in values.yaml" -}}
+{{- $ingressDef := get $.Values "ingress" | required "'ingress' missing in values.yaml" -}}
 - http:
     paths:
 {{- range $ruleDef := (default (list) (get $ingressDef "rules")) }}
