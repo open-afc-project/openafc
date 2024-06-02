@@ -366,7 +366,7 @@ def do_export(args: Any) -> None:
     if args.compose_file:
         try:
             with open(args.compose_file, mode="a", encoding="utf-8") as f:
-                f.write(yaml.dump({"secrets": secrets}, indent=4))
+                f.write(yaml.dump({"secrets": secrets}, indent=2))
         except OSError as ex:
             fatal(f"Error writing '{args.compose_file}': {ex}")
 
