@@ -17,7 +17,7 @@ DEFAULT_CLUSTER = "AUTO"
 DEFAULT_TAG = "AUTO"
 DEFAULT_RELEASE = "AUTO"
 DEFAULT_EXPOSE = \
-    "http,https,ratdb,rat_server,msghnd,bulk_postgres,rcache,grafana," \
+    "http,https,ratdb,rat-server,msghnd,bulk-postgres,rcache,grafana," \
     "prometheus"
 
 SCRIPT_DIR = os.path.dirname(__file__)
@@ -125,6 +125,7 @@ def main(argv: List[str]) -> None:
                  "--expose", args.expose, args.cluster])
     execute(
         [os.path.join(bin_dir, "helm_install_int.py"), "--tag", args.tag,
+         "--values", os.path.join(SCRIPT_DIR, "values-afc-int.yaml"),
          "--fake_secrets",
          f"secret-store:{os.path.join(SCRIPT_DIR, 'secrets')}",
          "--wait", "5m"] +

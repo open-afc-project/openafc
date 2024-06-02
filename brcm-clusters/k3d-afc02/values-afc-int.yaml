@@ -1,0 +1,30 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# helm/afc-int/values.yaml overrides for k3d cluster
+
+configmaps:
+  flask-conf:
+    FLASK_USER_EMAIL_SENDER_EMAIL: fbrat@a9556f3227ba.ihl.broadcom.net
+  ratapi-configurator:
+    REGISTRATION_APPROVE_LINK: ._
+      https://docs.google.com/spreadsheets/d/1W7TKAtjd26q6KHC2yqaA_CdzCLw7sPN60zH4Tv9wNm0/edit
+    REGISTRATION_DEST_EMAIL: afc.admin@broadcom.com
+    REGISTRATION_DEST_PDL_EMAIL: afc-admin@broadcom.com
+    REGISTRATION_SRC_EMAIL: afc.admin@broadcom.com
+    MAIL_SERVER: smtp.gmail.com
+    MAIL_USERNAME: afc.admin@broadcom.com
+    MAIL_PORT: "465"
+    MAIL_USE_TLS: "False"
+    MAIL_USE_SSL: "True"
+    USE_CAPTCHA: "True"
+    CAPTCHA_VERIFY: >-
+      https://www.google.com/recaptcha/api/siteverify
+    USER_APP_NAME: Broadcom AFC
+  oidc-configurator:
+    OIDC_LOGIN: "False"
+    OIDC_DISCOVERY_URL: >-
+      https://login.broadcom.com/oauth2/default/.well-known/openid-configuration

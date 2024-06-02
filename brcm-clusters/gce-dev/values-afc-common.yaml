@@ -16,10 +16,12 @@ externalIps:
 imageRepositories:
   public:
     path: wcc-afc-docker-virtual.usw2.packages.broadcom.com
-    pullSecrets: [image-pull]
+    pullSecrets:
+      - image-pull
   private:
     path: wcc-afc-docker-virtual.usw2.packages.broadcom.com
-    pullSecrets: [image-pull]
+    pullSecrets:
+      - image-pull
 
 secretStores:
   secret-store:

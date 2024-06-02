@@ -53,8 +53,8 @@ def main(argv: List[str]) -> None:
 
     args = argument_parser.parse_args(argv)
     bin_dir = os.path.join(args.source_root, "helm/bin")
-    execute([os.path.join(bin_dir, "k3d_cluster_create.py"), "--uninstall",
-             args.expose, args.cluster])
+    execute([os.path.join(bin_dir, "k3d_cluster_create.py"), "--delete",
+             args.cluster])
 
 
 if __name__ == "__main__":
