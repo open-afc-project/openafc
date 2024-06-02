@@ -15,7 +15,6 @@
 import argparse
 import datetime
 import email.mime.text
-import json
 import logging
 import os
 import pydantic
@@ -29,6 +28,28 @@ from uls_service_state_db import AlarmType, CheckType, DownloaderMilestone, \
     LogType, safe_dsn, StateDb
 
 
+class SmtpSettings(NamedTuple):
+    """ SMTP server settings """
+    server: Optional[str]
+    port: Optional[int]
+    username: Optional[str]
+    password_file: Optional[str]
+    ssl: bool
+    tls: bool
+
+    @property
+    def password(self) -> Optional[str]:
+        """ SMTP password (None if none) """
+        if not (self.password_file and os.path.isfile(self.password_file)):
+            return None
+        with open(self.password_file, encoding="ascii") as f:
+            return f.read() or None
+
+    def is_specified(self) -> bool:
+        """ True if parameters are seemingly specified """
+        return bool(self.server) and bool(self.username)
+
+
 class Settings(pydantic.BaseSettings):
     """ Arguments from command lines - with their default values """
 
@@ -36,7 +57,14 @@ class Settings(pydantic.BaseSettings):
         pydantic.Field(..., env="ULS_SERVICE_STATE_DB_DSN")
     service_state_db_password_file: Optional[str] = \
         pydantic.Field(None, env="ULS_SERVICE_STATE_DB_PASSWORD_FILE")
-    smtp_info: Optional[str] = pydantic.Field(None, env="ULS_ALARM_SMTP_INFO")
+    smtp_server: Optional[str] = pydantic.Field(None, env="ULS_SMTP_SERVER")
+    smtp_port: Optional[int] = pydantic.Field(None, env="ULS_SMTP_PORT")
+    smtp_username: Optional[str] = \
+        pydantic.Field(None, env="ULS_SMTP_USERNAME")
+    smtp_password_file: Optional[str] = \
+        pydantic.Field(None, env="ULS_SMTP_PASSWORD_FILE")
+    smtp_ssl: bool = pydantic.Field(False, env="ULS_SMTP_SSL")
+    smtp_tls: bool = pydantic.Field(False, env="ULS_SMTP_TLS")
     email_to: Optional[str] = pydantic.Field(None, env="ULS_ALARM_EMAIL_TO")
     beacon_email_to: Optional[str] = \
         pydantic.Field(None, env="ULS_BEACON_EMAIL_TO")
@@ -76,43 +104,27 @@ class Settings(pydantic.BaseSettings):
         return v
 
 
-def send_email_smtp(smtp_info_filename: Optional[str], to: Optional[str],
+def send_email_smtp(smtp_settings: SmtpSettings, to: Optional[str],
                     subject: str, body: str) -> None:
     """ Send an email via SMTP
 
     Arguments:
-    smtp_info -- Optional name of JSON file containing SMTP credentials
-    to        -- Optional recipient email
-    subject   -- Message subject
-    body      -- Message body
+    smtp_settings -- SmtpSettings object
+    to            -- Optional recipient email
+    subject       -- Message subject
+    body          -- Message body
     """
-    if not (smtp_info_filename and to):
+    if not (smtp_settings.is_specified() and to):
         return
-    error_if(not os.path.isfile(smtp_info_filename),
-             f"SMTP credentials file '{smtp_info_filename}' not found")
-    with open(smtp_info_filename, mode="rb") as f:
-        smtp_info_content = f.read()
-    if not smtp_info_content:
-        return
-    try:
-        credentials = json.loads(smtp_info_content)
-    except json.JSONDecodeError as ex:
-        error(f"Invalid format of '{smtp_info_filename}': {ex}")
     smtp_kwargs: Dict[str, Any] = {}
     login_kwargs: Dict[str, Any] = {}
-    for key, key_type, kwargs, arg_name in \
-            [("SERVER", str, smtp_kwargs, "host"),
-             ("PORT", int, smtp_kwargs, "port"),
-             ("USERNAME", str, login_kwargs, "user"),
-             ("PASSWORD", str, login_kwargs, "password")]:
-        value = credentials.get(key)
-        if value is None:
-            continue
-        error_if(not isinstance(value, key_type),
-                 f"Invalid type for '{key}' in '{smtp_info_filename}'")
-        kwargs[arg_name] = value
-    error_if("user" not in login_kwargs,
-             f"`USERNAME' (sender email) not found in '{smtp_info_filename}'")
+    for attr, kwargs, arg_name in [("server", smtp_kwargs, "host"),
+                                   ("port", smtp_kwargs, "port"),
+                                   ("username", login_kwargs, "user"),
+                                   ("password", login_kwargs, "password")]:
+        value = getattr(smtp_settings, attr)
+        if value is not None:
+            kwargs[arg_name] = value
     msg = email.mime.text.MIMEText(body)
     msg["Subject"] = subject
     msg["From"] = login_kwargs["user"]
@@ -120,14 +132,12 @@ def send_email_smtp(smtp_info_filename: Optional[str], to: Optional[str],
     msg["To"] = to
 
     try:
-        smtp = smtplib.SMTP_SSL(**smtp_kwargs) if credentials.get("USE_SSL") \
-            else smtplib.SMTP(**smtp_kwargs)
-        if credentials.get("USE_TLS"):
-            smtp.starttls()  # No idea how it would work without key/cert
-        else:
+        with (smtplib.SMTP_SSL(**smtp_kwargs) if smtp_settings.ssl
+              else smtplib.SMTP(**smtp_kwargs)) as smtp:
+            if smtp_settings.tls:
+                smtp.starttls()
             smtp.login(**login_kwargs)
-        smtp.sendmail(msg["From"], to_list, msg.as_string())
-        smtp.quit()
+            smtp.sendmail(msg["From"], to_list, msg.as_string())
     except smtplib.SMTPException as ex:
         error(f"Email send failure: {ex}")
 
@@ -301,9 +311,13 @@ def email_if_needed(state_db: StateDb, settings: Any) -> None:
     if settings.print_email:
         print(f"SUBJECT: {message_subject}\nBody:\n{message_body}")
     else:
-        send_email_smtp(smtp_info_filename=settings.smtp_info,
-                        to=email_to, subject=message_subject,
-                        body=message_body)
+        send_email_smtp(
+            smtp_settings=SmtpSettings(
+                server=settings.smtp_server, port=settings.smtp_port,
+                username=settings.smtp_username,
+                password_file=settings.smtp_password_file,
+                ssl=settings.smtp_ssl, tls=settings.smtp_tls),
+            to=email_to, subject=message_subject, body=message_body)
         state_db.write_milestone(email_milestone)
 
     alarm_reasons: Dict[AlarmType, Set[str]] = {}
@@ -331,12 +345,26 @@ def main(argv: List[str]) -> None:
         help=f"Optional name of file with password to use in database DSN"
         f"{env_help(Settings, 'service_state_db_password_file')}")
     argument_parser.add_argument(
-        "--smtp_info", metavar="SMTP_CREDENTIALS_FILE",
-        help=f"SMTP credentials file. For its structure - see "
-        f"NOTIFIER_MAIL.json secret in one of files in "
-        f"tools/secrets/templates directory. If parameter not specified or "
-        f"secret file is empty - no alarm/beacon emails will be sent"
-        f"{env_help(Settings, 'smtp_info')}")
+        "--smtp_server", metavar="SMTP_SERVER",
+        help=f"SMTP server. If unspecified no alarm/beacon emails will be "
+        f"sent{env_help(Settings, 'smtp_server')}")
+    argument_parser.add_argument(
+        "--smtp_port", metavar="SMTP_PORT",
+        help=f"Port to use on SMTP server{env_help(Settings, 'smtp_port')}")
+    argument_parser.add_argument(
+        "--smtp_username", metavar="SMTP_USER",
+        help=f"Login name for SMTP server. If unspecified no alarm/beacon "
+        f"emails will be sent{env_help(Settings, 'smtp_username')}")
+    argument_parser.add_argument(
+        "--smtp_password_file", metavar="SMTP_PASSWORD_FILE",
+        help=f"File with password for SMTP servern (ignored if empty or "
+        f"absent){env_help(Settings, 'smtp_password_file')}")
+    argument_parser.add_argument(
+        "--smtp_ssl", action="store_true",
+        help=f"Use SSL with SMTP server{env_help(Settings, 'smtp_ssl')}")
+    argument_parser.add_argument(
+        "--smtp_tls", action="store_true",
+        help=f"Use TLS with SMTP server{env_help(Settings, 'smtp_tls')}")
     argument_parser.add_argument(
         "--email_to", metavar="EMAIL",
         help=f"Email address to send alarms/beacons to. If parameter not "

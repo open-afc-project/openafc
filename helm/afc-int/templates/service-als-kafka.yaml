@@ -4,8 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Service helmchart for rmq pod
-{{- $ := mergeOverwrite $ (dict "component" "rat_server") }}
+# Service helmchart for als-kafka pods
+{{- $ := mergeOverwrite $ (dict "component" "als-kafka") }}
 
 apiVersion: v1
 kind: Service

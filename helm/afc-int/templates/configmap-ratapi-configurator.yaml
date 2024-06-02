@@ -4,9 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Configmap for als_kafka and als_siphon environment variables
-
-{{- $ := mergeOverwrite $ (dict "configmap" "als_kafka-common") }}
+# Configmap for Flask config, retrieved by RatApiConfigurator
+{{- $ := mergeOverwrite $ (dict "configmap" "ratapi-configurator") }}
 
 apiVersion: v1
 kind: ConfigMap

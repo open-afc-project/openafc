@@ -59,7 +59,7 @@ securityContexts:
 #    rendering big integers as floating points (@I is trimmed from variable
 #    name)
 #  - {{host:<COMPONENTNAME>}} rendered as hostname for given component (e.g.
-#    as of time of this writing '{{host:rat_server}}' rendered as 'webui')
+#    as of time of this writing '{{host:rat-server}}' rendered as 'webui')
 #  - {{port:<COMPONENTNAME>:<PORTNAME>}} rendered as service port number of
 #    port of - given name of given component (e.g. as of time of this writing
 #    '{{port:objst:fileStorage}}' rendered as '5000')
@@ -92,15 +92,57 @@ configmaps:
     AFC_ENFORCE_MTLS: "False"
     AFC_MSGHND_NAME: "{{host:msghnd}}"
     AFC_MSGHND_PORT: "{{port:msghnd:msghnd}}"
-    AFC_WEBUI_NAME: "{{host:rat_server}}"
-    AFC_WEBUI_PORT: "{{port:rat_server:rat_server}}"
-  # Connection string and password file to ratdb
-  ratdb-conn:
+    AFC_WEBUI_NAME: "{{host:rat-server}}"
+    AFC_WEBUI_PORT: "{{port:rat-server:rat-server}}"
+  # Flask config parameters defined in config/ratapi.conf. Config settings
+  # passed via environment variables should be prefixed with FLASK_, passed via
+  # filename environment variables should be prefixed wiyth FLASKFILE_
+  flask-conf:
     FLASK_SQLALCHEMY_DATABASE_URI: >-
       postgresql://postgres:postgres@{{host:ratdb}}:{{port:ratdb:ratdb}}/fbrat
-    FLASK_RATDB_PASSWORD_FILE: "{{secretFile:ratdb-password:optional}}"
-  # Own environment variables for rat_server container(s)
-  rat_server:
+    FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD: >-
+      {{secretFile:ratdb-password:optional}}
+    FLASKFILE_SECRET_KEY: >-
+      {{secretFile:flask-secret-key:optional}}
+    FLASKFILE_GOOGLE_APIKEY: >-
+      {{secretFile:google-apikey:optional}}
+    FLASK_USER_EMAIL_SENDER_EMAIL: admin@afc_please_override.com
+  # Flask config parameters retrieved by RatApiConfigurator (should be defined
+  # in site-specific values.yaml overrides and/or in secrets). Config settings
+  # passed via environment variables should be given as is, passed via
+  # filename environment variables should be prefixed with RATAPIFILE_
+  ratapi-configurator:
+    REGISTRATION_APPROVE_LINK: ""
+    REGISTRATION_DEST_EMAIL: ""
+    REGISTRATION_DEST_PDL_EMAIL: ""
+    REGISTRATION_SRC_EMAIL: ""
+    RATAPIFILE_MAIL_PASSWORD: >-
+      {{secretFile:ratapi-mail-password:optional}}
+    MAIL_USERNAME: ""
+    MAIL_SERVER: ""
+    MAIL_PORT: ""
+    MAIL_USE_TLS: ""
+    MAIL_USE_SSL: ""
+    USE_CAPTCHA: ""
+    RATAPIFILE_CAPTCHA_SECRET: >-
+      {{secretFile:ratapi-captcha-secret:optional}}
+    RATAPIFILE_CAPTCHA_SITEKEY: >-
+      {{secretFile:ratapi-captcha-sitekey:optional}}
+    CAPTCHA_VERIFY: ""
+    USER_APP_NAME: AFC
+  # Flask config parameters retrieved by OIDCConfigurator (should be defined
+  # in site-specific values.yaml overrides and/or in secrets). Config settings
+  # passed via environment variables should be given as is, passed via
+  # filename environment variables should be prefixed with OIDCFILE_
+  oidc-configurator:
+    OIDC_LOGIN: "False"
+    OIDCFILE_OIDC_CLIENT_ID: >-
+      {{secretFile:oidc-client-id:optional}}
+    OIDCFILE_OIDC_CLIENT_SECRET: >-
+      {{secretFile:oidc-client-secret:optional}}
+    OIDC_DISCOVERY_URL: ""
+  # Own environment variables for rat-server container(s)
+  rat-server:
     ALS_KAFKA_SERVER_ID: rat_server
   # Own environment variables for msghnd container(s)
   msghnd:
@@ -124,24 +166,24 @@ configmaps:
   als-client:
     ALS_KAFKA_MAX_REQUEST_SIZE@I: 10485760
     ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS: >-
-      {{host:als_kafka}}:{{port:als_kafka:kafka}}
-  # Own environment variables for als_kafka
-  als_kafka:
-    KAFKA_ADVERTISED_HOST: "{{host:als_kafka}}"
-    KAFKA_CLIENT_PORT: "{{port:als_kafka:kafka}}"
-  # Environment variables common to als_kafka and als_siphon
-  als_kafka-common:
+      {{host:als-kafka}}:{{port:als-kafka:kafka}}
+  # Own environment variables for als-kafka
+  als-kafka:
+    KAFKA_ADVERTISED_HOST: "{{host:als-kafka}}"
+    KAFKA_CLIENT_PORT: "{{port:als-kafka:kafka}}"
+  # Environment variables common to als-kafka and als_siphon
+  als-kafka-common:
     KAFKA_MAX_REQUEST_SIZE@I: 10485760
-  # Own environment variables for als_siphon
-  als_siphon:
-    KAFKA_SERVERS: "{{host:als_kafka}}:{{port:als_kafka:kafka}}"
+  # Own environment variables for als-siphon
+  als-siphon:
+    KAFKA_SERVERS: "{{host:als-kafka}}:{{port:als-kafka:kafka}}"
     INIT_IF_EXISTS: skip
     POSTGRES_INIT_CONN_STR: >-
-      postgresql://postgres:postgres@{{host:bulk_postgres}}:{{port:bulk_postgres:bulk_postgres}}/postgres
+      postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/postgres
     POSTGRES_ALS_CONN_STR: >-
-      postgresql://postgres:postgres@{{host:bulk_postgres}}:{{port:bulk_postgres:bulk_postgres}}/ALS
+      postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/ALS
     POSTGRES_LOG_CONN_STR: >-
-      postgresql://postgres:postgres@{{host:bulk_postgres}}:{{port:bulk_postgres:bulk_postgres}}/AFC_LOGS
+      postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/AFC_LOGS
     POSTGRES_INIT_PASSWORD_FILE: "{{secretFile:postgres-password:optional}}"
     POSTGRES_ALS_PASSWORD_FILE: "{{secretFile:als-db-password:optional}}"
     POSTGRES_LOG_PASSWORD_FILE: >-
@@ -157,23 +199,34 @@ configmaps:
     AFC_AEP_DEBUG: 1
     AFC_AEP_REAL_MOUNTPOINT: >-
       {{staticVolumeMount:worker:rat_transfer}}/3dep/1_arcsec
-  # Own environment variables of uls_downloader container(s)
-  uls_downloader:
+  # Own environment variables of uls-downloader container(s)
+  uls-downloader:
     ULS_AFC_URL: >-
       http://{{host:msghnd}}:{{port:msghnd:msghnd}}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
-    ULS_DELAY_HR: 1
+    ULS_DELAY_HR: 0
     ULS_SERVICE_STATE_DB_DSN: >-
-      postgresql://postgres:postgres@{{host:bulk_postgres}}/fs_state
+      postgresql://postgres:postgres@{{host:bulk-postgres}}/fs_state
     ULS_SERVICE_STATE_DB_PASSWORD_FILE: >-
       {{secretFile:uls-state-db-password:optional}}
     ULS_PROMETHEUS_PORT: 8000
-    ULS_ALARM_SMTP_INFO: "{{secretFile:notifier-mail:optional}}"
+    ULS_SMTP_SERVER: >-
+      {{sameAs:ratapi-configurator:MAIL_SERVER:optional}}
+    ULS_SMTP_PORT: >-
+      {{sameAs:ratapi-configurator:MAIL_PORT:optional}}
+    ULS_SMTP_USERNAME: >-
+      {{sameAs:ratapi-configurator:MAIL_USERNAME:optional}}
+    ULS_SMTP_PASSWORD_FILE: >-
+      {{secretFile:ratapi-mail-password:optional}}
+    ULS_SMTP_SSL: >-
+      {{sameAs:ratapi-configurator:MAIL_USE_SSL:optional}}
+    ULS_SMTP_TLS: >-
+      {{sameAs:ratapi-configurator:MAIL_USE_TLS:optional}}
   # Common Environment variables for Rcache container(s) and clients of Rcache
   # service
   rcache-common:
     RCACHE_ENABLED: "True"
     RCACHE_POSTGRES_DSN: >-
-      postgresql://postgres:postgres@{{host:bulk_postgres}}/rcache
+      postgresql://postgres:postgres@{{host:bulk-postgres}}/rcache
     RCACHE_POSTGRES_PASSWORD_FILE: "{{secretFile:rcache-db-password:optional}}"
   # Environment variables for Rcache service clients
   rcache-client:
@@ -186,9 +239,9 @@ configmaps:
     RCACHE_AFC_REQ_URL: >-
       http://{{host:msghnd}}:{{port:msghnd:msghnd}}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
     RCACHE_RULESETS_URL: >-
-      http://{{host:rat_server}}/fbrat/ratapi/v1/GetRulesetIDs
+      http://{{host:rat-server}}/fbrat/ratapi/v1/GetRulesetIDs
     RCACHE_CONFIG_RETRIEVAL_URL: >-
-      http://{{host:rat_server}}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
+      http://{{host:rat-server}}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
 
 # Dictionary of static (non-templated and non-secret) volume definitions.
 # Indexed by volume names
@@ -266,7 +319,7 @@ components:
     service:
       type: ClusterIP
     initialReplicas: 1
-    imagePullPolicy: IfNotPresent
+    imagePullPolicy: Always
     serviceAccount:
     securityContextKey: none
     pvc:
@@ -298,8 +351,11 @@ components:
       port: metrics
       path: /metrics/detailed
       params:
-        vhost: [fbrat, rcache]
-        family: [queue_coarse_metrics]
+        vhost:
+          - fbrat
+          - rcache
+        family:
+          - queue_coarse_metrics
     containerResources:
       requests:
         memory: 200Mi
@@ -308,7 +364,10 @@ components:
     imageRepositoryKey: public
     service:
       type: LoadBalancer
-    envConfigmapKeys: [dispatcher, objst-client, objst-common]
+    envConfigmapKeys:
+      - dispatcher
+      - objst-client
+      - objst-common
     ports:
       http:
         servicePort: 80
@@ -318,13 +377,13 @@ components:
         nodePort: 30443
       status:
         servicePort: 8080
-  rat_server:
+  rat-server:
     imageName: afc-server
     imageRepositoryKey: private
     service:
       hostname: webui
     ports:
-      rat_server:
+      rat-server:
         servicePort: 80
         nodePort: 30081
       https:
@@ -332,12 +391,30 @@ components:
     containerResources:
       requests:
         memory: 200Mi
-    envConfigmapKeys: [rat_server, ratdb-conn, celery-client, objst-client,
-                       objst-common, als-client, rcache-client, rcache-common]
+    envConfigmapKeys:
+      - rat-server
+      - flask-conf
+      - ratapi-configurator
+      - oidc-configurator
+      - celery-client
+      - objst-client
+      - objst-common
+      - als-client
+      - rcache-client
+      - rcache-common
     staticVolumeMounts:
       rat_transfer: /mnt/nfs/rat_transfer
       pipe: /pipe
-    mountedSecrets: [ratdb-password, rcache-db-password]
+    mountedSecrets:
+      - ratdb-password
+      - flask-secret-key
+      - google-apikey
+      - ratapi-captcha-secret
+      - ratapi-captcha-sitekey
+      - ratapi-mail-password
+      - oidc-client-id
+      - oidc-client-secret
+      - rcache-db-password
   msghnd:
     imageName: afc-msghnd
     imageRepositoryKey: private
@@ -352,9 +429,27 @@ components:
     containerResources:
       requests:
         memory: 1200Mi
-    envConfigmapKeys: [msghnd, ratdb-conn, celery-client, objst-client,
-                       objst-common, als-client, rcache-client, rcache-common]
-    mountedSecrets: [ratdb-password, rcache-db-password]
+    envConfigmapKeys:
+      - msghnd
+      - flask-conf
+      - ratapi-configurator
+      - oidc-configurator
+      - celery-client
+      - objst-client
+      - objst-common
+      - als-client
+      - rcache-client
+      - rcache-common
+    mountedSecrets:
+      - ratdb-password
+      - flask-secret-key
+      - google-apikey
+      - ratapi-captcha-secret
+      - ratapi-captcha-sitekey
+      - ratapi-mail-password
+      - oidc-client-id
+      - oidc-client-secret
+      - rcache-db-password
   objst:
     imageName: objstorage-image
     imageRepositoryKey: public
@@ -366,16 +461,35 @@ components:
     containerResources:
       requests:
         memory: 500Mi
-    envConfigmapKeys: [objst, ratdb-conn, objst-common]
-    mountedSecrets: [ratdb-password]
+    envConfigmapKeys:
+      - objst
+      - flask-conf
+      - ratapi-configurator
+      - oidc-configurator
+      - objst-common
+    mountedSecrets:
+      - ratdb-password
+      - flask-secret-key
+      - google-apikey
+      - ratapi-captcha-secret
+      - ratapi-captcha-sitekey
+      - ratapi-mail-password
+      - oidc-client-id
+      - oidc-client-secret
   worker:
     imageName: afc-worker
     imageRepositoryKey: private
     containerResources:
       requests:
         memory: 4500Mi
-    envConfigmapKeys: [worker, celery-client, objst-client, objst-common,
-                       als-client, rcache-client, rcache-common]
+    envConfigmapKeys:
+      - worker
+      - celery-client
+      - objst-client
+      - objst-common
+      - als-client
+      - rcache-client
+      - rcache-common
     staticVolumeMounts:
       rat_transfer: /mnt/nfs/rat_transfer
       pipe: /pipe
@@ -406,23 +520,21 @@ components:
       #         periodSeconds: 30
       #   scaleDown:
       #     stabilizationWindowSeconds: 300
-  als_kafka:
+  als-kafka:
     imageName: als-kafka-image
     imageRepositoryKey: public
-    service:
-      hostname: als-kafka
     ports:
       kafka:
         servicePort: 9092
     containerResources:
       requests:
         memory: 500Mi
-    envConfigmapKeys: [als_kafka, als_kafka-common]
-  als_siphon:
+    envConfigmapKeys:
+      - als-kafka
+      - als-kafka-common
+  als-siphon:
     imageName: als-siphon-image
     imageRepositoryKey: public
-    service:
-      hostname: als-siphon
     ports:
       metrics:
         containerPort: 8080
@@ -431,16 +543,18 @@ components:
     containerResources:
       requests:
         memory: 100Mi
-    envConfigmapKeys: [als_siphon, als_kafka-common]
-    mountedSecrets: [postgres-password, als-db-password,
-                     als-json-log-db-password]
-  bulk_postgres:
+    envConfigmapKeys:
+      - als-siphon
+      - als-kafka-common
+    mountedSecrets:
+      - postgres-password
+      - als-db-password
+      - als-json-log-db-password
+  bulk-postgres:
     imageName: bulk-postgres-image
     imageRepositoryKey: public
-    service:
-      hostname: bulk-postgres
     ports:
-      bulk_postgres:
+      bulk-postgres:
         servicePort: 5432
         nodePort: 31433
     pvc:
@@ -449,27 +563,40 @@ components:
       resources:
         requests:
           storage: 100Mi
-  uls_downloader:
+  uls-downloader:
     imageName: uls-downloader
     imageRepositoryKey: public
-    service:
-      hostname: uls-downloader
-    envConfigmapKeys: [uls_downloader, rcache-client, rcache-common]
+    envConfigmapKeys:
+      - uls-downloader
+      - rcache-client
+      - rcache-common
     staticVolumeMounts:
       rat_transfer: /rat_transfer
-    mountedSecrets: [notifier-mail, uls-state-db-password]
+    mountedSecrets:
+      - ratapi-mail-password
+      - uls-state-db-password
     ports:
       metrics:
         containerPort: 8000
     metrics:
       port: metrics
-  cert_db:
+  cert-db:
     imageName: cert_db
     imageRepositoryKey: public
-    service:
-      hostname: cert-db
-    envConfigmapKeys: [ratdb-conn, als-client]
-    mountedSecrets: [ratdb-password]
+    envConfigmapKeys:
+      - flask-conf
+      - ratapi-configurator
+      - oidc-configurator
+      - als-client
+    mountedSecrets:
+      - ratdb-password
+      - flask-secret-key
+      - google-apikey
+      - ratapi-captcha-secret
+      - ratapi-captcha-sitekey
+      - ratapi-mail-password
+      - oidc-client-id
+      - oidc-client-secret
   rcache:
     imageName: rcache-image
     imageRepositoryKey: public
@@ -480,8 +607,11 @@ components:
     containerResources:
       requests:
         memory: 100Mi
-    envConfigmapKeys: [rcache, rcache-common]
-    mountedSecrets: [rcache-db-password]
+    envConfigmapKeys:
+      - rcache
+      - rcache-common
+    mountedSecrets:
+      - rcache-db-password
   grafana:
     imageName: grafana-image
     imageRepositoryKey: public
@@ -529,8 +659,8 @@ ingress:
       portKey: msghnd
       path: /fbrat/ap-afc/availableSpectrumInquiry
       pathType: Prefix
-    - componentKey: rat_server
-      portKey: rat_server
+    - componentKey: rat-server
+      portKey: rat-server
       path: /fbrat
       pathType: Prefix
     - componentKey: objst
@@ -578,6 +708,8 @@ secretStores:
 #    absent - corresponded ExternalSecret not created
 #  type - Optional 'type' value for secret manifest
 #  mountPath Directory to which secret is mounted
+#  mountPathPrefix If 'mountPath' not defined it is constructed as
+#          concatenation of this prefix and secret name
 #  subPath SubPath clause (e.g. for mounting several secrets into same
 #          directory)
 #  structuredRemote - can be:
@@ -596,27 +728,33 @@ externalSecrets:
   default:
     secretStore: secret-store
     refreshInterval: 5m
-  notifier-mail:
-    property: NOTIFIER_MAIL.json
-    mountPath: /secrets/notifier-mail
+    mountPathPrefix: /secrets/
   postgres-password:
     property: POSTGRES_PASSWORD
-    mountPath: /secrets/postgres-password
   ratdb-password:
     property: RATDB_PASSWORD
-    mountPath: /secrets/ratdb-password
   uls-state-db-password:
     property: ULS_STATE_DB_PASSWORD
-    mountPath: /secrets/uls-state-db-password
   rcache-db-password:
     property: RCACHE_DB_PASSWORD
-    mountPath: /secrets/rcache-db-password
   als-db-password:
     property: ALS_DB_PASSWORD
-    mountPath: /secrets/als-db-password
   als-json-log-db-password:
     property: ALS_JSON_LOG_DB_PASSWORD
-    mountPath: /secrets/als-json-log-db-password
   image-pull:
     property: .dockerconfigjson
     type: kubernetes.io/dockerconfigjson
+  flask-secret-key:
+    property: SECRET_KEY
+  google-apikey:
+    property: GOOGLE_APIKEY
+  ratapi-captcha-secret:
+    property: CAPTCHA_SECRET
+  ratapi-captcha-sitekey:
+    property: CAPTCHA_SITEKEY
+  ratapi-mail-password:
+    property: MAIL_PASSWORD
+  oidc-client-id:
+    property: OIDC_CLIENT_ID
+  oidc-client-secret:
+    property: OIDC_CLIENT_SECRET

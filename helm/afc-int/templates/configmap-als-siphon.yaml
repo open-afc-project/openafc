@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Configmap for rat_server's own environment variables
+# Configmap for als-siphon own environment variables
 
-{{- $ := mergeOverwrite $ (dict "configmap" "rat_server") }}
+{{- $ := mergeOverwrite $ (dict "configmap" "als-siphon") }}
 
 apiVersion: v1
 kind: ConfigMap

@@ -4,8 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Configmap for ratdb connection string
-{{- $ := mergeOverwrite $ (dict "configmap" "ratdb-conn") }}
+# Configmap for ULS Downloader's own environment variables
+{{- $ := mergeOverwrite $ (dict "configmap" "uls-downloader") }}
 
 apiVersion: v1
 kind: ConfigMap

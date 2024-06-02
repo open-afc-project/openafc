@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Prometheus operator Pod Monitor for ALS Siphon
-{{- $ := mergeOverwrite $ (dict "component" "als_siphon") }}
-{{- $compDef := merge (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
+# Prometheus operator Pod Monitor for ULS Downloader
+{{- $ := mergeOverwrite $ (dict "component" "uls-downloader") }}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- if hasKey $compDef "metrics"}}
 
 apiVersion: monitoring.coreos.com/v1

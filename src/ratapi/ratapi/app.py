@@ -78,8 +78,21 @@ def create_app(config_override=None):
     config_path = BaseDirectory.load_first_config('fbrat', 'ratapi.conf')
     if config_path:
         flaskapp.config.from_pyfile(config_path)
-    # override from FLASK_... environment variables
+    # override from FLASK_... environment variables by value ...
     flaskapp.config.from_prefixed_env()
+    # ... and by file name
+    env_file_prefix = flaskapp.config.get('ENV_FILE_PREFIX')
+    if env_file_prefix:
+        for env_name, env_value in os.environ.items():
+            if not (env_name.startswith(env_file_prefix) and
+                    os.path.isfile(env_value)):
+                continue
+            with open(env_value, encoding="utf-8") as f:
+                setting = f.read()
+                if len(setting) == 0:
+                    continue
+                flaskapp.config[env_name[len(env_file_prefix):]] = setting
+
     # final overrides for this instance
     if config_override:
         flaskapp.config.update(config_override)
@@ -106,7 +119,7 @@ def create_app(config_override=None):
     flaskapp.config['SQLALCHEMY_DATABASE_URI'] = \
         secret_utils.substitute_password(
             dsc='fbrat', dsn=flaskapp.config.get('SQLALCHEMY_DATABASE_URI'),
-            password_file=flaskapp.config.get('RATDB_PASSWORD_FILE'),
+            password=flaskapp.config.get('SQLALCHEMY_DATABASE_PASSWORD'),
             optional=True)
 
     db.init_app(flaskapp)

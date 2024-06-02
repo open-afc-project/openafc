@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Deployment helmchart for als_siphon pods
+# Deployment helmchart for cert-db pods
 
-{{- $ := mergeOverwrite $ (dict "component" "als_siphon") }}
+{{- $ := mergeOverwrite $ (dict "component" "cert-db") }}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -30,7 +30,6 @@ spec:
           envFrom: {{- include "afc.envFromConfigMaps" . | nindent 12 }}
           env: {{- include "afc.componentEnvEntries" . | nindent 12 }}
           resources: {{- include "afc.containerResources" . | nindent 12 }}
-          ports: {{- include "afc.containerPorts" . | nindent 12 }}
           volumeMounts: {{- include "afc.staticVolumeMounts" . | nindent 12 }}
       volumes:
         {{- include "afc.staticVolumes" . | nindent 8 }}

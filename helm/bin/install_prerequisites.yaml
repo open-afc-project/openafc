@@ -57,7 +57,7 @@ install_components:
   prometheus_adapter:
     namespace: monitoring
     preinstall:
-      - -kubectl delete apiservice v1beta1.metrics.k8s.io
+      - -kubectl delete apiservice v1beta1.metrics.k8s.io --wait --force -A
     helm_chart: prometheus-community/prometheus-adapter
     helm_repo: https://prometheus-community.github.io/helm-charts
     helm_release: custom-metrics

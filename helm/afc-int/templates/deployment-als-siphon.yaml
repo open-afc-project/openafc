@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Deployment helmchart for rat_server pods
+# Deployment helmchart for als-siphon pods
 
-{{- $ := mergeOverwrite $ (dict "component" "rat_server") }}
+{{- $ := mergeOverwrite $ (dict "component" "als-siphon") }}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -29,8 +29,8 @@ spec:
         - {{- include "afc.containerImage" . | nindent 10 }}
           envFrom: {{- include "afc.envFromConfigMaps" . | nindent 12 }}
           env: {{- include "afc.componentEnvEntries" . | nindent 12 }}
-          ports: {{- include "afc.containerPorts" . | nindent 12 }}
           resources: {{- include "afc.containerResources" . | nindent 12 }}
+          ports: {{- include "afc.containerPorts" . | nindent 12 }}
           volumeMounts: {{- include "afc.staticVolumeMounts" . | nindent 12 }}
       volumes:
         {{- include "afc.staticVolumes" . | nindent 8 }}

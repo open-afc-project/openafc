@@ -159,7 +159,7 @@ components:
     service:
       type: ClusterIP
     initialReplicas: 1
-    imagePullPolicy: IfNotPresent
+    imagePullPolicy: Always
     serviceAccount:
     securityContextKey: none
     pvc:
@@ -170,7 +170,8 @@ components:
     service:
       type: LoadBalancer
       loadBalancerIpKey: ext-dispatcher
-    envConfigmapKeys: [dispatcher]
+    envConfigmapKeys:
+     - dispatcher
     ports:
       http:
         servicePort: 80
@@ -219,6 +220,8 @@ secretStores:
 #    absent - corresponded ExternalSecret not created
 #  type - Optional 'type' value for secret manifest
 #  mountPath Directory to which secret is mounted
+#  mountPathPrefix If 'mountPath' not defined it is constructed as
+#          concatenation of this prefix and secret name
 #  subPath SubPath clause (e.g. for mounting several secrets into same
 #          directory)
 #  structuredRemote - can be:
@@ -242,9 +245,7 @@ externalSecrets:
     type: kubernetes.io/dockerconfigjson
   server-cert-pem:
     property: server.cert.pem
-    subpath: server.cert.pem
-    mountPath: /certificates/servers/server.cert.pem
+    mountPath: /certificates/servers/cert/server.cert.pem
   server-key-pem:
     property: server.key.pem
-    subpath: server.key.pem
-    mountPath: /certificates/servers/server.key.pem
+    mountPath: /certificates/servers/key/server.key.pem

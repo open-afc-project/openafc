@@ -4,24 +4,22 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# StatefuSet helmchart for bulk_postgres pod (for use in k3d configuration)
+# Deployment helmchart for ULS Downloader pods
 
-{{- $ := mergeOverwrite $ (dict "component" "bulk_postgres") }}
-{{- if (include "afc.fullImageName" .) }}
+{{- $ := mergeOverwrite $ (dict "component" "uls-downloader") }}
 
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: {{ include "afc.compManifestName" . }}
   labels: {{- include "afc.commonLabels" . | nindent 4 }}
-  annotations: {{- include "afc.commonStatefulsetAnnotations" . | nindent 4 }}
+  annotations: {{- include "afc.commonDeploymentAnnotations" . | nindent 4 }}
 spec:
   selector:
     matchLabels: {{- include "afc.selectorLabels" . | nindent 6 }}
   replicas: {{ include "afc.replicas" . }}
   {{- include "afc.serviceAccountRef" . | indent 2 }}
   {{- include "afc.securityContext" . | indent 2 }}
-  serviceName: {{ include "afc.compManifestName" . }}
   template:
     metadata:
       labels: {{- include "afc.commonLabels" . | nindent 8 }}
@@ -33,9 +31,6 @@ spec:
           env: {{- include "afc.componentEnvEntries" . | nindent 12 }}
           ports: {{- include "afc.containerPorts" . | nindent 12 }}
           resources: {{- include "afc.containerResources" . | nindent 12 }}
-          volumeMounts:
-            - {{- include "afc.pvcMount" . | nindent 14 }}
-  volumeClaimTemplates:
-    - {{- include "afc.pvcTemplate" . | nindent 6 }}
-
-{{- end -}}
+          volumeMounts: {{- include "afc.staticVolumeMounts" . | nindent 12 }}
+      volumes:
+        {{- include "afc.staticVolumes" . | nindent 8 }}
