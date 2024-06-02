@@ -397,6 +397,15 @@ Render environment from ConfigMaps, contained in envConfigmapKeys list of compon
 {{- end }}
 
 {{/*
+Mount path of given secret
+.secret (key in $.Values.externalSecrets) must be defined
+*/}}
+{{- define "afc.secretMountPath" -}}
+{{- $extSecretDef := merge (dict) (get $.Values.externalSecrets .secret | required (cat "External secret" .secret "not found")) $.Values.externalSecrets.default -}}
+{{- hasKey $extSecretDef "mountPath" | ternary (get $extSecretDef "mountPath") (printf "%s%s" (get $extSecretDef "mountPathPrefix" | required (cat "External secret" .secret "has neither 'mountPath' nor 'mountPathPrefix' property")) .secret) -}}
+{{- end -}}
+
+{{/*
 Renders configmap entry or environment variable value
 .value (Value to render) must be defined
 .Values (top level values dictionary) must be defined
@@ -463,8 +472,10 @@ Returns value or 'SKIP_SKIP_SKIP_SKIP' to skip
 {{-   end }}
 {{-   $extSecretDef := merge (dict) (default (dict) (get (default (dict) $.Values.externalSecrets) $extSecret)) (default (dict) (get (default (dict) $.Values.externalSecrets) "default")) -}}
 {{-   $property := get $extSecretDef "property" -}}
-{{-   $mountPath := get $extSecretDef "mountPath" -}}
-{{-   if not (and $property $mountPath) }}
+{{-   $mountPath := "" -}}
+{{-   if $property }}
+{{-     $mountPath = include "afc.secretMountPath" (dict "secret" $extSecret "Values" $.Values) }}
+{{-   else }}
 {{-     if eq $ifAbsent "optional" -}}
 {{-       $skip = true -}}
 {{-     else if eq $ifAbsent "nullable" }}
@@ -661,9 +672,8 @@ Mount of static volumes (inhabitatnts of $.Values.staticVolumes) and mounted sec
 {{- end }}
 {{- if $mountedSecrets }}
 {{-   range $name := $mountedSecrets }}
-{{-     $secretDef := get (default (dict) $.Values.externalSecrets) $name -}}
-{{-     if $secretDef }}
-{{-       $mountPath := get $secretDef "mountPath" | required (cat "External secret" $name "doesn't have 'mountPath' property") -}}
+{{-     if get (default (dict) $.Values.externalSecrets) $name }}
+{{-       $mountPath := include "afc.secretMountPath" (dict "secret" $name "Values" $.Values) -}}
 - name: {{ $name | include "afc.secretMountName" }}
   mountPath: {{ $mountPath }}
 {{      end }}
@@ -798,7 +808,7 @@ Renders data or dataFrom in ExternalSecret
 .secret (key in $.Values.externalSecrets) must be defined
 */}}
 {{- define "afc.extSecretData" -}}
-{{- $extSecretDef := merge (dict) (get $.Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) $.Values.externalSecrets.default -}}
+{{- $extSecretDef := merge (dict) (get $.Values.externalSecrets .secret | required (cat "External secret" .secret "not found")) $.Values.externalSecrets.default -}}
 {{- $property := get $extSecretDef "property" -}}
 {{- $secretStoreName := get $extSecretDef "secretStore" | required  (cat "secretStore not defined for external secret" .secret) }}
 {{- $secretStoreDef := get $.Values.secretStores $secretStoreName | required (cat "Secret" .secret "uses undefined secret store"  $secretStoreName) }}
