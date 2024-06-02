@@ -49,13 +49,6 @@ RUN chmod -x /wd/*.py
 RUN chmod +x /wd/uls_service.py /wd/uls_service_healthcheck.py \
     wd/fsid_tool.py wd/fs_db_diff.py wd/fs_afc.py
 
-# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
-# installed as Alpine package (thus not requiring gcc and musl-dev install)
-RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
-    librdkafka-dev=~2.1.1 && \
-    pip3 install confluent-kafka==2.1.1 && \
-    apk del python3-dev gcc musl-dev
-
 FROM alpine:3.18
 
 # DOWNLOADER SERVICE PARAMETERS
@@ -167,6 +160,25 @@ ENV ULS_NICE=YES
 # hours. Default defined in uls_service.py (40 hours as of time of this
 # writing)
 # ENV ULS_HEALTH_UPDATE_MAX_AGE_HR
+
+# SMTP server. If unspecified no alarm/beacon emails will be sent
+# ENV ULS_SMTP_SERVER
+
+# Port to use on SMTP server
+# ENV ULS_SMTP_PORT
+
+# Login name for SMTP server. If unspecified no alarm/beacon emails will be
+# sent
+# ENV ULS_SMTP_USERNAME
+
+# File with password for SMTP servern (ignored if empty or absent)
+# ENV ULS_SMTP_PASSWORD_FILE
+
+# Use SSL with SMTP server
+# ENV ULS_SMTP_SSL
+
+# Use TLS with SMTP server
+# ENV ULS_SMTP_TLS
 
 # Name of JSON secret with SMTP parameters (formatted as per
 # NOTIFIER_MAIL.json). If not specified no emails will be sent
