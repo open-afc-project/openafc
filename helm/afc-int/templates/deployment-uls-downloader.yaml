@@ -6,7 +6,7 @@
 
 # Deployment helmchart for ULS Downloader pods
 
-{{- $ := mergeOverwrite $ (dict "component" "uls_downloader") }}
+{{- $ := mergeOverwrite $ (dict "component" "uls-downloader") }}
 
 apiVersion: apps/v1
 kind: Deployment

@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Configmap for rat_server's own environment variables
+# Configmap for rat-server's own environment variables
 
-{{- $ := mergeOverwrite $ (dict "configmap" "rat_server") }}
+{{- $ := mergeOverwrite $ (dict "configmap" "rat-server") }}
 
 apiVersion: v1
 kind: ConfigMap

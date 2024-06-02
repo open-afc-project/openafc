@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Deployment helmchart for als_siphon pods
+# Deployment helmchart for als-siphon pods
 
-{{- $ := mergeOverwrite $ (dict "component" "als_siphon") }}
+{{- $ := mergeOverwrite $ (dict "component" "als-siphon") }}
 
 apiVersion: apps/v1
 kind: Deployment

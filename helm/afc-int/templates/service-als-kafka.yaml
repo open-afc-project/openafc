@@ -4,8 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Service helmchart for als_kafka pods
-{{- $ := mergeOverwrite $ (dict "component" "als_kafka") }}
+# Service helmchart for als-kafka pods
+{{- $ := mergeOverwrite $ (dict "component" "als-kafka") }}
 
 apiVersion: v1
 kind: Service

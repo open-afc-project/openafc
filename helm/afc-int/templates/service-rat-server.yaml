@@ -5,7 +5,7 @@
 # included with this software program.
 
 # Service helmchart for rmq pod
-{{- $ := mergeOverwrite $ (dict "component" "rat_server") }}
+{{- $ := mergeOverwrite $ (dict "component" "rat-server") }}
 
 apiVersion: v1
 kind: Service

@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Deployment helmchart for cert_db pods
+# Deployment helmchart for cert-db pods
 
-{{- $ := mergeOverwrite $ (dict "component" "cert_db") }}
+{{- $ := mergeOverwrite $ (dict "component" "cert-db") }}
 
 apiVersion: apps/v1
 kind: Deployment

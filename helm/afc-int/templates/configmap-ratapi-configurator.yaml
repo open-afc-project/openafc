@@ -4,9 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Configmap for als-siphon own environment variables
-
-{{- $ := mergeOverwrite $ (dict "configmap" "als-siphon") }}
+# Configmap for Flask config, retrieved by RatApiConfigurator
+{{- $ := mergeOverwrite $ (dict "configmap" "ratapi-configurator") }}
 
 apiVersion: v1
 kind: ConfigMap

@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Deployment helmchart for rat_server pods
+# Deployment helmchart for rat-server pods
 
-{{- $ := mergeOverwrite $ (dict "component" "rat_server") }}
+{{- $ := mergeOverwrite $ (dict "component" "rat-server") }}
 
 apiVersion: apps/v1
 kind: Deployment

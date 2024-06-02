@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Configmap for als_kafka and als_siphon environment variables
+# Configmap for als-kafka and als-siphon environment variables
 
-{{- $ := mergeOverwrite $ (dict "configmap" "als_kafka-common") }}
+{{- $ := mergeOverwrite $ (dict "configmap" "als-kafka-common") }}
 
 apiVersion: v1
 kind: ConfigMap

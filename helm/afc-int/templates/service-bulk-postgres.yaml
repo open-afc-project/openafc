@@ -4,8 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Service helmchart for bulk_postgres pod (for use in k3d configuration)
-{{- $ := mergeOverwrite $ (dict "component" "bulk_postgres") }}
+# Service helmchart for bulk-postgres pod (for use in k3d configuration)
+{{- $ := mergeOverwrite $ (dict "component" "bulk-postgres") }}
 {{- if (include "afc.fullImageName" .) }}
 
 # Headless service

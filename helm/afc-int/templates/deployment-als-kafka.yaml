@@ -4,9 +4,9 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Deployment helmchart for als_kafka pods
+# Deployment helmchart for als-kafka pods
 
-{{- $ := mergeOverwrite $ (dict "component" "als_kafka") }}
+{{- $ := mergeOverwrite $ (dict "component" "als-kafka") }}
 
 apiVersion: apps/v1
 kind: Deployment

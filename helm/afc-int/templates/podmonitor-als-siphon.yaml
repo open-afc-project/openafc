@@ -5,7 +5,7 @@
 # included with this software program.
 
 # Prometheus operator Pod Monitor for ALS Siphon
-{{- $ := mergeOverwrite $ (dict "component" "als_siphon") }}
+{{- $ := mergeOverwrite $ (dict "component" "als-siphon") }}
 {{- $compDef := merge (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- if hasKey $compDef "metrics"}}
 
