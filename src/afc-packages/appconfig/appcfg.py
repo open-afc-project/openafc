@@ -123,7 +123,8 @@ class ObjstConfig(ObjstConfigBase):
 
 class SecretConfigurator(object):
 
-    def __init__(self, secret_env, bool_attr, str_attr, int_attr):
+    def __init__(self, secret_env, file_env_prefix, bool_attr, str_attr,
+                 int_attr):
         attr = bool_attr + str_attr + int_attr
 
         # Initialize to false and empty
@@ -149,19 +150,19 @@ class SecretConfigurator(object):
         # override boolean config with environment variables
         for k in bool_attr:
             # Override with environment variables
-            ret = os.getenv(k)
+            ret = self._getenv(k, file_env_prefix)
             if ret:
                 setattr(self, k, (ret.lower() == 'true'))
 
         # override string config with environment variables
         for k in str_attr:
-            ret = os.getenv(k)
+            ret = self._getenv(k, file_env_prefix)
             if ret:
                 setattr(self, k, ret)
 
         # override int config with environment variables
         for k in int_attr:
-            ret = os.getenv(k)
+            ret = self._getenv(k, file_env_prefix)
             if ret:
                 setattr(self, k, int(ret))
 
@@ -181,6 +182,16 @@ class SecretConfigurator(object):
                     if k in data:
                         setattr(self, k, int(data[k]))
 
+    def _getenv(self, attr, file_env_prefix):
+        ret = os.environ.get(attr)
+        if ret:
+            return ret
+        filename = os.environ.get(file_env_prefix + attr)
+        if filename and os.path.isfile(filename):
+            with open(filename, encoding="utf-8") as f:
+                return f.read()
+        return None
+
 
 class OIDCConfigurator(SecretConfigurator):
     def __init__(self):
@@ -188,7 +199,9 @@ class OIDCConfigurator(SecretConfigurator):
         oidc_str_attr = ['OIDC_CLIENT_ID',
                          'OIDC_CLIENT_SECRET', 'OIDC_DISCOVERY_URL']
         oidc_env = 'OIDC_ARG'
-        super().__init__(oidc_env, oidc_bool_attr, oidc_str_attr, [])
+        super().__init__(secret_env=oidc_env, file_env_prefix='OIDCFILE_',
+                         bool_attr=oidc_bool_attr, str_attr=oidc_str_attr,
+                         int_attr=[])
 
 
 class RatApiConfigurator(SecretConfigurator):
@@ -208,7 +221,9 @@ class RatApiConfigurator(SecretConfigurator):
             'USER_APP_NAME']
         ratapi_int_attr = ['MAIL_PORT']
         ratapi_env = 'RATAPI_ARG'
-        super().__init__(ratapi_env, ratapi_bool_attr, ratapi_str_attr, ratapi_int_attr)
+        super().__init__(secret_env=ratapi_env, file_env_prefix='RATAPIFILE_',
+                         bool_attr=ratapi_bool_attr, str_attr=ratapi_str_attr,
+                         int_attr=ratapi_int_attr)
 
 
 # Msghnd configuration interfaces
