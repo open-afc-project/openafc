@@ -826,7 +826,10 @@ If you would like to use OIDC login method, please read [OIDC_Login.md](/OIDC_Lo
 |AFC_MSGHND_ERROR_LOG|`/proc/self/fd/2`|msghnd| the Error log file to write to|
 |AFC_MSGHND_LOG_LEVEL|`info`|msghnd| The granularity of Error log outputs (values are 'debug', 'info', 'warning', 'error', 'critical'|
 |FLASK_SQLALCHEMY_DATABASE_URI||msghnd,rat-server,objst,cert_db|Ratdb DSN. Overrides SQLALCHEMY_DATABASE_URI of ratapi.conf|
-|FLASK_RATDB_PASSWORD_FILE||msghnd,rat-server,objst,cert_db|File with password for ratdb DSN. Overrides RATDB_PASSWORD_FILE of ratapi.conf|
+|FLASKFILE_SQLALCHEMY_DATABASE_PASSWORD||msghnd,rat-server,objst,cert_db|File with password for ratdb DSN. Overrides SQLALCHEMY_DATABASE_PASSWORD of ratapi.conf|
+|FLASKFILE_SECRET_KEY||msghnd,rat-server,objst,cert_db|File with Flask secret key. Overrides SECRET_KEY of ratapi.conf|
+|FLASKFILE_GOOGLE_APIKEY||msghnd,rat-server,objst,cert_db|File with Google API key. Overrides GOOGLE_APIKEY of ratapi.conf|
+|FLASK_USER_EMAIL_SENDER_EMAIL||msghnd,rat-server,objst,cert_db|Sender of notification emails. Overrides USER_EMAIL_SENDER_EMAIL of ratapi.conf|
 | **worker settings**|||please read [afc-engine-preload README.md](/src/afc-engine-preload/README.md)|
 |AFC_AEP_ENABLE|Not defined|worker|Enable the preload library if defined|
 |AFC_AEP_FILELIST|`/aep/list/aep.list`|worker|Path to file tree info file|
