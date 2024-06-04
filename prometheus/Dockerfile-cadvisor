@@ -7,7 +7,7 @@
 
 # Cadvisor dockerfile
 
-FROM gcr.io/cadvisor/cadvisor:v0.47.2
+FROM gcr.io/cadvisor/cadvisor:v0.49.1
 
 # Housekeeping interval
 ENV CADVISOR_HOUSEKEEPING_INTERVAL=5s
@@ -15,7 +15,7 @@ ENV CADVISOR_HOUSEKEEPING_INTERVAL=5s
 # Metrics - comma separated list of metric groups (see
 # https://github.com/google/cadvisor/blob/master/docs/storage/prometheus.md for
 # more details)
-ENV CADVISOR_METRICS=cpu,memory,process,sched
+ENV CADVISOR_METRICS=cpu,memory,process,sched,network
 
 # Additional arguments
 ENV CADVISOR_ADDITIONAL_ARGS=
@@ -28,7 +28,7 @@ ENTRYPOINT /usr/bin/cadvisor \
     -store_container_labels=false \
     -housekeeping_interval=$CADVISOR_HOUSEKEEPING_INTERVAL \
     -enable_metrics=$CADVISOR_METRICS \
-    -enable_load_reader=true \
+    -enable_load_reader=false \
     $CADVISOR_ADDITIONAL_ARGS
 
 HEALTHCHECK CMD \

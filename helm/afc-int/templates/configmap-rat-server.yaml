@@ -1,0 +1,17 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# Configmap for rat-server's own environment variables
+
+{{- $ := mergeOverwrite $ (dict "configmap" "rat-server") }}
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "afc.configmapManifestName" . }}
+  labels: {{- include "afc.commonAppLabels" . | nindent 4 }}
+data:
+  {{- include "afc.configmapEnvEntries" . | indent 2 }}

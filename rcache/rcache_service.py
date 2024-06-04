@@ -8,6 +8,7 @@
 
 # pylint: disable=wrong-import-order, invalid-name, too-many-arguments
 # pylint: disable=too-many-instance-attributes, too-few-public-methods
+# pylint: disable=too-many-nested-blocks
 
 import aiohttp
 import asyncio
@@ -117,11 +118,32 @@ class RcacheService:
     _schedule_lag_ema              -- Average scheduling delay
     """
 
-    def __init__(self, rcache_db_dsn: str, precompute_quota: int,
-                 afc_req_url: Optional[str], rulesets_url: Optional[str],
+    def __init__(self, rcache_db_dsn: str,
+                 rcache_db_password_file: Optional[str],
+                 precompute_quota: int, afc_req_url: Optional[str],
+                 rulesets_url: Optional[str],
                  config_retrieval_url: Optional[str]) -> None:
+        """ Constructor
+
+        Arguments:
+        rcache_db_dsn           -- Postgres database DSN
+        rcache_db_password_file -- Optional name of secret credentials file for
+                                   Postgres database
+        precompute_quota        -- Maximum number of precomputing requests in
+                                   flight
+        afc_req_url             -- REST API URL to send requests for
+                                   precomputation. None for no precomputation
+        rulesets_url            -- REST API URL for getting list of active
+                                   Ruleset IDs. None to use default maximum AP
+                                   FS distance
+        config_retrieval_url    -- REST API URL for retrieving AFC Config by
+                                   Ruleset ID. None to use default maximum AP
+                                   FS distance
+        """
         self._start_time = datetime.datetime.now()
-        self._db = RcacheDbAsync(rcache_db_dsn)
+        self._db = \
+            RcacheDbAsync(rcache_db_dsn=rcache_db_dsn,
+                          rcache_db_password_file=rcache_db_password_file)
         self._db_connected_event = asyncio.Event()
         self._afc_req_url = afc_req_url
         self._rulesets_url = rulesets_url.rstrip("/") if rulesets_url else None

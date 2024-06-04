@@ -27,13 +27,16 @@ class RcacheDbAsync(RcacheDb):
     # Name of Postgres asynchronous driver (to use in DSN)
     ASYNC_DRIVER_NAME = "asyncpg"
 
-    def __init__(self, rcache_db_dsn: str) -> None:
+    def __init__(self, rcache_db_dsn: str,
+                 rcache_db_password_file: Optional[str]) -> None:
         """ Constructor
 
         Arguments:
-        rcache_db_dsn -- Postgres database connection string
+        rcache_db_dsn           -- Postgres database connection string
+        rcache_db_password_file -- Name of file with password to use in DSN
         """
-        super().__init__(rcache_db_dsn)
+        super().__init__(rcache_db_dsn=rcache_db_dsn,
+                         rcache_db_password_file=rcache_db_password_file)
 
     async def disconnect(self) -> None:
         """ Disconnect database """
@@ -83,11 +86,12 @@ class RcacheDbAsync(RcacheDb):
         assert len(rows) <= self.max_update_records()
         try:
             ins = sa_pg.insert(self.ap_table).values(rows)
-            ins = ins.on_conflict_do_update(
-                index_elements=self.ap_pk_columns,
-                set_={col_name: ins.excluded[col_name]
-                      for col_name in self.ap_table.columns.keys()
-                      if col_name not in self.ap_pk_columns})
+            ins = \
+                ins.on_conflict_do_update(
+                    index_elements=self.ap_pk_columns,
+                    set_={col_name: ins.excluded[col_name]
+                          for col_name in self.ap_table.columns.keys()
+                          if col_name not in self.ap_pk_columns})
             async with self._engine.begin() as conn:
                 await conn.execute(ins)
         except sa.exc.SQLAlchemyError as ex:

@@ -18,7 +18,7 @@ import sys
 import tempfile
 from typing import cast, List, Optional
 
-from k3d_lib import error, execute, parse_kubecontext, ROOT_DIR
+from utils import error, execute, parse_kubecontext, ROOT_DIR
 
 POD_NAME_STEMS = ["rat-server", "webui"]
 TESTS_DOCKERFILE = "tests/Dockerfile"
@@ -39,8 +39,8 @@ def main(argv: List[str]) -> None:
         "parameter specified the current/default is used")
     argument_parser.add_argument(
         "--context", metavar="[CONFIG_FILE][:CONTEXT]",
-        help="Kubeconfig and/or context to use. Curent is used if not "
-        "specified")
+        help="Kubeconfig and/or context to use. Context name may include "
+        f"wildcards (e.g. ':*.int'). Current are used if unspecified")
     argument_parser.add_argument(
         "--pod_stem", metavar="POD_NAME_STEM",
         help=f"Substring rat_server pod name must contain. Default is to try "

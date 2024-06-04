@@ -119,6 +119,11 @@ class Settings(pydantic.BaseSettings):
             ..., env="ULS_SERVICE_STATE_DB_DSN",
             description="Connection string to service state database",
             convert=safe_dsn)
+    service_state_db_password_file: Optional[str] = \
+        pydantic.Field(
+            None, env="ULS_SERVICE_STATE_DB_PASSWORD_FILE",
+            description="Optional name of file with password for state "
+            "database DSN")
     service_state_db_create_if_absent: bool = \
         pydantic.Field(
             True, env="ULS_SERVICE_STATE_DB_CREATE_IF_ABSENT",
@@ -371,8 +376,8 @@ class StatusUpdater:
         NamedTuple(
             "_StatsdLabeledMetricInfo",
             [
-                # String.format()-compatible pattern, containing placeholder for
-                # label value
+                # String.format()-compatible pattern, containing placeholder
+                # for label value
                 ("pattern", str),
                 # Dictionary of StatsD metrics, indexed by label value name
                 ("metrics", Dict[str, statsd.Gauge])])
@@ -398,7 +403,11 @@ class StatusUpdater:
         self._statsd_check_metrics: \
             Optional["StatusUpdater._StatsdLabeledMetricInfo"] = None
         if prometheus_port is not None:
-            prometheus_client.start_http_server(prometheus_port)
+            try:
+                prometheus_client.start_http_server(prometheus_port)
+            except OSError as ex:
+                logging.warning(f"Cant't start Prometheus client: {ex}. "
+                                f"Proceeding nevertheless")
             self._prometheus_metrics[DownloaderMilestone.DownloadStart] = \
                 prometheus_client.Gauge(
                     "fs_download_started",
@@ -781,10 +790,10 @@ class ExtParamFilesChecker:
     _ExtParamFiles = \
         NamedTuple("_ExtParamFiles",
                    [
-                       # Location in the internet
-                       ("base_url", str),
-                       # Downloader script subdirectory
-                       ("subdir", str), ("files", List[str])])
+                        # Location in the internet
+                        ("base_url", str),
+                        # Downloader script subdirectory
+                        ("subdir", str), ("files", List[str])])
 
     def __init__(self, status_updater: StatusUpdater,
                  ext_files_arg: Optional[List[str]] = None,
@@ -919,6 +928,10 @@ def main(argv: List[str]) -> None:
         f"(that is used by healthcheck script)"
         f"{env_help(Settings, 'service_state_db_dsn')}")
     argument_parser.add_argument(
+        "--service_state_db_password_file", metavar="PASSWORD_FILE",
+        help=f"Name of file with password to use in state database connection "
+        f"string{env_help(Settings, 'service_state_db_password_file')}")
+    argument_parser.add_argument(
         "--service_state_db_create_if_absent", action="store_true",
         help=f"Create state database if absent"
         f"{env_help(Settings, 'service_state_db_create_if_absent')}")
@@ -1002,7 +1015,9 @@ def main(argv: List[str]) -> None:
 
         print_args(settings)
 
-        state_db = StateDb(db_dsn=settings.service_state_db_dsn)
+        state_db = \
+            StateDb(db_dsn=settings.service_state_db_dsn,
+                    db_password_file=settings.service_state_db_password_file)
         state_db.check_server()
         if settings.service_state_db_create_if_absent:
             state_db.create_db(

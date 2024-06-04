@@ -1,6 +1,6 @@
 #
 # Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
-# refers solely to the Broadcom Inc. corporate affiliate that owns 
+# refers solely to the Broadcom Inc. corporate affiliate that owns
 # the software below. This work is licensed under the OpenAFC Project License,
 # a copy of which is included with this software program
 #
@@ -14,7 +14,10 @@ FROM alpine:3.18
 # ENV RCACHE_CLIENT_PORT
 
 # Connection string to Postgres DB
-# ENV RCACHE_POSTGRES_DSN=postgresql://[user[:password]]@host[:port]/database[?options]
+# ENV RCACHE_POSTGRES_DSN=postgresql://[user[:password]@]host[:port]/database[?options]
+
+# File with password for Rcache database DSN
+# ENV RCACHE_POSTGRES_PASSWORD_FILE
 
 # What to do if database already exists:
 #  - 'leave' (leave as is - default)

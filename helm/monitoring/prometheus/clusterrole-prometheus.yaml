@@ -5,7 +5,7 @@ metadata:
   name: prometheus
 rules:
   - apiGroups: [""]
-    resources: 
+    resources:
       - nodes
       - nodes/metrics
       - services

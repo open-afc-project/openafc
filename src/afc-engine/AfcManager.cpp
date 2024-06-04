@@ -1196,20 +1196,35 @@ void AfcManager::initializeDatabases()
 			throw std::runtime_error("AfcManager::initializeDatabases(): _nlcdFile not "
 						 "defined.");
 		}
-		std::string nlcdPattern, nlcdDirectory;
+		std::string nlcdDirectory;
 		auto nlcdFileInfo = QFileInfo(QString::fromStdString(_nlcdFile));
-		if (nlcdFileInfo.isDir()) {
-			nlcdPattern = "*";
-			nlcdDirectory = _nlcdFile;
-		} else {
-			nlcdPattern = nlcdFileInfo.fileName().toStdString();
+		std::unique_ptr<GdalNameMapperBase> nameMapper(nullptr);
+		// NLCD specification in config may be of various flavors
+		if (nlcdFileInfo.fileName().contains('{')) {
+			// Name part contains template - tiled NLCD. Sample config:
+			// "nlcdFile":
+			// "rat_transfer/tiled_nlcd/nlcd_production/nlcd_production_{latHem:ns}{latDegCeil:02}{lonHem:ew}{lonDegFloor:03}.tif"
+			// See comments in GdalNameMapper.h for formatting details
 			nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
+			nameMapper = GdalNameMapperPattern::make_unique(
+				nlcdFileInfo.fileName().toStdString(),
+				nlcdDirectory);
+		} else if (nlcdFileInfo.isDir()) {
+			// Path is directory - set of files. Sample config:
+			// "nlcdFile":
+			// "rat_transfer/nlcd/nlcd_production"
+			nlcdDirectory = _nlcdFile;
+			nameMapper = GdalNameMapperDirect::make_unique("*", _nlcdFile);
+		} else {
+			// Otherwise path supposed to be a file. Sample config:
+			// "nlcdFile":
+			// "rat_transfer/nlcd/nlcd_production/nlcd_2019_land_cover_l48_20210604_resample.tif"
+			nlcdDirectory = nlcdFileInfo.dir().path().toStdString();
+			nameMapper = GdalNameMapperDirect::make_unique(
+				nlcdFileInfo.fileName().toStdString(),
+				nlcdDirectory);
 		}
-		cgNlcd.reset(
-			new CachedGdal<uint8_t>(nlcdDirectory,
-						"nlcd",
-						GdalNameMapperDirect::make_unique(nlcdPattern,
-										  nlcdDirectory)));
+		cgNlcd.reset(new CachedGdal<uint8_t>(nlcdDirectory, "nlcd", std::move(nameMapper)));
 		cgNlcd->setNoData(0);
 		/**********************************************************************************/
 	} else if (_propEnvMethod == CConst::popDensityMapPropEnvMethod) {
@@ -2824,8 +2839,10 @@ void AfcManager::importConfigAFCjson(const std::string &inputJSONpath, const std
 	}
 
 	if (jsonObj.contains("nlcdFile") && !jsonObj["nlcdFile"].isUndefined()) {
-		_nlcdFile = SearchPaths::forReading("data", jsonObj["nlcdFile"].toString(), true)
-				    .toStdString();
+		// Name part may contain template, it should not be searched for
+		auto nlcdFileInfo = QFileInfo(jsonObj["nlcdFile"].toString());
+		auto nlcdDir = SearchPaths::forReading("data", nlcdFileInfo.dir().path(), true);
+		_nlcdFile = QDir::cleanPath(nlcdDir + "/" + nlcdFileInfo.fileName()).toStdString();
 	} else {
 		throw std::runtime_error("AfcManager::importConfigAFCjson(): nlcdFile is missing.");
 	}

@@ -57,6 +57,8 @@ class RcacheServiceSettings(pydantic.BaseSettings):
             ...,
             title="Postgres DSN: "
             "postgresql://[user[:password]]@host[:port]/database[?...]")
+    postgres_password_file: Optional[str] = \
+        pydantic.Field(None, title="File with password for database DSN")
     if_db_exists: IfDbExists = \
         pydantic.Field(
             IfDbExists.leave,
@@ -106,6 +108,8 @@ class RcacheClientSettings(pydantic.BaseSettings):
             None,
             title="Postgres DSN: "
             "postgresql://[user[:password]]@host[:port]/database[?...]")
+    postgres_password_file: Optional[str] = \
+        pydantic.Field(None, title="File with password for database DSN")
     service_url: Optional[pydantic.AnyHttpUrl] = \
         pydantic.Field(None, title="Rcache server base RestAPI URL")
     rmq_dsn: Optional[pydantic.AmqpDsn] = \

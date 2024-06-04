@@ -21,6 +21,7 @@ import json
 import os
 import random
 import re
+import secret_utils
 import sqlalchemy as sa
 import sqlalchemy.ext.asyncio as sa_async
 import sys
@@ -35,6 +36,9 @@ from rcache_models import AfcReqRespKey, ApDbRecord, ApDbRespState, \
 
 # Environment variable with connection string to Postgres DB
 POSTGRES_DSN_ENV = "RCACHE_POSTGRES_DSN"
+
+# Environment variable with credentials filename for Postgres DB
+POSTGRES_PASSWORD_FILE_ENV = "RCACHE_POSTGRES_PASSWORD_FILE"
 
 # Environment variable with URL to Rcache service
 RCACHE_URL_ENV = "RCACHE_SERVICE_URL"
@@ -518,8 +522,12 @@ async def do_mass_lookup(args: Any) -> None:
     per_worker_count = args.count // args.threads
     reporter = Reporter(total_count=per_worker_count * args.threads)
     metadata: Optional[sa.MetaData] = None
+    postgres_dsn = \
+        secret_utils.substitute_password(
+            dsc="rcache database", dsn=args.postgres,
+            password_file=args.postgres_password_file, optional=args.dry)
     if not args.dry:
-        engine = sa.create_engine(args.postgres)
+        engine = sa.create_engine(postgres_dsn)
         metadata = sa.MetaData()
         metadata.reflect(bind=engine)
         engine.dispose()
@@ -527,8 +535,8 @@ async def do_mass_lookup(args: Any) -> None:
         for _ in range(args.threads):
             tg.create_task(
                 lookup_worker(
-                    postgres_dsn=args.postgres, metadata=metadata,
-                    dry=args.dry, min_idx=args.min_idx, max_idx=args.max_idx,
+                    postgres_dsn=postgres_dsn, metadata=metadata, dry=args.dry,
+                    min_idx=args.min_idx, max_idx=args.max_idx,
                     batch_size=args.batch, count=per_worker_count,
                     reporter=reporter))
     reporter.report()
@@ -662,6 +670,7 @@ def main(argv: List[str]) -> None:
     argv -- Program arguments
     """
     default_postgres = os.environ.get(POSTGRES_DSN_ENV)
+    default_postgres_password_file = os.environ.get(POSTGRES_PASSWORD_FILE_ENV)
 
     default_rcache = os.environ.get(RCACHE_URL_ENV)
     if (default_rcache is None) and (RCACHE_PORT_ENV in os.environ):
@@ -697,6 +706,12 @@ def main(argv: List[str]) -> None:
         help="Connection string to Rcache Postgres database. " +
         (f"Default is {default_postgres}" if default_postgres is not None
          else "This parameter is mandatory"))
+    switches_postgres.add_argument(
+        "--postgres_password_file", metavar="PASSWORD_FILE",
+        default=default_postgres_password_file,
+        help="Name of file with Postgres DSN password" +
+        (f". Default is {default_postgres_password_file}"
+         if default_postgres_password_file else ""))
 
     switches_rcache = argparse.ArgumentParser(add_help=False)
     switches_rcache.add_argument(

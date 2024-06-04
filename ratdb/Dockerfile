@@ -1,5 +1,5 @@
 FROM postgres:14.9-alpine
-ENV POSTGRES_PASSWORD=N3SF0LVKJx1RAhFGx4fcw
+ENV POSTGRES_PASSWORD=postgres
 ENV PGDATA=/mnt/nfs/psql/data
 ENV POSTGRES_DB=fbrat
 #

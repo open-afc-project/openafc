@@ -395,12 +395,12 @@ def main(argv: List[str]) -> None:
                         executor.submit(
                             do_request, req=req, url=args.server_url,
                             timeout_sec=request_timeout_sec
-                        )] = ReqInfo(name=point[POINT_NAME_KEY],
-                                     region=region, req=req,
-                                     lat=point[POINT_COORD_DICT_KEY][
-                            POINT_COORD_LAT_KEY],
-                        lon=point[POINT_COORD_DICT_KEY][
-                            POINT_COORD_LON_KEY])
+                            )] = ReqInfo(name=point[POINT_NAME_KEY],
+                                         region=region, req=req,
+                                         lat=point[POINT_COORD_DICT_KEY][
+                                             POINT_COORD_LAT_KEY],
+                                         lon=point[POINT_COORD_DICT_KEY][
+                                             POINT_COORD_LON_KEY])
             # Processing finished requests
             for future in concurrent.futures.as_completed(future_to_req_info):
                 req_info = future_to_req_info[future]

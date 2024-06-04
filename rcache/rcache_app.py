@@ -45,6 +45,7 @@ def get_service() -> RcacheService:
         rcache_service = \
             RcacheService(
                 rcache_db_dsn=settings.postgres_dsn,
+                rcache_db_password_file=settings.postgres_password_file,
                 precompute_quota=settings.precompute_quota,
                 afc_req_url=settings.afc_req_url,
                 rulesets_url=settings.rulesets_url,
@@ -116,10 +117,10 @@ async def update(
 
 @app.post("/invalidation_state/{enabled}")
 async def set_invalidation_state(
-    enabled: Annotated[
-        bool,
-        fastapi.Path(
-            title="true/false to enable/disable invalidation")],
+        enabled: Annotated[
+            bool,
+            fastapi.Path(
+                title="true/false to enable/disable invalidation")],
         service: RcacheService = fastapi.Depends(get_service)) -> None:
     """ Enable/disable invalidation """
     await service.set_invalidation_enabled(enabled)
@@ -134,10 +135,10 @@ async def get_invalidation_state(
 
 @app.post("/precomputation_state/{enabled}")
 async def set_precomputation_state(
-    enabled: Annotated[
-        bool,
-        fastapi.Path(
-            title="true/false to enable/disable precomputation")],
+        enabled: Annotated[
+            bool,
+            fastapi.Path(
+                title="true/false to enable/disable precomputation")],
         service: RcacheService = fastapi.Depends(get_service)) -> None:
     """ Enable/disable precomputation """
     await service.set_precomputation_enabled(enabled)
@@ -152,17 +153,17 @@ async def get_precomputation_state(
 
 @app.post("/update_state/{enabled}")
 async def setupdate_state(
-    enabled: Annotated[
-        bool,
-        fastapi.Path(
-            title="true/false to enable/disable update")],
+        enabled: Annotated[
+            bool,
+            fastapi.Path(
+                title="true/false to enable/disable update")],
         service: RcacheService = fastapi.Depends(get_service)) -> None:
     """ Enable/disable update """
     await service.set_update_enabled(enabled)
 
 
 @app.get("/update_state")
-async def get_precomputation_state(
+async def get_update_enabled_state(
         service: RcacheService = fastapi.Depends(get_service)) -> bool:
     """ Return update enabled state """
     return await service.get_update_enabled()
@@ -178,7 +179,7 @@ async def get_service_status(
 
 @app.get("/precomputation_quota")
 async def get_precompute_quota(
-        service: RcacheService = fastapi.Depends(get_service)) -> int:
+            service: RcacheService = fastapi.Depends(get_service)) -> int:
     """ Returns current precomputation quota (maximum number of simultaneously
     running precomputations) """
     return service.precompute_quota

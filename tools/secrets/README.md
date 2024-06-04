@@ -39,35 +39,37 @@ In Kubernetes the simplest (by no means safest) form of storing secrets is **sec
 apiVersion: v1
 kind: Secret
 metadata:
-    name: SECRETS_GROUP_NAME
+    name: SECRETS_NAME
 data:
     # Comment1
-    SECRET_NAME1: <Base64 secret value>
+    SECRET_KEY11: <Base64 secret value>
     # Comment2
-    SECRET_NAME2: <Base64 secret value>
+    SECRET_KEY2: <Base64 secret value>
     ...
 stringData:
     # Comment3
-    SECRET_NAME3: <verbatim secret value>
+    SECRET_KEY3: <verbatim secret value>
     # Comment4
-    SECRET_NAME4: <verbatim secret value>
+    SECRET_KEY4: <verbatim secret value>
     ...
 
     # Comment5
-    JSON_SECRET1.json: |
+    JSON_SECRET_KEY1.json: |
         {
             "FIELD1": "VALUE1",
             ...
         }
 
     # Comment6
-    YAML_SECRET1.yaml: |
+    YAML_SECRET_KEY1.yaml: |
         ---
         FIELD1: VALUE1
         ...
 
 ```
 Note how YAML format allows to store JSON and YAML files in verbatim secrets section (`JSON_SECRET1.json`, `YAML_SECRET1.yam`).
+
+Keys of `data`/`stringData` sections are used as file names (in Kubernetes they also can be used as environment variables). One manifest may contain several keys, but for simplicity of management AFC uses one key per secrest manifest (several manifests may be stored in a single file, using `---` separator).
 
 This Kubernetes secret manifest format is used to store secrets (at least in Compose environment - Kubernetes storage mechanism may evolve towards something safer/more appropriate).
 
@@ -79,29 +81,29 @@ This structure is documented in secret template file. Secret template file is se
 apiVersion: v1
 kind: Secret
 metadata:
-    name: SECRETS_GROUP_NAME
+    name: SECRETS_NAME
 data:
     # Comment1
-    SECRET_NAME1:
+    SECRET_KEY1:
     # Comment2
-    SECRET_NAME2:
+    SECRET_KEY2:
     ...
 stringData:
     # Comment3
-    SECRET_NAME3:
+    SECRET_KEY3:
     # Comment4
-    SECRET_NAME4:
+    SECRET_KEY4:
     ...
 
     # Comment5
-    JSON_SECRET1.json: |
+    JSON_SECRET_KEY1.json: |
         {
             "FIELD1": null,
             ...
         }
 
     # Comment6
-    YAML_SECRET1.yaml: |
+    YAML_SECRET_KEY1.yaml: |
         ---
         FIELD1:
         ...
@@ -124,19 +126,19 @@ services:
   service1:
     image: image1
     secrets:
-      - SECRET_NAME1
-      - SECRET_NAME2
+      - SECRET_KEY1
+      - SECRET_KEY2
   service2:
     image: image2
     secrets:
-      - JSON_SECRET1.json:
+      - JSON_SECRET_KEY1.json:
 
 secrets:
-  SECRET_NAME1:
+  SECRET_KEY1:
     file: <Filename for SECRET_NAME1>
-  SECRET_NAME2:
+  SECRET_KEY2:
     file: <Filename for SECRET_NAME2>
-  JSON_SECRET1.json:
+  JSON_SECRET_KEY1.json:
     file: <Filename for JSON_SECRET1.json>
 ```
 
@@ -217,7 +219,7 @@ As of time of this writing the template for AFC Secrets looked like this:
 apiVersion: v1
 kind: Secret
 metadata:
-    name: afc_secrets
+    name: oidc
 stringData:
     OIDC.json: |
         {
@@ -226,7 +228,12 @@ stringData:
             "CLIENT_SECRET": null,
             "DISCOVERY_URL": null
         }
-
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: registration-captcha
+stringData:
     REGISTRATION_CAPTCHA.json: |
         {
             "USE_CAPTCHA": null,
@@ -234,7 +241,12 @@ stringData:
             "SITEKEY": null,
             "VERIFY": null
         }
-
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: notifier-mail
+stringData:
     NOTIFIER_MAIL.json: |
         {
             "SERVER": null,
@@ -244,12 +256,18 @@ stringData:
             "USERNAME": null,
             "PASSWORD": null
         }
-
+---
+apiVersion: v1
+kind: Secret
+metadata:
+    name: registration-json
+stringData:
     REGISTRATION.json: |
         {
             "DEST_EMAIL": null,
             "DEST_PDL_EMAIL": null,
             "SRC_EMAIL": null,
             "APPROVE_LINK": null,
+            "ABOUT_CONTENT": null
         }
 ```

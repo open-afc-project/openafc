@@ -6,7 +6,7 @@
 
 apiVersion: v2
 name: afc-int
-description: Helm charts for 'inner' AFC cluster
+description: Helm charts for 'internal' AFC cluster
 
 # A chart can be either an 'application' or a 'library' chart.
 #
