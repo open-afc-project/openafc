@@ -26,6 +26,9 @@ externalIps:
 # Dictionary of image repositories. Keys may be any - they are used in
 # component definition. Fields are:
 # path Repository path
+# pushPath Repsoitory to push images to (default is same as 'path'). This field
+# is used by image push script, not by helmcharts and most likely be defined in
+# site-specific values.yaml override
 # pullSecrets List of names of pull secrets
 imageRepositories:
   public:
