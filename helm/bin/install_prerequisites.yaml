@@ -7,6 +7,11 @@
 ---
 # Parameters for install_prerequisites.py
 
+# Default list of components (keys of 'install_components' dictionary) to
+# install/uninstall. Can be overridden in e.g. YAML file, passed via
+# --extra_cfg parameter)
+default_install_components: []
+
 # Dictionary of components (helmcharts and manifests) that might be installed.
 # Keys used in install_prerequisites.py command lines to chose what to install.
 # Entries better be in recommended install order (e.g. because parametyerless

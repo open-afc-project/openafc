@@ -28,6 +28,10 @@ from utils import ArgumentParserFromFile, ClusterContext, Duration, error, \
 
 DEFAULT_CONFIG = os.path.splitext(__file__)[0] + ".yaml"
 
+KEY_DEFAULT_COMPONENTS = "default_install_components"
+KEY_INSTALL_COMPONENTS = "install_components"
+ALL_KEYS = [KEY_DEFAULT_COMPONENTS, KEY_INSTALL_COMPONENTS]
+
 
 class InstallComponent:
     """ Container of install component, allowing dot-access to its attributes
@@ -47,10 +51,10 @@ class InstallComponent:
         cfg  -- The whole config dictionary
         name -- Install component name
         """
-        assert name in cfg["install_components"]
+        assert name in cfg[KEY_INSTALL_COMPONENTS]
         self._cfg = cfg
         self.name = name
-        self._component = self._cfg["install_components"][self.name]
+        self._component = self._cfg[KEY_INSTALL_COMPONENTS][self.name]
 
     def __getattr__(self, attr: str) -> Any:
         """ Install component attribute retrieval """
@@ -186,7 +190,6 @@ class InstallHandler(abc.ABC):
                cluster_context: ClusterContext) -> "InstallHandler":
         """ InstallHandler factory
 
-
         Arguments:
         component        -- InstallComponent object
         is_new_namespace -- True if namespace present and not appeared in
@@ -207,7 +210,10 @@ class InstallHandler(abc.ABC):
                 HelmInstallHandler(
                     component=component, is_new_namespace=is_new_namespace,
                     cluster_context=cluster_context)
-        error(f"Install item '{component.name}' has unsupported structure")
+        return \
+            DummyInstallHandler(
+                component=component, is_new_namespace=is_new_namespace,
+                cluster_context=cluster_context)
 
 
 class ManifestInstallHandler(InstallHandler):
@@ -330,6 +336,18 @@ class HelmInstallHandler(InstallHandler):
     #                for chartinfo in installed_charts)
 
 
+class DummyInstallHandler(InstallHandler):
+    """ Installs/uninstalls dummy (neither of the above) component """
+
+    def _install_impl(self) -> None:
+        """ Class-specific installation operations """
+        pass
+
+    def _uninstall_impl(self) -> None:
+        """ Class-specific uninstallation operations """
+        pass
+
+
 def recursive_merge(base: Any, override: Any) -> Any:
     """ Recursive merge
 
@@ -414,9 +432,12 @@ def main(argv: List[str]) -> None:
     argument_parser.add_argument(
         "COMPONENT", nargs="*",
         help=f"Names of components to install (valid names are: "
-        f"{', '.join(cfg['install_components'].keys())}). This parameter may "
-        f"be unspecified for uninstallation - in this case uninstallation of "
-        f"all components will be attempted.")
+        f"{', '.join(cfg[KEY_INSTALL_COMPONENTS].keys())}). If this list is "
+        f"empty, '{KEY_DEFAULT_COMPONENTS}' of consolidated config is used "
+        f"(currently it is: "
+        f"'{', '.join(cfg.get(KEY_DEFAULT_COMPONENTS, []))}'). If still empty "
+        f"- on installation it is error, on uninstallation - all components "
+        f"are uninstalled")
 
     if not argv:
         argument_parser.print_help()
@@ -427,16 +448,19 @@ def main(argv: List[str]) -> None:
     if args.print_cfg:
         print(
             yaml.dump(
-                cfg, indent=2, allow_unicode=True,
+                {k: v for k, v in cfg.items() if k in ALL_KEYS},
+                indent=2, allow_unicode=True,
                 Dumper=getattr(yaml, "CDumper", yaml.Dumper)))
         return
 
     # Creating install list
-    error_if(not (args.uninstall or args.COMPONENT),
-             "Components to install should be explicitly specified")
-    install_list = args.COMPONENT or list(cfg["install_components"].keys())
+    error_if(not (args.uninstall or args.COMPONENT or
+                  cfg.get(KEY_DEFAULT_COMPONENTS)),
+             "Components to install should be specified")
+    install_list = args.COMPONENT or cfg.get(KEY_DEFAULT_COMPONENTS) or \
+        list(cfg[KEY_INSTALL_COMPONENTS].keys())
     for component in install_list:
-        error_if(component not in cfg["install_components"],
+        error_if(component not in cfg[KEY_INSTALL_COMPONENTS],
                  f"Unknown component name '{component}'")
 
     cluster_context = parse_kubecontext(args.context)
