@@ -549,15 +549,14 @@ class RatAfc(MethodView):
     ''' RAT AFC resources
     '''
 
-    def _auth_cert_id(self, cert_id, ruleset):
+    def _auth_cert_id(self, cert_id, ruleset, session):
         ''' Authenticate certification id. Return new indoor value
             for bell application
         '''
         LOGGER.debug("(%d) %s::%s()", threading.get_native_id(),
                      self.__class__, inspect.stack()[0][3])
         indoor_certified = True
-
-        certId = CertId.query.filter_by(certification_id=cert_id).first()
+        certId = session.query(CertId).filter_by(certification_id=cert_id).first()
         if not certId:
             raise DeviceUnallowedException("")
         if not certId.ruleset.name == ruleset:
@@ -590,33 +589,33 @@ class RatAfc(MethodView):
                      threading.get_native_id(),
                      self.__class__, inspect.stack()[0][3],
                      serial_number, prefix, cert_id, rulesets, version)
+        with db.session() as session:
+            deny_ap = session.query(AccessPointDeny).filter_by(
+                serial_number=serial_number). filter_by(
+                certification_id=cert_id).first()
+            if deny_ap:
+                raise DeviceUnallowedException("")  # InvalidCredentialsException()
 
-        deny_ap = AccessPointDeny.query.filter_by(
-            serial_number=serial_number). filter_by(
-            certification_id=cert_id).first()
-        if deny_ap:
-            raise DeviceUnallowedException("")  # InvalidCredentialsException()
+            deny_ap = session.query(AccessPointDeny).filter_by(certification_id=cert_id).\
+                filter_by(serial_number=None).first()
+            if deny_ap:
+                # denied all devices matching certification id
+                raise DeviceUnallowedException("")  # InvalidCredentialsException()
 
-        deny_ap = AccessPointDeny.query.filter_by(certification_id=cert_id).\
-            filter_by(serial_number=None).first()
-        if deny_ap:
-            # denied all devices matching certification id
-            raise DeviceUnallowedException("")  # InvalidCredentialsException()
+            ruleset = prefix
 
-        ruleset = prefix
+            # Test AP will by pass certification ID check as Indoor Certified
+            if cert_id == "TestCertificationId" \
+               and serial_number == "TestSerialNumber":
+                return True
 
-        # Test AP will by pass certification ID check as Indoor Certified
-        if cert_id == "TestCertificationId" \
-           and serial_number == "TestSerialNumber":
-            return True
+            if cert_id == "HeatMapCertificationId" \
+               and serial_number == "HeatMapSerialNumber":
+                return True
 
-        if cert_id == "HeatMapCertificationId" \
-           and serial_number == "HeatMapSerialNumber":
-            return True
-
-        # Assume that once we got here, we already trim the cert_obj list down
-        # to only one entry for the country we're operating in
-        return self._auth_cert_id(cert_id, ruleset)
+            # Assume that once we got here, we already trim the cert_obj list
+            # down to only one entry for the country we're operating in
+            return self._auth_cert_id(cert_id, ruleset, session)
 
     def get(self):
         ''' GET method for Analysis Status '''
@@ -784,8 +783,9 @@ class RatAfc(MethodView):
                                  runtime_opts)
 
                     # Retrieving config
-                    config = AFCConfig.query.filter(
-                        AFCConfig.config['regionStr'].astext == region).first()
+                    with db.session() as session:
+                        config = session.query(AFCConfig).filter(
+                            AFCConfig.config['regionStr'].astext == region).first()
                     if not config:
                         raise DeviceUnallowedException(
                             "No AFC configuration for ruleset")
