@@ -73,79 +73,79 @@ merge_upstream_changes:
 
 
 
-# # This job runs to create dir with unique name
-# # that includes sources that will be validated
-# getsrc_job:
-#   stage: getsrc
-#   rules:
-#     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
-#       when: always
-#   script:
-#     - echo "create random number"
-#     - RAND=`date +"D_%d_%m_%y_T_%H_%M_%S_TZ_%Z"`_hash_`git rev-parse --short HEAD` && echo ${RAND}
-#     - echo "RAND=${RAND}" >> $CI_PROJECT_DIR/vars.env
+# This job runs to create dir with unique name
+# that includes sources that will be validated
+getsrc_job:
+  stage: getsrc
+  rules:
+    - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
+      when: always
+  script:
+    - echo "create random number"
+    - RAND=`date +"D_%d_%m_%y_T_%H_%M_%S_TZ_%Z"`_hash_`git rev-parse --short HEAD` && echo ${RAND}
+    - echo "RAND=${RAND}" >> $CI_PROJECT_DIR/vars.env
 
-#     - echo "generate workdir which includes random number"
-#     - WD=$CI_WORKING_DIR/wccafc-dev_${RAND}
-#     - echo "WD=${WD}" >> $CI_PROJECT_DIR/vars.env
+    - echo "generate workdir which includes random number"
+    - WD=$CI_WORKING_DIR/wccafc-dev_${RAND}
+    - echo "WD=${WD}" >> $CI_PROJECT_DIR/vars.env
 
-#     - echo "rsync sources"
-#     - echo "cmd rsync -raz --delete ./ ${WD}"
-#     - rsync -raz --delete ./ ${WD}/
-#   artifacts:
-#     reports:
-#       dotenv: $CI_PROJECT_DIR/vars.env
+    - echo "rsync sources"
+    - echo "cmd rsync -raz --delete ./ ${WD}"
+    - rsync -raz --delete ./ ${WD}/
+  artifacts:
+    reports:
+      dotenv: $CI_PROJECT_DIR/vars.env
 
-# # Building regression test images
-# build_job:
-#   stage: build
-#   rules:
-#     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
-#       when: always
-#   before_script:
-#     - if [ "$PUSH_DI" = "1" ]; then echo $ARTIFACTORY_PASSWORD | docker login -u $ARTIFACTORY_USER --password-stdin $PRIV_REPO; fi
-#   script:
-#     ######## git clone sources ##############
-#     # main repo already cloned and copied to:
-#     # $CI_WORKING_DIR/wccafc-dev_$RAND
-#     # now need to init submodules
-#     - cd "${WD}"
-#     - git submodule update --init --recursive
+# Building regression test images
+build_job:
+  stage: build
+  rules:
+    - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
+      when: always
+  before_script:
+    - if [ "$PUSH_DI" = "1" ]; then echo $ARTIFACTORY_PASSWORD | docker login -u $ARTIFACTORY_USER --password-stdin $PRIV_REPO; fi
+  script:
+    ######## git clone sources ##############
+    # main repo already cloned and copied to:
+    # $CI_WORKING_DIR/wccafc-dev_$RAND
+    # now need to init submodules
+    - cd "${WD}"
+    - git submodule update --init --recursive
 
-#     # generate  regression dir path
-#     - REGRD=tests/regression_${RAND}
-#     - REGRD_ORIG=tests/regression
-#     - echo "REGRD=${REGRD}" >> $CI_PROJECT_DIR/vars.env
+    # generate  regression dir path
+    - REGRD=tests/regression_${RAND}
+    - REGRD_ORIG=tests/regression
+    - echo "REGRD=${REGRD}" >> $CI_PROJECT_DIR/vars.env
 
-#     # create regression dir which includes rand
-#     # it is done the name of dir is used by docker-compose to create service name
-#     - cp -r "${WD}/${REGRD_ORIG}/." "${WD}/${REGRD}/"
-#     # build regr test images
-#     - bash "${WD}/${REGRD}/build_imgs.sh" ${WD} ${RAND} ${PUSH_DI}
-#   # after_script:
-#   #   - if [ "$PUSH_DI" = "1" ]; then docker logout $PRIV_REPO; fi
-#   artifacts:
-#     reports:
-#       dotenv: $CI_PROJECT_DIR/vars.env
+    # create regression dir which includes rand
+    # it is done the name of dir is used by docker-compose to create service name
+    - cp -r "${WD}/${REGRD_ORIG}/." "${WD}/${REGRD}/"
+    # build regr test images
+    - bash "${WD}/${REGRD}/build_imgs.sh" ${WD} ${RAND} ${PUSH_DI}
+  # after_script:
+  #   - if [ "$PUSH_DI" = "1" ]; then docker logout $PRIV_REPO; fi
+  artifacts:
+    reports:
+      dotenv: $CI_PROJECT_DIR/vars.env
 
-# #Running tests
-# test_job:
-#   stage: test
-#   rules:
-#     - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
-#       when: always
-#   variables:
-#     RUN_FROM_RAND: 1
-#   before_script:
-#     # start dev srvr
-#     - bash "${WD}/${REGRD}/run_srvr.sh" ${WD} ${RAND} ${RUN_FROM_RAND}
-#   script:
-#     # get dev srvr port num
-#     - TEST_PORT=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 80 |sed 's/.*://'`
+#Running tests
+test_job:
+  stage: test
+  rules:
+    - if: '($CI_PIPELINE_SOURCE != "schedule" && ($CI_COMMIT_REF_NAME == "main" || $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "main"))'
+      when: always
+  variables:
+    RUN_FROM_RAND: 1
+  before_script:
+    # start dev srvr
+    - bash "${WD}/${REGRD}/run_srvr.sh" ${WD} ${RAND} ${RUN_FROM_RAND}
+  script:
+    # get dev srvr port num
+    - TEST_PORT=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 80 |sed 's/.*://'`
 
-#     # run tests
-#     - bash "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} $CI_HOST_HOSTNAME ${TEST_PORT} http
-#   after_script:
-#     # stop dev srvr
-#     - bash "${WD}/${REGRD}/stop_srvr.sh" ${WD} ${RAND}
+    # run tests
+    - bash "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} $CI_HOST_HOSTNAME ${TEST_PORT} http
+  after_script:
+    # stop dev srvr
+    - bash "${WD}/${REGRD}/stop_srvr.sh" ${WD} ${RAND}
 
