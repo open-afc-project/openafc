@@ -50,7 +50,7 @@ merge_upstream_changes:
       when: always
   environment: production
   before_script:
-  - git remote set-url origin https://git:${CI_JOB_TOKEN}@wcc-gitlab.lvn.broadcom.net:30443/afc/brcm-afc.git
+  - git remote set-url origin https://git:${CI_PUSH_TOKEN}@wcc-gitlab.lvn.broadcom.net:30443/afc/brcm-afc.git
   - git config --global user.email "gitlab-runner@broadcom.com"
   - git config --global user.name "gitlab-runner"
   script:
