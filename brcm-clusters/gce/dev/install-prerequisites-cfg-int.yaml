@@ -7,7 +7,16 @@
 
 # Internal cluster-specifc config for install_prerequisites.py.
 # Requires YAML with externalIps (values-afc-common.yaml as of time of this
-# writing) to also be included as config file
+# writing) to also be included as config file.
+
+default_install_components:
+  - prometheus_operator
+  - prometheus
+  - prometheus_adapter
+  - external_secrets
+  - ingress_nginx
+  - default_istio_injection
+
 install_components:
   ingress_nginx:
     helm_settings:
@@ -16,3 +25,14 @@ install_components:
       - controller.service.internal.annotations."cloud\.google\.com/load-balancer-type"=Internal
       - controller.service.annotations."networking\.gke\.io/load-balancer-type"=Internal
       - controller.service.loadBalancerIP={{externalIps.int-ingress}}
+    postinstall:
+      - >-
+        kubectl patch namespace ingress-nginx -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+  external_secrets:
+    postinstall:
+      - >-
+        kubectl patch namespace external-secrets -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+  default_istio_injection:
+    postinstall:
+      - >-
+        kubectl patch namespace default -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'

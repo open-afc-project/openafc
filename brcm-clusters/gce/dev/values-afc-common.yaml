@@ -4,7 +4,19 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
+# This values.yaml override, common to external and internal AFC clusters is
+# used by:
+#  - start.py:
+#     - As --values parameter to helm_install_int/ext.py
+#     - As --ext_cfg parameter to install_prerequisites (as it contains
+#       IP addresses that might be useful there)
+#     - For printing IP addresses at the end
+#  - repository_push.py
+#     - For push/pull image repository addresses
+
 # Static IPs of internal and external clusters
+# This dictionary is used by AFC helmcharts of both clusters and by
+# install_prerequisites.py
 externalIps:
   # Ingress of internal cluster
   int-ingress: 10.255.128.213
@@ -12,14 +24,18 @@ externalIps:
   int-rmq: 10.255.128.214
   # Dispatcher on external cluster
   ext-dispatcher: 10.255.0.24
+  # Postgres server
+  postgres: 10.255.161.7
 
 imageRepositories:
   public:
     path: wcc-afc-docker-virtual.usw2.packages.broadcom.com
+    pushPath: wcc-afc-docker-dev-local.usw2.packages.broadcom.com
     pullSecrets:
       - image-pull
   private:
     path: wcc-afc-docker-virtual.usw2.packages.broadcom.com
+    pushPath: wcc-afc-docker-dev-local.usw2.packages.broadcom.com
     pullSecrets:
       - image-pull
 

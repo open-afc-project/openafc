@@ -34,7 +34,7 @@ staticVolumes:
 
 configmaps:
   flask-conf:
-    FLASK_SQLALCHEMY_DATABASE_URI: postgresql://postgres@10.255.161.7/fbrat
+    FLASK_SQLALCHEMY_DATABASE_URI: postgresql://postgres@{{ip:postgres}}/fbrat
     FLASK_USER_EMAIL_SENDER_EMAIL: afc.admin@broadcom.com
   ratapi-configurator:
     REGISTRATION_APPROVE_LINK: ._
@@ -56,14 +56,15 @@ configmaps:
     OIDC_DISCOVERY_URL: >-
       https://login.broadcom.com/oauth2/default/.well-known/openid-configuration
   als-siphon:
-    POSTGRES_INIT_CONN_STR: postgresql://postgres@10.255.161.7/postgres
-    POSTGRES_ALS_CONN_STR: postgresql://postgres@10.255.161.7/ALS
-    POSTGRES_LOG_CONN_STR: postgresql://postgres@10.255.161.7/AFC_LOGS
+    POSTGRES_INIT_CONN_STR: postgresql://postgres@{{ip:postgres}}/postgres
+    POSTGRES_ALS_CONN_STR: postgresql://postgres@1{{ip:postgres}}/ALS
+    POSTGRES_LOG_CONN_STR: postgresql://postgres@{{ip:postgres}}/AFC_LOGS
   uls-downloader:
-    ULS_SERVICE_STATE_DB_DSN: postgresql://postgres@10.255.161.7/fs_state
+    ULS_SERVICE_STATE_DB_DSN: postgresql://postgres@{{ip:postgres}}/fs_state
   rcache-common:
-    RCACHE_POSTGRES_DSN: postgresql://postgres@10.255.161.7/rcache
+    RCACHE_POSTGRES_DSN: postgresql://postgres@{{ip:postgres}}/rcache
 
+# Redirecting all password secrets to 'postgres' user password secret
 externalSecrets:
   ratdb-password:
     remoteSecretName: postgres-password
