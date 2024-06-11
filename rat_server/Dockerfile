@@ -89,7 +89,7 @@ COPY rat_server/devel.sh /wd/
 RUN chmod +x /wd/devel.sh
 RUN /wd/devel.sh
 # TODO to rename following variable after source split
-ENV AFC_MSGHND_RATAFC_TOUT=${AFC_MSGHND_RATAFC_TOUT:-600}
+ENV FLASK_AFC_MSGHND_RATAFC_TOUT=${FLASK_AFC_MSGHND_RATAFC_TOUT:-600}
 ENV AFC_RATAPI_LOG_LEVEL=${AFC_RATAPI_LOG_LEVEL:-WARNING}
 COPY rat_server/entrypoint.sh /
 RUN chmod +x /entrypoint.sh
