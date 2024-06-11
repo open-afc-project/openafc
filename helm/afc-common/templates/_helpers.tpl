@@ -37,14 +37,6 @@ Manifest name made from component name
 {{- end }}
 
 {{/*
-Manifest name made from configmap name
-.configmap must be defined
-*/}}
-{{- define "afc.configmapManifestName" -}}
-{{- .configmap | include "afc.rfc1123" -}}
-{{- end }}
-
-{{/*
 Manifest name made from secret name
 .secret must be defined
 */}}
@@ -382,21 +374,6 @@ securityContext: {{ toYaml $sc | nindent 2 }}
 {{- end }}
 
 {{/*
-Render environment from ConfigMaps, contained in envConfigmapKeys list of component descriptor
-.component (key in $.Values.components) must be defined
-*/}}
-{{- define "afc.envFromConfigMaps" -}}
-{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
-{{- $configmaps := get $compDef "envConfigmapKeys" -}}
-{{- if $configmaps }}
-{{-   range $configmap := $configmaps }}
-- configMapRef:
-    name: {{ include "afc.configmapManifestName" (dict "configmap" $configmap) }}
-{{-   end }}
-{{- end }}
-{{- end }}
-
-{{/*
 Mount path of given secret
 .secret (key in $.Values.externalSecrets) must be defined
 */}}
@@ -406,10 +383,10 @@ Mount path of given secret
 {{- end -}}
 
 {{/*
-Renders configmap entry or environment variable value
+Renders environment value
 .value (Value to render) must be defined
 .Values (top level values dictionary) must be defined
-Parameter is configmap entry or environment variable as specified in values.yanl (i.e. may contain {{...}} expressions - see values.yaml, comment to configmap section for supported expressons)
+Parameter is value of environment entry in sharedEnv.* or components.*.env of values.yaml, may contain {{...}} expressions (see values.yaml, comment to sharedEnv section for supported expressons)
 Returns value or 'SKIP_SKIP_SKIP_SKIP' to skip
 */}}
 {{- define "afc.envValue" -}}
@@ -533,23 +510,23 @@ Returns value or 'SKIP_SKIP_SKIP_SKIP' to skip
 {{- $sameAsDefs := regexFindAll "\\{\\{sameAs:.+?\\}\\}" $value -1 -}}
 {{- range $sameAsDef := $sameAsDefs }}
 {{-   $parts := regexFindAll "[^:\\{\\}]+" $sameAsDef -1 -}}
-{{-   $configmapKey := index $parts 1 -}}
+{{-   $sharedEnvKey := index $parts 1 -}}
 {{-   $valueKey := index $parts 2 -}}
 {{    $ifAbsent := "required" }}
 {{-   if ge (len $parts) 4 }}
 {{-     $ifAbsent = index $parts 3 -}}
 {{-   end }}
-{{-   $configmapDef := get $.Values.configmaps $configmapKey | required (cat "Configmap" $configmapKey "used in rendering of " $sameAsDef "not found" ) -}}
-{{-   if not (hasKey $configmapDef $valueKey) }}
+{{-   $sharedEnvDef := get $.Values.sharedEnv $sharedEnvKey | required (cat "Shared environment block" $sharedEnvKey "used in rendering of" $sameAsDef "not found" ) -}}
+{{-   if not (hasKey $sharedEnvDef $valueKey) }}
 {{-     if eq $ifAbsent "optional" }}
 {{-       $skip = true -}}
 {{-     else if eq $ifAbsent "nullable" }}
 {{-       $empty = true -}}
 {{-     else }}
-{{-       fail (cat "Value" $valueKey "not found in configmap" $configmapKey "while rendering" $sameAsDef) }}
+{{-       fail (cat "Value" $valueKey "not found in shared environment block" $sharedEnvKey "while rendering" $sameAsDef) }}
 {{-     end }}
 {{-   end }}
-{{-   $v := include "afc.envValue" (dict "value" (get $configmapDef $valueKey) "Values" $.Values) -}}
+{{-   $v := include "afc.envValue" (dict "value" (get $sharedEnvDef $valueKey) "Values" $.Values) -}}
 {{-   if eq $v "SKIP_SKIP_SKIP_SKIP" }}
 {{-     $skip = true -}}
 {{-   end }}
@@ -559,50 +536,43 @@ Returns value or 'SKIP_SKIP_SKIP_SKIP' to skip
 {{- end }}
 
 {{/*
-Renders entries in $.Values.configmap subdictionary as configmap environment entries
-.configmap (key in $.Values.configmaps) must be defined
+Renders environment entries in from given environment dictionary ($.Values.sharedEnv.* or $.Values.components.*.env)
+.envDict (environment dictionary to render values from) must be defined
+.Values (top level values dictionary) must be defined
 */}}
-{{- define "afc.configmapEnvEntries" -}}
-{{- $values := get $.Values.configmaps .configmap | required (cat "No configmap for this configmap key:" .configmap) -}}
-{{- range $name, $value := $values }}
+{{- define "afc.envEntries" -}}
+{{- range $name, $value := .envDict | default (dict) }}
 {{-   if hasSuffix "@S" $name }}
-{{      trimSuffix "@S" $name -}}: {{ toYaml $value }}
+- name: {{ trimSuffix "@S" $name }}
+  value: {{ $value | toString | toYaml }}
 {{-   else if hasSuffix "@I" $name }}
-{{      trimSuffix "@I" $name -}}: {{ int $value | toString | toYaml }}
+- name: {{ trimSuffix "@I" $name }}
+  value: {{ $value | int | toString | toYaml }}
 {{-   else if kindIs "string" $value }}
-{{-     $value = include "afc.envValue" (dict "value" $value "Values" $.Values) }}
-{{-     if ne $value "SKIP_SKIP_SKIP_SKIP" }}
-{{        $name -}}: {{ $value | toString | toYaml }}
+{{-     $v := include "afc.envValue" (dict "value" $value "Values" $.Values) }}
+{{-     if ne $v "SKIP_SKIP_SKIP_SKIP" }}
+- name: {{ $name }}
+  value: {{ $v | toString | toYaml }}
 {{-     end }}
 {{-   else }}
-{{      $name -}}: {{ $value | toString | toYaml }}
+- name: {{ $name }}
+  value: {{ $value | toString | toYaml }}
 {{-   end }}
 {{- end }}
 {{- end }}
 
 {{/*
-Renders environment entries from $.Values.component.*.env
+Render env
 .component (key in $.Values.components) must be defined
 */}}
-{{- define "afc.componentEnvEntries" -}}
+{{- define "afc.env" -}}
 {{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
-{{- range $name, $value := default (dict) (get $compDef "env") }}
-{{-   $skip := false }}
-{{-   if hasSuffix "@S" $name }}
-{{-     $name = trimSuffix "@S" $name }}
-{{-   else if hasSuffix "@I" $name }}
-{{-     $name = trimSuffix "@I" $name }}
-{{      $value = int $value | toString }}
-{{-   else if kindIs "string" $value }}
-{{-     $value = include "afc.envValue" (dict "value" $value "Values" $.Values) }}
-{{-     if eq $value "SKIP_SKIP_SKIP_SKIP" }}
-{{        $skip = true }}
-{{-     end }}
+{{- include "afc.envEntries" (dict "envDict" (get $compDef "env") "Values" $.Values) }}
+{{- range $sharedEnvKey := default (list) (get $compDef "sharedEnvKeys") }}
+{{-   if not (hasKey (get $.Values "sharedEnv" | default (dict)) $sharedEnvKey) }}
+{{-     fail (cat "Shared environment block" $sharedEnvKey "used in rendering of " $.component "not found") }}
 {{-   end }}
-{{-   if not $skip }}
-- name: {{ $name }}
-  value: {{ $value | toString | toYaml }}
-{{-   end }}
+{{-   include "afc.envEntries" (dict "envDict" (get $.Values.sharedEnv $sharedEnvKey) "Values" $.Values) }}
 {{- end }}
 {{- end }}
 
@@ -631,7 +601,7 @@ Container (target) port number by name
 {{- end -}}
 
 {{/*
-Declaration of static volumes (inhabitatnts of $.Values.staticVolumes) and mounted secrets in a Deployment/StatefulSet
+Declaration of static volumes (inhabitants of $.Values.staticVolumes) and mounted secrets in a Deployment/StatefulSet
 .component (key in $.Values.components) must be defined
 */}}
 {{- define "afc.staticVolumes" -}}
