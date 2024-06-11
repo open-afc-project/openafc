@@ -26,6 +26,7 @@ import datetime
 import requests
 import appcfg
 import threading
+import time
 from flask.views import MethodView
 import werkzeug.exceptions
 from defs import RNTM_OPT_DBG_GUI, RNTM_OPT_DBG
@@ -117,29 +118,31 @@ def build_task(
         runtime_opts=RNTM_OPT_DBG_GUI,
         rcache_queue=None,
         request_str=None,
-        config_str=None):
+        config_str=None,
+        timeout_sec=600):
     """
     Shared logic between PAWS and All other analysis for constructing and async call to run task
     """
 
     prot, host, port = dataif.getProtocol()
-    args = [
-        prot,
-        host,
-        port,
-        request_type,
-        task_id,
-        hash_val,
-        config_path,
-        history_dir,
-        runtime_opts,
-        flask.current_app.config['NFS_MOUNT_PATH'],
-        rcache_queue,
-        request_str,
-        config_str
-    ]
-    LOGGER.debug("build_task() {}".format(args))
-    run.apply_async(args)
+    kwargs = {
+        "prot": prot,
+        "host": host,
+        "port": port,
+        "request_type": request_type,
+        "task_id": task_id,
+        "hash_val": hash_val,
+        "config_path": config_path,
+        "history_dir": history_dir,
+        "runtime_opts": runtime_opts,
+        "mntroot": flask.current_app.config['NFS_MOUNT_PATH'],
+        "rcache_queue": rcache_queue,
+        "request_str": request_str,
+        "config_str": config_str,
+        "deadline": time.time() + timeout_sec
+    }
+    LOGGER.debug(f"build_task({kwargs})")
+    run.apply_async(kwargs=kwargs)
 
 
 class GuiConfig(MethodView):

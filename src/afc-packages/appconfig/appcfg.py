@@ -22,6 +22,8 @@ DEBUG = False
 PROPAGATE_EXCEPTIONS = False
 #: Root logger filter
 AFC_RATAPI_LOG_LEVEL = os.getenv("AFC_RATAPI_LOG_LEVEL", "WARNING")
+# Default request timeout in seconds
+AFC_MSGHND_RATAFC_TOUT = 600
 #: Set of log handlers to use for root logger
 LOG_HANDLERS = [
     logging.StreamHandler(),
@@ -264,11 +266,6 @@ class MsghndConfiguration(abc.ABC):
         # AFC_MSGHND_TIMEOUT
         pass
 
-    @abc.abstractmethod
-    def get_ratafc_tout(self):
-        # AFC_MSGHND_RATAFC_TOUT
-        pass
-
 
 class HealthchecksMsghndCfgIface(MsghndConfiguration):
     def __init__(self):
@@ -296,15 +293,8 @@ class HealthchecksMsghndCfgIface(MsghndConfiguration):
     def get_timeout(self):
         pass
 
-    def get_ratafc_tout(self):
-        pass
-
 
 class RatafcMsghndCfgIface(MsghndConfiguration):
-    def __init__(self):
-        setattr(self, 'AFC_MSGHND_RATAFC_TOUT',
-                os.getenv('AFC_MSGHND_RATAFC_TOUT'))
-
     def get_name(self):
         pass
 
@@ -325,6 +315,3 @@ class RatafcMsghndCfgIface(MsghndConfiguration):
 
     def get_timeout(self):
         pass
-
-    def get_ratafc_tout(self):
-        return int(self.AFC_MSGHND_RATAFC_TOUT)
