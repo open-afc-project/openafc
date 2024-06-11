@@ -48,7 +48,7 @@ ARG_ENV_VAR = "AFC_HELM_INSTALL_ARGS"
 DEFAULT_SECRET_DIR = "tools/secrets/templates"
 
 # values.yaml path to engines per worker environment variable
-ENGINES_PER_WORKER_PATH = "configmaps.worker.AFC_WORKER_CELERY_CONCURRENCY"
+ENGINES_PER_WORKER_PATH = "components.worker.env.AFC_WORKER_CELERY_CONCURRENCY"
 
 # values.yaml path to  maximum number of workers
 MAX_WORKERS_PATH = "components.worker.hpa.maxReplicas"
@@ -455,7 +455,7 @@ def main(argv: List[str]) -> None:
             os.makedirs(args.temp_dir, exist_ok=True)
             tempdir = os.path.abspath(args.temp_dir)
         else:
-            tempdir = tempfile.gettempdir()
+            tempdir = tempfile.mkdtemp(prefix="fake_secrets_")
 
         execute(["helm", "dependency", "update", INT_HELM_REL_DIR],
                 cwd=ROOT_DIR)

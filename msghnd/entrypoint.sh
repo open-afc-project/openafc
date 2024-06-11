@@ -18,7 +18,7 @@ case "$AFC_DEVEL_ENV" in
     echo "AFC_MSGHND_TIMEOUT = ${AFC_MSGHND_TIMEOUT}"
     echo "AFC_MSGHND_WORKERS = ${AFC_MSGHND_WORKERS}"
     echo "AFC_MSGHND_LOG_LEVEL = ${AFC_MSGHND_LOG_LEVEL}"
-    echo "AFC_MSGHND_RATAFC_TOUT = ${AFC_MSGHND_RATAFC_TOUT}"
+    echo "FLASK_AFC_MSGHND_RATAFC_TOUT = ${FLASK_AFC_MSGHND_RATAFC_TOUT}"
     ;;
   "production")
     echo "Running production profile"

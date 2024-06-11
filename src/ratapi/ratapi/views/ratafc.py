@@ -625,7 +625,8 @@ class RatAfc(MethodView):
 
         dataif = DataIf()
         t = afctask.Task(
-            task_id, dataif, RatafcMsghndCfgIface().get_ratafc_tout())
+            task_id, dataif,
+            flask.current_app.config['AFC_MSGHND_RATAFC_TOUT'])
         task_stat = t.get()
 
         if t.ready(task_stat):  # The task is done
@@ -1001,7 +1002,9 @@ class RatAfc(MethodView):
                    runtime_opts=req_info.runtime_opts,
                    rcache_queue=rcache_queue,
                    request_str=None if use_tasks else request_str,
-                   config_str=None if use_tasks else req_info.config_str)
+                   config_str=None if use_tasks else req_info.config_str,
+                   timeout_sec=flask.current_app.config[
+                        'AFC_MSGHND_RATAFC_TOUT'])
         if use_tasks:
             return afctask.Task(task_id=req_info.task_id, dataif=dataif,
                                 hash_val=req_info.req_cfg_hash,
@@ -1041,7 +1044,8 @@ class RatAfc(MethodView):
                 for req_cfg_hash, task in tasks.items():
                     task_stat = \
                         task.wait(
-                            timeout=RatafcMsghndCfgIface().get_ratafc_tout())
+                            timeout=flask.current_app.config[
+                                'AFC_MSGHND_RATAFC_TOUT'])
                     ret[req_cfg_hash] = \
                         response_map[task_stat['status']](task).data
                 return ret
@@ -1049,7 +1053,8 @@ class RatAfc(MethodView):
                 rcache.rmq_receive_responses(
                     rx_connection=rmq_conn,
                     req_cfg_digests=req_infos.keys(),
-                    timeout_sec=RatafcMsghndCfgIface().get_ratafc_tout())
+                    timeout_sec=flask.current_app.config[
+                        'AFC_MSGHND_RATAFC_TOUT'])
             for req_cfg_hash, response in ret.items():
                 req_info = req_infos[req_cfg_hash]
                 if (not response) or (not req_info.history_dir):

@@ -47,15 +47,10 @@ securityContexts:
   readOnly:
     readOnlyRootFilesystem: true
 
-# Dictionary of configmaps. Indexed by configmap keys (suffixes of configmap
-# names). Values are dictionaries, with uppercase-named entries going to
-# configmap as is, non-uppercase entries may be used in construction of
-# configmap entries.
-# DSNs present here may contain usernames/passwords for development (Docker
-# Compose) configurations. Really secret usernames/passwords (but not entire
-# DSNs please!) should be passed via secrets.
-# Some syntax conventions introduced to properly render variables without
-# additional helm trickery:
+# Dictionary of environment variable grooups, used by several components.
+# Values are dictionaries.
+# Some syntax conventions introduced to properly render values without helm
+# trickery or literal repetitions:
 #  - If variable name ends with @S, its value rendered as string verbatim (@S
 #    is trimmed from variable name)
 #  - If variable name ends with @I, it is rendered as integer, thus avoiding
@@ -84,19 +79,10 @@ securityContexts:
 #  - {{ip:<IPKEY>[:<IFABSENT>]}} IP address by key in 'externalIps'. <IFABSENT>
 #    describes what to do if name is valid, but IP name is not defined (see
 #    above for values)
-#  - {{sameAs:<CONFIGMAP>:<ENTRY>[:<IFABSENT>]}} Same value as another entry in
-#    another configmap. <IFABSENT> describes what to do if referred value is
-#    absent (see above for values)
-configmaps:
-  # Own environment variables of dispatcher container(s)
-  dispatcher:
-    AFC_SERVER_NAME: _
-    AFC_ENFORCE_HTTPS: "True"
-    AFC_ENFORCE_MTLS: "False"
-    AFC_MSGHND_NAME: "{{host:msghnd}}"
-    AFC_MSGHND_PORT: "{{port:msghnd:msghnd}}"
-    AFC_WEBUI_NAME: "{{host:rat-server}}"
-    AFC_WEBUI_PORT: "{{port:rat-server:rat-server}}"
+#  - {{sameAs:<SHAREDENVKEY>:<ENTRY>[:<IFABSENT>]}} Same value as another entry
+#    in another shared environment block. <IFABSENT> describes what to do if
+#    referred value is absent (see above for values)
+sharedEnv:
   # Flask config parameters defined in config/ratapi.conf. Config settings
   # passed via environment variables should be prefixed with FLASK_, passed via
   # filename environment variables should be prefixed wiyth FLASKFILE_
@@ -110,6 +96,7 @@ configmaps:
     FLASKFILE_GOOGLE_APIKEY: >-
       {{secretFile:google-apikey:optional}}
     FLASK_USER_EMAIL_SENDER_EMAIL: admin@afc_please_override.com
+    FLASK_AFC_MSGHND_RATAFC_TOUT: 180
   # Flask config parameters retrieved by RatApiConfigurator (should be defined
   # in site-specific values.yaml overrides and/or in secrets). Config settings
   # passed via environment variables should be given as is, passed via
@@ -144,16 +131,6 @@ configmaps:
     OIDCFILE_OIDC_CLIENT_SECRET: >-
       {{secretFile:oidc-client-secret:optional}}
     OIDC_DISCOVERY_URL: ""
-  # Own environment variables for rat-server container(s)
-  rat-server:
-    ALS_KAFKA_SERVER_ID: rat_server
-  # Own environment variables for msghnd container(s)
-  msghnd:
-    ALS_KAFKA_SERVER_ID: msghnd
-  # Own environment variables of objst container(s)
-  objst:
-    AFC_OBJST_HIST_PORT: "{{port:objst:historyView}}"
-    AFC_OBJST_LOCAL_DIR: /storage
   # Common environment variables for objst container(s)
   objst-common:
     AFC_OBJST_PORT: "{{port:objst:fileStorage}}"
@@ -170,60 +147,9 @@ configmaps:
     ALS_KAFKA_MAX_REQUEST_SIZE@I: 10485760
     ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS: >-
       {{host:als-kafka}}:{{port:als-kafka:kafka}}
-  # Own environment variables for als-kafka
-  als-kafka:
-    KAFKA_ADVERTISED_HOST: "{{host:als-kafka}}"
-    KAFKA_CLIENT_PORT: "{{port:als-kafka:kafka}}"
   # Environment variables common to als-kafka and als_siphon
   als-kafka-common:
     KAFKA_MAX_REQUEST_SIZE@I: 10485760
-  # Own environment variables for als-siphon
-  als-siphon:
-    KAFKA_SERVERS: "{{host:als-kafka}}:{{port:als-kafka:kafka}}"
-    INIT_IF_EXISTS: skip
-    POSTGRES_INIT_CONN_STR: >-
-      postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/postgres
-    POSTGRES_ALS_CONN_STR: >-
-      postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/ALS
-    POSTGRES_LOG_CONN_STR: >-
-      postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/AFC_LOGS
-    POSTGRES_INIT_PASSWORD_FILE: "{{secretFile:postgres-password:optional}}"
-    POSTGRES_ALS_PASSWORD_FILE: "{{secretFile:als-db-password:optional}}"
-    POSTGRES_LOG_PASSWORD_FILE: >-
-      {{secretFile:als-json-log-db-password:optional}}
-  # Own environment variables of worker container(s)
-  worker:
-    AFC_WORKER_CELERY_WORKERS: rat_1
-    # Number of engines per worker by default is equal to number of CPUs
-    # (`nproc`). It can't be limited with containerResources.limits.cpu, hence
-    # must be explicitly set with AFC_WORKER_CELERY_CONCURRENCY
-    AFC_WORKER_CELERY_CONCURRENCY: 2
-    AFC_AEP_ENABLE: 1
-    AFC_AEP_DEBUG: 1
-    AFC_AEP_REAL_MOUNTPOINT: >-
-      {{staticVolumeMount:worker:rat_transfer}}/3dep/1_arcsec
-  # Own environment variables of uls-downloader container(s)
-  uls-downloader:
-    ULS_AFC_URL: >-
-      http://{{host:msghnd}}:{{port:msghnd:msghnd}}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
-    ULS_DELAY_HR: 0
-    ULS_SERVICE_STATE_DB_DSN: >-
-      postgresql://postgres:postgres@{{host:bulk-postgres}}/fs_state
-    ULS_SERVICE_STATE_DB_PASSWORD_FILE: >-
-      {{secretFile:uls-state-db-password:optional}}
-    ULS_PROMETHEUS_PORT: 8000
-    ULS_SMTP_SERVER: >-
-      {{sameAs:ratapi-configurator:MAIL_SERVER:optional}}
-    ULS_SMTP_PORT: >-
-      {{sameAs:ratapi-configurator:MAIL_PORT:optional}}
-    ULS_SMTP_USERNAME: >-
-      {{sameAs:ratapi-configurator:MAIL_USERNAME:optional}}
-    ULS_SMTP_PASSWORD_FILE: >-
-      {{secretFile:ratapi-mail-password:optional}}
-    ULS_SMTP_SSL: >-
-      {{sameAs:ratapi-configurator:MAIL_USE_SSL:optional}}
-    ULS_SMTP_TLS: >-
-      {{sameAs:ratapi-configurator:MAIL_USE_TLS:optional}}
   # Common Environment variables for Rcache container(s) and clients of Rcache
   # service
   rcache-common:
@@ -236,15 +162,6 @@ configmaps:
     RCACHE_SERVICE_URL: "http://{{host:rcache}}:{{port:rcache:rcache}}"
     RCACHE_RMQ_DSN: >-
       amqp://rcache:rcache@{{host:rmq}}:{{port:rmq:amqp}}/rcache
-  # Own environment variables of rcache container(s)
-  rcache:
-    RCACHE_CLIENT_PORT: "{{port:rcache:rcache}}"
-    RCACHE_AFC_REQ_URL: >-
-      http://{{host:msghnd}}:{{port:msghnd:msghnd}}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
-    RCACHE_RULESETS_URL: >-
-      http://{{host:rat-server}}/fbrat/ratapi/v1/GetRulesetIDs
-    RCACHE_CONFIG_RETRIEVAL_URL: >-
-      http://{{host:rat-server}}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
 
 # Dictionary of static (non-templated and non-secret) volume definitions.
 # Indexed by volume names
@@ -298,9 +215,9 @@ staticVolumes:
 #             ReadWriteOncePod)
 #     mountPath Mount path inside container
 #     resources PVC resources (has 'requests', etc. properties)
-#   envConfigmapKeys List of configmap keys (keys into configmaps dictionary)
+#   env Dictionary of individual component-specific environment variables
+#   sharedEnvKeys List of sharedEnv keys (keys into sharedEnv dictionary)
 #           to include into environment
-#   env Dictionary of individual environment variables
 #   staticVolumeMounts Dictionary of mount points of used static
 #           (non-templated, non-secret) volumes, indexed by staticVolumes
 #           dictionary keys
@@ -367,8 +284,15 @@ components:
     imageRepositoryKey: public
     service:
       type: LoadBalancer
-    envConfigmapKeys:
-      - dispatcher
+    env:
+      AFC_SERVER_NAME: _
+      AFC_ENFORCE_HTTPS: "True"
+      AFC_ENFORCE_MTLS: "False"
+      AFC_MSGHND_NAME: "{{host:msghnd}}"
+      AFC_MSGHND_PORT: "{{port:msghnd:msghnd}}"
+      AFC_WEBUI_NAME: "{{host:rat-server}}"
+      AFC_WEBUI_PORT: "{{port:rat-server:rat-server}}"
+    sharedEnvKeys:
       - objst-client
       - objst-common
     ports:
@@ -394,8 +318,9 @@ components:
     containerResources:
       requests:
         memory: 200Mi
-    envConfigmapKeys:
-      - rat-server
+    env:
+      ALS_KAFKA_SERVER_ID: rat_server
+    sharedEnvKeys:
       - flask-conf
       - ratapi-configurator
       - oidc-configurator
@@ -432,8 +357,9 @@ components:
     containerResources:
       requests:
         memory: 1200Mi
-    envConfigmapKeys:
-      - msghnd
+    env:
+      ALS_KAFKA_SERVER_ID: msghnd
+    sharedEnvKeys:
       - flask-conf
       - ratapi-configurator
       - oidc-configurator
@@ -464,8 +390,10 @@ components:
     containerResources:
       requests:
         memory: 500Mi
-    envConfigmapKeys:
-      - objst
+    env:
+      AFC_OBJST_HIST_PORT: "{{port:objst:historyView}}"
+      AFC_OBJST_LOCAL_DIR: /storage
+    sharedEnvKeys:
       - flask-conf
       - ratapi-configurator
       - oidc-configurator
@@ -485,8 +413,17 @@ components:
     containerResources:
       requests:
         memory: 4500Mi
-    envConfigmapKeys:
-      - worker
+    env:
+      AFC_WORKER_CELERY_WORKERS: rat_1
+      # Number of engines per worker by default is equal to number of CPUs
+      # (`nproc`). It can't be limited with containerResources.limits.cpu,
+      # hence must be explicitly set with AFC_WORKER_CELERY_CONCURRENCY
+      AFC_WORKER_CELERY_CONCURRENCY: 2
+      AFC_AEP_ENABLE: 1
+      AFC_AEP_DEBUG: 1
+      AFC_AEP_REAL_MOUNTPOINT: >-
+        {{staticVolumeMount:worker:rat_transfer}}/3dep/1_arcsec
+    sharedEnvKeys:
       - celery-client
       - objst-client
       - objst-common
@@ -532,8 +469,10 @@ components:
     containerResources:
       requests:
         memory: 500Mi
-    envConfigmapKeys:
-      - als-kafka
+    env:
+      KAFKA_ADVERTISED_HOST: "{{host:als-kafka}}"
+      KAFKA_CLIENT_PORT: "{{port:als-kafka:kafka}}"
+    sharedEnvKeys:
       - als-kafka-common
   als-siphon:
     imageName: als-siphon-image
@@ -546,8 +485,20 @@ components:
     containerResources:
       requests:
         memory: 100Mi
-    envConfigmapKeys:
-      - als-siphon
+    env:
+      KAFKA_SERVERS: "{{host:als-kafka}}:{{port:als-kafka:kafka}}"
+      INIT_IF_EXISTS: skip
+      POSTGRES_INIT_CONN_STR: >-
+        postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/postgres
+      POSTGRES_ALS_CONN_STR: >-
+        postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/ALS
+      POSTGRES_LOG_CONN_STR: >-
+        postgresql://postgres:postgres@{{host:bulk-postgres}}:{{port:bulk-postgres:bulk-postgres}}/AFC_LOGS
+      POSTGRES_INIT_PASSWORD_FILE: "{{secretFile:postgres-password:optional}}"
+      POSTGRES_ALS_PASSWORD_FILE: "{{secretFile:als-db-password:optional}}"
+      POSTGRES_LOG_PASSWORD_FILE: >-
+        {{secretFile:als-json-log-db-password:optional}}
+    sharedEnvKeys:
       - als-kafka-common
     mountedSecrets:
       - postgres-password
@@ -569,8 +520,28 @@ components:
   uls-downloader:
     imageName: uls-downloader
     imageRepositoryKey: public
-    envConfigmapKeys:
-      - uls-downloader
+    env:
+      ULS_AFC_URL: >-
+        http://{{host:msghnd}}:{{port:msghnd:msghnd}}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
+      ULS_DELAY_HR: 0
+      ULS_SERVICE_STATE_DB_DSN: >-
+        postgresql://postgres:postgres@{{host:bulk-postgres}}/fs_state
+      ULS_SERVICE_STATE_DB_PASSWORD_FILE: >-
+        {{secretFile:uls-state-db-password:optional}}
+      ULS_PROMETHEUS_PORT: 8000
+      ULS_SMTP_SERVER: >-
+        {{sameAs:ratapi-configurator:MAIL_SERVER:optional}}
+      ULS_SMTP_PORT: >-
+        {{sameAs:ratapi-configurator:MAIL_PORT:optional}}
+      ULS_SMTP_USERNAME: >-
+        {{sameAs:ratapi-configurator:MAIL_USERNAME:optional}}
+      ULS_SMTP_PASSWORD_FILE: >-
+        {{secretFile:ratapi-mail-password:optional}}
+      ULS_SMTP_SSL: >-
+        {{sameAs:ratapi-configurator:MAIL_USE_SSL:optional}}
+      ULS_SMTP_TLS: >-
+        {{sameAs:ratapi-configurator:MAIL_USE_TLS:optional}}
+    sharedEnvKeys:
       - rcache-client
       - rcache-common
     staticVolumeMounts:
@@ -586,7 +557,7 @@ components:
   cert-db:
     imageName: cert_db
     imageRepositoryKey: public
-    envConfigmapKeys:
+    sharedEnvKeys:
       - flask-conf
       - ratapi-configurator
       - oidc-configurator
@@ -610,8 +581,15 @@ components:
     containerResources:
       requests:
         memory: 100Mi
-    envConfigmapKeys:
-      - rcache
+    env:
+      RCACHE_CLIENT_PORT: "{{port:rcache:rcache}}"
+      RCACHE_AFC_REQ_URL: >-
+        http://{{host:msghnd}}:{{port:msghnd:msghnd}}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
+      RCACHE_RULESETS_URL: >-
+        http://{{host:rat-server}}/fbrat/ratapi/v1/GetRulesetIDs
+      RCACHE_CONFIG_RETRIEVAL_URL: >-
+        http://{{host:rat-server}}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
+    sharedEnvKeys:
       - rcache-common
     mountedSecrets:
       - rcache-db-password

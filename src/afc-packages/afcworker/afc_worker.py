@@ -11,6 +11,7 @@ import os
 import subprocess
 import shutil
 import tempfile
+import time
 import zlib
 from celery import Celery
 from celery.utils.log import get_task_logger
@@ -34,9 +35,6 @@ class WorkerConfig(BrokerConfigurator):
         self.AFC_ENGINE = os.getenv("AFC_ENGINE")
         self.AFC_ENGINE_LOG_LVL = os.getenv("AFC_ENGINE_LOG_LVL", "info")
         self.AFC_WORKER_CELERY_LOG = os.getenv("AFC_WORKER_CELERY_LOG")
-        # worker task engine timeout
-        # the default value predefined by image environment (Dockefile)
-        self.AFC_WORKER_ENG_TOUT = os.getenv("AFC_WORKER_ENG_TOUT")
 
 
 conf = WorkerConfig()
@@ -63,7 +61,7 @@ client = Celery(
 @client.task(ignore_result=True)
 def run(prot, host, port, request_type, task_id, hash_val,
         config_path, history_dir, runtime_opts, mntroot, rcache_queue,
-        request_str, config_str):
+        request_str, config_str, deadline):
     """ Run AFC Engine
 
         The parameters are all serializable so they can be passed through the message queue.
@@ -87,10 +85,12 @@ def run(prot, host, port, request_type, task_id, hash_val,
         :param request_str None for task-based synchronization, request text for RMQ-based synchronization
 
         :param config_str None for task-based synchronization, config text for RMQ-based synchronization
+
+        :param deadline Processung deadline (when msghnd timeout expires) as seconds since Epoch
     """
     LOGGER.debug(f"run(prot={prot}, host={host}, port={port}, "
                  f"task_id={task_id}, hash={hash_val}, opts={runtime_opts}, "
-                 f"mntroot={mntroot}, timeout={conf.AFC_WORKER_ENG_TOUT}, "
+                 f"mntroot={mntroot}, timeout={deadline-time.time()}, "
                  f"rcache_queue={rcache_queue}")
 
     use_tasks = rcache_queue is None
@@ -136,10 +136,16 @@ def run(prot, host, port, request_type, task_id, hash_val,
         tmp_objdir = os.path.join("/responses", task_id)
         retcode = 0
         success = False
-        timeout = False
+        timeout_expired = False
+        error_msg = ""
 
         # run the AFC Engine
         try:
+            timeout = deadline - time.time()
+            if timeout <= 0:
+                error_msg += "AFC processing deadline expired"
+                timtimeout_expiredeout = True
+                raise subprocess.CalledProcessError(retcode, cmd)
             cmd = [
                 conf.AFC_ENGINE,
                 "--request-type=" + request_type,
@@ -156,11 +162,10 @@ def run(prot, host, port, request_type, task_id, hash_val,
             retcode = 0
             proc = subprocess.Popen(cmd, stderr=err_file, stdout=log_file)
             try:
-                retcode = proc.wait(timeout=int(conf.AFC_WORKER_ENG_TOUT))
-            except Exception as e:
-                timeout = True
-                LOGGER.error(f"run(): afc-engine timeout "
-                             f"{conf.AFC_WORKER_ENG_TOUT} error {type(e)}")
+                retcode = proc.wait(timeout=timeout)
+            except subprocess.SubprocessError as e:
+                timeout_expired = isinstance(e, subprocess.TimeoutExpired)
+                error_msg += f"afc-engine failure: {e}"
                 raise subprocess.CalledProcessError(retcode, cmd)
             if retcode:
                 raise subprocess.CalledProcessError(retcode, cmd)
@@ -169,7 +174,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
         except subprocess.CalledProcessError as error:
             with open(os.path.join(tmpdir, "engine-error.txt"),
                       encoding="utf-8", errors="replace") as infile:
-                error_msg = infile.read(1000).strip()
+                error_msg += infile.read(1000).strip()
             LOGGER.error(
                 f"run(): afc-engine crashed. Task ID={task_id}, error "
                 f"message:\n{error_msg}")
@@ -186,7 +191,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
                 als.als_initialize()
                 als.als_json_log("afc_engine_crash",
                                  {"task_id": task_id, "error_msg": error_msg,
-                                  "timeout": timeout,
+                                  "timeout": timeout_expired,
                                   "request": json.loads(request_str),
                                   "config": json.loads(config_str)})
             except Exception as ex:

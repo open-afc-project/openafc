@@ -6,6 +6,7 @@
 
 # Enforces TLS verification
 
-configmaps:
+components:
   dispatcher:
-    AFC_ENFORCE_HTTPS: False
+    env:
+      AFC_ENFORCE_HTTPS: False
