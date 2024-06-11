@@ -1439,7 +1439,7 @@ class ResultsProcessor:
 
 
 def post_req_worker(
-        url: str, retries: int, backoff: float, dry: bool,
+        url: str, retries: int, backoff: float, timeout: float, dry: bool,
         post_req_queue: multiprocessing.Queue,
         result_queue: "multiprocessing.Queue[ResultQueueDataType]",
         dry_result_data: Optional[bytes], use_requests: bool,
@@ -1450,6 +1450,7 @@ def post_req_worker(
     url             -- REST API URL to send POSTs to
     retries         -- Number of retries
     backoff         -- Initial backoff window in seconds
+    timeout         -- Request timeout in seconds
     dry             -- True to dry run
     post_req_queue  -- Request queue. Elements are PostWorkerReqInfo objects
                        corresponding to single REST API post or None to stop
@@ -1492,7 +1493,7 @@ def post_req_worker(
                                         "application/json; charset=utf-8",
                                         "Content-Length":
                                         str(len(req_info.req_data))},
-                                    timeout=180)
+                                    timeout=timeout)
                             if not resp.ok:
                                 last_error = \
                                     f"{resp.status_code}: {resp.reason}"
@@ -1509,7 +1510,8 @@ def post_req_worker(
                                        str(len(req_info.req_data)))
                         try:
                             with urllib.request.urlopen(
-                                    req, req_info.req_data, timeout=180) as f:
+                                    req, req_info.req_data, timeout=timeout) \
+                                    as f:
                                 result_data = f.read()
                             break
                         except (urllib.error.HTTPError, urllib.error.URLError,
@@ -1542,7 +1544,7 @@ def post_req_worker(
 
 def get_req_worker(
         url: str, expected_code: Optional[int], retries: int, backoff: float,
-        dry: bool, get_req_queue: multiprocessing.Queue,
+        timeout: float, dry: bool, get_req_queue: multiprocessing.Queue,
         result_queue: "multiprocessing.Queue[ResultQueueDataType]",
         use_requests: bool) -> None:
     """ REST API GET worker
@@ -1552,6 +1554,7 @@ def get_req_worker(
     expected_code -- None or expected non-200 status code
     retries       -- Number of retries
     backoff       -- Initial backoff window in seconds
+    timeout       -- Request timeout in seconds
     dry           -- True to dry run
     get_req_queue -- Request queue. Elements are GetWorkerReqInfo objects
                      corresponding to bunch of single REST API GETs or None to
@@ -1583,7 +1586,7 @@ def get_req_worker(
                         if use_requests:
                             assert session is not None
                             try:
-                                resp = session.get(url=url, timeout=30)
+                                resp = session.get(url=url, timeout=timeout)
                                 if resp.status_code != expected_code:
                                     last_error = \
                                         f"{resp.status_code}: {resp.reason}"
@@ -1596,7 +1599,8 @@ def get_req_worker(
                             status_code: Optional[int] = None
                             status_reason: str = ""
                             try:
-                                with urllib.request.urlopen(req, timeout=30):
+                                with urllib.request.urlopen(req,
+                                                            timeout=timeout):
                                     pass
                                 status_code = http.HTTPStatus.OK.value
                                 status_reason = http.HTTPStatus.OK.name
@@ -1699,8 +1703,8 @@ def producer_worker(
             req_queue.put(None)
 
 
-def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
-        status_period: int, batch: int,
+def run(url: str, parallel: int, backoff: float, timeout: float, retries: int,
+        dry: bool, status_period: int, batch: int,
         rest_data_handler: Optional[RestDataHandlerBase] = None,
         netload_target: Optional[str] = None,
         expected_code: Optional[int] = None, min_idx: Optional[int] = None,
@@ -1716,6 +1720,7 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
     url               -- REST API URL to send POSTs to (GET in case of netload)
     parallel          -- Number of worker processes to use
     backoff           -- Initial size of backoff windows in seconds
+    timeout           -- Timeout in seconds
     retries           -- Number of retries
     dry               -- True to dry run
     status_period     -- Period (in terms of count) of status message prints (0
@@ -1749,6 +1754,7 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
     logging.info(f"URL: {'N/A' if dry else url}")
     logging.info(f"Streams: {parallel}")
     logging.info(f"Backoff: {backoff} sec, {retries} retries")
+    logging.info(f"Request timeout: {timeout} sec")
     if not netload_target:
         logging.info(f"Index range: {min_idx:_} - {max_idx:_}")
         logging.info(f"Batch size: {batch}")
@@ -1785,8 +1791,8 @@ def run(url: str, parallel: int, backoff: int, retries: int, dry: bool,
             error(f"Failed to create directory '{err_dir}': {repr(ex)}")
     try:
         req_worker_kwargs: Dict[str, Any] = {
-            "url": url, "backoff": backoff, "retries": retries,
-            "dry": dry, "result_queue": result_queue,
+            "url": url, "backoff": backoff, "timeout": timeout,
+            "retries": retries, "dry": dry, "result_queue": result_queue,
             "use_requests": use_requests}
         req_worker: Callable
         if netload_target:
@@ -2066,9 +2072,9 @@ def do_preload(cfg: Config, args: Any) -> None:
             cfg=cfg, afc_config=afc_config,
             req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
-        retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
-        max_idx=max_idx, status_period=args.status_period,
-        use_requests=args.no_reconnect)
+        timeout=args.timeout, retries=args.retries, dry=args.dry,
+        batch=args.batch, min_idx=min_idx, max_idx=max_idx,
+        status_period=args.status_period, use_requests=args.no_reconnect)
 
     if not args.dry:
         wait_rcache_flush(cfg=cfg, args=args,
@@ -2107,8 +2113,9 @@ def do_load(cfg: Config, args: Any) -> None:
             cfg=cfg, randomize=args.random, population_db=args.population,
             req_msg_pattern=patch_req(cfg=cfg, args_req=args.req)),
         url=worker_url, parallel=args.parallel, backoff=args.backoff,
-        retries=args.retries, dry=args.dry, batch=args.batch, min_idx=min_idx,
-        max_idx=max_idx, status_period=args.status_period, count=args.count,
+        timeout=args.timeout, retries=args.retries, dry=args.dry,
+        batch=args.batch, min_idx=min_idx, max_idx=max_idx,
+        status_period=args.status_period, count=args.count,
         use_requests=args.no_reconnect, err_dir=args.err_dir,
         ramp_up=args.ramp_up, randomize=args.random,
         population_db=args.population)
@@ -2157,10 +2164,10 @@ def do_netload(cfg: Config, args: Any) -> None:
                     if args.dispatcher else None)
             expected_code = cfg.rest_api.dispatcher_get.get("code")
     run(netload_target=args.target, url=worker_url,
-        parallel=args.parallel, backoff=args.backoff, retries=args.retries,
-        dry=args.dry, batch=1000, expected_code=expected_code,
-        status_period=args.status_period, count=args.count,
-        use_requests=args.no_reconnect)
+        parallel=args.parallel, backoff=args.backoff, timeout=args.timeout,
+        retries=args.retries, dry=args.dry, batch=1000,
+        expected_code=expected_code, status_period=args.status_period,
+        count=args.count, use_requests=args.no_reconnect)
 
 
 def do_cache(cfg: Config, args: Any) -> None:
@@ -2279,6 +2286,10 @@ def main(argv: List[str]) -> None:
         "--retries", metavar="N", type=int, default=cfg.defaults.retries,
         help=f"Maximum number of retries before giving up. Default is "
         f"{cfg.defaults.retries}")
+    switches_common.add_argument(
+        "--timeout", metavar="SECONDS", type=float,
+        default=cfg.defaults.timeout,
+        help=f"Request timeout. Default is {cfg.defaults.timeout} seconds")
     switches_common.add_argument(
         "--dry", action="store_true",
         help="Dry run (no communication with server) to estimate overhead")
