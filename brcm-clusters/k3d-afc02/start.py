@@ -124,7 +124,8 @@ def main(argv: List[str]) -> None:
         execute([os.path.join(bin_dir, "k3d_cluster_create.py"),
                  "--expose", args.expose, args.cluster])
     execute(
-        [os.path.join(bin_dir, "helm_install_int.py"), "--tag", args.tag,
+        [os.path.join(bin_dir, "helm_install_int.py"), "--upgrade",
+         "--tag", args.tag,
          "--values", os.path.join(SCRIPT_DIR, "values-afc-int.yaml"),
          "--fake_secrets",
          f"secret-store:{os.path.join(SCRIPT_DIR, 'secrets')}",

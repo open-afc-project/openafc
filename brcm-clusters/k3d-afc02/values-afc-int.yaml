@@ -6,7 +6,7 @@
 
 # helm/afc-int/values.yaml overrides for k3d cluster
 
-configmaps:
+sharedEnv:
   flask-conf:
     FLASK_USER_EMAIL_SENDER_EMAIL: fbrat@a9556f3227ba.ihl.broadcom.net
   ratapi-configurator:
