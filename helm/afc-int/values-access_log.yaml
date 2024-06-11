@@ -6,6 +6,7 @@
 
 # Allows dispatcher access log
 
-configmaps:
+components:
   dispatcher:
-    AFC_MSGHND_ACCESS_LOG: /proc/self/fd/2
+    env:
+      AFC_MSGHND_ACCESS_LOG: /proc/self/fd/2
