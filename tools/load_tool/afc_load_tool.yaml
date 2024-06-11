@@ -23,6 +23,9 @@ defaults:
     # Number of retries
     retries: 5
 
+    # Request timeout in seconds
+    timeout: 200
+
     # Status printing period (in number of requests)
     status_period: 1000
 
