@@ -106,6 +106,10 @@ if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE OR
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -larmadillo")
   endif()
 
+  if ("EngineDebug" IN_LIST OPENAFC_BUILD_TYPE)
+     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+  endif()
+
   message("CMAKE_C_FLAGS ${CMAKE_C_FLAGS}")
   message("CMAKE_CXX_FLAGS ${CMAKE_CXX_FLAGS}")
 endif()
