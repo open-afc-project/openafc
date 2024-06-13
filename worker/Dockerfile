@@ -1,3 +1,5 @@
+
+
 #
 # Copyright (C) 2021 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
@@ -22,13 +24,16 @@ COPY src /root/afc/src/
 
 RUN mkdir -p -m 777 /root/afc/build
 ARG BUILDREV=localbuild
+
+# debug build
 RUN cd /root/afc/build && \
-cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineRelease -DSVN_LAST_REVISION=$BUILDREV -G Ninja /root/afc && \
-ninja -j$(nproc) install
+cmake -DCMAKE_INSTALL_PREFIX=/root/afc/__install -DCMAKE_PREFIX_PATH=/usr -DBUILD_WITH_COVERAGE=off -DCMAKE_BUILD_TYPE=EngineDebug -DSVN_LAST_REVISION=$BUILDREV -G Ninja /root/afc && \
+ninja -j$(nproc) -v install
 RUN cd /root/afc/src/afc-engine-preload && make && cp libaep.so /root/afc/__install/lib/ && cp parse_fs.py /root/afc/__install/bin/
-RUN strip --strip-unneeded /root/afc/__install/bin/afc-engine
-RUN strip --strip-unneeded /root/afc/__install/lib/*.so
-#
+# Do not strip
+# RUN strip --strip-unneeded /root/afc/__install/bin/afc-engine
+# RUN strip --strip-unneeded /root/afc/__install/lib/*.so
+# 
 # Stage Install
 #
 FROM ${PRINST_NAME}:${PRINST_TAG} as install_image
@@ -60,16 +65,20 @@ RUN chmod +x /usr/bin/afc-engine.sh
 
 # Development env
 COPY worker/devel.sh worker/ddd.tar.gz /wd/
-ARG AFC_DEVEL_ENV=production
+ARG AFC_DEVEL_ENV=debug
 ENV AFC_DEVEL_ENV ${AFC_DEVEL_ENV}
 # set alternative user
 ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
 ARG AFC_WORKER_UID=${AFC_WORKER_UID}
 RUN /wd/devel.sh
-RUN rm -f /wd/devel.sh /wd/ddd.tar.gz
+# RUN rm -f /wd/devel.sh /wd/ddd.tar.gz
+# COPY  --from=build_image /root/afc/build /wd/build
+# COPY  --from=build_image /root/afc/src /wd/src
+
 
 FROM alpine:3.18
 COPY --from=install_image / /
+COPY  --from=build_image /root/afc /root/afc
 
 LABEL revision="afc-worker-al"
 ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
