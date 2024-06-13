@@ -72,9 +72,6 @@ ARG AFC_WORKER_USER=${AFC_WORKER_USER:-root}
 ARG AFC_WORKER_UID=${AFC_WORKER_UID}
 RUN /wd/devel.sh
 # RUN rm -f /wd/devel.sh /wd/ddd.tar.gz
-# COPY  --from=build_image /root/afc/build /wd/build
-# COPY  --from=build_image /root/afc/src /wd/src
-
 
 FROM alpine:3.18
 COPY --from=install_image / /
