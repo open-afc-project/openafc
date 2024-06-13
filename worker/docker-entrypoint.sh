@@ -62,6 +62,19 @@ else
     export AFC_ENGINE="/usr/bin/afc-engine"
 fi
 
-celery multi start $AFC_WORKER_CELERY_WORKERS $AFC_WORKER_CELERY_OPTS -A afc_worker --concurrency=$AFC_WORKER_CELERY_CONCURRENCY --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$AFC_WORKER_CELERY_LOG &
+# Celery worker shutdown function
+shutdown_celery_workers() {
+    echo "Shutting down Celery workers gracefully..."
+    celery multi stopwait $AFC_WORKER_CELERY_WORKERS $AFC_WORKER_CELERY_OPTS -A afc_worker --concurrency=$AFC_WORKER_CELERY_CONCURRENCY --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$AFC_WORKER_CELERY_LOG
+    echo "Celery workers have been gracefully shut down"
+    exit 0
+}
 
-sleep infinity
+# Trap SIGTERM signal
+trap 'shutdown_celery_workers' TERM
+
+celery multi start $AFC_WORKER_CELERY_WORKERS $AFC_WORKER_CELERY_OPTS -A afc_worker --concurrency=$AFC_WORKER_CELERY_CONCURRENCY --pidfile=/var/run/celery/%n.pid --logfile=/proc/1/fd/2 --loglevel=$AFC_WORKER_CELERY_LOG
+
+sleep infinity &
+
+wait $!

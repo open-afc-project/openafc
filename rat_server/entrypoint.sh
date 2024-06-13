@@ -1,9 +1,6 @@
 #!/bin/sh
 
-echo "httpd $HTTPD_OPTIONS -DFOREGROUND >"
-httpd $HTTPD_OPTIONS -DFOREGROUND &
-#
-postfix start
-sleep infinity
+postfix start &
 
-exit $?
+echo "httpd $HTTPD_OPTIONS -DFOREGROUND >"
+exec httpd $HTTPD_OPTIONS -DFOREGROUND
