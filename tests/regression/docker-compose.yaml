@@ -33,6 +33,9 @@ services:
       - AFC_OBJST_HOST=objst
       - AFC_OBJST_PORT=5000
       - AFC_OBJST_SCHEME=HTTP
+      # Prometheus params:
+      - AFC_PROMETHEUS_TARGET=prometheus:9090
+      - AFC_PROMETHEUS_ENABLED=true
     depends_on:
       - msghnd
       - rat_server
