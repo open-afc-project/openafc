@@ -304,6 +304,12 @@ components:
         nodePort: 30443
       status:
         servicePort: 8080
+      disp-prometheus:
+        servicePort: 9090
+        nodePort: 31091
+      disp-grafana:
+        servicePort: 3000
+        nodePort: 31001
   rat-server:
     imageName: afc-server
     imageRepositoryKey: private
@@ -626,28 +632,33 @@ components:
 # Properties are
 #   annotations
 #   ingressClassName Value for spec.ingressClassName
-#   rules List of path descriptors. Each descriptor has properties:
-#     name Ingress name
-#     componentKey Index in components
-#     portKey Index in components[componentKey].ports
-#     path Path to match
+#   rules Dictionary of path descriptors, indexed by path. Path descriptors
+#           have the following properties
 #     pathType (Prefix, ImplementationSpecific or Exact). Default is Prefix
+#     componentKey Index in components (not used if 'service' is specified)
+#     portKey Index in components[componentKey].ports. Only used if
+#             'componentKey' is specified
+#     serviceName Explicitly specified host name
+#     portNumber Explicitly specified port number
 ingress:
   name: ingress-int
   ingressClassName: nginx
   rules:
-    - componentKey: msghnd
+    /fbrat/ap-afc/availableSpectrumInquiry:
+      componentKey: msghnd
       portKey: msghnd
-      path: /fbrat/ap-afc/availableSpectrumInquiry
-      pathType: Prefix
-    - componentKey: rat-server
+    /fbrat/ap-afc/availableSpectrumInquirySec:
+      componentKey: msghnd
+      portKey: msghnd
+    /fbrat/ratapi:
+      componentKey: rat-server
       portKey: rat-server
-      path: /fbrat
-      pathType: Prefix
-    - componentKey: objst
+    /certificate:
+      componentKey: objst
       portKey: fileStorage
-      path: /certificate
-      pathType: Prefix
+    /grafana:
+      componentKey: grafana
+      portKey: grafana
 
 # Dictionary of secret store descriptors
 # Keys used as secret store name (after conversion to RFC1123)
