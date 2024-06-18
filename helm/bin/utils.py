@@ -433,6 +433,7 @@ class Duration:
         "y": 3600 * 24 * 365.25}
 
     def __init__(self, duration: Optional[Union[str, int, float]]) -> None:
+        """ Constructs from seconds or Go duration """
         self._seconds: Optional[Union[float, int]]
         if duration is None:
             self._seconds = None
