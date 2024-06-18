@@ -822,18 +822,28 @@ Renders ingress rules
 {{- $ingressDef := get $.Values "ingress" | required "'ingress' missing in values.yaml" -}}
 - http:
     paths:
-{{- range $ruleDef := (default (list) (get $ingressDef "rules")) }}
-{{-   $compKey := get $ruleDef "componentKey" | required (cat "'componentKey' missing in ingress rule definition") }}
-{{-   $portKey := get $ruleDef "portKey" | required (cat "'portKey' missing in ingress rule definition") }}
-{{-   $path := get $ruleDef "path" | required (cat "'path' missing in ingress rule definition") }}
-{{-   $compDef := get $.Values.components $compKey | required (cat "Component" $compKey "used in one of ingress rules not found") }}
-{{-   $servicePort := get (default (dict) (get (default (dict) (get $compDef "ports")) $portKey)) "servicePort" | required (cat "Component" $compKey "used in one of ingress rules does not define service port" $portKey) }}
+{{- range $path, $ruleDef := (default (dict) (get $ingressDef "rules")) }}
+{{-   if $ruleDef }}
+{{-     $serviceName := get $ruleDef "serviceName" }}
+{{-     $portNumber := get $ruleDef "portNumber" }}
+{{-     if not (and $serviceName $portNumber) }}
+{{-       $compKey := get $ruleDef "componentKey" | required (cat "Missing required 'componentKey' in definition of ingress rule for" $path) }}
+{{-       $compDef := get $.Values.components $compKey | required (cat "Component" $compKey "used in definition of ingress rule for" $path "not found") }}
+{{-       if not $serviceName }}
+{{-         $serviceName = get (get $compDef "service" | default dict) "hostname" | default $compKey }}
+{{-       end }}
+{{-       if not $portNumber }}
+{{-         $portKey := get $ruleDef "portKey" | required (cat "'portKey' missing in idefinition of ingress rule for" $path) }}
+{{-         $portNumber = get (get (get $compDef "ports" | default dict) $portKey | default dict) "servicePort" | required (cat "Service port" $portKey "of component" $compKey "used in definition of ingress rule" $path "not found") }}
+{{-       end }}
+{{-     end }}
       - path: {{ $path }}
-        pathType: {{ default "Prefix" (get $ruleDef "pathType") }}
+        pathType: {{ get $ruleDef "pathType" | default "Prefix" }}
         backend:
           service:
-            name: {{ default $compKey (get (default (dict) (get $compDef "service")) "hostname" ) }}
+            name: {{ $serviceName }}
             port:
-              number: {{ $servicePort }}
+              number: {{ $portNumber }}
+{{-   end }}
 {{- end }}
 {{- end }}

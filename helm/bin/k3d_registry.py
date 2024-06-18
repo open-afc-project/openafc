@@ -53,7 +53,7 @@ def main(argv: List[str]) -> None:
             else:
                 print(f"Registry '{args.registry}' is not currently running")
         elif len(registries) == 0:
-            print("Nothing to do")
+            print("No registries currently running")
         else:
             error_if((len(registries) > 1) and (not args.force),
                      "More than one registy running. Specify name of registry "
@@ -69,7 +69,7 @@ def main(argv: List[str]) -> None:
             execute(["k3d", "registry", "create", args.registry])
         else:
             if registries:
-                print("Nothing to do")
+                print("Registry is currently running")
             else:
                 execute(["k3d", "registry", "create",
                          args.registry or DEFAULT_REGISTRY_NAME])

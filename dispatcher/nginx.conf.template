@@ -208,6 +208,38 @@ http {
         }
     }
 
+    upstream prometheus {
+        server ${AFC_PROMETHEUS_TARGET};
+    }
+
+    # Prometheus forwarding
+    server {
+        listen 9090;
+        set $prometheus_enabled "${AFC_PROMETHEUS_ENABLED}";
+        if ($prometheus_enabled != true) {
+            return 501;
+        }
+        location / {
+            proxy_pass http://prometheus${AFC_PROMETHEUS_PATH}$request_uri;
+        }
+    }
+
+    upstream grafana {
+        server ${AFC_GRAFANA_TARGET};
+    }
+
+    # Grafana forwarding
+    server {
+        listen 3000;
+        set $grafana_enabled "${AFC_GRAFANA_ENABLED}";
+        if ($grafana_enabled != true) {
+            return 501;
+        }
+        location / {
+            proxy_pass http://grafana${AFC_GRAFANA_PATH}$request_uri;
+        }
+    }
+
     include       /etc/nginx/mime.types;
     default_type  application/octet-stream;
 
