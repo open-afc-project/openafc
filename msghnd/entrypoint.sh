@@ -30,7 +30,7 @@ case "$AFC_DEVEL_ENV" in
     ;;
 esac
 
-gunicorn \
+exec gunicorn \
 --bind "${AFC_MSGHND_BIND}:${AFC_MSGHND_PORT}" \
 --pid "${AFC_MSGHND_PID}" \
 --workers "${AFC_MSGHND_WORKERS}" \
