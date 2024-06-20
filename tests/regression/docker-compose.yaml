@@ -39,6 +39,8 @@ services:
     depends_on:
       - msghnd
       - rat_server
+      - prometheus
+      - grafana
     dns_search: [.]
 
   rat_server:
@@ -319,7 +321,6 @@ services:
     restart: always
     depends_on:
       - cadvisor
-      - nginxexporter
     dns_search: [.]
 
   cadvisor:
