@@ -43,8 +43,8 @@ http {
         
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_prefer_server_ciphers on;
-        ssl_certificate /certificates/servers/cert/server.cert.pem;
-        ssl_certificate_key /certificates/servers/key/server.key.pem;
+        ssl_certificate /certificates/servers/server.cert.pem;
+        ssl_certificate_key /certificates/servers/server.key.pem;
 
         ssl_client_certificate /etc/nginx/certs/client.bundle.pem;
         ssl_verify_client optional;

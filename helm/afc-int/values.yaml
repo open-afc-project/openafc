@@ -698,7 +698,8 @@ secretStores:
 #            environment variable)
 #    empty - remote secret used verbatim
 #    absent - corresponded ExternalSecret not created
-#  type - Optional 'type' value for secret manifest
+#  template - Optional 'template' clause to insert to 'target'
+#  data - Explicitly specified 'data' clause for complicated secrets
 #  mountPath Directory to which secret is mounted
 #  mountPathPrefix If 'mountPath' not defined it is constructed as
 #          concatenation of this prefix and secret name
@@ -735,7 +736,8 @@ externalSecrets:
     property: ALS_JSON_LOG_DB_PASSWORD
   image-pull:
     property: .dockerconfigjson
-    type: kubernetes.io/dockerconfigjson
+    template:
+      type: kubernetes.io/dockerconfigjson
   flask-secret-key:
     property: SECRET_KEY
   google-apikey:

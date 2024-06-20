@@ -186,6 +186,8 @@ components:
         servicePort: 9090
       disp-grafana:
         servicePort: 3000
+    mountedSecrets:
+      - server-cert
 
 # Dictionary of secret store descriptors
 # Keys used as secret store name (after conversion to RFC1123)
@@ -225,7 +227,8 @@ secretStores:
 #            environment variable)
 #    empty - remote secret used verbatim
 #    absent - corresponded ExternalSecret not created
-#  type - Optional 'type' value for secret manifest
+#  template - Optional 'template' clause to insert to 'target'
+#  data - Explicitly specified 'data' clause for complicated secrets
 #  mountPath Directory to which secret is mounted
 #  mountPathPrefix If 'mountPath' not defined it is constructed as
 #          concatenation of this prefix and secret name
@@ -249,10 +252,21 @@ externalSecrets:
     refreshInterval: 5m
   image-pull:
     property: .dockerconfigjson
-    type: kubernetes.io/dockerconfigjson
-  server-cert-pem:
-    property: server.cert.pem
-    mountPath: /certificates/servers/cert/server.cert.pem
-  server-key-pem:
-    property: server.key.pem
-    mountPath: /certificates/servers/key/server.key.pem
+    template:
+      type: kubernetes.io/dockerconfigjson
+  server-cert:
+    data:
+      # Probably more logical solution could have been storing PKCS12 archive
+      # in remote store and unpacking it with External Secrets templating, but
+      # looks like it adds too much hassle (binary secret, password
+      # provisioning, etc.)
+      # Theoretically, using two separate external secrets for this secret may
+      # cause secret rotation race conditions problems, not sure this would be
+      # a problem in practice though
+      - secretKey: server.cert.pem
+        remoteRef:
+          key: server-cert-pem
+      - secretKey: server.key.pem
+        remoteRef:
+          key: server-key-pem
+    mountPath: /certificates/servers

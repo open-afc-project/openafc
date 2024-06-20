@@ -28,3 +28,4 @@ staticVolumes:
 
 externalSecrets:
   image-pull: null
+  server-cert: null

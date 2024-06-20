@@ -379,7 +379,11 @@ Mount path of given secret
 */}}
 {{- define "afc.secretMountPath" -}}
 {{- $extSecretDef := merge (dict) (get $.Values.externalSecrets .secret | required (cat "External secret" .secret "not found")) $.Values.externalSecrets.default -}}
-{{- hasKey $extSecretDef "mountPath" | ternary (get $extSecretDef "mountPath") (printf "%s%s" (get $extSecretDef "mountPathPrefix" | required (cat "External secret" .secret "has neither 'mountPath' nor 'mountPathPrefix' property")) .secret) -}}
+{{- if hasKey $extSecretDef "mountPath" -}}
+{{-   get $extSecretDef "mountPath" -}}
+{{- else -}}
+{{-   printf "%s%s" (get $extSecretDef "mountPathPrefix" | required (cat "External secret" .secret "has neither 'mountPath' nor 'mountPathPrefix' property")) .secret -}}
+{{- end -}}
 {{- end -}}
 
 {{/*
@@ -762,14 +766,13 @@ Renders target in ExternalSecret
 */}}
 {{- define "afc.extSecretTarget" -}}
 {{- $extSecretDef := merge (dict) (get $.Values.externalSecrets .secret | required (cat "External secret" .extSecret "not found")) $.Values.externalSecrets.default -}}
-{{- $type := get $extSecretDef "type" -}}
+{{- $template := get $extSecretDef "template" -}}
 target:
   name: {{ include "afc.secretManifestName" . }}
   creationPolicy: Owner
   deletionPolicy: Delete
-{{- if $type }}
-  template:
-    type: {{ $type }}
+{{- if $template }}
+  template: {{ toYaml $template | nindent 4 }}
 {{- end }}
 {{- end }}
 
@@ -779,10 +782,13 @@ Renders data or dataFrom in ExternalSecret
 */}}
 {{- define "afc.extSecretData" -}}
 {{- $extSecretDef := merge (dict) (get $.Values.externalSecrets .secret | required (cat "External secret" .secret "not found")) $.Values.externalSecrets.default -}}
+{{- $data := get $extSecretDef "data" -}}
 {{- $property := get $extSecretDef "property" -}}
 {{- $secretStoreName := get $extSecretDef "secretStore" | required  (cat "secretStore not defined for external secret" .secret) }}
 {{- $secretStoreDef := get $.Values.secretStores $secretStoreName | required (cat "Secret" .secret "uses undefined secret store"  $secretStoreName) }}
-{{- if $property }}
+{{- if hasKey $extSecretDef "data" }}
+data: {{ toYaml $data | nindent 2 }}
+{{- else if $property }}
 data:
   - secretKey: {{ $property }}
     remoteRef:

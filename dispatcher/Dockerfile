@@ -29,13 +29,12 @@ RUN set -x \
     && pip3 uninstall -y setuptools pip \
 # create certificate directories
     && mkdir -p \
-    /certificates/servers/cert \
-    /certificates/servers/key \
+    /certificates/servers \
     /etc/nginx/templates
 
 # Server side certificates
-COPY dispatcher/certs/servers/server.cert.pem /certificates/servers/cert
-COPY dispatcher/certs/servers/server.key.pem /certificates/servers/key
+COPY dispatcher/certs/servers/server.cert.pem \
+dispatcher/certs/servers/server.key.pem /certificates/servers/
 # Default client side CA certificates as a placeholder
 COPY dispatcher/certs/clients/client.bundle.pem \
 /etc/nginx/certs/
