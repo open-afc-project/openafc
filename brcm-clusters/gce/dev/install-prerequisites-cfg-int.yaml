@@ -16,8 +16,16 @@ default_install_components:
   - external_secrets
   - ingress_nginx
   - default_istio_injection
+  - prometheus_ingress
 
 install_components:
+  prometheus_adapter:
+    # This is an extremely dirty hack. Some entity keep reinstalling default
+    # v1beta1.metrics.k8s.io (metrics server), so there is a chance it will be
+    # resurrected after deletion but before helm insatallation - these retries
+    # are to counteract this occurence. This resurrection should be somehow
+    # stopped
+    attempts: 10
   ingress_nginx:
     helm_settings:
       - controller.service.annotations."networking\.gke\.io/internal-load-balancer-allow-global-access"=true
@@ -27,12 +35,12 @@ install_components:
       - controller.service.loadBalancerIP={{externalIps.int-ingress}}
     postinstall:
       - >-
-        kubectl patch namespace ingress-nginx -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+        kubectl patch namespace ingress-nginx {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
   external_secrets:
     postinstall:
       - >-
-        kubectl patch namespace external-secrets -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+        kubectl patch namespace external-secrets {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
   default_istio_injection:
     postinstall:
       - >-
-        kubectl patch namespace default -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+        kubectl patch namespace default {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'

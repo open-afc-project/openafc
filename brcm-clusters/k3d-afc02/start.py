@@ -18,11 +18,14 @@ DEFAULT_TAG = "AUTO"
 DEFAULT_RELEASE = "AUTO"
 DEFAULT_EXPOSE = \
     "http,https,ratdb,rat-server,msghnd,bulk-postgres,rcache,grafana," \
-    "prometheus"
+    "prometheus,disp-prometheus,disp-grafana"
 
 SCRIPT_DIR = os.path.dirname(__file__)
 DEFAULT_SOURCE_ROOT = \
     os.path.normpath(os.path.abspath(os.path.join(SCRIPT_DIR, "../..")))
+
+# Environment variable containing additional arguments
+PARAM_ENV = "AFC_START_ARGS"
 
 
 def execute(args: List[str]) -> None:
@@ -64,7 +67,8 @@ def main(argv: List[str]) -> None:
     """
     argument_parser = \
         argparse.ArgumentParser(
-            description="Starts AFC in k3d cluster")
+            description=f"Starts AFC in k3d cluster. Additional parameters "
+            f"may be specified in {PARAM_ENV} environment variable")
     argument_parser.add_argument(
         "--cluster", metavar="CLUSTER_NAME", default=DEFAULT_CLUSTER,
         help=f"Cluster to start. 'AUTO' means name made of username and "
@@ -117,7 +121,10 @@ def main(argv: List[str]) -> None:
         "--set", metavar="VA.RI.AB.LE=VALUE", action="append", default=[],
         help="Additional setting for values.yaml of AFC helmchart")
 
-    args = argument_parser.parse_args(argv)
+    args = \
+        argument_parser.parse_args(
+            argv + shlex.split(os.environ.get(PARAM_ENV, "")))
+
     bin_dir = os.path.join(args.source_root, "helm/bin")
     if not args.internal:
         execute([os.path.join(bin_dir, "k3d_registry.py")])

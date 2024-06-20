@@ -9,12 +9,17 @@
 # pylint: disable=invalid-name, too-many-locals, too-many-arguments
 
 import argparse
+import os
+import shlex
 import sys
 from typing import List, Optional
 
 from utils import cluster_filename, cluster_values, DEFAULT_EXT_CONTEXT, \
     DEFAULT_INT_CONTEXT, DEFAULT_SOURCE_ROOT, DEFAULT_RELEASE, execute, \
     helm_bin, optional_args, values_afc_common, VALUES_AFC_COMMON_YAML
+
+# Environment variable containing additional arguments
+PARAM_ENV = "AFC_START_ARGS"
 
 
 def start_cluster(int_ext: str, cluster_subdir: str, context: str,
@@ -70,7 +75,8 @@ def main(argv: List[str]) -> None:
     """
     argument_parser = \
         argparse.ArgumentParser(
-            description="Starts internal and external clusters")
+            description=f"Starts internal and external clusters. Additional "
+            f"parameters may be specified in {PARAM_ENV} environment variable")
     argument_parser.add_argument(
         "--tag", metavar="IMAGE_TAG",
         help="Tag of AFC images to use. By default Chart.yaml's 'appVersion' "
@@ -129,7 +135,9 @@ def main(argv: List[str]) -> None:
         argument_parser.print_help()
         sys.exit(1)
 
-    args = argument_parser.parse_args(argv)
+    args = \
+        argument_parser.parse_args(
+            argv + shlex.split(os.environ.get(PARAM_ENV, "")))
 
     start_cluster(
         int_ext="int", cluster_subdir=args.CLUSTER,

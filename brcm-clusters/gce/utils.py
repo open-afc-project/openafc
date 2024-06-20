@@ -110,7 +110,7 @@ def cluster_values() -> List[str]:
 
 
 def cluster_filename(cluster: str, filename: str) -> str:
-    """ Full path to YANML file in cluster-specific subdirectory of this script
+    """ Full path to YAML file in cluster-specific subdirectory of this script
 
     Arguments:
     cluster  -- This script's subdirectory containing cluster-specific files

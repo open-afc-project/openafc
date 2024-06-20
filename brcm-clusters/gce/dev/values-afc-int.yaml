@@ -6,10 +6,12 @@
 
 # helm/afc-int/values.yaml overrides for internal GCP cluster
 
-shared_env:
+sharedEnv:
   flask-conf:
     FLASK_SQLALCHEMY_DATABASE_URI: postgresql://postgres@{{ip:postgres}}/fbrat
     FLASK_USER_EMAIL_SENDER_EMAIL: afc.admin@broadcom.com
+  rcache-common:
+    RCACHE_POSTGRES_DSN: postgresql://postgres@{{ip:postgres}}/rcache
   ratapi-configurator:
     REGISTRATION_APPROVE_LINK: ._
       https://docs.google.com/spreadsheets/d/1W7TKAtjd26q6KHC2yqaA_CdzCLw7sPN60zH4Tv9wNm0/edit
@@ -34,14 +36,11 @@ components:
   als-siphon:
     env:
       POSTGRES_INIT_CONN_STR: postgresql://postgres@{{ip:postgres}}/postgres
-      POSTGRES_ALS_CONN_STR: postgresql://postgres@1{{ip:postgres}}/ALS
+      POSTGRES_ALS_CONN_STR: postgresql://postgres@{{ip:postgres}}/ALS
       POSTGRES_LOG_CONN_STR: postgresql://postgres@{{ip:postgres}}/AFC_LOGS
   uls-downloader:
     env:
       ULS_SERVICE_STATE_DB_DSN: postgresql://postgres@{{ip:postgres}}/fs_state
-  rcache-common:
-    env:
-      RCACHE_POSTGRES_DSN: postgresql://postgres@{{ip:postgres}}/rcache
   bulk-postgres:
     imageName: null
   ratdb:

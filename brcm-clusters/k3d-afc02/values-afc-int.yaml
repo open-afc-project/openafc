@@ -28,3 +28,10 @@ sharedEnv:
     OIDC_LOGIN: "False"
     OIDC_DISCOVERY_URL: >-
       https://login.broadcom.com/oauth2/default/.well-known/openid-configuration
+
+components:
+  dispatcher:
+    env:
+      AFC_PROMETHEUS_ENABLED: true
+      AFC_GRAFANA_ENABLED: true
+      AFC_PROMETHEUS_TARGET: prometheus-operated.monitoring:9090

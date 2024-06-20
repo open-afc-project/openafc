@@ -17,8 +17,8 @@ install_components:
   external_secrets:
     postinstall:
       - >-
-        kubectl patch namespace external-secrets -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+        kubectl patch namespace external-secrets {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
   default_istio_injection:
     postinstall:
       - >-
-        kubectl patch namespace default -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+        kubectl patch namespace default {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
