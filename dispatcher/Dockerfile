@@ -6,7 +6,7 @@
 #
 FROM nginx:1.24.0-alpine
 ENV PYTHONUNBUFFERED=1
-RUN apk add --update --no-cache python3 \
+RUN apk add --update --no-cache python3 py3-psutil \
     && ln -sf python3 /usr/bin/python \
     && python3 -m ensurepip
 RUN pip3 install --no-cache --upgrade \
@@ -74,4 +74,5 @@ COPY dispatcher/entrypoint.sh /
 RUN chmod +x /entrypoint.sh
 CMD ["/entrypoint.sh"]
 HEALTHCHECK --start-period=60s --interval=30s --retries=1 \
-    CMD curl --fail http://localhost/fbrat/ap-afc/healthy || exit 1
+    CMD curl --fail http://localhost/fbrat/ap-afc/healthy && \
+    /wd/acceptor.py --cmd check || exit 1
