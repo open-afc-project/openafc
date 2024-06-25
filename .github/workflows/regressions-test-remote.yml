@@ -23,7 +23,7 @@ jobs:
         echo ${{ steps.ip.outputs.ipv4 }}
         echo ${{ steps.ip.outputs.ipv6 }}
 
-    - name: Allow Security group rule to connect Github Actions to OpenAFC servers
+    - name: Allow Security group rule to connect Github Actions to the temporal OpenAFC test server
       run: |
         aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/24
       env:
