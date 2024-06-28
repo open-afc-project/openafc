@@ -4,7 +4,7 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Exposes Prometheus over 
+# Exposes Prometheus via ingress-nginx
 
 apiVersion: networking.k8s.io/v1
 kind: Ingress
