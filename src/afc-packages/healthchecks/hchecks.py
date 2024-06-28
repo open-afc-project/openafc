@@ -53,7 +53,7 @@ class ObjstHealthcheck(BasicHealthcheck):
     def __init__(self, cfg) -> None:
         app_log.debug(f"({os.getpid()}) {self.__class__.__name__}()")
         self.url = 'http://' + cfg['AFC_OBJST_HOST'] + ':' + \
-                   cfg['AFC_OBJST_PORT'] + '/healthy'
+                   cfg['AFC_OBJST_PORT'] + '/objst_healthy'
 
 
 class MsghndHealthcheck(BasicHealthcheck):
