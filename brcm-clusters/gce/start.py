@@ -52,7 +52,7 @@ def start_cluster(int_ext: str, cluster_subdir: str, context: str,
                               f"install-prerequisites-cfg-{int_ext}.yaml")])
     if install_helm:
         execute(
-            [helm_bin(source_root, f"helm_install_{int_ext}.py"), "--upgrade",
+            [helm_bin(source_root, f"helm_install_{int_ext}.py"),
              "--values", cluster_filename(cluster_subdir,
                                           f"values-afc-{int_ext}.yaml"),
              "--values", cluster_filename(cluster_subdir,
@@ -146,7 +146,7 @@ def main(argv: List[str]) -> None:
         install_helm=True, print_ips=False,
         extra_args=optional_args(
             [("--tag", args.tag, args.tag),
-             ("--max_workers", args.max_workers, args.max_workers)]) +
+             ("--max_workers", str(args.max_workers), args.max_workers)]) +
         sum([["--set", s] for s in args.set_int], []))
     start_cluster(
         int_ext="ext", cluster_subdir=args.CLUSTER,
