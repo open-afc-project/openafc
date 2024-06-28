@@ -23,3 +23,5 @@ spec:
   scrapeInterval: 5s
   scrapeTimeout: 2s
   evaluationInterval: 30s  # Interval for recording rules
+  routePrefix: /prometheus
+  externalUrl: http://prometheus-operated:9090/prometheus
