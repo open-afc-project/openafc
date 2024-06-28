@@ -10,22 +10,22 @@ case "$AFC_DEVEL_ENV" in
   "devel")
     echo "Running debug profile" 
     ACCEPTOR_LOG_LEVEL="--log debug"
-    export NGINX_BIN=nginx-debug
+    BIN=nginx-debug
     apk add --update --no-cache bash
     ;;
   "production")
     echo "Running production profile"
     ACCEPTOR_LOG_LEVEL=
-    export NGINX_BIN=nginx
+    BIN=nginx
     ;;
   *)
     echo "Uknown profile"
     ACCEPTOR_LOG_LEVEL=
-    export NGINX_BIN=nginx
+    BIN=nginx
     ;;
 esac
 
-/docker-entrypoint.sh $NGINX_BIN -g "daemon off;" &
+/docker-entrypoint.sh $BIN -g "daemon off;" &
 
 /wd/acceptor.py $ACCEPTOR_LOG_LEVEL --cmd run
 
