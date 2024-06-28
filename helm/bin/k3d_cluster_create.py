@@ -276,7 +276,7 @@ def main(argv: List[str]) -> None:
     kubeconfig: Optional[str] = \
         expand_filename(args.kubeconfig) if args.kubeconfig else None
     execute(
-        ["k3d", "cluster", "create", cluster, "--agents", "2",
+        ["k3d", "cluster", "create", cluster, "--agents", "1",
          "-v", f"{static_dir}:/opt/afc/databases/rat_transfer",
          "-v", "/home:/hosthome", "--registry-use", registry,
          "--kubeconfig-switch-context", "--kubeconfig-update-default"] +
