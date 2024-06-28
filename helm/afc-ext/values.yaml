@@ -140,6 +140,14 @@ sharedEnv:
 #             'type' field derived from top-level key)
 #     behavior Behavior clause of HPA manifest. Optional. Default is to scale
 #             immediately, without looking back
+#   livenessProbe livenessProbe clause. Liveness is a probe Kubernetes uses to
+#           decide if container must be restarted
+#   readinessProbe readinessProbe clause. Readiness is a probe Kubernetes uses
+#           to decide if container is able to acept traffic (or should be
+#           excluded from LoadBalancer)
+#   startupProbe startupProbe clause. Startup is a probe Kubernetes uses to
+#           decide if readiness probe may already be used (or container is
+#           still starting)
 components:
   default:
     service:
@@ -170,11 +178,9 @@ components:
       BROKER_FQDN: "{{ip:int-rmq}}"
       BROKER_PORT: 5672
       AFC_PROMETHEUS_TARGET: >-
-          {{ip:int-ingress}}:9090
-      AFC_PROMETHEUS_PATH: /prometheus
+          {{ip:int-ingress}}
       AFC_GRAFANA_TARGET: >-
-          {{ip:int-ingress}}:3000
-      AFC_GRAFANA_PATH: /grafana
+          {{ip:int-ingress}}
     ports:
       http:
         servicePort: 80
@@ -182,12 +188,14 @@ components:
         servicePort: 443
       status:
         servicePort: 8080
-      disp-prometheus:
-        servicePort: 9090
-      disp-grafana:
-        servicePort: 3000
     mountedSecrets:
       - server-cert
+    readinessProbe:
+      exec:
+        command: [/wd/acceptor.py, --cmd, check]
+    livenessProbe:
+      exec:
+        command: [curl, --fail, http://localhost/fbrat/ap-afc/healthy]
 
 # Dictionary of secret store descriptors
 # Keys used as secret store name (after conversion to RFC1123)
