@@ -6,6 +6,7 @@
 # Rules for promnetheus adapter. Define metrics to be used by HPA
 prometheus:
   url: http://prometheus-operated.monitoring.svc
+  path: /prometheus/
 rules:
   default: true
   external:

@@ -22,7 +22,6 @@ from logging.config import dictConfig
 import argparse
 import inspect
 import gevent
-import psutil
 import subprocess
 import shutil
 import time
@@ -52,8 +51,6 @@ dictConfig({
     },
 })
 app_log = logging.getLogger()
-
-NGINX_BIN = os.environ.get("NGINX_BIN", "nginx")
 
 
 class Configurator(dict):
@@ -97,9 +94,6 @@ def readiness_check(cfg):
        list of subjects (containers)
     """
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
-    if not any(p.name() == NGINX_BIN for p in psutil.process_iter()):
-        app_log.error("Nginx process not running")
-        return 1
     objst_chk = ObjstHealthcheck(cfg)
     msghnd_chk = MsghndHealthcheck.from_hcheck_if()
     checks = [gevent.spawn(objst_chk.healthcheck),
@@ -130,7 +124,7 @@ def run_restart(cfg):
                          f"{cfg['DISPAT_CERT_CLI_BUNDLE_DFLT']}")
             shutil.copy2(cfg['DISPAT_CERT_CLI_BUNDLE_DFLT'],
                          cfg['DISPAT_CERT_CLI_BUNDLE'])
-        p = subprocess.Popen(f"{NGINX_BIN} -s reload",
+        p = subprocess.Popen("nginx -s reload",
                              stdout=subprocess.PIPE, shell=True)
         app_log.info(f"{p.communicate()}")
 
@@ -146,7 +140,7 @@ def run_remove(cfg):
                   f"{cfg['DISPAT_CERT_CLI_BUNDLE_DFLT']}")
     shutil.copy2(cfg['DISPAT_CERT_CLI_BUNDLE_DFLT'],
                  cfg['DISPAT_CERT_CLI_BUNDLE'])
-    p = subprocess.Popen(f"{NGINX_BIN} -s reload",
+    p = subprocess.Popen("nginx -s reload",
                          stdout=subprocess.PIPE, shell=True)
     app_log.info(f"{p.communicate()}")
 
@@ -172,13 +166,6 @@ def run_it(cfg):
                  cfg['DISPAT_CERT_CLI_BUNDLE_DFLT'])
     # check if lucky to find new certificate bundle already
     run_restart(cfg)
-
-    time.sleep(10)
-    if not any(p.name() == NGINX_BIN for p in psutil.process_iter()):
-        app_log.critical(
-            f"Nginx process '{NGINX_BIN} not started or prematurely "
-            f"terminated. Check validity of nginx config files")
-        return 1
 
     maker = MsgAcceptor(cfg['BROKER_URL'], cfg['BROKER_EXCH_DISPAT'],
                         msg_handler=get_commands, handler_params=cfg)

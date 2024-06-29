@@ -29,6 +29,7 @@ spec:
       {{- include "afc.imagePullSecrets" . | indent 6 }}
       containers:
         - {{- include "afc.containerImage" . | nindent 10 }}
+          {{- include "afc.probes" . | nindent 10 }}
           env: {{- include "afc.env" . | nindent 12 }}
           ports: {{- include "afc.containerPorts" . | nindent 12 }}
           resources: {{- include "afc.containerResources" . | nindent 12 }}

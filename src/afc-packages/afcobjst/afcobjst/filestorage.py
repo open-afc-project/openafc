@@ -234,7 +234,7 @@ def head(path):
         return abort(500)
 
 
-@objst_app.route('/healthy', methods=['GET'])
+@objst_app.route('/objst_healthy', methods=['GET'])
 def healthcheck():
     ''' Get method for healthcheck. '''
     msg = 'The objst is healthy'

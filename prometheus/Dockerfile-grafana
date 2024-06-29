@@ -9,4 +9,6 @@
 
 FROM grafana/grafana-oss:10.2.0-ubuntu
 
+COPY grafana.ini /etc/grafana/
+
 EXPOSE 3000/tcp

@@ -1,0 +1,26 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# Ingress for msghnd endpoints
+
+{{- $ := mergeOverwrite $ (dict "component" "msghnd") }}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
+{{- $ingressDef := default (dict) (get $compDef "ingress") -}}
+{{- if and ($ingressDef) (get $ingressDef "rules") (not (get $compDef "noIngress")) (include "afc.fullImageName" .) }}
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "afc.compManifestName" . }}
+  labels: {{- include "afc.commonLabels" . | nindent 4 }}
+  annotations: {{- include "afc.ingressAnnotations" . | nindent 4 }}
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths: {{- include "afc.ingressPaths" . | nindent 10 }}
+
+{{- end -}}

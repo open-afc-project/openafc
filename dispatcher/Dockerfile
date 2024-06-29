@@ -60,15 +60,11 @@ ENV AFC_DEVEL_ENV=${AFC_DEVEL_ENV:-production}
 ENV AFC_PROMETHEUS_ENABLED=false
 # Host and port of Prometheus server
 ENV AFC_PROMETHEUS_TARGET=prometheus:9090
-# Path on Prometheus server (if not empty - must start with /)
-ENV AFC_PROMETHEUS_PATH=
 
 # 'true' to enable access to Grafana via dispatcher
 ENV AFC_GRAFANA_ENABLED=false
 # Host and port of Grafana server
 ENV AFC_GRAFANA_TARGET=grafana:3000
-# Path on Grafana server (if not empty - must start with /)
-ENV AFC_GRAFANA_PATH=
 
 COPY dispatcher/entrypoint.sh /
 RUN chmod +x /entrypoint.sh

@@ -24,4 +24,4 @@ ENV AFC_OBJST_HIST_PORT=${AFC_OBJST_HIST_PORT:-"4999"}
 ENV AFC_OBJST_HIST_WORKERS=${AFC_OBJST_HIST_WORKERS:-2}
 CMD ["/wd/docker-entrypoint.sh"]
 HEALTHCHECK CMD wget --no-verbose --tries=1 --spider \
-    http://localhost:${AFC_OBJST_PORT}/healthy || exit 1
+    http://localhost:${AFC_OBJST_PORT}/objst_healthy || exit 1

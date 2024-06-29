@@ -672,6 +672,20 @@ Common StatefulSet annotations
 {{- end }}
 
 {{/*
+Renders probes
+.component (key in $.Values.components) must be defined
+*/}}
+{{- define "afc.probes" -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
+{{- range $probeType := list "startupProbe" "livenessProbe" "readinessProbe" }}
+{{-   $probe := get $compDef $probeType }}
+{{-   if $probe }}
+{{-     $probeType }}: {{- toYaml $probe | nindent 2 }}
+{{-   end }}
+{{  end }}
+{{- end }}
+
+{{/*
 Declaration of Prometheus metric endpoint for ServiceMonitor resource
 .component (key in $.Values.components) must be defined
 */}}
@@ -803,53 +817,38 @@ dataFrom:
 {{- end }}
 
 {{/*
-Renders Ingress name
+Ingress annotations
+.component (key in $.Values.components) must be defined
 */}}
-{{- define "afc.ingressName" -}}
-{{- $ingressDef := get $.Values "ingress" | required "'ingress' missing in values.yaml" -}}
-{{ default "ingress" (get $ingressDef "name") | include "afc.rfc1123" }}
-{{- end }}
-
-{{/*
-Renders ingressClassName (if specified)
-*/}}
-{{- define "afc.ingressClass" -}}
-{{- $ingressDef := get $.Values "ingress" | required "'ingress' missing in values.yaml" -}}
-{{- $ingressClassName := get $ingressDef "ingressClassName" -}}
-{{- if $ingressClassName }}
-ingressClassName: {{ $ingressClassName }}
+{{- define "afc.ingressAnnotations" -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
+{{- $ingressDef := get $compDef "ingress" | required (cat "Component" .component "does not have ingress defined") -}}
+{{- range $key, $value := (default (dict) (get $ingressDef "annotations")) }}
+{{ $key }}: {{ $value }}
 {{- end }}
 {{- end }}
 
 {{/*
-Renders ingress rules
+Renders ingress rules' paths
+.component (key in $.Values.components) must be defined
 */}}
-{{- define "afc.ingressRules" -}}
-{{- $ingressDef := get $.Values "ingress" | required "'ingress' missing in values.yaml" -}}
-- http:
-    paths:
-{{- range $path, $ruleDef := (default (dict) (get $ingressDef "rules")) }}
-{{-   if $ruleDef }}
-{{-     $serviceName := get $ruleDef "serviceName" }}
-{{-     $portNumber := get $ruleDef "portNumber" }}
-{{-     if not (and $serviceName $portNumber) }}
-{{-       $compKey := get $ruleDef "componentKey" | required (cat "Missing required 'componentKey' in definition of ingress rule for" $path) }}
-{{-       $compDef := get $.Values.components $compKey | required (cat "Component" $compKey "used in definition of ingress rule for" $path "not found") }}
-{{-       if not $serviceName }}
-{{-         $serviceName = get (get $compDef "service" | default dict) "hostname" | default $compKey }}
-{{-       end }}
-{{-       if not $portNumber }}
-{{-         $portKey := get $ruleDef "portKey" | required (cat "'portKey' missing in idefinition of ingress rule for" $path) }}
-{{-         $portNumber = get (get (get $compDef "ports" | default dict) $portKey | default dict) "servicePort" | required (cat "Service port" $portKey "of component" $compKey "used in definition of ingress rule" $path "not found") }}
-{{-       end }}
-{{-     end }}
-      - path: {{ $path }}
-        pathType: {{ get $ruleDef "pathType" | default "Prefix" }}
-        backend:
-          service:
-            name: {{ $serviceName }}
-            port:
-              number: {{ $portNumber }}
-{{-   end }}
+{{- define "afc.ingressPaths" -}}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
+{{- $ingressDef := get $compDef "ingress" | required (cat "Component" .component "does not have ingress defined") -}}
+{{- $hostName := include "afc.hostName" . -}}
+{{- $rules := get $ingressDef "rules" -}}
+{{- if not $rules }}
+{{-   fail (cat "No ingress rules defined for component" .component) }}
+{{- end }}
+{{- range $ruleDef := $rules }}
+{{-   $portKey := get $ruleDef "portKey" | required (cat "'portKey' missing in definition of ingress rule for" $.component) }}
+{{-   $portNumber := get (get (get $compDef "ports" | default dict) $portKey | default dict) "servicePort" | required (cat "Service port" $portKey "of component" $.Component "used in definition of one of ingress rules not found") }}
+- path: {{ get $ruleDef "path" | required (cat "'path' missing in definition of ingress rule for" $.component) }}
+  pathType: {{ get $ruleDef "pathType" | default "Prefix" }}
+  backend:
+    service:
+      name: {{ $hostName }}
+      port:
+        number: {{ $portNumber }}
 {{- end }}
 {{- end }}

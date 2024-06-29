@@ -9,6 +9,7 @@
 components:
   default:
     imagePullPolicy: Always
+    noIngress: true
   dispatcher:
     service:
       type: NodePort

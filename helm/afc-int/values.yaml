@@ -234,6 +234,22 @@ staticVolumes:
 #             'type' field derived from top-level key)
 #     behavior Behavior clause of HPA manifest. Optional. Default is to scale
 #             immediately, without looking back
+#   livenessProbe livenessProbe clause. Liveness is a probe Kubernetes uses to
+#           decide if container must be restarted
+#   readinessProbe readinessProbe clause. Readiness is a probe Kubernetes uses
+#           to decide if container is able to acept traffic (or should be
+#           excluded from LoadBalancer)
+#   startupProbe startupProbe clause. Startup is a probe Kubernetes uses to
+#           decide if readiness probe may already be used (or container is
+#           still starting)
+#   ingress Parameters of ingress:
+#     anotations Annotations dictionary for Ingress manifest
+#     rules List of structures with materials to ingress rules. Structures have
+#             properties:
+#       path Path for rule
+#       pathType (Prefix, ImplementationSpecific or Exact). Default is Prefix
+#       portKey Name of target port
+#   noIngress True to ignore 'ingress' even if it is present
 components:
   default:
     service:
@@ -349,6 +365,14 @@ components:
       - oidc-client-id
       - oidc-client-secret
       - rcache-db-password
+    ingress:
+      rules:
+        - path: /fbrat/ap-afc/availableSpectrumInquirySec
+          portKey: rat-server
+        - path: /fbrat/ratapi/v1/files
+          portKey: rat-server
+        - path: /fbrat
+          portKey: rat-server
   msghnd:
     imageName: afc-msghnd
     imageRepositoryKey: private
@@ -385,6 +409,12 @@ components:
       - oidc-client-id
       - oidc-client-secret
       - rcache-db-password
+    ingress:
+      rules:
+        - path: /fbrat/ap-afc/availableSpectrumInquiry
+          portKey: msghnd
+        - path: /fbrat/ap-afc/healthy
+          portKey: msghnd
   objst:
     imageName: objstorage-image
     imageRepositoryKey: public
@@ -413,6 +443,12 @@ components:
       - ratapi-mail-password
       - oidc-client-id
       - oidc-client-secret
+    ingress:
+      rules:
+        - path: /certificate
+          portKey: fileStorage
+        - path: /objst_healthy
+          portKey: fileStorage
   worker:
     imageName: afc-worker
     imageRepositoryKey: private
@@ -456,16 +492,22 @@ components:
             type: AverageValue
             # 1700m is 1.7 in HPA parlance
             averageValue: 1700m
-      # Example behavior definition
-      # behavior:
-      #   scaleUp:
-      #     stabilizationWindowSeconds: 0
-      #     policies:
-      #       - type: Pods
-      #         value: 4
-      #         periodSeconds: 30
-      #   scaleDown:
-      #     stabilizationWindowSeconds: 300
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Pods
+              value: 4
+              periodSeconds: 30
+        scaleDown:
+          stabilizationWindowSeconds: 120
+          policies:
+            - type: Pods
+              value: 4
+              periodSeconds: 30
+            - type: Percent
+              value: 10
+              periodSeconds: 30
   als-kafka:
     imageName: als-kafka-image
     imageRepositoryKey: public
@@ -606,6 +648,13 @@ components:
       grafana:
         servicePort: 3000
         nodePort: 31000
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/rewrite-target: /$2
+      rules:
+        - path: /grafana($|/)(.*)
+          pathType: ImplementationSpecific
+          portKey: grafana
   nginxexporter:
     imageName: nginxexporter-image
     imageRepositoryKey: public
@@ -626,39 +675,6 @@ components:
         nodePort: 31090
   # Only to have proper label in its servicemonitor
   cadvisor: {}
-
-# Dictionary that defines ingress parameters (override to Null if no ingress)
-# name Ingress name.
-# Properties are
-#   annotations
-#   ingressClassName Value for spec.ingressClassName
-#   rules Dictionary of path descriptors, indexed by path. Path descriptors
-#           have the following properties
-#     pathType (Prefix, ImplementationSpecific or Exact). Default is Prefix
-#     componentKey Index in components (not used if 'service' is specified)
-#     portKey Index in components[componentKey].ports. Only used if
-#             'componentKey' is specified
-#     serviceName Explicitly specified host name
-#     portNumber Explicitly specified port number
-ingress:
-  name: ingress-int
-  ingressClassName: nginx
-  rules:
-    /fbrat/ap-afc/availableSpectrumInquiry:
-      componentKey: msghnd
-      portKey: msghnd
-    /fbrat/ap-afc/availableSpectrumInquirySec:
-      componentKey: msghnd
-      portKey: msghnd
-    /fbrat/ratapi:
-      componentKey: rat-server
-      portKey: rat-server
-    /certificate:
-      componentKey: objst
-      portKey: fileStorage
-    /grafana:
-      componentKey: grafana
-      portKey: grafana
 
 # Dictionary of secret store descriptors
 # Keys used as secret store name (after conversion to RFC1123)
