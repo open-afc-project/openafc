@@ -291,7 +291,7 @@ class RcacheDbAsync(RcacheDb):
                     parts._replace(
                         scheme=f"{parts.scheme}+{self.ASYNC_DRIVER_NAME}"))
         try:
-            return sa_async.create_async_engine(dsn)
+            return sa_async.create_async_engine(dsn, pool_pre_ping=True)
         except sa.exc.SQLAlchemyError as ex:
             error(f"Invalid database DSN: '{safe_dsn(dsn)}': {ex}")
         return None  # Will never happen. Appeasing pylint
