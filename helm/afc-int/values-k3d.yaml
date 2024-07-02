@@ -13,6 +13,13 @@ components:
   dispatcher:
     service:
       type: NodePort
+  grafana:
+    env:
+      # Somehow Grafana behaves differently when exposed from behind dispatcher
+      # only (k3d) as compared to dispatcher and ingress-nginx (GCE) - hence
+      # this setting. The root cause is probably some dispatcher nginx
+      # configuration issue.
+      GF_SERVER_SERVE_FROM_SUB_PATH: "true"
 
 ingress: null
 
