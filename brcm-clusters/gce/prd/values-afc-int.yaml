@@ -1,0 +1,80 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# helm/afc-int/values.yaml overrides for internal GCP cluster
+
+sharedEnv:
+  flask-conf:
+    FLASK_SQLALCHEMY_DATABASE_URI: postgresql://postgres@{{ip:postgres}}/fbrat
+    FLASK_USER_EMAIL_SENDER_EMAIL: afc.admin@broadcom.com
+  rcache-common:
+    RCACHE_POSTGRES_DSN: postgresql://postgres@{{ip:postgres}}/rcache
+  ratapi-configurator:
+    REGISTRATION_APPROVE_LINK: ._
+      https://docs.google.com/spreadsheets/d/1W7TKAtjd26q6KHC2yqaA_CdzCLw7sPN60zH4Tv9wNm0/edit
+    REGISTRATION_DEST_EMAIL: afc.admin@broadcom.com
+    REGISTRATION_DEST_PDL_EMAIL: afc-admin@broadcom.com
+    REGISTRATION_SRC_EMAIL: afc.admin@broadcom.com
+    MAIL_SERVER: smtp.gmail.com
+    MAIL_USERNAME: afc.admin@broadcom.com
+    MAIL_PORT: "465"
+    MAIL_USE_TLS: "False"
+    MAIL_USE_SSL: "True"
+    USE_CAPTCHA: "True"
+    CAPTCHA_VERIFY: >-
+      https://www.google.com/recaptcha/api/siteverify
+    USER_APP_NAME: Broadcom AFC
+  oidc-configurator:
+    OIDC_LOGIN: "False"
+    OIDC_DISCOVERY_URL: >-
+      https://login.broadcom.com/oauth2/default/.well-known/openid-configuration
+
+components:
+  als-siphon:
+    env:
+      POSTGRES_INIT_CONN_STR: postgresql://postgres@{{ip:postgres}}/postgres
+      POSTGRES_ALS_CONN_STR: postgresql://postgres@{{ip:postgres}}/ALS
+      POSTGRES_LOG_CONN_STR: postgresql://postgres@{{ip:postgres}}/AFC_LOGS
+  uls-downloader:
+    env:
+      ULS_SERVICE_STATE_DB_DSN: postgresql://postgres@{{ip:postgres}}/fs_state
+  bulk-postgres:
+    imageName: null
+  ratdb:
+    imageName: null
+  nginxexporter:
+    imageName: null
+  dispatcher:
+    imageName: null
+  rmq:
+    service:
+      type: LoadBalancer
+      annotations:
+        networking.gke.io/internal-load-balancer-allow-global-access: "true"
+        networking.gke.io/load-balancer-type: Internal
+
+staticVolumes:
+  rat_transfer:
+    nfs:
+      server: 10.255.164.2
+      path: /vol1/rat_transfer
+  pipe:
+    nfs:
+      server: 10.255.164.2
+      path: /vol1/rat_transfer
+
+# Redirecting all password secrets to 'postgres' user password secret
+externalSecrets:
+  ratdb-password:
+    remoteSecretName: postgres-password
+  uls-state-db-password:
+    remoteSecretName: postgres-password
+  rcache-db-password:
+    remoteSecretName: postgres-password
+  als-db-password:
+    remoteSecretName: postgres-password
+  als-json-log-db-password:
+    remoteSecretName: postgres-password
