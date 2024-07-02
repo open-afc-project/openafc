@@ -55,6 +55,13 @@ RUN pip3 install --use-pep517 --root-user-action=ignore \
         -r /wd/afc-packages/pkgs.rcache \
     && rm -rf /wd/afc-packages
 
+# Installing Confluent Kafka Python client. Eventually, hopefully, it will be
+# installed as Alpine package (thus not requiring gcc and musl-dev install)
+RUN apk add --update --no-cache python3-dev=~3.11 gcc musl-dev \
+    librdkafka-dev=~2.1.1 && \
+    pip3 install confluent-kafka==2.1.1 && \
+    apk del python3-dev gcc musl-dev
+
 COPY rcache/requirements.txt /wd
 RUN pip3 install  --root-user-action=ignore -r /wd/requirements.txt
 COPY rcache/rcache_app.py rcache/rcache_app.py rcache/rcache_db_async.py \
