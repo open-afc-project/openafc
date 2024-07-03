@@ -410,6 +410,13 @@ components:
       - oidc-client-secret
       - rcache-db-password
     ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "720"
+        nginx.ingress.kubernetes.io/proxy-connect-timeout: "720"
+        nginx.ingress.kubernetes.io/client-body-timeout: "720"
+        nginx.ingress.kubernetes.io/client-header-timeout: "720"
+        nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "720"
+        nginx.ingress.kubernetes.io/keep-alive: "720"
       rules:
         - path: /fbrat/ap-afc/availableSpectrumInquiry
           portKey: msghnd
