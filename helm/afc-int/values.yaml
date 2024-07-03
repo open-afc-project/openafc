@@ -650,11 +650,9 @@ components:
         servicePort: 3000
         nodePort: 31000
     ingress:
-      annotations:
-        nginx.ingress.kubernetes.io/rewrite-target: /$2
       rules:
-        - path: /grafana($|/)(.*)
-          pathType: ImplementationSpecific
+        - path: /grafana
+          pathType: Prefix
           portKey: grafana
   nginxexporter:
     imageName: nginxexporter-image
