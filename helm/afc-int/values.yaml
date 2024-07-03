@@ -646,6 +646,7 @@ components:
         http://{{host:rat-server}}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
     sharedEnvKeys:
       - rcache-common
+      - als-client
     mountedSecrets:
       - rcache-db-password
   grafana:
