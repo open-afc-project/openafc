@@ -302,6 +302,10 @@ services:
       - RCACHE_AFC_REQ_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
       - RCACHE_RULESETS_URL=http://rat_server/fbrat/ratapi/v1/GetRulesetIDs
       - RCACHE_CONFIG_RETRIEVAL_URL=http://rat_server/fbrat/ratapi/v1/GetAfcConfigByRulesetID
+      # ALS params
+      - ALS_KAFKA_SERVER_ID=msghnd
+      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
     secrets:
       - RCACHE_DB_PASSWORD
     depends_on:
