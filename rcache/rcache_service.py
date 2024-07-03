@@ -23,6 +23,7 @@ import time
 import traceback
 from typing import Any, Dict, Optional, Set, Tuple, Union
 
+import als
 from rcache_common import dp, error_if, get_module_logger
 from rcache_db_async import RcacheDbAsync
 from rcache_models import AfcReqRespKey, RcacheUpdateReq, ApDbPk, ApDbRecord, \
@@ -140,6 +141,7 @@ class RcacheService:
                                    Ruleset ID. None to use default maximum AP
                                    FS distance
         """
+        als.als_initialize(client_id="rcache_sevice")
         self._start_time = datetime.datetime.now()
         self._db = \
             RcacheDbAsync(rcache_db_dsn=rcache_db_dsn,
@@ -180,6 +182,7 @@ class RcacheService:
 
     async def set_invalidation_enabled(self, value: bool) -> None:
         """ Enables/disables invalidation """
+        self._log_invalidation(enabled=value)
         await self._db.set_switch(FuncSwitch.Invalidate, value)
 
     async def get_precomputation_enabled(self) -> bool:
@@ -188,6 +191,7 @@ class RcacheService:
 
     async def set_precomputation_enabled(self, value: bool) -> None:
         """ Enables/disables precomputation """
+        self._log_precomputation(enabled=value)
         await self._db.set_switch(FuncSwitch.Precompute, value)
 
     async def get_update_enabled(self) -> bool:
@@ -196,6 +200,7 @@ class RcacheService:
 
     async def set_update_enabled(self, value: bool) -> None:
         """ Enables/disables update """
+        self._log_update(enabled=value)
         await self._db.set_switch(FuncSwitch.Update, value)
 
     @property
@@ -206,6 +211,7 @@ class RcacheService:
     @precompute_quota.setter
     def precompute_quota(self, value: int) -> None:
         """ Sets precompute quota """
+        self._log_precomputation(quota=value)
         error_if(value < 0, f"Precompute quota of {value} is invalid")
         self._precompute_quota = value
 
@@ -249,6 +255,15 @@ class RcacheService:
             invalidation_req: Union[RcacheInvalidateReq,
                                     RcacheSpatialInvalidateReq]) -> None:
         """ Enqueue arrived invalidation requests """
+        if isinstance(invalidation_req, RcacheInvalidateReq):
+            if invalidation_req.ruleset_ids is None:
+                self._log_invalidation(invalidate_all=True)
+            else:
+                for ruleset_id in invalidation_req.ruleset_ids:
+                    self._log_invalidation(invalidate_ruleset_id=ruleset_id)
+        elif isinstance(invalidation_req, RcacheInvalidateReq):
+            for tile in invalidation_req.tiles:
+                self._log_invalidation(invalidate_tile=tile)
         self._invalidation_queue.put_nowait(invalidation_req)
 
     async def get_status(self) -> RcacheStatus:
@@ -499,3 +514,43 @@ class RcacheService:
             self._all_tasks_running = False
             LOGGER.error(f"Averager task unexpectedly aborted:\n"
                          f"{''.join(traceback.format_exception(ex))}")
+
+    def _log_invalidation(
+            self, enabled: Optional[bool] = None, invalidate_all: bool = False,
+            invalidate_ruleset_id: Optional[str] = None,
+            invalidate_tile: Optional[LatLonRect] = None) -> None:
+        """ Make ALS log invalidation-related record
+
+        Arguments:
+        enabled               -- New invalidation state. None if unchanged
+        invalidate_all        -- True fie invalidate-all request
+        invalidate_ruleset_id -- Ruleset ID ti invalidate or None
+        invalidate_tile       -- Tile to invalidate or None
+        """
+        als.als_json_log(
+            "rcache_invalidation",
+            {
+                "enabled": enabled,
+                "invalidate_all": invalidate_all,
+                "invalidate_ruleset_id": invalidate_ruleset_id,
+                "invalidate_rect":
+                    {"min_lat": invalidate_tile.min_lat,
+                     "max_lat": invalidate_tile.max_lat,
+                     "min_lon": invalidate_tile.min_lon,
+                     "max_lon": invalidate_tile.max_lon} if invalidate_tile
+                    else None})
+
+    def _log_update(self, enabled: Optional[bool] = None) -> None:
+        """ Make ALS log update-related record """
+        als.als_json_log("rcache_update", {"enabled": enabled})
+
+    def _log_precomputation(self, enabled: Optional[bool] = None,
+                            quota: Optional[int] = None) -> None:
+        """ Make ALS log precomputation-related record
+
+        Arguments:
+        enabled -- New precomputation state. None if unchanged
+        quota   - New precomputation quota. None if unchanged
+        """
+        als.als_json_log("rcache_precomputation",
+                         {"enabled": enabled, "quota": quota})

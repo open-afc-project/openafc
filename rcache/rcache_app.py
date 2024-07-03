@@ -152,7 +152,7 @@ async def get_precomputation_state(
 
 
 @app.post("/update_state/{enabled}")
-async def setupdate_state(
+async def set_update_state(
         enabled: Annotated[
             bool,
             fastapi.Path(
