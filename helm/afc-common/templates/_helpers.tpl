@@ -823,8 +823,9 @@ Ingress annotations
 {{- define "afc.ingressAnnotations" -}}
 {{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
 {{- $ingressDef := get $compDef "ingress" | required (cat "Component" .component "does not have ingress defined") -}}
-{{- range $key, $value := (default (dict) (get $ingressDef "annotations")) }}
-{{ $key }}: {{ $value }}
+{{- $annotations := get $ingressDef "annotations" -}}
+{{- if $annotations }}
+{{    toYaml $annotations }}
 {{- end }}
 {{- end }}
 
