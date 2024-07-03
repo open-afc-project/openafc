@@ -6104,8 +6104,8 @@ void AfcManager::readULSData(
 								// DO NOTHING
 
 								// ignoreFlag = true;
-								// reasonIgnored = "invalid Rx Gain";
-								// numIgnoreInvalid++;
+								// reasonIgnored = "invalid Rx
+								// Gain"; numIgnoreInvalid++;
 							}
 						}
 					}
