@@ -1,6 +1,14 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**104*|
+| :- | :- |
+|**Date**|**07/08/2024**|
+
+## **Issues Addressed**
+Reverted the formatting of AfcManager.cpp to previous state due to overly agressive reformatting from clang-format
+
+## **Version and Date**
 |Version|**102*|
 | :- | :- |
 |**Date**|**02/29/2024**|

@@ -32,15 +32,16 @@ jobs:
           dry: true
           prettier_options: "src/web/src --check"
 
-  check-cpp-code:
-    name: Check C++ code format
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Run clang-format style check for C/C++/Protobuf programs.
-      uses: jidicula/clang-format-action@v4.11.0
-      with:
-        clang-format-version: '14'
-        check-path: 'src'
+  # Disable until code formtter question is resolved
+  # check-cpp-code:
+  #   name: Check C++ code format
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - uses: actions/checkout@v4
+  #   - name: Run clang-format style check for C/C++/Protobuf programs.
+  #     uses: jidicula/clang-format-action@v4.11.0
+  #     with:
+  #       clang-format-version: '14'
+  #       check-path: 'src'
             
             
