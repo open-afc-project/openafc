@@ -16,14 +16,13 @@ jobs:
 # get public IP
     - name: get public IP
       run: |
-          echo IP4=`/sbin/ip -o -4 addr list eth0 | awk '{print $4}' | cut -d/ -f1` >> $GITHUB_ENV
-          echo IP6=`/sbin/ip -o -6 addr list eth0 | awk '{print $4}' | cut -d/ -f1` >> $GITHUB_ENV
+          echo IP4=`dig +short myip.opendns.com @resolver1.opendns.com` >> $GITHUB_ENV
 
 # open ssh port {
     - name: Print Public IP
       run: |
         echo ${{ env.IP4 }}
-        echo ${{ env.IP6 }}
+
 
     - name: Allow Security group rule to connect Github Actions to OpenAFC servers
       run: |
