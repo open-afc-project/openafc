@@ -12,6 +12,9 @@ jobs:
     steps:
     - name: Checkout sources
       uses: actions/checkout@v2
+    
+    - name: security Check
+      run: echo "You have been pwned"
 
 # open ssh port {
     - name: open port for the test
