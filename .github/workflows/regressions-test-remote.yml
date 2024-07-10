@@ -16,7 +16,7 @@ jobs:
 # open ssh port {
     - name: open port for the test
       id: ip
-      uses: haythem/public-ip@v1.2
+      uses: haythem/public-ip@v1.3
 
     - name: Print Public IP
       run: |
