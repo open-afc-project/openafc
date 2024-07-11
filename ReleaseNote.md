@@ -1,6 +1,24 @@
 # Release Note
 
 ## **Version and Date**
+|Version|**105*|
+| :- | :- |
+|**Date**|**07/10/2024**|
+
+## **Issues Addressed**
+ * 105: fix exc_thr file
+
+
+## **Interface Changes**
+ * None
+
+## **Testing Done**
+ * Ran a test [FSP1 but for 20 MHz channels only] (see attached afc-config, request and response json files and exc_thr files to the issue) and validated that the updated exc_thr would now show the links with distance > 1km using ITM (rather the FSPL that was tried originally to determine whether the regulatory threshold is exceeded or not) (previously, only the FSPL ones were shown). When printSkippedLinks flag in AFC Config is set, links that pass the regulatory threshold with FSPL are shown as well. Note that when the printSkippedLinks flag is set to false, links that should be using FSPL (i.e. 30m distance or inside AP uncertainty footprint) are still shown.
+
+## **Open Issues** 
+ * Impact on speed from these changes need to be evaluated.
+
+## **Version and Date**
 |Version|**104*|
 | :- | :- |
 |**Date**|**07/08/2024**|
