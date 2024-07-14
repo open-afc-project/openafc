@@ -1,0 +1,24 @@
+#
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# External cluster-specifc config for install_prerequisites.py.
+# Requires YAML with externalIps (values-afc-common.yaml as of time of this
+# writing) to also be included as config file
+
+default_install_components:
+  - external_secrets
+  - default_istio_injection
+
+install_components:
+  external_secrets:
+    postinstall:
+      - >-
+        kubectl patch namespace external-secrets {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+  default_istio_injection:
+    postinstall:
+      - >-
+        kubectl patch namespace default {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'

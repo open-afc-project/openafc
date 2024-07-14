@@ -1,0 +1,46 @@
+#
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+# Internal cluster-specifc config for install_prerequisites.py.
+# Requires YAML with externalIps (values-afc-common.yaml as of time of this
+# writing) to also be included as config file.
+
+default_install_components:
+  - prometheus_operator
+  - prometheus
+  - prometheus_adapter
+  - external_secrets
+  - ingress_nginx
+  - default_istio_injection
+  - prometheus_ingress
+
+install_components:
+  prometheus_adapter:
+    # This is an extremely dirty hack. Some entity keep reinstalling default
+    # v1beta1.metrics.k8s.io (metrics server), so there is a chance it will be
+    # resurrected after deletion but before helm insatallation - these retries
+    # are to counteract this occurence. This resurrection should be somehow
+    # stopped
+    attempts: 10
+  ingress_nginx:
+    helm_settings:
+      - controller.service.annotations."networking\.gke\.io/internal-load-balancer-allow-global-access"=true
+      - contorller.service.internal.enabled="true"
+      - controller.service.internal.annotations."cloud\.google\.com/load-balancer-type"=Internal
+      - controller.service.annotations."networking\.gke\.io/load-balancer-type"=Internal
+      - controller.service.loadBalancerIP={{externalIps.int-ingress}}
+    postinstall:
+      - >-
+        kubectl patch namespace ingress-nginx {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+  external_secrets:
+    postinstall:
+      - >-
+        kubectl patch namespace external-secrets {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+  default_istio_injection:
+    postinstall:
+      - >-
+        kubectl patch namespace default {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
