@@ -18,8 +18,10 @@ import shutil
 import sqlalchemy
 import time
 from flask_migrate import MigrateCommand
+import werkzeug.exceptions
 from . import create_app
 from afcmodels.base import db
+from afcmodels.hardcoded_relations import RulesetVsRegion
 from .db.generators import shp_to_spatialite, spatialite_to_raster
 from prettytable import PrettyTable
 from flask_script import Manager, Command, Option, commands
@@ -170,9 +172,8 @@ class DbCreate(Command):
         LOGGER.debug('DbCreate.__call__()')
         with flaskapp.app_context():
             from afcmodels.aaa import Role, Ruleset
-            from .views.ratapi import rulesets
             from flask_migrate import stamp
-            ruleset_list = rulesets()
+            ruleset_list = RulesetVsRegion.ruleset_list()
             db.create_all()
             get_or_create(db.session, Role, name='Admin')
             get_or_create(db.session, Role, name='Super')
@@ -340,7 +341,6 @@ class DbUpgrade(Command):
         with flaskapp.app_context():
             import flask
             from afcmodels.aaa import Ruleset
-            from .views.ratapi import rulesets
             from flask_migrate import (upgrade, stamp)
             setUserIdNextVal()
             try:
@@ -356,7 +356,7 @@ class DbUpgrade(Command):
                     stamp(revision='230b7680b81e')
             db.session.commit()
             upgrade()
-            ruleset_list = rulesets()
+            ruleset_list = RulesetVsRegion.ruleset_list()
             for rule in ruleset_list:
                 get_or_create(db.session, Ruleset, name=rule)
 
@@ -874,7 +874,6 @@ class CertIdSweep(Command):
     def sweep_canada(self, flaskapp):
         import csv
         import requests
-        from .views.ratapi import regionStrToRulesetId
         from afcmodels.aaa import CertId, Ruleset
         import datetime
         now = datetime.datetime.now()
@@ -918,7 +917,10 @@ class CertIdSweep(Command):
                                 else:
                                     cert = CertId(certification_id=cert_id,
                                                   location=location)
-                                    ruleset_id_str = regionStrToRulesetId("CA")
+                                    ruleset_id_str = \
+                                        RulesetVsRegion.region_to_ruleset(
+                                            "CA",
+                                            exc=werkzeug.exceptions.NotFound)
                                     ruleset = Ruleset.query.filter_by(
                                         name=ruleset_id_str).first()
                                     ruleset.cert_ids.append(cert)
@@ -949,7 +951,6 @@ class CertIdSweep(Command):
 
     def sweep_fcc_data(self, flaskapp, data, location):
         from afcmodels.aaa import CertId, Ruleset
-        from .views.ratapi import regionStrToRulesetId
         import requests
         import datetime
 
@@ -981,7 +982,10 @@ class CertIdSweep(Command):
                                 # add new entries that are in 6SD list.
                                 cert = CertId(certification_id=fcc_id,
                                               location=CertId.OUTDOOR)
-                                ruleset_id_str = regionStrToRulesetId("US")
+                                ruleset_id_str = \
+                                        RulesetVsRegion.region_to_ruleset(
+                                            "US",
+                                            exc=werkzeug.exceptions.NotFound)
                                 ruleset = Ruleset.query.filter_by(
                                     name=ruleset_id_str).first()
                                 ruleset.cert_ids.append(cert)
@@ -1389,7 +1393,6 @@ class ConfigAdd(Command):
     def __call__(self, flaskapp, src):
         LOGGER.debug('ConfigAdd.__call__() %s', src)
         from afcmodels.aaa import AFCConfig, CertId, User
-        from .views.ratapi import regionStrToRulesetId
         import datetime
 
         split_items = src.split('=', 1)
@@ -1460,7 +1463,8 @@ class ConfigAdd(Command):
                         cfg_rcrd = json_lookup('afcConfig', new_rcrd, None)
                         region_rcrd = json_lookup('regionStr', cfg_rcrd, None)
                         # validate the region string
-                        regionStrToRulesetId(region_rcrd[0])
+                        RulesetVsRegion.region_to_ruleset(
+                            region_rcrd[0], exc=werkzeug.exceptions.NotFound)
 
                         config = AFCConfig.query.filter(
                             AFCConfig.config['regionStr'].astext == region_rcrd[0]).first()

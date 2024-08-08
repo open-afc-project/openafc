@@ -22,9 +22,9 @@ from werkzeug import exceptions
 from sqlalchemy.exc import IntegrityError
 import werkzeug
 import afcmodels.aaa as aaa
+from afcmodels.hardcoded_relations import RulesetVsRegion
 from .auth import auth
 from afcmodels.base import db
-from .ratapi import rulesetIdToRegionStr, rulesets
 
 #: Logger for this module
 LOGGER = logging.getLogger(__name__)
@@ -209,7 +209,7 @@ class AccessPointDeny(MethodView):
                 access_points = organization.aps
 
         # translate ruleset.id to index into rulesets
-        rules = rulesets()
+        rules = RulesetVsRegion.ruleset_list()
         rule_map = {}
         for idx, rule in enumerate(rules):
             r = db.session.query(aaa.Ruleset).filter(
@@ -218,7 +218,7 @@ class AccessPointDeny(MethodView):
                 rule_map[r.id] = idx
 
         return flask.jsonify(
-            rulesets=rules,
+            rulesets=RulesetVsRegion.ruleset_list(),
             access_points={
                 "data": [
                     "{},{},{},{}".format(
