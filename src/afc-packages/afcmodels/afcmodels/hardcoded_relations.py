@@ -10,6 +10,7 @@ from typing import Dict, List, NamedTuple, Optional, Set
 
 from . import aaa
 
+
 class RulesetVsRegion:
     """ Translations between Ruleset IDs and Afc Config's region strings """
     # Domain (region) descriptotr as stored internally
@@ -126,7 +127,7 @@ class SpecialCertifications:
 
     # Certificate dictionary. Initialized on first call to class methods
     _special_certificates: Dict["SpecialCertifications._Key",
-                              "SpecialCertifications.Properties"] = {}
+                               "SpecialCertifications.Properties"] = {}
 
     @classmethod
     def get_properties(cls, cert_id: str, serial_number: str) \
@@ -141,10 +142,10 @@ class SpecialCertifications:
         if cls._special_certificates:
             return
         for cert_id, serial_number, location_flags in \
-               [("TestCertificationId", "TestSerialNumber",
-                 aaa.CertId.OUTDOOR | aaa.CertId.INDOOR),
-                ("HeatMapCertificationId", "HeatMapSerialNumber",
-                 aaa.CertId.OUTDOOR | aaa.CertId.INDOOR)]:
+                [("TestCertificationId", "TestSerialNumber",
+                  aaa.CertId.OUTDOOR | aaa.CertId.INDOOR),
+                 ("HeatMapCertificationId", "HeatMapSerialNumber",
+                  aaa.CertId.OUTDOOR | aaa.CertId.INDOOR)]:
             key = cls._Key(cert_id=cert_id, serial_number=serial_number)
             assert key not in cls._special_certificates
             cls._special_certificates[key] = \
