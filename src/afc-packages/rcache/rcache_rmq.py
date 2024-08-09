@@ -16,7 +16,7 @@ import random
 import string
 from typing import cast, List, Optional, Set
 
-from rcache_common import error, get_module_logger, safe_dsn
+from log_utils import error, get_module_logger, safe_dsn
 from rcache_models import RmqReqRespKey
 
 __all__ = ["RcacheRmq", "RcacheRmqConnection"]

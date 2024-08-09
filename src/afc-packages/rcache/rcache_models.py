@@ -16,7 +16,7 @@ import json
 import pydantic
 from typing import Any, Dict, List, Optional
 
-from rcache_common import dp
+from log_utils import dp
 
 __all__ = ["AfcReqRespKey", "ApDbPk", "ApDbRecord", "ApDbRespState",
            "FuncSwitch", "IfDbExists", "LatLonRect", "RatapiAfcConfig",

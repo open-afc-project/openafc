@@ -24,7 +24,7 @@ import traceback
 from typing import Any, Dict, Optional, Set, Tuple, Union
 
 import als
-from rcache_common import dp, error_if, get_module_logger
+from log_utils import dp, error_if, get_module_logger
 from rcache_db_async import RcacheDbAsync
 from rcache_models import AfcReqRespKey, RcacheUpdateReq, ApDbPk, ApDbRecord, \
     FuncSwitch, RatapiAfcConfig, RatapiRulesetIds, RcacheInvalidateReq, \
