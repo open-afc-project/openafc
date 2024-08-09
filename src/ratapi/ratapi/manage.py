@@ -983,9 +983,8 @@ class CertIdSweep(Command):
                                 cert = CertId(certification_id=fcc_id,
                                               location=CertId.OUTDOOR)
                                 ruleset_id_str = \
-                                        RulesetVsRegion.region_to_ruleset(
-                                            "US",
-                                            exc=werkzeug.exceptions.NotFound)
+                                    RulesetVsRegion.region_to_ruleset(
+                                        "US", exc=werkzeug.exceptions.NotFound)
                                 ruleset = Ruleset.query.filter_by(
                                     name=ruleset_id_str).first()
                                 ruleset.cert_ids.append(cert)
