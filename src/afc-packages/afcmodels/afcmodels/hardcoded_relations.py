@@ -127,7 +127,7 @@ class SpecialCertifications:
 
     # Certificate dictionary. Initialized on first call to class methods
     _special_certificates: Dict["SpecialCertifications._Key",
-                               "SpecialCertifications.Properties"] = {}
+                                "SpecialCertifications.Properties"] = {}
 
     @classmethod
     def get_properties(cls, cert_id: str, serial_number: str) \
