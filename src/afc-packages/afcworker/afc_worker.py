@@ -39,11 +39,22 @@ class WorkerConfig(BrokerConfigurator):
 
 conf = WorkerConfig()
 
-rcache_settings = RcacheClientSettings(postgres_dsn=None)
-# In this validation rcache is True to handle 'update_on_send' case
-rcache_settings.validate_for(rmq=True, rcache=True)
-rcache = RcacheClient(rcache_settings, rmq_receiver=False) \
-    if rcache_settings.enabled else None
+_rcache_settings = None
+_rcache_client = None
+
+def get_rcache_client():
+    """ Delayed rcache client initialization
+    Avoids initialization when Celery client includes this file just for
+    signatures """
+    global _rcache_settings, _rcache_client
+    if _rcache_settings is None:
+        _rcache_settings = RcacheClientSettings(postgres_dsn=None)
+        # In this validation rcache is True to handle 'update_on_send' case
+        _rcache_settings.validate_for(rmq=True, rcache=True)
+        _rcache_client = \
+            RcacheClient(_rcache_settings, rmq_receiver=False) \
+            if _rcache_settings.enabled else None
+    return _rcache_client
 
 LOGGER.info('Celery Broker: %s', conf.BROKER_URL)
 
@@ -98,7 +109,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
         assert task_id and config_path and \
             (runtime_opts & defs.RNTM_OPT_AFCENGINE_HTTP_IO)
     else:
-        assert rcache and request_str and config_str and \
+        assert get_rcache_client() and request_str and config_str and \
             (not (runtime_opts & defs.RNTM_OPT_AFCENGINE_HTTP_IO))
 
     proc = None
@@ -214,7 +225,7 @@ def run(prot, host, port, request_type, task_id, hash_val,
                 zlib.decompress(response_gz,
                                 16 + zlib.MAX_WBITS).decode("utf-8") \
                 if success and response_gz else None
-            rcache.rmq_send_response(
+            get_rcache_client().rmq_send_response(
                 queue_name=rcache_queue, req_cfg_digest=hash_val,
                 request=request_str, response=response_str)
 
