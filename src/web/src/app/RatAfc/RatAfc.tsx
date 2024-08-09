@@ -244,7 +244,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
           lat: 40,
           lng: -100,
         },
-        includeMap: props.afcConfig.kind === 'Success' ? props.afcConfig.result.enableMapInVirtualAp ?? false : false,
+        includeMap: props.afcConfig.kind === 'Success' ? (props.afcConfig.result.enableMapInVirtualAp ?? false) : false,
         clickedMapPoint: {
           latitude: 40,
           longitude: -100,
@@ -267,7 +267,7 @@ export class RatAfc extends React.Component<RatAfcProps, RatAfcState> {
     const st = getCacheItem('ratAfcCache') as RatAfcState;
     if (st !== undefined) {
       st.includeMap =
-        this.props.afcConfig.kind === 'Success' ? this.props.afcConfig.result.enableMapInVirtualAp ?? false : false;
+        this.props.afcConfig.kind === 'Success' ? (this.props.afcConfig.result.enableMapInVirtualAp ?? false) : false;
       if (st.mapState.val.features.length <= 646) {
         this.setState(st);
       } else {
