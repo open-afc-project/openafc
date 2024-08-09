@@ -42,6 +42,7 @@ conf = WorkerConfig()
 _rcache_settings = None
 _rcache_client = None
 
+
 def get_rcache_client():
     """ Delayed rcache client initialization
     Avoids initialization when Celery client includes this file just for
@@ -56,7 +57,9 @@ def get_rcache_client():
             if _rcache_settings.enabled else None
     return _rcache_client
 
+
 LOGGER.info('Celery Broker: %s', conf.BROKER_URL)
+
 
 #: constant celery reference. Configure once flask app is created
 client = Celery(
