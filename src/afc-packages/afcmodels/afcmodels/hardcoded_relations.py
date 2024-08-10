@@ -8,7 +8,11 @@
 
 from typing import Dict, List, NamedTuple, Optional, Set
 
-from . import aaa
+
+# Bits in 'location' field of cart_id table (represented by aaa.CertId)
+CERT_ID_LOCATION_UNKNOWN = 0
+CERT_ID_LOCATION_OUTDOOR = 2
+CERT_ID_LOCATION_INDOOR = 1
 
 
 class RulesetVsRegion:
@@ -143,9 +147,9 @@ class SpecialCertifications:
             return
         for cert_id, serial_number, location_flags in \
                 [("TestCertificationId", "TestSerialNumber",
-                  aaa.CertId.OUTDOOR | aaa.CertId.INDOOR),
+                  CERT_ID_LOCATION_OUTDOOR | CERT_ID_LOCATION_INDOOR),
                  ("HeatMapCertificationId", "HeatMapSerialNumber",
-                  aaa.CertId.OUTDOOR | aaa.CertId.INDOOR)]:
+                  CERT_ID_LOCATION_OUTDOOR | CERT_ID_LOCATION_INDOOR)]:
             key = cls._Key(cert_id=cert_id, serial_number=serial_number)
             assert key not in cls._special_certificates
             cls._special_certificates[key] = \

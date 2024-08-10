@@ -21,7 +21,8 @@ from flask_migrate import MigrateCommand
 import werkzeug.exceptions
 from . import create_app
 from afcmodels.base import db
-from afcmodels.hardcoded_relations import RulesetVsRegion
+from afcmodels.hardcoded_relations import RulesetVsRegion, \
+    CERT_ID_LOCATION_UNKNOWN, CERT_ID_LOCATION_OUTDOOR, CERT_ID_LOCATION_INDOOR
 from .db.generators import shp_to_spatialite, spatialite_to_raster
 from prettytable import PrettyTable
 from flask_script import Manager, Command, Option, commands
@@ -903,12 +904,14 @@ class CertIdSweep(Command):
                             cert_id = row[7]
                             code = int(row[6])
                             if code == 103:
-                                location = CertId.OUTDOOR
+                                location = CERT_ID_LOCATION_OUTDOOR
                             elif code == 111:
-                                location = CertId.INDOOR | CertId.OUTDOOR
+                                location = \
+                                    CERT_ID_LOCATION_INDOOR | \
+                                    CERT_ID_LOCATION_OUTDOOR
                             else:
-                                location = CertId.UNKNOWN
-                            if not location == CertId.UNKNOWN:
+                                location = CERT_ID_LOCATION_UNKNOWN
+                            if not location == CERT_ID_LOCATION_UNKNOWN:
                                 cert = CertId.query.filter_by(
                                     certification_id=cert_id).first()
                                 if cert:
@@ -947,7 +950,7 @@ class CertIdSweep(Command):
         from afcmodels.aaa import CertId
 
         sd_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=250&equipment_class_description=6SD-15E+6+GHz+Standard+Power+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"  # noqa
-        self.sweep_fcc_data(flaskapp, sd_data, CertId.OUTDOOR)
+        self.sweep_fcc_data(flaskapp, sd_data, CERT_ID_LOCATION_OUTDOOR)
 
     def sweep_fcc_data(self, flaskapp, data, location):
         from afcmodels.aaa import CertId, Ruleset
@@ -978,10 +981,10 @@ class CertIdSweep(Command):
                             if cert:
                                 cert.refreshed_at = now
                                 cert.location = cert.location | location
-                            elif location == CertId.OUTDOOR:
+                            elif location == CERT_ID_LOCATION_OUTDOOR:
                                 # add new entries that are in 6SD list.
                                 cert = CertId(certification_id=fcc_id,
-                                              location=CertId.OUTDOOR)
+                                              location=CERT_ID_LOCATION_OUTDOOR)
                                 ruleset_id_str = \
                                     RulesetVsRegion.region_to_ruleset(
                                         "US", exc=werkzeug.exceptions.NotFound)

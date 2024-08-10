@@ -42,7 +42,8 @@ from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from afcmodels.aaa import User, AFCConfig, CertId, Ruleset, \
     Organization, AccessPointDeny
 from afcmodels.hardcoded_relations import RulesetVsRegion, \
-    SpecialCertifications, VendorExtensionFilter
+    SpecialCertifications, VendorExtensionFilter, CERT_ID_LOCATION_UNKNOWN, \
+    CERT_ID_LOCATION_OUTDOOR, CERT_ID_LOCATION_INDOOR
 from .auth import auth
 from .ratapi import build_task
 from fst import DataIf
@@ -442,9 +443,9 @@ class RatAfc(MethodView):
                          self.__class__, inspect.stack()[0][3],
                          certId.certification_id)
 
-        if not certId.location & certId.OUTDOOR:
+        if not certId.location & CERT_ID_LOCATION_OUTDOOR:
             raise DeviceUnallowedException("Outdoor operation not allowed")
-        elif certId.location & certId.INDOOR:
+        elif certId.location & CERT_ID_LOCATION_INDOOR:
             indoor_certified = True
         else:
             indoor_certified = False
