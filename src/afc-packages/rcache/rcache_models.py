@@ -21,8 +21,14 @@ from log_utils import dp
 __all__ = ["AfcReqRespKey", "ApDbPk", "ApDbRecord", "ApDbRespState",
            "FuncSwitch", "IfDbExists", "LatLonRect", "RatapiAfcConfig",
            "RatapiRulesetIds", "RcacheClientSettings", "RcacheInvalidateReq",
-           "RcacheServiceSettings", "RcacheSpatialInvalidateReq",
-           "RcacheStatus", "RcacheUpdateReq", "RmqReqRespKey"]
+           "RCACHE_RMQ_EXCHANGE_NAME", "RcacheServiceSettings",
+           "RcacheSpatialInvalidateReq", "RcacheStatus", "RcacheUpdateReq",
+           "RmqReqRespKey"]
+
+
+# Name of RMQ exchange for delivering AFC Responses from Worker
+RCACHE_RMQ_EXCHANGE_NAME = "RcacheExchange"
+
 
 # Format of response expiration time
 RESP_EXPIRATION_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
