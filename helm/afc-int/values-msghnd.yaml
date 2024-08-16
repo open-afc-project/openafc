@@ -16,4 +16,4 @@ components:
     imageName: afc-msghnd  
     noIngress: False
   afcserver:
-    imageName: None
+    imageName: null
