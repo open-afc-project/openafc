@@ -1,0 +1,18 @@
+# Copyright (C) 2022 Broadcom. All rights reserved.
+# The term "Broadcom" refers solely to the Broadcom Inc. corporate affiliate
+# that owns the software below.
+# This work is licensed under the OpenAFC Project License, a copy of which is
+# included with this software program.
+
+# Parameter values for using msghnd (instead of afcserver) to handle AFC
+# requests
+
+sharedEnv:
+  afc-req-service:
+    host: msghnd
+
+components:
+  msghnd:
+   noIngress: False
+  afcserver:
+    imageName: None
