@@ -744,7 +744,7 @@ class RatAfc(MethodView):
                                 missing_params=['certificationId', 'id'])
                         elif not certId:
                             raise InvalidValueException(
-                                ["certificationId", certId])
+                                ["id", certId])
                     else:
                         # ruleset is not in list
                         raise DeviceUnallowedException("")
@@ -828,15 +828,14 @@ class RatAfc(MethodView):
                             runtime_opts=runtime_opts,
                             task_id=str(uuid.uuid4()))
                 except AP_Exception as e:
+                    response_dict = {"responseCode": e.response_code,
+                                     "shortDescription": e.description}
+                    if e.supplemental_info:
+                        response_dict["supplementalInfo"] = e.supplemental_info
                     results["availableSpectrumInquiryResponses"].append(
                         {"requestId": individual_request["requestId"],
                          "rulesetId": prefix or "Unknown",
-                         "response": {"responseCode": e.response_code,
-                                      "shortDescription": e.description,
-                                      "supplementalInfo":
-                                      json.dumps(e.supplemental_info)
-                                      if e.supplemental_info is not None
-                                      else None}})
+                         "response": response_dict})
 
             # Creating 'responses' - dictionary of responses as JSON strings,
             # indexed by request/config hashes
