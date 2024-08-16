@@ -13,6 +13,7 @@ sharedEnv:
 
 components:
   msghnd:
-   noIngress: False
+    imageName: afc-msghnd  
+    noIngress: False
   afcserver:
     imageName: None

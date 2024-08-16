@@ -7,7 +7,7 @@
 # Prometheus operator Pod Monitor for msghnd
 {{- $ := mergeOverwrite $ (dict "component" "msghnd") }}
 {{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
-{{- if hasKey $compDef "metrics"}}
+{{- if and (hasKey $compDef "metrics") (include "afc.fullImageName" .) }}
 
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor

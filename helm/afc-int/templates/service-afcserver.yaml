@@ -6,6 +6,7 @@
 
 # Service helmchart for afcservice pods
 {{- $ := mergeOverwrite $ (dict "component" "afcserver") }}
+{{- if (include "afc.fullImageName" .) }}
 
 apiVersion: v1
 kind: Service
@@ -17,3 +18,5 @@ spec:
   {{- include "afc.serviceIp" . | nindent 2 }}
   selector: {{- include "afc.serviceSelector" . | nindent 4 }}
   ports: {{- include "afc.servicePorts" . | nindent 4 }}
+
+{{- end -}}

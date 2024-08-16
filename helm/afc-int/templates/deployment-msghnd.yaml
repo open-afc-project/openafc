@@ -7,6 +7,7 @@
 # Deployment helmchart for msghnd pods
 
 {{- $ := mergeOverwrite $ (dict "component" "msghnd") }}
+{{- if (include "afc.fullImageName" .) }}
 
 apiVersion: apps/v1
 kind: Deployment
@@ -34,3 +35,5 @@ spec:
           volumeMounts: {{- include "afc.staticVolumeMounts" . | nindent 12 }}
       volumes:
         {{- include "afc.staticVolumes" . | nindent 8 }}
+
+{{- end -}}

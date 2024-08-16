@@ -381,7 +381,8 @@ components:
         - path: /fbrat
           portKey: rat-server
   msghnd:
-    imageName: afc-msghnd
+     # afc-msghnd when enabled
+    imageName: None
     imageRepositoryKey: private
     ports:
       msghnd:
