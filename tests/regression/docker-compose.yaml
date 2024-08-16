@@ -25,7 +25,7 @@ services:
       - AFC_ENFORCE_HTTPS=${AFC_ENFORCE_HTTPS:-TRUE}
       # set to true if required to enforce mTLS check
       - AFC_ENFORCE_MTLS=false
-      - AFC_MSGHND_NAME=msghnd
+      - AFC_MSGHND_NAME=${AFC_REQ_SERVER}
       - AFC_MSGHND_PORT=8000
       - AFC_WEBUI_NAME=rat_server
       - AFC_WEBUI_PORT=80
@@ -37,6 +37,7 @@ services:
       - AFC_PROMETHEUS_TARGET=prometheus:9090
       - AFC_PROMETHEUS_ENABLED=true
     depends_on:
+      - afcserver
       - msghnd
       - rat_server
       - prometheus
@@ -142,6 +143,40 @@ services:
       - bulk_postgres
       - rcache
 
+  afcserver:
+    image: ${PRIV_REPO:-ghcr.io/open-afc-project}/afcserver-image:${TAG:-latest}
+    restart: always
+    environment:
+      - AFC_SERVER_PORT=8000
+      - AFC_SERVER_RATDB_DSN=postgresql://postgres:postgres@ratdb/fbrat
+      - AFC_SERVER_RATDB_RATDB_PASSWORD_FILE=${VOL_C_SECRETS}/RATDB_PASSWORD
+      - AFC_SERVER_REQUEST_TIMEOUT=180
+      - AFC_SERVER_CONFIG_REFRESH=5
+      - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
+      - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
+      - RCACHE_RMQ_DSN=amqp://rcache:rcache@rmq:5672/rcache
+      # ALS params
+      - ALS_KAFKA_SERVER_ID=afcserver
+      - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
+      - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
+      # Filestorage params:
+      - AFC_OBJST_HOST=objst
+      - AFC_OBJST_PORT=5000
+      - AFC_OBJST_SCHEME=HTTP
+      # RabbitMQ server name:
+      - BROKER_TYPE=external
+      - BROKER_FQDN=rmq
+    dns_search: [.]
+    secrets:
+      - RATDB_PASSWORD
+      - RCACHE_DB_PASSWORD
+    depends_on:
+      - ratdb
+      - rmq
+      - als_kafka
+      - bulk_postgres
+      - objst
+
   objst:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/objstorage-image:${TAG:-latest}
     environment:
@@ -241,7 +276,7 @@ services:
     image: ${PUB_REPO:-ghcr.io/open-afc-project}/uls-downloader:${TAG:-latest}
     restart: always
     environment:
-      - ULS_AFC_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
+      - ULS_AFC_URL=http://${AFC_REQ_SERVER}:8000/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
       - ULS_DELAY_HR=1
       - ULS_SERVICE_STATE_DB_DSN=postgresql://postgres:postgres@bulk_postgres/fs_state
       - ULS_SERVICE_STATE_DB_PASSWORD_FILE=${VOL_C_SECRETS}/ULS_STATE_DB_PASSWORD
@@ -299,11 +334,11 @@ services:
       - RCACHE_CLIENT_PORT=${RCACHE_CLIENT_PORT}
       - RCACHE_POSTGRES_DSN=postgresql://postgres:postgres@bulk_postgres/rcache
       - RCACHE_POSTGRES_PASSWORD_FILE=${VOL_C_SECRETS}/RCACHE_DB_PASSWORD
-      - RCACHE_AFC_REQ_URL=http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
+      - RCACHE_AFC_REQ_URL=http://${AFC_REQ_SERVER}:8000/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
       - RCACHE_RULESETS_URL=http://rat_server/fbrat/ratapi/v1/GetRulesetIDs
       - RCACHE_CONFIG_RETRIEVAL_URL=http://rat_server/fbrat/ratapi/v1/GetAfcConfigByRulesetID
       # ALS params
-      - ALS_KAFKA_SERVER_ID=msghnd
+      - ALS_KAFKA_SERVER_ID=rcache
       - ALS_KAFKA_CLIENT_BOOTSTRAP_SERVERS=${ALS_KAFKA_SERVER_}:${ALS_KAFKA_CLIENT_PORT_}
       - ALS_KAFKA_MAX_REQUEST_SIZE=${ALS_KAFKA_MAX_REQUEST_SIZE_}
     secrets:
