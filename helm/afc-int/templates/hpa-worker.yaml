@@ -7,6 +7,8 @@
 # Worker autoscaler on number of processed requests
 
 {{- $ := mergeOverwrite $ (dict "component" "worker") }}
+{{- $compDef := merge (dict) (get $.Values.components .component | required (cat "No component for this component key:" .component)) $.Values.components.default -}}
+{{- if hasKey $compDef "hpa" }}
 
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
@@ -21,3 +23,5 @@ spec:
   {{- include "afc.hpaReplicas" . | nindent 2 }}
   {{- include "afc.hpaBehavior" . | nindent 2 }}
   metrics: {{- include "afc.hpaMetric" . | nindent 4 }}
+
+{{- end -}}
