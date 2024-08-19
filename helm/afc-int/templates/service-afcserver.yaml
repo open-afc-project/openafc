@@ -4,8 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Service helmchart for msghnd pods
-{{- $ := mergeOverwrite $ (dict "component" "msghnd") }}
+# Service helmchart for afcservice pods
+{{- $ := mergeOverwrite $ (dict "component" "afcserver") }}
 {{- if (include "afc.fullImageName" .) }}
 
 apiVersion: v1

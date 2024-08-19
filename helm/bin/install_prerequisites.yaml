@@ -25,6 +25,8 @@ default_install_components: []
 #   - postinstall. List of commands to perform after kubernetes/helm
 #             installation. Commands that starts with `-` - not checked for
 #             failure. Executed from checkout root directory
+#   - postuninstall. List of commands to perform after kubernetes/helm
+#             uninstallation
 #   - manifest. Path or URL to manifest file or directory. Path may use ~ and
 #             $. Relative paths are from script's directory'
 #   - manifest_url. URL to manifest file or directory
