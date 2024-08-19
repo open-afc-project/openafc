@@ -37,6 +37,7 @@ from hchecks import RmqHealthcheck, ObjstHealthcheck
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from afcmodels.aaa import User, AccessPointDeny, AFCConfig, MTLS
 from afcmodels.base import db
+from afcmodels.hardcoded_relations import RulesetVsRegion
 from .auth import auth
 from appcfg import ObjstConfig
 
@@ -46,66 +47,6 @@ LOGGER.setLevel(appcfg.AFC_RATAPI_LOG_LEVEL)
 
 #: All views under this API blueprint
 module = flask.Blueprint('ratapi-v1', 'ratapi')
-baseRegions = ['US', 'CA', 'BR', 'GB']
-
-
-def regions():
-    return baseRegions + list(map(lambda s: 'DEMO_' + s, baseRegions)) + \
-        list(map(lambda s: 'TEST_' + s, baseRegions))
-
-
-def rulesets():
-    return ['US_47_CFR_PART_15_SUBPART_E',
-            'CA_RES_DBS-06',
-            'BRAZIL_RULESETID',
-            'UNITEDKINGDOM_RULESETID'] + list(map(lambda s: 'DEMO_' + s,
-                                                  baseRegions)) + list(map(lambda s: 'TEST_' + s,
-                                                                           baseRegions))
-
-
-# after 1.4 use Ruleset ID
-def regionStrToRulesetId(region_str):
-    """ Input: region_str: regionStr field of the afc config.
-        Output: nra
-        nra: can match with the NRA field of the AP, e.g. FCC
-        Eg. 'USA' => 'FCC'
-    """
-    map = {
-        'DEFAULT': 'US_47_CFR_PART_15_SUBPART_E',
-        'US': 'US_47_CFR_PART_15_SUBPART_E',
-        'CA': 'CA_RES_DBS-06',
-        'BR': 'BRAZIL_RULESETID',
-        'GB': 'UNITEDKINGDOM_RULESETID'
-
-    }
-    region_str = region_str.upper()
-    try:
-        # for test and demo
-        if region_str.startswith("DEMO_") or region_str.startswith("TEST_"):
-            return region_str
-
-        return map[region_str]
-    except BaseException:
-        raise werkzeug.exceptions.NotFound('Invalid Region %s' % region_str)
-
-
-def rulesetIdToRegionStr(rulesetId):
-    map = {
-        'US_47_CFR_PART_15_SUBPART_E': 'US',
-        'CA_RES_DBS-06': 'CA',
-        'BRAZIL_RULESETID': 'BR',
-        'UNITEDKINGDOM_RULESETID': 'GB'
-
-    }
-    rulesetId = rulesetId.upper()
-    try:
-        if rulesetId.startswith("DEMO_") or rulesetId.startswith("TEST_"):
-            if rulesetId in rulesets():
-                return rulesetId
-
-        return map[rulesetId]
-    except BaseException:
-        raise werkzeug.exceptions.NotFound('Invalid ruleset %s' % rulesetId)
 
 
 def build_task(
@@ -453,7 +394,8 @@ class AfcConfigFile(MethodView):
         filename = rcrd['regionStr'].upper()
         LOGGER.debug('AfcConfigFile.put({})'.format(filename))
         # validate the region string
-        regionStrToRulesetId(filename)
+        RulesetVsRegion.region_to_ruleset(filename,
+                                          exc=werkzeug.exceptions.NotFound)
         # make sure the config region string is upper case
         rcrd['regionStr'] = filename
         ordered_bytes = json.dumps(rcrd, sort_keys=True)
@@ -494,7 +436,7 @@ class AfcRegions(MethodView):
         ''' GET method for afc config
         '''
         resp = flask.make_response()
-        resp.data = ' '.join(regions())
+        resp.data = ' '.join(RulesetVsRegion.region_list())
         resp.content_type = 'text/plain'
         return resp
 
@@ -1195,7 +1137,7 @@ class AfcRulesetIds(MethodView):
         ''' GET method for afc config
         '''
         resp = flask.make_response()
-        resp.data = ' '.join(rulesets())
+        resp.data = ' '.join(RulesetVsRegion.ruleset_list())
         resp.content_type = 'text/plain'
         return resp
 
@@ -1252,8 +1194,10 @@ class GetRuleset(MethodView):
             configs = AFCConfig.query.all()
             regionStrs = set()
             for config in configs:
-                regionStrs.add(regionStrToRulesetId(
-                    config.config['regionStr']))
+                regionStrs.add(
+                    RulesetVsRegion.region_to_ruleset(
+                        config.config['regionStr'],
+                        exc=werkzeug.exceptions.NotFound))
         except BaseException:
             return flask.make_response('DB error', 404)
         resp = flask.make_response()
@@ -1267,7 +1211,9 @@ class GetAfcConfigByRuleset(MethodView):
     """ Get afc_config by rulesets """
 
     def get(self, ruleset):
-        regionStr = rulesetIdToRegionStr(ruleset)  # returns 404 if not found
+        regionStr = \
+            RulesetVsRegion.ruleset_to_region(ruleset,
+                                              exc=werkzeug.exceptions.NotFound)
         try:
             config = AFCConfig.query.filter(
                 AFCConfig.config['regionStr'].astext == regionStr).first()
