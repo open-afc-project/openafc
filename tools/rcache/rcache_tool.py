@@ -29,7 +29,7 @@ import tabulate
 from typing import Any, Dict, List, Optional, Set, Tuple, Union
 import urllib.parse
 
-from rcache_common import dp, error, error_if
+from log_utils import dp, error, error_if
 from rcache_models import AfcReqRespKey, ApDbRecord, ApDbRespState, \
     LatLonRect, RcacheInvalidateReq, RcacheSpatialInvalidateReq, \
     RcacheStatus, RcacheUpdateReq
