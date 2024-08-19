@@ -101,14 +101,13 @@ class CertId(db.Model):
     ''' entry to designate allowed AP's for the PAWS interface '''
 
     __tablename__ = 'cert_id'
-    UNKNOWN = 0
-    OUTDOOR = 2
-    INDOOR = 1
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     certification_id = db.Column(db.String(64), nullable=False)
     refreshed_at = db.Column(db.DateTime())
     ruleset_id = db.Column(db.Integer, db.ForeignKey(
         'aaa_ruleset.id', ondelete='CASCADE'), nullable=False)
+    # Bits for this field defined by hardcoded_relations.CERT_ID_LOCATION_...
+    # constants
     location = db.Column(db.Integer, nullable=False)
 
     def __init__(self, certification_id, location):
