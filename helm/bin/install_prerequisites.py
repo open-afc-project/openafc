@@ -24,7 +24,7 @@ import yaml
 
 from utils import ArgumentParserFromFile, ClusterContext, Duration, error, \
     error_if, execute, expand_filename, filter_args, parse_json_output, \
-    parse_kubecontext, SCRIPTS_DIR, yaml_load
+    parse_kubecontext, SCRIPTS_DIR, wait_termination, yaml_load
 
 DEFAULT_CONFIG = os.path.splitext(__file__)[0] + ".yaml"
 
@@ -57,6 +57,8 @@ class InstallComponent:
         self._cfg = cfg
         self.name = name
         self._component = self._cfg[KEY_INSTALL_COMPONENTS][self.name]
+        error_if(not self._component,
+                 f"Component '{self.name}' not found")
         self._cluster_context = cluster_context
 
     def __getattr__(self, attr: str) -> Any:
@@ -195,7 +197,10 @@ class InstallHandler(abc.ABC):
             execute(["kubectl", "delete", "namespace",
                      self._component.namespace] +
                     self._cluster_context.kubectl_args() +
-                    self._kubectl_uninstall_wait_args())
+                    self._kubectl_uninstall_wait_args(),
+                    fail_on_error=False)
+        for cmd in getattr(self._component, "postuninstall", []):
+            execute(cmd.lstrip("-"), fail_on_error=False)
 
     def _namespace_exists(self) -> bool:
         """ True if this item's namespace exists """
@@ -314,7 +319,8 @@ class ManifestInstallHandler(InstallHandler):
             ["kubectl", "delete", "-f", self._manifest_name(),
              "--ignore-not-found"] +
             self._cluster_context.kubectl_args(namespace=self._namespace) +
-            self._kubectl_uninstall_wait_args())
+            self._kubectl_uninstall_wait_args(),
+            fail_on_error=False)
 
     def _component_installed(self) -> bool:
         """ True if component known to be installed """
@@ -393,30 +399,14 @@ class HelmInstallHandler(InstallHandler):
             helm_args = \
                 ["helm", "uninstall", self._component.helm_release] + \
                 self._cluster_context.helm_args(namespace=self._namespace)
-            execute(helm_args)
+            execute(helm_args, fail_on_error=False)
             uninstall_wait = \
                 Duration(getattr(self._component, "uninstall_wait", None))
             if uninstall_wait:
-                duration = uninstall_wait.seconds()
-                assert duration is not None
-                start = datetime.datetime.now()
-                time.sleep(1)
-                while True:
-                    if "Terminating" not in \
-                        cast(
-                            str,
-                            execute(
-                                ["kubectl", "get", "all"] +
-                                self._cluster_context.kubectl_args(
-                                    namespace=self._namespace),
-                                return_output=True)):
-                        break
-                    error_if(
-                        (datetime.datetime.now() - start).total_seconds() >
-                        duration,
-                        f"Uninstall timeout expired for component "
-                        f"'{self._component.name}'")
-                    time.sleep(5)
+                wait_termination(what=f"component {self._component.name}",
+                                 cluster_context=self._cluster_context,
+                                 namespace=self._namespace,
+                                 uninstall_duration=uninstall_wait)
 
     def _component_installed(self) -> bool:
         """ True if component known to be installed """
