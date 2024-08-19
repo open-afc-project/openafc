@@ -23,7 +23,6 @@ import glob
 import re
 import datetime
 import zlib
-import hashlib
 import uuid
 import copy
 import platform
@@ -42,8 +41,11 @@ from afc_worker import run
 from ..util import AFCEngineException, require_default_uls, getQueueDirectory
 from afcmodels.aaa import User, AFCConfig, CertId, Ruleset, \
     Organization, AccessPointDeny
+from afcmodels.hardcoded_relations import RulesetVsRegion, \
+    SpecialCertifications, VendorExtensionFilter, CERT_ID_LOCATION_UNKNOWN, \
+    CERT_ID_LOCATION_OUTDOOR, CERT_ID_LOCATION_INDOOR
 from .auth import auth
-from .ratapi import build_task, rulesetIdToRegionStr
+from .ratapi import build_task
 from fst import DataIf
 import afctask
 import als
@@ -52,10 +54,10 @@ from flask_login import current_user
 from .auth import auth
 import traceback
 from urllib.parse import urlparse
-from .ratapi import rulesets
 from typing import Any, Dict, NamedTuple, Optional
 from rcache_models import RcacheClientSettings
 from rcache_client import RcacheClient
+from rcache_req_cfg_hash import RequestConfigHash
 import prometheus_client
 
 LOGGER = logging.getLogger(__name__)
@@ -71,7 +73,7 @@ prometheus_metric_flask_afc_waiting_reqs = \
 
 # We want to dynamically trim this this list e.g.
 # via environment variable, for the current deployment
-RULESETS = rulesets()
+RULESETS = RulesetVsRegion.ruleset_list()
 
 #: All views under this API blueprint
 module = flask.Blueprint('ap-afc', 'ap-afc')
@@ -220,163 +222,33 @@ def _translate_afc_error(error_msg):
         raise VersionNotSupportedException()
 
 
-class VendorExtensionFilter:
-    """ Filters Vendor Extensions from Messages and requests/responses
-    according to type-specific whitelists
+def drop_unwanted_extensions(json_dict, is_input, is_gui, is_internal):
+    """ Removes unallowed vendor extensions from given message
 
-    Private attributes:
-    _whitelist_dict -- Dictionary of whitelists, indexed by (nonpartial)
-                       whitelist types
+    Arguments:
+    json_dict   -- AFC Request/Response message in dictionary form
+    is_input    -- True for request, False for response
+    is_gui      -- True if from GUI
+    is_internal -- True if internal (from within AFC Cluster)
     """
-    class _WhitelistType(NamedTuple):
-        """ Whitelist type """
-        # True for message, False for request/response, None for both
-        is_message: Optional[bool] = None
-        # True for input (request), false for output(response), None for both
-        is_input: Optional[bool] = None
-        # True for GUI, False for non-GUI, None for both
-        is_gui: Optional[bool] = None
-        # True for internal, False for external, None for both
-        is_internal: Optional[bool] = None
-
-        def is_partial(self):
-            """ True for partial whitelist type that has fields set to None """
-            return any(getattr(self, attr) is None for attr in self._fields)
-
-    class _Whitelist:
-        """ Whitelist for a message/request/response type(s)
-
-        Public attributes:
-        extensions -- Set of allowed extension IDs
-
-        Private attributes
-        _partial_type -- Specifies type(s) of messages/resuests/response this
-                          whitelist is for
-        """
-
-        def __init__(self, extensions, partial_type):
-            """ Constructor
-
-            Arguments:
-            extensions   -- Sequence of whitelisted extensions
-            partial_type -- Type(s) of messages/resuests/response this
-                             whitelist is for
-            """
-            assert isinstance(extensions, list)
-            self._partial_type = partial_type
-            self.extensions = set(extensions)
-
-        def is_for(self, whitelist_type):
-            """ True if this whilelist is for messages/requests/responses
-            specified by nonpartial whitelist type """
-            assert not whitelist_type.is_partial()
-            for attr in whitelist_type._fields:
-                value = getattr(whitelist_type, attr)
-                if getattr(self._partial_type, attr) not in (None, value):
-                    return False
-            return True
-
-    # List of whilelists. Only nonempty whitelists are presented
-    # It is OK for more than one whitelist to cover some type
-    # It is OK to add more whitelists (e.g. for different whitelist types)
-    _whitelists = [
-        # Allowed vendor extensions for individual requests from AFC services
-        # (NOT from APs)
-        _Whitelist(
-            ["openAfc.overrideAfcConfig"],
-            _WhitelistType(is_input=True, is_message=False, is_internal=True)),
-        # Allowed vendor extensions for individual requests received from APs
-        _Whitelist(
-            ["rlanAntenna"],
-            _WhitelistType(is_input=True, is_message=False)),
-        # Allowed vendor extensions for individual responses sent to AFC Web
-        # GUI
-        _Whitelist(
-            ["openAfc.redBlackData", "openAfc.mapinfo"],
-            _WhitelistType(is_input=False, is_message=False, is_gui=True)),
-        _Whitelist(
-            ["openAfc.heatMap"],
-            _WhitelistType(is_input=True, is_gui=True))]
-
-    def __init__(self):
-        """ Constructor """
-        # Maps whitelist types to sets of allowed extensions
-        self._whitelist_dict = {}
-        for is_message in (True, False):
-            for is_input in (True, False):
-                for is_gui in (True, False):
-                    for is_internal in (True, False):
-                        whitelist_type = \
-                            self._WhitelistType(
-                                is_input=is_input, is_message=is_message,
-                                is_gui=is_gui, is_internal=is_internal)
-                        # Ensure that no attributes were omitted
-                        assert not whitelist_type.is_partial()
-                        # Finding whitelist for key
-                        for wl in self._whitelists:
-                            if wl.is_for(whitelist_type):
-                                self._whitelist_dict.setdefault(
-                                    whitelist_type, set()).\
-                                    update(wl.extensions)
-
-    def filter(self, json_dict, is_input, is_gui, is_internal):
-        """ Filtering out nonwhitelisted vendor extensions
-
-        Arguments:
-        json_dict   -- Dictionary made of message
-        is_input    -- True for input (request), False for output (Response)
-        is_gui      -- True for GUI
-        is_internal -- True for internal
-        """
-        if not isinstance(json_dict, dict):
-            return
-        # First filtering message
-        self._filter_ext_list(
-            json_dict,
-            self._WhitelistType(is_message=True, is_input=is_input,
-                                is_gui=is_gui, is_internal=is_internal))
-        # Filtering individual requests/responses
-        for req_resp in \
-                json_dict.get("availableSpectrumInquiryRequests" if is_input
-                              else "availableSpectrumInquiryResponses", []):
-            self._filter_ext_list(
-                req_resp,
-                self._WhitelistType(is_message=False, is_input=is_input,
-                                    is_gui=is_gui, is_internal=is_internal))
-
-    def _filter_ext_list(self, container, whitelist_type):
-        """ Drops extensions that not passed whitelist
-
-        Arguments:
-        container      -- Dictionary that (may) contain "vendorExtensions"
-                          list. Modified inplace
-        whitelist_type -- Type of whitelist to apply
-        """
-        if not isinstance(container, dict):
-            return
+    for container, is_message in [(json_dict, True)] + \
+            [(req_resp, False) for req_resp in
+             json_dict.get("availableSpectrumInquiryRequests" if is_input
+                           else "availableSpectrumInquiryResponses", [])]:
         extensions = container.get("vendorExtensions")
         if extensions is None:
-            return
-        assert not whitelist_type.is_partial()
-        allowed_extensions = self._whitelist_dict.get(whitelist_type)
-        if not allowed_extensions:
-            del container["vendorExtensions"]
-            return
+            continue
         idx = 0
         while idx < len(extensions):
-            if extensions[idx]["extensionId"] not in allowed_extensions:
-                extensions.pop(idx)
-            else:
+            if VendorExtensionFilter.allowed_extension(
+                    extension=extensions[idx]["extensionId"],
+                    is_message=is_message, is_input=is_input, is_gui=is_gui,
+                    is_internal=is_internal):
                 idx += 1
+            else:
+                extensions.pop(idx)
         if not extensions:
             del container["vendorExtensions"]
-
-
-def get_vendor_extension_filter():
-    """ Returns VendorExtensionFilter instance for given app instance"""
-    if not hasattr(flask.g, "vendor_extension_filter"):
-        flask.g.vendor_extension_filter = VendorExtensionFilter()
-    return flask.g.vendor_extension_filter
 
 
 def _get_vendor_extension(json_dict, ext_id):
@@ -482,8 +354,8 @@ def success_done(t):
                         map_data,
                         16 +
                         zlib.MAX_WBITS).decode('iso-8859-1') if map_data else None}})
-    get_vendor_extension_filter().filter(
-        resp_json, is_input=False,
+    drop_unwanted_extensions(
+        json_dict=resp_json, is_input=False,
         is_gui=bool(task_stat['runtime_opts'] & RNTM_OPT_GUI),
         is_internal=bool(task_stat['is_internal_request']))
     resp_data = json.dumps(resp_json)
@@ -571,9 +443,9 @@ class RatAfc(MethodView):
                          self.__class__, inspect.stack()[0][3],
                          certId.certification_id)
 
-        if not certId.location & certId.OUTDOOR:
+        if not certId.location & CERT_ID_LOCATION_OUTDOOR:
             raise DeviceUnallowedException("Outdoor operation not allowed")
-        elif certId.location & certId.INDOOR:
+        elif certId.location & CERT_ID_LOCATION_INDOOR:
             indoor_certified = True
         else:
             indoor_certified = False
@@ -604,14 +476,11 @@ class RatAfc(MethodView):
 
             ruleset = prefix
 
-            # Test AP will by pass certification ID check as Indoor Certified
-            if cert_id == "TestCertificationId" \
-               and serial_number == "TestSerialNumber":
-                return True
-
-            if cert_id == "HeatMapCertificationId" \
-               and serial_number == "HeatMapSerialNumber":
-                return True
+            scp = \
+                SpecialCertifications.get_properties(
+                    cert_id=cert_id, serial_number=serial_number)
+            if scp is not None:
+                return (scp.location_flags & CertId.INDOOR) != 0
 
             # Assume that once we got here, we already trim the cert_obj list
             # down to only one entry for the country we're operating in
@@ -662,7 +531,7 @@ class RatAfc(MethodView):
             is_internal_request = urlparse(flask.request.url).path.\
                 endswith("/availableSpectrumInquiryInternal")
             is_gui = flask.request.args.get('gui') == 'True'
-            get_vendor_extension_filter().filter(
+            drop_unwanted_extensions(
                 json_dict=flask.request.json, is_input=True, is_gui=is_gui,
                 is_internal=is_internal_request)
             # start request
@@ -726,7 +595,9 @@ class RatAfc(MethodView):
                             # empty/non-exist ruleset
                             break
                         if prefix in RULESETS:
-                            region = rulesetIdToRegionStr(prefix)
+                            region = \
+                                RulesetVsRegion.ruleset_to_region(
+                                    prefix, exc=werkzeug.exceptions.NotFound)
                             certId = r.get('id')
                             break
                         prefix = prefix.strip()
@@ -789,40 +660,35 @@ class RatAfc(MethodView):
                             AFCConfig.config['regionStr'].astext == region).first()
                     if not config:
                         raise DeviceUnallowedException(
-                            "No AFC configuration for ruleset")
+                            "No AFC configuration for ruleset " + str(region))
                     afc_config = config.config
-                    if region[:5] == "TEST_" or region[:5] == 'DEMO_':
-                        afc_config = dict(afc_config)
-                        afc_config['regionStr'] = region[5:]
-                    config_str = json.dumps(afc_config, sort_keys=True)
+                    try:
+                        overwrite_region = \
+                            RulesetVsRegion.overwrite_region(
+                                region, exc=KeyError)
+                        if overwrite_region:
+                            afc_config = dict(afc_config)
+                            afc_config['regionStr'] = overwrite_region
+                    except KeyError:
+                        pass
 
-                    # calculate hash of config
-                    hashlibobj = hashlib.md5()
-                    hashlibobj.update(config_str.encode('utf-8'))
-                    config_hash = hashlibobj.hexdigest()
+                    rcc = RequestConfigHash(req_dict=individual_request,
+                                            afc_config_dict=afc_config,
+                                            compute_config_hash=True)
                     config_path = \
-                        os.path.join("/afc_config", prefix, config_hash,
+                        os.path.join("/afc_config", prefix, rcc.cfg_hash,
                                      "afc_config.json") if use_tasks else None
-
-                    # calculate hash of config + request
-                    hashlibobj.update(
-                        json.dumps(
-                            {k: v for k, v in individual_request.items()
-                             if k != "requestId"},
-                            sort_keys=True).encode('utf-8'))
-                    req_cfg_hash = hashlibobj.hexdigest()
-
                     history_dir = None
                     if runtime_opts & (RNTM_OPT_DBG | RNTM_OPT_SLOW_DBG):
                         history_dir =\
                             os.path.join(
                                 "/history", str(serial),
                                 str(datetime.datetime.now().isoformat()))
-                    req_infos[req_cfg_hash] = \
+                    req_infos[rcc.req_cfg_hash] = \
                         ReqInfo(
-                            req_idx=req_idx, req_cfg_hash=req_cfg_hash,
+                            req_idx=req_idx, req_cfg_hash=rcc.req_cfg_hash,
                             request_id=individual_request["requestId"],
-                            request=request, config_str=config_str,
+                            request=request, config_str=rcc.cfg_str,
                             config_path=config_path, region=region,
                             history_dir=history_dir, request_type=request_type,
                             runtime_opts=runtime_opts,
@@ -882,8 +748,8 @@ class RatAfc(MethodView):
                     engine_result_ext = \
                         _get_vendor_extension(actualResult[0],
                                               "openAfc.used_data") or {}
-                    uls_id = engine_result_ext.get("openAfc.uls_id", uls_id)
-                    geo_id = engine_result_ext.get("openAfc.geo_id", geo_id)
+                    uls_id = engine_result_ext.get("uls_id", uls_id)
+                    geo_id = engine_result_ext.get("geo_id", geo_id)
                     actualResult[0]["requestId"] = req_info.request_id
                     results["availableSpectrumInquiryResponses"].append(
                         actualResult[0])
@@ -923,7 +789,7 @@ class RatAfc(MethodView):
                  "response": response_info})
 
         # Removing internal vendor extensions
-        get_vendor_extension_filter().filter(
+        drop_unwanted_extensions(
             json_dict=results, is_input=False, is_gui=is_gui,
             is_internal=is_internal_request)
 

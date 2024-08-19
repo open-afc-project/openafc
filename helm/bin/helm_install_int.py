@@ -22,11 +22,11 @@ from typing import Any, cast, Dict, List, Optional, Set
 import yaml
 
 from utils import ArgumentParserFromFile, auto_name, AUTO_NAME, \
-    ClusterContext, error, error_if, execute, filter_args, \
+    ClusterContext, Duration, error, error_if, execute, filter_args, \
     get_helm_values, get_known_nodeports, INT_HELM_REL_DIR, K3D_PREFIX, \
     parse_json_output, parse_k3d_reg, parse_kubecontext, print_helm_values, \
-    ROOT_DIR, SCRIPTS_DIR, set_silent_execute, unused_argument, yaml_load, \
-    yaml_loads
+    ROOT_DIR, SCRIPTS_DIR, set_silent_execute, unused_argument, \
+    wait_termination, yaml_load, yaml_loads
 
 EPILOG = """\
 - Recommended k3d invocation:
@@ -365,6 +365,9 @@ def main(argv: List[str]) -> None:
         "--mtls", action="store_true",
         help="Enforce mTLS operation (client certificat checking)")
     argument_parser.add_argument(
+        "--msghnd", action="store_true",
+        help="Use legacy msghnd AFC Request handler (instead of afcserver)")
+    argument_parser.add_argument(
         "--access_log", action="store_true",
         help="Enables dispatcher access log")
     argument_parser.add_argument(
@@ -474,6 +477,10 @@ def main(argv: List[str]) -> None:
         # If release currently running and no upgrade - uninstall it first
         if was_running and (args.uninstall or (not args.upgrade)):
             execute(["helm", "uninstall", release] + context_args)
+            print(">> Waiting for uninstallation completion")
+            wait_termination(
+                what=release, cluster_context=cluster_handler.cluster_context,
+                uninstall_duration=Duration(args.wait))
 
         if args.uninstall:
             return
@@ -492,6 +499,7 @@ def main(argv: List[str]) -> None:
                 [(args.no_secrets, "values-no_secrets.yaml"),
                  (args.http, "values-http.yaml"),
                  (args.mtls, "values-mtls.yaml"),
+                 (args.msghnd, "values-msghnd.yaml"),
                  (args.access_log, "values-access_log.yaml"),
                  (args.fake_secrets,
                   make_fake_secrets(fake_secrets_arg=args.fake_secrets,
