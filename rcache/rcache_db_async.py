@@ -1,4 +1,4 @@
-""" Synchronous part of AFC Request Cache database stuff """
+""" Asynchronous part of AFC Request Cache database stuff """
 #
 # Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
 # refers solely to the Broadcom Inc. corporate affiliate that owns
@@ -14,7 +14,7 @@ import sqlalchemy.ext.asyncio as sa_async
 import sqlalchemy.dialects.postgresql as sa_pg
 from typing import Any, Dict, List, Optional
 
-from rcache_common import dp, error, error_if, FailOnError, safe_dsn
+from log_utils import dp, error, error_if, FailOnError, safe_dsn
 from rcache_db import RcacheDb
 from rcache_models import ApDbRespState, FuncSwitch, LatLonRect, ApDbPk
 

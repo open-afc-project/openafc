@@ -18,7 +18,7 @@ setup(
     # Label compatible with PEP 440
     version='0.1.0',
     description='AFC packages',
-    py_modules=["rcache_client", "rcache_common", "rcache_db", "rcache_models",
+    py_modules=["log_utils", "rcache_client", "rcache_db", "rcache_models",
                 "rcache_req_cfg_hash", "rcache_rcache", "rcache_rmq"],
     cmdclass={
         'install': InstallCmdWrapper,
