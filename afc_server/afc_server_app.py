@@ -73,8 +73,6 @@ async def startup() -> None:
     set_dp_printer(fastapi.logger.logger.error)
     if settings.log_level is not None:
         logging.getLogger(PARENT_LOGGER).setLevel(settings.log_level.upper())
-    # Enforce establishment of all connections
-    await get_message_processor()
 
 
 @app.on_event("shutdown")
