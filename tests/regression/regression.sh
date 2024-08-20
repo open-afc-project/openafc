@@ -19,6 +19,7 @@ ALS_SIPHON="${PUB_REPO}/als-siphon-image"               # ALS Siphon image
 ALS_KAFKA="${PUB_REPO}/als-kafka-image"                   # Kafka for ALS
 BULK_POSTGRES="${PUB_REPO}/bulk-postgres-image" # PostgreSQL for bulk stuff (ALS, req cache, etc.)
 RCACHE="${PUB_REPO}/rcache-image"                             # Request cache
+AFC_SERVER="${PUB_REPO}/afcserver-image"                      # AFC Server image
 GRAFANA="${PUB_REPO}/grafana-image"                           # Grafana
 PROMETHEUS="${PUB_REPO}/prometheus-image"                     # Prometheus
 CADVISOR="${PUB_REPO}/cadvisor-image"                         # Cadvisor
@@ -169,6 +170,9 @@ build_dev_server() {
 
   # Build Request Cache
   docker_build_and_push ${wd}/rcache/Dockerfile ${RCACHE}:${tag} ${push} &
+
+  # Build AFC Server
+  docker_build_and_push ${wd}/afc_server/Dockerfile ${AFC_SERVER}:${tag} ${push} &
 
   # Build Prometheus-related images
   cd ${wd}/prometheus && docker_build_and_push Dockerfile-prometheus ${PROMETHEUS}:${tag} ${push} &
