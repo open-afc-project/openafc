@@ -30,6 +30,7 @@ LOGGER = get_module_logger()
 
 __all__ = ["AfcServerCompute"]
 
+
 class AfcServerCompute:
     """ Sender AFC Requests to computation in AFC Engine
 
@@ -73,7 +74,7 @@ class AfcServerCompute:
                 and (self.seq == other.seq)
 
     def __init__(self, rmq_dsn: str, rmq_password_file: Optional[str],
-                       engine_request_type: str, worker_mnt_root: str) -> None:
+                 engine_request_type: str, worker_mnt_root: str) -> None:
         """ Constructor
 
         Arguments:
@@ -202,26 +203,32 @@ class AfcServerCompute:
         """ Called on separate thread to AFC Engine request via Celery """
         if self._stopping:
             return
-        if history_dir:
-            for fname, content in [("analysisRequest.json", request_str),
-                                   ("afc_config.json", config_str)]:
-                with self._dataif.open(os.path.join(history_dir, fname)) \
-                        as hfile:
-                    hfile.write(content.encode("utf-8"))
-        prot, host, port = self._dataif.getProtocol()
-        afc_worker.run.apply_async(
-            kwargs={
-                "prot": prot,
-                "host": host,
-                "port": port,
-                "request_type": self._engine_request_type,
-                "task_id": task_id,
-                "hash_val": req_cfg_digest,
-                "config_path": None,
-                "history_dir": history_dir,
-                "runtime_opts": runtime_opts,
-                "mntroot": self._worker_mnt_root,
-                "rcache_queue": self._rmq_rx_queue_name,
-                "request_str": request_str,
-                "config_str": config_str,
-                "deadline": deadline})
+        try:
+            if history_dir:
+                for fname, content in [("analysisRequest.json", request_str),
+                                       ("afc_config.json", config_str)]:
+                    with self._dataif.open(os.path.join(history_dir, fname)) \
+                            as hfile:
+                        hfile.write(content.encode("utf-8"))
+        except Exception as ex:
+            LOGGER.error(f"Failed to write request to objstore: {ex}")
+        try:
+            prot, host, port = self._dataif.getProtocol()
+            afc_worker.run.apply_async(
+                kwargs={
+                    "prot": prot,
+                    "host": host,
+                    "port": port,
+                    "request_type": self._engine_request_type,
+                    "task_id": task_id,
+                    "hash_val": req_cfg_digest,
+                    "config_path": None,
+                    "history_dir": history_dir,
+                    "runtime_opts": runtime_opts,
+                    "mntroot": self._worker_mnt_root,
+                    "rcache_queue": self._rmq_rx_queue_name,
+                    "request_str": request_str,
+                    "config_str": config_str,
+                    "deadline": deadline})
+        except Exception as ex:
+            error(f"Failed to send request to AFC Engine worker: {ex}")

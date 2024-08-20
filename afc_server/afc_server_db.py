@@ -9,7 +9,8 @@
 # pylint: disable=wrong-import-order, too-many-locals, too-many-branches
 # pylint: disable=too-many-nested-blocks, too-few-public-methods
 # pylint: disable=unnecessary-pass, invalid-name, consider-using-from-import
-# pylint: disable=broad-exception-caught
+# pylint: disable=broad-exception-caught, too-many-arguments
+# pylint: disable=too-many-instance-attributes
 
 import asyncio
 from collections.abc import Coroutine
@@ -33,7 +34,7 @@ __all__ = ["AfcCertReq", "AfcCertResp", "AfcServerDb"]
 LOGGER = get_module_logger()
 
 
-class CertId(NamedTuple):
+class Certification(NamedTuple):
     """ Identifies single certification """
     # Ruleset ID (corresponds to certification domain)
     ruleset_name: str
@@ -47,25 +48,26 @@ class AfcCertReq:
     names. Supposed to be immutable
 
     Public attributes:
-    serial   -- AP Serial Number
-    cert_ids -- AP certifications (set of CertId objects)
+    serial         -- AP Serial Number
+    certifications -- AP certifications (set of Certification objects)
     """
     def __init__(self, dev_dsc: afc_server_models.Rest_DeviceDescriptor_1_4) \
             -> None:
         """ Constructor from Rest_DeviceDescriptor_1_4 object """
         self.serial = dev_dsc.serialNumber
-        self.cert_ids = \
-            {CertId(ruleset_name=c.rulesetId, certification_id=c.id)
+        self.certifications = \
+            {Certification(ruleset_name=c.rulesetId, certification_id=c.id)
              for c in dev_dsc.certificationId}
 
     def __hash__(self) -> int:
         """ Hash function """
-        return hash(self.serial) + sum(hash(ci) for ci in self.cert_ids)
+        return hash(self.serial) + sum(hash(ci) for ci in self.certifications)
 
     def __eq__(self, other: Any) -> bool:
         """ Equality comparison """
         return isinstance(other, self.__class__) and \
-            (self.serial == other.serial) and (self.cert_ids == other.cert_ids)
+            (self.serial == other.serial) and \
+            (self.certifications == other.certifications)
 
 
 class AfcCertResp:
@@ -120,19 +122,19 @@ class AfcCertResp:
         self.cert_responses: List["AfcCertResp.CertResp"] = []
 
     def add_cert_resp(self, cert_resp: "AfcCertResp.CertResp", serial: str,
-                      cert_id: str) -> None:
+                      certification_id: str) -> None:
         """ Add response info for one certification
 
         Arguments:
-        cert_resp -- Certification response info being added
-        serial    -- Serial number from certificate request
-        cert_id   -- Certificate ID from certificate request
+        cert_resp        -- Certification response info being added
+        serial           -- Serial number from certificate request
+        certification_id -- Certificate ID from certificate request
         """
         if cert_resp.cert_undefined:
             # Override from special certificates
             scp = \
                 hardcoded_relations.SpecialCertifications.get_properties(
-                    cert_id=cert_id, serial_number=serial)
+                    cert_id=certification_id, serial_number=serial)
             if scp is not None:
                 cert_resp = \
                     self.CertResp(
@@ -296,6 +298,9 @@ class AfcServerDb:
     _rcache_lookup_pipeline     -- DbPipeline for Rcache lookup requests
     _cert_lookup_pipeline       -- DbPipeline for certification check requests
     _afc_config_lookup_pipeline -- DbPipeline for AFC Config lookup requests
+    _bypass_cert                -- True to bypass certificate database query
+    _bypass_rcache              -- True to bypass Rcache
+    _sample_rcache_reply        -- Rcache reply to use if bypassed
     """
     # Name of Postgres asynchronous driver (to use in DSN)
     _ASYNC_DRIVER_NAME = "asyncpg"
@@ -317,7 +322,9 @@ class AfcServerDb:
     _MAX_AFC_CONFIG_LOOKUP = 1000
 
     def __init__(self, ratdb_dsn: str, ratdb_password_file: Optional[str],
-                 rcache_dsn: str, rcache_password_file: Optional[str]) -> None:
+                 rcache_dsn: str, rcache_password_file: Optional[str],
+                 bypass_cert: bool = False, bypass_rcache: bool = False) \
+            -> None:
         """ Constructor
 
         Arguments:
@@ -327,6 +334,8 @@ class AfcServerDb:
         rcache_dsn           -- Rcache DB DSN (maybe without password)
         rcache_password_file -- Optional name of file with password for Rcache
                                 DB DSN
+        bypass_cert          -- True to bypass certificate database query
+        bypass_rcache        -- True to bypass Rcache
         """
         self._ratdb_meta = sa.MetaData()
         self._rcache_meta = sa.MetaData()
@@ -349,6 +358,9 @@ class AfcServerDb:
             DbPipeline(name="AFC Config lookup",
                        db_access=self._get_afc_configs,
                        max_reqs=self._MAX_AFC_CONFIG_LOOKUP)
+        self._bypass_cert = bypass_cert
+        self._bypass_rcache = bypass_rcache
+        self._sample_rcache_reply: Optional[str] = None
 
     async def close(self) -> None:
         """ Stop workers and dispose of SqlAlchemy resources """
@@ -394,6 +406,22 @@ class AfcServerDb:
             await self._get_table(
                 table_name=self._RCACHE_AP_TABLE, meta=self._rcache_meta,
                 engine=self._rcache_engine, db_name="Rcache")
+
+        if self._bypass_rcache:
+            if self._sample_rcache_reply is None:
+                s = sa.select([ap_table])
+                try:
+                    async with self._rcache_engine.connect() as conn:
+                        rp = await conn.execute(s)
+                        row = rp.first()
+                        if row:
+                            self._sample_rcache_reply = \
+                                rcache_models.ApDbRecord.parse_obj(row).\
+                                get_patched_response()
+                except (sa.exc.SQLAlchemyError, OSError) as ex:
+                    error(f"Rcache DB lookup error: {ex}")
+            return {d: self._sample_rcache_reply for d in req_cfg_digests}
+
         s = sa.select([ap_table]).\
             where((ap_table.c.req_cfg_digest.in_(req_cfg_digests)) &
                   (ap_table.c.state == rcache_models.ApDbRespState.Valid.name))
@@ -420,11 +448,29 @@ class AfcServerDb:
         reqs -- Set of AfcCertReq objects
         Returns Per-request dictionary of responses
         """
+        ret: Dict[AfcCertReq, AfcCertResp] = {}
+        if self._bypass_cert:
+            for req in reqs:
+                cert = list(req.certifications)[0]
+                resp = AfcCertResp()
+                resp.add_cert_resp(
+                    cert_resp=AfcCertResp.CertResp(
+                        ruleset_name=cert.ruleset_name,
+                        location_flags=hardcoded_relations.
+                        CERT_ID_LOCATION_INDOOR |
+                        hardcoded_relations.CERT_ID_LOCATION_OUTDOOR,
+                        cert_undefined=False, cert_denied=False,
+                        serial_denied=False),
+                    serial=req.serial,
+                    certification_id=cert.certification_id)
+                ret[req] = resp
+            return ret
+
         req_serials: Set[str] = set()
-        req_cert_ids: Set[CertId] = set()
+        req_certifications: Set[Certification] = set()
         for req in reqs:
             req_serials.add(req.serial)
-            req_cert_ids.update(req.cert_ids)
+            req_certifications.update(req.certifications)
         deny_table = \
             await self._get_table(
                 table_name=self._RATDB_DENY_TABLE, meta=self._ratdb_meta,
@@ -451,7 +497,7 @@ class AfcServerDb:
                     sa.tuple_(ruleset_table.c.name,
                               cert_table.c.certification_id).in_(
                         [(cert.ruleset_name, cert.certification_id)
-                         for cert in req_cert_ids])
+                         for cert in req_certifications])
                 ).where(deny_table.c.serial_number.is_(None) |
                         deny_table.c.serial_number.in_(list(req_serials)))
 
@@ -460,18 +506,18 @@ class AfcServerDb:
             location_flags: int
             denied_serials: Set[Optional[str]] = set()
 
-        cert_infos: Dict[CertId, CertInfo] = {}
+        cert_infos: Dict[Certification, CertInfo] = {}
         try:
             async with self._ratdb_engine.connect() as conn:
                 rp = await conn.execute(s)
                 for row in rp.fetchall():
-                    res_cert_id = \
-                        CertId(
+                    res_certification = \
+                        Certification(
                             certification_id=row["certification_id"],
                             ruleset_name=row["name"])
                     cert_info = \
                         cert_infos.setdefault(
-                            res_cert_id,
+                            res_certification,
                             CertInfo(location_flags=row["location"]))
                     if row["id"] is not None:
                         cert_info.denied_serials.add(row["serial_number"])
@@ -481,16 +527,15 @@ class AfcServerDb:
         # denied certificate it contains all denied serials (from original list
         # of serials due to second 'where'), even if they were not in original
         # requests (highly unlikely, but possible)
-        ret: Dict[AfcCertReq, AfcCertResp] = {}
         for req in reqs:
             if req in ret:
                 continue
             ret[req] = AfcCertResp()
-            for req_cert_id in req.cert_ids:
-                optional_cert_info = cert_infos.get(req_cert_id)
+            for certification in req.certifications:
+                optional_cert_info = cert_infos.get(certification)
                 ret[req].add_cert_resp(
                     AfcCertResp.CertResp(
-                        ruleset_name=req_cert_id.ruleset_name,
+                        ruleset_name=certification.ruleset_name,
                         location_flags=None if optional_cert_info is None
                         else optional_cert_info.location_flags,
                         cert_undefined=optional_cert_info is None,
@@ -499,7 +544,7 @@ class AfcServerDb:
                         serial_denied=(optional_cert_info is not None) and
                         (req.serial in optional_cert_info.denied_serials)),
                     serial=req.serial,
-                    cert_id=req_cert_id.certification_id)
+                    certification_id=certification.certification_id)
         return ret
 
     async def _get_afc_configs(self, ruleset_ids: Set[str]) \
@@ -550,7 +595,7 @@ class AfcServerDb:
                          engine: sa_async.AsyncEngine, db_name: str) \
             -> sa.Table:
         """  Get table of given name from given database
-        
+
         Arguments:
         table_name -- Table name
         meta       -- DB metadata (maybe not yet fetched)

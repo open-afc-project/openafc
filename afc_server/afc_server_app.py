@@ -44,7 +44,9 @@ async def get_message_processor() \
                 ratdb_dsn=settings.ratdb_dsn,
                 ratdb_password_file=settings.ratdb_password_file,
                 rcache_dsn=settings.rcache_dsn,
-                rcache_password_file=settings.rcache_password_file)
+                rcache_password_file=settings.rcache_password_file,
+                bypass_cert=settings.bypass_cert,
+                bypass_rcache=settings.bypass_rcache)
         compute = \
             afc_server_compute.AfcServerCompute(
                 rmq_dsn=settings.rmq_dsn,
@@ -114,6 +116,7 @@ async def available_pectrum_inquiry(
         await message_processor.process_msg(
             req_msg=afc_req_msg, debug=debug, edebug=edebug,
             nocache=nocache, gui=gui, internal=False)
+
 
 @app.post("/fbrat/ap-afc/availableSpectrumInquiryInternal",
           summary="Process AFC Request from inside the cluster (legacy path)")

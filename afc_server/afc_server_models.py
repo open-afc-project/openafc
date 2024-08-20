@@ -78,7 +78,16 @@ class AfcServerSettings(pydantic.BaseSettings):
                                               title="Log level name")
     engine_request_type: str = pydantic.Field(default="AP-AFC",
                                               title="AFC Engine Request Type")
-
+    bypass_cert: bool = \
+        pydantic.Field(
+            default=False,
+            title="Bypass certification lookup (always respond "
+            "affirmatively). For performance estimation purposes")
+    bypass_rcache: bool = \
+        pydantic.Field(
+            default=False,
+            title="Bypass actual Rcache lookup (always return same record). "
+            "For performance estimation purposes")
 
 # Supported request versions. Last is default response version
 Rest_SupportedVersions = ["1.4"]

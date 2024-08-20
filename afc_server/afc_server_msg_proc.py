@@ -436,9 +436,6 @@ class AfcServerMessageProcessor:
     def _make_failed_response(self, request_id: str, ruleset_id: str,
                               response_info: Rest_Response) -> Dict[str, Any]:
         """ Returns singular failed AFC response object in dictionary form """
-        dp(Rest_AvailableSpectrumInquiryResponseMinGen(
-            requestId=request_id, rulesetId=ruleset_id,
-            response=response_info).dict(exclude_none=True))
         return \
             Rest_AvailableSpectrumInquiryResponseMinGen(
                 requestId=request_id, rulesetId=ruleset_id,
