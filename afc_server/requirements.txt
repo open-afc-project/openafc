@@ -1,0 +1,14 @@
+#
+# Copyright (C) 2023 Broadcom. All rights reserved. The term "Broadcom"
+# refers solely to the Broadcom Inc. corporate affiliate that owns 
+# the software below. This work is licensed under the OpenAFC Project License,
+# a copy of which is included with this software program
+#
+
+aio-pika==9.4.2
+asyncpg==0.29.0
+celery==5.4.0
+fastapi==0.111.1
+gunicorn==23.0.0
+requests==2.32.3
+uvicorn==0.30.1
