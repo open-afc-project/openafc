@@ -199,6 +199,7 @@ class RcacheDbAsync(RcacheDb):
                             self.ap_table.c.rulesets,
                             self.ap_table.c.cert_ids]).\
                 where(self.ap_table.c.state == ApDbRespState.Invalid.name).\
+                order_by(sa.desc(self.ap_table.c.last_update)).\
                 limit(limit)
             upd = sa.update(self.ap_table).\
                 values({"state": ApDbRespState.Precomp.name}).\
