@@ -12,7 +12,7 @@ import pydantic
 import requests
 from typing import Any, Dict, List, Optional
 
-from rcache_common import dp, error, FailOnError
+from log_utils import dp, error, FailOnError
 from rcache_models import AfcReqRespKey, RcacheUpdateReq, \
     RcacheInvalidateReq, LatLonRect, RcacheSpatialInvalidateReq
 

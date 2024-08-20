@@ -16,15 +16,12 @@ import random
 import string
 from typing import cast, List, Optional, Set
 
-from rcache_common import error, get_module_logger, safe_dsn
-from rcache_models import RmqReqRespKey
+from log_utils import error, get_module_logger, safe_dsn
+from rcache_models import RCACHE_RMQ_EXCHANGE_NAME, RmqReqRespKey
 
 __all__ = ["RcacheRmq", "RcacheRmqConnection"]
 
 LOGGER = get_module_logger()
-
-# Exchange name
-EXCHANGE_NAME = "RcacheExchange"
 
 
 class RcacheRmqConnection:
@@ -55,7 +52,7 @@ class RcacheRmqConnection:
             Optional[pika.adapters.blocking_connection.BlockingChannel] = None
         self._connection = pika.BlockingConnection(url_params)
         self._channel = self._connection.channel()
-        self._channel.exchange_declare(exchange=EXCHANGE_NAME,
+        self._channel.exchange_declare(exchange=RCACHE_RMQ_EXCHANGE_NAME,
                                        exchange_type="direct")
         self._for_rx = tx_queue_name is None
         if self._for_rx:
@@ -65,7 +62,7 @@ class RcacheRmqConnection:
                                        k=10))
             self._channel.queue_declare(queue=self._queue_name, exclusive=True)
             self._channel.queue_bind(queue=self._queue_name,
-                                     exchange=EXCHANGE_NAME)
+                                     exchange=RCACHE_RMQ_EXCHANGE_NAME)
         else:
             self._queue_name = cast(str, tx_queue_name)
 
@@ -90,7 +87,7 @@ class RcacheRmqConnection:
         try:
             self._channel.tx_select()
             self._channel.basic_publish(
-                exchange=EXCHANGE_NAME, routing_key=self._queue_name,
+                exchange=RCACHE_RMQ_EXCHANGE_NAME, routing_key=self._queue_name,
                 body=RmqReqRespKey(
                     afc_req=request, afc_resp=response,
                     req_cfg_digest=req_cfg_digest).json(),
