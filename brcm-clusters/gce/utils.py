@@ -23,7 +23,7 @@ DEFAULT_INT_CONTEXT = ":*int"
 DEFAULT_EXT_CONTEXT = ":*ext"
 
 # Default release name for helm_install_ext/int.py
-DEFAULT_RELEASE = "AUTO"
+DEFAULT_RELEASE = "afc"
 
 # Directory of this script and scripts that use it
 SCRIPT_DIR = os.path.dirname(__file__)

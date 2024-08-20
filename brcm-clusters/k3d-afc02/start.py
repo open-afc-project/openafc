@@ -18,7 +18,7 @@ DEFAULT_TAG = "AUTO"
 DEFAULT_RELEASE = "AUTO"
 DEFAULT_EXPOSE = \
     "http,https,ratdb,rat-server,msghnd,bulk-postgres,rcache,grafana," \
-    "prometheus,disp-prometheus,disp-grafana"
+    "prometheus,disp-prometheus,disp-grafana,afcserver"
 
 SCRIPT_DIR = os.path.dirname(__file__)
 DEFAULT_SOURCE_ROOT = \
@@ -107,6 +107,9 @@ def main(argv: List[str]) -> None:
         "--mtls", action="store_true",
         help="Enforce mTLS operation (client certificate checking)")
     argument_parser.add_argument(
+        "--msghnd", action="store_true",
+        help="Use legacy msghnd AFC Request handler (instead of afcserver)")
+    argument_parser.add_argument(
         "--access_log", action="store_true",
         help="Enables dispatcher access log")
     argument_parser.add_argument(
@@ -143,6 +146,7 @@ def main(argv: List[str]) -> None:
                        ("--preload_ratdb", None, args.preload_ratdb),
                        ("--http", None, args.http),
                        ("--mtls", None, args.mtls),
+                       ("--msghnd", None, args.msghnd),
                        ("--access_log", None, args.access_log)]) +
         sum([["--set", s] for s in args.set], []) +
         [args.release])

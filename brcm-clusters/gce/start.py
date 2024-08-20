@@ -106,6 +106,9 @@ def main(argv: List[str]) -> None:
         "--mtls", action="store_true",
         help="Enforce mTLS operation (client certificate checking)")
     argument_parser.add_argument(
+        "--msghnd", action="store_true",
+        help="Use legacy msghnd AFC Request handler (instead of afcserver)")
+    argument_parser.add_argument(
         "--access_log", action="store_true",
         help="Enables dispatcher access log")
     argument_parser.add_argument(
@@ -146,6 +149,7 @@ def main(argv: List[str]) -> None:
         install_helm=True, print_ips=False,
         extra_args=optional_args(
             [("--tag", args.tag, args.tag),
+             ("--msghnd", None, args.msghnd),
              ("--max_workers", str(args.max_workers), args.max_workers)]) +
         sum([["--set", s] for s in args.set_int], []))
     start_cluster(

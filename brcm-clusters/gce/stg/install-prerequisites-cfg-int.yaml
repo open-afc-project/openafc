@@ -44,3 +44,6 @@ install_components:
     postinstall:
       - >-
         kubectl patch namespace default {{context:kubectl}} -p '{"metadata":{"labels":{"istio-injection": "enabled"}}}'
+    postuninstall:
+      - >-
+        kubectl label namespace default {{context:kubectl}} istio-injection-

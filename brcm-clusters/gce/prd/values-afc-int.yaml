@@ -55,6 +55,26 @@ components:
       annotations:
         networking.gke.io/internal-load-balancer-allow-global-access: "true"
         networking.gke.io/load-balancer-type: Internal
+  afcserver:
+    containerResources:
+      requests:
+        cpu: 1600m
+    env:
+      AFC_SERVER_RATDB_DSN: postgresql://postgres@{{ip:postgres}}/fbrat
+      AFC_SERVER_GUNICORN_WORKERS: 2
+    hpa:
+      maxReplicas: 3
+      metric:
+        resource:
+          name: cpu
+          target:
+            type: Utilization
+            averageUtilization: 80
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+        scaleDown:
+          stabilizationWindowSeconds: 120
 
 staticVolumes:
   rat_transfer:
