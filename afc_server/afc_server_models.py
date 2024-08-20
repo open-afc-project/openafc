@@ -89,6 +89,7 @@ class AfcServerSettings(pydantic.BaseSettings):
             title="Bypass actual Rcache lookup (always return same record). "
             "For performance estimation purposes")
 
+
 # Supported request versions. Last is default response version
 Rest_SupportedVersions = ["1.4"]
 
