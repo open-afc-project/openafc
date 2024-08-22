@@ -480,7 +480,7 @@ class RatAfc(MethodView):
                 SpecialCertifications.get_properties(
                     cert_id=cert_id, serial_number=serial_number)
             if scp is not None:
-                return (scp.location_flags & CertId.INDOOR) != 0
+                return (scp.location_flags & CERT_ID_LOCATION_INDOOR) != 0
 
             # Assume that once we got here, we already trim the cert_obj list
             # down to only one entry for the country we're operating in

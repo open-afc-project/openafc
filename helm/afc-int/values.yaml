@@ -440,7 +440,8 @@ components:
         containerPort: 8000
         nodePort: 30084
     env:
-      AFC_SERVER_PORT: 8000
+      AFC_SERVER_PORT: >-
+        {{containerPort:afcserver:afcserver}}
       AFC_SERVER_RATDB_DSN: >-
         postgresql://postgres:postgres@{{host:ratdb}}:{{port:ratdb:ratdb}}/fbrat
       AFC_SERVER_RATDB_PASSWORD_FILE: >-
