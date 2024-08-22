@@ -944,7 +944,7 @@ class CertIdSweep(Command):
     def sweep_fcc_id(self, flaskapp):
         from afcmodels.aaa import CertId
         id_data = "grantee_code=&product_code=&applicant_name=&grant_date_from=&grant_date_to=&comments=&application_purpose=&application_purpose_description=&grant_code_1=&grant_code_2=&grant_code_3=&test_firm=&application_status=&application_status_description=&equipment_class=243&equipment_class_description=6ID-15E+6+GHz+Low+Power+Indoor+Access+Point&lower_frequency=&upper_frequency=&freq_exact_match=on&bandwidth_from=&emission_designator=&tolerance_from=&tolerance_to=&tolerance_exact_match=on&power_output_from=&power_output_to=&power_exact_match=on&rule_part_1=&rule_part_2=&rule_part_3=&rule_part_exact_match=on&product_description=&modular_type_description=&tcb_code=&tcb_code_description=&tcb_scope=&tcb_scope_description=&outputformat=XML&show_records=10&fetchfrom=0&calledFromFrame=N"  # noqa
-        self.sweep_fcc_data(flaskapp, id_data, CertId.INDOOR)
+        self.sweep_fcc_data(flaskapp, id_data, CERT_ID_LOCATION_INDOOR)
 
     def sweep_fcc_sd(self, flaskapp):
         from afcmodels.aaa import CertId
