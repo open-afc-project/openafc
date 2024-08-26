@@ -86,7 +86,7 @@ export class PropogationModelForm extends React.PureComponent<{
         this.props.onChange({
           kind: s,
           win2ProbLosThreshold: 10,
-          win2Confidence: 50,
+          win2ConfidenceCombined: 50,
           itmConfidence: 50,
           itmReliability: 50,
           p2108Confidence: 50,
@@ -97,7 +97,7 @@ export class PropogationModelForm extends React.PureComponent<{
         this.props.onChange({
           kind: s,
           win2ProbLosThreshold: 10,
-          win2Confidence: 50,
+          win2ConfidenceCombined: 50,
           itmConfidence: 50,
           itmReliability: 50,
           p2108Confidence: 50,
@@ -559,13 +559,13 @@ export class PropogationModelForm extends React.PureComponent<{
                         label="Winner II Confidence"
                         fieldId="propogation-model-win-confidence"
                     ><InputGroup><TextInput
-                        value={model.win2Confidence}
+                        value={model.win2ConfidenceCombined}
                         type="number"
                         onChange={this.setWin2Confidence}
                         id="propogation-model-win-confidence"
                         name="propogation-model-win-confidence"
                         style={{ textAlign: "right" }}
-                        isValid={model.win2Confidence >= 0 && model.win2Confidence <= 100} />
+                        isValid={model.win2ConfidenceCombined >= 0 && model.win2ConfidenceCombined <= 100} />
                             <InputGroupText>%</InputGroupText></InputGroup>
                     </FormGroup>
                     <FormGroup
