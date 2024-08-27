@@ -28,11 +28,11 @@ This also contains all lidar tiles where each city has a subdirectory with tiles
 #### **Multiband-BDesign3D:** 
 contains building database over Manhattan.
 #### **globe:** 
-contains NOAA GLOBE (1km resolution) terrain database.
+contains NOAA GLOBE (1km resolution) terrain database.  These are gdal .bil raster files.  With 1Km resolution, these are the coarsest terrain data files used in AFC.  The globe data is a fallback mode in that for a specific location, globe data is only used if none of the other finer reolution datasets provide the terrain height at that location.  As such, the globe data us used very infrequently.
 #### **srtm3arcsecondv003:** 
-contains 3arcsec (=90m) SRTM terrain database files. These are used in the regions where 1arcsec 3DEP is used in the event a 3DEP tile is missing.
+contains 3arcsec (=90m) SRTM terrain database files. These are gdal .hgt raster files.  When the directory containing 3 arcsec SRTM data is specified as the SRTM terrain data source, these files are used in the regions where 3DEP terrain data is not available.
 #### **srtm1arcsecond:** 
-contains 1arcsec (=30m) SRTM terrain database files. This is used in regions where 1arcsec 3DEP is not available.
+contains 1arcsec (=30m) SRTM terrain database files. These are gdal .hgt raster files.  When the directory containing 1 arcsec SRTM data is specified as the SRTM terrain data source, these files are used in the regions where 3DEP terrain data is not available.
 #### **3dep:** 
 The 1_arcsec subdirectory (one currently used) contains 1arcsec (=30m) 3DEP terrain database files over US, Canada and Mexico.
 #### **cdsm:** 
@@ -60,7 +60,7 @@ specifies Brazil's country boundary where AP access is allowed for that region.
 contains two ITU maps that are used by the ITM path loss model. 1) Radio Climate map (TropoClim.txt) and 2) Surface Refractivity map (N050.txt)
 
 #### **winnforum databases:** 
-these are WinnForum databases used by the FS Parser (antenna_model_diameter_gain.csv, billboard_reflector.csv, category_b1_antennas.csv, high_performance_antennas.csv, fcc_fixed_service_channelization.csv, transmit_radio_unit_architecture.csv). They provide the data to validate/fix/fill-in the corresponding ULS parameters. Two other WinnForum databases (nfa_table_data.csv and rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv) are used by the AFC Engine for near-field adjustment factor calculation for primary/diversity receivers and passive sites respectively. Note that the nfa_table_data.csv is generated manually as a simplied version of WINNF-TS-1014-V1.2.0-App01.csv. The use of these databases is described in WINNF-TS-1014 and WINNF-TS-5008 documents.
+these are WinnForum databases used by the FS Parser (antenna_model_diameter_gain.csv, billboard_reflector.csv, category_b1_antennas.csv, high_performance_antennas.csv, fcc_fixed_service_channelization.csv, transmit_radio_unit_architecture.csv). They provide the data to validate/fix/fill-in the corresponding ULS parameters. Two other WinnForum databases (nfa_table_data.csv and rat_transfer/pr/WINNF-TS-1014-V1.2.0-App02.csv) are used by the AFC Engine for near-field adjustment factor calculation for primary/diversity receivers and passive sites respectively. Note that the nfa_table_data.csv is generated manually as a simplified version of WINNF-TS-1014-V1.2.0-App01.csv. The use of these databases is described in WINNF-TS-1014 and WINNF-TS-5008 documents.
 
 ### **Location or procedure to download/acquire these databases**
 * **FS_Database:** Created using FS Script Parser from ULS raw data on FCC website (see details in the ULS Script documentation), RAS database from FCC 47CFR Part 15.407, and ISED's 6GHz DataExtract database on https://ised-isde.canada.ca/site/spectrum-management-system/en/spectrum-management-system-data
@@ -69,8 +69,8 @@ these are WinnForum databases used by the FS Parser (antenna_model_diameter_gain
 * **Multiband-BDesign3D:** this was purchased https://www.b-design3d.com/
 
 * **globe:** https://ngdc.noaa.gov/mgg/topo/globe.html
-* **srtm3arcsecondv003:** https://www2.jpl.nasa.gov/srtm/
-* **srtm1arcsecond:** https://search.earthdata.nasa.gov/search/granules?p=C1000000240-LPDAAC_ECS&pg[0][v]=f&pg[0][gsk]=-start_date&q=srtm&tl=1702926101.019!3!!
+* **srtm3arcsecondv003:** https://search.earthdata.nasa.gov/search/granules?p=C2763266377-LPCLOUD&pg[0][v]=f&pg[0][gsk]=-start_date&q=srtm&gdf=HGT&tl=1702926101!3!!
+* **srtm1arcsecond:** https://search.earthdata.nasa.gov/search/granules?p=C2763266360-LPCLOUD&pg[0][v]=f&pg[0][gsk]=-start_date&q=srtm&gdf=HGT&tl=1702926101!3!!
 * **3dep:** https://data.globalchange.gov/dataset/usgs-national-elevation-dataset-ned-1-arc-second
 * **cdsm:"** https://open.canada.ca/data/en/dataset/768570f8-5761-498a-bd6a-315eb6cc023d
 
@@ -84,7 +84,7 @@ these are WinnForum databases used by the FS Parser (antenna_model_diameter_gain
 * **GB.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
 * **BRA.kml:** https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/?flg=en-us
  
-* **itudata:** Radio Climate map from ITU-R Rec, P.617-3 (https://www.itu.int/rec/R-REC-P.617-3-201309-S/en) and Surface Refractivity map from ITU-R Rec, P.452-17 (https://www.itu.int/rec/R-REC-P.452-17-202109-I/en)
+* **itudata:** The Radio Climate map, TropoClim.txt, is in the zip file from ITU-R Rec, P.617-3 (https://www.itu.int/dms_pubrec/itu-r/rec/p/R-REC-P.617-3-201309-S!!ZIP-E.zip).  The Surface Refractivity map, N050.txt, is in the zip file from ITU-R Rec, P.617-5 (https://www.itu.int/dms_pubrec/itu-r/rec/p/R-REC-P.617-5-201908-I!!ZIP-E.zip)
 
 * **winnforum databases:** The Winnforum databases used by FS parser can be downloaded from here: Use https://github.com/Wireless-Innovation-Forum/6-GHz-AFC/tree/main/data/common_data to open in browser.  The scripts use: https://raw.githubusercontent.com/Wireless-Innovation-Forum/6-GHz-AFC/main/data/common_data/ for downloading. The near-field adjustment factor databases can be downloaded from: https://6ghz.wirelessinnovation.org/baseline-standards. 
 
