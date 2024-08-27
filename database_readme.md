@@ -28,11 +28,11 @@ This also contains all lidar tiles where each city has a subdirectory with tiles
 #### **Multiband-BDesign3D:** 
 contains building database over Manhattan.
 #### **globe:** 
-contains NOAA GLOBE (1km resolution) terrain database.  These are gdal .bil raster files.  With 1Km resolution, these are the coarsest terrain data files used in AFC.  The globe data is a fallback mode in that for a specific location, globe data is only used if none of the other finer reolution datasets provide the terrain height at that location.  As such, the globe data us used very infrequently.
+contains NOAA GLOBE (1km resolution) terrain database.  These are gdal .bil raster files.  With 1Km resolution, these are the coarsest terrain data files used in AFC.  The globe data is a fallback mode in that for a specific location, globe data is only used if none of the other finer resolution datasets provide the terrain height at that location.  As such, the globe data is used very infrequently.
 #### **srtm3arcsecondv003:** 
-contains 3arcsec (=90m) SRTM terrain database files. These are gdal .hgt raster files.  When the directory containing 3 arcsec SRTM data is specified as the SRTM terrain data source, these files are used in the regions where 3DEP terrain data is not available.
+contains 3arcsec (=90m) SRTM terrain database files. These are gdal .hgt raster files.  When the directory containing 3 arcsec SRTM data is specified as the SRTM terrain data source, these files are used in the regions where the higher resolution (e.g. 1arcsecond) 3DEP terrain data is not available.
 #### **srtm1arcsecond:** 
-contains 1arcsec (=30m) SRTM terrain database files. These are gdal .hgt raster files.  When the directory containing 1 arcsec SRTM data is specified as the SRTM terrain data source, these files are used in the regions where 3DEP terrain data is not available.
+contains 1arcsec (=30m) SRTM terrain database files. These are gdal .hgt raster files.  When the directory containing 1 arcsec SRTM data is specified as the SRTM terrain data source, these files are used in the regions where 3DEP terrain data is not available (i.e. outside US, Canada and Mexico).
 #### **3dep:** 
 The 1_arcsec subdirectory (one currently used) contains 1arcsec (=30m) 3DEP terrain database files over US, Canada and Mexico.
 #### **cdsm:** 
