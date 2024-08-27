@@ -11,9 +11,9 @@ import os
 import sys
 from typing import List, Optional
 
-from utils import ArgumentParserFromFile, auto_name, AUTO_NAME, execute, \
-    EXT_HELM_REL_DIR, parse_json_output, parse_kubecontext, \
-    print_helm_values, ROOT_DIR, set_silent_execute
+from utils import ArgumentParserFromFile, auto_name, AUTO_NAME, Duration, \
+    execute, EXT_HELM_REL_DIR, parse_json_output, parse_kubecontext, \
+    print_helm_values, ROOT_DIR, set_silent_execute, wait_termination
 
 # values.yaml path to default image tag
 DEFAULT_IMAGE_TAG_PATH = "components.default.imageTag"
@@ -108,6 +108,9 @@ def main(argv: List[str]) -> None:
     # If release currently running and no upgrade - uninstall it first
     if was_running and (args.uninstall or (not args.upgrade)):
         execute(["helm", "uninstall", release] + cluster_context.helm_args())
+        print(">> Waiting for uninstallation completion")
+        wait_termination(what=release, cluster_context=cluster_context,
+                         uninstall_duration=Duration(args.wait))
 
     if args.uninstall:
         return

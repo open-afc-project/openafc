@@ -14,8 +14,8 @@ import secret_utils
 from typing import Any, cast, Dict, List, Optional, Tuple
 import urllib.parse
 
-from rcache_common import dp, error, error_if, FailOnError, \
-    get_module_logger, safe_dsn
+from log_utils import dp, error, error_if, FailOnError, get_module_logger, \
+    safe_dsn
 from rcache_models import ApDbRespState, ApDbRecord
 
 __all__ = ["RcacheDb"]
@@ -350,7 +350,7 @@ class RcacheDb:
         Returns Engine object
         """
         try:
-            return sa.create_engine(dsn)
+            return sa.create_engine(dsn, pool_pre_ping=True)
         except sa.exc.SQLAlchemyError as ex:
             error(f"Invalid database DSN: '{safe_dsn(dsn)}': {ex}")
         return None  # Will never happen, appeasing pylint

@@ -47,7 +47,8 @@ securityContexts:
   readOnly:
     readOnlyRootFilesystem: true
 
-# Dictionary of environment variable grooups, used by several components.
+# Dictionary of environment variable grooups, used by several components or
+# referred to from other environment variables.
 # Values are dictionaries.
 # Some syntax conventions introduced to properly render values without helm
 # trickery or literal repetitions:
@@ -83,6 +84,12 @@ securityContexts:
 #    in another shared environment block. <IFABSENT> describes what to do if
 #    referred value is absent (see above for values)
 sharedEnv:
+  # Who processes AFC Requests?
+  afc-req-service:
+    # Service name: afcserver or msghnd
+    host: afcserver
+    # Service port
+    port: "80"
   # Flask config parameters defined in config/ratapi.conf. Config settings
   # passed via environment variables should be prefixed with FLASK_, passed via
   # filename environment variables should be prefixed wiyth FLASKFILE_
@@ -96,7 +103,7 @@ sharedEnv:
     FLASKFILE_GOOGLE_APIKEY: >-
       {{secretFile:google-apikey:optional}}
     FLASK_USER_EMAIL_SENDER_EMAIL: admin@afc_please_override.com
-    FLASK_AFC_MSGHND_RATAFC_TOUT: 180
+    FLASK_AFC_MSGHND_RATAFC_TOUT: "180"
   # Flask config parameters retrieved by RatApiConfigurator (should be defined
   # in site-specific values.yaml overrides and/or in secrets). Config settings
   # passed via environment variables should be given as is, passed via
@@ -234,6 +241,22 @@ staticVolumes:
 #             'type' field derived from top-level key)
 #     behavior Behavior clause of HPA manifest. Optional. Default is to scale
 #             immediately, without looking back
+#   livenessProbe livenessProbe clause. Liveness is a probe Kubernetes uses to
+#           decide if container must be restarted
+#   readinessProbe readinessProbe clause. Readiness is a probe Kubernetes uses
+#           to decide if container is able to acept traffic (or should be
+#           excluded from LoadBalancer)
+#   startupProbe startupProbe clause. Startup is a probe Kubernetes uses to
+#           decide if readiness probe may already be used (or container is
+#           still starting)
+#   ingress Parameters of ingress:
+#     anotations Annotations dictionary for Ingress manifest
+#     rules List of structures with materials to ingress rules. Structures have
+#             properties:
+#       path Path for rule
+#       pathType (Prefix, ImplementationSpecific or Exact). Default is Prefix
+#       portKey Name of target port
+#   noIngress True to ignore 'ingress' even if it is present
 components:
   default:
     service:
@@ -288,8 +311,8 @@ components:
       AFC_SERVER_NAME: _
       AFC_ENFORCE_HTTPS: "True"
       AFC_ENFORCE_MTLS: "False"
-      AFC_MSGHND_NAME: "{{host:msghnd}}"
-      AFC_MSGHND_PORT: "{{port:msghnd:msghnd}}"
+      AFC_MSGHND_NAME: "{{sameAs:afc-req-service:host}}"
+      AFC_MSGHND_PORT: "{{sameAs:afc-req-service:port}}"
       AFC_WEBUI_NAME: "{{host:rat-server}}"
       AFC_WEBUI_PORT: "{{port:rat-server:rat-server}}"
     sharedEnvKeys:
@@ -349,8 +372,17 @@ components:
       - oidc-client-id
       - oidc-client-secret
       - rcache-db-password
+    ingress:
+      rules:
+        - path: /fbrat/ap-afc/availableSpectrumInquirySec
+          portKey: rat-server
+        - path: /fbrat/ratapi/v1/files
+          portKey: rat-server
+        - path: /fbrat
+          portKey: rat-server
   msghnd:
-    imageName: afc-msghnd
+     # afc-msghnd when enabled
+    imageName: null
     imageRepositoryKey: private
     ports:
       msghnd:
@@ -385,6 +417,62 @@ components:
       - oidc-client-id
       - oidc-client-secret
       - rcache-db-password
+    noIngress: True
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "720"
+        nginx.ingress.kubernetes.io/proxy-connect-timeout: "720"
+        nginx.ingress.kubernetes.io/client-body-timeout: "720"
+        nginx.ingress.kubernetes.io/client-header-timeout: "720"
+        nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "720"
+        nginx.ingress.kubernetes.io/keep-alive: "720"
+      rules:
+        - path: /fbrat/ap-afc/availableSpectrumInquiry
+          portKey: msghnd
+        - path: /fbrat/ap-afc/healthy
+          portKey: msghnd
+  afcserver:
+    imageName: afcserver-image
+    imageRepositoryKey: private
+    ports:
+      afcserver:
+        servicePort: 80
+        containerPort: 8000
+        nodePort: 30084
+    env:
+      AFC_SERVER_PORT: >-
+        {{containerPort:afcserver:afcserver}}
+      AFC_SERVER_RATDB_DSN: >-
+        postgresql://postgres:postgres@{{host:ratdb}}:{{port:ratdb:ratdb}}/fbrat
+      AFC_SERVER_RATDB_PASSWORD_FILE: >-
+        {{secretFile:ratdb-password:optional}}
+      AFC_SERVER_REQUEST_TIMEOUT: >-
+        {{sameAs:flask-conf:FLASK_AFC_MSGHND_RATAFC_TOUT}}
+      AFC_SERVER_CONFIG_REFRESH: 5
+      ALS_KAFKA_SERVER_ID: afcserver
+    sharedEnvKeys:
+      - rcache-common
+      - rcache-client
+      - celery-client
+      - objst-client
+      - objst-common
+      - als-client
+    mountedSecrets:
+      - ratdb-password
+      - rcache-db-password
+    ingress:
+      annotations:
+        nginx.ingress.kubernetes.io/proxy-read-timeout: "720"
+        nginx.ingress.kubernetes.io/proxy-connect-timeout: "720"
+        nginx.ingress.kubernetes.io/client-body-timeout: "720"
+        nginx.ingress.kubernetes.io/client-header-timeout: "720"
+        nginx.ingress.kubernetes.io/upstream-keepalive-timeout: "720"
+        nginx.ingress.kubernetes.io/keep-alive: "720"
+      rules:
+        - path: /fbrat/ap-afc/availableSpectrumInquiry
+          portKey: afcserver
+        - path: /fbrat/ap-afc/healthy
+          portKey: afcserver
   objst:
     imageName: objstorage-image
     imageRepositoryKey: public
@@ -413,6 +501,12 @@ components:
       - ratapi-mail-password
       - oidc-client-id
       - oidc-client-secret
+    ingress:
+      rules:
+        - path: /certificate
+          portKey: fileStorage
+        - path: /objst_healthy
+          portKey: fileStorage
   worker:
     imageName: afc-worker
     imageRepositoryKey: private
@@ -429,6 +523,7 @@ components:
       AFC_AEP_DEBUG: 1
       AFC_AEP_REAL_MOUNTPOINT: >-
         {{staticVolumeMount:worker:rat_transfer}}/3dep/1_arcsec
+      ALS_KAFKA_SERVER_ID: worker
     sharedEnvKeys:
       - celery-client
       - objst-client
@@ -456,16 +551,22 @@ components:
             type: AverageValue
             # 1700m is 1.7 in HPA parlance
             averageValue: 1700m
-      # Example behavior definition
-      # behavior:
-      #   scaleUp:
-      #     stabilizationWindowSeconds: 0
-      #     policies:
-      #       - type: Pods
-      #         value: 4
-      #         periodSeconds: 30
-      #   scaleDown:
-      #     stabilizationWindowSeconds: 300
+      behavior:
+        scaleUp:
+          stabilizationWindowSeconds: 0
+          policies:
+            - type: Pods
+              value: 4
+              periodSeconds: 30
+        scaleDown:
+          stabilizationWindowSeconds: 120
+          policies:
+            - type: Pods
+              value: 4
+              periodSeconds: 30
+            - type: Percent
+              value: 10
+              periodSeconds: 30
   als-kafka:
     imageName: als-kafka-image
     imageRepositoryKey: public
@@ -528,7 +629,7 @@ components:
     imageRepositoryKey: public
     env:
       ULS_AFC_URL: >-
-        http://{{host:msghnd}}:{{port:msghnd:msghnd}}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
+        http://{{sameAs:afc-req-service:host}}:{{sameAs:afc-req-service:port}}/fbrat/ap-afc/availableSpectrumInquiryInternal?nocache=True
       ULS_DELAY_HR: 0
       ULS_SERVICE_STATE_DB_DSN: >-
         postgresql://postgres:postgres@{{host:bulk-postgres}}/fs_state
@@ -563,6 +664,8 @@ components:
   cert-db:
     imageName: cert_db
     imageRepositoryKey: public
+    env:
+      ALS_KAFKA_SERVER_ID: cert-db
     sharedEnvKeys:
       - flask-conf
       - ratapi-configurator
@@ -590,13 +693,15 @@ components:
     env:
       RCACHE_CLIENT_PORT: "{{port:rcache:rcache}}"
       RCACHE_AFC_REQ_URL: >-
-        http://{{host:msghnd}}:{{port:msghnd:msghnd}}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
+        http://{{sameAs:afc-req-service:host}}:{{sameAs:afc-req-service:port}}/fbrat/ap-afc/availableSpectrumInquiry?nocache=True
       RCACHE_RULESETS_URL: >-
         http://{{host:rat-server}}/fbrat/ratapi/v1/GetRulesetIDs
       RCACHE_CONFIG_RETRIEVAL_URL: >-
         http://{{host:rat-server}}/fbrat/ratapi/v1/GetAfcConfigByRulesetID
+      ALS_KAFKA_SERVER_ID: rcache
     sharedEnvKeys:
       - rcache-common
+      - als-client
     mountedSecrets:
       - rcache-db-password
   grafana:
@@ -606,6 +711,11 @@ components:
       grafana:
         servicePort: 3000
         nodePort: 31000
+    ingress:
+      rules:
+        - path: /grafana
+          pathType: Prefix
+          portKey: grafana
   nginxexporter:
     imageName: nginxexporter-image
     imageRepositoryKey: public
@@ -626,39 +736,6 @@ components:
         nodePort: 31090
   # Only to have proper label in its servicemonitor
   cadvisor: {}
-
-# Dictionary that defines ingress parameters (override to Null if no ingress)
-# name Ingress name.
-# Properties are
-#   annotations
-#   ingressClassName Value for spec.ingressClassName
-#   rules Dictionary of path descriptors, indexed by path. Path descriptors
-#           have the following properties
-#     pathType (Prefix, ImplementationSpecific or Exact). Default is Prefix
-#     componentKey Index in components (not used if 'service' is specified)
-#     portKey Index in components[componentKey].ports. Only used if
-#             'componentKey' is specified
-#     serviceName Explicitly specified host name
-#     portNumber Explicitly specified port number
-ingress:
-  name: ingress-int
-  ingressClassName: nginx
-  rules:
-    /fbrat/ap-afc/availableSpectrumInquiry:
-      componentKey: msghnd
-      portKey: msghnd
-    /fbrat/ap-afc/availableSpectrumInquirySec:
-      componentKey: msghnd
-      portKey: msghnd
-    /fbrat/ratapi:
-      componentKey: rat-server
-      portKey: rat-server
-    /certificate:
-      componentKey: objst
-      portKey: fileStorage
-    /grafana:
-      componentKey: grafana
-      portKey: grafana
 
 # Dictionary of secret store descriptors
 # Keys used as secret store name (after conversion to RFC1123)
@@ -698,7 +775,8 @@ secretStores:
 #            environment variable)
 #    empty - remote secret used verbatim
 #    absent - corresponded ExternalSecret not created
-#  type - Optional 'type' value for secret manifest
+#  template - Optional 'template' clause to insert to 'target'
+#  data - Explicitly specified 'data' clause for complicated secrets
 #  mountPath Directory to which secret is mounted
 #  mountPathPrefix If 'mountPath' not defined it is constructed as
 #          concatenation of this prefix and secret name
@@ -735,7 +813,8 @@ externalSecrets:
     property: ALS_JSON_LOG_DB_PASSWORD
   image-pull:
     property: .dockerconfigjson
-    type: kubernetes.io/dockerconfigjson
+    template:
+      type: kubernetes.io/dockerconfigjson
   flask-secret-key:
     property: SECRET_KEY
   google-apikey:

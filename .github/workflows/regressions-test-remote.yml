@@ -13,19 +13,20 @@ jobs:
     - name: Checkout sources
       uses: actions/checkout@v2
 
-# open ssh port {
-    - name: open port for the test
-      id: ip
-      uses: haythem/public-ip@v1.2
+# get public IP
+    - name: get public IP
+      run: |
+          echo IP4=`dig +short myip.opendns.com @resolver1.opendns.com` >> $GITHUB_ENV
 
+# open ssh port {
     - name: Print Public IP
       run: |
-        echo ${{ steps.ip.outputs.ipv4 }}
-        echo ${{ steps.ip.outputs.ipv6 }}
+        echo ${{ env.IP4 }}
+
 
     - name: Allow Security group rule to connect Github Actions to OpenAFC servers
       run: |
-        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/24
+        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port 22 --cidr ${{ env.IP4 }}/24
       env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -89,7 +90,7 @@ jobs:
 # open srvr test port {
     - name: Allow Security group rule to connect Github Actions to OpenAFC servers
       run: |
-        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT }} --cidr ${{ steps.ip.outputs.ipv4 }}/24
+        aws ec2 authorize-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT }} --cidr ${{ env.IP4 }}/24
       env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -125,7 +126,7 @@ jobs:
     - name: remove Security group rule that was added for this test
       if: ${{ always() }}
       run: |
-        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port 22 --cidr ${{ steps.ip.outputs.ipv4 }}/24
+        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port 22 --cidr ${{ env.IP4 }}/24
       env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -136,7 +137,7 @@ jobs:
     - name: remove Security group rule that was added for this test
       if: ${{ always() }}
       run: |
-        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT }} --cidr ${{ steps.ip.outputs.ipv4 }}/24
+        aws ec2 revoke-security-group-ingress --group-id ${{ secrets.AWS_AFC_DEV_SEC_GROUP_ID }} --protocol tcp --port ${{ env.TEST_PORT }} --cidr ${{ env.IP4 }}/24
       env:
           AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

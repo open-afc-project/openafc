@@ -15,15 +15,16 @@ import uvicorn
 import sys
 from typing import Annotated, Optional
 
-from rcache_common import dp, get_module_logger, set_dp_printer
+from log_utils import dp, get_module_logger, set_dp_printer, set_parent_logger
 from rcache_models import IfDbExists, RcacheServiceSettings, RcacheUpdateReq, \
     RcacheInvalidateReq, RcacheSpatialInvalidateReq, RcacheStatus
 from rcache_service import RcacheService
 
 __all__ = ["app"]
 
+PARENT_LOGGER = "uvicorn.error"
+set_parent_logger(PARENT_LOGGER)
 LOGGER = get_module_logger()
-LOGGER.setLevel(logging.INFO)
 
 # Parameters (passed via environment variables)
 settings = RcacheServiceSettings()
@@ -61,7 +62,7 @@ app = fastapi.FastAPI()
 async def startup() -> None:
     """ App startup event handler """
     set_dp_printer(fastapi.logger.logger.error)
-    logging.basicConfig(level=logging.INFO)
+    logging.getLogger(PARENT_LOGGER).setLevel("INFO")
     if not settings.enabled:
         return
     service = get_service()
@@ -152,7 +153,7 @@ async def get_precomputation_state(
 
 
 @app.post("/update_state/{enabled}")
-async def setupdate_state(
+async def set_update_state(
         enabled: Annotated[
             bool,
             fastapi.Path(

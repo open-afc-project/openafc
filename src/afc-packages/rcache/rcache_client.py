@@ -12,7 +12,7 @@ import pydantic
 import sys
 from typing import Dict, List, Optional, Union
 
-from rcache_common import error, error_if, get_module_logger, \
+from log_utils import error, error_if, get_module_logger, \
     include_stack_to_error_log, set_error_exception
 
 try:
@@ -55,7 +55,7 @@ class RcacheClient:
     _update_on_send -- True to update cache on sender
     """
 
-    def __init__(self, client_settings: RcacheClientSettings,
+    def __init__(self, client_settings: "RcacheClientSettings",
                  rmq_receiver: Optional[bool] = None) -> None:
         """ Constructor
 
@@ -67,7 +67,7 @@ class RcacheClient:
         set_error_exception(RuntimeError)
         include_stack_to_error_log(True)
 
-        self._rcache_db: Optional[RcacheDb] = None
+        self._rcache_db: Optional["RcacheDb"] = None
         if client_settings.enabled and \
                 (client_settings.postgres_dsn is not None):
             assert "rcache_db" in sys.modules
@@ -77,7 +77,7 @@ class RcacheClient:
                     rcache_db_password_file=client_settings.
                     postgres_password_file)
 
-        self._rcache_rmq: Optional[RcacheRmq] = None
+        self._rcache_rmq: Optional["RcacheRmq"] = None
         if client_settings.enabled and \
                 (client_settings.rmq_dsn is not None):
             assert "rcache_rmq" in sys.modules
@@ -87,7 +87,7 @@ class RcacheClient:
             self._rmq_receiver = rmq_receiver
         self._update_on_send = client_settings.update_on_send
 
-        self._rcache_rcache: Optional[RcacheRcache] = None
+        self._rcache_rcache: Optional["RcacheRcache"] = None
         if client_settings.enabled and \
                 (client_settings.service_url is not None):
             assert "rcache_rcache" in sys.modules
@@ -131,7 +131,7 @@ class RcacheClient:
             except pydantic.ValidationError as ex:
                 error(f"Invalid arguments syntax: '{ex}'")
 
-    def rmq_create_rx_connection(self) -> RcacheRmqConnection:
+    def rmq_create_rx_connection(self) -> "RcacheRmqConnection":
         """ Creates RcacheRmqConnection.
 
         Must be called before opposite side starts transmitting. Object being
@@ -141,7 +141,7 @@ class RcacheClient:
         assert self._rcache_rmq is not None
         return self._rcache_rmq.create_connection()
 
-    def rmq_receive_responses(self, rx_connection: RcacheRmqConnection,
+    def rmq_receive_responses(self, rx_connection: "RcacheRmqConnection",
                               req_cfg_digests: List[str],
                               timeout_sec: float) -> Dict[str, Optional[str]]:
         """ Receiver ARC responses from RabbitMQ queue

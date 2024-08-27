@@ -28,6 +28,14 @@ http {
         keepalive  32;
     }
 
+    upstream prometheus {
+        server ${AFC_PROMETHEUS_TARGET};
+    }
+
+    upstream grafana {
+        server ${AFC_GRAFANA_TARGET};
+    }
+
     map $scheme:$afc_https_enforce $should_redirect {
         http:TRUE 1;
         default 0;
@@ -43,8 +51,8 @@ http {
         
         ssl_protocols TLSv1.2 TLSv1.3;
         ssl_prefer_server_ciphers on;
-        ssl_certificate /certificates/servers/cert/server.cert.pem;
-        ssl_certificate_key /certificates/servers/key/server.key.pem;
+        ssl_certificate /certificates/servers/server.cert.pem;
+        ssl_certificate_key /certificates/servers/server.key.pem;
 
         ssl_client_certificate /etc/nginx/certs/client.bundle.pem;
         ssl_verify_client optional;
@@ -156,6 +164,37 @@ http {
             return 403;
         }
 
+        location /prometheus {
+            set $prometheus_enabled "${AFC_PROMETHEUS_ENABLED}";
+            if ($prometheus_enabled != true) {
+                return 501;
+            }
+            proxy_bind $server_addr;
+            sendfile on;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_hide_header Content-Security-Policy;
+            add_header Content-Security-Policy  "script-src 'self' 'unsafe-inline'";
+            proxy_pass http://prometheus$request_uri;
+            proxy_redirect http:// $scheme://;
+        }
+
+        location /grafana {
+            set $grafana_enabled "${AFC_GRAFANA_ENABLED}";
+            if ($grafana_enabled != true) {
+                return 501;
+            }
+            proxy_bind $server_addr;
+            sendfile on;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_hide_header Content-Security-Policy;
+            add_header Content-Security-Policy  "script-src 'self' 'unsafe-eval' 'unsafe-inline'";
+            proxy_pass http://grafana$request_uri;
+        }
+
         location / {
             if ($request_uri = "/") {
                 return 301 $scheme://$http_host/fbrat;
@@ -205,38 +244,6 @@ http {
         listen 8080;
         location /stub_status {
             stub_status;
-        }
-    }
-
-    upstream prometheus {
-        server ${AFC_PROMETHEUS_TARGET};
-    }
-
-    # Prometheus forwarding
-    server {
-        listen 9090;
-        set $prometheus_enabled "${AFC_PROMETHEUS_ENABLED}";
-        if ($prometheus_enabled != true) {
-            return 501;
-        }
-        location / {
-            proxy_pass http://prometheus${AFC_PROMETHEUS_PATH}$request_uri;
-        }
-    }
-
-    upstream grafana {
-        server ${AFC_GRAFANA_TARGET};
-    }
-
-    # Grafana forwarding
-    server {
-        listen 3000;
-        set $grafana_enabled "${AFC_GRAFANA_ENABLED}";
-        if ($grafana_enabled != true) {
-            return 501;
-        }
-        location / {
-            proxy_pass http://grafana${AFC_GRAFANA_PATH}$request_uri;
         }
     }
 

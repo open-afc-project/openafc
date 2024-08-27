@@ -18,17 +18,23 @@ default_install_components: []
 # uninstall uninstall components in reverse order)
 # Dictionary values may have the following properties:
 #   - namespace. Namespace to install manifests/helmcharts in
+#   - attempts. Number of attempts to make (default is 1)
 #   - preinstall. List of commands to perform before kubernetes/helm
 #             installation. Commands that starts with `-` - not checked for
 #             failure. Executed from checkout root directory
 #   - postinstall. List of commands to perform after kubernetes/helm
 #             installation. Commands that starts with `-` - not checked for
 #             failure. Executed from checkout root directory
+#   - postuninstall. List of commands to perform after kubernetes/helm
+#             uninstallation
 #   - manifest. Path or URL to manifest file or directory. Path may use ~ and
 #             $. Relative paths are from script's directory'
 #   - manifest_url. URL to manifest file or directory
-#   - has_service. Name of service installed by manifest of this step. If
-#             present - installation is skipped
+#   - manifest_check. Manifest considered installed if this entity present:
+#       - kind Entity kind
+#       - name Entity name
+#   - wait_pod Initial part of pod name to wait for on manifest or helm
+#             installation
 #   - helm_chart. Helmchart to install if filename - relative to script's
 #             directory
 #   - helm_release. Helm release name
@@ -37,39 +43,45 @@ default_install_components: []
 #             directory. May use ~ and environment variables
 #   - helm_settings: List of value settings
 #   - helm_version. Helmchart version specifier
-#   - helm_wait. How long to wait for helm install install
+#   - install_wait. How long to wait for installation completion
 #   - uninstall_wait. How long to wait for helm/kubectl uninstall
 #
-# Property values may contain references to content of other places in config
-# file in form {{attr1.attr2....}}. Here attrN is a sequence of
-# attributes to reach target value.
-# E.g. if there is ip.yaml file containing ip address dictionary externalIps
-# (see values.yaml for details) and command line has --extra_cfg ip.yaml then
-# {{externalIps.int-ingress}} in some value will be substituted with
-# corresponding IP address. This feature was introduced to access IPs in AFC
-# helmchart in values.yaml override of ingress-nginx
+# Property values may contain {{...}} inserts of the following forms:
+#   - {{ATTR1.ATTR2....}} - sequence of attributes to reach some value in
+#             consolidated config file. Sample usage is to include (with
+#             --extra_cfg) values.yaml override with external IPs and then
+#             refer values from there as {{externalIps.int-ingress}}
+#   - {{context:FORMAT}} Where FORMAT is either 'kubectl' or 'helm'. This is
+#             rendered as contetx arguments in kubectl or helm form
 install_components:
   prometheus_operator:
     manifest: >-
       https://github.com/prometheus-operator/prometheus-operator/releases/download/v0.72.0/bundle.yaml
-    has_service: prometheus-operator
+    manifest_check:
+      kind: service
+      name: prometheus-operator
+    wait_pod: prometheus-operator
+    install_wait: 5m
     uninstall_wait: 5m
   prometheus:
     namespace: monitoring
     manifest: ../monitoring/prometheus
-    has_service: prometheus-operated
+    manifest_check:
+      kind: service
+      name: prometheus-operated
     uninstall_wait: 5m
   prometheus_adapter:
     namespace: monitoring
     preinstall:
-      - -kubectl delete apiservice v1beta1.metrics.k8s.io --wait --force -A
+      - >-
+        -kubectl delete apiservice v1beta1.metrics.k8s.io {{context:kubectl}} -A
     helm_chart: prometheus-community/prometheus-adapter
     helm_repo: https://prometheus-community.github.io/helm-charts
     helm_release: custom-metrics
     helm_values:
       - ../monitoring/prometheus_adapter/values-prometheus_adapter.yaml
     helm_version: 2.14.2
-    helm_wait: 5m
+    install_wait: 5m
     uninstall_wait: 5m
   external_secrets:
     namespace: external-secrets
@@ -78,12 +90,21 @@ install_components:
     helm_release: external-secrets
     helm_settings:
       - installCRDs=true
-    helm_wait: 5m
+    wait_pod: external-secrets-webhook
+    install_wait: 5m
     uninstall_wait: 5m
   ingress_nginx:
     namespace: ingress-nginx
     helm_chart: ingress-nginx/ingress-nginx
     helm_repo: https://kubernetes.github.io/ingress-nginx
     helm_release: ingress-nginx
-    helm_wait: 5m
+    install_wait: 5m
+    wait_pod: ingress-nginx-controller
     uninstall_wait: 5m
+  prometheus_ingress:
+    namespace: monitoring
+    manifest: ../monitoring/prometheus_ingress
+    uninstall_wait: 5m
+    manifest_check:
+      kind: ingress
+      name: prometheus-ingress

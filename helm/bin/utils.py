@@ -8,6 +8,7 @@
 # pylint: disable=invalid-name, too-many-arguments, global-statement
 
 import argparse
+import datetime
 import fnmatch
 import json
 import os
@@ -16,6 +17,7 @@ import shlex
 import socket
 import subprocess
 import sys
+import time
 from typing import Any, cast, Dict, List, NamedTuple, NoReturn, Optional, \
     Set, Union
 import yaml
@@ -433,6 +435,7 @@ class Duration:
         "y": 3600 * 24 * 365.25}
 
     def __init__(self, duration: Optional[Union[str, int, float]]) -> None:
+        """ Constructs from seconds or Go duration """
         self._seconds: Optional[Union[float, int]]
         if duration is None:
             self._seconds = None
@@ -522,3 +525,32 @@ def print_helm_values(helm_args: List[str], print_format: str) -> None:
     else:
         error(f"Internal error: unsupported values output format "
               f"'{print_format}'")
+
+
+def wait_termination(what: str, cluster_context: ClusterContext,
+                     namespace: Optional[str] = None,
+                     uninstall_duration: Duration = Duration(None)) -> None:
+    """ Wait until all 'Terminating' extinguished in given context
+
+    Arguments:
+    what               -- What is being uininstalled (for use in error
+                          messages)
+    cluster_context    -- Cluster context
+    namespace          -- Optional namespace name
+    uninstall_duration -- Maximum duration
+    """
+    start = datetime.datetime.now()
+    time.sleep(1)
+    while "Terminating" in \
+            cast(
+                str,
+                execute(
+                    ["kubectl", "get", "all"] +
+                    cluster_context.kubectl_args(namespace=namespace),
+                    return_output=True)):
+        error_if(
+            uninstall_duration and
+            ((datetime.datetime.now() - start).total_seconds() >
+             cast(float, uninstall_duration.seconds())),
+            f"Uninstall timeout expired for {what}")
+        time.sleep(5)

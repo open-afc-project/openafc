@@ -19,12 +19,12 @@ import os
 import re
 import sys
 import time
-from typing import Any, cast, Dict, List, Optional
+from typing import Any, cast, Dict, List, Optional, Union
 import yaml
 
 from utils import ArgumentParserFromFile, ClusterContext, Duration, error, \
     error_if, execute, expand_filename, filter_args, parse_json_output, \
-    parse_kubecontext, SCRIPTS_DIR, yaml_load
+    parse_kubecontext, SCRIPTS_DIR, wait_termination, yaml_load
 
 DEFAULT_CONFIG = os.path.splitext(__file__)[0] + ".yaml"
 
@@ -41,10 +41,12 @@ class InstallComponent:
     name - Component name
 
     Private attributes:
-    _cfg       -- The whole config dictionary
-    _component -- Install component content as dictionary
+    _cfg             -- The whole config dictionary
+    _component       -- Install component content as dictionary
+    _cluster_context -- ClusterContext object
     """
-    def __init__(self, cfg: Dict[str, Any], name: str) -> None:
+    def __init__(self, cfg: Dict[str, Any], name: str,
+                 cluster_context: ClusterContext) -> None:
         """ Constructor
 
         Arguments:
@@ -55,6 +57,9 @@ class InstallComponent:
         self._cfg = cfg
         self.name = name
         self._component = self._cfg[KEY_INSTALL_COMPONENTS][self.name]
+        error_if(not self._component,
+                 f"Component '{self.name}' not found")
+        self._cluster_context = cluster_context
 
     def __getattr__(self, attr: str) -> Any:
         """ Install component attribute retrieval """
@@ -72,34 +77,48 @@ class InstallComponent:
         if isinstance(value, str):
             ret = ""
             prev_end = 0
-            for m in re.finditer(r"\{\{([a-zA-Z0-9_\-.]+)\}\}", value):
+            for m in re.finditer(r"\{\{([a-zA-Z0-9_:\-.]+)\}\}", value):
                 ret += value[prev_end: m.start()]
                 prev_end = m.end()
-                target = self._cfg
-                for attr in m.group(1).split("."):
-                    if isinstance(target, dict):
-                        error_if(
-                            attr not in target,
-                            f"Invalid item reference '{m.group(0)}' in "
-                            f"config: attribute '{attr}' doesn't point to "
-                            f"existing item")
-                        target = target[attr]
-                    elif isinstance(target, list):
-                        error_if(
-                            not re.match(r"^\d+$", attr),
-                            f"Invalid item reference '{m.group(0)}' in "
-                            f"config: '{attr}' is not a valid list index")
-                        idx = int(attr)
-                        error_if(
-                            not (0 <= idx < len(target)),
-                            f"Invalid item reference '{m.group(0)}' in "
-                            f"config: index '{idx}' is out of range")
-                        target = target[idx]
+                if ":" in m.group(1):
+                    op, params = m.group(1).split(":", maxsplit=1)
+                    if op == "context":
+                        if params == "kubectl":
+                            ret += \
+                                " ".join(self._cluster_context.kubectl_args())
+                        elif params == "helm":
+                            ret += \
+                                " ".join(self._cluster_context.helm_args())
+                        else:
+                            error(f"Unknown context format: {m.group(0)}")
                     else:
-                        error(
-                            f"Invalid item reference '{m.group(0)}' in "
-                            f"config: '{attr}' addresses nothing")
-                ret += str(target)
+                        error(f"Unknown expression: {m.group(0)}")
+                else:
+                    target = self._cfg
+                    for attr in m.group(1).split("."):
+                        if isinstance(target, dict):
+                            error_if(
+                                attr not in target,
+                                f"Invalid item reference '{m.group(0)}' in "
+                                f"config: attribute '{attr}' doesn't point to "
+                                f"existing item")
+                            target = target[attr]
+                        elif isinstance(target, list):
+                            error_if(
+                                not re.match(r"^\d+$", attr),
+                                f"Invalid item reference '{m.group(0)}' in "
+                                f"config: '{attr}' is not a valid list index")
+                            idx = int(attr)
+                            error_if(
+                                not (0 <= idx < len(target)),
+                                f"Invalid item reference '{m.group(0)}' in "
+                                f"config: index '{idx}' is out of range")
+                            target = target[idx]
+                        else:
+                            error(
+                                f"Invalid item reference '{m.group(0)}' in "
+                                f"config: '{attr}' addresses nothing")
+                    ret += str(target)
             ret += value[prev_end: len(value)]
             return ret
         return value
@@ -133,19 +152,41 @@ class InstallHandler(abc.ABC):
 
     def install(self) -> None:
         """ Performs installation. Base implementation contains common part """
-        print(f">>> Installing: {self._component.name}")
-        if self._component_installed():
-            print("Component already installed, skipping installation")
+        attempts = getattr(self._component, "attempts", 1)
+        for attempt in range(attempts):
+            print(f">>> Installing: {self._component.name}. "
+                  f"Attempt {attempt + 1} of {attempts}")
+            if self._component_installed():
+                print("Component already installed, skipping installation")
+                return
+            install_wait = \
+                Duration(getattr(self._component, "install_wait", None))
+            deadline: Optional[datetime.datetime] = \
+                (datetime.datetime.now() +
+                 datetime.timedelta(
+                     seconds=cast(Union[int, float],
+                                  install_wait.seconds()))) \
+                if install_wait else None
+            if not self._preinstall_impl():
+                continue
+            for cmd in getattr(self._component, "preinstall", []):
+                result = execute(cmd.lstrip("-"), fail_on_error=False)
+                if (not result) and (not cmd.startswith("-")):
+                    continue
+            if self._is_new_namespace and (not self._namespace_exists()):
+                assert isinstance(self._namespace, str)
+                execute(["kubectl", "create", "namespace", self._namespace] +
+                        self._cluster_context.kubectl_args())
+            if not self._install_impl():
+                continue
+            for cmd in getattr(self._component, "postinstall", []):
+                result = execute(cmd.lstrip("-"), fail_on_error=False)
+                if (not result) and (not cmd.startswith("-")):
+                    continue
+            if not self._wait_for_pod(deadline):
+                continue
             return
-        for cmd in getattr(self._component, "preinstall", []):
-            execute(cmd.lstrip("-"), fail_on_error=not cmd.startswith("-"))
-        if self._is_new_namespace and (not self._namespace_exists()):
-            assert isinstance(self._namespace, str)
-            execute(["kubectl", "create", "namespace", self._namespace] +
-                    self._cluster_context.kubectl_args())
-        self._install_impl()
-        for cmd in getattr(self._component, "postinstall", []):
-            execute(cmd.lstrip("-"), fail_on_error=not cmd.startswith("-"))
+        error("Execution failed")
 
     def uninstall(self) -> None:
         """ Perform uninstallation """
@@ -156,7 +197,10 @@ class InstallHandler(abc.ABC):
             execute(["kubectl", "delete", "namespace",
                      self._component.namespace] +
                     self._cluster_context.kubectl_args() +
-                    self._kubectl_uninstall_wait_args())
+                    self._kubectl_uninstall_wait_args(),
+                    fail_on_error=False)
+        for cmd in getattr(self._component, "postuninstall", []):
+            execute(cmd.lstrip("-"), fail_on_error=False)
 
     def _namespace_exists(self) -> bool:
         """ True if this item's namespace exists """
@@ -171,13 +215,52 @@ class InstallHandler(abc.ABC):
         return Duration(getattr(self._component, "uninstall_wait", None)).\
             kubectl_timeout()
 
+    def _wait_for_pod(self, deadline: Optional[datetime.datetime]) -> bool:
+        """ If component should waiyt for pod readiness on installation - do it
+        """
+        wait_pod = getattr(self._component, "wait_pod", None)
+        if not wait_pod:
+            return True
+        error_if(deadline is None,
+                 "'wait_pod' requires 'install_wait' to be specified")
+        assert deadline is not None
+        print(f"Waiting for pod '{wait_pod}*' to be ready")
+        while True:
+            if deadline <= datetime.datetime.now():
+                print("Timeout expired", file=sys.stderr)
+                return False
+            pod_infos: List[Dict[str, Any]] = \
+                [pod_info for pod_info in
+                 parse_json_output(
+                     ["kubectl", "get", "pods", "-o", "json"] +
+                     self._cluster_context.kubectl_args(
+                         namespace=self._namespace),
+                     echo=False)["items"]
+                 if pod_info["metadata"]["name"].startswith(wait_pod)]
+            error_if(len(pod_infos) > 1,
+                     f"More than one pod with name starting with '{wait_pod}' "
+                     f"found")
+            if (len(pod_infos) == 1) and \
+                    all(cs.get("ready") for cs in
+                        pod_infos[0].get("status", {}).
+                        get("containerStatuses", [])):
+                break
+            time.sleep(10)
+        return True
+
     def _component_installed(self) -> bool:
         """ True if component known to be installed """
         return False
 
+    def _preinstall_impl(self) -> bool:
+        """ Class-specific preinstallation operations
+        Returns True on success, False on fail """
+        return True
+
     @abc.abstractmethod
-    def _install_impl(self) -> None:
-        """ Class-specific installation operations """
+    def _install_impl(self) -> bool:
+        """ Class-specific installation operations
+        Returns True on success, False on fail """
         ...
 
     @abc.abstractmethod
@@ -219,11 +302,16 @@ class InstallHandler(abc.ABC):
 class ManifestInstallHandler(InstallHandler):
     """ Installs/uninstalls manifest component """
 
-    def _install_impl(self) -> None:
-        """ Class-specific installation operations """
-        execute(
-            ["kubectl", "create", "-f", self._manifest_name()] +
-            self._cluster_context.kubectl_args(namespace=self._namespace))
+    def _install_impl(self) -> bool:
+        """ Class-specific installation operations
+        Returns True on success, False on fail
+        """
+        if not execute(["kubectl", "create", "-f", self._manifest_name()] +
+                       self._cluster_context.kubectl_args(
+                           namespace=self._namespace),
+                       fail_on_error=False):
+            return False
+        return True
 
     def _uninstall_impl(self) -> None:
         """ Class-specific uninstallation operations """
@@ -231,17 +319,19 @@ class ManifestInstallHandler(InstallHandler):
             ["kubectl", "delete", "-f", self._manifest_name(),
              "--ignore-not-found"] +
             self._cluster_context.kubectl_args(namespace=self._namespace) +
-            self._kubectl_uninstall_wait_args())
+            self._kubectl_uninstall_wait_args(),
+            fail_on_error=False)
 
     def _component_installed(self) -> bool:
         """ True if component known to be installed """
-        if not hasattr(self._component, "has_service"):
+        if not hasattr(self._component, "manifest_check"):
             return False
         return \
             cast(bool,
                  execute(
-                     ["kubectl", "get", "service",
-                      self._component.has_service] +
+                     ["kubectl", "get",
+                      self._component.manifest_check["kind"],
+                      self._component.manifest_check["name"]] +
                      self._cluster_context.kubectl_args(
                          namespace=self._namespace),
                      fail_on_error=False, hide_stderr=True))
@@ -254,11 +344,9 @@ class ManifestInstallHandler(InstallHandler):
 class HelmInstallHandler(InstallHandler):
     """ Installs/uninstalls helm install item """
 
-    def _install_impl(self) -> None:
-        """ Class-specific installation operations """
-        error_if(not hasattr(self._component, "helm_release"),
-                 f"'helm_release' should be specified for component "
-                 f"'{self._component.name}'")
+    def _preinstall_impl(self) -> bool:
+        """ Class-specific preinstallation operations
+        Returns True on success, False on fail """
         helmchart = self._component.helm_chart
         if hasattr(self._component, "helm_repo"):
             m = re.match("^(.+?)/", helmchart)
@@ -269,7 +357,17 @@ class HelmInstallHandler(InstallHandler):
             execute(["helm", "repo", "add", m.group(1),
                      self._component.helm_repo])
             execute(["helm", "repo", "update"])
-        else:
+        return True
+
+    def _install_impl(self) -> bool:
+        """ Class-specific installation operations
+       Returns True on success, False on fail
+       """
+        error_if(not hasattr(self._component, "helm_release"),
+                 f"'helm_release' should be specified for component "
+                 f"'{self._component.name}'")
+        helmchart = self._component.helm_chart
+        if not hasattr(self._component, "helm_repo"):
             helmchart = expand_filename(helmchart, root=SCRIPTS_DIR)
         helm_args = \
             ["helm", "upgrade", "--install", self._component.helm_release,
@@ -285,7 +383,7 @@ class HelmInstallHandler(InstallHandler):
         helm_args += getattr(self._component, "args", []) + \
             Duration(getattr(self._component, "helm_wait", None)).\
             helm_timeout()
-        execute(helm_args)
+        return cast(bool, execute(helm_args, fail_on_error=False))
 
     def _uninstall_impl(self) -> None:
         """ Class-specific uninstallation operations """
@@ -301,51 +399,37 @@ class HelmInstallHandler(InstallHandler):
             helm_args = \
                 ["helm", "uninstall", self._component.helm_release] + \
                 self._cluster_context.helm_args(namespace=self._namespace)
-            execute(helm_args)
+            execute(helm_args, fail_on_error=False)
             uninstall_wait = \
                 Duration(getattr(self._component, "uninstall_wait", None))
             if uninstall_wait:
-                duration = uninstall_wait.seconds()
-                assert duration is not None
-                start = datetime.datetime.now()
-                time.sleep(1)
-                while True:
-                    if "Terminating" not in \
-                        cast(
-                            str,
-                            execute(
-                                ["kubectl", "get", "all"] +
-                                self._cluster_context.kubectl_args(
-                                    namespace=self._namespace),
-                                return_output=True)):
-                        break
-                    error_if(
-                        (datetime.datetime.now() - start).total_seconds() >
-                        duration,
-                        f"Uninstall timeout expired for component "
-                        f"'{self._component.name}'")
-                    time.sleep(5)
+                wait_termination(what=f"component {self._component.name}",
+                                 cluster_context=self._cluster_context,
+                                 namespace=self._namespace,
+                                 uninstall_duration=uninstall_wait)
 
-    # def _component_installed(self) -> bool:
-    #     """ True if component known to be installed """
-    #     installed_charts = \
-    #         parse_json_output(
-    #             ["helm", "list", "-o", "json"] +
-    #             self._cluster_context.helm_args(namespace=self._namespace))
-    #     return any(chartinfo.get("name") == self._component.helm_release
-    #                for chartinfo in installed_charts)
+    def _component_installed(self) -> bool:
+        """ True if component known to be installed """
+        installed_charts = \
+            parse_json_output(
+                ["helm", "list", "-o", "json"] +
+                self._cluster_context.helm_args(namespace=self._namespace))
+        return any(chartinfo.get("name") == self._component.helm_release
+                   for chartinfo in installed_charts)
 
 
 class DummyInstallHandler(InstallHandler):
     """ Installs/uninstalls dummy (neither of the above) component """
 
-    def _install_impl(self) -> None:
-        """ Class-specific installation operations """
-        pass
+    def _install_impl(self) -> bool:
+        """ Class-specific installation operations
+        Returns True on success, False on fail
+        """
+        return True
 
     def _uninstall_impl(self) -> None:
         """ Class-specific uninstallation operations """
-        pass
+        ...
 
 
 def recursive_merge(base: Any, override: Any) -> Any:
@@ -469,14 +553,16 @@ def main(argv: List[str]) -> None:
                 (len(install_list) - 1) if args.uninstall else 0,
                 -1 if args.uninstall else len(install_list),
                 -1 if args.uninstall else 1):
-        component = InstallComponent(cfg=cfg, name=install_list[item_idx])
+        component = InstallComponent(cfg=cfg, name=install_list[item_idx],
+                                     cluster_context=cluster_context)
         namespace: Optional[str] = getattr(component, "namespace", None)
         install_handler = \
             InstallHandler.create(
                 component=component,
                 is_new_namespace=bool(namespace) and
                 (not any(
-                    getattr(InstallComponent(cfg=cfg, name=install_list[i]),
+                    getattr(InstallComponent(cfg=cfg, name=install_list[i],
+                                             cluster_context=cluster_context),
                             "namespace", None) == namespace
                     for i in range(item_idx))),
                 cluster_context=cluster_context)
