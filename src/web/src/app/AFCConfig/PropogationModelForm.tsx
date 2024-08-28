@@ -101,7 +101,7 @@ export class PropogationModelForm extends React.PureComponent<{
           win2ProbLosThreshold: 10,
           win2ConfidenceCombined: 50,
           win2ConfidenceLOS: 50,
-          win2ConfidenceNLOS:50,
+          win2ConfidenceNLOS: 50,
           itmConfidence: 50,
           itmReliability: 50,
           p2108Confidence: 50,
