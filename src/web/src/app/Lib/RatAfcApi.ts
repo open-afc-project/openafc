@@ -19,7 +19,7 @@ import { guiConfig, getDefaultAfcConf, getCSRF } from './RatApi';
 export const spectrumInquiryRequest = async (
   request: AvailableSpectrumInquiryRequest,
 ): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> => {
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
 
   let resp = await fetch(guiConfig.rat_afc + '?debug=True&gui=True', {
     method: 'POST',
@@ -48,7 +48,7 @@ export const spectrumInquiryRequestByString = async (
   version: string,
   requestAsJsonString: string,
 ): Promise<RatResponse<AvailableSpectrumInquiryResponseMessage>> => {
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
   let resp = await fetch(guiConfig.rat_afc + '?debug=True&gui=True', {
     method: 'POST',
     headers: {
