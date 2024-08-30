@@ -207,7 +207,7 @@ def create_app(config_override=None):
             from flask_login import current_user
             if (flask.request.method == 'POST') and \
                     (current_user.is_authenticated) and \
-                    (flask.request.headers.get('X-Csrf-Token') != \
+                    (flask.request.headers.get('X-Csrf-Token') !=
                      flask.request.cookies.get('csrf_token')):
                 LOGGER.error(f"CSRF Token mismatch. Token from header: "
                              f"{flask.request.headers.get('X-Csrf-Token')}, "
