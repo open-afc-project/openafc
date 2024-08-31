@@ -1115,8 +1115,11 @@ export const importCache = (s: { [k: string]: any }) => Object.assign(applicatio
 export const clearCache = (): void => Object.keys(applicationCache).forEach((key) => delete applicationCache[key]);
 
 export const getCSRF = (): string => {
-  let csrf_token = document.cookie.split('; ').find((row) => row.startsWith('csrf_token='))?.split('=')[1];
-  return (csrf_token === undefined) ? '' : csrf_token;
+  let csrf_token = document.cookie
+    .split("; ")
+    .find((row) => row.startsWith("csrf_token="))
+    ?.split("=")[1];
+  return csrf_token === undefined ? "" : csrf_token;
 };
 
 export const heatMapRequestObject = (
