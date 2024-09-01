@@ -1116,10 +1116,10 @@ export const clearCache = (): void => Object.keys(applicationCache).forEach((key
 
 export const getCSRF = (): string => {
   let csrf_token = document.cookie
-    .split("; ")
-    .find((row) => row.startsWith("csrf_token="))
-    ?.split("=")[1];
-  return csrf_token === undefined ? "" : csrf_token;
+    .split('; ')
+    .find((row) => row.startsWith('csrf_token='))
+    ?.split('=')[1];
+  return csrf_token === undefined ? '' : csrf_token;
 };
 
 export const heatMapRequestObject = (
