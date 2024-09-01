@@ -35,6 +35,11 @@ SECRET_KEY = None  # Must be set in app config
 # postgresql://[user[:password]@][netloc][:port][/dbname][?param1=value1&...]
 SQLALCHEMY_DATABASE_URI = None  # Must be set in app config
 SQLALCHEMY_TRACK_MODIFICATIONS = False  # Avoids SQLAlchemy warning
+SQLALCHEMY_ENGINE_OPTIONS = \
+    {
+        # Avoids EOF on stale connections that causes Error 500 in Web UI
+        'pool_pre_ping': True,
+    }
 
 # Flask-User settings
 USER_APP_NAME = "AFC"  # Shown in and email templates and page footers
