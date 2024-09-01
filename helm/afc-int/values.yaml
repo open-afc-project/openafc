@@ -183,6 +183,11 @@ staticVolumes:
     #   # Path better be overridden, type set to bypass creation if overridden
     #   path: /tmp
     #   type: DirectoryOrCreate
+  objst-storage:
+    # hostPath:
+    #   # Path better be overridden, type set to bypass creation if overridden
+    #   path: /storage
+    #   type: DirectoryOrCreate
 
 # Dictionary of components. Component roughly corresponds to Docker Compose
 # service. Keys in dictionary are Docker Compose service names, plus there is
@@ -492,6 +497,8 @@ components:
       - ratapi-configurator
       - oidc-configurator
       - objst-common
+    staticVolumeMounts:
+        objst-storage: /storage
     mountedSecrets:
       - ratdb-password
       - flask-secret-key
