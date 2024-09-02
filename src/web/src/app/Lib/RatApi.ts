@@ -195,7 +195,7 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
   scanPointBelowGroundMethod: 'truncate',
   polarizationMismatchLoss: {
     kind: 'Fixed Value',
-    value: 3,
+    value: 0,
   },
   bodyLoss: {
     kind: 'Fixed Value',
@@ -207,16 +207,16 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     value: 0,
   },
   receiverFeederLoss: {
-    IDU: 3,
+    IDU: 0,
     ODU: 0,
-    UNKNOWN: 3,
+    UNKNOWN: 0,
   },
   fsReceiverNoise: {
     freqList: [6425],
     noiseFloorList: [-110, -109.5],
   },
   threshold: -6,
-  maxLinkDistance: 150,
+  maxLinkDistance: 200,
   maxEIRP: 36,
   minEIRPIndoor: 21,
   minEIRPOutdoor: -100,
@@ -224,8 +224,8 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
   propagationModel: {
     kind: 'ISED DBS-06',
     win2ConfidenceCombined: 16,
-    win2ConfidenceLOS: 50,
-    win2ConfidenceNLOS: 50,
+    win2ConfidenceLOS: 16,
+    win2ConfidenceNLOS: 16,
     winner2LOSOption: 'CDSM',
     win2UseGroundDistance: false,
     fsplUseGroundDistance: false,
@@ -262,7 +262,7 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
     maxFsAglHeight: 6,
   },
   enableMapInVirtualAp: false,
-  channelResponseAlgorithm: 'pwr',
+  channelResponseAlgorithm: 'psd',
   visibilityThreshold: -6,
   version: guiConfig.version,
   allowScanPtsInUncReg: false,
@@ -288,7 +288,7 @@ const defaultAfcConfCanada: () => AFCConfigFile = () => ({
   regionDir: 'rat_transfer/population',
   worldPopulationFile: 'rat_transfer/population/gpw_v4_population_density_rev11_2020_30_sec.tif',
   cdsmLOSThr: 0.5,
-  roundPSDEIRPFlag: false,
+  roundPSDEIRPFlag: true,
 });
 
 const defaultAfcConfBrazil: () => AFCConfigFile = () => ({
