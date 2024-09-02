@@ -182,7 +182,9 @@ export interface FSPL {
 export interface Win2ItmDb {
   kind: 'ITM with building data';
   win2ProbLosThreshold: number;
-  win2Confidence: number;
+  win2ConfidenceCombined: number;
+  win2ConfidenceLOS?: number;
+  win2ConfidenceNLOS?: number;
   itmConfidence: number;
   itmReliability: number;
   p2108Confidence: number;
@@ -191,7 +193,9 @@ export interface Win2ItmDb {
 export interface Win2ItmClutter {
   kind: 'ITM with no building data';
   win2ProbLosThreshold: number;
-  win2Confidence: number;
+  win2ConfidenceCombined: number;
+  win2ConfidenceLOS?: number;
+  win2ConfidenceNLOS?: number;
   itmConfidence: number;
   itmReliability: number;
   p2108Confidence: number;
