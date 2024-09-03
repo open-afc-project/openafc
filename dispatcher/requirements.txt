@@ -2,5 +2,5 @@ amqp==5.1.1
 gevent==23.9.1
 greenlet==2.0.2
 kombu==5.2.4
-requests==2.32.2
+requests==2.32.3
 vine==5.0.0
