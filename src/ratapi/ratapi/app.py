@@ -62,7 +62,7 @@ def create_app(config_override=None):
 
     # Child members
     from . import views, util
-    from flask_wtf.csrf import CSRFProtect
+    from flask_wtf.csrf import generate_csrf
 
     flaskapp = flask.Flask(__name__.split('.')[0])
     flaskapp.response_class = util.Response
@@ -200,11 +200,26 @@ def create_app(config_override=None):
 
     # Static file dispatchers
     if flaskapp.config['AFC_APP_TYPE'] == 'server':
-        csrf = CSRFProtect(flaskapp)
 
         @flaskapp.before_request
-        def check_csrf():
-            csrf.protect()
+        def check_csrf_token():
+            import werkzeug
+            from flask_login import current_user
+            if (flask.request.method == 'POST') and \
+                    (current_user.is_authenticated) and \
+                    (flask.request.headers.get('X-Csrf-Token') !=
+                     flask.request.cookies.get('csrf_token')):
+                LOGGER.error(f"CSRF Token mismatch. Token from header: "
+                             f"{flask.request.headers.get('X-Csrf-Token')}, "
+                             f"token from cookie: "
+                             f"{flask.request.cookies.get('csrf_token')}")
+                raise werkzeug.exceptions.BadRequest("CSRF token mismatch")
+
+        @flaskapp.after_request
+        def make_csrf_cookie(response):
+            from flask_login import current_user
+            response.set_cookie('csrf_token', generate_csrf())
+            return response
 
         if not os.path.exists(os.path.join(
                 nfs_mount_path, 'rat_transfer', 'frequency_bands')):

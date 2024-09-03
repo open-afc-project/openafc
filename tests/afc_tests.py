@@ -54,7 +54,6 @@ AFC_URL_SUFFIX = '/fbrat/ap-afc/'
 AFC_REQ_NAME = 'availableSpectrumInquiry'
 AFC_WEBUI_URL_SUFFIX = '/fbrat/ratapi/v1/'
 AFC_WEBUI_REQ_NAME = 'availableSpectrumInquirySec'
-AFC_WEBUI_TOKEN = 'about_csrf'
 headers = {'content-type': 'application/json'}
 
 AFC_TEST_DB_FILENAME = 'afc_input.sqlite3'
@@ -450,6 +449,28 @@ def send_email(cfg):
         server.sendmail(sender, recipient, message.as_string())
 
 
+def _resubmit_cookies(ssn):
+    """ Part of cookie drop fix
+
+    There are two problems with requests.Session in this script:
+    1. External cookie loss. 'session' cookie never get back to rat_server.
+       Reason is not yet known.
+       To mitigate this problem this function reads all cookies and resubmits
+       them with path of /, all domains.
+       Maybe more nuanced appropach may do it better, but for purpose of this
+       script this is, probably, good enough
+    2. Internal cookie loss. For some reason session.post() on sign in causes
+       two spurious GET. As a result all-important session cookie with login
+       sussess gets lost - it even is not passed to first GET.
+       To mitigate this problem 'allow_redirects=False' passed to all session
+       get()/post() calls
+    """
+    saved_cookies = dict(ssn.cookies.get_dict())
+    ssn.cookies.clear()
+    for name, value in saved_cookies.items():
+        ssn.cookies.set(name, value)
+
+
 def _send_recv(cfg, req_data, ssn=None):
     """Send AFC request and receiver it's response"""
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
@@ -474,7 +495,11 @@ def _send_recv(cfg, req_data, ssn=None):
         }
         headers['Accept-Encoding'] = 'gzip, defalte'
         headers['Referer'] = cfg['base_url'] + 'fbrat/www/index.html'
-        headers['X-Csrf-Token'] = cfg['token']
+
+        csrf_token = ssn.cookies.get('csrf_token', default='')
+        if csrf_token:
+            headers['X-Csrf-Token'] = csrf_token
+
         app_log.debug(
             f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
             f"Cookies: {requests.utils.dict_from_cookiejar(ssn.cookies)}")
@@ -514,7 +539,10 @@ def _send_recv(cfg, req_data, ssn=None):
             headers=headers,
             timeout=600,  # 10 min
             cert=cli_certs,
+            allow_redirects=False,
             verify=ser_cert if cfg['verif'] else False)
+        if cfg['webui']:
+            _resubmit_cookies(ssn)
         rawresp.raise_for_status()
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as err:
@@ -543,11 +571,10 @@ def _send_recv(cfg, req_data, ssn=None):
     return resp
 
 
-def _send_recv_token(cfg, ssn):
-    """Making login, open session and getting CSRF token"""
+def _login(cfg, ssn):
+    """ Making login, opening session """
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()")
 
-    token = ''
     ser_cert = ()
     cli_certs = None
     app_log.debug(f"=== ser {type(ser_cert)}")
@@ -571,7 +598,7 @@ def _send_recv_token(cfg, ssn):
                 cfg['verif'] = True
             else:
                 app_log.error(f"Missing CA certificate while forced.")
-                return token
+                return
 
     app_log.debug(f"Client {cli_certs}, Server {ser_cert}")
 
@@ -589,19 +616,21 @@ def _send_recv_token(cfg, ssn):
         rawresp = ssn.get(url_login,
                           stream=False,
                           cert=cli_certs,
+                          allow_redirects=False,
                           verify=ser_cert if cfg['verif'] else False)
+        _resubmit_cookies(ssn)
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as err:
         app_log.error(f"{err}")
-        return token
-    soup = BeautifulSoup(rawresp.text, 'html.parser')
-    inp_tkn = soup.find('input', id='csrf_token')
+        return
+    csrf_token = ssn.cookies.get('csrf_token', default='')
+    if not csrf_token:
+        app_log.error("CSRF token not found in login response")
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
                   f"<--- Status {rawresp.status_code}\n"
                   f"<--- Headers {rawresp.headers}\n"
                   f"<--- Cookies: {ssn.cookies}\n"
-                  f"<--- Input: {inp_tkn}\n")
-    token = inp_tkn.get('value')
+                  f"<--- CSRF token: {csrf_token}\n")
 
     # fetch username and password from test db
     con = sqlite3.connect(cfg['db_filename'])
@@ -615,30 +644,33 @@ def _send_recv_token(cfg, ssn):
     form_data = {
         'next': '/',
         'reg_next': '/',
-        'csrf_token': token,
+        'csrf_token': csrf_token,
         'username': found_json['username'],
         'password': found_json['password']
     }
     ssn.headers.update({
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Referer': url_login
+        'Referer': url_login,
+        'X-Csrf-Token': csrf_token
     })
     try:
         rawresp = ssn.post(url_login,
                            data=form_data,
                            stream=False,
                            cert=cli_certs,
+                           allow_redirects=False,
                            verify=ser_cert if cfg['verif'] else False)
+        _resubmit_cookies(ssn)
     except (requests.exceptions.HTTPError,
             requests.exceptions.ConnectionError) as err:
         app_log.error(f"{err}")
-        return token
+        return
     app_log.debug(f"({os.getpid()}) {inspect.stack()[0][3]}()\n"
                   f"<--- Status {rawresp.status_code}\n"
                   f"<--- Headers {rawresp.headers}\n"
                   f"<--- Cookies: {ssn.cookies}\n")
 
-    return token
+    return
 
 
 def make_db(filename):
@@ -1636,7 +1668,7 @@ def _run_tests(cfg, reqs, resps, comparator, ids, test_cases):
     ssn = None
     if cfg['webui'] is True:
         ssn = requests.Session()
-        cfg['token'] = _send_recv_token(cfg, ssn)
+        _login(cfg, ssn)
 
     for test_case in test_cases:
         # Default reset test_res value
@@ -1944,8 +1976,6 @@ def parse_run_test_args(cfg):
         if cfg['webui'] is False:
             cfg['url_path'] += AFC_URL_SUFFIX + AFC_REQ_NAME
         else:
-            cfg['url_token'] = cfg['url_path'] + AFC_WEBUI_URL_SUFFIX +\
-                AFC_WEBUI_TOKEN
             cfg['url_path'] += AFC_URL_SUFFIX + AFC_WEBUI_REQ_NAME
     return AFC_OK
 
