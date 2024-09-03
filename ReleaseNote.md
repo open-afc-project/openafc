@@ -1,4 +1,21 @@
 # Release Note
+## **Version and Date**
+|Version|**2&136*|
+| :- | :- |
+|**Date**|**08/28/2024**|
+
+## **Issues Addressed**
+ * 2: Migrated - 'ITM with building data' propagation model is broken (837)
+ * 136: Update Canada default afc-config 
+
+## **Interface Changes**
+ * There were changes to the UI code to define default afc-config for Canada (per issue 136)
+
+## **Testing Done**
+ * 2: Ran a small test and confirmed that ITM with LiDAR is used as set in afc-config. The test configuration and result are attached to the issue 2.
+ * 136: Confirmed that the default Canada afc-config is correct. This file is attached to issue 136 after the change.
+
+## **Open Issues** 
 
 ## **Version and Date**
 |Version|**105*|
