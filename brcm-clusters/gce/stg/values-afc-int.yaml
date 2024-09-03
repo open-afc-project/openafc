@@ -85,6 +85,10 @@ staticVolumes:
     nfs:
       server: 10.255.170.2
       path: /vol1/rat_transfer
+  objst-storage:
+    nfs:
+      server: 10.255.170.2
+      path: /vol1/storage
 
 # Redirecting all password secrets to 'postgres' user password secret
 externalSecrets:

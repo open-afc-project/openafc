@@ -12,3 +12,5 @@ components:
       annotations:
         networking.gke.io/internal-load-balancer-allow-global-access: "true"
         networking.gke.io/load-balancer-type: Internal
+    env:
+      AFC_SERVER_NAME: test.afc.broadcom.com  # TODO: should be afc.broadcom.com once we go live
