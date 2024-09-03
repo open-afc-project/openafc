@@ -62,7 +62,7 @@ export const getMinimumEIRP = () =>
  * @param limit the new EIRP value
  */
 export const setMinimumEIRP = async (limit: Limit) => {
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
   return fetch(guiConfig.admin_url.replace('-1', 'eirp_min'), {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
@@ -121,7 +121,7 @@ export const getUser = (id: number) =>
  * @param user User to replace with
  */
 export const updateUser = async (user: { email: string; password: string; id: number; active: boolean }) => {
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
   return fetch(guiConfig.admin_url.replace('-1', String(user.id)), {
     method: 'POST',
     body: JSON.stringify(Object.assign(user, { setProps: true })),
@@ -135,7 +135,7 @@ export const updateUser = async (user: { email: string; password: string; id: nu
  * @param role role to add
  */
 export const addUserRole = async (id: number, role: Role) => {
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
   return fetch(guiConfig.admin_url.replace('-1', String(id)), {
     method: 'POST',
     body: JSON.stringify({ addRole: role }),
@@ -157,7 +157,7 @@ export const addUserRole = async (id: number, role: Role) => {
  * @param role role to remove
  */
 export const removeUserRole = async (id: number, role: Role) => {
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
   return fetch(guiConfig.admin_url.replace('-1', id.toString()), {
     method: 'POST',
     body: JSON.stringify({ removeRole: role }),
@@ -178,7 +178,7 @@ export const removeUserRole = async (id: number, role: Role) => {
  * @param id user'd Id
  */
 export const deleteUser = async (id: number) => {
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
   return fetch(guiConfig.admin_url.replace('-1', String(id)), {
     method: 'DELETE',
     headers: { 'X-CSRF-Token': csrf_token },
@@ -219,7 +219,7 @@ export const getAccessPointsDeny = (userId?: number) =>
  * @param userId owner of new access point
  */
 export const addAccessPointDeny = async (ap: AccessPointModel, userId: number) => {
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
 
   return fetch(guiConfig.ap_deny_admin_url.replace('-1', String(userId)), {
     method: 'PUT',
@@ -244,7 +244,7 @@ export const addAccessPointDeny = async (ap: AccessPointModel, userId: number) =
  * @param userId owner of new access point
  */
 export const putAccessPointDenyList = async (ap: AccessPointListModel, userId: number) => {
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
   return fetch(guiConfig.ap_deny_admin_url.replace('-1', String(userId)), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
@@ -268,7 +268,7 @@ export const putAccessPointDenyList = async (ap: AccessPointListModel, userId: n
  * @param userId who creates the new mtls cert
  */
 export const addMTLS = async (mtls: MTLSModel, userId: number) => {
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
   return fetch(guiConfig.mtls_admin_url.replace('-1', String(userId)), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf_token },
@@ -292,7 +292,7 @@ export const addMTLS = async (mtls: MTLSModel, userId: number) => {
  */
 export const deleteMTLSCert = async (id: number) => {
   // here the id in the url is the mtls id, not the user id
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
   return fetch(guiConfig.mtls_admin_url.replace('-1', String(id)), {
     method: 'DELETE',
     headers: { 'X-CSRF-Token': csrf_token },
@@ -367,7 +367,7 @@ export const getDeniedRegionsCsvFile = (regionStr: string) => {
 // Update the denied regions for a given region
 export const updateDeniedRegions = async (records: DeniedRegion[], regionStr: string) => {
   let body = mapDeniedRegionToCsv(records, regionStr, true);
-  let csrf_token = await getCSRF();
+  let csrf_token = getCSRF();
 
   return fetch(guiConfig.dr_admin_url.replace('XX', regionStr), {
     method: 'PUT',
