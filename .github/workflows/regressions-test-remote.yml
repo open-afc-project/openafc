@@ -109,7 +109,7 @@ jobs:
         ${{ github.workspace }}/${{ env.LREGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} ${{ env.TEST_PORT }}
     - name: run ngnx-rat_server-rmq-worker path tests
       run: |
-        ${{ github.workspace }}/${{ env.LREGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} ${{ env.TEST_PORT }} https 8 --webui
+        ${{ github.workspace }}/${{ env.LREGRD }}/run_tests.sh ${{ github.workspace }} afc-regression-test ${{ secrets.AFC_DEV_SERVER }} ${{ env.TEST_PORT }} https 8 "AFCS.SRS.1,AFCS.URS.1,AFCS.FSP.1,AFCS.IBP.1,AFCS.SIP.1,BRCM.EXT_FSP.1" "--webui"
   # }run tests
 
 # stop dev srvr {
