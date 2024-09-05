@@ -13,7 +13,8 @@ addr=${3}
 port=${4:-443}
 prot=${5:-"https"}
 burst=${6:-8}
-ext_args=${7}
+testcase_ids=${7}
+ext_args=${8}
 ap_count=$(docker run --rm ${di_name} --cmd get_nbr_testcases;echo $?)
 
 source $wd/tests/regression/regression.sh
@@ -27,30 +28,33 @@ check_retval() {
   fi
 }
 
+verify_tls=''
+if [ "$prot" == "https" ]; then
+    verify_tls='--verif'
+fi
+echo "verify_tls - $verify_tls"
+
+afc_tests() {
+    docker run --rm ${di_name} --addr=${addr} --port=${port} --prot=${prot} \
+        --cmd=run --prefix_cmd  /usr/app/certs.sh cert_client \
+        ${verify_tls} ${ext_args} \
+        --cli_cert /usr/app/test_cli/test_cli_crt.pem \
+        --cli_key /usr/app/test_cli/test_cli_key.pem "$@"
+
+}
+
 loop() {
     start=0
     max=${1}
     step=${2:-10}
     s=${start}
-    verify_tls=''
-    if [ "$prot" == "https" ]; then
-        verify_tls='--verif'
-    fi
-
-    echo "verify_tls - $verify_tls"
-
     while [ $s -le $max ]
     do
         e=$(($((s + ${step}))<=${max} ? $((s + ${step})) : ${max}))
         echo "from $s  to $e"
         # run processes and store pids in array
         for i in `seq $((s+1)) ${e}`; do
-            docker run --rm ${di_name} --addr=${addr} --port=${port} \
-                --prot=${prot} --cmd=run --testcase_indexes=${i} \
-                --prefix_cmd  /usr/app/certs.sh cert_client \
-                ${verify_tls} ${ext_args} \
-                --cli_cert /usr/app/test_cli/test_cli_crt.pem \
-                --cli_key /usr/app/test_cli/test_cli_key.pem &
+            afc_tests --testcase_indexes=${i} &
             pids+=( $! )
         done
         s=$((s + ${step}))
@@ -65,7 +69,12 @@ loop() {
 }
 
 cd $wd
-loop $ap_count ${burst}
+if [ "${testcase_ids}" == "" ]; then
+    loop $ap_count ${burst}
+else
+    afc_tests --testcase_ids=${testcase_ids}
+    check_retval $?
+fi
 
 
 # Local Variables:
