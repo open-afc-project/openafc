@@ -113,8 +113,8 @@ def main(argv: List[str]) -> None:
         "--access_log", action="store_true",
         help="Enables dispatcher access log")
     argument_parser.add_argument(
-        "--internal", action="store_true",
-        help="Only reloads (upgrades) internal AFC helmchart")
+        "--no_prerequisites", action="store_true",
+        help="Only reloads (upgrades) top-level AFC helmcharts")
     argument_parser.add_argument(
         "--source_root", metavar="SOURCE_ROOT_DIR",
         default=DEFAULT_SOURCE_ROOT,
@@ -129,7 +129,7 @@ def main(argv: List[str]) -> None:
             argv + shlex.split(os.environ.get(PARAM_ENV, "")))
 
     bin_dir = os.path.join(args.source_root, "helm/bin")
-    if not args.internal:
+    if not args.no_prerequisites:
         execute([os.path.join(bin_dir, "k3d_registry.py")])
         execute([os.path.join(bin_dir, "k3d_cluster_create.py"),
                  "--expose", args.expose, args.cluster])

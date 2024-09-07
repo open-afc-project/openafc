@@ -25,7 +25,8 @@ PARAM_ENV = "AFC_START_ARGS"
 def start_cluster(int_ext: str, cluster_subdir: str, context: str,
                   release: str, source_root: Optional[str],
                   install_prerequisites: bool, install_helm: bool,
-                  print_ips: bool, extra_args: List[str]) -> None:
+                  print_ips: bool, extra_args: List[str],
+                  extra_cfg: Optional[List[str]]) -> None:
     """ Install prerequisites and AFC helmcharts in internal or external
     cluster
 
@@ -40,8 +41,18 @@ def start_cluster(int_ext: str, cluster_subdir: str, context: str,
     install_helm          -- True to install AFC helmcharts
     print_ips             -- True to print IPs
     extra_args            -- Additional arguments for helm_install... script
+    extra_cfg             -- Values for --extra_cfg parameters for
+                             install_prerequisites script. Filenames without
+                             directory assumed to e in 'cluxster_subdir'
     """
     if install_prerequisites:
+        ec = \
+            [cluster_filename(cluster_subdir, VALUES_AFC_COMMON_YAML),
+             cluster_filename(cluster_subdir,
+                              f"install-prerequisites-cfg-{int_ext}.yaml")] + \
+            [(fn if os.path.dirname(fn)
+              else cluster_filename(cluster_subdir, fn))
+             for fn in (extra_cfg or [])]
         execute(
             [helm_bin(source_root, "install_prerequisites.py"),
              "--context", context,
@@ -49,7 +60,8 @@ def start_cluster(int_ext: str, cluster_subdir: str, context: str,
              cluster_filename(cluster_subdir, VALUES_AFC_COMMON_YAML),
              "--extra_cfg",
              cluster_filename(cluster_subdir,
-                              f"install-prerequisites-cfg-{int_ext}.yaml")])
+                              f"install-prerequisites-cfg-{int_ext}.yaml")] +
+             sum([["--extra_cfg", fn] for fn in ec], []))
     if install_helm:
         execute(
             [helm_bin(source_root, f"helm_install_{int_ext}.py"),
@@ -115,8 +127,8 @@ def main(argv: List[str]) -> None:
         "--max_workers", metavar="MAX_WORKER_PODS", type=int,
         help="Maximum number of worker pods to set for autoscaler")
     argument_parser.add_argument(
-        "--internal", action="store_true",
-        help="Only reloads (upgrades) internal AFC helmchart")
+        "--no_prerequisites", action="store_true",
+        help="Only reloads (upgrades) top-level AFC helmcharts")
     argument_parser.add_argument(
         "--source_root", metavar="SOURCE_ROOT_DIR",
         default=DEFAULT_SOURCE_ROOT,
@@ -128,6 +140,16 @@ def main(argv: List[str]) -> None:
     argument_parser.add_argument(
         "--set_ext", metavar="VA.RI.AB.LE=VALUE", action="append", default=[],
         help="Additional setting for values.yaml of external AFC helmchart")
+    argument_parser.add_argument(
+        "--extra_cfg_int", metavar="FILENAME", action="append",
+        help="--extra_cfg for install_prerequisites.py of internal cluster. "
+        "May be specified several times. If filename has no directory name - "
+        "it is assumed top be in subdirectory of cluster-specific files")
+    argument_parser.add_argument(
+        "--extra_cfg_ext", metavar="FILENAME", action="append",
+        help="--extra_cfg for install_prerequisites.py of external cluster. "
+        "May be specified several times. If filename has no directory name - "
+        "it is assumed top be in subdirectory of cluster-specific files")
     argument_parser.add_argument(
         "CLUSTER",
         choices=cluster_values(),
@@ -145,24 +167,28 @@ def main(argv: List[str]) -> None:
     start_cluster(
         int_ext="int", cluster_subdir=args.CLUSTER,
         context=args.context_int, release=args.release,
-        source_root=args.source_root, install_prerequisites=not args.internal,
+        source_root=args.source_root,
+        install_prerequisites=not args.no_prerequisites,
         install_helm=True, print_ips=False,
         extra_args=optional_args(
             [("--tag", args.tag, args.tag),
              ("--msghnd", None, args.msghnd),
              ("--max_workers", str(args.max_workers), args.max_workers)]) +
-        sum([["--set", s] for s in args.set_int], []))
+        sum([["--set", s] for s in args.set_int], []),
+        extra_cfg=args.extra_cfg_int)
     start_cluster(
         int_ext="ext", cluster_subdir=args.CLUSTER,
         context=args.context_ext, release=args.release,
-        source_root=args.source_root, install_prerequisites=not args.internal,
-        install_helm=not args.internal, print_ips=True,
+        source_root=args.source_root,
+        install_prerequisites=not args.no_prerequisites,
+        install_helm=True, print_ips=True,
         extra_args=optional_args(
             [("--tag", args.tag, args.tag),
              ("--http", None, args.http),
              ("--mtls", None, args.mtls),
              ("--access_log", None, args.access_log)]) +
-        sum([["--set", s] for s in args.set_ext], []))
+        sum([["--set", s] for s in args.set_ext], []),
+        extra_cfg=args.extra_cfg_ext)
 
 
 if __name__ == "__main__":
