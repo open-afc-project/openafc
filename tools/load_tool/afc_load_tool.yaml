@@ -453,15 +453,15 @@ rest_api:
 
     # Make AFC Request via msghnd
     afc_req:
-        url: http://msghnd:8000/fbrat/ap-afc/availableSpectrumInquiry
+        url: http://afcserver:8000/fbrat/ap-afc/availableSpectrumInquiry
 
     # Make AFC Request via dispatcher
     afc_req_dispatcher:
         url: http://dispatcher/fbrat/ap-afc/availableSpectrumInquiry
 
-    # Msghnd endpoint to use for network load test
-    msghnd_get:
-        url: http://msghnd:8000/fbrat/ap-afc/healthy
+    # AFC Server endpoint to use for network load test
+    afcserver_get:
+        url: http://afcserver:8000/healthy
 
     # Rcache endpoint to use for network load test
     rcache_get:
@@ -470,7 +470,7 @@ rest_api:
     # Nginx endpoint to use for network load test
     dispatcher_get:
         url: http://dispatcher:80/fbrat/ratapi/v1/GetAfcConfigByRulesetID
-        code: 404
+        code: 403
 
 # Stuff for working with ratdb
 ratdb:
@@ -502,3 +502,5 @@ k3d_nodeports:
         https: 30443
     ratdb:
         http: 31432
+    afcserver:
+        http: 30084
