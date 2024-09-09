@@ -110,7 +110,8 @@ def main(argv: List[str]) -> None:
         execute(["helm", "uninstall", release] + cluster_context.helm_args())
         print(">> Waiting for uninstallation completion")
         wait_termination(what=release, cluster_context=cluster_context,
-                         uninstall_duration=Duration(args.wait))
+                         uninstall_duration=Duration(args.wait),
+                         services=["dispatcher"])
 
     if args.uninstall:
         return
