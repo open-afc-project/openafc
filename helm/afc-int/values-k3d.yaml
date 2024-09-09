@@ -33,6 +33,11 @@ staticVolumes:
       # Path better be overridden, type set to bypass creation if overridden
       path: /tmp
       type: DirectoryOrCreate
+  objst-storage:
+    hostPath:
+      # Path better be overridden, type set to bypass creation if overridden
+      path: /opt/afc/databases/storage
+      type: DirectoryOrCreate
 
 externalSecrets:
   image-pull: null
