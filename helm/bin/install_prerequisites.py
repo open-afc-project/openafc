@@ -382,7 +382,7 @@ class HelmInstallHandler(InstallHandler):
         for helm_setting in \
                 (getattr(self._component, "helm_settings", None) or []):
             helm_args += ["--set", helm_setting]
-        helm_args += (getattr(self._component, "args",None) or []) + \
+        helm_args += (getattr(self._component, "args", None) or []) + \
             Duration(getattr(self._component, "helm_wait", None)).\
             helm_timeout()
         return cast(bool, execute(helm_args, fail_on_error=False))
