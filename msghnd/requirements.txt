@@ -50,7 +50,7 @@ pyxdg==0.28
 PyYAML==6.0.1
 SQLAlchemy
 typeguard==2.13.3
-urllib3==1.26.18
+urllib3==1.26.19
 vine==5.0.0
 wcwidth==0.2.5
 Werkzeug==3.0.3
