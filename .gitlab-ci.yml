@@ -142,9 +142,13 @@ test_job:
   script:
     # get dev srvr port num
     - TEST_PORT=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 80 |sed 's/.*://'`
+    - TEST_PORT_HTTPS=`cd ${WD}/${REGRD} && TAG=${RAND} docker-compose port dispatcher 443 |sed 's/.*://'`
 
     # run tests
     - bash "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} $CI_HOST_HOSTNAME ${TEST_PORT} http
+
+    # run ngnx-rat_server-rmq-worker path tests
+    - bash "${WD}/${REGRD}/run_tests.sh" ${WD} rtest:${RAND} $CI_HOST_HOSTNAME ${TEST_PORT} http 8 "AFCS.SRS.1,AFCS.URS.1,AFCS.FSP.1,AFCS.IBP.1,AFCS.SIP.1,BRCM.EXT_FSP.1" "--webui"
   after_script:
     # stop dev srvr
     - bash "${WD}/${REGRD}/stop_srvr.sh" ${WD} ${RAND}
