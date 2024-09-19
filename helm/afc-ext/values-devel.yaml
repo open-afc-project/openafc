@@ -4,9 +4,8 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Allows dispatcher access log
+# Enables some development stuff
 
-components:
-  dispatcher:
-    env:
-      AFC_MSGHND_ACCESS_LOG: /proc/self/fd/2
+sharedEnv:
+  devel-env:
+    AFC_DEVEL_ENV: devel

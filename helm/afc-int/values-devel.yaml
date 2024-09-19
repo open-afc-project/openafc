@@ -4,7 +4,11 @@
 # This work is licensed under the OpenAFC Project License, a copy of which is
 # included with this software program.
 
-# Allows dispatcher access log
+# Enables development stuff in eligible containers
+
+sharedEnv:
+  devel-env:
+    AFC_DEVEL_ENV: devel
 
 components:
   dispatcher:

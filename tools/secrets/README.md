@@ -69,7 +69,7 @@ stringData:
 ```
 Note how YAML format allows to store JSON and YAML files in verbatim secrets section (`JSON_SECRET1.json`, `YAML_SECRET1.yam`).
 
-Keys of `data`/`stringData` sections are used as file names (in Kubernetes they also can be used as environment variables). One manifest may contain several keys, but for simplicity of management AFC uses one key per secrest manifest (several manifests may be stored in a single file, using `---` separator).
+Keys of `data`/`stringData` sections are used as file names (in Kubernetes they also can be used as environment variables). One manifest may contain several keys, but for simplicity of management AFC uses one key per secret manifest (several manifests may be stored in a single file, using `---` separator).
 
 This Kubernetes secret manifest format is used to store secrets (at least in Compose environment - Kubernetes storage mechanism may evolve towards something safer/more appropriate).
 

@@ -116,10 +116,10 @@ sharedEnv:
     RATAPIFILE_MAIL_PASSWORD: >-
       {{secretFile:ratapi-mail-password:optional}}
     MAIL_USERNAME: ""
-    MAIL_SERVER: ""
-    MAIL_PORT: ""
-    MAIL_USE_TLS: ""
-    MAIL_USE_SSL: ""
+    MAIL_SERVER: "smtp.gmail.com"
+    MAIL_PORT: "465"
+    MAIL_USE_TLS: "False"
+    MAIL_USE_SSL: "True"
     USE_CAPTCHA: ""
     RATAPIFILE_CAPTCHA_SECRET: >-
       {{secretFile:ratapi-captcha-secret:optional}}
@@ -169,6 +169,10 @@ sharedEnv:
     RCACHE_SERVICE_URL: "http://{{host:rcache}}:{{port:rcache:rcache}}"
     RCACHE_RMQ_DSN: >-
       amqp://rcache:rcache@{{host:rmq}}:{{port:rmq:amqp}}/rcache
+  # Setting AFC_DEVEL_ENV to 'devel' enables certain development options in
+  # certain containers
+  devel-env:
+    AFC_DEVEL_ENV: production
 
 # Dictionary of static (non-templated and non-secret) volume definitions.
 # Indexed by volume names
@@ -275,6 +279,8 @@ components:
   ratdb:
     imageName: ratdb-image
     imageRepositoryKey: public
+    sharedEnvKeys:
+      - devel-env
     ports:
       ratdb:
         servicePort: 5432
@@ -290,6 +296,8 @@ components:
     imageRepositoryKey: public
     service:
       loadBalancerIpKey: int-rmq
+    sharedEnvKeys:
+      - devel-env
     ports:
       amqp:
         servicePort: 5672
@@ -323,6 +331,9 @@ components:
     sharedEnvKeys:
       - objst-client
       - objst-common
+      - devel-env
+    mountedSecrets:
+      - server-cert
     ports:
       http:
         servicePort: 80
@@ -364,6 +375,7 @@ components:
       - als-client
       - rcache-client
       - rcache-common
+      - devel-env
     staticVolumeMounts:
       rat_transfer: /mnt/nfs/rat_transfer
       pipe: /pipe
@@ -412,6 +424,7 @@ components:
       - als-client
       - rcache-client
       - rcache-common
+      - devel-env
     mountedSecrets:
       - ratdb-password
       - flask-secret-key
@@ -462,6 +475,7 @@ components:
       - objst-client
       - objst-common
       - als-client
+      - devel-env
     mountedSecrets:
       - ratdb-password
       - rcache-db-password
@@ -497,6 +511,7 @@ components:
       - ratapi-configurator
       - oidc-configurator
       - objst-common
+      - devel-env
     staticVolumeMounts:
         objst-storage: /storage
     mountedSecrets:
@@ -538,6 +553,7 @@ components:
       - als-client
       - rcache-client
       - rcache-common
+      - devel-env
     staticVolumeMounts:
       rat_transfer: /mnt/nfs/rat_transfer
       pipe: /pipe
@@ -658,6 +674,7 @@ components:
     sharedEnvKeys:
       - rcache-client
       - rcache-common
+      - devel-env
     staticVolumeMounts:
       rat_transfer: /rat_transfer
     mountedSecrets:
@@ -678,6 +695,7 @@ components:
       - ratapi-configurator
       - oidc-configurator
       - als-client
+      - devel-env
     mountedSecrets:
       - ratdb-password
       - flask-secret-key
@@ -836,3 +854,19 @@ externalSecrets:
     property: OIDC_CLIENT_ID
   oidc-client-secret:
     property: OIDC_CLIENT_SECRET
+  server-cert:
+    data:
+      # Probably more logical solution could have been storing PKCS12 archive
+      # in remote store and unpacking it with External Secrets templating, but
+      # looks like it adds too much hassle (binary secret, password
+      # provisioning, etc.)
+      # Theoretically, using two separate external secrets for this secret may
+      # cause secret rotation race conditions problems, not sure this would be
+      # a problem in practice though
+      - secretKey: server.cert.pem
+        remoteRef:
+          key: server-cert-pem
+      - secretKey: server.key.pem
+        remoteRef:
+          key: server-key-pem
+    mountPath: /certificates/servers

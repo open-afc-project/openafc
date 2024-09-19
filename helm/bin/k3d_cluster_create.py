@@ -106,10 +106,9 @@ def main(argv: List[str]) -> None:
         f"subkey). Known nodeport names: "
         f"{', '.join(sorted(known_nodeports.keys()))}). For this to work "
         f"ports should also be exposed during helm installation (--expose "
-        f"switch of helm_install.py). HOST_PPORTn are unused host ports (if "
-        f"unspecified - some unused ports are chosen). Defaults may be found "
-        f"in script's config file. This parameter may be specified more than "
-        f"once")
+        f"switch of helm_install.py). HOST_PORTn are unused host ports (if "
+        f"unspecified - some unused ports are chosen). This parameter may be "
+        "specified more than once")
     argument_parser.add_argument(
         "--delete", action="store_true",
         help="Delete cluster if it is running. Not very logical, but makes "

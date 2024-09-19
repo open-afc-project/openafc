@@ -81,6 +81,10 @@ securityContexts:
 #    in another shared environment block. <IFABSENT> describes what to do if
 #    referred value is absent (see above for values)
 sharedEnv:
+  # Setting AFC_DEVEL_ENV to 'devel' enables certain development options in
+  # certain containers
+  devel-env:
+    AFC_DEVEL_ENV: production
 
 # Dictionary of components. Component roughly corresponds to Docker Compose
 # service. Keys in dictionary are Docker Compose service names, plus there is
@@ -164,6 +168,8 @@ components:
     service:
       type: LoadBalancer
       loadBalancerIpKey: ext-dispatcher
+    sharedEnvKeys:
+      - devel-env
     env:
       AFC_SERVER_NAME: _
       AFC_ENFORCE_HTTPS: "True"
