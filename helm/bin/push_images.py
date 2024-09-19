@@ -32,7 +32,7 @@ def main(argv: List[str]) -> None:
     argument_parser.add_argument(
         "--k3d_reg", metavar="[NAME][:PORT] or DEFAULT",
         help="Push images to k3d image registry - either explicitly specified "
-        "or the default (default is the only k3d registryt, running locally)")
+        "or the default (default is the only k3d registry, running locally)")
     argument_parser.add_argument(
         "--registry", metavar="PULL_REGISTRY",
         help="Image registry Kubernetes will pull images from")
